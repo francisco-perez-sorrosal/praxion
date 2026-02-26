@@ -27,7 +27,7 @@ Spawn agents without waiting for the user to ask:
 - Plan ready --> `implementer`; implementation complete --> `verifier`
 - Context artifacts stale/conflicting or plan touches them --> `context-engineer` (parallel with `researcher`/`systems-architect`)
 - Ecosystem health or regression check --> `sentinel`; stale check: `.ai-state/SENTINEL_LOG.md` vs `git log -1 --format=%ci`
-- Files added/removed/renamed or catalogs need updates --> `doc-engineer`
+- Documentation impact likely --> `doc-engineer` (in background): feature planned in area with existing docs, implementation or refactoring complete, files added/removed/renamed, new public API or interface
 - Pipeline complete + LEARNINGS.md has content --> `skill-genesis`
 
 **Depth check:** Before spawning an agent recommended by another agent's output, confirm with the user if doing so would create a chain of 3+ agents from the original request.
@@ -41,6 +41,7 @@ Agents communicate through shared documents, not direct invocation.
 ```text
 promethean --> researcher --> systems-architect --> implementation-planner --> implementer --> verifier
                                                                      context-engineer (any stage)
+                                                                     doc-engineer (pipeline checkpoints)
                                                                      sentinel (independent audit)
 ```
 
@@ -50,6 +51,7 @@ promethean --> researcher --> systems-architect --> implementation-planner --> i
 - **Context-engineer** collaborates at any pipeline stage for context artifact work. Also operates independently for standalone audits.
 - **Sentinel** is independent. Reports (`SENTINEL_REPORT_*.md`) are public -- any agent or user can consume them. Promethean may read them for ideation (its choice, not a pipeline handoff).
 - Small-scope context work (single artifact) --> context-engineer directly; large-scope (3+) --> full pipeline.
+- **Doc-engineer** is a proactive pipeline participant, not a cleanup agent. Invoke at natural checkpoints: after planning (assess documentation scope), after implementation (update affected docs), after refactoring (sync docs with structural changes). Runs in background when independent of other pipeline stages.
 
 ### Boundary Discipline
 
@@ -62,7 +64,7 @@ promethean --> researcher --> systems-architect --> implementation-planner --> i
 | Context Engineer | Manages information architecture, implements context artifacts | Implement features |
 | Implementer | Receives and implements steps | Plan, skip, reorder steps |
 | Verifier | Identifies issues, recommends actions | Fix issues |
-| Doc-engineer | Maintains project documentation | Manage context artifacts |
+| Doc-engineer | Proactively maintains project documentation at pipeline checkpoints | Manage context artifacts |
 | Sentinel | Diagnoses and reports across ecosystem | Fix artifacts |
 | Skill-Genesis | Triages learnings into artifact proposals, delegates creation | Ideate features, audit ecosystem, create artifacts |
 | CI/CD Engineer | Designs and writes CI/CD pipelines, optimizes and debugs workflows | Modify application code, manage infrastructure |
@@ -78,7 +80,7 @@ Use an agent when the task benefits from a separate context window (large scope,
 | Multi-source research, architecture 3+ components, large feature decomposition | Agent |
 | Ecosystem audit or 3+ context artifacts | `context-engineer` or `sentinel` |
 | Post-implementation quality review | `verifier` |
-| Documentation audit or cross-reference fixes | `doc-engineer` |
+| Documentation scope assessment, post-implementation doc updates, cross-reference fixes | `doc-engineer` |
 | Feature-level ideation from project state | `promethean` |
 | Post-pipeline learning harvest or 3+ accumulated LEARNINGS.md entries | `skill-genesis` |
 
@@ -100,6 +102,7 @@ Launch independent agents concurrently whenever possible.
 | Multiple independent research questions | One agent's output feeds the next (pipeline dependency) |
 | Separate codebase areas needing analysis | Two agents analyzing and modifying the same files |
 | Context audit alongside development planning | |
+| Doc-engineer alongside implementer or verifier | |
 | N same-type agents on disjoint work units (see Intra-Stage Parallelism) | Same-type agents whose file sets overlap |
 | Context-engineer alongside researcher or systems-architect | |
 
@@ -138,6 +141,17 @@ For high-risk decisions, use parallel agents with distinct lenses: **correctness
 | Verification | N/A (verifier checks code, not context artifacts) | Verifier finds planned context updates were skipped --> routes to context-engineer |
 
 **Scale:** Single artifact --> context-engineer directly. 3+ artifacts or restructuring --> full pipeline under planner supervision.
+
+### Doc-Engineer Pipeline Engagement
+
+| Stage | Role | Trigger |
+|-------|------|---------|
+| Planning | Assess existing documentation in the affected area; flag docs that will need updates | Plan touches area with README, catalog, or architecture docs |
+| Implementation | Update affected READMEs, catalogs, changelogs after code changes | Implementation adds, removes, or renames files; new public APIs or interfaces |
+| Refactoring | Sync documentation with structural changes | Refactoring moves, renames, or reorganizes modules or directories |
+| Verification | N/A (verifier checks code) | Verifier finds documentation updates were planned but not executed --> routes to doc-engineer |
+
+**Timing:** Runs in background parallel with other agents when its work is independent. Post-implementation documentation updates can run alongside the verifier.
 
 ### Interaction Reporting
 

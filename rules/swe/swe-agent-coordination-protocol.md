@@ -12,6 +12,7 @@ Conventions for when and how to use the available software agents -- autonomous 
 | `implementation-planner` | Step decomposition, execution supervision | `IMPLEMENTATION_PLAN.md`, `WIP.md`, `LEARNINGS.md` | Yes |
 | `context-engineer` | Context artifact domain expert; any pipeline stage | Audit report + artifact changes | Yes |
 | `implementer` | Executes implementation steps with self-review | Code changes + `WIP.md` update | Yes |
+| `test-engineer` | Dedicated testing: complex test design, test suite refactoring, testing infrastructure | Test code + `WIP.md` update | Yes |
 | `verifier` | Post-implementation review against acceptance criteria | `VERIFICATION_REPORT.md` | Yes |
 | `doc-engineer` | Documentation quality (READMEs, catalogs, changelogs) | Doc report or file fixes | Yes |
 | `sentinel` | Read-only ecosystem auditor (independent, not a pipeline stage) | `SENTINEL_REPORT_*.md`, `SENTINEL_LOG.md` | Yes |
@@ -24,7 +25,7 @@ Spawn agents without waiting for the user to ask:
 
 - Complex feature --> `researcher` then `systems-architect` (skip researcher if codebase context suffices)
 - Architecture approved --> `implementation-planner`; resuming work --> same agent to re-assess `WIP.md`
-- Plan ready --> `implementer`; implementation complete --> `verifier`
+- Plan ready --> `implementer`; dedicated testing steps --> `test-engineer`; implementation complete --> `verifier`
 - Context artifacts stale/conflicting or plan touches them --> `context-engineer` (parallel with `researcher`/`systems-architect`)
 - Ecosystem health or regression check --> `sentinel`; stale check: `.ai-state/SENTINEL_LOG.md` vs `git log -1 --format=%ci`
 - Documentation impact likely --> `doc-engineer` (in background): feature planned in area with existing docs, implementation or refactoring complete, files added/removed/renamed, new public API or interface
@@ -39,7 +40,7 @@ Spawn agents without waiting for the user to ask:
 Agents communicate through shared documents, not direct invocation.
 
 ```text
-promethean --> researcher --> systems-architect --> implementation-planner --> implementer --> verifier
+promethean --> researcher --> systems-architect --> implementation-planner --> implementer / test-engineer --> verifier
                                                                      context-engineer (any stage)
                                                                      doc-engineer (pipeline checkpoints)
                                                                      sentinel (independent audit)
@@ -63,6 +64,7 @@ promethean --> researcher --> systems-architect --> implementation-planner --> i
 | Planner | Decomposes and supervises | Redesign |
 | Context Engineer | Manages information architecture, implements context artifacts | Implement features |
 | Implementer | Receives and implements steps | Plan, skip, reorder steps |
+| Test-Engineer | Designs, writes, and refactors test suites | Write production code, modify plans |
 | Verifier | Identifies issues, recommends actions | Fix issues |
 | Doc-engineer | Proactively maintains project documentation at pipeline checkpoints | Manage context artifacts |
 | Sentinel | Diagnoses and reports across ecosystem | Fix artifacts |
@@ -79,6 +81,7 @@ Use an agent when the task benefits from a separate context window (large scope,
 |-----------|-----|
 | Multi-source research, architecture 3+ components, large feature decomposition | Agent |
 | Ecosystem audit or 3+ context artifacts | `context-engineer` or `sentinel` |
+| Complex test design, test suite refactoring, testing infrastructure setup | `test-engineer` |
 | Post-implementation quality review | `verifier` |
 | Documentation scope assessment, post-implementation doc updates, cross-reference fixes | `doc-engineer` |
 | Feature-level ideation from project state | `promethean` |
@@ -117,11 +120,11 @@ Multiple instances of the same agent type can run concurrently on disjoint work 
 3. Each instance reports independently
 4. Main agent reviews all outputs for coherence
 
-**Planner-supervised** (implementer under implementation-planner):
+**Planner-supervised** (implementer/test-engineer under implementation-planner):
 
 1. Planner prepares `WIP.md` in parallel mode with per-step assignees and file lists
-2. Main agent spawns N implementer agents with `isolation: "worktree"`, each assigned one step
-3. Each implementer updates only its own step status in `WIP.md`
+2. Main agent spawns N implementer or test-engineer agents with `isolation: "worktree"`, each assigned one step
+3. Each agent updates only its own step status in `WIP.md`
 4. After all report back, planner runs coherence review (re-reads modified files, verifies integration, merges learnings)
 
 **Conflict avoidance:** Before spawning parallel instances, verify file disjointness across all work units. If an agent needs a file outside its declared set, it stops and reports `[CONFLICT]`.

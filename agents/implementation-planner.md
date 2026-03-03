@@ -77,6 +77,17 @@ Break the architecture into incremental implementation steps.
 - Happy path before error handling
 - Each step leaves the system in a working state
 
+**Package/module structure discipline:**
+
+New code must land in meaningful, well-scoped packages and modules — not dumped into existing catch-all files. During decomposition:
+
+- **Design the module layout first** — before writing step details, decide where each new concept lives. The directory tree should read like a table of contents: a reader scanning package names should understand what the system does without opening any file.
+- **One responsibility per module** — if a step introduces a new concern (validation, persistence, a domain concept), it gets its own module, not a section in an existing one.
+- **Avoid `utils`/`helpers`/`common`** — these are symptoms of unclear ownership. Every function belongs to a domain concept; find it.
+- **Include module creation as explicit steps** — creating `payments/refund_policy.py` with its interface is a step, not an afterthought inside "implement refunds."
+- **Name modules for domain concepts, not technical layers** — `order_fulfillment`, not `service2`; `pricing_rules`, not `business_logic`.
+- **Post-refactoring re-wiring** — when steps restructure existing code, include explicit verification that all consumers are reconnected and dead code is removed (see the refactoring skill's verification checklist).
+
 **Step validation** — every step must be describable in one sentence, leave the system working, be independently testable, have clear done criteria, fit in a single commit, and include a `Files` field. Validate against the known-good increment criteria in the software-planning skill for full details.
 
 **If you can't describe a step in one sentence, break it down further.**

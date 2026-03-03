@@ -110,12 +110,16 @@ project/
 
 If tests fail after a change, revert and try a smaller step.
 
-### 4. Verify and Clean Up
+### 4. Verify Re-Wiring and Clean Up
 
-- All tests pass
-- No dead code left behind
-- Imports are clean
-- Run a final check: does each module have a single clear purpose?
+After restructuring, systematically verify that **every consumer** of the changed code is correctly reconnected:
+
+- **Trace all call sites**: Search for every reference to moved/renamed/extracted code — imports, function calls, type references, configuration entries
+- **Verify integration points**: Run the full test suite, not just unit tests for the changed modules — integration and end-to-end tests catch broken wiring that unit tests miss
+- **Check indirect consumers**: Templates, config files, CLI entry points, plugin registrations, dependency injection containers — anything that references code by name or path
+- **Remove dead code**: Delete unused imports, orphaned functions, abandoned classes, and stale configuration that the refactoring made obsolete — don't leave corpses behind
+- **Clean up transitional scaffolding**: Remove compatibility shims, re-exports, and forwarding functions that were only needed during the transition
+- **Final sweep**: `grep`/search for old names, old paths, old module references — if anything still points to pre-refactoring locations, it's a bug
 
 ## Decision Framework
 
@@ -212,11 +216,14 @@ class ShoppingCart {
 
 Before committing refactoring:
 
-- [ ] All tests pass
+- [ ] All tests pass (unit, integration, and end-to-end)
 - [ ] No behavior changes
+- [ ] All call sites re-wired — no references to old names, paths, or modules
+- [ ] Indirect consumers updated (config, templates, CLI entry points, DI registrations)
 - [ ] Coupling reduced or unchanged
 - [ ] Cohesion improved
-- [ ] No dead code remains
+- [ ] No dead code remains — orphaned functions, classes, and imports deleted
+- [ ] No transitional scaffolding left (compatibility shims, re-exports, forwarding functions)
 - [ ] Imports are clean
 - [ ] Each module has clear purpose
 - [ ] Can explain why each change improves design

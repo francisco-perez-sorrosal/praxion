@@ -62,6 +62,8 @@ The refactoring phase is complete when:
 
 - [ ] All refactoring steps are committed
 - [ ] No behavior changes — same tests, same results
+- [ ] All consumers re-wired — every call site, import, config entry, and indirect reference points to the new locations
+- [ ] Dead code cleaned up — orphaned functions, stale imports, compatibility shims, and transitional scaffolding removed
 - [ ] The structural obstacle that motivated the phase is resolved
 - [ ] The codebase is ready for the feature steps that follow
 

@@ -6,7 +6,7 @@ description: >
   when the user needs to understand a technology, evaluate options, investigate
   a codebase area, or gather context before architectural or implementation
   decisions.
-tools: Read, Glob, Grep, Bash, WebSearch, WebFetch
+tools: Read, Glob, Grep, Bash, WebSearch, WebFetch, Write
 skills: claude-ecosystem
 permissionMode: default
 memory: user

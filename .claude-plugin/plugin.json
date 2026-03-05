@@ -61,7 +61,6 @@
     "./agents/test-engineer.md",
     "./agents/sentinel.md",
     "./agents/skill-genesis.md",
-    "./agents/cicd-engineer.md",
-    "./agents/test-engineer.md"
+    "./agents/cicd-engineer.md"
   ]
 }

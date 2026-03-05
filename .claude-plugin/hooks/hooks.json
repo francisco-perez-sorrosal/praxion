@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/send_event.py",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/send_event.py",
             "timeout": 10,
             "async": true
           }
@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/send_event.py",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/send_event.py",
             "timeout": 10,
             "async": true
           }
@@ -32,7 +32,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/send_event.py",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/send_event.py",
             "timeout": 10,
             "async": true
           }

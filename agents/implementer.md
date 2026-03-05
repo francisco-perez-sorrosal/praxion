@@ -60,12 +60,13 @@ For your assigned step:
 1. **Understand scope** — read the step's Implementation and Done when fields. Identify the files you will create or modify. If in parallel mode, verify your step's `Files` field does not overlap with other concurrent steps.
 2. **Read existing code** — before modifying any file, read it first. Understand the patterns, conventions, and structure already in place.
 3. **Implement** — write the code described in the step. Follow existing patterns and conventions. Keep changes focused on the step's scope.
-4. **Format and lint** — after implementation, run all project formatters and linters in fix mode to auto-correct style and lint violations. Detect tools from config files (`pyproject.toml`, `package.json`, `.prettierrc`, etc.) and run them. Common examples: `ruff format && ruff check --fix` (Python), `prettier --write && eslint --fix` (JS/TS), `rustfmt` (Rust), `gofmt` (Go). Fix any remaining violations that auto-fix cannot resolve.
-5. **Run tests** — execute tests or validation commands specified in the step's Testing field. If no testing field exists, run available project-level checks (e.g., `pytest`, `mypy`, `tsc --noEmit`). For **integration checkpoint steps**: run the full test suite (new behavioral tests from the test-engineer + all pre-existing tests). Fix any test failures — adjust production code for new test failures, fix pre-existing tests broken by your changes (boy scout rule). Iterate until all tests pass.
-6. **Self-review** — check your changes against the coding-style conventions (see below).
-7. **Update WIP.md** — mark your step as complete (see WIP.md Update Protocol).
-8. **Update LEARNINGS.md** — record any discoveries (see LEARNINGS.md Protocol).
-9. **Report** — stop and report one of: `[COMPLETE]`, `[BLOCKED]`, or `[CONFLICT]`.
+4. **Format and lint** — run the project's formatters and linters in fix mode on the files you changed. Detect tools from project config files. Consult the loaded language skill for specific tools and commands. Fix any violations that auto-fix cannot resolve.
+5. **Type check** — run the project's type checker if one is configured.
+6. **Run tests** — execute tests or validation commands specified in the step's Testing field. If no testing field exists, run available project-level test commands. For **integration checkpoint steps**: run the full test suite (new behavioral tests from the test-engineer + all pre-existing tests). Fix any test failures — adjust production code for new test failures, fix pre-existing tests broken by your changes (boy scout rule). Iterate until all tests pass.
+7. **Self-review** — check your changes against the coding-style conventions (see below).
+8. **Update WIP.md** — mark your step as complete (see WIP.md Update Protocol).
+9. **Update LEARNINGS.md** — record any discoveries (see LEARNINGS.md Protocol).
+10. **Report** — stop and report one of: `[COMPLETE]`, `[BLOCKED]`, or `[CONFLICT]`.
 
 ## Self-Review
 
@@ -143,7 +144,7 @@ Record anything that would help future steps: unexpected file structures, gotcha
 At each phase transition, append a single line to `.ai-work/PROGRESS.md` (create the file and `.ai-work/` directory if they do not exist):
 
 ```
-[TIMESTAMP] [implementer] Phase N/9: [phase-name] -- [one-line summary of what was done or found]
+[TIMESTAMP] [implementer] Phase N/10: [phase-name] -- [one-line summary of what was done or found]
 ```
 
 Write the line immediately upon entering each new phase. Include optional hashtag labels at the end for categorization (e.g., `#observability #feature=auth`).

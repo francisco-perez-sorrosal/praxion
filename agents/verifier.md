@@ -78,6 +78,8 @@ Apply the `code-review` skill's review workflow:
 
 Convention checks (derived from `coding-style` rule):
 
+- Formatting and linting (verify formatters and linters were applied — no unformatted code or lint violations in changed files)
+- Type checking (verify type checker passes on changed files, if configured)
 - Function size (target 30 lines, ceiling 50)
 - File size (target 200-400, ceiling 800)
 - Nesting depth (maximum 4 levels)

@@ -10,9 +10,17 @@ Language-independent structural and design conventions for writing and reviewing
 - Natural line breaks unless the surrounding code is wrapped at a specific column
 - Trailing newline in all files
 
+### Formatting and Linting
+
+Every code change must pass the project's formatters and linters before commit. This is non-negotiable — format and lint in fix mode after writing code, before running tests.
+
+**Universal workflow:** format → lint (fix mode) → type check → test. Detect tools from project config files (`pyproject.toml`, `package.json`, `Cargo.toml`, `go.mod`, `.prettierrc`, etc.). Run them on the files you changed. Fix any violations that auto-fix cannot resolve.
+
+Language-specific tool choices and configuration belong in each language's skill (e.g., `ruff` for Python, `prettier`/`eslint` for JS/TS). This rule defines the principle; skills define the tools.
+
 ### Language-Specific Style
 
-Formatting, linting rules, and language idioms belong to each language's toolchain — not here. Delegate to the appropriate tools (e.g., `ruff`/`black` for Python, `prettier` for JS/TS, `rustfmt` for Rust, `gofmt` for Go). This rule covers structural and design conventions that transcend any single language.
+Formatting, linting rules, and language idioms belong to each language's toolchain — not here. This rule covers structural and design conventions that transcend any single language.
 
 ### Immutability
 

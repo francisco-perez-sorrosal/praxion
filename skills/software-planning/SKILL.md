@@ -54,7 +54,7 @@ When planning work in a specific language or tech stack, load the relevant **con
 
 - **PLAN.md**: Add a `Tech Stack` field linking to the relevant context and skills
 - **Step templates**: Use language-specific templates for common step types (new module, add dependency, etc.)
-- **Quality gates**: Run language-specific checks (linter, type checker, tests) before each commit
+- **Quality gates**: Run language-specific format → lint → type check → test before each commit
 - **Testing field**: Choose testing approach based on language-specific patterns
 
 If no context exists for your language, use the generic planning workflow and reference language-specific documentation directly.
@@ -148,12 +148,13 @@ Each step MUST:
 
 After completing a step:
 
-1. Verify system is in working state
-2. Run relevant tests if they exist
-3. Verify static analysis passes
-4. Update WIP.md with progress
-5. Capture any learnings in LEARNINGS.md
-6. **STOP and ask**: "Ready to commit [description]. Approve?"
+1. Verify formatters and linters pass (fix mode already applied)
+2. Verify type checker passes (if configured)
+3. Run relevant tests if they exist
+4. Verify system is in working state
+5. Update WIP.md with progress
+6. Capture any learnings in LEARNINGS.md
+7. **STOP and ask**: "Ready to commit [description]. Approve?"
 
 Only proceed with commit after explicit approval.
 
@@ -223,7 +224,7 @@ START: Create PLAN.md (get approval) + WIP.md + LEARNINGS.md
 FOR EACH STEP:
   1. Update WIP.md (IMPLEMENTING)
   2. Write implementation + tests (if critical)
-  3. Verify system works, run quality checks
+  3. Format → lint (fix mode) → type check → test
   4. Capture learnings, update WIP.md (WAITING)
   5. WAIT FOR COMMIT APPROVAL
 
@@ -295,10 +296,11 @@ The `implementation-planner` agent uses this skill directly for step decompositi
 
 ### Checklist Before Commit Approval
 
-- [ ] System is in working state
+- [ ] Formatters and linters pass (fix mode already applied)
+- [ ] Type checker passes (if configured)
 - [ ] Relevant tests pass (if tests exist)
-- [ ] Static analysis passes
 - [ ] Language-specific quality gates pass (see [Language Context](#language-context))
+- [ ] System is in working state
 - [ ] WIP.md reflects current state
 - [ ] Learnings captured if any
 - [ ] Can describe change in one sentence

@@ -130,10 +130,11 @@ Write the tests following these structural rules:
 
 ### Phase 4 — Format, Lint, and Validate
 
-1. Run all project formatters and linters in fix mode on test files
-2. Verify test files are syntactically valid and importable
-3. If production code exists (sequential mode or post-integration), run the full test suite. If production code does not exist yet (concurrent mode), verify tests are structurally sound — they are expected to fail at the integration checkpoint
-4. If a failure reveals a test design issue, fix it. If it reveals a production code bug, document it in LEARNINGS.md and report `[BLOCKED]`
+1. Run the project's formatters and linters in fix mode on the test files you wrote. Detect tools from project config files. Consult the loaded language skill for specific tools and commands. Fix any violations that auto-fix cannot resolve.
+2. Run the project's type checker on test files if one is configured.
+3. Verify test files are syntactically valid and importable.
+4. If production code exists (sequential mode or post-integration), run the full test suite. If production code does not exist yet (concurrent mode), verify tests are structurally sound — they are expected to fail at the integration checkpoint.
+5. If a failure reveals a test design issue, fix it. If it reveals a production code bug, document it in LEARNINGS.md and report `[BLOCKED]`.
 
 ### Phase 5 — Self-Review
 

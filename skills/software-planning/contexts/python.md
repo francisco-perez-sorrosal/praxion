@@ -29,8 +29,8 @@ When a plan involves creating or initializing a Python project, include an early
 Every plan step that produces code should pass these checks before requesting commit approval. Use `<tool>` as placeholder for your package manager (pixi or uv).
 
 ```bash
-<tool> run ruff check .          # Lint
-<tool> run ruff format --check . # Format check
+<tool> run ruff format .         # Format (fix mode)
+<tool> run ruff check --fix .    # Lint (fix mode)
 <tool> run mypy src/             # Type check (or pyright)
 <tool> run pytest                # Tests
 ```

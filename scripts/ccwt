@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+# ccwt — Claude Code Worktrees
+#
+# Opens a tmux session with one pane per git worktree, each running claude.
+#
+# Usage:
+#   ccwt <project>           # project under $HOME/dev/
+#   ccwt /absolute/path      # explicit project path
+#   ccwt <project> --list    # list worktrees without launching
+#   ccwt <project> --kill    # kill existing session
+#   ccwt --help
+
+set -eo pipefail
+
+DEV_DIR="${CCWT_DEV_DIR:-$HOME/dev}"
+
+# --- Helpers ----------------------------------------------------------------
+
+die() { printf "ccwt: %s\n" "$*" >&2; exit 1; }
+
+show_usage() {
+    cat <<'EOF'
+Usage: ccwt <project> [--list | --kill]
+       ccwt /path/to/project [--list | --kill]
+
+Opens a tmux session with one pane per git worktree, each running `claude`.
+
+Options:
+  --list    List worktrees and exit
+  --kill    Kill existing tmux session for project
+  --help    Show this help
+
+Environment:
+  CCWT_DEV_DIR   Base directory for projects (default: $HOME/dev)
+
+Examples:
+  ccwt ai-assistants          # open all worktrees in $HOME/dev/ai-assistants
+  ccwt ai-assistants --list   # just list the worktrees
+  ccwt /tmp/my-repo           # use absolute path
+EOF
+    exit 0
+}
+
+# --- Argument parsing -------------------------------------------------------
+
+PROJECT=""
+ACTION="launch"
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --help|-h) show_usage ;;
+        --list)    ACTION="list" ;;
+        --kill)    ACTION="kill" ;;
+        -*)        die "Unknown option: $1. Use --help for usage." ;;
+        *)
+            [ -n "$PROJECT" ] && die "Too many arguments. Use --help for usage."
+            PROJECT="$1"
+            ;;
+    esac
+    shift
+done
+
+[ -z "$PROJECT" ] && die "Missing project name. Use --help for usage."
+
+# Resolve project directory
+if [[ "$PROJECT" = /* ]]; then
+    PROJECT_DIR="$PROJECT"
+else
+    PROJECT_DIR="${DEV_DIR}/${PROJECT}"
+fi
+
+PROJECT_NAME="$(basename "$PROJECT_DIR")"
+SESSION="cc-${PROJECT_NAME}"
+
+[ -d "$PROJECT_DIR" ] || die "Directory not found: $PROJECT_DIR"
+
+# Verify it's a git repo
+if [ ! -d "$PROJECT_DIR/.git" ] && [ ! -f "$PROJECT_DIR/.git" ]; then
+    die "Not a git repository: $PROJECT_DIR"
+fi
+
+# --- Worktree discovery -----------------------------------------------------
+
+discover_worktrees() {
+    git -C "$PROJECT_DIR" worktree list --porcelain \
+        | grep '^worktree ' \
+        | cut -d' ' -f2-
+}
+
+mapfile -t WORKTREES < <(discover_worktrees)
+
+if [ ${#WORKTREES[@]} -eq 0 ]; then
+    die "No worktrees found in $PROJECT_DIR"
+fi
+
+# --- Actions ----------------------------------------------------------------
+
+case "$ACTION" in
+    list)
+        printf "Worktrees for %s (%d):\n" "$PROJECT_NAME" "${#WORKTREES[@]}"
+        for wt in "${WORKTREES[@]}"; do
+            branch=$(git -C "$wt" branch --show-current 2>/dev/null || echo "detached")
+            printf "  %s  [%s]\n" "$wt" "$branch"
+        done
+        exit 0
+        ;;
+
+    kill)
+        if tmux has-session -t "$SESSION" 2>/dev/null; then
+            tmux kill-session -t "$SESSION"
+            printf "Killed session: %s\n" "$SESSION"
+        else
+            printf "No active session: %s\n" "$SESSION"
+        fi
+        exit 0
+        ;;
+
+    launch)
+        # Preflight
+        command -v tmux &>/dev/null || die "tmux not found. Install: brew install tmux"
+        command -v claude &>/dev/null || die "claude CLI not found. Install: https://docs.anthropic.com/en/docs/claude-code"
+
+        # Reuse existing session if running
+        if tmux has-session -t "$SESSION" 2>/dev/null; then
+            printf "Attaching to existing session: %s\n" "$SESSION"
+            exec tmux attach -t "$SESSION"
+        fi
+
+        # Create session with first worktree
+        tmux new-session -d -s "$SESSION" -c "${WORKTREES[0]}"
+        tmux send-keys -t "$SESSION" "claude" C-m
+
+        # Add panes for remaining worktrees
+        for ((i = 1; i < ${#WORKTREES[@]}; i++)); do
+            tmux split-window -t "$SESSION" -c "${WORKTREES[$i]}"
+            tmux send-keys -t "$SESSION" "claude" C-m
+            tmux select-layout -t "$SESSION" tiled
+        done
+
+        printf "Session '%s' created with %d pane(s)\n" "$SESSION" "${#WORKTREES[@]}"
+        exec tmux attach -t "$SESSION"
+        ;;
+esac

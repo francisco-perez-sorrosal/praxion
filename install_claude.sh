@@ -234,6 +234,37 @@ EOF
     return 0
 }
 
+# =============================================================================
+# CLI scripts (~/.local/bin/)
+# =============================================================================
+
+install_scripts() {
+    local scripts_src="${SCRIPT_DIR}/scripts"
+    local bin_dir="${HOME}/.local/bin"
+
+    header "Step 5 — CLI Scripts"
+
+    if [ ! -d "$scripts_src" ] || [ -z "$(ls -A "$scripts_src" 2>/dev/null)" ]; then
+        step "No scripts to install"
+        return
+    fi
+
+    mkdir -p "$bin_dir"
+
+    for script in "$scripts_src"/*; do
+        [ -f "$script" ] || continue
+        local name
+        name="$(basename "$script")"
+        link_item "$script" "${bin_dir}/${name}" "${name} → ~/.local/bin/"
+    done
+
+    # Check PATH
+    if [[ ":$PATH:" != *":${bin_dir}:"* ]]; then
+        warn "~/.local/bin is not in PATH"
+        step "Add to ~/.zshrc:  export PATH=\"\$HOME/.local/bin:\$PATH\""
+    fi
+}
+
 install_plugin_permissions() {
     local settings_file="${HOME}/.claude/settings.json"
 
@@ -346,7 +377,7 @@ get_claude_desktop_config_dir() {
 }
 
 prompt_claude_desktop_link() {
-    header "Step 5 — Claude Desktop"
+    header "Step 6 — Claude Desktop"
     cat <<EOF
 
   ${B}[1] Skip${R}
@@ -448,6 +479,20 @@ check_claude_code() {
         healthy=false
     fi
 
+    printf "\n  ${B}Scripts:${R}\n"
+    local bin_dir="${HOME}/.local/bin"
+    for script in "${SCRIPT_DIR}/scripts"/*; do
+        [ -f "$script" ] || continue
+        local name
+        name="$(basename "$script")"
+        if [ -L "${bin_dir}/${name}" ] && [ "$(readlink "${bin_dir}/${name}")" = "$script" ]; then
+            info "${name} linked"
+        else
+            warn "${name} not linked to ~/.local/bin/"
+            healthy=false
+        fi
+    done
+
     printf "\n  ${B}Hooks:${R}\n"
     local settings_file="${HOME}/.claude/settings.json"
     if [ -f "$settings_file" ] && python3 -c "
@@ -538,6 +583,18 @@ uninstall_claude_code() {
             || warn "Plugin removal failed"
     fi
 
+    # Remove scripts
+    local bin_dir="${HOME}/.local/bin"
+    for script in "${SCRIPT_DIR}/scripts"/*; do
+        [ -f "$script" ] || continue
+        local name
+        name="$(basename "$script")"
+        if [ -L "${bin_dir}/${name}" ] && [ "$(readlink "${bin_dir}/${name}")" = "$script" ]; then
+            rm "${bin_dir}/${name}"
+            info "Removed ${name} from ~/.local/bin/"
+        fi
+    done
+
     # Remove hooks
     local settings_file="${HOME}/.claude/settings.json"
     if [ -f "$settings_file" ]; then
@@ -590,6 +647,7 @@ install_claude_code() {
         prompt_hooks_install
     fi
 
+    install_scripts
     prompt_claude_desktop_link
 
     printf "\n"
@@ -625,6 +683,10 @@ dry_run_claude_code() {
     done
     printf "\n  ${B}Agents:${R}\n"
     find "${SCRIPT_DIR}/agents" -name '*.md' -type f ! -name 'README.md' 2>/dev/null | sed 's|.*/||;s|\.md$||' | sed 's/^/    /' || step "(none)"
+    printf "\n  ${B}Scripts:${R}\n"
+    for script in "${SCRIPT_DIR}/scripts"/*; do
+        [ -f "$script" ] && printf "    %s\n" "$(basename "$script")"
+    done
     printf "\n"
 }
 

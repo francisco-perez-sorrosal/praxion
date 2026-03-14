@@ -13,8 +13,9 @@ A walkthrough of developing a small application using the ai-assistants agent pi
 Agents communicate through documents in `.ai-work/`, not through direct invocation. Each agent reads upstream documents and writes its own, forming a chain:
 
 ```
-promethean ──► researcher ──► systems-architect ──► implementation-planner ──► implementer    ──► verifier
-                                                                               test-engineer
+promethean ──► researcher ────────► systems-architect ──► implementation-planner ──► implementer    ──► verifier
+               + context-engineer   + context-engineer                               test-engineer
+                 (shadow)             (shadow)                                       doc-engineer (when assigned)
 ```
 
 You drive the pipeline by telling Claude what you need. It delegates to the right agent based on context. You can also name agents explicitly.
@@ -93,9 +94,9 @@ The planner reads `SYSTEMS_PLAN.md` and writes three documents:
 
 Steps are paired: each implementation step has a matching test step. The planner assigns them to run concurrently on disjoint file sets (production code vs test code).
 
-### Step 5: Implementation (implementer + test-engineer)
+### Step 5: Implementation (implementer + test-engineer + doc-engineer)
 
-The planner delegates steps to two agents that run in parallel:
+The planner delegates steps to agents that run in parallel:
 
 ```
 Implement the next step from the plan.
@@ -103,8 +104,9 @@ Implement the next step from the plan.
 
 - **implementer** — writes production code for one step, runs format/lint/typecheck/test, self-reviews, marks the step complete in `WIP.md`
 - **test-engineer** — writes behavioral tests from acceptance criteria (not from the production code), runs them, reports status
+- **doc-engineer** — when the planner assigns a doc step (files added/removed/renamed, new APIs), updates affected documentation concurrently
 
-After both complete, an integration checkpoint runs the full test suite. Failing tests trigger a fix cycle until everything passes.
+After all agents complete, an integration checkpoint runs the full test suite. Failing tests trigger a fix cycle until everything passes.
 
 Each step = one logical change. The implementer stops after completing its assigned step.
 
@@ -162,8 +164,8 @@ These agents operate alongside the main pipeline:
 
 | Agent | When to use | Example prompt |
 |-------|-------------|----------------|
-| **context-engineer** | Modifying skills, rules, commands, or CLAUDE.md | "Audit the project's context artifacts" |
-| **doc-engineer** | Documentation needs updating after changes | "Update the README to reflect the new feature" |
+| **context-engineer** | Modifying skills, rules, commands, or CLAUDE.md. Automatically shadows researcher/architect stages when work involves context artifacts | "Audit the project's context artifacts" |
+| **doc-engineer** | Documentation needs updating after changes. Runs in parallel during implementation when the planner assigns doc steps | "Update the README to reflect the new feature" |
 | **sentinel** | Ecosystem health check | "Run a sentinel audit" |
 | **skill-genesis** | After a pipeline run, harvest learnings into reusable artifacts | "Harvest learnings from the last implementation" |
 | **cicd-engineer** | Setting up CI/CD | "Create a GitHub Actions workflow for this project" |

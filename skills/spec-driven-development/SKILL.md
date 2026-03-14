@@ -21,7 +21,7 @@ Behavioral specifications bridge architecture and implementation by giving each 
 
 ## Complexity Triage
 
-Classify every task before deciding whether to produce a behavioral specification. The classification determines spec depth and pipeline overhead.
+Classify every task before deciding whether to produce a behavioral specification. This triage refines SDD depth within the Standard and Full tiers of the [process calibration](../../rules/swe/swe-agent-coordination-protocol.md#process-calibration) — it governs how much specification to produce, not whether to use agents or planning documents.
 
 | Tier | Signals | Spec Depth |
 |------|---------|------------|

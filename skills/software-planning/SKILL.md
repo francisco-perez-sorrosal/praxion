@@ -205,6 +205,8 @@ Only proceed with commit after explicit approval.
 **Done when**: ...
 ```
 
+**Acceptance criteria source**: In the agent pipeline, copy criteria verbatim from `SYSTEMS_PLAN.md` — the architect's criteria are authoritative and drive test design downstream. In manual planning (no `SYSTEMS_PLAN.md`), define criteria directly in the plan as concrete, testable conditions for "done."
+
 ### Plan Changes Require Approval
 
 If the plan needs to change:
@@ -267,6 +269,8 @@ Use timeboxed **spike steps** for exploratory work. Spikes must produce a decisi
 --> See [references/decomposition-guide.md](references/decomposition-guide.md#anti-patterns) for the full list of planning anti-patterns to avoid.
 
 ## When to Use This Skill
+
+Three-document planning maps to the **Standard** and **Full** tiers in the [process calibration](../../rules/swe/swe-agent-coordination-protocol.md#process-calibration). Direct and Lightweight tiers use simpler tracking or none.
 
 **Use three-document planning for:**
 

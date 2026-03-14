@@ -2,6 +2,24 @@
 
 Conventions for when and how to use the available software agents -- autonomous subprocesses that run in separate context windows.
 
+### Process Calibration
+
+Assess the task before starting work. Each tier prescribes what to do — higher tiers include everything below them.
+
+| Tier | Signals | Process |
+|------|---------|---------|
+| **Direct** | Single-file fix, config, doc, typo | Fix → verify → commit. No agents, no planning documents, no spec. |
+| **Lightweight** | 2-3 files, single behavior, clear scope | Optional researcher. Acceptance criteria inline. Task tools for tracking. No SDD, no three-document planning. |
+| **Standard** | 4-8 files, 2-4 behaviors, architectural decisions | Full agent pipeline. [SDD](../../skills/spec-driven-development/SKILL.md) behavioral spec with REQ IDs. [Three-document model](../../skills/software-planning/SKILL.md). |
+| **Full** | 9+ files, 5+ behaviors, cross-cutting | Standard plus parallel execution, doc-engineer in groups, context-engineer shadowing, structured decisions, spec archival. |
+| **Spike** | Exploratory, outcome uncertain | Timeboxed researcher. Decision in LEARNINGS.md. No implementation until resolved. |
+
+- The main agent selects the tier at task intake. User override always wins.
+- Default to the lower tier when uncertain — process can be added later, but overhead cannot be reclaimed.
+- Bug fixes: Direct unless 4+ files or structural issue (escalate to Standard).
+- Refactoring: Standard with `[Phase: Refactoring]` delegation to the [refactoring skill](../../skills/refactoring/SKILL.md).
+- The SDD skill's [complexity triage](../../skills/spec-driven-development/SKILL.md#complexity-triage) refines specification depth within Standard and Full tiers.
+
 ### Available Agents
 
 | Agent | Purpose | Output | Bg Safe |

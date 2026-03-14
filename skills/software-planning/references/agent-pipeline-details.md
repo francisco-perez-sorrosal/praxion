@@ -10,11 +10,11 @@ Detailed tables and specifications for the SWE agent coordination pipeline. This
 | Researcher | Presents options with trade-offs | Recommend |
 | Architect | Designs structure, makes decisions | Plan steps |
 | Planner | Decomposes and supervises | Redesign |
-| Context Engineer | Manages information architecture, implements context artifacts | Implement features |
+| Context Engineer | Manages information architecture, implements context artifacts, shadows research/architecture stages with `CONTEXT_REVIEW.md` | Implement features |
 | Implementer | Implements steps, makes tests pass, fixes broken pre-existing tests | Plan, skip, reorder steps |
 | Test-Engineer | Designs behavioral tests from acceptance criteria, writes test suites concurrently with implementer | Write production code, modify plans |
 | Verifier | Identifies issues, recommends actions | Fix issues |
-| Doc-engineer | Proactively maintains project documentation at pipeline checkpoints | Manage context artifacts |
+| Doc-engineer | Proactively maintains project documentation at pipeline checkpoints and in parallel execution during implementation | Manage context artifacts |
 | Sentinel | Diagnoses and reports across ecosystem | Fix artifacts |
 | Skill-Genesis | Triages learnings into artifact proposals, delegates creation | Ideate features, audit ecosystem, create artifacts |
 | CI/CD Engineer | Designs and writes CI/CD pipelines, optimizes and debugs workflows | Modify application code, manage infrastructure |
@@ -44,6 +44,7 @@ Launch independent agents concurrently whenever possible.
 | Context audit alongside development planning | |
 | Doc-engineer alongside implementer or verifier | |
 | Implementer + test-engineer on paired steps (disjoint: production vs test files) | Implementer + test-engineer modifying the same files |
+| Implementer + test-engineer + doc-engineer on triple steps (disjoint: production / test / doc files) | Doc-engineer modifying files that overlap with production or test code |
 | N same-type agents on disjoint work units (see Intra-Stage Parallelism) | Same-type agents whose file sets overlap |
 | Context-engineer alongside researcher or systems-architect | |
 
@@ -75,24 +76,27 @@ For high-risk decisions, use parallel agents with distinct lenses: **correctness
 
 | Stage | Role | Trigger |
 |-------|------|---------|
-| Research | Domain expertise on context artifacts; evaluates findings through artifact placement lens | Research involves context engineering topics |
-| Architecture | Artifact type selection, token budget, progressive disclosure constraints | Architecture affects context artifacts or introduces new conventions |
-| Planning | Reviews step ordering for artifact dependencies, validates crafting spec compliance | Plan creates, modifies, or restructures context artifacts |
+| Research | Domain expertise on context artifacts; evaluates findings through artifact placement lens. **Shadowing:** runs in parallel with researcher, writes `## Research Stage Review` in `CONTEXT_REVIEW.md` | Research involves context engineering topics; task creates/modifies/restructures context artifacts |
+| Architecture | Artifact type selection, token budget, progressive disclosure constraints. **Shadowing:** runs in parallel with architect, reads research-stage review, appends `## Architecture Stage Review` to `CONTEXT_REVIEW.md` | Architecture affects context artifacts or introduces new conventions |
+| Planning | Reviews step ordering for artifact dependencies, validates crafting spec compliance. Reads full `CONTEXT_REVIEW.md` | Plan creates, modifies, or restructures context artifacts |
 | Execution | Executes artifact steps using crafting skills; planner supervises | Large-scope context work (3+ artifacts, restructuring) |
 | Verification | N/A (verifier checks code, not context artifacts) | Verifier finds planned context updates were skipped --> routes to context-engineer |
 
 **Scale:** Single artifact --> context-engineer directly. 3+ artifacts or restructuring --> full pipeline under planner supervision.
+
+**Shadowing activation:** Conditional — only when the task involves context artifacts. Pure application code does not trigger shadowing. `CONTEXT_REVIEW.md` is cumulative (stage-delimited sections) and single-writer (context-engineer only).
 
 ## Doc-Engineer Pipeline Engagement
 
 | Stage | Role | Trigger |
 |-------|------|---------|
 | Planning | Assess existing documentation in the affected area; flag docs that will need updates | Plan touches area with README, catalog, or architecture docs |
-| Implementation | Update affected READMEs, catalogs, changelogs after code changes | Implementation adds, removes, or renames files; new public APIs or interfaces |
+| Execution | **Parallel mode:** runs concurrently with implementer + test-engineer on planner-assigned doc steps, updating documentation files (disjoint file sets). Writes to fragment files (`WIP_doc-engineer.md`, etc.) | Planner assigns a doc step to the parallel group (files added/removed/renamed, new APIs, module structure changes) |
+| Implementation (checkpoints) | Update affected READMEs, catalogs, changelogs after code changes | Implementation adds, removes, or renames files; new public APIs or interfaces (when no parallel doc step was assigned) |
 | Refactoring | Sync documentation with structural changes | Refactoring moves, renames, or reorganizes modules or directories |
 | Verification | N/A (verifier checks code) | Verifier finds documentation updates were planned but not executed --> routes to doc-engineer |
 
-**Timing:** Runs in background parallel with other agents when its work is independent. Post-implementation documentation updates can run alongside the verifier.
+**Timing:** In parallel execution mode, runs as part of the implementation batch (up to 3 concurrent agents per group). At pipeline checkpoints, runs in background parallel with other agents when its work is independent. Post-implementation documentation updates can run alongside the verifier.
 
 ## Interaction Reporting
 
@@ -109,6 +113,8 @@ When the Task Chronograph MCP server is registered, call `report_interaction(sou
 ## Semantic Document Reconciliation
 
 When concurrent agents write to fragment files (`WIP_<agent>.md`, `LEARNINGS_<agent>.md`, `PROGRESS_<agent>.md`), the supervising agent (implementation-planner) merges fragments into canonical documents after all agents in a batch complete. Each document type has its own schema and merge semantics -- naive concatenation produces structurally invalid documents.
+
+**Note:** `CONTEXT_REVIEW.md` is not subject to fragment patterns — it is single-writer (context-engineer only) with cumulative stage-delimited sections. No reconciliation needed.
 
 ### WIP.md Reconciliation
 
@@ -131,7 +137,7 @@ Status: in-progress
 - [ ] Step K: ...
 ```
 
-**Fragment structure:** Each `WIP_<agent>.md` contains a single `### Step N` section with an updated `Status` field. No batch header, no progress checklist, no blockers section.
+**Fragment structure:** Each `WIP_<agent>.md` (e.g., `WIP_implementer.md`, `WIP_test-engineer.md`, `WIP_doc-engineer.md`) contains a single `### Step N` section with an updated `Status` field. No batch header, no progress checklist, no blockers section.
 
 **Merge procedure:**
 

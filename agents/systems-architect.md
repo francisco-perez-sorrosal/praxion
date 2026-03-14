@@ -38,11 +38,12 @@ Work through these phases in order. Complete each phase before moving to the nex
 Determine what you have to work with:
 
 1. **Check for RESEARCH_FINDINGS.md** — if it exists, read it thoroughly. This is your primary information source.
-2. **Check for existing SYSTEMS_PLAN.md** — you may be refining an existing architecture, not starting fresh.
-3. **Clarify the goal** — restate it in one sentence. If ambiguous, state your interpretation and ask for confirmation.
-4. **Define acceptance criteria as behavioral specs** — concrete, testable conditions for "done" expressed as observable behaviors. These criteria drive test design downstream: the test-engineer will derive behavioral tests directly from them. Write each criterion as a verifiable behavior ("When X happens, the system does Y"), not an implementation detail ("Module Z is refactored").
-5. **Classify task complexity** — assess the task against the complexity triage criteria. For **medium and large** tasks, load the `spec-driven-development` skill and produce a `## Behavioral Specification` section in `SYSTEMS_PLAN.md` with requirements in the `When/and/the system/so that` format, each assigned a unique ID (`REQ-01`, `REQ-02`, ...). For **trivial, small, and spike** tasks, the existing acceptance criteria format suffices — skip the behavioral specification section entirely. The skill provides the format conventions and ID rules.
-6. **Identify scope boundaries** — what is explicitly in scope and out of scope.
+2. **Check for CONTEXT_REVIEW.md** — if present, read the `## Research Stage Review` section for context artifact inventory, health assessment, and artifact placement recommendations. Factor these into your architectural decisions when the task involves context artifacts.
+3. **Check for existing SYSTEMS_PLAN.md** — you may be refining an existing architecture, not starting fresh.
+4. **Clarify the goal** — restate it in one sentence. If ambiguous, state your interpretation and ask for confirmation.
+5. **Define acceptance criteria as behavioral specs** — concrete, testable conditions for "done" expressed as observable behaviors. These criteria drive test design downstream: the test-engineer will derive behavioral tests directly from them. Write each criterion as a verifiable behavior ("When X happens, the system does Y"), not an implementation detail ("Module Z is refactored").
+6. **Classify task complexity** — assess the task against the complexity triage criteria. For **medium and large** tasks, load the `spec-driven-development` skill and produce a `## Behavioral Specification` section in `SYSTEMS_PLAN.md` with requirements in the `When/and/the system/so that` format, each assigned a unique ID (`REQ-01`, `REQ-02`, ...). For **trivial, small, and spike** tasks, the existing acceptance criteria format suffices — skip the behavioral specification section entirely. The skill provides the format conventions and ID rules.
+7. **Identify scope boundaries** — what is explicitly in scope and out of scope.
 
 If `RESEARCH_FINDINGS.md` does not exist and the task requires research, recommend invoking the researcher agent first. You can proceed with direct codebase analysis for tasks that don't need external research.
 
@@ -239,6 +240,7 @@ Your `SYSTEMS_PLAN.md` is the implementation planner's primary input. Focus on:
 - For context-based system design (artifact restructuring, new artifact types, ecosystem changes): the context-engineer provides domain constraints — artifact type selection, token budget, progressive disclosure patterns
 - For features that create new conventions: the context-engineer assesses where conventions should be documented (rule vs. skill vs. CLAUDE.md) and flags potential conflicts with existing artifacts
 - Reference context engineering reviews for artifact placement rationale rather than making artifact-type decisions independently
+- When the task involves context artifacts, the context-engineer may shadow this stage — running in parallel, reading the research-stage review from `CONTEXT_REVIEW.md`, and appending the architecture-stage section. Read the `## Research Stage Review` section (if present) for context artifact inventory and health assessment to inform your design decisions
 - Scope boundary: you make architectural decisions; the context-engineer provides context engineering domain expertise that informs those decisions
 
 ## Output

@@ -19,6 +19,7 @@ skills/                              # Shared skill modules (assistant-agnostic)
 ├── refactoring/
 ├── code-review/
 ├── software-planning/
+├── spec-driven-development/
 ├── doc-management/
 ├── cicd/
 ├── memory/
@@ -42,6 +43,7 @@ agents/                              # Shared agent definitions
 ├── implementation-planner.md
 ├── context-engineer.md
 ├── implementer.md
+├── test-engineer.md
 ├── verifier.md
 ├── doc-engineer.md
 ├── sentinel.md
@@ -58,8 +60,13 @@ rules/                               # Rules (installed to ~/.claude/rules/ or .
     └── readme-style.md
 .claude-plugin/                      # Claude Code plugin manifest
 ├── plugin.json
-└── PLUGIN_SCHEMA_NOTES.md
+├── PLUGIN_SCHEMA_NOTES.md
+└── hooks/                           # Plugin hook scripts
+    ├── hooks.json
+    ├── send_event.py
+    └── precompact_state.py
 claude/config/                       # Claude personal config (symlinked to ~/.claude/)
+├── README.md
 ├── CLAUDE.md
 ├── claude_desktop_config.json
 ├── userPreferences.txt
@@ -72,8 +79,12 @@ cursor/config/                       # Cursor installer config
 ├── export-cursor-commands.py
 ├── export-cursor-rules.py
 └── README.md
+scripts/                             # Utility scripts
+└── ccwt                             # Multi-worktree Claude session launcher
 docs/                                # Cross-cutting documentation
-└── cursor-compat.md
+├── getting-started.md
+├── cursor-compat.md
+└── spec-driven-development.md
 task-chronograph-mcp/                # Pipeline observability MCP server
 memory-mcp/                          # Persistent memory MCP server
 install.sh                           # Installer router

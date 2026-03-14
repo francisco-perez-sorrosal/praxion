@@ -112,6 +112,10 @@ Read the user preferences from https://raw.githubusercontent.com/francisco-perez
 
 This tells Claude to fetch and apply the adaptive precision mode instructions at the start of each conversation.
 
+## Getting Started
+
+For a walkthrough of developing a small application using the agent pipeline — from ideation through implementation and verification — see [docs/getting-started.md](docs/getting-started.md).
+
 ## Spec-Driven Development
 
 For medium and large features, the pipeline activates spec-driven development -- behavioral specifications with requirement IDs threaded through architecture, planning, testing, and verification. Small tasks skip specs entirely; the pipeline scales proportionally.

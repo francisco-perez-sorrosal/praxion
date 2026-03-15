@@ -164,3 +164,64 @@ Express what the system does, not what it avoids. Frame negatives as the positiv
 - **Prefer**: "the system returns 401 Unauthorized for requests without valid credentials"
 
 When a negative is truly the clearest expression, use it -- but ensure the `so that` clause explains what the prevention achieves.
+
+## Spec Delta Template
+
+For brownfield features with prior archived specs, the systems-architect produces `SPEC_DELTA.md` in `.ai-work/`. See the [SDD skill](../SKILL.md#spec-delta-format) for activation conditions and lifecycle.
+
+```markdown
+# Spec Delta: [Feature Name]
+
+**Prior spec**: SPEC_<name>_YYYY-MM-DD.md
+**Tier**: Standard | Full
+**Baseline confidence**: High | Low (staleness caveat)
+
+## Staleness Warning
+
+Prior spec requirements with uncertain baselines (SH03 FAIL):
+- REQ-03: [reason for uncertainty -- e.g., referenced function moved, behavior may have changed]
+
+## Added Requirements
+
+### REQ-04: [Title]
+
+**When** [trigger]
+**and** [optional precondition]
+**the system** [response]
+**so that** [outcome]
+
+**Rationale**: [Why this requirement is new -- what gap or opportunity it addresses]
+
+## Modified Requirements
+
+### REQ-01: [New Title] (was: [Old Title])
+
+**Before** (from SPEC_<name>_YYYY-MM-DD.md):
+> **When** [old trigger]
+> **the system** [old response]
+> **so that** [old outcome]
+
+**After**:
+**When** [new trigger]
+**the system** [new response]
+**so that** [new outcome]
+
+**Change rationale**: [What changed and why -- behavioral difference, not implementation detail]
+
+## Removed Requirements
+
+### ~REQ-02: [Title]~ (from SPEC_<name>_YYYY-MM-DD.md)
+
+**Removal rationale**: [Why this behavior is no longer needed]
+**Cleanup needed**: Yes | No -- [whether implementation artifacts (code, tests, config) remain]
+```
+
+**Format conventions**:
+
+- **Added requirements** use the standard `When/and/the system/so that` format with fresh REQ IDs scoped to the new feature (not continuing the old spec's numbering)
+- **Modified requirements** show before/after with blockquoted "before" text to visually distinguish prior from new. The `(was: [Old Title])` annotation preserves the cross-feature mapping
+- **Removed requirements** use strikethrough on the REQ ID and title. The cleanup flag tells the planner whether dead code/tests need explicit removal steps
+- **Baseline confidence** signals delta reliability: High when the sentinel's last SH03 check passed for the prior spec, Low when SH03 shows FAIL or no recent sentinel report exists
+- **Staleness Warning** is conditional — omit the section entirely when baseline confidence is High
+
+**When the delta is empty**: if comparison reveals no behavioral changes (pure refactoring or implementation-only changes), skip `SPEC_DELTA.md` entirely. The absence of a delta signals "no behavioral change" to the planner and verifier.

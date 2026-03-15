@@ -16,7 +16,7 @@ Behavioral specifications bridge architecture and implementation by giving each 
 
 **Satellite files** (loaded on-demand):
 
-- [references/spec-format-guide.md](references/spec-format-guide.md) -- full spec format with examples, EARS/GWT comparison, traceability matrix template, persistent spec template, edge cases
+- [references/spec-format-guide.md](references/spec-format-guide.md) -- full spec format with examples, EARS/GWT comparison, traceability matrix template, persistent spec template, spec delta template, edge cases
 - [references/sentinel-spec-checks.md](references/sentinel-spec-checks.md) -- spec health check catalog for sentinel integration, pass conditions, integration guidance
 
 ## Complexity Triage
@@ -144,6 +144,26 @@ When a medium or large feature completes, the implementation-planner archives th
 
 The `.ai-state/specs/` directory is created on first use. Archived specs are committed to git alongside other persistent project intelligence. The sentinel audits these specs for drift, completeness, and traceability coverage.
 
+## Spec Delta Format
+
+For brownfield features — when `.ai-state/specs/` contains prior `SPEC_*.md` files relevant to the feature being designed and the process calibration tier is Standard or Full — the systems-architect produces a `SPEC_DELTA.md` alongside `SYSTEMS_PLAN.md`. The delta shows what behavioral requirements change before implementation planning begins.
+
+**Activation condition**: prior archived specs exist for the affected area AND tier is Standard or Full. Greenfield work (no prior specs) skips delta production entirely.
+
+**Document structure**:
+
+- **Header**: prior spec reference, tier, baseline confidence (High/Low based on sentinel SH03 status)
+- **Staleness Warning** (conditional): when the prior spec's SH03 check shows FAIL, lists requirements with uncertain baselines
+- **Added Requirements**: new REQ IDs in standard `When/and/the system/so that` format with rationale
+- **Modified Requirements**: before (blockquoted prior text) and after (new text) with change rationale
+- **Removed Requirements**: prior REQ IDs with strikethrough, removal rationale, and cleanup flag
+
+**Lifecycle**: ephemeral in `.ai-work/`. Consumed by the implementation-planner (step ordering) and verifier (delta validation). Deleted after pipeline completion — the delta's content is subsumed by the archived spec.
+
+**REQ ID convention**: fresh per-feature IDs as established by the existing convention. The delta provides the cross-feature mapping between old and new IDs.
+
+--> See [references/spec-format-guide.md](references/spec-format-guide.md#spec-delta-template) for the full template with examples.
+
 ## Quick Reference
 
 **When to apply SDD:**
@@ -166,4 +186,5 @@ The `.ai-state/specs/` directory is created on first use. Archived specs are com
 | Test naming | Test code: `test_req{NN}_description` |
 | Traceability matrix | `VERIFICATION_REPORT.md` `## Spec Conformance` section |
 | Archived spec | `.ai-state/specs/SPEC_<name>_YYYY-MM-DD.md` |
+| Spec delta (brownfield) | `.ai-work/SPEC_DELTA.md` (ephemeral, produced by architect) |
 | Decision documentation | `LEARNINGS.md` `### Decisions Made` section |

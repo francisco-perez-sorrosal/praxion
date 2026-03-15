@@ -156,6 +156,7 @@ Requires `.ai-state/specs/` directory with spec files. Skip with a note when no 
 | SH03 | L | Spec requirements still reflected in code | Key behavioral claims in spec match current implementation |
 | SH04 | L | Traceability matrix has no UNTESTED entries | All requirements have at least one test |
 | SH05 | L | Key Decisions section is substantive | Decisions include what, why, alternatives |
+| SH06 | L | Spec delta claims match actual spec evolution | Added/modified/removed requirements in delta consistent with differences between prior and current archived specs |
 
 ### Self-Verification (V)
 
@@ -218,7 +219,7 @@ Execute llm type checks by reading artifact content in batches:
 
 **Batch 4 — Pipeline Discipline** (conditional): If Task Chronograph MCP tools are available (`get_pipeline_status`, `get_agent_events`), query for pipeline data and apply P01-P05 checks. If unavailable, skip with a note in the report.
 
-**Batch 5 — Spec Health** (conditional): If `.ai-state/specs/` exists with spec files, load `skills/spec-driven-development/references/sentinel-spec-checks.md`. Apply SH03-SH05 checks. If no specs exist, skip with a note in the report.
+**Batch 5 — Spec Health** (conditional): If `.ai-state/specs/` exists with spec files, load `skills/spec-driven-development/references/sentinel-spec-checks.md`. Apply SH03-SH06 checks (SH06 only when a spec has a predecessor). If no specs exist, skip with a note in the report.
 
 For each batch, add findings to the running report. If context fills, write a partial report with `[PARTIAL]` header.
 

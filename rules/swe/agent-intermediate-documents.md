@@ -14,6 +14,7 @@ Agent documents live in two locations based on their lifecycle:
     RESEARCH_FINDINGS.md
     CONTEXT_REVIEW.md
     SYSTEMS_PLAN.md
+    SPEC_DELTA.md
     SKILL_GENESIS_REPORT.md
     IMPLEMENTATION_PLAN.md
     WIP.md
@@ -62,7 +63,7 @@ Agents that update `.ai-state/`: promethean (idea ledger), sentinel (report, log
 
 | Tier | Location | Documents | Lifetime |
 |------|----------|-----------|----------|
-| Ephemeral | `.ai-work/` | `IDEA_PROPOSAL.md`, `RESEARCH_FINDINGS.md`, `CONTEXT_REVIEW.md`, `SYSTEMS_PLAN.md`, `SKILL_GENESIS_REPORT.md`, `VERIFICATION_REPORT.md`, `PROGRESS.md` | Single pipeline run — delete after downstream consumption (merge `VERIFICATION_REPORT.md` patterns into `LEARNINGS.md` first) |
+| Ephemeral | `.ai-work/` | `IDEA_PROPOSAL.md`, `RESEARCH_FINDINGS.md`, `CONTEXT_REVIEW.md`, `SYSTEMS_PLAN.md`, `SPEC_DELTA.md`, `SKILL_GENESIS_REPORT.md`, `VERIFICATION_REPORT.md`, `PROGRESS.md` | Single pipeline run — delete after downstream consumption (merge `VERIFICATION_REPORT.md` patterns into `LEARNINGS.md` first) |
 | Session-persistent | `.ai-work/` | `IMPLEMENTATION_PLAN.md`, `WIP.md`, `LEARNINGS.md` | Across sessions — merge learnings into permanent locations at feature end |
 | Permanent | `.ai-state/` | `IDEA_LEDGER_*.md`, `SENTINEL_REPORT_*.md`, `SENTINEL_LOG.md`, `SPEC_*.md` | Project lifetime — committed to git, timestamped per run |
 

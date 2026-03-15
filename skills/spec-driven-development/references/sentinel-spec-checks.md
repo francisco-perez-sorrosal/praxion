@@ -19,6 +19,7 @@ When multiple spec files exist, the sentinel samples a representative subset con
 | SH03 | L | Spec requirements still reflected in code | Key behavioral claims match current implementation |
 | SH04 | L | Traceability matrix has no UNTESTED entries | All requirements have at least one test |
 | SH05 | L | Key Decisions section is substantive | Decisions include what, why, alternatives |
+| SH06 | L | Spec delta claims match actual spec evolution | Added/modified/removed requirements in delta consistent with differences between prior and current archived specs |
 
 ## Check Evaluation Details
 
@@ -58,10 +59,23 @@ Read the `## Key Decisions` section. Each decision entry should include: what wa
 
 **Common failures**: decisions copied from LEARNINGS.md without the structured format, rushed archival that omitted rationale.
 
+### SH06 -- Delta-Spec Consistency (LLM)
+
+When a current archived spec was produced by a pipeline that included a `SPEC_DELTA.md`, compare the delta's claims against the actual differences between the prior and current archived specs. The delta stated that certain requirements were added, modified, or removed — the archived specs should reflect those changes.
+
+**Evaluation**: for each delta section (Added/Modified/Removed), verify:
+- **Added**: requirements listed as added in the delta should appear in the current spec but not the prior spec
+- **Modified**: requirements listed as modified should show behavioral differences between prior and current specs consistent with the delta's before/after description
+- **Removed**: requirements listed as removed in the delta should appear in the prior spec but not the current spec
+
+If all delta claims are consistent with actual spec evolution, PASS. If a claim contradicts the evidence (e.g., delta says REQ was removed but it still appears in the current spec), FAIL. When behavioral comparison is ambiguous (requirement rephrased but intent unclear), WARN.
+
+**Common failures**: delta produced from stale baseline (prior spec's behavior had already drifted from code), delta claims not updated after plan amendments changed scope, rushed archival that preserved the delta but modified the spec differently.
+
 ## Integration with Sentinel Methodology
 
 **Pass 1 (Auto checks)**: SH01 and SH02 run alongside other A-type checks during the sentinel's automated pass. These are filesystem-level checks using Glob and Grep.
 
-**Pass 2 (LLM judgment)**: SH03, SH04, and SH05 run as **Batch 5 -- Spec Health** (conditional). The sentinel loads this reference file on demand when `.ai-state/specs/` contains spec files. This batch follows the existing Batch 4 (Pipeline Discipline).
+**Pass 2 (LLM judgment)**: SH03, SH04, SH05, and SH06 run as **Batch 5 -- Spec Health** (conditional). The sentinel loads this reference file on demand when `.ai-state/specs/` contains spec files. This batch follows the existing Batch 4 (Pipeline Discipline). SH06 is further conditioned on the current spec having a predecessor — skip SH06 when the spec is the first archived spec for its feature.
 
 The sentinel's standard scoring applies: per-spec grades contribute to the ecosystem health grade. Spec health findings use the same severity tiers (Critical/Important/Suggested) as other dimensions.

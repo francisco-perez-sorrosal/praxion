@@ -43,7 +43,8 @@ Determine what you have to work with:
 4. **Clarify the goal** — restate it in one sentence. If ambiguous, state your interpretation and ask for confirmation.
 5. **Define acceptance criteria as behavioral specs** — concrete, testable conditions for "done" expressed as observable behaviors. These criteria drive test design downstream: the test-engineer will derive behavioral tests directly from them. Write each criterion as a verifiable behavior ("When X happens, the system does Y"), not an implementation detail ("Module Z is refactored").
 6. **Classify task complexity** — assess the task against the complexity triage criteria. For **medium and large** tasks, load the `spec-driven-development` skill and produce a `## Behavioral Specification` section in `SYSTEMS_PLAN.md` with requirements in the `When/and/the system/so that` format, each assigned a unique ID (`REQ-01`, `REQ-02`, ...). For **trivial, small, and spike** tasks, the existing acceptance criteria format suffices — skip the behavioral specification section entirely. The skill provides the format conventions and ID rules.
-7. **Identify scope boundaries** — what is explicitly in scope and out of scope.
+7. **Detect brownfield baseline** — for Standard and Full tier tasks, check `.ai-state/specs/` for prior `SPEC_*.md` files relevant to the feature being designed. If found, note the prior spec as the behavioral baseline for delta production in Phase 3.5. If the sentinel's last SH03 check shows FAIL for the prior spec, note the staleness caveat. If no prior specs exist, the feature is greenfield — skip delta production entirely.
+8. **Identify scope boundaries** — what is explicitly in scope and out of scope.
 
 If `RESEARCH_FINDINGS.md` does not exist and the task requires research, recommend invoking the researcher agent first. You can proceed with direct codebase analysis for tasks that don't need external research.
 
@@ -84,6 +85,18 @@ Design the architecture by working through these questions:
 - Design for the current requirements, not hypothetical future ones
 - Favor composition over inheritance, interfaces over concrete coupling
 - Make the architecture testable — if it can't be tested, redesign it
+
+### Phase 3.5 — Spec Delta Production (conditional)
+
+When Phase 1 identified a prior spec baseline (brownfield detection):
+
+1. Compare the new behavioral specification (produced in Phase 3) against the prior spec's requirements
+2. Produce `SPEC_DELTA.md` in `.ai-work/` following the format defined in the `spec-driven-development` skill
+3. Organize changes into Added (new REQ IDs with rationale), Modified (before/after with blockquoted prior text and change rationale), and Removed (with removal rationale and cleanup flag)
+4. Include a `## Staleness Warning` section if the baseline has Low confidence (prior spec's SH03 shows FAIL)
+5. If comparison reveals no behavioral changes (pure refactoring or implementation-only), skip `SPEC_DELTA.md` entirely — absence signals "no behavioral change" to downstream agents
+
+Skip this phase entirely when no prior spec was identified in Phase 1 (greenfield).
 
 ### Phase 4 — Trade-off Analysis
 
@@ -245,7 +258,7 @@ Your `SYSTEMS_PLAN.md` is the implementation planner's primary input. Focus on:
 
 ## Output
 
-After creating `SYSTEMS_PLAN.md`, return a concise summary:
+After creating `SYSTEMS_PLAN.md` (and `SPEC_DELTA.md` for brownfield features), return a concise summary:
 
 1. **Goal** — one sentence
 2. **Architecture approach** — brief description of the design

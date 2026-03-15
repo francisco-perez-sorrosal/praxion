@@ -79,6 +79,8 @@ When `SYSTEMS_PLAN.md` contains a `## Behavioral Specification` section with REQ
 |-------------|---------|----------------|--------|
 | REQ-01 | test_req01_... | src/path:function() | PASS |
 
+When `SPEC_DELTA.md` exists alongside the behavioral specification, add a `## Delta Validation` subsection after the traceability matrix. Compare the new traceability matrix against the prior spec's matrix (referenced in the delta's header). Verify: added requirements have new tests, modified requirements have updated tests, removed requirements have no orphaned tests. Classify each delta claim as CONFIRMED (evidence matches) or UNCONFIRMED (evidence missing or contradicts the claim).
+
 Skip this phase when no Behavioral Specification section exists in `SYSTEMS_PLAN.md`.
 
 ### Phase 4 -- Convention Compliance

@@ -40,10 +40,11 @@ Work through these phases in order. Complete each phase before moving to the nex
 Determine what you have to work with:
 
 1. **Check for SYSTEMS_PLAN.md** — read the architectural sections (Goal, Acceptance Criteria, Architecture, Risk Assessment)
-2. **Check for RESEARCH_FINDINGS.md** — read for codebase context and technical details
-3. **Check for CONTEXT_REVIEW.md** — if present, read the accumulated context engineering review (research-stage and architecture-stage sections) for artifact dependency ordering, placement recommendations, and spec compliance notes
-4. **Check for existing IMPLEMENTATION_PLAN.md / WIP.md / LEARNINGS.md** — you may be resuming, not starting fresh
-5. **Verify the architecture is sufficient** — you need enough design detail to decompose into steps
+2. **Check for SPEC_DELTA.md** — if present, read the spec delta for brownfield context. Modified requirements indicate targeted refactoring-then-implementation steps. Removed requirements indicate explicit cleanup steps with dead code/test removal. Added requirements follow normal step decomposition. Note any staleness warnings for verification substeps.
+3. **Check for RESEARCH_FINDINGS.md** — read for codebase context and technical details
+4. **Check for CONTEXT_REVIEW.md** — if present, read the accumulated context engineering review (research-stage and architecture-stage sections) for artifact dependency ordering, placement recommendations, and spec compliance notes
+5. **Check for existing IMPLEMENTATION_PLAN.md / WIP.md / LEARNINGS.md** — you may be resuming, not starting fresh
+6. **Verify the architecture is sufficient** — you need enough design detail to decompose into steps
 
 If `SYSTEMS_PLAN.md` does not exist or lacks architecture sections, recommend invoking the systems-architect agent first. If `RESEARCH_FINDINGS.md` is missing and the task is complex, recommend invoking the researcher agent first.
 
@@ -77,6 +78,7 @@ Break the architecture into incremental implementation steps.
 - Core logic before UI / API surface
 - Happy path before error handling
 - Each step leaves the system in a working state
+- Delta-aware ordering (when `SPEC_DELTA.md` exists): modified requirements produce targeted update steps, removed requirements produce explicit cleanup steps (delete dead code/tests), added requirements follow normal ordering. Requirements with a staleness caveat get a verification substep to confirm the baseline before modifying.
 
 **Package/module structure discipline:**
 

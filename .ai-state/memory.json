@@ -151,8 +151,8 @@
           "type": "session",
           "detail": null
         },
-        "access_count": 3,
-        "last_accessed": "2026-02-12T04:13:12.630419Z",
+        "access_count": 4,
+        "last_accessed": "2026-03-16T18:01:31.701419Z",
         "status": "active",
         "links": []
       }
@@ -171,8 +171,8 @@
           "type": "session",
           "detail": null
         },
-        "access_count": 0,
-        "last_accessed": null,
+        "access_count": 1,
+        "last_accessed": "2026-03-16T18:01:32.146025Z",
         "status": "active",
         "links": []
       },
@@ -190,8 +190,8 @@
           "type": "session",
           "detail": null
         },
-        "access_count": 0,
-        "last_accessed": null,
+        "access_count": 1,
+        "last_accessed": "2026-03-16T18:01:32.146025Z",
         "status": "active",
         "links": []
       }
@@ -274,8 +274,8 @@
           "type": "session",
           "detail": null
         },
-        "access_count": 0,
-        "last_accessed": null,
+        "access_count": 1,
+        "last_accessed": "2026-03-16T18:01:32.168304Z",
         "status": "active",
         "links": []
       },
@@ -295,8 +295,8 @@
           "type": "session",
           "detail": null
         },
-        "access_count": 0,
-        "last_accessed": null,
+        "access_count": 1,
+        "last_accessed": "2026-03-16T18:01:32.168304Z",
         "status": "active",
         "links": []
       },
@@ -315,8 +315,8 @@
           "type": "session",
           "detail": null
         },
-        "access_count": 0,
-        "last_accessed": null,
+        "access_count": 1,
+        "last_accessed": "2026-03-16T18:01:32.168304Z",
         "status": "active",
         "links": []
       },
@@ -335,8 +335,8 @@
           "type": "session",
           "detail": null
         },
-        "access_count": 0,
-        "last_accessed": null,
+        "access_count": 1,
+        "last_accessed": "2026-03-16T18:01:32.168304Z",
         "status": "active",
         "links": []
       },
@@ -356,8 +356,8 @@
           "type": "session",
           "detail": null
         },
-        "access_count": 0,
-        "last_accessed": null,
+        "access_count": 1,
+        "last_accessed": "2026-03-16T18:01:32.168304Z",
         "status": "active",
         "links": []
       },
@@ -377,8 +377,8 @@
           "type": "session",
           "detail": null
         },
-        "access_count": 0,
-        "last_accessed": null,
+        "access_count": 1,
+        "last_accessed": "2026-03-16T18:01:32.168304Z",
         "status": "active",
         "links": []
       },
@@ -398,8 +398,8 @@
           "type": "session",
           "detail": null
         },
-        "access_count": 0,
-        "last_accessed": null,
+        "access_count": 1,
+        "last_accessed": "2026-03-16T18:01:32.168304Z",
         "status": "active",
         "links": [
           {
@@ -410,5 +410,5 @@
       }
     }
   },
-  "session_count": 12
+  "session_count": 13
 }

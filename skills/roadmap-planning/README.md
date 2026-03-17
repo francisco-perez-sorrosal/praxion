@@ -1,4 +1,4 @@
-# Roadmap Planning Skill
+# roadmap-planning
 
 Roadmap planning, feature prioritization, and backlog management for technical projects. Transforms promethean's unstructured ideas into prioritized, dependency-aware, sequenced roadmaps that feed into spec-driven-development.
 

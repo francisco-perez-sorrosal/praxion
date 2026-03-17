@@ -1,4 +1,4 @@
-# Data Modeling Skill
+# data-modeling
 
 Database and data model design -- relational schemas, NoSQL document modeling, migration strategies, ORM patterns, and schema evolution.
 

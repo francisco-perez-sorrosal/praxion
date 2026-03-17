@@ -1,4 +1,4 @@
-# Performance Architecture
+# performance-architecture
 
 Performance architecture patterns and decisions for software systems. Covers performance as an architectural concern -- the patterns and decisions made during design and implementation, not operational monitoring.
 

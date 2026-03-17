@@ -28,6 +28,21 @@ Reusable skill modules for AI coding assistants. Each skill is a self-contained 
 | --- | --- | --- |
 | **[doc-management](doc-management/)** | Writing and maintaining project documentation (README.md, catalogs, architecture docs, changelogs). Covers cross-reference validation, catalog maintenance, and structural integrity. | Creating or reviewing project documentation, maintaining catalog READMEs, validating cross-references, ensuring documentation freshness. |
 
+### Planning & Communication
+
+| Skill | Description | When to Use |
+| --- | --- | --- |
+| **[roadmap-planning](roadmap-planning/)** | Roadmap planning, feature prioritization (RICE, MoSCoW, WSJF, Kano, ICE), dependency mapping, and backlog management. Integrates with promethean and spec-driven-development. | Prioritizing features, building roadmaps, managing backlogs, mapping dependencies, deciding what to build next. |
+| **[stakeholder-communications](stakeholder-communications/)** | Developer-oriented communication patterns: technical status updates, RFC authoring, release announcements, demo scripts, and approval workflows. | Writing status reports, authoring RFCs, communicating releases or breaking changes, preparing demos, seeking technical approval. |
+
+### Design & Architecture
+
+| Skill | Description | When to Use |
+| --- | --- | --- |
+| **[api-design](api-design/)** | API-first design methodology covering REST, GraphQL, OpenAPI 3.1, versioning strategies, data contracts, and interface contracts. | Designing APIs, writing OpenAPI specs, choosing REST vs GraphQL, defining data or interface contracts, planning API versioning. |
+| **[data-modeling](data-modeling/)** | Database and data model design covering relational schemas, NoSQL patterns, migrations (expand-contract), ORM patterns, and schema evolution. | Designing database schemas, choosing between relational and NoSQL, planning migrations, modeling entities and relationships. |
+| **[performance-architecture](performance-architecture/)** | Performance as an architectural concern: caching strategies, benchmarking methodology, capacity planning, concurrency patterns, and scaling decisions. | Designing for performance, choosing caching strategies, sizing connection pools, planning capacity, setting up load testing. |
+
 ### Software Development
 
 | Skill                                       | Description                                                                                                      | When to Use                                                                                             |

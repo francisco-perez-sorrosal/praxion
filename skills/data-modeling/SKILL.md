@@ -151,6 +151,7 @@ ORMs reduce boilerplate for standard CRUD operations. Use them as a starting poi
 
 ## Integration with Other Skills
 
+- **[API Design](../api-design/SKILL.md)** -- data models inform API resource surfaces; schema evolution rules complement API versioning
 - **[Python Development](../python-development/SKILL.md)** -- SQLAlchemy and Pydantic model patterns when working in Python
 - **[CI/CD](../cicd/SKILL.md)** -- running migration checks and schema validation in CI pipelines
 

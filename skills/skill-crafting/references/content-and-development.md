@@ -14,6 +14,26 @@ When deciding how to encode behavior in your skill, match the content type to th
 
 Prefer scripts for anything a linter, formatter, or validator could do -- deterministic checks are cheaper and more reliable than LLM reasoning. Reserve prose instructions for decisions that genuinely require judgment.
 
+## Gotchas Sections
+
+Build a gotchas section early and grow it iteratively through the author-tester workflow:
+
+1. Use the skill on real tasks and note where the agent fails or deviates
+2. Add each failure as a concise gotcha with the wrong behavior and the correct approach
+3. Prioritize gotchas that challenge the agent's default reasoning over obvious reminders
+
+Structure:
+
+```markdown
+## Gotchas
+
+- **Wrong**: `client.query(sql)` returns a cursor, not results. **Right**: Call `.fetchall()` on the cursor
+- **Wrong**: Timestamps default to local time. **Right**: Always use `datetime.utcnow()` or `datetime.now(timezone.utc)`
+- **Wrong**: The `--force` flag skips validation. **Right**: Use `--force-with-lease` to preserve safety checks
+```
+
+Gotchas accumulate over time. Each iteration of the author-tester workflow may surface new ones. Keep the section near the top of the skill body -- it is the content most likely to prevent errors.
+
 ## Workflows with Feedback Loops
 
 For complex tasks, provide step-by-step checklists the agent can track:
@@ -51,6 +71,8 @@ Build evaluations BEFORE writing extensive documentation:
 4. Bring observations back to Instance A for refinements
 5. Repeat until the skill reliably handles target scenarios
 
+**Adversarial review variant**: For code quality and review skills, spawn a fresh-eyes subagent to critique the skill's output. The subagent applies the skill, then a second subagent reviews the result without knowing the original intent. Iterate until findings degrade to nitpicks. This catches blind spots the original author misses.
+
 ## Observe Navigation Patterns
 
 Watch how the agent uses the skill:
@@ -80,3 +102,80 @@ MAX_RETRIES = 3
 **Package Dependencies**: List required packages and verify availability.
 
 **MCP Tool Names**: Use fully qualified format: `ServerName:tool_name`
+
+## Visual Analysis
+
+When skill inputs or outputs can be rendered as images, use the agent's vision capabilities for verification:
+
+```markdown
+## Layout verification
+
+1. Convert the output to an image: `python scripts/render_preview.py output.pdf`
+2. Analyze the rendered image to verify field placement and formatting
+3. Compare against the expected layout
+```
+
+This pattern is particularly useful for PDF form filling, UI scaffolding, document generation, and any skill where visual correctness matters more than textual content.
+
+## Deprecated Content
+
+When a skill covers evolving APIs or workflows, use collapsible "Old patterns" sections instead of time-based conditionals:
+
+```markdown
+## Current method
+
+Use the v2 API endpoint: `api.example.com/v2/messages`
+
+## Old patterns
+
+<details>
+<summary>Legacy v1 API (deprecated 2025-08)</summary>
+
+The v1 API used: `api.example.com/v1/messages`
+
+This endpoint is no longer supported.
+</details>
+```
+
+Never use time-based conditionals ("If before August 2025, use X"). They become wrong silently. The old patterns section provides historical context without cluttering main content.
+
+## Configuration and Setup
+
+For skills that need user-specific setup (API keys, project paths, tool preferences), store configuration in structured files:
+
+```markdown
+## Setup
+
+This skill reads configuration from `config.json` in the skill directory:
+
+```json
+{
+  "api_endpoint": "https://api.example.com",
+  "default_format": "markdown"
+}
+```
+
+When setup varies by user, prompt for necessary details (e.g., via AskUserQuestion in Claude Code) with structured choices rather than expecting users to manually edit config files.
+```
+
+## Measurement and Tracking
+
+Track skill adoption and effectiveness using PreToolUse hooks that parse the hook's stdin JSON payload. Log which skills activate, how often, and in what contexts:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Read",
+      "hooks": [{
+        "type": "command",
+        "command": "python3 -c \"import sys,json; d=json.load(sys.stdin); print(f'{d.get(\\\"tool_name\\\",\\\"unknown\\\")}', file=open('/tmp/skill-usage.log','a'))\""
+      }]
+    }]
+  }
+}
+```
+
+Note: Hook payloads arrive via stdin as JSON, not as environment variables. Parse the payload to extract tool and context information.
+
+Compare actual activation frequency against expectations. Skills that under-trigger may need better descriptions. Skills that over-trigger may need narrower descriptions. Skills that activate but produce poor results need content improvements.

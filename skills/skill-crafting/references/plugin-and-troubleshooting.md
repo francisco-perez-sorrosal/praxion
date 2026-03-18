@@ -29,6 +29,50 @@ Add a wildcard allowlist to avoid this:
 
 Use `/context` to inspect what's currently loaded in the context window, including which skills and reference files have been read. Useful for verifying progressive disclosure is working as intended.
 
+## Recommended Hooks
+
+Skills cannot install hooks at runtime -- hooks are defined statically in `settings.json` or `settings.local.json`. However, a skill should document recommended hooks that users can configure to complement the skill's behavior:
+
+```markdown
+## Recommended hooks
+
+Add this PreToolUse hook to your `settings.json` to guard against destructive commands when working with databases:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Bash",
+      "hooks": [{
+        "type": "prompt",
+        "prompt": "If the command contains 'rm -rf', 'DROP TABLE', or 'force push', BLOCK it and suggest the safe alternative."
+      }]
+    }]
+  }
+}
+```
+```
+
+Document domain-specific hooks in the skill body so users can adopt them selectively. A database skill should recommend guarding against `DROP TABLE`; a deployment skill should recommend guarding against force-pushes. Users decide which hooks to enable based on their workflow.
+
+## Persistent State
+
+Skills that need memory across sessions (accumulated gotchas, user preferences, execution logs) use append-only files or structured data:
+
+```markdown
+## Execution log
+
+After each run, append results to the log:
+
+```bash
+echo "$(date -Iseconds) | $STATUS | $DETAILS" >> execution_log.txt
+```
+
+Use the log to maintain consistency across executions and track patterns.
+```
+
+For plugin-distributed skills, store persistent data in `${CLAUDE_PLUGIN_DATA}` directories to survive skill upgrades (the plugin cache gets overwritten on reinstall, but `CLAUDE_PLUGIN_DATA` persists). Use append-only logs or JSON files -- avoid databases unless the skill genuinely needs query capabilities.
+
 ## Anti-Patterns
 
 - Vague descriptions ("Helps with documents")

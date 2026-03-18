@@ -20,6 +20,7 @@ Guide for creating effective Agent Skills. Official specification at [agentskill
 - [references/content-and-development.md](references/content-and-development.md) -- content type selection, feedback loops, evaluation-driven development
 - [references/output-patterns.md](references/output-patterns.md) -- template and examples patterns for skill output
 - [references/workflows.md](references/workflows.md) -- sequential and conditional workflow patterns
+- [references/skill-categories.md](references/skill-categories.md) -- nine skill archetype categories from Anthropic's internal practice
 - [references/plugin-and-troubleshooting.md](references/plugin-and-troubleshooting.md) -- plugin mechanics, anti-patterns, troubleshooting
 
 ## About Skills
@@ -32,7 +33,9 @@ Skills are modular, self-contained packages that extend agent capabilities with 
 
 **The agent is already smart.** Only include information the model does not possess. Challenge each piece: "Does the agent really need this?" If in doubt, leave it out.
 
-**But not all agents are equally capable.** Skills may be consumed by agents with varying model capabilities. Avoid explaining universal knowledge (basic syntax, common idioms), but include enough context -- concrete examples, complete workflows, and explicit decision criteria -- so specific conventions can be followed correctly by less capable agents too. Examples and workflows are robust across the capability spectrum: they guide weaker agents without burdening stronger ones.
+**But not all agents are equally capable.** Skills may be consumed by agents with varying model capabilities. Avoid explaining universal knowledge (basic syntax, common idioms), but include enough context -- concrete examples, complete workflows, and explicit decision criteria -- so specific conventions can be followed correctly by less capable agents too. Examples and workflows are robust across the capability spectrum: they guide weaker agents without burdening stronger ones. Test with all models you plan to use -- what works perfectly for Opus might need more guidance for Haiku.
+
+**Gotchas are the highest-signal content.** The most valuable part of many skills is the list of non-obvious failure points -- things the agent gets wrong by default. Build a gotchas section early and grow it as you observe failures. One targeted gotcha prevents more errors than a page of general instructions. Focus on information that breaks the agent's default reasoning, not on restating what it already knows.
 
 **Conciseness.** Aim to keep SKILL.md concise (500 lines is a good guideline, not a hard limit). Use progressive disclosure -- split detailed content into separate files loaded on-demand. Every instruction added dilutes the weight of every other instruction, in the skill and in others.
 
@@ -88,7 +91,13 @@ The directory name is the skill's identity (Claude Code infers the name from it)
 
 #### Description Best Practices
 
-Write in third person -- the description is injected into the system prompt. Include what the skill does, specific trigger terms, and key use cases.
+The description is not a summary -- it is a trigger specification. Claude uses it to decide whether to activate the skill from potentially hundreds of candidates. Write in third person (injected into the system prompt). Focus on:
+
+- **What the skill does**: the capability it provides
+- **When to trigger it**: specific contexts, tasks, or user phrasings that should activate it
+- **Key terms**: domain vocabulary the agent should match against
+
+Avoid vague descriptions ("Helps with documents"). Include terms that challenge the agent's default reasoning -- if the agent would handle the task differently without the skill, the description should signal that difference.
 
 ### Bundled Resources
 
@@ -180,6 +189,8 @@ Follow these steps in order, skipping only with clear reason.
 
 Skip only when usage patterns are already clearly understood.
 
+Identify which [skill category](references/skill-categories.md) the skill falls into -- this guides structural decisions (scripts vs. references vs. assets, verification approach, content type).
+
 Understand concrete examples of how the skill will be used. Ask questions like:
 
 - "What functionality should this skill support?"
@@ -241,6 +252,22 @@ Use the skill on real tasks. Observe behavior -- where it struggles, succeeds, o
 
 --> See [references/content-and-development.md](references/content-and-development.md#evaluation-driven-development) for the full evaluation-driven development process.
 
+## Skill Composition
+
+Skills can reference each other by name when dependencies exist:
+
+```markdown
+For database schema conventions, see the `data-modeling` skill.
+```
+
+Keep cross-references lightweight -- name the skill, describe why to consult it. Avoid deep dependency chains between skills. The agent resolves these references through its own discovery mechanism.
+
+## Skill Categories
+
+Skills cluster into recurring archetypes. When creating a skill, consider which category it falls into -- this shapes its structure, content type, and testing approach.
+
+--> See [references/skill-categories.md](references/skill-categories.md) for the nine categories with descriptions and structural guidance for each.
+
 ## Cross-Agent Portability
 
 The [Agent Skills standard](https://agentskills.io) is adopted by 25+ tools including Claude Code, Cursor, VS Code/Copilot, OpenAI Codex, Gemini CLI, Roo Code, Goose, Amp, and others.
@@ -259,6 +286,7 @@ Keep SKILL.md body in standard markdown. Isolate tool-specific instructions behi
 - [Authoring Best Practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)
 - [Example Skills](https://github.com/anthropics/skills) -- Anthropic's official reference implementations
 - [Validation Library (skills-ref)](https://github.com/agentskills/agentskills/tree/main/skills-ref)
+- [Lessons from Building Claude Code: How We Use Skills](https://www.techtwitter.com/articles/lessons-from-building-claude-code-how-we-use-skills) -- Anthropic's internal skill practices (Thariq Shihipar)
 - [Awesome Agent Skills](https://github.com/VoltAgent/awesome-agent-skills) -- Curated collection of 200+ skills
 - [Vercel Labs Skills](https://github.com/vercel-labs/agent-skills) -- Reference implementations from Vercel
 - [Claude Skills Deep Dive](https://leehanchung.github.io/blogs/2025/10/26/claude-skills-deep-dive/) -- Architectural analysis
@@ -277,7 +305,8 @@ Before deploying a skill:
 - [ ] Consistent terminology throughout
 - [ ] Concrete examples provided
 - [ ] Progressive disclosure (metadata --> instructions --> resources)
-- [ ] No time-sensitive information
+- [ ] Gotchas section for common failure points (if applicable)
+- [ ] No time-sensitive information (use collapsible "Old patterns" sections for deprecated content)
 - [ ] No duplication between SKILL.md and reference files
 - [ ] Writing uses imperative/infinitive form
 

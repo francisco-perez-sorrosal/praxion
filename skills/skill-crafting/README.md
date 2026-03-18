@@ -33,7 +33,8 @@ Trigger explicitly by asking about "agent skills," "creating a skill," or refere
 | `references/content-and-development.md` | Content type selection, feedback loops, evaluation-driven development |
 | `references/output-patterns.md` | Template and examples patterns for skill output |
 | `references/workflows.md` | Sequential and conditional workflow patterns |
-| `references/plugin-and-troubleshooting.md` | Plugin mechanics, anti-patterns, troubleshooting |
+| `references/skill-categories.md` | Nine skill archetype categories from Anthropic's internal practice |
+| `references/plugin-and-troubleshooting.md` | Plugin mechanics, anti-patterns, recommended hooks, persistent state, troubleshooting |
 | `scripts/init_skill.py` | Scaffold a new skill directory from template |
 | `scripts/package_skill.py` | Create a distributable .skill archive (validates first) |
 | `scripts/validate.py` | Quick validation of skill structure and frontmatter |

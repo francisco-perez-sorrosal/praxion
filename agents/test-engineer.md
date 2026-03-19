@@ -66,7 +66,7 @@ Before writing tests, detect the project language to load the right test framewo
 4. Identify the test framework in use (`pytest`, `jest`, `vitest`, `cargo test`, `go test`, etc.) from config files and existing tests
 5. Match the project's existing test patterns: directory structure, fixture conventions, assertion style, test naming
 
-The three statically-injected skills (`software-planning`, `code-review`, `refactoring`) are always available. Language skills are loaded on demand based on the project.
+The three statically-injected skills (`software-planning`, `code-review`, `refactoring`) are always available. Language skills are loaded on demand based on the project. If the project involves AI agents (detected via agentic SDK dependencies, agent configuration files, or step description mentioning "agent eval"), also load `skills/agent-evals/SKILL.md` for agent-specific evaluation patterns -- non-determinism handling, trajectory evaluation, LLM-as-judge grading, and eval framework selection.
 
 ## Input Protocol
 

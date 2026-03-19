@@ -44,7 +44,8 @@ Before making changes, gather context:
 2. **Read project config** -- check `pyproject.toml`, `package.json`, `Cargo.toml`, `go.mod` for language and tooling
 3. **Read the cicd skill** -- load `skills/cicd/SKILL.md` for core principles and patterns
 4. **Load references on demand** -- load `skills/cicd/references/github-actions.md` for syntax details, `skills/cicd/references/patterns-and-examples.md` for complete workflow templates
-5. **Determine mode** -- new pipeline, optimization, debugging, security review, or migration
+5. **Check for agent projects** -- if the project involves AI agents (agentic SDK dependencies, agent configs), also load `skills/agent-evals/SKILL.md` for eval-specific CI/CD patterns (eval-on-commit, deployment gates, regression tracking)
+6. **Determine mode** -- new pipeline, optimization, debugging, security review, or migration
 
 ### Phase 2 -- Design or Diagnose (2/6)
 

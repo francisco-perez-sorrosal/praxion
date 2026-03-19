@@ -113,6 +113,7 @@ When tests exist or are expected:
 2. Note untested edge cases in complex logic
 3. Review test results if available (read results, never execute tests)
 4. Flag if the plan required tests that were not written
+5. When verifying agent-based systems, consult the `agent-evals` skill for agent-specific evaluation methodology (non-determinism handling, trajectory evaluation, grader design)
 
 ### Phase 6 -- Context Artifact Completeness (pipeline mode only)
 

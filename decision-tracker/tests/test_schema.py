@@ -89,6 +89,16 @@ class TestDecision:
                 source="agent",
             )
 
+    def test_pending_status_valid(self):
+        d = Decision(
+            status="pending",
+            category="architectural",
+            decision="Use Redis",
+            made_by="agent",
+            source="hook",
+        )
+        assert d.status == "pending"
+
     def test_invalid_category_raises(self):
         with pytest.raises(ValidationError):
             Decision(

@@ -240,12 +240,13 @@ class TestExtractGatingTierBlocks:
                 _handle_extract(SimpleNamespace(command="extract"))
             assert exc_info.value.code == 2
 
-        # Pending file should exist
+        # Pending file should exist with decisions in "pending" status
         pending_path = tmp_path / PENDING_FILENAME
         assert pending_path.is_file()
         pending = json.loads(pending_path.read_text(encoding="utf-8"))
         assert pending["tier"] == "standard"
         assert len(pending["decisions"]) == 1
+        assert pending["decisions"][0]["status"] == "pending"
 
         # stderr should have review_required
         captured = capsys.readouterr()
@@ -360,10 +361,10 @@ class TestExtractFailOpenOnError:
 
 
 class TestExtractPendingResolution:
-    def test_resolved_pending_appended_and_file_deleted(
+    def test_approved_pending_appended_and_file_deleted(
         self, tmp_path: Path, capsys: pytest.CaptureFixture
     ) -> None:
-        # Create pending file with an approved decision (status != "pending")
+        """Full review cycle: pending -> approved -> logged."""
         pending_path = tmp_path / PENDING_FILENAME
         pending_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -391,14 +392,132 @@ class TestExtractPendingResolution:
                 _handle_extract(SimpleNamespace(command="extract"))
             assert exc_info.value.code == 0
 
-        # Pending file should be deleted
         assert not pending_path.is_file()
-
-        # Decision should be in log
         entries = _read_log_entries(tmp_path / DECISIONS_FILENAME)
         assert len(entries) == 1
         assert entries[0]["decision"] == "Use Redis for caching"
         assert entries[0]["status"] == "approved"
+
+    def test_rejected_pending_logged_for_audit_trail(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture
+    ) -> None:
+        """Rejected decisions are still logged for audit trail."""
+        pending_path = tmp_path / PENDING_FILENAME
+        pending_path.parent.mkdir(parents=True, exist_ok=True)
+
+        rejected_decision = Decision(
+            status="rejected",
+            category="implementation",
+            decision="Use global mutable state",
+            made_by="agent",
+            source="hook",
+            rejection_reason="Violates immutability principle",
+        )
+        pending = PendingDecisions(
+            tier="standard",
+            session_id="sess-abc",
+            decisions=[rejected_decision],
+        )
+        pending_path.write_text(pending.model_dump_json(indent=2), encoding="utf-8")
+
+        payload = _make_hook_payload(command="git commit -m 'reviewed'", cwd=str(tmp_path))
+
+        with (
+            patch("sys.stdin", StringIO(payload)),
+            patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                _handle_extract(SimpleNamespace(command="extract"))
+            assert exc_info.value.code == 0
+
+        assert not pending_path.is_file()
+        entries = _read_log_entries(tmp_path / DECISIONS_FILENAME)
+        assert len(entries) == 1
+        assert entries[0]["status"] == "rejected"
+        assert entries[0]["rejection_reason"] == "Violates immutability principle"
+
+    def test_mixed_approved_and_rejected(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture
+    ) -> None:
+        """Mix of approved and rejected in one review — both logged."""
+        pending_path = tmp_path / PENDING_FILENAME
+        pending_path.parent.mkdir(parents=True, exist_ok=True)
+
+        decisions = [
+            Decision(
+                status="approved",
+                category="architectural",
+                decision="Use Redis",
+                made_by="agent",
+                source="hook",
+            ),
+            Decision(
+                status="rejected",
+                category="implementation",
+                decision="Use global state",
+                made_by="agent",
+                source="hook",
+                rejection_reason="Bad practice",
+            ),
+        ]
+        pending = PendingDecisions(tier="standard", decisions=decisions)
+        pending_path.write_text(pending.model_dump_json(indent=2), encoding="utf-8")
+
+        payload = _make_hook_payload(command="git commit -m 'mixed'", cwd=str(tmp_path))
+
+        with (
+            patch("sys.stdin", StringIO(payload)),
+            patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                _handle_extract(SimpleNamespace(command="extract"))
+            assert exc_info.value.code == 0
+
+        assert not pending_path.is_file()
+        entries = _read_log_entries(tmp_path / DECISIONS_FILENAME)
+        assert len(entries) == 2
+        assert entries[0]["status"] == "approved"
+        assert entries[1]["status"] == "rejected"
+
+        captured = capsys.readouterr()
+        output = json.loads(captured.err)
+        assert "1 approved" in output["message"]
+        assert "1 rejected" in output["message"]
+
+    def test_unresolved_pending_blocks_again(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture
+    ) -> None:
+        """Pending decisions that haven't been reviewed still block."""
+        pending_path = tmp_path / PENDING_FILENAME
+        pending_path.parent.mkdir(parents=True, exist_ok=True)
+
+        unresolved = Decision(
+            status="pending",
+            category="architectural",
+            decision="Use Redis",
+            made_by="agent",
+            source="hook",
+        )
+        pending = PendingDecisions(tier="standard", decisions=[unresolved])
+        pending_path.write_text(pending.model_dump_json(indent=2), encoding="utf-8")
+
+        payload = _make_hook_payload(command="git commit -m 'retry'", cwd=str(tmp_path))
+
+        with (
+            patch("sys.stdin", StringIO(payload)),
+            patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                _handle_extract(SimpleNamespace(command="extract"))
+            assert exc_info.value.code == 2
+
+        # Pending file should still exist
+        assert pending_path.is_file()
+
+        captured = capsys.readouterr()
+        output = json.loads(captured.err)
+        assert output["status"] == "review_required"
+        assert output["count"] == 1
 
 
 # ---------------------------------------------------------------------------

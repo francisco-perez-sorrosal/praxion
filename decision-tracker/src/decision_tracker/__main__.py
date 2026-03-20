@@ -181,11 +181,22 @@ def _handle_pending(pending_path: Path, log_path: Path) -> None:
         )
         sys.exit(2)
 
-    # All resolved: append approved ones
-    approved = [d for d in pending.decisions if d.status in ("approved", "auto-approved")]
-    for decision in approved:
+    # All resolved: append to log (both approved and rejected for audit trail)
+    resolved = [d for d in pending.decisions if d.status in ("approved", "rejected")]
+    for decision in resolved:
         append_decision(log_path, decision)
     pending_path.unlink()
+
+    approved_count = sum(1 for d in resolved if d.status == "approved")
+    rejected_count = sum(1 for d in resolved if d.status == "rejected")
+    _emit_hook_output(
+        HookOutput(
+            status="auto_logged",
+            count=len(resolved),
+            tier=pending.tier,
+            message=f"Review complete: {approved_count} approved, {rejected_count} rejected.",
+        )
+    )
     sys.exit(0)
 
 
@@ -196,6 +207,10 @@ def _gate_decisions(
     pending_path: Path,
 ) -> None:
     """Write pending file and exit with gating code."""
+    # Mark decisions as pending review — _handle_pending checks for this status
+    for d in novel:
+        d.status = "pending"  # type: ignore[assignment]
+
     pending = PendingDecisions(
         tier=tier,  # type: ignore[arg-type]
         session_id=session_id,

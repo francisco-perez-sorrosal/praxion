@@ -8,7 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-StatusType = Literal["approved", "auto-approved", "documented", "rejected"]
+StatusType = Literal["pending", "approved", "auto-approved", "documented", "rejected"]
 CategoryType = Literal[
     "architectural", "behavioral", "implementation", "configuration", "calibration"
 ]

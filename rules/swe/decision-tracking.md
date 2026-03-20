@@ -20,7 +20,7 @@ Each line in `decisions.jsonl` is a JSON object:
 | `id` | string | Yes | `"dec-"` + 12-char UUID fragment |
 | `version` | int | Yes | Schema version (initially `1`) |
 | `timestamp` | string | Yes | ISO 8601 UTC creation time |
-| `status` | string | Yes | `approved` / `auto-approved` / `documented` / `rejected` |
+| `status` | string | Yes | `pending` / `approved` / `auto-approved` / `documented` / `rejected` |
 | `category` | string | Yes | `architectural` / `behavioral` / `implementation` / `configuration` / `calibration` |
 | `question` | string | No | What was being decided |
 | `decision` | string | Yes | The choice that was made |
@@ -42,7 +42,8 @@ Each line in `decisions.jsonl` is a JSON object:
 
 ### Status Semantics
 
-- **`approved`** — user explicitly approved during Standard/Full review (hook path)
+- **`pending`** — extracted by the hook, awaiting user review (Standard/Full tiers only)
+- **`approved`** — user explicitly approved during review (hook path)
 - **`auto-approved`** — silently logged during Direct/Lightweight/Spike tiers (hook path)
 - **`documented`** — written directly by an agent (primary path, no review needed)
 - **`rejected`** — user rejected during review (still logged for audit trail)
@@ -75,6 +76,17 @@ uv run --project <decision-tracker-path> python -m decision_tracker write \
 ```
 
 The human-readable LEARNINGS.md entry and the machine-readable JSONL entry coexist — LEARNINGS.md is the authoring surface, `decisions.jsonl` is the audit log.
+
+### Commit-Time Review Protocol (Standard/Full Tiers)
+
+When the hook blocks a `git commit` (exit code 2), the agent receives a JSON message on stderr with `status: "review_required"` and a `decisions` array. The agent must:
+
+1. **Present** each decision to the user with its `decision` text, `category`, and `confidence`
+2. **Collect** the user's response for each: approve, reject (with optional reason), or edit (modify the text)
+3. **Update** `.ai-work/.pending_decisions.json` — change each decision's `status` from `"pending"` to `"approved"` or `"rejected"`. For rejections, populate `rejection_reason`. For edits, update the `decision` text and set `status` to `"approved"`.
+4. **Re-commit** — the hook will see the resolved pending file, append all decisions (both approved and rejected) to the log, delete the pending file, and allow the commit
+
+If the user wants to skip review entirely, set all decisions to `"approved"` and re-commit.
 
 ### Consumption Patterns
 

@@ -122,6 +122,14 @@ For medium and large features, the pipeline activates spec-driven development --
 
 See [docs/spec-driven-development.md](docs/spec-driven-development.md) for the spec format, traceability flow, and comparison with spec-only tools.
 
+## Decision Tracking
+
+The pipeline captures decisions from AI-assisted development sessions in a machine-readable audit log (`.ai-state/decisions.jsonl`). Agents write decisions directly when they have full context (primary path), and a commit-time hook extracts undocumented decisions from conversation transcripts and diffs as a safety net. Tier-aware behavior silently logs for lightweight work and gates commits for review on substantive features.
+
+Unlike standalone decision extraction tools that bolt onto the development workflow, this system is native to the agent pipeline: dual-path capture instead of extraction-only, tier-aware gating instead of uniform application, and ecosystem consumption by sentinel, skill-genesis, and verifier agents.
+
+See [docs/decision-tracking.md](docs/decision-tracking.md) for the full architecture, comparison with other approaches, and schema reference.
+
 ## Skills
 
 Reusable knowledge modules loaded automatically based on context. See [`skills/README.md`](skills/README.md) for the full catalog.

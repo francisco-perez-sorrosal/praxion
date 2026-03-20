@@ -1,13 +1,14 @@
 ---
-description: Report spec-to-test and spec-to-code coverage for the current feature's behavioral specification
-allowed-tools: [Read, Grep, Glob, Bash(grep:*)]
+description: Report spec-to-test and spec-to-code coverage for REQ IDs
+argument-hint: [spec-path]
+allowed-tools: [Read, Grep, Glob]
 ---
 
-Scan the behavioral specification in `SYSTEMS_PLAN.md` and report which requirements have tests, which have implementations, and which are missing coverage. Runnable at any time during development — not just at verification.
+Scan the behavioral specification for REQ IDs and report which have tests, implementations, or are missing coverage. Runnable at any time during development.
 
 ## Process
 
-1. **Locate the spec**: Read `.ai-work/SYSTEMS_PLAN.md`. If it doesn't exist, check if an archived spec was provided as an argument. If no spec exists, report "No behavioral specification found" and stop.
+1. **Locate the spec**: If `$ARGUMENTS` is provided, use it as the spec path. Otherwise read `.ai-work/SYSTEMS_PLAN.md`. If neither exists, report "No behavioral specification found" and stop.
 
 2. **Extract REQ IDs**: Find all `### REQ-NN:` headings in the `## Behavioral Specification` section. For each, extract the ID and title.
 

@@ -1,6 +1,6 @@
 ---
 name: software-planning
-description: Planning complex software tasks using a three-document model (IMPLEMENTATION_PLAN.md, WIP.md, LEARNINGS.md) for tracking work in small, known-good increments. Use when starting significant development work, breaking down complex features, doing architecture planning, managing multi-session projects, or when the user mentions feature breakdown, work planning, or incremental development.
+description: Planning complex software tasks using a three-document model (IMPLEMENTATION_PLAN.md, WIP.md, LEARNINGS.md) for tracking work in small, known-good increments. Use when starting significant development work, breaking down complex features, doing architecture planning, managing multi-session projects, or when the user mentions feature breakdown, work planning, work breakdown, task tracking, WIP management, or incremental development.
 compatibility: Claude Code
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 ---
@@ -265,6 +265,14 @@ Use timeboxed **spike steps** for exploratory work. Spikes must produce a decisi
 --> See [references/decomposition-guide.md](references/decomposition-guide.md#handling-unknowns) for spike step templates and characteristics.
 
 ## Anti-Patterns
+
+Critical gotchas (most common planning failures):
+
+- **Letting WIP.md become stale** -- state drift between plan and reality causes cascading wrong decisions downstream
+- **Vague "done when" criteria** -- "when it works" is not verifiable; leads to premature step completion or scope creep
+- **Changing plans silently** -- unannounced plan changes break coordination and trust; all changes require discussion and approval
+- **Steps spanning multiple commits** -- violates the known-good-increment principle; if a step needs multiple commits, break it down further
+- **Keeping planning docs after feature complete** -- stale documents pollute future context loads; merge learnings to permanent locations and delete
 
 --> See [references/decomposition-guide.md](references/decomposition-guide.md#anti-patterns) for the full list of planning anti-patterns to avoid.
 

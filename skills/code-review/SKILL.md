@@ -4,7 +4,8 @@ description: >
   Structured code review methodology with finding classification (PASS/FAIL/WARN),
   language adaptation, and report templates. Use when reviewing code for convention
   compliance, conducting post-implementation verification, reviewing pull requests,
-  or performing ad-hoc code quality assessments.
+  or performing ad-hoc code quality assessments. Also activates for PR review,
+  code audit, and code quality checks.
 allowed-tools: [Read, Glob, Grep, Bash]
 compatibility: Claude Code
 ---
@@ -13,6 +14,17 @@ compatibility: Claude Code
 
 Structured review methodology for assessing code against documented conventions.
 Provides finding classification, language adaptation, and report templates.
+
+**Satellite files** (loaded on-demand):
+
+- [references/report-template.md](references/report-template.md) -- structured review report template with finding format and verdict scale
+
+## Gotchas
+
+- **Review scope in PR context**: Review only changed lines and their immediate context -- not the entire file. Reviewing unchanged code inflates findings and obscures the actual PR quality signal.
+- **Language adaptation is additive**: Entries in the Language Adaptation table extend the coding-style rule's generic conventions for a specific language. They do not replace the generic checks -- both layers apply.
+- **PASS verdict requires full coverage**: A PASS verdict means every convention category was checked and none produced FAIL or WARN findings. The absence of FAIL findings alone is not sufficient -- skipping a category entirely is not a PASS.
+- **Structural findings belong to refactoring**: When review findings indicate structural issues (module too large, deep coupling, misplaced responsibility), flag them but defer remediation to the `refactoring` skill rather than prescribing structural fixes inline.
 
 ## Relationship to coding-style Rule
 
@@ -125,3 +137,7 @@ that language-specific review was not available.
 
 See [references/report-template.md](references/report-template.md) for the
 canonical `VERIFICATION_REPORT.md` structure. Load on demand when producing a report.
+
+## Related Skills
+
+- **`refactoring`**: When review findings reveal structural issues (oversized modules, deep coupling, misplaced responsibilities), hand off to the `refactoring` skill for remediation planning rather than prescribing structural changes in the review report.

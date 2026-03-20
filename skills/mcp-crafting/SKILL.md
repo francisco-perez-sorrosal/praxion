@@ -1,6 +1,6 @@
 ---
 name: mcp-crafting
-description: Building MCP (Model Context Protocol) servers using official SDKs. Covers protocol concepts (tools, resources, prompts), transports (stdio, streamable HTTP), bundles (.mcpb), testing with MCP Inspector, client integration with Claude Desktop and Claude Code, logging, error handling, and security principles. Language modules available for Python (with FastMCP). Use when creating MCP servers, defining tools or resources, configuring transports, packaging bundles, testing MCP servers, or integrating with Claude.
+description: Building MCP (Model Context Protocol) servers using official SDKs. Covers protocol concepts (tools, resources, prompts), transports (stdio, streamable HTTP), bundles (.mcpb), testing with MCP Inspector, client integration with Claude Desktop and Claude Code, logging, error handling, and security principles. Language modules available for Python (with FastMCP). Use when creating MCP servers, defining MCP tools or MCP resources, configuring transports, packaging bundles, testing MCP servers, or integrating with Claude. Also relevant for MCP tool definition, MCP resource exposure, and FastMCP server patterns.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---
@@ -14,6 +14,8 @@ Build [Model Context Protocol](https://modelcontextprotocol.io) servers that exp
 - [references/resources.md](references/resources.md) -- full manifest specification, bundle structures, advanced examples
 - [references/python-resources.md](references/python-resources.md) -- Python-specific FastMCP patterns and examples
 - [../skill-crafting/references/artifact-naming.md](../skill-crafting/references/artifact-naming.md) -- naming conventions for all artifact types
+
+For MCP connector API features (calling MCP servers from the Messages API), consult the `claude-ecosystem` skill.
 
 ## Table of Contents
 

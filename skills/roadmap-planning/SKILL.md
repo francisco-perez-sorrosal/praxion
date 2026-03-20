@@ -14,7 +14,7 @@ allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 
 # Roadmap Planning
 
-Transform unstructured ideas into prioritized, sequenced plans. This skill sits between ideation (promethean) and specification (spec-driven-development) in the pipeline: promethean generates ideas; this skill organizes them into a roadmap; SDD turns roadmap items into behavioral specs.
+Transform unstructured ideas into prioritized, sequenced plans. Sits between ideation (promethean) and specification (spec-driven-development) in the pipeline: promethean generates ideas; this skill organizes them into a roadmap; SDD turns roadmap items into behavioral specs.
 
 **Satellite files** (loaded on-demand):
 
@@ -30,7 +30,7 @@ IDEA_LEDGER_*.md  ──►  ROADMAP.md + BACKLOG.md  ──►  SYSTEMS_PLAN.md
 (ideas)                (prioritized sequence)          (behavioral spec)
 ```
 
-The promethean produces ideas with impact/effort assessments. This skill consumes those assessments, applies structured prioritization, maps dependencies, and produces a sequenced roadmap. Individual roadmap items then flow into SDD for behavioral specification when they reach the "Now" horizon.
+The promethean produces ideas with impact/effort assessments. Consume those assessments, apply structured prioritization, map dependencies, and produce a sequenced roadmap. Individual roadmap items then flow into SDD for behavioral specification when they reach the "Now" horizon.
 
 ## Core Workflow
 

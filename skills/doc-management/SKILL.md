@@ -22,7 +22,7 @@ Procedural expertise for writing, maintaining, and validating project-facing doc
 
 ## Relationship to readme-style Rule
 
-This skill does not define documentation conventions -- it defines how to apply them.
+Does not define documentation conventions -- defines how to apply them.
 
 - **readme-style rule** (auto-loaded): defines WHAT documentation conventions to follow (writing style, structural integrity, naming consistency)
 - **doc-management skill** (this file): defines HOW to author, validate, and maintain documentation

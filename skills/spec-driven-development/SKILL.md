@@ -33,7 +33,7 @@ Behavioral specifications bridge architecture and implementation by giving each 
 
 Before selecting a process tier, the main agent runs a structured calibration assessment at task intake. The procedure collects 6 objective signals (file count proxy, behavior count, architectural scope, prior spec existence, test coverage, request complexity), scores them against a weighted matrix, and produces a tier recommendation with per-signal evidence. The user can override at any time. Decisions are logged to `.ai-state/calibration_log.md` for trend analysis.
 
-**Calibration selects the tier; complexity triage refines spec depth within it.** These are two stages of the same decision — calibration determines how much pipeline machinery to deploy (Direct through Full), then triage determines how detailed the behavioral specification should be (trivial through large).
+**Calibration selects the tier; complexity triage refines spec depth within it.** Two stages of the same decision — calibration determines how much pipeline machinery to deploy (Direct through Full), then triage determines how detailed the behavioral specification should be (trivial through large).
 
 --> See [references/calibration-procedure.md](references/calibration-procedure.md) for the full signal catalog, scoring matrix, evidence output template, and assessment examples.
 

@@ -132,7 +132,7 @@ See [references/sdk-patterns.md](references/sdk-patterns.md) for initialization,
 
 ## Ecosystem Relationships
 
-This skill provides the **platform knowledge layer** -- what the Claude API offers, which SDK to use, which model fits a task, and where to find documentation. It does not cover how to build specific artifact types or use specific tools.
+The **platform knowledge layer** -- what the Claude API offers, which SDK to use, which model fits a task, and where to find documentation. Does not cover how to build specific artifact types or use specific tools.
 
 **Boundaries with related skills and agents:**
 

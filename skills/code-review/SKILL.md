@@ -28,7 +28,7 @@ Provides finding classification, language adaptation, and report templates.
 
 ## Relationship to coding-style Rule
 
-This skill does not define conventions -- it defines how to review against them.
+Does not define conventions -- defines how to review against them.
 
 - **coding-style rule** (auto-loaded): defines WHAT conventions to check
 - **code-review skill** (this file): defines HOW to conduct a review
@@ -84,7 +84,7 @@ Severity within FAIL/WARN:
 
 ## Report Modes
 
-The skill adapts its output based on available context:
+Adapt output based on available context:
 
 ### Pipeline Mode
 
@@ -103,8 +103,7 @@ When invoked directly by a user (no pipeline documents):
 
 ## Language Adaptation
 
-The coding-style rule is language-independent. This skill maps generic conventions
-to language-specific idioms when reviewing code.
+The coding-style rule is language-independent. Map generic conventions to language-specific idioms when reviewing code.
 
 ### Detection
 

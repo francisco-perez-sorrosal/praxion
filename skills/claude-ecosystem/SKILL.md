@@ -4,8 +4,9 @@ description: Anthropic Claude platform knowledge -- Claude API features, Anthrop
   usage patterns, model selection guidance, extended thinking, batch processing, prompt
   caching, structured outputs, token counting, Files API, and ecosystem navigation.
   Use when building applications with the Claude Messages API, choosing between Claude
-  models, integrating Anthropic client SDKs (Python or TypeScript), choosing between
-  Agent SDK and Messages API, or navigating Anthropic documentation.
+  models (which model to use), integrating Anthropic client SDKs (Python or TypeScript),
+  SDK selection, choosing between Agent SDK and Messages API, Claude API integration,
+  or navigating Anthropic documentation.
 allowed-tools: [Read, Glob, Grep]
 compatibility: Claude Code
 ---
@@ -20,6 +21,14 @@ Structured knowledge of the Anthropic/Claude platform -- models, API features, S
 - [references/sdk-patterns.md](references/sdk-patterns.md) -- SDK idioms, async patterns, error handling, Agent SDK
 - [references/docs-map.md](references/docs-map.md) -- documentation site navigation, repo index, LLM-friendly URLs
 - [references/platform-services.md](references/platform-services.md) -- batch processing, prompt caching, Files API, data residency
+
+## Gotchas
+
+- **Prompt caching silently ignores small blocks**: Content below 1024 tokens (Opus/Sonnet) or 2048 tokens (Haiku) is never cached regardless of `cache_control` markers -- no error returned, just no cache. See [references/platform-services.md](references/platform-services.md).
+- **1M context requires a beta header**: The default context limit is 200K. Extended context (1M tokens) requires the `interleaved-thinking-2025-05-14` or `extended-context` beta header -- without it, requests exceeding 200K fail.
+- **`max_tokens` has no default**: Every `messages.create` call must set `max_tokens` explicitly. Omitting it produces an API error, not a sensible default. See [references/sdk-patterns.md](references/sdk-patterns.md).
+- **Extended thinking is incompatible with `temperature`**: When using `thinking.budget_tokens`, temperature must be unset or exactly 1. Any other value produces an error.
+- **System prompt is not in the messages array**: Use the top-level `system` parameter. Placing the system prompt as `role: "system"` in `messages` does not work -- it is not a valid role in the Claude Messages API.
 
 ## Current Model Lineup
 

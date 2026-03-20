@@ -521,6 +521,343 @@ class TestExtractPendingResolution:
 
 
 # ---------------------------------------------------------------------------
+# _to_decision conversion tests
+# ---------------------------------------------------------------------------
+
+
+class TestToDecisionAffectedReqs:
+    def test_affected_reqs_propagated(self) -> None:
+        from decision_tracker.__main__ import _to_decision
+
+        ed = _make_extracted_decision(affected_reqs=["REQ-01", "REQ-03"])
+        decision = _to_decision(ed, session_id=None, branch=None, commit_sha=None, tier="standard")
+
+        assert decision.affected_reqs == ["REQ-01", "REQ-03"]
+
+    def test_affected_reqs_none_propagated(self) -> None:
+        from decision_tracker.__main__ import _to_decision
+
+        ed = _make_extracted_decision()  # affected_reqs defaults to None
+        decision = _to_decision(ed, session_id=None, branch=None, commit_sha=None, tier="direct")
+
+        assert decision.affected_reqs is None
+        assert decision.source == "hook"
+        assert decision.status == "documented"
+
+
+# ---------------------------------------------------------------------------
+# _detect_branch / _detect_commit_sha error handling tests
+# ---------------------------------------------------------------------------
+
+
+class TestDetectGitMetadataErrors:
+    def test_detect_branch_returns_none_on_failure(self, tmp_path: Path) -> None:
+        from decision_tracker.__main__ import _detect_branch
+
+        # tmp_path is not a git repo — git rev-parse will fail
+        result = _detect_branch(tmp_path)
+        assert result is None
+
+    def test_detect_commit_sha_returns_none_on_failure(self, tmp_path: Path) -> None:
+        from decision_tracker.__main__ import _detect_commit_sha
+
+        # tmp_path is not a git repo — git rev-parse will fail
+        result = _detect_commit_sha(tmp_path)
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Propose-amendment subcommand tests
+# ---------------------------------------------------------------------------
+
+
+SAMPLE_SPEC_CONTENT = """\
+## Behavioral Specification
+
+### REQ-01: Expired session rejected
+
+**When** a client sends an expired session token
+**the system** returns a 401 Unauthorized response
+**so that** the client knows to re-authenticate
+
+### REQ-02: Default role assignment
+
+**When** a new user registers
+**the system** assigns the viewer role
+**so that** the user has minimal permissions
+"""
+
+
+class TestProposeAmendmentNoSpec:
+    def test_returns_no_spec_when_file_missing(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture
+    ) -> None:
+        decisions_json = json.dumps([{"decision": "Use JWT", "affected_reqs": ["REQ-01"]}])
+
+        from decision_tracker.__main__ import _handle_propose_amendment
+
+        args = SimpleNamespace(
+            command="propose-amendment",
+            spec_path=str(tmp_path / "nonexistent.md"),
+            cwd=str(tmp_path),
+        )
+
+        with patch("sys.stdin", StringIO(decisions_json)):
+            _handle_propose_amendment(args)
+
+        captured = capsys.readouterr()
+        output = json.loads(captured.out)
+        assert output["status"] == "no_spec"
+
+
+class TestProposeAmendmentNoAffectedReqs:
+    def test_returns_no_affected_reqs(self, tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+        spec_file = tmp_path / "SYSTEMS_PLAN.md"
+        spec_file.write_text(SAMPLE_SPEC_CONTENT, encoding="utf-8")
+
+        decisions_json = json.dumps([{"decision": "Use JWT"}])
+
+        from decision_tracker.__main__ import _handle_propose_amendment
+
+        args = SimpleNamespace(
+            command="propose-amendment",
+            spec_path=str(spec_file),
+            cwd=str(tmp_path),
+        )
+
+        with patch("sys.stdin", StringIO(decisions_json)):
+            _handle_propose_amendment(args)
+
+        captured = capsys.readouterr()
+        output = json.loads(captured.out)
+        assert output["status"] == "no_affected_reqs"
+
+
+class TestProposeAmendmentReqsNotFound:
+    def test_returns_reqs_not_found(self, tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+        spec_file = tmp_path / "SYSTEMS_PLAN.md"
+        spec_file.write_text(SAMPLE_SPEC_CONTENT, encoding="utf-8")
+
+        decisions_json = json.dumps([{"decision": "Something", "affected_reqs": ["REQ-99"]}])
+
+        from decision_tracker.__main__ import _handle_propose_amendment
+
+        args = SimpleNamespace(
+            command="propose-amendment",
+            spec_path=str(spec_file),
+            cwd=str(tmp_path),
+        )
+
+        with patch("sys.stdin", StringIO(decisions_json)):
+            _handle_propose_amendment(args)
+
+        captured = capsys.readouterr()
+        output = json.loads(captured.out)
+        assert output["status"] == "reqs_not_found"
+        assert "REQ-99" in output["missing_reqs"]
+
+
+class TestProposeAmendmentGeneratesAmendments:
+    @patch("decision_tracker.amender.generate_amendments")
+    def test_full_flow_with_mocked_amender(
+        self,
+        mock_generate: MagicMock,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture,
+    ) -> None:
+        from decision_tracker.amender import SpecAmendment
+
+        spec_file = tmp_path / "SYSTEMS_PLAN.md"
+        spec_file.write_text(SAMPLE_SPEC_CONTENT, encoding="utf-8")
+
+        mock_generate.return_value = [
+            SpecAmendment(
+                req_id="REQ-01",
+                current_title="Expired session rejected",
+                proposed_title="Expired JWT rejected",
+                current_text="### REQ-01: Expired session rejected\n\n...",
+                proposed_text="### REQ-01: Expired JWT rejected\n\n...",
+                change_summary="Changed from session to JWT",
+            )
+        ]
+
+        decisions_json = json.dumps([{"decision": "Use JWT for auth", "affected_reqs": ["REQ-01"]}])
+
+        from decision_tracker.__main__ import _handle_propose_amendment
+
+        args = SimpleNamespace(
+            command="propose-amendment",
+            spec_path=str(spec_file),
+            cwd=str(tmp_path),
+        )
+
+        with patch("sys.stdin", StringIO(decisions_json)):
+            _handle_propose_amendment(args)
+
+        captured = capsys.readouterr()
+        output = json.loads(captured.out)
+        assert output["status"] == "amendments_proposed"
+        assert len(output["amendments"]) == 1
+        assert output["amendments"][0]["req_id"] == "REQ-01"
+        assert output["amendments"][0]["change_summary"] == "Changed from session to JWT"
+
+
+SAMPLE_PLAN_CONTENT = """\
+## Steps
+
+### Step 1: Implement auth
+
+**Implementation**: Write auth module
+**Testing**: Validates REQ-01
+**Done when**: Auth works
+
+### Step 2: Add roles
+
+**Implementation**: Role checking
+**Testing**: Validates REQ-02
+**Done when**: Roles assigned
+"""
+
+
+class TestProposeAmendmentWithPlanImpacts:
+    @patch("decision_tracker.amender.generate_amendments")
+    def test_plan_impacts_included_when_plan_exists(
+        self,
+        mock_generate: MagicMock,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture,
+    ) -> None:
+        from decision_tracker.amender import SpecAmendment
+
+        spec_file = tmp_path / "SYSTEMS_PLAN.md"
+        spec_file.write_text(SAMPLE_SPEC_CONTENT, encoding="utf-8")
+
+        # Create IMPLEMENTATION_PLAN.md in .ai-work/
+        plan_dir = tmp_path / ".ai-work"
+        plan_dir.mkdir(parents=True, exist_ok=True)
+        plan_file = plan_dir / "IMPLEMENTATION_PLAN.md"
+        plan_file.write_text(SAMPLE_PLAN_CONTENT, encoding="utf-8")
+
+        mock_generate.return_value = [
+            SpecAmendment(
+                req_id="REQ-01",
+                current_title="Expired session rejected",
+                proposed_title="Expired JWT rejected",
+                current_text="### REQ-01: ...",
+                proposed_text="### REQ-01: ...",
+                change_summary="Session to JWT",
+            )
+        ]
+
+        decisions_json = json.dumps([{"decision": "Use JWT", "affected_reqs": ["REQ-01"]}])
+
+        from decision_tracker.__main__ import _handle_propose_amendment
+
+        args = SimpleNamespace(
+            command="propose-amendment",
+            spec_path=str(spec_file),
+            cwd=str(tmp_path),
+        )
+
+        with patch("sys.stdin", StringIO(decisions_json)):
+            _handle_propose_amendment(args)
+
+        captured = capsys.readouterr()
+        output = json.loads(captured.out)
+        assert output["status"] == "amendments_proposed"
+        assert output["plan_impacts"] is not None
+        assert len(output["plan_impacts"]) == 1
+        assert "REQ-01" in output["plan_impacts"][0]["affected_reqs"]
+        assert "Step 1" in output["plan_impacts"][0]["step_heading"]
+
+    @patch("decision_tracker.amender.generate_amendments")
+    def test_no_plan_impacts_when_plan_missing(
+        self,
+        mock_generate: MagicMock,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture,
+    ) -> None:
+        from decision_tracker.amender import SpecAmendment
+
+        spec_file = tmp_path / "SYSTEMS_PLAN.md"
+        spec_file.write_text(SAMPLE_SPEC_CONTENT, encoding="utf-8")
+
+        mock_generate.return_value = [
+            SpecAmendment(
+                req_id="REQ-01",
+                current_title="Expired session rejected",
+                proposed_title="Expired JWT rejected",
+                current_text="### REQ-01: ...",
+                proposed_text="### REQ-01: ...",
+                change_summary="Session to JWT",
+            )
+        ]
+
+        decisions_json = json.dumps([{"decision": "Use JWT", "affected_reqs": ["REQ-01"]}])
+
+        from decision_tracker.__main__ import _handle_propose_amendment
+
+        args = SimpleNamespace(
+            command="propose-amendment",
+            spec_path=str(spec_file),
+            cwd=str(tmp_path),
+        )
+
+        with patch("sys.stdin", StringIO(decisions_json)):
+            _handle_propose_amendment(args)
+
+        captured = capsys.readouterr()
+        output = json.loads(captured.out)
+        assert output["status"] == "amendments_proposed"
+        # No plan_impacts key when plan doesn't exist
+        assert "plan_impacts" not in output
+
+
+class TestProposeAmendmentInvalidInput:
+    def test_invalid_json_returns_error(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture
+    ) -> None:
+        spec_file = tmp_path / "SYSTEMS_PLAN.md"
+        spec_file.write_text(SAMPLE_SPEC_CONTENT, encoding="utf-8")
+
+        from decision_tracker.__main__ import _handle_propose_amendment
+
+        args = SimpleNamespace(
+            command="propose-amendment",
+            spec_path=str(spec_file),
+            cwd=str(tmp_path),
+        )
+
+        with patch("sys.stdin", StringIO("not json")):
+            _handle_propose_amendment(args)
+
+        captured = capsys.readouterr()
+        output = json.loads(captured.out)
+        assert output["status"] == "error"
+        assert "Invalid JSON" in output["message"]
+
+    def test_non_array_returns_error(self, tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+        spec_file = tmp_path / "SYSTEMS_PLAN.md"
+        spec_file.write_text(SAMPLE_SPEC_CONTENT, encoding="utf-8")
+
+        from decision_tracker.__main__ import _handle_propose_amendment
+
+        args = SimpleNamespace(
+            command="propose-amendment",
+            spec_path=str(spec_file),
+            cwd=str(tmp_path),
+        )
+
+        with patch("sys.stdin", StringIO('{"not": "an array"}')):
+            _handle_propose_amendment(args)
+
+        captured = capsys.readouterr()
+        output = json.loads(captured.out)
+        assert output["status"] == "error"
+        assert "JSON array" in output["message"]
+
+
+# ---------------------------------------------------------------------------
 # Main / argparse integration tests
 # ---------------------------------------------------------------------------
 

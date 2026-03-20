@@ -100,6 +100,60 @@ class TestSystemsPlanTakesPriority:
 # ---------------------------------------------------------------------------
 
 
+class TestCalibrationLogEdgeCases:
+    def test_missing_tier_column_returns_direct(self, tmp_path: Path):
+        """Calibration log with no 'actual tier' or 'tier' column."""
+        log_dir = tmp_path / ".ai-state"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / "calibration_log.md"
+        log_path.write_text(
+            "| timestamp | task |\n|---|---|\n| 2026-03-19T12:00:00+00:00 | test |\n",
+            encoding="utf-8",
+        )
+        assert detect_tier(tmp_path) == "direct"
+
+    def test_invalid_tier_value_returns_direct(self, tmp_path: Path):
+        """Calibration log with an unrecognized tier value."""
+        recent = datetime.now(UTC) - timedelta(hours=1)
+        _write_calibration_log(tmp_path, tier="mega", timestamp=recent)
+        assert detect_tier(tmp_path) == "direct"
+
+    def test_unparseable_timestamp_returns_direct(self, tmp_path: Path):
+        """Calibration log with a malformed timestamp treats as stale."""
+        log_dir = tmp_path / ".ai-state"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / "calibration_log.md"
+        log_path.write_text(
+            f"{CALIBRATION_HEADER}\n{CALIBRATION_SEPARATOR}\n"
+            "| not-a-date | Feature | signals | standard | full | user | - |\n",
+            encoding="utf-8",
+        )
+        assert detect_tier(tmp_path) == "direct"
+
+    def test_empty_calibration_file_returns_direct(self, tmp_path: Path):
+        """Calibration log with header but no data rows."""
+        log_dir = tmp_path / ".ai-state"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / "calibration_log.md"
+        log_path.write_text(
+            f"{CALIBRATION_HEADER}\n{CALIBRATION_SEPARATOR}\n",
+            encoding="utf-8",
+        )
+        assert detect_tier(tmp_path) == "direct"
+
+    def test_header_with_tier_alias(self, tmp_path: Path):
+        """Calibration log with 'tier' column (no 'actual tier')."""
+        log_dir = tmp_path / ".ai-state"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / "calibration_log.md"
+        recent = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
+        log_path.write_text(
+            f"| timestamp | tier |\n|---|---|\n| {recent} | standard |\n",
+            encoding="utf-8",
+        )
+        assert detect_tier(tmp_path) == "standard"
+
+
 class TestIsGatingTierStandard:
     def test_standard_is_gating(self):
         assert is_gating_tier("standard") is True

@@ -67,6 +67,7 @@ class ExtractedDecision(BaseModel):
     made_by: MadeByType
     confidence: float
     affected_files: list[str] | None = None
+    affected_reqs: list[str] | None = None
     spec_relevant: bool = True
 
 
@@ -89,4 +90,22 @@ class HookOutput(BaseModel):
     count: int = 0
     tier: TierType | None = None
     decisions: list[dict] | None = None
+    message: str
+
+
+class AmendmentOutput(BaseModel):
+    """Structured stdout output from the propose-amendment subcommand."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal[
+        "amendments_proposed",
+        "no_spec",
+        "no_affected_reqs",
+        "reqs_not_found",
+        "error",
+    ]
+    amendments: list[dict]
+    plan_impacts: list[dict] | None = None
+    missing_reqs: list[str] | None = None
     message: str

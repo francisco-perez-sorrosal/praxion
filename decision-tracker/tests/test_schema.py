@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from decision_tracker.schema import (
+    AmendmentOutput,
     Decision,
     ExtractedDecision,
     HookOutput,
@@ -25,6 +26,28 @@ class TestGenerateId:
     def test_unique(self):
         ids = {generate_id() for _ in range(100)}
         assert len(ids) == 100
+
+
+class TestNowUtc:
+    def test_returns_iso_format(self):
+        from decision_tracker.schema import now_utc
+
+        ts = now_utc()
+        # Must parse without error
+        from datetime import datetime
+
+        parsed = datetime.fromisoformat(ts)
+        assert parsed is not None
+
+    def test_returns_utc_timezone(self):
+        from datetime import UTC, datetime
+
+        from decision_tracker.schema import now_utc
+
+        ts = now_utc()
+        parsed = datetime.fromisoformat(ts)
+        assert parsed.tzinfo is not None
+        assert parsed.tzinfo == UTC
 
 
 class TestDecision:
@@ -216,10 +239,21 @@ class TestExtractedDecision:
             made_by="user",
             confidence=0.92,
             affected_files=["src/cache.py"],
+            affected_reqs=["REQ-01", "REQ-03"],
             spec_relevant=False,
         )
         assert ed.alternatives == ["Memcached"]
         assert ed.spec_relevant is False
+        assert ed.affected_reqs == ["REQ-01", "REQ-03"]
+
+    def test_affected_reqs_defaults_none(self):
+        ed = ExtractedDecision(
+            decision="Use Redis",
+            category="architectural",
+            made_by="agent",
+            confidence=0.85,
+        )
+        assert ed.affected_reqs is None
 
 
 class TestPendingDecisions:
@@ -255,3 +289,52 @@ class TestHookOutput:
     def test_error(self):
         ho = HookOutput(status="error", message="API key missing.")
         assert ho.status == "error"
+
+
+class TestAmendmentOutput:
+    def test_amendments_proposed(self):
+        ao = AmendmentOutput(
+            status="amendments_proposed",
+            amendments=[{"req_id": "REQ-01", "change_summary": "Updated"}],
+            message="1 amendment(s) proposed",
+        )
+        assert ao.status == "amendments_proposed"
+        assert len(ao.amendments) == 1
+
+    def test_no_spec(self):
+        ao = AmendmentOutput(
+            status="no_spec",
+            amendments=[],
+            message="No spec found",
+        )
+        assert ao.status == "no_spec"
+        assert ao.missing_reqs is None
+
+    def test_reqs_not_found_with_missing(self):
+        ao = AmendmentOutput(
+            status="reqs_not_found",
+            amendments=[],
+            missing_reqs=["REQ-99"],
+            message="REQ IDs not found",
+        )
+        assert ao.missing_reqs == ["REQ-99"]
+
+    def test_invalid_status_raises(self):
+        with pytest.raises(ValidationError):
+            AmendmentOutput(
+                status="invalid",
+                amendments=[],
+                message="bad",
+            )
+
+    def test_json_roundtrip(self):
+        ao = AmendmentOutput(
+            status="amendments_proposed",
+            amendments=[{"req_id": "REQ-01"}],
+            message="1 proposed",
+        )
+        json_str = ao.model_dump_json(exclude_none=True)
+        parsed = json.loads(json_str)
+        assert "missing_reqs" not in parsed
+        ao2 = AmendmentOutput.model_validate(parsed)
+        assert ao2.status == "amendments_proposed"

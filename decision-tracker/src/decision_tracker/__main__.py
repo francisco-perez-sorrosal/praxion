@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 from decision_tracker.schema import (
+    AmendmentOutput,
     Decision,
     ExtractedDecision,
     HookOutput,
@@ -256,6 +257,148 @@ def _auto_approve_decisions(
 
 
 # ---------------------------------------------------------------------------
+# Propose-amendment subcommand
+# ---------------------------------------------------------------------------
+
+
+def _handle_propose_amendment(args: argparse.Namespace) -> None:
+    """Generate spec amendment proposals for approved decisions."""
+    from decision_tracker.amender import generate_amendments
+    from decision_tracker.spec import get_req_by_id, parse_spec
+
+    cwd = Path(args.cwd)
+    spec_path = Path(args.spec_path) if args.spec_path else cwd / ".ai-work/SYSTEMS_PLAN.md"
+
+    if not spec_path.is_file():
+        _emit_amendment_output(
+            AmendmentOutput(
+                status="no_spec",
+                amendments=[],
+                message=f"No spec found at {spec_path}",
+            )
+        )
+        return
+
+    spec = parse_spec(spec_path)
+    if spec is None or not spec.requirements:
+        _emit_amendment_output(
+            AmendmentOutput(
+                status="no_spec",
+                amendments=[],
+                message="Spec has no behavioral specification section",
+            )
+        )
+        return
+
+    # Read decisions from stdin
+    raw_stdin = sys.stdin.read()
+    try:
+        decisions = json.loads(raw_stdin)
+    except (json.JSONDecodeError, TypeError) as exc:
+        _emit_amendment_output(
+            AmendmentOutput(
+                status="error",
+                amendments=[],
+                message=f"Invalid JSON input: {exc}",
+            )
+        )
+        return
+
+    if not isinstance(decisions, list):
+        _emit_amendment_output(
+            AmendmentOutput(
+                status="error",
+                amendments=[],
+                message="Input must be a JSON array of decisions",
+            )
+        )
+        return
+
+    # Collect all unique affected REQ IDs across decisions
+    all_req_ids: set[str] = set()
+    for d in decisions:
+        for req_id in d.get("affected_reqs", []):
+            all_req_ids.add(req_id)
+
+    if not all_req_ids:
+        _emit_amendment_output(
+            AmendmentOutput(
+                status="no_affected_reqs",
+                amendments=[],
+                message="No decisions with affected_reqs found",
+            )
+        )
+        return
+
+    # Look up the actual REQ text
+    affected_reqs = []
+    missing_reqs = []
+    for req_id in sorted(all_req_ids):
+        req = get_req_by_id(spec, req_id)
+        if req:
+            affected_reqs.append(req)
+        else:
+            missing_reqs.append(req_id)
+
+    if not affected_reqs:
+        _emit_amendment_output(
+            AmendmentOutput(
+                status="reqs_not_found",
+                amendments=[],
+                missing_reqs=missing_reqs,
+                message=f"REQ IDs not found in spec: {', '.join(missing_reqs)}",
+            )
+        )
+        return
+
+    # Generate amendments via Haiku
+    try:
+        amendments = generate_amendments(decisions, affected_reqs)
+    except Exception as exc:
+        _emit_amendment_output(
+            AmendmentOutput(
+                status="error",
+                amendments=[],
+                message=f"Amendment generation failed: {exc}",
+            )
+        )
+        return
+
+    # Scan IMPLEMENTATION_PLAN.md for steps referencing amended REQs
+    plan_impacts_data = None
+    if amendments:
+        from decision_tracker.plan import find_plan_impacts
+
+        amended_ids = {a.req_id for a in amendments}
+        plan_path = cwd / ".ai-work/IMPLEMENTATION_PLAN.md"
+        impacts = find_plan_impacts(plan_path, amended_ids)
+        if impacts:
+            plan_impacts_data = [
+                {
+                    "step_heading": imp.step_heading,
+                    "line_number": imp.line_number,
+                    "affected_reqs": imp.affected_reqs,
+                }
+                for imp in impacts
+            ]
+
+    _emit_amendment_output(
+        AmendmentOutput(
+            status="amendments_proposed",
+            amendments=[a.model_dump() for a in amendments],
+            plan_impacts=plan_impacts_data,
+            missing_reqs=missing_reqs or None,
+            message=f"{len(amendments)} amendment(s) proposed for {len(affected_reqs)} requirement(s)",
+        )
+    )
+
+
+def _emit_amendment_output(output: AmendmentOutput) -> None:
+    """Write structured amendment output as JSON to stdout."""
+    print(output.model_dump_json(exclude_none=True))
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -279,6 +422,7 @@ def _to_decision(
         made_by=extracted.made_by,
         confidence=extracted.confidence,
         affected_files=extracted.affected_files,
+        affected_reqs=extracted.affected_reqs,
         source="hook",
         session_id=session_id,
         branch=branch,
@@ -361,6 +505,18 @@ def _build_parser() -> argparse.ArgumentParser:
     # -- extract subcommand --
     subparsers.add_parser("extract", help="Extract decisions from hook payload on stdin")
 
+    # -- propose-amendment subcommand --
+    amend_parser = subparsers.add_parser(
+        "propose-amendment",
+        help="Propose spec amendments for approved decisions (reads JSON from stdin)",
+    )
+    amend_parser.add_argument(
+        "--spec-path",
+        default=None,
+        help="Path to SYSTEMS_PLAN.md (default: <cwd>/.ai-work/SYSTEMS_PLAN.md)",
+    )
+    amend_parser.add_argument("--cwd", default=".", help="Project directory (default: .)")
+
     return parser
 
 
@@ -373,6 +529,8 @@ def main() -> None:
         _handle_write(args)
     elif args.command == "extract":
         _handle_extract(args)
+    elif args.command == "propose-amendment":
+        _handle_propose_amendment(args)
 
 
 if __name__ == "__main__":

@@ -117,6 +117,30 @@ class TestExtractDecisions:
         assert results[0].decision == "Use dataclasses"
 
 
+class TestAffectedReqsExtraction:
+    def test_affected_reqs_extracted(self):
+        decision_with_reqs = {
+            **VALID_DECISION,
+            "affected_reqs": ["REQ-01", "REQ-03"],
+        }
+        client = MagicMock()
+        client.messages.create.return_value = _mock_response([decision_with_reqs])
+
+        results = extract_decisions(transcript="test", diff="test", client=client)
+
+        assert len(results) == 1
+        assert results[0].affected_reqs == ["REQ-01", "REQ-03"]
+
+    def test_affected_reqs_absent_when_not_provided(self):
+        client = MagicMock()
+        client.messages.create.return_value = _mock_response([MINIMAL_DECISION])
+
+        results = extract_decisions(transcript="test", diff="test", client=client)
+
+        assert len(results) == 1
+        assert results[0].affected_reqs is None
+
+
 class TestClientCreation:
     def test_no_api_key_raises(self):
         with patch.dict("os.environ", {}, clear=True):
@@ -157,6 +181,13 @@ class TestToolSchema:
             "properties"
         ]
         assert item_props["made_by"]["enum"] == ["user", "agent"]
+
+    def test_affected_reqs_in_item_schema(self):
+        item_props = EXTRACTION_TOOL["input_schema"]["properties"]["decisions"]["items"][
+            "properties"
+        ]
+        assert "affected_reqs" in item_props
+        assert item_props["affected_reqs"]["type"] == "array"
 
     def test_decisions_is_required_top_level(self):
         assert "decisions" in EXTRACTION_TOOL["input_schema"]["required"]

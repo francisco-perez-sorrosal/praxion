@@ -63,6 +63,15 @@ EXTRACTION_TOOL: dict[str, Any] = {
                             "type": "array",
                             "items": {"type": "string"},
                         },
+                        "affected_reqs": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": (
+                                "REQ IDs (e.g. REQ-01, REQ-03) from the behavioral "
+                                "specification that this decision affects. Only include "
+                                "IDs explicitly mentioned in the transcript or diff."
+                            ),
+                        },
                         "spec_relevant": {
                             "type": "boolean",
                             "description": "Whether this decision affects the spec",
@@ -87,6 +96,9 @@ A decision is a CHOICE — something picked over an alternative. Apply these rul
 reflect a deliberate choice with alternatives.
 3. Git/workflow and tooling/environment decisions are NOT spec-relevant.
 4. When in doubt, include it — false positives are better than missed decisions.
+5. When the transcript or diff references REQ IDs (REQ-01, REQ-02, etc.) from a \
+behavioral specification, include them in affected_reqs. Only include IDs that \
+appear explicitly — do not guess.
 
 For each decision, assess your confidence (0.0-1.0) in whether it truly \
 represents a deliberate choice that was made during this session.\

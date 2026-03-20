@@ -21,6 +21,14 @@ Guidance for designing data models, database schemas, and data access patterns a
 - [references/migrations.md](references/migrations.md) -- expand-contract pattern, zero-downtime migrations, rollback strategies
 - [references/orm-patterns.md](references/orm-patterns.md) -- repository pattern, N+1 prevention, query optimization, raw SQL escape hatches
 
+## Gotchas
+
+- **Premature denormalization.** Do not denormalize "for performance" without measured evidence. Start at 3NF, profile actual query loads, and denormalize only the specific access paths that are too slow. Every denormalization introduces update anomalies and maintenance cost
+- **N+1 queries are the ORM default.** Most ORMs use lazy loading unless explicitly told otherwise. Eager loading (`joinedload`, `includes`, `Include`) must be specified per query -- it is never automatic. Assume N+1 is happening unless you see explicit eager loading in the code
+- **Migration ordering with foreign keys.** A migration that creates a table with foreign key constraints will fail if the referenced table does not yet exist. When generating multiple migrations, topologically sort by FK dependencies -- create referenced tables first, drop them last
+- **Over-indexing slows writes.** Each additional index degrades INSERT/UPDATE/DELETE performance and consumes storage. Add indexes only for measured slow queries, not speculatively for every column in a WHERE clause. Review and drop unused indexes periodically
+- **NULL semantics in unique constraints.** Most databases treat `NULL != NULL`, so a unique constraint on a nullable column permits multiple NULL values. If business logic requires at most one NULL, use a partial unique index (e.g., `CREATE UNIQUE INDEX ... WHERE column IS NOT NULL`) or add an application-level check
+
 ## Core Principles
 
 **Model from behavior, not from storage.** Start with the domain's entities, relationships, and access patterns. Let the data model serve the application's needs rather than fitting application logic around a schema. Entity-relationship modeling comes first; physical schema design follows.

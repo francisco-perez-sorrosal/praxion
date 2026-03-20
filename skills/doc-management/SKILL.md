@@ -1,6 +1,6 @@
 ---
 name: doc-management
-description: Writing and maintaining project documentation (README.md, catalogs, architecture docs, changelogs). Covers cross-reference validation, catalog maintenance, documentation freshness, and structural integrity. Use when creating, reviewing, or fixing project documentation, maintaining catalog READMEs, or ensuring documentation matches filesystem state.
+description: Writing and maintaining project documentation (README.md, catalogs, architecture docs, changelogs). Covers cross-reference validation, catalog maintenance, documentation freshness, and structural integrity. Use when creating, reviewing, or fixing project documentation, maintaining catalog READMEs, ensuring documentation matches filesystem state, performing a documentation audit, or checking doc freshness.
 compatibility: Claude Code
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 ---
@@ -13,6 +13,13 @@ Procedural expertise for writing, maintaining, and validating project-facing doc
 - [references/cross-reference-patterns.md](references/cross-reference-patterns.md) -- cross-reference validation procedures, catalog sync, drift scenarios
 - [references/documentation-types.md](references/documentation-types.md) -- per-type guidelines for README, architecture, changelog, contributing, API docs
 
+## Gotchas
+
+- **Trusting counts in prose without filesystem verification.** Documentation stating "Contains 5 modules" may silently become wrong after adding or removing one. Always count against the filesystem -- never assume the prose count is current.
+- **Phantom catalog entries.** A catalog table may list artifacts that no longer exist on disk (renamed, deleted, moved). Validate every table row against `ls` output before declaring a catalog complete.
+- **Missing indirect consumers of referenced files.** Renaming or moving a file breaks not just the one document you are editing, but every document that links to it. Use `Grep` for the old filename/path across all markdown files before finalizing a rename.
+- **Structure trees that look correct but are stale.** A documented directory tree can appear plausible even when directories have been added or removed. Always regenerate the tree from the actual filesystem rather than hand-editing an existing one.
+
 ## Relationship to readme-style Rule
 
 This skill does not define documentation conventions -- it defines how to apply them.
@@ -20,6 +27,7 @@ This skill does not define documentation conventions -- it defines how to apply 
 - **readme-style rule** (auto-loaded): defines WHAT documentation conventions to follow (writing style, structural integrity, naming consistency)
 - **doc-management skill** (this file): defines HOW to author, validate, and maintain documentation
 - **doc-engineer agent**: autonomous subprocess that uses this skill for documentation quality management
+- **code-review skill**: after a code review identifies added, removed, or renamed files, use this skill to update affected documentation
 
 ## Core Principles
 

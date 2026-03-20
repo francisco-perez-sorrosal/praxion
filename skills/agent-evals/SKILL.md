@@ -20,6 +20,28 @@ Evaluate AI agent behavior systematically. Agent evals differ fundamentally from
 - [references/eval-design-patterns.md](references/eval-design-patterns.md) -- golden datasets, LLM-as-judge, grader design, scoring, non-determinism
 - [references/cicd-integration.md](references/cicd-integration.md) -- GitHub Actions workflows, deployment gates, regression tracking, cost management
 
+## Gotchas
+
+- **Non-determinism is not a bug, it's the medium.** Never expect exact output matching. Use rubrics, partial credit, and statistical aggregation. A single trial tells you almost nothing.
+
+- **0% pass rate usually means broken eval, not broken agent.** Verify tasks are solvable by running them manually with a reference solution. Check grader fairness before blaming the agent.
+
+- **Grading outcomes, not paths, is harder than it sounds.** An agent that uses 3 tools instead of your expected 2 may still be correct. Default to lenient trajectory matching (unordered or subset) unless ordering genuinely matters.
+
+- **LLM-as-judge needs calibration, not blind trust.** Validate model graders against human judgments regularly. Few-shot prompting increases consistency from ~65% to ~78%. Use structured rubrics with explicit scoring criteria.
+
+- **Cost surprises compound with trials.** Running 50 test cases x 5 trials x LLM grading = 250+ API calls per eval run. Budget upfront. Use tiered execution: full suite nightly, critical subset on PR.
+
+- **`temperature=0` does not guarantee determinism.** Research confirms non-determinism persists even at zero temperature. Always run multiple trials and report both pass@k and pass^k.
+
+- **Golden datasets rot.** As the agent improves, easy evals saturate and stop providing signal. Grow the dataset continuously and retire saturated cases to the regression suite.
+
+- **Don't eval what you can assert.** If a check is deterministic (JSON schema validation, test suite execution, file existence), use a code-based grader. Reserve LLM grading for genuinely subjective or nuanced dimensions.
+
+- **Sandboxing is not optional for tool-using agents.** Agents with file system or shell access can cause real damage during evals. Use Docker containers, temp directories, or git checkpoints.
+
+- **Skip transcript review at your peril.** Graders can be wrong in both directions -- passing bad outputs and failing good ones. Regular transcript review builds intuition and catches grader drift.
+
 ## Why Agent Evals Differ from Traditional Tests
 
 | Dimension | Traditional Tests | Agent Evals |
@@ -208,28 +230,6 @@ This mirrors the `spec-driven-development` skill's behavioral specification work
 - **`python-development`** -- pytest patterns, test organization, and code quality tools for eval implementations
 - **`agentic-sdks`** -- agent building patterns (the systems you are evaluating); SDK-specific testing hooks
 - **`spec-driven-development`** -- behavioral specifications and acceptance criteria inform eval design; REQ IDs thread into eval case naming
-
-## Gotchas
-
-- **Non-determinism is not a bug, it's the medium.** Never expect exact output matching. Use rubrics, partial credit, and statistical aggregation. A single trial tells you almost nothing.
-
-- **0% pass rate usually means broken eval, not broken agent.** Verify tasks are solvable by running them manually with a reference solution. Check grader fairness before blaming the agent.
-
-- **Grading outcomes, not paths, is harder than it sounds.** An agent that uses 3 tools instead of your expected 2 may still be correct. Default to lenient trajectory matching (unordered or subset) unless ordering genuinely matters.
-
-- **LLM-as-judge needs calibration, not blind trust.** Validate model graders against human judgments regularly. Few-shot prompting increases consistency from ~65% to ~78%. Use structured rubrics with explicit scoring criteria.
-
-- **Cost surprises compound with trials.** Running 50 test cases x 5 trials x LLM grading = 250+ API calls per eval run. Budget upfront. Use tiered execution: full suite nightly, critical subset on PR.
-
-- **`temperature=0` does not guarantee determinism.** Research confirms non-determinism persists even at zero temperature. Always run multiple trials and report both pass@k and pass^k.
-
-- **Golden datasets rot.** As the agent improves, easy evals saturate and stop providing signal. Grow the dataset continuously and retire saturated cases to the regression suite.
-
-- **Don't eval what you can assert.** If a check is deterministic (JSON schema validation, test suite execution, file existence), use a code-based grader. Reserve LLM grading for genuinely subjective or nuanced dimensions.
-
-- **Sandboxing is not optional for tool-using agents.** Agents with file system or shell access can cause real damage during evals. Use Docker containers, temp directories, or git checkpoints.
-
-- **Skip transcript review at your peril.** Graders can be wrong in both directions -- passing bad outputs and failing good ones. Regular transcript review builds intuition and catches grader drift.
 
 ## Resources
 

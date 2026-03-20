@@ -16,7 +16,7 @@ compatibility: Claude Code
 
 Protocols for agent-to-agent communication -- enabling agents built with different frameworks, languages, or organizations to discover each other and collaborate on tasks.
 
-**Satellite files** (loaded on-demand). `contexts/` is a project convention for language-specific implementation guides — functionally equivalent to `references/` but semantically distinct (task-oriented vs. lookup).
+**Satellite files** (loaded on-demand): `contexts/` is a project convention for language-specific implementation guides — functionally equivalent to `references/` but semantically distinct (task-oriented vs. lookup).
 
 - [contexts/a2a-python.md](contexts/a2a-python.md) -- A2A Python SDK implementation guide (`a2a-sdk`)
 - [contexts/a2a-typescript.md](contexts/a2a-typescript.md) -- A2A TypeScript SDK implementation guide (`@a2a-js/sdk`)

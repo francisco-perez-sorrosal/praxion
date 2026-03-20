@@ -149,6 +149,7 @@ Higher priority wins when names collide:
 - Agents delegate specific workflows to a separate context window
 - Use the `skills` field to inject skill content into an agent
 - Agents do **not** inherit skills from the parent -- list them explicitly
+- For creating or modifying skills that agents consume, see the `skill-crafting` skill
 
 ```yaml
 ---

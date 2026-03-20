@@ -82,8 +82,10 @@ cursor/config/                       # Cursor installer config
 scripts/                             # Utility scripts
 └── ccwt                             # Multi-worktree Claude session launcher
 docs/                                # Cross-cutting documentation
+├── concepts.md
 ├── getting-started.md
 ├── cursor-compat.md
+├── decision-tracking.md
 └── spec-driven-development.md
 task-chronograph-mcp/                # Pipeline observability MCP server
 memory-mcp/                          # Persistent memory MCP server

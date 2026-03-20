@@ -5,7 +5,8 @@ description: Creating and managing rules -- contextual domain knowledge
   rules, naming for relevance matching, content guidelines, and the rules-vs-skills-vs-CLAUDE.md
   decision model. Use when creating new rules, updating existing rules, debugging
   rule loading, organizing rule files, or deciding whether something belongs in a
-  rule vs skill vs CLAUDE.md.
+  rule vs skill vs CLAUDE.md. Also covers Claude Code rule authoring, auto-loaded
+  rule mechanics, and rule debugging techniques.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

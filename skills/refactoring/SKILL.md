@@ -1,6 +1,6 @@
 ---
 name: refactoring
-description: Pragmatic refactoring practices emphasizing modularity, low coupling, high cohesion, and incremental improvement. Use when restructuring code, improving design, reducing coupling, organizing codebases, extracting modules, eliminating code smells, or discussing refactoring patterns and code organization.
+description: Pragmatic refactoring practices emphasizing modularity, low coupling, high cohesion, and incremental improvement. Use when restructuring code, improving design, reducing coupling, organizing codebases, extracting modules, eliminating code smells, discussing refactoring patterns and code organization, cleaning up code, addressing technical debt, splitting modules, or simplifying complex code.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---
@@ -8,6 +8,10 @@ compatibility: Claude Code
 # Pragmatic Refactoring
 
 Systematic approach to refactoring that prioritizes modularity, low coupling, high cohesion, and maintainable structure.
+
+**Satellite files** (loaded on-demand):
+
+- [references/patterns.md](references/patterns.md) -- detailed refactoring patterns with before/after examples and application criteria
 
 ## Core Principles
 
@@ -160,6 +164,13 @@ See [references/patterns.md](references/patterns.md) for detailed refactoring pa
 | **Speculative Generality** — flexibility for hypothetical needs | Implement for current requirements only |
 | **Premature Optimization** — optimizing without measurements | Profile first, optimize hot paths only |
 
+## Gotchas
+
+Process-level pitfalls distinct from the code design anti-patterns above:
+
+- **Refactoring without sufficient test coverage.** Before restructuring code that lacks tests, write characterization tests first -- tests that capture the current behavior as-is, even if the behavior is imperfect. Refactoring untested code turns "restructure" into "hope nothing breaks."
+- **Mixing refactoring with behavior changes in the same commit.** Keep refactoring commits pure -- structure-only, zero behavior change. When a feature requires refactoring to make room, do the refactoring in a separate commit first, then add the feature. This makes each commit independently reviewable and safely revertible.
+
 ## When to Refactor
 
 **Don't refactor if**:
@@ -194,6 +205,8 @@ Monitor these thresholds:
 - Type hints enable safe refactoring
 
 See the [Python](../python-development/SKILL.md) skill for detailed type hint patterns, testing, and code quality tools.
+
+See the [Code Review](../code-review/SKILL.md) skill for structured post-refactoring review with finding classification and report templates.
 
 ### General (Language Agnostic)
 

@@ -29,3 +29,4 @@ Trigger explicitly by mentioning "refactoring skill" or referencing it by name.
 
 - [`python-development`](../python-development/) — Python-specific patterns used in refactoring (Protocols, dataclasses, type hints)
 - [`software-planning`](../software-planning/) — embedding refactoring phases within structured plans
+- [`code-review`](../code-review/) — structured post-refactoring review with finding classification and report templates

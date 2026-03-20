@@ -5,7 +5,8 @@ description: Behavioral specification methodology with requirement traceability 
   triage (trivial through spike), REQ ID conventions, traceability threading through
   the pipeline, decision documentation format, and spec archival. Use when working
   on behavioral specifications, requirement traceability, SDD methodology, spec format
-  conventions, REQ IDs, spec-driven development, complexity triage, or spec archival.
+  conventions, requirement format, REQ IDs, spec-driven development, complexity triage,
+  or spec archival.
 compatibility: Claude Code
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 ---
@@ -19,6 +20,14 @@ Behavioral specifications bridge architecture and implementation by giving each 
 - [references/spec-format-guide.md](references/spec-format-guide.md) -- full spec format with examples, EARS/GWT comparison, traceability matrix template, persistent spec template, spec delta template, edge cases
 - [references/sentinel-spec-checks.md](references/sentinel-spec-checks.md) -- spec health check catalog for sentinel integration, pass conditions, integration guidance
 - [references/calibration-procedure.md](references/calibration-procedure.md) -- structured tier assessment procedure with signal catalog, scoring matrix, evidence template, and calibration log format
+
+## Gotchas
+
+- **Over-specifying trivial tasks.** If the calibration tier is Direct or Lightweight, skip SDD entirely -- no REQ IDs, no behavioral spec. Agents default to producing specs for everything; the complexity triage exists to prevent this overhead.
+- **REQ ID scope is per-feature, not global.** IDs reset for each new `SYSTEMS_PLAN.md`. REQ-01 in Feature A is unrelated to REQ-01 in Feature B. Do not attempt global uniqueness or cross-feature ID continuity.
+- **Stale archived specs as baseline.** Before using an archived spec in `.ai-state/specs/` as a baseline for a spec delta, check `SENTINEL_LOG.md` for the most recent SH03 result. A FAIL means the spec's behavioral claims may have drifted from the code -- the delta's "before" side is unreliable.
+- **Using Given/When/Then instead of ecosystem format.** Agents trained on BDD content default to Given/When/Then. This ecosystem uses `When/and/the system/so that` -- a distinct format that captures intent (`so that`) rather than test assertions (`Then`). Catch and correct GWT usage in specs.
+- **Omitting the `so that` clause.** The `so that` clause is required, not optional. Without it, a requirement reads as a test assertion rather than a behavioral specification. The intent clause is what distinguishes SDD from a test plan.
 
 ## Process Calibration
 

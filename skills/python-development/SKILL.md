@@ -1,6 +1,6 @@
 ---
 name: python-development
-description: Modern Python development conventions covering type hints, testing with pytest, code quality tools (ruff, mypy, pyright), data modeling (dataclasses, Pydantic), async patterns, and error handling. Use when writing Python code, implementing tests, configuring linting or formatting, choosing between dataclasses and Pydantic, working with structural pattern matching, or setting up pytest fixtures and parametrize.
+description: Modern Python development conventions covering type hints, testing with pytest, code quality tools (ruff, mypy, pyright), data modeling (dataclasses, Pydantic), async patterns, and error handling. Use when writing Python code, implementing tests, configuring linting or formatting, choosing between dataclasses and Pydantic, working with structural pattern matching, or setting up pytest fixtures and parametrize. Also activates for Python coding tasks, Python testing questions, ruff formatting or linting issues, mypy type checking, and pytest configuration work.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---
@@ -13,6 +13,16 @@ Comprehensive guidance for Python development following pragmatic, production-re
 
 - [references/testing-and-tooling.md](references/testing-and-tooling.md) -- pytest patterns, pyproject.toml config, pre-commit setup
 - [references/patterns-and-examples.md](references/patterns-and-examples.md) -- dataclasses, Pydantic, protocols, context managers, pattern matching, async, error handling
+
+## Gotchas
+
+Non-obvious pitfalls that cause silent failures or confusing errors:
+
+- **ruff format vs lint line-length conflict.** `ruff format` enforces its own line length independently of `[tool.ruff] line-length`. If `line-length` in `[tool.ruff]` and `[tool.ruff.format]` differ (or if `[tool.ruff.lint]` selects `E501`), formatting and linting fight each other in a cycle. Set the same `line-length` under `[tool.ruff]` and either ignore `E501` in lint (let the formatter own line wrapping) or ensure both agree on the limit.
+- **mypy strict mode false positives with third-party libraries.** Enabling `strict = true` globally triggers errors in untyped third-party packages (`error: ... has no attribute ...`, missing type stubs). Fix with per-module overrides in `pyproject.toml` (`[[tool.mypy.overrides]]` with `module` and `ignore_missing_imports = true`), not blanket `# type: ignore` comments that suppress real errors.
+- **pytest fixture scope pollution.** A `session`-scoped fixture that mutates state (e.g., populates a database, modifies a class attribute) bleeds across tests, causing order-dependent failures. Default to `function` scope. Use `session` only for truly read-only, expensive setup (e.g., spinning up a test server), and pair it with cleanup in a finalizer or `yield`.
+- **pytest-asyncio mode configuration.** `pytest-asyncio` defaults to `auto` mode in recent versions but older pinned versions default to `strict`, requiring explicit `@pytest.mark.asyncio` on every async test. Set `asyncio_mode = "auto"` in `[tool.pytest.ini_options]` to avoid silent test skipping where async tests appear to pass (collected but never awaited).
+- **`from __future__ import annotations` breaks runtime type access.** This import makes all annotations strings (PEP 563), which breaks code that inspects types at runtime -- Pydantic v1, `dataclasses.fields()` type checks, `isinstance` on `get_type_hints()`. Pydantic v2 handles it, but verify before adding the import to modules that use runtime type introspection.
 
 ## Core Principles
 

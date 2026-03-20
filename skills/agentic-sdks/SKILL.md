@@ -26,6 +26,18 @@ Build production AI agents using the OpenAI Agents SDK or Claude Agent SDK. Both
 - [contexts/claude-agent-python.md](contexts/claude-agent-python.md) -- Claude Agent SDK for Python
 - [contexts/claude-agent-typescript.md](contexts/claude-agent-typescript.md) -- Claude Agent SDK for TypeScript
 
+**Related skills:**
+
+- For Claude model selection, API features, and Messages SDK patterns, see the `claude-ecosystem` skill
+
+## Gotchas
+
+- **Context object invisible to LLM (OpenAI)**: `RunContextWrapper.context` is dependency injection for tools and hooks only -- the model never sees it. To pass information to the LLM, put it in the prompt or instructions, not the context object.
+- **Claude SDK loads no project settings by default**: `setting_sources` / `settingSources` defaults to empty. CLAUDE.md, skills, and `.claude/settings.json` are silently ignored unless you explicitly set `["project"]`.
+- **Context type must unify across a run (OpenAI)**: All agents, tools, guardrails, and hooks in a single `Runner.run()` call must share the same generic context type parameter. Mixing types causes runtime errors with no clear diagnostic.
+- **MCP tool names require triple-underscore prefix (Claude)**: Custom MCP tools must be referenced as `mcp__<server>__<tool>` in `allowed_tools`. A mismatch silently makes the tool unavailable -- no error, just invisible to the agent.
+- **Zod v4 required at runtime (OpenAI TS)**: The TypeScript SDK validates schemas using the Zod v4 API. Installing Zod v3 (the common default) causes silent schema failures at runtime, not at import time.
+
 ## Framework Selection
 
 ### Use OpenAI Agents SDK When

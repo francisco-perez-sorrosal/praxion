@@ -45,7 +45,7 @@
             "type": "command",
             "command": "python3 ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/format_python.py",
             "timeout": 10,
-            "async": true
+            "async": false
           }
         ]
       }

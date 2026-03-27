@@ -358,7 +358,7 @@ settings["hooks"] = {
     "SubagentStop": [hook("send_event.py")],
     "PostToolUse": [
         hook("send_event.py", "Write|Edit"),
-        hook("format_python.py", "Write|Edit"),
+        hook("format_python.py", "Write|Edit", is_async=False),
     ],
     # Code quality gate (sync, blocks on violations)
     "PreToolUse": [{

@@ -37,12 +37,29 @@
             "async": true
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/format_python.py",
+            "timeout": 10,
+            "async": true
+          }
+        ]
       }
     ],
     "PreToolUse": [
       {
         "matcher": "Bash",
         "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/check_code_quality.py",
+            "timeout": 30,
+            "async": false
+          },
           {
             "type": "command",
             "command": "python3 ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/extract_decisions.py",

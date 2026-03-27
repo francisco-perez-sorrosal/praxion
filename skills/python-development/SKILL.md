@@ -149,7 +149,7 @@ Be explicit about error conditions. Create domain-specific exception classes, ch
 2. **Set up tools**: ruff, mypy/pyright, pytest
 3. **Write tests first** for critical functionality
 4. **Implement** with type hints
-5. **Run checks**: `<tool> run ruff check . && <tool> run mypy src/ && <tool> run pytest`
+5. **Run checks**: `<tool> run ruff format . && <tool> run ruff check --fix . && <tool> run mypy src/ && <tool> run pytest`
 6. **Iterate** in small increments
 
 ## Quick Commands
@@ -157,9 +157,9 @@ Be explicit about error conditions. Create domain-specific exception classes, ch
 For package management commands, see the [Python Project Management](../python-prj-mgmt/SKILL.md) skill.
 
 ```bash
-# Code quality
-<tool> run ruff check .             # Lint
+# Code quality (order matters: format -> lint -> typecheck)
 <tool> run ruff format .            # Format
+<tool> run ruff check --fix .       # Lint (fix mode)
 <tool> run mypy src/                # Type check
 
 # Testing

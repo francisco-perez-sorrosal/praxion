@@ -14,7 +14,9 @@ Language-independent structural and design conventions for writing and reviewing
 
 Every code change must pass the project's formatters and linters before commit. This is non-negotiable — format and lint in fix mode after writing code, before running tests.
 
-**Universal workflow:** format → lint (fix mode) → type check → test. Detect tools from project config files (`pyproject.toml`, `package.json`, `Cargo.toml`, `go.mod`, `.prettierrc`, etc.). Run them on the files you changed. Fix any violations that auto-fix cannot resolve.
+**Universal workflow:** format → lint (fix mode) → type check → test. Detect tools from project config files (`pyproject.toml`, `package.json`, `Cargo.toml`, `go.mod`, `.prettierrc`, etc.). Run them on changed files only — not the entire project. Fix any violations that auto-fix cannot resolve.
+
+**When to run:** At minimum before every commit and before each test run. When working interactively outside the agent pipeline (Direct or Spike tiers), run after completing a logical change — not necessarily after every individual edit.
 
 Language-specific tool choices and configuration belong in each language's skill (e.g., `ruff` for Python, `prettier`/`eslint` for JS/TS). This rule defines the principle; skills define the tools.
 

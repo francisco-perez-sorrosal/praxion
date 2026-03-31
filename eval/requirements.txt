@@ -1,0 +1,4 @@
+# Evaluation dependencies (install in the Phoenix venv or a separate venv)
+arize-phoenix
+arize-phoenix-evals>=2.12
+openai

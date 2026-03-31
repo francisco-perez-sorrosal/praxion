@@ -140,6 +140,22 @@ class OTelRelay:
         except Exception:
             logger.warning("Failed to shutdown OTel provider", exc_info=True)
 
+    def _ensure_initialized(self, session_id: str = "", project_dir: str = "") -> bool:
+        """Lazy init: if no session was started, initialise from available context.
+
+        Returns True if the relay is ready to create spans.
+        """
+        if self._provider is not None:
+            return True
+        if not _is_otel_enabled():
+            return False
+        # Auto-initialize with best-effort project info
+        effective_dir = project_dir or os.environ.get("CLAUDE_PROJECT_DIR", "")
+        self._init_provider(effective_dir)
+        if session_id and self._session_span is None:
+            self._open_session_span(session_id, effective_dir)
+        return self._provider is not None
+
     # ------------------------------------------------------------------
     # Agent lifecycle
     # ------------------------------------------------------------------
@@ -155,6 +171,7 @@ class OTelRelay:
         if not _is_otel_enabled():
             return
         try:
+            self._ensure_initialized(session_id)
             self._start_agent_span(agent_id, agent_type, session_id, parent_session_id)
         except Exception:
             logger.warning("Failed to start OTel agent span for %s", agent_id, exc_info=True)
@@ -192,6 +209,7 @@ class OTelRelay:
         if not _is_otel_enabled():
             return
         try:
+            self._ensure_initialized()
             self._record_tool_span(
                 agent_id, tool_name, input_summary, output_summary, is_error, error_msg
             )
@@ -262,10 +280,12 @@ class OTelRelay:
 
     def _init_provider(self, project_dir: str) -> None:
         """Create the TracerProvider with the appropriate exporter and resource."""
+        from openinference.semconv.resource import ResourceAttributes
+
         project_name = os.path.basename(project_dir) if project_dir else self._default_project_name
         resource = Resource.create(
             {
-                "project_name": project_name,
+                ResourceAttributes.PROJECT_NAME: project_name,
             }
         )
 

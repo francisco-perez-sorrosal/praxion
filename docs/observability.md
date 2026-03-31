@@ -69,7 +69,9 @@ Each agent span carries `praxion.agent_origin`:
 
 When working on the Praxion repository itself, the observability system traces its own pipeline runs. Traces appear under project `praxion` in Phoenix. No special configuration needed -- the same hooks, chronograph, and Phoenix backend that instrument other projects also instrument Praxion.
 
-## Managing the Daemon
+## Managing Services
+
+### Phoenix Daemon (persistent trace backend)
 
 ```bash
 phoenix-ctl install    # Install venv + launchd plist, start daemon
@@ -78,6 +80,18 @@ phoenix-ctl stop       # Stop the daemon
 phoenix-ctl restart    # Stop + start
 phoenix-ctl status     # Show PID, memory, ports, UI reachability
 phoenix-ctl uninstall  # Stop, remove plist (data preserved at ~/.phoenix/)
+```
+
+### Chronograph (event relay)
+
+During normal operation, Claude Code manages the chronograph as an MCP server. For development (picking up code changes without restarting Claude Code):
+
+```bash
+chronograph-ctl start    # Start HTTP server from source (background)
+chronograph-ctl stop     # Stop the server
+chronograph-ctl restart  # Stop + start (picks up code changes)
+chronograph-ctl status   # Show PID, memory, event count
+chronograph-ctl logs     # Tail the log file
 ```
 
 ## Configuration

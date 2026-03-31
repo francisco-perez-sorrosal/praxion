@@ -1,0 +1,184 @@
+#!/usr/bin/env bash
+# chronograph-ctl — Manage the Task Chronograph HTTP server for development.
+#
+# During normal operation, Claude Code manages the chronograph as an MCP server.
+# This script runs it standalone (HTTP-only, no MCP stdio) for:
+#   - Restarting after code changes without restarting Claude Code
+#   - Running outside Claude Code for testing
+#   - Debugging with visible logs
+#
+# Usage: chronograph-ctl {start|stop|restart|status|logs}
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+CHRONO_DIR="${SCRIPT_DIR}/task-chronograph-mcp"
+CHRONO_PORT="${CHRONOGRAPH_PORT:-8765}"
+PIDFILE="/tmp/chronograph-ctl.pid"
+LOGFILE="/tmp/chronograph-ctl.log"
+
+B='\033[1m'
+R='\033[0m'
+info()  { printf "  ✓ %s\n" "$*"; }
+warn()  { printf "  ⚠ %s\n" "$*"; }
+
+_is_running() {
+    if [ -f "$PIDFILE" ]; then
+        local pid
+        pid=$(cat "$PIDFILE")
+        if kill -0 "$pid" 2>/dev/null; then
+            return 0
+        fi
+        rm -f "$PIDFILE"
+    fi
+    # Also check by port
+    lsof -iTCP:"$CHRONO_PORT" -sTCP:LISTEN -P -n >/dev/null 2>&1
+}
+
+_get_pid() {
+    if [ -f "$PIDFILE" ]; then
+        local pid
+        pid=$(cat "$PIDFILE")
+        if kill -0 "$pid" 2>/dev/null; then
+            echo "$pid"
+            return
+        fi
+    fi
+    lsof -iTCP:"$CHRONO_PORT" -sTCP:LISTEN -t 2>/dev/null || true
+}
+
+cmd_start() {
+    if _is_running; then
+        local pid
+        pid=$(_get_pid)
+        warn "Already running (PID: ${pid}) on port ${CHRONO_PORT}"
+        warn "Use 'chronograph-ctl restart' to reload code changes"
+        return 1
+    fi
+
+    printf "${B}Starting chronograph (HTTP-only, port %s)${R}\n" "$CHRONO_PORT"
+
+    cd "$CHRONO_DIR"
+    nohup uv run python -c "
+import asyncio, os, uvicorn
+os.environ.setdefault('CHRONOGRAPH_PORT', '${CHRONO_PORT}')
+from task_chronograph_mcp.server import app, _core_lifespan, DEFAULT_PORT
+
+async def run():
+    async with _core_lifespan(app):
+        port = int(os.environ.get('CHRONOGRAPH_PORT', str(DEFAULT_PORT)))
+        config = uvicorn.Config(app, host='127.0.0.1', port=port, log_level='info')
+        await uvicorn.Server(config).serve()
+
+asyncio.run(run())
+" > "$LOGFILE" 2>&1 &
+    local pid=$!
+    echo "$pid" > "$PIDFILE"
+
+    # Wait for server to be ready
+    local tries=0
+    while [ $tries -lt 10 ]; do
+        if curl -sf "http://localhost:${CHRONO_PORT}/api/state" >/dev/null 2>&1; then
+            info "Running (PID: ${pid}, port: ${CHRONO_PORT})"
+            info "Logs: ${LOGFILE}"
+            return 0
+        fi
+        sleep 0.5
+        tries=$((tries + 1))
+    done
+
+    warn "Started (PID: ${pid}) but not yet responding — check logs:"
+    warn "  tail -f ${LOGFILE}"
+}
+
+cmd_stop() {
+    local pid
+    pid=$(_get_pid)
+    if [ -z "$pid" ]; then
+        info "Not running"
+        return 0
+    fi
+
+    kill "$pid" 2>/dev/null || true
+    rm -f "$PIDFILE"
+
+    # Wait for port to be free
+    local tries=0
+    while [ $tries -lt 10 ]; do
+        if ! lsof -iTCP:"$CHRONO_PORT" -sTCP:LISTEN -P -n >/dev/null 2>&1; then
+            info "Stopped (was PID: ${pid})"
+            return 0
+        fi
+        sleep 0.3
+        tries=$((tries + 1))
+    done
+    warn "Sent kill to PID ${pid} — port may still be releasing"
+}
+
+cmd_restart() {
+    cmd_stop
+    sleep 1
+    cmd_start
+}
+
+cmd_status() {
+    printf "${B}Chronograph Status${R}\n"
+
+    local pid
+    pid=$(_get_pid)
+    if [ -n "$pid" ]; then
+        info "Running (PID: ${pid})"
+        local mem
+        mem=$(ps -o rss= -p "$pid" 2>/dev/null | awk '{printf "%.0f", $1/1024}')
+        [ -n "$mem" ] && info "Memory: ${mem} MB"
+    else
+        warn "Not running"
+    fi
+
+    printf "  Port:     %s\n" "$CHRONO_PORT"
+    printf "  Source:   %s\n" "$CHRONO_DIR"
+    printf "  Logs:     %s\n" "$LOGFILE"
+    printf "  PID file: %s\n" "$PIDFILE"
+
+    if curl -sf "http://localhost:${CHRONO_PORT}/api/state" >/dev/null 2>&1; then
+        local state
+        state=$(curl -sf "http://localhost:${CHRONO_PORT}/api/state" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+print('events=%d agents=%d' % (d.get('event_count', 0), len(d.get('agents', {}))))
+" 2>/dev/null)
+        info "API reachable ($state)"
+    else
+        warn "API not reachable"
+    fi
+}
+
+cmd_logs() {
+    if [ -f "$LOGFILE" ]; then
+        tail -f "$LOGFILE"
+    else
+        warn "No log file at ${LOGFILE}"
+    fi
+}
+
+case "${1:-}" in
+    start)   cmd_start ;;
+    stop)    cmd_stop ;;
+    restart) cmd_restart ;;
+    status)  cmd_status ;;
+    logs)    cmd_logs ;;
+    --help|-h)
+        printf "Usage: chronograph-ctl {start|stop|restart|status|logs}\n\n"
+        printf "Manage the Task Chronograph HTTP server for development.\n"
+        printf "Runs from source at %s on port %s.\n\n" "$CHRONO_DIR" "$CHRONO_PORT"
+        printf "Commands:\n"
+        printf "  start    Start the HTTP server (background)\n"
+        printf "  stop     Stop the server\n"
+        printf "  restart  Stop + start (picks up code changes)\n"
+        printf "  status   Show PID, port, memory, event count\n"
+        printf "  logs     Tail the log file\n"
+        ;;
+    *)
+        printf "Usage: chronograph-ctl {start|stop|restart|status|logs}\n" >&2
+        exit 1
+        ;;
+esac

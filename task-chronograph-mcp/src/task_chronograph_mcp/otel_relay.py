@@ -45,7 +45,7 @@ MAIN_AGENT_TYPE = "main-agent"
 TRACE_TYPE_PIPELINE = "pipeline"
 TRACE_TYPE_NATIVE = "native"
 
-# Span reaper configuration
+# Context reaper configuration
 AGENT_SPAN_TIMEOUT_S = 60  # seconds of inactivity before reaping
 REAPER_INTERVAL_S = 10  # seconds between reaper sweeps
 
@@ -79,9 +79,14 @@ class OTelRelay:
     never propagate to the caller.  This ensures the EventStore path is never
     disrupted by OTel failures.
 
-    A background reaper thread ends agent spans that have had no tool activity
-    for ``AGENT_SPAN_TIMEOUT_S`` seconds. This compensates for SubagentStop
-    hooks not firing for background agents.
+    Agent and session spans are ended immediately after creation so that
+    Phoenix receives the trace structure right away (the BatchSpanProcessor
+    only exports ended spans). Child spans reference their parent's
+    SpanContext for linkage -- this works after the parent is closed because
+    OTel links by IDs, not by live Span objects.
+
+    A background reaper thread cleans up stale context entries (agents whose
+    SubagentStop hook never fired) to prevent memory leaks.
     """
 
     def __init__(
@@ -101,9 +106,11 @@ class OTelRelay:
         self._provider: TracerProvider | None = None
         self._tracer: trace.Tracer | None = None
 
-        # Span tracking — protected by _span_lock
+        # Context tracking -- protected by _span_lock
+        # Stores the OTel Context (with embedded SpanContext) for each agent,
+        # used to parent child spans. Agent spans themselves are ended immediately.
         self._span_lock = threading.Lock()
-        self._span_map: dict[str, trace.Span] = {}
+        self._context_map: dict[str, context_api.Context] = {}
         self._span_last_activity: dict[str, float] = {}
 
         self._session_span: trace.Span | None = None
@@ -129,7 +136,7 @@ class OTelRelay:
         if not _is_otel_enabled():
             return
         if self._session_context is not None:
-            return  # already have an active session — skip duplicate
+            return  # already have an active session -- skip duplicate
         try:
             if self._provider is None:
                 self._init_provider(project_dir)
@@ -138,24 +145,18 @@ class OTelRelay:
             logger.warning("Failed to start OTel session", exc_info=True)
 
     def end_session(self, session_id: str) -> None:
-        """End all open agent spans, flush, and clear session state.
+        """Flush pending spans and clear session state.
 
-        The root span was already ended in ``_open_session_span``. This
-        ends any orphaned agent spans, flushes, and resets so the next
-        ``start_session`` can create a fresh root span.
+        All spans (session, agents, tools) are already ended at creation
+        time. This method cleans up tracking state and flushes the
+        exporter.
         """
         if not _is_otel_enabled():
             return
         try:
             with self._span_lock:
-                spans_to_end = list(self._span_map.items())
-                self._span_map.clear()
+                self._context_map.clear()
                 self._span_last_activity.clear()
-            for _agent_id, span in spans_to_end:
-                try:
-                    span.end()
-                except Exception:
-                    logger.debug("Failed to end orphaned span %s", _agent_id)
             self._session_span = None
             self._session_context = None
             self._trace_type_set = False
@@ -209,7 +210,7 @@ class OTelRelay:
         *,
         project_dir: str = "",
     ) -> None:
-        """Open an AGENT child span under the session root."""
+        """Open an AGENT child span under the session root (ended immediately)."""
         if not _is_otel_enabled():
             return
         try:
@@ -219,19 +220,33 @@ class OTelRelay:
             logger.warning("Failed to start OTel agent span for %s", agent_id, exc_info=True)
 
     def end_agent(self, agent_id: str, output: str = "") -> None:
-        """Set the output value and end the AGENT span."""
+        """Record agent completion and clean up the context entry.
+
+        If *output* is provided, creates a short ``agent-result`` child
+        span carrying the output value so it appears in the Phoenix trace.
+        """
         if not _is_otel_enabled():
             return
         try:
             with self._span_lock:
-                span = self._span_map.pop(agent_id, None)
+                agent_context = self._context_map.pop(agent_id, None)
                 self._span_last_activity.pop(agent_id, None)
-            if span is None:
-                logger.debug("No span found for agent_id=%s", agent_id)
+            if agent_context is None:
+                logger.debug("No context found for agent_id=%s", agent_id)
                 return
-            if output:
-                span.set_attribute(SpanAttributes.OUTPUT_VALUE, output)
-            span.end()
+            if output and self._tracer is not None:
+                span = self._tracer.start_span(
+                    name="agent-result",
+                    context=agent_context,
+                    kind=SpanKind.INTERNAL,
+                    attributes={
+                        SpanAttributes.OPENINFERENCE_SPAN_KIND: (
+                            OpenInferenceSpanKindValues.CHAIN.value
+                        ),
+                        SpanAttributes.OUTPUT_VALUE: output,
+                    },
+                )
+                span.end()
         except Exception:
             logger.warning("Failed to end OTel agent span for %s", agent_id, exc_info=True)
 
@@ -263,7 +278,7 @@ class OTelRelay:
             logger.warning("Failed to record OTel tool span for %s", tool_name, exc_info=True)
 
     # ------------------------------------------------------------------
-    # Span events
+    # Span events (emitted as child spans for immediate Phoenix visibility)
     # ------------------------------------------------------------------
 
     def add_phase_event(
@@ -274,20 +289,25 @@ class OTelRelay:
         name: str,
         summary: str,
     ) -> None:
-        """Add a ``phase_transition`` event to the given agent span."""
+        """Create a ``phase`` child span under the given agent."""
         if not _is_otel_enabled():
             return
         try:
             with self._span_lock:
-                span = self._span_map.get(agent_id)
+                agent_context = self._context_map.get(agent_id)
                 if agent_id in self._span_last_activity:
                     self._span_last_activity[agent_id] = time.monotonic()
-            if span is None:
-                logger.debug("No span for phase event, agent_id=%s", agent_id)
+            if agent_context is None or self._tracer is None:
+                logger.debug("No context for phase event, agent_id=%s", agent_id)
                 return
-            span.add_event(
-                "phase_transition",
+            span = self._tracer.start_span(
+                name=f"phase:{name}",
+                context=agent_context,
+                kind=SpanKind.INTERNAL,
                 attributes={
+                    SpanAttributes.OPENINFERENCE_SPAN_KIND: (
+                        OpenInferenceSpanKindValues.CHAIN.value
+                    ),
                     "phase.number": phase,
                     "phase.total": total,
                     "phase.name": name,
@@ -295,11 +315,12 @@ class OTelRelay:
                     "agent.type": agent_id,
                 },
             )
+            span.end()
         except Exception:
             logger.warning("Failed to add phase event for %s", agent_id, exc_info=True)
 
     def add_decision_event(self, agent_id: str, decision: dict[str, Any]) -> None:
-        """Add a ``decision_made`` event to the given agent span.
+        """Create a ``decision`` child span under the given agent.
 
         *decision* should contain keys ``id``, ``category``, ``text``, and
         ``made_by``.
@@ -308,28 +329,34 @@ class OTelRelay:
             return
         try:
             with self._span_lock:
-                span = self._span_map.get(agent_id)
-            if span is None:
-                logger.debug("No span for decision event, agent_id=%s", agent_id)
+                agent_context = self._context_map.get(agent_id)
+            if agent_context is None or self._tracer is None:
+                logger.debug("No context for decision event, agent_id=%s", agent_id)
                 return
-            span.add_event(
-                "decision_made",
+            span = self._tracer.start_span(
+                name="decision",
+                context=agent_context,
+                kind=SpanKind.INTERNAL,
                 attributes={
+                    SpanAttributes.OPENINFERENCE_SPAN_KIND: (
+                        OpenInferenceSpanKindValues.CHAIN.value
+                    ),
                     "decision.id": decision.get("id", ""),
                     "decision.category": decision.get("category", ""),
                     "decision.text": decision.get("text", ""),
                     "decision.made_by": decision.get("made_by", ""),
                 },
             )
+            span.end()
         except Exception:
             logger.warning("Failed to add decision event for %s", agent_id, exc_info=True)
 
     # ------------------------------------------------------------------
-    # Span reaper
+    # Context reaper
     # ------------------------------------------------------------------
 
     def _start_reaper(self) -> None:
-        """Start the background span reaper thread if not already running."""
+        """Start the background context reaper thread if not already running."""
         if self._reaper_thread is not None:
             return
         self._reaper_stop.clear()
@@ -341,31 +368,28 @@ class OTelRelay:
         self._reaper_thread.start()
 
     def _reaper_loop(self) -> None:
-        """Periodically check for and end stale agent spans."""
+        """Periodically check for and clean up stale agent contexts."""
         while not self._reaper_stop.wait(REAPER_INTERVAL_S):
-            self._reap_stale_spans()
+            self._reap_stale_contexts()
 
-    def _reap_stale_spans(self) -> None:
-        """End agent spans that haven't had activity recently."""
+    def _reap_stale_contexts(self) -> None:
+        """Remove context entries for agents that have had no activity recently.
+
+        Agent spans are already ended (immediately at creation), so there
+        are no open spans to close. The reaper's job is to prevent memory
+        leaks from SubagentStop hooks that never fire.
+        """
         now = time.monotonic()
-        stale: list[tuple[str, trace.Span]] = []
-
         with self._span_lock:
-            for agent_id, last_activity in list(self._span_last_activity.items()):
-                if now - last_activity > AGENT_SPAN_TIMEOUT_S:
-                    span = self._span_map.pop(agent_id, None)
-                    self._span_last_activity.pop(agent_id, None)
-                    if span is not None:
-                        stale.append((agent_id, span))
-
-        # End spans outside the lock (span.end triggers processor pipeline)
-        for agent_id, span in stale:
-            try:
-                span.set_attribute("praxion.reaped", True)
-                span.end()
-                logger.info("Reaped stale agent span: %s", agent_id)
-            except Exception:
-                logger.debug("Failed to reap span %s", agent_id)
+            stale = [
+                aid
+                for aid, last in self._span_last_activity.items()
+                if now - last > AGENT_SPAN_TIMEOUT_S
+            ]
+            for agent_id in stale:
+                self._context_map.pop(agent_id, None)
+                self._span_last_activity.pop(agent_id, None)
+                logger.info("Reaped stale agent context: %s", agent_id)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -409,21 +433,22 @@ class OTelRelay:
 
         The span is ended right away so Phoenix receives it and shows the
         trace in the Traces view. Child spans (agents, tools) reference
-        the root's SpanContext for parent-child linkage — this works even
+        the root's SpanContext for parent-child linkage -- this works even
         after the root span is closed because OTel links by IDs, not by
         live Span objects.
 
-        A synthetic ``main-agent`` AGENT span is also created to parent
-        tool calls from the main Claude agent (which has no lifecycle hooks).
-        The ``_session_context`` is preserved so child spans can be
-        parented under this root throughout the session.
+        A synthetic ``main-agent`` AGENT span is also created (and ended
+        immediately) to parent tool calls from the main Claude agent
+        (which has no lifecycle hooks). The ``_session_context`` is
+        preserved so child spans can be parented under this root
+        throughout the session.
         """
         if self._tracer is None:
             return
 
         project_name = os.path.basename(project_dir) if project_dir else self._default_project_name
 
-        # No parent context → true root span.
+        # No parent context -> true root span.
         self._session_span = self._tracer.start_span(
             name="session",
             kind=SpanKind.INTERNAL,
@@ -435,7 +460,7 @@ class OTelRelay:
                 "praxion.session_start": datetime.now(UTC).isoformat(),
             },
         )
-        # Capture context BEFORE ending — child spans parent under this.
+        # Capture context BEFORE ending -- child spans parent under this.
         self._session_context = trace.set_span_in_context(self._session_span)
         # End immediately so Phoenix receives the root span right away.
         # Child spans still link to it via the saved _session_context.
@@ -456,11 +481,13 @@ class OTelRelay:
                 "praxion.session_id": session_id,
             },
         )
+        main_context = trace.set_span_in_context(main_span)
+        main_span.end()  # End immediately for Phoenix visibility
         with self._span_lock:
-            self._span_map[MAIN_AGENT_ID] = main_span
+            self._context_map[MAIN_AGENT_ID] = main_context
             self._span_last_activity[MAIN_AGENT_ID] = time.monotonic()
 
-        # Start reaper to handle background agent span cleanup
+        # Start reaper to handle stale context cleanup
         self._start_reaper()
 
     def _start_agent_span(
@@ -470,7 +497,12 @@ class OTelRelay:
         session_id: str,
         parent_session_id: str,
     ) -> None:
-        """Create an AGENT span as a child of the session root."""
+        """Create an AGENT span as a child of the session root, ended immediately.
+
+        The span is ended right away so Phoenix shows the trace hierarchy
+        without waiting for SubagentStop. The span's context is stored in
+        ``_context_map`` for parenting child spans (tools, phases, decisions).
+        """
         if self._tracer is None or self._session_context is None:
             return
 
@@ -480,8 +512,11 @@ class OTelRelay:
         # Set trace_type on each agent span (session span is already ended)
         trace_type = TRACE_TYPE_PIPELINE if origin == "praxion" else TRACE_TYPE_NATIVE
 
+        # Ensure a meaningful span name for Phoenix display
+        span_name = clean_type or agent_id or "unknown-agent"
+
         span = self._tracer.start_span(
-            name=clean_type,
+            name=span_name,
             context=self._session_context,
             kind=SpanKind.INTERNAL,
             attributes={
@@ -494,8 +529,11 @@ class OTelRelay:
                 "praxion.parent_session_id": parent_session_id,
             },
         )
+        agent_context = trace.set_span_in_context(span)
+        span.end()  # End immediately for Phoenix visibility
+
         with self._span_lock:
-            self._span_map[agent_id] = span
+            self._context_map[agent_id] = agent_context
             self._span_last_activity[agent_id] = time.monotonic()
 
     def _record_tool_span(
@@ -511,21 +549,19 @@ class OTelRelay:
         if self._tracer is None:
             return
 
-        # Determine parent: agent span if available, main agent for empty
+        # Determine parent: agent context if available, main agent for empty
         # agent_id, or session root as last resort
         lookup_id = agent_id if agent_id else MAIN_AGENT_ID
 
         with self._span_lock:
-            parent_span = self._span_map.get(lookup_id)
+            parent_context = self._context_map.get(lookup_id)
             # Update activity timestamp for the parent agent
             if lookup_id in self._span_last_activity:
                 self._span_last_activity[lookup_id] = time.monotonic()
 
-        if parent_span is not None:
-            parent_context = trace.set_span_in_context(parent_span)
-        elif self._session_context is not None:
+        if parent_context is None:
             parent_context = self._session_context
-        else:
+        if parent_context is None:
             return
 
         attributes: dict[str, str] = {

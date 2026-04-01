@@ -177,14 +177,19 @@ class TestAgentSpanLifecycle:
         agent = harness.spans_with_attribute("praxion.agent_type", "researcher")[0]
         assert agent.attributes["openinference.span.kind"] == "AGENT"
 
-    def test_agent_stop_sets_output_value(self, harness: OTelRelayTestHarness):
+    def test_agent_stop_creates_result_span_with_output(self, harness: OTelRelayTestHarness):
         harness.relay.start_session(SESSION_ID, harness.project_dir)
         harness.relay.start_agent("agent-r1", "researcher", SESSION_ID)
         harness.relay.end_agent("agent-r1", "Findings: auth uses OAuth2")
         harness.relay.end_session(SESSION_ID)
 
+        result_spans = harness.spans_named("agent-result")
+        assert len(result_spans) == 1
+        assert result_spans[0].attributes["output.value"] == "Findings: auth uses OAuth2"
+
+        # Result span is a child of the agent span
         agent = harness.spans_with_attribute("praxion.agent_type", "researcher")[0]
-        assert agent.attributes["output.value"] == "Findings: auth uses OAuth2"
+        assert result_spans[0].parent.span_id == agent.context.span_id
 
     def test_praxion_agent_origin_detected(self, harness: OTelRelayTestHarness):
         harness.relay.start_session(SESSION_ID, harness.project_dir)
@@ -204,6 +209,57 @@ class TestAgentSpanLifecycle:
 
         agent = harness.spans_with_attribute("praxion.agent_type", "general-purpose")[0]
         assert agent.attributes["praxion.agent_origin"] == "claude-code"
+
+
+# ---------------------------------------------------------------------------
+# 2b. Agent spans are ended immediately for Phoenix visibility
+# ---------------------------------------------------------------------------
+
+
+class TestAgentSpanImmediateEnd:
+    """Verify agent spans are ended immediately so Phoenix shows the hierarchy."""
+
+    def test_agent_span_available_before_end_agent(self, harness: OTelRelayTestHarness):
+        harness.relay.start_session(SESSION_ID, harness.project_dir)
+        harness.relay.start_agent("agent-r1", "researcher", SESSION_ID)
+
+        # Agent span should already be in finished spans (ended immediately)
+        agent_spans = harness.spans_with_attribute("praxion.agent_type", "researcher")
+        assert len(agent_spans) == 1
+        assert agent_spans[0].end_time is not None
+
+        harness.relay.end_agent("agent-r1")
+        harness.relay.end_session(SESSION_ID)
+
+    def test_tool_spans_parent_under_immediately_ended_agent(self, harness: OTelRelayTestHarness):
+        harness.relay.start_session(SESSION_ID, harness.project_dir)
+        harness.relay.start_agent("agent-i1", "implementer", SESSION_ID)
+        harness.relay.record_tool(agent_id="agent-i1", tool_name="Read", input_summary="f.py")
+        harness.relay.end_agent("agent-i1")
+        harness.relay.end_session(SESSION_ID)
+
+        agent = harness.spans_with_attribute("praxion.agent_id", "agent-i1")[0]
+        tool = harness.spans_with_attribute("tool.name", "Read")[0]
+        assert tool.parent.span_id == agent.context.span_id
+
+    def test_empty_agent_type_uses_agent_id_as_name(self, harness: OTelRelayTestHarness):
+        harness.relay.start_session(SESSION_ID, harness.project_dir)
+        harness.relay.start_agent("my-agent-id", "", SESSION_ID)
+        harness.relay.end_agent("my-agent-id")
+        harness.relay.end_session(SESSION_ID)
+
+        # Should use agent_id as span name when agent_type is empty
+        spans = harness.spans_named("my-agent-id")
+        assert len(spans) == 1
+
+    def test_fully_empty_agent_uses_unknown_name(self, harness: OTelRelayTestHarness):
+        harness.relay.start_session(SESSION_ID, harness.project_dir)
+        harness.relay.start_agent("", "", SESSION_ID)
+        harness.relay.end_agent("")
+        harness.relay.end_session(SESSION_ID)
+
+        spans = harness.spans_named("unknown-agent")
+        assert len(spans) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -404,9 +460,9 @@ class TestParallelAgentSpans:
 
 
 class TestPhaseTransitionEvent:
-    """Verify phase transitions appear as events on the agent span."""
+    """Verify phase transitions appear as child spans under the agent."""
 
-    def test_phase_event_appears_on_agent_span(self, harness: OTelRelayTestHarness):
+    def test_phase_creates_child_span_under_agent(self, harness: OTelRelayTestHarness):
         harness.relay.start_session(SESSION_ID, harness.project_dir)
         harness.relay.start_agent("agent-r1", "researcher", SESSION_ID)
         harness.relay.add_phase_event(
@@ -419,15 +475,18 @@ class TestPhaseTransitionEvent:
         harness.relay.end_agent("agent-r1", "Done")
         harness.relay.end_session(SESSION_ID)
 
-        agent = harness.spans_with_attribute("praxion.agent_id", "agent-r1")[0]
-        phase_events = [e for e in agent.events if e.name == "phase_transition"]
-        assert len(phase_events) == 1
+        phase_spans = harness.spans_named("phase:analysis")
+        assert len(phase_spans) == 1
 
-        event = phase_events[0]
-        assert event.attributes["phase.number"] == 2
-        assert event.attributes["phase.total"] == 5
-        assert event.attributes["phase.name"] == "analysis"
-        assert event.attributes["phase.summary"] == "Analyzing auth libraries"
+        phase = phase_spans[0]
+        assert phase.attributes["phase.number"] == 2
+        assert phase.attributes["phase.total"] == 5
+        assert phase.attributes["phase.name"] == "analysis"
+        assert phase.attributes["phase.summary"] == "Analyzing auth libraries"
+
+        # Phase span is a child of the agent span
+        agent = harness.spans_with_attribute("praxion.agent_id", "agent-r1")[0]
+        assert phase.parent.span_id == agent.context.span_id
 
 
 # ---------------------------------------------------------------------------
@@ -436,9 +495,9 @@ class TestPhaseTransitionEvent:
 
 
 class TestDecisionEvent:
-    """Verify decision records appear as events on the agent span."""
+    """Verify decision records appear as child spans under the agent."""
 
-    def test_decision_event_appears_on_agent_span(self, harness: OTelRelayTestHarness):
+    def test_decision_creates_child_span_under_agent(self, harness: OTelRelayTestHarness):
         harness.relay.start_session(SESSION_ID, harness.project_dir)
         harness.relay.start_agent("agent-sa1", "systems-architect", SESSION_ID)
         harness.relay.add_decision_event(
@@ -453,14 +512,17 @@ class TestDecisionEvent:
         harness.relay.end_agent("agent-sa1", "Done")
         harness.relay.end_session(SESSION_ID)
 
-        agent = harness.spans_with_attribute("praxion.agent_id", "agent-sa1")[0]
-        decision_events = [e for e in agent.events if e.name == "decision_made"]
-        assert len(decision_events) == 1
+        decision_spans = harness.spans_named("decision")
+        assert len(decision_spans) == 1
 
-        event = decision_events[0]
-        assert event.attributes["decision.id"] == "dec-abc123"
-        assert event.attributes["decision.category"] == "architectural"
-        assert event.attributes["decision.text"] == "Use event sourcing for state management"
+        dec = decision_spans[0]
+        assert dec.attributes["decision.id"] == "dec-abc123"
+        assert dec.attributes["decision.category"] == "architectural"
+        assert dec.attributes["decision.text"] == "Use event sourcing for state management"
+
+        # Decision span is a child of the agent span
+        agent = harness.spans_with_attribute("praxion.agent_id", "agent-sa1")[0]
+        assert dec.parent.span_id == agent.context.span_id
 
 
 # ---------------------------------------------------------------------------
@@ -711,14 +773,20 @@ class TestMainAgentSpan:
         assert tool.parent is not None
         assert tool.parent.span_id == agent.context.span_id
 
-    def test_main_agent_ended_on_session_end(self, harness: OTelRelayTestHarness):
+    def test_main_agent_ended_immediately(self, harness: OTelRelayTestHarness):
         harness.relay.start_session(SESSION_ID, harness.project_dir)
+        # Main agent span is already ended (immediately at session start)
+        main = harness.spans_with_attribute("praxion.agent_id", "__main_agent__")[0]
+        assert main.end_time is not None
+        assert main.end_time >= main.start_time
+
+        # Tool calls still parent under it via saved context
         harness.relay.record_tool(agent_id="", tool_name="Bash", input_summary="echo hi")
         harness.relay.end_session(SESSION_ID)
 
-        main = harness.spans_with_attribute("praxion.agent_id", "__main_agent__")[0]
-        assert main.end_time is not None
-        assert main.end_time > main.start_time
+        tools = [s for s in harness.exporter.get_finished_spans() if s.attributes.get("tool.name")]
+        assert len(tools) == 1
+        assert tools[0].parent.span_id == main.context.span_id
 
 
 # ---------------------------------------------------------------------------
@@ -726,10 +794,10 @@ class TestMainAgentSpan:
 # ---------------------------------------------------------------------------
 
 
-class TestSpanReaper:
-    """Verify the background span reaper for stale agent spans."""
+class TestContextReaper:
+    """Verify the background reaper cleans up stale agent contexts."""
 
-    def test_stale_agent_span_reaped(self, harness: OTelRelayTestHarness):
+    def test_stale_agent_context_reaped(self, harness: OTelRelayTestHarness):
         import task_chronograph_mcp.otel_relay as relay_mod
 
         orig_timeout = relay_mod.AGENT_SPAN_TIMEOUT_S
@@ -739,22 +807,19 @@ class TestSpanReaper:
             harness.relay.start_agent("bg-agent", "i-am:verifier", SESSION_ID)
             harness.relay.record_tool(agent_id="bg-agent", tool_name="Read", input_summary="f.py")
 
-            # Wait for reaper to detect inactivity
+            # Wait for inactivity to exceed timeout
             import time
 
             time.sleep(0.5)
 
             # Manually trigger reap (reaper thread may not have run yet)
-            harness.relay._reap_stale_spans()
+            harness.relay._reap_stale_contexts()
+
+            # Context should be cleaned up
+            with harness.relay._span_lock:
+                assert "bg-agent" not in harness.relay._context_map
 
             harness.relay.end_session(SESSION_ID)
-
-            reaped = [
-                s
-                for s in harness.exporter.get_finished_spans()
-                if s.attributes.get("praxion.reaped") is True and s.name == "verifier"
-            ]
-            assert len(reaped) == 1
         finally:
             relay_mod.AGENT_SPAN_TIMEOUT_S = orig_timeout
 
@@ -770,11 +835,11 @@ class TestSpanReaper:
                 agent_id="active-agent", tool_name="Read", input_summary="f.py"
             )
 
-            harness.relay._reap_stale_spans()
+            harness.relay._reap_stale_contexts()
 
-            # Agent should still be in span map (not reaped)
+            # Agent should still be in context map (not reaped)
             with harness.relay._span_lock:
-                assert "active-agent" in harness.relay._span_map
+                assert "active-agent" in harness.relay._context_map
 
             harness.relay.end_agent("active-agent")
             harness.relay.end_session(SESSION_ID)
@@ -786,15 +851,11 @@ class TestSpanReaper:
         harness.relay.start_agent("agent-x", "i-am:sentinel", SESSION_ID)
         harness.relay.end_agent("agent-x", "Done")
 
-        harness.relay._reap_stale_spans()
+        harness.relay._reap_stale_contexts()
 
-        # No reaped spans — agent was explicitly stopped
-        reaped = [
-            s
-            for s in harness.exporter.get_finished_spans()
-            if s.attributes.get("praxion.reaped") is True
-        ]
-        assert len(reaped) == 0
+        # Context already removed by end_agent -- nothing to reap
+        with harness.relay._span_lock:
+            assert "agent-x" not in harness.relay._context_map
         harness.relay.end_session(SESSION_ID)
 
     def test_reaper_thread_stops_on_shutdown(self, harness: OTelRelayTestHarness):

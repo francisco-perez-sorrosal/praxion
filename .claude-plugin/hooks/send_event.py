@@ -61,7 +61,14 @@ def _parse_last_progress_line(content):
 
 def _agent_label(data):
     """Best available human-readable label for the agent in this hook payload."""
-    return data.get("agent_type", "") or data.get("agent_id", "") or "unknown"
+    agent_type = data.get("agent_type", "")
+    if agent_type:
+        return agent_type
+    # Prefer description (human-readable) over agent_id (UUID-like)
+    description = data.get("description", "")
+    if description:
+        return description[:50]
+    return data.get("agent_id", "") or "unknown-agent"
 
 
 def _truncate(text, max_bytes=4096):

@@ -124,10 +124,10 @@ class TestBuildEventsSubagentStart:
         }
         events, interactions = build_events(payload)
         assert len(events) == 1
-        assert events[0]["agent_type"] == "unknown"
-        assert "unknown" in events[0]["message"]
+        assert events[0]["agent_type"] == "unknown-agent"
+        assert "unknown-agent" in events[0]["message"]
         assert len(interactions) == 1
-        assert "unknown" in interactions[0]["summary"]
+        assert "unknown-agent" in interactions[0]["summary"]
 
     def test_subagent_start_empty_type_falls_back_to_agent_id(self, build_events):
         payload = {

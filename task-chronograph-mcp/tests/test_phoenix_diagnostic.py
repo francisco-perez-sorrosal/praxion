@@ -186,11 +186,13 @@ class TestPhoenixDiagnostic:
                 f"Agent span parent={a['parentId']} != session span={session_span_id}"
             )
 
-        # Check hierarchy: tools parented to agent
-        agent_span_id = agent_spans[0]["context"]["spanId"]
+        # Check hierarchy: tools parented to the researcher agent (not main-agent)
+        researcher_spans = [a for a in agent_spans if a["name"] == "researcher"]
+        assert len(researcher_spans) == 1, "Expected exactly 1 researcher agent span"
+        researcher_span_id = researcher_spans[0]["context"]["spanId"]
         for t in tool_spans:
-            assert t["parentId"] == agent_span_id, (
-                f"Tool span parent={t['parentId']} != agent span={agent_span_id}"
+            assert t["parentId"] == researcher_span_id, (
+                f"Tool span parent={t['parentId']} != researcher span={researcher_span_id}"
             )
 
         # Check all same trace_id

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
+import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -12,7 +14,7 @@ from opentelemetry import context as context_api
 from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExporter
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor, SpanExporter
 from opentelemetry.trace import (
     SpanKind,
     StatusCode,
@@ -35,18 +37,23 @@ TRACER_NAME = "praxion.chronograph"
 # Agent origin detection prefix
 _PRAXION_AGENT_PREFIX = "i-am:"
 
+# Main agent synthetic span
+MAIN_AGENT_ID = "__main_agent__"
+MAIN_AGENT_TYPE = "main-agent"
 
 # Trace type values
 TRACE_TYPE_PIPELINE = "pipeline"
 TRACE_TYPE_NATIVE = "native"
 
+# Span reaper configuration
+AGENT_SPAN_TIMEOUT_S = 60  # seconds of inactivity before reaping
+REAPER_INTERVAL_S = 10  # seconds between reaper sweeps
+
 
 def _is_otel_enabled() -> bool:
-    """OTel export is opt-in: disabled by default, enabled by chronograph-ctl.
+    """OTel export is enabled by default via plugin.json.
 
-    MCP-managed chronograph processes (spawned by Claude Code) should NOT
-    export to Phoenix — only the chronograph-ctl instance should. This
-    prevents stale MCP processes from creating traces with wrong project names.
+    Can be disabled by setting OTEL_ENABLED=false for debugging.
     """
     return os.environ.get(OTEL_ENABLED_ENV, "false").lower() in ("true", "1", "yes")
 
@@ -71,6 +78,10 @@ class OTelRelay:
     All public methods are fail-open: exceptions are logged as warnings and
     never propagate to the caller.  This ensures the EventStore path is never
     disrupted by OTel failures.
+
+    A background reaper thread ends agent spans that have had no tool activity
+    for ``AGENT_SPAN_TIMEOUT_S`` seconds. This compensates for SubagentStop
+    hooks not firing for background agents.
     """
 
     def __init__(
@@ -89,10 +100,19 @@ class OTelRelay:
 
         self._provider: TracerProvider | None = None
         self._tracer: trace.Tracer | None = None
+
+        # Span tracking — protected by _span_lock
+        self._span_lock = threading.Lock()
         self._span_map: dict[str, trace.Span] = {}
+        self._span_last_activity: dict[str, float] = {}
+
         self._session_span: trace.Span | None = None
         self._session_context: context_api.Context | None = None
         self._trace_type_set = False
+
+        # Reaper thread
+        self._reaper_stop = threading.Event()
+        self._reaper_thread: threading.Thread | None = None
 
     # ------------------------------------------------------------------
     # Session lifecycle
@@ -127,13 +147,15 @@ class OTelRelay:
         if not _is_otel_enabled():
             return
         try:
-            # End any orphaned agent spans
-            for _agent_id, span in list(self._span_map.items()):
+            with self._span_lock:
+                spans_to_end = list(self._span_map.items())
+                self._span_map.clear()
+                self._span_last_activity.clear()
+            for _agent_id, span in spans_to_end:
                 try:
                     span.end()
                 except Exception:
-                    pass
-            self._span_map.clear()
+                    logger.debug("Failed to end orphaned span %s", _agent_id)
             self._session_span = None
             self._session_context = None
             self._trace_type_set = False
@@ -143,8 +165,12 @@ class OTelRelay:
             logger.warning("Failed to end OTel session", exc_info=True)
 
     def shutdown(self) -> None:
-        """Shut down the TracerProvider, releasing all resources."""
+        """Shut down the TracerProvider and reaper thread, releasing all resources."""
         try:
+            self._reaper_stop.set()
+            if self._reaper_thread is not None:
+                self._reaper_thread.join(timeout=5)
+                self._reaper_thread = None
             if self._provider is not None:
                 self._provider.shutdown()
                 self._provider = None
@@ -197,7 +223,9 @@ class OTelRelay:
         if not _is_otel_enabled():
             return
         try:
-            span = self._span_map.pop(agent_id, None)
+            with self._span_lock:
+                span = self._span_map.pop(agent_id, None)
+                self._span_last_activity.pop(agent_id, None)
             if span is None:
                 logger.debug("No span found for agent_id=%s", agent_id)
                 return
@@ -223,7 +251,7 @@ class OTelRelay:
         session_id: str = "",
         project_dir: str = "",
     ) -> None:
-        """Create a TOOL child span under the given agent (or session root)."""
+        """Create a TOOL child span under the given agent (or main agent)."""
         if not _is_otel_enabled():
             return
         try:
@@ -250,7 +278,10 @@ class OTelRelay:
         if not _is_otel_enabled():
             return
         try:
-            span = self._span_map.get(agent_id)
+            with self._span_lock:
+                span = self._span_map.get(agent_id)
+                if agent_id in self._span_last_activity:
+                    self._span_last_activity[agent_id] = time.monotonic()
             if span is None:
                 logger.debug("No span for phase event, agent_id=%s", agent_id)
                 return
@@ -276,7 +307,8 @@ class OTelRelay:
         if not _is_otel_enabled():
             return
         try:
-            span = self._span_map.get(agent_id)
+            with self._span_lock:
+                span = self._span_map.get(agent_id)
             if span is None:
                 logger.debug("No span for decision event, agent_id=%s", agent_id)
                 return
@@ -291,6 +323,49 @@ class OTelRelay:
             )
         except Exception:
             logger.warning("Failed to add decision event for %s", agent_id, exc_info=True)
+
+    # ------------------------------------------------------------------
+    # Span reaper
+    # ------------------------------------------------------------------
+
+    def _start_reaper(self) -> None:
+        """Start the background span reaper thread if not already running."""
+        if self._reaper_thread is not None:
+            return
+        self._reaper_stop.clear()
+        self._reaper_thread = threading.Thread(
+            target=self._reaper_loop,
+            daemon=True,
+            name="otel-span-reaper",
+        )
+        self._reaper_thread.start()
+
+    def _reaper_loop(self) -> None:
+        """Periodically check for and end stale agent spans."""
+        while not self._reaper_stop.wait(REAPER_INTERVAL_S):
+            self._reap_stale_spans()
+
+    def _reap_stale_spans(self) -> None:
+        """End agent spans that haven't had activity recently."""
+        now = time.monotonic()
+        stale: list[tuple[str, trace.Span]] = []
+
+        with self._span_lock:
+            for agent_id, last_activity in list(self._span_last_activity.items()):
+                if now - last_activity > AGENT_SPAN_TIMEOUT_S:
+                    span = self._span_map.pop(agent_id, None)
+                    self._span_last_activity.pop(agent_id, None)
+                    if span is not None:
+                        stale.append((agent_id, span))
+
+        # End spans outside the lock (span.end triggers processor pipeline)
+        for agent_id, span in stale:
+            try:
+                span.set_attribute("praxion.reaped", True)
+                span.end()
+                logger.info("Reaped stale agent span: %s", agent_id)
+            except Exception:
+                logger.debug("Failed to reap span %s", agent_id)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -311,12 +386,22 @@ class OTelRelay:
 
         if self._custom_exporter is not None:
             exporter = self._custom_exporter
+            # Use SimpleSpanProcessor for injected exporters (tests)
+            # to keep span export deterministic.
+            self._provider.add_span_processor(SimpleSpanProcessor(exporter))
         else:
             from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
             exporter = OTLPSpanExporter(endpoint=self._endpoint)
+            self._provider.add_span_processor(
+                BatchSpanProcessor(
+                    exporter,
+                    max_queue_size=512,
+                    schedule_delay_millis=5000,
+                    max_export_batch_size=64,
+                )
+            )
 
-        self._provider.add_span_processor(SimpleSpanProcessor(exporter))
         self._tracer = self._provider.get_tracer(TRACER_NAME)
 
     def _open_session_span(self, session_id: str, project_dir: str) -> None:
@@ -328,6 +413,8 @@ class OTelRelay:
         after the root span is closed because OTel links by IDs, not by
         live Span objects.
 
+        A synthetic ``main-agent`` AGENT span is also created to parent
+        tool calls from the main Claude agent (which has no lifecycle hooks).
         The ``_session_context`` is preserved so child spans can be
         parented under this root throughout the session.
         """
@@ -336,8 +423,7 @@ class OTelRelay:
 
         project_name = os.path.basename(project_dir) if project_dir else self._default_project_name
 
-        # No parent context → true root span. The SeededIdGenerator provides
-        # our deterministic trace_id on the first generate_trace_id() call.
+        # No parent context → true root span.
         self._session_span = self._tracer.start_span(
             name="session",
             kind=SpanKind.INTERNAL,
@@ -355,6 +441,27 @@ class OTelRelay:
         # Child spans still link to it via the saved _session_context.
         self._session_span.end()
         self._trace_type_set = False
+
+        # Create synthetic main-agent span for the main Claude agent.
+        # Tool calls with empty agent_id will be parented under this span.
+        main_span = self._tracer.start_span(
+            name=MAIN_AGENT_TYPE,
+            context=self._session_context,
+            kind=SpanKind.INTERNAL,
+            attributes={
+                SpanAttributes.OPENINFERENCE_SPAN_KIND: OpenInferenceSpanKindValues.AGENT.value,
+                "praxion.agent_type": MAIN_AGENT_TYPE,
+                "praxion.agent_origin": "claude-code",
+                "praxion.agent_id": MAIN_AGENT_ID,
+                "praxion.session_id": session_id,
+            },
+        )
+        with self._span_lock:
+            self._span_map[MAIN_AGENT_ID] = main_span
+            self._span_last_activity[MAIN_AGENT_ID] = time.monotonic()
+
+        # Start reaper to handle background agent span cleanup
+        self._start_reaper()
 
     def _start_agent_span(
         self,
@@ -387,7 +494,9 @@ class OTelRelay:
                 "praxion.parent_session_id": parent_session_id,
             },
         )
-        self._span_map[agent_id] = span
+        with self._span_lock:
+            self._span_map[agent_id] = span
+            self._span_last_activity[agent_id] = time.monotonic()
 
     def _record_tool_span(
         self,
@@ -398,12 +507,20 @@ class OTelRelay:
         is_error: bool,
         error_msg: str,
     ) -> None:
-        """Create a TOOL span as a child of the agent span or session root."""
+        """Create a TOOL span as a child of the agent span or main agent."""
         if self._tracer is None:
             return
 
-        # Determine parent: agent span if available, else session root
-        parent_span = self._span_map.get(agent_id) if agent_id else None
+        # Determine parent: agent span if available, main agent for empty
+        # agent_id, or session root as last resort
+        lookup_id = agent_id if agent_id else MAIN_AGENT_ID
+
+        with self._span_lock:
+            parent_span = self._span_map.get(lookup_id)
+            # Update activity timestamp for the parent agent
+            if lookup_id in self._span_last_activity:
+                self._span_last_activity[lookup_id] = time.monotonic()
+
         if parent_span is not None:
             parent_context = trace.set_span_in_context(parent_span)
         elif self._session_context is not None:

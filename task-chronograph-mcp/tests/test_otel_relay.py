@@ -234,7 +234,7 @@ class TestToolSpanCreation:
         assert tool.parent is not None
         assert tool.parent.span_id == agent.context.span_id
 
-    def test_tool_span_under_session_root_when_no_agent_id(self, harness: OTelRelayTestHarness):
+    def test_tool_span_under_main_agent_when_no_agent_id(self, harness: OTelRelayTestHarness):
         harness.relay.start_session(SESSION_ID, harness.project_dir)
         harness.relay.record_tool(
             agent_id="",
@@ -245,9 +245,9 @@ class TestToolSpanCreation:
         harness.relay.end_session(SESSION_ID)
 
         tool = harness.spans_with_attribute("tool.name", "Bash")[0]
-        root = harness.session_span()
+        main_agent = harness.spans_with_attribute("praxion.agent_id", "__main_agent__")[0]
         assert tool.parent is not None
-        assert tool.parent.span_id == root.context.span_id
+        assert tool.parent.span_id == main_agent.context.span_id
 
     def test_tool_span_under_session_root_when_unknown_agent_id(
         self, harness: OTelRelayTestHarness
@@ -656,3 +656,153 @@ class TestTraceTypeDetection:
         gp = harness.spans_named("general-purpose")[0]
         assert researcher.attributes.get("praxion.trace_type") == "pipeline"
         assert gp.attributes.get("praxion.trace_type") == "native"
+
+
+# ---------------------------------------------------------------------------
+# 13. Main agent span
+# ---------------------------------------------------------------------------
+
+
+class TestMainAgentSpan:
+    """Verify the synthetic main-agent span created on session start."""
+
+    def test_main_agent_span_created_on_session_start(self, harness: OTelRelayTestHarness):
+        harness.relay.start_session(SESSION_ID, harness.project_dir)
+        harness.relay.end_session(SESSION_ID)
+
+        main_spans = harness.spans_with_attribute("praxion.agent_id", "__main_agent__")
+        assert len(main_spans) == 1
+        main = main_spans[0]
+        assert main.name == "main-agent"
+        assert main.attributes.get("openinference.span.kind") == "AGENT"
+        assert main.attributes.get("praxion.agent_origin") == "claude-code"
+
+    def test_main_agent_is_child_of_session_root(self, harness: OTelRelayTestHarness):
+        harness.relay.start_session(SESSION_ID, harness.project_dir)
+        harness.relay.end_session(SESSION_ID)
+
+        main = harness.spans_with_attribute("praxion.agent_id", "__main_agent__")[0]
+        root = harness.session_span()
+        assert main.parent is not None
+        assert main.parent.span_id == root.context.span_id
+
+    def test_empty_agent_id_tools_go_under_main_agent(self, harness: OTelRelayTestHarness):
+        harness.relay.start_session(SESSION_ID, harness.project_dir)
+        harness.relay.record_tool(agent_id="", tool_name="Read", input_summary="f.py")
+        harness.relay.record_tool(agent_id="", tool_name="Bash", input_summary="ls")
+        harness.relay.end_session(SESSION_ID)
+
+        main = harness.spans_with_attribute("praxion.agent_id", "__main_agent__")[0]
+        tools = [s for s in harness.exporter.get_finished_spans() if s.attributes.get("tool.name")]
+        assert len(tools) == 2
+        for tool in tools:
+            assert tool.parent is not None
+            assert tool.parent.span_id == main.context.span_id
+
+    def test_subagent_tools_not_affected_by_main_agent(self, harness: OTelRelayTestHarness):
+        harness.relay.start_session(SESSION_ID, harness.project_dir)
+        harness.relay.start_agent("a1", "i-am:researcher", SESSION_ID)
+        harness.relay.record_tool(agent_id="a1", tool_name="Glob", input_summary="*.py")
+        harness.relay.end_agent("a1")
+        harness.relay.end_session(SESSION_ID)
+
+        agent = harness.spans_named("researcher")[0]
+        tool = harness.spans_with_attribute("tool.name", "Glob")[0]
+        assert tool.parent is not None
+        assert tool.parent.span_id == agent.context.span_id
+
+    def test_main_agent_ended_on_session_end(self, harness: OTelRelayTestHarness):
+        harness.relay.start_session(SESSION_ID, harness.project_dir)
+        harness.relay.record_tool(agent_id="", tool_name="Bash", input_summary="echo hi")
+        harness.relay.end_session(SESSION_ID)
+
+        main = harness.spans_with_attribute("praxion.agent_id", "__main_agent__")[0]
+        assert main.end_time is not None
+        assert main.end_time > main.start_time
+
+
+# ---------------------------------------------------------------------------
+# 14. Span reaper
+# ---------------------------------------------------------------------------
+
+
+class TestSpanReaper:
+    """Verify the background span reaper for stale agent spans."""
+
+    def test_stale_agent_span_reaped(self, harness: OTelRelayTestHarness):
+        import task_chronograph_mcp.otel_relay as relay_mod
+
+        orig_timeout = relay_mod.AGENT_SPAN_TIMEOUT_S
+        relay_mod.AGENT_SPAN_TIMEOUT_S = 0.1  # 100ms for testing
+        try:
+            harness.relay.start_session(SESSION_ID, harness.project_dir)
+            harness.relay.start_agent("bg-agent", "i-am:verifier", SESSION_ID)
+            harness.relay.record_tool(agent_id="bg-agent", tool_name="Read", input_summary="f.py")
+
+            # Wait for reaper to detect inactivity
+            import time
+
+            time.sleep(0.5)
+
+            # Manually trigger reap (reaper thread may not have run yet)
+            harness.relay._reap_stale_spans()
+
+            harness.relay.end_session(SESSION_ID)
+
+            reaped = [
+                s
+                for s in harness.exporter.get_finished_spans()
+                if s.attributes.get("praxion.reaped") is True and s.name == "verifier"
+            ]
+            assert len(reaped) == 1
+        finally:
+            relay_mod.AGENT_SPAN_TIMEOUT_S = orig_timeout
+
+    def test_active_agent_not_reaped(self, harness: OTelRelayTestHarness):
+        import task_chronograph_mcp.otel_relay as relay_mod
+
+        orig_timeout = relay_mod.AGENT_SPAN_TIMEOUT_S
+        relay_mod.AGENT_SPAN_TIMEOUT_S = 10  # long timeout
+        try:
+            harness.relay.start_session(SESSION_ID, harness.project_dir)
+            harness.relay.start_agent("active-agent", "i-am:researcher", SESSION_ID)
+            harness.relay.record_tool(
+                agent_id="active-agent", tool_name="Read", input_summary="f.py"
+            )
+
+            harness.relay._reap_stale_spans()
+
+            # Agent should still be in span map (not reaped)
+            with harness.relay._span_lock:
+                assert "active-agent" in harness.relay._span_map
+
+            harness.relay.end_agent("active-agent")
+            harness.relay.end_session(SESSION_ID)
+        finally:
+            relay_mod.AGENT_SPAN_TIMEOUT_S = orig_timeout
+
+    def test_explicit_stop_prevents_reap(self, harness: OTelRelayTestHarness):
+        harness.relay.start_session(SESSION_ID, harness.project_dir)
+        harness.relay.start_agent("agent-x", "i-am:sentinel", SESSION_ID)
+        harness.relay.end_agent("agent-x", "Done")
+
+        harness.relay._reap_stale_spans()
+
+        # No reaped spans — agent was explicitly stopped
+        reaped = [
+            s
+            for s in harness.exporter.get_finished_spans()
+            if s.attributes.get("praxion.reaped") is True
+        ]
+        assert len(reaped) == 0
+        harness.relay.end_session(SESSION_ID)
+
+    def test_reaper_thread_stops_on_shutdown(self, harness: OTelRelayTestHarness):
+        harness.relay.start_session(SESSION_ID, harness.project_dir)
+
+        assert harness.relay._reaper_thread is not None
+        assert harness.relay._reaper_thread.is_alive()
+
+        harness.relay.shutdown()
+
+        assert harness.relay._reaper_thread is None or not harness.relay._reaper_thread.is_alive()

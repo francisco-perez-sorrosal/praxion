@@ -19,15 +19,21 @@ from task_chronograph_mcp.server import _http_ready, app, derive_port, mcp
 
 def _run_http_server(port: int) -> None:
     """Run the Starlette app (API + OTel relay) in its own event loop."""
-    config = uvicorn.Config(
-        app,
-        host="127.0.0.1",
-        port=port,
-        log_level="warning",
-        access_log=False,
-    )
-    server = uvicorn.Server(config)
-    asyncio.run(server.serve())
+    try:
+        config = uvicorn.Config(
+            app,
+            host="127.0.0.1",
+            port=port,
+            log_level="warning",
+            access_log=False,
+        )
+        server = uvicorn.Server(config)
+        asyncio.run(server.serve())
+    except OSError as e:
+        sys.stderr.write(
+            f"Task Chronograph: HTTP port {port} unavailable ({e}). "
+            "Hook events will go to the existing chronograph instance.\n"
+        )
 
 
 # Derive port: explicit env var > project-based derivation > default

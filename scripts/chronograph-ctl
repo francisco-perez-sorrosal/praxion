@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
-# chronograph-ctl — Manage the Task Chronograph HTTP server for development.
+# chronograph-ctl — Development helper for the Task Chronograph.
 #
-# During normal operation, Claude Code manages the chronograph as an MCP server.
-# This script runs it standalone (HTTP-only, no MCP stdio) for:
-#   - Restarting after code changes without restarting Claude Code
-#   - Running outside Claude Code for testing
-#   - Debugging with visible logs
+# In production, the MCP instance (via plugin.json) handles everything:
+# hook ingestion, OTel export, and MCP tools. OTEL_ENABLED=true by default.
+#
+# This script runs chronograph from SOURCE (not plugin cache) for development:
+#   - Testing source changes without reinstalling the plugin
+#   - Running outside Claude Code for debugging
+#   - Visible logs for diagnosing trace issues
+#
+# When ctl is running, it takes the derived port. The MCP instance's HTTP
+# thread will fail to bind (gracefully) and hooks will go to ctl instead.
 #
 # Usage: chronograph-ctl {start|stop|restart|status|logs}
 set -euo pipefail

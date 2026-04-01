@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from watchfiles import awatch
@@ -77,7 +77,7 @@ def _parse_timestamp(timestamp_str: str) -> datetime:
     try:
         return datetime.fromisoformat(timestamp_str)
     except ValueError:
-        return datetime.now()
+        return datetime.now(UTC)
 
 
 async def watch_progress_file(path: Path, store: EventStore) -> None:
@@ -107,4 +107,4 @@ async def watch_progress_file(path: Path, store: EventStore) -> None:
             for line in new_lines:
                 event = parse_progress_line(line)
                 if event is not None:
-                    await store.add(event)
+                    store.add(event)

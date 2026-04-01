@@ -1,14 +1,18 @@
-"""Tests for file_watcher: parse_progress_line and helpers."""
+"""Tests for file_watcher: parse_progress_line, helpers, and watch_progress_file."""
 
 from __future__ import annotations
 
-from datetime import datetime
+import asyncio
+from datetime import UTC, datetime
 
-from task_chronograph_mcp.events import EventType
+import pytest
+
+from task_chronograph_mcp.events import EventStore, EventType
 from task_chronograph_mcp.file_watcher import (
     _parse_labels_and_summary,
     _parse_timestamp,
     parse_progress_line,
+    watch_progress_file,
 )
 
 # ---------------------------------------------------------------------------
@@ -121,13 +125,53 @@ class TestParseTimestamp:
         assert isinstance(ts, datetime)
 
     def test_invalid_timestamp_falls_back_to_now(self):
-        before = datetime.now()
+        before = datetime.now(UTC)
         ts = _parse_timestamp("not-a-timestamp")
-        after = datetime.now()
+        after = datetime.now(UTC)
         assert before <= ts <= after
 
     def test_empty_string_falls_back_to_now(self):
-        before = datetime.now()
+        before = datetime.now(UTC)
         ts = _parse_timestamp("")
-        after = datetime.now()
+        after = datetime.now(UTC)
         assert before <= ts <= after
+
+
+# ---------------------------------------------------------------------------
+# watch_progress_file
+# ---------------------------------------------------------------------------
+
+
+class TestWatchProgressFile:
+    async def test_new_lines_added_to_store(self, tmp_path):
+        """Writing new progress lines to PROGRESS.md adds events to the store."""
+        store = EventStore()
+        store.set_loop(asyncio.get_running_loop())
+
+        progress_file = tmp_path / "PROGRESS.md"
+        progress_file.write_text("")
+
+        watcher_task = asyncio.create_task(watch_progress_file(tmp_path, store))
+
+        # Give the watcher time to start
+        await asyncio.sleep(0.3)
+
+        # Write a valid progress line
+        progress_file.write_text(
+            "[2025-01-15T14:30:00] [researcher] Phase 2/5: analysis -- Analyzing auth\n"
+        )
+
+        # Wait for the watcher to detect the change
+        await asyncio.sleep(0.5)
+
+        watcher_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await watcher_task
+
+        summary = store.get_pipeline_summary()
+        assert summary["event_count"] >= 1
+        events = summary["recent_events"]
+        phase_events = [e for e in events if e["event_type"] == "phase_transition"]
+        assert len(phase_events) == 1
+        assert phase_events[0]["agent_type"] == "researcher"
+        assert phase_events[0]["phase"] == 2

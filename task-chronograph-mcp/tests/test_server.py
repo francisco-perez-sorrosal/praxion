@@ -18,13 +18,17 @@ BASE_URL = "http://test"
 
 
 @pytest.fixture
-async def client():
+async def client(monkeypatch):
     """Async HTTP client with ASGI transport and lifespan properly managed.
 
     Uses _core_lifespan (EventStore + file watcher) without the MCP session
     manager, which requires anyio task group lifecycle not compatible with
     pytest-asyncio fixtures.
+
+    OTel is disabled so the real relay in the app doesn't leak spans to
+    Phoenix when the test suite runs with OTEL_ENABLED=true.
     """
+    monkeypatch.setenv("OTEL_ENABLED", "false")
     import task_chronograph_mcp.server as server_module
 
     async with server_module._core_lifespan(app):

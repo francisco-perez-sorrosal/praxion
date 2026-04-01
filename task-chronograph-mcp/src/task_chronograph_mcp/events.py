@@ -114,6 +114,7 @@ class AgentState:
     labels: dict[str, str] = field(default_factory=dict)
     delegation_parent: str = ""
     delegation_children: list[str] = field(default_factory=list)
+    last_event_at: datetime | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -125,6 +126,7 @@ class AgentState:
             "phase_name": self.phase_name,
             "started_at": self.started_at.isoformat() if self.started_at else None,
             "stopped_at": self.stopped_at.isoformat() if self.stopped_at else None,
+            "last_event_at": self.last_event_at.isoformat() if self.last_event_at else None,
             "task_summary": self.task_summary,
             "last_message": self.last_message,
             "labels": dict(self.labels),
@@ -190,6 +192,7 @@ class EventStore:
             return
 
         state = self._agents[agent_key]
+        state.last_event_at = event.timestamp
 
         if event.event_type == EventType.AGENT_STOP:
             state.status = AgentStatus.COMPLETE

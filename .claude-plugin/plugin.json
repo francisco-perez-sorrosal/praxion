@@ -30,7 +30,10 @@
         "python",
         "-m",
         "task_chronograph_mcp"
-      ]
+      ],
+      "env": {
+        "OTEL_ENABLED": "true"
+      }
     },
     "memory": {
       "command": "uv",

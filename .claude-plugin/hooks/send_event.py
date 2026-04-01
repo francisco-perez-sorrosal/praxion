@@ -29,7 +29,7 @@ PROGRESS_LINE_RE = re.compile(
 
 
 def _post(port, path, payload):
-    """POST JSON to the Chronograph server. Swallow all errors."""
+    """POST JSON to the Chronograph server. Log failures to stderr."""
     try:
         req = urllib.request.Request(
             f"http://localhost:{port}{path}",
@@ -37,13 +37,13 @@ def _post(port, path, payload):
             headers={"Content-Type": "application/json"},
         )
         urllib.request.urlopen(req, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        sys.stderr.write(f"chronograph: POST {path} to :{port} failed: {e}\n")
 
 
 def _parse_last_progress_line(content):
     """Parse the last non-empty line from PROGRESS.md content."""
-    lines = [l for l in content.strip().splitlines() if l.strip()]
+    lines = [line for line in content.strip().splitlines() if line.strip()]
     if not lines:
         return None
     match = PROGRESS_LINE_RE.match(lines[-1].strip())
@@ -252,8 +252,8 @@ def main():
             _post(port, "/api/events", event)
         for interaction in interactions:
             _post(port, "/api/interactions", interaction)
-    except Exception:
-        pass
+    except Exception as e:
+        sys.stderr.write(f"chronograph hook: {e}\n")
 
 
 if __name__ == "__main__":

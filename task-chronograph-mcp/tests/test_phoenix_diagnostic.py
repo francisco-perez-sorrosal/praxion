@@ -175,7 +175,8 @@ class TestPhoenixDiagnostic:
         print(f"Tool spans:    {len(tool_spans)}")
 
         assert len(session_spans) == 1, f"Expected 1 session span, got {len(session_spans)}"
-        assert len(agent_spans) == 1, f"Expected 1 agent span, got {len(agent_spans)}"
+        # 2 agent spans: researcher + synthetic main-agent
+        assert len(agent_spans) == 2, f"Expected 2 agent spans, got {len(agent_spans)}"
         assert len(tool_spans) == 2, f"Expected 2 tool spans, got {len(tool_spans)}"
 
         # Check hierarchy: agent parented to session
@@ -252,8 +253,9 @@ class TestPhoenixDiagnostic:
         assert len(session_spans) == 2, (
             f"Expected 2 session spans (one per session), got {len(session_spans)}"
         )
-        assert len(agent_spans) == 2, (
-            f"Expected 2 agent spans (one per session), got {len(agent_spans)}"
+        # 4 agent spans: 1 explicit agent + 1 main-agent per session
+        assert len(agent_spans) == 4, (
+            f"Expected 4 agent spans (agent + main-agent per session), got {len(agent_spans)}"
         )
         assert len(tool_spans) == 2, (
             f"Expected 2 tool spans (one per session), got {len(tool_spans)}"
@@ -305,15 +307,17 @@ class TestPhoenixDiagnostic:
             print(f"  {s['name']:20s}  kind={s['spanKind']:6s}  parent={s['parentId']}")
 
         session_spans = [s for s in spans if s["name"] == "session"]
+        main_spans = [s for s in spans if s["name"] == "main-agent"]
         tool_spans = [s for s in spans if s["spanKind"] == "tool"]
 
         assert len(session_spans) == 1
+        assert len(main_spans) == 1
         assert len(tool_spans) == 2
 
-        # Tools should be parented to session root
-        session_span_id = session_spans[0]["context"]["spanId"]
+        # Tools should be parented to main-agent (not session root)
+        main_span_id = main_spans[0]["context"]["spanId"]
         for t in tool_spans:
-            assert t["parentId"] == session_span_id
+            assert t["parentId"] == main_span_id
 
     def test_04_session_linkage(self, unique_project, monkeypatch):
         """Test: session_id attribute maps to Phoenix Sessions view."""

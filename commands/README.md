@@ -16,6 +16,7 @@ Reusable slash commands for AI coding assistants. Each `.md` file becomes a `/co
 | `/memory` | Manage persistent memory (user prefs, assistant learnings, project conventions) |
 | `/merge-worktree` | Merge a worktree branch back into current branch |
 | `/onboard-project` | Onboard the current project for the Praxion plugin ecosystem |
+| `/release` | Bump version, update changelog, and create a release tag |
 | `/sdd-coverage` | Report spec-to-test and spec-to-code coverage for REQ IDs |
 | `/star-repo` | Star the Praxion repo on GitHub |
 

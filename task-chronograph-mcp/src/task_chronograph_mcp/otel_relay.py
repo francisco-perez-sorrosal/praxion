@@ -167,15 +167,19 @@ class OTelRelay:
     def _ensure_initialized(self, session_id: str = "", project_dir: str = "") -> bool:
         """Lazy init: if no session was started, initialise from available context.
 
+        Uses the first available project_dir from: the event, CLAUDE_PROJECT_DIR
+        env, or cwd (which Claude Code sets to the project directory for hooks).
         Returns True if the relay is ready to create spans.
         """
         if self._provider is not None:
             return True
         if not _is_otel_enabled():
             return False
-        # Auto-initialize with best-effort project info
         effective_dir = project_dir or os.environ.get("CLAUDE_PROJECT_DIR", "")
-        self._init_provider(effective_dir)
+        if not effective_dir or effective_dir == "/":
+            effective_dir = ""  # let it fall back to default_project_name
+        trace_id = _generate_trace_id(session_id) if session_id else None
+        self._init_provider(effective_dir, trace_id=trace_id)
         if session_id and self._session_span is None:
             self._open_session_span(session_id, effective_dir)
         return self._provider is not None
@@ -190,12 +194,14 @@ class OTelRelay:
         agent_type: str,
         session_id: str,
         parent_session_id: str = "",
+        *,
+        project_dir: str = "",
     ) -> None:
         """Open an AGENT child span under the session root."""
         if not _is_otel_enabled():
             return
         try:
-            self._ensure_initialized(session_id)
+            self._ensure_initialized(session_id, project_dir=project_dir)
             self._start_agent_span(agent_id, agent_type, session_id, parent_session_id)
         except Exception:
             logger.warning("Failed to start OTel agent span for %s", agent_id, exc_info=True)

@@ -114,7 +114,11 @@ def _relay_event(relay: OTelRelay, event: Event) -> None:
                 relay.end_session(event.session_id)
             case EventType.AGENT_START:
                 relay.start_agent(
-                    event.agent_id, event.agent_type, event.session_id, event.parent_session_id
+                    event.agent_id,
+                    event.agent_type,
+                    event.session_id,
+                    event.parent_session_id,
+                    project_dir=event.project_dir,
                 )
             case EventType.AGENT_STOP:
                 relay.end_agent(event.agent_id, event.message)

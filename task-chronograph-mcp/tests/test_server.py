@@ -280,7 +280,7 @@ class TestRelayWiring:
         )
         assert resp.status_code == 201
         mock.start_agent.assert_called_once_with(
-            "agent-r1", "i-am:researcher", "sess-001", "parent-001"
+            "agent-r1", "i-am:researcher", "sess-001", "parent-001", project_dir=""
         )
 
     async def test_agent_stop_routes_to_relay(self, relay_client):

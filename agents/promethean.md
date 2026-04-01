@@ -45,7 +45,7 @@ Work through these phases in order. Complete each phase before moving to the nex
 
 ### Phase 1 — Seed & Scope
 
-Determine the ideation focus:
+Determine the ideation focus. The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all reads and writes.
 
 1. **Check for a seed** — did the user provide a topic, gist, or domain direction? (e.g., "MCP integrations", "developer onboarding", "testing workflow")
 2. **If seeded** — narrow ideation to that area while still grounding in full project state. Acknowledge the seed and confirm your interpretation
@@ -169,7 +169,7 @@ After discarding an idea, offer to return to the candidate list. The user can st
 
 ### Phase 7 — Proposal Document
 
-When an idea is validated, write `IDEA_PROPOSAL.md` to `.ai-work/`:
+When an idea is validated, write `IDEA_PROPOSAL.md` to `.ai-work/<task-slug>/`:
 
 ```markdown
 # Idea Proposal: [Title]
@@ -205,7 +205,7 @@ When an idea is validated, write `IDEA_PROPOSAL.md` to `.ai-work/`:
 
 In non-interactive mode, include the `[AUTO-VALIDATED]` marker after the title. This signals downstream agents that no user refinement occurred and the proposal may need closer scrutiny. In interactive mode, omit the marker line.
 
-Create the `.ai-work/` directory if it does not exist. If an `IDEA_PROPOSAL.md` already exists, confirm with the user before overwriting.
+Create the `.ai-work/<task-slug>/` directory if it does not exist. If an `IDEA_PROPOSAL.md` already exists, confirm with the user before overwriting.
 
 After writing the proposal, produce the idea ledger in `.ai-state/`:
 
@@ -232,7 +232,7 @@ Sentinel baseline: [timestamp from SENTINEL_LOG.md latest entry]
 
 If the project-root `CLAUDE.md` exists and contains a `## Structure` section, sync it with the discovered filesystem state:
 
-1. Compare the section content against actual top-level directories — include only architectural directories (skip build artifacts, caches, and hidden tool directories like `.ai-work/`)
+1. Compare the section content against actual top-level directories — include only architectural directories (skip build artifacts, caches, and hidden tool directories like `.ai-work/<task-slug>/`)
 2. If drift is detected, use `Edit` to update **only** the `## Structure` section — never modify other sections
 3. Match the existing format: bullet style, indentation, and description style
 4. If no `CLAUDE.md` exists or it has no `## Structure` section, skip silently
@@ -282,11 +282,11 @@ After writing `IDEA_PROPOSAL.md`, return a concise summary:
 1. **Idea title** — the validated idea
 2. **Key insight** — the core opportunity in one sentence
 3. **Recommended next step** — which agent picks this up and why
-4. **Ready for review** — point the user to `.ai-work/IDEA_PROPOSAL.md`
+4. **Ready for review** — point the user to `.ai-work/<task-slug>/IDEA_PROPOSAL.md`
 
 ## Progress Signals
 
-At each phase transition, append a single line to `.ai-work/PROGRESS.md` (create the file and `.ai-work/` directory if they do not exist):
+At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
 
 ```
 [TIMESTAMP] [promethean] Phase N/7: [phase-name] -- [one-line summary of what was done or found]
@@ -303,4 +303,4 @@ Write the line immediately upon entering each new phase. Include optional hashta
 - **Ground in reality.** Every idea must connect to something concrete in the project's current state. No generic best-practice suggestions.
 - **Respect the user's time.** If an idea isn't landing, move on. If the user wants to stop, stop.
 - **Do not commit.** The proposal is a draft for user and downstream agent review.
-- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.
+- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.

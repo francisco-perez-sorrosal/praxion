@@ -8,7 +8,7 @@ Scan the behavioral specification for REQ IDs and report which have tests, imple
 
 ## Process
 
-1. **Locate the spec**: If `$ARGUMENTS` is provided, use it as the spec path. Otherwise read `.ai-work/SYSTEMS_PLAN.md`. If neither exists, report "No behavioral specification found" and stop.
+1. **Locate the spec**: If `$ARGUMENTS` is provided, use it as the spec path. Otherwise search `.ai-work/<task-slug>/SYSTEMS_PLAN.md` across task-scoped subdirectories (use the most recently modified if multiple exist). If neither exists, report "No behavioral specification found" and stop.
 
 2. **Extract REQ IDs**: Find all `### REQ-NN:` headings in the `## Behavioral Specification` section. For each, extract the ID and title.
 

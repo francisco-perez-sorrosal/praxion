@@ -30,13 +30,13 @@ If the user wants to skip review entirely, set all decisions to `"approved"` and
 
 ## Spec Auto-Update Protocol (Standard/Full Tiers)
 
-After collecting the user's approve/reject decisions in step 2 above, the agent checks whether any **approved** decisions have `affected_reqs` AND `.ai-work/SYSTEMS_PLAN.md` exists. If both conditions are met:
+After collecting the user's approve/reject decisions in step 2 above, the agent checks whether any **approved** decisions have `affected_reqs` AND `.ai-work/<task-slug>/SYSTEMS_PLAN.md` exists. If both conditions are met:
 
 1. **Call** the amendment generator with approved decisions piped to stdin:
    ```
    echo '<decisions-json>' | uv run --project <decision-tracker-path> \
      python -m decision_tracker propose-amendment \
-     --spec-path .ai-work/SYSTEMS_PLAN.md [--cwd .]
+     --spec-path .ai-work/<task-slug>/SYSTEMS_PLAN.md [--cwd .]
    ```
    Input: JSON array of approved decisions with `decision`, `affected_reqs`, and optional `rationale`.
    Output: JSON on stdout with `status`, `amendments` array, and optional `plan_impacts` array.

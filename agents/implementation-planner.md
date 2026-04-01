@@ -37,7 +37,7 @@ Work through these phases in order. Complete each phase before moving to the nex
 
 ### Phase 1 — Input Assessment
 
-Determine what you have to work with:
+Determine what you have to work with. The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all reads and writes.
 
 1. **Check for SYSTEMS_PLAN.md** — read the architectural sections (Goal, Acceptance Criteria, Architecture, Risk Assessment)
 2. **Check for SPEC_DELTA.md** — if present, read the spec delta for brownfield context. Modified requirements indicate targeted refactoring-then-implementation steps. Removed requirements indicate explicit cleanup steps with dead code/test removal. Added requirements follow normal step decomposition. Note any staleness warnings for verification substeps.
@@ -389,7 +389,7 @@ After completing the planning documents, return a concise summary:
 
 ## Progress Signals
 
-At each phase transition, append a single line to `.ai-work/PROGRESS.md` (create the file and `.ai-work/` directory if they do not exist):
+At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
 
 ```
 [TIMESTAMP] [implementation-planner] Phase N/7: [phase-name] -- [one-line summary of what was done or found]
@@ -409,4 +409,4 @@ Write the line immediately upon entering each new phase. Include optional hashta
 - **Never commit without user approval.** After completing a step during supervision, stop and ask.
 - **Keep WIP.md accurate.** If reality changes, update immediately.
 - **Capture learnings as they occur.** Don't defer to the end.
-- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.
+- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.

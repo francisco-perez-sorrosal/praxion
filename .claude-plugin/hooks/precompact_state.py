@@ -59,13 +59,24 @@ def main():
             return
 
         sections = []
-        for doc_name in PIPELINE_DOCS:
-            doc_path = ai_work / doc_name
-            if not doc_path.exists():
-                continue
-            content = _head(doc_path, HEAD_LINES)
-            if content.strip():
-                sections.append(f"## {doc_name}\n\n```\n{content}```\n")
+        # Scan task-scoped subdirectories for pipeline documents
+        task_dirs = sorted(
+            p for p in ai_work.iterdir() if p.is_dir() and not p.name.startswith(".")
+        )
+        if not task_dirs:
+            # Fallback: check root for legacy flat layout
+            task_dirs = [ai_work]
+
+        for task_dir in task_dirs:
+            slug = task_dir.name if task_dir != ai_work else "(root)"
+            for doc_name in PIPELINE_DOCS:
+                doc_path = task_dir / doc_name
+                if not doc_path.exists():
+                    continue
+                content = _head(doc_path, HEAD_LINES)
+                if content.strip():
+                    header = f"{slug}/{doc_name}" if slug != "(root)" else doc_name
+                    sections.append(f"## {header}\n\n```\n{content}```\n")
 
         if not sections:
             return

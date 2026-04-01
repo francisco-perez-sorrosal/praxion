@@ -167,7 +167,7 @@ When a negative is truly the clearest expression, use it -- but ensure the `so t
 
 ## Spec Delta Template
 
-For brownfield features with prior archived specs, the systems-architect produces `SPEC_DELTA.md` in `.ai-work/`. See the [SDD skill](../SKILL.md#spec-delta-format) for activation conditions and lifecycle.
+For brownfield features with prior archived specs, the systems-architect produces `SPEC_DELTA.md` in `.ai-work/<task-slug>/`. See the [SDD skill](../SKILL.md#spec-delta-format) for activation conditions and lifecycle.
 
 ```markdown
 # Spec Delta: [Feature Name]

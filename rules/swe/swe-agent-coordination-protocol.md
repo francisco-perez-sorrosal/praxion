@@ -52,7 +52,9 @@ Spawn agents without waiting for the user to ask:
 
 **Depth check:** Before spawning an agent recommended by another agent's output, confirm with the user if doing so would create a chain of 3+ agents from the original request.
 
-**Multiplicity check:** Before spawning any Bg Safe agent, check whether the work decomposes into N independent targets with disjoint file sets. If so, spawn N instances (up to 2-3 concurrent) rather than one sequential agent.
+**Multiplicity check:** Before spawning any Bg Safe agent, check whether the work decomposes into N independent targets with disjoint file sets. If so, spawn N instances (up to 2-3 concurrent) rather than one sequential agent. Each instance receives the same task slug — they share a task-scoped directory and use fragment files to avoid collisions (see [agent-intermediate-documents](agent-intermediate-documents.md)).
+
+**Task slug propagation:** At pipeline start, the main agent generates a kebab-case task slug (2–4 words) derived from the task description. Every subagent prompt must include `Task slug: <slug>`. All `.ai-work/` reads and writes use `.ai-work/<task-slug>/`. The slug never changes mid-pipeline. See the [task slug convention](agent-intermediate-documents.md#task-slug-convention) for naming guidelines.
 
 ### Coordination Pipeline
 
@@ -89,7 +91,7 @@ Use an agent when the task benefits from a separate context window (large scope,
 
 ### Background Agents
 
-Run agents in the background when their output is not immediately needed. Check the Bg Safe column before using `run_in_background`. Monitor `.ai-work/PROGRESS.md` for status; check output before proceeding with dependent work.
+Run agents in the background when their output is not immediately needed. Check the Bg Safe column before using `run_in_background`. Monitor `.ai-work/<task-slug>/PROGRESS.md` for status; check output before proceeding with dependent work.
 
 ### Parallel Execution & Boundary Discipline
 

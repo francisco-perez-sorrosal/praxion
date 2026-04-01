@@ -38,6 +38,8 @@ Work through these phases in order. Complete each phase before moving to the nex
 
 ### Phase 1 -- Input Assessment
 
+The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all reads and writes.
+
 Determine what you have to work with:
 
 1. **Check for `SYSTEMS_PLAN.md`** -- if it exists, extract the acceptance criteria. This is your primary reference for what the implementation should achieve.
@@ -136,7 +138,7 @@ Skip this phase entirely in standalone mode.
    - **PASS** -- all acceptance criteria met, no FAIL findings
    - **PASS WITH FINDINGS** -- all acceptance criteria met, only WARN findings
    - **FAIL** -- any acceptance criterion not met, FAIL findings in convention compliance, or any requirement in the traceability matrix shows FAIL
-3. Write `VERIFICATION_REPORT.md` to `.ai-work/`
+3. Write `VERIFICATION_REPORT.md` to `.ai-work/<task-slug>/`
 4. Include the disclaimer: "Automated review complements but does not replace human judgment."
 5. Include the merge-to-LEARNINGS reminder: "Before deleting this report, merge recurring patterns and systemic quality issues into LEARNINGS.md. Tag merged entries with `**[verifier]**` for attribution."
 
@@ -194,7 +196,7 @@ After creating `VERIFICATION_REPORT.md`, return a concise summary:
 
 ## Progress Signals
 
-At each phase transition, append a single line to `.ai-work/PROGRESS.md` (create the file and `.ai-work/` directory if they do not exist):
+At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
 
 ```
 [TIMESTAMP] [verifier] Phase N/7: [phase-name] -- [one-line summary of what was done or found]
@@ -213,4 +215,4 @@ Write the line immediately upon entering each new phase. Include optional hashta
 - **No subjective observations.** "Could be improved" is not a finding. "Exceeds 50-line function ceiling (coding-style.md: Function Size)" is.
 - **Focus on changed code.** Do not review the entire codebase -- only files affected by the implementation.
 - **Include the human-judgment disclaimer** in every report.
-- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.
+- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.

@@ -16,4 +16,4 @@ Create a commit for the current staged changes (or all changes if nothing is sta
    - Group changes by logical task (by file and/or by diff hunks). Prefer grouping by file when files have a single clear purpose; use partial staging (`git add -p` or file subsets) when one file contains unrelated edits.
    - For each group in a sensible order (e.g. fix before feat, code before docs): stage only that group, craft a conventional commit message for that type, create the commit. Repeat until all changes are committed.
 6. **When not splitting**: Stage files if needed (prefer specific files over `git add -A`), craft the commit message following our commit conventions, create the commit.
-7. If `.ai-work/` exists, ask the user whether to clean it up (`rm -rf .ai-work/`). Before deleting, check for `LEARNINGS.md` and remind the user to merge any valuable content into permanent locations first
+7. If `.ai-work/` exists with task-scoped subdirectories, ask the user whether to clean them up. Before deleting, check each subdirectory for `LEARNINGS.md` and remind the user to merge any valuable content into permanent locations first

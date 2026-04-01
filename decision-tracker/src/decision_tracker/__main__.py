@@ -31,6 +31,22 @@ CATEGORY_CHOICES: list[str] = [
 ]
 
 
+def _find_pipeline_doc(cwd: Path, doc_name: str) -> Path:
+    """Find a pipeline document in any task-scoped subdirectory of .ai-work/.
+
+    Searches ``<cwd>/.ai-work/<task-slug>/<doc_name>`` for all task-slug
+    subdirectories.  When multiple exist, returns the most recently modified.
+    Falls back to ``<cwd>/.ai-work/<doc_name>`` for legacy flat layouts.
+    Returns a non-existent path (the flat fallback) when nothing is found,
+    so callers can use ``.is_file()`` to detect absence.
+    """
+    ai_work = cwd / ".ai-work"
+    candidates = list(ai_work.glob(f"*/{doc_name}")) if ai_work.is_dir() else []
+    if candidates:
+        return max(candidates, key=lambda p: p.stat().st_mtime)
+    return ai_work / doc_name  # fallback (may not exist)
+
+
 # ---------------------------------------------------------------------------
 # Write subcommand
 # ---------------------------------------------------------------------------
@@ -267,7 +283,9 @@ def _handle_propose_amendment(args: argparse.Namespace) -> None:
     from decision_tracker.spec import get_req_by_id, parse_spec
 
     cwd = Path(args.cwd)
-    spec_path = Path(args.spec_path) if args.spec_path else cwd / ".ai-work/SYSTEMS_PLAN.md"
+    spec_path = (
+        Path(args.spec_path) if args.spec_path else _find_pipeline_doc(cwd, "SYSTEMS_PLAN.md")
+    )
 
     if not spec_path.is_file():
         _emit_amendment_output(
@@ -370,7 +388,7 @@ def _handle_propose_amendment(args: argparse.Namespace) -> None:
         from decision_tracker.plan import find_plan_impacts
 
         amended_ids = {a.req_id for a in amendments}
-        plan_path = cwd / ".ai-work/IMPLEMENTATION_PLAN.md"
+        plan_path = _find_pipeline_doc(cwd, "IMPLEMENTATION_PLAN.md")
         impacts = find_plan_impacts(plan_path, amended_ids)
         if impacts:
             plan_impacts_data = [
@@ -513,7 +531,7 @@ def _build_parser() -> argparse.ArgumentParser:
     amend_parser.add_argument(
         "--spec-path",
         default=None,
-        help="Path to SYSTEMS_PLAN.md (default: <cwd>/.ai-work/SYSTEMS_PLAN.md)",
+        help="Path to SYSTEMS_PLAN.md (default: auto-discover in .ai-work/<task-slug>/)",
     )
     amend_parser.add_argument("--cwd", default=".", help="Project directory (default: .)")
 

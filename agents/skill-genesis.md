@@ -39,9 +39,11 @@ Work through these phases in order. Complete each phase before moving to the nex
 
 ### Phase 1 -- Scope & Context (1/7)
 
+The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all reads and writes.
+
 Determine the analysis scope:
 
-1. **Check invocation context** -- were you launched post-pipeline (`.ai-work/LEARNINGS.md` and/or `.ai-work/VERIFICATION_REPORT.md` exist) or standalone (user requesting a learning harvest)?
+1. **Check invocation context** -- were you launched post-pipeline (`.ai-work/<task-slug>/LEARNINGS.md` and/or `.ai-work/<task-slug>/VERIFICATION_REPORT.md` exist) or standalone (user requesting a learning harvest)?
 2. **Read the existing artifact inventory** -- `Glob skills/*/SKILL.md` for skills, `Glob rules/**/*.md` for rules. Record names and descriptions for deduplication in Phase 3
 3. **Read the latest idea ledger** -- find the most recent `.ai-state/IDEA_LEDGER_*.md` (by timestamp in filename) to understand what has already been proposed, implemented, or discarded
 4. **State the scope** -- "Analyzing [N learning sources] for artifact promotion candidates"
@@ -52,10 +54,10 @@ If no learning sources exist (no LEARNINGS.md, no memory entries, no verificatio
 
 Consume all available learning sources in priority order. Skip any source that does not exist -- partial analysis is valid.
 
-1. **LEARNINGS.md** (`.ai-work/`) -- gotchas, patterns, decisions, edge cases, technical debt
+1. **LEARNINGS.md** (`.ai-work/<task-slug>/`) -- gotchas, patterns, decisions, edge cases, technical debt
 2. **Memory MCP `learnings` category** -- cross-session insights via `recall` tool with category `learnings`
 3. **Memory MCP `project` category** -- project conventions via `recall` with category `project`
-4. **VERIFICATION_REPORT.md** (`.ai-work/`) -- recurring quality patterns
+4. **VERIFICATION_REPORT.md** (`.ai-work/<task-slug>/`) -- recurring quality patterns
 5. **Latest SENTINEL_REPORT_*.md** (`.ai-state/`) -- ecosystem patterns and recurring findings
 6. **Latest IDEA_LEDGER_*.md** (`.ai-state/`) -- avoid re-proposing implemented or discarded ideas
 7. **`decisions.jsonl`** (`.ai-state/`) -- machine-readable decision audit log. Recurring decision patterns across multiple features (same category, similar rationale) are candidates for rule or skill formalization.
@@ -158,7 +160,7 @@ For all other artifact types, write the delegation recommendations into the outp
 
 ### Phase 7 -- Output Report (7/7)
 
-Write `SKILL_GENESIS_REPORT.md` to `.ai-work/`:
+Write `SKILL_GENESIS_REPORT.md` to `.ai-work/<task-slug>/`:
 
 ```markdown
 # Skill Genesis Report
@@ -199,7 +201,7 @@ Write `SKILL_GENESIS_REPORT.md` to `.ai-work/`:
 [Which agents to invoke for approved skill/rule proposals]
 ```
 
-Create the `.ai-work/` directory if it does not exist.
+Create the `.ai-work/<task-slug>/` directory if it does not exist.
 
 ## Collaboration Points
 
@@ -244,11 +246,11 @@ After writing `SKILL_GENESIS_REPORT.md`, return a concise summary:
 3. **Proposals** -- count made, count approved, count rejected
 4. **Delegations executed** -- memory entries stored directly
 5. **Recommended next steps** -- which agents to invoke for approved proposals
-6. **Ready for review** -- point the user to `.ai-work/SKILL_GENESIS_REPORT.md`
+6. **Ready for review** -- point the user to `.ai-work/<task-slug>/SKILL_GENESIS_REPORT.md`
 
 ## Progress Signals
 
-At each phase transition, append a single line to `.ai-work/PROGRESS.md` (create the file and `.ai-work/` directory if they do not exist):
+At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
 
 ```
 [TIMESTAMP] [skill-genesis] Phase N/7: [phase-name] -- [one-line summary of what was done or found]
@@ -265,4 +267,4 @@ Write the line immediately upon entering each new phase. Include optional hashta
 - **Proposals require user approval.** Never delegate artifact creation without explicit user approval via AskUserQuestion. Memory entries also require approval before the `remember` call.
 - **One proposal at a time.** Present each proposal individually. Do not batch-present all proposals in a single message.
 - **Do not commit.** Write the report for user review. The user handles version control.
-- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.
+- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.

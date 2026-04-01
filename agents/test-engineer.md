@@ -70,6 +70,8 @@ The three statically-injected skills (`software-planning`, `code-review`, `refac
 
 ## Input Protocol
 
+The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all document reads and writes.
+
 Before writing any test code, read the planning documents in this order:
 
 1. **`WIP.md`** — find your assigned step. If parallel mode, implement only the step assigned to you.
@@ -191,7 +193,7 @@ This ensures decisions have both human-readable (LEARNINGS.md) and machine-reada
 
 ### Phase 8 — Report
 
-**Spec coverage check**: When a `## Behavioral Specification` section exists in `.ai-work/SYSTEMS_PLAN.md`, include a quick coverage table in your report. For each REQ-NN, grep test files for `req{NN}_` patterns and report which requirements now have tests and which still lack coverage. This gives the user immediate visibility into spec-to-test gaps without waiting for the verifier.
+**Spec coverage check**: When a `## Behavioral Specification` section exists in `.ai-work/<task-slug>/SYSTEMS_PLAN.md`, include a quick coverage table in your report. For each REQ-NN, grep test files for `req{NN}_` patterns and report which requirements now have tests and which still lack coverage. This gives the user immediate visibility into spec-to-test gaps without waiting for the verifier.
 
 Stop and report one of:
 - `[COMPLETE]` — step done, tests pass, WIP.md updated, spec coverage table included (if applicable)
@@ -260,7 +262,7 @@ This feedback surfaces design issues for the implementer or architect to address
 
 ## Progress Signals
 
-At each phase transition, append a single line to `.ai-work/PROGRESS.md` (create the file and `.ai-work/` directory if they do not exist):
+At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
 
 ```
 [TIMESTAMP] [test-engineer] Phase N/8: [phase-name] -- [one-line summary of what was done or found]
@@ -278,4 +280,4 @@ Write the line immediately upon entering each new phase. Include optional hashta
 - **Read before write.** Never modify a file you have not read in this session.
 - **Respect existing test patterns.** Match the test framework, directory structure, fixture conventions, and naming patterns already in use.
 - **Keep WIP.md accurate.** Update it before reporting — your status must reflect reality.
-- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.
+- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.

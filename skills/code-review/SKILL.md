@@ -88,7 +88,7 @@ Adapt output based on available context:
 
 ### Pipeline Mode
 
-When pipeline documents exist in `.ai-work/` (`SYSTEMS_PLAN.md`, `IMPLEMENTATION_PLAN.md`):
+When pipeline documents exist in `.ai-work/<task-slug>/` (`SYSTEMS_PLAN.md`, `IMPLEMENTATION_PLAN.md`):
 
 - **All sections**: Verdict, Acceptance Criteria, Convention Compliance, Test Coverage, Context Artifact Completeness, Recommendations, Scope
 - Used by the verifier agent

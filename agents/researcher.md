@@ -34,7 +34,7 @@ Work through these phases in order. Complete each phase before moving to the nex
 
 ### Phase 1 — Research Scoping
 
-Before gathering information, clarify what needs to be researched:
+Before gathering information, clarify what needs to be researched. The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all reads and writes.
 
 1. **Restate the research goal** in one sentence
 2. **Identify research questions** — concrete questions the findings must answer
@@ -215,7 +215,7 @@ After creating `RESEARCH_FINDINGS.md`, return a concise summary:
 
 ## Progress Signals
 
-At each phase transition, append a single line to `.ai-work/PROGRESS.md` (create the file and `.ai-work/` directory if they do not exist):
+At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
 
 ```
 [TIMESTAMP] [researcher] Phase N/5: [phase-name] -- [one-line summary of what was done or found]
@@ -233,4 +233,4 @@ Write the line immediately upon entering each new phase. Include optional hashta
 - **Respect existing patterns.** Describe what the codebase does, don't judge it — that is the systems-architect's job.
 - **Right-size the document.** A simple research task does not need 10 sections. Match depth to the complexity of the questions.
 - **Do not commit.** The document is a draft for user and downstream agent review.
-- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.
+- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.

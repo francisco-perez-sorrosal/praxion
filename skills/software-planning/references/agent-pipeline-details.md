@@ -112,7 +112,7 @@ When the Task Chronograph MCP server is registered, call `report_interaction(sou
 
 ## Semantic Document Reconciliation
 
-When concurrent agents write to fragment files (`WIP_<agent>.md`, `LEARNINGS_<agent>.md`, `PROGRESS_<agent>.md`), the supervising agent (implementation-planner) merges fragments into canonical documents after all agents in a batch complete. Each document type has its own schema and merge semantics -- naive concatenation produces structurally invalid documents.
+When concurrent agents write to fragment files (`WIP_<agent>.md`, `LEARNINGS_<agent>.md`, `PROGRESS_<agent>.md`), the supervising agent (implementation-planner) merges fragments into canonical documents after all agents in a batch complete. All fragment files and canonical documents live inside the task-scoped directory (`.ai-work/<task-slug>/`). Each document type has its own schema and merge semantics -- naive concatenation produces structurally invalid documents.
 
 **Note:** `CONTEXT_REVIEW.md` is not subject to fragment patterns — it is single-writer (context-engineer only) with cumulative stage-delimited sections. No reconciliation needed.
 
@@ -137,12 +137,12 @@ Status: in-progress
 - [ ] Step K: ...
 ```
 
-**Fragment structure:** Each `WIP_<agent>.md` (e.g., `WIP_implementer.md`, `WIP_test-engineer.md`, `WIP_doc-engineer.md`) contains a single `### Step N` section with an updated `Status` field. No batch header, no progress checklist, no blockers section.
+**Fragment structure:** Each `WIP_<agent>.md` (e.g., `.ai-work/<task-slug>/WIP_implementer.md`, `WIP_test-engineer.md`, `WIP_doc-engineer.md`) contains a single `### Step N` section with an updated `Status` field. No batch header, no progress checklist, no blockers section.
 
 **Merge procedure:**
 
-1. Read each `WIP_<agent>.md`. Extract the step number (from `### Step N`) and the new `Status` value.
-2. In canonical `WIP.md`, locate `### Step N` under `## Current Batch`. Update the `Status` field.
+1. Read each `WIP_<agent>.md` from `.ai-work/<task-slug>/`. Extract the step number (from `### Step N`) and the new `Status` value.
+2. In canonical `.ai-work/<task-slug>/WIP.md`, locate `### Step N` under `## Current Batch`. Update the `Status` field.
 3. In `## Progress`, update the step marker: `[~]` becomes `[x]` if `COMPLETE`, stays `[~]` if `IN-PROGRESS`, becomes `[!]` if `BLOCKED` or `CONFLICT`.
 4. If all batch steps show `COMPLETE`: set batch `Status: complete`, update `## Next Action`.
 5. If any step shows `BLOCKED`/`CONFLICT`: add the blocker to `## Blockers`.
@@ -154,12 +154,12 @@ Status: in-progress
 
 **Schema:** Five fixed topic sections (`## Gotchas`, `## Patterns That Worked`, `## Decisions Made`, `## Edge Cases`, `## Technical Debt`). Entries are bullet points with `**[agent-name]**` attribution.
 
-**Fragment structure:** Each `LEARNINGS_<agent>.md` contains only the topic sections the agent has entries for, with entries under `##` headings matching canonical section names.
+**Fragment structure:** Each `LEARNINGS_<agent>.md` (in `.ai-work/<task-slug>/`) contains only the topic sections the agent has entries for, with entries under `##` headings matching canonical section names.
 
 **Merge procedure:**
 
-1. Read each `LEARNINGS_<agent>.md`. For each `## [Topic]` section, extract bullet-point entries.
-2. In canonical `LEARNINGS.md`, locate the matching `## [Topic]` section. Append entries at the end.
+1. Read each `LEARNINGS_<agent>.md` from `.ai-work/<task-slug>/`. For each `## [Topic]` section, extract bullet-point entries.
+2. In canonical `.ai-work/<task-slug>/LEARNINGS.md`, locate the matching `## [Topic]` section. Append entries at the end.
 3. If a fragment contains an unrecognized `## [Topic]` header: create a `## Uncategorized` section and place entries there.
 4. Entry order within a section reflects merge order (no re-sorting -- entries are unordered within topics).
 5. Delete fragment files after successful merge.
@@ -178,11 +178,11 @@ Status: in-progress
 
 Append-only. Entries in chronological order by timestamp.
 
-**Fragment structure:** Each `PROGRESS_<agent>.md` contains the agent's own entries in the same format, chronologically ordered within the fragment.
+**Fragment structure:** Each `PROGRESS_<agent>.md` (in `.ai-work/<task-slug>/`) contains the agent's own entries in the same format, chronologically ordered within the fragment.
 
 **Merge procedure:**
 
-1. Read canonical `PROGRESS.md` and all `PROGRESS_<agent>.md` fragments.
+1. Read canonical `.ai-work/<task-slug>/PROGRESS.md` and all `PROGRESS_<agent>.md` fragments from the same directory.
 2. Collect all fragment entries into a single list.
 3. Sort by timestamp (ISO 8601 prefix enables lexicographic sorting).
 4. Append sorted entries to canonical `PROGRESS.md`. Do not re-sort existing canonical entries.
@@ -206,7 +206,7 @@ When worktree branches are merged, `.ai-state/` documents are subject to git mer
 
 **Reconciliation procedure:**
 
-1. Check if `.ai-work/WIP.md` exists in the main worktree.
+1. Check if `.ai-work/<task-slug>/WIP.md` exists in the main worktree.
 2. Compare the `## Progress` checklist against git log: check if commits for "completed" steps exist on the current branch.
 3. Update steps whose implementation is visible in git history but marked incomplete: set status to `[COMPLETE]`, marker to `[x]`.
 4. Incorporate `LEARNINGS.md` entries from the merged worktree using the topic-section merge protocol above.

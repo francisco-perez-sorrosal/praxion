@@ -7,8 +7,9 @@ from pathlib import Path
 
 from decision_tracker.schema import TierType
 
-SYSTEMS_PLAN_PATH = ".ai-work/SYSTEMS_PLAN.md"
-IMPLEMENTATION_PLAN_PATH = ".ai-work/IMPLEMENTATION_PLAN.md"
+AI_WORK_DIR = ".ai-work"
+SYSTEMS_PLAN_NAME = "SYSTEMS_PLAN.md"
+IMPLEMENTATION_PLAN_NAME = "IMPLEMENTATION_PLAN.md"
 CALIBRATION_LOG_PATH = ".ai-state/calibration_log.md"
 
 DEFAULT_TIER: TierType = "direct"
@@ -16,19 +17,35 @@ GATING_TIERS: frozenset[TierType] = frozenset({"standard", "full"})
 STALENESS_THRESHOLD = timedelta(hours=24)
 
 
+def _has_pipeline_doc(cwd: Path, doc_name: str) -> bool:
+    """Check whether *doc_name* exists in any task-scoped subdirectory of .ai-work/.
+
+    Searches `.ai-work/<task-slug>/<doc_name>` for all task-slug subdirectories.
+    Falls back to `.ai-work/<doc_name>` for legacy flat layouts.
+    """
+    ai_work = cwd / AI_WORK_DIR
+    if not ai_work.is_dir():
+        return False
+    # Check task-scoped subdirectories
+    if any(ai_work.glob(f"*/{doc_name}")):
+        return True
+    # Fallback: legacy flat layout
+    return (ai_work / doc_name).is_file()
+
+
 def detect_tier(cwd: Path) -> TierType:
     """Detect the pipeline tier from filesystem signals in *cwd*.
 
     Priority order:
-    1. Presence of SYSTEMS_PLAN.md -> "standard"
-    2. Presence of IMPLEMENTATION_PLAN.md -> "standard"
+    1. Presence of SYSTEMS_PLAN.md (in any task-scoped dir) -> "standard"
+    2. Presence of IMPLEMENTATION_PLAN.md (in any task-scoped dir) -> "standard"
     3. Recent entry in calibration_log.md -> that entry's tier
     4. Default -> "direct"
     """
-    if (cwd / SYSTEMS_PLAN_PATH).is_file():
+    if _has_pipeline_doc(cwd, SYSTEMS_PLAN_NAME):
         return "standard"
 
-    if (cwd / IMPLEMENTATION_PLAN_PATH).is_file():
+    if _has_pipeline_doc(cwd, IMPLEMENTATION_PLAN_NAME):
         return "standard"
 
     tier = _tier_from_calibration_log(cwd / CALIBRATION_LOG_PATH)

@@ -35,7 +35,7 @@ Work through these phases in order. Complete each phase before moving to the nex
 
 ### Phase 1 — Input Assessment
 
-Determine what you have to work with:
+Determine what you have to work with. The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all reads and writes.
 
 1. **Check for RESEARCH_FINDINGS.md** — if it exists, read it thoroughly. This is your primary information source.
 2. **Check for CONTEXT_REVIEW.md** — if present, read the `## Research Stage Review` section for context artifact inventory, health assessment, and artifact placement recommendations. Factor these into your architectural decisions when the task involves context artifacts.
@@ -124,7 +124,7 @@ Design the architecture by working through these questions:
 When Phase 1 identified a prior spec baseline (brownfield detection):
 
 1. Compare the new behavioral specification (produced in Phase 3) against the prior spec's requirements
-2. Produce `SPEC_DELTA.md` in `.ai-work/` following the format defined in the `spec-driven-development` skill
+2. Produce `SPEC_DELTA.md` in `.ai-work/<task-slug>/` following the format defined in the `spec-driven-development` skill
 3. Organize changes into Added (new REQ IDs with rationale), Modified (before/after with blockquoted prior text and change rationale), and Removed (with removal rationale and cleanup flag)
 4. Include a `## Staleness Warning` section if the baseline has Low confidence (prior spec's SH03 shows FAIL)
 5. If comparison reveals no behavioral changes (pure refactoring or implementation-only), skip `SPEC_DELTA.md` entirely — absence signals "no behavioral change" to downstream agents
@@ -316,7 +316,7 @@ After creating `SYSTEMS_PLAN.md` (and `SPEC_DELTA.md` for brownfield features), 
 
 ## Progress Signals
 
-At each phase transition, append a single line to `.ai-work/PROGRESS.md` (create the file and `.ai-work/` directory if they do not exist):
+At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
 
 ```
 [TIMESTAMP] [systems-architect] Phase N/7: [phase-name] -- [one-line summary of what was done or found]
@@ -334,4 +334,4 @@ Write the line immediately upon entering each new phase. Include optional hashta
 - **Right-size the design.** A 3-file feature does not need a multi-page architecture document. Match depth to complexity.
 - **Make trade-offs explicit.** Every significant decision should show what was considered and why.
 - **Design for incrementality.** The architecture must be implementable in small, safe steps — if it requires a big-bang change, redesign it.
-- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.
+- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.

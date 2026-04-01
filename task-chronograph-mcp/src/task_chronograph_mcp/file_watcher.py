@@ -1,4 +1,4 @@
-"""Watch .ai-work/PROGRESS.md for new progress lines and convert to events."""
+"""Watch .ai-work/<task-slug>/PROGRESS.md for new progress lines and convert to events."""
 
 from __future__ import annotations
 
@@ -81,28 +81,37 @@ def _parse_timestamp(timestamp_str: str) -> datetime:
 
 
 async def watch_progress_file(path: Path, store: EventStore) -> None:
-    """Watch a directory for PROGRESS.md changes and convert new lines to events.
+    """Watch a directory tree for PROGRESS.md changes and convert new lines to events.
+
+    Watches `.ai-work/` and all task-scoped subdirectories (e.g.,
+    `.ai-work/<task-slug>/PROGRESS.md`).  Tracks line counts per file so
+    multiple concurrent pipelines are handled independently.
 
     The watcher skips lines that existed before it started (no history replay).
     New lines are parsed and, if valid, added to the store as phase-transition events.
     """
-    progress_file = path / PROGRESS_FILENAME
-    last_line_count = 0
+    line_counts: dict[Path, int] = {}
 
-    if progress_file.exists():
-        last_line_count = len(progress_file.read_text().splitlines())
+    # Seed counts for any pre-existing PROGRESS.md files (root + subdirs)
+    for progress_file in path.rglob(PROGRESS_FILENAME):
+        try:
+            line_counts[progress_file] = len(progress_file.read_text().splitlines())
+        except (OSError, UnicodeDecodeError):
+            line_counts[progress_file] = 0
 
     async for changes in awatch(path):
         for _change_type, changed_path in changes:
             if Path(changed_path).name != PROGRESS_FILENAME:
                 continue
+            changed = Path(changed_path)
             try:
-                lines = Path(changed_path).read_text().splitlines()
+                lines = changed.read_text().splitlines()
             except (OSError, UnicodeDecodeError):
                 continue
 
-            new_lines = lines[last_line_count:]
-            last_line_count = len(lines)
+            last = line_counts.get(changed, 0)
+            new_lines = lines[last:]
+            line_counts[changed] = len(lines)
 
             for line in new_lines:
                 event = parse_progress_line(line)

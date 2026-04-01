@@ -10,7 +10,7 @@ A walkthrough of developing a small application using the Praxion agent pipeline
 
 ## The Agent Pipeline
 
-Agents communicate through documents in `.ai-work/`, not through direct invocation. Each agent reads upstream documents and writes its own, forming a chain:
+Agents communicate through documents in `.ai-work/<task-slug>/`, not through direct invocation. Each pipeline run gets its own task-scoped subdirectory (a kebab-case 2–4 word identifier generated at pipeline start). Each agent reads upstream documents and writes its own, forming a chain:
 
 ```mermaid
 graph LR
@@ -43,7 +43,7 @@ I want fresh ideas for a small utility I can build to practice with this ecosyst
 
 The promethean presents 3–5 candidate ideas and asks you to pick one. After a brief dialog refining scope, it writes:
 
-- `.ai-work/IDEA_PROPOSAL.md` — validated idea with problem statement, proposed solution, impact, and scope
+- `.ai-work/<task-slug>/IDEA_PROPOSAL.md` — validated idea with problem statement, proposed solution, impact, and scope
 - `.ai-state/IDEA_LEDGER_*.md` — permanent ideation history
 
 > **Note:** The promethean requires a sentinel report to exist (ecosystem health baseline). If none exists, Claude runs the sentinel first.
@@ -67,7 +67,7 @@ Research the feasibility of the idea in IDEA_PROPOSAL.md.
 
 The researcher explores the codebase and the web, then writes:
 
-- `.ai-work/RESEARCH_FINDINGS.md` — structured findings with codebase analysis, external sources, comparative tables, and open questions
+- `.ai-work/<task-slug>/RESEARCH_FINDINGS.md` — structured findings with codebase analysis, external sources, comparative tables, and open questions
 
 The researcher presents options with trade-offs but does **not** recommend a solution — that's the architect's job.
 
@@ -83,7 +83,7 @@ Design the architecture for the URL shortener based on the research findings.
 
 The architect reads `RESEARCH_FINDINGS.md`, assesses your codebase, and writes:
 
-- `.ai-work/SYSTEMS_PLAN.md` — architecture overview, component design, data flow, interface contracts, acceptance criteria, risk assessment
+- `.ai-work/<task-slug>/SYSTEMS_PLAN.md` — architecture overview, component design, data flow, interface contracts, acceptance criteria, risk assessment
 
 For medium/large tasks, the plan includes a **behavioral specification** with requirement IDs (e.g., `REQ-01: Shortened URL redirects to original within 50ms`) that thread through the rest of the pipeline.
 
@@ -97,9 +97,9 @@ Break down the architecture into implementation steps.
 
 The planner reads `SYSTEMS_PLAN.md` and writes three documents:
 
-- `.ai-work/IMPLEMENTATION_PLAN.md` — numbered steps, each with: what to implement, what to test, done-when criteria, and which files to touch
-- `.ai-work/WIP.md` — tracks the current step, status, and blockers
-- `.ai-work/LEARNINGS.md` — initialized for capturing discoveries during implementation
+- `.ai-work/<task-slug>/IMPLEMENTATION_PLAN.md` — numbered steps, each with: what to implement, what to test, done-when criteria, and which files to touch
+- `.ai-work/<task-slug>/WIP.md` — tracks the current step, status, and blockers
+- `.ai-work/<task-slug>/LEARNINGS.md` — initialized for capturing discoveries during implementation
 
 Steps are paired: each implementation step has a matching test step. The planner assigns them to run concurrently on disjoint file sets (production code vs test code).
 
@@ -129,7 +129,7 @@ Verify the implementation against the acceptance criteria.
 
 The verifier reads the entire pipeline trail — `SYSTEMS_PLAN.md`, `IMPLEMENTATION_PLAN.md`, `WIP.md`, `LEARNINGS.md`, and the git diff — then writes:
 
-- `.ai-work/VERIFICATION_REPORT.md` — verdict (PASS / PASS WITH FINDINGS / FAIL), acceptance criteria validation, convention compliance findings, test coverage assessment
+- `.ai-work/<task-slug>/VERIFICATION_REPORT.md` — verdict (PASS / PASS WITH FINDINGS / FAIL), acceptance criteria validation, convention compliance findings, test coverage assessment
 
 The verifier is **read-only** — it identifies issues but does not fix them. If findings need action, the implementer runs again.
 
@@ -141,7 +141,7 @@ After the feature is complete and verified:
 /clean-work
 ```
 
-This removes `.ai-work/` after merging learnings into permanent locations. Commit your code with `/co`.
+This removes `.ai-work/<task-slug>/` after merging learnings into permanent locations. Commit your code with `/co`.
 
 ## Shortcuts
 
@@ -165,7 +165,7 @@ The pipeline supports multi-session work. If you close Claude and return later:
 Resume work on the URL shortener — check WIP.md and continue.
 ```
 
-The implementation-planner reads the existing `WIP.md`, finds where you left off, and picks up from there.
+The implementation-planner reads the existing `WIP.md` in the task's `.ai-work/<task-slug>/` directory, finds where you left off, and picks up from there.
 
 ## Supporting Agents
 
@@ -187,7 +187,7 @@ These agents operate alongside the main pipeline:
 | `/cop` | Commit and push |
 | `/create-worktree [branch]` | Work on a feature in an isolated worktree |
 | `/merge-worktree [branch]` | Merge the worktree back |
-| `/clean-work` | Remove `.ai-work/` after pipeline completion |
+| `/clean-work` | Remove `.ai-work/<task-slug>/` after pipeline completion |
 | `/memory` | Manage persistent memory across sessions |
 | `/onboard-project` | Set up a new project for the ecosystem |
 

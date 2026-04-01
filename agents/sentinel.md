@@ -196,6 +196,8 @@ Work through these phases in order. Complete each phase before moving to the nex
 
 ### Phase 1 — Scope (1/7)
 
+The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all reads and writes.
+
 Determine the audit scope:
 
 1. **Default**: Full ecosystem sweep — all artifacts, all dimensions
@@ -397,7 +399,7 @@ The sentinel diagnoses and reports. For remediation, invoke the context-engineer
 
 ## Progress Signals
 
-At each phase transition, append a line to `.ai-work/PROGRESS.md`:
+At each phase transition, append a line to `.ai-work/<task-slug>/PROGRESS.md`:
 
 ```
 [TIMESTAMP] [sentinel] Phase N/7: [phase-name] -- [one-line summary] #sentinel

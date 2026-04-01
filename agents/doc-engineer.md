@@ -35,6 +35,8 @@ You operate in two modes: **audit mode** (assess and report) and **fix mode** (a
 
 ## Process
 
+The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all document reads and writes.
+
 Work through these phases in order. Complete each phase before moving to the next.
 
 ### Phase 1 -- Scope Assessment (1/6)
@@ -241,7 +243,7 @@ After completing the assessment, return a concise summary:
 
 ## Progress Signals
 
-At each phase transition, append a single line to `.ai-work/PROGRESS.md` (create the file and `.ai-work/` directory if they do not exist):
+At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
 
 ```text
 [TIMESTAMP] [doc-engineer] Phase N/6: [phase-name] -- [one-line summary of what was done or found]
@@ -257,4 +259,4 @@ Write the line immediately upon entering each new phase. Include optional hashta
 - **Filesystem is source of truth.** When documentation and the filesystem disagree, the filesystem wins.
 - **Do not commit.** Produce changes for user review.
 - **Do not invent requirements.** If something is ambiguous, state your assumption.
-- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.
+- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.

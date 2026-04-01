@@ -13,6 +13,8 @@ from pathlib import Path
 STEP_HEADING_RE = re.compile(r"^### Step \d+", re.MULTILINE)
 REQ_REF_RE = re.compile(r"REQ-\d+")
 
+# Path is task-scoped: .ai-work/<task-slug>/IMPLEMENTATION_PLAN.md
+# Callers pass the resolved path; this constant is for documentation.
 IMPLEMENTATION_PLAN_PATH = ".ai-work/IMPLEMENTATION_PLAN.md"
 ANNOTATION_MARKER = "[SPEC AMENDED]"
 

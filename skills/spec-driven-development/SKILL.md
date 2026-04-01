@@ -180,7 +180,7 @@ For brownfield features — when `.ai-state/specs/` contains prior `SPEC_*.md` f
 - **Modified Requirements**: before (blockquoted prior text) and after (new text) with change rationale
 - **Removed Requirements**: prior REQ IDs with strikethrough, removal rationale, and cleanup flag
 
-**Lifecycle**: ephemeral in `.ai-work/`. Consumed by the implementation-planner (step ordering) and verifier (delta validation). Deleted after pipeline completion — the delta's content is subsumed by the archived spec.
+**Lifecycle**: ephemeral in `.ai-work/<task-slug>/`. Consumed by the implementation-planner (step ordering) and verifier (delta validation). Deleted after pipeline completion — the delta's content is subsumed by the archived spec.
 
 **REQ ID convention**: fresh per-feature IDs as established by the existing convention. The delta provides the cross-feature mapping between old and new IDs.
 
@@ -208,6 +208,6 @@ For brownfield features — when `.ai-state/specs/` contains prior `SPEC_*.md` f
 | Test naming | Test code: `test_req{NN}_description` |
 | Traceability matrix | `VERIFICATION_REPORT.md` `## Spec Conformance` section |
 | Archived spec | `.ai-state/specs/SPEC_<name>_YYYY-MM-DD.md` |
-| Spec delta (brownfield) | `.ai-work/SPEC_DELTA.md` (ephemeral, produced by architect) |
+| Spec delta (brownfield) | `.ai-work/<task-slug>/SPEC_DELTA.md` (ephemeral, produced by architect) |
 | Calibration log | `.ai-state/calibration_log.md` (persistent, append-only) |
 | Decision documentation | `LEARNINGS.md` `### Decisions Made` section |

@@ -38,10 +38,19 @@ def _write_calibration_log(
 
 
 def _create_ai_work_file(tmp_path: Path, filename: str) -> Path:
-    """Create a file under .ai-work/ in tmp_path."""
+    """Create a file under .ai-work/ in tmp_path (legacy flat layout)."""
     ai_work = tmp_path / ".ai-work"
     ai_work.mkdir(parents=True, exist_ok=True)
     path = ai_work / filename
+    path.write_text("# placeholder\n", encoding="utf-8")
+    return path
+
+
+def _create_task_scoped_file(tmp_path: Path, task_slug: str, filename: str) -> Path:
+    """Create a file under .ai-work/<task-slug>/ in tmp_path."""
+    task_dir = tmp_path / ".ai-work" / task_slug
+    task_dir.mkdir(parents=True, exist_ok=True)
+    path = task_dir / filename
     path.write_text("# placeholder\n", encoding="utf-8")
     return path
 
@@ -84,6 +93,29 @@ class TestCalibrationLogStaleEntry:
 class TestNoSignalsReturnsDefault:
     def test_empty_directory_returns_direct(self, tmp_path: Path):
         assert detect_tier(tmp_path) == "direct"
+
+
+class TestTaskScopedSystemsPlan:
+    def test_systems_plan_in_task_dir_returns_standard(self, tmp_path: Path):
+        _create_task_scoped_file(tmp_path, "auth-flow", "SYSTEMS_PLAN.md")
+
+        assert detect_tier(tmp_path) == "standard"
+
+
+class TestTaskScopedImplPlan:
+    def test_impl_plan_in_task_dir_returns_standard(self, tmp_path: Path):
+        _create_task_scoped_file(tmp_path, "payment-api", "IMPLEMENTATION_PLAN.md")
+
+        assert detect_tier(tmp_path) == "standard"
+
+
+class TestMultipleTaskDirs:
+    def test_any_task_dir_with_plan_returns_standard(self, tmp_path: Path):
+        """Multiple task-scoped dirs — presence in any one is sufficient."""
+        _create_task_scoped_file(tmp_path, "auth-flow", "RESEARCH_FINDINGS.md")
+        _create_task_scoped_file(tmp_path, "payment-api", "SYSTEMS_PLAN.md")
+
+        assert detect_tier(tmp_path) == "standard"
 
 
 class TestSystemsPlanTakesPriority:

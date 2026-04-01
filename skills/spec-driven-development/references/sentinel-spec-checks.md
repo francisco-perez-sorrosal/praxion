@@ -6,7 +6,7 @@ Defines the Spec Health dimension for the sentinel's check catalog. These checks
 
 - **Run** when `.ai-state/specs/` exists and contains at least one `SPEC_*.md` file
 - **Skip** when no specs directory or no spec files exist. Log "Spec Health: skipped (no specs found)" in the report
-- This dimension does NOT apply to ephemeral `.ai-work/` documents -- only to archived persistent specs
+- This dimension does NOT apply to ephemeral `.ai-work/<task-slug>/` documents -- only to archived persistent specs
 
 When multiple spec files exist, the sentinel samples a representative subset consistent with its existing sampling approach for large artifact sets.
 

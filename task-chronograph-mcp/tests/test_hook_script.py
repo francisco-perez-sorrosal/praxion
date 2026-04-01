@@ -349,6 +349,24 @@ class TestBuildEventsPostToolUse:
         assert len(events) == 2
         assert events[1]["message"] == "Scanning codebase"
 
+    def test_task_scoped_progress_path_detected(self, build_events):
+        """PROGRESS.md inside a task-scoped subdirectory is detected."""
+        content = "[2025-01-15T10:30:00Z] [researcher] Phase 1/3: scope -- Gathering context"
+        payload = {
+            "hook_event_name": "PostToolUse",
+            "session_id": "sess-001",
+            "tool_input": {
+                "file_path": "/project/.ai-work/auth-flow/PROGRESS.md",
+                "content": content,
+            },
+        }
+        events, interactions = build_events(payload)
+        assert len(events) == 2
+        assert events[0]["event_type"] == "tool_use"
+        assert events[1]["event_type"] == "phase_transition"
+        assert events[1]["agent_type"] == "researcher"
+        assert events[1]["phase"] == 1
+
 
 # ---------------------------------------------------------------------------
 # _build_events: PostToolUse — all tools emit tool_use

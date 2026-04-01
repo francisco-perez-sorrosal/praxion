@@ -42,7 +42,7 @@ Slash commands for frequent workflows. Invoke with `/<name>` (or `/i-am:<name>` 
 
 Autonomous subprocesses that handle complex, multi-step tasks. Each agent runs in its own context window with a specific specialty, reads upstream documents, and writes structured output for downstream agents.
 
-Agents communicate through shared documents in `.ai-work/`, not through direct invocation. This forms a pipeline where each agent's output feeds the next stage. The assistant delegates to the right agent based on what you ask for -- or you can name agents explicitly.
+Agents communicate through shared documents in `.ai-work/<task-slug>/`, not through direct invocation. Each pipeline run gets its own task-scoped subdirectory (a kebab-case 2–4 word identifier generated at pipeline start). This forms a pipeline where each agent's output feeds the next stage. The assistant delegates to the right agent based on what you ask for -- or you can name agents explicitly.
 
 **Examples:** `researcher` (codebase exploration, external docs), `systems-architect` (trade-off analysis, system design), `implementer` (step execution with self-review), `verifier` (post-implementation review against acceptance criteria).
 

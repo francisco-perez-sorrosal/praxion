@@ -32,7 +32,7 @@ Load explicitly with `roadmap-planning` or reference prioritization, roadmap, ba
 3. **Score and rank**: apply the framework to each candidate item
 4. **Map dependencies**: identify blocking and enhancing relationships between items
 5. **Sequence**: produce a Now-Next-Later roadmap (or other format) respecting dependency constraints
-6. **Write artifacts**: output `ROADMAP.md` (and optionally `BACKLOG.md`) to `.ai-work/`
+6. **Write artifacts**: output `ROADMAP.md` (and optionally `BACKLOG.md`) to `.ai-work/<task-slug>/`
 7. **Hand off**: "Now" items flow to the systems-architect or researcher for specification
 
 ## Related Skills

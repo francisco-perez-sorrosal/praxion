@@ -67,7 +67,13 @@ TRACE_TYPE_NATIVE = "native"
 
 
 def _is_otel_enabled() -> bool:
-    return os.environ.get(OTEL_ENABLED_ENV, "true").lower() in ("true", "1", "yes")
+    """OTel export is opt-in: disabled by default, enabled by chronograph-ctl.
+
+    MCP-managed chronograph processes (spawned by Claude Code) should NOT
+    export to Phoenix — only the chronograph-ctl instance should. This
+    prevents stale MCP processes from creating traces with wrong project names.
+    """
+    return os.environ.get(OTEL_ENABLED_ENV, "false").lower() in ("true", "1", "yes")
 
 
 def _detect_agent_origin(agent_type: str) -> str:

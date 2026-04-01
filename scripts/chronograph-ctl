@@ -79,6 +79,7 @@ cmd_start() {
     nohup uv run python -c "
 import asyncio, os, uvicorn
 os.environ.setdefault('CHRONOGRAPH_PORT', '${CHRONO_PORT}')
+os.environ['OTEL_ENABLED'] = 'true'
 from task_chronograph_mcp.server import app, _core_lifespan, DEFAULT_PORT
 
 async def run():

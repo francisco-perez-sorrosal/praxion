@@ -105,7 +105,19 @@ Key attributes: `praxion.agent_origin` (praxion vs claude-code), `praxion.trace_
 
 ```bash
 cd task-chronograph-mcp
-uv run python -m pytest -q    # 150 tests
+uv run python -m pytest -q    # 152 tests
 uv run ruff check              # Lint
 uv run ruff format             # Format
 ```
+
+### Gotchas
+
+- **Phoenix storage**: Default `PHOENIX_SQL_DATABASE_URL` writes to a temp folder — data lost on restart. Always set `PHOENIX_WORKING_DIR` and `PHOENIX_SQL_DATABASE_URL` to a stable path (`~/.phoenix/`).
+- **launchd plists**: `$HOME` must be expanded to a literal path at generation time — launchd does not expand shell variables.
+- **`InMemorySpanExporter`**: Lives at `opentelemetry.sdk.trace.export.in_memory_span_exporter`, not `opentelemetry.sdk.trace.export`.
+- **Hook matchers**: Empty string `""` matches all tools. The `format_python.py` hook uses `"Write|Edit"` in its own entry and is unaffected by the observability hook's empty matcher.
+- **Frozen Event dataclass**: New fields must have defaults to avoid breaking existing callers.
+- **Test lifespan**: `test_server.py` uses `_core_lifespan` (not `app_lifespan`) because MCP session manager doesn't work with pytest-asyncio.
+- **`arize-phoenix-evals`**: Uses Elastic-2.0 license (not MIT/Apache). Fine for self-hosted tooling but blocks offering evaluations as a service.
+- **OpenInference span.kind**: The only required attribute. Phoenix renders recognized attributes (`input.value`, `output.value`, `tool.name`, `session.id`) with special UI treatment.
+- **Phoenix UI limitations**: No alerting, no custom dashboards, no configurable views. Trace-first with a fixed layout.

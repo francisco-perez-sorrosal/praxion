@@ -95,13 +95,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/check_code_quality.py",
+            "command": "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/commit_gate.sh ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/check_code_quality.py",
             "timeout": 30,
             "async": false
           },
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/extract_decisions.py",
+            "command": "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/commit_gate.sh ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/extract_decisions.py",
             "timeout": 30,
             "async": false
           }

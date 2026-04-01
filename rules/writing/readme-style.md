@@ -1,3 +1,9 @@
+---
+paths:
+  - "**/README.md"
+  - "**/README_DEV.md"
+---
+
 ## README Writing Style
 
 Technical documentation style for README.md files. Applies the Adaptive Precision philosophy: every sentence must earn its place.

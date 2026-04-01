@@ -24,7 +24,7 @@ Procedural expertise for writing, maintaining, and validating project-facing doc
 
 Does not define documentation conventions -- defines how to apply them.
 
-- **readme-style rule** (auto-loaded): defines WHAT documentation conventions to follow (writing style, structural integrity, naming consistency)
+- **readme-style rule** (path-scoped — loads when accessing README files): defines WHAT documentation conventions to follow (writing style, structural integrity, naming consistency)
 - **doc-management skill** (this file): defines HOW to author, validate, and maintain documentation
 - **doc-engineer agent**: autonomous subprocess that uses this skill for documentation quality management
 - **code-review skill**: after a code review identifies added, removed, or renamed files, use this skill to update affected documentation

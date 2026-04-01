@@ -25,7 +25,7 @@ rules/
 | `swe/decision-tracking.md` | Append-only decision audit log (`decisions.jsonl`), dual-path model, commit-time review, spec auto-update |
 | `swe/swe-agent-coordination-protocol.md` | Agent selection, coordination pipeline, parallel execution — detailed tables in `software-planning` skill reference |
 | `swe/vcs/git-conventions.md` | Commit scope, staging discipline, secrets, exclusions, message format |
-| `writing/readme-style.md` | Precision-first technical writing and structural integrity conventions for README.md files |
+| `writing/readme-style.md` | Precision-first technical writing and structural integrity conventions for README.md files. Path-scoped: loads only when accessing `**/README.md` or `**/README_DEV.md` |
 
 ## How Rules Work
 

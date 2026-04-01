@@ -5,7 +5,9 @@ Contributor and developer documentation for Praxion. For installation and usage,
 ## Project Structure
 
 ```
+CLAUDE.md                            # Project-level instructions (always loaded)
 skills/                              # Shared skill modules (assistant-agnostic)
+├── CLAUDE.md                        # Skill conventions (lazy loaded)
 ├── agent-crafting/
 ├── agent-evals/
 ├── agentic-sdks/
@@ -33,6 +35,7 @@ skills/                              # Shared skill modules (assistant-agnostic)
 ├── spec-driven-development/
 └── stakeholder-communications/
 commands/                            # Shared slash commands
+├── CLAUDE.md                        # Command conventions (lazy loaded)
 ├── add-rules.md
 ├── clean-work.md
 ├── co.md
@@ -46,6 +49,7 @@ commands/                            # Shared slash commands
 ├── sdd-coverage.md
 └── star-repo.md
 agents/                              # Shared agent definitions
+├── CLAUDE.md                        # Agent conventions (lazy loaded)
 ├── promethean.md
 ├── researcher.md
 ├── systems-architect.md
@@ -59,6 +63,7 @@ agents/                              # Shared agent definitions
 ├── skill-genesis.md
 └── cicd-engineer.md
 rules/                               # Rules (installed to ~/.claude/rules/ or .cursor/rules/)
+├── CLAUDE.md                        # Rule conventions (lazy loaded)
 ├── swe/
 │   ├── agent-intermediate-documents.md
 │   ├── coding-style.md
@@ -67,8 +72,9 @@ rules/                               # Rules (installed to ~/.claude/rules/ or .
 │   └── vcs/
 │       └── git-conventions.md
 └── writing/
-    └── readme-style.md
+    └── readme-style.md              # Path-scoped: loads only for README files
 .claude-plugin/                      # Claude Code plugin manifest
+├── CLAUDE.md                        # Plugin config conventions (lazy loaded)
 ├── plugin.json
 ├── PLUGIN_SCHEMA_NOTES.md
 └── hooks/                           # Plugin hook scripts
@@ -94,9 +100,10 @@ cursor/config/                       # Cursor installer config
 ├── export-cursor-rules.py
 └── README.md
 scripts/                             # Utility scripts
+├── CLAUDE.md                        # Script conventions (lazy loaded)
 ├── ccwt                             # Multi-worktree Claude session launcher
-├── chronograph-ctl                  # Task Chronograph server control
-└── phoenix-ctl                      # Phoenix observability server control
+├── chronograph-ctl                  # Task Chronograph dev helper (start/stop/status)
+└── phoenix-ctl                      # Phoenix observability daemon manager
 docs/                                # Cross-cutting documentation
 ├── concepts.md
 ├── cursor-compat.md
@@ -106,7 +113,14 @@ docs/                                # Cross-cutting documentation
 ├── observability.md
 └── spec-driven-development.md
 task-chronograph-mcp/                # Pipeline observability MCP server
+├── CLAUDE.md                        # MCP server dev conventions (lazy loaded)
+└── ...
 memory-mcp/                          # Persistent memory MCP server
+├── CLAUDE.md                        # MCP server dev conventions (lazy loaded)
+└── ...
+decision-tracker/                    # Decision extraction CLI utility
+├── CLAUDE.md                        # CLI tool dev conventions (lazy loaded)
+└── ...
 install.sh                           # Installer router
 install_claude.sh                    # Claude Code / Desktop installer
 install_cursor.sh                    # Cursor installer
@@ -131,10 +145,26 @@ Makefile                             # Development targets
 - **Symlink for personal config**: `install_claude.sh` symlinks Claude config to `~/.claude/`; `install_cursor.sh` symlinks skills and rules into `.cursor/` or `~/.cursor/`
 - **Progressive disclosure**: Skills load metadata at startup, full content on activation, reference files on demand
 - **CLAUDE.md stays lean**: Skills, commands, agents, and rules are auto-discovered by Claude via filesystem scanning -- listing them in `CLAUDE.md` wastes always-loaded tokens and creates a sync burden. `README.md` and per-directory READMEs serve as the human-facing catalogs
+- **Nested CLAUDE.md for progressive disclosure**: Each artifact directory has its own `CLAUDE.md` with conventions specific to that directory. These are lazily loaded -- Claude reads them only when it accesses files in that directory, adding zero cost to sessions that don't touch the directory
 
 ## Progressive Disclosure and Satellite Files
 
 Skills, agents, and rules each have a distinct execution model that determines how they load, resolve file references, and interact with the sandbox. Understanding these differences is essential for deciding where to place content and how to structure large instruction sets.
+
+### Nested CLAUDE.md Files
+
+Claude Code discovers CLAUDE.md files through a bidirectional directory walk:
+- **Upward (eager)**: At session start, walks from cwd to the filesystem root, loading every CLAUDE.md found
+- **Downward (lazy)**: Subdirectory CLAUDE.md files load only when Claude reads files in that directory
+
+This project uses nested CLAUDE.md files as a progressive disclosure layer between the always-loaded root `CLAUDE.md` and the on-demand crafting skills. Each artifact directory (`agents/`, `skills/`, `commands/`, `rules/`, etc.) has its own `CLAUDE.md` with:
+- Directory-specific conventions (structure, naming, registration)
+- Pointers to the relevant crafting skill for detailed guidance
+- Gotchas and constraints unique to that artifact type
+
+These files are Claude-facing (loaded into context on demand). The existing `README.md` files in each directory remain the human-facing catalogs. Both complement each other — READMEs tell humans what exists, CLAUDE.md files tell Claude how to work there.
+
+CLAUDE.md files survive compaction (re-injected after `/compact`), so once loaded they persist for the session.
 
 ### Execution Models
 
@@ -177,8 +207,9 @@ The token budget constraint (8,500 tokens for always-loaded content) drives a cl
 
 | Content Type | Where to Put It | Why |
 |---|---|---|
-| Global directives, short conventions | `CLAUDE.md` | Always loaded — keep lean |
-| Domain knowledge, constraints, reference material | Rules | Eagerly loaded within scope — keep concise (shares token budget with CLAUDE.md) |
+| Global directives, short conventions | Root `CLAUDE.md` | Always loaded — keep lean |
+| Directory-specific conventions, registration gotchas | Subdirectory `CLAUDE.md` | Lazy loaded — zero cost until Claude enters the directory |
+| Domain knowledge, constraints, reference material | Rules | Eagerly loaded within scope — keep concise (shares token budget with root CLAUDE.md) |
 | Multi-step workflows, procedures with code | Skills | Lazy-loaded with progressive disclosure — satellite files absorb depth |
 | Sub-agent behavior definitions | Agents | Loaded at spawn — self-contained by necessity |
 

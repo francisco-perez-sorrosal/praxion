@@ -130,6 +130,8 @@ def _relay_event(relay: OTelRelay, event: Event) -> None:
                     str(event.metadata.get("output_summary", "")),
                     is_error=False,
                     error_msg="",
+                    session_id=event.session_id,
+                    project_dir=event.project_dir,
                 )
             case EventType.ERROR:
                 relay.record_tool(
@@ -139,6 +141,8 @@ def _relay_event(relay: OTelRelay, event: Event) -> None:
                     "",
                     is_error=True,
                     error_msg=event.message,
+                    session_id=event.session_id,
+                    project_dir=event.project_dir,
                 )
             case EventType.PHASE_TRANSITION:
                 relay.add_phase_event(

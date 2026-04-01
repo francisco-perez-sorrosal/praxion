@@ -234,12 +234,14 @@ class OTelRelay:
         *,
         is_error: bool = False,
         error_msg: str = "",
+        session_id: str = "",
+        project_dir: str = "",
     ) -> None:
         """Create a TOOL child span under the given agent (or session root)."""
         if not _is_otel_enabled():
             return
         try:
-            self._ensure_initialized()
+            self._ensure_initialized(session_id, project_dir=project_dir)
             self._record_tool_span(
                 agent_id, tool_name, input_summary, output_summary, is_error, error_msg
             )

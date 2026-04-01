@@ -311,7 +311,14 @@ class TestRelayWiring:
         )
         assert resp.status_code == 201
         mock.record_tool.assert_called_once_with(
-            "agent-r1", "Read", "/path/to/file", "200 lines", is_error=False, error_msg=""
+            "agent-r1",
+            "Read",
+            "/path/to/file",
+            "200 lines",
+            is_error=False,
+            error_msg="",
+            session_id="",
+            project_dir="",
         )
 
     async def test_error_routes_to_relay_with_error_flag(self, relay_client):

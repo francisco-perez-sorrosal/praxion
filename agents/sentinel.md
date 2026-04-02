@@ -169,15 +169,15 @@ Requires `.ai-state/calibration_log.md`. Skip with a note when no calibration lo
 
 ### Decision Log (DL)
 
-Conditional activation: skip DL checks when no `decisions.jsonl` exists (same pattern as SH checks with specs).
+Conditional activation: skip DL checks when no `.ai-state/decisions/` directory exists or it contains no ADR files (same pattern as SH checks with specs).
 
 | ID | Tp | Rule | Pass |
 |----|----|------|------|
-| DL01 | A | `decisions.jsonl` exists in `.ai-state/` when archived specs exist | `decisions.jsonl` present or no archived specs |
-| DL02 | A | `decisions.jsonl` entries are valid JSONL with required fields | Each line parses as JSON with `id`, `version`, `timestamp`, `status`, `category`, `decision`, `made_by`, `source` |
-| DL03 | L | Decision entries referencing REQ IDs match actual REQ IDs in archived specs | `affected_reqs` values found in corresponding `SPEC_*.md` |
-| DL04 | L | Decision entries have non-empty rationale for `source: "agent"` entries | Agent-written decisions have `rationale` field populated |
-| DL05 | L | Decision frequency is reasonable for features with archived specs | Average decisions per feature between 2-30 |
+| DL01 | A | `.ai-state/decisions/` has ADR files when archived specs exist | `Glob .ai-state/decisions/[0-9]*.md` returns files, or no archived specs |
+| DL02 | A | ADR files have valid YAML frontmatter with required fields | Each ADR has `id`, `title`, `status`, `category`, `date`, `summary`, `tags`, `made_by` in frontmatter |
+| DL03 | A | `DECISIONS_INDEX.md` is consistent with ADR files | Row count in index table matches `Glob .ai-state/decisions/[0-9]*.md` file count; IDs match |
+| DL04 | L | No orphaned supersession pointers | If an ADR has `supersedes: dec-NNN`, the referenced ADR file exists; if `superseded_by: dec-MMM`, that file exists and points back |
+| DL05 | L | Recent features have associated ADR files | Features with archived specs have corresponding ADR files (frequency check) |
 
 ### Self-Verification (V)
 

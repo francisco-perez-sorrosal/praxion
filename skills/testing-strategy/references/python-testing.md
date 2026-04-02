@@ -2,6 +2,8 @@
 
 Advanced pytest patterns, fixture architecture, property-based testing, and plugin ecosystem. Reference material for the [Testing Strategy](../SKILL.md) skill.
 
+**Important**: Always invoke pytest through the project's package manager — never bare `pytest`. Detect the runner from project config: `pixi run pytest` (if `pixi.toml` or `[tool.pixi]`), `uv run pytest` (if `uv.lock` or `[tool.uv]`), or `python -m pytest` (fallback). Commands in this reference use `<runner> pytest` as placeholder — substitute with the actual project runner.
+
 ## pytest Fundamentals
 
 pytest discovers tests by scanning for `test_*.py` / `*_test.py` files, collecting `test_`-prefixed functions and `Test`-prefixed classes (without `__init__`).
@@ -121,7 +123,7 @@ def test_full_pipeline(): ...
 def test_database_roundtrip(): ...
 ```
 
-Run by marker: `pytest -m "not slow"`, `pytest -m "integration or smoke"`.
+Run by marker: `<runner> pytest -m "not slow"`, `<runner> pytest -m "integration or smoke"`.
 
 Enforce registration to catch typos:
 
@@ -200,7 +202,7 @@ show_missing = true
 exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError", "@overload"]
 ```
 
-Run: `<tool> run pytest --cov --cov-report=term-missing`.
+Run: `<runner> pytest --cov --cov-report=term-missing`.
 
 - **Branch coverage** (`branch = true`): Checks both sides of every conditional -- catches missing `else` branches that line coverage misses
 - **`--cov-fail-under` as ratchet**: Set to current level and only increase; goal is preventing regression, not hitting a target
@@ -225,7 +227,7 @@ Set `asyncio_mode = "auto"` in `[tool.pytest.ini_options]` so all `async def tes
 | **pytest-timeout** | Per-test time limits | Preventing hung tests, especially async |
 | **pytest-sugar** | Progress bar and instant failures | Local developer experience |
 
-**pytest-xdist**: `<tool> run pytest -n auto`. If a test fails only under `-n auto`, it has hidden shared state. **pytest-mock**: `mocker.patch("path.to.func")` auto-undoes after each test -- no `with patch(...)` needed.
+**pytest-xdist**: `<runner> pytest -n auto`. If a test fails only under `-n auto`, it has hidden shared state. **pytest-mock**: `mocker.patch("path.to.func")` auto-undoes after each test -- no `with patch(...)` needed.
 
 ## pyproject.toml Configuration
 

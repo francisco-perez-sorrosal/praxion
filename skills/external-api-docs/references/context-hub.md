@@ -42,28 +42,31 @@ context-hub merges entries from multiple sources at query time. Add private docu
 
 Author-prefixed IDs (`author/name`) prevent namespace collisions across sources.
 
-## Telemetry Controls
+## Telemetry and Feedback Controls
 
-context-hub collects usage analytics (PostHog) and sends feedback to its API by default. Disable both:
+context-hub has two separate opt-out mechanisms:
+
+- **`CHUB_TELEMETRY`** — passive usage analytics (PostHog). Disabled in all Praxion integrations.
+- **`CHUB_FEEDBACK`** — enables the explicit `chub feedback` command for rating docs. Left **enabled** so agents can give feedback that improves doc quality for everyone.
 
 **Per-command** (recommended in all skill examples):
 
 ```bash
-CHUB_TELEMETRY=0 CHUB_FEEDBACK=0 chub <command>
+CHUB_TELEMETRY=0 CHUB_FEEDBACK=1 chub <command>
 ```
 
 **Persistent via config** (`~/.chub/config.yaml`):
 
 ```yaml
 telemetry: false
-feedback: false
+feedback: true
 ```
 
 **Environment variables** (shell profile):
 
 ```bash
 export CHUB_TELEMETRY=0
-export CHUB_FEEDBACK=0
+export CHUB_FEEDBACK=1
 ```
 
 ## CLI Reference
@@ -111,10 +114,10 @@ Store a local annotation that auto-appends to future `chub get` output. One anno
 ### Feedback
 
 ```bash
-chub feedback <author/entry-id> <up|down>
+chub feedback <author/entry-id> <up|down> [--label <label>] ["comment"]
 ```
 
-Rate an entry. Requires feedback API to be enabled (`CHUB_FEEDBACK=1` or config default).
+Rate an entry. Requires `CHUB_FEEDBACK=1` (the default). Available labels: `outdated`, `inaccurate`, `incomplete`, `wrong-examples`, `wrong-version`, `poorly-structured`, `accurate`, `well-structured`, `helpful`, `good-examples`.
 
 ### Cache Management
 

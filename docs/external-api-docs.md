@@ -40,7 +40,7 @@ If you skipped the installer step or want to set up manually:
       "args": ["-y", "@aisuite/chub", "mcp"],
       "env": {
         "CHUB_TELEMETRY": "0",
-        "CHUB_FEEDBACK": "0"
+        "CHUB_FEEDBACK": "1"
       }
     }
   }
@@ -68,8 +68,10 @@ The MCP server disables telemetry via environment variables. For CLI usage, add 
 
 ```bash
 export CHUB_TELEMETRY=0
-export CHUB_FEEDBACK=0
+export CHUB_FEEDBACK=1
 ```
+
+`CHUB_TELEMETRY=0` disables passive usage analytics (PostHog). `CHUB_FEEDBACK=1` enables the `chub feedback` command for rating docs — an explicit agent action, not passive tracking. Set to `0` to disable if you don't want to send ratings to context-hub.
 
 ## How It Works
 

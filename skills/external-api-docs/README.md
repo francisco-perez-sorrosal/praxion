@@ -27,8 +27,8 @@ Trigger explicitly by mentioning "external API docs" or referencing the skill by
 ## Quick Start
 
 1. Install the default provider: `npm install -g @aisuite/chub`
-2. Search for docs: `CHUB_TELEMETRY=0 CHUB_FEEDBACK=0 chub search "stripe"`
-3. Fetch a doc: `CHUB_TELEMETRY=0 CHUB_FEEDBACK=0 chub get stripe/api --lang python`
+2. Search for docs: `CHUB_TELEMETRY=0 CHUB_FEEDBACK=1 chub search "stripe"`
+3. Fetch a doc: `CHUB_TELEMETRY=0 CHUB_FEEDBACK=1 chub get stripe/api --lang python`
 
 The skill teaches agents to follow this workflow automatically during implementation tasks.
 

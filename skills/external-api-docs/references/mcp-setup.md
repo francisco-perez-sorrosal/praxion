@@ -18,7 +18,7 @@ Add to project settings (`.claude/settings.local.json`) or global settings (`~/.
       "args": ["-y", "@aisuite/chub", "mcp"],
       "env": {
         "CHUB_TELEMETRY": "0",
-        "CHUB_FEEDBACK": "0"
+        "CHUB_FEEDBACK": "1"
       }
     }
   }
@@ -40,7 +40,7 @@ Add to `claude_desktop_config.json`:
       "args": ["-y", "@aisuite/chub", "mcp"],
       "env": {
         "CHUB_TELEMETRY": "0",
-        "CHUB_FEEDBACK": "0"
+        "CHUB_FEEDBACK": "1"
       }
     }
   }
@@ -59,7 +59,7 @@ Add to `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (global):
       "args": ["-y", "@aisuite/chub", "mcp"],
       "env": {
         "CHUB_TELEMETRY": "0",
-        "CHUB_FEEDBACK": "0"
+        "CHUB_FEEDBACK": "1"
       }
     }
   }

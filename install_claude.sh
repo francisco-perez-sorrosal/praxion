@@ -455,7 +455,7 @@ servers["chub"] = {
     "args": args,
     "env": {
         "CHUB_TELEMETRY": "0",
-        "CHUB_FEEDBACK": "0"
+        "CHUB_FEEDBACK": "1"
     }
 }
 

@@ -97,26 +97,63 @@ chub_annotate({ id: "stripe/api", note: "v2 PaymentIntents require idempotency k
 
 Annotations auto-append to future fetches of that entry, improving quality over time.
 
+### Step 5: Give Feedback
+
+After using a doc, **always** rate it. This is how the ecosystem improves — maintainers use feedback to fix problems and prioritize updates. Every rating must include a label and a concrete comment. Be honest and straight to the point.
+
+**Comment quality matters.** Vague comments ("good docs", "didn't work") waste maintainer time. State exactly what was correct or what was wrong, with specifics: endpoint names, parameter mismatches, version numbers, missing sections.
+
+```
+chub_feedback({ id: "stripe/api", vote: "up", label: "accurate", comment: "PaymentIntents create/confirm flow matches v2024-12 API. Python examples run without modification." })
+chub_feedback({ id: "openai/chat", vote: "down", label: "outdated", comment: "Documents gpt-4o as latest model but gpt-5.4 is current. Structured outputs section missing the 'strict' parameter added in 2025." })
+chub_feedback({ id: "anthropic/sdk", vote: "down", label: "incomplete", comment: "No coverage of streaming tool_use responses. Only shows non-streaming examples." })
+chub_feedback({ id: "fastapi/docs", vote: "up", label: "good-examples", comment: "Dependency injection examples cover all three scopes (request, session, app). Error handling patterns are production-ready." })
+```
+
+Available labels:
+
+| Positive | Negative |
+|----------|----------|
+| `accurate`, `well-structured`, `helpful`, `good-examples` | `outdated`, `inaccurate`, `incomplete`, `wrong-examples`, `wrong-version`, `poorly-structured` |
+
+**When to downvote:** wrong model names, deprecated endpoints, missing parameters, incorrect auth flows, code examples that fail, version mismatches between docs and current API. Always include what is wrong and what the correct state is.
+
+**Visibility requirement.** Feedback is sent to an external service (context-hub). After submitting, **always report what was sent** to the user in a visible block:
+
+```
+[CHUB FEEDBACK SENT] stripe/api — UP (accurate)
+"PaymentIntents create/confirm flow matches v2024-12 API. Python examples run without modification."
+```
+
+```
+[CHUB FEEDBACK SENT] openai/chat — DOWN (outdated)
+"Documents gpt-4o as latest model but gpt-5.4 is current. Structured outputs section missing the 'strict' parameter added in 2025."
+```
+
+Never send feedback silently. The user must see every rating submitted to a third-party system.
+
 ## Retrieval: CLI Fallback
 
-When MCP tools are not available (server not configured, running in a context without MCP), use the CLI via Bash. All commands disable telemetry via environment variables.
+When MCP tools are not available (server not configured, running in a context without MCP), use the CLI via Bash. All commands disable telemetry (`CHUB_TELEMETRY=0`) and enable feedback (`CHUB_FEEDBACK=1`).
 
 ### Search
 
 ```bash
-CHUB_TELEMETRY=0 CHUB_FEEDBACK=0 chub search "<library>" --json
+CHUB_TELEMETRY=0 CHUB_FEEDBACK=1 chub search "<library>" --json
 ```
+
+`chub search` with no query lists all available entries.
 
 ### Fetch
 
 ```bash
-CHUB_TELEMETRY=0 CHUB_FEEDBACK=0 chub get <author/entry-id> --lang <language>
+CHUB_TELEMETRY=0 CHUB_FEEDBACK=1 chub get <author/entry-id> --lang <language>
 ```
 
 ### Fetch to File (for large docs)
 
 ```bash
-CHUB_TELEMETRY=0 CHUB_FEEDBACK=0 chub get <author/entry-id> -o tmp/api-docs/
+CHUB_TELEMETRY=0 CHUB_FEEDBACK=1 chub get <author/entry-id> -o tmp/api-docs/
 ```
 
 Then read only the relevant sections using the Read tool.
@@ -124,8 +161,34 @@ Then read only the relevant sections using the Read tool.
 ### Annotate
 
 ```bash
-CHUB_TELEMETRY=0 CHUB_FEEDBACK=0 chub annotate <author/entry-id> "<note>"
+CHUB_TELEMETRY=0 CHUB_FEEDBACK=1 chub annotate <author/entry-id> "<note>"
 ```
+
+List existing annotations:
+
+```bash
+CHUB_TELEMETRY=0 CHUB_FEEDBACK=1 chub annotate --list
+```
+
+### Feedback
+
+```bash
+CHUB_TELEMETRY=0 CHUB_FEEDBACK=1 chub feedback <author/entry-id> up --label accurate "PaymentIntents flow matches v2024-12 API, Python examples run clean"
+CHUB_TELEMETRY=0 CHUB_FEEDBACK=1 chub feedback <author/entry-id> down --label outdated "Documents gpt-4o as latest but gpt-5.4 is current, missing strict param in structured outputs"
+```
+
+### Quick Reference
+
+| Goal | MCP tool | CLI equivalent |
+|------|----------|----------------|
+| Find a doc | `chub_search({ query: "stripe" })` | `chub search "stripe" --json` |
+| List all docs | `chub_list()` | `chub search` (no query) |
+| Fetch Python docs | `chub_get({ id: "stripe/api", language: "python" })` | `chub get stripe/api --lang py` |
+| Fetch specific file | `chub_get({ id: "stripe/api", file: "references/webhooks.md" })` | `chub get stripe/api --file references/webhooks.md` |
+| Save to file | N/A (MCP returns content directly) | `chub get stripe/api -o docs.md` |
+| Save a note | `chub_annotate({ id: "stripe/api", note: "..." })` | `chub annotate stripe/api "..."` |
+| List notes | N/A | `chub annotate --list` |
+| Rate a doc | `chub_feedback({ id: "stripe/api", vote: "up" })` | `chub feedback stripe/api up` |
 
 ## Fallback Hierarchy
 

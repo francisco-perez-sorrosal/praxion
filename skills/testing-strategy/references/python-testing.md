@@ -2,7 +2,7 @@
 
 Advanced pytest patterns, fixture architecture, property-based testing, and plugin ecosystem. Reference material for the [Testing Strategy](../SKILL.md) skill.
 
-**Important**: Always invoke pytest through the project's package manager — never bare `pytest`. Detect the runner from project config: `pixi run pytest` (if `pixi.toml` or `[tool.pixi]`), `uv run pytest` (if `uv.lock` or `[tool.uv]`), or `python -m pytest` (fallback). Commands in this reference use `<runner> pytest` as placeholder — substitute with the actual project runner.
+**Runner awareness**: When the project uses a package or environment manager, invoke pytest through it — `pixi run pytest` (if `pixi.toml` or `[tool.pixi]`), `uv run pytest` (if `uv.lock` or `[tool.uv]`). If no runner is detected, bare `pytest` or `python -m pytest` is fine. Commands in this reference use `<runner> pytest` as placeholder — substitute with the project's actual runner or omit the prefix if none is configured.
 
 ## pytest Fundamentals
 

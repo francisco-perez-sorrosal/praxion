@@ -157,9 +157,9 @@ Review LEARNINGS.md and determine destination:
 | Technical debt | Issue tracker or CLAUDE.md | Track future improvements |
 | Domain knowledge | Project docs | Update relevant documentation |
 
-### 3. Verify Decision Log Consistency
+### 3. Verify ADR Consistency
 
-- Verify that `.ai-state/decisions.jsonl` entries covering the feature period are consistent with the decisions merged from `LEARNINGS.md`. Check for decisions in the log that were not merged (may indicate undocumented decisions caught by the hook), and decisions merged but missing from the log (may indicate the write protocol was not followed).
+- Verify that ADR files in `.ai-state/decisions/` covering the feature period are consistent with the decisions merged from `LEARNINGS.md`. Check for decisions in LEARNINGS.md that lack corresponding ADR files (may indicate the ADR creation protocol was not followed), and ADR files without corresponding LEARNINGS.md entries (unusual but not necessarily an error).
 
 ### 4. Delete Documents
 

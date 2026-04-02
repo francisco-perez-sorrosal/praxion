@@ -11,7 +11,7 @@ Back-link: [Context Security Review Skill](../SKILL.md)
 | `send_event.py` | SessionStart, Stop, SubagentStart, SubagentStop, PostToolUse, PostToolUseFailure | stdin (JSON payload) | None (files) | localhost only (Chronograph HTTP) | Fail-open (exit 0) |
 | `commit_gate.sh` | PreToolUse (Bash) | stdin (JSON payload) | None | None | Fail-open (exit 0) |
 | `check_code_quality.py` | PreToolUse (Bash, commit-gated) | stdin, staged files via `git diff` | Staged files via `git add` | None | Fail-open (exit 0), blocks on unfixable violations (exit 2) |
-| `extract_decisions.py` | PreToolUse (Bash, commit-gated) | stdin (JSON payload) | `.ai-state/decisions.jsonl` (via decision-tracker) | Anthropic API (via decision-tracker) | Fail-open (exit 0) |
+| `adr_reminder.py` | PreToolUse (Bash, commit-gated) | stdin (JSON payload), `.ai-state/decisions/` (file listing) | None | None | Fail-open (exit 0) |
 | `format_python.py` | PostToolUse (Write\|Edit) | stdin, target Python file | Target Python file (formatted) | None | Fail-open (exit 0) |
 | `precompact_state.py` | PreCompact | stdin, `.ai-work/` pipeline docs | `.ai-work/PIPELINE_STATE.md` | None | Fail-open (exit 0) |
 
@@ -85,28 +85,27 @@ Back-link: [Context Security Review Skill](../SKILL.md)
 - Never blocks commits due to its own internal errors (bare except, exit 0)
 - Only blocks commits (exit 2) when unfixable ruff violations remain
 
-### `extract_decisions.py`
+### `adr_reminder.py`
 
-**Purpose**: Extract architectural/implementation decisions from the conversation context at commit time. Delegates to the `decision-tracker` package.
+**Purpose**: Emit a warning when architectural files are committed without a corresponding ADR file dated today. Nudges agents to document decisions as ADR files.
 
 **Reads**:
 - stdin: JSON hook payload (includes command string)
-- Environment: `CLAUDE_PLUGIN_ROOT` (to locate decision-tracker)
+- `.ai-state/decisions/` directory listing (checks for ADR files with today's date in frontmatter)
+- Staged file list via `git diff --cached --name-only`
 
 **Writes**:
-- `.ai-state/decisions.jsonl` (via decision-tracker subprocess)
-- stderr (diagnostic messages)
+- stderr (warning message when no matching ADR found)
 
 **External contact**:
-- **Anthropic API** (via the decision-tracker's `anthropic` SDK) -- sends git diff and conversation context for LLM-based decision extraction
-- Requires `ANTHROPIC_API_KEY` in environment
+- None
 
 **Guarantees NOT to do**:
-- Never contacts any endpoint other than Anthropic's API
-- Never stores or logs the API key
-- Never modifies source code files
-- Never blocks commits due to extraction failure (fail-open)
-- Skips entirely if `uv` or `ANTHROPIC_API_KEY` is not available
+- Never contacts any network endpoint
+- Never writes to the filesystem (read-only check)
+- Never modifies source code or ADR files
+- Never blocks commits (exit 0 unconditionally)
+- Never requires any API keys or external dependencies
 
 ### `format_python.py`
 

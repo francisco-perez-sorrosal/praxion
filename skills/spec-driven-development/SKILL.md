@@ -133,7 +133,7 @@ This structure enables:
 
 Trivial and small tasks use freeform decision notes -- the structured format adds value only when decisions are complex enough to have alternatives worth recording.
 
-Decisions captured in this format are also recorded to `.ai-state/decisions.jsonl` via the `decision-tracker write` CLI. The human-readable format in LEARNINGS.md and the machine-readable format in `decisions.jsonl` coexist -- LEARNINGS.md is the authoring surface, `decisions.jsonl` is the persistent audit log. See the [decision-tracking rule](../../rules/swe/decision-tracking.md) for the JSONL schema.
+Decision-making agents (systems-architect, implementation-planner) also create an ADR file in `.ai-state/decisions/` following the [adr-conventions rule](../../rules/swe/adr-conventions.md). The human-readable format in LEARNINGS.md and the persistent ADR file coexist -- LEARNINGS.md is the ephemeral authoring surface, the ADR file is the permanent record.
 
 ## Spec Archival
 

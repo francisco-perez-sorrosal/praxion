@@ -128,7 +128,7 @@ Accidental or intentional exposure of secrets, credentials, or sensitive data th
 - API keys hardcoded in source files or configuration
 - `.env` files committed to the repository
 - Secrets in memory storage (`.ai-state/memory.json`) committed to git
-- Conversation transcripts in `decisions.jsonl` containing sensitive information
+- Sensitive information in ADR files committed to `.ai-state/decisions/`
 
 **What to look for:**
 - Strings matching known secret patterns (see [secret patterns catalog](references/secret-patterns.md))

@@ -13,6 +13,7 @@ Comprehensive guidance for Python development following pragmatic, production-re
 
 - [references/testing-and-tooling.md](references/testing-and-tooling.md) -- pytest patterns, pyproject.toml config, pre-commit setup
 - [references/patterns-and-examples.md](references/patterns-and-examples.md) -- dataclasses, Pydantic, protocols, context managers, pattern matching, async, error handling
+- For advanced pytest strategy (conftest architecture, hypothesis, fixture composition, coverage philosophy), see the [testing-strategy](../testing-strategy/SKILL.md) skill
 
 ## Gotchas
 

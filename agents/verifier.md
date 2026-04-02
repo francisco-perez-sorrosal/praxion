@@ -9,7 +9,7 @@ description: >
   committing results.
 tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit
-skills: [code-review]
+skills: [code-review, context-security-review]
 permissionMode: default
 memory: user
 maxTurns: 40
@@ -108,6 +108,23 @@ Convention checks (derived from `coding-style` rule):
 - Immutability (prefer immutable patterns)
 - Naming (descriptive, intention-revealing)
 - Code organization (modular, no catch-all utils)
+
+### Phase 4.5 -- Security Review (when context-security-review skill is loaded)
+
+When the `context-security-review` skill is available, perform a security review in **diff mode** scoped to the current change set:
+
+1. Get the list of changed files from the implementation plan's `Files` fields or `git diff --name-only` against the base branch
+2. Filter to files matching security-critical paths from the skill's checklist
+3. For each matching file, apply the vulnerability category assessment from the skill
+4. Classify findings using the existing PASS/WARN/FAIL format with a `[Security: <Category>]` tag:
+   - **FAIL**: Permission escalation, new unscoped Bash, hook exfiltration vector, secret exposure
+   - **WARN**: New dependency, CLAUDE.md change with legitimate justification, broadened tool permissions
+   - **PASS**: No security-relevant changes, or changes with clear security justification
+5. Add findings to the Security Review section of VERIFICATION_REPORT.md
+
+SCOPE: Only files in the current change set. Never scan the full project -- that is the `/full-security-scan` command's domain.
+
+Skip this phase if the `context-security-review` skill is not loaded.
 
 ### Phase 5 -- Test Coverage Assessment
 

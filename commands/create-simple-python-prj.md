@@ -1,7 +1,7 @@
 ---
 description: Create a basic Python project with pixi or uv package manager
 argument-hint: [project-name] [description] [package-manager] [target-dir]
-allowed-tools: [Bash, Write, Read, Edit]
+allowed-tools: [Bash(uv:*), Bash(pixi:*), Bash(git:*), Bash(mkdir:*), Bash(ls:*), Bash(touch:*), Write, Read, Edit]
 ---
 
 # Create Simple Python Project

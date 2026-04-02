@@ -1,7 +1,7 @@
 ---
 description: Bump version, update changelog, and create a release tag
 argument-hint: [dev|patch|minor|major]
-allowed-tools: [Bash, Read, Grep, Glob]
+allowed-tools: [Bash(cz:*), Bash(git:*), Bash(gh:*), Bash(pip:*), Read, Grep, Glob]
 ---
 
 Bump the project version, generate a changelog entry, and create a release tag using the **versioning** skill. The command detects the active versioning tool automatically -- it does not hardcode tool-specific commands.

@@ -20,3 +20,8 @@ __pycache__/
 
 # User-specific local settings
 **/.claude/settings.local.json
+
+# Environment files (secrets)
+.env
+.env.*
+.env.local

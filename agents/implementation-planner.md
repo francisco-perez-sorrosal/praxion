@@ -44,7 +44,8 @@ Determine what you have to work with. The **task slug** (provided in your prompt
 3. **Check for RESEARCH_FINDINGS.md** — read for codebase context and technical details
 4. **Check for CONTEXT_REVIEW.md** — if present, read the accumulated context engineering review (research-stage and architecture-stage sections) for artifact dependency ordering, placement recommendations, and spec compliance notes
 5. **Check for existing IMPLEMENTATION_PLAN.md / WIP.md / LEARNINGS.md** — you may be resuming, not starting fresh
-6. **Verify the architecture is sufficient** — you need enough design detail to decompose into steps
+6. **Check past decisions** — read `.ai-state/decisions/DECISIONS_INDEX.md` for prior ADRs whose `affected_files` or `tags` overlap with the current task. Prior decisions may constrain decomposition choices (e.g., a past decision to use a specific tool or pattern). Read the full ADR files for relevant matches.
+7. **Verify the architecture is sufficient** — you need enough design detail to decompose into steps
 
 If `SYSTEMS_PLAN.md` does not exist or lacks architecture sections, recommend invoking the systems-architect agent first. If `RESEARCH_FINDINGS.md` is missing and the task is complex, recommend invoking the researcher agent first.
 

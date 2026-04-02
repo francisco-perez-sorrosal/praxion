@@ -60,7 +60,7 @@ Consume all available learning sources in priority order. Skip any source that d
 4. **VERIFICATION_REPORT.md** (`.ai-work/<task-slug>/`) -- recurring quality patterns
 5. **Latest SENTINEL_REPORT_*.md** (`.ai-state/`) -- ecosystem patterns and recurring findings
 6. **Latest IDEA_LEDGER_*.md** (`.ai-state/`) -- avoid re-proposing implemented or discarded ideas
-7. **ADR files** (`.ai-state/decisions/`) -- structured Architecture Decision Records. Recurring decision patterns across multiple features (same category, similar rationale) are candidates for rule or skill formalization.
+7. **ADR files** -- read `.ai-state/decisions/DECISIONS_INDEX.md` for a scannable overview. Recurring decision patterns across multiple features (same category, similar rationale in the summary column) are candidates for rule or skill formalization. Read the full ADR files for promising matches.
 
 For each source, extract discrete learning items. A learning item is a pattern, gotcha, convention, workflow, decision rationale, or recurring issue that appears actionable and reusable beyond its original context.
 
@@ -74,7 +74,7 @@ For each extracted learning item, check whether it is already captured by an exi
 2. **Rules** -- read `rules/**/*.md`. Does an existing rule encode this knowledge?
 3. **CLAUDE.md** -- is this already documented as a project convention?
 4. **Memory entries** -- is this already stored and serving its purpose as memory?
-5. **ADR files** -- check `.ai-state/decisions/` for decisions that have already been captured as rules, skills, or memory entries to avoid proposing artifacts that duplicate existing knowledge.
+5. **ADR files** -- read `.ai-state/decisions/DECISIONS_INDEX.md` to check if the learning item overlaps with an existing decision. Read the full ADR for matches to verify coverage.
 
 Discard items already covered. Flag items that partially overlap but extend existing artifacts -- these become "update existing artifact" proposals rather than "create new artifact" proposals.
 

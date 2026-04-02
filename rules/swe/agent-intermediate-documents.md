@@ -28,6 +28,7 @@ Agent documents live in two locations based on their lifecycle:
 
 - Dot-prefixed — hidden by default in file browsers and `ls`
 - **Task-scoped** — each pipeline run operates in its own `<task-slug>/` subdirectory, preventing collisions between concurrent pipelines
+- **Worktree-scoped** — `.ai-work/` is gitignored, so each worktree has its own independent copy. When the main agent uses `EnterWorktree` for Standard/Full tiers (see [coordination protocol](swe-agent-coordination-protocol.md#pipeline-isolation)), the pipeline's `.ai-work/` lives inside the worktree, fully isolated from other sessions
 - Created on first use — agents create `.ai-work/<task-slug>/` when writing their first document
 
 Scope: **exclusively for agent coordination pipeline documents** — the outputs defined in the [SWE agent coordination protocol](swe-agent-coordination-protocol.md) rule.
@@ -71,6 +72,7 @@ This scoping prevents collisions when multiple pipelines or multiple instances o
 ```
 
 - Committed to git — versioned, shareable, accumulates value over time
+- **Worktree-aware** — when a pipeline operates in a worktree, `.ai-state/` changes are committed on the pipeline branch and reconciled at merge time (see [.ai-state/ Reconciliation](../../skills/software-planning/references/agent-pipeline-details.md#ai-state-reconciliation-for-worktree-merges))
 - Created on first use — agents create `.ai-state/` when writing their first persistent document
 
 `IDEA_LEDGER_*.md` — promethean's timestamped ideation records (sentinel baseline, implemented/pending/discarded ideas, future paths). Each run carries forward all previous entries.

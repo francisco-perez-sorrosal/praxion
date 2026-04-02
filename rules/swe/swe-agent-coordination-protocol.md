@@ -21,6 +21,32 @@ Assess the task before starting work. Each tier prescribes what to do — higher
 - The SDD skill's [complexity triage](../../skills/spec-driven-development/SKILL.md#complexity-triage) refines specification depth within Standard and Full tiers.
 - For structured calibration with signal scoring, see the SDD skill's [calibration procedure](../../skills/spec-driven-development/references/calibration-procedure.md).
 
+### Pipeline Isolation
+
+Standard and Full tier pipelines **must** operate in a dedicated worktree to prevent collisions when multiple pipelines run concurrently on the same repository.
+
+**Isolation by tier:**
+
+| Tier | Isolation |
+|------|-----------|
+| Direct, Lightweight, Spike | None — work in the current checkout |
+| Standard, Full | Worktree — main agent calls `EnterWorktree` before spawning any agent |
+
+**At pipeline start** (immediately after tier selection and task slug generation):
+
+1. Call `EnterWorktree` with `name: "<task-slug>"` — creates a worktree and switches the session into it
+2. All subsequent work (`.ai-work/`, `.ai-state/`, code changes) happens inside the worktree
+3. Parallel file-modifying agents (implementer + test-engineer + doc-engineer) additionally use `isolation: "worktree"` on the Agent tool for intra-pipeline isolation
+
+**At pipeline end:**
+
+1. Verify all `.ai-state/` artifacts (ADRs, specs, calibration log) are committed — no untracked stragglers
+2. Commit all remaining changes in the worktree branch
+3. Call `ExitWorktree` with `action: "keep"` — preserves the branch for user review and merge
+4. Report branch name + `.ai-state/` artifact summary + merge notes to the user
+
+See [agent-pipeline-details.md](../../skills/software-planning/references/agent-pipeline-details.md#pipeline-worktree-lifecycle) for the full lifecycle, merge procedure, and multi-instance guidance.
+
 ### Available Agents
 
 | Agent | Purpose | Output | Bg Safe |
@@ -54,7 +80,7 @@ Spawn agents without waiting for the user to ask:
 
 **Multiplicity check:** Before spawning any Bg Safe agent, check whether the work decomposes into N independent targets with disjoint file sets. If so, spawn N instances (up to 2-3 concurrent) rather than one sequential agent. Each instance receives the same task slug — they share a task-scoped directory and use fragment files to avoid collisions (see [agent-intermediate-documents](agent-intermediate-documents.md)).
 
-**Task slug propagation:** At pipeline start, the main agent generates a kebab-case task slug (2–4 words) derived from the task description. Every subagent prompt must include `Task slug: <slug>`. All `.ai-work/` reads and writes use `.ai-work/<task-slug>/`. The slug never changes mid-pipeline. See the [task slug convention](agent-intermediate-documents.md#task-slug-convention) for naming guidelines.
+**Task slug propagation:** At pipeline start, the main agent generates a kebab-case task slug (2–4 words) derived from the task description. For Standard/Full tiers, the slug also names the worktree (see [Pipeline Isolation](#pipeline-isolation)). Every subagent prompt must include `Task slug: <slug>`. All `.ai-work/` reads and writes use `.ai-work/<task-slug>/`. The slug never changes mid-pipeline. See the [task slug convention](agent-intermediate-documents.md#task-slug-convention) for naming guidelines.
 
 ### Coordination Pipeline
 

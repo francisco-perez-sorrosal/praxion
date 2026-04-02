@@ -68,6 +68,65 @@ Multiple instances of the same agent type can run concurrently on disjoint work 
 
 **Conflict avoidance:** Before spawning parallel instances, verify file disjointness across all work units. If an agent needs a file outside its declared set, it stops and reports `[CONFLICT]`.
 
+## Pipeline Worktree Lifecycle
+
+Standard and Full tier pipelines operate inside a dedicated worktree created by the main agent at pipeline start. This provides two levels of isolation:
+
+1. **Pipeline-level** — `EnterWorktree` switches the main agent's session into a worktree, isolating the entire pipeline (`.ai-work/`, `.ai-state/`, code) from other concurrent Claude Code sessions on the same repo
+2. **Agent-level** — parallel file-modifying agents (implementer + test-engineer + doc-engineer) use `isolation: "worktree"` on the Agent tool to avoid colliding with each other within the pipeline
+
+### Entry
+
+Immediately after tier selection and task slug generation:
+
+1. Main agent calls `EnterWorktree` with `name: "<task-slug>"`
+2. The session's working directory switches to `.claude/worktrees/<task-slug>/`
+3. A new branch is created from HEAD automatically
+4. All subsequent agent spawns, file reads/writes, and `.ai-work/<task-slug>/` operations happen inside this worktree
+
+Research-only agents (researcher, systems-architect, implementation-planner) read the codebase but produce only `.ai-work/` documents — they run inside the pipeline worktree naturally (no additional `isolation: "worktree"` needed).
+
+### During Execution
+
+- **Sequential agents** (single implementer, single test-engineer): run directly in the pipeline worktree — no agent-level isolation needed since there's no concurrency
+- **Parallel agents** (implementer + test-engineer + doc-engineer in a batch): spawn with `isolation: "worktree"` on the Agent tool to prevent intra-pipeline file collisions. After each batch completes, merge returned branches into the pipeline worktree branch
+- **`.ai-state/` writes** (ADRs, calibration log, spec archival): happen in the pipeline worktree, committed there. Git merge handles them when the pipeline branch is merged back
+
+### Exit
+
+When the pipeline completes (verifier done, or all steps marked complete):
+
+1. **Verify all `.ai-state/` artifacts are committed** — run `git status` in the worktree and confirm no untracked or modified files under `.ai-state/` (ADRs, specs, calibration log, sentinel reports). Commit any stragglers before exiting
+2. **End-of-feature archival** — if the planner performed spec archival or learnings merge, confirm those files are committed
+3. Commit all remaining changes in the pipeline worktree branch
+4. Call `ExitWorktree` with `action: "keep"` — preserves the worktree and branch on disk
+5. Report to the user:
+   - Branch name (e.g., `pipeline/<task-slug>`)
+   - Summary of `.ai-state/` artifacts created (ADR count, spec archived, calibration entry)
+   - Any merge notes (e.g., "created ADR 005 — check for sequence number collision if other pipelines also created ADRs")
+6. User reviews and merges at their discretion (via `/merge-worktree`, `git merge`, or PR), then runs the [Post-Merge Verification Checklist](#post-merge-verification-checklist)
+
+If the pipeline is abandoned:
+
+1. Call `ExitWorktree` with `action: "remove"` (confirm with user if uncommitted changes exist)
+2. Note: `.ai-state/` changes on the abandoned branch are lost unless the user explicitly cherry-picks them
+
+### Multi-Instance Guidance
+
+When running multiple Claude Code sessions concurrently on the same repository:
+
+- Each session that starts a Standard/Full pipeline enters its own worktree via `EnterWorktree`
+- Worktree names are unique (derived from task slugs), so sessions never collide
+- `.ai-work/` is gitignored — each worktree has its own independent copy, no cross-session bleed
+- `.ai-state/` is committed per-branch — git merge reconciles at merge time (see [.ai-state/ Reconciliation](#ai-state-reconciliation-for-worktree-merges) below)
+- The `ccwt` script (`scripts/ccwt`) can launch tmux sessions with one pane per worktree for monitoring
+
+### When Not to Isolate
+
+- **Direct and Lightweight tiers**: low collision risk, few files, short duration — work directly in the current checkout
+- **Spike tier**: read-only exploration, no file modifications — no isolation needed
+- **Sentinel runs**: read-only audits — run from any checkout without isolation
+
 ## Multi-Perspective Analysis
 
 For high-risk decisions, use parallel agents with distinct lenses: **correctness** (requirements satisfied?), **security** (vulnerabilities introduced?), **performance** (bottlenecks?), **maintainability** (evolvable?). Reserve for decisions with significant blast radius; most tasks need only the standard pipeline.
@@ -194,11 +253,44 @@ Append-only. Entries in chronological order by timestamp.
 
 ### .ai-state/ Reconciliation for Worktree Merges
 
-When worktree branches are merged, `.ai-state/` documents are subject to git merge semantics. Most avoid conflicts by design (timestamped filenames), but two cases need attention:
+`.ai-state/` is committed to git, so its contents survive worktree merges via normal git merge semantics. Most artifacts avoid conflicts by design, but concurrent pipelines can produce overlapping writes. The table below covers every `.ai-state/` artifact:
 
-- **SENTINEL_LOG.md** — append-only table. If merge conflicts arise, resolve by keeping both entries in timestamp order. Git usually auto-merges concurrent appends.
-- **IDEA_LEDGER_\*.md** — each promethean run creates a timestamped file carrying forward previous entries. If two worktrees both run promethean, the later ledger may miss the earlier's new entries. Create a reconciled ledger with suffix `_reconciled` containing the union of both.
-- **specs/** — unique feature-name filenames. No reconciliation needed -- git merge handles distinct file additions natively.
+| Artifact | Conflict risk | Reconciliation |
+|----------|--------------|----------------|
+| `decisions/<NNN>-<slug>.md` | Low — unique sequence numbers, but two worktrees may pick the same NNN | After merge, scan for duplicate sequence numbers. Renumber the later ADR and update its `id` field. Regenerate `DECISIONS_INDEX.md` |
+| `decisions/DECISIONS_INDEX.md` | Medium — both worktrees regenerate the full index | Discard both versions and regenerate from all ADR files: `python scripts/regenerate_adr_index.py` or rebuild manually |
+| `calibration_log.md` | Low — append-only | Keep both entries in timestamp order. Git usually auto-merges concurrent appends. If conflict, concatenate and re-sort by timestamp |
+| `SENTINEL_LOG.md` | Medium — append-only index referencing report files | After merge: (1) keep both entries, (2) re-sort all rows by timestamp, (3) verify every `Report File` cell points to an existing `SENTINEL_REPORT_*.md` — delete orphan rows, add missing rows for reports present on disk but absent from the log |
+| `SENTINEL_REPORT_*.md` | None — timestamped filenames are unique | Git merge handles distinct file additions natively |
+| `IDEA_LEDGER_*.md` | Medium — each promethean run carries forward previous entries | If two worktrees both run promethean, the later ledger may miss the earlier's new entries. Create a reconciled ledger with suffix `_reconciled` containing the union of both |
+| `specs/SPEC_*.md` | None — unique feature-name + date filenames | Git merge handles distinct file additions natively |
+
+**General principle:** timestamped or uniquely-named files merge cleanly. Append-only logs need chronological ordering. Generated indexes should be regenerated from source files rather than merged textually.
+
+### Non-.ai-state/ Artifacts with Special Merge Concerns
+
+Beyond `.ai-state/`, pipelines modify project files that are committed to git. Most merge via standard git semantics, but these require extra attention:
+
+| Artifact | Who modifies | Conflict risk | Reconciliation |
+|----------|-------------|--------------|----------------|
+| `.claude-plugin/plugin.json` | context-engineer (registers new skills/agents/commands) | High — JSON doesn't merge well with line-based git merge; concurrent additions break syntax | After merge, validate JSON syntax (`python -m json.tool plugin.json`). If both branches added entries to the same array, manually combine. Re-validate against plugin schema |
+| `CLAUDE.md` (project root) | context-engineer, promethean (Structure section) | Medium — multiple sections may be edited concurrently | Merge by section. If conflict in Structure section, regenerate from filesystem scan rather than merging textually |
+| `README.md` / architecture docs | doc-engineer | Low — typically different sections per pipeline | Standard git merge. If both pipelines modified the same section, prefer the later change and verify coherence |
+| `.github/workflows/*.yml` | cicd-engineer | Medium — YAML indentation-sensitive; concurrent edits to the same workflow file break syntax | After merge, validate YAML syntax. If both branches modified the same workflow, verify step ordering and job dependencies |
+
+### Post-Merge Verification Checklist
+
+After merging a pipeline worktree branch back into the target branch, run this checklist to confirm nothing was lost:
+
+1. **`.ai-state/` referential integrity**
+   - Every `SENTINEL_LOG.md` row points to an existing `SENTINEL_REPORT_*.md` file
+   - Every ADR `id` field matches its filename number — no duplicate NNNs
+   - `DECISIONS_INDEX.md` lists every ADR file in `decisions/` (regenerate if needed)
+2. **Registered artifacts** — if context-engineer added skills/agents/commands, verify they appear in `.claude-plugin/plugin.json` and the referenced files exist
+3. **Append-only logs** — `calibration_log.md` and `SENTINEL_LOG.md` entries are in chronological order
+4. **Spec archival** — if the pipeline completed a feature, verify `SPEC_<name>_*.md` exists in `.ai-state/specs/` and cross-references the correct ADR files
+5. **No orphan ADRs** — every ADR with `supersedes` has the corresponding old ADR marked `superseded_by` and status `superseded`
+6. **JSON/YAML validity** — `plugin.json` parses cleanly; workflow files pass syntax check
 
 ### Post-Worktree .ai-work/ State Reconciliation
 

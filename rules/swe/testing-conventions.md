@@ -98,3 +98,26 @@ Tests leave no trace -- no temporary files, database records, environment variab
 - Use context managers (`with`) or teardown fixtures for resource cleanup
 - Prefer `tmp_path` and scoped fixtures over manual file creation and deletion
 - Global state modifications (environment variables, module-level caches) must be reverted in teardown, not left for other tests to inherit
+
+### No Commented-Out Tests
+
+Never commit commented-out or skipped-without-reason tests. A disabled test is invisible debt.
+
+- Commented-out test code must be deleted, not preserved
+- `@pytest.mark.skip` and `@xfail` require a reason string explaining when the skip can be removed
+- If a test is no longer relevant, delete it — version control is the history
+
+### Assertion Messages
+
+Include assertion messages when the failure output alone would be ambiguous.
+
+- Not needed for simple equality checks (`assert result == 42` is self-explanatory)
+- Required when asserting on opaque booleans, container membership, or complex conditions where the default failure message does not explain what went wrong
+
+### Test File Organization
+
+Test files mirror the source structure they test.
+
+- `src/module/handler.py` → `tests/module/test_handler.py`
+- Shared fixtures live in `conftest.py` at the appropriate scope level (directory-level for shared, root-level for global)
+- Test utilities and custom assertions live in `tests/helpers/` or `tests/utils/`, never in production code

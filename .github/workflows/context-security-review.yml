@@ -14,7 +14,8 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  actions: read  # needed for artifact URL access
+  actions: read    # needed for artifact URL access
+  id-token: write  # required by claude-code-action for OIDC authentication
 
 jobs:
   context-security-review:

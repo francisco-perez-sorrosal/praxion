@@ -20,7 +20,7 @@ Scan the behavioral specification for REQ IDs and report which have tests, imple
 4. **Scan for implementations**: For each REQ-NN, search non-test source files for patterns:
    - `REQ-{NN}` in comments
    - Function/class names matching the requirement's behavioral description (best-effort heuristic)
-   - Files referenced in `decisions.jsonl` entries with matching `affected_reqs` (if the file exists)
+   - Files referenced in ADR files in `.ai-state/decisions/` with matching `affected_reqs` frontmatter (if any exist)
 
 5. **Output the coverage table**:
 

@@ -113,4 +113,4 @@ The pipeline scales to task complexity. Not every task needs twelve agents:
 
 The guiding principle: process overhead cannot be reclaimed. Default to the lighter option when uncertain -- process can always be added later.
 
-For the full spec-driven development methodology, see [Spec-Driven Development](spec-driven-development.md). For the decision audit trail, see [Decision Tracking](decision-tracking.md).
+For the full spec-driven development methodology, see [Spec-Driven Development](spec-driven-development.md). For the decision audit trail using Architecture Decision Records, see [Decision Tracking](decision-tracking.md).

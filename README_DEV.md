@@ -67,7 +67,7 @@ rules/                               # Rules (installed to ~/.claude/rules/ or .
 ├── swe/
 │   ├── agent-intermediate-documents.md
 │   ├── coding-style.md
-│   ├── decision-tracking.md
+│   ├── adr-conventions.md
 │   ├── swe-agent-coordination-protocol.md
 │   └── vcs/
 │       └── git-conventions.md
@@ -82,7 +82,7 @@ rules/                               # Rules (installed to ~/.claude/rules/ or .
     ├── send_event.py
     ├── precompact_state.py
     ├── format_python.py
-    ├── extract_decisions.py
+    ├── adr_reminder.py
     ├── check_code_quality.py
     └── commit_gate.sh
 claude/config/                       # Claude personal config (symlinked to ~/.claude/)
@@ -103,11 +103,12 @@ scripts/                             # Utility scripts
 ├── CLAUDE.md                        # Script conventions (lazy loaded)
 ├── ccwt                             # Multi-worktree Claude session launcher
 ├── chronograph-ctl                  # Task Chronograph dev helper (start/stop/status)
-└── phoenix-ctl                      # Phoenix observability daemon manager
+├── phoenix-ctl                      # Phoenix observability daemon manager
+└── regenerate_adr_index.py          # Regenerate DECISIONS_INDEX.md from ADR files
 docs/                                # Cross-cutting documentation
 ├── concepts.md
 ├── cursor-compat.md
-├── decision-tracking.md
+├── decision-tracking.md              # Content updated to describe ADR system
 ├── external-api-docs.md
 ├── getting-started.md
 ├── observability.md
@@ -118,8 +119,13 @@ task-chronograph-mcp/                # Pipeline observability MCP server
 memory-mcp/                          # Persistent memory MCP server
 ├── CLAUDE.md                        # MCP server dev conventions (lazy loaded)
 └── ...
-decision-tracker/                    # Decision extraction CLI utility
-├── CLAUDE.md                        # CLI tool dev conventions (lazy loaded)
+.ai-state/                           # Persistent project intelligence (committed to git)
+├── decisions/                       # Architecture Decision Records (ADR files)
+│   ├── 001-skill-wrapper-over-mcp-server.md
+│   ├── ...
+│   └── DECISIONS_INDEX.md           # Auto-generated summary table
+├── SENTINEL_REPORT_*.md
+├── SENTINEL_LOG.md
 └── ...
 install.sh                           # Installer router
 install_claude.sh                    # Claude Code / Desktop installer

@@ -209,7 +209,7 @@ Read the user preferences from https://raw.githubusercontent.com/francisco-perez
 
 - **[External API Docs](docs/external-api-docs.md)** -- Retrieve current, curated API documentation for external libraries (Stripe, OpenAI, AWS, etc.) during development. Setup guide, workflow examples, and the annotation learning loop.
 - **[Spec-Driven Development](docs/spec-driven-development.md)** -- Behavioral specifications with requirement IDs for medium/large features. The pipeline scales proportionally: small tasks skip specs; substantive features get full traceability.
-- **[Decision Tracking](docs/decision-tracking.md)** -- Machine-readable audit log of decisions from AI-assisted sessions. Dual-path capture (agents write directly + commit-time hook safety net) with tier-aware gating.
+- **[Decision Tracking](docs/decision-tracking.md)** -- Architecture Decision Records (ADRs) in `.ai-state/decisions/` capture decisions from AI-assisted sessions. Agents write structured Markdown files with YAML frontmatter, with a lightweight reminder hook for architectural commits.
 - **[Claude Code vs Cursor](docs/cursor-compat.md)** -- Format differences, discovery paths, and adaptation details for each tool.
 - **[Core Concepts](docs/concepts.md)** -- Deep explanation of the building blocks, the layered architecture, and the agent pipeline.
 

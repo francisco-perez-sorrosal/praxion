@@ -5,7 +5,6 @@ version_files = [
     ".claude-plugin/plugin.json:version",
     "memory-mcp/pyproject.toml:version",
     "task-chronograph-mcp/pyproject.toml:version",
-    "decision-tracker/pyproject.toml:version",
 ]
 tag_format = "v$version"
 update_changelog_on_bump = true

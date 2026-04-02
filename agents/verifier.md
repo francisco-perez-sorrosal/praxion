@@ -83,7 +83,7 @@ When `SYSTEMS_PLAN.md` contains a `## Behavioral Specification` section with REQ
 
 When `SPEC_DELTA.md` exists alongside the behavioral specification, add a `## Delta Validation` subsection after the traceability matrix. Compare the new traceability matrix against the prior spec's matrix (referenced in the delta's header). Verify: added requirements have new tests, modified requirements have updated tests, removed requirements have no orphaned tests. Classify each delta claim as CONFIRMED (evidence matches) or UNCONFIRMED (evidence missing or contradicts the claim).
 
-**Decision log cross-reference (optional):** If `.ai-state/decisions.jsonl` exists and the feature has REQ IDs, verify that decisions with `affected_reqs` fields reference real REQ IDs from the behavioral specification. Flag mismatches as WARN findings -- the decision may reference outdated or incorrect requirement IDs.
+**Decision log cross-reference (optional):** If `.ai-state/decisions/` contains ADR files and the feature has REQ IDs, verify that ADRs with `affected_reqs` in their frontmatter reference real REQ IDs from the behavioral specification. Flag mismatches as WARN findings -- the ADR may reference outdated or incorrect requirement IDs.
 
 Skip this phase when no Behavioral Specification section exists in `SYSTEMS_PLAN.md`.
 

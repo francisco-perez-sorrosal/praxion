@@ -115,17 +115,6 @@ For medium/large features (when `SYSTEMS_PLAN.md` contains a `## Behavioral Spec
 
 When running concurrently (parallel mode), write to `LEARNINGS_implementer.md` instead of `LEARNINGS.md`.
 
-**Decision write protocol:** When you document a decision in `LEARNINGS.md ### Decisions Made`, also record it to the decision audit log:
-
-```
-uv run --project ${CLAUDE_PLUGIN_ROOT}/decision-tracker python -m decision_tracker write \
-  --decision "<decision text>" --category "<type>" --agent-type "implementer" \
-  [--rationale "<why>"] [--alternatives "<alt1>" "<alt2>"] \
-  [--affected-reqs "<REQ-01>"] [--affected-files "<path>"]
-```
-
-This ensures decisions have both human-readable (LEARNINGS.md) and machine-readable (`.ai-state/decisions.jsonl`) representations. See the [decision-tracking rule](../rules/swe/decision-tracking.md) for schema details.
-
 ## Collaboration Points
 
 ### With the Planner

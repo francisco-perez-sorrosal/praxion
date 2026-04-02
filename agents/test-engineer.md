@@ -180,17 +180,6 @@ You write ONLY to your own step's fields:
 
 Record: testing patterns that worked, gotchas with the test framework, flaky test risks identified, boundary conditions discovered, production code issues surfaced by tests.
 
-**Decision write protocol:** When you document a decision in `LEARNINGS.md ### Decisions Made`, also record it to the decision audit log:
-
-```
-uv run --project ${CLAUDE_PLUGIN_ROOT}/decision-tracker python -m decision_tracker write \
-  --decision "<decision text>" --category "<type>" --agent-type "test-engineer" \
-  [--rationale "<why>"] [--alternatives "<alt1>" "<alt2>"] \
-  [--affected-reqs "<REQ-01>"] [--affected-files "<path>"]
-```
-
-This ensures decisions have both human-readable (LEARNINGS.md) and machine-readable (`.ai-state/decisions.jsonl`) representations. See the [decision-tracking rule](../rules/swe/decision-tracking.md) for schema details.
-
 ### Phase 8 — Report
 
 **Spec coverage check**: When a `## Behavioral Specification` section exists in `.ai-work/<task-slug>/SYSTEMS_PLAN.md`, include a quick coverage table in your report. For each REQ-NN, grep test files for `req{NN}_` patterns and report which requirements now have tests and which still lack coverage. This gives the user immediate visibility into spec-to-test gaps without waiting for the verifier.

@@ -101,7 +101,7 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/commit_gate.sh ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/extract_decisions.py",
+            "command": "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/commit_gate.sh ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/remind_adr.py",
             "timeout": 30,
             "async": false
           }

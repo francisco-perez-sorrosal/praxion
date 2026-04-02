@@ -31,7 +31,7 @@ Future language references (e.g., `references/typescript-testing.md`, `reference
 - **Coverage theater.** Chasing a line coverage target (e.g., 90%) incentivizes testing trivial code (getters, framework glue) while ignoring complex logic that is hard to cover. Use coverage to *discover gaps*, not to set targets. Mutation testing is a better proxy for test suite quality.
 - **Testing implementation instead of behavior.** Tests that assert on internal method calls, private state, or exact SQL queries break on every refactor without catching real bugs. Test through public interfaces and assert on observable outcomes.
 - **Sleep in tests.** `time.sleep()` and wall-clock waits make tests slow and non-deterministic. Use time-freezing libraries, explicit event waits, or polling with short timeouts instead.
-- **Invoking test frameworks directly.** Never run test tools directly (e.g., bare `pytest`, `jest`). Always run through the project's package or environment manager (e.g., `pixi run pytest`, `uv run pytest`, `pnpm exec vitest`). This ensures the correct virtual environment, dependencies, and project-level configuration are active. Detect the runner from lockfiles and config before invoking tests.
+- **Ignoring the project's package manager.** When a project uses a package or environment manager (pixi, uv, pnpm, yarn, etc.), run tests through it (e.g., `pixi run pytest`, `uv run pytest`, `pnpm exec vitest`) to ensure the correct virtual environment and dependencies are active. Detect the runner from lockfiles and config (`pixi.toml`, `uv.lock`, `pnpm-lock.yaml`, etc.) before invoking tests. If no runner is detected, invoking the test tool directly is fine.
 
 ## Test Strategy Selection
 

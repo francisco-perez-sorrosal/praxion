@@ -305,32 +305,28 @@ The plugin manifest lives in `.claude-plugin/plugin.json`. Key constraints:
 
 Versioning is managed by [Commitizen](https://commitizen-tools.github.io/commitizen/) with conventional commits. The version is tracked in `pyproject.toml` and synced to `memory-mcp/pyproject.toml`, `task-chronograph-mcp/pyproject.toml`, and `.claude-plugin/plugin.json` via `version_files`.
 
-### Dev releases (default, automatic)
+### Day-to-day development
 
-Every push to `main` triggers the Release workflow, which increments the `.devN` suffix. Dev bumps are lightweight — version files only, no tags, no changelog, no GitHub release. The commit is pushed with `[skip ci]` to prevent re-triggering.
+Push to `main` with conventional commit messages (`feat:`, `fix:`, etc.). No CI runs on push — the version in `main` stays at the last stable release. Conventional commits accumulate and determine the bump level at release time.
 
-No local commands needed. Just push to `main` with conventional commit messages (`feat:`, `fix:`, etc.). The commit types accumulate and determine the version at stable release time.
-
-### Stable releases (manual, from GitHub UI)
-
-No local commands needed. Everything happens through the GitHub Actions UI:
+### Creating a release (manual, from GitHub UI)
 
 1. Go to **Actions → Release → Run workflow**
-2. Select `stable` from the release type dropdown
-3. Click **Run workflow**
+2. Click **Run workflow**
 
-Commitizen computes the proper semver bump from all conventional commits since the last stable tag, generates `CHANGELOG.md`, creates a git tag, and publishes a GitHub release. The bump level depends on commit types: `fix:` → patch, `feat:` → minor, breaking change → major.
-
-After a stable release, the next push to `main` automatically starts a new dev cycle at `<patch+1>.dev0`.
+Commitizen computes the proper semver bump from all conventional commits since the last tag, generates `CHANGELOG.md`, creates a git tag, and publishes a GitHub release. The bump level depends on commit types: `fix:` → patch, `feat:` → minor, breaking change → major.
 
 ### Version lifecycle example
 
 ```text
-0.0.1.dev0 → 0.0.1.dev1 → 0.0.1.dev2   (dev pushes)
-                              ↓
-                            0.1.0          (stable — had feat: commits)
-                              ↓
-                            0.1.1.dev0 → 0.1.1.dev1 → ...
+push fix: ...     →  (main stays at 0.0.1)
+push feat: ...    →  (main stays at 0.0.1)
+push fix: ...     →  (main stays at 0.0.1)
+  ↓ Run workflow
+0.1.0                (stable — had feat: commits, changelog generated)
+push fix: ...     →  (main stays at 0.1.0)
+  ↓ Run workflow
+0.1.1                (patch — only fix: commits since 0.1.0)
 ```
 
 ### Manual version operations

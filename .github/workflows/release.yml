@@ -1,30 +1,16 @@
-# Release workflow -- bumps version, updates changelog, tags, and creates a GitHub Release.
+# Release workflow -- manual-only stable releases via workflow_dispatch.
 #
-# Two modes:
-#   1. Auto (push to main): increments the .devN suffix (0.0.1.dev0 → 0.0.1.dev1 → ...).
-#      No tags, no changelog, no GitHub release — just a version file bump committed with
-#      [skip ci] to prevent re-triggering.
-#   2. Manual (workflow_dispatch with "stable"): lets commitizen compute the proper semver
-#      bump from conventional commits, generates CHANGELOG.md, tags, and creates a GitHub
-#      release (e.g., 0.0.1.dev5 → 0.1.0). No .devN tags exist, so changelog works cleanly.
+# Commitizen computes the proper semver bump from conventional commits since
+# the last stable tag, generates CHANGELOG.md, creates a git tag, and publishes
+# a GitHub release.
+#
+# No CI runs on push to main. Between releases, the version in main reflects
+# the last stable release.
 
 name: Release
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - "CHANGELOG.md"
   workflow_dispatch:
-    inputs:
-      release_type:
-        description: "Release type"
-        required: true
-        default: "dev"
-        type: choice
-        options:
-          - dev
-          - stable
 
 permissions:
   contents: write
@@ -53,49 +39,22 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Bump version
+      - name: Bump version and tag
         id: cz
-        continue-on-error: true
         run: |
-          RELEASE_TYPE="${{ github.event.inputs.release_type || 'dev' }}"
-          CURRENT=$(cz version --project)
-
-          if [ "$RELEASE_TYPE" = "stable" ]; then
-            # Stable: commitizen computes semver, generates changelog, commits, and tags
-            cz bump --changelog --yes 2>&1 | tee bump_output.txt
-          else
-            # Dev: increment .devN suffix, keep base version fixed
-            if echo "$CURRENT" | grep -qE '\.dev[0-9]+$'; then
-              BASE="${CURRENT%.dev*}"
-              DEV="${CURRENT##*.dev}"
-              NEXT="${BASE}.dev$((DEV + 1))"
-            else
-              # After a stable release, start next patch dev cycle
-              IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-              NEXT="${MAJOR}.${MINOR}.$((PATCH + 1)).dev0"
-            fi
-
-            # Skip if version already matches (idempotency for re-triggered runs)
-            if [ "$CURRENT" = "$NEXT" ]; then
-              echo "Version already at $NEXT, nothing to do"
-              exit 1
-            fi
-
-            # Update version files only (no tag, no commit, no changelog)
-            cz bump "$NEXT" --files-only --yes 2>&1 | tee bump_output.txt
-
-            # Commit and push with [skip ci] to prevent re-triggering
-            git add -A
-            git commit -m "bump: version $CURRENT → $NEXT [skip ci]"
-          fi
+          cz bump --yes 2>&1 | tee bump_output.txt
           echo "version=$(cz version --project)" >> $GITHUB_OUTPUT
 
-      - name: Push
-        if: steps.cz.outcome == 'success'
+      - name: Generate changelog
+        run: |
+          cz changelog
+          git add CHANGELOG.md
+          git commit --amend --no-edit
+
+      - name: Push with tags
         run: git push --follow-tags
 
       - name: Create GitHub Release
-        if: steps.cz.outcome == 'success' && (github.event.inputs.release_type == 'stable')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

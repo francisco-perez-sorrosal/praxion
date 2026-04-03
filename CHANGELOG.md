@@ -4,3 +4,249 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## v0.0.1.dev1 (2026-04-03)
+
+### Feat
+
+- Add mandatory worktree isolation for Standard/Full pipeline tiers
+- Add ADR index as discovery source for researcher, architect, and promethean
+- Replace decision extraction hook with ADR reminder hook
+- Add ADR index regeneration script
+- Add ADR conventions rule and 8 seed decision records
+- Add /test command with auto-detect framework support
+- Add Python testing reference with advanced pytest patterns
+- Add path-scoped testing-conventions rule for test files
+- Add testing-strategy skill with language-agnostic test methodology
+- Add /full-security-scan command for project-wide security audit
+- Add security review Phase 4.5 to verifier agent
+- Add GitHub Actions PR security review workflow
+- Add context-security-review skill with diff/full-scan modes
+- Add secret pattern redaction to hook event logging
+- Add tool-agnostic /release command for version bumping
+- Add versioning skill with tool detection and Commitizen reference
+- Add GitHub Actions release workflow with Commitizen
+- Add Commitizen config and align all versions to 0.0.1
+- Add feedback step and align external-api-docs with upstream chub skill
+- Add nested CLAUDE.md files for progressive disclosure
+- Per-project chronograph ports for multi-project parallelism
+- Add chronograph-ctl for dev-cycle restarts
+- Add trajectory evaluation script for Phoenix traces
+- Add phoenix-ctl, expand hook registration, update installer
+- Expand send_event.py for all Tier 1 hook events
+- Wire OTelRelay into server event handler
+- Add OTel relay module for Phoenix trace export
+- Add external-api-docs skill with context-hub integration
+- Add hook-crafting skill for hook creation and registration
+- Add code quality hooks for Python formatting and commit gating
+- Add spec auto-update on decision approval
+- Add /sdd-coverage command for mid-flight spec coverage checks
+- Add decision tracking system with dual-path capture
+- Add agent-evals skill for AI agent evaluation
+- Upgrade skill-crafting with Anthropic's internal skill practices
+- Add stakeholder-communications skill
+- Add roadmap-planning skill
+- Add performance-architecture skill
+- Add api-design skill with cross-references
+- Add data-modeling skill
+- Add scale-adaptive process calibration with signal scoring
+- Add spec delta workflow for brownfield SDD pipeline
+- Add unified process calibration and cross-reference SWE artifacts
+- Update pipeline agents and reference for new coordination patterns
+- Add context-engineer shadowing and doc-engineer parallel execution
+- Add spec-driven development skill with pipeline integration
+- Add ccwt script for multi-worktree Claude sessions
+- Embed BDD/TDD into the agent coordination pipeline
+- Add test-engineer agent to the development crew
+- Add package/module structure discipline to planner
+- Add post-refactoring re-wiring verification
+- Elevate doc-engineer to proactive pipeline participant
+- Add native subagent features to all agents
+- Generalize intra-stage parallelism for all Bg Safe agents
+- Add mandatory format-and-lint step to implementer
+- Add communicating-agents skill for A2A protocol
+- Add agentic-sdks skill for OpenAI Agents and Claude Agent SDKs
+- Add CI/CD skill and cicd-engineer agent
+- Add skill-genesis agent for post-pipeline learning harvest
+- Wire claude-ecosystem skill to relevant agents
+- Add claude-ecosystem skill
+- Add /onboard-project command
+- Add /clean-work command for .ai-work/ cleanup
+- Reengineer skill-crafting using official skill-creator as guide
+- Migrate memory system to MCP-backed storage
+- Add memory MCP server
+- Add candidate selection step to promethean agent
+- Update session memory with assistant identity and learnings
+- Add persistent memory skill with JSON storage
+- Add github-star skill and /star-repo command
+- Add .ai-work/ cleanup prompt to co and cop commands
+- Add artifact naming rule and rename documentation skill
+- Add hybrid stdio+HTTP transport and plugin MCP registration
+- Add documentation management system (skill, agent, rule update)
+- Add sentinel agent with ecosystem coherence and promethean integration
+- Add CLAUDE.md Structure sync to promethean agent
+- Add agent observability, pipeline governance, and Task Chronograph MCP
+- Add implementer agent, rename python skill, add parallel execution
+- Add verifier agent and code-review skill
+- Add persistent project index for efficient ideation
+- Add prompt sizing, memory, and permissionMode guidance
+- Register commands directory in plugin manifest
+- Add naming convention guidance to command-crafting spec
+- Add README section ordering guidance to skill-crafting spec
+- Add promethean ideation agent
+- Add .ai-work/ placement rule for agent documents
+- Add /add-rules command for per-project rule distribution
+- Add [CUSTOMIZE] sections to all rules
+- Add [CUSTOMIZE] sections to rule-crafting
+- Integrate context-engineer as full crew member
+- Add software-agents-usage rule
+- Split software-architect into researcher, systems-architect, and implementation-planner
+- Add context-engineer agent
+- Add software-architect agent with stakeholder review and execution supervision
+- Add coding-style rule and slim down CLAUDE.md
+- Add readme-style writing rule and /readme command
+- Add rule-crafting skill for creating and managing rules
+- Add mcp-server skill for MCP server development in Python
+- Add cross-agent portability, content type framework, and resources to agent-skills
+- Rename planning to software-planning, add contexts and phases
+- Add commit commands, Desktop config, and restructure skills
+
+### Fix
+
+- Set initial dev version and fix release workflow
+- Reduce terminal noise from hooks and VS Code markdownlint
+- Ensure all agents discover ADRs through index, then read full files
+- Make runner detection conditional — direct invocation is fine without a runner
+- Enforce project runner detection in testing skill and Python reference
+- Detect project runner (pixi/uv/pnpm/yarn) before invoking test framework
+- Add missing testing constraints (commented-out tests, assertions, file org)
+- Use OAuth token instead of API key for claude-code-action auth
+- Add id-token permission for claude-code-action OIDC auth
+- Add .env gitignore patterns and scope Bash in commands
+- Default to dev pre-release tags in release workflow
+- End agent spans immediately for real-time Phoenix visibility
+- Resolve trace completeness and reliability issues
+- Allow OTelRelay to create new root spans across sessions
+- Use random trace IDs, deduplicate session root spans
+- Default OTEL_ENABLED to false, opt-in via chronograph-ctl
+- Pass session_id and project_dir to record_tool for auto-init
+- Pass project_dir through to relay for subagent initialization
+- End session root span immediately for Phoenix Traces visibility
+- Add logging to _relay_event for observability of relay failures
+- Make session span a true root for Phoenix Traces view
+- Use cwd from hook payload for project directory detection
+- Use openinference.project.name for Phoenix project routing, add lazy init
+- Fix PID parsing in phoenix-ctl, register all Tier 1 hooks
+- Change format_python hook from async to sync for feedback delivery
+- Register code quality hooks in installer, remove test file
+- Add quality gate to commit commands, align code quality artifacts
+- Make commit-time decision review gate functional
+- Align sdd-coverage command with command-crafting conventions
+- Address remaining sentinel suggested findings
+- Address sentinel audit findings (1 critical, 3 important)
+- Correct functional bugs in researcher, plugin manifest, hooks, and verifier
+- Ecosystem audit fixes and philosophy alignment
+- Audit fixes for cursor-compat branch
+- Remove redundant name fields from skill frontmatter
+- Use installed_plugins.json for plugin detection
+- Close missing quote in onboard-project plugin check
+- Use correct GitHub repo name in star skill and command
+- Correct repo name and add emojis in github-star skill
+- Inline check code prefixes in sentinel scorecard headers
+- Require root-relative paths for README.md in sentinel reports
+- Resolve MCP endpoint routing and enrich hook events
+- Add missing argument-hint to commit commands
+- Mark name field as optional in skill-crafting spec
+- Update stale agent count in software-agents-usage rule
+- Update stale agent catalog in agent-crafting README
+- Update stale rule catalog in rule-crafting README
+- Remove stale ticker and stock-clusters entries from skills catalog
+- Repair broken YAML frontmatter in readme command
+- Repair broken YAML frontmatter in context-engineer agent
+- Add anti-pattern for slash command refs in skills
+- Modernize agent-creator skill per agent-skills spec
+- Modernize slash-cmd skill per agent-skills spec
+- Modernize python-prj-mgmt skill per agent-skills spec
+- Modernize software-planning skill per agent-skills spec
+- Modernize python skill per agent-skills spec
+- Use backtick skill names in refactoring Related Skills
+- Modernize refactoring skill per agent-skills spec
+- Address remaining low-priority skill review items
+- Modernize software-planning skill per spec and current tooling
+- Add cross-references and Related Skills to refactoring skill
+- Update CI action versions and clarify uv config in python-prj-mgmt
+- Update python skill with fresh versions, async patterns, match/case
+- Repair broken link and update model naming in slash-cmd
+- Add Related Skills and expand integration example in agent-creator
+- Correct skills/README.md field references and add cross-links
+- Add frontmatter to slash commands and fix typos
+
+### Refactor
+
+- Remove old decision tracking infrastructure
+- Update docs, READMEs, and project files for ADR migration
+- Update skills to reference ADR files and adr-conventions rule
+- Update rules to reference ADR files instead of decisions.jsonl
+- Update sentinel, verifier, and skill-genesis to consume ADR files
+- Update agent prompts to write ADR files instead of decisions.jsonl
+- Fix language agnosticism and add context-specific progressive disclosure
+- Scope .ai-work/ documents to task-slug subdirectories
+- Gate PreToolUse hooks behind shell commit check
+- Split decision-tracking rule to resolve token budget overshoot
+- Retire custom dashboard, delegate UI to Phoenix
+- Move chub CLI install to shared layer, chub MCP to ~/.claude.json
+- Pass 2 voice normalization across 6 skills
+- Pass 1 additive upgrade for stakeholder-communications skill
+- Pass 1 additive upgrade for spec-driven-development skill
+- Pass 1 additive upgrade for software-planning skill
+- Pass 1 additive upgrade for roadmap-planning skill
+- Pass 1 additive upgrade for refactoring skill
+- Pass 1 additive upgrade for python-prj-mgmt skill
+- Pass 1 additive upgrade for performance-architecture skill
+- Pass 1 additive upgrade for claude-ecosystem skill
+- Pass 1 additive upgrade for communicating-agents skill
+- Pass 1 additive upgrade for code-review skill
+- Pass 1 additive upgrade for agentic-sdks skill
+- Pass 1 additive upgrade for memory skill
+- Pass 1 additive upgrade for doc-management skill
+- Pass 1 additive upgrade for python-development skill
+- Pass 1 additive upgrade for data-modeling skill
+- Pass 1 additive upgrade for mcp-crafting skill
+- Pass 1 additive upgrade for agent-crafting skill
+- Pass 1 additive upgrade for command-crafting skill
+- Pass 1 additive upgrade for cicd skill
+- Pass 1 additive upgrade for rule-crafting skill
+- Extend pipeline contract for context shadowing and doc parallelism
+- Optimize token budget and unify naming across ecosystem
+- Unify formatting and linting across the pipeline
+- Align CLAUDE.md files with development philosophy
+- Rewrite CLAUDE.md philosophy and add LEARNINGS.md attribution
+- split installer into router + claude/cursor config dirs
+- Fix rules loading docs and restructure READMEs
+- Enforce self-containment for rules and agents
+- Restructure docs and add hook auto-installation
+- Extract reference files for progressive disclosure in 3 skills
+- Compress 3 always-loaded rules to meet token budget
+- Reduce always-loaded token budget from ~14k to ~8.5k tokens
+- Generalize mcp-crafting skill into language-generic core with Python context
+- Make sentinel independent and timestamp report filenames
+- Rename readme command and add commands README
+- Rename worktree commands to kebab-case
+- Standardize satellite file terminology in agent-crafting
+- Standardize cross-reference format in skill READMEs
+- Remove Related Skills sections from SKILL.md files
+- Standardize README heading to "When to Use" across all skills
+- Standardize compatibility field to "Claude Code"
+- Reframe /add-rules as customization tool
+- Remove auto-discovered content from CLAUDE.md
+- Reorganize rules into swe/vcs subdirectory
+- Move commit conventions to rules/ dir
+- Rename skills to *-crafting convention
+- Move shared assets to repo root for plugin distribution
+- Modernize refactoring skill per agent-skills spec
+- Modernize python-prj-mgmt skill per agent-skills spec
+- Modernize python skill per agent-skills spec
+- Rename claude-agents to agent-creator, trim per agent-skills spec
+- Restructure slash-cmd skill with progressive disclosure
+- Remove plan-executor agent, consolidate planning in skill
+- Restructure claude-agents skill with progressive disclosure

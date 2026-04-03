@@ -307,7 +307,7 @@ Versioning is managed by [Commitizen](https://commitizen-tools.github.io/commiti
 
 ### Dev releases (default, automatic)
 
-Every push to `main` triggers the Release workflow, which increments the `.devN` suffix and creates a GitHub pre-release. No changelog is generated — dev bumps are lightweight version-only increments.
+Every push to `main` triggers the Release workflow, which increments the `.devN` suffix. Dev bumps are lightweight — version files only, no tags, no changelog, no GitHub release. The commit is pushed with `[skip ci]` to prevent re-triggering.
 
 No local commands needed. Just push to `main` with conventional commit messages (`feat:`, `fix:`, etc.). The commit types accumulate and determine the version at stable release time.
 
@@ -319,9 +319,7 @@ No local commands needed. Everything happens through the GitHub Actions UI:
 2. Select `stable` from the release type dropdown
 3. Click **Run workflow**
 
-Commitizen computes the proper semver bump from all conventional commits since the last stable tag. The bump level depends on commit types: `fix:` → patch, `feat:` → minor, breaking change → major. A full GitHub release is created (not pre-release) with auto-generated release notes.
-
-`CHANGELOG.md` is not auto-generated — commitizen's tag parser can't match `.devN` tags, so release notes live on the GitHub release page instead.
+Commitizen computes the proper semver bump from all conventional commits since the last stable tag, generates `CHANGELOG.md`, creates a git tag, and publishes a GitHub release. The bump level depends on commit types: `fix:` → patch, `feat:` → minor, breaking change → major.
 
 After a stable release, the next push to `main` automatically starts a new dev cycle at `<patch+1>.dev0`.
 

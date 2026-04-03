@@ -319,16 +319,18 @@ No local commands needed. Everything happens through the GitHub Actions UI:
 2. Select `stable` from the release type dropdown
 3. Click **Run workflow**
 
-Commitizen computes the proper semver bump from all conventional commits since the last stable tag and generates the changelog. The bump level depends on commit types: `fix:` → patch, `feat:` → minor, breaking change → major. A full GitHub release is created (not pre-release).
+Commitizen computes the proper semver bump from all conventional commits since the last stable tag. The bump level depends on commit types: `fix:` → patch, `feat:` → minor, breaking change → major. A full GitHub release is created (not pre-release) with auto-generated release notes.
+
+`CHANGELOG.md` is not auto-generated — commitizen's tag parser can't match `.devN` tags, so release notes live on the GitHub release page instead.
 
 After a stable release, the next push to `main` automatically starts a new dev cycle at `<patch+1>.dev0`.
 
 ### Version lifecycle example
 
 ```text
-0.0.1.dev0 → 0.0.1.dev1 → 0.0.1.dev2   (dev pushes, no changelog)
+0.0.1.dev0 → 0.0.1.dev1 → 0.0.1.dev2   (dev pushes)
                               ↓
-                            0.1.0          (stable — had feat: commits, changelog generated)
+                            0.1.0          (stable — had feat: commits)
                               ↓
                             0.1.1.dev0 → 0.1.1.dev1 → ...
 ```
@@ -340,7 +342,7 @@ After a stable release, the next push to `main` automatically starts a new dev c
 cz version --project
 
 # Preview what the next stable version would be (dry-run only, no changes)
-cz bump --dry-run --changelog --yes
+cz bump --dry-run --yes
 ```
 
 ## References

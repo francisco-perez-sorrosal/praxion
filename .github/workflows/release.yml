@@ -49,7 +49,7 @@ jobs:
         run: |
           cz changelog
           git add CHANGELOG.md
-          git commit --amend --no-edit
+          git commit -m "docs: Update CHANGELOG.md for v${{ steps.cz.outputs.version }}"
 
       - name: Push with tags
         run: git push --follow-tags

@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from memory_mcp.schema import SCHEMA_VERSION, VALID_CATEGORIES
-from memory_mcp.store import PRE_MIGRATION_SUFFIX, MemoryStore
+from memory_mcp.store import MemoryStore
 
 # -- Fixtures -----------------------------------------------------------------
 
@@ -23,51 +23,6 @@ def memory_file(tmp_path: Path) -> Path:
 def store(memory_file: Path) -> MemoryStore:
     """Return a MemoryStore backed by a fresh empty file."""
     return MemoryStore(memory_file)
-
-
-def _make_v1_0_document() -> dict:
-    """Create a v1.0 document matching the live memory.json structure."""
-    return {
-        "schema_version": "1.0",
-        "memories": {
-            "user": {
-                "first_name": {
-                    "value": "Francisco",
-                    "created_at": "2026-02-10T06:35:00Z",
-                    "updated_at": "2026-02-10T06:35:00Z",
-                    "tags": ["personal", "identity"],
-                    "confidence": None,
-                },
-            },
-            "assistant": {
-                "name": {
-                    "value": "Kael",
-                    "created_at": "2026-02-09T00:00:00Z",
-                    "updated_at": "2026-02-09T00:00:00Z",
-                    "tags": ["identity"],
-                    "confidence": None,
-                },
-            },
-            "relationships": {
-                "collaboration_style": {
-                    "value": "Pragmatic, direct.",
-                    "created_at": "2026-02-10T06:35:00Z",
-                    "updated_at": "2026-02-10T06:35:00Z",
-                    "tags": ["user-facing", "collaboration"],
-                    "confidence": 0.85,
-                },
-            },
-            "tools": {
-                "clipboard": {
-                    "value": "pbcopy / pbpaste",
-                    "created_at": "2026-02-10T06:35:00Z",
-                    "updated_at": "2026-02-10T06:35:00Z",
-                    "tags": ["user-preference", "cli"],
-                    "confidence": None,
-                },
-            },
-        },
-    }
 
 
 # -- Init and file creation ---------------------------------------------------
@@ -91,76 +46,45 @@ class TestStoreInit:
         assert data["session_count"] == 0
         assert set(data["memories"].keys()) == set(VALID_CATEGORIES)
 
-    def test_loads_existing_v1_2_file(self, memory_file: Path):
+    def test_loads_existing_v1_3_file(self, memory_file: Path):
         existing = {
-            "schema_version": "1.2",
+            "schema_version": "1.3",
             "session_count": 5,
-            "memories": {"user": {"name": {"value": "Test", "created_at": "2026-01-01T00:00:00Z",
-                                           "updated_at": "2026-01-01T00:00:00Z", "tags": [],
-                                           "confidence": None, "importance": 5,
-                                           "source": {"type": "session", "detail": None},
-                                           "access_count": 0, "last_accessed": None,
-                                           "status": "active", "links": []}}},
+            "memories": {
+                "user": {
+                    "name": {
+                        "value": "Test",
+                        "created_at": "2026-01-01T00:00:00Z",
+                        "updated_at": "2026-01-01T00:00:00Z",
+                        "tags": [],
+                        "confidence": None,
+                        "importance": 5,
+                        "source": {"type": "session", "detail": None},
+                        "access_count": 0,
+                        "last_accessed": None,
+                        "status": "active",
+                        "links": [],
+                        "summary": "Test",
+                        "valid_at": "2026-01-01T00:00:00Z",
+                        "invalid_at": None,
+                    }
+                }
+            },
         }
         memory_file.write_text(json.dumps(existing, indent=2) + "\n")
         store = MemoryStore(memory_file)
         result = store.status()
         assert result["session_count"] == 5
 
-
-# -- Auto-migration -----------------------------------------------------------
-
-
-class TestAutoMigration:
-    def test_migrates_v1_0_to_v1_2(self, memory_file: Path):
-        v1_0 = _make_v1_0_document()
-        memory_file.write_text(json.dumps(v1_0, indent=2) + "\n")
-        MemoryStore(memory_file)
-
-        data = json.loads(memory_file.read_text())
-        assert data["schema_version"] == "1.2"
-        assert "session_count" in data
-
-        entry = data["memories"]["user"]["first_name"]
-        assert "importance" in entry
-        assert "source" in entry
-        assert "access_count" in entry
-        assert "status" in entry
-        assert "links" in entry
-        assert entry["links"] == []
-
-    def test_creates_pre_migration_backup(self, memory_file: Path):
-        v1_0 = _make_v1_0_document()
-        memory_file.write_text(json.dumps(v1_0, indent=2) + "\n")
-        MemoryStore(memory_file)
-
-        backup_path = memory_file.with_name(memory_file.stem + PRE_MIGRATION_SUFFIX)
-        assert backup_path.exists()
-        backup_data = json.loads(backup_path.read_text())
-        assert backup_data["schema_version"] == "1.0"
-
-    def test_preserves_original_data_after_migration(self, memory_file: Path):
-        v1_0 = _make_v1_0_document()
-        memory_file.write_text(json.dumps(v1_0, indent=2) + "\n")
-        MemoryStore(memory_file)
-
-        data = json.loads(memory_file.read_text())
-        entry = data["memories"]["user"]["first_name"]
-        assert entry["value"] == "Francisco"
-        assert entry["created_at"] == "2026-02-10T06:35:00Z"
-        assert entry["tags"] == ["personal", "identity"]
-
-    def test_skips_migration_for_v1_2(self, memory_file: Path):
-        v1_2 = {
+    def test_rejects_old_schema_version(self, memory_file: Path):
+        old = {
             "schema_version": "1.2",
             "session_count": 3,
             "memories": {"user": {}},
         }
-        memory_file.write_text(json.dumps(v1_2, indent=2) + "\n")
-        MemoryStore(memory_file)
-
-        backup_path = memory_file.with_name(memory_file.stem + PRE_MIGRATION_SUFFIX)
-        assert not backup_path.exists()
+        memory_file.write_text(json.dumps(old, indent=2) + "\n")
+        with pytest.raises(ValueError, match="Unsupported schema version"):
+            MemoryStore(memory_file)
 
 
 # -- CRUD cycle: remember -> recall -> forget ---------------------------------
@@ -173,6 +97,31 @@ class TestCRUDCycle:
         assert result["entry"]["value"] == "Alice"
         assert "identity" in result["entry"]["tags"]
 
+    def test_remember_sets_summary_on_create(self, store: MemoryStore):
+        result = store.remember("user", "name", "Alice Wonderland")
+        assert result["entry"]["summary"] == "Alice Wonderland"
+
+    def test_remember_auto_generates_summary(self, store: MemoryStore):
+        long_value = "word " * 30  # 150 chars
+        result = store.remember("user", "bio", long_value.strip())
+        summary = result["entry"]["summary"]
+        assert summary.endswith("...")
+        assert len(summary) <= 103  # 100 + "..."
+
+    def test_remember_accepts_custom_summary(self, store: MemoryStore):
+        result = store.remember(
+            "user",
+            "name",
+            "Alice Wonderland",
+            summary="Custom summary",
+        )
+        assert result["entry"]["summary"] == "Custom summary"
+
+    def test_remember_sets_valid_at_on_create(self, store: MemoryStore):
+        result = store.remember("user", "name", "Alice")
+        assert result["entry"]["valid_at"] is not None
+        assert result["entry"]["invalid_at"] is None
+
     def test_remember_updates_existing_entry(self, store: MemoryStore):
         store.remember("user", "name", "Alice", tags=["identity"])
         result = store.remember("user", "name", "Bob", tags=["updated"])
@@ -180,6 +129,11 @@ class TestCRUDCycle:
         assert result["entry"]["value"] == "Bob"
         assert "identity" in result["entry"]["tags"]
         assert "updated" in result["entry"]["tags"]
+
+    def test_remember_updates_summary_on_update(self, store: MemoryStore):
+        store.remember("user", "name", "Alice")
+        result = store.remember("user", "name", "Bob")
+        assert result["entry"]["summary"] == "Bob"
 
     def test_remember_preserves_created_at_on_update(self, store: MemoryStore):
         add_result = store.remember("user", "name", "Alice")
@@ -202,14 +156,18 @@ class TestCRUDCycle:
         assert "name" in result["entries"]
         assert "email" in result["entries"]
 
-    def test_forget_removes_entry(self, store: MemoryStore):
+    def test_forget_soft_deletes_entry(self, store: MemoryStore, memory_file: Path):
         store.remember("user", "name", "Alice")
         result = store.forget("user", "name")
-        assert result["removed"]["value"] == "Alice"
+        assert result["action"] == "soft_deleted"
+        assert result["entry"]["value"] == "Alice"
+        assert result["entry"]["invalid_at"] is not None
+        assert result["entry"]["status"] == "superseded"
         assert "backup_path" in result
 
-        with pytest.raises(KeyError):
-            store.recall("user", "name")
+        # Entry still exists in the file -- soft delete, not removal
+        data = json.loads(memory_file.read_text())
+        assert "name" in data["memories"]["user"]
 
     def test_forget_creates_backup_file(self, store: MemoryStore, memory_file: Path):
         store.remember("user", "name", "Alice")

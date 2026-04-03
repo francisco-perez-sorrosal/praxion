@@ -59,6 +59,7 @@ def remember(
     confidence: float | None = None,
     force: bool = False,
     broad: bool = False,
+    summary: str | None = None,
 ) -> dict:
     """Store a new memory or update an existing one.
 
@@ -80,6 +81,7 @@ def remember(
         confidence: Optional confidence score (0.0 to 1.0).
         force: If True, skip deduplication check and write immediately.
         broad: If True, check for duplicates across all categories (not just target).
+        summary: Optional one-line summary (~100 chars). Auto-generated from value if omitted.
     """
     try:
         return _get_store().remember(
@@ -92,6 +94,7 @@ def remember(
             confidence=confidence,
             force=force,
             broad=broad,
+            summary=summary,
         )
     except (ValueError, KeyError) as exc:
         return {"error": str(exc)}
@@ -101,14 +104,15 @@ def remember(
 
 @mcp.tool()
 def forget(category: str, key: str) -> dict:
-    """Remove a memory entry.
+    """Soft-delete a memory entry.
 
-    Deletes the specified entry and creates a backup of the full store
-    before removal. Returns the removed entry data and backup path.
+    Sets invalid_at timestamp and status to 'superseded' instead of removing.
+    The entry remains queryable via search(include_historical=True).
+    Creates a backup before mutation.
 
     Args:
         category: The category containing the entry.
-        key: The key of the entry to remove.
+        key: The key of the entry to soft-delete.
     """
     try:
         return _get_store().forget(category, key)
@@ -139,19 +143,28 @@ def recall(category: str, key: str | None = None) -> dict:
 
 
 @mcp.tool()
-def search(query: str, category: str | None = None) -> dict:
-    """Search memories by text across keys, values, and tags.
+def search(
+    query: str,
+    category: str | None = None,
+    detail: str = "index",
+    include_historical: bool = False,
+) -> dict:
+    """Search memories by text across keys, values, tags, and summaries.
 
-    Case-insensitive search with match reasons indicating where each
-    result matched (key, value, or tag). Results have their access
-    counts updated.
+    Tokenizes multi-term queries and matches individual terms. Returns
+    Markdown-formatted summaries by default for token efficiency, or full
+    entry data when detail="full".
 
     Args:
         query: Search text to match against entries.
         category: Optional category filter. If omitted, searches all categories.
+        detail: Response format -- "index" (Markdown summaries) or "full" (complete entries).
+        include_historical: If True, include soft-deleted entries in results.
     """
     try:
-        return _get_store().search(query, category)
+        return _get_store().search(
+            query, category, detail=detail, include_historical=include_historical
+        )
     except ValueError as exc:
         return {"error": str(exc)}
     except Exception as exc:
@@ -297,9 +310,75 @@ def remove_link(
         target_key: Key of the target entry.
     """
     try:
-        return _get_store().remove_link(
-            source_category, source_key, target_category, target_key
-        )
+        return _get_store().remove_link(source_category, source_key, target_category, target_key)
+    except (ValueError, KeyError) as exc:
+        return {"error": str(exc)}
+    except Exception as exc:
+        return {"error": f"Unexpected error: {exc}"}
+
+
+@mcp.tool()
+def browse_index(include_historical: bool = False) -> dict:
+    """Browse the full memory index as a compact Markdown summary.
+
+    Returns all entry summaries in Markdown-KV format grouped by category.
+    This is the most token-efficient way to see the entire memory store.
+    Each entry is shown as: - **key**: summary [tags]
+
+    Args:
+        include_historical: If True, include soft-deleted entries with annotation.
+    """
+    try:
+        return _get_store().browse_index(include_historical=include_historical)
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def hard_delete(category: str, key: str) -> dict:
+    """Permanently remove a memory entry.
+
+    Unlike forget() which soft-deletes, this permanently removes the entry
+    and cleans up all incoming links. Use for sensitive data or errors.
+    Creates a backup before removal.
+
+    Args:
+        category: The category containing the entry.
+        key: The key of the entry to permanently remove.
+    """
+    try:
+        return _get_store().hard_delete(category, key)
+    except (ValueError, KeyError) as exc:
+        return {"error": str(exc)}
+    except Exception as exc:
+        return {"error": f"Unexpected error: {exc}"}
+
+
+@mcp.tool()
+def consolidate(actions: str, dry_run: bool = False) -> dict:
+    """Execute structured consolidation actions on the memory store.
+
+    Accepts a JSON string of actions to perform (merge, archive,
+    adjust_confidence, update_summary). Creates a backup before any
+    mutation. Use dry_run=True to preview changes without applying.
+
+    Action types:
+    - merge: {action: "merge", sources: [{category, key}], target: {category, key}, merged_value: str, merged_summary: str}
+    - archive: {action: "archive", category: str, key: str}
+    - adjust_confidence: {action: "adjust_confidence", category: str, key: str, confidence: float}
+    - update_summary: {action: "update_summary", category: str, key: str, summary: str}
+
+    Args:
+        actions: JSON string containing a list of action objects.
+        dry_run: If True, validate and preview without applying changes.
+    """
+    try:
+        parsed_actions = json.loads(actions)
+        if not isinstance(parsed_actions, list):
+            return {"error": "actions must be a JSON array of action objects"}
+        return _get_store().consolidate(parsed_actions, dry_run=dry_run)
+    except json.JSONDecodeError as exc:
+        return {"error": f"Invalid JSON in actions: {exc}"}
     except (ValueError, KeyError) as exc:
         return {"error": str(exc)}
     except Exception as exc:
@@ -322,8 +401,11 @@ def schema_resource() -> str:
         "statuses": list(VALID_STATUSES),
         "entry_fields": {
             "value": "The memory content (string, required)",
+            "summary": "One-line description (~100 chars) for index browsing",
             "created_at": "ISO 8601 UTC timestamp when the entry was created",
             "updated_at": "ISO 8601 UTC timestamp of the last modification",
+            "valid_at": "ISO 8601 UTC timestamp when entry became valid (set on creation)",
+            "invalid_at": "ISO 8601 UTC timestamp when entry was soft-deleted (null if active)",
             "tags": "List of string tags for categorization and search",
             "confidence": "Confidence score from 0.0 to 1.0 (null if unset)",
             "importance": "Priority from 1 (low) to 10 (critical), default 5",

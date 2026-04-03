@@ -1,13 +1,12 @@
-"""Schema dataclasses and migration logic for memory-mcp."""
+"""Schema dataclasses for memory-mcp v1.3."""
 
 from __future__ import annotations
 
-import copy
 from dataclasses import dataclass, field
 
 # -- Constants ----------------------------------------------------------------
 
-SCHEMA_VERSION = "1.2"
+SCHEMA_VERSION = "1.3"
 
 VALID_CATEGORIES = ("user", "assistant", "project", "relationships", "tools", "learnings")
 
@@ -20,6 +19,28 @@ VALID_RELATIONS = ("supersedes", "elaborates", "contradicts", "related-to", "dep
 DEFAULT_IMPORTANCE = 5
 MIN_IMPORTANCE = 1
 MAX_IMPORTANCE = 10
+
+SUMMARY_MAX_LENGTH = 100
+
+
+# -- Summary generation -------------------------------------------------------
+
+
+def generate_summary(value: str, max_len: int = SUMMARY_MAX_LENGTH) -> str:
+    """Generate a one-line summary from a value string.
+
+    Truncates at a word boundary and appends "..." if the value exceeds max_len.
+    """
+    if len(value) <= max_len:
+        return value
+
+    # Find the last space before max_len to avoid splitting a word
+    truncated = value[:max_len]
+    last_space = truncated.rfind(" ")
+    if last_space > 0:
+        truncated = truncated[:last_space]
+
+    return truncated.rstrip() + "..."
 
 
 # -- Dataclasses --------------------------------------------------------------
@@ -57,7 +78,7 @@ class Link:
 
 @dataclass
 class MemoryEntry:
-    """A single memory entry with v1.2 schema fields."""
+    """A single memory entry with v1.3 schema fields."""
 
     value: str
     created_at: str
@@ -70,6 +91,9 @@ class MemoryEntry:
     last_accessed: str | None = None
     status: str = "active"
     links: list[Link] = field(default_factory=list)
+    summary: str = ""
+    valid_at: str | None = None
+    invalid_at: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -84,6 +108,9 @@ class MemoryEntry:
             "last_accessed": self.last_accessed,
             "status": self.status,
             "links": [link.to_dict() for link in self.links],
+            "summary": self.summary,
+            "valid_at": self.valid_at,
+            "invalid_at": self.invalid_at,
         }
 
     @classmethod
@@ -102,48 +129,7 @@ class MemoryEntry:
             last_accessed=data.get("last_accessed"),
             status=data.get("status", "active"),
             links=[Link.from_dict(ld) for ld in links_data],
+            summary=data.get("summary", ""),
+            valid_at=data.get("valid_at"),
+            invalid_at=data.get("invalid_at"),
         )
-
-
-# -- Migration ----------------------------------------------------------------
-
-
-def migrate_v1_0_to_v1_1(data: dict) -> dict:
-    """Migrate a v1.0 memory document to v1.1.
-
-    Adds default values for new fields to every entry and bumps the schema version.
-    Does NOT mutate the input dict -- returns a new dict.
-    """
-    result = copy.deepcopy(data)
-
-    memories = result.get("memories", {})
-    for _category_name, entries in memories.items():
-        for _key, entry in entries.items():
-            entry.setdefault("importance", DEFAULT_IMPORTANCE)
-            entry.setdefault("source", {"type": "session", "detail": None})
-            entry.setdefault("access_count", 0)
-            entry.setdefault("last_accessed", None)
-            entry.setdefault("status", "active")
-
-    result.setdefault("session_count", 0)
-    result["schema_version"] = "1.1"
-
-    return result
-
-
-def migrate_v1_1_to_v1_2(data: dict) -> dict:
-    """Migrate a v1.1 memory document to v1.2.
-
-    Adds empty ``links`` list to every entry and bumps the schema version.
-    Does NOT mutate the input dict -- returns a new dict.
-    """
-    result = copy.deepcopy(data)
-
-    memories = result.get("memories", {})
-    for _category_name, entries in memories.items():
-        for _key, entry in entries.items():
-            entry.setdefault("links", [])
-
-    result["schema_version"] = "1.2"
-
-    return result

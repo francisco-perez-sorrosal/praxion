@@ -33,7 +33,7 @@ def _make_entry(
     importance: int = 5,
     links: list[dict] | None = None,
 ) -> dict:
-    """Build a raw v1.2 entry dict for direct file injection."""
+    """Build a raw v1.3 entry dict for direct file injection."""
     return {
         "value": value,
         "created_at": "2026-02-10T06:35:00Z",
@@ -46,14 +46,16 @@ def _make_entry(
         "last_accessed": None,
         "status": "active",
         "links": links or [],
+        "summary": value[:100],
+        "valid_at": "2026-02-10T06:35:00Z",
+        "invalid_at": None,
     }
 
 
 def _write_store(memory_file: Path, entries_by_category: dict) -> None:
     """Write a pre-built memory store to the file."""
     memories = {
-        cat: {} for cat in
-        ("user", "assistant", "project", "relationships", "tools", "learnings")
+        cat: {} for cat in ("user", "assistant", "project", "relationships", "tools", "learnings")
     }
     for cat, entries in entries_by_category.items():
         memories[cat] = entries
@@ -294,12 +296,16 @@ class TestAutoLinking:
     def test_auto_link_on_tag_overlap(self, store: MemoryStore, memory_file: Path):
         """New entry with 2+ tag overlap gets auto-linked to existing."""
         store.remember(
-            "user", "name", "Alice",
+            "user",
+            "name",
+            "Alice",
             tags=["identity", "personal", "profile"],
             force=True,
         )
         store.remember(
-            "user", "email", "alice@example.com",
+            "user",
+            "email",
+            "alice@example.com",
             tags=["identity", "personal", "contact"],
             force=True,
         )
@@ -309,8 +315,7 @@ class TestAutoLinking:
         email_links = data["memories"]["user"]["email"]["links"]
         assert len(email_links) >= 1
         assert any(
-            lk["target"] == "user.name" and lk["relation"] == "related-to"
-            for lk in email_links
+            lk["target"] == "user.name" and lk["relation"] == "related-to" for lk in email_links
         )
 
     def test_no_auto_link_below_threshold(self, store: MemoryStore, memory_file: Path):
@@ -325,12 +330,16 @@ class TestAutoLinking:
     def test_no_auto_link_on_update(self, store: MemoryStore, memory_file: Path):
         """Updates (existing key) should NOT trigger auto-linking."""
         store.remember(
-            "user", "name", "Alice",
+            "user",
+            "name",
+            "Alice",
             tags=["identity", "personal", "profile"],
             force=True,
         )
         store.remember(
-            "user", "email", "alice@example.com",
+            "user",
+            "email",
+            "alice@example.com",
             tags=["identity", "personal", "contact"],
             force=True,
         )
@@ -343,7 +352,9 @@ class TestAutoLinking:
         # Reload store and update the existing key
         store2 = MemoryStore(memory_file)
         result = store2.remember(
-            "user", "email", "newalice@example.com",
+            "user",
+            "email",
+            "newalice@example.com",
             tags=["identity", "personal", "contact"],
         )
         assert result["action"] == "UPDATE"
@@ -358,7 +369,9 @@ class TestAutoLinking:
         # Create more entries than the limit
         for i in range(MAX_AUTO_LINKS_PER_REMEMBER + 2):
             store.remember(
-                "learnings", f"entry_{i}", f"Lesson {i}",
+                "learnings",
+                f"entry_{i}",
+                f"Lesson {i}",
                 tags=shared_tags + [f"unique_{i}"],
                 force=True,
             )
@@ -379,12 +392,12 @@ class TestAutoLinking:
         assert len(email_links) == 0
 
 
-# -- Forget with link cleanup -------------------------------------------------
+# -- Forget (soft-delete) with link preservation ------------------------------
 
 
-class TestForgetLinkCleanup:
-    def test_incoming_links_removed_on_forget(self, store: MemoryStore, memory_file: Path):
-        """When an entry is deleted, all incoming links from other entries are removed."""
+class TestForgetLinkPreservation:
+    def test_links_preserved_on_soft_delete(self, store: MemoryStore, memory_file: Path):
+        """Soft-deleting an entry preserves all links (both incoming and outgoing)."""
         store.remember("user", "name", "Alice")
         store.remember("user", "email", "alice@example.com")
         store.remember("tools", "editor", "vim")
@@ -397,16 +410,18 @@ class TestForgetLinkCleanup:
         assert len(data["memories"]["user"]["email"]["links"]) == 1
         assert len(data["memories"]["tools"]["editor"]["links"]) == 1
 
-        # Delete the target entry
+        # Soft-delete the target entry
         store.forget("user", "name")
 
-        # Verify incoming links are cleaned up
+        # Links are preserved -- soft delete keeps everything
         data = json.loads(memory_file.read_text())
-        assert len(data["memories"]["user"]["email"]["links"]) == 0
-        assert len(data["memories"]["tools"]["editor"]["links"]) == 0
+        assert len(data["memories"]["user"]["email"]["links"]) == 1
+        assert len(data["memories"]["tools"]["editor"]["links"]) == 1
+        # Entry still exists with superseded status
+        assert data["memories"]["user"]["name"]["status"] == "superseded"
 
-    def test_other_links_preserved_on_forget(self, store: MemoryStore, memory_file: Path):
-        """Links not pointing to the deleted entry are preserved."""
+    def test_outgoing_links_preserved_on_soft_delete(self, store: MemoryStore, memory_file: Path):
+        """Soft-deleting an entry preserves its outgoing links."""
         store.remember("user", "name", "Alice")
         store.remember("user", "email", "alice@example.com")
         store.remember("tools", "editor", "vim")
@@ -415,6 +430,49 @@ class TestForgetLinkCleanup:
         store.add_link("user", "email", "tools", "editor", "related-to")
 
         store.forget("user", "name")
+
+        # Both links on email are preserved
+        data = json.loads(memory_file.read_text())
+        email_links = data["memories"]["user"]["email"]["links"]
+        assert len(email_links) == 2
+
+
+# -- Hard delete with link cleanup --------------------------------------------
+
+
+class TestHardDeleteLinkCleanup:
+    def test_incoming_links_removed_on_hard_delete(self, store: MemoryStore, memory_file: Path):
+        """When an entry is hard-deleted, all incoming links from other entries are removed."""
+        store.remember("user", "name", "Alice")
+        store.remember("user", "email", "alice@example.com")
+        store.remember("tools", "editor", "vim")
+
+        store.add_link("user", "email", "user", "name", "elaborates")
+        store.add_link("tools", "editor", "user", "name", "depends-on")
+
+        # Verify links exist before hard_delete
+        data = json.loads(memory_file.read_text())
+        assert len(data["memories"]["user"]["email"]["links"]) == 1
+        assert len(data["memories"]["tools"]["editor"]["links"]) == 1
+
+        # Hard-delete the target entry
+        store.hard_delete("user", "name")
+
+        # Verify incoming links are cleaned up
+        data = json.loads(memory_file.read_text())
+        assert len(data["memories"]["user"]["email"]["links"]) == 0
+        assert len(data["memories"]["tools"]["editor"]["links"]) == 0
+
+    def test_other_links_preserved_on_hard_delete(self, store: MemoryStore, memory_file: Path):
+        """Links not pointing to the deleted entry are preserved."""
+        store.remember("user", "name", "Alice")
+        store.remember("user", "email", "alice@example.com")
+        store.remember("tools", "editor", "vim")
+
+        store.add_link("user", "email", "user", "name", "elaborates")
+        store.add_link("user", "email", "tools", "editor", "related-to")
+
+        store.hard_delete("user", "name")
 
         # The link to tools.editor should be preserved
         data = json.loads(memory_file.read_text())
@@ -426,79 +484,11 @@ class TestForgetLinkCleanup:
 # -- Migration in store (chained) ---------------------------------------------
 
 
-class TestStoreMigrationChain:
-    def test_v1_0_file_migrated_to_v1_2(self, memory_file: Path):
-        """A v1.0 file should be auto-migrated through v1.1 to v1.2."""
-        v1_0 = {
-            "schema_version": "1.0",
-            "memories": {
-                "user": {
-                    "name": {
-                        "value": "Alice",
-                        "created_at": "2026-02-10T06:35:00Z",
-                        "updated_at": "2026-02-10T06:35:00Z",
-                        "tags": ["identity"],
-                        "confidence": None,
-                    },
-                },
-            },
-        }
-        memory_file.write_text(json.dumps(v1_0, indent=2) + "\n")
-
-        MemoryStore(memory_file)
-
-        data = json.loads(memory_file.read_text())
-        assert data["schema_version"] == "1.2"
-
-        entry = data["memories"]["user"]["name"]
-        # v1.1 fields
-        assert entry["importance"] == 5
-        assert entry["source"] == {"type": "session", "detail": None}
-        assert entry["access_count"] == 0
-        assert entry["status"] == "active"
-        # v1.2 field
-        assert entry["links"] == []
-
-    def test_v1_1_file_migrated_to_v1_2(self, memory_file: Path):
-        """A v1.1 file should be auto-migrated to v1.2."""
-        v1_1 = {
-            "schema_version": "1.1",
-            "session_count": 3,
-            "memories": {
-                "user": {
-                    "name": {
-                        "value": "Alice",
-                        "created_at": "2026-02-10T06:35:00Z",
-                        "updated_at": "2026-02-10T06:35:00Z",
-                        "tags": ["identity"],
-                        "confidence": None,
-                        "importance": 8,
-                        "source": {"type": "user-stated", "detail": None},
-                        "access_count": 5,
-                        "last_accessed": "2026-02-10T10:00:00Z",
-                        "status": "active",
-                    },
-                },
-            },
-        }
-        memory_file.write_text(json.dumps(v1_1, indent=2) + "\n")
-
-        MemoryStore(memory_file)
-
-        data = json.loads(memory_file.read_text())
-        assert data["schema_version"] == "1.2"
-        assert data["session_count"] == 3
-
-        entry = data["memories"]["user"]["name"]
-        assert entry["links"] == []
-        # Preserved v1.1 fields
-        assert entry["importance"] == 8
-        assert entry["access_count"] == 5
-
-    def test_v1_2_file_not_migrated(self, memory_file: Path):
-        """A v1.2 file should not trigger migration."""
-        v1_2 = {
-            "schema_version": "1.2",
+class TestSchemaVersionValidation:
+    def test_v1_3_file_loads_cleanly(self, memory_file: Path):
+        """A v1.3 file should load without issues."""
+        v1_3 = {
+            "schema_version": "1.3",
             "session_count": 10,
             "memories": {
                 "user": {
@@ -514,47 +504,28 @@ class TestStoreMigrationChain:
                         "last_accessed": "2026-02-10T10:00:00Z",
                         "status": "active",
                         "links": [{"target": "tools.editor", "relation": "related-to"}],
+                        "summary": "User name is Alice",
+                        "valid_at": "2026-02-10T06:35:00Z",
+                        "invalid_at": None,
                     },
                 },
             },
         }
-        memory_file.write_text(json.dumps(v1_2, indent=2) + "\n")
+        memory_file.write_text(json.dumps(v1_3, indent=2) + "\n")
 
         MemoryStore(memory_file)
 
         data = json.loads(memory_file.read_text())
-        assert data["schema_version"] == "1.2"
-        # Links preserved, not reset
+        assert data["schema_version"] == "1.3"
         assert len(data["memories"]["user"]["name"]["links"]) == 1
 
-    def test_v1_0_migration_creates_backups(self, memory_file: Path):
-        """v1.0 migration should create both v1.0 and v1.1 backups."""
+    def test_old_schema_version_raises(self, memory_file: Path):
+        """Old schema versions should raise ValueError."""
         v1_0 = {
             "schema_version": "1.0",
-            "memories": {
-                "user": {
-                    "name": {
-                        "value": "Alice",
-                        "created_at": "2026-02-10T06:35:00Z",
-                        "updated_at": "2026-02-10T06:35:00Z",
-                        "tags": [],
-                        "confidence": None,
-                    },
-                },
-            },
+            "memories": {"user": {}},
         }
         memory_file.write_text(json.dumps(v1_0, indent=2) + "\n")
 
-        MemoryStore(memory_file)
-
-        # v1.0 backup
-        v1_0_backup = memory_file.with_name(memory_file.stem + ".pre-migration-1.0.json")
-        assert v1_0_backup.exists()
-        backup_data = json.loads(v1_0_backup.read_text())
-        assert backup_data["schema_version"] == "1.0"
-
-        # v1.1 backup
-        v1_1_backup = memory_file.with_name(memory_file.stem + ".pre-migration-1.1.json")
-        assert v1_1_backup.exists()
-        backup_data = json.loads(v1_1_backup.read_text())
-        assert backup_data["schema_version"] == "1.1"
+        with pytest.raises(ValueError, match="Unsupported schema version"):
+            MemoryStore(memory_file)

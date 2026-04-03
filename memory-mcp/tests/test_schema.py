@@ -1,8 +1,8 @@
-"""Tests for schema dataclasses and migration logic."""
+"""Tests for schema dataclasses and v1.3 schema."""
 
 from __future__ import annotations
 
-import copy
+import pytest
 
 from memory_mcp.schema import (
     DEFAULT_IMPORTANCE,
@@ -14,8 +14,7 @@ from memory_mcp.schema import (
     Link,
     MemoryEntry,
     Source,
-    migrate_v1_0_to_v1_1,
-    migrate_v1_1_to_v1_2,
+    generate_summary,
 )
 
 # -- Source round-trip ---------------------------------------------------------
@@ -62,6 +61,9 @@ class TestMemoryEntry:
         assert restored.access_count == 0
         assert restored.last_accessed is None
         assert restored.status == "active"
+        assert restored.summary == ""
+        assert restored.valid_at is None
+        assert restored.invalid_at is None
 
     def test_full_entry_round_trip(self):
         entry = MemoryEntry(
@@ -75,6 +77,9 @@ class TestMemoryEntry:
             access_count=3,
             last_accessed="2026-02-10T08:00:00Z",
             status="active",
+            summary="Francisco",
+            valid_at="2026-02-10T06:35:00Z",
+            invalid_at=None,
         )
         data = entry.to_dict()
         restored = MemoryEntry.from_dict(data)
@@ -86,6 +91,9 @@ class TestMemoryEntry:
         assert restored.access_count == entry.access_count
         assert restored.last_accessed == entry.last_accessed
         assert restored.status == entry.status
+        assert restored.summary == entry.summary
+        assert restored.valid_at == entry.valid_at
+        assert restored.invalid_at == entry.invalid_at
 
     def test_round_trip_is_lossless(self):
         """Verify dict -> dataclass -> dict produces identical output."""
@@ -101,6 +109,9 @@ class TestMemoryEntry:
             "last_accessed": "2026-02-10T07:00:00Z",
             "status": "archived",
             "links": [{"target": "user.name", "relation": "related-to"}],
+            "summary": "test",
+            "valid_at": "2026-02-10T06:35:00Z",
+            "invalid_at": None,
         }
         entry = MemoryEntry.from_dict(original)
         result = entry.to_dict()
@@ -118,17 +129,45 @@ class TestMemoryEntry:
         data["tags"].append("b")
         assert entry.tags == ["a"]
 
+    def test_new_fields_default_values(self):
+        """Verify summary, valid_at, invalid_at have correct defaults."""
+        entry = MemoryEntry(
+            value="test",
+            created_at="2026-02-10T06:35:00Z",
+            updated_at="2026-02-10T06:35:00Z",
+        )
+        assert entry.summary == ""
+        assert entry.valid_at is None
+        assert entry.invalid_at is None
+
+    def test_from_dict_without_new_fields(self):
+        """Entries missing new fields get defaults (backward compatibility)."""
+        data = {
+            "value": "old entry",
+            "created_at": "2026-02-10T06:35:00Z",
+            "updated_at": "2026-02-10T06:35:00Z",
+        }
+        entry = MemoryEntry.from_dict(data)
+        assert entry.summary == ""
+        assert entry.valid_at is None
+        assert entry.invalid_at is None
+
 
 # -- Constants -----------------------------------------------------------------
 
 
 class TestConstants:
     def test_schema_version(self):
-        assert SCHEMA_VERSION == "1.2"
+        assert SCHEMA_VERSION == "1.3"
 
     def test_valid_categories(self):
         assert set(VALID_CATEGORIES) == {
-            "user", "assistant", "project", "relationships", "tools", "learnings"
+            "user",
+            "assistant",
+            "project",
+            "relationships",
+            "tools",
+            "learnings",
         }
 
     def test_valid_statuses(self):
@@ -139,142 +178,12 @@ class TestConstants:
 
     def test_valid_relations(self):
         assert set(VALID_RELATIONS) == {
-            "supersedes", "elaborates", "contradicts", "related-to", "depends-on"
+            "supersedes",
+            "elaborates",
+            "contradicts",
+            "related-to",
+            "depends-on",
         }
-
-
-# -- Migration v1.0 -> v1.1 ---------------------------------------------------
-
-
-def _make_v1_0_document() -> dict:
-    """Create a v1.0 document matching the live memory.json structure."""
-    return {
-        "schema_version": "1.0",
-        "memories": {
-            "user": {
-                "first_name": {
-                    "value": "Francisco",
-                    "created_at": "2026-02-10T06:35:00Z",
-                    "updated_at": "2026-02-10T06:35:00Z",
-                    "tags": ["personal", "identity"],
-                    "confidence": None,
-                },
-                "coding_philosophy": {
-                    "value": "Pragmatism is non-negotiable.",
-                    "created_at": "2026-02-10T06:35:00Z",
-                    "updated_at": "2026-02-10T06:35:00Z",
-                    "tags": ["preference", "philosophy"],
-                    "confidence": None,
-                },
-            },
-            "assistant": {
-                "name": {
-                    "value": "Kael",
-                    "created_at": "2026-02-09T00:00:00Z",
-                    "updated_at": "2026-02-09T00:00:00Z",
-                    "tags": ["identity"],
-                    "confidence": None,
-                },
-            },
-            "relationships": {
-                "collaboration_style": {
-                    "value": "Pragmatic, direct.",
-                    "created_at": "2026-02-10T06:35:00Z",
-                    "updated_at": "2026-02-10T06:35:00Z",
-                    "tags": ["user-facing", "collaboration"],
-                    "confidence": 0.85,
-                },
-            },
-        },
-    }
-
-
-class TestMigration:
-    def test_bumps_schema_version(self):
-        v1_0 = _make_v1_0_document()
-        v1_1 = migrate_v1_0_to_v1_1(v1_0)
-        assert v1_1["schema_version"] == "1.1"
-
-    def test_adds_session_count(self):
-        v1_0 = _make_v1_0_document()
-        v1_1 = migrate_v1_0_to_v1_1(v1_0)
-        assert v1_1["session_count"] == 0
-
-    def test_adds_new_fields_with_defaults(self):
-        v1_0 = _make_v1_0_document()
-        v1_1 = migrate_v1_0_to_v1_1(v1_0)
-
-        entry = v1_1["memories"]["user"]["first_name"]
-        assert entry["importance"] == DEFAULT_IMPORTANCE
-        assert entry["source"] == {"type": "session", "detail": None}
-        assert entry["access_count"] == 0
-        assert entry["last_accessed"] is None
-        assert entry["status"] == "active"
-
-    def test_preserves_original_data(self):
-        v1_0 = _make_v1_0_document()
-        v1_1 = migrate_v1_0_to_v1_1(v1_0)
-
-        # Original v1.0 fields preserved
-        entry = v1_1["memories"]["user"]["first_name"]
-        assert entry["value"] == "Francisco"
-        assert entry["created_at"] == "2026-02-10T06:35:00Z"
-        assert entry["updated_at"] == "2026-02-10T06:35:00Z"
-        assert entry["tags"] == ["personal", "identity"]
-        assert entry["confidence"] is None
-
-    def test_preserves_existing_confidence(self):
-        v1_0 = _make_v1_0_document()
-        v1_1 = migrate_v1_0_to_v1_1(v1_0)
-
-        entry = v1_1["memories"]["relationships"]["collaboration_style"]
-        assert entry["confidence"] == 0.85
-
-    def test_preserves_different_timestamps(self):
-        """Verify entries with different timestamps keep their original values."""
-        v1_0 = _make_v1_0_document()
-        v1_1 = migrate_v1_0_to_v1_1(v1_0)
-
-        user_entry = v1_1["memories"]["user"]["first_name"]
-        assistant_entry = v1_1["memories"]["assistant"]["name"]
-        assert user_entry["created_at"] == "2026-02-10T06:35:00Z"
-        assert assistant_entry["created_at"] == "2026-02-09T00:00:00Z"
-
-    def test_all_entries_get_new_fields(self):
-        v1_0 = _make_v1_0_document()
-        v1_1 = migrate_v1_0_to_v1_1(v1_0)
-
-        new_fields = {"importance", "source", "access_count", "last_accessed", "status"}
-        for _cat_name, entries in v1_1["memories"].items():
-            for key, entry in entries.items():
-                for field_name in new_fields:
-                    assert field_name in entry, f"Missing '{field_name}' in {_cat_name}.{key}"
-
-    def test_does_not_mutate_input(self):
-        v1_0 = _make_v1_0_document()
-        original_copy = copy.deepcopy(v1_0)
-        migrate_v1_0_to_v1_1(v1_0)
-        assert v1_0 == original_copy
-
-    def test_preserves_session_count_if_already_present(self):
-        """If session_count already exists (edge case), preserve it."""
-        v1_0 = _make_v1_0_document()
-        v1_0["session_count"] = 42
-        v1_1 = migrate_v1_0_to_v1_1(v1_0)
-        assert v1_1["session_count"] == 42
-
-    def test_migrated_entries_parse_as_memory_entry(self):
-        """Verify migrated entries are valid MemoryEntry input."""
-        v1_0 = _make_v1_0_document()
-        v1_1 = migrate_v1_0_to_v1_1(v1_0)
-
-        for _cat_name, entries in v1_1["memories"].items():
-            for _key, entry_data in entries.items():
-                # Add links field since MemoryEntry now expects it for full round-trip
-                entry_data.setdefault("links", [])
-                entry = MemoryEntry.from_dict(entry_data)
-                assert entry.value == entry_data["value"]
-                assert entry.to_dict() == entry_data
 
 
 # -- Link round-trip ----------------------------------------------------------
@@ -296,8 +205,6 @@ class TestLink:
 
     def test_link_is_frozen(self):
         link = Link(target="user.name", relation="related-to")
-        import pytest
-
         with pytest.raises(AttributeError):
             link.target = "other.key"  # type: ignore[misc]
 
@@ -333,7 +240,7 @@ class TestMemoryEntryLinks:
         assert entry.to_dict()["links"] == []
 
     def test_entry_from_dict_without_links_field(self):
-        """Entries from v1.1 data (no links field) get empty links."""
+        """Entries from older data (no links field) get empty links."""
         data = {
             "value": "old entry",
             "created_at": "2026-02-10T06:35:00Z",
@@ -343,114 +250,44 @@ class TestMemoryEntryLinks:
         assert entry.links == []
 
 
-# -- Migration v1.1 -> v1.2 ---------------------------------------------------
+# -- generate_summary ---------------------------------------------------------
 
 
-def _make_v1_1_document() -> dict:
-    """Create a v1.1 document for migration testing."""
-    return {
-        "schema_version": "1.1",
-        "session_count": 5,
-        "memories": {
-            "user": {
-                "name": {
-                    "value": "Alice",
-                    "created_at": "2026-02-10T06:35:00Z",
-                    "updated_at": "2026-02-10T06:35:00Z",
-                    "tags": ["identity"],
-                    "confidence": None,
-                    "importance": 8,
-                    "source": {"type": "user-stated", "detail": None},
-                    "access_count": 3,
-                    "last_accessed": "2026-02-10T10:00:00Z",
-                    "status": "active",
-                },
-            },
-            "learnings": {
-                "git_tip": {
-                    "value": "Use atomic commits",
-                    "created_at": "2026-02-10T07:00:00Z",
-                    "updated_at": "2026-02-10T07:00:00Z",
-                    "tags": ["git", "workflow"],
-                    "confidence": 0.9,
-                    "importance": 6,
-                    "source": {"type": "session", "detail": None},
-                    "access_count": 0,
-                    "last_accessed": None,
-                    "status": "active",
-                },
-            },
-        },
-    }
+class TestGenerateSummary:
+    def test_short_value_unchanged(self):
+        """Values under max_len are returned as-is."""
+        assert generate_summary("short value") == "short value"
 
+    def test_exact_max_len_unchanged(self):
+        value = "x" * 100
+        assert generate_summary(value) == value
 
-class TestMigrationV11ToV12:
-    def test_bumps_schema_version(self):
-        v1_1 = _make_v1_1_document()
-        v1_2 = migrate_v1_1_to_v1_2(v1_1)
-        assert v1_2["schema_version"] == "1.2"
+    def test_truncates_long_value_at_word_boundary(self):
+        value = "word " * 25  # 125 chars
+        result = generate_summary(value, max_len=50)
+        assert result.endswith("...")
+        assert len(result) <= 53  # 50 + "..."
 
-    def test_adds_links_to_every_entry(self):
-        v1_1 = _make_v1_1_document()
-        v1_2 = migrate_v1_1_to_v1_2(v1_1)
+    def test_truncated_does_not_split_words(self):
+        value = "the quick brown fox jumps over the lazy dog " * 5
+        result = generate_summary(value, max_len=30)
+        # Should not end with a partial word before "..."
+        without_ellipsis = result[:-3]
+        assert not without_ellipsis[-1].isalpha() or without_ellipsis.endswith(
+            without_ellipsis.split()[-1]
+        )
 
-        for _cat_name, entries in v1_2["memories"].items():
-            for _key, entry in entries.items():
-                assert "links" in entry
-                assert entry["links"] == []
+    def test_empty_value(self):
+        assert generate_summary("") == ""
 
-    def test_preserves_original_data(self):
-        v1_1 = _make_v1_1_document()
-        v1_2 = migrate_v1_1_to_v1_2(v1_1)
+    def test_single_long_word(self):
+        """A single word longer than max_len gets truncated at max_len."""
+        value = "a" * 150
+        result = generate_summary(value, max_len=100)
+        # No space found, so truncate at max_len directly
+        assert result.endswith("...")
 
-        entry = v1_2["memories"]["user"]["name"]
-        assert entry["value"] == "Alice"
-        assert entry["importance"] == 8
-        assert entry["access_count"] == 3
-
-    def test_preserves_session_count(self):
-        v1_1 = _make_v1_1_document()
-        v1_2 = migrate_v1_1_to_v1_2(v1_1)
-        assert v1_2["session_count"] == 5
-
-    def test_does_not_mutate_input(self):
-        v1_1 = _make_v1_1_document()
-        original_copy = copy.deepcopy(v1_1)
-        migrate_v1_1_to_v1_2(v1_1)
-        assert v1_1 == original_copy
-
-
-# -- Chained migration v1.0 -> v1.2 ------------------------------------------
-
-
-class TestChainedMigration:
-    def test_v1_0_to_v1_2_via_chain(self):
-        """Apply v1.0 -> v1.1 -> v1.2 sequentially."""
-        v1_0 = _make_v1_0_document()
-        v1_1 = migrate_v1_0_to_v1_1(v1_0)
-        v1_2 = migrate_v1_1_to_v1_2(v1_1)
-
-        assert v1_2["schema_version"] == "1.2"
-        assert v1_2["session_count"] == 0
-
-        # All entries have both v1.1 and v1.2 fields
-        entry = v1_2["memories"]["user"]["first_name"]
-        assert entry["importance"] == DEFAULT_IMPORTANCE
-        assert entry["source"] == {"type": "session", "detail": None}
-        assert entry["access_count"] == 0
-        assert entry["status"] == "active"
-        assert entry["links"] == []
-
-        # Original data preserved
-        assert entry["value"] == "Francisco"
-        assert entry["tags"] == ["personal", "identity"]
-
-    def test_chained_migration_preserves_all_entries(self):
-        v1_0 = _make_v1_0_document()
-        v1_1 = migrate_v1_0_to_v1_1(v1_0)
-        v1_2 = migrate_v1_1_to_v1_2(v1_1)
-
-        # Count entries: same number as original
-        original_count = sum(len(e) for e in v1_0["memories"].values())
-        migrated_count = sum(len(e) for e in v1_2["memories"].values())
-        assert migrated_count == original_count
+    def test_custom_max_len(self):
+        result = generate_summary("hello world", max_len=5)
+        assert result.endswith("...")
+        assert len(result) <= 10  # generous bound

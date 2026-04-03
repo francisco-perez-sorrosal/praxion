@@ -5,16 +5,18 @@ from __future__ import annotations
 import contextlib
 import fcntl
 import json
-import math
 import os
-import re
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
+from memory_mcp.consolidation import apply_actions, validate_actions
+from memory_mcp.dedup import (
+    _find_dedup_candidates,
+    _recommend_action,
+)
 from memory_mcp.lifecycle import analyze as lifecycle_analyze
 from memory_mcp.schema import (
-    DEFAULT_IMPORTANCE,
     MAX_IMPORTANCE,
     MIN_IMPORTANCE,
     SCHEMA_VERSION,
@@ -22,47 +24,30 @@ from memory_mcp.schema import (
     VALID_RELATIONS,
     MemoryEntry,
     Source,
-    migrate_v1_0_to_v1_1,
-    migrate_v1_1_to_v1_2,
+    generate_summary,
+)
+from memory_mcp.search import (
+    _compute_importance_score,
+    _compute_recency_score,
+    _compute_search_score,
+    _compute_tag_match_score,
+    _compute_text_match_score,
+    _find_match_reasons_multi,
+    _format_as_markdown,
+    format_markdown_kv_index,
+    format_search_results_markdown,
 )
 
 # -- Constants ----------------------------------------------------------------
 
 JSON_INDENT = 2
 BACKUP_SUFFIX = ".backup.json"
-PRE_MIGRATION_SUFFIX = ".pre-migration-1.0.json"
+PRE_FORGET_BACKUP_SUFFIX = ".pre-forget.json"
 
 # Auto-link constants
 AUTO_LINK_TAG_OVERLAP_THRESHOLD = 2
 MAX_AUTO_LINKS_PER_REMEMBER = 3
 AUTO_LINK_RELATION = "related-to"
-
-PRE_MIGRATION_V1_1_SUFFIX = ".pre-migration-1.1.json"
-
-# Dedup thresholds
-MIN_TAG_OVERLAP_FOR_CANDIDATE = 2
-STRONG_TAG_OVERLAP_THRESHOLD = 3
-MIN_WORD_LENGTH = 3
-HIGH_VALUE_SIMILARITY_RATIO = 0.6
-MIN_SIGNIFICANT_WORDS_FOR_VALUE_MATCH = 3
-STOP_WORDS = frozenset({
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "could",
-    "should", "may", "might", "shall", "can", "and", "but", "or", "not",
-    "no", "so", "if", "for", "to", "of", "in", "on", "at", "by", "with",
-    "from", "as", "into", "that", "this", "it", "its",
-})
-
-# Search ranking weights (each signal normalized to 0.0-1.0)
-SEARCH_WEIGHTS = {
-    "text_match": 0.4,
-    "tag_match": 0.2,
-    "importance": 0.25,
-    "recency": 0.15,
-}
-
-# Recency exponential decay: half-life ~21 days (score ~0.37 at 30 days)
-RECENCY_DECAY_DAYS = 30
 
 
 # -- Helpers ------------------------------------------------------------------
@@ -77,6 +62,11 @@ def _clamp_importance(value: int) -> int:
     return max(MIN_IMPORTANCE, min(MAX_IMPORTANCE, value))
 
 
+def _is_active(entry: dict) -> bool:
+    """Check whether a memory entry is currently active (not soft-deleted)."""
+    return entry.get("invalid_at") is None
+
+
 def _human_file_size(byte_count: int) -> str:
     """Format byte count as human-readable string."""
     if byte_count < 1024:
@@ -88,157 +78,14 @@ def _human_file_size(byte_count: int) -> str:
     return f"{mib:.1f} MB"
 
 
-# -- Dedup helpers ------------------------------------------------------------
-
-
-def _extract_significant_words(text: str) -> set[str]:
-    """Extract significant words from text, filtering stopwords and short tokens."""
-    words = re.findall(r"[a-z0-9]+", text.lower())
-    return {w for w in words if len(w) >= MIN_WORD_LENGTH and w not in STOP_WORDS}
-
-
-def _tag_overlap_count(tags_a: list[str], tags_b: list[str]) -> int:
-    """Count shared tags between two tag lists (case-insensitive)."""
-    set_a = {t.lower() for t in tags_a}
-    set_b = {t.lower() for t in tags_b}
-    return len(set_a & set_b)
-
-
-def _value_similarity_ratio(new_words: set[str], existing_words: set[str]) -> float:
-    """Fraction of new_words that appear in existing_words. Returns 0.0 if no words."""
-    if not new_words:
-        return 0.0
-    return len(new_words & existing_words) / len(new_words)
-
-
-def _find_dedup_candidates(
-    new_key: str,
-    new_value: str,
-    new_tags: list[str],
-    entries: dict[str, dict],
-    category: str,
-) -> list[dict]:
-    """Scan entries for overlap with the proposed new entry.
-
-    Returns a list of candidate dicts with match_reason and overlap details.
-    Skips the entry whose key matches new_key (exact key match is handled separately).
-    """
-    new_words = _extract_significant_words(new_value)
-    candidates = []
-
-    for existing_key, entry in entries.items():
-        if existing_key == new_key:
-            continue
-
-        reasons = []
-        existing_tags = entry.get("tags", [])
-        tag_overlap = _tag_overlap_count(new_tags, existing_tags)
-        if tag_overlap >= MIN_TAG_OVERLAP_FOR_CANDIDATE:
-            reasons.append(f"tag_overlap({tag_overlap})")
-
-        existing_words = _extract_significant_words(entry.get("value", ""))
-        similarity = _value_similarity_ratio(new_words, existing_words)
-        has_enough_words = len(new_words) >= MIN_SIGNIFICANT_WORDS_FOR_VALUE_MATCH
-        if has_enough_words and similarity >= HIGH_VALUE_SIMILARITY_RATIO:
-            reasons.append(f"value_similarity({similarity:.0%})")
-
-        if reasons:
-            candidates.append({
-                "category": category,
-                "key": existing_key,
-                "value": entry.get("value", ""),
-                "tags": existing_tags,
-                "match_reason": ", ".join(reasons),
-                "tag_overlap": tag_overlap,
-                "value_similarity": round(similarity, 2),
-            })
-
-    return candidates
-
-
-def _recommend_action(candidates: list[dict], new_value: str) -> str:
-    """Choose ADD, UPDATE, or NOOP recommendation based on candidate overlap."""
-    new_words = _extract_significant_words(new_value)
-
-    for candidate in candidates:
-        existing_words = _extract_significant_words(candidate["value"])
-        has_substance = len(new_words) >= MIN_SIGNIFICANT_WORDS_FOR_VALUE_MATCH
-        if has_substance and new_words == existing_words:
-            return "NOOP"
-
-    for candidate in candidates:
-        if candidate["tag_overlap"] >= STRONG_TAG_OVERLAP_THRESHOLD:
-            return "UPDATE"
-        if candidate["value_similarity"] >= HIGH_VALUE_SIMILARITY_RATIO:
-            return "UPDATE"
-
-    return "ADD"
-
-
-# -- Search scoring helpers ----------------------------------------------------
-
-
-def _compute_text_match_score(
-    key: str, entry: dict, query_lower: str,
-) -> float:
-    """Score text match: 1.0 for exact key, 0.7 for key substring, 0.5 for value/tag match."""
-    if key.lower() == query_lower:
-        return 1.0
-    if query_lower in key.lower():
-        return 0.7
-    if query_lower in entry.get("value", "").lower():
-        return 0.5
-    tags = entry.get("tags", [])
-    if any(query_lower in tag.lower() for tag in tags):
-        return 0.5
-    return 0.0
-
-
-def _compute_tag_match_score(entry: dict, query_terms: list[str]) -> float:
-    """Fraction of entry tags that match any query term."""
-    if not query_terms:
-        return 0.0
-    tags_lower = {t.lower() for t in entry.get("tags", [])}
-    if not tags_lower:
-        return 0.0
-    matching = sum(
-        1 for term in query_terms if any(term in tag for tag in tags_lower)
-    )
-    return min(matching / max(len(query_terms), 1), 1.0)
-
-
-def _compute_importance_score(entry: dict) -> float:
-    """Normalize importance from 1-10 scale to 0.0-1.0."""
-    importance = entry.get("importance", DEFAULT_IMPORTANCE)
-    return importance / MAX_IMPORTANCE
-
-
-def _compute_recency_score(entry: dict, now: datetime) -> float:
-    """Exponential decay based on last_accessed. 0.0 if never accessed."""
-    last_accessed = entry.get("last_accessed")
-    if not last_accessed:
-        return 0.0
-    accessed_str = last_accessed.replace("Z", "+00:00")
-    accessed_dt = datetime.fromisoformat(accessed_str)
-    days_since = (now - accessed_dt).total_seconds() / 86400
-    return math.exp(-days_since / RECENCY_DECAY_DAYS)
-
-
-def _compute_search_score(signals: dict[str, float]) -> float:
-    """Weighted combination of individual signal scores."""
-    return sum(
-        SEARCH_WEIGHTS[signal] * score for signal, score in signals.items()
-    )
-
-
 # -- MemoryStore --------------------------------------------------------------
 
 
 class MemoryStore:
     """Persistent memory store backed by a single JSON file.
 
-    Provides CRUD operations, access tracking, atomic writes, link management,
-    and chained auto-migration (v1.0 -> v1.1 -> v1.2) on first load.
+    Provides CRUD operations, access tracking, atomic writes, and link management.
+    Requires schema v1.3 -- no migration from older versions.
     """
 
     def __init__(self, file_path: Path) -> None:
@@ -302,31 +149,18 @@ class MemoryStore:
             lock_fd.close()
 
     def _auto_migrate_if_needed(self) -> None:
-        """Detect outdated schema and apply chained migrations (v1.0 -> v1.1 -> v1.2)."""
+        """Validate schema version is 1.3. Raises ValueError on mismatch."""
         data = self._load()
         version = data.get("schema_version")
 
         if version == SCHEMA_VERSION:
             return
 
-        if version == "1.0":
-            backup_path = self._path.with_name(
-                self._path.stem + PRE_MIGRATION_SUFFIX
-            )
-            backup_content = json.dumps(data, indent=JSON_INDENT, ensure_ascii=False) + "\n"
-            backup_path.write_text(backup_content, encoding="utf-8")
-            data = migrate_v1_0_to_v1_1(data)
-            version = "1.1"
-
-        if version == "1.1":
-            backup_path = self._path.with_name(
-                self._path.stem + PRE_MIGRATION_V1_1_SUFFIX
-            )
-            backup_content = json.dumps(data, indent=JSON_INDENT, ensure_ascii=False) + "\n"
-            backup_path.write_text(backup_content, encoding="utf-8")
-            data = migrate_v1_1_to_v1_2(data)
-
-        self._save(data)
+        msg = (
+            f"Unsupported schema version '{version}' in {self._path}. "
+            f"Expected '{SCHEMA_VERSION}'. Migration from older versions is not supported."
+        )
+        raise ValueError(msg)
 
     def _read_modify_write(self, mutator):
         """Lock, load, apply mutator, save. Returns mutator's return value."""
@@ -379,6 +213,7 @@ class MemoryStore:
         confidence: float | None = None,
         force: bool = False,
         broad: bool = False,
+        summary: str | None = None,
     ) -> dict:
         """Create or update a memory entry.
 
@@ -393,9 +228,7 @@ class MemoryStore:
         resolved_tags = sorted(tags) if tags else []
 
         if not force:
-            candidates = self._find_candidates(
-                category, key, value, resolved_tags, broad=broad
-            )
+            candidates = self._find_candidates(category, key, value, resolved_tags, broad=broad)
             if candidates:
                 recommendation = _recommend_action(candidates, value)
                 return {
@@ -405,11 +238,14 @@ class MemoryStore:
                 }
 
         return self._do_remember(
-            category, key, value,
+            category,
+            key,
+            value,
             tags=resolved_tags,
             importance=importance,
             source_type=source_type,
             confidence=confidence,
+            summary=summary,
         )
 
     def _find_candidates(
@@ -434,13 +270,9 @@ class MemoryStore:
         if broad:
             for cat_name in VALID_CATEGORIES:
                 entries = memories.get(cat_name, {})
-                all_candidates.extend(
-                    _find_dedup_candidates(key, value, tags, entries, cat_name)
-                )
+                all_candidates.extend(_find_dedup_candidates(key, value, tags, entries, cat_name))
         else:
-            all_candidates = _find_dedup_candidates(
-                key, value, tags, cat_entries, category
-            )
+            all_candidates = _find_dedup_candidates(key, value, tags, cat_entries, category)
 
         return all_candidates
 
@@ -454,6 +286,7 @@ class MemoryStore:
         importance: int,
         source_type: str,
         confidence: float | None,
+        summary: str | None = None,
     ) -> dict:
         """Unconditionally create or update a memory entry (no dedup check).
 
@@ -461,6 +294,7 @@ class MemoryStore:
         and auto-creates ``related-to`` links when 2+ tags overlap.
         """
         now = _now_utc()
+        resolved_summary = summary if summary is not None else generate_summary(value)
 
         def _mutate(data: dict) -> dict:
             memories = data.setdefault("memories", {})
@@ -470,6 +304,7 @@ class MemoryStore:
                 existing = cat_entries[key]
                 existing["value"] = value
                 existing["updated_at"] = now
+                existing["summary"] = resolved_summary
                 if tags:
                     merged = list(set(existing.get("tags", [])) | set(tags))
                     existing["tags"] = sorted(merged)
@@ -489,6 +324,9 @@ class MemoryStore:
                 access_count=0,
                 last_accessed=None,
                 status="active",
+                summary=resolved_summary,
+                valid_at=now,
+                invalid_at=None,
             )
             entry_dict = entry.to_dict()
             cat_entries[key] = entry_dict
@@ -503,7 +341,45 @@ class MemoryStore:
         return self._read_modify_write(_mutate)
 
     def forget(self, category: str, key: str) -> dict:
-        """Remove a memory entry, clean up incoming links, and create a backup."""
+        """Soft-delete a memory entry by setting invalid_at and status.
+
+        The entry remains in the store with status="superseded" and an
+        ``invalid_at`` timestamp.  Links are preserved for historical queries.
+        A pre-mutation backup is created.
+        """
+        self._validate_category(category)
+        now = _now_utc()
+
+        def _mutate(data: dict) -> dict:
+            memories = data.get("memories", {})
+            cat_entries = memories.get(category, {})
+            if key not in cat_entries:
+                msg = f"Key '{key}' not found in category '{category}'"
+                raise KeyError(msg)
+
+            # Create backup before mutation
+            backup_path = self._path.with_name(self._path.stem + PRE_FORGET_BACKUP_SUFFIX)
+            backup_content = json.dumps(data, indent=JSON_INDENT, ensure_ascii=False) + "\n"
+            backup_path.write_text(backup_content, encoding="utf-8")
+
+            entry = cat_entries[key]
+            entry["invalid_at"] = now
+            entry["status"] = "superseded"
+
+            return {
+                "action": "soft_deleted",
+                "entry": dict(entry),
+                "backup_path": str(backup_path),
+            }
+
+        return self._read_modify_write(_mutate)
+
+    def hard_delete(self, category: str, key: str) -> dict:
+        """Permanently remove a memory entry and clean up incoming links.
+
+        Creates a backup before removal. Use this for entries that must be
+        fully erased (e.g., sensitive data).
+        """
         self._validate_category(category)
         target_ref = f"{category}.{key}"
 
@@ -552,12 +428,27 @@ class MemoryStore:
 
         return self._read_modify_write(_mutate)
 
-    def search(self, query: str, category: str | None = None) -> dict:
-        """Multi-signal ranked search across keys, values, and tags.
+    def search(
+        self,
+        query: str,
+        category: str | None = None,
+        *,
+        detail: str = "full",
+        include_historical: bool = False,
+    ) -> dict:
+        """Multi-signal ranked search across keys, values, tags, and summaries.
 
         Entries must match the text query to be included. Among matches,
         results are ranked by a weighted combination of text match quality,
         tag overlap, importance, and recency signals.
+
+        Args:
+            query: Search text. Multi-term queries match if ANY term matches
+                ANY field (key, value, tags, summary).
+            category: Optional category filter.
+            detail: ``"index"`` returns Markdown-formatted summaries;
+                ``"full"`` returns complete entry dicts (default).
+            include_historical: When True, include soft-deleted entries.
         """
         if category is not None:
             self._validate_category(category)
@@ -568,17 +459,20 @@ class MemoryStore:
 
         def _mutate(data: dict) -> dict:
             memories = data.get("memories", {})
-            categories_to_search = (
-                {category: memories.get(category, {})}
-                if category
-                else memories
-            )
+            categories_to_search = {category: memories.get(category, {})} if category else memories
 
             results = []
             for cat_name, entries in categories_to_search.items():
                 for entry_key, entry in entries.items():
-                    match_reasons = _find_match_reasons(
-                        entry_key, entry, query_lower
+                    # Filter inactive entries unless include_historical
+                    if not _is_active(entry) and not include_historical:
+                        continue
+
+                    match_reasons = _find_match_reasons_multi(
+                        entry_key,
+                        entry,
+                        query_lower,
+                        query_terms,
                     )
                     if not match_reasons:
                         continue
@@ -587,10 +481,13 @@ class MemoryStore:
                     # so recency reflects the entry's pre-search state
                     signals = {
                         "text_match": _compute_text_match_score(
-                            entry_key, entry, query_lower,
+                            entry_key,
+                            entry,
+                            query_lower,
                         ),
                         "tag_match": _compute_tag_match_score(
-                            entry, query_terms,
+                            entry,
+                            query_terms,
                         ),
                         "importance": _compute_importance_score(entry),
                         "recency": _compute_recency_score(entry, now_dt),
@@ -601,16 +498,23 @@ class MemoryStore:
                     entry["access_count"] = entry.get("access_count", 0) + 1
                     entry["last_accessed"] = now_str
 
-                    results.append({
-                        "category": cat_name,
-                        "key": entry_key,
-                        "entry": dict(entry),
-                        "score": round(score, 4),
-                        "signals": {k: round(v, 4) for k, v in signals.items()},
-                        "match_reason": ", ".join(match_reasons),
-                    })
+                    results.append(
+                        {
+                            "category": cat_name,
+                            "key": entry_key,
+                            "entry": dict(entry),
+                            "score": round(score, 4),
+                            "signals": {k: round(v, 4) for k, v in signals.items()},
+                            "match_reason": ", ".join(match_reasons),
+                        }
+                    )
 
             results.sort(key=lambda r: r["score"], reverse=True)
+
+            if detail == "index":
+                markdown = format_search_results_markdown(results, query)
+                return {"results_markdown": markdown, "count": len(results)}
+
             return {"results": results}
 
         return self._read_modify_write(_mutate)
@@ -644,6 +548,71 @@ class MemoryStore:
 
         return {"content": _format_as_markdown(data)}
 
+    def browse_index(self, include_historical: bool = False) -> dict:
+        """Return a Markdown-KV index of all memory entries grouped by category.
+
+        Soft-deleted entries are excluded by default. Set *include_historical*
+        to include them with an annotation.
+        """
+        data = self._load()
+        memories = data.get("memories", {})
+
+        # Count active (and optionally historical) entries per category
+        categories: dict[str, int] = {}
+        total = 0
+        for cat_name, entries in memories.items():
+            count = 0
+            for entry in entries.values():
+                if _is_active(entry) or include_historical:
+                    count += 1
+            if count:
+                categories[cat_name] = count
+                total += count
+
+        index_md = format_markdown_kv_index(memories, include_historical=include_historical)
+        return {
+            "index": index_md,
+            "entry_count": total,
+            "categories": categories,
+        }
+
+    def consolidate(self, actions: list[dict], *, dry_run: bool = False) -> dict:
+        """Validate and apply consolidation actions atomically.
+
+        Creates a timestamped backup before mutation. Actions are validated
+        first -- if any fail, no changes are made.
+
+        Args:
+            actions: List of action dicts (merge, archive, adjust_confidence,
+                update_summary).
+            dry_run: When True, validate and preview without mutating.
+        """
+        # Pre-validate against current state (read-only)
+        data = self._load()
+        memories = data.get("memories", {})
+        validation = validate_actions(actions, memories)
+
+        if not validation["valid"]:
+            return {"valid": False, "errors": validation["errors"]}
+
+        if dry_run:
+            return {"valid": True, "dry_run": True, "action_count": len(actions), "errors": []}
+
+        def _mutate(data: dict) -> dict:
+            # Create pre-consolidation backup
+            now_stamp = _now_utc().replace(":", "-")
+            backup_name = f"{self._path.stem}.pre-consolidation-{now_stamp}.json"
+            backup_path = self._path.with_name(backup_name)
+            backup_content = json.dumps(data, indent=JSON_INDENT, ensure_ascii=False) + "\n"
+            backup_path.write_text(backup_content, encoding="utf-8")
+
+            mems = data.get("memories", {})
+            result = apply_actions(actions, mems)
+            result["backup_path"] = str(backup_path)
+            return result
+
+        return self._read_modify_write(_mutate)
+
     def about_me(self) -> dict:
         """Aggregate user profile from user, relationships, and tools categories."""
         data = self._load()
@@ -657,10 +626,7 @@ class MemoryStore:
                 lines.append(f"- **{key}**: {entry['value']}")
 
         rel_entries = memories.get("relationships", {})
-        user_facing = {
-            k: v for k, v in rel_entries.items()
-            if "user-facing" in v.get("tags", [])
-        }
+        user_facing = {k: v for k, v in rel_entries.items() if "user-facing" in v.get("tags", [])}
         if user_facing:
             lines.append("")
             lines.append("## Relationship Context")
@@ -669,8 +635,7 @@ class MemoryStore:
 
         tools_entries = memories.get("tools", {})
         user_prefs = {
-            k: v for k, v in tools_entries.items()
-            if "user-preference" in v.get("tags", [])
+            k: v for k, v in tools_entries.items() if "user-preference" in v.get("tags", [])
         }
         if user_prefs:
             lines.append("")
@@ -793,9 +758,7 @@ class MemoryStore:
             source_entry = src_entries[source_key]
             links = source_entry.get("links", [])
             original_count = len(links)
-            source_entry["links"] = [
-                lk for lk in links if lk["target"] != target_ref
-            ]
+            source_entry["links"] = [lk for lk in links if lk["target"] != target_ref]
 
             if len(source_entry["links"]) == original_count:
                 msg = f"No link from '{source_ref}' to '{target_ref}'"
@@ -828,11 +791,13 @@ class MemoryStore:
             relation = link["relation"]
             tgt_cat, tgt_key = target.split(".", 1)
             tgt_entry = memories.get(tgt_cat, {}).get(tgt_key, {})
-            outgoing.append({
-                "target": target,
-                "relation": relation,
-                "entry_summary": tgt_entry.get("value", ""),
-            })
+            outgoing.append(
+                {
+                    "target": target,
+                    "relation": relation,
+                    "entry_summary": tgt_entry.get("value", ""),
+                }
+            )
 
         # Incoming links (reverse lookup)
         incoming = _find_incoming_links(memories, target_ref)
@@ -841,39 +806,6 @@ class MemoryStore:
 
 
 # -- Module-level helpers (kept out of class for readability) -----------------
-
-
-def _find_match_reasons(key: str, entry: dict, query_lower: str) -> list[str]:
-    """Return list of match reasons for a search query against an entry."""
-    reasons = []
-    if query_lower in key.lower():
-        reasons.append("key")
-    if query_lower in entry.get("value", "").lower():
-        reasons.append("value")
-    tags = entry.get("tags", [])
-    if any(query_lower in tag.lower() for tag in tags):
-        reasons.append("tag")
-    return reasons
-
-
-def _format_as_markdown(data: dict) -> str:
-    """Format full memory data as markdown."""
-    lines = [f"# Memory Export (schema {data.get('schema_version', '?')})"]
-    lines.append(f"Session count: {data.get('session_count', 0)}")
-    lines.append("")
-
-    memories = data.get("memories", {})
-    for cat_name, entries in memories.items():
-        if not entries:
-            continue
-        lines.append(f"## {cat_name}")
-        for key, entry in entries.items():
-            tags_str = ", ".join(entry.get("tags", []))
-            tag_suffix = f" [{tags_str}]" if tags_str else ""
-            lines.append(f"- **{key}**: {entry.get('value', '')}{tag_suffix}")
-        lines.append("")
-
-    return "\n".join(lines)
 
 
 def _find_auto_links(
@@ -900,10 +832,12 @@ def _find_auto_links(
         overlap = len(new_tag_set & existing_tags)
         if overlap >= AUTO_LINK_TAG_OVERLAP_THRESHOLD:
             target_ref = f"{category}.{existing_key}"
-            auto_links.append({
-                "target": target_ref,
-                "relation": AUTO_LINK_RELATION,
-            })
+            auto_links.append(
+                {
+                    "target": target_ref,
+                    "relation": AUTO_LINK_RELATION,
+                }
+            )
             if len(auto_links) >= MAX_AUTO_LINKS_PER_REMEMBER:
                 break
 
@@ -916,9 +850,7 @@ def _remove_incoming_links(memories: dict, target_ref: str) -> None:
         for _key, entry in entries.items():
             links = entry.get("links", [])
             if links:
-                entry["links"] = [
-                    lk for lk in links if lk["target"] != target_ref
-                ]
+                entry["links"] = [lk for lk in links if lk["target"] != target_ref]
 
 
 def _find_incoming_links(memories: dict, target_ref: str) -> list[dict]:
@@ -929,11 +861,13 @@ def _find_incoming_links(memories: dict, target_ref: str) -> list[dict]:
             for link in entry.get("links", []):
                 if link["target"] == target_ref:
                     source_ref = f"{cat_name}.{entry_key}"
-                    incoming.append({
-                        "source": source_ref,
-                        "relation": link["relation"],
-                        "entry_summary": entry.get("value", ""),
-                    })
+                    incoming.append(
+                        {
+                            "source": source_ref,
+                            "relation": link["relation"],
+                            "entry_summary": entry.get("value", ""),
+                        }
+                    )
     return incoming
 
 

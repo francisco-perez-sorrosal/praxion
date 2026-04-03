@@ -95,9 +95,7 @@ def _days_since(dt: datetime, now: datetime) -> float:
     return delta.total_seconds() / 86400
 
 
-def _check_staleness(
-    category: str, key: str, entry: dict, now: datetime
-) -> dict | None:
+def _check_staleness(category: str, key: str, entry: dict, now: datetime) -> dict | None:
     """Flag entries with access_count == 0 that were created over 7 days ago."""
     access_count = entry.get("access_count", 0)
     if access_count > 0:
@@ -120,9 +118,7 @@ def _check_staleness(
     }
 
 
-def _check_archival_candidate(
-    category: str, key: str, entry: dict
-) -> dict | None:
+def _check_archival_candidate(category: str, key: str, entry: dict) -> dict | None:
     """Flag low-importance, never-accessed, active entries for archival."""
     importance = entry.get("importance", 5)
     access_count = entry.get("access_count", 0)
@@ -158,13 +154,15 @@ def _check_confidence_adjustments(
 
     # Frequently accessed entries deserve higher confidence
     if access_count >= HIGH_ACCESS_THRESHOLD and confidence < HIGH_CONFIDENCE_FLOOR:
-        proposals.append({
-            "category": category,
-            "key": key,
-            "current_confidence": confidence,
-            "proposed_confidence": HIGH_CONFIDENCE_FLOOR,
-            "reason": "frequently accessed",
-        })
+        proposals.append(
+            {
+                "category": category,
+                "key": key,
+                "current_confidence": confidence,
+                "proposed_confidence": HIGH_CONFIDENCE_FLOOR,
+                "reason": "frequently accessed",
+            }
+        )
 
     # Never-accessed old entries should lose confidence
     if access_count == 0 and confidence > LOW_CONFIDENCE_CEILING:
@@ -173,22 +171,26 @@ def _check_confidence_adjustments(
             days_old = _days_since(created_at, now)
             if days_old >= STALENESS_DAYS_THRESHOLD:
                 reduced = round(confidence - CONFIDENCE_REDUCTION_STEP, 2)
-                proposals.append({
-                    "category": category,
-                    "key": key,
-                    "current_confidence": confidence,
-                    "proposed_confidence": max(reduced, 0.0),
-                    "reason": "never accessed",
-                })
+                proposals.append(
+                    {
+                        "category": category,
+                        "key": key,
+                        "current_confidence": confidence,
+                        "proposed_confidence": max(reduced, 0.0),
+                        "reason": "never accessed",
+                    }
+                )
 
     # User-stated facts should have high confidence
     if source_type == "user-stated" and confidence < USER_STATED_MINIMUM_CONFIDENCE:
-        proposals.append({
-            "category": category,
-            "key": key,
-            "current_confidence": confidence,
-            "proposed_confidence": USER_STATED_MINIMUM_CONFIDENCE,
-            "reason": "user-stated fact",
-        })
+        proposals.append(
+            {
+                "category": category,
+                "key": key,
+                "current_confidence": confidence,
+                "proposed_confidence": USER_STATED_MINIMUM_CONFIDENCE,
+                "reason": "user-stated fact",
+            }
+        )
 
     return proposals

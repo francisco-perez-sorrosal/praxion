@@ -32,18 +32,14 @@ class TestDedupNoOverlap:
 
     def test_unrelated_entries_no_candidates(self, store: MemoryStore):
         store.remember("user", "name", "Alice", tags=["identity"])
-        result = store.remember(
-            "user", "email", "alice@example.com", tags=["contact"]
-        )
+        result = store.remember("user", "email", "alice@example.com", tags=["contact"])
         assert result["action"] == "ADD"
         assert result["entry"]["value"] == "alice@example.com"
 
     def test_single_tag_overlap_not_enough(self, store: MemoryStore):
         """One shared tag is below the MIN_TAG_OVERLAP_FOR_CANDIDATE threshold."""
         store.remember("user", "name", "Alice", tags=["identity", "personal"])
-        result = store.remember(
-            "user", "email", "alice@example.com", tags=["identity", "contact"]
-        )
+        result = store.remember("user", "email", "alice@example.com", tags=["identity", "contact"])
         # Only 1 tag overlap ("identity") -- below threshold of 2
         assert result["action"] == "ADD"
 
@@ -54,11 +50,15 @@ class TestDedupNoOverlap:
 class TestDedupTagOverlap:
     def test_two_tag_overlap_returns_candidates(self, store: MemoryStore):
         store.remember(
-            "user", "name", "Alice Wonderland",
+            "user",
+            "name",
+            "Alice Wonderland",
             tags=["identity", "personal", "profile"],
         )
         result = store.remember(
-            "user", "nickname", "Ally",
+            "user",
+            "nickname",
+            "Ally",
             tags=["identity", "personal", "shortname"],
         )
         assert result["action"] == "candidates"
@@ -70,11 +70,15 @@ class TestDedupTagOverlap:
 
     def test_three_tag_overlap_recommends_update(self, store: MemoryStore):
         store.remember(
-            "learnings", "python-packaging", "Use hatchling for builds",
+            "learnings",
+            "python-packaging",
+            "Use hatchling for builds",
             tags=["python", "packaging", "hatchling", "build"],
         )
         result = store.remember(
-            "learnings", "hatch-build-system", "Hatchling is the recommended build backend",
+            "learnings",
+            "hatch-build-system",
+            "Hatchling is the recommended build backend",
             tags=["python", "packaging", "hatchling"],
         )
         assert result["action"] == "candidates"
@@ -82,11 +86,15 @@ class TestDedupTagOverlap:
 
     def test_candidates_include_entry_details(self, store: MemoryStore):
         store.remember(
-            "tools", "editor", "neovim",
+            "tools",
+            "editor",
+            "neovim",
             tags=["development", "coding", "preference"],
         )
         result = store.remember(
-            "tools", "code-editor", "vscode",
+            "tools",
+            "code-editor",
+            "vscode",
             tags=["development", "coding", "ide"],
         )
         assert result["action"] == "candidates"
@@ -102,12 +110,14 @@ class TestDedupTagOverlap:
 class TestDedupValueOverlap:
     def test_high_value_similarity_returns_candidates(self, store: MemoryStore):
         store.remember(
-            "learnings", "git-workflow",
+            "learnings",
+            "git-workflow",
             "Always use atomic commits with descriptive messages",
             tags=["git"],
         )
         result = store.remember(
-            "learnings", "commit-style",
+            "learnings",
+            "commit-style",
             "Use atomic commits with clear descriptive messages",
             tags=["vcs"],
         )
@@ -117,11 +127,15 @@ class TestDedupValueOverlap:
 
     def test_near_exact_value_recommends_noop(self, store: MemoryStore):
         store.remember(
-            "project", "language", "The project uses Python for backend",
+            "project",
+            "language",
+            "The project uses Python for backend",
             tags=["tech"],
         )
         result = store.remember(
-            "project", "main-language", "The project uses Python for backend",
+            "project",
+            "main-language",
+            "The project uses Python for backend",
             tags=["stack"],
         )
         assert result["action"] == "candidates"
@@ -134,11 +148,15 @@ class TestDedupValueOverlap:
 class TestDedupExactKeyMatch:
     def test_exact_key_match_updates_directly(self, store: MemoryStore):
         store.remember(
-            "user", "name", "Alice",
+            "user",
+            "name",
+            "Alice",
             tags=["identity", "personal", "profile"],
         )
         result = store.remember(
-            "user", "name", "Bob",
+            "user",
+            "name",
+            "Bob",
             tags=["identity", "personal", "profile"],
         )
         assert result["action"] == "UPDATE"
@@ -146,11 +164,15 @@ class TestDedupExactKeyMatch:
 
     def test_exact_key_match_never_returns_candidates(self, store: MemoryStore):
         store.remember(
-            "learnings", "pattern", "Use dependency injection",
+            "learnings",
+            "pattern",
+            "Use dependency injection",
             tags=["design", "patterns", "architecture"],
         )
         result = store.remember(
-            "learnings", "pattern", "Prefer dependency injection over service locator",
+            "learnings",
+            "pattern",
+            "Prefer dependency injection over service locator",
             tags=["design", "patterns", "architecture"],
         )
         assert result["action"] == "UPDATE"
@@ -163,11 +185,15 @@ class TestDedupExactKeyMatch:
 class TestDedupForceBypass:
     def test_force_bypasses_dedup_check(self, store: MemoryStore):
         store.remember(
-            "user", "name", "Alice Wonderland",
+            "user",
+            "name",
+            "Alice Wonderland",
             tags=["identity", "personal", "profile"],
         )
         result = store.remember(
-            "user", "nickname", "Ally",
+            "user",
+            "nickname",
+            "Ally",
             tags=["identity", "personal", "shortname"],
             force=True,
         )
@@ -176,12 +202,14 @@ class TestDedupForceBypass:
 
     def test_force_allows_similar_value_entry(self, store: MemoryStore):
         store.remember(
-            "learnings", "git-workflow",
+            "learnings",
+            "git-workflow",
             "Always use atomic commits with descriptive messages",
             tags=["git"],
         )
         result = store.remember(
-            "learnings", "commit-style",
+            "learnings",
+            "commit-style",
             "Use atomic commits with clear descriptive messages",
             tags=["vcs"],
             force=True,
@@ -202,30 +230,32 @@ class TestDedupForceBypass:
 class TestDedupBroad:
     def test_broad_finds_candidates_across_categories(self, store: MemoryStore):
         store.remember(
-            "learnings", "python-patterns",
+            "learnings",
+            "python-patterns",
             "Use dataclasses for value objects",
             tags=["python", "patterns", "dataclass"],
         )
         result = store.remember(
-            "project", "coding-style",
+            "project",
+            "coding-style",
             "Prefer dataclasses for simple value objects",
             tags=["python", "patterns", "style"],
             broad=True,
         )
         assert result["action"] == "candidates"
-        assert any(
-            c["category"] == "learnings" for c in result["candidates"]
-        )
+        assert any(c["category"] == "learnings" for c in result["candidates"])
 
     def test_broad_false_does_not_cross_categories(self, store: MemoryStore):
         store.remember(
-            "learnings", "python-patterns",
+            "learnings",
+            "python-patterns",
             "Use dataclasses for value objects",
             tags=["python", "patterns", "dataclass"],
         )
         # Same entry but in a different category -- without broad, no candidates
         result = store.remember(
-            "project", "coding-style",
+            "project",
+            "coding-style",
             "Prefer dataclasses for simple value objects",
             tags=["python", "patterns", "style"],
             broad=False,
@@ -234,12 +264,14 @@ class TestDedupBroad:
 
     def test_broad_with_force_bypasses(self, store: MemoryStore):
         store.remember(
-            "learnings", "tip",
+            "learnings",
+            "tip",
             "Use immutable data structures",
             tags=["functional", "immutable", "patterns"],
         )
         result = store.remember(
-            "project", "convention",
+            "project",
+            "convention",
             "Prefer immutable data structures",
             tags=["functional", "immutable", "coding"],
             broad=True,
@@ -254,7 +286,9 @@ class TestDedupBroad:
 class TestDedupEdgeCases:
     def test_empty_store_no_candidates(self, store: MemoryStore):
         result = store.remember(
-            "user", "name", "Alice",
+            "user",
+            "name",
+            "Alice",
             tags=["identity", "personal"],
         )
         assert result["action"] == "ADD"
@@ -274,11 +308,15 @@ class TestDedupEdgeCases:
     def test_recommendation_add_for_moderate_overlap(self, store: MemoryStore):
         """Two-tag overlap but low value similarity should recommend ADD."""
         store.remember(
-            "tools", "editor", "neovim for terminal editing",
+            "tools",
+            "editor",
+            "neovim for terminal editing",
             tags=["development", "coding", "terminal"],
         )
         result = store.remember(
-            "tools", "debugger", "lldb for native debugging",
+            "tools",
+            "debugger",
+            "lldb for native debugging",
             tags=["development", "coding", "debugging"],
         )
         assert result["action"] == "candidates"

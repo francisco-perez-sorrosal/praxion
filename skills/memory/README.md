@@ -1,70 +1,61 @@
 # Memory Skill
 
-Persistent, structured memory system that tracks user preferences, assistant learnings, project conventions, and relationship dynamics across sessions. Stores data in `.ai-state/memory.json` as a categorized, queryable JSON document.
+Persistent, structured memory system that tracks user preferences, assistant learnings, project conventions, and relationship dynamics across sessions. Stores data in `.ai-state/memory.json` as a categorized, queryable JSON document with progressive disclosure via Markdown-KV format.
 
-Complements built-in memory (e.g. Claude Code's `MEMORY.md`) with explicit categories, tags, confidence levels, and subcommands. Used via memory MCP in both Claude Code and Cursor (see main repo README).
+Complements built-in memory (e.g. Claude Code's `MEMORY.md`) with explicit categories, tags, confidence levels, temporal supersession, and structured consolidation. Used via memory MCP in both Claude Code and Cursor.
 
 ## When to Use
 
-- Starting a new session and loading context about the user and past interactions
-- Storing user preferences, project conventions, or workflow discoveries
-- Recalling what the assistant knows about the user or project
-- Managing assistant self-knowledge (patterns, effective approaches, mistakes)
-- Searching across accumulated knowledge from past sessions
-- Reviewing and consolidating cross-session learnings
+- Starting a new session (memory context is auto-injected via hook -- no manual action needed)
+- Storing user preferences, project conventions, or workflow discoveries via `remember()`
+- Browsing the full memory index via `browse_index()`
+- Searching across accumulated knowledge via `search()`
+- Consolidating overlapping entries via `consolidate()`
+- Reviewing memory health via `reflect()`
 
-## Activation
+## Three-Layer Enforcement
 
-The skill activates automatically when the agent detects memory-related tasks: remembering preferences, recalling past knowledge, user profile queries, or session context loading.
+Memory is automatically integrated into agent workflows:
 
-Trigger explicitly via the `/memory` command with a subcommand:
-
-```
-/memory init
-/memory remember user timezone "America/Los_Angeles"
-/memory recall user
-/memory about-me
-/memory search "python"
-/memory reflect
-```
+1. **Hook injection**: `inject_memory.py` injects Markdown-KV summary into every agent's context at spawn
+2. **Always-loaded rule**: `memory-protocol.md` guides when to call `remember()`
+3. **Validation hook**: `validate_memory.py` warns when agents write LEARNINGS.md without calling `remember()`
 
 ## Skill Contents
 
 | File | Purpose |
 |------|---------|
-| `SKILL.md` | Core reference: ontology, subcommand procedures, session integration, proactive memory guidelines |
-| `references/schema.md` | Full JSON schema, category definitions, field constraints, migration notes |
+| `SKILL.md` | Core reference: ontology, tool table, enforcement, integration, proactive guidelines |
+| `references/schema.md` | Full JSON schema v1.3, field constraints, Markdown-KV format, consolidation actions |
 | `README.md` | This file -- overview and usage guide |
 
 ## Data Model
 
-Six categories, each stored as a keyed object in `.ai-state/memory.json`:
+Schema v1.3 with six categories. Key new fields: `summary` (one-line description), `valid_at`/`invalid_at` (temporal supersession).
 
 | Category | Tracks |
 |----------|--------|
 | `user` | Personal info, preferences, workflow habits |
-| `assistant` | Self-knowledge about patterns, mistakes, effective approaches |
+| `assistant` | Self-knowledge about patterns, effective approaches |
 | `project` | Conventions, architecture decisions, tech stack |
 | `relationships` | Interaction dynamics, delegation style, trust |
 | `tools` | Tool preferences, environment setup, CLI shortcuts |
 | `learnings` | Cross-session insights, gotchas, debugging solutions |
 
-## Subcommands
+## Key Tools
 
-| Subcommand | Arguments | Description |
-|------------|-----------|-------------|
-| `init` | -- | Initialize memory store (safe to re-run) |
-| `remember` | `<category> <key> <value>` | Store or update a memory entry |
-| `forget` | `<category> <key>` | Remove an entry (creates backup first) |
-| `recall` | `<category> [key]` | Retrieve entries (all in category or specific key) |
-| `status` | -- | Show entry counts, last updated, file size |
-| `export` | -- | Export all memories as formatted markdown |
-| `about-me` | -- | Show everything known about the user |
-| `about-us` | -- | Show the relationship and collaboration profile |
-| `search` | `<query>` | Full-text search across all memories |
-| `reflect` | -- | Assistant reviews and consolidates its knowledge |
+| Tool | Description |
+|------|-------------|
+| `browse_index` | Full Markdown-KV summary of all entries. Most token-efficient view. |
+| `remember` | Store entry with optional `summary` param. Auto-generates summary if omitted. |
+| `search` | Multi-term ranked search. `detail="index"` (Markdown) or `detail="full"` (JSON). |
+| `forget` | Soft-delete (sets `invalid_at`). Use `hard_delete` for permanent removal. |
+| `consolidate` | Execute structured actions (merge, archive, adjust, update) with backup. |
+| `reflect` | Lifecycle analysis: stale entries, archival candidates. Read-only. |
 
 ## Related Artifacts
 
 - [`/memory` command](../../commands/memory.md) -- slash command that delegates to this skill
+- [`memory-protocol.md`](../../rules/swe/memory-protocol.md) -- always-loaded rule for remember guidance
+- [`inject_memory.py`](../../.claude-plugin/hooks/inject_memory.py) -- SubagentStart hook for context injection
 - [`.ai-state/memory.json`](../../.ai-state/memory.json) -- the persistent data store

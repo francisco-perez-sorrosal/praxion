@@ -9,14 +9,26 @@ compatibility: Claude Code
 MCP-backed memory that persists across sessions. The `memory` MCP server handles all storage operations -- this skill defines **when** and **why** to use each tool, not how to manipulate JSON.
 
 **Satellite files** (loaded on-demand):
-- [references/schema.md](references/schema.md) -- full JSON schema, category definitions, field constraints, migration notes
+- [references/schema.md](references/schema.md) -- full JSON schema, category definitions, field constraints
+
+## Three-Layer Enforcement
+
+Memory context is delivered to agents through three complementary mechanisms:
+
+1. **Hook injection (Layer 1)**: The `inject_memory.py` SubagentStart hook reads `.ai-state/memory.json` and injects a Markdown-KV summary into every agent's context. Agents see memory data automatically without calling any tool.
+
+2. **Always-loaded rule (Layer 2)**: The `memory-protocol.md` rule provides clear criteria for when to call `remember()` vs. when to skip. Loaded for every agent session.
+
+3. **Validation hook (Layer 3)**: The `validate_memory.py` SubagentStop hook checks whether agents that wrote to LEARNINGS.md also called `remember()`. Warns the parent agent on omission.
+
+**Implication**: You do NOT need to call `session_start()` or `recall()` to see memory data. It is already in your context. Focus on `remember()` for writing discoveries.
 
 ## Gotchas
 
-- **Never store secrets, API keys, or tokens in memory.** The memory store is a plain JSON file committed to `.ai-state/` -- anything written there is visible in version control.
-- **Memory categories are not tags -- each memory belongs to exactly one category.** Choosing the wrong category means the entry won't surface from category-scoped `recall` or `about_me`/`about_us` aggregations. Consult the Ontology table below before storing.
-- **`session_start` must be called at the beginning of every session.** Without it, memory context is empty and the assistant has no continuity from prior conversations. This is a silent failure -- nothing errors, you just lose all accumulated knowledge.
-- **Do not duplicate CLAUDE.md or rule content into memory.** If a convention is already in always-loaded context, storing it again wastes memory entries and creates drift risk when the source is updated but the memory copy is not.
+- **Never store secrets, API keys, or tokens in memory.** The memory store is a plain JSON file committed to `.ai-state/` -- visible in version control.
+- **Memory categories are not tags** -- each memory belongs to exactly one category.
+- **Do not duplicate CLAUDE.md or rule content into memory.** Creates drift when the source is updated but memory is not.
+- **`forget()` soft-deletes** -- entry remains with `invalid_at` set and `status=superseded`. Use `hard_delete()` for permanent removal.
 
 ## Ontology
 
@@ -24,48 +36,57 @@ Six memory categories, each targeting a distinct knowledge domain:
 
 | Category | Purpose | Examples |
 |----------|---------|----------|
-| `user` | Personal info, preferences, workflow habits, communication style | Name, email, preferred tools, response style |
-| `assistant` | Self-identity, patterns, mistakes, effective approaches | Name, "User prefers concise answers" |
-| `project` | Project-specific conventions, architecture decisions, tech stack | "Uses plugin system", "Skills follow progressive disclosure" |
-| `relationships` | Interaction dynamics, delegation style, trust, collaboration patterns | "Prefers proactive agent usage", "Values pragmatism" |
-| `tools` | Tool preferences, environment setup, CLI shortcuts, configurations | "Uses gh CLI", "Prefers pbcopy for clipboard" |
-| `learnings` | Cross-session insights, gotchas, patterns, debugging solutions | "Hooks can't live in ~/.claude/hooks/" |
+| `user` | Personal info, preferences, workflow habits | Name, email, preferred tools, response style |
+| `assistant` | Self-identity, patterns, effective approaches | Name, "User prefers concise answers" |
+| `project` | Project conventions, architecture decisions, tech stack | "Uses plugin system", "Skills use progressive disclosure" |
+| `relationships` | Interaction dynamics, delegation style, collaboration | "Prefers proactive agents", "Values pragmatism" |
+| `tools` | Tool preferences, environment setup, configurations | "Uses gh CLI", "Prefers pbcopy for clipboard" |
+| `learnings` | Cross-session insights, gotchas, patterns | "Hooks can't live in ~/.claude/hooks/" |
 
 ## Available Tools
 
-All operations go through the `memory` MCP server. Each tool listed below is a registered MCP tool.
-
 | Tool | Description |
 |------|-------------|
-| `session_start` | Initialize a session: increments session counter, returns full memory summary. Call at conversation start. |
-| `remember` | Store or update a memory entry. Checks for duplicates first; returns candidates if similar entries exist. Use `force=True` to bypass dedup. Use `broad=True` for cross-category dedup scan. |
-| `recall` | Retrieve entries from a category, optionally by key. Updates access tracking on returned entries. |
-| `search` | Case-insensitive text search across keys, values, and tags. Optional category filter. Updates access tracking. |
-| `forget` | Remove an entry. Creates a full-store backup before deletion. |
-| `status` | Category counts, total entries, schema version, session count, file size. Quick health check. |
-| `reflect` | Lifecycle analysis: staleness detection, archival candidates, confidence adjustments. Read-only. *(Step 8)* |
-| `about_me` | Aggregated user profile from user, relationships, and tools categories. |
-| `about_us` | Aggregated relationship profile from relationships and assistant categories. |
-| `export_memories` | Export all memories as markdown or JSON (`output_format` parameter). |
-| `connections` | Show links between entries (outgoing + incoming). *(v1.2, Step 10)* |
+| `remember` | Store or update. Checks for duplicates first. Use `force=True` to bypass. Optional `summary` param for one-line description. |
+| `forget` | **Soft-delete**: sets `invalid_at` and status to `superseded`. Entry remains in historical queries. |
+| `hard_delete` | Permanent removal with link cleanup and backup. |
+| `search` | Multi-term ranked search. `detail="index"` (Markdown summaries, default) or `detail="full"` (complete entries). `include_historical=True` to include soft-deleted. |
+| `browse_index` | Full Markdown-KV summary of all entries grouped by category. Most token-efficient overview. |
+| `consolidate` | Execute structured actions (merge, archive, adjust_confidence, update_summary) atomically with backup. JSON actions param. |
+| `recall` | Retrieve entries from a category with access tracking. |
+| `session_start` | Increment session counter, return summary. Not needed for agents (hook handles this). |
+| `reflect` | Lifecycle analysis: stale entries, archival candidates, confidence adjustments. Read-only. |
+| `about_me` / `about_us` | Aggregated user or relationship profiles. |
+| `connections` | Show outgoing and incoming links for an entry. |
+| `add_link` / `remove_link` | Manage unidirectional links between entries. |
 
 ### Key Parameters on `remember`
 
-- **`importance`** (int, 1-10, default 5): Priority level. Use 8-10 for critical user preferences, 1-3 for speculative observations.
-- **`source_type`** (str, default "session"): Origin of the memory -- `"session"`, `"user-stated"`, `"inferred"`, or `"codebase"`.
-- **`confidence`** (float, 0.0-1.0, optional): Certainty level. Use for assistant self-knowledge; leave null for factual entries.
-- **`force`** (bool, default false): Skip deduplication check and write immediately.
-- **`broad`** (bool, default false): Check for duplicates across all categories, not just the target.
+- **`summary`** (str, optional): One-line description (~100 chars). Auto-generated from value if omitted.
+- **`importance`** (int, 1-10, default 5): Priority. Gotchas/conventions: 7-8. Patterns: 5-6. Preferences: 3-4.
+- **`source_type`** (str, default "session"): `"session"`, `"user-stated"`, `"inferred"`, or `"codebase"`.
+- **`confidence`** (float, 0.0-1.0, optional): For assistant self-knowledge; null for factual entries.
+- **`tags`**: 2-4 lowercase tags for discoverability.
 
 See [references/schema.md](references/schema.md) for full field definitions and constraints.
 
-## Session Integration
+## Integration with Agent Pipeline
 
-**Session start**: Call `session_start` to load context about the user, project conventions, and past learnings. This provides continuity across conversations. Check if `assistant.name` exists in the returned summary -- if missing, pick a random first name (any origin, any style) and store it immediately with `remember`. Use this name naturally when introducing yourself.
+### LEARNINGS.md Bridge
 
-**During session**: When discovering new information about the user's preferences, project patterns, or effective approaches, call `remember` proactively. Do not wait for the user to ask -- accumulate knowledge naturally. Be genuinely curious about the user -- when conversation allows, learn about their interests, background, working style, and preferences.
+LEARNINGS.md captures valuable insights during pipeline execution. At pipeline end:
+- Agents should call `remember()` for discoveries that apply beyond the current task
+- The dream agent or skill-genesis can harvest LEARNINGS.md entries into permanent memory
+- The `validate_memory.py` hook warns when LEARNINGS.md was written without `remember()` calls
 
-**Session end**: Consider calling `reflect` to consolidate learnings from the current session. Update confidence levels on assistant entries based on new evidence.
+### What to Remember vs. What Stays in LEARNINGS.md Only
+
+| Promote to Memory | Keep in LEARNINGS.md Only |
+|-------------------|--------------------------|
+| Gotchas that apply beyond this task | Task-specific implementation details |
+| Reusable patterns | Temporary workarounds resolved in this task |
+| Project conventions not documented elsewhere | Info derivable from code or git history |
+| Framework quirks or API drift | Content already in CLAUDE.md or rules |
 
 ## Proactive Memory Guidelines
 
@@ -74,23 +95,19 @@ Store memories when you observe:
 - **User corrects a preference**: "Actually, I prefer X over Y" --> remember it
 - **Repeated patterns**: User consistently uses a tool or workflow --> remember the pattern
 - **Explicit requests**: "Remember that I always..." --> remember immediately
-- **Project discoveries**: Architecture decisions, naming conventions, tech stack details --> store as project knowledge
-- **Debugging insights**: Solutions to tricky problems, environment quirks --> store as learnings
+- **Project discoveries**: Architecture decisions, naming conventions --> store as project knowledge
+- **Debugging insights**: Framework quirks, environment issues --> store as learnings
 - **Collaboration feedback**: "That was helpful" or "Don't do that" --> update relationship dynamics
-- **User background**: Interests, domain expertise, professional context --> build a richer user profile
-
-**Be curious about the user.** Don't just passively record -- when context allows, ask follow-up questions to understand the person behind the keyboard. Store what you learn in the `user` and `relationships` categories.
 
 Do NOT store:
-- Transient task details (current file being edited, temporary debugging state)
-- Information already in CLAUDE.md or rules (avoid duplication)
-- Speculative conclusions from a single interaction (wait for confirmation)
-- Sensitive credentials, API keys, or secrets
+- Transient task details
+- Information already in CLAUDE.md or rules
+- Speculative conclusions from a single interaction
+- Sensitive credentials
 
 ## Constraints
 
-- Never store secrets, credentials, API keys, or tokens in memory
-- Validate category names strictly -- reject unknown categories
-- Preserve `created_at` on updates -- only change `updated_at`
-- Confidence values are 0.0 to 1.0, or null for non-assistant entries
-- Importance values are clamped to 1-10
+- Never store secrets, credentials, API keys, or tokens
+- Validate category names -- reject unknown categories
+- Confidence values: 0.0 to 1.0, or null
+- Importance values: clamped to 1-10

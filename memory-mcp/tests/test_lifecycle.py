@@ -75,9 +75,11 @@ def _wrap_data(entries_by_category: dict[str, dict[str, dict]]) -> dict:
 
 class TestStalenessDetection:
     def test_old_unaccessed_entry_is_stale(self):
-        data = _wrap_data({
-            "user": {"old_entry": _make_entry(days_ago=10, access_count=0)},
-        })
+        data = _wrap_data(
+            {
+                "user": {"old_entry": _make_entry(days_ago=10, access_count=0)},
+            }
+        )
         result = analyze(data, session_count=10)
         assert len(result["stale_entries"]) == 1
         stale = result["stale_entries"][0]
@@ -86,34 +88,42 @@ class TestStalenessDetection:
         assert stale["days_old"] >= 10.0
 
     def test_recently_created_entry_not_stale(self):
-        data = _wrap_data({
-            "user": {"new_entry": _make_entry(days_ago=2, access_count=0)},
-        })
+        data = _wrap_data(
+            {
+                "user": {"new_entry": _make_entry(days_ago=2, access_count=0)},
+            }
+        )
         result = analyze(data, session_count=10)
         assert len(result["stale_entries"]) == 0
 
     def test_accessed_entry_not_stale(self):
-        data = _wrap_data({
-            "user": {"accessed": _make_entry(days_ago=30, access_count=3)},
-        })
+        data = _wrap_data(
+            {
+                "user": {"accessed": _make_entry(days_ago=30, access_count=3)},
+            }
+        )
         result = analyze(data, session_count=10)
         assert len(result["stale_entries"]) == 0
 
     def test_entry_at_exact_threshold_is_stale(self):
-        data = _wrap_data({
-            "user": {"boundary": _make_entry(
-                days_ago=STALENESS_DAYS_THRESHOLD, access_count=0
-            )},
-        })
+        data = _wrap_data(
+            {
+                "user": {
+                    "boundary": _make_entry(days_ago=STALENESS_DAYS_THRESHOLD, access_count=0)
+                },
+            }
+        )
         result = analyze(data, session_count=10)
         assert len(result["stale_entries"]) == 1
 
     def test_entry_just_below_threshold_not_stale(self):
-        data = _wrap_data({
-            "user": {"recent": _make_entry(
-                days_ago=STALENESS_DAYS_THRESHOLD - 1, access_count=0
-            )},
-        })
+        data = _wrap_data(
+            {
+                "user": {
+                    "recent": _make_entry(days_ago=STALENESS_DAYS_THRESHOLD - 1, access_count=0)
+                },
+            }
+        )
         result = analyze(data, session_count=10)
         assert len(result["stale_entries"]) == 0
 
@@ -123,11 +133,13 @@ class TestStalenessDetection:
 
 class TestArchivalCandidates:
     def test_low_importance_unaccessed_active_flagged(self):
-        data = _wrap_data({
-            "learnings": {"trivial": _make_entry(
-                importance=2, access_count=0, status="active"
-            )},
-        })
+        data = _wrap_data(
+            {
+                "learnings": {
+                    "trivial": _make_entry(importance=2, access_count=0, status="active")
+                },
+            }
+        )
         result = analyze(data, session_count=10)
         assert len(result["archival_candidates"]) == 1
         candidate = result["archival_candidates"][0]
@@ -136,47 +148,55 @@ class TestArchivalCandidates:
         assert "Low importance" in candidate["reason"]
 
     def test_high_importance_entry_not_flagged(self):
-        data = _wrap_data({
-            "user": {"important": _make_entry(
-                importance=8, access_count=0, status="active"
-            )},
-        })
+        data = _wrap_data(
+            {
+                "user": {"important": _make_entry(importance=8, access_count=0, status="active")},
+            }
+        )
         result = analyze(data, session_count=10)
         assert len(result["archival_candidates"]) == 0
 
     def test_accessed_low_importance_not_flagged(self):
-        data = _wrap_data({
-            "tools": {"used": _make_entry(
-                importance=2, access_count=1, status="active"
-            )},
-        })
+        data = _wrap_data(
+            {
+                "tools": {"used": _make_entry(importance=2, access_count=1, status="active")},
+            }
+        )
         result = analyze(data, session_count=10)
         assert len(result["archival_candidates"]) == 0
 
     def test_archived_entry_not_flagged(self):
-        data = _wrap_data({
-            "learnings": {"old": _make_entry(
-                importance=1, access_count=0, status="archived"
-            )},
-        })
+        data = _wrap_data(
+            {
+                "learnings": {"old": _make_entry(importance=1, access_count=0, status="archived")},
+            }
+        )
         result = analyze(data, session_count=10)
         assert len(result["archival_candidates"]) == 0
 
     def test_importance_at_ceiling_included(self):
-        data = _wrap_data({
-            "project": {"borderline": _make_entry(
-                importance=LOW_IMPORTANCE_CEILING, access_count=0, status="active"
-            )},
-        })
+        data = _wrap_data(
+            {
+                "project": {
+                    "borderline": _make_entry(
+                        importance=LOW_IMPORTANCE_CEILING, access_count=0, status="active"
+                    )
+                },
+            }
+        )
         result = analyze(data, session_count=10)
         assert len(result["archival_candidates"]) == 1
 
     def test_importance_above_ceiling_excluded(self):
-        data = _wrap_data({
-            "project": {"above": _make_entry(
-                importance=LOW_IMPORTANCE_CEILING + 1, access_count=0, status="active"
-            )},
-        })
+        data = _wrap_data(
+            {
+                "project": {
+                    "above": _make_entry(
+                        importance=LOW_IMPORTANCE_CEILING + 1, access_count=0, status="active"
+                    )
+                },
+            }
+        )
         result = analyze(data, session_count=10)
         assert len(result["archival_candidates"]) == 0
 
@@ -186,11 +206,13 @@ class TestArchivalCandidates:
 
 class TestConfidenceBump:
     def test_high_access_low_confidence_proposes_bump(self):
-        data = _wrap_data({
-            "user": {"popular": _make_entry(
-                access_count=HIGH_ACCESS_THRESHOLD, confidence=0.5
-            )},
-        })
+        data = _wrap_data(
+            {
+                "user": {
+                    "popular": _make_entry(access_count=HIGH_ACCESS_THRESHOLD, confidence=0.5)
+                },
+            }
+        )
         result = analyze(data, session_count=10)
         updates = result["confidence_updates"]
         bump = [u for u in updates if u["reason"] == "frequently accessed"]
@@ -199,21 +221,25 @@ class TestConfidenceBump:
         assert bump[0]["current_confidence"] == 0.5
 
     def test_high_access_high_confidence_no_bump(self):
-        data = _wrap_data({
-            "user": {"solid": _make_entry(
-                access_count=10, confidence=0.9
-            )},
-        })
+        data = _wrap_data(
+            {
+                "user": {"solid": _make_entry(access_count=10, confidence=0.9)},
+            }
+        )
         result = analyze(data, session_count=10)
         bump = [u for u in result["confidence_updates"] if u["reason"] == "frequently accessed"]
         assert len(bump) == 0
 
     def test_low_access_no_bump(self):
-        data = _wrap_data({
-            "user": {"rarely_used": _make_entry(
-                access_count=HIGH_ACCESS_THRESHOLD - 1, confidence=0.3
-            )},
-        })
+        data = _wrap_data(
+            {
+                "user": {
+                    "rarely_used": _make_entry(
+                        access_count=HIGH_ACCESS_THRESHOLD - 1, confidence=0.3
+                    )
+                },
+            }
+        )
         result = analyze(data, session_count=10)
         bump = [u for u in result["confidence_updates"] if u["reason"] == "frequently accessed"]
         assert len(bump) == 0
@@ -221,42 +247,46 @@ class TestConfidenceBump:
 
 class TestConfidenceReduction:
     def test_zero_access_old_entry_proposes_reduction(self):
-        data = _wrap_data({
-            "tools": {"unused": _make_entry(
-                days_ago=14, access_count=0, confidence=0.7
-            )},
-        })
+        data = _wrap_data(
+            {
+                "tools": {"unused": _make_entry(days_ago=14, access_count=0, confidence=0.7)},
+            }
+        )
         result = analyze(data, session_count=10)
         reductions = [u for u in result["confidence_updates"] if u["reason"] == "never accessed"]
         assert len(reductions) == 1
         assert reductions[0]["proposed_confidence"] == 0.55
 
     def test_zero_access_recent_entry_no_reduction(self):
-        data = _wrap_data({
-            "tools": {"new_tool": _make_entry(
-                days_ago=2, access_count=0, confidence=0.7
-            )},
-        })
+        data = _wrap_data(
+            {
+                "tools": {"new_tool": _make_entry(days_ago=2, access_count=0, confidence=0.7)},
+            }
+        )
         result = analyze(data, session_count=10)
         reductions = [u for u in result["confidence_updates"] if u["reason"] == "never accessed"]
         assert len(reductions) == 0
 
     def test_low_confidence_no_reduction(self):
-        data = _wrap_data({
-            "tools": {"low_conf": _make_entry(
-                days_ago=30, access_count=0, confidence=LOW_CONFIDENCE_CEILING
-            )},
-        })
+        data = _wrap_data(
+            {
+                "tools": {
+                    "low_conf": _make_entry(
+                        days_ago=30, access_count=0, confidence=LOW_CONFIDENCE_CEILING
+                    )
+                },
+            }
+        )
         result = analyze(data, session_count=10)
         reductions = [u for u in result["confidence_updates"] if u["reason"] == "never accessed"]
         assert len(reductions) == 0
 
     def test_reduction_does_not_go_below_zero(self):
-        data = _wrap_data({
-            "tools": {"almost_zero": _make_entry(
-                days_ago=30, access_count=0, confidence=0.05
-            )},
-        })
+        data = _wrap_data(
+            {
+                "tools": {"almost_zero": _make_entry(days_ago=30, access_count=0, confidence=0.05)},
+            }
+        )
         result = analyze(data, session_count=10)
         # confidence 0.05 is below LOW_CONFIDENCE_CEILING (0.3), so no reduction
         reductions = [u for u in result["confidence_updates"] if u["reason"] == "never accessed"]
@@ -265,32 +295,32 @@ class TestConfidenceReduction:
 
 class TestUserStatedConfidence:
     def test_user_stated_low_confidence_proposes_minimum(self):
-        data = _wrap_data({
-            "user": {"stated": _make_entry(
-                source_type="user-stated", confidence=0.6
-            )},
-        })
+        data = _wrap_data(
+            {
+                "user": {"stated": _make_entry(source_type="user-stated", confidence=0.6)},
+            }
+        )
         result = analyze(data, session_count=10)
         user_stated = [u for u in result["confidence_updates"] if u["reason"] == "user-stated fact"]
         assert len(user_stated) == 1
         assert user_stated[0]["proposed_confidence"] == USER_STATED_MINIMUM_CONFIDENCE
 
     def test_user_stated_high_confidence_no_change(self):
-        data = _wrap_data({
-            "user": {"confident": _make_entry(
-                source_type="user-stated", confidence=0.95
-            )},
-        })
+        data = _wrap_data(
+            {
+                "user": {"confident": _make_entry(source_type="user-stated", confidence=0.95)},
+            }
+        )
         result = analyze(data, session_count=10)
         user_stated = [u for u in result["confidence_updates"] if u["reason"] == "user-stated fact"]
         assert len(user_stated) == 0
 
     def test_non_user_stated_no_minimum(self):
-        data = _wrap_data({
-            "user": {"inferred": _make_entry(
-                source_type="inferred", confidence=0.5
-            )},
-        })
+        data = _wrap_data(
+            {
+                "user": {"inferred": _make_entry(source_type="inferred", confidence=0.5)},
+            }
+        )
         result = analyze(data, session_count=10)
         user_stated = [u for u in result["confidence_updates"] if u["reason"] == "user-stated fact"]
         assert len(user_stated) == 0
@@ -302,13 +332,17 @@ class TestUserStatedConfidence:
 class TestMultipleProposals:
     def test_entry_can_have_multiple_confidence_proposals(self):
         """A user-stated entry with high access and low confidence gets two proposals."""
-        data = _wrap_data({
-            "user": {"multi": _make_entry(
-                source_type="user-stated",
-                access_count=HIGH_ACCESS_THRESHOLD,
-                confidence=0.5,
-            )},
-        })
+        data = _wrap_data(
+            {
+                "user": {
+                    "multi": _make_entry(
+                        source_type="user-stated",
+                        access_count=HIGH_ACCESS_THRESHOLD,
+                        confidence=0.5,
+                    )
+                },
+            }
+        )
         result = analyze(data, session_count=10)
         updates = [u for u in result["confidence_updates"] if u["key"] == "multi"]
         reasons = {u["reason"] for u in updates}
@@ -321,12 +355,14 @@ class TestMultipleProposals:
 
 class TestNoMutation:
     def test_analyze_does_not_mutate_input(self):
-        data = _wrap_data({
-            "user": {
-                "stale": _make_entry(days_ago=30, access_count=0, confidence=0.7),
-                "low": _make_entry(importance=1, access_count=0),
-            },
-        })
+        data = _wrap_data(
+            {
+                "user": {
+                    "stale": _make_entry(days_ago=30, access_count=0, confidence=0.7),
+                    "low": _make_entry(importance=1, access_count=0),
+                },
+            }
+        )
         original = copy.deepcopy(data)
         analyze(data, session_count=10)
         assert data == original
@@ -361,20 +397,20 @@ class TestEmptyStore:
 
 class TestSummary:
     def test_summary_counts_match(self):
-        data = _wrap_data({
-            "user": {
-                "stale1": _make_entry(days_ago=30, access_count=0),
-                "active1": _make_entry(days_ago=1, access_count=5),
-            },
-            "tools": {
-                "archived1": _make_entry(status="archived"),
-            },
-            "learnings": {
-                "archival_target": _make_entry(
-                    importance=1, access_count=0, status="active"
-                ),
-            },
-        })
+        data = _wrap_data(
+            {
+                "user": {
+                    "stale1": _make_entry(days_ago=30, access_count=0),
+                    "active1": _make_entry(days_ago=1, access_count=5),
+                },
+                "tools": {
+                    "archived1": _make_entry(status="archived"),
+                },
+                "learnings": {
+                    "archival_target": _make_entry(importance=1, access_count=0, status="active"),
+                },
+            }
+        )
         result = analyze(data, session_count=10)
         summary = result["summary"]
         assert summary["total_entries"] == 4
@@ -390,11 +426,17 @@ class TestSummary:
 
 class TestNullConfidence:
     def test_entry_with_null_confidence_skips_adjustments(self):
-        data = _wrap_data({
-            "user": {"no_conf": _make_entry(
-                days_ago=30, access_count=0, confidence=None,
-                source_type="user-stated",
-            )},
-        })
+        data = _wrap_data(
+            {
+                "user": {
+                    "no_conf": _make_entry(
+                        days_ago=30,
+                        access_count=0,
+                        confidence=None,
+                        source_type="user-stated",
+                    )
+                },
+            }
+        )
         result = analyze(data, session_count=10)
         assert len(result["confidence_updates"]) == 0

@@ -1,6 +1,6 @@
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.0.1"
+version = "0.0.1.dev0"
 version_files = [
     ".claude-plugin/plugin.json:version",
     "memory-mcp/pyproject.toml:version",
@@ -8,5 +8,4 @@ version_files = [
 ]
 tag_format = "v$version"
 update_changelog_on_bump = true
-changelog_start_rev = "v0.0.1"
 major_version_zero = true

@@ -1,6 +1,6 @@
 {
   "name": "i-am",
-  "version": "0.0.1",
+  "version": "0.0.1.dev0",
   "description": "Skills, commands, and agents for AI coding workflows — Claude Code authoring, Python development, project management, and domain-specific tools",
   "author": {
     "name": "Francisco Perez-Sorrosal",

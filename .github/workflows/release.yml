@@ -1,11 +1,15 @@
 # Release workflow -- bumps version, updates changelog, tags, and creates a GitHub Release.
 #
-# Idempotency: This workflow triggers on push to main. When it bumps and pushes,
-# it re-triggers itself. The second run finds no bumpable commits (the bump commit
-# itself is not a conventional commit type that warrants a version increment), so
-# `cz bump` exits non-zero. The `continue-on-error: true` on the bump step lets
-# the workflow exit gracefully instead of failing. Downstream steps are conditional
-# on bump success, so no duplicate tags or releases are created.
+# Two modes:
+#   1. Auto (push to main): increments the .devN suffix (0.0.1.dev0 → 0.0.1.dev1 → ...).
+#      No changelog generated — dev bumps are lightweight version increments only.
+#      If the current version is stable (no .devN), starts a new dev cycle at <patch+1>.dev0.
+#   2. Manual (workflow_dispatch with "stable"): lets commitizen compute the proper semver
+#      bump from conventional commits and generates the changelog (e.g., 0.0.1.dev5 → 0.1.0).
+#
+# Idempotency: The bump commit itself has no conventional commit prefix, so a re-triggered
+# run finds no bumpable change. The dev bump script detects the tag already exists and
+# exits cleanly. Downstream steps are conditional on bump success.
 
 name: Release
 
@@ -14,6 +18,16 @@ on:
     branches: [main]
     paths-ignore:
       - "CHANGELOG.md"
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: "Release type"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - stable
 
 permissions:
   contents: write
@@ -46,7 +60,32 @@ jobs:
         id: cz
         continue-on-error: true
         run: |
-          cz bump --prerelease dev --changelog --yes 2>&1 | tee bump_output.txt
+          RELEASE_TYPE="${{ github.event.inputs.release_type || 'dev' }}"
+          CURRENT=$(cz version --project)
+
+          if [ "$RELEASE_TYPE" = "stable" ]; then
+            # Stable: commitizen computes semver from conventional commits + generates changelog
+            cz bump --changelog --yes 2>&1 | tee bump_output.txt
+          else
+            # Dev: increment .devN suffix, keep base version fixed
+            if echo "$CURRENT" | grep -qE '\.dev[0-9]+$'; then
+              BASE="${CURRENT%.dev*}"
+              DEV="${CURRENT##*.dev}"
+              NEXT="${BASE}.dev$((DEV + 1))"
+            else
+              # After a stable release, start next patch dev cycle
+              IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+              NEXT="${MAJOR}.${MINOR}.$((PATCH + 1)).dev0"
+            fi
+
+            # Skip if this version is already tagged (idempotency)
+            if git tag -l "v${NEXT}" | grep -q .; then
+              echo "Tag v${NEXT} already exists, nothing to do"
+              exit 1
+            fi
+
+            cz bump "$NEXT" --yes 2>&1 | tee bump_output.txt
+          fi
           echo "version=$(cz version --project)" >> $GITHUB_OUTPUT
 
       - name: Push with tags
@@ -59,4 +98,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="v${{ steps.cz.outputs.version }}"
-          gh release create "$VERSION" --generate-notes --title "$VERSION" --prerelease
+          RELEASE_TYPE="${{ github.event.inputs.release_type || 'dev' }}"
+          if gh release view "$VERSION" > /dev/null 2>&1; then
+            echo "Release $VERSION already exists, skipping"
+            exit 0
+          fi
+          if [ "$RELEASE_TYPE" = "stable" ]; then
+            gh release create "$VERSION" --generate-notes --title "$VERSION"
+          else
+            gh release create "$VERSION" --generate-notes --title "$VERSION" --prerelease
+          fi

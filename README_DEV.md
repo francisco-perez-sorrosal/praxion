@@ -301,6 +301,48 @@ The plugin manifest lives in `.claude-plugin/plugin.json`. Key constraints:
 - The plugin is distributed via the [`bit-agora`](https://github.com/francisco-perez-sorrosal/bit-agora) GitHub marketplace
 - When installed, commands are namespaced as `/i-am:<name>`
 
+## Releases
+
+Versioning is managed by [Commitizen](https://commitizen-tools.github.io/commitizen/) with conventional commits. The version is tracked in `pyproject.toml` and synced to `memory-mcp/pyproject.toml`, `task-chronograph-mcp/pyproject.toml`, and `.claude-plugin/plugin.json` via `version_files`.
+
+### Dev releases (default, automatic)
+
+Every push to `main` triggers the Release workflow, which increments the `.devN` suffix and creates a GitHub pre-release. No changelog is generated — dev bumps are lightweight version-only increments.
+
+No local commands needed. Just push to `main` with conventional commit messages (`feat:`, `fix:`, etc.). The commit types accumulate and determine the version at stable release time.
+
+### Stable releases (manual, from GitHub UI)
+
+No local commands needed. Everything happens through the GitHub Actions UI:
+
+1. Go to **Actions → Release → Run workflow**
+2. Select `stable` from the release type dropdown
+3. Click **Run workflow**
+
+Commitizen computes the proper semver bump from all conventional commits since the last stable tag and generates the changelog. The bump level depends on commit types: `fix:` → patch, `feat:` → minor, breaking change → major. A full GitHub release is created (not pre-release).
+
+After a stable release, the next push to `main` automatically starts a new dev cycle at `<patch+1>.dev0`.
+
+### Version lifecycle example
+
+```text
+0.0.1.dev0 → 0.0.1.dev1 → 0.0.1.dev2   (dev pushes, no changelog)
+                              ↓
+                            0.1.0          (stable — had feat: commits, changelog generated)
+                              ↓
+                            0.1.1.dev0 → 0.1.1.dev1 → ...
+```
+
+### Manual version operations
+
+```bash
+# Check current version
+cz version --project
+
+# Preview what the next stable version would be (dry-run only, no changes)
+cz bump --dry-run --changelog --yes
+```
+
 ## References
 
 - [Claude Code Plugins](https://code.claude.com/docs/en/plugins)

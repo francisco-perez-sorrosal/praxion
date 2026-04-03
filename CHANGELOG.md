@@ -1,4 +1,4 @@
-## v0.1.0 (2026-04-03)
+## v0.2.0 (2026-04-03)
 
 ### Feat
 
@@ -106,6 +106,7 @@
 
 ### Fix
 
+- Separate changelog commit to preserve version tag
 - Simplify release to manual-only stable releases
 - No-tag dev bumps, changelog on stable only
 - Drop changelog generation from release workflow

@@ -284,7 +284,12 @@ def main() -> None:
 
     context = f"## Memory Context (auto-injected)\n\n{markdown}"
 
-    output = {"hookSpecificOutput": {"additionalContext": context}}
+    output = {
+        "hookSpecificOutput": {
+            "hookEventName": "SubagentStart",
+            "additionalContext": context,
+        }
+    }
     print(json.dumps(output))
 
 

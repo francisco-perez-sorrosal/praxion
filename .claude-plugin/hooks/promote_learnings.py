@@ -73,12 +73,13 @@ def main() -> None:
     files_list = "\n".join(f"- {path}: {count} entries" for path, count in learnings)
     output = {
         "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
             "additionalContext": (
                 f"LEARNINGS.md files found with unpromoted content:\n"
                 f"{files_list}\n\n"
                 f"Consider running `/cajalogic dream` or calling `remember()` "
                 f"for cross-session insights before cleanup."
-            )
+            ),
         }
     }
     print(json.dumps(output))

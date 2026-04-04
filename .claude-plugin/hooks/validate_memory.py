@@ -81,6 +81,7 @@ def main() -> None:
         agent_type = payload.get("agent_type", "unknown")
         output = {
             "hookSpecificOutput": {
+                "hookEventName": "SubagentStop",
                 "additionalContext": (
                     f"Note: Agent [{agent_type}] wrote to LEARNINGS.md but did not call "
                     f"remember(). Consider promoting cross-session insights to memory "

@@ -161,6 +161,53 @@ relink_all() {
 }
 
 # =============================================================================
+# Git merge drivers and hooks for .ai-state/ reconciliation
+# =============================================================================
+
+install_git_merge_infra() {
+    # Custom merge drivers for structured .ai-state/ files.
+    # These are invoked by git during merge when .gitattributes routes files
+    # to them, preventing line-based merge from corrupting JSON/JSONL data.
+    # Drivers are per-repo config (not global) — safe for multi-repo setups.
+
+    header "Step 2 — Git merge infrastructure"
+
+    local repo_root
+    repo_root="$(git -C "${SCRIPT_DIR}" rev-parse --show-toplevel 2>/dev/null)"
+    if [ -z "$repo_root" ]; then
+        warn "Not a git repository — skipping merge drivers"
+        return
+    fi
+
+    # Register merge drivers (references scripts/ in the repo)
+    git -C "$repo_root" config merge.memory-json.name "Semantic memory.json merge"
+    git -C "$repo_root" config merge.memory-json.driver "python3 scripts/merge_driver_memory.py %O %A %B"
+
+    git -C "$repo_root" config merge.observations-jsonl.name "Observations JSONL merge"
+    git -C "$repo_root" config merge.observations-jsonl.driver "python3 scripts/merge_driver_observations.py %O %A %B"
+
+    info "Merge drivers: memory-json, observations-jsonl"
+
+    # Install post-merge hook for ADR renumbering + index regeneration.
+    # The hook only fires when .ai-state/ files were involved in the merge.
+    local hook_src="${SCRIPT_DIR}/scripts/git-post-merge-hook.sh"
+    local hook_dst="${repo_root}/.git/hooks/post-merge"
+
+    if [ -f "$hook_src" ]; then
+        # Preserve existing post-merge hook if present
+        if [ -f "$hook_dst" ] && ! grep -q "reconcile_ai_state" "$hook_dst" 2>/dev/null; then
+            warn "Existing post-merge hook found — appending reconciliation"
+            printf '\n# Praxion .ai-state/ reconciliation\n' >> "$hook_dst"
+            cat "$hook_src" >> "$hook_dst"
+        else
+            cp "$hook_src" "$hook_dst"
+        fi
+        chmod +x "$hook_dst"
+        info "Post-merge hook: ADR renumbering + index regeneration"
+    fi
+}
+
+# =============================================================================
 # Plugin installation
 # =============================================================================
 
@@ -182,7 +229,7 @@ marketplace_is_registered() {
 
 # Returns 0 if plugin was installed, 1 if skipped.
 prompt_plugin_install() {
-    header "Step 2 — i-am Plugin"
+    header "Step 3 — i-am Plugin"
     cat <<EOF
 
   ${B}[1] Install plugin (recommended)${R}
@@ -290,7 +337,7 @@ prompt_hooks_install() {
         return
     fi
 
-    header "Step 3 — Hooks (Observability + Code Quality)"
+    header "Step 4 — Hooks (Observability + Code Quality)"
     cat <<EOF
 
   ${B}[1] Install hooks (recommended)${R}
@@ -403,7 +450,7 @@ PYEOF
 # =============================================================================
 
 prompt_chub_mcp() {
-    header "Step 4 — context-hub MCP Server"
+    header "Step 5 — context-hub MCP Server"
 
     # Prefer globally installed chub-mcp, fall back to npx
     local chub_mcp_cmd chub_mcp_args
@@ -495,7 +542,7 @@ if 'chub' in servers:
 # =============================================================================
 
 prompt_phoenix_install() {
-    header "Step 5 — Phoenix Observability Daemon"
+    header "Step 6 — Phoenix Observability Daemon"
 
     cat <<EOF
 
@@ -532,7 +579,7 @@ get_claude_desktop_config_dir() {
 }
 
 prompt_claude_desktop_link() {
-    header "Step 6 — Claude Desktop"
+    header "Step 7 — Claude Desktop"
     cat <<EOF
 
   ${B}[1] Skip${R}
@@ -857,6 +904,8 @@ install_claude_code() {
     header "Step 1 — Symlinks (config, rules, scripts)"
     clean_stale_symlinks
     relink_all
+
+    install_git_merge_infra
 
     if prompt_plugin_install; then
         prompt_hooks_install

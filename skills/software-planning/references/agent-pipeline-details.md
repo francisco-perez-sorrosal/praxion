@@ -257,15 +257,24 @@ Append-only. Entries in chronological order by timestamp.
 
 | Artifact | Conflict risk | Reconciliation |
 |----------|--------------|----------------|
-| `decisions/<NNN>-<slug>.md` | Low — unique sequence numbers, but two worktrees may pick the same NNN | After merge, scan for duplicate sequence numbers. Renumber the later ADR and update its `id` field. Regenerate `DECISIONS_INDEX.md` |
-| `decisions/DECISIONS_INDEX.md` | Medium — both worktrees regenerate the full index | Discard both versions and regenerate from all ADR files: `python scripts/regenerate_adr_index.py` or rebuild manually |
+| `memory.json` | **High** — JSON object, git can't merge structurally; concurrent `remember()` calls produce divergent keys | Run `python scripts/reconcile_ai_state.py`. Semantic merge: union of entries per category, `updated_at` timestamp wins for duplicate keys, session counts summed |
+| `observations.jsonl` | Medium — append-only JSONL, git usually auto-merges but can conflict at insertion point | Run `python scripts/reconcile_ai_state.py`. Concat both, dedup by `(timestamp, session_id, event_type, tool_name)`, sort by timestamp |
+| `decisions/<NNN>-<slug>.md` | Low — unique sequence numbers, but two worktrees may pick the same NNN | Run `python scripts/reconcile_ai_state.py`. Auto-detects duplicate NNN prefixes, renumbers the later ADR, updates its `id` field |
+| `decisions/DECISIONS_INDEX.md` | Medium — both worktrees regenerate the full index | Run `python scripts/reconcile_ai_state.py`. Always regenerated from ADR files — never merge textually |
 | `calibration_log.md` | Low — append-only | Keep both entries in timestamp order. Git usually auto-merges concurrent appends. If conflict, concatenate and re-sort by timestamp |
 | `SENTINEL_LOG.md` | Medium — append-only index referencing report files | After merge: (1) keep both entries, (2) re-sort all rows by timestamp, (3) verify every `Report File` cell points to an existing `SENTINEL_REPORT_*.md` — delete orphan rows, add missing rows for reports present on disk but absent from the log |
 | `SENTINEL_REPORT_*.md` | None — timestamped filenames are unique | Git merge handles distinct file additions natively |
 | `IDEA_LEDGER_*.md` | Medium — each promethean run carries forward previous entries | If two worktrees both run promethean, the later ledger may miss the earlier's new entries. Create a reconciled ledger with suffix `_reconciled` containing the union of both |
 | `specs/SPEC_*.md` | None — unique feature-name + date filenames | Git merge handles distinct file additions natively |
 
-**General principle:** timestamped or uniquely-named files merge cleanly. Append-only logs need chronological ordering. Generated indexes should be regenerated from source files rather than merged textually.
+**Automated reconciliation:** Three layers of protection:
+1. **Git merge drivers** (`.gitattributes`) — handle `memory.json` and `observations.jsonl` automatically during `git merge`. Registered by `install.sh code` Step 2.
+2. **Post-merge hook** (`.git/hooks/post-merge`) — runs ADR renumbering + index regeneration after every merge that touches `.ai-state/`.
+3. **`/merge-worktree` command** — manual fallback that calls `python scripts/reconcile_ai_state.py` for full reconciliation.
+
+**GitHub PR caveat:** Merge drivers and post-merge hooks only run locally. For PRs that touch `.ai-state/`, use regular merge (not squash). Squash merge overwrites the target branch's `.ai-state/` with the source branch's version, losing any changes made on the target since the branch diverged. If squash is required, rebase locally first so the branch has the target's latest `.ai-state/`.
+
+**General principle:** timestamped or uniquely-named files merge cleanly. Append-only logs need chronological ordering. Generated indexes should be regenerated from source files rather than merged textually. JSON files require semantic merge — never rely on git's line-based merge for structured data.
 
 ### Non-.ai-state/ Artifacts with Special Merge Concerns
 

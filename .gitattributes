@@ -1,0 +1,14 @@
+# Custom merge drivers for .ai-state/ artifacts.
+# These prevent git's line-based merge from corrupting structured data.
+#
+# SETUP: Drivers must be registered in git config. Run install.sh or:
+#   git config merge.memory-json.driver "python3 scripts/merge_driver_memory.py %O %A %B"
+#   git config merge.observations-jsonl.driver "python3 scripts/merge_driver_observations.py %O %A %B"
+#
+# IMPORTANT: These drivers only run on LOCAL merges. GitHub PR merges
+# (especially squash merge) bypass them. For PRs that touch .ai-state/:
+#   - Use regular merge (not squash) to preserve both sides' changes
+#   - Or rebase locally first, then push, so the branch has main's latest state
+
+.ai-state/memory.json merge=memory-json
+.ai-state/observations.jsonl merge=observations-jsonl

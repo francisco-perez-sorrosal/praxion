@@ -1,12 +1,70 @@
 {
   "schema_version": "2.0",
-  "session_count": 0,
+  "session_count": 1,
   "memories": {
     "user": {},
     "assistant": {},
-    "project": {},
+    "project": {
+      "memory-system-v2-architecture": {
+        "value": "Memory system v2.0 uses a dual-layer architecture: curated memories in .ai-state/memory.json (JSON, schema v2.0 with type ontology, provenance, soft delete) and automatic observations in .ai-state/observations.jsonl (append-only JSONL captured by hooks with zero LLM cost). The inject_memory.py hook injects curated context into every subagent via SubagentStart additionalContext (requires hookEventName field in output). JSON storage with Markdown presentation — the LLM never reads raw JSON.",
+        "created_at": "2026-04-04T18:24:47.510343Z",
+        "updated_at": "2026-04-04T18:24:47.510343Z",
+        "tags": [
+          "architecture",
+          "decision",
+          "memory"
+        ],
+        "confidence": null,
+        "importance": 9,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "Memory v2.0: dual-layer (curated JSON + observation JSONL), hook-injected, zero LLM cost",
+        "valid_at": "2026-04-04T18:24:47.510343Z",
+        "invalid_at": null,
+        "type": "decision",
+        "created_by": "main"
+      }
+    },
     "relationships": {},
     "tools": {},
-    "learnings": {}
+    "learnings": {
+      "hook-output-requires-hookEventName": {
+        "value": "Claude Code hooks that output additionalContext MUST include hookEventName in the hookSpecificOutput JSON. Without it, the additionalContext is silently ignored and never injected into the agent context. Format: {\"hookSpecificOutput\": {\"hookEventName\": \"SubagentStart\", \"additionalContext\": \"...\"}}",
+        "created_at": "2026-04-04T18:24:54.862577Z",
+        "updated_at": "2026-04-04T18:24:54.862577Z",
+        "tags": [
+          "claude-code",
+          "gotcha",
+          "hooks"
+        ],
+        "confidence": null,
+        "importance": 9,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "Hook additionalContext requires hookEventName field or injection is silently ignored",
+        "valid_at": "2026-04-04T18:24:54.862577Z",
+        "invalid_at": null,
+        "type": "gotcha",
+        "created_by": "main"
+      }
+    }
   }
 }

@@ -168,11 +168,14 @@ def main() -> None:
     has_error = isinstance(tool_response, dict) and tool_response.get("error")
     outcome = "failure" if has_error else "success"
 
+    session_id = payload.get("session_id", "")
+    agent_id = payload.get("agent_id", "") or session_id  # main agent uses session_id
+
     observation = {
         "timestamp": datetime.now(UTC).isoformat(),
-        "session_id": payload.get("session_id", ""),
+        "session_id": session_id,
         "agent_type": payload.get("agent_type", "main"),
-        "agent_id": payload.get("agent_id", ""),
+        "agent_id": agent_id,
         "project": Path(cwd).name,
         "event_type": "tool_use",
         "tool_name": tool_name,

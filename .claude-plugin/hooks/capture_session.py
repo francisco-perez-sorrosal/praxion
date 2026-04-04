@@ -73,12 +73,14 @@ def main() -> None:
 
     obs_path = ai_state_dir / "observations.jsonl"
     summary = _build_summary(event_type, payload)
+    session_id = payload.get("session_id", "")
+    agent_id = payload.get("agent_id", "") or session_id  # main agent uses session_id
 
     observation = {
         "timestamp": datetime.now(UTC).isoformat(),
-        "session_id": payload.get("session_id", ""),
+        "session_id": session_id,
         "agent_type": payload.get("agent_type", "main"),
-        "agent_id": payload.get("agent_id", ""),
+        "agent_id": agent_id,
         "project": Path(cwd).name,
         "event_type": event_type,
         "tool_name": None,

@@ -6,7 +6,7 @@
     "assistant": {},
     "project": {
       "memory-system-v2-architecture": {
-        "value": "Memory system v2.0 uses a dual-layer architecture: curated memories in .ai-state/memory.json (JSON, schema v2.0 with type ontology, provenance, soft delete) and automatic observations in .ai-state/observations.jsonl (append-only JSONL captured by hooks with zero LLM cost). The inject_memory.py hook injects curated context into every subagent via SubagentStart additionalContext (requires hookEventName field in output). JSON storage with Markdown presentation \u2014 the LLM never reads raw JSON.",
+        "value": "Memory system v2.0 uses a dual-layer architecture: curated memories in .ai-state/memory.json (JSON, schema v2.0 with type ontology, provenance, soft delete) and automatic observations in .ai-state/observations.jsonl (append-only JSONL captured by hooks with zero LLM cost). The inject_memory.py hook injects curated context into every subagent via SubagentStart additionalContext (requires hookEventName field in output). JSON storage with Markdown presentation — the LLM never reads raw JSON.",
         "created_at": "2026-04-04T18:24:47.510343Z",
         "updated_at": "2026-04-04T18:24:47.510343Z",
         "tags": [
@@ -34,7 +34,7 @@
         "created_by": "main"
       },
       "memory-enforcement-architecture": {
-        "value": "Memory creation is enforced by three layers: (1) memory_gate.py Stop hook blocks main agent if >3 edits and 0 remember() calls, (2) validate_memory.py SubagentStop hook blocks subagents if >5 edits and 0 remember() calls (exempt: Explore, sentinel, doc-engineer, Plan), (3) inject_memory.py appends a memory obligation footer to every subagent's context. The memory-protocol rule uses mandatory language. This replaced the original design where remember() calls were purely voluntary \u2014 which resulted in 0 organic memories across 300+ observations.",
+        "value": "Memory creation is enforced by three layers: (1) memory_gate.py Stop hook blocks main agent if >3 edits and 0 remember() calls, (2) validate_memory.py SubagentStop hook blocks subagents if >5 edits and 0 remember() calls (exempt: Explore, sentinel, doc-engineer, Plan), (3) inject_memory.py appends a memory obligation footer to every subagent's context. The memory-protocol rule uses mandatory language. This replaced the original design where remember() calls were purely voluntary — which resulted in 0 organic memories across 300+ observations.",
         "created_at": "2026-04-05T00:32:39.022026Z",
         "updated_at": "2026-04-05T00:32:39.022026Z",
         "tags": [
@@ -67,7 +67,7 @@
         "created_by": "main"
       },
       "ecosystem-health-2026-04-04": {
-        "value": "Full system verification 2026-04-05: Grade A (4th consecutive). 536/536 tests pass (171 task-chronograph, 365 memory-mcp). Token budget improved to 84.3% (12,652/15,000) from 91.8% \u2014 15.7% headroom now. 77 artifacts (29 skills, 12 agents, 8 rules, 15 commands, 18 hooks, 13 ADRs, 2 MCP servers). 0 critical/important findings, 6 suggested. Hygiene items: stale symlink ~/.claude/rules/swe/decision-tracking.md -> deleted file; 6 git stashes; 2 empty local branches; hook-crafting orphaned exit-code-semantics.md ref. All cosmetic.",
+        "value": "Full system verification 2026-04-05: Grade A (4th consecutive). 536/536 tests pass (171 task-chronograph, 365 memory-mcp). Token budget improved to 84.3% (12,652/15,000) from 91.8% — 15.7% headroom now. 77 artifacts (29 skills, 12 agents, 8 rules, 15 commands, 18 hooks, 13 ADRs, 2 MCP servers). 0 critical/important findings, 6 suggested. Hygiene items: stale symlink ~/.claude/rules/swe/decision-tracking.md -> deleted file; 6 git stashes; 2 empty local branches; hook-crafting orphaned exit-code-semantics.md ref. All cosmetic.",
         "created_at": "2026-04-05T01:13:16.217061Z",
         "updated_at": "2026-04-05T20:52:05.326406Z",
         "tags": [
@@ -130,7 +130,7 @@
         "created_by": "main"
       },
       "stop-hook-gate-pattern": {
-        "value": "The Stop hook gate pattern enforces pre-completion checklists: a sync Stop hook scans the transcript, exits 2 with {\"decision\": \"block\", \"reason\": \"...\"} on stderr when criteria aren't met, and checks stop_hook_active to prevent infinite loops (exit 0 on second invocation). This pattern is reusable for any \"before you stop\" enforcement \u2014 test runs, commit checks, memory persistence. The key design: first invocation blocks with actionable feedback, second invocation always passes.",
+        "value": "The Stop hook gate pattern enforces pre-completion checklists: a sync Stop hook scans the transcript, exits 2 with {\"decision\": \"block\", \"reason\": \"...\"} on stderr when criteria aren't met, and checks stop_hook_active to prevent infinite loops (exit 0 on second invocation). This pattern is reusable for any \"before you stop\" enforcement — test runs, commit checks, memory persistence. The key design: first invocation blocks with actionable feedback, second invocation always passes.",
         "created_at": "2026-04-05T00:32:14.428100Z",
         "updated_at": "2026-04-05T00:32:14.428100Z",
         "tags": [
@@ -158,7 +158,7 @@
         "created_by": "main"
       },
       "hook-additionalContext-supported-events": {
-        "value": "additionalContext in hook output is only supported for specific events: PostToolUse, PostToolUseFailure, SessionStart, UserPromptSubmit, SubagentStart, Notification, PreToolUse (exit 0 only). Stop and SubagentStop do NOT support additionalContext \u2014 output is silently ignored. For those events, use decision: \"block\" + exit 2 + stderr JSON instead. This caused validate_memory.py to be dead code for months \u2014 it generated warnings that nobody ever saw.",
+        "value": "additionalContext in hook output is only supported for specific events: PostToolUse, PostToolUseFailure, SessionStart, UserPromptSubmit, SubagentStart, Notification, PreToolUse (exit 0 only). Stop and SubagentStop do NOT support additionalContext — output is silently ignored. For those events, use decision: \"block\" + exit 2 + stderr JSON instead. This caused validate_memory.py to be dead code for months — it generated warnings that nobody ever saw.",
         "created_at": "2026-04-05T00:32:26.230942Z",
         "updated_at": "2026-04-05T00:32:26.230942Z",
         "tags": [
@@ -191,7 +191,7 @@
         "created_by": "main"
       },
       "async-hooks-cannot-deliver-feedback": {
-        "value": "Async hooks (async: true) cannot reliably deliver additionalContext to Claude \u2014 the agent may move on before the hook output arrives. Any hook that needs Claude to see and act on its output MUST be sync (async: false). This was the root cause of validate_memory.py being dead code: it was registered as async at SubagentStop, so its warnings were generated but never reached the parent agent. Always verify async vs sync when a hook's purpose is to influence agent behavior.",
+        "value": "Async hooks (async: true) cannot reliably deliver additionalContext to Claude — the agent may move on before the hook output arrives. Any hook that needs Claude to see and act on its output MUST be sync (async: false). This was the root cause of validate_memory.py being dead code: it was registered as async at SubagentStop, so its warnings were generated but never reached the parent agent. Always verify async vs sync when a hook's purpose is to influence agent behavior.",
         "created_at": "2026-04-05T00:32:28.438442Z",
         "updated_at": "2026-04-05T00:32:28.438442Z",
         "tags": [
@@ -221,14 +221,14 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Async hooks silently drop feedback \u2014 any hook influencing agent behavior must be sync",
+        "summary": "Async hooks silently drop feedback — any hook influencing agent behavior must be sync",
         "valid_at": "2026-04-05T00:32:28.438442Z",
         "invalid_at": null,
         "type": "gotcha",
         "created_by": "main"
       },
       "user-expects-memory-from-all-sessions": {
-        "value": "User expects that every meaningful session \u2014 not just code-editing ones \u2014 produces memories. Running a sentinel audit and only presenting results without storing insights was flagged as a gap. The principle: if a session produces findings, trends, or cross-session insights, the main agent must proactively call remember() regardless of whether the enforcement hooks would trigger. Memory creation is a responsibility, not just a compliance check.",
+        "value": "User expects that every meaningful session — not just code-editing ones — produces memories. Running a sentinel audit and only presenting results without storing insights was flagged as a gap. The principle: if a session produces findings, trends, or cross-session insights, the main agent must proactively call remember() regardless of whether the enforcement hooks would trigger. Memory creation is a responsibility, not just a compliance check.",
         "created_at": "2026-04-05T01:13:20.012482Z",
         "updated_at": "2026-04-05T01:13:20.012482Z",
         "tags": [
@@ -256,7 +256,7 @@
         "created_by": "main"
       },
       "memory-gate-blind-spot-analysis-sessions": {
-        "value": "The memory gate enforcement (memory_gate.py for main agent, validate_memory.py for subagents) only triggers based on code edit counts (>=3 edits for main, >=5 for subagents). Analysis-heavy sessions \u2014 sentinel audits, research, reviews, planning \u2014 produce zero code edits and slip through with no memories stored. Additionally, sentinel/Explore/doc-engineer/Plan agents are explicitly exempt from validate_memory.py. This means the most insight-rich sessions (audits that reveal ecosystem health trends, research that surfaces architectural patterns) are the least likely to produce memories. The main agent must self-enforce memory creation after consuming analysis results, regardless of edit count.",
+        "value": "The memory gate enforcement (memory_gate.py for main agent, validate_memory.py for subagents) only triggers based on code edit counts (>=3 edits for main, >=5 for subagents). Analysis-heavy sessions — sentinel audits, research, reviews, planning — produce zero code edits and slip through with no memories stored. Additionally, sentinel/Explore/doc-engineer/Plan agents are explicitly exempt from validate_memory.py. This means the most insight-rich sessions (audits that reveal ecosystem health trends, research that surfaces architectural patterns) are the least likely to produce memories. The main agent must self-enforce memory creation after consuming analysis results, regardless of edit count.",
         "created_at": "2026-04-05T01:13:26.662451Z",
         "updated_at": "2026-04-05T01:13:26.662451Z",
         "tags": [
@@ -291,7 +291,7 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Memory gate only fires on code edits \u2014 analysis/audit sessions produce zero memories unless self-enforced",
+        "summary": "Memory gate only fires on code edits — analysis/audit sessions produce zero memories unless self-enforced",
         "valid_at": "2026-04-05T01:13:26.662451Z",
         "invalid_at": null,
         "type": "gotcha",
@@ -320,7 +320,7 @@
         "last_accessed": null,
         "status": "superseded",
         "links": [],
-        "summary": "_scan_transcript() duplicated in memory_gate.py and validate_memory.py \u2014 refactoring candidate for DRY",
+        "summary": "_scan_transcript() duplicated in memory_gate.py and validate_memory.py — refactoring candidate for DRY",
         "valid_at": "2026-04-05T01:33:31.818069Z",
         "invalid_at": "2026-04-05T02:07:26.827694Z",
         "type": "gotcha",
@@ -357,7 +357,7 @@
         "created_by": null
       },
       "proactive-memory-vs-enforcement": {
-        "value": "Hooks alone cannot fully solve the memory gap. The fundamental issue is behavioral: the main agent must proactively call remember() during work, not wait for enforcement hooks to remind it. Hooks are a safety net, not a substitute for proactive memory. The Claude Code auto-memory system works because the instructions tell Claude to save memories as it discovers insights \u2014 it's instruction-driven, not enforcement-driven. Our system relies too heavily on enforcement (memory_gate at Stop, validate_memory at SubagentStop, remind_memory at commit) and not enough on the agent's own initiative to remember. The fix is both: enforce at boundaries AND instruct the agent to remember proactively.",
+        "value": "Hooks alone cannot fully solve the memory gap. The fundamental issue is behavioral: the main agent must proactively call remember() during work, not wait for enforcement hooks to remind it. Hooks are a safety net, not a substitute for proactive memory. The Claude Code auto-memory system works because the instructions tell Claude to save memories as it discovers insights — it's instruction-driven, not enforcement-driven. Our system relies too heavily on enforcement (memory_gate at Stop, validate_memory at SubagentStop, remind_memory at commit) and not enough on the agent's own initiative to remember. The fix is both: enforce at boundaries AND instruct the agent to remember proactively.",
         "created_at": "2026-04-05T02:04:24.988115Z",
         "updated_at": "2026-04-05T02:04:24.988115Z",
         "tags": [
@@ -379,14 +379,14 @@
         "last_accessed": "2026-04-05T20:56:17.175817Z",
         "status": "active",
         "links": [],
-        "summary": "Memory needs proactive agent behavior, not just enforcement hooks \u2014 hooks are safety nets, not substitutes",
+        "summary": "Memory needs proactive agent behavior, not just enforcement hooks — hooks are safety nets, not substitutes",
         "valid_at": "2026-04-05T02:04:24.988115Z",
         "invalid_at": null,
         "type": "insight",
         "created_by": null
       },
       "memory-enforcement-gap-commit-hook": {
-        "value": "Memory enforcement has a timing gap: SubagentStop hooks catch subagent work, Stop hook catches at session end, but nothing enforces memory for the main agent's mid-session work. The commit is the natural \"done with work phase\" checkpoint. Solution: remind_memory.py hook gated by commit_gate.sh that scans the transcript at commit time and warns if remember() was never called. Non-blocking (exit 0) \u2014 the Stop hook remains the hard gate. This still misses the case where the main agent is told the results by the user and then acts without any explicit remember() \u2014 the behavioral gap is that the agent itself should proactively remember, not just be reminded by hooks.",
+        "value": "Memory enforcement has a timing gap: SubagentStop hooks catch subagent work, Stop hook catches at session end, but nothing enforces memory for the main agent's mid-session work. The commit is the natural \"done with work phase\" checkpoint. Solution: remind_memory.py hook gated by commit_gate.sh that scans the transcript at commit time and warns if remember() was never called. Non-blocking (exit 0) — the Stop hook remains the hard gate. This still misses the case where the main agent is told the results by the user and then acts without any explicit remember() — the behavioral gap is that the agent itself should proactively remember, not just be reminded by hooks.",
         "created_at": "2026-04-05T02:04:31.028562Z",
         "updated_at": "2026-04-05T02:04:31.028562Z",
         "tags": [
@@ -428,7 +428,7 @@
         "created_by": null
       },
       "inject-memory-session-start-gap": {
-        "value": "inject_memory.py was only registered at SubagentStart, so the main agent never received curated memory or decision context at session start. This meant the main agent started every session blind \u2014 no memory priming, no obligation footer, no decisions context. Fixed by registering inject_memory.py at SessionStart too, with event detection (payload has agent_type for SubagentStart, not for SessionStart) to set the correct hookEventName. This mirrors how Claude Code's auto-memory works: MEMORY.md is always loaded at session start, creating a virtuous cycle of seeing memories \u2192 being primed to create more.",
+        "value": "inject_memory.py was only registered at SubagentStart, so the main agent never received curated memory or decision context at session start. This meant the main agent started every session blind — no memory priming, no obligation footer, no decisions context. Fixed by registering inject_memory.py at SessionStart too, with event detection (payload has agent_type for SubagentStart, not for SessionStart) to set the correct hookEventName. This mirrors how Claude Code's auto-memory works: MEMORY.md is always loaded at session start, creating a virtuous cycle of seeing memories → being primed to create more.",
         "created_at": "2026-04-05T02:07:17.474251Z",
         "updated_at": "2026-04-05T02:07:17.474251Z",
         "tags": [
@@ -463,7 +463,7 @@
             "relation": "related-to"
           }
         ],
-        "summary": "inject_memory.py was missing from SessionStart \u2014 main agent never got memory context; now fixed",
+        "summary": "inject_memory.py was missing from SessionStart — main agent never got memory context; now fixed",
         "valid_at": "2026-04-05T02:07:17.474251Z",
         "invalid_at": null,
         "type": "gotcha",
@@ -483,6 +483,124 @@
         "importance": 7,
         "summary": "8/11 Bg Safe agents missing background:true in frontmatter -- protocol vs runtime mismatch",
         "type": "gotcha"
+      },
+      "agent-background-flag-protocol-drift": {
+        "value": "Agent frontmatter `background: true` must match the Bg Safe column in swe-agent-coordination-protocol.md. Found 8/11 agents missing the flag despite being declared Bg Safe. The sentinel audit checks doc cross-references but doesn't validate agent frontmatter flags against the protocol table — the plugin-validator caught it instead. When adding a new agent or changing its Bg Safe status, update both the protocol rule AND the agent frontmatter.",
+        "created_at": "2026-04-05T21:19:22.820218Z",
+        "updated_at": "2026-04-05T21:19:22.820218Z",
+        "tags": [
+          "agents",
+          "cross-reference",
+          "frontmatter",
+          "gotcha"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.agent-background-flag-mismatch",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Agent background: true must match Bg Safe in protocol — 8/11 were missing; sentinel doesn't catch this",
+        "valid_at": "2026-04-05T21:19:22.820218Z",
+        "invalid_at": null,
+        "type": "gotcha",
+        "created_by": null
+      },
+      "mechanical-moves-miss-semantic-docs": {
+        "value": "When a large mechanical move happens (e.g. relocating hooks from .claude-plugin/hooks/ to hooks/), path-based find-and-replace catches file references but misses semantic documentation that describes the *pattern* rather than the *path*. The hook-crafting skill described the dual-registration pattern ('hooks.json does NOT auto-fire, must register in settings.json') which was factually wrong after the move to auto-discovery. README_DEV.md project tree was also stale. Always audit skill content and project structure docs after architectural moves, not just path references.",
+        "created_at": "2026-04-05T21:19:25.137145Z",
+        "updated_at": "2026-04-05T21:19:25.137145Z",
+        "tags": [
+          "documentation",
+          "gotcha",
+          "hooks",
+          "refactoring"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.hook-output-requires-hookEventName",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.hook-additionalContext-supported-events",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.async-hooks-cannot-deliver-feedback",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Mechanical path moves miss semantic docs — skill content and project trees need manual audit after relocation",
+        "valid_at": "2026-04-05T21:19:25.137145Z",
+        "invalid_at": null,
+        "type": "gotcha",
+        "created_by": null
+      },
+      "memory-gate-phase-aware-fix": {
+        "value": "The memory gate had a critical bug: it checked total session-wide remember() count, so one early remember() silenced the gate for all subsequent work. Fixed by making scan_transcript() track counters that reset on each remember() call. The gate now uses has_unmemorized_work (checks work since last remember) instead of the old pattern (remember_count > 0 → return early). Fix applied to all 3 consumers: memory_gate.py (Stop), remind_memory.py (PreToolUse/commit), validate_memory.py (SubagentStop). The _hook_utils.py TranscriptStats dataclass gained 5 new fields tracking post-remember work.",
+        "created_at": "2026-04-05T21:25:21.964884Z",
+        "updated_at": "2026-04-05T21:25:21.964884Z",
+        "tags": [
+          "bugfix",
+          "enforcement",
+          "hooks",
+          "memory"
+        ],
+        "confidence": null,
+        "importance": 8,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.stop-hook-gate-pattern",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.user-expects-memory-from-all-sessions",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.memory-gate-blind-spot-analysis-sessions",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Memory gate was session-wide — one early remember() silenced it; now phase-aware with per-remember reset",
+        "valid_at": "2026-04-05T21:25:21.964884Z",
+        "invalid_at": null,
+        "type": "bugfix",
+        "created_by": null
       }
     }
   }

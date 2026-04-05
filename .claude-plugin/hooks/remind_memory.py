@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
-"""Memory reminder hook -- warns at commit time when significant work was done
+"""Memory enforcement gate -- blocks commits when significant work was done
 without calling remember().
 
 PreToolUse hook gated by commit_gate.sh. Scans the transcript for work
 patterns and remember() calls. If significant work was done without any
-remember() calls, emits a non-blocking warning (exit 0) to stderr so the
-main agent sees it before the commit proceeds.
+remember() calls, blocks the commit via exit 2 so the agent must call
+remember() before proceeding.
 
 This closes the gap between SubagentStop (which enforces memory on subagents)
 and Stop (which enforces memory at session end). The commit is a natural
 checkpoint for "I'm done with this work phase" and the right place to
-remind the main agent to persist learnings.
+enforce memory persistence.
+
+Exit code semantics (Claude Code hooks):
+  exit 0 -- allow the action; stdout JSON (hookSpecificOutput) is processed
+  exit 2 -- block the action; stdout is IGNORED, stderr is fed back to agent
 
 Pure transcript scanning -- no LLM calls, no API keys required.
-Follows fail-open: always exits 0 (never blocks commits).
+Blocks via exit 2 on PreToolUse (supported since Claude Code v2.1.90).
 """
 
 import json
@@ -25,7 +29,7 @@ sys.path.insert(0, __import__("os").path.dirname(__file__))
 from _hook_utils import REMEMBER_PROMPT, scan_transcript  # noqa: E402
 
 GIT_COMMIT_RE = re.compile(r"git\s+commit")
-PREFIX = "[memory-reminder]"
+PREFIX = "[memory-gate:commit]"
 
 
 def main() -> None:
@@ -54,10 +58,12 @@ def main() -> None:
 
     print(
         f"{PREFIX} You did significant work ({stats.work_summary}) but "
-        f"haven't called remember() yet. Consider persisting learnings "
-        f"before or after this commit.\n{REMEMBER_PROMPT}",
+        f"haven't called remember() yet. You MUST call "
+        f"mcp__plugin_i-am_memory__remember now before committing.\n"
+        f"{REMEMBER_PROMPT}",
         file=sys.stderr,
     )
+    sys.exit(2)
 
 
 if __name__ == "__main__":

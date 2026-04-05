@@ -326,126 +326,12 @@ PYEOF
 }
 
 # =============================================================================
-# Task Chronograph hooks
+# Hooks: provided by plugin hooks.json (no settings.json registration needed)
 # =============================================================================
-
-prompt_hooks_install() {
-    local hooks_dir="${SCRIPT_DIR}/.claude-plugin/hooks"
-    local send_event="${hooks_dir}/send_event.py"
-    if [ ! -f "$send_event" ]; then
-        warn "Hook script not found: ${send_event} — skipping hooks"
-        return
-    fi
-
-    header "Step 4 — Hooks (Observability + Code Quality)"
-    cat <<EOF
-
-  ${B}[1] Install hooks (recommended)${R}
-      ${D}Observability: agent lifecycle tracking via Task Chronograph.${R}
-      ${D}Code quality: auto-format Python on Write/Edit, lint gate on commit.${R}
-      ${D}Modifies ~/.claude/settings.json.${R}
-
-  ${B}[2] Skip hooks${R}
-      ${D}No observability or automatic code quality enforcement.${R}
-      ${D}Install later by re-running: ./install.sh code${R}
-EOF
-    ask 1 2
-
-    if [ "$REPLY" -eq 2 ]; then
-        step "Hooks skipped"
-        return
-    fi
-
-    local settings_file="${HOME}/.claude/settings.json"
-    step "Installing hooks into settings.json..."
-
-    python3 - "$settings_file" "$hooks_dir" << 'PYEOF'
-import json, sys
-
-settings_path, hooks_dir = sys.argv[1], sys.argv[2]
-
-try:
-    with open(settings_path) as f:
-        settings = json.load(f)
-except FileNotFoundError:
-    settings = {}
-
-def hook(script, matcher="", timeout=10, is_async=True):
-    return {
-        "matcher": matcher,
-        "hooks": [{
-            "type": "command",
-            "command": f"python3 {hooks_dir}/{script}",
-            "timeout": timeout,
-            "async": is_async,
-        }],
-    }
-
-settings["hooks"] = {
-    # Session lifecycle (async, fire-and-forget)
-    "SessionStart": [
-        hook("send_event.py"),
-        hook("capture_session.py", timeout=5),
-    ],
-    "Stop": [
-        hook("send_event.py"),
-        hook("capture_session.py", timeout=5),
-    ],
-    # Agent lifecycle: observability + memory injection + capture
-    "SubagentStart": [
-        hook("send_event.py"),
-        hook("inject_memory.py", timeout=5, is_async=False),
-        hook("capture_session.py", timeout=5),
-    ],
-    "SubagentStop": [
-        hook("send_event.py"),
-        hook("validate_memory.py", timeout=10),
-        hook("capture_session.py", timeout=5),
-    ],
-    # Tool tracing: observability + memory capture + Python formatting
-    "PostToolUse": [
-        hook("send_event.py"),
-        hook("capture_memory.py", timeout=5),
-        hook("format_python.py", "Write|Edit", is_async=False),
-        hook("detect_duplication.py", "Write|Edit", is_async=False),
-    ],
-    "PostToolUseFailure": [hook("send_event.py")],
-    # Code quality gate + LEARNINGS.md promotion warning (sync, blocks on violations)
-    "PreToolUse": [{
-        "matcher": "Bash",
-        "hooks": [
-            {
-                "type": "command",
-                "command": f"python3 {hooks_dir}/check_code_quality.py",
-                "timeout": 30,
-                "async": False,
-            },
-            {
-                "type": "command",
-                "command": f"python3 {hooks_dir}/promote_learnings.py",
-                "timeout": 5,
-                "async": False,
-            },
-        ],
-    }],
-    # Pipeline state snapshot before context compaction
-    "PreCompact": [hook("precompact_state.py", is_async=False, timeout=15)],
-}
-
-with open(settings_path, "w") as f:
-    json.dump(settings, f, indent=2)
-    f.write("\n")
-PYEOF
-
-    info "Hooks installed:"
-    info "  Observability: send_event (all lifecycle + tool events)"
-    info "  Memory:        inject_memory (SubagentStart), validate_memory (SubagentStop),"
-    info "                 capture_memory (PostToolUse), capture_session (lifecycle),"
-    info "                 promote_learnings (PreToolUse cleanup warning)"
-    info "  Code quality:  format_python (PostToolUse), detect_duplication (PostToolUse),"
-    info "                 check_code_quality (PreToolUse)"
-    info "  Pipeline:      precompact_state (PreCompact)"
-}
+# Hooks were previously installed into ~/.claude/settings.json by this script.
+# Since Claude Code auto-loads hooks from installed plugins, the plugin's
+# hooks.json (.claude-plugin/hooks/hooks.json) is now the single authority.
+# The installer only cleans up stale hooks from settings.json if present.
 
 # =============================================================================
 # External API Docs (context-hub MCP)
@@ -698,18 +584,21 @@ check_claude_code() {
     done
 
     printf "\n  ${B}Hooks:${R}\n"
-    local settings_file="${HOME}/.claude/settings.json"
-    if [ -f "$settings_file" ] && python3 -c "
+    local hooks_json="${SCRIPT_DIR}/.claude-plugin/hooks/hooks.json"
+    if [ -f "$hooks_json" ]; then
+        info "Hooks provided by plugin hooks.json"
+        # Warn if stale hooks remain in settings.json
+        local settings_file="${HOME}/.claude/settings.json"
+        if [ -f "$settings_file" ] && python3 -c "
 import json, sys
 with open(sys.argv[1]) as f:
     s = json.load(f)
-hooks = s.get('hooks', {})
-required = {'SessionStart', 'Stop', 'SubagentStart', 'SubagentStop', 'PostToolUse', 'PostToolUseFailure', 'PreToolUse', 'PreCompact'}
-sys.exit(0 if required.issubset(hooks.keys()) else 1)
+sys.exit(0 if 'hooks' in s else 1)
 " "$settings_file" 2>/dev/null; then
-        info "Hooks configured (observability + memory + code quality)"
+            warn "Stale hooks in settings.json — remove the 'hooks' key to prevent double-firing"
+        fi
     else
-        warn "Hooks not configured — re-run ./install.sh code"
+        warn "Plugin hooks.json not found at ${hooks_json}"
         healthy=false
     fi
 
@@ -909,9 +798,7 @@ install_claude_code() {
 
     install_git_merge_infra
 
-    if prompt_plugin_install; then
-        prompt_hooks_install
-    fi
+    prompt_plugin_install
 
     prompt_chub_mcp
     prompt_phoenix_install

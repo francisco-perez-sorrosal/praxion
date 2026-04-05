@@ -86,6 +86,14 @@ def main():
         state += f"{HEAD_LINES} lines each).\n\n"
         state += "\n".join(sections)
 
+        state += (
+            "\n## Memory Obligation\n\n"
+            "Before completing, call `remember()` if you discovered any "
+            "gotcha, pattern, convention, or insight that future agents "
+            "should know. The memory gate will block session completion "
+            "and commits without `remember()` calls.\n"
+        )
+
         output_path = ai_work / "PIPELINE_STATE.md"
         with open(output_path, "w") as f:
             f.write(state)

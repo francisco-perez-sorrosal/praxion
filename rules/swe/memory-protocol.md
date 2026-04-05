@@ -42,6 +42,7 @@ remember(category, key, value, tags, importance, summary, type)
 ```
 
 - **category**: `learnings` for gotchas/patterns, `project` for conventions/decisions
+- **key**: Kebab-case topic slug. Never include dates — `updated_at` tracks freshness. Use descriptive topics: `memory-gate-phase-aware-fix`, not `memory-gate-fix-2026-04-05`
 - **summary**: One-line description (~100 chars) -- this is what agents see in the index
 - **importance**: Gotchas and conventions: 7-8. Patterns: 5-6. Preferences: 3-4
 - **tags**: 2-4 lowercase tags for discoverability

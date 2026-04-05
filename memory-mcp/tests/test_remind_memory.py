@@ -165,3 +165,117 @@ class TestRemindMemoryBlocking:
 
         result = _run_hook(payload)
         assert result.returncode == 2
+
+
+class TestPhaseAwareMemoryGate:
+    """Test that the gate detects significant work AFTER the last remember() call.
+
+    This is the core fix: an early remember() should NOT silence the gate
+    for the entire session. If new significant work happens after the last
+    remember(), the gate must block again.
+    """
+
+    def test_blocks_when_significant_work_after_remember(self, tmp: Path):
+        """remember() early, then more significant work = exit 2."""
+        entries = [
+            # Phase 1: some work + remember
+            _tool_use_turn("Edit", {"file_path": "/tmp/f1.py"}),
+            _tool_use_turn("Edit", {"file_path": "/tmp/f2.py"}),
+            _tool_use_turn("mcp__plugin_i-am_memory__remember"),
+            # Phase 2: new significant work without remember
+            _tool_use_turn("Edit", {"file_path": "/tmp/f3.py"}),
+            _tool_use_turn("Edit", {"file_path": "/tmp/f4.py"}),
+            _tool_use_turn("Edit", {"file_path": "/tmp/f5.py"}),
+        ]
+        transcript = _make_transcript(entries, tmp)
+
+        payload = {
+            "tool_input": {"command": "git commit -m 'test'"},
+            "transcript_path": str(transcript),
+        }
+
+        result = _run_hook(payload)
+        assert result.returncode == 2
+        assert "since last remember()" in result.stderr
+
+    def test_passes_when_remember_covers_all_work(self, tmp: Path):
+        """All significant work followed by remember() = exit 0."""
+        entries = [
+            _tool_use_turn("Edit", {"file_path": "/tmp/f1.py"}),
+            _tool_use_turn("Edit", {"file_path": "/tmp/f2.py"}),
+            _tool_use_turn("Edit", {"file_path": "/tmp/f3.py"}),
+            _tool_use_turn("Edit", {"file_path": "/tmp/f4.py"}),
+            _tool_use_turn("mcp__plugin_i-am_memory__remember"),
+        ]
+        transcript = _make_transcript(entries, tmp)
+
+        payload = {
+            "tool_input": {"command": "git commit -m 'test'"},
+            "transcript_path": str(transcript),
+        }
+
+        result = _run_hook(payload)
+        assert result.returncode == 0
+
+    def test_blocks_agent_delegation_after_remember(self, tmp: Path):
+        """Agent delegation after remember() = exit 2."""
+        entries = [
+            _tool_use_turn("Agent"),
+            _tool_use_turn("mcp__plugin_i-am_memory__remember"),
+            _tool_use_turn("Agent"),  # new delegation post-remember
+        ]
+        transcript = _make_transcript(entries, tmp)
+
+        payload = {
+            "tool_input": {"command": "git commit -m 'test'"},
+            "transcript_path": str(transcript),
+        }
+
+        result = _run_hook(payload)
+        assert result.returncode == 2
+
+    def test_passes_when_work_after_remember_is_insignificant(self, tmp: Path):
+        """Significant work + remember() + trivial follow-up = exit 0."""
+        entries = [
+            _tool_use_turn("Edit", {"file_path": "/tmp/f1.py"}),
+            _tool_use_turn("Edit", {"file_path": "/tmp/f2.py"}),
+            _tool_use_turn("Edit", {"file_path": "/tmp/f3.py"}),
+            _tool_use_turn("mcp__plugin_i-am_memory__remember"),
+            # Only 1 edit after remember — below threshold
+            _tool_use_turn("Edit", {"file_path": "/tmp/f4.py"}),
+        ]
+        transcript = _make_transcript(entries, tmp)
+
+        payload = {
+            "tool_input": {"command": "git commit -m 'test'"},
+            "transcript_path": str(transcript),
+        }
+
+        result = _run_hook(payload)
+        assert result.returncode == 0
+
+    def test_multiple_remember_calls_reset_tracking(self, tmp: Path):
+        """Multiple phases each covered by remember() = exit 0."""
+        entries = [
+            # Phase 1
+            _tool_use_turn("Edit", {"file_path": "/tmp/f1.py"}),
+            _tool_use_turn("Edit", {"file_path": "/tmp/f2.py"}),
+            _tool_use_turn("Edit", {"file_path": "/tmp/f3.py"}),
+            _tool_use_turn("mcp__plugin_i-am_memory__remember"),
+            # Phase 2
+            _tool_use_turn("Edit", {"file_path": "/tmp/f4.py"}),
+            _tool_use_turn("Edit", {"file_path": "/tmp/f5.py"}),
+            _tool_use_turn("Edit", {"file_path": "/tmp/f6.py"}),
+            _tool_use_turn("mcp__plugin_i-am_memory__remember"),
+            # Only trivial work after last remember
+            _tool_use_turn("Read", {"file_path": "/tmp/f1.py"}),
+        ]
+        transcript = _make_transcript(entries, tmp)
+
+        payload = {
+            "tool_input": {"command": "git commit -m 'test'"},
+            "transcript_path": str(transcript),
+        }
+
+        result = _run_hook(payload)
+        assert result.returncode == 0

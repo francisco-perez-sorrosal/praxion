@@ -48,7 +48,8 @@ class TestDedupNoOverlap:
 
 
 class TestDedupTagOverlap:
-    def test_two_tag_overlap_returns_candidates(self, store: MemoryStore):
+    def test_two_tag_overlap_writes_directly(self, store: MemoryStore):
+        """Two-tag overlap with ADD recommendation writes without a second call."""
         store.remember(
             "user",
             "name",
@@ -61,12 +62,8 @@ class TestDedupTagOverlap:
             "Ally",
             tags=["identity", "personal", "shortname"],
         )
-        assert result["action"] == "candidates"
-        assert len(result["candidates"]) >= 1
-        candidate = result["candidates"][0]
-        assert candidate["key"] == "name"
-        assert candidate["category"] == "user"
-        assert "tag_overlap" in candidate["match_reason"]
+        assert result["action"] == "ADD"
+        assert result["entry"]["value"] == "Ally"
 
     def test_three_tag_overlap_recommends_update(self, store: MemoryStore):
         store.remember(
@@ -84,7 +81,8 @@ class TestDedupTagOverlap:
         assert result["action"] == "candidates"
         assert result["recommendation"] == "UPDATE"
 
-    def test_candidates_include_entry_details(self, store: MemoryStore):
+    def test_moderate_overlap_writes_directly(self, store: MemoryStore):
+        """Two-tag overlap (below strong threshold) writes immediately."""
         store.remember(
             "tools",
             "editor",
@@ -97,11 +95,8 @@ class TestDedupTagOverlap:
             "vscode",
             tags=["development", "coding", "ide"],
         )
-        assert result["action"] == "candidates"
-        candidate = result["candidates"][0]
-        assert candidate["value"] == "neovim"
-        assert candidate["tags"] == ["coding", "development", "preference"]
-        assert "tag_overlap" in candidate
+        assert result["action"] == "ADD"
+        assert result["entry"]["value"] == "vscode"
 
 
 # -- Value overlap: candidates returned ---------------------------------------
@@ -305,8 +300,8 @@ class TestDedupEdgeCases:
         # "Al" has no significant words (< MIN_WORD_LENGTH=3), so no value match
         assert result["action"] == "ADD"
 
-    def test_recommendation_add_for_moderate_overlap(self, store: MemoryStore):
-        """Two-tag overlap but low value similarity should recommend ADD."""
+    def test_recommendation_add_writes_immediately(self, store: MemoryStore):
+        """Two-tag overlap but low value similarity: writes directly (ADD)."""
         store.remember(
             "tools",
             "editor",
@@ -319,5 +314,6 @@ class TestDedupEdgeCases:
             "lldb for native debugging",
             tags=["development", "coding", "debugging"],
         )
-        assert result["action"] == "candidates"
-        assert result["recommendation"] == "ADD"
+        # ADD recommendation proceeds to write — no second call needed
+        assert result["action"] == "ADD"
+        assert result["entry"]["value"] == "lldb for native debugging"

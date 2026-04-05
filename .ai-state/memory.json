@@ -34,9 +34,9 @@
         "created_by": "main"
       },
       "memory-enforcement-architecture": {
-        "value": "Memory creation is enforced by three layers: (1) memory_gate.py Stop hook blocks main agent if >3 edits and 0 remember() calls, (2) validate_memory.py SubagentStop hook blocks subagents if >5 edits and 0 remember() calls (exempt: Explore, sentinel, doc-engineer, Plan), (3) inject_memory.py appends a memory obligation footer to every subagent's context. The memory-protocol rule uses mandatory language. This replaced the original design where remember() calls were purely voluntary — which resulted in 0 organic memories across 300+ observations.",
+        "value": "Memory creation is enforced by three layers: (1) memory_gate.py Stop hook blocks main agent if significant work detected (reads, searches, delegations, edits) since last remember() call — phase-aware, resets per remember(), (2) validate_memory.py SubagentStop hook blocks subagents with significant unmemorized work (exempt: Explore, sentinel, doc-engineer, Plan), (3) inject_memory.py appends a memory obligation footer to every subagent's and main agent's context at SessionStart and SubagentStart. The scan_transcript() function lives in _hook_utils.py (shared, not duplicated). All three consumers use TranscriptStats with phase-aware counters.",
         "created_at": "2026-04-05T00:32:39.022026Z",
-        "updated_at": "2026-04-05T00:32:39.022026Z",
+        "updated_at": "2026-04-05T22:08:25.686025Z",
         "tags": [
           "architecture",
           "enforcement",
@@ -60,16 +60,16 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Three-layer memory enforcement: Stop gate, SubagentStop gate, inject obligation footer",
+        "summary": "Three-layer memory enforcement: phase-aware Stop gate, SubagentStop gate, inject obligation footer",
         "valid_at": "2026-04-05T00:32:39.022026Z",
         "invalid_at": null,
         "type": "decision",
         "created_by": "main"
       },
       "ecosystem-health-2026-04-04": {
-        "value": "Full system verification 2026-04-05: Grade A (4th consecutive). 536/536 tests pass (171 task-chronograph, 365 memory-mcp). Token budget improved to 84.3% (12,652/15,000) from 91.8% — 15.7% headroom now. 77 artifacts (29 skills, 12 agents, 8 rules, 15 commands, 18 hooks, 13 ADRs, 2 MCP servers). 0 critical/important findings, 6 suggested. Hygiene items: stale symlink ~/.claude/rules/swe/decision-tracking.md -> deleted file; 6 git stashes; 2 empty local branches; hook-crafting orphaned exit-code-semantics.md ref. All cosmetic.",
+        "value": "System verification 2026-04-05: Grade A (restored). 541 tests total (370 memory-mcp, 171 task-chronograph-mcp) — all pass (1 flaky test_02_multi_session_lifecycle passes in isolation). Lint: 8 ruff errors in peripheral scripts (cursor config, eval, skill-crafting scripts). Format: 6 files need reformatting. Token budget at 89.4% (~13,404/15,000). The prior Grade B findings (README_DEV.md hooks path, hook-crafting skill docs) were already fixed by commits eea34e7 and ab46551. 77 artifacts: 29 skills, 12 agents, 17 commands, 8 rules, 16 hook scripts, 13 ADRs, 2 MCP servers. Persistent warnings: 5 agents above 300-line threshold (monitoring only).",
         "created_at": "2026-04-05T01:13:16.217061Z",
-        "updated_at": "2026-04-05T20:52:05.326406Z",
+        "updated_at": "2026-04-05T22:07:49.236227Z",
         "tags": [
           "audit",
           "health",
@@ -89,13 +89,49 @@
         },
         "access_count": 2,
         "last_accessed": "2026-04-05T20:56:17.175817Z",
-        "status": "active",
+        "status": "superseded",
         "links": [],
-        "summary": "System verification 2026-04-05: Grade A, 536/536 tests pass, token budget improved to 84.3%, hygiene items only",
+        "summary": "System verification 2026-04-05: Grade A (restored), 541/541 tests pass, lint/format hygiene items only",
         "valid_at": "2026-04-05T01:13:16.217061Z",
-        "invalid_at": null,
+        "invalid_at": "2026-04-05T22:12:30.042395Z",
         "type": "insight",
         "created_by": "main"
+      },
+      "ecosystem-health-latest": {
+        "value": "System verification 2026-04-05: Grade A (restored). 541 tests total (370 memory-mcp, 171 task-chronograph-mcp) — all pass (1 flaky test_02_multi_session_lifecycle passes in isolation). Lint: 8 ruff errors in peripheral scripts (cursor config, eval, skill-crafting scripts). Format: 6 files need reformatting. Token budget at 89.4% (~13,404/15,000). The prior Grade B findings (README_DEV.md hooks path, hook-crafting skill docs) were already fixed by commits eea34e7 and ab46551. 77 artifacts: 29 skills, 12 agents, 17 commands, 8 rules, 16 hook scripts, 13 ADRs, 2 MCP servers. Persistent warnings: 5 agents above 300-line threshold (monitoring only).",
+        "created_at": "2026-04-05T22:12:26.568635Z",
+        "updated_at": "2026-04-05T22:12:26.568635Z",
+        "tags": [
+          "audit",
+          "health",
+          "sentinel",
+          "tests",
+          "token-budget",
+          "verification"
+        ],
+        "confidence": null,
+        "importance": 6,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "project.ecosystem-health-2026-04-04",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Latest system verification: Grade A, 541/541 tests pass, lint/format hygiene items only",
+        "valid_at": "2026-04-05T22:12:26.568635Z",
+        "invalid_at": null,
+        "type": "insight",
+        "created_by": null
       }
     },
     "relationships": {},
@@ -256,9 +292,9 @@
         "created_by": "main"
       },
       "memory-gate-blind-spot-analysis-sessions": {
-        "value": "The memory gate enforcement (memory_gate.py for main agent, validate_memory.py for subagents) only triggers based on code edit counts (>=3 edits for main, >=5 for subagents). Analysis-heavy sessions — sentinel audits, research, reviews, planning — produce zero code edits and slip through with no memories stored. Additionally, sentinel/Explore/doc-engineer/Plan agents are explicitly exempt from validate_memory.py. This means the most insight-rich sessions (audits that reveal ecosystem health trends, research that surfaces architectural patterns) are the least likely to produce memories. The main agent must self-enforce memory creation after consuming analysis results, regardless of edit count.",
+        "value": "The memory gate (memory_gate.py) now tracks multiple work signals beyond code edits: file reads, grep searches, agent delegations, and tool calls. It uses phase-aware counting (resets after each remember() call) via _hook_utils.py TranscriptStats. The original blind spot — analysis sessions with zero edits slipping through — is partially closed. The gate still exempts certain agent types (Explore, sentinel, doc-engineer, Plan) at SubagentStop. The main agent gate triggers on a combination of reads + searches + delegations, not just edits.",
         "created_at": "2026-04-05T01:13:26.662451Z",
-        "updated_at": "2026-04-05T01:13:26.662451Z",
+        "updated_at": "2026-04-05T22:08:15.769915Z",
         "tags": [
           "enforcement",
           "gotcha",
@@ -266,7 +302,7 @@
           "memory"
         ],
         "confidence": null,
-        "importance": 8,
+        "importance": 7,
         "source": {
           "type": "session",
           "detail": null,
@@ -291,24 +327,25 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Memory gate only fires on code edits — analysis/audit sessions produce zero memories unless self-enforced",
+        "summary": "Memory gate now tracks reads/searches/delegations, not just edits — analysis session blind spot partially closed",
         "valid_at": "2026-04-05T01:13:26.662451Z",
         "invalid_at": null,
         "type": "gotcha",
         "created_by": "main"
       },
       "hook-duplication-scan-transcript": {
-        "value": "The _scan_transcript() function is duplicated across memory_gate.py and validate_memory.py hooks in .claude-plugin/hooks/. Both implement identical logic to scan Claude Code transcripts and classify tool events. This should be refactored into a shared utility module (already partially done with _hook_utils.py) to reduce maintenance burden and prevent divergence.",
+        "value": "Resolved: _scan_transcript() duplication was refactored. scan_transcript() now lives solely in hooks/_hook_utils.py as a shared function. All consumers (memory_gate.py, validate_memory.py, remind_memory.py) import from _hook_utils. No longer a refactoring candidate.",
         "created_at": "2026-04-05T01:33:31.818069Z",
-        "updated_at": "2026-04-05T01:33:31.818069Z",
+        "updated_at": "2026-04-05T22:08:49.953831Z",
         "tags": [
           "architecture",
           "code-quality",
           "hooks",
-          "refactoring"
+          "refactoring",
+          "resolved"
         ],
         "confidence": null,
-        "importance": 5,
+        "importance": 3,
         "source": {
           "type": "session",
           "detail": null,
@@ -320,16 +357,16 @@
         "last_accessed": null,
         "status": "superseded",
         "links": [],
-        "summary": "_scan_transcript() duplicated in memory_gate.py and validate_memory.py — refactoring candidate for DRY",
+        "summary": "scan_transcript() duplication resolved — now shared in _hook_utils.py",
         "valid_at": "2026-04-05T01:33:31.818069Z",
         "invalid_at": "2026-04-05T02:07:26.827694Z",
-        "type": "gotcha",
+        "type": "pattern",
         "created_by": null
       },
       "praxion-ecosystem-inventory-2026-04-04": {
-        "value": "Comprehensive ecosystem inventory completed for Praxion plugin. All component categories verified:\n\nSKILLS: 29 directories with SKILL.md, all with proper frontmatter (name, description). Catalog in skills/README.md matches filesystem exactly.\n\nCOMMANDS: 15 files with frontmatter (description, argument-hint, allowed-tools). Catalog in commands/README.md matches filesystem exactly. Note: renamed from 'memory.md' to 'cajalogic.md' (update README_DEV.md).\n\nAGENTS: 12 files with proper frontmatter (name, description, tools, skills). All 12 registered in plugin.json agents array. Filesystem matches plugin.json exactly.\n\nRULES: 8 rule files in swe/ and writing/ subdirectories. Two path-scoped (testing-conventions.md for tests/**, readme-style.md for **/README.md). Catalog in rules/README.md matches filesystem.\n\nHOOKS: 13 hook scripts + 1 utility module (_hook_utils.py) in .claude-plugin/hooks/. All registered in hooks.json. Types: Python (11), Shell (1), Tests (1), Utils (1).\n\nMCP SERVERS: 2 servers registered in plugin.json and present as directories:\n- task-chronograph-mcp (Python, uv-based)\n- memory-mcp (Python, uv-based)\n\nREFERENCE FILES: All skills have optional references/ subdirectories for progressive disclosure.\n\nISSUE IDENTIFIED: README_DEV.md lists 'commands/memory.md' but actual file is 'commands/cajalogic.md'. Needs update.",
+        "value": "Praxion ecosystem inventory (updated 2026-04-05): SKILLS: 29 directories with SKILL.md. COMMANDS: 17 command files. AGENTS: 12 agent definitions, all in plugin.json. RULES: 8 files (6 always-loaded, 2 path-scoped). HOOKS: 16 files in hooks/ at repo root, auto-discovered via hooks/hooks.json (moved from .claude-plugin/hooks/ in commit ab46551). MCP SERVERS: 2 (memory-mcp, task-chronograph-mcp), both Python 3.13+, uv-managed. ADRs: 13 in .ai-state/decisions/.",
         "created_at": "2026-04-05T01:34:25.891042Z",
-        "updated_at": "2026-04-05T01:34:25.891042Z",
+        "updated_at": "2026-04-05T22:08:06.837169Z",
         "tags": [
           "audit",
           "documentation",
@@ -338,7 +375,7 @@
           "structure"
         ],
         "confidence": null,
-        "importance": 8,
+        "importance": 7,
         "source": {
           "type": "session",
           "detail": null,
@@ -348,12 +385,12 @@
         },
         "access_count": 1,
         "last_accessed": "2026-04-05T20:56:17.175817Z",
-        "status": "active",
+        "status": "superseded",
         "links": [],
-        "summary": "Comprehensive ecosystem inventory completed for Praxion plugin. All component categories...",
+        "summary": "Updated ecosystem inventory: 29 skills, 17 commands, 12 agents, 8 rules, 16 hooks at repo root, 2 MCP servers",
         "valid_at": "2026-04-05T01:34:25.891042Z",
-        "invalid_at": null,
-        "type": "decision",
+        "invalid_at": "2026-04-05T22:12:30.495908Z",
+        "type": "convention",
         "created_by": null
       },
       "proactive-memory-vs-enforcement": {
@@ -470,32 +507,34 @@
         "created_by": null
       },
       "agent-background-flag-mismatch": {
-        "value": "8 of 11 Bg Safe agents (per swe-agent-coordination-protocol.md) are missing background: true in their agent frontmatter. Only cicd-engineer, doc-engineer, and sentinel have it set. Missing from: context-engineer, implementation-planner, implementer, researcher, skill-genesis, systems-architect, test-engineer, verifier. The background flag enables Claude Code to run agents in background mode; without it the coordination protocol Bg Safe designation has no runtime effect.",
+        "value": "Fixed: All 11 Bg Safe agents now have background: true in frontmatter (fixed in commit 0ba1d9b). Only promethean and skill-genesis correctly lack it (not Bg Safe per protocol). The mismatch between protocol table and agent frontmatter was caught by plugin-validator, not sentinel — the sentinel doesn't validate frontmatter flags against the protocol table.",
         "created_at": "2026-04-05T20:58:03.191934+00:00",
-        "updated_at": "2026-04-05T20:58:03.191934+00:00",
+        "updated_at": "2026-04-05T22:08:33.210993Z",
         "tags": [
-          "gotcha",
           "agents",
+          "background",
+          "gotcha",
           "plugin-validation",
-          "background"
+          "resolved"
         ],
         "confidence": null,
-        "importance": 7,
-        "summary": "8/11 Bg Safe agents missing background:true in frontmatter -- protocol vs runtime mismatch",
+        "importance": 5,
+        "summary": "Bg Safe agent background flag mismatch resolved — all 11 agents now have background:true (commit 0ba1d9b)",
         "type": "gotcha"
       },
       "agent-background-flag-protocol-drift": {
-        "value": "Agent frontmatter `background: true` must match the Bg Safe column in swe-agent-coordination-protocol.md. Found 8/11 agents missing the flag despite being declared Bg Safe. The sentinel audit checks doc cross-references but doesn't validate agent frontmatter flags against the protocol table — the plugin-validator caught it instead. When adding a new agent or changing its Bg Safe status, update both the protocol rule AND the agent frontmatter.",
+        "value": "Agent frontmatter `background: true` must match the Bg Safe column in swe-agent-coordination-protocol.md. This was violated (8/11 missing) and fixed in commit 0ba1d9b. The sentinel audit doesn't validate frontmatter flags against the protocol table — the plugin-validator caught it instead. When adding a new agent or changing its Bg Safe status, update both the protocol rule AND the agent frontmatter. Currently all 11 Bg Safe agents are correctly flagged.",
         "created_at": "2026-04-05T21:19:22.820218Z",
-        "updated_at": "2026-04-05T21:19:22.820218Z",
+        "updated_at": "2026-04-05T22:08:47.018938Z",
         "tags": [
           "agents",
+          "convention",
           "cross-reference",
           "frontmatter",
           "gotcha"
         ],
         "confidence": null,
-        "importance": 7,
+        "importance": 6,
         "source": {
           "type": "session",
           "detail": null,
@@ -512,10 +551,10 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Agent background: true must match Bg Safe in protocol — 8/11 were missing; sentinel doesn't catch this",
+        "summary": "Agent background:true must match protocol Bg Safe — now correct; sentinel doesn't validate this, plugin-validator does",
         "valid_at": "2026-04-05T21:19:22.820218Z",
         "invalid_at": null,
-        "type": "gotcha",
+        "type": "convention",
         "created_by": null
       },
       "mechanical-moves-miss-semantic-docs": {
@@ -600,6 +639,129 @@
         "valid_at": "2026-04-05T21:25:21.964884Z",
         "invalid_at": null,
         "type": "bugfix",
+        "created_by": null
+      },
+      "task-chronograph-mcp-structure": {
+        "value": "task-chronograph-mcp is an MCP server project (not a Praxion plugin with agents/skills/hooks). It provides agent pipeline observability via OpenTelemetry export to Phoenix. Project structure: src/ (6 Python modules), tests/ (6 test files with 113 total tests), docs (CLAUDE.md, README.md). No .claude-plugin/ directory with plugin.json exists in this repo - the CLAUDE.md indicates plugin.json should exist at .claude-plugin/plugin.json but it's not tracked in git. This appears to be a self-contained MCP server intended for integration into the i-am plugin, not a consumer of the plugin ecosystem.",
+        "created_at": "2026-04-05T21:44:45.127029Z",
+        "updated_at": "2026-04-05T21:44:45.127029Z",
+        "tags": [
+          "architecture",
+          "mcp-server",
+          "project-structure",
+          "task-chronograph-mcp"
+        ],
+        "confidence": null,
+        "importance": 6,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "superseded",
+        "links": [],
+        "summary": "task-chronograph-mcp is an MCP server project (not a Praxion plugin with agents/skills/hooks). It...",
+        "valid_at": "2026-04-05T21:44:45.127029Z",
+        "invalid_at": "2026-04-05T22:08:41.990546Z",
+        "type": "insight",
+        "created_by": null
+      },
+      "mcp-tests-require-python313-uv": {
+        "value": "Both memory-mcp and task-chronograph-mcp require Python 3.13+ (pyproject.toml requires-python = '>=3.13'). The default system Python (3.11.5 via pyenv) cannot run tests — uv must create a venv with --python 3.13 first. Correct test command: cd into subproject dir, then `uv venv --python 3.13 && uv sync && uv run pytest`. Running pytest from repo root or with wrong Python gives ModuleNotFoundError for the package.",
+        "created_at": "2026-04-05T22:04:05.470596Z",
+        "updated_at": "2026-04-05T22:04:05.470596Z",
+        "tags": [
+          "gotcha",
+          "memory-mcp",
+          "python",
+          "task-chronograph",
+          "testing",
+          "uv"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "MCP subprojects need Python 3.13+ via uv venv — system Python 3.11 causes import failures",
+        "valid_at": "2026-04-05T22:04:05.470596Z",
+        "invalid_at": null,
+        "type": "gotcha",
+        "created_by": null
+      },
+      "praxion-ecosystem-inventory": {
+        "value": "Praxion ecosystem inventory (updated 2026-04-05): SKILLS: 29 directories with SKILL.md. COMMANDS: 17 command files. AGENTS: 12 agent definitions, all in plugin.json. RULES: 8 files (6 always-loaded, 2 path-scoped). HOOKS: 16 files in hooks/ at repo root, auto-discovered via hooks/hooks.json (moved from .claude-plugin/hooks/ in commit ab46551). MCP SERVERS: 2 (memory-mcp, task-chronograph-mcp), both Python 3.13+, uv-managed. ADRs: 13 in .ai-state/decisions/.",
+        "created_at": "2026-04-05T22:12:38.488421Z",
+        "updated_at": "2026-04-05T22:12:38.488421Z",
+        "tags": [
+          "audit",
+          "documentation",
+          "ecosystem",
+          "inventory",
+          "structure"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.praxion-ecosystem-inventory-2026-04-04",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Ecosystem inventory: 29 skills, 17 commands, 12 agents, 8 rules, 16 hooks at repo root, 2 MCP servers",
+        "valid_at": "2026-04-05T22:12:38.488421Z",
+        "invalid_at": null,
+        "type": "convention",
+        "created_by": null
+      },
+      "memory-key-naming-no-dates": {
+        "value": "Memory keys must be topic-based, never date-suffixed. Dates in keys become misleading when the entry is updated with newer data (e.g. ecosystem-health-2026-04-04 holding 2026-04-05 data). The updated_at timestamp already tracks freshness. Use descriptive topic slugs: ecosystem-health-latest, praxion-ecosystem-inventory, not ecosystem-health-2026-04-04.",
+        "created_at": "2026-04-05T22:13:27.472273Z",
+        "updated_at": "2026-04-05T22:13:27.472273Z",
+        "tags": [
+          "convention",
+          "memory",
+          "naming"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "Memory keys must be topic-based, never date-suffixed — dates belong in timestamps, not keys",
+        "valid_at": "2026-04-05T22:13:27.472273Z",
+        "invalid_at": null,
+        "type": "correction",
         "created_by": null
       }
     }

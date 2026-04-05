@@ -1,8 +1,8 @@
 """SubagentStop hook: block subagent completion when significant work was done
 without calling remember().
 
-Scans the agent transcript for Write/Edit tool calls and for remember()
-calls. If the agent made substantial edits but never persisted learnings,
+Scans the agent transcript for tool usage patterns and for remember()
+calls. If the agent did substantial work but never persisted learnings,
 blocks completion (exit 2) with a stderr message.
 
 Synchronous hook (async: false). Uses exit 2 + stderr for blocking.
@@ -15,6 +15,8 @@ from __future__ import annotations
 import json
 import sys
 
+from _hook_utils import REMEMBER_PROMPT, scan_transcript
+
 # Read-only agents that should never be blocked for memory
 EXEMPT_AGENTS = frozenset(
     {
@@ -24,64 +26,6 @@ EXEMPT_AGENTS = frozenset(
         "Plan",
     }
 )
-
-MIN_EDITS_FOR_SIGNIFICANT = 3
-REMEMBER_TOOL_SUBSTRING = "remember"
-SIGNIFICANT_TOOLS = frozenset({"Write", "Edit"})
-
-
-def _scan_transcript(transcript_path: str) -> tuple[int, int, bool]:
-    """Scan transcript for work and remember() indicators.
-
-    Returns (edit_count, remember_count, wrote_learnings).
-    """
-    edit_count = 0
-    remember_count = 0
-    wrote_learnings = False
-
-    try:
-        with open(transcript_path, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    turn = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-
-                if turn.get("type") != "assistant":
-                    continue
-
-                message = turn.get("message", {})
-                content = message.get("content", [])
-                if not isinstance(content, list):
-                    continue
-
-                for block in content:
-                    if block.get("type") != "tool_use":
-                        continue
-
-                    name = block.get("name", "")
-                    tool_input = block.get("input", {})
-
-                    if name in SIGNIFICANT_TOOLS:
-                        edit_count += 1
-                        file_path = tool_input.get("file_path", "")
-                        if "LEARNINGS" in file_path:
-                            wrote_learnings = True
-
-                    if REMEMBER_TOOL_SUBSTRING in name.lower():
-                        remember_count += 1
-    except OSError:
-        pass
-
-    return edit_count, remember_count, wrote_learnings
-
-
-def _is_retry(payload: dict) -> bool:
-    """Detect retry via stop_hook_active (main agent) or SubagentStop re-entry."""
-    return bool(payload.get("stop_hook_active"))
 
 
 def main() -> None:
@@ -93,7 +37,6 @@ def main() -> None:
 
     agent_type = payload.get("agent_type", "")
 
-    # Exempt read-only or documentation agents
     if agent_type in EXEMPT_AGENTS:
         return
 
@@ -101,39 +44,25 @@ def main() -> None:
     if not transcript_path:
         return
 
-    is_retry = _is_retry(payload)
+    is_retry = bool(payload.get("stop_hook_active"))
 
-    edit_count, remember_count, wrote_learnings = _scan_transcript(transcript_path)
+    stats = scan_transcript(transcript_path)
 
-    # If remember() was called, always pass through
-    if remember_count > 0:
+    if stats.remember_count > 0:
         return
 
-    significant_work = edit_count >= MIN_EDITS_FOR_SIGNIFICANT
-    if not significant_work:
+    if not stats.has_significant_work:
         return
 
     # Second attempt and still no remember() — let through to avoid infinite loop
     if is_retry:
         return
 
-    detail = f"{edit_count} file edits"
-    if wrote_learnings:
-        detail += " including LEARNINGS.md"
-
     message = (
         f"[validate-memory] Agent [{agent_type}] did significant work "
-        f"({detail}) but never called remember(). You MUST call the "
+        f"({stats.work_summary}) but never called remember(). You MUST call the "
         f"mcp__plugin_i-am_memory__remember tool now before completing. "
-        f"Examples of what to remember:\n"
-        f"- Gotchas or non-obvious behaviors you discovered\n"
-        f"- Patterns that worked well and should be reused\n"
-        f"- Conventions or constraints not documented elsewhere\n"
-        f"- Debugging insights that took effort to discover\n\n"
-        f'Call: mcp__plugin_i-am_memory__remember with category="learnings", '
-        f"a descriptive key, the insight as value, relevant tags, "
-        f"importance (3-8), a one-line summary, and type "
-        f"(decision/gotcha/pattern/convention/preference/correction/insight)."
+        f"{REMEMBER_PROMPT}"
     )
     print(
         json.dumps({"decision": "block", "reason": message}),

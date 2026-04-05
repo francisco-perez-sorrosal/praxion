@@ -1,6 +1,6 @@
 {
   "schema_version": "2.0",
-  "session_count": 2,
+  "session_count": 3,
   "memories": {
     "user": {},
     "assistant": {},
@@ -23,8 +23,8 @@
           "agent_id": null,
           "session_id": null
         },
-        "access_count": 0,
-        "last_accessed": null,
+        "access_count": 1,
+        "last_accessed": "2026-04-05T01:01:04.745111Z",
         "status": "active",
         "links": [],
         "summary": "Memory v2.0: dual-layer (curated JSON + observation JSONL), hook-injected, zero LLM cost",
@@ -51,8 +51,8 @@
           "agent_id": null,
           "session_id": null
         },
-        "access_count": 0,
-        "last_accessed": null,
+        "access_count": 1,
+        "last_accessed": "2026-04-05T01:01:04.745111Z",
         "status": "active",
         "links": [
           {
@@ -64,6 +64,35 @@
         "valid_at": "2026-04-05T00:32:39.022026Z",
         "invalid_at": null,
         "type": "decision",
+        "created_by": "main"
+      },
+      "ecosystem-health-2026-04-04": {
+        "value": "Sentinel audit 2026-04-04: Health grade B (up from C). 70 artifacts (29 skills, 12 agents, 8 rules, 15 commands, 13 ADRs, 15 hooks). Token budget raised to 15,000 — project content at 11,024 tokens (26.5% headroom), but combined with global CLAUDE.md only 10.6% headroom (13,404/15,000). Core infrastructure is tight (agents, ADRs, plugin.json all consistent). Two important findings: (1) _scan_transcript() duplicated across memory_gate.py and validate_memory.py, (2) missing LICENSE file. Recurring pattern: documentation catalogs (README_DEV.md tree, rules/README.md) drift behind filesystem on every artifact addition.",
+        "created_at": "2026-04-05T01:13:16.217061Z",
+        "updated_at": "2026-04-05T01:13:16.217061Z",
+        "tags": [
+          "audit",
+          "health",
+          "sentinel",
+          "token-budget"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "Ecosystem health B, token budget 89.4% used, hook duplication and LICENSE are top findings",
+        "valid_at": "2026-04-05T01:13:16.217061Z",
+        "invalid_at": null,
+        "type": "insight",
         "created_by": "main"
       }
     },
@@ -88,8 +117,8 @@
           "agent_id": null,
           "session_id": null
         },
-        "access_count": 0,
-        "last_accessed": null,
+        "access_count": 1,
+        "last_accessed": "2026-04-05T01:01:04.948183Z",
         "status": "active",
         "links": [],
         "summary": "Hook additionalContext requires hookEventName field or injection is silently ignored",
@@ -116,8 +145,8 @@
           "agent_id": null,
           "session_id": null
         },
-        "access_count": 0,
-        "last_accessed": null,
+        "access_count": 1,
+        "last_accessed": "2026-04-05T01:01:04.948183Z",
         "status": "active",
         "links": [],
         "summary": "Stop hook gate pattern: sync hook + exit 2 + stop_hook_active check for pre-completion enforcement",
@@ -144,8 +173,8 @@
           "agent_id": null,
           "session_id": null
         },
-        "access_count": 0,
-        "last_accessed": null,
+        "access_count": 1,
+        "last_accessed": "2026-04-05T01:01:04.948183Z",
         "status": "active",
         "links": [
           {
@@ -177,8 +206,8 @@
           "agent_id": null,
           "session_id": null
         },
-        "access_count": 0,
-        "last_accessed": null,
+        "access_count": 1,
+        "last_accessed": "2026-04-05T01:01:04.948183Z",
         "status": "active",
         "links": [
           {
@@ -192,6 +221,76 @@
         ],
         "summary": "Async hooks silently drop feedback — any hook influencing agent behavior must be sync",
         "valid_at": "2026-04-05T00:32:28.438442Z",
+        "invalid_at": null,
+        "type": "gotcha",
+        "created_by": "main"
+      },
+      "user-expects-memory-from-all-sessions": {
+        "value": "User expects that every meaningful session — not just code-editing ones — produces memories. Running a sentinel audit and only presenting results without storing insights was flagged as a gap. The principle: if a session produces findings, trends, or cross-session insights, the main agent must proactively call remember() regardless of whether the enforcement hooks would trigger. Memory creation is a responsibility, not just a compliance check.",
+        "created_at": "2026-04-05T01:13:20.012482Z",
+        "updated_at": "2026-04-05T01:13:20.012482Z",
+        "tags": [
+          "enforcement",
+          "memory",
+          "preference"
+        ],
+        "confidence": null,
+        "importance": 8,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "User expects memory creation from ALL meaningful sessions, not just code-editing ones",
+        "valid_at": "2026-04-05T01:13:20.012482Z",
+        "invalid_at": null,
+        "type": "correction",
+        "created_by": "main"
+      },
+      "memory-gate-blind-spot-analysis-sessions": {
+        "value": "The memory gate enforcement (memory_gate.py for main agent, validate_memory.py for subagents) only triggers based on code edit counts (>=3 edits for main, >=5 for subagents). Analysis-heavy sessions — sentinel audits, research, reviews, planning — produce zero code edits and slip through with no memories stored. Additionally, sentinel/Explore/doc-engineer/Plan agents are explicitly exempt from validate_memory.py. This means the most insight-rich sessions (audits that reveal ecosystem health trends, research that surfaces architectural patterns) are the least likely to produce memories. The main agent must self-enforce memory creation after consuming analysis results, regardless of edit count.",
+        "created_at": "2026-04-05T01:13:26.662451Z",
+        "updated_at": "2026-04-05T01:13:26.662451Z",
+        "tags": [
+          "enforcement",
+          "gotcha",
+          "hooks",
+          "memory"
+        ],
+        "confidence": null,
+        "importance": 8,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.hook-output-requires-hookEventName",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.stop-hook-gate-pattern",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.hook-additionalContext-supported-events",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Memory gate only fires on code edits — analysis/audit sessions produce zero memories unless self-enforced",
+        "valid_at": "2026-04-05T01:13:26.662451Z",
         "invalid_at": null,
         "type": "gotcha",
         "created_by": "main"

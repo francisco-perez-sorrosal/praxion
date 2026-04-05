@@ -12,6 +12,7 @@ description: >
 tools: Read, Glob, Grep, Bash, Write, Edit
 skills: skill-crafting, rule-crafting, command-crafting, agent-crafting
 permissionMode: acceptEdits
+background: true
 memory: user
 maxTurns: 80
 hooks:

@@ -1,4 +1,5 @@
 .trees/
+.DS_Store
 
 claude/config/settings.local.json
 

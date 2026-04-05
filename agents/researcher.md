@@ -9,6 +9,7 @@ description: >
 tools: Read, Glob, Grep, Bash, WebSearch, WebFetch, Write
 skills: claude-ecosystem
 permissionMode: default
+background: true
 memory: user
 maxTurns: 80
 hooks:

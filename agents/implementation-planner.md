@@ -10,6 +10,7 @@ description: >
 tools: Read, Glob, Grep, Bash, Write, Edit
 skills: software-planning
 permissionMode: acceptEdits
+background: true
 memory: user
 maxTurns: 80
 hooks:

@@ -8,6 +8,7 @@ description: >
 tools: Read, Glob, Grep, Bash, Write, Edit
 skills: [claude-ecosystem, agentic-sdks, communicating-agents, mcp-crafting]
 permissionMode: acceptEdits
+background: true
 memory: user
 maxTurns: 80
 hooks:

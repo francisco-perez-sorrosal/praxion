@@ -11,6 +11,7 @@ tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit
 skills: [code-review, context-security-review]
 permissionMode: default
+background: true
 memory: user
 maxTurns: 40
 hooks:

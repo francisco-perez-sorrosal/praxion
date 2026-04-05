@@ -12,6 +12,7 @@ description: >
 tools: Read, Glob, Grep, Bash, Write, AskUserQuestion
 skills: [skill-crafting, rule-crafting]
 permissionMode: default
+background: true
 memory: user
 maxTurns: 40
 hooks:

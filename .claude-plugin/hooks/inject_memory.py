@@ -1,4 +1,9 @@
-"""SubagentStart hook: inject memory and decision context into every agent.
+"""SessionStart + SubagentStart hook: inject memory and decision context.
+
+Fires at both SessionStart (main agent) and SubagentStart (subagents),
+ensuring every agent sees curated memory and architectural decisions
+from the first turn. Detects the event type from the payload and sets
+hookEventName accordingly.
 
 Two independent data sources, combined into a single additionalContext:
 
@@ -446,9 +451,15 @@ def main() -> None:
     if not context:
         return
 
+    # Detect event type: SubagentStart payloads have agent_type,
+    # SessionStart payloads do not. hookEventName must match the
+    # triggering event or additionalContext is silently ignored.
+    is_subagent = bool(payload.get("agent_type"))
+    event_name = "SubagentStart" if is_subagent else "SessionStart"
+
     output = {
         "hookSpecificOutput": {
-            "hookEventName": "SubagentStart",
+            "hookEventName": event_name,
             "additionalContext": context,
         }
     }

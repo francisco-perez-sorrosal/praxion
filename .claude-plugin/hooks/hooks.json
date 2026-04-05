@@ -12,6 +12,12 @@
           },
           {
             "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/inject_memory.py",
+            "timeout": 5,
+            "async": false
+          },
+          {
+            "type": "command",
             "command": "python3 ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/capture_session.py 2>/dev/null",
             "timeout": 5,
             "async": true

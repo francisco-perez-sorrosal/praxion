@@ -1,8 +1,9 @@
 """Stop hook: block session end when significant work was done without remember().
 
 Scans the transcript for tool usage patterns (edits, reads, searches,
-agent delegation) and for remember() calls. If the session did substantial
-work but never persisted learnings to memory, blocks the stop (exit 2).
+agent delegation) and for remember() calls. Phase-aware: if remember()
+was called earlier but significant new work happened after the last call,
+the gate still blocks.
 
 Synchronous hook (async: false). Uses exit 2 + stderr for blocking.
 On second attempt (stop_hook_active), re-scans the transcript — only
@@ -33,10 +34,7 @@ def main() -> None:
 
     stats = scan_transcript(transcript_path)
 
-    if stats.remember_count > 0:
-        return
-
-    if not stats.has_significant_work:
+    if not stats.has_unmemorized_work:
         return
 
     # Second attempt and still no remember() — let through to avoid infinite loop

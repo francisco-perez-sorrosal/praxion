@@ -233,11 +233,13 @@ class MemoryStore:
             candidates = self._find_candidates(category, key, value, resolved_tags, broad=broad)
             if candidates:
                 recommendation = _recommend_action(candidates, value)
-                return {
-                    "action": "candidates",
-                    "candidates": candidates,
-                    "recommendation": recommendation,
-                }
+                if recommendation != "ADD":
+                    return {
+                        "action": "candidates",
+                        "candidates": candidates,
+                        "recommendation": recommendation,
+                    }
+                # ADD recommendation: proceed to write — no second call needed
 
         return self._do_remember(
             category,

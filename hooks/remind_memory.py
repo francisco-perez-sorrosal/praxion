@@ -50,10 +50,7 @@ def main() -> None:
 
     stats = scan_transcript(transcript_path)
 
-    if stats.remember_count > 0:
-        return
-
-    if not stats.has_significant_work:
+    if not stats.has_unmemorized_work:
         return
 
     print(

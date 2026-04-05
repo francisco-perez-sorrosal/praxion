@@ -25,6 +25,12 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/memory_gate.py",
+            "timeout": 15,
+            "async": false
+          },
+          {
+            "type": "command",
             "command": "python3 ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/send_event.py 2>/dev/null",
             "timeout": 10,
             "async": true
@@ -75,9 +81,9 @@
           },
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/validate_memory.py 2>/dev/null",
-            "timeout": 10,
-            "async": true
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/validate_memory.py",
+            "timeout": 15,
+            "async": false
           },
           {
             "type": "command",

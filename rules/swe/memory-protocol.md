@@ -6,13 +6,23 @@ Memory context is injected automatically at agent start via hook. You do NOT nee
 
 ### When to Remember
 
-Call `remember()` when you discover something that applies beyond the current task:
+You MUST call `remember()` when you discover something that applies beyond the current task. The memory gate hook will block session completion if significant work was done without any `remember()` calls.
+
+Call `remember()` for:
 
 - A gotcha that future agents working in this area should know
 - A pattern that worked well and should be reused
 - A project convention or constraint not documented elsewhere
 - A tool behavior, framework quirk, or API drift
 - An architectural insight or trade-off rationale (alongside ADR creation)
+- A user correction or preference expressed during the session
+- A debugging insight that took effort to discover
+
+**Examples of memories that should have been created:**
+
+- After discovering that async hooks silently drop `additionalContext` at SubagentStop: `remember("learnings", "async-hooks-drop-context", "...", tags=["gotcha", "hooks"], importance=8, type="gotcha")`
+- After a pipeline run reveals that worktree isolation prevents agent coordination issues: `remember("project", "worktree-isolation-pattern", "...", tags=["pattern", "pipeline"], importance=6, type="pattern")`
+- After the user corrects an approach: `remember("learnings", "user-prefers-X", "...", tags=["preference", "correction"], importance=7, type="correction")`
 
 ### When NOT to Remember
 
@@ -23,9 +33,11 @@ Do NOT call `remember()` for:
 - Temporary workarounds that will be resolved in this task
 - Content already captured in CLAUDE.md, rules, or skills
 
+When in doubt, remember. A low-importance memory (3-4) is better than a lost insight. The memory system handles deduplication.
+
 ### How to Remember
 
-```
+```python
 remember(category, key, value, tags, importance, summary, type)
 ```
 
@@ -56,6 +68,6 @@ Two memory systems coexist: Claude Code's auto-memory (`~/.claude/.../memory/`) 
 - **More recent wins** -- check `updated_at` on the Praxion entry. The most recently updated fact is the current truth.
 - **If still ambiguous** -- verify against the code or git history. Memory is a hint, not truth.
 
-### After Completing Your Task
+### Before Completing Your Task
 
-Before reporting completion, ask yourself: "Did I discover anything that future agents should know?" If yes, call `remember()`. If no, proceed.
+You MUST evaluate whether you discovered anything that future agents should know. This is enforced by the memory gate hook -- sessions with significant work and zero `remember()` calls will be blocked from completing. If you genuinely have nothing to persist, that's fine -- the gate will let you through on the second attempt. But the default should be to remember, not to skip.

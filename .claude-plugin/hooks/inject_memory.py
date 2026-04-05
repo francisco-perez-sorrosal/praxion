@@ -429,6 +429,19 @@ def main() -> None:
         sections.append(f"{_ADR_HEADER}{adr_body}")
     if memory_body:
         sections.append(f"{_MEM_HEADER}{memory_body}")
+
+    # Memory obligation footer — the only reliable injection point for agents
+    _OBLIGATION = (
+        "---\n"
+        "**Memory obligation**: Before completing, evaluate whether you "
+        "discovered a gotcha, pattern, convention, or architectural insight "
+        "that future agents should know. If yes, call "
+        "`remember(category, key, value, tags, importance, summary, type)`. "
+        "This is not optional — the memory gate will block session completion "
+        "if significant work was done without any remember() calls."
+    )
+    sections.append(_OBLIGATION)
+
     context = _SECTION_JOIN.join(sections)
     if not context:
         return

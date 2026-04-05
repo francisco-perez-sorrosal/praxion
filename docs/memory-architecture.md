@@ -30,8 +30,11 @@ Praxion's memory system gives every agent persistent, cross-session knowledge ab
   │                                                     │
   │  Enforcement Layer                                  │
   │  ─────────────────                                  │
-  │  inject_memory.py    → injects context at spawn     │
-  │  validate_memory.py  → warns on omitted remember()  │
+  │  inject_memory.py    → injects context at start     │
+  │                        (SessionStart + SubagentStart)│
+  │  memory_gate.py      → blocks Stop without remember │
+  │  validate_memory.py  → blocks SubagentStop same way │
+  │  remind_memory.py    → warns at commit time         │
   │  capture_memory.py   → captures tool events         │
   │  capture_session.py  → captures lifecycle events    │
   │  promote_learnings.py → warns before cleanup        │
@@ -135,7 +138,7 @@ Memory integration relies on three complementary mechanisms — not on agents "r
 
 ### Layer 1: Context Injection (inject_memory.py)
 
-A **synchronous** SubagentStart hook that reads `memory.json` (with LOCK_SH for concurrency safety), formats active entries as Markdown-KV, and injects them into the agent's context via `additionalContext`. Every agent sees memory data automatically without calling any tool.
+A **synchronous** hook registered at both **SessionStart** and **SubagentStart** that reads `memory.json` (with LOCK_SH for concurrency safety), formats active entries as Markdown-KV, and injects them into the agent's context via `additionalContext`. Every agent — including the main agent — sees memory data automatically from the first turn without calling any tool. The hook detects the event type from the payload and sets `hookEventName` accordingly.
 
 **Scaling strategy** for large stores:
 
@@ -155,9 +158,13 @@ An always-loaded rule that guides agents on when to call `remember()`:
 - **Don't remember**: Task-specific details, info derivable from code/git, temporary workarounds
 - Includes a standard tag vocabulary for consistent discoverability
 
-### Layer 3: Validation (validate_memory.py)
+### Layer 3: Enforcement Gates
 
-An **async** SubagentStop hook that parses the agent's transcript. If the agent wrote to LEARNINGS.md but didn't call `remember()`, the parent agent receives a warning suggesting promotion.
+Three hooks form a chain of enforcement checkpoints:
+
+- **memory_gate.py** (Stop, sync): Blocks session end if the main agent did significant work without calling `remember()`. Scans the transcript for edit/search/delegation patterns. Passes through on retry to prevent infinite loops.
+- **validate_memory.py** (SubagentStop, sync): Same logic for subagents. Exempt agents (sentinel, Explore, doc-engineer, Plan) pass through automatically.
+- **remind_memory.py** (PreToolUse/Bash, sync, commit-gated): Non-blocking warning at commit time if significant work was done without `remember()`. Closes the gap between SubagentStop and Stop — the commit is a natural "done with work phase" checkpoint.
 
 ### Layer 4: Automatic Capture
 
@@ -170,10 +177,10 @@ An **async** SubagentStop hook that parses the agent's transcript. If the agent 
 Every agent in the pipeline benefits from memory at different points:
 
 ```
-Pipeline Start
+Session/Agent Start
   ↓
   inject_memory.py fires → agent receives curated Markdown-KV context
-  ↓
+  ↓                        (SessionStart for main agent, SubagentStart for subagents)
 Agent executes its primary task
   ↓
   capture_memory.py fires on each tool call → observations accumulate
@@ -182,9 +189,13 @@ Agent discovers a cross-session insight
   ↓
   Agent calls remember() → curated entry stored with provenance
   ↓
+Agent commits work
+  ↓
+  remind_memory.py fires → warns if remember() not called (main agent, commit-gated)
+  ↓
 Agent completes
   ↓
-  validate_memory.py fires → warns if LEARNINGS.md written but remember() skipped
+  memory_gate.py / validate_memory.py fires → blocks if significant work without remember()
   ↓
   capture_session.py fires → agent_stop event recorded
 ```

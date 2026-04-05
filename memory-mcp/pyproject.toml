@@ -8,7 +8,7 @@ version = "0.1.1.dev0"
 description = "Persistent memory management via MCP server with JSON storage"
 requires-python = ">=3.13"
 dependencies = [
-    "mcp[cli]>=1.25,<2",
+    "mcp[cli]>=1.27,<2",
 ]
 
 [dependency-groups]

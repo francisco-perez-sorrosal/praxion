@@ -21,7 +21,7 @@ tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit
 permissionMode: default
 memory: user
-maxTurns: 150
+maxTurns: 100
 background: true
 hooks:
   Stop:

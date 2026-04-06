@@ -6,7 +6,7 @@
     "assistant": {},
     "project": {
       "memory-system-v2-architecture": {
-        "value": "Memory system v2.0 uses a dual-layer architecture: curated memories in .ai-state/memory.json (JSON, schema v2.0 with type ontology, provenance, soft delete) and automatic observations in .ai-state/observations.jsonl (append-only JSONL captured by hooks with zero LLM cost). The inject_memory.py hook injects curated context into every subagent via SubagentStart additionalContext (requires hookEventName field in output). JSON storage with Markdown presentation \u2014 the LLM never reads raw JSON.",
+        "value": "Memory system v2.0 uses a dual-layer architecture: curated memories in .ai-state/memory.json (JSON, schema v2.0 with type ontology, provenance, soft delete) and automatic observations in .ai-state/observations.jsonl (append-only JSONL captured by hooks with zero LLM cost). The inject_memory.py hook injects curated context into every subagent via SubagentStart additionalContext (requires hookEventName field in output). JSON storage with Markdown presentation — the LLM never reads raw JSON.",
         "created_at": "2026-04-04T18:24:47.510343Z",
         "updated_at": "2026-04-04T18:24:47.510343Z",
         "tags": [
@@ -34,7 +34,7 @@
         "created_by": "main"
       },
       "memory-enforcement-architecture": {
-        "value": "Memory creation is enforced by three layers: (1) memory_gate.py Stop hook blocks main agent if significant work detected (reads, searches, delegations, edits) since last remember() call \u2014 phase-aware, resets per remember(), (2) validate_memory.py SubagentStop hook blocks subagents with significant unmemorized work (exempt: Explore, sentinel, doc-engineer, Plan), (3) inject_memory.py appends a memory obligation footer to every subagent's and main agent's context at SessionStart and SubagentStart. The scan_transcript() function lives in _hook_utils.py (shared, not duplicated). All three consumers use TranscriptStats with phase-aware counters.",
+        "value": "Memory creation is enforced by three layers: (1) memory_gate.py Stop hook blocks main agent if significant work detected (reads, searches, delegations, edits) since last remember() call — phase-aware, resets per remember(), (2) validate_memory.py SubagentStop hook blocks subagents with significant unmemorized work (exempt: Explore, sentinel, doc-engineer, Plan), (3) inject_memory.py appends a memory obligation footer to every subagent's and main agent's context at SessionStart and SubagentStart. The scan_transcript() function lives in _hook_utils.py (shared, not duplicated). All three consumers use TranscriptStats with phase-aware counters.",
         "created_at": "2026-04-05T00:32:39.022026Z",
         "updated_at": "2026-04-05T22:08:25.686025Z",
         "tags": [
@@ -67,7 +67,7 @@
         "created_by": "main"
       },
       "ecosystem-health-2026-04-04": {
-        "value": "System verification 2026-04-05: Grade A (restored). 541 tests total (370 memory-mcp, 171 task-chronograph-mcp) \u2014 all pass (1 flaky test_02_multi_session_lifecycle passes in isolation). Lint: 8 ruff errors in peripheral scripts (cursor config, eval, skill-crafting scripts). Format: 6 files need reformatting. Token budget at 89.4% (~13,404/15,000). The prior Grade B findings (README_DEV.md hooks path, hook-crafting skill docs) were already fixed by commits eea34e7 and ab46551. 77 artifacts: 29 skills, 12 agents, 17 commands, 8 rules, 16 hook scripts, 13 ADRs, 2 MCP servers. Persistent warnings: 5 agents above 300-line threshold (monitoring only).",
+        "value": "System verification 2026-04-05: Grade A (restored). 541 tests total (370 memory-mcp, 171 task-chronograph-mcp) — all pass (1 flaky test_02_multi_session_lifecycle passes in isolation). Lint: 8 ruff errors in peripheral scripts (cursor config, eval, skill-crafting scripts). Format: 6 files need reformatting. Token budget at 89.4% (~13,404/15,000). The prior Grade B findings (README_DEV.md hooks path, hook-crafting skill docs) were already fixed by commits eea34e7 and ab46551. 77 artifacts: 29 skills, 12 agents, 17 commands, 8 rules, 16 hook scripts, 13 ADRs, 2 MCP servers. Persistent warnings: 5 agents above 300-line threshold (monitoring only).",
         "created_at": "2026-04-05T01:13:16.217061Z",
         "updated_at": "2026-04-05T22:07:49.236227Z",
         "tags": [
@@ -98,7 +98,7 @@
         "created_by": "main"
       },
       "ecosystem-health-latest": {
-        "value": "System verification 2026-04-05: Grade A. 740/740 tests pass (370 memory-mcp, 370 chronograph), zero lint/format issues, all versions synchronized at 0.1.1.dev0, 13 ADRs with consistent index, 21 hooks all referencing valid scripts, 29 skills, 17 commands, 12 agents, 12 rules. No root-level tests exist \u2014 all tests are in the two MCP subprojects. Git status clean except runtime state files (memory.json, observations.jsonl).",
+        "value": "System verification 2026-04-05: Grade A. 740/740 tests pass (370 memory-mcp, 370 chronograph), zero lint/format issues, all versions synchronized at 0.1.1.dev0, 13 ADRs with consistent index, 21 hooks all referencing valid scripts, 29 skills, 17 commands, 12 agents, 12 rules. No root-level tests exist — all tests are in the two MCP subprojects. Git status clean except runtime state files (memory.json, observations.jsonl).",
         "created_at": "2026-04-05T22:12:26.568635Z",
         "updated_at": "2026-04-06T03:46:43.702814Z",
         "tags": [
@@ -163,7 +163,7 @@
         "created_by": null
       },
       "memory-metrics-feature-research": {
-        "value": "User requested memory system observability: statistics on retrieval, inserts, updates, forget hits, per-agent metrics, per-skill metrics. Two parallel researchers investigating: (1) memory MCP internals \u2014 all operations, data model, hooks, existing tracking, (2) observability infrastructure \u2014 OTel/Phoenix pipeline, visualization options (Phoenix dashboards, Streamlit, Grafana, CLI stats). Goal: design metrics collection and visualization for the memory system to help users improve it. Research outputs in .ai-work/memory-metrics/ and .ai-work/memory-metrics-viz/.",
+        "value": "User requested memory system observability: statistics on retrieval, inserts, updates, forget hits, per-agent metrics, per-skill metrics. Two parallel researchers investigating: (1) memory MCP internals — all operations, data model, hooks, existing tracking, (2) observability infrastructure — OTel/Phoenix pipeline, visualization options (Phoenix dashboards, Streamlit, Grafana, CLI stats). Goal: design metrics collection and visualization for the memory system to help users improve it. Research outputs in .ai-work/memory-metrics/ and .ai-work/memory-metrics-viz/.",
         "created_at": "2026-04-06T06:37:01.068378Z",
         "updated_at": "2026-04-06T06:37:01.068378Z",
         "tags": [
@@ -186,23 +186,85 @@
         "last_accessed": null,
         "status": "active",
         "links": [],
-        "summary": "Memory metrics feature in research phase \u2014 tracking ops, per-agent stats, visualization via Phoenix or web app",
+        "summary": "Memory metrics feature in research phase — tracking ops, per-agent stats, visualization via Phoenix or web app",
         "valid_at": "2026-04-06T06:37:01.068378Z",
         "invalid_at": null,
         "type": "insight",
         "created_by": null
       },
       "solid-foundation-progress-snapshot": {
-        "value": "SOLID_FOUNDATION_IMPROVEMENTS.md audit (2026-04-06): P1.3 (api-design refs), P2.5 (/review-pr command), P3.2 phases 1-3 (Memory v2.0) newly confirmed done. Token budget resolved by raising to 15k (89.7% used, 10.3% headroom). SDLC coverage now 15/16 Strong. Remaining open: P1.1 (compression for headroom), P1.2 (dangling TS ref), P3.4 (sentinel 459/500 lines), P3.5 (/co /cop consolidation), P2.3 (deployment skill), P2.4 (observability skill), P4.1 (GH Actions templates), P3.1 (TS skill deferred), P3.2 phase 4 (multi-project memory), P4.3 (MCP integration docs).",
+        "value": "SOLID_FOUNDATION_IMPROVEMENTS.md progress as of 2026-04-06: 15/16 SDLC phases Strong, 1 Weak (Deployment only). Observability skill shipped. Ecosystem: 30 skills, 12 agents, 8 rules, 16 commands, 15 hooks, 3 MCP servers (memory, task-chronograph, chub). Token budget at 89.7% (1,545 token headroom). Remaining open items: P1.1 (token compression), P1.2 (dangling TS skill ref in implementer/test-engineer), P2.3 (deployment skill), P3.4 (sentinel 459/500 lines), P3.5 (co/cop consolidation), P4.1 (GH Actions templates), P4.3 (MCP integration docs).",
         "created_at": "2026-04-06T07:29:59.417061Z",
-        "updated_at": "2026-04-06T07:29:59.417061Z",
+        "updated_at": "2026-04-06T16:56:16.117252Z",
         "tags": [
+          "ecosystem",
+          "inventory",
           "progress",
           "roadmap",
           "solid-foundation"
         ],
         "confidence": null,
-        "importance": 5,
+        "importance": 6,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 1,
+        "last_accessed": "2026-04-06T20:05:19.284001Z",
+        "status": "active",
+        "links": [],
+        "summary": "Roadmap 15/16 Strong; remaining: deployment skill, token compression, sentinel size, co/cop merge, GH templates",
+        "valid_at": "2026-04-06T07:29:59.417061Z",
+        "invalid_at": null,
+        "type": "insight",
+        "created_by": null
+      },
+      "upstream-issue-steward-initiative": {
+        "value": "User wants a formal artifact (agent/skill/command) for upstream issue stewardship — responsibly reporting bugs and contributing fixes to third-party OSS projects we depend on. Triggered by filing anthropics/claude-code#44075 without checking for duplicates first. Key requirements: (1) deduplication — search existing issues before filing, assess true uniqueness vs overly-broad existing reports, (2) detail without exposure — max reproducibility info with zero internal/sensitive leaks, (3) root cause contribution — PR fixes upstream when we find the cause, (4) context-hub integration — track filed issues across sessions, (5) community philosophy — helping upstream projects thrive is a Praxion goal. Full pipeline research in progress with promethean + 2 researchers → systems-architect next.",
+        "created_at": "2026-04-06T17:43:35.068329Z",
+        "updated_at": "2026-04-06T17:43:35.068329Z",
+        "tags": [
+          "community",
+          "context-hub",
+          "initiative",
+          "issue-reporting",
+          "open-source",
+          "upstream"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 1,
+        "last_accessed": "2026-04-06T20:05:19.284001Z",
+        "status": "active",
+        "links": [],
+        "summary": "Upstream issue steward: formal artifact for responsible OSS bug reporting, dedup, sensitive info stripping, and fix contribution",
+        "valid_at": "2026-04-06T17:43:35.068329Z",
+        "invalid_at": null,
+        "type": "decision",
+        "created_by": null
+      },
+      "project-onboarding-feature-design": {
+        "value": "Project Cartographer: adaptive developer onboarding system refined through promethean ideation (April 2026).\n\nARCHITECTURE: Three progressive modes, NOT one monolithic experience:\n1. Executive Summary (/explore) — fast filesystem fingerprinting, no deep analysis. Produces an 'exploration card' with project type, scale, architecture, build system, entry points, test approach, key patterns, gotchas. Under 60 seconds.\n2. Guided Exploration (/explore guide) — 8-step adaptive sequence (Front Door, Skeleton, Heart, Nervous System, Metabolism, Immune System, Customs, History). Steps adapt based on project classification. Interactive — user controls depth and order.\n3. Persistent Learning Map (/explore map) — memory MCP integration for cross-session continuity. Tracks coverage, understanding anchors, knowledge gaps, bookmarks, questions.\nWild card: Architectural Archaeology (/explore history) — traces project evolution through git analysis (founding commits, geological layers, fault lines, fossil record, architects).\n\nCOMPONENT DECOMPOSITION (follows dec-014 Skill+Command pattern):\n- Skill (project-cartography): reusable methodology — other agents (researcher, systems-architect) can load it when encountering foreign codebases\n- Command (explore): user trigger with subcommand routing (summary/guide/map/history)\n- Agent question UNRESOLVED: context-engineer says interactive exploration should NOT use an agent (breaks follow-up dialog). But autonomous deep analysis (Mode 2's 8-step sequence) may benefit from agent isolation. Needs architect resolution.\n\nPROJECT CLASSIFICATION SYSTEM: 7 dimensions (scale, age, complexity, documentation, architecture style, language familiarity, domain) detected from filesystem signals. Classification drives which exploration steps are emphasized and how much detail is shown.\n\nINCREMENTAL DELIVERY: 5 phases, each independently valuable. Phase 1 (summary card) is a useful MVP.\nNext: researcher for classification signal validation, then systems-architect for component decomposition.",
+        "created_at": "2026-04-06T20:24:36.570254Z",
+        "updated_at": "2026-04-06T20:30:47.925713+00:00",
+        "tags": [
+          "architecture",
+          "decision",
+          "onboarding",
+          "feature-design"
+        ],
+        "confidence": null,
+        "importance": 8,
         "source": {
           "type": "session",
           "detail": null,
@@ -213,11 +275,16 @@
         "access_count": 0,
         "last_accessed": null,
         "status": "active",
-        "links": [],
-        "summary": "Solid foundation audit: 15/16 SDLC strong, 10 items remain open, token budget at 89.7%",
-        "valid_at": "2026-04-06T07:29:59.417061Z",
+        "links": [
+          {
+            "target": "project.memory-metrics-feature-research",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Project Cartographer: 3-mode adaptive onboarding (summary/guide/map), 7-dim classification, Skill+Command composition, incremental delivery",
+        "valid_at": "2026-04-06T20:24:36.570254Z",
         "invalid_at": null,
-        "type": "insight",
+        "type": "decision",
         "created_by": null
       }
     },
@@ -253,7 +320,7 @@
         "created_by": "main"
       },
       "stop-hook-gate-pattern": {
-        "value": "The Stop hook gate pattern enforces pre-completion checklists: a sync Stop hook scans the transcript, exits 2 with {\"decision\": \"block\", \"reason\": \"...\"} on stderr when criteria aren't met, and checks stop_hook_active to prevent infinite loops (exit 0 on second invocation). This pattern is reusable for any \"before you stop\" enforcement \u2014 test runs, commit checks, memory persistence. The key design: first invocation blocks with actionable feedback, second invocation always passes.",
+        "value": "The Stop hook gate pattern enforces pre-completion checklists: a sync Stop hook scans the transcript, exits 2 with {\"decision\": \"block\", \"reason\": \"...\"} on stderr when criteria aren't met, and checks stop_hook_active to prevent infinite loops (exit 0 on second invocation). This pattern is reusable for any \"before you stop\" enforcement — test runs, commit checks, memory persistence. The key design: first invocation blocks with actionable feedback, second invocation always passes.",
         "created_at": "2026-04-05T00:32:14.428100Z",
         "updated_at": "2026-04-05T00:32:14.428100Z",
         "tags": [
@@ -281,7 +348,7 @@
         "created_by": "main"
       },
       "hook-additionalContext-supported-events": {
-        "value": "additionalContext in hook output is only supported for specific events: PostToolUse, PostToolUseFailure, SessionStart, UserPromptSubmit, SubagentStart, Notification, PreToolUse (exit 0 only). Stop and SubagentStop do NOT support additionalContext \u2014 output is silently ignored. For those events, use decision: \"block\" + exit 2 + stderr JSON instead. This caused validate_memory.py to be dead code for months \u2014 it generated warnings that nobody ever saw.",
+        "value": "additionalContext in hook output is only supported for specific events: PostToolUse, PostToolUseFailure, SessionStart, UserPromptSubmit, SubagentStart, Notification, PreToolUse (exit 0 only). Stop and SubagentStop do NOT support additionalContext — output is silently ignored. For those events, use decision: \"block\" + exit 2 + stderr JSON instead. This caused validate_memory.py to be dead code for months — it generated warnings that nobody ever saw.",
         "created_at": "2026-04-05T00:32:26.230942Z",
         "updated_at": "2026-04-05T00:32:26.230942Z",
         "tags": [
@@ -314,7 +381,7 @@
         "created_by": "main"
       },
       "async-hooks-cannot-deliver-feedback": {
-        "value": "Async hooks (async: true) cannot reliably deliver additionalContext to Claude \u2014 the agent may move on before the hook output arrives. Any hook that needs Claude to see and act on its output MUST be sync (async: false). This was the root cause of validate_memory.py being dead code: it was registered as async at SubagentStop, so its warnings were generated but never reached the parent agent. Always verify async vs sync when a hook's purpose is to influence agent behavior.",
+        "value": "Async hooks (async: true) cannot reliably deliver additionalContext to Claude — the agent may move on before the hook output arrives. Any hook that needs Claude to see and act on its output MUST be sync (async: false). This was the root cause of validate_memory.py being dead code: it was registered as async at SubagentStop, so its warnings were generated but never reached the parent agent. Always verify async vs sync when a hook's purpose is to influence agent behavior.",
         "created_at": "2026-04-05T00:32:28.438442Z",
         "updated_at": "2026-04-05T00:32:28.438442Z",
         "tags": [
@@ -344,14 +411,14 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Async hooks silently drop feedback \u2014 any hook influencing agent behavior must be sync",
+        "summary": "Async hooks silently drop feedback — any hook influencing agent behavior must be sync",
         "valid_at": "2026-04-05T00:32:28.438442Z",
         "invalid_at": null,
         "type": "gotcha",
         "created_by": "main"
       },
       "user-expects-memory-from-all-sessions": {
-        "value": "User expects that every meaningful session \u2014 not just code-editing ones \u2014 produces memories. Running a sentinel audit and only presenting results without storing insights was flagged as a gap. The principle: if a session produces findings, trends, or cross-session insights, the main agent must proactively call remember() regardless of whether the enforcement hooks would trigger. Memory creation is a responsibility, not just a compliance check.",
+        "value": "User expects that every meaningful session — not just code-editing ones — produces memories. Running a sentinel audit and only presenting results without storing insights was flagged as a gap. The principle: if a session produces findings, trends, or cross-session insights, the main agent must proactively call remember() regardless of whether the enforcement hooks would trigger. Memory creation is a responsibility, not just a compliance check.",
         "created_at": "2026-04-05T01:13:20.012482Z",
         "updated_at": "2026-04-05T01:13:20.012482Z",
         "tags": [
@@ -379,7 +446,7 @@
         "created_by": "main"
       },
       "memory-gate-blind-spot-analysis-sessions": {
-        "value": "The memory gate (memory_gate.py) now tracks multiple work signals beyond code edits: file reads, grep searches, agent delegations, and tool calls. It uses phase-aware counting (resets after each remember() call) via _hook_utils.py TranscriptStats. The original blind spot \u2014 analysis sessions with zero edits slipping through \u2014 is partially closed. The gate still exempts certain agent types (Explore, sentinel, doc-engineer, Plan) at SubagentStop. The main agent gate triggers on a combination of reads + searches + delegations, not just edits.",
+        "value": "The memory gate (memory_gate.py) now tracks multiple work signals beyond code edits: file reads, grep searches, agent delegations, and tool calls. It uses phase-aware counting (resets after each remember() call) via _hook_utils.py TranscriptStats. The original blind spot — analysis sessions with zero edits slipping through — is partially closed. The gate still exempts certain agent types (Explore, sentinel, doc-engineer, Plan) at SubagentStop. The main agent gate triggers on a combination of reads + searches + delegations, not just edits.",
         "created_at": "2026-04-05T01:13:26.662451Z",
         "updated_at": "2026-04-05T22:08:15.769915Z",
         "tags": [
@@ -414,7 +481,7 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Memory gate now tracks reads/searches/delegations, not just edits \u2014 analysis session blind spot partially closed",
+        "summary": "Memory gate now tracks reads/searches/delegations, not just edits — analysis session blind spot partially closed",
         "valid_at": "2026-04-05T01:13:26.662451Z",
         "invalid_at": null,
         "type": "gotcha",
@@ -444,7 +511,7 @@
         "last_accessed": null,
         "status": "superseded",
         "links": [],
-        "summary": "scan_transcript() duplication resolved \u2014 now shared in _hook_utils.py",
+        "summary": "scan_transcript() duplication resolved — now shared in _hook_utils.py",
         "valid_at": "2026-04-05T01:33:31.818069Z",
         "invalid_at": "2026-04-05T02:07:26.827694Z",
         "type": "pattern",
@@ -481,7 +548,7 @@
         "created_by": null
       },
       "proactive-memory-vs-enforcement": {
-        "value": "Hooks alone cannot fully solve the memory gap. The fundamental issue is behavioral: the main agent must proactively call remember() during work, not wait for enforcement hooks to remind it. Hooks are a safety net, not a substitute for proactive memory. The Claude Code auto-memory system works because the instructions tell Claude to save memories as it discovers insights \u2014 it's instruction-driven, not enforcement-driven. Our system relies too heavily on enforcement (memory_gate at Stop, validate_memory at SubagentStop, remind_memory at commit) and not enough on the agent's own initiative to remember. The fix is both: enforce at boundaries AND instruct the agent to remember proactively.",
+        "value": "Hooks alone cannot fully solve the memory gap. The fundamental issue is behavioral: the main agent must proactively call remember() during work, not wait for enforcement hooks to remind it. Hooks are a safety net, not a substitute for proactive memory. The Claude Code auto-memory system works because the instructions tell Claude to save memories as it discovers insights — it's instruction-driven, not enforcement-driven. Our system relies too heavily on enforcement (memory_gate at Stop, validate_memory at SubagentStop, remind_memory at commit) and not enough on the agent's own initiative to remember. The fix is both: enforce at boundaries AND instruct the agent to remember proactively.",
         "created_at": "2026-04-05T02:04:24.988115Z",
         "updated_at": "2026-04-05T02:04:24.988115Z",
         "tags": [
@@ -503,14 +570,14 @@
         "last_accessed": "2026-04-05T20:56:17.175817Z",
         "status": "active",
         "links": [],
-        "summary": "Memory needs proactive agent behavior, not just enforcement hooks \u2014 hooks are safety nets, not substitutes",
+        "summary": "Memory needs proactive agent behavior, not just enforcement hooks — hooks are safety nets, not substitutes",
         "valid_at": "2026-04-05T02:04:24.988115Z",
         "invalid_at": null,
         "type": "insight",
         "created_by": null
       },
       "memory-enforcement-gap-commit-hook": {
-        "value": "Memory enforcement has a timing gap: SubagentStop hooks catch subagent work, Stop hook catches at session end, but nothing enforces memory for the main agent's mid-session work. The commit is the natural \"done with work phase\" checkpoint. Solution: remind_memory.py hook gated by commit_gate.sh that scans the transcript at commit time and warns if remember() was never called. Non-blocking (exit 0) \u2014 the Stop hook remains the hard gate. This still misses the case where the main agent is told the results by the user and then acts without any explicit remember() \u2014 the behavioral gap is that the agent itself should proactively remember, not just be reminded by hooks.",
+        "value": "Memory enforcement has a timing gap: SubagentStop hooks catch subagent work, Stop hook catches at session end, but nothing enforces memory for the main agent's mid-session work. The commit is the natural \"done with work phase\" checkpoint. Solution: remind_memory.py hook gated by commit_gate.sh that scans the transcript at commit time and warns if remember() was never called. Non-blocking (exit 0) — the Stop hook remains the hard gate. This still misses the case where the main agent is told the results by the user and then acts without any explicit remember() — the behavioral gap is that the agent itself should proactively remember, not just be reminded by hooks.",
         "created_at": "2026-04-05T02:04:31.028562Z",
         "updated_at": "2026-04-05T02:04:31.028562Z",
         "tags": [
@@ -552,7 +619,7 @@
         "created_by": null
       },
       "inject-memory-session-start-gap": {
-        "value": "inject_memory.py was only registered at SubagentStart, so the main agent never received curated memory or decision context at session start. This meant the main agent started every session blind \u2014 no memory priming, no obligation footer, no decisions context. Fixed by registering inject_memory.py at SessionStart too, with event detection (payload has agent_type for SubagentStart, not for SessionStart) to set the correct hookEventName. This mirrors how Claude Code's auto-memory works: MEMORY.md is always loaded at session start, creating a virtuous cycle of seeing memories \u2192 being primed to create more.",
+        "value": "inject_memory.py was only registered at SubagentStart, so the main agent never received curated memory or decision context at session start. This meant the main agent started every session blind — no memory priming, no obligation footer, no decisions context. Fixed by registering inject_memory.py at SessionStart too, with event detection (payload has agent_type for SubagentStart, not for SessionStart) to set the correct hookEventName. This mirrors how Claude Code's auto-memory works: MEMORY.md is always loaded at session start, creating a virtuous cycle of seeing memories → being primed to create more.",
         "created_at": "2026-04-05T02:07:17.474251Z",
         "updated_at": "2026-04-05T02:07:17.474251Z",
         "tags": [
@@ -587,14 +654,14 @@
             "relation": "related-to"
           }
         ],
-        "summary": "inject_memory.py was missing from SessionStart \u2014 main agent never got memory context; now fixed",
+        "summary": "inject_memory.py was missing from SessionStart — main agent never got memory context; now fixed",
         "valid_at": "2026-04-05T02:07:17.474251Z",
         "invalid_at": null,
         "type": "gotcha",
         "created_by": null
       },
       "agent-background-flag-mismatch": {
-        "value": "Fixed: All 11 Bg Safe agents now have background: true in frontmatter (fixed in commit 0ba1d9b). Only promethean and skill-genesis correctly lack it (not Bg Safe per protocol). The mismatch between protocol table and agent frontmatter was caught by plugin-validator, not sentinel \u2014 the sentinel doesn't validate frontmatter flags against the protocol table.",
+        "value": "Fixed: All 11 Bg Safe agents now have background: true in frontmatter (fixed in commit 0ba1d9b). Only promethean and skill-genesis correctly lack it (not Bg Safe per protocol). The mismatch between protocol table and agent frontmatter was caught by plugin-validator, not sentinel — the sentinel doesn't validate frontmatter flags against the protocol table.",
         "created_at": "2026-04-05T20:58:03.191934+00:00",
         "updated_at": "2026-04-05T22:08:33.210993Z",
         "tags": [
@@ -606,11 +673,11 @@
         ],
         "confidence": null,
         "importance": 5,
-        "summary": "Bg Safe agent background flag mismatch resolved \u2014 all 11 agents now have background:true (commit 0ba1d9b)",
+        "summary": "Bg Safe agent background flag mismatch resolved — all 11 agents now have background:true (commit 0ba1d9b)",
         "type": "gotcha"
       },
       "agent-background-flag-protocol-drift": {
-        "value": "Agent frontmatter `background: true` must match the Bg Safe column in swe-agent-coordination-protocol.md. This was violated (8/11 missing) and fixed in commit 0ba1d9b. The sentinel audit doesn't validate frontmatter flags against the protocol table \u2014 the plugin-validator caught it instead. When adding a new agent or changing its Bg Safe status, update both the protocol rule AND the agent frontmatter. Currently all 11 Bg Safe agents are correctly flagged.",
+        "value": "Agent frontmatter `background: true` must match the Bg Safe column in swe-agent-coordination-protocol.md. This was violated (8/11 missing) and fixed in commit 0ba1d9b. The sentinel audit doesn't validate frontmatter flags against the protocol table — the plugin-validator caught it instead. When adding a new agent or changing its Bg Safe status, update both the protocol rule AND the agent frontmatter. Currently all 11 Bg Safe agents are correctly flagged.",
         "created_at": "2026-04-05T21:19:22.820218Z",
         "updated_at": "2026-04-05T22:08:47.018938Z",
         "tags": [
@@ -638,7 +705,7 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Agent background:true must match protocol Bg Safe \u2014 now correct; sentinel doesn't validate this, plugin-validator does",
+        "summary": "Agent background:true must match protocol Bg Safe — now correct; sentinel doesn't validate this, plugin-validator does",
         "valid_at": "2026-04-05T21:19:22.820218Z",
         "invalid_at": null,
         "type": "convention",
@@ -680,14 +747,14 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Mechanical path moves miss semantic docs \u2014 skill content and project trees need manual audit after relocation",
+        "summary": "Mechanical path moves miss semantic docs — skill content and project trees need manual audit after relocation",
         "valid_at": "2026-04-05T21:19:25.137145Z",
         "invalid_at": null,
         "type": "gotcha",
         "created_by": null
       },
       "memory-gate-phase-aware-fix": {
-        "value": "The memory gate had a critical bug: it checked total session-wide remember() count, so one early remember() silenced the gate for all subsequent work. Fixed by making scan_transcript() track counters that reset on each remember() call. The gate now uses has_unmemorized_work (checks work since last remember) instead of the old pattern (remember_count > 0 \u2192 return early). Fix applied to all 3 consumers: memory_gate.py (Stop), remind_memory.py (PreToolUse/commit), validate_memory.py (SubagentStop). The _hook_utils.py TranscriptStats dataclass gained 5 new fields tracking post-remember work.",
+        "value": "The memory gate had a critical bug: it checked total session-wide remember() count, so one early remember() silenced the gate for all subsequent work. Fixed by making scan_transcript() track counters that reset on each remember() call. The gate now uses has_unmemorized_work (checks work since last remember) instead of the old pattern (remember_count > 0 → return early). Fix applied to all 3 consumers: memory_gate.py (Stop), remind_memory.py (PreToolUse/commit), validate_memory.py (SubagentStop). The _hook_utils.py TranscriptStats dataclass gained 5 new fields tracking post-remember work.",
         "created_at": "2026-04-05T21:25:21.964884Z",
         "updated_at": "2026-04-05T21:25:21.964884Z",
         "tags": [
@@ -722,7 +789,7 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Memory gate was session-wide \u2014 one early remember() silenced it; now phase-aware with per-remember reset",
+        "summary": "Memory gate was session-wide — one early remember() silenced it; now phase-aware with per-remember reset",
         "valid_at": "2026-04-05T21:25:21.964884Z",
         "invalid_at": null,
         "type": "bugfix",
@@ -758,7 +825,7 @@
         "created_by": null
       },
       "mcp-tests-require-python313-uv": {
-        "value": "Both memory-mcp and task-chronograph-mcp require Python 3.13+ (pyproject.toml requires-python = '>=3.13'). The default system Python (3.11.5 via pyenv) cannot run tests \u2014 uv must create a venv with --python 3.13 first. Correct test command: cd into subproject dir, then `uv venv --python 3.13 && uv sync && uv run pytest`. Running pytest from repo root or with wrong Python gives ModuleNotFoundError for the package.",
+        "value": "Both memory-mcp and task-chronograph-mcp require Python 3.13+ (pyproject.toml requires-python = '>=3.13'). The default system Python (3.11.5 via pyenv) cannot run tests — uv must create a venv with --python 3.13 first. Correct test command: cd into subproject dir, then `uv venv --python 3.13 && uv sync && uv run pytest`. Running pytest from repo root or with wrong Python gives ModuleNotFoundError for the package.",
         "created_at": "2026-04-05T22:04:05.470596Z",
         "updated_at": "2026-04-05T22:04:05.470596Z",
         "tags": [
@@ -782,7 +849,7 @@
         "last_accessed": null,
         "status": "active",
         "links": [],
-        "summary": "MCP subprojects need Python 3.13+ via uv venv \u2014 system Python 3.11 causes import failures",
+        "summary": "MCP subprojects need Python 3.13+ via uv venv — system Python 3.11 causes import failures",
         "valid_at": "2026-04-05T22:04:05.470596Z",
         "invalid_at": null,
         "type": "gotcha",
@@ -845,7 +912,7 @@
         "last_accessed": null,
         "status": "active",
         "links": [],
-        "summary": "Memory keys must be topic-based, never date-suffixed \u2014 dates belong in timestamps, not keys",
+        "summary": "Memory keys must be topic-based, never date-suffixed — dates belong in timestamps, not keys",
         "valid_at": "2026-04-05T22:13:27.472273Z",
         "invalid_at": null,
         "type": "correction",
@@ -884,7 +951,7 @@
         "created_by": null
       },
       "parent-session-id-always-equals-session-id": {
-        "value": "parent_session_id == session_id in send_event.py (lines 271, 296) for SubagentStart/SubagentStop. Claude Code shares session_id across main agent and subagents \u2014 subagents don't get separate session_ids. This means parent_session_id provides zero hierarchical information. However, the earlier analysis attributing two Phoenix traces to this bug was INCORRECT \u2014 the two traces were from two separate Claude Code conversations (d89d4bc7 was a 5-hour research session, 03d7e609 was the verification session). The actual missing-hierarchy issue is caused by SubagentStart hooks not firing for background agents (see subagentstart-hook-skipped-background-agents). The parent_session_id bug is real but its impact is limited to being redundant data, not to creating duplicate traces. Issue #7881 still OPEN.",
+        "value": "parent_session_id == session_id in send_event.py (lines 271, 296) for SubagentStart/SubagentStop. Claude Code shares session_id across main agent and subagents — subagents don't get separate session_ids. This means parent_session_id provides zero hierarchical information. However, the earlier analysis attributing two Phoenix traces to this bug was INCORRECT — the two traces were from two separate Claude Code conversations (d89d4bc7 was a 5-hour research session, 03d7e609 was the verification session). The actual missing-hierarchy issue is caused by SubagentStart hooks not firing for background agents (see subagentstart-hook-skipped-background-agents). The parent_session_id bug is real but its impact is limited to being redundant data, not to creating duplicate traces. Issue #7881 still OPEN.",
         "created_at": "2026-04-05T22:37:48.746668Z",
         "updated_at": "2026-04-06T04:13:39.692153Z",
         "tags": [
@@ -926,14 +993,14 @@
             "relation": "related-to"
           }
         ],
-        "summary": "parent_session_id == session_id always; earlier dual-trace attribution was wrong \u2014 separate conversations, not this bug",
+        "summary": "parent_session_id == session_id always; earlier dual-trace attribution was wrong — separate conversations, not this bug",
         "valid_at": "2026-04-05T22:37:48.746668Z",
         "invalid_at": null,
         "type": "gotcha",
         "created_by": null
       },
       "phoenix-graph-node-attrs-for-agent-graph": {
-        "value": "Phoenix Agent Graph & Path view requires graph.node.id, graph.node.name, and graph.node.parent_id attributes on AGENT spans \u2014 without these, the Agent Graph tab shows nothing even if the OTel span tree is correct. These are standard OpenInference attributes (SpanAttributes.GRAPH_NODE_ID etc.) available in openinference-semantic-conventions 0.1.28. Also set SpanAttributes.AGENT_NAME for proper Phoenix agent identification. The graph.node.parent_id provides a logical delegation hierarchy independent of the OTel span parent-child tree \u2014 useful when agents are flat siblings in the span tree but have a logical delegation chain. Key insight from Phoenix researcher: the Agent Graph view may only be available in Arize AX (commercial), not self-hosted Phoenix \u2014 needs verification.",
+        "value": "Phoenix Agent Graph & Path view requires graph.node.id, graph.node.name, and graph.node.parent_id attributes on AGENT spans — without these, the Agent Graph tab shows nothing even if the OTel span tree is correct. These are standard OpenInference attributes (SpanAttributes.GRAPH_NODE_ID etc.) available in openinference-semantic-conventions 0.1.28. Also set SpanAttributes.AGENT_NAME for proper Phoenix agent identification. The graph.node.parent_id provides a logical delegation hierarchy independent of the OTel span parent-child tree — useful when agents are flat siblings in the span tree but have a logical delegation chain. Key insight from Phoenix researcher: the Agent Graph view may only be available in Arize AX (commercial), not self-hosted Phoenix — needs verification.",
         "created_at": "2026-04-05T22:52:38.858920Z",
         "updated_at": "2026-04-05T22:52:38.858920Z",
         "tags": [
@@ -989,8 +1056,8 @@
           "agent_id": null,
           "session_id": null
         },
-        "access_count": 0,
-        "last_accessed": null,
+        "access_count": 1,
+        "last_accessed": "2026-04-06T20:05:19.284001Z",
         "status": "active",
         "links": [],
         "summary": "install_claude.sh code needs 5 piped '1' inputs for non-interactive install; no --yes flag",
@@ -1000,7 +1067,7 @@
         "created_by": null
       },
       "hook-executability-gotcha": {
-        "value": "GOTCHA: Hook executability patterns in Praxion\n\nWhen auditing hooks, note that MOST hooks in /hooks/ are NOT directly executable. This is CORRECT and intentional.\n\nWHY:\n- Hooks are invoked via hooks.json configuration, which explicitly calls \"python3 ${CLAUDE_PLUGIN_ROOT}/hooks/hookname.py\"\n- The hooks.json handler itself resolves the python3 interpreter path and executes the script\n- Making hooks directly executable (chmod +x) is unnecessary and can cause confusion about invocation method\n\nEXCEPTION:\n- commit_gate.sh IS executable because it's a shell script wrapper that internally invokes Python hooks and handles exit codes\n- It's the only hook that should have executable permissions\n\nVERIFICATION:\nWhen auditing, check hooks.json for invocation patterns:\n- If pattern is \"python3 ${CLAUDE_PLUGIN_ROOT}/hooks/*.py\" \u2192 hook need NOT be executable\n- If pattern is \"${CLAUDE_PLUGIN_ROOT}/hooks/*.sh\" \u2192 shell wrapper MUST be executable\n\nIMPLICATION:\nNever assume a non-executable hook is broken. Always check hooks.json to confirm proper invocation registration.",
+        "value": "GOTCHA: Hook executability patterns in Praxion\n\nWhen auditing hooks, note that MOST hooks in /hooks/ are NOT directly executable. This is CORRECT and intentional.\n\nWHY:\n- Hooks are invoked via hooks.json configuration, which explicitly calls \"python3 ${CLAUDE_PLUGIN_ROOT}/hooks/hookname.py\"\n- The hooks.json handler itself resolves the python3 interpreter path and executes the script\n- Making hooks directly executable (chmod +x) is unnecessary and can cause confusion about invocation method\n\nEXCEPTION:\n- commit_gate.sh IS executable because it's a shell script wrapper that internally invokes Python hooks and handles exit codes\n- It's the only hook that should have executable permissions\n\nVERIFICATION:\nWhen auditing, check hooks.json for invocation patterns:\n- If pattern is \"python3 ${CLAUDE_PLUGIN_ROOT}/hooks/*.py\" → hook need NOT be executable\n- If pattern is \"${CLAUDE_PLUGIN_ROOT}/hooks/*.sh\" → shell wrapper MUST be executable\n\nIMPLICATION:\nNever assume a non-executable hook is broken. Always check hooks.json to confirm proper invocation registration.",
         "created_at": "2026-04-06T03:45:12.709531Z",
         "updated_at": "2026-04-06T03:45:12.709531Z",
         "tags": [
@@ -1080,7 +1147,7 @@
         "created_by": null
       },
       "subagentstart-hook-skipped-background-agents": {
-        "value": "Claude Code does NOT fire SubagentStart hooks for agents launched with run_in_background: true. SubagentStop and PostToolUse hooks DO fire for background agents. This causes chronograph OTel relay to never create AGENT spans for background subagents \u2014 their tool calls fall back to main-agent parenting, producing a flat trace hierarchy in Phoenix. Workaround: auto-create synthetic agent spans from first tool_use event with an unknown agent_id, or retroactively create them from SubagentStop. Confirmed by examining observations.jsonl: 27 SubagentStart observations across earlier sessions (all foreground), zero for session 03d7e609 which used run_in_background: true.",
+        "value": "Claude Code does NOT fire SubagentStart hooks for agents launched with run_in_background: true. SubagentStop and PostToolUse hooks DO fire for background agents. This causes chronograph OTel relay to never create AGENT spans for background subagents — their tool calls fall back to main-agent parenting, producing a flat trace hierarchy in Phoenix. Workaround: auto-create synthetic agent spans from first tool_use event with an unknown agent_id, or retroactively create them from SubagentStop. Confirmed by examining observations.jsonl: 27 SubagentStart observations across earlier sessions (all foreground), zero for session 03d7e609 which used run_in_background: true.",
         "created_at": "2026-04-06T04:13:19.022914Z",
         "updated_at": "2026-04-06T04:13:19.022914Z",
         "tags": [
@@ -1118,7 +1185,7 @@
             "relation": "related-to"
           }
         ],
-        "summary": "SubagentStart hooks don't fire for background agents \u2014 causes missing agent spans in Phoenix traces",
+        "summary": "SubagentStart hooks don't fire for background agents — causes missing agent spans in Phoenix traces",
         "valid_at": "2026-04-06T04:13:19.022914Z",
         "invalid_at": null,
         "type": "gotcha",
@@ -1191,7 +1258,7 @@
         "last_accessed": null,
         "status": "active",
         "links": [],
-        "summary": "CWD drift to subproject dirs causes git staging failures \u2014 use relative paths from CWD",
+        "summary": "CWD drift to subproject dirs causes git staging failures — use relative paths from CWD",
         "valid_at": "2026-04-06T04:53:49.745780Z",
         "invalid_at": null,
         "type": "gotcha",
@@ -1236,14 +1303,14 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Sentinel stalls caused by maxTurns:80 exhaustion \u2014 ecosystem outgrew turn budget, needs ~150 turns",
+        "summary": "Sentinel stalls caused by maxTurns:80 exhaustion — ecosystem outgrew turn budget, needs ~150 turns",
         "valid_at": "2026-04-06T05:34:19.613357Z",
         "invalid_at": null,
         "type": "gotcha",
         "created_by": null
       },
       "ecosystem-health-latest": {
-        "value": "Sentinel audit 2026-04-05T22:13:53Z: Grade A, 77 artifacts, 0/0/6 findings (C/I/S), coherence A. All 781 tests pass (492 memory-mcp + 289 chronograph), zero lint issues. Token budget at 66.7% (10k/15k) \u2014 improved from 89.4%. Previous B-grade Important findings (stale hook-crafting docs, README_DEV.md tree) both resolved. Six persistent Suggested findings: 5 agents above 300-line WARN, 1 orphaned exit-code-semantics.md reference.",
+        "value": "Sentinel audit 2026-04-05T22:13:53Z: Grade A, 77 artifacts, 0/0/6 findings (C/I/S), coherence A. All 781 tests pass (492 memory-mcp + 289 chronograph), zero lint issues. Token budget at 66.7% (10k/15k) — improved from 89.4%. Previous B-grade Important findings (stale hook-crafting docs, README_DEV.md tree) both resolved. Six persistent Suggested findings: 5 agents above 300-line WARN, 1 orphaned exit-code-semantics.md reference.",
         "created_at": "2026-04-06T05:38:48.057510Z",
         "updated_at": "2026-04-06T05:38:48.057510Z",
         "tags": [
@@ -1274,7 +1341,7 @@
         "created_by": null
       },
       "sentinel-turn-budget-fix": {
-        "value": "Sentinel agent maxTurns set to 100 (was 80, briefly 150). With batching guidance, a full audit needs ~50-70 turns \u2014 100 provides ~40% margin. Turn-budget awareness safety net triggers at 80% (turn 80). User correctly flagged that 150 was excessive given the batching improvements. Three changes applied: (1) maxTurns 80\u2192100, (2) batching guidance in Phase 2 (~5 turns) and Phase 3 (~15-20 turns) with Bash examples, (3) turn-budget awareness with graceful [PARTIAL] degradation. Agent grew from 425 to 459 lines.",
+        "value": "Sentinel agent maxTurns set to 100 (was 80, briefly 150). With batching guidance, a full audit needs ~50-70 turns — 100 provides ~40% margin. Turn-budget awareness safety net triggers at 80% (turn 80). User correctly flagged that 150 was excessive given the batching improvements. Three changes applied: (1) maxTurns 80→100, (2) batching guidance in Phase 2 (~5 turns) and Phase 3 (~15-20 turns) with Bash examples, (3) turn-budget awareness with graceful [PARTIAL] degradation. Agent grew from 425 to 459 lines.",
         "created_at": "2026-04-06T05:55:30.575530Z",
         "updated_at": "2026-04-06T06:01:16.669442Z",
         "tags": [
@@ -1302,14 +1369,14 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Sentinel: maxTurns 80\u2192100 (not 150), batching cuts needs to ~50-70 turns, 80% safety net",
+        "summary": "Sentinel: maxTurns 80→100 (not 150), batching cuts needs to ~50-70 turns, 80% safety net",
         "valid_at": "2026-04-06T05:55:30.575530Z",
         "invalid_at": null,
         "type": "decision",
         "created_by": null
       },
       "maxturns-exhaustion-across-agents": {
-        "value": "All maxTurns exhaustion issues now fixed (commit af00012). Final values: sentinel 100 (was 80, hit 161%), promethean 60 (was 40, hit 152%), implementation-planner 100 (was 80, hit 100%), implementer 60 (was 50, hit 98%). All four agents now have turn-budget awareness: track usage, reserve last 5-10 turns for output, degrade gracefully with [PARTIAL] header at 80% budget. Verifier (88% at 35/40) and test-engineer (76% at 38/50) were not changed \u2014 monitor for future exhaustion. Pattern: add turn-budget awareness constraint to any agent's Constraints section alongside the existing partial-output-on-failure constraint.",
+        "value": "All maxTurns exhaustion issues now fixed (commit af00012). Final values: sentinel 100 (was 80, hit 161%), promethean 60 (was 40, hit 152%), implementation-planner 100 (was 80, hit 100%), implementer 60 (was 50, hit 98%). All four agents now have turn-budget awareness: track usage, reserve last 5-10 turns for output, degrade gracefully with [PARTIAL] header at 80% budget. Verifier (88% at 35/40) and test-engineer (76% at 38/50) were not changed — monitor for future exhaustion. Pattern: add turn-budget awareness constraint to any agent's Constraints section alongside the existing partial-output-on-failure constraint.",
         "created_at": "2026-04-06T06:08:26.073038Z",
         "updated_at": "2026-04-06T06:11:04.124826Z",
         "tags": [
@@ -1331,8 +1398,8 @@
           "agent_id": null,
           "session_id": null
         },
-        "access_count": 0,
-        "last_accessed": null,
+        "access_count": 1,
+        "last_accessed": "2026-04-06T20:05:19.284001Z",
         "status": "active",
         "links": [
           {
@@ -1374,8 +1441,8 @@
           "agent_id": null,
           "session_id": null
         },
-        "access_count": 0,
-        "last_accessed": null,
+        "access_count": 1,
+        "last_accessed": "2026-04-06T20:05:19.284001Z",
         "status": "active",
         "links": [
           {
@@ -1441,7 +1508,7 @@
         "created_by": null
       },
       "memory-metrics-tool-implementation": {
-        "value": "Implemented metrics() MCP tool in memory-mcp server. New module metrics.py computes stats from both memory.json (store metrics) and observations.jsonl (observation metrics). Returns structured JSON with summary_markdown for display. Key findings from live data: 77.8% of entries never accessed, 72% are importance 7+ (tier1), memory ops show 0 in session stats because capture_memory.py records full MCP tool name (mcp__plugin_i-am_memory__remember) not short name \u2014 needs follow-up to match both patterns. Store._load() is the method to read raw data (not _read). 28 tests added, 520 total passing.",
+        "value": "Implemented metrics() MCP tool in memory-mcp server. New module metrics.py computes stats from both memory.json (store metrics) and observations.jsonl (observation metrics). Returns structured JSON with summary_markdown for display. Key findings from live data: 77.8% of entries never accessed, 72% are importance 7+ (tier1), memory ops show 0 in session stats because capture_memory.py records full MCP tool name (mcp__plugin_i-am_memory__remember) not short name — needs follow-up to match both patterns. Store._load() is the method to read raw data (not _read). 28 tests added, 520 total passing.",
         "created_at": "2026-04-06T06:54:32.224478Z",
         "updated_at": "2026-04-06T06:54:32.224478Z",
         "tags": [
@@ -1484,7 +1551,7 @@
         "created_by": null
       },
       "memory-system-health-baseline-april": {
-        "value": "Memory system health baseline (2026-04-06): 37 active entries, 78.4% never accessed (expected \u2014 system is 1.5 days old), 70% at tier 1 (importance inflation risk), 0 user-category entries (gap \u2014 no user profile captured), 18 gotchas vs 3 patterns (defensive skew). Key improvement areas: demote narrow gotchas to tier 2-3, capture user preferences, balance gotcha-to-pattern ratio. Token budget for always-loaded rules at 89.7% (13,455/15,000 tokens) with 10.3% headroom \u2014 tight but not overflowing.",
+        "value": "Memory system health baseline (2026-04-06): 37 active entries, 78.4% never accessed (expected — system is 1.5 days old), 70% at tier 1 (importance inflation risk), 0 user-category entries (gap — no user profile captured), 18 gotchas vs 3 patterns (defensive skew). Key improvement areas: demote narrow gotchas to tier 2-3, capture user preferences, balance gotcha-to-pattern ratio. Token budget for always-loaded rules at 89.7% (13,455/15,000 tokens) with 10.3% headroom — tight but not overflowing.",
         "created_at": "2026-04-06T07:19:04.024996Z",
         "updated_at": "2026-04-06T07:19:04.024996Z",
         "tags": [
@@ -1638,9 +1705,15 @@
         ],
         "confidence": 0.8,
         "importance": 5,
-        "source": "implementer",
-        "access_count": 0,
-        "last_accessed": null,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": "implementer",
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 1,
+        "last_accessed": "2026-04-06T20:05:19.284001Z",
         "status": "active",
         "links": [],
         "summary": "Structure dual-SDK metrics docs by backend choice (prometheus-client vs OTel), not by metric type",
@@ -1648,6 +1721,554 @@
         "invalid_at": null,
         "type": "pattern",
         "created_by": "i-am:implementer"
+      },
+      "worktree-merge-state-file-stash-pattern": {
+        "value": "When merging a worktree branch back to main with --ff-only, .ai-state/memory.json and observations.jsonl often have local modifications on main (from hooks firing during the merge session itself). Pattern: git stash push the state files, merge --ff-only, then git stash drop (worktree version is newer and authoritative). The .ai-state/ reconciliation hook auto-runs on merge to check ADR numbering and regenerate DECISIONS_INDEX.md.",
+        "created_at": "2026-04-06T16:36:56.865172Z",
+        "updated_at": "2026-04-06T16:36:56.865172Z",
+        "tags": [
+          "git",
+          "merge",
+          "pattern",
+          "worktree"
+        ],
+        "confidence": null,
+        "importance": 5,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "Stash .ai-state files before worktree ff-merge to avoid conflict, then drop stash",
+        "valid_at": "2026-04-06T16:36:56.865172Z",
+        "invalid_at": null,
+        "type": "pattern",
+        "created_by": null
+      },
+      "chub-mcp-registered-in-claude-json": {
+        "value": "The context-hub (chub) MCP server is registered in ~/.claude.json (not in plugin.json, not in ~/.claude/settings.json, not in .mcp.json). The Praxion install_claude.sh script writes it there via prompt_chub_mcp(). It uses the globally installed chub-mcp command with CHUB_TELEMETRY=0 and CHUB_FEEDBACK=1. To verify it's working: call chub_search with any query. To check if it's been used: run `chub annotate --list` for local annotations.",
+        "created_at": "2026-04-06T16:47:15.061141Z",
+        "updated_at": "2026-04-06T16:47:15.061141Z",
+        "tags": [
+          "chub",
+          "configuration",
+          "context-hub",
+          "external-api-docs",
+          "mcp"
+        ],
+        "confidence": null,
+        "importance": 6,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 1,
+        "last_accessed": "2026-04-06T20:05:19.284001Z",
+        "status": "active",
+        "links": [],
+        "summary": "Chub MCP lives in ~/.claude.json, not plugin.json or settings.json — set by install_claude.sh",
+        "valid_at": "2026-04-06T16:47:15.061141Z",
+        "invalid_at": null,
+        "type": "gotcha",
+        "created_by": null
+      },
+      "upstream-stewardship-artifact-pattern": {
+        "value": "Upstream issue stewardship architecture finalized (dec-014): Skill + Command + Persistent Tracker, no dedicated agent. Follows github-star + star-repo pairing and dec-007 skill-centric precedent. Key design choices: (1) 8-phase guided workflow in /report-upstream command with user gate before filing — agents flag but never file autonomously, (2) two-layer dedup: keyword via gh search issues (30 req/min) + semantic via REST API search_type=hybrid (10 req/min, GA April 2026, not in gh CLI), (3) extended sanitization catalog in references/sanitization-patterns.md covering paths/hostnames/internal names beyond just credentials (builds on send_event.py SECRET_PATTERNS), (4) YAML form template parsing since gh --template only works with .md templates, (5) .ai-state/UPSTREAM_ISSUES.md append-only tracker chosen over memory entries for structured records, (6) responsible disclosure branch for security-sensitive findings (check SECURITY.md, GitHub private vuln reporting, never file publicly), (7) context-hub verification optional step to confirm bug isn't API misunderstanding, (8) community profile API (gh api repos/O/R/community/profile) for pre-filing intelligence.",
+        "created_at": "2026-04-06T17:46:20.967534+00:00",
+        "updated_at": "2026-04-06T17:59:32.423482Z",
+        "tags": [
+          "architecture",
+          "command",
+          "decision",
+          "pattern",
+          "skill",
+          "stewardship",
+          "upstream"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": "promethean ideation for upstream-issue-steward task",
+          "agent_type": "promethean",
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 1,
+        "last_accessed": "2026-04-06T20:05:19.284001Z",
+        "status": "active",
+        "links": [],
+        "summary": "Upstream stewardship finalized: Skill+Command+Tracker, 8-phase workflow, two-layer dedup, extended sanitization, user gate",
+        "type": "decision"
+      },
+      "gh-issue-create-template-yaml-limitation": {
+        "value": "The `gh issue create --template` flag only works with markdown (.md) issue templates, NOT with YAML form-based templates (.yml) that modern GitHub repos use. YAML form templates are GitHub web-only. To file template-compliant issues via CLI, you must parse the YAML template yourself and construct a --body that maps to each field. This is a critical design constraint for any automated issue-filing workflow. Discovered while researching upstream issue stewardship for Praxion — our filed issue anthropics/claude-code#44075 bypassed the template entirely, missing required fields (Claude Code version, model, regression status, platform, terminal).",
+        "created_at": "2026-04-06T17:48:48.987023Z",
+        "updated_at": "2026-04-06T17:48:48.987023Z",
+        "tags": [
+          "gh-cli",
+          "github",
+          "gotcha",
+          "issue-templates",
+          "upstream"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "gh issue create --template only works with .md templates, not YAML form templates — must construct body manually",
+        "valid_at": "2026-04-06T17:48:48.987023Z",
+        "invalid_at": null,
+        "type": "gotcha",
+        "created_by": null
+      },
+      "github-semantic-search-ga-2026-dedup": {
+        "value": "GitHub semantic/hybrid issue search became GA in April 2026. Available via REST API (search_type=semantic|hybrid) and GraphQL (searchType: SEMANTIC|HYBRID). Key constraints: 10 req/min rate limit (vs 30 for lexical), not yet exposed in gh CLI (requires direct API calls via gh api or curl), max 256 char query, must include is:issue for App tokens. Hybrid returns desired result in top 3 positions 75% of the time (vs 66% lexical). Best approach for issue deduplication: combine keyword search (gh search issues) as first pass + semantic API as second pass + LLM similarity assessment as third pass. AI triage tools (Dosu, trIAge) are maintainer-side only — reporters can't install them on repos they don't own.",
+        "created_at": "2026-04-06T17:53:43.852298Z",
+        "updated_at": "2026-04-06T17:53:43.852298Z",
+        "tags": [
+          "api",
+          "deduplication",
+          "github",
+          "semantic-search",
+          "upstream"
+        ],
+        "confidence": null,
+        "importance": 6,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.gh-issue-create-template-yaml-limitation",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "GitHub semantic issue search GA April 2026: 10 req/min, not in gh CLI, combine with keyword + LLM for dedup",
+        "valid_at": "2026-04-06T17:53:43.852298Z",
+        "invalid_at": null,
+        "type": "insight",
+        "created_by": null
+      },
+      "skill-command-pairing-review-checklist": {
+        "value": "When reviewing a proposed Skill + Command pair, check these dimensions in order: (1) naming against artifact-naming.md conventions, (2) skill description trigger terms including common user phrasings (Also activates for... pattern from code-review/external-api-docs), (3) progressive disclosure tiers (metadata/instructions/references), (4) command frontmatter (description, argument-hint, allowed-tools), (5) plugin.json auto-discovery (skills use dir globs, commands use dir globs, agents need explicit paths), (6) .ai-state/ tracker naming (SCREAMING_SNAKE_CASE matching SENTINEL_LOG/IDEA_LEDGER pattern), (7) cross-references to overlapping skills (especially shared pattern catalogs like secret-patterns.md), (8) agent awareness (prefer prompt notes over skills: injection for situational capabilities).",
+        "created_at": "2026-04-06T18:02:30.617673Z",
+        "updated_at": "2026-04-06T18:02:30.617673Z",
+        "tags": [
+          "checklist",
+          "context-engineering",
+          "pattern",
+          "review",
+          "skill-command"
+        ],
+        "confidence": null,
+        "importance": 6,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "Structured checklist for reviewing Skill+Command pair proposals against ecosystem conventions",
+        "valid_at": "2026-04-06T18:02:30.617673Z",
+        "invalid_at": null,
+        "type": "pattern",
+        "created_by": null
+      },
+      "skill-command-tracker-implementation-pattern": {
+        "value": "Successfully implemented the Skill + Command + Persistent Tracker pattern for upstream-stewardship (dec-014). Key implementation details: (1) Skill allowed-tools should be narrow (Read/Grep/Glob) when the skill is methodology-only and the command handles tool invocation — context-engineer WARN caught this. (2) Agent awareness is best added as lightweight collaboration sections in agent prompts (~4 lines each) rather than injecting the skill into the skills: frontmatter — avoids permanent token cost. (3) The .ai-state/ tracker follows the SENTINEL_LOG.md append-only pattern with markdown table format. (4) Seeding the tracker with an existing issue (#44075) establishes the format immediately. (5) SKILL.md at 173 lines is well within the 500-line target — moved depth to 3 reference files. This pattern (skill for methodology + command for workflow + .ai-state tracker for persistence) is now a proven composition alongside github-star+star-repo.",
+        "created_at": "2026-04-06T18:12:38.148715Z",
+        "updated_at": "2026-04-06T18:12:38.148715Z",
+        "tags": [
+          "architecture",
+          "implementation",
+          "pattern",
+          "skill-command",
+          "upstream"
+        ],
+        "confidence": null,
+        "importance": 6,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.proactive-memory-vs-enforcement",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.observability-skill-structure-pattern",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.upstream-stewardship-artifact-pattern",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Skill+Command+Tracker implementation: narrow allowed-tools, lightweight agent awareness, seed tracker with existing data",
+        "valid_at": "2026-04-06T18:12:38.148715Z",
+        "invalid_at": null,
+        "type": "pattern",
+        "created_by": null
+      },
+      "user-prefers-verification-before-commit": {
+        "value": "User explicitly requested verification of SYSTEMS_PLAN against implementation before committing. When presenting completed implementation work, do not immediately offer to commit — instead ask if the user wants to verify first. This aligns with the Understand-Plan-Verify methodology: proof before done.",
+        "created_at": "2026-04-06T18:13:57.582612Z",
+        "updated_at": "2026-04-06T18:13:57.582612Z",
+        "tags": [
+          "preference",
+          "verification",
+          "workflow"
+        ],
+        "confidence": null,
+        "importance": 5,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "User prefers running verification against systems plan before committing implementation work",
+        "valid_at": "2026-04-06T18:13:57.582612Z",
+        "invalid_at": null,
+        "type": "preference",
+        "created_by": null
+      },
+      "catalog-readme-staleness-on-new-artifacts": {
+        "value": "When creating new skills or commands, the verifier catches catalog README staleness as WARN findings. The skills/README.md and commands/README.md catalogs require manual updates — auto-discovery in plugin.json handles runtime registration but not human-browsable documentation. Always update both catalog READMEs and create a skill-level README.md (per skills/CLAUDE.md: \"Most skills also have a README.md for human-facing quick reference\") as part of artifact creation. The github-star/README.md provides the minimal pattern: title, one-line description, files table, related links.",
+        "created_at": "2026-04-06T18:19:37.401080Z",
+        "updated_at": "2026-04-06T18:19:37.401080Z",
+        "tags": [
+          "catalog",
+          "commands",
+          "convention",
+          "documentation",
+          "skills"
+        ],
+        "confidence": null,
+        "importance": 5,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "New skills/commands need catalog README updates + skill-level README.md — verifier catches staleness as WARN",
+        "valid_at": "2026-04-06T18:19:37.401080Z",
+        "invalid_at": null,
+        "type": "convention",
+        "created_by": null
+      },
+      "plugin-cache-stale-after-reinstall": {
+        "value": "When reinstalling the i-am plugin via `claude plugins install`, the cached copy in `~/.claude/plugins/cache/bit-agora/i-am/<version>/` may snapshot an older commit than HEAD. Commands added after the cached commit won't appear. Fix: `claude plugins update i-am` to refresh the cache to the latest commit. Diagnosed by comparing the `gitCommitSha` in `installed_plugins.json` against `git log`.",
+        "created_at": "2026-04-06T19:43:54.248090Z",
+        "updated_at": "2026-04-06T19:43:54.248090Z",
+        "tags": [
+          "cache",
+          "commands",
+          "gotcha",
+          "installation",
+          "plugin"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.plugin-agent-frontmatter-schema-no-model-color-required",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Plugin cache may snapshot older commit than HEAD — new commands won't appear until `plugins update`",
+        "valid_at": "2026-04-06T19:43:54.248090Z",
+        "invalid_at": null,
+        "type": "gotcha",
+        "created_by": null
+      },
+      "claude-code-bug-report-template-fields": {
+        "value": "The claude-code bug_report.yml template has 12 fields, 8 required: (1) Preflight Checklist [checkboxes, req], (2) What's Wrong? [textarea, req], (3) What Should Happen? [textarea, req], (4) Error Messages/Logs [textarea, opt, render:shell], (5) Steps to Reproduce [textarea, req], (6) Claude Model [dropdown: Sonnet/Opus/Not sure/Other, opt], (7) Is this a regression? [dropdown: Yes/No/Don't know, req], (8) Last Working Version [input, opt], (9) Claude Code Version [input, req], (10) Platform [dropdown: Anthropic API/Bedrock/Vertex/Other, req], (11) Operating System [dropdown, req], (12) Terminal/Shell [dropdown with 12+ options, req]. Title prefix: '[BUG] '. Blank issues disabled. Related issues #27755 (SubagentStart/Stop unreliability) and #44307 (missing subagent_type) exist in the hooks area.",
+        "created_at": "2026-04-06T19:56:53.268414Z",
+        "updated_at": "2026-04-06T19:56:53.268414Z",
+        "tags": [
+          "bug-report",
+          "claude-code",
+          "issue-templates",
+          "reference",
+          "upstream"
+        ],
+        "confidence": null,
+        "importance": 5,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.gh-issue-create-template-yaml-limitation",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "claude-code bug_report.yml: 12 fields (8 required), [BUG] prefix, blank issues disabled",
+        "valid_at": "2026-04-06T19:56:53.268414Z",
+        "invalid_at": null,
+        "type": "convention",
+        "created_by": null
+      },
+      "chub-context-hub-zero-organic-usage": {
+        "value": "Context-hub (chub) MCP has near-zero organic usage despite being installed and available. Across all observations, only 1 direct mcp__chub__ tool call exists (a chub_search verification test). A researcher agent used Bash to invoke chub CLI twice but not the MCP tools. The skill wrapper (dec-001) is opt-in and trigger conditions aren't matching real tasks. Agents aren't reaching for it when it would genuinely help (e.g., fetching external API docs before coding against a library). Potential actions: (1) improve skill trigger description so agents discover it, (2) add chub awareness to researcher/implementer agent prompts, (3) reference it in the external-api-docs skill as a primary source.",
+        "created_at": "2026-04-06T20:05:44.781068Z",
+        "updated_at": "2026-04-06T20:05:44.781068Z",
+        "tags": [
+          "adoption",
+          "chub",
+          "context-hub",
+          "gap",
+          "usage-audit"
+        ],
+        "confidence": null,
+        "importance": 6,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.chub-mcp-registered-in-claude-json",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Context-hub has near-zero organic usage — 1 MCP call total, agents not discovering or using it",
+        "valid_at": "2026-04-06T20:05:44.781068Z",
+        "invalid_at": null,
+        "type": "insight",
+        "created_by": null
+      },
+      "command-structure-praxion": {
+        "value": "Praxion command structure and patterns:\n\nORGANIZATION:\n- Commands live in `/commands/` directory as individual `.md` files\n- Filename (minus .md) becomes the command name: `co.md` → `/co`\n- Commands discovered automatically via glob in plugin.json: `\"commands\": [\"./commands/\"]`\n- No manifest update needed for new commands — auto-discovered\n- 17 total commands in Praxion (as of April 2026): co, cop, clean-work, create-worktree, merge-worktree, test, release, onboard-project, add-rules, full-security-scan, review-pr, report-upstream, sdd-coverage, cajalogic, manage-readme, create-simple-python-prj, star-repo\n\nFRONTMATTER FORMAT (YAML):\n- Required: `description` — brief description shown in /help\n- Optional: `argument-hint` — shows expected arguments to user (e.g., `[message]`, `[pr-number|branch]`)\n- Optional: `allowed-tools` — restricts which tools command can use (e.g., `[Bash(git:*), Read, Grep]`)\n- Optional: `model` — specify model version (haiku, sonnet, opus)\n- Optional: `disable-model-invocation` — prevent auto-invocation\n\nExample frontmatter:\n```yaml\n---\ndescription: Create a commit for staged (or all) changes\nargument-hint: [message]\nallowed-tools: [Bash(git:*), Read, Grep]\n---\n```\n\nARGUMENTS:\n- `$ARGUMENTS` — captures all arguments as single string\n- `$1`, `$2`, etc. — positional argument access\n- Test missing arguments gracefully\n\nCONTENT STRUCTURE:\n- After frontmatter: body content describes process as numbered steps\n- Typically 14-142 lines (star-repo is shortest at 6 lines after frontmatter, report-upstream longest at 142)\n- Process-focused: numbered steps, sub-steps, edge cases, gates\n- Often reference skills via links (e.g., `/release` uses `versioning` skill)\n- Can use bash execution (!) and file references (@) but less common\n\nKEY PATTERNS:\n1. Commands ARE NOT autonomous agents — they execute in main conversation context\n2. Commands reference skills for complex workflows (skill loaded on-demand when command mentions it)\n3. Commands are user-invoked prompts, not background tasks\n4. Quality gates common: format/lint checks before commits (/co, /cop)\n5. Multi-step processes with user confirmation gates before destructive actions\n6. Graceful handling of missing/invalid arguments (ask user, suggest alternatives)\n7. Many commands follow pattern: detect context → validate → execute → report\n8. No save/stash/snapshot commands in Praxion — uses git worktrees instead (/create-worktree for isolation)\n\nSKILLS INTEGRATION:\n- Commands reference skills for domain expertise (e.g., /release uses versioning skill)\n- Skills are loaded via context when mentioned by name\n- Commands describe PROCESS; skills provide KNOWLEDGE\n- Never inline skill knowledge into command — it loads automatically\n\nNAMING CONVENTION:\n- Kebab-case: create-worktree, add-rules, full-security-scan\n- Abbreviations OK for frequent use: co (commit), cop (commit+push)",
+        "created_at": "2026-04-06T20:24:20.861861Z",
+        "updated_at": "2026-04-06T20:24:20.861861Z",
+        "tags": [
+          "commands",
+          "frontmatter",
+          "pattern",
+          "plugin-structure",
+          "praxion",
+          "slash-commands"
+        ],
+        "confidence": null,
+        "importance": 8,
+        "source": {
+          "type": "codebase",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "Praxion command structure and patterns:\n\nORGANIZATION:\n- Commands live in `/commands/` directory as...",
+        "valid_at": "2026-04-06T20:24:20.861861Z",
+        "invalid_at": null,
+        "type": "pattern",
+        "created_by": null
+      },
+      "save-changes-command-pattern": {
+        "value": "Created /save-changes command that persists WIP snapshots to memory with two-layer security filtering: (1) file-level exclusion for known sensitive file patterns (.env, credentials, keys, SSH, database, internal state), (2) content-level regex redaction using the same 10 secret patterns from context-security-review skill plus home directory and private IP sanitization. The command references secret-patterns.md and sanitization-patterns.md as the canonical pattern sources — any new command dealing with content that may leave the repo should reuse these same catalogs rather than inventing ad-hoc filters.",
+        "created_at": "2026-04-06T20:26:13.840995Z",
+        "updated_at": "2026-04-06T20:26:13.840995Z",
+        "tags": [
+          "commands",
+          "memory",
+          "pattern",
+          "secret-filtering",
+          "security"
+        ],
+        "confidence": null,
+        "importance": 5,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.proactive-memory-vs-enforcement",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.memory-mcp-tools-already-in-otel-spans",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.command-structure-praxion",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Two-layer secret filtering pattern for commands that persist content to memory or external systems",
+        "valid_at": "2026-04-06T20:26:13.840995Z",
+        "invalid_at": null,
+        "type": "pattern",
+        "created_by": null
+      },
+      "skill-command-not-agent-for-interactive-exploration": {
+        "value": "Interactive user-driven exploration features (like project onboarding/understanding) should be Skill+Command pairs, not agents. Agents isolate the conversation into a separate context window, which breaks the natural follow-up dialog that makes exploration valuable. The user needs to ask \"tell me more about X\" in the same context where the overview was presented. Skill provides the methodology; command provides the entry point. Reserve agents for autonomous, background-safe, long-running workflows where isolation is a feature, not a limitation.",
+        "created_at": "2026-04-06T20:27:21.604240Z",
+        "updated_at": "2026-04-06T20:27:21.604240Z",
+        "tags": [
+          "architecture",
+          "context-engineering",
+          "pattern",
+          "skill-vs-agent"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.proactive-memory-vs-enforcement",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.observability-skill-structure-pattern",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.upstream-stewardship-artifact-pattern",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Interactive exploration features should be Skill+Command pairs, not agents -- isolation breaks follow-up dialog",
+        "valid_at": "2026-04-06T20:27:21.604240Z",
+        "invalid_at": null,
+        "type": "pattern",
+        "created_by": null
+      },
+      "memory-source-field-string-vs-dict-bug": {
+        "value": "The memory MCP metrics endpoint crashed with 'str' object has no attribute 'get' because entry learnings.metrics-reference-dual-sdk-pattern had source=\"implementer\" (a string) instead of the expected dict {\"type\": \"session\", ...}. Root cause: an agent (implementer) wrote source as a plain string via created_by path instead of the structured Source schema. Fixed by: (1) correcting the data in memory.json, (2) adding isinstance(source, dict) guard in metrics.py:103. The store's remember() code path should validate source is a dict on write — currently it doesn't, so malformed entries can slip in from agents that bypass schema validation.",
+        "created_at": "2026-04-06T20:30:56.836914Z",
+        "updated_at": "2026-04-06T20:30:56.836914Z",
+        "tags": [
+          "bugfix",
+          "gotcha",
+          "memory",
+          "metrics",
+          "schema-validation"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.memory-gate-blind-spot-analysis-sessions",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.memory-enforcement-gap-commit-hook",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.inject-memory-session-start-gap",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "metrics crash: source field stored as string instead of dict — needs write-time validation",
+        "valid_at": "2026-04-06T20:30:56.836914Z",
+        "invalid_at": null,
+        "type": "gotcha",
+        "created_by": null
       }
     }
   }

@@ -101,7 +101,7 @@ def _compute_store_metrics(memories: dict, now: str) -> dict:
                 has_confidence += 1
 
             source = entry.get("source", {})
-            if source.get("type"):
+            if isinstance(source, dict) and source.get("type"):
                 source_type_counts[source["type"]] += 1
 
             created_by = entry.get("created_by")

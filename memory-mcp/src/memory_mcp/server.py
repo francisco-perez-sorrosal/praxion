@@ -8,6 +8,7 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
+from memory_mcp.metrics import compute_metrics
 from memory_mcp.narrative import build_session_narrative, build_timeline
 from memory_mcp.observations import ObservationStore
 from memory_mcp.schema import (
@@ -491,6 +492,33 @@ def session_narrative(session_id: str | None = None) -> dict:
             "observation_count": len(observations),
             "session_id": session_id or "",
         }
+    except Exception as exc:
+        return {"error": f"Unexpected error: {exc}"}
+
+
+@mcp.tool()
+def metrics() -> dict:
+    """Compute comprehensive memory system metrics.
+
+    Analyzes both the curated memory store (memory.json) and the observation
+    layer (observations.jsonl) to produce structured statistics including:
+
+    - Entry counts by category, status, type, importance tier
+    - Access frequency distribution and never-accessed entries
+    - Tag frequency, knowledge types, source provenance
+    - Memory tool usage (remember/recall/search/forget counts)
+    - Per-agent activity breakdown
+    - Top sessions by event count with duration and memory op counts
+    - Work classification breakdown
+
+    Returns structured JSON with a pre-formatted summary_markdown field
+    for direct terminal display.
+    """
+    try:
+        store = _get_store()
+        data = store._load()  # noqa: SLF001
+        obs_store = _get_observation_store()
+        return compute_metrics(data, obs_store)
     except Exception as exc:
         return {"error": f"Unexpected error: {exc}"}
 

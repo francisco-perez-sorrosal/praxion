@@ -22,12 +22,12 @@ However, four SDLC phases remain weak or absent (Security, Deployment, Monitorin
 
 | Component | Count | Health |
 |-----------|-------|--------|
-| Skills | 26 | 24 A-grade, 2 B-grade |
-| Agents | 12 | 11 A-grade, 1 B-grade (sentinel approaching size ceiling) |
-| Rules | 6 (5 always-loaded, 1 path-scoped) | All A-grade but total exceeds token budget |
-| Commands | 12 | 9 A-grade, 3 B-grade |
-| Hooks | 7 scripts | All A-grade |
-| MCP Servers | 2 (memory, task-chronograph) | Both A-grade |
+| Skills | 30 | 28 A-grade, 2 B-grade |
+| Agents | 12 | 11 A-grade, 1 B-grade (sentinel at 459 lines, approaching size ceiling) |
+| Rules | 8 (6 always-loaded, 2 path-scoped) | All A-grade, token budget at 89.7% |
+| Commands | 16 | 13 A-grade, 3 B-grade |
+| Hooks | 15 scripts | All A-grade |
+| MCP Servers | 2 (memory, task-chronograph) + 1 external (chub) | All A-grade |
 | CLAUDE.md files | 11 | All accurate and consistent |
 
 ### 1.2 SDLC Coverage Map
@@ -45,13 +45,13 @@ However, four SDLC phases remain weak or absent (Security, Deployment, Monitorin
 | CI/CD | **Strong** | cicd-engineer agent, cicd skill, security review workflow, release workflow | Issue triage and docs freshness workflows still open |
 | Documentation | **Strong** | doc-engineer agent, doc-management skill | No changelog generation |
 | Deployment | **Weak** | — | No deployment patterns, IaC, or container orchestration |
-| Monitoring/Ops | **Weak** | task-chronograph (pipeline-only) | No app-level observability skill |
+| Monitoring/Ops | **Strong** | task-chronograph (pipeline-only), observability skill | — |
 | Security | **Strong** | context-security-review skill, verifier Phase 4.5, GH Actions PR workflow, /full-security-scan command, secret redaction hooks | General code security (SAST/DAST) deferred |
 | Versioning/Release | **Strong** | Commitizen config, versioning skill, /release command, GH Actions release workflow, CHANGELOG.md | — |
 | Learning/Retrospective | **Strong** | skill-genesis agent, sentinel, memory MCP (v2.0), ADR files in `.ai-state/decisions/`, observation layer | Memory v2.0 phases 1-3 shipped; multi-project split pending |
 | Cross-Session Continuity | **Strong** | memory MCP (v2.0), precompact hook, .ai-state/, observation layer | Memory v2.0 shipped with access tracking, importance tiers, cross-references, provenance. Multi-project split pending. |
 
-**Score: 15/16 Strong, 1 Moderate, 1 Weak** — security, testing, versioning, CI/CD, and memory gaps filled. Remaining gaps: Deployment and Monitoring/Ops.
+**Score: 15/16 Strong, 1 Weak** — security, testing, versioning, CI/CD, memory, and monitoring/ops gaps filled. Remaining gap: Deployment.
 
 ### 1.3 Token Budget Status
 
@@ -187,17 +187,14 @@ Implemented as `testing-strategy` skill with language-agnostic core and progress
 - `references/iac-patterns.md`: Terraform, CloudFormation, Pulumi basics
 - `references/feature-flags.md`: Feature flag patterns, gradual rollout
 
-#### P2.4 — Create `observability` Skill
+#### ~~P2.4 — Create `observability` Skill~~ DONE
 
-**Why**: The task-chronograph MCP covers pipeline observability but there is no guidance for application-level concerns. Structured logging, metrics, distributed tracing, and alerting are unaddressed.
-
-**Scope**:
-
-- SKILL.md: Observability strategy, three pillars (logs, metrics, traces), instrumentation
+Implemented as `observability` skill covering the three pillars (logs, metrics, traces) plus alerting:
+- SKILL.md: Observability strategy, RED/USE methodologies, SLI/SLO/error budgets, OpenTelemetry instrumentation, cardinality management
 - `references/structured-logging.md`: Log levels, structured formats, correlation IDs
-- `references/metrics-design.md`: RED/USE methods, counter vs gauge vs histogram
+- `references/metrics-design.md`: RED/USE methods, counter vs gauge vs histogram, Prometheus naming
 - `references/distributed-tracing.md`: OpenTelemetry patterns, span design, context propagation
-- `references/alerting-patterns.md`: Alert design, runbooks, on-call patterns
+- `references/alerting-patterns.md`: Alert design, burn rate alerting, runbooks, on-call patterns
 
 #### ~~P2.5 — Create `/review-pr` Command~~ DONE
 
@@ -360,7 +357,7 @@ Recommended order based on impact, dependencies, and effort:
 ### Phase 3: Expansion (3-5 sessions)
 
 1. P2.3 — Deployment skill
-2. P2.4 — Observability skill
+2. ~~P2.4 — Observability skill~~ DONE
 3. ~~P3.3 — Security-reviewer agent~~ SUPERSEDED (verifier Phase 4.5)
 4. P4.1 — GitHub Actions workflow templates (PR review for general code, issue triage, docs freshness)
 

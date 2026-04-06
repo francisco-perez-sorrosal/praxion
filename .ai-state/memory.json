@@ -286,6 +286,36 @@
         "invalid_at": null,
         "type": "decision",
         "created_by": null
+      },
+      "project-exploration-feature-implemented": {
+        "value": "Project exploration feature (dec-015, dec-016) implemented as Skill+Command pair: skills/project-exploration/SKILL.md (241 lines) + 3 reference files (analysis-checklists, framework-signatures, architecture-patterns with Mermaid templates) + commands/explore-project.md. Three modes: default (executive summary), guide (interactive walkthrough), focused (deep dive on specific area). Adaptive across 3 dimensions: project size, type, documentation quality. Mermaid diagrams in v1 scope per user request. Source-code-as-truth principle baked into all analysis phases. No plugin.json changes needed — auto-discovery via directory globs. Deferred: memory integration, architectural archaeology mode, language-specific reference files.",
+        "created_at": "2026-04-06T21:59:06.191694Z",
+        "updated_at": "2026-04-06T21:59:06.191694Z",
+        "tags": [
+          "command",
+          "feature",
+          "implementation",
+          "project-exploration",
+          "skill"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "Project exploration Skill+Command implemented: 5 files, 3 modes, Mermaid in v1, source-code-as-truth",
+        "valid_at": "2026-04-06T21:59:06.191694Z",
+        "invalid_at": null,
+        "type": "decision",
+        "created_by": null
       }
     },
     "relationships": {},
@@ -2268,6 +2298,198 @@
         "valid_at": "2026-04-06T20:30:56.836914Z",
         "invalid_at": null,
         "type": "gotcha",
+        "created_by": null
+      },
+      "onboarding-research-convergence-skill-command": {
+        "value": "Four parallel research agents (methodology researcher, ecosystem analyst, context engineer, promethean) converged on Skill+Command as the core delivery mechanism for the project onboarding feature. Key tension: context engineer argues NO agent (interactivity breaks in separate context window), promethean argues FOR agent (keeps main context clean for large projects). The methodology researcher's educational theory (von Mayrhauser & Vans integrated comprehension model, cognitive load theory) supports hybrid: static generation for executive summary + interactive exploration in main context for deeper layers. Progressive disclosure applies at TWO levels: skill structure (SKILL.md + references) AND output structure (summary → architecture → deep dives). The /test command's auto-detection pattern (scanning config files) is directly reusable for project characterization.",
+        "created_at": "2026-04-06T20:32:57.284466Z",
+        "updated_at": "2026-04-06T20:32:57.284466Z",
+        "tags": [
+          "architecture",
+          "convergence",
+          "onboarding",
+          "pattern",
+          "research"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.proactive-memory-vs-enforcement",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.observability-skill-structure-pattern",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.upstream-stewardship-artifact-pattern",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "4-agent research converges on Skill+Command; agent-vs-no-agent is key tension for systems-architect to resolve",
+        "valid_at": "2026-04-06T20:32:57.284466Z",
+        "invalid_at": null,
+        "type": "insight",
+        "created_by": null
+      },
+      "worktree-rebase-merge-requires-removal-first": {
+        "value": "Cannot git rebase a branch that has an active worktree — git refuses with 'is already used by worktree'. Must remove the worktree first (git worktree remove, --force if untracked files exist) before rebasing. Full workflow: remove worktree → stash if dirty → rebase branch onto main → checkout main → merge --ff-only → stash pop → delete branch. The observations.jsonl in worktrees is always modified (auto-generated), so --force is typically needed for removal.",
+        "created_at": "2026-04-06T20:36:19.032253Z",
+        "updated_at": "2026-04-06T20:36:19.032253Z",
+        "tags": [
+          "git",
+          "gotcha",
+          "rebase",
+          "worktree"
+        ],
+        "confidence": null,
+        "importance": 6,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.cwd-drift-git-staging",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.worktree-merge-state-file-stash-pattern",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Git rebase fails on branches with active worktrees — must remove worktree first",
+        "valid_at": "2026-04-06T20:36:19.032253Z",
+        "invalid_at": null,
+        "type": "gotcha",
+        "created_by": null
+      },
+      "project-exploration-architecture": {
+        "value": "Project exploration (developer onboarding to unfamiliar projects) uses Skill+Command pair, not an agent. Three modes: default (executive summary), guided (step-by-step), focused (deep dive). Three adaptive dimensions: project size, project type, documentation quality. 4-phase analysis: First Impressions, Architecture Discovery, Development Workflow, Deep Dives. Skill: project-exploration. Command: /explore-project. ADRs: dec-015 (composition), dec-016 (naming). Research synthesized from 4 parallel agents.",
+        "created_at": "2026-04-06T20:38:45.662639Z",
+        "updated_at": "2026-04-06T20:38:45.662639Z",
+        "tags": [
+          "architecture",
+          "decision",
+          "onboarding",
+          "project-exploration",
+          "skill-command"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.upstream-stewardship-artifact-pattern",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.skill-command-tracker-implementation-pattern",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.onboarding-research-convergence-skill-command",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Project exploration uses Skill+Command (not agent) with 3 modes, 3 adaptive dimensions, 4-phase analysis framework",
+        "valid_at": "2026-04-06T20:38:45.662639Z",
+        "invalid_at": null,
+        "type": "decision",
+        "created_by": null
+      },
+      "user-source-code-always-truth": {
+        "value": "User explicitly stated: source code is ALWAYS the source of truth. When detecting documentation-code drift, any discrepancy means the docs are wrong (stale or buggy), never that code is wrong relative to docs. This principle should be baked into any analysis methodology that compares docs against code. Applied first in the project-exploration skill's documentation quality assessment.",
+        "created_at": "2026-04-06T21:47:54.743338Z",
+        "updated_at": "2026-04-06T21:47:54.743338Z",
+        "tags": [
+          "convention",
+          "documentation",
+          "preference",
+          "project-exploration",
+          "source-code"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.catalog-readme-staleness-on-new-artifacts",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Source code is always truth; doc-code drift = docs are wrong, not code",
+        "valid_at": "2026-04-06T21:47:54.743338Z",
+        "invalid_at": null,
+        "type": "preference",
+        "created_by": null
+      },
+      "stale-branch-fast-forward-pattern": {
+        "value": "When a branch has zero unique commits (all its commits are ancestors of main), git branch -f <branch> main is cleaner than rebasing — it just moves the pointer. Check with git log --oneline main..<branch>; empty output means no unique work. This avoids the rebase ceremony (stash, checkout, rebase, checkout back) for branches that are simply stale pointers.",
+        "created_at": "2026-04-06T21:49:51.916014Z",
+        "updated_at": "2026-04-06T21:49:51.916014Z",
+        "tags": [
+          "branch-management",
+          "git",
+          "pattern"
+        ],
+        "confidence": null,
+        "importance": 4,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.worktree-merge-state-file-stash-pattern",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Use git branch -f to fast-forward stale branches with no unique commits instead of rebasing",
+        "valid_at": "2026-04-06T21:49:51.916014Z",
+        "invalid_at": null,
+        "type": "pattern",
         "created_by": null
       }
     }

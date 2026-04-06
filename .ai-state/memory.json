@@ -161,6 +161,36 @@
         "invalid_at": null,
         "type": "pattern",
         "created_by": null
+      },
+      "memory-metrics-feature-research": {
+        "value": "User requested memory system observability: statistics on retrieval, inserts, updates, forget hits, per-agent metrics, per-skill metrics. Two parallel researchers investigating: (1) memory MCP internals — all operations, data model, hooks, existing tracking, (2) observability infrastructure — OTel/Phoenix pipeline, visualization options (Phoenix dashboards, Streamlit, Grafana, CLI stats). Goal: design metrics collection and visualization for the memory system to help users improve it. Research outputs in .ai-work/memory-metrics/ and .ai-work/memory-metrics-viz/.",
+        "created_at": "2026-04-06T06:37:01.068378Z",
+        "updated_at": "2026-04-06T06:37:01.068378Z",
+        "tags": [
+          "feature",
+          "memory",
+          "metrics",
+          "observability",
+          "research"
+        ],
+        "confidence": null,
+        "importance": 6,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "Memory metrics feature in research phase — tracking ops, per-agent stats, visualization via Phoenix or web app",
+        "valid_at": "2026-04-06T06:37:01.068378Z",
+        "invalid_at": null,
+        "type": "insight",
+        "created_by": null
       }
     },
     "relationships": {},
@@ -1216,9 +1246,9 @@
         "created_by": null
       },
       "sentinel-turn-budget-fix": {
-        "value": "Sentinel agent maxTurns increased from 80 to 150 and restructured for efficiency. Three changes: (1) maxTurns 80→150 to accommodate 77-artifact ecosystem, (2) batching guidance in Phase 2 (~5 turns) and Phase 3 (~15-20 turns) with Bash examples combining multiple checks per call, (3) turn-budget awareness — agent tracks usage, reserves last 10 turns for report writing, degrades gracefully with [PARTIAL] header at 80% budget. Previous 80 turns caused silent termination mid-Phase 3 with no output. Agent grew from 425 to 459 lines (still under 500-line FAIL threshold).",
+        "value": "Sentinel agent maxTurns set to 100 (was 80, briefly 150). With batching guidance, a full audit needs ~50-70 turns — 100 provides ~40% margin. Turn-budget awareness safety net triggers at 80% (turn 80). User correctly flagged that 150 was excessive given the batching improvements. Three changes applied: (1) maxTurns 80→100, (2) batching guidance in Phase 2 (~5 turns) and Phase 3 (~15-20 turns) with Bash examples, (3) turn-budget awareness with graceful [PARTIAL] degradation. Agent grew from 425 to 459 lines.",
         "created_at": "2026-04-06T05:55:30.575530Z",
-        "updated_at": "2026-04-06T05:55:30.575530Z",
+        "updated_at": "2026-04-06T06:01:16.669442Z",
         "tags": [
           "agents",
           "batching",
@@ -1244,10 +1274,185 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Sentinel: maxTurns 80→150, batching guidance, turn-budget awareness with graceful degradation",
+        "summary": "Sentinel: maxTurns 80→100 (not 150), batching cuts needs to ~50-70 turns, 80% safety net",
         "valid_at": "2026-04-06T05:55:30.575530Z",
         "invalid_at": null,
         "type": "decision",
+        "created_by": null
+      },
+      "maxturns-exhaustion-across-agents": {
+        "value": "All maxTurns exhaustion issues now fixed (commit af00012). Final values: sentinel 100 (was 80, hit 161%), promethean 60 (was 40, hit 152%), implementation-planner 100 (was 80, hit 100%), implementer 60 (was 50, hit 98%). All four agents now have turn-budget awareness: track usage, reserve last 5-10 turns for output, degrade gracefully with [PARTIAL] header at 80% budget. Verifier (88% at 35/40) and test-engineer (76% at 38/50) were not changed — monitor for future exhaustion. Pattern: add turn-budget awareness constraint to any agent's Constraints section alongside the existing partial-output-on-failure constraint.",
+        "created_at": "2026-04-06T06:08:26.073038Z",
+        "updated_at": "2026-04-06T06:11:04.124826Z",
+        "tags": [
+          "agents",
+          "exhaustion",
+          "gotcha",
+          "maxTurns",
+          "pattern",
+          "resolved",
+          "silent-termination",
+          "turn-budget"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.agent-background-flag-mismatch",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.agent-background-flag-protocol-drift",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.plugin-agent-frontmatter-schema-no-model-color-required",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "All 4 maxTurns exhaustions fixed with increases + turn-budget awareness; verifier/test-engineer to monitor",
+        "valid_at": "2026-04-06T06:08:26.073038Z",
+        "invalid_at": null,
+        "type": "decision",
+        "created_by": null
+      },
+      "phoenix-custom-dashboards-ax-only": {
+        "value": "Phoenix open-source (v13.20.0) does NOT support custom dashboards. Custom dashboard widgets (timeseries, distribution, statistic, experiments, text) are an Arize AX (paid) feature only. The OSS version provides pre-built project dashboards (latency, errors, token usage, tool calls) and a trace explorer with span filtering, but no ability to create custom metric views. For custom visualization of non-LLM data (like memory metrics), alternatives are needed: MCP tool (text stats), static HTML report (charts), or Streamlit (interactive). Phoenix only ingests OTLP traces (spans), not OTel metrics (Counter/Histogram/Gauge).",
+        "created_at": "2026-04-06T06:42:52.090343Z",
+        "updated_at": "2026-04-06T06:42:52.090343Z",
+        "tags": [
+          "dashboards",
+          "gotcha",
+          "observability",
+          "phoenix",
+          "visualization"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.chronograph-flat-span-hierarchy-gap",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.parent-session-id-always-equals-session-id",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.phoenix-graph-node-attrs-for-agent-graph",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Phoenix OSS has no custom dashboards (AX-only); only ingests traces, not OTel metrics",
+        "valid_at": "2026-04-06T06:42:52.090343Z",
+        "invalid_at": null,
+        "type": "gotcha",
+        "created_by": null
+      },
+      "memory-mcp-tools-already-in-otel-spans": {
+        "value": "Memory MCP tool calls (remember, recall, search, etc.) already appear as TOOL spans in Phoenix via the existing chronograph pipeline. send_event.py _classify_mcp_tool() detects pattern mcp__plugin_i-am_memory__<tool> and adds mcp_server/mcp_tool metadata. What is MISSING is memory-specific enrichment attributes (category, key, importance, access_count) on those spans -- they appear as generic MCP tool calls. Enriching these spans with praxion.memory.* attributes would make them filterable in Phoenix trace explorer without any new infrastructure.",
+        "created_at": "2026-04-06T06:42:52.091745Z",
+        "updated_at": "2026-04-06T06:42:52.091745Z",
+        "tags": [
+          "chronograph",
+          "memory",
+          "observability",
+          "otel",
+          "pattern"
+        ],
+        "confidence": null,
+        "importance": 6,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.proactive-memory-vs-enforcement",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.chronograph-flat-span-hierarchy-gap",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.parent-session-id-always-equals-session-id",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Memory MCP tools already appear as OTel spans but lack memory-specific attribute enrichment",
+        "valid_at": "2026-04-06T06:42:52.091745Z",
+        "invalid_at": null,
+        "type": "insight",
+        "created_by": null
+      },
+      "memory-metrics-tool-implementation": {
+        "value": "Implemented metrics() MCP tool in memory-mcp server. New module metrics.py computes stats from both memory.json (store metrics) and observations.jsonl (observation metrics). Returns structured JSON with summary_markdown for display. Key findings from live data: 77.8% of entries never accessed, 72% are importance 7+ (tier1), memory ops show 0 in session stats because capture_memory.py records full MCP tool name (mcp__plugin_i-am_memory__remember) not short name — needs follow-up to match both patterns. Store._load() is the method to read raw data (not _read). 28 tests added, 520 total passing.",
+        "created_at": "2026-04-06T06:54:32.224478Z",
+        "updated_at": "2026-04-06T06:54:32.224478Z",
+        "tags": [
+          "gotcha",
+          "implementation",
+          "mcp",
+          "memory",
+          "metrics"
+        ],
+        "confidence": null,
+        "importance": 6,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.memory-gate-blind-spot-analysis-sessions",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.memory-enforcement-gap-commit-hook",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.inject-memory-session-start-gap",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Memory metrics() MCP tool implemented; 77.8% entries never accessed; MCP tool name matching gap in observations",
+        "valid_at": "2026-04-06T06:54:32.224478Z",
+        "invalid_at": null,
+        "type": "insight",
         "created_by": null
       }
     }

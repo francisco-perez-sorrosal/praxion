@@ -12,7 +12,7 @@ tools: Read, Glob, Grep, Bash, Write, Edit, AskUserQuestion
 model: opus
 permissionMode: default
 memory: user
-maxTurns: 40
+maxTurns: 60
 hooks:
   Stop:
     - hooks:
@@ -304,4 +304,5 @@ Write the line immediately upon entering each new phase. Include optional hashta
 - **Ground in reality.** Every idea must connect to something concrete in the project's current state. No generic best-practice suggestions.
 - **Respect the user's time.** If an idea isn't landing, move on. If the user wants to stop, stop.
 - **Do not commit.** The proposal is a draft for user and downstream agent review.
-- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.
+- **Partial output on failure.** If you hit an error or approach your turn budget limit, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Stopped at**: Phase N -- [reason]`, and `**Usable sections**: [list]`. A partial proposal is always better than no output.
+- **Turn budget awareness.** You have a hard turn limit (`maxTurns` in frontmatter). Track your tool call count — reserve the last 5 turns for writing your output documents. At 80% budget consumed, wrap up the current phase and write output with what you have.

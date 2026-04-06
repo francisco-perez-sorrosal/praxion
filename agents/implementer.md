@@ -11,7 +11,7 @@ skills: [software-planning, code-review, refactoring]
 permissionMode: acceptEdits
 background: true
 memory: user
-maxTurns: 50
+maxTurns: 60
 hooks:
   Stop:
     - hooks:
@@ -168,4 +168,5 @@ Write the line immediately upon entering each new phase. Include optional hashta
 - **Read before write.** Never modify a file you have not read in this session.
 - **Respect existing patterns.** Match the conventions, naming, and structure of the codebase you are modifying.
 - **Keep WIP.md accurate.** Update it before reporting — your status must reflect reality.
-- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.
+- **Partial output on failure.** If you hit an error or approach your turn budget limit, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Stopped at**: Phase N -- [reason]`, and `**Usable sections**: [list]`. A partial implementation is always better than no output.
+- **Turn budget awareness.** You have a hard turn limit (`maxTurns` in frontmatter). Track your tool call count — reserve the last 5 turns for updating `WIP.md` and reporting status. At 80% budget consumed, finish the current file edit, update WIP.md with progress, and report `[PARTIAL]`.

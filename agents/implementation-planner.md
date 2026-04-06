@@ -12,7 +12,7 @@ skills: software-planning
 permissionMode: acceptEdits
 background: true
 memory: user
-maxTurns: 80
+maxTurns: 100
 hooks:
   Stop:
     - hooks:
@@ -408,4 +408,5 @@ Write the line immediately upon entering each new phase. Include optional hashta
 - **Never commit without user approval.** After completing a step during supervision, stop and ask.
 - **Keep WIP.md accurate.** If reality changes, update immediately.
 - **Capture learnings as they occur.** Don't defer to the end.
-- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.
+- **Partial output on failure.** If you hit an error or approach your turn budget limit, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Stopped at**: Phase N -- [reason]`, and `**Usable sections**: [list]`. A partial plan is always better than no output.
+- **Turn budget awareness.** You have a hard turn limit (`maxTurns` in frontmatter). Track your tool call count — reserve the last 5-10 turns for writing `IMPLEMENTATION_PLAN.md` and `WIP.md`. At 80% budget consumed, wrap up the current phase and write output with what you have.

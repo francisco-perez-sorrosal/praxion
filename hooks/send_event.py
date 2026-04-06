@@ -23,6 +23,33 @@ def _derive_port(project_dir):
     return DEFAULT_PORT + offset
 
 
+def _resolve_project_root(cwd):
+    """Resolve the main repo root when running inside a git worktree.
+
+    Worktrees have a different path than the main repo, but must derive the
+    same chronograph port. Uses git-common-dir which points to the shared
+    .git directory in the real repo for worktrees, or .git for regular clones.
+    Falls back to cwd on any failure (non-git directory, missing git, etc.).
+    """
+    if not cwd:
+        return cwd
+    try:
+        common = subprocess.check_output(
+            ["git", "rev-parse", "--git-common-dir"],
+            cwd=cwd,
+            timeout=2,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        abs_common = os.path.normpath(os.path.join(cwd, common))
+        # common-dir is the .git directory; its parent is the project root
+        if os.path.basename(abs_common) == ".git":
+            return os.path.dirname(abs_common)
+        return cwd
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return cwd
+
+
 TASK_SLUG_RE = re.compile(r"Task\s+slug:\s*(\S+)")
 
 
@@ -317,7 +344,9 @@ def _build_events(data):
 
         # Detect Skill invocations
         if tool_name == "Skill":
-            skill_name = tool_input.get("skill", "") if isinstance(tool_input, dict) else ""
+            skill_name = (
+                tool_input.get("skill", "") if isinstance(tool_input, dict) else ""
+            )
             if skill_name:
                 events.append(
                     {
@@ -363,9 +392,15 @@ def _build_events(data):
 
         # Additionally detect PROGRESS.md writes for phase transitions
         if PROGRESS_MARKER in fp:
-            content = tool_input.get("content", "") if isinstance(tool_input, dict) else ""
+            content = (
+                tool_input.get("content", "") if isinstance(tool_input, dict) else ""
+            )
             if not content:
-                content = tool_input.get("new_string", "") if isinstance(tool_input, dict) else ""
+                content = (
+                    tool_input.get("new_string", "")
+                    if isinstance(tool_input, dict)
+                    else ""
+                )
             parsed = _parse_last_progress_line(content) if content else None
             if parsed:
                 events.append(
@@ -413,7 +448,7 @@ def main():
         if os.environ.get("CHRONOGRAPH_PORT"):
             port = int(os.environ["CHRONOGRAPH_PORT"])
         else:
-            port = _derive_port(data.get("cwd", ""))
+            port = _derive_port(_resolve_project_root(data.get("cwd", "")))
         for event in events:
             _post(port, "/api/events", event)
         for interaction in interactions:

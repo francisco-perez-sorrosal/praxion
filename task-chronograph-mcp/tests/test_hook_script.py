@@ -19,14 +19,20 @@ HOOK_SCRIPT_PATH = Path(__file__).resolve().parents[2] / "hooks" / "send_event.p
 
 
 @pytest.fixture
-def build_events():
-    """Load the _build_events function from the hook script."""
+def hook_module():
+    """Load the hook script module for access to all functions."""
     spec = importlib.util.spec_from_file_location("send_event", HOOK_SCRIPT_PATH)
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module._build_events
+    return module
+
+
+@pytest.fixture
+def build_events(hook_module):
+    """Load the _build_events function from the hook script."""
+    return hook_module._build_events
 
 
 @pytest.fixture(autouse=True)
@@ -764,3 +770,68 @@ class TestTaskSlugExtraction:
         }
         events, _ = build_events(payload)
         assert "task_slug" not in events[0].get("metadata", {})
+
+
+# ---------------------------------------------------------------------------
+# Worktree port resolution
+# ---------------------------------------------------------------------------
+
+
+class TestResolveProjectRoot:
+    def test_returns_repo_root_for_regular_checkout(self, hook_module, tmp_path):
+        """In a regular git repo, resolves to the repo root (same as cwd)."""
+        subprocess.run(["git", "init", str(tmp_path)], capture_output=True)
+        result = hook_module._resolve_project_root(str(tmp_path))
+        assert result == str(tmp_path)
+
+    def test_returns_main_repo_root_for_worktree(self, hook_module, tmp_path):
+        """In a git worktree, resolves to the MAIN repo root, not the worktree."""
+        main_repo = tmp_path / "main"
+        main_repo.mkdir()
+        subprocess.run(["git", "init", str(main_repo)], capture_output=True)
+        subprocess.run(
+            ["git", "commit", "--allow-empty", "-m", "init"],
+            cwd=str(main_repo),
+            capture_output=True,
+        )
+        wt_path = tmp_path / "wt"
+        subprocess.run(
+            ["git", "worktree", "add", str(wt_path), "-b", "wt-branch"],
+            cwd=str(main_repo),
+            capture_output=True,
+        )
+        result = hook_module._resolve_project_root(str(wt_path))
+        assert result == str(main_repo)
+
+    def test_worktree_derives_same_port_as_main_repo(self, hook_module, tmp_path):
+        """The whole point: worktree and main repo must hash to the same port."""
+        main_repo = tmp_path / "main"
+        main_repo.mkdir()
+        subprocess.run(["git", "init", str(main_repo)], capture_output=True)
+        subprocess.run(
+            ["git", "commit", "--allow-empty", "-m", "init"],
+            cwd=str(main_repo),
+            capture_output=True,
+        )
+        wt_path = tmp_path / "wt"
+        subprocess.run(
+            ["git", "worktree", "add", str(wt_path), "-b", "wt-branch"],
+            cwd=str(main_repo),
+            capture_output=True,
+        )
+        main_port = hook_module._derive_port(hook_module._resolve_project_root(str(main_repo)))
+        wt_port = hook_module._derive_port(hook_module._resolve_project_root(str(wt_path)))
+        assert main_port == wt_port
+
+    def test_fallback_to_cwd_for_non_git_directory(self, hook_module, tmp_path):
+        """Non-git directories fall back to using cwd as-is."""
+        result = hook_module._resolve_project_root(str(tmp_path))
+        assert result == str(tmp_path)
+
+    def test_empty_string_returns_empty(self, hook_module):
+        """Empty cwd returns empty without calling git."""
+        assert hook_module._resolve_project_root("") == ""
+
+    def test_none_returns_none(self, hook_module):
+        """None cwd returns None without calling git."""
+        assert hook_module._resolve_project_root(None) is None

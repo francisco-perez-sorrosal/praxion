@@ -14,7 +14,32 @@ import threading
 
 import uvicorn
 
+import subprocess
+
 from task_chronograph_mcp.server import _http_ready, app, derive_port, mcp
+
+
+def _resolve_project_root(cwd: str) -> str:
+    """Resolve the main repo root when running inside a git worktree.
+
+    Must match the logic in hooks/send_event.py:_resolve_project_root().
+    """
+    if not cwd:
+        return cwd
+    try:
+        common = subprocess.check_output(
+            ["git", "rev-parse", "--git-common-dir"],
+            cwd=cwd,
+            timeout=2,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        abs_common = os.path.normpath(os.path.join(cwd, common))
+        if os.path.basename(abs_common) == ".git":
+            return os.path.dirname(abs_common)
+        return cwd
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return cwd
 
 
 def _run_http_server(port: int) -> None:
@@ -40,7 +65,7 @@ def _run_http_server(port: int) -> None:
 if os.environ.get("CHRONOGRAPH_PORT"):
     port = int(os.environ["CHRONOGRAPH_PORT"])
 else:
-    port = derive_port(os.getcwd())
+    port = derive_port(_resolve_project_root(os.getcwd()))
 
 http_thread = threading.Thread(
     target=_run_http_server,

@@ -41,34 +41,37 @@ However, four SDLC phases remain weak or absent (Security, Deployment, Monitorin
 | Planning | **Strong** | implementation-planner agent, software-planning skill | — |
 | Implementation | **Strong** | implementer agent, python-development, refactoring skills | Python-only language coverage |
 | Testing | **Strong** | test-engineer agent, agent-evals skill, testing-strategy skill, testing-conventions rule, /test command | — |
-| Code Review | **Moderate** | verifier agent, code-review skill | General /review-pr command still open |
+| Code Review | **Strong** | verifier agent, code-review skill, `/review-pr` command | — |
 | CI/CD | **Strong** | cicd-engineer agent, cicd skill, security review workflow, release workflow | Issue triage and docs freshness workflows still open |
 | Documentation | **Strong** | doc-engineer agent, doc-management skill | No changelog generation |
 | Deployment | **Weak** | — | No deployment patterns, IaC, or container orchestration |
 | Monitoring/Ops | **Weak** | task-chronograph (pipeline-only) | No app-level observability skill |
 | Security | **Strong** | context-security-review skill, verifier Phase 4.5, GH Actions PR workflow, /full-security-scan command, secret redaction hooks | General code security (SAST/DAST) deferred |
 | Versioning/Release | **Strong** | Commitizen config, versioning skill, /release command, GH Actions release workflow, CHANGELOG.md | — |
-| Learning/Retrospective | **Strong** | skill-genesis agent, sentinel, memory MCP, ADR files in `.ai-state/decisions/` | Memory v2.0 pending |
-| Cross-Session Continuity | **Moderate** | memory MCP, precompact hook, .ai-state/ | 15-25% time re-establishing context |
+| Learning/Retrospective | **Strong** | skill-genesis agent, sentinel, memory MCP (v2.0), ADR files in `.ai-state/decisions/`, observation layer | Memory v2.0 phases 1-3 shipped; multi-project split pending |
+| Cross-Session Continuity | **Strong** | memory MCP (v2.0), precompact hook, .ai-state/, observation layer | Memory v2.0 shipped with access tracking, importance tiers, cross-references, provenance. Multi-project split pending. |
 
-**Score: 14/16 Strong, 1 Moderate, 2 Weak** — security, testing, versioning, and CI/CD gaps filled. Remaining gaps: Deployment and Monitoring/Ops.
+**Score: 15/16 Strong, 1 Moderate, 1 Weak** — security, testing, versioning, CI/CD, and memory gaps filled. Remaining gaps: Deployment and Monitoring/Ops.
 
 ### 1.3 Token Budget Status
 
+*Updated 2026-04-06*
+
 | Source | Chars | Est. Tokens | % Budget |
 |--------|-------|-------------|----------|
-| `~/.claude/CLAUDE.md` (global) | 8,330 | 2,380 | 28.0% |
-| Project `CLAUDE.md` | 2,087 | 596 | 7.0% |
-| `swe-agent-coordination-protocol.md` | 9,338 | 2,668 | **31.4%** |
-| `agent-intermediate-documents.md` | 5,627 | 1,608 | 18.9% |
-| `coding-style.md` | 5,328 | 1,522 | 17.9% |
-| `adr-conventions.md` | ~3,990 | ~1,140 | 13.4% |
-| `git-conventions.md` | 2,191 | 626 | 7.4% |
-| **Total** | **32,320** | **9,234** | **108.6%** |
-| **Budget** | **29,750** | **8,500** | **100%** |
-| **Overshoot** | **2,570** | **734** | **8.6%** |
+| `~/.claude/CLAUDE.md` (global) | 8,330 | 2,380 | 15.9% |
+| Project `CLAUDE.md` | 2,845 | 813 | 5.4% |
+| `swe-agent-coordination-protocol.md` | 11,653 | 3,329 | **22.2%** |
+| `agent-intermediate-documents.md` | 7,842 | 2,241 | 14.9% |
+| `coding-style.md` | 5,858 | 1,674 | 11.2% |
+| `adr-conventions.md` | ~3,990 | ~1,140 | 7.6% |
+| `git-conventions.md` | 2,191 | 626 | 4.2% |
+| `memory-protocol.md` | 4,382 | 1,252 | 8.3% |
+| **Total** | **47,091** | **13,455** | **89.7%** |
+| **Budget** | **52,500** | **15,000** | **100%** |
+| **Headroom** | **5,409** | **1,545** | **10.3%** |
 
-The coordination protocol rule alone consumes 31.4% of the budget. This is the primary compression target.
+Budget was raised to 15,000 tokens. No longer in overshoot, but headroom is tight (10.3%). The coordination protocol grew from 9,338 to 11,653 chars and `memory-protocol.md` (4,382 chars) was added. Compression remains desirable for growth margin.
 
 ---
 
@@ -124,16 +127,17 @@ The industry has converged on "context engineering" as the core discipline. Key 
 
 #### P1.1 — Compress Always-Loaded Token Budget
 
-**Problem**: 8.6% overshoot persists across multiple sentinel audits. Every conversation and every agent spawn pays ~734 extra tokens.
+**Problem**: ~~8.6% overshoot persists across multiple sentinel audits.~~ Budget was raised to 15,000 tokens, resolving the overshoot. However, the coordination protocol grew from 9,338 to 11,653 chars and `memory-protocol.md` (4,382 chars) was added. Headroom is only 10.3% (1,545 tokens) — tight for adding new always-loaded rules.
 
-**Solution**: Compress `swe-agent-coordination-protocol.md` from 9,338 to ~6,300 chars by:
+**Status**: Partially resolved. No overshoot, but compression remains valuable for growth margin.
 
-- Removing "Parallel Execution & Boundary Discipline" section body (already deferred to skill reference) — ~1,200 chars
+**Original solution** (still applicable for reclaiming headroom):
+
 - Compressing "Proactive Agent Usage" into a tighter list — ~800 chars
 - Reducing "Delegation Depth", "Background Agents", "Multiplicity check" to one-liners with skill reference — ~600 chars
 - Converting "Coordination Pipeline" prose to diagram + reference pointer — ~400 chars
 
-**Impact**: Brings total under 29,750 budget. Every conversation saves ~734 tokens.
+**Impact**: Would reclaim ~1,800 chars (~514 tokens) of headroom for future rules.
 
 #### P1.2 — Fix Dangling TypeScript Skill Reference
 
@@ -143,13 +147,9 @@ The industry has converged on "context engineering" as the core discipline. Key 
 
 **Impact**: Eliminates silent failure path in two core agents.
 
-#### P1.3 — Fix api-design Undiscoverable References
+#### ~~P1.3 — Fix api-design Undiscoverable References~~ DONE
 
-**Problem**: 4 of 5 reference files in `api-design/references/` not listed in SKILL.md's satellite file section. `graphql-patterns.md`, `data-contracts.md`, `interface-contracts.md`, `api-versioning.md` exist but agents cannot find them.
-
-**Solution**: Update the satellite file list in `api-design/SKILL.md`.
-
-**Impact**: Makes existing high-quality content discoverable.
+All 5 reference files (`openapi-patterns.md`, `graphql-patterns.md`, `api-versioning.md`, `data-contracts.md`, `interface-contracts.md`) are now listed in `api-design/SKILL.md` and exist on disk.
 
 ---
 
@@ -199,9 +199,9 @@ Implemented as `testing-strategy` skill with language-agnostic core and progress
 - `references/distributed-tracing.md`: OpenTelemetry patterns, span design, context propagation
 - `references/alerting-patterns.md`: Alert design, runbooks, on-call patterns
 
-#### ~~P2.5 — Create `/review-pr` Command~~ PARTIALLY ADDRESSED
+#### ~~P2.5 — Create `/review-pr` Command~~ DONE
 
-The security watchdog's GitHub Actions workflow (`context-security-review.yml`) handles automated PR review for security issues. A general-purpose `/review-pr` command for non-security code review remains open.
+Implemented as `/review-pr` command (`commands/review-pr.md`). Accepts PR number, branch name, or no argument (current branch). Uses the `code-review` skill in standalone mode with the structured report template. Supports `gh` CLI for PR metadata and diff fetching. The security workflow (`context-security-review.yml`) covers security-specific PR review separately.
 
 ---
 
@@ -222,14 +222,16 @@ The security watchdog's GitHub Actions workflow (`context-security-review.yml`) 
 
 #### P3.2 — Memory v2.0
 
-**Why**: Industry research shows 15-25% of interaction time is re-establishing context. The current memory MCP works but lacks sophistication. The Idea Ledger's phased upgrade plan directly addresses this.
+**Why**: Industry research shows 15-25% of interaction time is re-establishing context. The Idea Ledger's phased upgrade plan directly addresses this.
 
 **Phases** (from Idea Ledger):
 
-1. Access tracking + importance scoring
-2. Source provenance + dedup-on-write
-3. Cross-references between memories
-4. Multi-project memory split (global vs project-local)
+1. ~~Access tracking + importance scoring~~ DONE — `access_count`, `importance` (1-10), three injection tiers
+2. ~~Source provenance + dedup-on-write~~ DONE — `source` object with type/agent_type/session_id
+3. ~~Cross-references between memories~~ DONE — `links` array with target/relation pairs (54 links across 37 entries)
+4. Multi-project memory split (global vs project-local) — **NOT DONE**
+
+**Additional v2.0 features shipped**: type ontology (gotcha/pattern/decision/etc.), soft delete with `status` field, `valid_at`/`invalid_at` timestamps, `confidence` field, observation layer (`observations.jsonl` with 1,883 events), hook-injected context at session start, `memory-protocol.md` rule, memory gate enforcement, metrics MCP tool.
 
 **Industry benchmark**: Mem0 reports 91% response time reduction with structured memory. Amazon Bedrock AgentCore Memory provides enterprise-grade persistence.
 
@@ -330,7 +332,7 @@ These require user decisions before implementation:
 | 3 | TypeScript priority | Create now vs. wait for TS work | Wait — create when needed |
 | ~~4~~ | ~~ADR format~~ | ~~MADR vs. extended decisions.jsonl vs. agent output~~ | **Resolved**: MADR format with YAML frontmatter in `.ai-state/decisions/`. Replaced `decisions.jsonl` entirely. |
 | 5 | GitHub Actions templates | Bundle vs. generate | Both — templates as starting points |
-| ~~6~~ | ~~Token budget resolution~~ | ~~Increase budget vs. compress rule~~ | **Open**: Section was already lean. Needs fresh token audit to determine if still over budget. |
+| ~~6~~ | ~~Token budget resolution~~ | ~~Increase budget vs. compress rule~~ | **Resolved**: Budget raised to 15,000 tokens; at 89.7% usage with 10.3% headroom. Compression still desirable for growth margin. |
 | 7 | MCP server expansion | Bundle servers vs. document patterns | Document patterns via skills |
 
 ---
@@ -341,17 +343,17 @@ Recommended order based on impact, dependencies, and effort:
 
 ### Phase 1: Foundation Fixes (1-2 sessions)
 
-1. P1.1 — Compress coordination protocol rule (unblocks token budget)
+1. P1.1 — ~~Compress coordination protocol rule~~ Partially resolved (budget raised, 10.3% headroom — compression still valuable)
 2. P1.2 — Fix dangling TS skill reference (removes silent failure)
-3. P1.3 — Fix api-design undiscoverable references (enables existing content)
-4. P3.4 — Sentinel size reduction (prevents future ceiling hit)
+3. ~~P1.3 — Fix api-design undiscoverable references~~ DONE
+4. P3.4 — Sentinel size reduction (459/500 lines — approaching ceiling)
 5. P3.5 — Consolidate /co and /cop (reduces maintenance surface)
 
 ### ~~Phase 2: SDLC Gap Filling~~ DONE
 
 1. ~~P2.1 — Security skill~~ DONE (`context-security-review` + GH Actions workflow + verifier Phase 4.5 + `/full-security-scan`)
 2. ~~P2.2 — Testing-strategy skill + testing-conventions rule~~ DONE
-3. P2.5 — /review-pr command (partially addressed by security workflow; general code review command still open)
+3. ~~P2.5 — /review-pr command~~ DONE
 4. ~~P3.6 — /test command~~ DONE
 5. ~~P4.4 — Versioning and release automation~~ DONE (Commitizen + `/release` + `versioning` skill + GH Actions)
 
@@ -365,7 +367,7 @@ Recommended order based on impact, dependencies, and effort:
 ### Phase 4: Polish (ongoing)
 
 1. P3.1 — TypeScript skill (when TS work begins)
-2. P3.2 — Memory v2.0 (phased upgrade)
+2. P3.2 — ~~Memory v2.0 phases 1-3~~ DONE; Phase 4 (multi-project split) pending
 3. ~~P4.2 — ADR management~~ DONE
 4. P4.3 — MCP server integration docs
 

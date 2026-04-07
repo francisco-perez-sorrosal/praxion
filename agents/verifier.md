@@ -13,7 +13,7 @@ skills: [code-review, context-security-review]
 permissionMode: default
 background: true
 memory: user
-maxTurns: 40
+maxTurns: 80
 hooks:
   Stop:
     - hooks:
@@ -251,4 +251,10 @@ Write the line immediately upon entering each new phase. Include optional hashta
 - **No subjective observations.** "Could be improved" is not a finding. "Exceeds 50-line function ceiling (coding-style.md: Function Size)" is.
 - **Focus on changed code.** Do not review the entire codebase -- only files affected by the implementation.
 - **Include the human-judgment disclaimer** in every report.
+- **Turn budget awareness.** You have a hard turn limit (`maxTurns` in frontmatter). Every tool call costs one turn. Manage your budget:
+  - **Phase 1-2 (inputs + scope):** Read `SYSTEMS_PLAN.md` first to build a mental map of acceptance criteria. Spot-check source files for gaps rather than exhaustively reading every file — prioritize files mentioned in acceptance criteria and files with the most changes.
+  - **Batch reads:** Use `Grep` and `Glob` over multiple `Read` calls when scanning for patterns across files.
+  - **At 60% budget consumed:** Skip optional phases (3.5 Delta Validation, 4.5 Security Review, 6 Context Artifacts) unless critical findings are expected. Begin writing the report with findings so far.
+  - **At 80% budget consumed:** Stop reading, finalize the report immediately with whatever evidence you have. Ten real findings with evidence are worth more than an exhaustive pass/fail checklist.
+  - **Reserve the last 5 turns** for writing `VERIFICATION_REPORT.md` — this is your primary deliverable. A partial report is infinitely more valuable than no report.
 - **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.

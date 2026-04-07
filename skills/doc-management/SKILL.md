@@ -1,6 +1,6 @@
 ---
 name: doc-management
-description: Writing and maintaining project documentation (README.md, catalogs, architecture docs, changelogs). Covers cross-reference validation, catalog maintenance, documentation freshness, and structural integrity. Use when creating, reviewing, or fixing project documentation, maintaining catalog READMEs, ensuring documentation matches filesystem state, performing a documentation audit, or checking doc freshness.
+description: Writing and maintaining project documentation (README.md, catalogs, architecture docs, changelogs). Covers cross-reference validation, catalog maintenance, documentation freshness, structural integrity, and Mermaid diagram conventions. Use when creating, reviewing, or fixing project documentation, maintaining catalog READMEs, ensuring documentation matches filesystem state, performing a documentation audit, checking doc freshness, or authoring diagrams.
 compatibility: Claude Code
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 ---
@@ -12,6 +12,7 @@ Procedural expertise for writing, maintaining, and validating project-facing doc
 **Satellite files** (loaded on-demand):
 - [references/cross-reference-patterns.md](references/cross-reference-patterns.md) -- cross-reference validation procedures, catalog sync, drift scenarios
 - [references/documentation-types.md](references/documentation-types.md) -- per-type guidelines for README, architecture, changelog, contributing, API docs
+- [references/diagram-conventions.md](references/diagram-conventions.md) -- Mermaid diagram creation, decomposition methodology, type recipes, styling guide
 
 ## Gotchas
 

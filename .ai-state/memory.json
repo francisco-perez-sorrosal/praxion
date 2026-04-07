@@ -1406,9 +1406,9 @@
         "created_by": null
       },
       "maxturns-exhaustion-across-agents": {
-        "value": "All maxTurns exhaustion issues now fixed (commit af00012). Final values: sentinel 100 (was 80, hit 161%), promethean 60 (was 40, hit 152%), implementation-planner 100 (was 80, hit 100%), implementer 60 (was 50, hit 98%). All four agents now have turn-budget awareness: track usage, reserve last 5-10 turns for output, degrade gracefully with [PARTIAL] header at 80% budget. Verifier (88% at 35/40) and test-engineer (76% at 38/50) were not changed — monitor for future exhaustion. Pattern: add turn-budget awareness constraint to any agent's Constraints section alongside the existing partial-output-on-failure constraint.",
+        "value": "All 5 maxTurns exhaustions fixed with increases + turn-budget awareness; verifier bumped 40→80 after failing on 15+ doc verification scopes. Implementer, sentinel, and other agents previously fixed. Pattern: agents that read many documents need both higher limits AND explicit budget management instructions in their prompt.",
         "created_at": "2026-04-06T06:08:26.073038Z",
-        "updated_at": "2026-04-06T06:11:04.124826Z",
+        "updated_at": "2026-04-07T01:53:54.900490Z",
         "tags": [
           "agents",
           "exhaustion",
@@ -1417,7 +1417,8 @@
           "pattern",
           "resolved",
           "silent-termination",
-          "turn-budget"
+          "turn-budget",
+          "verifier"
         ],
         "confidence": null,
         "importance": 7,
@@ -1445,10 +1446,10 @@
             "relation": "related-to"
           }
         ],
-        "summary": "All 4 maxTurns exhaustions fixed with increases + turn-budget awareness; verifier/test-engineer to monitor",
+        "summary": "Verifier maxTurns 40→80 + budget awareness; fifth agent fixed for turn exhaustion",
         "valid_at": "2026-04-06T06:08:26.073038Z",
         "invalid_at": null,
-        "type": "decision",
+        "type": "gotcha",
         "created_by": null
       },
       "phoenix-custom-dashboards-ax-only": {

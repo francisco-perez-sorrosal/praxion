@@ -224,17 +224,27 @@ def scan_transcript(transcript_path: str) -> TranscriptStats:
 
 
 def is_memory_system_active(cwd: str, stats: TranscriptStats) -> bool:
-    """Check if the memory system is active for this project.
+    """Check if the memory system is active and usable for this project.
 
     Returns True if either:
-    - .ai-state/memory.json exists (memory system initialized for this project)
     - Memory MCP tools were used in the transcript (MCP server is running)
+    - .ai-state/memory.json exists AND has a compatible schema version
 
-    When neither is true, the memory system isn't functional and the gate
-    should not block.
+    When the file exists but has an incompatible schema (e.g. v1.2 when
+    the MCP requires v2.0), the memory MCP server will have crashed on
+    startup. Blocking in that state creates an unresolvable loop — the
+    agent cannot call remember() because the tool doesn't exist.
     """
+    if stats.memory_tools_seen:
+        return True
     memory_path = Path(cwd) / ".ai-state" / "memory.json"
-    return memory_path.exists() or stats.memory_tools_seen
+    if not memory_path.exists():
+        return False
+    try:
+        data = json.loads(memory_path.read_text(encoding="utf-8"))
+        return data.get("schema_version") == "2.0"
+    except (json.JSONDecodeError, OSError, ValueError):
+        return False
 
 
 REMEMBER_PROMPT = (

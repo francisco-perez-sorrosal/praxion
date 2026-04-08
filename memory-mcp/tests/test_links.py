@@ -521,24 +521,26 @@ class TestSchemaVersionValidation:
         assert data["schema_version"] == "2.0"
         assert len(data["memories"]["user"]["name"]["links"]) == 1
 
-    def test_old_schema_version_raises(self, memory_file: Path):
-        """Old schema versions should raise ValueError."""
+    def test_v1_schema_migrates_to_v2(self, memory_file: Path):
+        """v1.x schema versions are auto-migrated to v2.0."""
         v1_0 = {
             "schema_version": "1.0",
             "memories": {"user": {}},
         }
         memory_file.write_text(json.dumps(v1_0, indent=2) + "\n")
 
-        with pytest.raises(ValueError, match="Unsupported schema version"):
-            MemoryStore(memory_file)
+        MemoryStore(memory_file)
+        data = json.loads(memory_file.read_text())
+        assert data["schema_version"] == "2.0"
 
-    def test_v1_3_schema_version_raises(self, memory_file: Path):
-        """v1.3 is now an old version that should raise ValueError."""
+    def test_v1_3_schema_migrates_to_v2(self, memory_file: Path):
+        """v1.3 is auto-migrated to v2.0."""
         v1_3 = {
             "schema_version": "1.3",
             "memories": {"user": {}},
         }
         memory_file.write_text(json.dumps(v1_3, indent=2) + "\n")
 
-        with pytest.raises(ValueError, match="Unsupported schema version"):
-            MemoryStore(memory_file)
+        MemoryStore(memory_file)
+        data = json.loads(memory_file.read_text())
+        assert data["schema_version"] == "2.0"

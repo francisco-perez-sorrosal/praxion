@@ -78,25 +78,97 @@ class TestStoreInit:
         result = store.status()
         assert result["session_count"] == 5
 
-    def test_rejects_old_schema_version(self, memory_file: Path):
+    def test_migrates_v1_2_to_v2_0(self, memory_file: Path):
         old = {
             "schema_version": "1.2",
             "session_count": 3,
-            "memories": {"user": {}},
+            "memories": {
+                "user": {},
+                "learnings": {
+                    "test-entry": {
+                        "value": "A test learning that should survive migration",
+                        "created_at": "2026-01-15T10:00:00Z",
+                        "updated_at": "2026-01-15T10:00:00Z",
+                        "tags": ["testing"],
+                        "confidence": None,
+                        "importance": 7,
+                        "source": {"type": "session", "detail": None},
+                        "access_count": 0,
+                        "last_accessed": None,
+                        "status": "active",
+                        "links": [],
+                    }
+                },
+            },
         }
         memory_file.write_text(json.dumps(old, indent=2) + "\n")
-        with pytest.raises(ValueError, match="Unsupported schema version"):
-            MemoryStore(memory_file)
+        store = MemoryStore(memory_file)
+        data = json.loads(memory_file.read_text())
+        assert data["schema_version"] == "2.0"
+        assert data["session_count"] == 3
+        entry = data["memories"]["learnings"]["test-entry"]
+        assert entry["value"] == "A test learning that should survive migration"
+        assert entry["summary"] != ""
+        assert entry["valid_at"] == "2026-01-15T10:00:00Z"
+        assert entry["invalid_at"] is None
+        assert entry["type"] is None
+        assert entry["created_by"] is None
+        assert entry["source"]["agent_type"] is None
+        # All v2.0 categories exist after migration
+        assert set(data["memories"].keys()) == set(VALID_CATEGORIES)
+        # Store is functional after migration
+        result = store.status()
+        assert result["total"] == 1
 
-    def test_rejects_v1_3_schema_version(self, memory_file: Path):
+    def test_migrates_v1_3_to_v2_0(self, memory_file: Path):
         v1_3 = {
             "schema_version": "1.3",
             "session_count": 3,
             "memories": {"user": {}},
         }
         memory_file.write_text(json.dumps(v1_3, indent=2) + "\n")
+        MemoryStore(memory_file)
+        data = json.loads(memory_file.read_text())
+        assert data["schema_version"] == "2.0"
+
+    def test_rejects_unknown_schema_version(self, memory_file: Path):
+        unknown = {
+            "schema_version": "3.0",
+            "session_count": 0,
+            "memories": {"user": {}},
+        }
+        memory_file.write_text(json.dumps(unknown, indent=2) + "\n")
         with pytest.raises(ValueError, match="Unsupported schema version"):
             MemoryStore(memory_file)
+
+    def test_migration_handles_string_source(self, memory_file: Path):
+        old = {
+            "schema_version": "1.0",
+            "session_count": 1,
+            "memories": {
+                "learnings": {
+                    "entry": {
+                        "value": "Test",
+                        "created_at": "2026-01-01T00:00:00Z",
+                        "updated_at": "2026-01-01T00:00:00Z",
+                        "source": "implementer",
+                        "tags": [],
+                        "importance": 5,
+                        "access_count": 0,
+                        "last_accessed": None,
+                        "status": "active",
+                        "links": [],
+                    }
+                }
+            },
+        }
+        memory_file.write_text(json.dumps(old, indent=2) + "\n")
+        MemoryStore(memory_file)
+        data = json.loads(memory_file.read_text())
+        source = data["memories"]["learnings"]["entry"]["source"]
+        assert isinstance(source, dict)
+        assert source["type"] == "session"
+        assert source["detail"] == "implementer"
 
 
 # -- CRUD cycle: remember -> recall -> forget ---------------------------------

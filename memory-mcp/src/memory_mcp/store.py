@@ -149,18 +149,56 @@ class MemoryStore:
             lock_fd.close()
 
     def _auto_migrate_if_needed(self) -> None:
-        """Validate schema version is 2.0. Raises ValueError on mismatch."""
+        """Migrate older schema versions to 2.0, or raise on unknown versions."""
         data = self._load()
         version = data.get("schema_version")
 
         if version == SCHEMA_VERSION:
             return
 
+        if version and version.startswith("1."):
+            self._migrate_v1_to_v2(data)
+            return
+
         msg = (
-            f"Unsupported schema version '{version}' in {self._path}. "
-            f"Expected '{SCHEMA_VERSION}'. Migration from older versions is not supported."
+            f"Unsupported schema version '{version}' in {self._path}. Expected '{SCHEMA_VERSION}'."
         )
         raise ValueError(msg)
+
+    def _migrate_v1_to_v2(self, data: dict) -> None:
+        """Migrate v1.x memory.json to v2.0 schema in-place.
+
+        v1.x entries lack: summary, valid_at, invalid_at, type, created_by,
+        and source may be missing agent_type/agent_id/session_id fields.
+        All are added with safe defaults. The file is rewritten atomically.
+        """
+        for entries in data.get("memories", {}).values():
+            for entry in entries.values():
+                if "summary" not in entry:
+                    entry["summary"] = generate_summary(entry.get("value", ""))
+                if "valid_at" not in entry:
+                    entry["valid_at"] = entry.get("created_at")
+                if "invalid_at" not in entry:
+                    entry["invalid_at"] = None
+                if "type" not in entry:
+                    entry["type"] = None
+                if "created_by" not in entry:
+                    entry["created_by"] = None
+                source = entry.get("source", {})
+                if isinstance(source, str):
+                    source = {"type": "session", "detail": source}
+                    entry["source"] = source
+                source.setdefault("agent_type", None)
+                source.setdefault("agent_id", None)
+                source.setdefault("session_id", None)
+
+        # Ensure all v2.0 categories exist
+        memories = data.setdefault("memories", {})
+        for cat in VALID_CATEGORIES:
+            memories.setdefault(cat, {})
+
+        data["schema_version"] = SCHEMA_VERSION
+        self._save(data)
 
     def _read_modify_write(self, mutator):
         """Lock, load, apply mutator, save. Returns mutator's return value."""

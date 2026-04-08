@@ -3000,6 +3000,48 @@
         "invalid_at": null,
         "type": "gotcha",
         "created_by": null
+      },
+      "memory-gate-requires-active-check": {
+        "value": "Memory gate hooks (memory_gate.py, validate_memory.py) must check whether the memory system is actually active before blocking. Without this check, projects where the plugin is installed but the memory MCP isn't running get blocked with no way to call remember(). Fix: is_memory_system_active() checks for .ai-state/memory.json existence OR memory MCP tool usage in the transcript. If neither is true, the gate silently passes through.",
+        "created_at": "2026-04-08T19:00:36.757286Z",
+        "updated_at": "2026-04-08T19:00:36.757286Z",
+        "tags": [
+          "gotcha",
+          "hooks",
+          "memory",
+          "memory-gate"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.hook-output-requires-hookEventName",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.hook-additionalContext-supported-events",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.async-hooks-cannot-deliver-feedback",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Memory gate must verify memory system is active (memory.json exists or MCP tools seen) before blocking",
+        "valid_at": "2026-04-08T19:00:36.757286Z",
+        "invalid_at": null,
+        "type": "gotcha",
+        "created_by": null
       }
     }
   }

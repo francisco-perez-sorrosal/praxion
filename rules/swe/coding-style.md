@@ -91,6 +91,15 @@ function process(items):
 - Internal/server code: log full context (stack trace, input values, operation attempted)
 - Distinguish recoverable errors (retry, fallback) from fatal ones (fail fast)
 
+### Ordered Operations
+
+When operations have an inherent required order — shutdown sequences, initialization protocols, middleware chains, resource cleanup, migration steps — the code must make that order explicit and resistant to accidental reordering.
+
+- Define the sequence in a single authoritative place (a list, an enum, a pipeline definition) — never scatter ordered steps across unrelated functions where a reader cannot see the full sequence
+- Release resources in reverse acquisition order: what was acquired last is released first
+- Add a comment at the sequence definition explaining *why* the order matters when the reason is not obvious from the operations themselves
+- When steps are added or removed, verify the ordering invariant still holds — especially for cleanup and teardown paths where a misordered step can leak resources or corrupt state
+
 ### Input Validation
 
 Validate at system boundaries only — not between trusted internal modules.

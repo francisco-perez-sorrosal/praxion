@@ -71,7 +71,7 @@ Spawn agents without waiting for the user to ask:
 - Complex feature --> `researcher` then `systems-architect` (skip researcher if codebase context suffices)
 - Architecture approved --> `implementation-planner`; resuming work --> same agent to re-assess `WIP.md`
 - Plan ready --> `implementer` + `test-engineer` concurrently (paired steps on disjoint file sets); both complete --> run tests --> fix cycle if needed --> `verifier`
-- Context artifacts stale/conflicting or plan touches them --> `context-engineer` (parallel with `researcher`/`systems-architect`); when work involves context artifacts during research or architecture stages --> `context-engineer` shadows in parallel, producing cumulative `CONTEXT_REVIEW.md` that flows forward to downstream stages
+- Context artifacts stale/conflicting or plan touches them --> `context-engineer` (parallel with `researcher`/`systems-architect` as shadow; see context-engineer shadowing rule below)
 - Ecosystem health or regression check --> `sentinel`; stale check: `.ai-state/SENTINEL_LOG.md` vs `git log -1 --format=%ci`
 - Documentation impact likely --> `doc-engineer`: at pipeline checkpoints (after planning, after implementation, after refactoring), or in parallel with `implementer` + `test-engineer` when the planner assigns a doc step to the parallel group
 - Pipeline complete + LEARNINGS.md has content --> `skill-genesis`
@@ -100,10 +100,14 @@ promethean --> researcher ---------> systems-architect --> implementation-planne
 
 - **Do not skip stages.** Research before architecture (unless codebase context suffices). Re-invoke upstream agents when downstream input is incomplete.
 - **BDD/TDD execution.** The planner produces paired implementation and test steps. Test-engineers design behavioral tests from the systems plan's acceptance criteria. Implementers and test-engineers execute concurrently on disjoint file sets. After both complete, tests are run against the implementation. Failing tests trigger a fix cycle until all tests pass — including pre-existing tests broken by the change (boy scout rule).
+- **Batched improvement execution.** When a list of improvements is presented (from sentinel reports, code reviews, analysis, or user requests), the main agent must evaluate their independence and execute with maximum parallelism:
+  1. **Classify** each improvement's file set — identify which improvements touch disjoint files and can run concurrently vs. which overlap and must be sequenced.
+  2. **Pair-spawn** an `implementer` + `test-engineer` for each independent improvement, launching as many pairs concurrently as the concurrency limit allows (2-3 pairs). Each pair follows the standard BDD/TDD cycle: implementer writes production code, test-engineer writes tests, run the new tests until green.
+  3. **Sequence** dependent improvements — when two improvements touch overlapping files, the second pair waits for the first to complete.
+  4. **Full suite gate** — after all improvement pairs have completed and their individual tests pass, run the full project test suite once. Fix any regressions before considering the batch done.
 - **Context-engineer shadowing.** When work involves context artifacts, the context-engineer runs in parallel with the researcher (research-stage shadow) and/or systems-architect (architecture-stage shadow), appending stage-delimited sections to a cumulative `CONTEXT_REVIEW.md`. The architect reads the research-stage section; the planner reads both. Shadowing is conditional — it activates only when the task creates, modifies, or restructures context artifacts. For pure application code, no shadowing occurs.
-- **Context-engineer** also collaborates at any pipeline stage for direct context artifact work and operates independently for standalone audits.
+- **Context-engineer scope.** Small-scope context work (single artifact) --> context-engineer directly at any pipeline stage. Large-scope (3+ artifacts) --> full pipeline. Also operates independently for standalone audits.
 - **Sentinel** is independent. Reports (`SENTINEL_REPORT_*.md`) are public -- any agent or user can consume them.
-- Small-scope context work (single artifact) --> context-engineer directly; large-scope (3+) --> full pipeline.
 - **Doc-engineer parallel execution.** When the planner assigns a doc step to a parallel group, the doc-engineer runs concurrently with the implementer and test-engineer on disjoint file sets (documentation files vs production code vs test code). A parallel group can have up to three concurrent agents. Doc steps are assigned only when a group adds/removes/renames files, introduces new APIs, or changes module structure — not 1:1 with every implementation step. The doc-engineer also continues to run at pipeline checkpoints (after planning, after implementation, after refactoring) as before.
 
 ### Agent Selection Criteria

@@ -381,6 +381,37 @@
         "invalid_at": null,
         "type": "decision",
         "created_by": null
+      },
+      "architecture-md-living-document-design": {
+        "value": "User wants a living ARCHITECTURE.md in .ai-state/ for projects managed by Praxion. Key design decisions:\n\n1. **Creation**: Joint effort by systems-architect + implementation-planner after first pipeline run\n2. **Major changes**: systems-architect produces new plan based on existing ARCHITECTURE.md, then implementation-planner updates it\n3. **Minor architectural changes**: implementation-planner alone updates ARCHITECTURE.md\n4. **Non-architectural changes**: ARCHITECTURE.md untouched\n5. **Location**: .ai-state/ARCHITECTURE.md (persistent, committed to git)\n6. **Critical constraint**: Coordinator agents (Claude Code, Cursor main agents) MUST be aware of ARCHITECTURE.md even when they bypass Praxion agents — they cannot act architecture-agnostic\n7. **Vision metaphor**: \"A breathing tree, ever mutating towards the sun of clarity, simplicity and cleanliness\"\n\nThis is a Standard/Full tier feature touching agents, rules, skills, hooks, and CLAUDE.md files. Research phase launched with external (reputable engineer practices) and internal (ecosystem mapping) tracks.",
+        "created_at": "2026-04-10T17:50:58.947620Z",
+        "updated_at": "2026-04-10T17:50:58.947620Z",
+        "tags": [
+          "agents",
+          "ai-state",
+          "architecture",
+          "design",
+          "ecosystem",
+          "living-document"
+        ],
+        "confidence": null,
+        "importance": 8,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "Living ARCHITECTURE.md design: created by architect+planner, updated on changes, coordinator-agent-aware",
+        "valid_at": "2026-04-10T17:50:58.947620Z",
+        "invalid_at": null,
+        "type": "decision",
+        "created_by": null
       }
     },
     "relationships": {},
@@ -3160,6 +3191,284 @@
         "valid_at": "2026-04-10T05:39:21.100175Z",
         "invalid_at": null,
         "type": "convention",
+        "created_by": null
+      },
+      "ai-state-living-document-recipe": {
+        "value": "The living document pattern in .ai-state/ is now a validated six-element recipe applied to two instances: (1) SYSTEM_DEPLOYMENT.md (dec-019, 10 sections, deployment skill) and (2) ARCHITECTURE.md (dec-020, 8 sections, software-planning skill). Recipe: template as skill asset, methodology reference, section ownership model, four-layer staleness mitigation (main agent + implementer + verifier + sentinel), natural pipeline sequencing, reconciliation table entry. When the two docs coexist, cross-reference rather than subsume — clear identity per doc: WHAT (architecture), HOW (deployment), WHY (ADRs). This forms a documentation triad. Sentinel at 463 lines with ~15 more for architecture checks (~478) — approaching 500-line ceiling; may need check catalog extraction soon.",
+        "created_at": "2026-04-10T18:03:34.732532Z",
+        "updated_at": "2026-04-10T18:18:00.224028Z",
+        "tags": [
+          "ai-state",
+          "architecture",
+          "dec-020",
+          "deployment",
+          "living-document",
+          "pattern"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.proactive-memory-vs-enforcement",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.observability-skill-structure-pattern",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.upstream-stewardship-artifact-pattern",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Six-element recipe for .ai-state/ living documents, validated across SYSTEM_DEPLOYMENT.md (dec-019) and ARCHITECTURE.md (dec-020)",
+        "valid_at": "2026-04-10T18:03:34.732532Z",
+        "invalid_at": null,
+        "type": "pattern",
+        "created_by": null
+      },
+      "architecture-doc-external-research-key-findings": {
+        "value": "External research for ARCHITECTURE.md design converged on key findings: (1) AGENTS.md peer-reviewed study (arxiv:2601.20404) shows 28.64% time reduction and 16.58% token savings with structured project context — tables, explicit file paths, consistent headers are what make docs machine-readable. (2) Evolutionary architecture (Ford/Parsons) fitness functions map directly to sentinel audits — ARCHITECTURE.md should synthesize accumulated decisions, not prescribe top-down. (3) C4 hierarchical model already aligned with Praxion's L0/L1/L2 diagram conventions. (4) Anti-pattern consensus: documentation drift is #1 killer, prevented by ownership + co-location + automated detection. (5) Hybrid template recommended: C4 visualization + arc42 section independence + SYSTEM_DEPLOYMENT.md ownership pattern + fitness function validation. (6) Codified context paper (arxiv:2602.20478) emphasizes explicit file paths and function names over prose for machine consumption.",
+        "created_at": "2026-04-10T18:12:08.461855Z",
+        "updated_at": "2026-04-10T18:12:08.461855Z",
+        "tags": [
+          "architecture",
+          "external",
+          "living-document",
+          "machine-readability",
+          "research"
+        ],
+        "confidence": null,
+        "importance": 6,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.onboarding-research-convergence-skill-command",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.deployment-research-key-findings",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.living-document-pattern-ai-state",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "External research convergence: structured context +28% efficiency, evolutionary fitness functions, C4/arc42 hybrid, drift prevention via ownership",
+        "valid_at": "2026-04-10T18:12:08.461855Z",
+        "invalid_at": null,
+        "type": "insight",
+        "created_by": null
+      },
+      "architecture-upstream-deployment-downstream": {
+        "value": "User clarified the relationship between ARCHITECTURE.md and SYSTEM_DEPLOYMENT.md: architecture is upstream, deployment is downstream. ARCHITECTURE.md defines the main building blocks that later have to be deployed on computer systems (laptops, desktops, clusters, clouds). SYSTEM_DEPLOYMENT.md describes how those blocks land on real infrastructure. Cross-reference is the right choice — not subsumption. Each doc keeps its independence and clear identity. This directionality should be reflected in cross-references: ARCHITECTURE.md is the reference that deployment consumes.",
+        "created_at": "2026-04-10T18:36:37.326306Z",
+        "updated_at": "2026-04-10T18:36:37.326306Z",
+        "tags": [
+          "architecture",
+          "deployment",
+          "living-document",
+          "preference",
+          "relationship"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.deployment-skill-ecosystem-patterns",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.deployment-research-key-findings",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.living-document-pattern-ai-state",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "ARCHITECTURE.md is upstream (building blocks), SYSTEM_DEPLOYMENT.md is downstream (how blocks land on infrastructure) — cross-reference, not subsume",
+        "valid_at": "2026-04-10T18:36:37.326306Z",
+        "invalid_at": null,
+        "type": "preference",
+        "created_by": null
+      },
+      "deployment-doc-missing-reconciliation-table": {
+        "value": "SYSTEM_DEPLOYMENT.md is NOT in the .ai-state/ reconciliation table in agent-pipeline-details.md — the table stops at specs/. This was likely an oversight during dec-019 implementation. When implementing ARCHITECTURE.md (dec-020), Step 11 should add both SYSTEM_DEPLOYMENT.md and ARCHITECTURE.md to the reconciliation table to close this gap.",
+        "created_at": "2026-04-10T18:42:32.242920Z",
+        "updated_at": "2026-04-10T18:42:32.242920Z",
+        "tags": [
+          "agent-pipeline-details",
+          "deployment",
+          "gotcha",
+          "reconciliation"
+        ],
+        "confidence": null,
+        "importance": 6,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.direct-tier-artifact-drift-gap",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "SYSTEM_DEPLOYMENT.md missing from .ai-state/ reconciliation table in agent-pipeline-details.md — add alongside ARCHITECTURE.md",
+        "valid_at": "2026-04-10T18:42:32.242920Z",
+        "invalid_at": null,
+        "type": "gotcha",
+        "created_by": null
+      },
+      "software-planning-no-assets-dir": {
+        "value": "skills/software-planning/ has contexts/, phases/, references/ but no assets/ subdirectory. The first living doc template placed here (ARCHITECTURE_TEMPLATE.md for dec-020) required creating the directory. Future living document templates in software-planning will use this directory.",
+        "created_at": "2026-04-10T18:55:47.147050Z",
+        "updated_at": "2026-04-10T18:55:47.147050Z",
+        "tags": [
+          "gotcha",
+          "skill-structure",
+          "software-planning"
+        ],
+        "confidence": null,
+        "importance": 4,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "software-planning skill had no assets/ dir — created for ARCHITECTURE_TEMPLATE.md, first living doc template there",
+        "valid_at": "2026-04-10T18:55:47.147050Z",
+        "invalid_at": null,
+        "type": "gotcha",
+        "created_by": null
+      },
+      "architecture-md-implementation-complete": {
+        "value": "ARCHITECTURE.md living artifact fully implemented (dec-020). 15 files touched: 2 new (template + methodology reference in software-planning skill), 7 agent definitions, 2 rules, 3 skill references, 1 ADR.\n\nAGENT ADDITIONS (all small, 2-15 lines each):\n- systems-architect: Phase 3.8 (create/update architecture doc)\n- implementer: Step 7.6 (update doc when structural files change)\n- implementation-planner: [Architecture] step annotation\n- verifier: Phase 4.8 (cross-check doc vs code structure)\n- sentinel: 4 new checks — AC01, AC02, AC03, AC04\n- researcher: Phase 2 item 10 (architecture context source)\n- promethean: Phase 3 Source 1 bullet (architecture context)\n\nKEY FACTS:\n- Sentinel at 474 lines (was 463, ceiling 500) — approaching limit\n- SYSTEM_DEPLOYMENT.md was missing from reconciliation table — added alongside ARCHITECTURE.md (closed pre-existing dec-019 gap)\n- software-planning/assets/ directory created (didn't exist before)\n- Documentation triad established: ADRs (WHY) + ARCHITECTURE.md (WHAT) + SYSTEM_DEPLOYMENT.md (HOW)\n- Phase/step numbering: .7 = deployment, .8 = architecture, extensible to .9 for future living docs",
+        "created_at": "2026-04-10T19:04:48.583007Z",
+        "updated_at": "2026-04-10T19:04:48.583007Z",
+        "tags": [
+          "agents",
+          "architecture",
+          "dec-020",
+          "implementation",
+          "living-document"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.skill-command-tracker-implementation-pattern",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.living-document-pattern-ai-state",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.system-deployment-md-implementation-complete",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Dec-020 implemented: 15 files, 7 agents, 2 rules, 3 skill refs; sentinel at 474/500; documentation triad complete",
+        "valid_at": "2026-04-10T19:04:48.583007Z",
+        "invalid_at": null,
+        "type": "pattern",
+        "created_by": null
+      },
+      "sentinel-no-finding-routing-section": {
+        "value": "The sentinel check catalog has no dedicated \"finding routing\" subsection — unlike the deployment-documentation.md methodology reference which has an explicit routing table (Check -> Finding -> Recommended Owner -> Fix Action). When adding new check groups (like AC01-AC04 for architecture), the finding routing guidance lives in the methodology reference, not in the sentinel agent definition itself. Tasks referencing \"finding routing guidance\" in the sentinel should know this section does not exist there.",
+        "created_at": "2026-04-10T19:34:04.928145Z",
+        "updated_at": "2026-04-10T19:34:04.928145Z",
+        "tags": [
+          "architecture",
+          "finding-routing",
+          "gotcha",
+          "living-document",
+          "sentinel"
+        ],
+        "confidence": null,
+        "importance": 5,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.memory-enforcement-gap-commit-hook",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.inject-memory-session-start-gap",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.sentinel-background-agent-stall-pattern",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Sentinel has no finding routing section — routing tables live in methodology references (deployment-documentation.md, architecture-documentation.md)",
+        "valid_at": "2026-04-10T19:34:04.928145Z",
+        "invalid_at": null,
+        "type": "gotcha",
         "created_by": null
       }
     }

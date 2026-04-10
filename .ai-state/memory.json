@@ -3091,7 +3091,7 @@
       "memory-v1-to-v2-migration-implemented": {
         "value": "Implemented auto-migration from memory.json schema v1.x to v2.0 in store.py._migrate_v1_to_v2(). Migration adds missing fields with safe defaults: summary (auto-generated from value), valid_at (from created_at), invalid_at/type/created_by (null), source.agent_type/agent_id/session_id (null). Also handles string source bug (converts to dict). Gate fix in _hook_utils.py: is_memory_system_active() now reads schema_version from memory.json and only returns True for v2.0 — prevents stuck loop when MCP server crashes on incompatible schema. Both changes needed together: migration fixes the MCP crash, gate fix prevents blocking when migration hasn't run yet.",
         "created_at": "2026-04-08T21:43:06.738661Z",
-        "updated_at": "2026-04-08T21:43:06.738661Z",
+        "updated_at": "2026-04-08T21:47:54.165057Z",
         "tags": [
           "implementation",
           "memory",
@@ -3125,6 +3125,41 @@
         "valid_at": "2026-04-08T21:43:06.738661Z",
         "invalid_at": null,
         "type": "pattern",
+        "created_by": null
+      },
+      "batched-improvement-parallel-execution-protocol": {
+        "value": "Added \"Batched improvement execution\" pipeline rule to swe-agent-coordination-protocol.md. When a list of improvements arrives (sentinel, review, user), the main agent classifies file set independence, pair-spawns implementer+test-engineer per independent improvement (2-3 concurrent pairs), sequences dependent ones, then runs full test suite as a gate after all pairs finish. Also deduplicated context-engineer mentions: trimmed proactive bullet to trigger-only with cross-reference, merged two scope bullets into one.",
+        "created_at": "2026-04-10T05:39:21.100175Z",
+        "updated_at": "2026-04-10T05:39:21.100175Z",
+        "tags": [
+          "agents",
+          "convention",
+          "coordination",
+          "parallelism",
+          "protocol"
+        ],
+        "confidence": null,
+        "importance": 6,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.agent-background-flag-protocol-drift",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Batched improvement rule: classify→pair-spawn→sequence→full-suite-gate; context-engineer dedup",
+        "valid_at": "2026-04-10T05:39:21.100175Z",
+        "invalid_at": null,
+        "type": "convention",
         "created_by": null
       }
     }

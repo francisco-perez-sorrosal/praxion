@@ -674,18 +674,19 @@
         "created_by": null
       },
       "praxion-ecosystem-inventory-2026-04-04": {
-        "value": "Praxion ecosystem inventory (updated 2026-04-05): SKILLS: 29 directories with SKILL.md. COMMANDS: 17 command files. AGENTS: 12 agent definitions, all in plugin.json. RULES: 8 files (6 always-loaded, 2 path-scoped). HOOKS: 16 files in hooks/ at repo root, auto-discovered via hooks/hooks.json (moved from .claude-plugin/hooks/ in commit ab46551). MCP SERVERS: 2 (memory-mcp, task-chronograph-mcp), both Python 3.13+, uv-managed. ADRs: 13 in .ai-state/decisions/.",
+        "value": "VERIFIED AUDIT (2026-04-10): Praxion ecosystem actual state matches design targets with minor staling:\n\nSKILLS: 33 directories with SKILL.md ✓ (doc claimed 29, was stale)\nAGENTS: 13 .md files on disk, 12 registered in plugin.json ✓\nRULES: 9 files (7 swe/ + 2 writing/) ✓\nCOMMANDS: 19 slash commands ✓\nHOOKS: 13 Python scripts + commit_gate.sh wrapper, 21 total registrations across 7 events ✓\nMCP SERVERS: 2 in .claude-plugin/plugin.json (task-chronograph, memory) ✓\nINSTALLERS: 3 (install.sh, install_claude.sh, install_cursor.sh) ✓\nSCRIPTS: 11 in scripts/ (utilities for vcs, Phoenix control, state management)\n.AI-STATE: 51 files (22 decisions, 4 IDEA_LEDGER, 4 TOKEN_BUDGETING, 23 SENTINEL_REPORT, 1 ARCHITECTURE.md design-target)\n\nARCHITECTURE.md (in .ai-state/) is living design-target doc (not code-verified); intended code-verified version would be docs/architecture.md (not found). Current ARCHITECTURE.md is authoritative per its header.\n\nOLD MEMORY ENTRY claimed: 29 skills, 17 commands, 12 agents, 8 rules, 16 hooks — all have drifted or been miscounted. Current audit shows higher skill/command/rule counts, suggesting ecosystem expanded since 2026-04-05.",
         "created_at": "2026-04-05T01:34:25.891042Z",
-        "updated_at": "2026-04-05T22:08:06.837169Z",
+        "updated_at": "2026-04-10T23:52:51.570891Z",
         "tags": [
           "audit",
           "documentation",
           "ecosystem",
           "inventory",
-          "structure"
+          "structure",
+          "verification"
         ],
         "confidence": null,
-        "importance": 7,
+        "importance": 9,
         "source": {
           "type": "session",
           "detail": null,
@@ -697,10 +698,10 @@
         "last_accessed": "2026-04-05T20:56:17.175817Z",
         "status": "superseded",
         "links": [],
-        "summary": "Updated ecosystem inventory: 29 skills, 17 commands, 12 agents, 8 rules, 16 hooks at repo root, 2 MCP servers",
+        "summary": "VERIFIED AUDIT (2026-04-10): Praxion ecosystem actual state matches design targets with minor...",
         "valid_at": "2026-04-05T01:34:25.891042Z",
         "invalid_at": "2026-04-05T22:12:30.495908Z",
-        "type": "convention",
+        "type": "insight",
         "created_by": null
       },
       "proactive-memory-vs-enforcement": {
@@ -1012,9 +1013,9 @@
         "created_by": null
       },
       "praxion-ecosystem-inventory": {
-        "value": "Praxion ecosystem inventory (updated 2026-04-05): SKILLS: 29 directories with SKILL.md. COMMANDS: 17 command files. AGENTS: 12 agent definitions, all in plugin.json. RULES: 8 files (6 always-loaded, 2 path-scoped). HOOKS: 16 files in hooks/ at repo root, auto-discovered via hooks/hooks.json (moved from .claude-plugin/hooks/ in commit ab46551). MCP SERVERS: 2 (memory-mcp, task-chronograph-mcp), both Python 3.13+, uv-managed. ADRs: 13 in .ai-state/decisions/.",
+        "value": "Ecosystem inventory (verified 2026-04-10): 33 skills, 21 commands, 12 agents, 9 rules, 14 hooks (13 .py + 1 .sh wrapper, 21 hook invocations across 7 event types), 2 MCP servers (memory + task-chronograph), 3 installers, 11 scripts",
         "created_at": "2026-04-05T22:12:38.488421Z",
-        "updated_at": "2026-04-05T22:12:38.488421Z",
+        "updated_at": "2026-04-11T00:16:06.121406Z",
         "tags": [
           "audit",
           "documentation",
@@ -1023,7 +1024,7 @@
           "structure"
         ],
         "confidence": null,
-        "importance": 7,
+        "importance": 6,
         "source": {
           "type": "session",
           "detail": null,
@@ -1040,10 +1041,10 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Ecosystem inventory: 29 skills, 17 commands, 12 agents, 8 rules, 16 hooks at repo root, 2 MCP servers",
+        "summary": "Ecosystem: 33 skills, 21 commands, 12 agents, 9 rules, 14 hooks, 2 MCP servers (verified 2026-04-10)",
         "valid_at": "2026-04-05T22:12:38.488421Z",
         "invalid_at": null,
-        "type": "convention",
+        "type": "insight",
         "created_by": null
       },
       "memory-key-naming-no-dates": {
@@ -1881,17 +1882,18 @@
         "created_by": "i-am:implementer"
       },
       "worktree-merge-state-file-stash-pattern": {
-        "value": "When merging a worktree branch back to main with --ff-only, .ai-state/memory.json and observations.jsonl often have local modifications on main (from hooks firing during the merge session itself). Pattern: git stash push the state files, merge --ff-only, then git stash drop (worktree version is newer and authoritative). The .ai-state/ reconciliation hook auto-runs on merge to check ADR numbering and regenerate DECISIONS_INDEX.md.",
+        "value": "When ff-merging a worktree branch into main from within the worktree, the main repo often has dirty state (observations.jsonl, memory.json) that blocks the merge. Pattern: (1) git -C /path/to/main stash, (2) git -C /path/to/main merge --ff-only branch-name, (3) git -C /path/to/main stash pop. The stash pop triggers git merge drivers (.gitattributes) for observations.jsonl dedup automatically. The .ai-state/ reconciliation hook auto-runs on merge to check ADR numbering and regenerate DECISIONS_INDEX.md. After ff-merge, the worktree branch has no unmerged commits and can be safely removed with ExitWorktree action:remove discard_changes:true — the 'discarded commits' warning is cosmetic since they're already on main.",
         "created_at": "2026-04-06T16:36:56.865172Z",
-        "updated_at": "2026-04-06T16:36:56.865172Z",
+        "updated_at": "2026-04-10T23:44:52.134438Z",
         "tags": [
+          "ff-merge",
           "git",
           "merge",
           "pattern",
           "worktree"
         ],
         "confidence": null,
-        "importance": 5,
+        "importance": 6,
         "source": {
           "type": "session",
           "detail": null,
@@ -1903,7 +1905,7 @@
         "last_accessed": null,
         "status": "active",
         "links": [],
-        "summary": "Stash .ai-state files before worktree ff-merge to avoid conflict, then drop stash",
+        "summary": "FF-merge worktree into main: stash main's dirty state, merge --ff-only, stash pop triggers merge drivers",
         "valid_at": "2026-04-06T16:36:56.865172Z",
         "invalid_at": null,
         "type": "pattern",
@@ -3583,6 +3585,137 @@
         ],
         "summary": "Sentinel remediation: doc surfaces lag artifact growth — 5 READMEs stale after burst, systemic pattern",
         "valid_at": "2026-04-10T20:39:20.295518Z",
+        "invalid_at": null,
+        "type": "pattern",
+        "created_by": null
+      },
+      "dual-audience-architecture-documentation": {
+        "value": "Dual-audience architecture documentation — refined design after deep research:\n\nFIVE DIMENSIONS FRAMEWORK:\n1. Primary audience: Architect (design/extend) vs Developer (navigate)\n2. Source of truth: Evolves spec → self+code → self+new research (architect doc is authoritative for design intent; code is authoritative for what exists)\n3. Time orientation: Design target / partial future (architect) vs Present-tense / factual (developer)\n4. Trust model: High depth, accuracy abstracted from the real codebase to encompass multiple implementations (architect) vs High accuracy, code-verified (developer)\n5. Core question: \"What should X look like? Why?\" (architect) vs \"What is X? Where is it?\" (developer)\n\nTRUST MODEL IMPLICATIONS:\n- ARCHITECTURE.md operates at a higher abstraction level — a design blueprint that accommodates multiple conforming implementations\n- Validation for architect doc = design coherence (internal consistency, design accounts for what exists), NOT strict code matching\n- Validation for developer doc = factual correctness (names/paths/deps match code exactly)\n- Sentinel AC02/AC03 (strict name/path matching) belong ONLY to developer doc; architect doc gets design-level checks\n- Verifier Phase 4.8 checks design coherence for .ai-state/ARCHITECTURE.md; new Phase 4.9 checks factual accuracy for docs/architecture.md\n- Relationship: ARCHITECTURE.md (abstract design space) → constrains → Code (specific realization) → verified against → docs/architecture.md (factual state)\n\nKEY DESIGN DECISIONS:\n- Both docs use same 8-section structure with different framing\n- Architect template: Component table adds Status column (Designed/Built/Planned/Deprecated), Overview adds \"Source stage\" metadata\n- Developer template: Only includes what exists on disk, adds \"Last verified against code\" date, no Status column\n- Systems-architect creates BOTH in Phase 3.8; implementer updates both (7.6 for .ai-state/, 7.7 for docs/)\n- Doc-engineer maintains docs/architecture.md at pipeline checkpoints\n- Template placement: architect template in software-planning/assets/, developer template in doc-management/assets/\n\nCHANGE SCOPE: 21 artifacts total (16 modified, 5 new):\n- 2 templates (modify existing + new developer template)\n- 1 methodology reference (major update for dual-doc model)\n- 8 agent definitions (systems-architect, implementer, implementation-planner, verifier, sentinel, researcher, promethean, doc-engineer)\n- 2 rules (agent-intermediate-documents, coordination-protocol)\n- 4 skills (software-planning SKILL.md, doc-management types, doc-management SKILL.md, pipeline-details reconciliation)\n- 1 new instance (docs/architecture.md for Praxion)\n- 1 new ADR (dec-021, supersedes dec-020)\n- 1 existing instance update (.ai-state/ARCHITECTURE.md reframed + sentinel fixes)\n- 1 index update (DECISIONS_INDEX.md)\n\nSENTINEL EXTENSION: AC05-AC08 for docs/architecture.md (strict code-verified checks) + AC09 cross-consistency. Existing AC01-AC04 relaxed for design-level validation on .ai-state/ARCHITECTURE.md. Sentinel at ~478 lines — may need check catalog extraction to reference file.",
+        "created_at": "2026-04-10T22:03:23.768969Z",
+        "updated_at": "2026-04-10T22:20:05.825464Z",
+        "tags": [
+          "analysis",
+          "architecture",
+          "dec-021",
+          "design",
+          "design-target",
+          "documentation",
+          "dual-audience",
+          "living-document",
+          "pattern",
+          "praxion",
+          "trust-model"
+        ],
+        "confidence": 0.95,
+        "importance": 8,
+        "source": {
+          "type": "codebase",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.living-document-pattern-ai-state",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.ai-state-living-document-recipe",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.architecture-doc-external-research-key-findings",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Dual-audience arch docs: .ai-state/ (abstract design target for architects) + docs/ (code-verified guide for developers), 21 artifacts",
+        "valid_at": "2026-04-10T22:03:23.768969Z",
+        "invalid_at": null,
+        "type": "insight",
+        "created_by": null
+      },
+      "dual-audience-doc-decomposition-ordering": {
+        "value": "When adding a derived document to an existing pipeline (e.g., docs/architecture.md derived from .ai-state/ARCHITECTURE.md), the natural decomposition ordering is: (1) templates first (both source and derived), (2) methodology reference describing both documents, (3) agent definitions in parallel (each touches one disjoint file), (4) integration files (rules, skills) that reference the template paths, (5) instance document creation + cross-reference verification last. This ordering ensures every cross-reference resolves at each commit boundary.",
+        "created_at": "2026-04-10T22:41:43.246823Z",
+        "updated_at": "2026-04-10T22:41:43.246823Z",
+        "tags": [
+          "decomposition",
+          "dual-audience",
+          "living-document",
+          "ordering",
+          "pattern"
+        ],
+        "confidence": null,
+        "importance": 6,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.living-document-pattern-ai-state",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.ai-state-living-document-recipe",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.dual-audience-architecture-documentation",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Derived-document features decompose as: templates -> methodology -> agent defs (parallel) -> integration -> instance + verify",
+        "valid_at": "2026-04-10T22:41:43.246823Z",
+        "invalid_at": null,
+        "type": "pattern",
+        "created_by": null
+      },
+      "architecture-docs-differentiation-gap": {
+        "value": "Dual-audience architecture docs remediated. Key differentiation patterns applied:\n\n1. STATUS COLUMN is the structural differentiator: architect doc Components table has Status column (Built/Designed/Planned/Deprecated), developer guide does not — this is the single most visible structural difference\n2. KEY FILES HEADER: architect doc labels column \"Key Files (illustrative)\" to signal paths are advisory; developer guide uses plain \"Key Files\" (paths must resolve)\n3. TONE SPLIT: architect doc uses design-level descriptions (\"persistent dual-layer memory: curated institutional knowledge + zero-cost automatic observations\"); developer guide uses present-tense action verbs (\"Stores persistent dual-layer memory\", \"Delivers domain expertise\", \"Provides developer tooling\")\n4. CROSS-REFERENCES: each doc links to the other with appropriate framing — architect says \"for code-verified navigation\", developer says \"for design rationale and architectural evolution\"\n5. SECTION OWNERSHIP MARKERS: HTML comments on every section header prevent concurrent edit conflicts and enable staleness tracking\n6. ACTUAL COUNTS (2026-04-10): 33 skills, 12 agents, 14 hooks (13 .py + 1 .sh), 9 rules, 21 commands — previous memory entry \"praxion-ecosystem-inventory\" is stale (claimed 29 skills, 17 commands, 8 rules, 16 hooks)",
+        "created_at": "2026-04-10T23:55:16.475577Z",
+        "updated_at": "2026-04-11T00:15:58.716196Z",
+        "tags": [
+          "architecture",
+          "content-accuracy",
+          "dec-021",
+          "documentation",
+          "dual-audience",
+          "gap-analysis",
+          "pattern",
+          "remediation",
+          "staleness"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.dual-audience-architecture-documentation",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Architecture docs remediated: Status column, illustrative paths header, tone split, ownership markers, count fixes",
+        "valid_at": "2026-04-10T23:55:16.475577Z",
         "invalid_at": null,
         "type": "pattern",
         "created_by": null

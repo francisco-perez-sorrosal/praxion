@@ -9,7 +9,7 @@ tags: [security, review-modes, ci]
 made_by: agent
 agent_type: systems-architect
 pipeline_tier: standard
-affected_files: ["skills/context-security-review/SKILL.md", ".github/workflows/security-review.yml", "commands/full-security-scan.md"]
+affected_files: ["skills/context-security-review/SKILL.md", ".github/workflows/context-security-review.yml", "commands/full-security-scan.md"]
 ---
 
 ## Context

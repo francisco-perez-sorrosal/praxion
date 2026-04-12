@@ -9,7 +9,7 @@ tags: [security, skills, architecture]
 made_by: agent
 agent_type: systems-architect
 pipeline_tier: standard
-affected_files: ["skills/context-security-review/SKILL.md", "agents/verifier.md", ".github/workflows/security-review.yml"]
+affected_files: ["skills/context-security-review/SKILL.md", "agents/verifier.md", ".github/workflows/context-security-review.yml"]
 ---
 
 ## Context

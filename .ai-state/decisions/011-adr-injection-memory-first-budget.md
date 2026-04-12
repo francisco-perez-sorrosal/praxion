@@ -10,7 +10,7 @@ tags: [memory, adr, hooks, budget, injection]
 made_by: agent
 agent_type: systems-architect
 pipeline_tier: standard
-affected_files: [.claude-plugin/hooks/inject_memory.py, memory-mcp/tests/test_inject_memory.py]
+affected_files: [hooks/inject_memory.py, memory-mcp/tests/test_inject_memory.py]
 ---
 
 ## Context

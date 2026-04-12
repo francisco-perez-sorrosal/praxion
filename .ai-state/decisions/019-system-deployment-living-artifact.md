@@ -10,7 +10,6 @@ made_by: agent
 agent_type: systems-architect
 pipeline_tier: standard
 affected_files:
-  - .ai-state/SYSTEM_DEPLOYMENT.md
   - skills/deployment/assets/SYSTEM_DEPLOYMENT_TEMPLATE.md
   - skills/deployment/references/deployment-documentation.md
   - skills/deployment/SKILL.md

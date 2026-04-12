@@ -11,8 +11,8 @@ agent_type: systems-architect
 pipeline_tier: standard
 affected_files:
   - rules/swe/coding-style.md
-  - .claude-plugin/hooks/detect_duplication.py
-  - .claude-plugin/hooks/hooks.json
+  - hooks/detect_duplication.py
+  - hooks/hooks.json
   - agents/implementer.md
   - agents/verifier.md
   - agents/sentinel.md

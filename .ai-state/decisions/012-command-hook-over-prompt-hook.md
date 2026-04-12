@@ -10,7 +10,7 @@ made_by: agent
 agent_type: systems-architect
 pipeline_tier: standard
 affected_files:
-  - .claude-plugin/hooks/detect_duplication.py
+  - hooks/detect_duplication.py
   - agents/verifier.md
 ---
 

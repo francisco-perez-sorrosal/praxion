@@ -40,11 +40,15 @@ paths:
   - "**/ARCHITECTURE.md"
   - "**/SYSTEM_DEPLOYMENT.md"
   - ".ai-state/**"
-  - ".ai-work/**/architecture*.md"
-  - ".ai-work/**/design*.md"
+  - "**/IDEA_PROPOSAL.md"
+  - "**/RESEARCH_FINDINGS.md"
+  - "**/SYSTEMS_PLAN.md"
+  - "**/IMPLEMENTATION_PLAN.md"
 ```
 
 No change to the rule's body content. The rule continues to load — but only during sessions that match one of the narrower globs. Non-matching sessions (most code edits, skill/agent/command authoring, ADR updates) no longer pay the ~2,664-char cost.
+
+**Note on the glob set (implementer deviation from initial plan, accepted):** the initial plan used `.ai-work/**/architecture*.md` and `.ai-work/**/design*.md` as a pipeline-document catch-all. The implementation instead names the four canonical pipeline documents explicitly (`IDEA_PROPOSAL.md`, `RESEARCH_FINDINGS.md`, `SYSTEMS_PLAN.md`, `IMPLEMENTATION_PLAN.md`) so diagrams authored in any of those — not just architecture/design variants — receive rule coverage. Broader and more predictable than the initial proposal; this ADR captures the accepted final globs. Verifier AC 22 WARN closed by this update.
 
 Expected budget impact: always-loaded total drops to ~49,546 chars (94.4% utilization) on non-documentation sessions. On doc-authoring sessions (where one of the globs matches), the rule still loads and the utilization is equivalent to pre-change.
 

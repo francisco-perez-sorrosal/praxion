@@ -181,7 +181,9 @@ Combined Phase 1B recovery estimate: ~2,400 additional tokens, bringing budget t
 
 #### 1.7 Opportunistic Deprecations ✅ DONE (2026-04-12)
 
-Closed from the Deprecation & Cleanup table (Phase-1-tagged): deleted `claude/config/CLAUDE.md` (byte-identical duplicate of global), `claude/config/CLAUDE_OLD.md`, `claude/config/CLAUDE_UNPOLISHED.md`; confirmed `**/__pycache__/` in `.gitignore`. `TODO.md` disposition deferred.
+Closed from the Deprecation & Cleanup table (Phase-1-tagged): deleted `claude/config/CLAUDE_OLD.md` and `claude/config/CLAUDE_UNPOLISHED.md` (historical trial-version prompts the user was iterating on). Confirmed `**/__pycache__/` in `.gitignore`. `TODO.md` disposition deferred.
+
+**Kept intentionally**: `claude/config/CLAUDE.md` is a versioned mirror of the user's `~/.claude/CLAUDE.md` that the project preserves under git on purpose. It was initially deleted in commit `a4440e1` based on a bad inference ("byte-identical duplicate ⇒ safe to delete"); restored in a follow-up commit. The Deprecation & Cleanup entry below has been corrected.
 
 ---
 
@@ -445,8 +447,8 @@ Items to remove or retire during the roadmap execution:
 
 | Item | Action | Phase |
 |------|--------|-------|
-| `claude/config/CLAUDE.md` duplicate | Delete (byte-for-byte copy of `~/.claude/CLAUDE.md`, not in a recognized config path) | 1 |
-| `claude/config/CLAUDE_OLD.md`, `CLAUDE_UNPOLISHED.md` | Delete (historical artifacts, no current purpose) | 1 |
+| `claude/config/CLAUDE.md` | **KEEP** — intentionally versioned mirror of `~/.claude/CLAUDE.md`; project preserves it under git so the user-level philosophy travels with the repo | — |
+| `claude/config/CLAUDE_OLD.md`, `CLAUDE_UNPOLISHED.md` | Deleted in Phase 1.7 (historical trial-version prompts) | 1 ✅ |
 | `github-star` skill | Move to command (procedure, not domain expertise). The `/star-repo` command already exists | 4 |
 | `TODO.md` | Either expand as canonical tracker or retire in favor of this ROADMAP | 1 |
 | `SOLID_FOUNDATION_IMPROVEMENTS.md` | Retire. Open items migrated to this ROADMAP. Done items are historical record | 1 |
@@ -494,7 +496,7 @@ How we'll know the roadmap is working:
 - **Memory hygiene**: 6 entries condensed from 2K–7.4K chars to ≤400 chars; 12 duplicate/stale entries archived (history preserved); `session_count` fixed via derivation from `observations.jsonl`; stale `memory-mcp/CLAUDE.md` + `store.py:88` migration claim corrected (1.4)
 - **Documentation hygiene**: `rules/README.md` gained `writing/diagram-conventions.md`; `SOLID_FOUNDATION_IMPROVEMENTS.md` retired entirely (every count was stale) (1.5)
 - **Principles embedding**: `CLAUDE.md` gains a 4-principle cross-reference block; `README.md` gains rich prose anchor (1.6)
-- **Cleanup**: stale `claude/config/CLAUDE_OLD.md` + `CLAUDE_UNPOLISHED.md` + byte-identical `claude/config/CLAUDE.md` deleted (1.7)
+- **Cleanup**: `claude/config/CLAUDE_OLD.md` + `CLAUDE_UNPOLISHED.md` deleted (1.7). `claude/config/CLAUDE.md` was initially deleted in error and restored — it is an intentionally versioned mirror of `~/.claude/CLAUDE.md`.
 - **Budget relief for Phase 4+ growth**: narrower `diagram-conventions.md` scope reclaims ~2,886 chars on non-doc sessions; total non-doc budget now at 76.0% / 86.9% (well under Phase 1 target of <80%)
 
 **Still needed to reach Phase 3 targets**: Phase 2.1 (turn-budget measurement + systems-architect on Opus); Phase 3.1 (eval framework expansion); Phase 3.4 (type checking in CI); Phase 4.3 (staleness markers).

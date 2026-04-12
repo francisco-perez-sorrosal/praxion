@@ -70,7 +70,7 @@ For each acceptance criterion from `SYSTEMS_PLAN.md`:
 
 Skip this phase entirely in standalone mode.
 
-### Phase 3.5 -- Spec Conformance (pipeline mode, when behavioral specification exists)
+### Phase 4 -- Spec Conformance (pipeline mode, when behavioral specification exists)
 
 When `SYSTEMS_PLAN.md` contains a `## Behavioral Specification` section with REQ IDs:
 
@@ -88,7 +88,7 @@ When `SPEC_DELTA.md` exists alongside the behavioral specification, add a `## De
 
 Skip this phase when no Behavioral Specification section exists in `SYSTEMS_PLAN.md`.
 
-### Phase 4 -- Convention Compliance
+### Phase 5 -- Convention Compliance
 
 Apply the `code-review` skill's review workflow:
 
@@ -111,7 +111,7 @@ Convention checks (derived from `coding-style` rule):
 - Code organization (modular, no catch-all utils)
 - Code duplication (no repeated logic within files; for changed files, read sibling files in the same module — capped at 5 — and use LLM judgment to assess cross-module semantic similarity; report duplicated patterns with file paths and line ranges)
 
-### Phase 4.5 -- Security Review (when context-security-review skill is loaded)
+### Phase 6 -- Security Review (when context-security-review skill is loaded)
 
 When the `context-security-review` skill is available, perform a security review in **diff mode** scoped to the current change set:
 
@@ -128,7 +128,7 @@ SCOPE: Only files in the current change set. Never scan the full project -- that
 
 Skip this phase if the `context-security-review` skill is not loaded.
 
-### Phase 4.7 -- Deployment Documentation Validation
+### Phase 7 -- Deployment Documentation Validation
 
 If `.ai-state/SYSTEM_DEPLOYMENT.md` exists and the implementation changed deployment files (`compose.yaml`, `Dockerfile`, `Caddyfile`, `.env.example`):
 
@@ -142,7 +142,7 @@ Classify each as `PASS` / `WARN` / `FAIL` with `[Deployment]` tag. A stale or mi
 
 Skip this phase if `.ai-state/SYSTEM_DEPLOYMENT.md` does not exist or no deployment files were changed.
 
-### Phase 4.8a -- Architecture Design Document Validation (Design Coherence)
+### Phase 8 -- Architecture Design Document Validation (Design Coherence)
 
 If `.ai-state/ARCHITECTURE.md` exists and the implementation changed structural files (new modules, interfaces, data models, dependencies):
 
@@ -157,7 +157,7 @@ Classify each as `PASS` / `WARN` / `FAIL` with `[Architecture:design]` tag. A st
 
 Skip this sub-phase if `.ai-state/ARCHITECTURE.md` does not exist or no structural files were changed.
 
-### Phase 4.8b -- Developer Architecture Guide Validation (Code Verification)
+### Phase 9 -- Developer Architecture Guide Validation (Code Verification)
 
 If `docs/architecture.md` exists:
 
@@ -171,17 +171,18 @@ Classify each as `PASS` / `WARN` / `FAIL` with `[Architecture:guide]` tag.
 
 Skip this sub-phase if `docs/architecture.md` does not exist.
 
-### Phase 5 -- Test Coverage Assessment
+### Phase 10 -- Test Coverage Assessment
 
 When tests exist or are expected:
 
-1. Check whether critical paths in the new code have test coverage
-2. Note untested edge cases in complex logic
-3. Review test results if available (read results, never execute tests)
-4. Flag if the plan required tests that were not written
-5. When verifying agent-based systems, consult the `agent-evals` skill for agent-specific evaluation methodology (non-determinism handling, trajectory evaluation, grader design)
+1. **Read `.ai-work/<task-slug>/TEST_RESULTS.md`** — this is the implementer/test-engineer's test-run handoff. If the file is missing and the plan expected tests, log a `WARN` (not a `FAIL`) — the artifact is advisory during rollout.
+2. Classify each failure block in `TEST_RESULTS.md` against the current code state.
+3. Check whether critical paths in the new code have test coverage.
+4. Note untested edge cases in complex logic.
+5. Flag if the plan required tests that were not written.
+6. When verifying agent-based systems, consult the `agent-evals` skill for agent-specific evaluation methodology (non-determinism handling, trajectory evaluation, grader design).
 
-### Phase 6 -- Context Artifact Completeness (pipeline mode only)
+### Phase 11 -- Context Artifact Completeness (pipeline mode only)
 
 If the `IMPLEMENTATION_PLAN.md` included steps to update context artifacts (`CLAUDE.md`, rules, skills, READMEs):
 
@@ -191,9 +192,9 @@ If the `IMPLEMENTATION_PLAN.md` included steps to update context artifacts (`CLA
 
 Skip this phase entirely in standalone mode.
 
-### Phase 7 -- Report Generation
+### Phase 12 -- Report Generation
 
-**Incremental writing:** Write the `VERIFICATION_REPORT.md` document structure (all section headers with `[pending]` markers for incomplete sections) at the start of Phase 1. Fill in Scope during Phase 2, Acceptance Criteria results during Phase 3, Convention Compliance during Phase 4, Test Coverage during Phase 5, Context Artifact Completeness during Phase 6, and finalize the verdict in Phase 7. This ensures partial progress is visible even if the agent fails mid-execution, and allows the main agent to check partial results of a background agent.
+**Incremental writing:** Write the `VERIFICATION_REPORT.md` document structure (all section headers with `[pending]` markers for incomplete sections) at the start of Phase 1. Fill in Scope during Phase 2, Acceptance Criteria results during Phase 3, Convention Compliance during Phase 5, Test Coverage during Phase 10, Context Artifact Completeness during Phase 11, and finalize the verdict in Phase 12. This ensures partial progress is visible even if the agent fails mid-execution, and allows the main agent to check partial results of a background agent.
 
 1. Load the report template from the `code-review` skill's `references/report-template.md`
 2. Determine the overall verdict:
@@ -212,7 +213,7 @@ The verifier anchors a self-healing loop for code quality — including duplicat
 
 ```
 edit → PostToolUse hook (advisory) → implementer may self-correct
-  → if not caught: verifier Phase 4 detects (LLM-judged cross-module)
+  → if not caught: verifier Phase 5 detects (LLM-judged cross-module)
   → FAIL/WARN in VERIFICATION_REPORT.md
   → user routes to implementation-planner
   → planner creates corrective steps → implementer fixes
@@ -278,7 +279,7 @@ After creating `VERIFICATION_REPORT.md`, return a concise summary:
 At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
 
 ```
-[TIMESTAMP] [verifier] Phase N/7: [phase-name] -- [one-line summary of what was done or found]
+[TIMESTAMP] [verifier] Phase N/12: [phase-name] -- [one-line summary of what was done or found]
 ```
 
 Write the line immediately upon entering each new phase. Include optional hashtag labels at the end for categorization (e.g., `#observability #feature=auth`).

@@ -47,8 +47,8 @@ Outputs use path prefixes to signal lifecycle: `.ai-work/<slug>/` = ephemeral (d
 | `systems-architect` | Trade-off analysis, system design | `.ai-work/<slug>/SYSTEMS_PLAN.md`, `.ai-state/decisions/` (ADRs), `.ai-state/ARCHITECTURE.md`^1, `docs/architecture.md`^1 | Yes |
 | `implementation-planner` | Step decomposition, execution supervision | `.ai-work/<slug>/IMPLEMENTATION_PLAN.md`, `.ai-work/<slug>/WIP.md`, `.ai-work/<slug>/LEARNINGS.md` | Yes |
 | `context-engineer` | Context artifact domain expert; any pipeline stage | Audit report + artifact changes, `.ai-work/<slug>/CONTEXT_REVIEW.md` (shadowing) | Yes |
-| `implementer` | Executes implementation steps with self-review | Code changes + `.ai-work/<slug>/WIP.md` update | Yes |
-| `test-engineer` | Dedicated testing: complex test design, test suite refactoring, testing infrastructure | Test code + `.ai-work/<slug>/WIP.md` update | Yes |
+| `implementer` | Executes implementation steps with self-review | Code changes + `.ai-work/<slug>/WIP.md` update + `.ai-work/<slug>/TEST_RESULTS.md` (when step runs tests) | Yes |
+| `test-engineer` | Dedicated testing: complex test design, test suite refactoring, testing infrastructure | Test code + `.ai-work/<slug>/WIP.md` update + `.ai-work/<slug>/TEST_RESULTS.md` (canonical when paired with implementer on tests) | Yes |
 | `verifier` | Post-implementation review against acceptance criteria | `.ai-work/<slug>/VERIFICATION_REPORT.md` | Yes |
 | `doc-engineer` | Documentation quality (READMEs, catalogs, changelogs, developer architecture guide) | Doc report or file fixes | Yes |
 | `sentinel` | Read-only ecosystem auditor (independent, not a pipeline stage) | `.ai-state/SENTINEL_REPORT_*.md`, `.ai-state/SENTINEL_LOG.md` | Yes |
@@ -76,11 +76,13 @@ When delegating to an agent, the main agent **must** include these deliverables 
 - "Execute step N from `WIP.md` at `.ai-work/<task-slug>/`"
 - "Update `WIP.md` with completion status"
 - "If structural changes: update `.ai-state/ARCHITECTURE.md` (step 7.6) and `docs/architecture.md` (step 7.7)"
+- "If the step runs tests: write `TEST_RESULTS.md` at `.ai-work/<task-slug>/` per ADR-038 schema"
 
 **verifier** — always include in prompt:
 - "Produce `VERIFICATION_REPORT.md` at `.ai-work/<task-slug>/`"
 - "Verify against acceptance criteria in the `SYSTEMS_PLAN.md`"
-- "Check `.ai-state/ARCHITECTURE.md` design coherence (Phase 4.8a) and `docs/architecture.md` code accuracy (Phase 4.8b)"
+- "Check `.ai-state/ARCHITECTURE.md` design coherence (Phase 8) and `docs/architecture.md` code accuracy (Phase 9)"
+- "Read `TEST_RESULTS.md` at `.ai-work/<task-slug>/` for test outcomes (missing file → WARN, not FAIL)"
 
 ### Proactive Agent Usage
 

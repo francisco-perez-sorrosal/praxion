@@ -12,7 +12,7 @@
 - Add path-scoped testing-conventions rule for test files
 - Add testing-strategy skill with language-agnostic test methodology
 - Add /full-security-scan command for project-wide security audit
-- Add security review Phase 4.5 to verifier agent
+- Add security review Phase 6 to verifier agent
 - Add GitHub Actions PR security review workflow
 - Add context-security-review skill with diff/full-scan modes
 - Add secret pattern redaction to hook event logging

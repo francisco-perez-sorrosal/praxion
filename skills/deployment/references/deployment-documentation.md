@@ -13,7 +13,7 @@ The deployment skill provides generic deployment *knowledge* (primitives, patter
 
 ### Creation
 
-The **systems-architect** creates the document from the template (`assets/SYSTEM_DEPLOYMENT_TEMPLATE.md`) during Phase 3.7 when the architecture includes deployable components. It fills in:
+The **systems-architect** creates the document from the template (`assets/SYSTEM_DEPLOYMENT_TEMPLATE.md`) during Phase 4 when the architecture includes deployable components. It fills in:
 - Section 1 (Overview): quick-facts table
 - Section 2 (System Context): boundary diagram and external dependencies
 - Section 3 (Service Topology): skeleton with known services
@@ -38,7 +38,7 @@ The **cicd-engineer** updates Section 5 (Deployment Process) when creating deplo
 
 ### Validation
 
-The **verifier** cross-checks the document against actual configs during Phase 4.7:
+The **verifier** cross-checks the document against actual configs during Phase 7:
 - Port consistency (doc vs compose.yaml)
 - Environment variables (doc vs actual usage)
 - Service names (doc vs compose service keys)
@@ -80,7 +80,7 @@ Four layers of defense:
 
 1. **Main agent awareness** -- when modifying deployment files in Direct/Lightweight tier (no pipeline), the main agent checks for `.ai-state/SYSTEM_DEPLOYMENT.md` and updates affected sections. The deployment skill's gotchas section reminds of this
 2. **Implementer post-step** -- in Standard/Full pipelines, updates doc when deployment files change (proactive, step 7.5)
-3. **Verifier Phase 4.7** -- cross-checks doc vs actual configs after implementation (reactive, per-pipeline)
+3. **Verifier Phase 7** -- cross-checks doc vs actual configs after implementation (reactive, per-pipeline)
 4. **Sentinel audit** -- checks freshness and consistency independently (reactive, periodic). Finding routing:
 
 | Check | Finding | Recommended Owner | Fix Action |

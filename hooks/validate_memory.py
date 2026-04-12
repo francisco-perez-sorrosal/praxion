@@ -15,16 +15,11 @@ from __future__ import annotations
 import json
 import sys
 
-from _hook_utils import REMEMBER_PROMPT, is_memory_system_active, scan_transcript
-
-# Read-only agents that should never be blocked for memory
-EXEMPT_AGENTS = frozenset(
-    {
-        "Explore",
-        "i-am:sentinel",
-        "i-am:doc-engineer",
-        "Plan",
-    }
+from _hook_utils import (
+    REMEMBER_PROMPT,
+    is_exempt,
+    is_memory_system_active,
+    scan_transcript,
 )
 
 
@@ -37,7 +32,7 @@ def main() -> None:
 
     agent_type = payload.get("agent_type", "")
 
-    if agent_type in EXEMPT_AGENTS:
+    if is_exempt(agent_type):
         return
 
     transcript_path = payload.get("agent_transcript_path")

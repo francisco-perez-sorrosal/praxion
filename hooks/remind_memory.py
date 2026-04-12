@@ -26,7 +26,11 @@ import sys
 
 sys.path.insert(0, __import__("os").path.dirname(__file__))
 
-from _hook_utils import REMEMBER_PROMPT, scan_transcript  # noqa: E402
+from _hook_utils import (  # noqa: E402
+    REMEMBER_PROMPT,
+    is_exempt,
+    scan_transcript,
+)
 
 GIT_COMMIT_RE = re.compile(r"git\s+commit")
 PREFIX = "[memory-gate:commit]"
@@ -38,6 +42,10 @@ def main() -> None:
         payload = json.loads(raw)
     except (json.JSONDecodeError, ValueError):
         return
+
+    agent_type = payload.get("agent_type", "")
+    if is_exempt(agent_type):
+        sys.exit(0)
 
     tool_input = payload.get("tool_input", {})
     command = tool_input.get("command", "")

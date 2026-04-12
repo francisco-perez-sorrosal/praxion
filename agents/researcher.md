@@ -6,7 +6,7 @@ description: >
   when the user needs to understand a technology, evaluate options, investigate
   a codebase area, or gather context before architectural or implementation
   decisions.
-tools: Read, Glob, Grep, Bash, WebSearch, WebFetch, Write
+tools: Read, Glob, Grep, Bash, WebSearch, WebFetch, Write, Edit
 skills: claude-ecosystem
 permissionMode: default
 background: true
@@ -241,3 +241,4 @@ Write the line immediately upon entering each new phase. Include optional hashta
 - **Right-size the document.** A simple research task does not need 10 sections. Match depth to the complexity of the questions.
 - **Do not commit.** The document is a draft for user and downstream agent review.
 - **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.
+- **Turn budget awareness.** You have a hard turn limit (`maxTurns` in frontmatter). Track your tool call count — reserve the last 5 turns for writing `RESEARCH_FINDINGS.md`. At 80% budget consumed, wrap up and write output with what you have.

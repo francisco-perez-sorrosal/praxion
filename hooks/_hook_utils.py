@@ -2,6 +2,12 @@
 
 Provides transcript scanning and significance detection used by both
 memory_gate.py (Stop) and validate_memory.py (SubagentStop).
+
+Also exports ``EXEMPT_AGENTS`` and ``is_exempt()``: a single source of
+truth for agent types that should never be blocked by memory gates.
+This list governs both the subagent-completion gate (``validate_memory.py``)
+and the pre-commit gate (``remind_memory.py``), keeping exemption policy
+in one place.
 """
 
 from __future__ import annotations
@@ -17,6 +23,37 @@ SEARCH_TOOLS = frozenset({"Grep", "Glob"})
 DELEGATION_TOOLS = frozenset({"Agent"})
 REMEMBER_SUBSTRING = "remember"
 MEMORY_TOOL_PREFIX = "mcp__plugin_i-am_memory__"
+
+# Agents exempt from memory enforcement. Read-only/navigational agents
+# ("Explore", "Plan") and agents whose outputs are persistent project
+# intelligence rather than session-memory material ("i-am:sentinel",
+# "i-am:doc-engineer") should never be blocked for not calling remember().
+#
+# This frozenset is consumed by BOTH memory gates:
+#   - hooks/validate_memory.py  (SubagentStop — subagent completion gate)
+#   - hooks/remind_memory.py    (PreToolUse  — git-commit gate)
+#
+# An empty agent_type (the main agent's default) is NOT a member of this
+# set, so the main agent is always subject to the gate.
+EXEMPT_AGENTS = frozenset(
+    {
+        "Explore",
+        "i-am:sentinel",
+        "i-am:doc-engineer",
+        "Plan",
+    }
+)
+
+
+def is_exempt(agent_type: str) -> bool:
+    """Return True if ``agent_type`` is exempt from memory enforcement.
+
+    The default empty string (``payload.get("agent_type", "")`` for the
+    main agent) is intentionally not in ``EXEMPT_AGENTS`` and returns
+    False — the main agent remains subject to both memory gates.
+    """
+    return agent_type in EXEMPT_AGENTS
+
 
 # Significance thresholds — any single criterion triggers the gate
 MIN_EDITS = 3  # substantial code changes

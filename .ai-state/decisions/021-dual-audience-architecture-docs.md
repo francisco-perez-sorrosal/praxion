@@ -100,6 +100,10 @@ Key design choices:
 - Sentinel grows by ~12 lines (5 new checks + guidance)
 - Risk of developer doc drifting from architect doc if cross-consistency check (AC09) is not enforced
 
+## Phase Renumbering Addendum (2026-04-12)
+
+Phases referenced in this ADR (3.8, 7.6, 7.7, 4.8a, 4.8b) were renumbered to (5, 7.6, 7.7, 8, 9) on 2026-04-12 per pipeline-hardening task 2.1. Step 7.6/7.7 are implementer sub-steps (not phases) and remain stable. ADR body preserved unchanged — historical phase numbers appear above in their original form to maintain the decision's authenticity at time of authoring; downstream agent prompts, skill references, and validation docs now use the renumbered values.
+
 ## Prior Decision
 
 This supersedes dec-020 (Living ARCHITECTURE.md in .ai-state/). Dec-020 established the single living document pattern. Dec-021 preserves the core pattern (section ownership, staleness mitigation, pipeline maintenance) but splits the single document into two with distinct audiences and validation models. The architect doc retains all of dec-020's design, adding Status column and design-target framing. The developer doc is the new addition.

@@ -15,7 +15,7 @@
 | **Type** | [e.g., Web application, CLI tool, Library, API service] |
 | **Language / Framework** | [e.g., Python 3.13 / FastAPI] |
 | **Architecture pattern** | [e.g., Layered, Hexagonal, Microservices, Monolith] |
-| **Source stage** | [Phase 3.8 creation / Step N update / Pipeline `<slug>`] |
+| **Source stage** | [Phase 5 creation / Step N update / Pipeline `<slug>`] |
 | **Last verified** | [YYYY-MM-DD by agent or human] |
 
 [One paragraph describing the system's purpose and high-level architectural approach.]

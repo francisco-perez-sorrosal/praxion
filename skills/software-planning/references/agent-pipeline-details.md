@@ -257,6 +257,18 @@ Append-only. Entries in chronological order by timestamp.
 
 **Post-merge invariants:** All entries in timestamp order. Every entry matches the format pattern. No exact-duplicate entries.
 
+### TEST_RESULTS.md Reconciliation
+
+**Schema:** Step-scoped sections with `## Step N` headers, each following the ADR-038 schema (command, summary counts, failures, optional coverage, notes). Written by the implementer (sub-step 7.8) or test-engineer (Phase 4 step 6).
+
+**Fragment naming:** `TEST_RESULTS_implementer.md` and `TEST_RESULTS_test-engineer.md` in `.ai-work/<task-slug>/`.
+
+**Canonical-writer rule:** When the implementer and test-engineer run as a paired step (BDD/TDD execution), the test-engineer is the canonical writer — the implementer skips its own write. Otherwise the implementer writes when the step runs tests.
+
+**Merge semantics:** Concatenate fragments by step number in ascending order. No dedup — each test run is independent evidence and multiple runs per step are additive, not conflicting. After merge, delete the fragment files.
+
+**Post-merge invariants:** Every `## Step N` present at most once per writer. All failure blocks preserved. No re-sorting within a step (ordering inside a step reflects test-run order).
+
 ### .ai-state/ Reconciliation for Worktree Merges
 
 `.ai-state/` is committed to git, so its contents survive worktree merges via normal git merge semantics. Most artifacts avoid conflicts by design, but concurrent pipelines can produce overlapping writes. The table below covers every `.ai-state/` artifact:

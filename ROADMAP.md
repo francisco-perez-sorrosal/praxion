@@ -85,7 +85,7 @@ One evaluation type (ToolSelection), no tests, stale API patterns, no scheduled 
 
 - **Systems-architect** runs on default Sonnet despite making the most consequential decisions (technology selection, system boundaries, data model). For Standard/Full tier tasks, Opus is justified
 - **Sentinel** prompt at 479 lines exceeds its own T03 check threshold. The check catalog (~200 lines, ~3,000 tokens) is embedded in the prompt instead of a reference file
-- **Phase numbering** is chaotic (3.5, 3.7, 4.8a, 4.8b) across systems-architect and verifier, causing misleading progress signals
+- **Phase numbering** was chaotic with decimal and letter-suffixed phases across systems-architect and verifier, causing misleading progress signals (resolved 2026-04-12 by pipeline-hardening task 2.1 — both agents now use sequential integer numbering)
 - **Test results** have no formal handoff between implementer and verifier -- the verifier "does not run tests" but needs results
 - **skill-genesis** has `background: true` in frontmatter but uses `AskUserQuestion` (interactive)
 - **Researcher** lacks `Edit` tool despite using incremental writing pattern
@@ -191,7 +191,9 @@ Closed from the Deprecation & Cleanup table (Phase-1-tagged): deleted `claude/co
 
 Build on the recovered token budget and CI foundation.
 
-#### 2.1 Agent Prompt Improvements (Batch)
+#### 2.1 Agent Prompt Improvements (Batch) ✅ DONE (2026-04-12)
+
+**Outcome**: Landed all items except sentinel catalog extraction. systems-architect gained `model: opus`; researcher added `Edit` to tools; skill-genesis lost `background: true`; test-engineer `maxTurns` raised to 60; cicd-engineer moved to language-detection with `skills: [cicd]`; six agents gained 2-bullet Turn Budget in `## Constraints` (per RECONCILIATION — not a dedicated section, avoiding cargo-cult from sentinel); systems-architect phases renumbered 1..10, verifier 1..12, with 13 dependent files phase-synced. Sentinel catalog stays inline (dec-021 addendum pattern; T03 deviation documented in LEARNINGS — `agents/references/` is not portable, and a new skill over-builds for a single consumer). See `.ai-work/pipeline-hardening/RECONCILIATION.md`.
 
 **Actions** (all low-effort, high-impact):
 
@@ -199,7 +201,7 @@ Build on the recovered token budget and CI foundation.
 |-------|-----|--------|
 | systems-architect | Add `model: opus` to frontmatter for consequential decisions | Trivial |
 | sentinel | Extract check catalog (~200 lines) to reference file, bring prompt under 400 lines | Small |
-| systems-architect, verifier | Renumber phases sequentially (no more 3.5, 3.7, 4.8a) | Small |
+| systems-architect, verifier | Renumber phases sequentially (no more decimal/letter-suffixed phases) | Small |
 | researcher | Add `Edit` to tools list | Trivial |
 | skill-genesis | Remove `background: true` or add non-interactive mode | Trivial |
 | researcher, test-engineer, doc-engineer, context-engineer, cicd-engineer, skill-genesis | Add turn budget awareness sections | Small |
@@ -209,11 +211,13 @@ Build on the recovered token budget and CI foundation.
 **Dependencies**: 1.1 (token budget recovery enables larger agent prompts where needed).
 **Risk**: Low. Each change is independent and testable.
 
-#### 2.2 Formalize Test Result Handoff
+#### 2.2 Formalize Test Result Handoff ✅ DONE (2026-04-12)
+
+**Outcome**: `TEST_RESULTS.md` declared at `.ai-work/<task-slug>/TEST_RESULTS.md`. Implementer writes at new sub-step 7.8 (after `docs/architecture.md` update); test-engineer is canonical writer when paired with implementer (BDD/TDD); verifier reads at renumbered Phase 10 with WARN-not-FAIL on missing file. Fragment pattern `TEST_RESULTS_<agent-type>.md` documented in `skills/software-planning/references/agent-pipeline-details.md`. Schema per ADR-038 (with addendum reconciling implementation landing points).
 
 **Problem**: Implementer runs tests, results are ephemeral. Verifier needs results but "does not run tests."
 
-**Action**: Define a lightweight `TEST_RESULTS.md` artifact written by the implementer after running tests. Contents: test command, pass/fail counts, failure details, coverage summary. The verifier reads this instead of relying on implicit handoff. Add to the implementer's step 7 and the verifier's Phase 4.
+**Action**: Define a lightweight `TEST_RESULTS.md` artifact written by the implementer after running tests. Contents: test command, pass/fail counts, failure details, coverage summary. The verifier reads this instead of relying on implicit handoff.
 
 **Dependencies**: 2.1 (agent prompt improvements).
 **Risk**: Low. Adds one file to the pipeline but provides formal handoff.
@@ -230,7 +234,9 @@ Build on the recovered token budget and CI foundation.
 **Dependencies**: 1.1 (token budget), 2.1 (agent improvements).
 **Risk**: Medium. Tier templates must be flexible enough for varied tasks.
 
-#### 2.4 Harmonize Memory Gate Exemptions
+#### 2.4 Harmonize Memory Gate Exemptions ✅ DONE (2026-04-12)
+
+**Outcome**: `EXEMPT_AGENTS` centralized as frozenset + `is_exempt(agent_type) -> bool` helper in `hooks/_hook_utils.py` (single source of truth). `validate_memory.py` and `remind_memory.py` both import the helper; `remind_memory.py` gained early-return short-circuit after `agent_type` retrieval. Smoke test green. ADR-039 captures the rationale.
 
 **Problem**: `validate_memory.py` exempts doc-engineer/sentinel/Explore/Plan at SubagentStop, but `remind_memory.py` (commit gate) exempts nobody.
 

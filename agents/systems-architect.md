@@ -10,6 +10,7 @@ description: >
   or structural assessment of a codebase before implementation.
 tools: Read, Glob, Grep, Bash, Write, Edit
 skills: [claude-ecosystem, agentic-sdks, communicating-agents, mcp-crafting]
+model: opus
 permissionMode: acceptEdits
 background: true
 memory: user
@@ -47,7 +48,7 @@ Determine what you have to work with. The **task slug** (provided in your prompt
 4. **Clarify the goal** — restate it in one sentence. If ambiguous, state your interpretation and ask for confirmation.
 5. **Define acceptance criteria as behavioral specs** — concrete, testable conditions for "done" expressed as observable behaviors. These criteria drive test design downstream: the test-engineer will derive behavioral tests directly from them. Write each criterion as a verifiable behavior ("When X happens, the system does Y"), not an implementation detail ("Module Z is refactored").
 6. **Classify task complexity** — assess the task against the complexity triage criteria. For **medium and large** tasks, load the `spec-driven-development` skill and produce a `## Behavioral Specification` section in `SYSTEMS_PLAN.md` with requirements in the `When/and/the system/so that` format, each assigned a unique ID (`REQ-01`, `REQ-02`, ...). For **trivial, small, and spike** tasks, the existing acceptance criteria format suffices — skip the behavioral specification section entirely. The skill provides the format conventions and ID rules.
-7. **Detect brownfield baseline** — for Standard and Full tier tasks, check `.ai-state/specs/` for prior `SPEC_*.md` files relevant to the feature being designed. If found, note the prior spec as the behavioral baseline for delta production in Phase 3.5. Also read `.ai-state/decisions/DECISIONS_INDEX.md` and scan the summary/tags columns for ADRs overlapping the current task's scope. For matches, read the full ADR files for context — prior decisions constrain the design space and should be acknowledged, not silently contradicted. If no prior specs or decisions exist, the feature is greenfield.
+7. **Detect brownfield baseline** — for Standard and Full tier tasks, check `.ai-state/specs/` for prior `SPEC_*.md` files relevant to the feature being designed. If found, note the prior spec as the behavioral baseline for delta production in Phase 6. Also read `.ai-state/decisions/DECISIONS_INDEX.md` and scan the summary/tags columns for ADRs overlapping the current task's scope. For matches, read the full ADR files for context — prior decisions constrain the design space and should be acknowledged, not silently contradicted. If no prior specs or decisions exist, the feature is greenfield.
 8. **Identify scope boundaries** — what is explicitly in scope and out of scope.
 
 If `RESEARCH_FINDINGS.md` does not exist and the task requires research, recommend invoking the researcher agent first. You can proceed with direct codebase analysis for tasks that don't need external research.
@@ -68,7 +69,7 @@ Evaluate the codebase for structural readiness to receive the proposed changes:
 
 **API version drift check:**
 
-When the architecture involves external APIs, use the `external-api-docs` skill to check context-hub for current documentation. Compare the documented API version against the project's dependency version (`pyproject.toml`, `package.json`, etc.). If the project uses an older version than what the curated docs cover, flag the drift in the Risk Assessment (Phase 5) using the `[API VERSION DRIFT]` format defined in the skill.
+When the architecture involves external APIs, use the `external-api-docs` skill to check context-hub for current documentation. Compare the documented API version against the project's dependency version (`pyproject.toml`, `package.json`, etc.). If the project uses an older version than what the curated docs cover, flag the drift in the Risk Assessment (Phase 8) using the `[API VERSION DRIFT]` format defined in the skill.
 
 Before acting on drift, **assess the dependency's criticality** to decide how much attention it deserves:
 
@@ -123,7 +124,7 @@ Design the architecture by working through these questions:
 - Favor composition over inheritance, interfaces over concrete coupling
 - Make the architecture testable — if it can't be tested, redesign it
 
-### Phase 3.7 — Deployment Documentation
+### Phase 4 — Deployment Documentation
 
 If the architecture includes deployable components (services, containers, infrastructure):
 
@@ -135,7 +136,7 @@ The deployment skill provides generic deployment knowledge; `SYSTEM_DEPLOYMENT.m
 
 Skip this phase for projects with no deployable components (pure libraries, CLI tools without infrastructure).
 
-### Phase 3.8 — Architecture Documentation
+### Phase 5 — Architecture Documentation
 
 If this is a Standard or Full tier pipeline:
 
@@ -156,7 +157,7 @@ The software-planning skill provides the methodology; `.ai-state/ARCHITECTURE.md
 
 Skip this phase for trivially simple projects (single module, no external dependencies).
 
-### Phase 3.5 — Spec Delta Production (conditional)
+### Phase 6 — Spec Delta Production (conditional)
 
 When Phase 1 identified a prior spec baseline (brownfield detection):
 
@@ -168,7 +169,7 @@ When Phase 1 identified a prior spec baseline (brownfield detection):
 
 Skip this phase entirely when no prior spec was identified in Phase 1 (greenfield).
 
-### Phase 4 — Trade-off Analysis
+### Phase 7 — Trade-off Analysis
 
 For every significant design decision, make the trade-offs explicit:
 
@@ -205,7 +206,7 @@ Small decisions don't need this format. Reserve it for choices that affect:
 
 See the [ADR conventions rule](../rules/swe/adr-conventions.md) for the full file format, frontmatter schema, and supersession protocol.
 
-### Phase 5 — Risk Assessment
+### Phase 8 — Risk Assessment
 
 Identify what could go wrong and how to mitigate it:
 
@@ -219,7 +220,7 @@ Focus on risks that are:
 - Actionable (the implementation planner can account for them in step ordering)
 - Proportional to the task complexity
 
-### Phase 6 — Stakeholder Review
+### Phase 9 — Stakeholder Review
 
 Review the architecture through multiple lenses. The depth adapts to task complexity.
 
@@ -242,9 +243,9 @@ When approved:
 - Revise architecture based on findings
 - Flag unresolved tensions between lenses
 
-### Phase 7 — Document Creation
+### Phase 10 — Document Creation
 
-**Incremental writing:** Write the `SYSTEMS_PLAN.md` document structure (all section headers with `[pending]` markers for incomplete sections) at the start of Phase 1. Fill in Acceptance Criteria during Phase 1, Codebase Readiness during Phase 2, Architecture during Phase 3, Decisions during Phase 4, Risk Assessment during Phase 5, Stakeholder Review during Phase 6, and finalize in Phase 7. This ensures partial progress is visible even if the agent fails mid-execution, and allows the main agent to check partial results of a background agent.
+**Incremental writing:** Write the `SYSTEMS_PLAN.md` document structure (all section headers with `[pending]` markers for incomplete sections) at the start of Phase 1. Fill in Acceptance Criteria during Phase 1, Codebase Readiness during Phase 2, Architecture during Phase 3, Decisions during Phase 7, Risk Assessment during Phase 8, Stakeholder Review during Phase 9, and finalize in Phase 10. This ensures partial progress is visible even if the agent fails mid-execution, and allows the main agent to check partial results of a background agent.
 
 Write `SYSTEMS_PLAN.md`:
 
@@ -284,7 +285,7 @@ Write `SYSTEMS_PLAN.md`:
 [New or modified interfaces, APIs, contracts]
 
 ### Decisions
-[Trade-off analysis for significant choices — use the format from Phase 4]
+[Trade-off analysis for significant choices — use the format from Phase 7]
 
 ## Codebase Readiness
 
@@ -354,7 +355,7 @@ After creating `SYSTEMS_PLAN.md` (and `SPEC_DELTA.md` for brownfield features, `
 At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
 
 ```
-[TIMESTAMP] [systems-architect] Phase N/7: [phase-name] -- [one-line summary of what was done or found]
+[TIMESTAMP] [systems-architect] Phase N/10: [phase-name] -- [one-line summary of what was done or found]
 ```
 
 Write the line immediately upon entering each new phase. Include optional hashtag labels at the end for categorization (e.g., `#observability #feature=auth`).

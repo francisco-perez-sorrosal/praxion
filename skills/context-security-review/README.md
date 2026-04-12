@@ -21,7 +21,7 @@ Security review methodology for Claude Code plugin ecosystems -- context artifac
 | Consumer | Mode | Context |
 |----------|------|---------|
 | CI workflow (`.github/workflows/context-security-review.yml`) | Diff | Runs on PR open/synchronize, posts findings as PR comments |
-| Verifier agent (Phase 4.5) | Diff | Loads alongside `code-review` during post-implementation verification |
+| Verifier agent (Phase 6) | Diff | Loads alongside `code-review` during post-implementation verification |
 | `/full-security-scan` command | Full-scan | On-demand comprehensive security audit with posture grade |
 
 ## Skill Contents

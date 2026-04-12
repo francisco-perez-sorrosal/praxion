@@ -10,7 +10,7 @@ description: >
   GitHub Actions workflows, debug workflow failures, optimize pipeline
   performance, review CI/CD security, or set up deployment automation.
 tools: Read, Write, Edit, Glob, Grep, Bash
-skills: [cicd, python-development, python-prj-mgmt]
+skills: [cicd]
 permissionMode: acceptEdits
 memory: user
 maxTurns: 50
@@ -43,7 +43,13 @@ The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.
 Before making changes, gather context:
 
 1. **Read existing workflows** -- check `.github/workflows/` for current CI/CD configuration
-2. **Read project config** -- check `pyproject.toml`, `package.json`, `Cargo.toml`, `go.mod` for language and tooling
+2. **Read project config and load language skill** -- detect the primary language from project config files and load the matching language skill by name:
+   - `pyproject.toml` --> load `python-development` (and `python-prj-mgmt` for pixi/uv dependency commands)
+   - `package.json` --> load `typescript-development`
+   - `Cargo.toml` --> load `rust-development`
+   - `go.mod` --> load `go-development`
+
+   If no language-specific skill exists for the detected language, proceed with the `cicd` skill's generic guidance — document the gap in `LEARNINGS.md` for skill-genesis to evaluate.
 3. **Read the cicd skill** -- load `skills/cicd/SKILL.md` for core principles and patterns
 4. **Load references on demand** -- load `skills/cicd/references/github-actions.md` for syntax details, `skills/cicd/references/patterns-and-examples.md` for complete workflow templates
 5. **Check for agent projects** -- if the project involves AI agents (agentic SDK dependencies, agent configs), also load `skills/agent-evals/SKILL.md` for eval-specific CI/CD patterns (eval-on-commit, deployment gates, regression tracking)
@@ -174,3 +180,4 @@ Write the line immediately upon entering each new phase. Include optional hashta
 - **Incremental changes.** For existing pipelines, propose targeted improvements rather than complete rewrites.
 - **No git commits.** Write files but never commit. The user handles version control.
 - **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.
+- **Turn budget awareness.** You have a hard turn limit (`maxTurns` in frontmatter). Track your tool call count — reserve the last 5 turns for writing workflow files + config. At 80% budget consumed, wrap up and write output with what you have.

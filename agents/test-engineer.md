@@ -13,7 +13,7 @@ skills: [software-planning, code-review, refactoring]
 permissionMode: acceptEdits
 background: true
 memory: user
-maxTurns: 50
+maxTurns: 60
 hooks:
   Stop:
     - hooks:
@@ -139,6 +139,7 @@ Write the tests following these structural rules:
 3. Verify test files are syntactically valid and importable.
 4. If production code exists (sequential mode or post-integration), run the full test suite. If production code does not exist yet (concurrent mode), verify tests are structurally sound — they are expected to fail at the integration checkpoint.
 5. If a failure reveals a test design issue, fix it. If it reveals a production code bug, document it in LEARNINGS.md and report `[BLOCKED]`.
+6. **Write test results** — after running the full test suite, write `.ai-work/<task-slug>/TEST_RESULTS.md` per the schema in ADR-038 (sections per step: command, pass/fail/skip counts, duration, optional coverage, failure blocks, notes). Presence of the file is the handoff signal to the verifier. **Canonical-writer rule**: when paired with an implementer on the same step (BDD/TDD execution), the test-engineer is the canonical writer of `TEST_RESULTS.md` — the implementer skips its own sub-step 7.8. In parallel mode, write fragment `TEST_RESULTS_test-engineer.md` — the planner merges fragments by concatenating `## Step N` sections in ascending step order.
 
 ### Phase 5 — Self-Review
 
@@ -271,3 +272,4 @@ Write the line immediately upon entering each new phase. Include optional hashta
 - **Respect existing test patterns.** Match the test framework, directory structure, fixture conventions, and naming patterns already in use.
 - **Keep WIP.md accurate.** Update it before reporting — your status must reflect reality.
 - **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.
+- **Turn budget awareness.** You have a hard turn limit (`maxTurns` in frontmatter). Track your tool call count — reserve the last 5 turns for running full test suite + updating `WIP.md`. At 80% budget consumed, wrap up and write output with what you have.

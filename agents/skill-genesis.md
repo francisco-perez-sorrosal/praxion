@@ -12,7 +12,6 @@ description: >
 tools: Read, Glob, Grep, Bash, Write, AskUserQuestion
 skills: [skill-crafting, rule-crafting]
 permissionMode: default
-background: true
 memory: user
 maxTurns: 40
 hooks:
@@ -269,3 +268,4 @@ Write the line immediately upon entering each new phase. Include optional hashta
 - **One proposal at a time.** Present each proposal individually. Do not batch-present all proposals in a single message.
 - **Do not commit.** Write the report for user review. The user handles version control.
 - **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.
+- **Turn budget awareness.** You have a hard turn limit (`maxTurns` in frontmatter). Track your tool call count — reserve the last 5 turns for writing `SKILL_GENESIS_REPORT.md`. At 80% budget consumed, wrap up and write output with what you have.

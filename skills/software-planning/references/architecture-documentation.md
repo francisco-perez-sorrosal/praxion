@@ -32,7 +32,7 @@ Both documents use the same 8 sections (Overview, System Context, Components, In
 
 ### Architect Doc (`.ai-state/ARCHITECTURE.md`)
 
-**Creation:** The **systems-architect** creates the document from the template (`skills/software-planning/assets/ARCHITECTURE_TEMPLATE.md`) during Phase 3.8 when the pipeline is Standard or Full tier. It fills in:
+**Creation:** The **systems-architect** creates the document from the template (`skills/software-planning/assets/ARCHITECTURE_TEMPLATE.md`) during Phase 5 when the pipeline is Standard or Full tier. It fills in:
 - Section 1 (Overview): quick-facts table with Source stage, summary
 - Section 2 (System Context): L0 boundary diagram and external actors
 - Section 3 (Components): skeleton with known components, Status column populated
@@ -56,7 +56,7 @@ Skip creation for trivially simple projects (single module, no external dependen
 
 If `.ai-state/ARCHITECTURE.md` does not exist, the implementer skips — the systems-architect creates it.
 
-**Validation:** The **verifier** checks design coherence during Phase 4.8a:
+**Validation:** The **verifier** checks design coherence during Phase 8:
 - Components referenced in Data Flow (Section 5) appear in Components (Section 3)
 - Status column is present with valid values
 - ADR IDs in Section 8 correspond to actual files in `.ai-state/decisions/`
@@ -73,7 +73,7 @@ A stale architect doc is a WARN, not a FAIL — it's advisory, not a gate.
 
 ### Developer Guide (`docs/architecture.md`)
 
-**Creation:** The **systems-architect** creates the developer guide alongside the architect doc during Phase 3.8, using the template at `skills/doc-management/assets/ARCHITECTURE_GUIDE_TEMPLATE.md`. Content is derived from the architect doc but filtered:
+**Creation:** The **systems-architect** creates the developer guide alongside the architect doc during Phase 5, using the template at `skills/doc-management/assets/ARCHITECTURE_GUIDE_TEMPLATE.md`. Content is derived from the architect doc but filtered:
 - Only components with Status `Built` are included
 - All component names and file paths are verified against the filesystem
 - Present-tense framing throughout — no future tense, no "Planned" or "Designed" items
@@ -92,14 +92,14 @@ If `docs/architecture.md` does not exist, the implementer skips — the systems-
 
 **Maintenance:** The **doc-engineer** maintains the developer guide at pipeline checkpoints by verifying content against the filesystem (code-verified accuracy). This is independent of the implementer's step 7.7 — it's a periodic freshness check.
 
-**Validation:** The **verifier** checks code accuracy during Phase 4.8b:
+**Validation:** The **verifier** checks code accuracy during Phase 9:
 - Every component name in Section 3 matches an actual module/directory name on disk
 - Every file path in the component table resolves to an existing file
 - No Planned/Designed items present
 - "Last verified" date is within the pipeline's timeframe
 - Cross-consistency: every component in the developer guide appears in the architect doc
 
-Skip Phase 4.8b if `docs/architecture.md` does not exist.
+Skip Phase 9 if `docs/architecture.md` does not exist.
 
 **Auditing:** The **sentinel** checks code accuracy with five checks:
 - **AC05**: `docs/architecture.md` exists when `.ai-state/ARCHITECTURE.md` exists
@@ -131,7 +131,7 @@ Five layers of defense:
 
 1. **Main agent awareness** — when modifying structural files in Direct/Lightweight tier (no pipeline), the main agent checks for both architecture documents and updates affected sections. This document's Coordinator Awareness section provides the guidance
 2. **Implementer post-step** — in Standard/Full pipelines, updates both docs when structural files change (proactive, steps 7.6 and 7.7)
-3. **Verifier Phase 4.8a/4.8b** — cross-checks both docs after implementation (reactive, per-pipeline)
+3. **Verifier Phase 8/9** — cross-checks both docs after implementation (reactive, per-pipeline)
 4. **Sentinel audit** — checks both docs independently (reactive, periodic)
 5. **Doc-engineer periodic verification** — verifies `docs/architecture.md` against the filesystem at pipeline checkpoints (reactive, per-pipeline)
 

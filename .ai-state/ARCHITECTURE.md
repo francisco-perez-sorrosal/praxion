@@ -16,7 +16,7 @@
 | **Type** | AI development meta-framework (plugin + MCP servers + knowledge artifacts) |
 | **Language / Framework** | Python 3.13+ (MCP servers), Markdown (skills/agents/rules/commands), Shell/Python (hooks, scripts) |
 | **Architecture pattern** | Plugin-based knowledge ecosystem with progressive disclosure and agent pipeline orchestration |
-| **Source stage** | Phase 3.8 creation, 2026-04-10 by systems-architect |
+| **Source stage** | Phase 5 creation, 2026-04-10 by systems-architect |
 | **Last verified** | 2026-04-12 by systems-architect |
 
 Praxion is a meta-project that provides the operational infrastructure for AI-assisted software development. Rather than being an application itself, it is an ecosystem of reusable skills, specialized agents, declarative rules, slash commands, lifecycle hooks, and MCP servers that compose into a coherent development workflow. It ships as the `i-am` Claude Code plugin, with secondary targets for Claude Desktop and Cursor.

@@ -15,6 +15,7 @@ Create and maintain planning documents (IMPLEMENTATION_PLAN.md, WIP.md, LEARNING
 - [references/document-templates.md](references/document-templates.md) -- WIP.md and LEARNINGS.md templates, parallel mode, end-of-feature workflow
 - [references/decomposition-guide.md](references/decomposition-guide.md) -- feature breakdown examples, spike steps, anti-patterns, Claude Code agent usage
 - [references/agent-pipeline-details.md](references/agent-pipeline-details.md) -- boundary discipline, parallel execution, intra-stage parallelism, pipeline engagement tables
+- [references/coordination-details.md](references/coordination-details.md) -- pipeline worktree lifecycle, BDD/TDD execution, batched improvement procedure, context-engineer/doc-engineer parallel details, fragment files
 - [references/adr-authoring-protocols.md](references/adr-authoring-protocols.md) -- ADR file creation, index regeneration, supersession protocol
 - [phases/refactoring.md](phases/refactoring.md) -- refactoring phase integration
 - [contexts/python.md](contexts/python.md) -- Python-specific quality gates and step templates

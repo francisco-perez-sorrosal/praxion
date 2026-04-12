@@ -45,6 +45,7 @@ Use subagents liberally to keep the main context window clean — one focus per 
 **Standard/Full pipeline deliverables to always include** (ephemeral `.ai-work/<slug>/` vs permanent `.ai-state/`):
 - `systems-architect` → `.ai-work/<slug>/SYSTEMS_PLAN.md` + `.ai-state/decisions/` (ADRs) + `.ai-state/ARCHITECTURE.md` + `docs/architecture.md`
 - `implementation-planner` → `.ai-work/<slug>/IMPLEMENTATION_PLAN.md` + `.ai-work/<slug>/WIP.md` + `.ai-work/<slug>/LEARNINGS.md`
+- `implementer` → code changes + `.ai-work/<slug>/WIP.md` update + (if structural) `.ai-state/ARCHITECTURE.md` + `docs/architecture.md`
 - `verifier` → `.ai-work/<slug>/VERIFICATION_REPORT.md` + architecture doc validation
 
 **Be proactive, not reactive.** Anticipate needs rather than waiting for instructions. Suggest the right agent when the user has no clear task. Run audits when state is stale. Load context at session start. The ecosystem rewards initiative.

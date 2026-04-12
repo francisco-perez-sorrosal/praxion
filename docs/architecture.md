@@ -15,9 +15,9 @@
 | **Type** | AI development meta-framework (plugin + MCP servers + knowledge artifacts) |
 | **Language / Framework** | Python 3.13+ (MCP servers), Markdown (skills/agents/rules/commands), Shell/Python (hooks, scripts) |
 | **Architecture pattern** | Plugin-based knowledge ecosystem with progressive disclosure and agent pipeline orchestration |
-| **Last verified against code** | 2026-04-10 |
+| **Last verified against code** | 2026-04-12 |
 
-<!-- OWNER: systems-architect (creation), doc-engineer (verification) | LAST UPDATED: 2026-04-10 -->
+<!-- OWNER: systems-architect (creation), doc-engineer (verification) | LAST UPDATED: 2026-04-12 -->
 
 Praxion provides the operational infrastructure for AI-assisted software development. It is an ecosystem of reusable skills, specialized agents, declarative rules, slash commands, lifecycle hooks, and MCP servers that compose into a coherent development workflow. It ships as the `i-am` Claude Code plugin, with secondary targets for Claude Desktop and Cursor.
 
@@ -25,7 +25,7 @@ The architecture is organized around three core concerns: **knowledge delivery**
 
 ## 2. System Context
 
-<!-- OWNER: systems-architect, doc-engineer (verification) | LAST UPDATED: 2026-04-10 -->
+<!-- OWNER: systems-architect, doc-engineer (verification) | LAST UPDATED: 2026-04-12 -->
 <!-- L0 diagram: system boundary + external actors/dependencies. Only existing integrations. -->
 
 ```mermaid
@@ -66,7 +66,7 @@ graph LR
 
 ## 3. Components
 
-<!-- OWNER: implementer (as-built), doc-engineer (verification) | LAST UPDATED: 2026-04-10 -->
+<!-- OWNER: implementer (as-built), doc-engineer (verification) | LAST UPDATED: 2026-04-12 -->
 <!-- L1 diagram: major building blocks and their relationships.
      Every component listed here MUST exist on disk — verify with ls/Glob before including. -->
 
@@ -123,7 +123,7 @@ graph TD
 
 ## 4. Interfaces
 
-<!-- OWNER: implementer (as-built) | LAST UPDATED: 2026-04-10 -->
+<!-- OWNER: implementer (as-built) | LAST UPDATED: 2026-04-12 -->
 <!-- Key APIs, contracts, and integration points between components.
      Only interfaces that are implemented and callable. -->
 
@@ -141,7 +141,7 @@ graph TD
 
 ## 5. Data Flow
 
-<!-- OWNER: systems-architect | LAST UPDATED: 2026-04-10 -->
+<!-- OWNER: systems-architect | LAST UPDATED: 2026-04-12 -->
 
 ### Agent Pipeline Execution (Standard/Full Tier)
 
@@ -208,7 +208,7 @@ graph LR
 
 ## 6. Dependencies
 
-<!-- OWNER: implementer (as-built), doc-engineer (verification) | LAST UPDATED: 2026-04-10 -->
+<!-- OWNER: implementer (as-built), doc-engineer (verification) | LAST UPDATED: 2026-04-12 -->
 <!-- External dependencies verified against pyproject.toml and project config. -->
 
 | Dependency | Version | Purpose | Criticality |
@@ -226,7 +226,7 @@ graph LR
 
 ## 7. Constraints
 
-<!-- OWNER: systems-architect | LAST UPDATED: 2026-04-10 -->
+<!-- OWNER: systems-architect | LAST UPDATED: 2026-04-12 -->
 <!-- Known limitations that affect developers working in this codebase. -->
 
 | Constraint | Type | Rationale |
@@ -244,7 +244,7 @@ graph LR
 
 ## 8. Decisions
 
-<!-- OWNER: systems-architect | LAST UPDATED: 2026-04-10 -->
+<!-- OWNER: systems-architect | LAST UPDATED: 2026-04-12 -->
 <!-- Architectural decisions are recorded as ADRs in .ai-state/decisions/.
      This section provides quick cross-references to decisions that shaped the architecture.
      Never duplicate ADR rationale here — just link. -->
@@ -264,7 +264,8 @@ graph LR
 | [dec-013](../.ai-state/decisions/013-layered-duplication-prevention.md) | Layered duplication: rule + hook + verifier (no new agent) | Three enforcement layers reuse existing agents; preserves boundary discipline |
 | [dec-017](../.ai-state/decisions/017-deployment-skill-local-first-compose-center.md) | Docker Compose as deployment skill gravity center | Local-first deployment with primitives vocabulary |
 | [dec-008](../.ai-state/decisions/008-diff-mode-default-security-review.md) | Diff mode by default for security review | Changed-files-only by default; full-scan on explicit command — balances speed with coverage |
-| [dec-011](../.ai-state/decisions/011-adr-injection-memory-first-budget.md) | Memory-first budget allocation for ADR injection | ADRs injected into SubagentStart with 2,000-char soft cap; memory takes priority in token budget |
+| [dec-011](../.ai-state/decisions/011-adr-injection-memory-first-budget.md) | Memory-first budget allocation for ADR injection (SUPERSEDED by dec-023) | Original framing contradicted the shipping `hooks/inject_memory.py`; retained for audit trail |
+| [dec-023](../.ai-state/decisions/023-adr-first-hook-injection.md) | ADR-first budget allocation with memory filling remainder | SubagentStart hook prioritizes ADRs (2,000-char soft cap) then fills the remaining budget with memory |
 | [dec-014](../.ai-state/decisions/014-upstream-stewardship-skill-command-composition.md) | Skill+Command composition for upstream stewardship | Reusable skill + user-trigger command instead of dedicated agent; validates composition pattern |
 | [dec-015](../.ai-state/decisions/015-project-exploration-skill-command-composition.md) | Skill+Command composition for project exploration | Interactive exploration requires main conversation context; agent would lose interactivity |
 | [dec-016](../.ai-state/decisions/016-explore-project-naming.md) | Naming convention for project exploration components | `/explore-project` command + `project-exploration` skill; verb-first command, noun-first skill |
@@ -272,5 +273,10 @@ graph LR
 | [dec-019](../.ai-state/decisions/019-system-deployment-living-artifact.md) | Living SYSTEM_DEPLOYMENT.md in .ai-state/ | Persistent deployment doc with section ownership, staleness mitigation |
 | [dec-020](../.ai-state/decisions/020-architecture-md-living-artifact.md) | Living ARCHITECTURE.md in .ai-state/ | Persistent architecture doc maintained by pipeline agents (superseded by dec-021) |
 | [dec-021](../.ai-state/decisions/021-dual-audience-architecture-docs.md) | Dual-audience architecture documentation | Splits architecture docs into design target (.ai-state/) and navigation guide (docs/); distinct validation models |
+| [dec-022](../.ai-state/decisions/022-coordination-detail-extraction.md) | Coordination procedural content extracted to skill reference | Coordination rules slimmed; procedural detail loads on-demand from `skills/software-planning/references/coordination-details.md` |
+| [dec-024](../.ai-state/decisions/024-ci-test-pipeline.md) | CI test pipeline via GitHub Actions matrix | Single SHA-pinned workflow runs ruff + pytest across both MCP servers |
+| [dec-025](../.ai-state/decisions/025-memory-hygiene-rules.md) | Memory hygiene disposition rules (R1–R7) | Deterministic rules replace ad-hoc judgment for condense/consolidate/supersede operations |
+| [dec-027](../.ai-state/decisions/027-principles-embedding-strategy.md) | Principles embedded via compact CLAUDE.md bullet + README prose | Four durable principles cross-referenced in `CLAUDE.md`; rich narrative in `README.md#guiding-principles` |
+| [dec-028](../.ai-state/decisions/028-diagram-conventions-path-scoping.md) | Narrow `diagram-conventions.md` path scope | Reclaims budget on non-doc sessions by scoping the rule to doc-authoring surfaces only |
 
 [Add new rows as architecture-related ADRs are created.]

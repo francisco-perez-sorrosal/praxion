@@ -1,7 +1,7 @@
 ---
 id: dec-015
 title: Skill+Command composition for project exploration (no agent)
-status: proposed
+status: accepted
 category: architectural
 date: 2026-04-06
 summary: Project exploration uses Skill+Command pair for interactive developer onboarding, not an agent -- interactivity requires main conversation context

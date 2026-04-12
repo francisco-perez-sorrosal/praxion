@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-<!-- OWNER: systems-architect | LAST UPDATED: 2026-04-10 by systems-architect -->
+<!-- OWNER: systems-architect | LAST UPDATED: 2026-04-12 by systems-architect -->
 
 | Attribute | Value |
 |-----------|-------|
@@ -17,7 +17,7 @@
 | **Language / Framework** | Python 3.13+ (MCP servers), Markdown (skills/agents/rules/commands), Shell/Python (hooks, scripts) |
 | **Architecture pattern** | Plugin-based knowledge ecosystem with progressive disclosure and agent pipeline orchestration |
 | **Source stage** | Phase 3.8 creation, 2026-04-10 by systems-architect |
-| **Last verified** | 2026-04-10 by systems-architect |
+| **Last verified** | 2026-04-12 by systems-architect |
 
 Praxion is a meta-project that provides the operational infrastructure for AI-assisted software development. Rather than being an application itself, it is an ecosystem of reusable skills, specialized agents, declarative rules, slash commands, lifecycle hooks, and MCP servers that compose into a coherent development workflow. It ships as the `i-am` Claude Code plugin, with secondary targets for Claude Desktop and Cursor.
 
@@ -25,7 +25,7 @@ The architecture is organized around three core concerns: **knowledge delivery**
 
 ## 2. System Context
 
-<!-- OWNER: systems-architect | LAST UPDATED: 2026-04-10 by systems-architect -->
+<!-- OWNER: systems-architect | LAST UPDATED: 2026-04-12 by systems-architect -->
 <!-- L0 diagram: system boundary + external actors/dependencies. -->
 
 ```mermaid
@@ -67,7 +67,7 @@ graph LR
 
 ## 3. Components
 
-<!-- OWNER: systems-architect (skeleton), implementer (as-built) | LAST UPDATED: 2026-04-10 by systems-architect -->
+<!-- OWNER: systems-architect (skeleton), implementer (as-built) | LAST UPDATED: 2026-04-12 by systems-architect -->
 <!-- L1 diagram: major building blocks and their relationships.
      Status values: Designed (interface defined, not yet implemented), Built (code exists on disk),
      Planned (roadmap item, no interface yet), Deprecated (scheduled for removal). -->
@@ -125,7 +125,7 @@ graph TD
 
 ## 4. Interfaces
 
-<!-- OWNER: systems-architect (design), implementer (as-built) | LAST UPDATED: 2026-04-10 by systems-architect -->
+<!-- OWNER: systems-architect (design), implementer (as-built) | LAST UPDATED: 2026-04-12 by systems-architect -->
 <!-- Key APIs, contracts, and integration points between components. -->
 
 | Interface | Type | Provider | Consumer(s) | Contract |
@@ -142,7 +142,7 @@ graph TD
 
 ## 5. Data Flow
 
-<!-- OWNER: systems-architect | LAST UPDATED: 2026-04-10 by systems-architect -->
+<!-- OWNER: systems-architect | LAST UPDATED: 2026-04-12 by systems-architect -->
 
 ### Agent Pipeline Execution (Standard/Full Tier)
 
@@ -209,7 +209,7 @@ graph LR
 
 ## 6. Dependencies
 
-<!-- OWNER: systems-architect (initial), implementer (as-built) | LAST UPDATED: 2026-04-10 by systems-architect -->
+<!-- OWNER: systems-architect (initial), implementer (as-built) | LAST UPDATED: 2026-04-12 by systems-architect -->
 <!-- External dependencies the system relies on. -->
 
 | Dependency | Version | Purpose | Criticality |
@@ -227,7 +227,7 @@ graph LR
 
 ## 7. Constraints
 
-<!-- OWNER: systems-architect | LAST UPDATED: 2026-04-10 by systems-architect -->
+<!-- OWNER: systems-architect | LAST UPDATED: 2026-04-12 by systems-architect -->
 <!-- Known limitations, performance boundaries, quality attributes, and compatibility requirements. -->
 
 | Constraint | Type | Rationale |
@@ -245,7 +245,7 @@ graph LR
 
 ## 8. Decisions
 
-<!-- OWNER: systems-architect | LAST UPDATED: 2026-04-10 by systems-architect -->
+<!-- OWNER: systems-architect | LAST UPDATED: 2026-04-12 by systems-architect -->
 <!-- Architectural decisions are recorded as ADRs in .ai-state/decisions/.
      This section provides quick cross-references to decisions that shaped the architecture.
      Never duplicate ADR rationale here — just link. -->
@@ -265,7 +265,8 @@ graph LR
 | [dec-013](decisions/013-layered-duplication-prevention.md) | Layered duplication: rule + hook + verifier (no new agent) | Three enforcement layers reuse existing agents; preserves boundary discipline |
 | [dec-017](decisions/017-deployment-skill-local-first-compose-center.md) | Docker Compose as deployment skill gravity center | Local-first deployment with primitives vocabulary |
 | [dec-008](decisions/008-diff-mode-default-security-review.md) | Diff mode by default for security review | Changed-files-only by default; full-scan on explicit command — balances speed with coverage |
-| [dec-011](decisions/011-adr-injection-memory-first-budget.md) | Memory-first budget allocation for ADR injection | ADRs injected into SubagentStart with 2,000-char soft cap; memory takes priority in token budget |
+| [dec-011](decisions/011-adr-injection-memory-first-budget.md) | Memory-first budget allocation for ADR injection (SUPERSEDED by dec-023) | Original framing contradicted implementation; retained for audit trail |
+| [dec-023](decisions/023-adr-first-hook-injection.md) | ADR-first budget allocation with memory filling remainder | SubagentStart hook prioritizes ADRs (2,000-char soft cap) then fills remainder with memory; corrects dec-011's framing |
 | [dec-014](decisions/014-upstream-stewardship-skill-command-composition.md) | Skill+Command composition for upstream stewardship | Reusable skill + user-trigger command instead of dedicated agent; validates composition pattern |
 | [dec-015](decisions/015-project-exploration-skill-command-composition.md) | Skill+Command composition for project exploration | Interactive exploration requires main conversation context; agent would lose interactivity |
 | [dec-016](decisions/016-explore-project-naming.md) | Naming convention for project exploration components | `/explore-project` command + `project-exploration` skill; verb-first command, noun-first skill |
@@ -273,5 +274,10 @@ graph LR
 | [dec-019](decisions/019-system-deployment-living-artifact.md) | Living SYSTEM_DEPLOYMENT.md in .ai-state/ | Persistent deployment doc with section ownership, staleness mitigation (not yet instantiated for Praxion) |
 | [dec-020](decisions/020-architecture-md-living-artifact.md) | Living ARCHITECTURE.md in .ai-state/ | This document — persistent architecture doc maintained by pipeline agents (superseded by dec-021) |
 | [dec-021](decisions/021-dual-audience-architecture-docs.md) | Dual-audience architecture documentation | Splits architecture docs into design target (.ai-state/) and navigation guide (docs/); distinct validation models |
+| [dec-022](decisions/022-coordination-detail-extraction.md) | Coordination procedural content extracted to on-demand skill reference | Phase 1.1 token reclaim: coordination rules slimmed with summary-plus-pointer stubs; procedural detail in `skills/software-planning/references/coordination-details.md` |
+| [dec-024](decisions/024-ci-test-pipeline.md) | CI test pipeline via GitHub Actions matrix over MCP servers | Single SHA-pinned workflow with `matrix.project=[memory-mcp, task-chronograph-mcp]` runs ruff + pytest per cell |
+| [dec-025](decisions/025-memory-hygiene-rules.md) | Memory hygiene disposition rules (R1–R7) | Seven deterministic rules govern condense/consolidate/supersede operations; replaces ad-hoc judgment |
+| [dec-027](decisions/027-principles-embedding-strategy.md) | Praxion-specific principles embedded via compact bullet + README prose | Four durable principles in `CLAUDE.md` (~320 chars) with anchor-target README section; anchored by dec-028 budget lever |
+| [dec-028](decisions/028-diagram-conventions-path-scoping.md) | Narrow `rules/writing/diagram-conventions.md` path-scope from `**/*.md` to doc-authoring surfaces | Reclaims ~2,584 chars on non-doc sessions; enables principles embedding without budget violation |
 
 [Add new rows as architecture-related ADRs are created.]

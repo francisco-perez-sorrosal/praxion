@@ -1,7 +1,7 @@
 ---
 id: dec-019
 title: Living SYSTEM_DEPLOYMENT.md artifact in .ai-state/
-status: proposed
+status: accepted
 category: architectural
 date: 2026-04-06
 summary: Persistent deployment architecture document maintained by pipeline agents via section ownership, stored in .ai-state/
@@ -78,3 +78,5 @@ This introduces a new `.ai-state/` pattern: a living document (versus the existi
 - A new `.ai-state/` pattern (living document) is introduced -- requires learning
 - Staleness risk exists despite triple defense (implementer + verifier + sentinel)
 - Sentinel definition grows closer to the 500-line threshold (459 → ~465)
+
+**Praxion instance deferred:** For Praxion itself, the `.ai-state/SYSTEM_DEPLOYMENT.md` instance is deferred — this repo is an ecosystem library of skills/agents/rules, not a deployable service. The mechanism (template, references, agent definitions) is shipped and ready for downstream projects that are deployables.

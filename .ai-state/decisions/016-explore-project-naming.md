@@ -1,7 +1,7 @@
 ---
 id: dec-016
 title: Naming convention for project exploration components
-status: proposed
+status: accepted
 category: architectural
 date: 2026-04-06
 summary: Command named /explore-project, skill named project-exploration -- differentiates from existing /onboard-project, follows verb-first convention

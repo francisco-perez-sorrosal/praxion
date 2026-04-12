@@ -1,7 +1,7 @@
 ---
 id: dec-010
 title: Zero-LLM observation capture via pattern extraction
-status: proposed
+status: accepted
 category: architectural
 date: 2026-04-03
 summary: Observations captured via regex/pattern matching on tool payloads, not LLM compression -- zero cost per event, LLM intelligence reserved for session narratives

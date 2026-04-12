@@ -1,7 +1,8 @@
 ---
 id: dec-011
 title: Memory-first budget allocation with ADR soft cap for hook injection
-status: proposed
+status: superseded
+superseded_by: dec-023
 category: architectural
 date: 2026-04-04
 summary: ADR context injected into SubagentStart hook using memory-first budget allocation with a 2,000-char soft cap for ADRs

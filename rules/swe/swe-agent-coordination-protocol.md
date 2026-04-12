@@ -23,6 +23,8 @@ Assess the task before starting work. Each tier prescribes what to do — higher
 
 ### Pipeline Isolation
 
+<!-- Anchor preserved for cross-rule links; do not remove -->
+
 Standard and Full tier pipelines **must** operate in a dedicated worktree to prevent collisions when multiple pipelines run concurrently on the same repository.
 
 **Isolation by tier:**
@@ -32,20 +34,7 @@ Standard and Full tier pipelines **must** operate in a dedicated worktree to pre
 | Direct, Lightweight, Spike | None — work in the current checkout |
 | Standard, Full | Worktree — main agent calls `EnterWorktree` before spawning any agent |
 
-**At pipeline start** (immediately after tier selection and task slug generation):
-
-1. Call `EnterWorktree` with `name: "<task-slug>"` — creates a worktree and switches the session into it
-2. All subsequent work (`.ai-work/`, `.ai-state/`, code changes) happens inside the worktree
-3. All subagents (researcher, architect, planner, implementer, test-engineer, doc-engineer) work directly in this worktree — do **NOT** use `isolation: "worktree"` on the Agent tool. Parallel document safety is handled by fragment files (see [agent-intermediate-documents](agent-intermediate-documents.md#parallel-execution))
-
-**At pipeline end:**
-
-1. Verify all `.ai-state/` artifacts (ADRs, specs, calibration log) are committed — no untracked stragglers
-2. Commit all remaining changes in the worktree branch
-3. Call `ExitWorktree` with `action: "keep"` — preserves the branch for user review and merge
-4. Report branch name + `.ai-state/` artifact summary + merge notes to the user
-
-See [agent-pipeline-details.md](../../skills/software-planning/references/agent-pipeline-details.md#pipeline-worktree-lifecycle) for the full lifecycle, merge procedure, and multi-instance guidance.
+See [coordination-details.md#pipeline-worktree-lifecycle](../../skills/software-planning/references/coordination-details.md#pipeline-worktree-lifecycle) for the full entry, during-execution, and exit procedures, plus multi-instance guidance.
 
 ### Available Agents
 
@@ -109,7 +98,7 @@ Spawn agents without waiting for the user to ask:
 
 **Multiplicity check:** Before spawning any Bg Safe agent, check whether the work decomposes into N independent targets with disjoint file sets. If so, spawn N instances (up to 2-3 concurrent) rather than one sequential agent. Each instance receives the same task slug — they share a task-scoped directory and use fragment files to avoid collisions (see [agent-intermediate-documents](agent-intermediate-documents.md)).
 
-**Task slug propagation:** At pipeline start, the main agent generates a kebab-case task slug (2–4 words) derived from the task description. For Standard/Full tiers, the slug also names the worktree (see [Pipeline Isolation](#pipeline-isolation)). Every subagent prompt must include `Task slug: <slug>`. All `.ai-work/` reads and writes use `.ai-work/<task-slug>/`. The slug never changes mid-pipeline. See the [task slug convention](agent-intermediate-documents.md#task-slug-convention) for naming guidelines.
+**Task slug propagation:** At pipeline start, the main agent generates a kebab-case task slug (2–4 words) derived from the task description; every subagent prompt must include `Task slug: <slug>`, and all `.ai-work/` reads and writes use `.ai-work/<task-slug>/`. See [coordination-details.md#task-slug-propagation](../../skills/software-planning/references/coordination-details.md#task-slug-propagation) for the full propagation contract; see the [task slug convention](agent-intermediate-documents.md#task-slug-convention) for naming guidelines.
 
 ### Coordination Pipeline
 
@@ -128,16 +117,12 @@ promethean --> researcher ---------> systems-architect --> implementation-planne
 **Pipeline rules:**
 
 - **Do not skip stages.** Research before architecture (unless codebase context suffices). Re-invoke upstream agents when downstream input is incomplete.
-- **BDD/TDD execution.** The planner produces paired implementation and test steps. Test-engineers design behavioral tests from the systems plan's acceptance criteria. Implementers and test-engineers execute concurrently on disjoint file sets. After both complete, tests are run against the implementation. Failing tests trigger a fix cycle until all tests pass — including pre-existing tests broken by the change (boy scout rule).
-- **Batched improvement execution.** When a list of improvements is presented (from sentinel reports, code reviews, analysis, or user requests), the main agent must evaluate their independence and execute with maximum parallelism:
-  1. **Classify** each improvement's file set — identify which improvements touch disjoint files and can run concurrently vs. which overlap and must be sequenced.
-  2. **Pair-spawn** an `implementer` + `test-engineer` for each independent improvement, launching as many pairs concurrently as the concurrency limit allows (2-3 pairs). Each pair follows the standard BDD/TDD cycle: implementer writes production code, test-engineer writes tests, run the new tests until green.
-  3. **Sequence** dependent improvements — when two improvements touch overlapping files, the second pair waits for the first to complete.
-  4. **Full suite gate** — after all improvement pairs have completed and their individual tests pass, run the full project test suite once. Fix any regressions before considering the batch done.
-- **Context-engineer shadowing.** When work involves context artifacts, the context-engineer runs in parallel with the researcher (research-stage shadow) and/or systems-architect (architecture-stage shadow), appending stage-delimited sections to a cumulative `CONTEXT_REVIEW.md`. The architect reads the research-stage section; the planner reads both. Shadowing is conditional — it activates only when the task creates, modifies, or restructures context artifacts. For pure application code, no shadowing occurs.
-- **Context-engineer scope.** Small-scope context work (single artifact) --> context-engineer directly at any pipeline stage. Large-scope (3+ artifacts) --> full pipeline. Also operates independently for standalone audits.
+- **BDD/TDD execution.** Planner produces paired implementation and test steps; both execute concurrently on disjoint file sets, tests run until green. See [coordination-details.md#bdd-tdd-execution](../../skills/software-planning/references/coordination-details.md#bdd-tdd-execution).
+- **Batched improvement execution.** When a list of improvements is presented, evaluate independence and execute with maximum parallelism. See [coordination-details.md#batched-improvement-execution](../../skills/software-planning/references/coordination-details.md#batched-improvement-execution) for the Classify/Pair-spawn/Sequence/Full-suite-gate procedure.
+- **Context-engineer shadowing.** When work involves context artifacts, context-engineer runs in parallel with researcher and/or systems-architect, appending to a cumulative `CONTEXT_REVIEW.md`; conditional — pure application code does not trigger it. See [coordination-details.md#context-engineer-shadowing](../../skills/software-planning/references/coordination-details.md#context-engineer-shadowing).
+- **Context-engineer scope.** Small-scope (single artifact) --> context-engineer directly at any stage. Large-scope (3+ artifacts) --> full pipeline. Also operates for standalone audits.
 - **Sentinel** is independent. Reports (`SENTINEL_REPORT_*.md`) are public -- any agent or user can consume them.
-- **Doc-engineer parallel execution.** When the planner assigns a doc step to a parallel group, the doc-engineer runs concurrently with the implementer and test-engineer on disjoint file sets (documentation files vs production code vs test code). A parallel group can have up to three concurrent agents. Doc steps are assigned only when a group adds/removes/renames files, introduces new APIs, or changes module structure — not 1:1 with every implementation step. The doc-engineer also continues to run at pipeline checkpoints (after planning, after implementation, after refactoring) as before.
+- **Doc-engineer parallel execution.** When planner assigns a doc step to a parallel group, doc-engineer runs concurrently with implementer and test-engineer on disjoint file sets; also runs at pipeline checkpoints. See [coordination-details.md#doc-engineer-parallel-execution](../../skills/software-planning/references/coordination-details.md#doc-engineer-parallel-execution).
 
 ### Agent Selection Criteria
 

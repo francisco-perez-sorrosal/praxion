@@ -111,16 +111,12 @@ Agents that update `.ai-state/`: promethean (idea ledger), sentinel (report, log
 
 ### Parallel Execution
 
-When agents run concurrently within a pipeline (e.g., implementer + test-engineer on paired steps), each concurrent agent writes to a scoped fragment file instead of the canonical document. All fragments live in the same task-scoped directory as the canonical:
+<!-- Anchor preserved for cross-rule links; do not remove -->
 
-| Canonical | Fragment Pattern | Example (in `.ai-work/auth-flow/`) |
-|-----------|-----------------|---------|
-| `WIP.md` | `WIP_<agent-type>.md` | `WIP_implementer.md`, `WIP_test-engineer.md`, `WIP_doc-engineer.md` |
-| `LEARNINGS.md` | `LEARNINGS_<agent-type>.md` | `LEARNINGS_implementer.md`, `LEARNINGS_doc-engineer.md` |
-| `PROGRESS.md` | `PROGRESS_<agent-type>.md` | `PROGRESS_implementer.md`, `PROGRESS_doc-engineer.md` |
+When agents run concurrently within a pipeline, each concurrent agent writes to a scoped fragment file instead of the canonical document. The supervising agent (implementation-planner or main agent) merges fragments into canonical documents after all concurrent agents complete.
 
-Agent types use the names from the [coordination protocol](swe-agent-coordination-protocol.md): `implementer`, `test-engineer`, `doc-engineer`, `cicd-engineer`, etc. Single-writer documents (`SYSTEMS_PLAN.md`, `IMPLEMENTATION_PLAN.md`, `CONTEXT_REVIEW.md`, etc.) are unaffected — they live directly in `.ai-work/<task-slug>/`.
+`CONTEXT_REVIEW.md` is cumulative and single-writer (context-engineer only) — not subject to fragment patterns.
 
-`CONTEXT_REVIEW.md` is cumulative and single-writer (context-engineer only). Each pipeline stage appends a new `## [Stage] Stage Review` section — the document grows as the pipeline progresses. Not subject to fragment patterns.
+See [coordination-details.md#parallel-execution-fragments](../../skills/software-planning/references/coordination-details.md#parallel-execution-fragments) for the full fragment naming pattern and reconciliation protocol.
 
-The supervising agent (implementation-planner or main agent) merges fragment files into canonical documents within the same task-scoped directory after concurrent agents complete. See the software-planning skill's [agent-pipeline-details.md](../../skills/software-planning/references/agent-pipeline-details.md) for the full semantic reconciliation protocols.
+See the software-planning skill's [agent-pipeline-details.md](../../skills/software-planning/references/agent-pipeline-details.md) for the full semantic reconciliation protocols.

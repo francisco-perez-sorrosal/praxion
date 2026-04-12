@@ -16,6 +16,7 @@ rules/
 │   └── vcs/
 │       └── git-conventions.md
 ├── writing/
+│   ├── diagram-conventions.md
 │   └── readme-style.md
 └── README.md
 ```
@@ -29,6 +30,7 @@ rules/
 | `swe/vcs/git-conventions.md` | Commit scope, staging discipline, secrets, exclusions, message format |
 | `swe/memory-protocol.md` | When and how to use the memory MCP — `remember()` triggers, tag vocabulary, conflict resolution between memory systems |
 | `swe/testing-conventions.md` | Test file placement, naming, coverage expectations, and test isolation. Path-scoped: loads only when accessing `tests/**` |
+| `writing/diagram-conventions.md` | Mermaid syntax, layered decomposition (L0/L1/L2), diagram type selection. Path-scoped: loads only when accessing documentation-authoring surfaces (`docs/`, architecture docs, `.ai-state/`) |
 | `writing/readme-style.md` | Precision-first technical writing and structural integrity conventions for README.md files. Path-scoped: loads only when accessing `**/README.md` or `**/README_DEV.md` |
 
 ## How Rules Work
@@ -212,6 +214,7 @@ rules/swe/coding-style.md                     →  ~/.claude/rules/swe/coding-st
 rules/swe/adr-conventions.md                  →  ~/.claude/rules/swe/adr-conventions.md
 rules/swe/swe-agent-coordination-protocol.md  →  ~/.claude/rules/swe/swe-agent-coordination-protocol.md
 rules/swe/vcs/git-conventions.md              →  ~/.claude/rules/swe/vcs/git-conventions.md
+rules/writing/diagram-conventions.md          →  ~/.claude/rules/writing/diagram-conventions.md
 rules/writing/readme-style.md                 →  ~/.claude/rules/writing/readme-style.md
 ```
 

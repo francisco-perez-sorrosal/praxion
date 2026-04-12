@@ -35,6 +35,28 @@ The ecosystem has five building blocks that layer from always-on background know
 
 For a full explanation of how these compose -- including the layered architecture, rules-vs-skills decision model, and agent pipeline flow -- see [Core Concepts](docs/concepts.md).
 
+## Guiding Principles
+
+Four durable principles shape how Praxion evolves, extending the global philosophy in `~/.claude/CLAUDE.md`.
+
+### Token budget is a first-class constraint
+
+Every artifact added must justify its token cost; every artifact removed is a gift to every project that consumes Praxion. Always-loaded content (CLAUDE.md files + unscoped rules) ships into the first 15,000 tokens of every session — `paths:` scoping and progressive-disclosure skills keep that ceiling inviolate.
+
+### Measure before optimizing
+
+Don't guess what improves output quality — measure it. The eval framework (ROADMAP Phase 3), sentinel audits, and the memory MCP observation store turn intuition-driven tuning into evidence-driven design.
+
+### Standards convergence is an opportunity
+
+MCP, AGENTS.md, and A2A under the Linux Foundation's AAIF let Praxion's patterns reach beyond any single assistant. Cross-tool portability to Cursor, Claude Desktop, and the next wave of agentic tooling is intentional.
+
+### Curiosity over dogma
+
+Agent Teams, HTTP hooks, MCP Gateways, and other emerging patterns may reshape assumptions. Keep the architecture open — track known limitations in [`CLAUDE.md`](CLAUDE.md#known-claude-code-limitations) and revisit when fixes ship.
+
+For phase-by-phase execution guidance, see [ROADMAP §Guiding Principles for Execution](ROADMAP.md#guiding-principles-for-execution).
+
 ## Quick Start
 
 ```bash

@@ -1,6 +1,15 @@
 ---
 paths:
-  - "**/*.md"
+  - "docs/**"
+  - "README.md"
+  - "**/README.md"
+  - "**/ARCHITECTURE.md"
+  - "**/SYSTEM_DEPLOYMENT.md"
+  - ".ai-state/**"
+  - "**/IDEA_PROPOSAL.md"
+  - "**/RESEARCH_FINDINGS.md"
+  - "**/SYSTEMS_PLAN.md"
+  - "**/IMPLEMENTATION_PLAN.md"
 ---
 
 ## Diagram Conventions

@@ -25,6 +25,10 @@ If `memories.assistant.name` is missing, pick a random name and store it immedia
 - **Assistant-specific config in subdirectories**: `claude/config/` for Claude, `cursor/config/` for Cursor
 - **Progressive disclosure**: Skills load metadata at startup, full content on activation, reference files on demand — keeping token cost minimal
 
+## Guiding Principles (Praxion-specific)
+
+Extends `~/.claude/CLAUDE.md`. Four principles: **token budget first-class**, **measure before optimize**, **standards convergence as opportunity**, **curiosity over dogma**. Rationale: `README.md#guiding-principles` and `ROADMAP.md#guiding-principles-for-execution`.
+
 ## Known Claude Code Limitations
 
 Tracked here so they can be revisited when Claude Code releases fixes:

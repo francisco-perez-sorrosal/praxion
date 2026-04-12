@@ -99,20 +99,52 @@ One evaluation type (ToolSelection), no tests, stale API patterns, no scheduled 
 
 These fixes address structural debts that block everything else. Do them first.
 
-#### 1.1 Reclaim Token Budget (~2,500 tokens)
+#### 1.1 Reclaim Token Budget — Phase 1A ✅ DONE (2026-04-11)
 
-**Problem**: 96.8% budget utilization, zero growth headroom.
+**Status**: Phase 1A complete. Phase 1B deferred (see notes below).
 
-**Action**: Refactor `swe-agent-coordination-protocol.md` from a 14,612-char always-loaded rule into:
-- A ~3,000-char **constraint summary** (rule) covering: tier table, pipeline order, boundary discipline principles, delegation checklist pointers
-- A `software-planning/references/coordination-details.md` **reference file** (skill) containing: parallel execution details, fragment reconciliation, worktree lifecycle, batched improvement execution, context-engineer shadowing, BDD/TDD execution details
+**Phase 1A — Safe-first extraction (shipped)**
 
-Also extract `agent-intermediate-documents.md` parallel execution section (~500 tokens) to the same reference file. Consolidate the two rules' overlapping content.
+Completed via full Standard-tier pipeline with context-engineer shadowing both architect and planner stages. ADR: `dec-022`.
 
-**Expected recovery**: ~2,500-3,000 tokens (~17-20% of budget). This is transformative headroom.
+**What was done:**
+- Created new on-demand reference file `skills/software-planning/references/coordination-details.md` (13,755 chars) with 7 anchor sections: Pipeline Worktree Lifecycle (link-out to `agent-pipeline-details.md` per D-01 anti-duplication), Task Slug Propagation, BDD/TDD Execution, Batched Improvement Execution, Context-Engineer Shadowing, Doc-Engineer Parallel Execution, Parallel Execution Fragment Files
+- Slimmed `rules/swe/swe-agent-coordination-protocol.md` (14,612 → 12,577 chars, −13.9%) with summary-plus-pointer stubs; preserved `#process-calibration` and `#pipeline-isolation` anchors via stub sections with `<!-- Anchor preserved -->` HTML comments
+- Slimmed `rules/swe/agent-intermediate-documents.md` (9,699 → 8,946 chars, −7.8%); preserved `#parallel-execution` and `#task-slug-convention` anchors
+- Registered new reference in `skills/software-planning/SKILL.md` satellite list; synced `skills/software-planning/README.md` Skill Contents table
+- Closed `claude/config/CLAUDE.md` implementer-deliverables gap (symmetric 4-agent block)
 
-**Dependencies**: None.
-**Risk**: Agents must still find the content. Verify that agent system prompts that reference coordination details include the software-planning skill.
+**What was kept always-loaded (decision-driving content — NOT extracted):**
+- Process Calibration tier table (every task starts here)
+- Available Agents inventory (agent awareness)
+- Delegation Checklists (per-agent "always include in prompt" bullets — see Phase 1B)
+- Proactive Agent Usage triggers (drives proactive spawning)
+- Pipeline diagram + core principles ("Do not skip stages", "Sentinel is independent")
+- Agent Selection Criteria, Delegation Depth, Background Agents
+
+**Results:**
+- Always-loaded budget: 57,444 chars → 52,130 chars (−5,314 chars / ~1,500 tokens reclaimed)
+- Budget utilization: 109.4%/95.7% → **99.3% conservative / 86.9% optimistic** (under 15,000-token ceiling at both chars/token ratios)
+- 10/10 acceptance criteria PASS, verifier PASS WITH FINDINGS (1 WARN remediated in same pipeline)
+- All 11 anchors (4 preserved + 7 new) resolve; zero broken agent-prompt references; both slimmed rules coherent standalone
+
+**Phase 1B — Bold extraction (deferred, possibly later)**
+
+Rationale: the safe-first Phase 1A delivered clean structural reclamation (~1,500 tokens) and validated that progressive disclosure works for pipeline coordination. Delegation checklists were explicitly kept always-loaded in Phase 1A (D-02 decision) because they drive every delegation prompt and redundancy is cheap at that frequency.
+
+If Phase 1A proves insufficient (sentinel T02 warns in real use, or more growth headroom is needed), Phase 1B candidates:
+
+1. **Extract Delegation Checklists** (~500 tokens savings). Would move the per-agent "always include in prompt" bullets from the coordination protocol rule to `coordination-details.md`, leaving a pointer. Mitigation already in place: `claude/config/CLAUDE.md` now has condensed deliverables for all 4 pipeline agents (implementer added in Phase 1A), so the main agent retains always-loaded access to the essential deliverables list without the per-agent detail. Risk: medium — the detailed checklists carry conditional deliverables (deployment doc, architecture doc) that the condensed list omits.
+
+2. **Path-scope `coding-style.md`** (~1,900 tokens savings). Currently always-loaded (~6,730 chars). Adding `paths:` frontmatter scoped to code file globs would exclude it from non-code sessions (planning, review, documentation). Risk: low — coding-style is already discoverable via file triggers and most sessions that need it edit code anyway.
+
+Combined Phase 1B recovery estimate: ~2,400 additional tokens, bringing budget to ~75-78% utilization (comfortable runway for ecosystem growth).
+
+**Dependencies for Phase 1B**: Phase 1A validation — observe sentinel T02 trend and main-agent orchestration quality for a few sessions before deciding.
+
+**Follow-up from Phase 1A (low priority, not blocking):**
+- Sentinel T02 command scope mismatch (`agents/sentinel.md:281`) — includes scoped `testing-conventions.md`, excludes `claude/config/CLAUDE.md` and scoped writing rules. Align sentinel T02 measurements with actual always-loaded scope.
+- Plan-arithmetic lesson learned: "under N chars" done-when targets should be computed against the "Keep unchanged" directives' total size, not set independently. Documented in LEARNINGS for future planners.
 
 #### 1.2 Add CI Test Pipeline
 

@@ -127,6 +127,30 @@ class ObservationStore:
         """Count total observations in the file."""
         return len(self._read_all())
 
+    def count_sessions(self) -> int:
+        """Count distinct session_id values across all observations.
+
+        Streams the JSONL file; missing file or empty file returns 0.
+        Malformed lines are skipped. O(N) over the active file only
+        (rotation is not walked).
+        """
+        if not self._path.exists():
+            return 0
+        seen: set[str] = set()
+        with self._path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obs = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                sid = obs.get("session_id")
+                if sid:
+                    seen.add(sid)
+        return len(seen)
+
     def file_size(self) -> int:
         """Return file size in bytes, or 0 if the file does not exist."""
         if not self._path.exists():

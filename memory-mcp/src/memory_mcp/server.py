@@ -518,6 +518,15 @@ def metrics() -> dict:
         store = _get_store()
         data = store._load()  # noqa: SLF001
         obs_store = _get_observation_store()
+        # Derive session count from observations rather than the stale
+        # memory.json `session_count` header (see dec-026). The in-file
+        # counter only increments in tests; observations are captured by
+        # hooks on every real session. Fall back to the stored value if
+        # the observation store cannot be read.
+        try:
+            data["session_count"] = obs_store.count_sessions()
+        except Exception:
+            data.setdefault("session_count", 0)
         return compute_metrics(data, obs_store)
     except Exception as exc:
         return {"error": f"Unexpected error: {exc}"}
@@ -574,10 +583,17 @@ def stats_resource() -> str:
     try:
         store = _get_store()
         store_status = store.status()
+        # Derive session count from observations rather than the stale
+        # memory.json header (see dec-026). Fall back to the stored value
+        # if the observation store cannot be read.
+        try:
+            session_count = _get_observation_store().count_sessions()
+        except Exception:
+            session_count = store_status["session_count"]
         stats = {
             "categories": store_status["categories"],
             "total": store_status["total"],
-            "session_count": store_status["session_count"],
+            "session_count": session_count,
             "schema_version": store_status["schema_version"],
             "file_size": store_status["file_size"],
         }

@@ -9,7 +9,7 @@ Persistent memory management via MCP (Model Context Protocol) server with dual-l
 - Tests: `tests/` — 329 tests across 13 files, run with `uv run pytest`
 - Lint/format: `uv run ruff check --fix` and `uv run ruff format`
 - Storage: JSON file at path specified by `MEMORY_FILE` env var (default: `.ai-state/memory.json`); JSONL at `OBSERVATIONS_FILE` (default: `.ai-state/observations.jsonl`)
-- Schema: v2.0 (fresh start, no migration code from earlier versions)
+- Schema: v2.0 (auto-migration from v1.x implemented in `store.py::_auto_migrate_if_needed`; runs on every constructor open)
 
 ## Module Layout
 
@@ -33,7 +33,7 @@ Persistent memory management via MCP (Model Context Protocol) server with dual-l
 Registered in `.claude-plugin/plugin.json` under `mcpServers.memory`. Runs via `uv run --project` with `MEMORY_FILE` pointing to `.ai-state/memory.json`.
 
 Six hooks integrate with Claude Code's event system:
-- `inject_memory.py` (SubagentStart) — injects memory context (Markdown-KV with importance tiers, agent-type routing) and ADR decision context (from `DECISIONS_INDEX.md`, filtered to accepted/proposed, with soft cap budget). Memory-first budget allocation within MAX_INJECT_CHARS
+- `inject_memory.py` (SubagentStart) — injects memory context (Markdown-KV with importance tiers, agent-type routing) and ADR decision context (from `DECISIONS_INDEX.md`, filtered to accepted/proposed, with soft cap budget). ADR-first budget allocation within MAX_INJECT_CHARS (ADRs consume up to a 2,000-char soft cap first; memory fills the remainder — see dec-023)
 - `validate_memory.py` (SubagentStop) — warns parent when agents write LEARNINGS.md without calling remember()
 - `capture_memory.py` (PostToolUse) — captures tool events as JSONL observations
 - `capture_session.py` (SessionStart, Stop, SubagentStart, SubagentStop) — captures lifecycle events as JSONL observations

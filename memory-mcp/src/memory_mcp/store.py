@@ -85,7 +85,8 @@ class MemoryStore:
     """Persistent memory store backed by a single JSON file.
 
     Provides CRUD operations, access tracking, atomic writes, and link management.
-    Requires schema v2.0 -- no migration from older versions.
+    Requires schema v2.0 -- migration from v1.x schemas runs automatically on load
+    (see ``_auto_migrate_if_needed``).
     """
 
     def __init__(self, file_path: Path) -> None:

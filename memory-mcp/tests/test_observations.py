@@ -381,3 +381,105 @@ class TestConcurrentAppends:
         assert len(lines) == expected_total
         for line in lines:
             json.loads(line)  # Should not raise
+
+
+# -- Count sessions -----------------------------------------------------------
+
+
+class TestCountSessions:
+    """Tests for ObservationStore.count_sessions() — AC 1.4.d.
+
+    Contract (from SYSTEMS_PLAN §Interfaces / count_sessions):
+      - Reads the observations.jsonl path configured on the store.
+      - Returns 0 when the file is missing or empty.
+      - Counts distinct session_id values across ALL records (not only
+        session_start events). Every observation carries session_id via
+        capture hooks.
+      - Records without a session_id field are skipped.
+      - Malformed JSONL lines are skipped; valid records still counted.
+      - Blank / whitespace-only lines are skipped.
+    """
+
+    def test_count_sessions_missing_file(self, tmp_path: Path):
+        """Returns 0 when the underlying file has never been created."""
+        store = ObservationStore(tmp_path / "never-created.jsonl")
+        assert store.count_sessions() == 0
+
+    def test_count_sessions_empty_file(self, obs_file: Path, store: ObservationStore):
+        """Returns 0 when the file exists but has no content."""
+        obs_file.touch()
+        assert obs_file.exists()
+        assert obs_file.stat().st_size == 0
+        assert store.count_sessions() == 0
+
+    def test_count_sessions_three_distinct(self, store: ObservationStore):
+        """Ten records across three distinct session_ids → returns 3."""
+        session_ids = ["sess-a", "sess-b", "sess-c"]
+        # 10 records distributed across 3 sessions (4+3+3)
+        distribution = ["sess-a"] * 4 + ["sess-b"] * 3 + ["sess-c"] * 3
+        for i, sid in enumerate(distribution):
+            store.append(
+                _make_observation(
+                    session_id=sid,
+                    timestamp=f"2026-01-15T10:{i:02d}:00Z",
+                )
+            )
+
+        assert store.count_sessions() == len(set(session_ids))
+
+    def test_count_sessions_duplicates_collapsed(self, store: ObservationStore):
+        """Twenty records sharing 2 session_ids collapse to count of 2."""
+        for i in range(20):
+            store.append(
+                _make_observation(
+                    session_id="sess-x" if i % 2 == 0 else "sess-y",
+                    timestamp=f"2026-01-15T11:{i:02d}:00Z",
+                )
+            )
+
+        assert store.count_sessions() == 2
+
+    def test_count_sessions_skips_missing_id(self, obs_file: Path, store: ObservationStore):
+        """Records without a session_id field do not contribute to the count."""
+        # Two valid records with session_ids
+        store.append(_make_observation(session_id="sess-present"))
+        store.append(_make_observation(session_id="sess-also-present"))
+
+        # Direct writes of records missing session_id (bypassing append's schema)
+        with obs_file.open("a", encoding="utf-8") as f:
+            f.write(json.dumps({"timestamp": "2026-01-15T12:00:00Z", "event_type": "x"}) + "\n")
+            f.write(json.dumps({"timestamp": "2026-01-15T12:01:00Z", "session_id": None}) + "\n")
+            f.write(json.dumps({"timestamp": "2026-01-15T12:02:00Z", "session_id": ""}) + "\n")
+
+        # Only the two valid session_ids should be counted
+        assert store.count_sessions() == 2
+
+    def test_count_sessions_skips_malformed(self, obs_file: Path, store: ObservationStore):
+        """Malformed JSONL lines are skipped; valid records still counted."""
+        store.append(_make_observation(session_id="sess-valid-1"))
+
+        # Inject unparseable lines between valid records
+        with obs_file.open("a", encoding="utf-8") as f:
+            f.write("this is not json\n")
+            f.write("{incomplete json\n")
+            f.write("}not-json-either\n")
+
+        store.append(_make_observation(session_id="sess-valid-2"))
+        store.append(_make_observation(session_id="sess-valid-1"))  # duplicate
+
+        # Two distinct valid session_ids survive despite malformed noise
+        assert store.count_sessions() == 2
+
+    def test_count_sessions_whitespace_tolerated(self, obs_file: Path, store: ObservationStore):
+        """Blank lines and whitespace-only lines are skipped."""
+        store.append(_make_observation(session_id="sess-alpha"))
+
+        with obs_file.open("a", encoding="utf-8") as f:
+            f.write("\n")
+            f.write("   \n")
+            f.write("\t\n")
+            f.write("\n\n")
+
+        store.append(_make_observation(session_id="sess-beta"))
+
+        assert store.count_sessions() == 2

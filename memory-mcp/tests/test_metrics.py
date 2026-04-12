@@ -449,3 +449,117 @@ class TestFmtDuration:
 
     def test_none(self):
         assert _fmt_duration(None) == "?"
+
+
+# -- Session-count derivation (dec-026) ---------------------------------------
+
+
+class TestMetricsSessionCountDerivation:
+    """`metrics()` derives session_count from the observation store.
+
+    Per dec-026, the stale `session_count` header in memory.json is
+    replaced by an on-demand scan of observations.jsonl. These tests
+    exercise the `metrics()` MCP tool end-to-end by pointing the server
+    at isolated tmp files.
+    """
+
+    @staticmethod
+    def _reset_server_singletons(server_module):
+        """Clear lazy-init singletons so env-var overrides take effect."""
+        server_module._store = None  # noqa: SLF001
+        server_module._obs_store = None  # noqa: SLF001
+
+    @staticmethod
+    def _write_memory_file(path, session_count_header: int) -> None:
+        """Write a minimal v2.0 memory.json with the given stale header."""
+        path.write_text(
+            json.dumps(
+                {
+                    "schema_version": "2.0",
+                    "session_count": session_count_header,
+                    "memories": {
+                        "learnings": {},
+                        "project": {},
+                        "user": {},
+                        "assistant": {},
+                        "relationships": {},
+                        "tools": {},
+                    },
+                }
+            )
+        )
+
+    @staticmethod
+    def _write_observations(path, session_ids):
+        """Write one observation per session_id to a JSONL file."""
+        with path.open("w") as f:
+            for i, sid in enumerate(session_ids):
+                f.write(
+                    json.dumps(
+                        {
+                            "timestamp": f"2026-04-10T10:0{i}:00Z",
+                            "session_id": sid,
+                            "agent_type": "main",
+                            "event_type": "session_start",
+                            "tool_name": None,
+                            "classification": None,
+                        }
+                    )
+                    + "\n"
+                )
+
+    def test_metrics_session_count_derived_from_observations(self, tmp_path, monkeypatch):
+        """`metrics()` returns the count of distinct session_ids, not the header."""
+        from memory_mcp import server
+
+        mem_file = tmp_path / "memory.json"
+        obs_file = tmp_path / "observations.jsonl"
+        # The stale in-file header says 999; the observation stream has 3
+        # distinct sessions. The tool must return 3.
+        self._write_memory_file(mem_file, session_count_header=999)
+        self._write_observations(obs_file, ["sess-a", "sess-b", "sess-c"])
+
+        monkeypatch.setenv("MEMORY_FILE", str(mem_file))
+        monkeypatch.setenv("OBSERVATIONS_FILE", str(obs_file))
+        self._reset_server_singletons(server)
+
+        result = server.metrics()
+
+        assert "error" not in result
+        assert "| Session count | 3 |" in result["summary_markdown"]
+        assert "| Session count | 999 |" not in result["summary_markdown"]
+
+    def test_metrics_session_count_with_duplicate_session_ids(self, tmp_path, monkeypatch):
+        """Duplicate session_ids collapse to the distinct count."""
+        from memory_mcp import server
+
+        mem_file = tmp_path / "memory.json"
+        obs_file = tmp_path / "observations.jsonl"
+        self._write_memory_file(mem_file, session_count_header=0)
+        # Five observations share two distinct session_ids.
+        self._write_observations(obs_file, ["sess-x", "sess-x", "sess-y", "sess-x", "sess-y"])
+
+        monkeypatch.setenv("MEMORY_FILE", str(mem_file))
+        monkeypatch.setenv("OBSERVATIONS_FILE", str(obs_file))
+        self._reset_server_singletons(server)
+
+        result = server.metrics()
+
+        assert "| Session count | 2 |" in result["summary_markdown"]
+
+    def test_metrics_session_count_zero_when_no_observations(self, tmp_path, monkeypatch):
+        """An empty/missing observations file yields zero, overriding the header."""
+        from memory_mcp import server
+
+        mem_file = tmp_path / "memory.json"
+        obs_file = tmp_path / "observations.jsonl"  # Not created.
+        self._write_memory_file(mem_file, session_count_header=42)
+
+        monkeypatch.setenv("MEMORY_FILE", str(mem_file))
+        monkeypatch.setenv("OBSERVATIONS_FILE", str(obs_file))
+        self._reset_server_singletons(server)
+
+        result = server.metrics()
+
+        assert "| Session count | 0 |" in result["summary_markdown"]
+        assert "| Session count | 42 |" not in result["summary_markdown"]

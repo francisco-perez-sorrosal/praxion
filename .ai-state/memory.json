@@ -148,7 +148,7 @@
       "architecture-bootstrap-from-codebase": {
         "value": "When bootstrapping ARCHITECTURE.md for an existing project, verify all file path references against the actual filesystem before considering the doc complete. Explorer/researcher agents may return slightly incorrect filenames (e.g., wrong ADR slugs). The fix is a post-write verification pass: glob the actual files and diff against the references in the doc.\n\n**Why:** During Praxion's bootstrap, the explorer returned ADR filenames that didn't match the actual files on disk (e.g., dec-003 slug was phoenix-isolated-venv not dedicated-phoenix-venv). Had to fix 4 filenames post-write.\n**How to apply:** After any architecture doc creation or major update, run a verification step that checks every file path reference resolves to an actual file.",
         "created_at": "2026-04-10T20:17:35.482690Z",
-        "updated_at": "2026-04-10T20:17:35.482690Z",
+        "updated_at": "2026-04-12T18:00:00Z",
         "tags": [
           "architecture",
           "gotcha",
@@ -166,7 +166,7 @@
         },
         "access_count": 0,
         "last_accessed": null,
-        "status": "active",
+        "status": "archived",
         "links": [
           {
             "target": "learnings.memory-enforcement-gap-commit-hook",
@@ -181,16 +181,16 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Verify all file refs in ARCHITECTURE.md against disk — explorer agents return wrong filenames",
+        "summary": "[ARCHIVED] Consolidated into dual-audience-architecture-documentation (see dec-021). Verify all file refs in ARCHITECTURE.md against disk — explorer agents return wrong filenames",
         "valid_at": "2026-04-10T20:17:35.482690Z",
-        "invalid_at": null,
+        "invalid_at": "2026-04-12T18:00:00Z",
         "type": "gotcha",
         "created_by": null
       },
       "architecture-doc-external-research-key-findings": {
         "value": "External research for ARCHITECTURE.md design converged on key findings: (1) AGENTS.md peer-reviewed study (arxiv:2601.20404) shows 28.64% time reduction and 16.58% token savings with structured project context — tables, explicit file paths, consistent headers are what make docs machine-readable. (2) Evolutionary architecture (Ford/Parsons) fitness functions map directly to sentinel audits — ARCHITECTURE.md should synthesize accumulated decisions, not prescribe top-down. (3) C4 hierarchical model already aligned with Praxion's L0/L1/L2 diagram conventions. (4) Anti-pattern consensus: documentation drift is #1 killer, prevented by ownership + co-location + automated detection. (5) Hybrid template recommended: C4 visualization + arc42 section independence + SYSTEM_DEPLOYMENT.md ownership pattern + fitness function validation. (6) Codified context paper (arxiv:2602.20478) emphasizes explicit file paths and function names over prose for machine consumption.",
         "created_at": "2026-04-10T18:12:08.461855Z",
-        "updated_at": "2026-04-10T18:12:08.461855Z",
+        "updated_at": "2026-04-12T18:00:00Z",
         "tags": [
           "architecture",
           "external",
@@ -209,7 +209,7 @@
         },
         "access_count": 0,
         "last_accessed": null,
-        "status": "active",
+        "status": "archived",
         "links": [
           {
             "target": "learnings.onboarding-research-convergence-skill-command",
@@ -224,16 +224,16 @@
             "relation": "related-to"
           }
         ],
-        "summary": "External research convergence: structured context +28% efficiency, evolutionary fitness functions, C4/arc42 hybrid, drift prevention via ownership",
+        "summary": "[ARCHIVED] Consolidated into dual-audience-architecture-documentation (see dec-021). External research convergence: structured context +28% efficiency, evolutionary fitness functions, C4/arc42 hybrid, drift prevention via ownership",
         "valid_at": "2026-04-10T18:12:08.461855Z",
-        "invalid_at": null,
+        "invalid_at": "2026-04-12T18:00:00Z",
         "type": "insight",
         "created_by": null
       },
       "architecture-docs-differentiation-gap": {
         "value": "Dual-audience architecture docs remediated. Key differentiation patterns applied:\n\n1. STATUS COLUMN is the structural differentiator: architect doc Components table has Status column (Built/Designed/Planned/Deprecated), developer guide does not — this is the single most visible structural difference\n2. KEY FILES HEADER: architect doc labels column \"Key Files (illustrative)\" to signal paths are advisory; developer guide uses plain \"Key Files\" (paths must resolve)\n3. TONE SPLIT: architect doc uses design-level descriptions (\"persistent dual-layer memory: curated institutional knowledge + zero-cost automatic observations\"); developer guide uses present-tense action verbs (\"Stores persistent dual-layer memory\", \"Delivers domain expertise\", \"Provides developer tooling\")\n4. CROSS-REFERENCES: each doc links to the other with appropriate framing — architect says \"for code-verified navigation\", developer says \"for design rationale and architectural evolution\"\n5. SECTION OWNERSHIP MARKERS: HTML comments on every section header prevent concurrent edit conflicts and enable staleness tracking\n6. ACTUAL COUNTS (2026-04-10): 33 skills, 12 agents, 14 hooks (13 .py + 1 .sh), 9 rules, 21 commands — previous memory entry \"praxion-ecosystem-inventory\" is stale (claimed 29 skills, 17 commands, 8 rules, 16 hooks)",
         "created_at": "2026-04-10T23:55:16.475577Z",
-        "updated_at": "2026-04-11T00:15:58.716196Z",
+        "updated_at": "2026-04-12T18:00:00Z",
         "tags": [
           "architecture",
           "content-accuracy",
@@ -256,16 +256,16 @@
         },
         "access_count": 0,
         "last_accessed": null,
-        "status": "active",
+        "status": "archived",
         "links": [
           {
             "target": "learnings.dual-audience-architecture-documentation",
             "relation": "related-to"
           }
         ],
-        "summary": "Architecture docs remediated: Status column, illustrative paths header, tone split, ownership markers, count fixes",
+        "summary": "[ARCHIVED] Consolidated into dual-audience-architecture-documentation (resolution via dec-021). Architecture docs remediated: Status column, illustrative paths header, tone split, ownership markers, count fixes",
         "valid_at": "2026-04-10T23:55:16.475577Z",
-        "invalid_at": null,
+        "invalid_at": "2026-04-12T18:00:00Z",
         "type": "pattern",
         "created_by": null
       },
@@ -654,9 +654,9 @@
         "created_by": null
       },
       "command-structure-praxion": {
-        "value": "Praxion command structure and patterns:\n\nORGANIZATION:\n- Commands live in `/commands/` directory as individual `.md` files\n- Filename (minus .md) becomes the command name: `co.md` → `/co`\n- Commands discovered automatically via glob in plugin.json: `\"commands\": [\"./commands/\"]`\n- No manifest update needed for new commands — auto-discovered\n- 17 total commands in Praxion (as of April 2026): co, cop, clean-work, create-worktree, merge-worktree, test, release, onboard-project, add-rules, full-security-scan, review-pr, report-upstream, sdd-coverage, cajalogic, manage-readme, create-simple-python-prj, star-repo\n\nFRONTMATTER FORMAT (YAML):\n- Required: `description` — brief description shown in /help\n- Optional: `argument-hint` — shows expected arguments to user (e.g., `[message]`, `[pr-number|branch]`)\n- Optional: `allowed-tools` — restricts which tools command can use (e.g., `[Bash(git:*), Read, Grep]`)\n- Optional: `model` — specify model version (haiku, sonnet, opus)\n- Optional: `disable-model-invocation` — prevent auto-invocation\n\nExample frontmatter:\n```yaml\n---\ndescription: Create a commit for staged (or all) changes\nargument-hint: [message]\nallowed-tools: [Bash(git:*), Read, Grep]\n---\n```\n\nARGUMENTS:\n- `$ARGUMENTS` — captures all arguments as single string\n- `$1`, `$2`, etc. — positional argument access\n- Test missing arguments gracefully\n\nCONTENT STRUCTURE:\n- After frontmatter: body content describes process as numbered steps\n- Typically 14-142 lines (star-repo is shortest at 6 lines after frontmatter, report-upstream longest at 142)\n- Process-focused: numbered steps, sub-steps, edge cases, gates\n- Often reference skills via links (e.g., `/release` uses `versioning` skill)\n- Can use bash execution (!) and file references (@) but less common\n\nKEY PATTERNS:\n1. Commands ARE NOT autonomous agents — they execute in main conversation context\n2. Commands reference skills for complex workflows (skill loaded on-demand when command mentions it)\n3. Commands are user-invoked prompts, not background tasks\n4. Quality gates common: format/lint checks before commits (/co, /cop)\n5. Multi-step processes with user confirmation gates before destructive actions\n6. Graceful handling of missing/invalid arguments (ask user, suggest alternatives)\n7. Many commands follow pattern: detect context → validate → execute → report\n8. No save/stash/snapshot commands in Praxion — uses git worktrees instead (/create-worktree for isolation)\n\nSKILLS INTEGRATION:\n- Commands reference skills for domain expertise (e.g., /release uses versioning skill)\n- Skills are loaded via context when mentioned by name\n- Commands describe PROCESS; skills provide KNOWLEDGE\n- Never inline skill knowledge into command — it loads automatically\n\nNAMING CONVENTION:\n- Kebab-case: create-worktree, add-rules, full-security-scan\n- Abbreviations OK for frequent use: co (commit), cop (commit+push)",
+        "value": "Praxion slash commands live in `/commands/<name>.md` with YAML frontmatter (argument-hint, description, allowed-tools, model), then prose body with the prompt. Catalog in `commands/README.md` and root `README.md`. See `skills/command-crafting/SKILL.md` for full conventions.",
         "created_at": "2026-04-06T20:24:20.861861Z",
-        "updated_at": "2026-04-06T20:24:20.861861Z",
+        "updated_at": "2026-04-12T18:00:00Z",
         "tags": [
           "commands",
           "frontmatter",
@@ -678,7 +678,7 @@
         "last_accessed": null,
         "status": "active",
         "links": [],
-        "summary": "Praxion command structure and patterns:\n\nORGANIZATION:\n- Commands live in `/commands/` directory as...",
+        "summary": "Praxion command layout: /commands/<name>.md with frontmatter+prose; see skills/command-crafting/SKILL.md",
         "valid_at": "2026-04-06T20:24:20.861861Z",
         "invalid_at": null,
         "type": "pattern",
@@ -875,9 +875,9 @@
         "created_by": null
       },
       "deployment-skill-ecosystem-patterns": {
-        "value": "Deployment skill design should follow Praxion ecosystem patterns:\n\nSKILL ANATOMY (Progressive Disclosure):\n- SKILL.md: Frontmatter (name, description, allowed-tools, compatibility) + core content (~500 lines)\n- references/ subdirectory: Deep-dive docs loaded on-demand (patterns, examples, reference material)\n- contexts/ subdirectory: Task-oriented implementations (language-specific, framework-specific)\n- scripts/ subdirectory: Executable utilities and tooling\n- assets/ subdirectory: Templates, schemas, data files\n- README.md: Human-facing quick reference\n\nDESCRIPTION FIELD (Critical for Activation):\n- Third-person, trigger-focused (used in system prompt to auto-activate)\n- Include: what it does, when to trigger it, key terms\n- All \"when to use\" info goes in description, NOT body (body loaded after activation)\n- Example from cicd: \"CI/CD pipeline design... deployment strategies... Use when creating CI/CD pipelines, writing GitHub Actions workflows, configuring automated testing, setting up deployment automation...\"\n\nREFERENCE FILES PATTERN:\n- Ordered by frequency of use/complexity depth\n- Backlinks recommended (~40% adoption in existing skills)\n- Named as: github-actions.md, patterns-and-examples.md, performance-patterns.md, benchmarking.md, etc.\n- Satellite files listed as YAML at start of SKILL.md body\n\nSKILL CROSS-LINKING:\n- Section: \"Integration with Other Skills\" with markdown links to related skills\n- Example: cicd links to [Python Development], [Python Project Management], [Observability]\n- Links establish skill ecosystem topology without creating circular dependencies\n- Skill-to-command integration: commands use Bash tool to invoke skill content\n\nGOTCHAS SECTION:\n- High-signal content: non-obvious failure points\n- Bullet list of gotchas early in SKILL.md body\n- More valuable than generic instructions\n- Examples: cardinality explosion, PII in logs, trace sampling, test isolation\n\nAGENT INTEGRATION:\n- Agents list skills in frontmatter: `skills: [cicd, python-development]`\n- Skills injected into agent context\n- Agents don't inherit parent skills\n- Example: cicd-engineer agent uses [cicd, python-development, python-prj-mgmt]\n\nDEPLOYMENT-ADJACENT SKILLS:\n- cicd: Pipeline architecture, GitHub Actions, deployment strategies (blue-green, canary, rolling)\n- performance-architecture: Capacity planning, scaling decisions\n- observability: Deployment environment tracking, alerting for deployments\n- api-design: Service boundary contracts for deployed services\n- testing-strategy: E2E testing of deployments\n- data-modeling: Schema migrations for deployments\n\nKEY PATTERNS FOR DEPLOYMENT SKILL:\n1. Cover: deployment strategies, environment promotion, infrastructure-as-code, service orchestration, monitoring deployments\n2. Avoid duplication: cicd already covers deployment automation in GitHub Actions; deployment skill should focus on *operational* deployment patterns, not workflow automation\n3. Separate concerns: cicd is automation + testing; deployment skill is deployment mechanics + infrastructure + observability integration\n4. Boundary: cicd covers \"how to deploy via GH Actions\"; deployment skill covers \"how to design for deployable systems, rollout strategies, traffic management\"\n5. Integration points: cicd skill for deployment automation, observability skill for deployment health, performance-architecture for capacity planning, api-design for service contracts",
+        "value": "Deployment skill anatomy follows progressive disclosure: SKILL.md (thin index), references/ (on-demand deep content), assets/ (templates, e.g. SYSTEM_DEPLOYMENT_TEMPLATE.md). Canonical implementation in `skills/deployment/`. When building new SDLC skills, mirror this structure; decomposition rules in `skills/skill-crafting/SKILL.md`.",
         "created_at": "2026-04-07T04:37:50.073912Z",
-        "updated_at": "2026-04-07T04:37:50.073912Z",
+        "updated_at": "2026-04-12T18:00:00Z",
         "tags": [
           "architecture",
           "conventions",
@@ -911,7 +911,7 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Deployment skill design should follow Praxion ecosystem patterns:\n\nSKILL ANATOMY (Progressive...",
+        "summary": "Deployment skill pattern: thin SKILL.md + references/ + assets/; see skills/deployment/ for canonical structure",
         "valid_at": "2026-04-07T04:37:50.073912Z",
         "invalid_at": null,
         "type": "pattern",
@@ -1003,9 +1003,9 @@
         "created_by": null
       },
       "dual-audience-architecture-documentation": {
-        "value": "Dual-audience architecture documentation — refined design after deep research:\n\nFIVE DIMENSIONS FRAMEWORK:\n1. Primary audience: Architect (design/extend) vs Developer (navigate)\n2. Source of truth: Evolves spec → self+code → self+new research (architect doc is authoritative for design intent; code is authoritative for what exists)\n3. Time orientation: Design target / partial future (architect) vs Present-tense / factual (developer)\n4. Trust model: High depth, accuracy abstracted from the real codebase to encompass multiple implementations (architect) vs High accuracy, code-verified (developer)\n5. Core question: \"What should X look like? Why?\" (architect) vs \"What is X? Where is it?\" (developer)\n\nTRUST MODEL IMPLICATIONS:\n- ARCHITECTURE.md operates at a higher abstraction level — a design blueprint that accommodates multiple conforming implementations\n- Validation for architect doc = design coherence (internal consistency, design accounts for what exists), NOT strict code matching\n- Validation for developer doc = factual correctness (names/paths/deps match code exactly)\n- Sentinel AC02/AC03 (strict name/path matching) belong ONLY to developer doc; architect doc gets design-level checks\n- Verifier Phase 4.8 checks design coherence for .ai-state/ARCHITECTURE.md; new Phase 4.9 checks factual accuracy for docs/architecture.md\n- Relationship: ARCHITECTURE.md (abstract design space) → constrains → Code (specific realization) → verified against → docs/architecture.md (factual state)\n\nKEY DESIGN DECISIONS:\n- Both docs use same 8-section structure with different framing\n- Architect template: Component table adds Status column (Designed/Built/Planned/Deprecated), Overview adds \"Source stage\" metadata\n- Developer template: Only includes what exists on disk, adds \"Last verified against code\" date, no Status column\n- Systems-architect creates BOTH in Phase 3.8; implementer updates both (7.6 for .ai-state/, 7.7 for docs/)\n- Doc-engineer maintains docs/architecture.md at pipeline checkpoints\n- Template placement: architect template in software-planning/assets/, developer template in doc-management/assets/\n\nCHANGE SCOPE: 21 artifacts total (16 modified, 5 new):\n- 2 templates (modify existing + new developer template)\n- 1 methodology reference (major update for dual-doc model)\n- 8 agent definitions (systems-architect, implementer, implementation-planner, verifier, sentinel, researcher, promethean, doc-engineer)\n- 2 rules (agent-intermediate-documents, coordination-protocol)\n- 4 skills (software-planning SKILL.md, doc-management types, doc-management SKILL.md, pipeline-details reconciliation)\n- 1 new instance (docs/architecture.md for Praxion)\n- 1 new ADR (dec-021, supersedes dec-020)\n- 1 existing instance update (.ai-state/ARCHITECTURE.md reframed + sentinel fixes)\n- 1 index update (DECISIONS_INDEX.md)\n\nSENTINEL EXTENSION: AC05-AC08 for docs/architecture.md (strict code-verified checks) + AC09 cross-consistency. Existing AC01-AC04 relaxed for design-level validation on .ai-state/ARCHITECTURE.md. Sentinel at ~478 lines — may need check catalog extraction to reference file.",
+        "value": "Two architecture docs coexist: `.ai-state/ARCHITECTURE.md` is the architect-facing design-target (abstracts above code to define valid-implementation space); `docs/architecture.md` is the developer-facing navigation guide (code-verified, Built components only). See dec-021 and `skills/software-planning/references/agent-pipeline-details.md`.",
         "created_at": "2026-04-10T22:03:23.768969Z",
-        "updated_at": "2026-04-10T22:20:05.825464Z",
+        "updated_at": "2026-04-12T18:00:00Z",
         "tags": [
           "analysis",
           "architecture",
@@ -1045,7 +1045,7 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Dual-audience arch docs: .ai-state/ (abstract design target for architects) + docs/ (code-verified guide for developers), 21 artifacts",
+        "summary": "Dual-audience arch docs: .ai-state/ARCHITECTURE.md design target + docs/architecture.md code-verified guide; see dec-021",
         "valid_at": "2026-04-10T22:03:23.768969Z",
         "invalid_at": null,
         "type": "insight",
@@ -1097,7 +1097,7 @@
       "ecosystem-health-latest": {
         "value": "Sentinel audit 2026-04-05T22:13:53Z: Grade A, 77 artifacts, 0/0/6 findings (C/I/S), coherence A. All 781 tests pass (492 memory-mcp + 289 chronograph), zero lint issues. Token budget at 66.7% (10k/15k) — improved from 89.4%. Previous B-grade Important findings (stale hook-crafting docs, README_DEV.md tree) both resolved. Six persistent Suggested findings: 5 agents above 300-line WARN, 1 orphaned exit-code-semantics.md reference.",
         "created_at": "2026-04-06T05:38:48.057510Z",
-        "updated_at": "2026-04-06T05:38:48.057510Z",
+        "updated_at": "2026-04-12T18:00:00Z",
         "tags": [
           "audit",
           "health",
@@ -1117,11 +1117,11 @@
         },
         "access_count": 0,
         "last_accessed": null,
-        "status": "active",
+        "status": "archived",
         "links": [],
-        "summary": "Sentinel Grade A: 77 artifacts, 781 tests pass, 0 critical/important findings, token budget 66.7%",
+        "summary": "[ARCHIVED] Superseded by praxion-ecosystem-inventory (most recent complete audit). Sentinel Grade A: 77 artifacts, 781 tests pass, 0 critical/important findings, token budget 66.7%",
         "valid_at": "2026-04-06T05:38:48.057510Z",
-        "invalid_at": null,
+        "invalid_at": "2026-04-12T18:00:00Z",
         "type": "insight",
         "created_by": null
       },
@@ -1783,7 +1783,7 @@
       "memory-enforcement-gap-commit-hook": {
         "value": "Memory enforcement has a timing gap: SubagentStop hooks catch subagent work, Stop hook catches at session end, but nothing enforces memory for the main agent's mid-session work. The commit is the natural \"done with work phase\" checkpoint. Solution: remind_memory.py hook gated by commit_gate.sh that scans the transcript at commit time and warns if remember() was never called. Non-blocking (exit 0) — the Stop hook remains the hard gate. This still misses the case where the main agent is told the results by the user and then acts without any explicit remember() — the behavioral gap is that the agent itself should proactively remember, not just be reminded by hooks.",
         "created_at": "2026-04-05T02:04:31.028562Z",
-        "updated_at": "2026-04-05T02:04:31.028562Z",
+        "updated_at": "2026-04-12T18:00:00Z",
         "tags": [
           "architecture",
           "gotcha",
@@ -1801,7 +1801,7 @@
         },
         "access_count": 0,
         "last_accessed": null,
-        "status": "active",
+        "status": "archived",
         "links": [
           {
             "target": "learnings.hook-output-requires-hookEventName",
@@ -1816,16 +1816,16 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Memory enforcement gap: no mid-session check for main agent work; commit-time hook closes it partially",
+        "summary": "[ARCHIVED] Consolidated into memory-gate-phase-aware-fix (latest enforcement evolution). Memory enforcement gap: no mid-session check for main agent work; commit-time hook closes it partially",
         "valid_at": "2026-04-05T02:04:31.028562Z",
-        "invalid_at": null,
+        "invalid_at": "2026-04-12T18:00:00Z",
         "type": "gotcha",
         "created_by": null
       },
       "memory-gate-blind-spot-analysis-sessions": {
         "value": "The memory gate (memory_gate.py) now tracks multiple work signals beyond code edits: file reads, grep searches, agent delegations, and tool calls. It uses phase-aware counting (resets after each remember() call) via _hook_utils.py TranscriptStats. The original blind spot — analysis sessions with zero edits slipping through — is partially closed. The gate still exempts certain agent types (Explore, sentinel, doc-engineer, Plan) at SubagentStop. The main agent gate triggers on a combination of reads + searches + delegations, not just edits.",
         "created_at": "2026-04-05T01:13:26.662451Z",
-        "updated_at": "2026-04-05T22:08:15.769915Z",
+        "updated_at": "2026-04-12T18:00:00Z",
         "tags": [
           "enforcement",
           "gotcha",
@@ -1843,7 +1843,7 @@
         },
         "access_count": 1,
         "last_accessed": "2026-04-05T20:56:17.175817Z",
-        "status": "active",
+        "status": "archived",
         "links": [
           {
             "target": "learnings.hook-output-requires-hookEventName",
@@ -1858,9 +1858,9 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Memory gate now tracks reads/searches/delegations, not just edits — analysis session blind spot partially closed",
+        "summary": "[ARCHIVED] Consolidated into memory-gate-phase-aware-fix. Memory gate now tracks reads/searches/delegations, not just edits — analysis session blind spot partially closed",
         "valid_at": "2026-04-05T01:13:26.662451Z",
-        "invalid_at": null,
+        "invalid_at": "2026-04-12T18:00:00Z",
         "type": "gotcha",
         "created_by": "main"
       },
@@ -1909,7 +1909,7 @@
       "memory-gate-requires-active-check": {
         "value": "Memory gate hooks (memory_gate.py, validate_memory.py) must check whether the memory system is actually active before blocking. Without this check, projects where the plugin is installed but the memory MCP isn't running get blocked with no way to call remember(). Fix: is_memory_system_active() checks for .ai-state/memory.json existence OR memory MCP tool usage in the transcript. If neither is true, the gate silently passes through.",
         "created_at": "2026-04-08T19:00:36.757286Z",
-        "updated_at": "2026-04-08T19:00:36.757286Z",
+        "updated_at": "2026-04-12T18:00:00Z",
         "tags": [
           "gotcha",
           "hooks",
@@ -1927,7 +1927,7 @@
         },
         "access_count": 0,
         "last_accessed": null,
-        "status": "active",
+        "status": "archived",
         "links": [
           {
             "target": "learnings.hook-output-requires-hookEventName",
@@ -1942,9 +1942,9 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Memory gate must verify memory system is active (memory.json exists or MCP tools seen) before blocking",
+        "summary": "[ARCHIVED] Consolidated into memory-gate-phase-aware-fix. Memory gate must verify memory system is active (memory.json exists or MCP tools seen) before blocking",
         "valid_at": "2026-04-08T19:00:36.757286Z",
-        "invalid_at": null,
+        "invalid_at": "2026-04-12T18:00:00Z",
         "type": "gotcha",
         "created_by": null
       },
@@ -2778,7 +2778,7 @@
       "praxion-ecosystem-inventory-2026-04-04": {
         "value": "VERIFIED AUDIT (2026-04-10): Praxion ecosystem actual state matches design targets with minor staling:\n\nSKILLS: 33 directories with SKILL.md ✓ (doc claimed 29, was stale)\nAGENTS: 13 .md files on disk, 12 registered in plugin.json ✓\nRULES: 9 files (7 swe/ + 2 writing/) ✓\nCOMMANDS: 19 slash commands ✓\nHOOKS: 13 Python scripts + commit_gate.sh wrapper, 21 total registrations across 7 events ✓\nMCP SERVERS: 2 in .claude-plugin/plugin.json (task-chronograph, memory) ✓\nINSTALLERS: 3 (install.sh, install_claude.sh, install_cursor.sh) ✓\nSCRIPTS: 11 in scripts/ (utilities for vcs, Phoenix control, state management)\n.AI-STATE: 51 files (22 decisions, 4 IDEA_LEDGER, 4 TOKEN_BUDGETING, 23 SENTINEL_REPORT, 1 ARCHITECTURE.md design-target)\n\nARCHITECTURE.md (in .ai-state/) is living design-target doc (not code-verified); intended code-verified version would be docs/architecture.md (not found). Current ARCHITECTURE.md is authoritative per its header.\n\nOLD MEMORY ENTRY claimed: 29 skills, 17 commands, 12 agents, 8 rules, 16 hooks — all have drifted or been miscounted. Current audit shows higher skill/command/rule counts, suggesting ecosystem expanded since 2026-04-05.",
         "created_at": "2026-04-05T01:34:25.891042Z",
-        "updated_at": "2026-04-10T23:52:51.570891Z",
+        "updated_at": "2026-04-12T18:00:00Z",
         "tags": [
           "audit",
           "documentation",
@@ -2798,11 +2798,11 @@
         },
         "access_count": 1,
         "last_accessed": "2026-04-05T20:56:17.175817Z",
-        "status": "superseded",
+        "status": "archived",
         "links": [],
-        "summary": "VERIFIED AUDIT (2026-04-10): Praxion ecosystem actual state matches design targets with minor...",
+        "summary": "[ARCHIVED] Superseded by praxion-ecosystem-inventory (later verification date). VERIFIED AUDIT (2026-04-10): Praxion ecosystem actual state matches design targets with minor...",
         "valid_at": "2026-04-05T01:34:25.891042Z",
-        "invalid_at": "2026-04-05T22:12:30.495908Z",
+        "invalid_at": "2026-04-12T18:00:00Z",
         "type": "insight",
         "created_by": null
       },
@@ -3536,9 +3536,9 @@
         "created_by": null
       },
       "target-project-main-agent-context-gap": {
-        "value": "TARGET PROJECT MAIN AGENT VISIBILITY GAP\n\nWhen i-am plugin is installed in a TARGET project (not Praxion repo), the main Claude Code agent lacks critical knowledge about the agent pipeline and architecture responsibilities.\n\nINSTALL FLOW:\n- install_claude.sh links Praxion's CLAUDE.md to ~/.claude/CLAUDE.md (single global copy, shared across all projects)\n- install_claude.sh links Praxion's rules to ~/.claude/rules (9 rules auto-loaded unconditionally)\n- Plugin is installed globally (user scope) or per-project (project scope)\n- /onboard-project command checks for .gitignore, plugin installation, creates project CLAUDE.md if missing via `claude init`\n\nWHAT TARGET PROJECT GETS:\n\n1. GLOBAL CLAUDE.md (~105 lines):\n   - Principles: pragmatism, context engineering, BDD, incremental evolution, structural beauty\n   - Methodology: Understand, Plan, Verify\n   - Learning loop: persistent memory patterns\n   - Operating conventions: response style, code style\n   - Links ecosystem to principles (skills, agents, rules, memory)\n   - But NO mention of:\n     * Which agents exist and what they do\n     * When to use which agent\n     * That systems-architect MUST produce ARCHITECTURE.md\n     * Naming conventions for any output documents\n     * The pipeline communication pattern through .ai-work/\n\n2. GLOBAL RULES (9 files):\n   - swe-agent-coordination-protocol: Tier selection, agent purposes, proactive usage\n   - agent-intermediate-documents: .ai-work/ and .ai-state/ structure\n   - agent-intermediate-documents: Document lifecycle (ephemeral vs persistent)\n   - adr-conventions: Decision record format\n   - memory-protocol: Memory MCP interaction rules\n   - coding-style, testing-conventions, git-conventions, vcs/git-conventions\n   - writing/readme-style, writing/diagram-conventions\n   \n   These are excellent but have problems for a new target project:\n   * swe-agent-coordination-protocol lists agent purposes but assumes familiarity with agents\n   * agent-intermediate-documents explains .ai-work/<task-slug>/ structure but doesn't say WHO creates it or how\n   * Agent definitions live at agents/*.md in the plugin, but target project has NO LOCAL COPY to read\n   * Agent descriptions are embedded in agent frontmatter, not in a centralized reference the main agent sees at startup\n\n3. PROJECT CLAUDE.md (target project only):\n   - Created by /onboard-project command via `claude init` (analyzes codebase)\n   - /onboard-project appends single line: \"Follow Understand, Plan, Verify methodology...\"\n   - The generated content is entirely project-specific (codebase summary)\n   - NO reference to available agents in the Praxion plugin ecosystem\n   - NO hint about ARCHITECTURE.md expectations\n\n4. INJECT_MEMORY.PY HOOK (SessionStart + SubagentStart):\n   - Injects decision context (from .ai-state/decisions/DECISIONS_INDEX.md if exists)\n   - Injects memory context (from .ai-state/memory.json if exists)\n   - Adds memory obligation footer\n   - But .ai-state/ doesn't exist on first use of target project\n   - And DECISIONS_INDEX.md is only created AFTER first architecture decision\n\nTHE CORE GAP:\n\nThe main agent in a target project knows:\n✓ General principles and methodology (from global CLAUDE.md)\n✓ Coordination protocol and tier selection (from swe-agent-coordination-protocol rule)\n✓ Agent names exist somewhere (from rule text: \"promethean\", \"researcher\", \"systems-architect\", etc.)\n✗ WHICH AGENTS are available to delegate to\n✗ WHAT OUTPUT each agent produces (SYSTEMS_PLAN.md vs SYSTEMS_ARCHITECTURE.md vs what?)\n✗ THAT systems-architect MUST PRODUCE ARCHITECTURE.md (not optional)\n✗ WHERE to find agent definitions to read their descriptions\n✗ THE PIPELINE ORDERING AND COMMUNICATION PATTERN clearly\n✗ WHAT TO TELL agents when delegating (e.g., \"architect: produce ARCHITECTURE.md alongside SYSTEMS_PLAN.md\")\n\nROOT CAUSE:\n\nThe agent catalog (.agents/README.md + individual agents/*.md) is a PRAXION REPO ARTIFACT, not something installed into target projects. The plugin.json registers agents as explicit file paths:\n\n  \"agents\": [\n    \"./agents/researcher.md\",\n    \"./agents/systems-architect.md\",\n    ...\n  ]\n\nClaude Code's plugin system auto-discovers these and makes them available for delegation. But:\n\n1. The plugin does NOT expose agent metadata (description, skills, output expectations) through any standard channel the main agent accesses at startup\n2. The main agent sees only the frontmatter when it delegates (which is minimal)\n3. There's no centralized \"Here's what each agent does and what to expect\" document that travels with the plugin to target projects\n\nWHAT'S MISSING IN TARGET PROJECTS:\n\n1. Agent catalog in target project's .claude/ context (or injectable at SessionStart):\n   - List of all agents with descriptions\n   - Output documentation for each agent (what files they create)\n   - When to use which agent (proactive usage signals)\n   - The pipeline flow diagram (researcher → architect → planner → implementer, etc.)\n\n2. Explicit ARCHITECTURE.md contract:\n   - When systems-architect is called, IT MUST produce ARCHITECTURE.md\n   - This is buried in the systems-architect.md frontmatter and agent prompt\n   - Not visible to the main agent planning the delegation\n   - Lead to the original problem: main agent forgets to tell architect to create ARCHITECTURE.md\n\n3. Project-level CLAUDE.md guidance:\n   - /onboard-project appends only ONE LINE\n   - Could append a much more complete skeleton that references the global version + adds local guidance\n   - Or SessionStart hook could inject a synthesized \"Agent Quick Reference\" that lists all available agents\n\nSOLUTION PATHS:\n\nOption A (SessionStart hook injection):\n  - inject_memory.py already constructs additionalContext for SessionStart\n  - Extend it to include \"## Available Agents\" section with agent catalog\n  - Requires reading .claude-plugin/plugin.json and extracting agent definitions\n  - Main agent sees agent catalog at session start\n\nOption B (Target project onboard enhancement):\n  - /onboard-project could generate a much richer skeleton CLAUDE.md\n  - Include \"## Available Agents\" section copied from Praxion repo\n  - Include agent output contracts (systems-architect → SYSTEMS_PLAN.md + ARCHITECTURE.md)\n  - Requires /onboard-project to be smarter about scaffold generation\n\nOption C (Agent frontend skill):\n  - Create new skill \"agent-catalog\" that lists all available agents\n  - Main agent loads it at relevant moments\n  - But doesn't solve the problem of agent availability being non-obvious\n\nOption D (Plugin manifest enhancement):\n  - Extend plugin.json to include agent metadata (outputs, triggers, tier)\n  - Add hook to inject agent catalog at SessionStart\n  - Requires Claude Code to surface agent metadata beyond frontmatter\n\nPREFERRED SOLUTION:\n\nCombination of B + A:\n1. /onboard-project generates a richer project CLAUDE.md skeleton with \"## Agents\" section describing available pipeline agents\n2. SessionStart hook (inject_memory.py) includes a \"## Agent Quick Reference\" section listing agents that can be delegated to\n3. systems-architect.md frontmatter makes the ARCHITECTURE.md output explicit and required in its description\n\nThis ensures the main agent in a target project:\n- Knows at session start what agents exist (via SessionStart injection)\n- Has persistent reference in project CLAUDE.md (via onboard-project)\n- Understands architecture responsibilities when delegating to systems-architect",
+        "value": "Plugin i-am target projects face visibility gap: main agent needs per-project memory routing via `$CLAUDE_PROJECT_DIR`, and agent discovery splits between `plugins/marketplaces/i-am/agents/` (global) and `.claude/agents/` (project-scoped). See `skills/onboard-project/SKILL.md` and `ARCHITECTURE.md §Deployment` for the routing contract.",
         "created_at": "2026-04-11T06:12:12.728755Z",
-        "updated_at": "2026-04-11T06:12:12.728755Z",
+        "updated_at": "2026-04-12T18:00:00Z",
         "tags": [
           "agents",
           "architecture",
@@ -3573,7 +3573,7 @@
             "relation": "related-to"
           }
         ],
-        "summary": "TARGET PROJECT MAIN AGENT VISIBILITY GAP\n\nWhen i-am plugin is installed in a TARGET project (not...",
+        "summary": "Target-project plugin visibility routes via CLAUDE_PROJECT_DIR; agents split between global marketplaces and .claude/agents",
         "valid_at": "2026-04-11T06:12:12.728755Z",
         "invalid_at": null,
         "type": "gotcha",
@@ -3680,7 +3680,7 @@
       "user-expects-memory-from-all-sessions": {
         "value": "User expects that every meaningful session — not just code-editing ones — produces memories. Running a sentinel audit and only presenting results without storing insights was flagged as a gap. The principle: if a session produces findings, trends, or cross-session insights, the main agent must proactively call remember() regardless of whether the enforcement hooks would trigger. Memory creation is a responsibility, not just a compliance check.",
         "created_at": "2026-04-05T01:13:20.012482Z",
-        "updated_at": "2026-04-05T01:13:20.012482Z",
+        "updated_at": "2026-04-12T18:00:00Z",
         "tags": [
           "enforcement",
           "memory",
@@ -3697,11 +3697,11 @@
         },
         "access_count": 0,
         "last_accessed": null,
-        "status": "active",
+        "status": "archived",
         "links": [],
-        "summary": "User expects memory creation from ALL meaningful sessions, not just code-editing ones",
+        "summary": "[ARCHIVED] Consolidated into proactive-memory-vs-enforcement (philosophical framing preserved). User expects memory creation from ALL meaningful sessions, not just code-editing ones",
         "valid_at": "2026-04-05T01:13:20.012482Z",
-        "invalid_at": null,
+        "invalid_at": "2026-04-12T18:00:00Z",
         "type": "correction",
         "created_by": "main"
       },
@@ -3950,6 +3950,150 @@
         "invalid_at": null,
         "type": "gotcha",
         "created_by": null
+      },
+      "adr-promotion-rationale-vs-implementation-check": {
+        "value": "When auditing proposed ADRs for promotion to accepted, file-existence verification is necessary but insufficient. The ADR decision rationale must also match the implementation behavior. Concrete example: Praxion dec-011 title says \"memory-first budget allocation\" but hooks/inject_memory.py:417 implements ADR-first (module docstring at :18 explicitly states this). File checks passed; the inversion would codify a contradiction if promoted. During ADR promotion workflows always read at least the Decision section of each ADR and compare against module docstrings, comments at key call sites, and test assertions. Flag inversions as blocking — resolve before promotion by fixing the code or rewriting the ADR.",
+        "created_at": "2026-04-12T17:10:19.798081Z",
+        "updated_at": "2026-04-12T17:10:19.798081Z",
+        "tags": [
+          "adr",
+          "gotcha",
+          "promotion",
+          "verification"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.architecture-bootstrap-from-codebase",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.github-heading-slug-punctuation-drops",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "ADR promotion audit must verify decision rationale matches implementation behavior, not just file existence (dec-011 case)",
+        "valid_at": "2026-04-12T17:10:19.798081Z",
+        "invalid_at": null,
+        "type": "gotcha",
+        "created_by": "researcher"
+      },
+      "living-doc-adr-mechanism-vs-instance": {
+        "value": "Living-document ADRs (Praxion dec-019 SYSTEM_DEPLOYMENT.md, dec-020 ARCHITECTURE.md) ship two separable things: (1) mechanism = template in skills/<skill>/assets/ + skill references + agent definition updates; (2) instance = .ai-state/<NAME>.md populated for the current project. When promoting such ADRs to accepted, distinguish the two. As of April 2026 Praxion has ARCHITECTURE.md instance but SYSTEM_DEPLOYMENT.md instance is absent — mechanism shipped, instance missing. For ecosystem/library repos the mechanism may suffice; for application repos the instance is probably required. Report both states independently in audit findings.",
+        "created_at": "2026-04-12T17:10:19.811402Z",
+        "updated_at": "2026-04-12T17:10:19.811402Z",
+        "tags": [
+          "adr",
+          "living-document",
+          "pattern",
+          "promotion"
+        ],
+        "confidence": null,
+        "importance": 6,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.ai-state-living-document-recipe",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.dual-audience-architecture-documentation",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.dual-audience-doc-decomposition-ordering",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Living-doc ADRs have separable mechanism (template+skill+agent) vs instance (.ai-state/X.md) — verify both during promotion",
+        "valid_at": "2026-04-12T17:10:19.811402Z",
+        "invalid_at": null,
+        "type": "insight",
+        "created_by": "researcher"
+      },
+      "session-count-dead-counter-only-tests-increment": {
+        "value": "memory.json schema_version 2.0 has a session_count header that does not reflect reality. Root cause: store.py:221 session_start() is the only function that increments session_count, and it is only called from tests/test_store.py (lines 362, 364, 369, 374, 375). No hook, no MCP tool endpoint, no server startup calls it. memory-protocol.md:5 explicitly tells agents \"You do NOT need to call session_start()\". hooks/inject_memory.py reads memory.json directly without incrementing. As of April 2026: header reads 10; .ai-state/observations.jsonl contains ~59 session_start events (drift ~5.9x). Downstream consumers: metrics.py:334 includes it in the metrics report; store.py:740-741 passes it to lifecycle.analyze() for archival scoring. Both read fiction. Fix: either register session_start() as a SessionStart hook action or wire it into the MCP server lifecycle, or remove the field from the schema entirely.",
+        "created_at": "2026-04-12T17:10:36.964358Z",
+        "updated_at": "2026-04-12T17:10:36.964358Z",
+        "tags": [
+          "counter-drift",
+          "gotcha",
+          "memory",
+          "schema",
+          "session-count"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.inject-memory-session-start-gap",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.memory-enforcement-gap-commit-hook",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.memory-gate-blind-spot-analysis-sessions",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "memory.json session_count header is dead — only tests increment it; 10 in header vs ~59 in observations.jsonl",
+        "valid_at": "2026-04-12T17:10:36.964358Z",
+        "invalid_at": null,
+        "type": "gotcha",
+        "created_by": "researcher"
+      },
+      "architect-adr-creation-drift-gotcha": {
+        "value": "When a SYSTEMS_PLAN.md references new ADR numbers (dec-NNN) or says 'implementer step 7.x will update the architecture decisions table', the files often do NOT exist on disk -- the architect designs the ADRs but does not always write them. The implementation-planner must verify on disk before decomposing steps, and add explicit implementer steps for each ADR creation and for architecture-doc updates. Also watch for arithmetic errors in acceptance criteria (e.g., 'no-longer-proposed' is not a valid ADR status). Detected live during phase-1-foundation planning: architect defined dec-023..028 + ARCHITECTURE.md decisions-table refresh but wrote none of them; AC 1.3.e math '25 accepted / 2 superseded / 1 no-longer-proposed' should be 26 accepted / 2 superseded / 0 proposed.",
+        "created_at": "2026-04-12T17:41:50.946781+00:00",
+        "updated_at": "2026-04-12T17:41:50.946781+00:00",
+        "tags": [
+          "gotcha",
+          "adr",
+          "systems-plan-drift",
+          "planning",
+          "verification"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "agent": "implementation-planner",
+          "task": "phase-1-foundation"
+        },
+        "summary": "Architect-defined ADRs may not exist on disk; verify and decompose explicit creation steps",
+        "type": "gotcha"
       }
     },
     "project": {
@@ -3989,7 +4133,7 @@
       "deployment-skill-research-initiative": {
         "value": "Initiated multi-angle research for a new deployment skill in Praxion. The skill targets local/single-machine deployment first (laptops/desktops with multi-CPU/GPU), but must be architecturally flexible to extend to: traditional cloud (AWS, GCP, Azure), AI-native clouds (Modal, Nebius, CoreWeave), and modern PaaS (Render, Vercel, Fly.io, Railway). Four parallel research agents launched covering: (1) deployment abstractions & mental models (IaC vs IfC, descriptor formats, taxonomies), (2) local deployment patterns (process management, containers, GPU sharing, AI/ML serving), (3) cloud/AI-cloud/PaaS patterns (provider comparison, portability, lifecycle). Next step after research: systems-architect to design skill structure, abstraction layers, and progressive disclosure model.",
         "created_at": "2026-04-07T04:38:32.684367Z",
-        "updated_at": "2026-04-07T04:38:32.684367Z",
+        "updated_at": "2026-04-12T18:00:00Z",
         "tags": [
           "architecture",
           "deployment",
@@ -4008,11 +4152,11 @@
         },
         "access_count": 0,
         "last_accessed": null,
-        "status": "active",
+        "status": "archived",
         "links": [],
-        "summary": "Deployment skill research: local-first, extensible to cloud/AI-cloud/PaaS — 4 parallel researchers launched",
+        "summary": "[ARCHIVED] Superseded by shipped skills/deployment/. Deployment skill research: local-first, extensible to cloud/AI-cloud/PaaS — 4 parallel researchers launched",
         "valid_at": "2026-04-07T04:38:32.684367Z",
-        "invalid_at": null,
+        "invalid_at": "2026-04-12T18:00:00Z",
         "type": "decision",
         "created_by": null
       },
@@ -4119,7 +4263,7 @@
       "memory-metrics-feature-research": {
         "value": "User requested memory system observability: statistics on retrieval, inserts, updates, forget hits, per-agent metrics, per-skill metrics. Two parallel researchers investigating: (1) memory MCP internals — all operations, data model, hooks, existing tracking, (2) observability infrastructure — OTel/Phoenix pipeline, visualization options (Phoenix dashboards, Streamlit, Grafana, CLI stats). Goal: design metrics collection and visualization for the memory system to help users improve it. Research outputs in .ai-work/memory-metrics/ and .ai-work/memory-metrics-viz/.",
         "created_at": "2026-04-06T06:37:01.068378Z",
-        "updated_at": "2026-04-06T06:37:01.068378Z",
+        "updated_at": "2026-04-12T18:00:00Z",
         "tags": [
           "feature",
           "memory",
@@ -4138,11 +4282,11 @@
         },
         "access_count": 0,
         "last_accessed": null,
-        "status": "active",
+        "status": "archived",
         "links": [],
-        "summary": "Memory metrics feature in research phase — tracking ops, per-agent stats, visualization via Phoenix or web app",
+        "summary": "[ARCHIVED] Superseded by shipped memory-mcp/src/memory_mcp/metrics.py. Memory metrics feature in research phase — tracking ops, per-agent stats, visualization via Phoenix or web app",
         "valid_at": "2026-04-06T06:37:01.068378Z",
-        "invalid_at": null,
+        "invalid_at": "2026-04-12T18:00:00Z",
         "type": "insight",
         "created_by": null
       },
@@ -4175,9 +4319,9 @@
         "created_by": "main"
       },
       "praxion-plugin-architecture": {
-        "value": "Praxion plugin ecosystem architecture and patterns:\n\nCOMPONENT STRUCTURE:\n- Skills: 29 directories auto-discovered via glob \"./skills/\", each contains SKILL.md with name+description frontmatter and optional references/ subdirectory for lazy-loaded reference files\n- Commands: 15 files in ./commands/, auto-discovered via glob, use description field (not name) in frontmatter\n- Agents: 12 files in ./agents/, MANUALLY listed in plugin.json (no glob), each has name+description frontmatter\n- Rules: 8 files organized hierarchically (swe/, writing/), support path-scoped loading via YAML frontmatter\n- Hooks: 13 active hooks in ./hooks/, registered in hooks.json, invoked via python3 (not directly executable), use ${CLAUDE_PLUGIN_ROOT} for portability\n- MCP Servers: 2 Python servers (task-chronograph-mcp, memory-mcp) invoked via uv with environment variables\n\nCRITICAL PATTERNS:\n1. Hook Invocation: Hooks are called via \"python3 ${CLAUDE_PLUGIN_ROOT}/hooks/hookname.py\" in hooks.json - they are NOT made directly executable\n2. Agent Registration: Agents require EXPLICIT file paths in plugin.json array (e.g., \"./agents/researcher.md\") - NOT auto-discovered via glob\n3. Skills use progressive disclosure: frontmatter at startup, full SKILL.md on activation, reference files loaded on-demand\n4. MCP servers use uv run --project pattern with environment variable injection for configuration\n5. Hook exit codes: 0=allow (with optional JSON output), 2=block (stderr message); never mix patterns in one hook\n\nREFERENCE INTEGRITY:\nAll skill reference files declared in SKILL.md are present on disk. No broken paths found in documentation links.\n\nTOKEN BUDGET CONSTRAINT:\nRules without path-scoped frontmatter load on every session - project has 15,000 token budget for always-loaded content (CLAUDE.md files + unconditional rules). Currently 6 unconditional rules + CLAUDE.md files are in budget.\n\nREGISTRATION AUTHORITY:\n- plugin.json: manifest source of truth for skills, commands, agents, MCP servers\n- hooks.json: separate file for hook registration (single authority, never duplicate in ~/.claude/settings.json)",
+        "value": "Praxion plugin ships skills/, agents/, rules/, commands/, hooks/, plus two MCP servers (`memory-mcp`, `task-chronograph-mcp`). Manifest in `.claude-plugin/plugin.json`. Component map in `.ai-state/ARCHITECTURE.md` and `docs/architecture.md`.",
         "created_at": "2026-04-06T03:45:04.070996Z",
-        "updated_at": "2026-04-06T03:45:04.070996Z",
+        "updated_at": "2026-04-12T18:00:00Z",
         "tags": [
           "architecture",
           "patterns",
@@ -4197,7 +4341,7 @@
         "last_accessed": null,
         "status": "active",
         "links": [],
-        "summary": "Praxion plugin ecosystem architecture and patterns:\n\nCOMPONENT STRUCTURE:\n- Skills: 29 directories...",
+        "summary": "Praxion plugin: skills/agents/rules/commands/hooks + 2 MCP servers; see .claude-plugin/plugin.json and ARCHITECTURE docs",
         "valid_at": "2026-04-06T03:45:04.070996Z",
         "invalid_at": null,
         "type": "pattern",
@@ -4234,9 +4378,9 @@
         "created_by": null
       },
       "project-onboarding-feature-design": {
-        "value": "Project Cartographer: adaptive developer onboarding system refined through promethean ideation (April 2026).\n\nARCHITECTURE: Three progressive modes, NOT one monolithic experience:\n1. Executive Summary (/explore) — fast filesystem fingerprinting, no deep analysis. Produces an 'exploration card' with project type, scale, architecture, build system, entry points, test approach, key patterns, gotchas. Under 60 seconds.\n2. Guided Exploration (/explore guide) — 8-step adaptive sequence (Front Door, Skeleton, Heart, Nervous System, Metabolism, Immune System, Customs, History). Steps adapt based on project classification. Interactive — user controls depth and order.\n3. Persistent Learning Map (/explore map) — memory MCP integration for cross-session continuity. Tracks coverage, understanding anchors, knowledge gaps, bookmarks, questions.\nWild card: Architectural Archaeology (/explore history) — traces project evolution through git analysis (founding commits, geological layers, fault lines, fossil record, architects).\n\nCOMPONENT DECOMPOSITION (follows dec-014 Skill+Command pattern):\n- Skill (project-cartography): reusable methodology — other agents (researcher, systems-architect) can load it when encountering foreign codebases\n- Command (explore): user trigger with subcommand routing (summary/guide/map/history)\n- Agent question UNRESOLVED: context-engineer says interactive exploration should NOT use an agent (breaks follow-up dialog). But autonomous deep analysis (Mode 2's 8-step sequence) may benefit from agent isolation. Needs architect resolution.\n\nPROJECT CLASSIFICATION SYSTEM: 7 dimensions (scale, age, complexity, documentation, architecture style, language familiarity, domain) detected from filesystem signals. Classification drives which exploration steps are emphasized and how much detail is shown.\n\nINCREMENTAL DELIVERY: 5 phases, each independently valuable. Phase 1 (summary card) is a useful MVP.\nNext: researcher for classification signal validation, then systems-architect for component decomposition.",
+        "value": "Project Cartographer onboarding: 3 modes (fresh, brownfield-full, brownfield-quick) across 7 dimensions (structure, deps, tests, docs, CI, deploy, conventions). Delivered via `skills/onboard-project/` + `commands/onboard-project.md`; see those files for current behavior.",
         "created_at": "2026-04-06T20:24:36.570254Z",
-        "updated_at": "2026-04-06T20:30:47.925713+00:00",
+        "updated_at": "2026-04-12T18:00:00Z",
         "tags": [
           "architecture",
           "decision",
@@ -4261,7 +4405,7 @@
             "relation": "related-to"
           }
         ],
-        "summary": "Project Cartographer: 3-mode adaptive onboarding (summary/guide/map), 7-dim classification, Skill+Command composition, incremental delivery",
+        "summary": "Onboard-project: 3 modes x 7 dims; implementation in skills/onboard-project/ and commands/onboard-project.md",
         "valid_at": "2026-04-06T20:24:36.570254Z",
         "invalid_at": null,
         "type": "decision",
@@ -4358,7 +4502,7 @@
       "system-deployment-md-artifact-initiative": {
         "value": "New SYSTEM_DEPLOYMENT.md artifact initiative: a living deployment document that captures deployment architecture, strategy, failure points, mitigations, and component diagrams (C4-style, high-level to detail). It evolves across the full SDLC:\n\nLIFECYCLE: Created by systems-architect during architecture phase, refined by implementation-planner, updated by implementer with as-built configs, validated by verifier, quality-reviewed by doc-engineer, audited by sentinel for freshness.\n\nKEY DESIGN QUESTION: Where does it live? Likely .ai-state/ since it's persistent and committed to git. How do multiple agents contribute without conflicts? Fragment pattern or section ownership.\n\nUSER VISION: The document should include component diagrams (building blocks at multiple abstraction levels), deployment strategy and process, points of failure with mitigations, and future work. Systems-architect drives creation, implementation-planner as copilot, context-engineer and researcher as advisors.\n\nTwo parallel researchers launched covering: (1) deployment doc best practices (C4, arc42, SRE runbooks, living docs, Mermaid diagrams), (2) agent pipeline integration (responsibility matrix, lifecycle events, required rule/agent changes). Next: systems-architect designs the integration.",
         "created_at": "2026-04-07T17:02:45.228837Z",
-        "updated_at": "2026-04-07T17:02:45.228837Z",
+        "updated_at": "2026-04-12T18:00:00Z",
         "tags": [
           "architecture",
           "artifact",
@@ -4377,16 +4521,16 @@
         },
         "access_count": 0,
         "last_accessed": null,
-        "status": "active",
+        "status": "archived",
         "links": [
           {
             "target": "project.deployment-skill-research-initiative",
             "relation": "related-to"
           }
         ],
-        "summary": "SYSTEM_DEPLOYMENT.md: living deployment artifact across SDLC — architect creates, pipeline agents refine",
+        "summary": "[ARCHIVED] Mechanism shipped (template + references + agent defs); Praxion instance deferred per dec-019. SYSTEM_DEPLOYMENT.md: living deployment artifact across SDLC — architect creates, pipeline agents refine",
         "valid_at": "2026-04-07T17:02:45.228837Z",
-        "invalid_at": null,
+        "invalid_at": "2026-04-12T18:00:00Z",
         "type": "decision",
         "created_by": null
       },

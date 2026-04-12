@@ -102,17 +102,7 @@ Spawn agents without waiting for the user to ask:
 
 ### Coordination Pipeline
 
-Agents communicate through shared documents, not direct invocation.
-
-```text
-promethean --> researcher ---------> systems-architect --> implementation-planner --+--> implementer    --+--> verifier
-              + context-engineer     + context-engineer                             |                     |
-                (shadow)               (shadow)                                    +--> test-engineer  --+
-                                                                                   |
-                                                                                   +--> doc-engineer   --+
-                                                                                        (when assigned)
-                                                                     sentinel (independent audit)
-```
+Agents communicate through shared documents, not direct invocation. The pipeline flows promethean → researcher → systems-architect → implementation-planner → (implementer ∥ test-engineer ∥ doc-engineer) → verifier, with context-engineer shadowing research+architecture and sentinel running as an independent audit. See [coordination-details.md#coordination-pipeline-diagram](../../skills/software-planning/references/coordination-details.md#coordination-pipeline-diagram) for the ASCII diagram.
 
 **Pipeline rules:**
 

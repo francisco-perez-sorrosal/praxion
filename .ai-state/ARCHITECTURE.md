@@ -122,6 +122,7 @@ graph TD
 | `.ai-work/` | Ephemeral pipeline documents scoped by task slug; gitignored, worktree-isolated | Built | `.ai-work/<task-slug>/` |
 | Installers | Target-specific deployment scripts (Claude Code, Claude Desktop, Cursor) | Built | `install.sh`, `install_claude.sh`, `install_cursor.sh` |
 | Scripts | Developer tooling: worktree management, merge drivers, daemon control, ADR index generation | Built | `scripts/` |
+| Roadmap-cartographer | Project-level roadmap generator orchestrating **project-derived lens-set** parallel audit, synthesis, and user-gated ROADMAP.md emission for any project (deterministic / agentic / hybrid); SPIRIT is one exemplar lens set among DORA / SPACE / FAIR / CNCF Platform Maturity / Custom | Designed | `agents/roadmap-cartographer.md`, `skills/roadmap-synthesis/` (dec-029, dec-030, dec-035, dec-036) |
 
 ## 4. Interfaces
 
@@ -139,6 +140,7 @@ graph TD
 | Pipeline documents | Markdown files | Upstream agents | Downstream agents | Shared `.ai-work/<task-slug>/` directory; fragment files for parallel writes |
 | Skill progressive disclosure | YAML frontmatter + Markdown | `SKILL.md` files | Claude Code skill loader | 3 tiers: metadata (startup), body (activation), references (on-demand) |
 | Hook registration | JSON | `hooks/hooks.json` | Claude Code plugin system | Event type, command, timeout, sync/async per hook |
+| `/roadmap` command | Slash command | `commands/roadmap.md` | User | Modes: fresh (default), diff (incremental re-run), `<focus-area>` (scoped audit); delegates to `roadmap-cartographer` (dec-029, dec-032) |
 
 ## 5. Data Flow
 
@@ -279,5 +281,14 @@ graph LR
 | [dec-025](decisions/025-memory-hygiene-rules.md) | Memory hygiene disposition rules (R1–R7) | Seven deterministic rules govern condense/consolidate/supersede operations; replaces ad-hoc judgment |
 | [dec-027](decisions/027-principles-embedding-strategy.md) | Praxion-specific principles embedded via compact bullet + README prose | Four durable principles in `CLAUDE.md` (~320 chars) with anchor-target README section; anchored by dec-028 budget lever |
 | [dec-028](decisions/028-diagram-conventions-path-scoping.md) | Narrow `rules/writing/diagram-conventions.md` path-scope from `**/*.md` to doc-authoring surfaces | Reclaims ~2,584 chars on non-doc sessions; enables principles embedding without budget violation |
+| [dec-029](decisions/029-roadmap-creation-shape-b-hybrid.md) | Shape B-hybrid for roadmap-creation (agent + skill + command, no rule) | Adds `roadmap-cartographer` agent + `roadmap-synthesis` skill + `/roadmap` command as a cohesive project-level capability; no new always-loaded content |
+| [dec-030](decisions/030-roadmap-planning-skill-coexistence.md) | `roadmap-planning` skill coexists with new `roadmap-synthesis` | Two skills paired by the cartographer: existing prioritization mechanics preserved, new audit-synthesis added; trigger-phrase disjointness enforced |
+| [dec-031](decisions/031-roadmap-creation-pipeline-placement.md) | Roadmap-creation is user-initiated and standalone (sentinel-like) | Not inserted into the promethean→SDD chain; three-layer discovery (command, delegation-table entry, semantic activation) |
+| [dec-032](decisions/032-roadmap-md-location-and-lifecycle.md) | `ROADMAP.md` at project root as living document with preserved Decision Log | User-visible; cross-run continuity via Decision Log; git history provides archival; `diff` mode for incremental re-runs |
+| [dec-033](decisions/033-six-dimension-lens-placement.md) | Lens content placement — skill reference file + template asset + SKILL.md summary (generalized by dec-036) | Zero always-loaded cost; procedural content in tier 4 references; structural echo in tier 5 template; SKILL.md summary table for activation-time context |
+| [dec-034](decisions/034-roadmap-budget-offset-via-prune.md) | Zero-net always-loaded budget via prune of redundant ASCII Coordination Pipeline block | Coordinator-awareness served via delegation-table entry with ≤0 net char delta; graceful-degradation escape hatch if offset infeasible |
+| [dec-035](decisions/035-roadmap-parallel-audit-via-researchers.md) | Parallel audit fan-out via N=3–6 researchers, not a new auditor agent | Cartographer orchestrates researchers (boundary-disciplined); reuses proven fan-out; paradigm-agnostic by construction |
+| [dec-036](decisions/036-lens-framework-project-derived.md) | Lens framework is project-derived; SPIRIT is an exemplar, not the canonical default | 4-step derivation methodology (project values + domain constraints + exemplar lens sets + user gate); exemplars: SPIRIT, DORA, SPACE, FAIR, CNCF Platform Maturity, Custom; replaces hardcoded six-dimension assumption |
+| [dec-037](decisions/037-opportunities-forward-lines.md) | Opportunities (Forward Lines) as a first-class roadmap section; Motivation field generalization | Template expands 9 → 10 sections with new §4 Opportunities (O1…On) between Weaknesses and Improvement Roadmap; Improvement Roadmap items cite Motivation (Weakness / Opportunity / Evolution trend / Strategic bet / User request / Prior item) rather than only Weakness; cartographer Phase 4 classifies findings into four buckets (strengths / weaknesses / opportunities / improvements) |
 
 [Add new rows as architecture-related ADRs are created.]

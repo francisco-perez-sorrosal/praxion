@@ -4176,6 +4176,66 @@
         "invalid_at": null,
         "type": "gotcha",
         "created_by": null
+      },
+      "roadmap-planning-skill-is-prioritization-only": {
+        "value": "The i-am:roadmap-planning skill (skills/roadmap-planning/SKILL.md, 260 lines) is explicitly scoped as the prioritization step between promethean ideation and SDD specification: IDEA_LEDGER -> ROADMAP.md/BACKLOG.md -> SYSTEMS_PLAN.md. It covers RICE/ICE/WSJF/MoSCoW/Kano + dependency mapping + Now-Next-Later formats. It does NOT cover: codebase audit, external research synthesis, six-dimension evaluation (automation/coordinator-awareness/quality/evolution/pragmatism/curiosity), 'preserve what works' section, quality metrics with baselines, deprecation tables, or methodology transparency. Praxion's own ROADMAP.md exemplar (524 lines, 9 sections) was produced by '6 parallel deep-dive audits + external research', NOT by following this skill. The skill is necessary but insufficient for an ultra-in-depth roadmap-creation capability.",
+        "created_at": "2026-04-12T19:28:39.904619+00:00",
+        "updated_at": "2026-04-12T19:28:39.904619+00:00",
+        "tags": [
+          "roadmap",
+          "skill-scope-gap",
+          "prioritization",
+          "pipeline"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "agent": "researcher",
+          "task": "roadmap-creation"
+        },
+        "summary": "roadmap-planning skill is prioritization-only; does not cover audit/research/dimensions needed for exemplar-depth roadmaps",
+        "type": "insight"
+      },
+      "major-agentic-projects-skip-roadmap-md": {
+        "value": "Verified 2026-04-12: LangChain v1.0, LangGraph, Goose (Block), and Aider have NO committed ROADMAP.md. They communicate forward direction via release notes, blog announcements, and GitHub Issues/Discussions. LangChain blog frames 1.0 as a completion milestone with one forward line ('Python 3.14 coming soon'). Goose has GOVERNANCE.md + RELEASE.md but no ROADMAP.md. Reflects 2026 PM trend (Product School) away from fixed feature roadmaps toward OKR-style learning machines. Implication for roadmap research: CNCF maintainer guidance (contribute.cncf.io) + smaller projects (Agentic-Tool-Optimization, AI-Engineering-Roadmap) are better structural references than major agentic projects. Also: Praxion's internal roadmap is structurally closer to a CNCF maintainer audit than to any major agentic project's public document.",
+        "created_at": "2026-04-12T19:28:39.904619+00:00",
+        "updated_at": "2026-04-12T19:28:39.904619+00:00",
+        "tags": [
+          "roadmap",
+          "landscape",
+          "agentic-projects",
+          "research-pivot"
+        ],
+        "confidence": null,
+        "importance": 6,
+        "source": {
+          "type": "session",
+          "agent": "researcher",
+          "task": "roadmap-creation"
+        },
+        "summary": "Major agentic projects (LangChain/LangGraph/Goose/Aider) skip ROADMAP.md; use CNCF + smaller projects as references instead",
+        "type": "insight"
+      },
+      "spirit-document-pipeline-anchor-pattern": {
+        "value": "When a pipeline's success criterion is 'reproduce the quality of something the user produced by hand' (roadmaps, specs, architecture docs from a specific ultrathink prompt), create .ai-work/<task-slug>/SPIRIT.md containing: (1) the verbatim original user prompt blockquoted, (2) distilled dimensions/acceptance criteria, (3) what the feature must enable for the coordinator. Why it works: every subagent sees the same north star in one file; verbatim blockquote prevents summarization drift across pipeline stages; acceptance-criteria distillation below the prompt gives shared vocabulary for the whole pipeline. The researcher reads SPIRIT.md FIRST, before starting discovery. Apply to: any 'reproduce-this-quality' feature. Don't apply to: SDD/REQ-ID-driven work where traceability matrix already anchors intent. Observed in roadmap-creation pipeline 2026-04-12.",
+        "created_at": "2026-04-12T19:28:39.904619+00:00",
+        "updated_at": "2026-04-12T19:28:39.904619+00:00",
+        "tags": [
+          "pattern",
+          "pipeline",
+          "subagent-coordination",
+          "ai-work"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "agent": "researcher",
+          "task": "roadmap-creation"
+        },
+        "summary": "SPIRIT.md (verbatim user prompt + distilled dimensions) as pipeline north star prevents quality drift across subagents",
+        "type": "pattern"
       }
     },
     "project": {

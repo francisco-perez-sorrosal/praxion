@@ -17,9 +17,9 @@ Compatible with **Claude Code** (mainly), **Claude Desktop**, and **Cursor**.
 
 ## What You Get
 
-- **33 skills** covering Python, API design, CI/CD, deployment, observability, refactoring, spec-driven development, external API docs, security review, testing strategy, and more -- loaded automatically when the task matches
-- **12 specialized agents** that collaborate on complex features (research, architecture, planning, implementation, testing, verification)
-- **19 slash commands** for daily workflows -- commits, worktrees, memory management, project scaffolding, testing, releases, code review
+- **34 skills** covering Python, API design, CI/CD, deployment, observability, refactoring, spec-driven development, external API docs, security review, testing strategy, roadmap synthesis, and more -- loaded automatically when the task matches
+- **13 specialized agents** that collaborate on complex features (research, architecture, planning, implementation, testing, verification, roadmap cartography)
+- **20 slash commands** for daily workflows -- commits, worktrees, memory management, project scaffolding, testing, releases, code review, roadmap generation
 - **Coding rules** auto-loaded by context -- coding style, git conventions, documentation standards, agent coordination
 - **MCP servers** for persistent memory and agent lifecycle observability
 
@@ -81,7 +81,7 @@ Reusable knowledge modules loaded automatically based on context. See [`skills/R
 | AI Assistant Crafting | skill-crafting, agent-crafting, command-crafting, mcp-crafting, rule-crafting, hook-crafting |
 | External Knowledge | external-api-docs |
 | Platform Knowledge | claude-ecosystem, agentic-sdks, communicating-agents |
-| Planning & Communication | roadmap-planning, stakeholder-communications |
+| Planning & Communication | roadmap-planning, roadmap-synthesis, stakeholder-communications |
 | Design & Architecture | api-design, data-modeling, deployment, observability, performance-architecture |
 | Documentation | doc-management |
 | Software Development | python-development, python-prj-mgmt, project-exploration, refactoring, code-review, software-planning, spec-driven-development, agent-evals, cicd, testing-strategy, versioning |
@@ -110,6 +110,7 @@ Slash commands invoked with `/<name>`. In Claude Code plugin mode, use `/i-am:<n
 | `/release` | Bump version, update changelog, and create a release tag |
 | `/test` | Auto-detect test framework and run tests |
 | `/explore-project` | Explore and understand an unfamiliar project's architecture, patterns, and workflow |
+| `/roadmap` | Produce a lens-audited `ROADMAP.md` for the current project with both deficit repairs (Weaknesses) and forward lines of work (Opportunities) via a project-derived evaluation lens set |
 | `/report-upstream` | File a well-formed bug report on an upstream open-source project |
 | `/review-pr` | Code review a pull request |
 | `/save-changes` | Save current working changes to project memory with secret filtering |
@@ -117,7 +118,7 @@ Slash commands invoked with `/<name>`. In Claude Code plugin mode, use `/i-am:<n
 
 ### Agents
 
-Twelve autonomous agents for complex, multi-step tasks. See [`agents/README.md`](agents/README.md) for the pipeline diagram and usage patterns.
+Thirteen autonomous agents for complex, multi-step tasks. See [`agents/README.md`](agents/README.md) for the pipeline diagram and usage patterns.
 
 | Agent | Description |
 |-------|-------------|
@@ -133,6 +134,7 @@ Twelve autonomous agents for complex, multi-step tasks. See [`agents/README.md`]
 | `sentinel` | Independent ecosystem quality auditor |
 | `skill-genesis` | Post-pipeline learning harvest and artifact proposal |
 | `cicd-engineer` | CI/CD pipeline design, GitHub Actions, deployment automation |
+| `roadmap-cartographer` | Project-level audit through a project-derived lens set (SPIRIT, DORA, SPACE, FAIR, CNCF Platform Maturity, or Custom) synthesized into a grounded `ROADMAP.md` covering strengths, weaknesses, **opportunities (forward lines of work)**, and phased improvements |
 
 ### Rules
 

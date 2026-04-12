@@ -21,6 +21,7 @@ Reusable slash commands for AI coding assistants. Each `.md` file becomes a `/co
 | `/release` | Bump version, update changelog, and create a release tag |
 | `/report-upstream` | File a well-formed bug report on an upstream open-source project |
 | `/review-pr` | Code review a pull request |
+| `/roadmap` | Produce a project-audited `ROADMAP.md` via a project-derived evaluation lens set (SPIRIT, DORA, SPACE, FAIR, CNCF Platform Maturity, or Custom) through the roadmap-cartographer agent; covers strengths, weaknesses, **opportunities (forward lines of work)**, phased improvements, and deprecations |
 | `/save-changes` | Save current working changes to project memory with secret filtering |
 | `/sdd-coverage` | Report spec-to-test and spec-to-code coverage for REQ IDs |
 | `/star-repo` | Star the Praxion repo on GitHub |

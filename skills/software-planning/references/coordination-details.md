@@ -188,3 +188,24 @@ Fragment files are deleted after a successful merge. For the full per-document-t
 - `LEARNINGS.md` topic-section merge with attribution preservation and deduplication policy.
 - `PROGRESS.md` timestamp-ordered append with duplicate detection.
 - Post-merge invariants for each document type.
+
+## Coordination Pipeline Diagram
+
+This is the canonical ASCII depiction of the Praxion agent coordination pipeline. Extracted from the `swe-agent-coordination-protocol` rule to reduce always-loaded context while keeping the diagram on-demand for readers who want it.
+
+```text
+promethean --> researcher ---------> systems-architect --> implementation-planner --+--> implementer    --+--> verifier
+              + context-engineer     + context-engineer                             |                     |
+                (shadow)               (shadow)                                    +--> test-engineer  --+
+                                                                                   |
+                                                                                   +--> doc-engineer   --+
+                                                                                        (when assigned)
+                                                                     sentinel (independent audit)
+```
+
+**Reading the diagram:**
+
+- Left-to-right arrows are pipeline handoffs via shared documents in `.ai-work/<task-slug>/`
+- `+ context-engineer (shadow)` indicates the context-engineer runs in parallel with that stage, appending to `CONTEXT_REVIEW.md`
+- `sentinel (independent audit)` is not part of the pipeline chain — it is a standalone read-only auditor invokable at any time
+- The parallel-implementer / test-engineer / doc-engineer group operates on disjoint file sets per BDD/TDD execution rules

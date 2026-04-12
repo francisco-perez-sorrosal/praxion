@@ -4577,6 +4577,175 @@
         "invalid_at": null,
         "type": "pattern",
         "created_by": null
+      },
+      "bash-worktree-remove-stucks-harness-cwd": {
+        "value": "When a session is inside a worktree created via EnterWorktree, running `git worktree remove <path>` directly through Bash removes the directory but the Claude Code harness keeps its tracked cwd pointing at the now-gone worktree path. Every subsequent Bash/Glob invocation blocks with \"Path ... does not exist\" — even commands with absolute-path `cd` prefixes get pre-checked and rejected. The dangerouslyDisableSandbox flag does not bypass this cwd pre-check. Recovery requires invoking ExitWorktree explicitly (with action=remove, discard_changes=true if the worktree had uncommitted telemetry like observations.jsonl) — that resets the harness's internal worktree tracking and restores Bash to the original directory. Rule: when a worktree was created by EnterWorktree, always exit via ExitWorktree; only use `git worktree remove` directly for worktrees created with `git worktree add` outside the harness. Validated in roadmap-creation cleanup 2026-04-12.",
+        "created_at": "2026-04-12T21:57:05.864021Z",
+        "updated_at": "2026-04-12T21:57:05.864021Z",
+        "tags": [
+          "bash",
+          "enterworktree",
+          "exitworktree",
+          "gotcha",
+          "harness",
+          "worktree"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.worktree-rebase-merge-requires-removal-first",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.subagent-cwd-leak-worktree-vs-main",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Always use ExitWorktree (not bash `git worktree remove`) for EnterWorktree-created worktrees — otherwise the harness cwd gets stuck on the removed path",
+        "valid_at": "2026-04-12T21:57:05.864021Z",
+        "invalid_at": null,
+        "type": "gotcha",
+        "created_by": null
+      },
+      "reconciliation-supersedes-systems-plan-at-planner": {
+        "value": "When a pipeline produces both SYSTEMS_PLAN.md (architect) and CONTEXT_REVIEW.md (context-engineer shadow) with divergent guidance, the coordinator may write a RECONCILIATION.md as the authoritative decision doc. The implementation-planner must then: (1) read RECONCILIATION.md last and treat it as authoritative; (2) expose an \"Inputs Superseded\" delta table at the top of IMPLEMENTATION_PLAN.md (SYSTEMS_PLAN vs Reconciled per topic); (3) thread each delta through every step body — never cite \"per reconciliation\" as a hand-wave; (4) remove superseded acceptance criteria (e.g., \"bring sentinel under 400 lines\" after RECONCILIATION kills the extraction); (5) record each override in LEARNINGS.md \"Decisions Made\" with Why + Alternatives. Silent mixing produces plans the verifier flags as only partially achieving SYSTEMS_PLAN while the coordinator's actual intent is met. Observed in pipeline-hardening pipeline 2026-04-12.",
+        "created_at": "2026-04-12T22:17:47.390445Z",
+        "updated_at": "2026-04-12T22:17:47.390445Z",
+        "tags": [
+          "coordination",
+          "pattern",
+          "pipeline",
+          "reconciliation"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "When architect+context-engineer shadows diverge, coordinator writes RECONCILIATION.md; planner threads deltas with delta table + step-body updates (never hand-wave)",
+        "valid_at": "2026-04-12T22:17:47.390445Z",
+        "invalid_at": null,
+        "type": "pattern",
+        "created_by": null
+      },
+      "narrow-imports-over-noqa-in-hooks": {
+        "value": "When refactoring hooks to import from `_hook_utils`, import only the specific symbols used (e.g., `from _hook_utils import is_exempt`) rather than bundling the unused constant with a `# noqa: F401` comment. Ruff F401 will flag unused imports. If the prose/plan says \"import EXEMPT_AGENTS + is_exempt\" but only the helper is actually called, narrow to just the helper — linter wins over documentation pedantry. Pattern surfaced in pipeline-hardening Step 3 (remind_memory.py).",
+        "created_at": "2026-04-12T22:22:40.492738Z",
+        "updated_at": "2026-04-12T22:22:40.492738Z",
+        "tags": [
+          "convention",
+          "hooks",
+          "linting",
+          "python"
+        ],
+        "confidence": null,
+        "importance": 5,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "In hooks, import only the symbols actually used; narrow imports beat noqa comments when linter flags unused",
+        "valid_at": "2026-04-12T22:22:40.492738Z",
+        "invalid_at": null,
+        "type": "convention",
+        "created_by": null
+      },
+      "canonical-template-partial-preexisting": {
+        "value": "When a plan directs \"append these N bullets\" and the target already has equivalent coverage for some bullets (slightly different wording, same semantics), preserve existing content and append only missing ones. The Done-when grep (e.g., `grep -l \"Turn budget awareness\"`) typically checks presence, not uniqueness — duplicate bullets violate co-existing \"no existing content deleted\" constraints. Observed on pipeline-hardening Step 5 where six agents already carried Partial output bullets.",
+        "created_at": "2026-04-12T22:23:36.388900Z",
+        "updated_at": "2026-04-12T22:23:36.388900Z",
+        "tags": [
+          "agent-crafting",
+          "implementer",
+          "pattern",
+          "templates"
+        ],
+        "confidence": null,
+        "importance": 5,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "Canonical template append — preserve pre-existing equivalent bullets; Done-when grep checks presence not uniqueness",
+        "valid_at": "2026-04-12T22:23:36.388900Z",
+        "invalid_at": null,
+        "type": "pattern",
+        "created_by": null
+      },
+      "adr-addendum-over-body-mutation": {
+        "value": "When an ADR's body describes decision X but implementation reconciles to X' (due to a RECONCILIATION.md override, a later pipeline renumber, or new information), do NOT mutate the ADR body. Instead append an `## Addendum (YYYY-MM-DD)` section at the end of the body with a delta table (ADR body | As implemented | Source) and a one-line note that the body is preserved for historical integrity. This is a lighter-weight alternative to the full supersession protocol (new ADR + supersedes/superseded_by frontmatter) for small-to-medium reconciliations where the decision's spirit is unchanged. Used twice in pipeline-hardening (2026-04-12): dec-021 gained a phase-renumber addendum mapping old→new phase numbers; dec-038 gained an implementation-reconciliation addendum for TEST_RESULTS.md placement (step 7.8 vs 6, Phase 10 vs 5, agent-scoped vs step-scoped fragments). Verifiers should PASS the addendum presence, not flag the body as drift.",
+        "created_at": "2026-04-12T23:35:30.557776Z",
+        "updated_at": "2026-04-12T23:35:30.557776Z",
+        "tags": [
+          "adr",
+          "documentation",
+          "pattern",
+          "reconciliation"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.architecture-docs-differentiation-gap",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.dual-audience-architecture-documentation",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.metrics-reference-dual-sdk-pattern",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "When ADR body decision drifts from implementation, append an Addendum section with a delta table — don't mutate the body (lighter than full supersession)",
+        "valid_at": "2026-04-12T23:35:30.557776Z",
+        "invalid_at": null,
+        "type": "pattern",
+        "created_by": null
       }
     },
     "project": {

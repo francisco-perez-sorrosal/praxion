@@ -1,0 +1,53 @@
+# Test workflow -- runs ruff format/lint + pytest on both MCP servers via a
+# matrix strategy. Actions are SHA-pinned per security convention (see
+# dec-024). Python is managed by astral-sh/setup-uv.
+
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [memory-mcp, task-chronograph-mcp]
+
+    concurrency:
+      group: test-${{ github.ref }}-${{ matrix.project }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Set up uv (manages Python 3.13)
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57  # v8.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.project }}
+        run: uv sync
+
+      - name: Ruff format check
+        working-directory: ${{ matrix.project }}
+        run: uv run ruff format --check
+
+      - name: Ruff lint
+        working-directory: ${{ matrix.project }}
+        run: uv run ruff check
+
+      - name: Pytest
+        working-directory: ${{ matrix.project }}
+        run: uv run pytest

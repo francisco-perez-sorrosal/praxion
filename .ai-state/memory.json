@@ -5067,6 +5067,93 @@
         "invalid_at": null,
         "type": "gotcha",
         "created_by": null
+      },
+      "eval-venv-missing-arize-phoenix-client": {
+        "value": "praxion-evals cannot connect to Phoenix because eval/pyproject.toml depends on `arize-phoenix-evals` (the eval helpers package) but NOT `arize-phoenix` (the full package that provides `phoenix.Client`). Consequence: trace_reader.py `importlib.import_module(\"phoenix\")` succeeds (arize-phoenix-evals installs a partial `phoenix` namespace module) but `px.Client()` raises AttributeError, caught by the broad `except Exception` in read_current_summary and swallowed into a `phoenix-client-error:` note that the CLI never surfaces. Symptom: capture-baseline always produces empty numeric fields; regression silently returns current_summary with span_count=0 against any baseline. Compare with trajectory_eval.py (the preserved shim) which imports `phoenix as px` with an explicit \"arize-phoenix not installed\" error message. Fix options: (a) add `arize-phoenix` to eval/pyproject.toml dependencies, (b) use the lighter `arize-phoenix-client` HTTP-only package, (c) at minimum surface the notes tuple from TraceSummary in the CLI output so users see \"phoenix-client-error: module 'phoenix' has no attribute 'Client'\" instead of \"Phoenix returned empty traces\". Also: duration_ms_p95 drift check requires BOTH current and baseline to be non-None (diff.py:64-68) — without full Phoenix connectivity, current duration is always None and p95 drift is silently skipped.",
+        "created_at": "2026-04-13T02:46:58.507300Z",
+        "updated_at": "2026-04-13T02:46:58.507300Z",
+        "tags": [
+          "dependencies",
+          "eval",
+          "gotcha",
+          "phoenix",
+          "silent-failure"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.otel-relay-zero-duration-spans",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.phoenix-custom-dashboards-ax-only",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.phoenix-graph-node-attrs-for-agent-graph",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "praxion-evals can't query Phoenix: pyproject has arize-phoenix-evals but not arize-phoenix; px.Client() AttributeError is silently swallowed",
+        "valid_at": "2026-04-13T02:46:58.507300Z",
+        "invalid_at": null,
+        "type": "gotcha",
+        "created_by": null
+      },
+      "baseline-key-must-match-population-semantics": {
+        "value": "Regression baselines must be keyed by something that recurs. The praxion-evals shipped-in-3.1 design keys by task_slug, but Praxion slugs are one-shot (each feature creates a unique slug like `architecture-doc`, runs once, then `.ai-work/<slug>/` is deleted). A baseline-key whose population has size 1 is not a baseline — it's a snapshot. Snapshot archival and regression testing are different things, and the diff engine output (\"no drift detected\") is misleading when applied to the former. Generalizable rule: before building regression infrastructure, ask \"what is the population of past runs that share this key?\" — if the answer is \"exactly one\", the key is wrong. Fix pattern: key by category (tier) or structural fingerprint (shape) instead — (tier=standard, impl_steps=small, parallel=false) yields stored envelopes `{p50, p95}` sampled from N past pipelines of that class. This is how CI flakiness dashboards and performance regression systems actually work. See ROADMAP 3.7 for the Praxion redesign tracking ADR, chronograph span enrichment, schema refactor, and the pre-req `arize-phoenix` dep fix. The 3.1 implementation has been marked SHIPPED BUT BROKEN with blockquotes in ROADMAP, README_DEV, commands/eval.md, and a stderr TODO banner baked into the CLI for both `regression` and `capture-baseline` subcommands so the POC status is self-evident at every surface.",
+        "created_at": "2026-04-13T02:59:14.541661Z",
+        "updated_at": "2026-04-13T02:59:14.541661Z",
+        "tags": [
+          "baseline",
+          "design-insight",
+          "eval",
+          "pattern",
+          "regression",
+          "roadmap"
+        ],
+        "confidence": null,
+        "importance": 8,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.spring-cleaning-parallel-audit-pattern",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.roadmap-shape-b-hybrid-pattern",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.opportunities-as-first-class-roadmap-section",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Regression baselines must be keyed by something that recurs; slug-keyed fails in Praxion (N=1 per slug). Fix: tier/shape-keyed envelopes sampled across many past runs. Tracked in ROADMAP 3.7.",
+        "valid_at": "2026-04-13T02:59:14.541661Z",
+        "invalid_at": null,
+        "type": "insight",
+        "created_by": null
       }
     },
     "project": {

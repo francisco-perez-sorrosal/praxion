@@ -5154,6 +5154,81 @@
         "invalid_at": null,
         "type": "insight",
         "created_by": null
+      },
+      "agent-skill-injection-vs-prose-mention-gap": {
+        "value": "Mentioning a skill in an agent's prose (\"use the `X` skill to...\") is NOT the same as injecting it via the `skills:` frontmatter. Without injection, the skill's auto-triggering behavior never fires — the agent has to remember to manually Read the SKILL.md file, which in practice gets skipped. Discovered via user report that researcher in a downstream project (lrtp-skill) skipped external-api-docs when researching Railway/Nango APIs, even though researcher.md Phase 1 step 9 explicitly says \"use the external-api-docs skill\". Root cause: researcher.md frontmatter only injects `claude-ecosystem`, not `external-api-docs`. Same gap exists for systems-architect (prose says use it; frontmatter doesn't inject it) and implementer (same). Fix pattern when you want an agent to reliably use skill X: add X to the `skills:` frontmatter array AND keep the prose directive. Injection alone gets auto-triggered by the skill's description; prose alone is aspirational. The gap applies to any \"when situation Y arises, use skill Z\" pattern — audit all agents for prose-mention-without-injection when diagnosing \"why did the agent skip the skill we told it to use?\" Verified by comparing: `claude-ecosystem` is injected into researcher via frontmatter and does fire reliably; `external-api-docs` is prose-only and does not.",
+        "created_at": "2026-04-13T17:59:11.470458Z",
+        "updated_at": "2026-04-13T17:59:11.470458Z",
+        "tags": [
+          "agents",
+          "auto-trigger",
+          "frontmatter",
+          "gotcha",
+          "injection",
+          "skills"
+        ],
+        "confidence": null,
+        "importance": 8,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "learnings.agent-background-flag-mismatch",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.agent-background-flag-protocol-drift",
+            "relation": "related-to"
+          },
+          {
+            "target": "learnings.maxturns-exhaustion-across-agents",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Prose-mentioning a skill in an agent prompt does NOT activate it; must add to `skills:` frontmatter for auto-triggers to fire. Why researcher skipped external-api-docs.",
+        "valid_at": "2026-04-13T17:59:11.470458Z",
+        "invalid_at": null,
+        "type": "gotcha",
+        "created_by": null
+      },
+      "shared-plugin-identity-derive-not-hardcode": {
+        "value": "When a user asks you to hardcode their name/email/identity into a shared, installable artifact (plugin skill, agent prompt, template, shared script), flag the portability concern before editing: hardcoded identity in a distributed artifact leaks the author's attribution onto every downstream user's actions. Correct pattern: derive the identity at call time from the user's local environment — typically `git config --get user.name` / `git config --get user.email` because every developer has these set and they represent the identity they use for commits. Example: `chub_feedback` comments in the external-api-docs skill now append ` — ${name} (${email})` derived from git config at call time. Safe fallback when git config is empty: omit the suffix rather than fabricate a partial identity. The user's specific format request (\"Francisco Perez-Sorrosal (fperezsorrosal@gmail.com)\") was the EXAMPLE they wanted for their own runs, not the literal hardcoded value — clarifying which they meant before editing avoided shipping their identity to every Praxion installer. Generalizable rule: anything that identifies or attributes must resolve at runtime from the current user's environment, never from static text in the artifact. Applies to: commit templates, feedback-to-external-service patterns, authorship lines, reviewer fields, support-contact fields.",
+        "created_at": "2026-04-13T18:43:26.926096Z",
+        "updated_at": "2026-04-13T18:43:26.926096Z",
+        "tags": [
+          "git-config",
+          "identity",
+          "pattern",
+          "plugin",
+          "portability",
+          "shared-artifacts"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "Never hardcode user identity into shared/distributed artifacts; derive from git config at call time. Clarify \"your identity\" vs \"an example format\" before editing.",
+        "valid_at": "2026-04-13T18:43:26.926096Z",
+        "invalid_at": null,
+        "type": "pattern",
+        "created_by": null
       }
     },
     "project": {
@@ -5718,6 +5793,77 @@
         "valid_at": "2026-04-12T20:41:00.684542Z",
         "invalid_at": null,
         "type": "pattern",
+        "created_by": null
+      },
+      "external-api-docs-cross-agent-convention": {
+        "value": "Convention established 2026-04-13: six pipeline agents have `external-api-docs` injected via their `skills:` frontmatter and are expected to use it whenever their work touches an external API/SDK/third-party integration. The six: researcher, systems-architect, implementation-planner, implementer, test-engineer, cicd-engineer. Each has both (a) injection and (b) a phase-appropriate prose directive — researcher Phase 3 step 1 (\"check context-hub FIRST\" before WebSearch), systems-architect API-drift check (already had it), implementation-planner Phase 1 step 8 (plan a docs-check step for each external API in SYSTEMS_PLAN.md), implementer skill-loading paragraph (already had it), test-engineer Language Context paragraph (integration tests against external APIs), cicd-engineer Phase 1 step 6 (auth/rate-limit/webhook lookup). Codified in rules/swe/swe-agent-coordination-protocol.md under a new \"Cross-Agent Skill Conventions\" subsection as a binding rule. Agents explicitly NOT injected (by design): context-engineer, verifier, doc-engineer, promethean, sentinel, skill-genesis — they don't write/design/test/plan/CI-configure against external APIs. When adding a new agent to the pipeline, decide inject-or-not based on whether the agent touches external APIs in its normal operation; if yes, add to the frontmatter AND the Cross-Agent Skill Conventions list. Motivating incident: researcher in a downstream project (lrtp-skill) skipped external-api-docs when researching Railway/Nango because the skill was prose-mentioned but not injected.",
+        "created_at": "2026-04-13T18:23:58.372286Z",
+        "updated_at": "2026-04-13T18:23:58.372286Z",
+        "tags": [
+          "agents",
+          "convention",
+          "cross-agent",
+          "external-api-docs",
+          "injection",
+          "skills"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [
+          {
+            "target": "project.skill-reference-file-conventions",
+            "relation": "related-to"
+          },
+          {
+            "target": "project.pointer-not-playbook-agent-discipline",
+            "relation": "related-to"
+          }
+        ],
+        "summary": "Six agents (researcher, systems-architect, implementation-planner, implementer, test-engineer, cicd-engineer) inject external-api-docs via frontmatter; codified in coordination protocol",
+        "valid_at": "2026-04-13T18:23:58.372286Z",
+        "invalid_at": null,
+        "type": "convention",
+        "created_by": null
+      },
+      "chub-feedback-enabled-by-default-three-surfaces": {
+        "value": "CHUB_FEEDBACK=1 (and CHUB_TELEMETRY=0) are enabled by default in three coordinated surfaces; modify all three together when changing chub env defaults: (1) install_claude.sh:443-444 — the Praxion installer writes the env block into the chub-mcp server config in ~/.claude.json so MCP tool calls work out of the box; (2) skills/external-api-docs/SKILL.md CLI fallback section — every `chub <cmd>` bash example prepends `CHUB_TELEMETRY=0 CHUB_FEEDBACK=1` so the CLI path works even without MCP; (3) skills/external-api-docs/references/mcp-setup.md — three example MCP config blocks (Claude Code, Cursor, Claude Desktop) for users configuring manually. Net effect: every Praxion installer ships with feedback enabled and telemetry disabled — no user action required for `chub_feedback` to work. When auditing or modifying chub env behavior, grep for both `CHUB_FEEDBACK` and `CHUB_TELEMETRY` to find all surfaces; missing one creates inconsistency between MCP and CLI paths.",
+        "created_at": "2026-04-13T18:56:02.641173Z",
+        "updated_at": "2026-04-13T18:56:02.641173Z",
+        "tags": [
+          "chub",
+          "configuration",
+          "context-hub",
+          "env-vars",
+          "install",
+          "mcp"
+        ],
+        "confidence": null,
+        "importance": 5,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "CHUB_FEEDBACK=1/CHUB_TELEMETRY=0 set in 3 places (installer, SKILL.md CLI examples, mcp-setup.md) — modify together when changing defaults",
+        "valid_at": "2026-04-13T18:56:02.641173Z",
+        "invalid_at": null,
+        "type": "convention",
         "created_by": null
       }
     },

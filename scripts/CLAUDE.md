@@ -15,3 +15,7 @@ Utility and operational scripts for the Praxion ecosystem.
 - Shell scripts (bash), `set -euo pipefail` (except `ccwt` which uses `set -eo pipefail`)
 - Each script is self-contained with usage documentation in header comments
 - `chronograph-ctl` and `phoenix-ctl` are development/operations tools — in production, MCP servers run via plugin.json
+
+## Installer Filter
+
+`install_claude.sh` links scripts under `~/.local/bin/` only when they are `-f && -x` AND do not match `merge_driver_*` or `git-*-hook.sh`. User-facing tools must be executable (`chmod +x`); merge drivers and git hooks are invoked by git, not by PATH, so they are intentionally skipped. Orphaned symlinks (from renamed/removed scripts) are cleaned on upgrade by `clean_stale_symlinks`. See dec-042.

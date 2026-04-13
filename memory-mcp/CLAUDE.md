@@ -8,6 +8,7 @@ Persistent memory management via MCP (Model Context Protocol) server with dual-l
 - Source: `src/memory_mcp/` (9 modules: schema, store, search, dedup, consolidation, lifecycle, observations, narrative, server)
 - Tests: `tests/` — 329 tests across 13 files, run with `uv run pytest`
 - Lint/format: `uv run ruff check --fix` and `uv run ruff format`
+- Type check: `uv run pyright src/` (see ADR `dec-041`)
 - Storage: JSON file at path specified by `MEMORY_FILE` env var (default: `.ai-state/memory.json`); JSONL at `OBSERVATIONS_FILE` (default: `.ai-state/observations.jsonl`)
 - Schema: v2.0 (auto-migration from v1.x implemented in `store.py::_auto_migrate_if_needed`; runs on every constructor open)
 
@@ -19,7 +20,7 @@ Persistent memory management via MCP (Model Context Protocol) server with dual-l
 - `dedup.py` — dedup candidates, value similarity, word extraction, stop words
 - `consolidation.py` — action validation (`validate_actions`), atomic execution (`apply_actions`)
 - `lifecycle.py` — read-only analysis (stale entries, archival candidates, confidence)
-- `observations.py` — `ObservationStore`: JSONL I/O, rotation, querying with process-safe locking
+- `observations.py` — `ObservationStore`: JSONL I/O, rotation, querying with process-safe locking. `session_start()` auto-invokes `rotate_if_needed()` when observations.jsonl exceeds 10 MiB; wrapped in try/except so rotation failure never breaks session start. Under-threshold cost is a single `stat()` (~2 ms p95).
 - `narrative.py` — `build_timeline()`, `build_session_narrative()`: Markdown formatters for observation data
 - `server.py` — FastMCP tool/resource registration (18 tools, 2 resources)
 
@@ -37,5 +38,5 @@ Six hooks integrate with Claude Code's event system:
 - `validate_memory.py` (SubagentStop) — warns parent when agents write LEARNINGS.md without calling remember()
 - `capture_memory.py` (PostToolUse) — captures tool events as JSONL observations
 - `capture_session.py` (SessionStart, Stop, SubagentStart, SubagentStop) — captures lifecycle events as JSONL observations
-- `promote_learnings.py` (PreToolUse) — warns before LEARNINGS.md cleanup when unpromoted entries exist
+- `promote_learnings.py` (PreToolUse) — warns before LEARNINGS.md cleanup when unpromoted entries exist; wrapped by `cleanup_gate.sh` (shell fast-path mirroring the `commit_gate.sh` pattern) so Python startup is skipped for non-cleanup Bash calls
 - `memory-protocol.md` (always-loaded rule) — guides when/how to call remember() with type guidance

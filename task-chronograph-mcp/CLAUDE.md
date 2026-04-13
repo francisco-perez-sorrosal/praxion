@@ -8,6 +8,7 @@ Agent pipeline observability via MCP server with OpenTelemetry export to Phoenix
 - Source: `src/task_chronograph_mcp/`
 - Tests: `tests/` — run with `uv run pytest`
 - Lint/format: `uv run ruff check --fix` and `uv run ruff format`
+- Type check: `uv run pyright src/` (see ADR `dec-041`)
 - OTel dependencies: `opentelemetry-api`, `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http`, `openinference-semantic-conventions`, `arize-phoenix-otel`
 - Development runner: `scripts/chronograph-ctl` (runs from source, not plugin cache)
 

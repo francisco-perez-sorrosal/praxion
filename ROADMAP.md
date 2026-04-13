@@ -251,7 +251,9 @@ Build on the recovered token budget and CI foundation.
 
 Invest in systematic quality measurement and automation gaps.
 
-#### 3.1 Eval Framework Overhaul
+#### 3.1 Eval Framework Overhaul ✅ DONE (2026-04-12)
+
+**Outcome**: New `eval/` uv workspace package with Tier 1 behavioral (artifact manifest check) and regression (Phoenix trace diff against baseline) evaluations landed. `/eval` slash command (scoped to `Bash(uv run --project eval praxion-evals:*)`); Tier 2 stubs (cost, decision-quality, claude-as-judge) deferred per user's "scope carefully" guidance. 30/30 eval tests pass. OUT-OF-BAND invariant enforced: `grep -rn praxion_evals hooks/` returns empty (dec-040). Existing `trajectory_eval.py` preserved as Tier 1 OpenAI-judge shim.
 
 **Problem**: Stub framework with one eval type, no tests, stale patterns.
 
@@ -268,7 +270,9 @@ Invest in systematic quality measurement and automation gaps.
 **Dependencies**: 1.2 (CI pipeline for running evals).
 **Risk**: High effort. Scope carefully -- start with behavioral eval and regression testing, expand incrementally.
 
-#### 3.2 Add Shell Gate for `promote_learnings.py`
+#### 3.2 Add Shell Gate for `promote_learnings.py` ✅ DONE (2026-04-12)
+
+**Outcome**: `hooks/cleanup_gate.sh` created mirroring `commit_gate.sh` structure; `hooks/hooks.json` routes `promote_learnings.py` through the gate. Conservative regex per context-engineer hardening — false-negative is the failure mode, so ambiguous cleanup patterns fall through to Python. Non-matching Bash commands skip Python startup (~200-500ms saved). 12/12 shell-gate tests pass.
 
 **Problem**: Python startup (~200-500ms) on every Bash call without fast-path filtering.
 
@@ -277,7 +281,9 @@ Invest in systematic quality measurement and automation gaps.
 **Dependencies**: None.
 **Risk**: None.
 
-#### 3.3 Add Large-File Warning Hook
+#### 3.3 Add Large-File Warning Hook ❌ WON'T DO (2026-04-12)
+
+**Rationale**: User directive — the 800-line coding-style rule should remain advisory; implementing a hook (even one that only warns) adds PostToolUse latency on every Write/Edit and introduces noise without enforcement value. Existing sentinel code-health dimension already flags large files during ecosystem audits, which is the right level of intervention for an advisory rule. Closed as out-of-scope by user decision, not a deferred item.
 
 **Problem**: Coding-style 800-line rule is advisory only.
 
@@ -286,7 +292,9 @@ Invest in systematic quality measurement and automation gaps.
 **Dependencies**: None.
 **Risk**: Low. Advisory only, does not block.
 
-#### 3.4 Add Type Checking to MCP Servers
+#### 3.4 Add Type Checking to MCP Servers ✅ DONE (2026-04-12)
+
+**Outcome**: Pyright (basic mode) added to both `memory-mcp` and `task-chronograph-mcp` dev deps; `[tool.pyright]` config scoped to `src/`; CI step wired between ruff and pytest. Staged rollout per dec-041 (observe → fix → enforce) completed in one pipeline: all observed errors fixed, then `continue-on-error: true` removed. Both servers at **0 errors, 0 warnings**. Full test suites still green (memory-mcp 418, task-chronograph-mcp 226).
 
 **Problem**: Both servers use type hints extensively but never validate them.
 
@@ -295,7 +303,9 @@ Invest in systematic quality measurement and automation gaps.
 **Dependencies**: 1.2 (CI pipeline).
 **Risk**: Medium. May surface latent type issues.
 
-#### 3.5 Automatic Observation Rotation
+#### 3.5 Automatic Observation Rotation ✅ DONE (2026-04-12)
+
+**Outcome**: `memory-mcp/src/memory_mcp/server.py::session_start()` now calls `_get_observation_store().rotate_if_needed()` wrapped in try/except so rotation failure never blocks session start. Hot-path safe: measured p95 = **0.023 ms** (2 orders of magnitude under the 2 ms EC-3.5.2 budget). 39/39 tests in `tests/test_observations.py::TestSessionStartRotationWiring` green.
 
 **Problem**: `observations.jsonl` grows unbounded. Rotation exists but is never called.
 
@@ -304,7 +314,9 @@ Invest in systematic quality measurement and automation gaps.
 **Dependencies**: None.
 **Risk**: Low.
 
-#### 3.6 Fix Scripts Linking
+#### 3.6 Fix Scripts Linking ✅ DONE (2026-04-12)
+
+**Outcome**: `install_claude.sh::relink_all()` filters via combined predicate (`[ -f && -x ]` AND `case "$name" in merge_driver_*|git-*-hook.sh) continue ;;` — per dec-042). `scripts/regenerate_adr_index.py` made executable in same commit (prevents silent regression). `clean_stale_symlinks()` extended to sweep `~/.local/bin/` for orphaned symlinks on upgrade. 14/14 install-filter tests pass. User-level install preserved: each project still operates on its own `$CWD`; no global config bleed.
 
 **Problem**: `install_claude.sh` links ALL files in `scripts/` to `~/.local/bin/`, including test files and CLAUDE.md.
 

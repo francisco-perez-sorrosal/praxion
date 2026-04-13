@@ -85,6 +85,44 @@ link_item() {
 # Symlink management — single source of truth for all symlink-based artifacts
 # =============================================================================
 
+# Predicate: should scripts/<file> be linked into ~/.local/bin/?
+# Returns 0 (true) only for user-facing CLI tools — regular executable files
+# whose basename is NOT an internal git helper (merge driver, git-* hook).
+# See dec-042 for rationale.
+script_is_user_facing() {
+    local path="$1"
+    [ -f "$path" ] && [ -x "$path" ] || return 1
+    local name
+    name="$(basename "$path")"
+    case "$name" in
+        merge_driver_*|git-*-hook.sh) return 1 ;;
+    esac
+    return 0
+}
+
+# Sweep ~/.local/bin/ for symlinks pointing into this repo's scripts/
+# directory that no longer pass the install filter (dec-042). Covers the
+# upgrade path from older installers that linked CLAUDE.md, merge drivers,
+# test files, or scripts that have since been renamed/removed.
+sweep_stale_script_symlinks() {
+    local scripts_src="${SCRIPT_DIR}/scripts"
+    local bin_dir="${HOME}/.local/bin"
+    [ -d "$bin_dir" ] && [ -d "$scripts_src" ] || return 0
+    for link in "$bin_dir"/*; do
+        [ -L "$link" ] || continue
+        local target
+        target="$(readlink "$link")"
+        case "$target" in
+            "$scripts_src"/*) ;;
+            *) continue ;;
+        esac
+        if ! script_is_user_facing "$target"; then
+            step "Removing stale symlink: ${link}"
+            rm "$link"
+        fi
+    done
+}
+
 clean_stale_symlinks() {
     local dest_dir="${HOME}/.claude"
     local list_file="${CLAUDE_CONFIG_DIR}/stale_symlinks.txt"
@@ -110,6 +148,7 @@ clean_stale_symlinks() {
             rmdir "$dest_subdir" 2>/dev/null || true
         fi
     done
+    sweep_stale_script_symlinks
 }
 
 relink_all() {
@@ -144,9 +183,16 @@ relink_all() {
         mkdir -p "$bin_dir"
         local scripts_count=0
         for script in "$scripts_src"/*; do
-            [ -f "$script" ] || continue
+            # Combined predicate (dec-042): user-facing scripts are regular
+            # files with the executable bit set. Internal helpers invoked by
+            # git (merge drivers, git-* hooks) must stay out of $PATH even
+            # though they are executable.
+            [ -f "$script" ] && [ -x "$script" ] || continue
             local name
             name="$(basename "$script")"
+            case "$name" in
+                merge_driver_*|git-*-hook.sh) continue ;;
+            esac
             ln -sf "$script" "${bin_dir}/${name}"
             scripts_count=$((scripts_count + 1))
         done
@@ -572,9 +618,14 @@ check_claude_code() {
     printf "\n  ${B}Scripts:${R}\n"
     local bin_dir="${HOME}/.local/bin"
     for script in "${SCRIPT_DIR}/scripts"/*; do
-        [ -f "$script" ] || continue
+        # Same combined predicate as relink_all() (dec-042) so check only
+        # reports on scripts that would actually be linked.
+        [ -f "$script" ] && [ -x "$script" ] || continue
         local name
         name="$(basename "$script")"
+        case "$name" in
+            merge_driver_*|git-*-hook.sh) continue ;;
+        esac
         if [ -L "${bin_dir}/${name}" ] && [ "$(readlink "${bin_dir}/${name}")" = "$script" ]; then
             info "${name} linked"
         else
@@ -703,12 +754,15 @@ uninstall_claude_code() {
             || warn "Plugin removal failed"
     fi
 
-    # Remove scripts
+    # Remove scripts (same combined filter as relink_all — dec-042).
     local bin_dir="${HOME}/.local/bin"
     for script in "${SCRIPT_DIR}/scripts"/*; do
-        [ -f "$script" ] || continue
+        [ -f "$script" ] && [ -x "$script" ] || continue
         local name
         name="$(basename "$script")"
+        case "$name" in
+            merge_driver_*|git-*-hook.sh) continue ;;
+        esac
         if [ -L "${bin_dir}/${name}" ] && [ "$(readlink "${bin_dir}/${name}")" = "$script" ]; then
             rm "${bin_dir}/${name}"
             info "Removed ${name} from ~/.local/bin/"

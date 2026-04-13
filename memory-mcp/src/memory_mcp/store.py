@@ -185,7 +185,7 @@ class MemoryStore:
                     entry["type"] = None
                 if "created_by" not in entry:
                     entry["created_by"] = None
-                source = entry.get("source", {})
+                source: dict[str, str | None] = entry.get("source", {})
                 if isinstance(source, str):
                     source = {"type": "session", "detail": source}
                     entry["source"] = source

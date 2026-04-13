@@ -48,6 +48,10 @@ jobs:
         working-directory: ${{ matrix.project }}
         run: uv run ruff check
 
+      - name: Pyright type check
+        working-directory: ${{ matrix.project }}
+        run: uv run pyright src/
+
       - name: Pytest
         working-directory: ${{ matrix.project }}
         run: uv run pytest

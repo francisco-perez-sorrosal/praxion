@@ -15,6 +15,7 @@ dependencies = [
 dev = [
     "pytest",
     "pytest-asyncio",
+    "pyright>=1.1.390",
     "ruff>=0.15.0",
 ]
 
@@ -39,3 +40,11 @@ ignore = ["E501"]
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.pyright]
+include = ["src"]
+exclude = ["tests", "build", "**/__pycache__"]
+pythonVersion = "3.13"
+typeCheckingMode = "basic"
+reportMissingImports = "error"
+reportMissingTypeStubs = "none"

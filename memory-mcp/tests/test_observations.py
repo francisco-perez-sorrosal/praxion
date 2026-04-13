@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from pathlib import Path
 
 import pytest
 
+from memory_mcp import server as server_module
 from memory_mcp.observations import ObservationStore
 
 # -- Fixtures -----------------------------------------------------------------
@@ -483,3 +485,156 @@ class TestCountSessions:
         store.append(_make_observation(session_id="sess-beta"))
 
         assert store.count_sessions() == 2
+
+
+# -- session_start wiring (Phase 3.5) -----------------------------------------
+
+
+# Number of repetitions for the hot-path latency bench. Chosen large enough to
+# amortize timer noise while staying under 1 s total test wall time.
+_ROTATE_BENCH_ITERATIONS = 200
+
+# EC-3.5.2 upper bound (2 ms p95) for the no-rotation-needed hot path.
+_ROTATE_HOTPATH_P95_MS = 2.0
+
+
+@pytest.fixture
+def reset_server_singletons(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
+    """Point server singletons at tmp paths and reset them before each test.
+
+    Yields (memory_file_path, observations_file_path). Restores singletons on
+    teardown so tests remain isolated.
+    """
+    mem_file = tmp_path / "memory.json"
+    obs_file = tmp_path / "observations.jsonl"
+    monkeypatch.setenv("MEMORY_FILE", str(mem_file))
+    monkeypatch.setenv("OBSERVATIONS_FILE", str(obs_file))
+
+    # Reset module-level singletons so the env vars take effect.
+    monkeypatch.setattr(server_module, "_store", None)
+    monkeypatch.setattr(server_module, "_obs_store", None)
+    return mem_file, obs_file
+
+
+class TestSessionStartRotationWiring:
+    """EC-3.5.1 / EC-3.5.2 / EC-3.5.3 / EC-3.5.4 / EC-3.5.5.
+
+    The MCP ``session_start`` tool wires ``rotate_if_needed`` on the hot path.
+    These tests verify the three contract points: no-op latency, rotation
+    success, and failure isolation.
+    """
+
+    def test_rotate_if_needed_hotpath_p95_under_2ms(
+        self, reset_server_singletons: tuple[Path, Path]
+    ) -> None:
+        """Direct benchmark: the no-rotation path stays under 2 ms p95.
+
+        Per EC-3.5.2 the added wall-clock cost is <2 ms p95 when the file is
+        below threshold. We measure ``rotate_if_needed()`` in isolation — that
+        is the only added cost on top of ``store.session_start()``.
+        """
+        _, obs_path = reset_server_singletons
+
+        # Seed a small observations file well below the 10 MiB threshold.
+        obs_store = server_module._get_observation_store()
+        obs_store.append(
+            {
+                "timestamp": "2026-04-12T00:00:00Z",
+                "session_id": "bench",
+                "event_type": "session_start",
+            }
+        )
+        assert obs_path.exists()
+
+        samples_ms: list[float] = []
+        for _ in range(_ROTATE_BENCH_ITERATIONS):
+            t0 = time.perf_counter()
+            result = obs_store.rotate_if_needed()
+            t1 = time.perf_counter()
+            assert result is None  # confirms we stayed on the hot path
+            samples_ms.append((t1 - t0) * 1000.0)
+
+        samples_ms.sort()
+        p95_index = int(0.95 * (len(samples_ms) - 1))
+        p95_ms = samples_ms[p95_index]
+
+        assert p95_ms <= _ROTATE_HOTPATH_P95_MS, (
+            f"rotate_if_needed p95 {p95_ms:.3f} ms exceeds "
+            f"{_ROTATE_HOTPATH_P95_MS} ms budget (EC-3.5.2)"
+        )
+
+        # Expose the measurement for the TEST_RESULTS.md capture.
+        print(f"\nrotate_if_needed hot-path p95 = {p95_ms:.3f} ms")
+
+    def test_session_start_positive_rotation(
+        self,
+        reset_server_singletons: tuple[Path, Path],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Over-threshold rotation succeeds and summary reports the rotated file.
+
+        Covers EC-3.5.1 (rotate called from session_start), EC-3.5.3
+        (rotation occurs + summary still returned), and EC-3.5.5 (new path).
+        """
+        _, obs_path = reset_server_singletons
+
+        # Write enough data so a tiny threshold forces rotation. We keep the
+        # default 10 MiB for the store and instead monkey-patch a tiny
+        # threshold via the singleton's rotate_if_needed default.
+        obs_store = server_module._get_observation_store()
+        for i in range(5):
+            obs_store.append(
+                {
+                    "timestamp": f"2026-04-12T00:0{i}:00Z",
+                    "session_id": "pre-rotation",
+                    "event_type": "tool_use",
+                }
+            )
+        assert obs_path.exists()
+
+        original_rotate = obs_store.rotate_if_needed
+
+        def _rotate_tiny(max_bytes: int = 1) -> str | None:
+            return original_rotate(max_bytes=max_bytes)
+
+        monkeypatch.setattr(obs_store, "rotate_if_needed", _rotate_tiny)
+
+        summary = server_module.session_start()
+
+        assert "error" not in summary
+        assert "total" in summary  # confirms MemoryStore summary contract intact
+        assert "observations_rotated_to" in summary
+        rotated_name = summary["observations_rotated_to"]
+        assert rotated_name.startswith("observations.")
+        assert rotated_name.endswith(".jsonl")
+        assert (obs_path.parent / rotated_name).exists()
+        assert not obs_path.exists()  # original file moved
+        assert "observations_rotation_error" not in summary
+
+    def test_session_start_safety_rotation_error_swallowed(
+        self,
+        reset_server_singletons: tuple[Path, Path],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Rotation failure is swallowed into the summary; session_start succeeds.
+
+        Covers EC-3.5.4 — a disk-full / permission error must never surface
+        as an exception from ``session_start``. The error is captured under
+        ``observations_rotation_error``.
+        """
+        obs_store = server_module._get_observation_store()
+
+        def _raise(*_args: object, **_kwargs: object) -> str | None:
+            raise OSError("simulated disk full")
+
+        monkeypatch.setattr(obs_store, "rotate_if_needed", _raise)
+
+        summary = server_module.session_start()
+
+        assert "error" not in summary
+        # MemoryStore summary must still be populated.
+        assert "total" in summary
+        assert "session_count" in summary
+        # The rotation error is surfaced via the summary, not via exception.
+        assert summary.get("observations_rotation_error") == "simulated disk full"
+        assert "observations_rotated_to" not in summary

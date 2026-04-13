@@ -3,34 +3,30 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "task-chronograph-mcp"
-version = "0.1.1.dev0"
-description = "Agent pipeline observability via MCP server with OTel export to Phoenix"
+name = "praxion-evals"
+version = "0.1.0"
+description = "Out-of-band quality measurement framework for Praxion agent pipelines (Tier 1: behavioral + regression)."
 requires-python = ">=3.13"
 dependencies = [
-    "mcp[cli]>=1.27,<2",
-    "starlette",
-    "uvicorn",
-    "watchfiles",
-    # OTel instrumentation for Phoenix relay
-    "opentelemetry-api>=1.20",
-    "opentelemetry-sdk>=1.20",
-    "opentelemetry-exporter-otlp-proto-http>=1.20",
-    "openinference-semantic-conventions>=0.1.5",
-    "arize-phoenix-otel>=0.15.0",
+    "arize-phoenix-evals>=2.12",
+    "openai",
+    "anthropic",
+    "pandas",
 ]
+
+[project.scripts]
+praxion-evals = "praxion_evals.cli:main"
 
 [dependency-groups]
 dev = [
     "pytest",
     "pytest-asyncio",
-    "httpx",
     "pyright>=1.1.390",
     "ruff>=0.15.0",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/task_chronograph_mcp"]
+packages = ["src/praxion_evals"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -42,6 +38,7 @@ asyncio_mode = "auto"
 [tool.ruff]
 line-length = 100
 target-version = "py313"
+extend-exclude = ["trajectory_eval.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "PT"]

@@ -1,0 +1,21 @@
+{
+  "task_slug": "phase3-quality-automation",
+  "captured_at": "2026-04-12T18:00:00Z",
+  "expected_phases": [
+    "research",
+    "architecture",
+    "planning",
+    "implementation",
+    "verification"
+  ],
+  "expected_deliverables": [
+    ".ai-work/phase3-quality-automation/SYSTEMS_PLAN.md",
+    ".ai-work/phase3-quality-automation/IMPLEMENTATION_PLAN.md",
+    ".ai-work/phase3-quality-automation/WIP.md",
+    ".ai-work/phase3-quality-automation/VERIFICATION_REPORT.md",
+    ".ai-state/decisions/040-eval-framework-out-of-band.md",
+    ".ai-state/decisions/041-pyright-over-mypy.md",
+    ".ai-state/decisions/042-scripts-filter-combined-predicate.md"
+  ],
+  "expected_exit_status": "pass"
+}

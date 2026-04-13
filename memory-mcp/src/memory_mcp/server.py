@@ -66,9 +66,24 @@ def session_start() -> dict:
     Increments the session counter and returns a summary of all stored memories
     including category counts, total entries, and schema version.
     Call this at the beginning of each conversation.
+
+    As a maintenance side effect, the observations JSONL file is rotated when
+    it exceeds the default 10 MiB threshold. The rotation is best-effort — a
+    failure is surfaced via ``summary["observations_rotation_error"]`` and
+    never breaks session_start. Under-threshold cost is a single ``stat()``
+    call (≤ 2 ms p95).
     """
     try:
-        return _get_store().session_start()
+        summary = _get_store().session_start()
+        # Maintenance: rotate observations file if oversized.
+        # Best-effort — a rotation failure must not break session_start.
+        try:
+            rotated = _get_observation_store().rotate_if_needed()
+            if rotated:
+                summary["observations_rotated_to"] = rotated
+        except Exception as rot_exc:  # noqa: BLE001
+            summary["observations_rotation_error"] = str(rot_exc)
+        return summary
     except Exception as exc:
         return {"error": str(exc)}
 

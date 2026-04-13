@@ -17,7 +17,7 @@
 | **Language / Framework** | Python 3.13+ (MCP servers), Markdown (skills/agents/rules/commands), Shell/Python (hooks, scripts) |
 | **Architecture pattern** | Plugin-based knowledge ecosystem with progressive disclosure and agent pipeline orchestration |
 | **Source stage** | Phase 5 creation, 2026-04-10 by systems-architect |
-| **Last verified** | 2026-04-12 by systems-architect |
+| **Last verified** | 2026-04-13 by systems-architect (Phase 3.1/3.6 design additions) |
 
 Praxion is a meta-project that provides the operational infrastructure for AI-assisted software development. Rather than being an application itself, it is an ecosystem of reusable skills, specialized agents, declarative rules, slash commands, lifecycle hooks, and MCP servers that compose into a coherent development workflow. It ships as the `i-am` Claude Code plugin, with secondary targets for Claude Desktop and Cursor.
 
@@ -116,13 +116,14 @@ graph TD
 | Rules | Declarative conventions auto-loaded by relevance into every session | Built | `rules/swe/`, `rules/writing/` |
 | Commands | User-invoked slash commands for repeatable workflows | Built | `commands/*.md` |
 | Hooks | Python/shell scripts triggered by Claude Code lifecycle events for enforcement and observability | Built | `hooks/*.py`, `hooks/*.sh`, `hooks/hooks.json` |
-| Memory MCP | Persistent dual-layer memory: curated institutional knowledge (JSON) + zero-cost automatic observations (JSONL) | Built | `memory-mcp/src/memory_mcp/` |
+| Memory MCP | Persistent dual-layer memory: curated institutional knowledge (JSON) + zero-cost automatic observations (JSONL). `session_start()` auto-rotates observations.jsonl above 10 MiB (best-effort, never blocks) | Built | `memory-mcp/src/memory_mcp/` |
 | Chronograph MCP | Agent pipeline observability via OpenTelemetry spans with HTTP event ingestion and OTLP export | Built | `task-chronograph-mcp/src/task_chronograph_mcp/` |
 | `.ai-state/` | Persistent project intelligence: ADRs, specs, sentinel reports, architecture docs, memory store | Built | `.ai-state/decisions/`, `.ai-state/memory.json` |
 | `.ai-work/` | Ephemeral pipeline documents scoped by task slug; gitignored, worktree-isolated | Built | `.ai-work/<task-slug>/` |
 | Installers | Target-specific deployment scripts (Claude Code, Claude Desktop, Cursor) | Built | `install.sh`, `install_claude.sh`, `install_cursor.sh` |
 | Scripts | Developer tooling: worktree management, merge drivers, daemon control, ADR index generation | Built | `scripts/` |
 | Roadmap-cartographer | Project-level roadmap generator orchestrating **project-derived lens-set** parallel audit, synthesis, and user-gated ROADMAP.md emission for any project (deterministic / agentic / hybrid); SPIRIT is one exemplar lens set among DORA / SPACE / FAIR / CNCF Platform Maturity / Custom | Designed | `agents/roadmap-cartographer.md`, `skills/roadmap-synthesis/` (dec-029, dec-030, dec-035, dec-036) |
+| Eval framework | Out-of-band quality measurement via `/eval` command and CI; tiered (behavioral + regression first, cost + decision-quality + LLM-judge as Tier 2 stubs); reads completed artifacts and Phoenix traces without mutating live pipeline state | Built | `eval/pyproject.toml`, `eval/src/praxion_evals/`, `commands/eval.md`, `.ai-state/evals/` (dec-040, dec-041) |
 
 ## 4. Interfaces
 
@@ -132,7 +133,7 @@ graph TD
 | Interface | Type | Provider | Consumer(s) | Contract |
 |-----------|------|----------|-------------|----------|
 | Plugin manifest | JSON | `plugin.json` | Claude Code plugin system | Skills/commands via directory globs, agents via explicit paths, MCP via command+args |
-| Hook lifecycle | JSON (stdin/stdout) | Claude Code | `hooks/*.py` | Exit 0 = allow + process stdout JSON; exit 2 = block + stderr feedback |
+| Hook lifecycle | JSON (stdin/stdout) | Claude Code | `hooks/*.py` | Exit 0 = allow + process stdout JSON; exit 2 = block + stderr feedback. Sync PreToolUse Python hooks (`check_code_quality`, `remind_adr`, `remind_memory`, `promote_learnings`) are fronted by shell-gate wrappers (`commit_gate.sh`, `cleanup_gate.sh`) that skip Python startup on non-matching Bash payloads |
 | Hook events HTTP | HTTP POST | `hooks/send_event.py` | Chronograph MCP | `localhost:8765/api/events` with event payload |
 | Memory MCP | stdio (MCP) | `memory-mcp` | Claude Code, agents, hooks | 18 tools + 2 resources; schema v2.0 |
 | Chronograph MCP | stdio (MCP) + HTTP | `task-chronograph-mcp` | Claude Code (stdio), hooks (HTTP) | 3 MCP tools; HTTP daemon on port 8765 |
@@ -141,6 +142,8 @@ graph TD
 | Skill progressive disclosure | YAML frontmatter + Markdown | `SKILL.md` files | Claude Code skill loader | 3 tiers: metadata (startup), body (activation), references (on-demand) |
 | Hook registration | JSON | `hooks/hooks.json` | Claude Code plugin system | Event type, command, timeout, sync/async per hook |
 | `/roadmap` command | Slash command | `commands/roadmap.md` | User | Modes: fresh (default), diff (incremental re-run), `<focus-area>` (scoped audit); delegates to `roadmap-cartographer` (dec-029, dec-032) |
+| `/eval` command | Slash command | `commands/eval.md` | User | Tiers: `behavioral --task-slug <slug>`, `regression --baseline <path>`, `judge`, `list` (default); shells to `uv run --project eval praxion-evals <tier>` (dec-040) |
+| Scripts install filter | Shell predicate | `install_claude.sh::relink_all` | User running install | Links only files matching `[ -f && -x ]` AND not matching `merge_driver_*` or `git-*-hook.sh`; `clean_stale_symlinks` sweeps `~/.local/bin/` for orphaned symlinks on upgrade (dec-042) |
 
 ## 5. Data Flow
 
@@ -290,5 +293,8 @@ graph LR
 | [dec-035](decisions/035-roadmap-parallel-audit-via-researchers.md) | Parallel audit fan-out via N=3–6 researchers, not a new auditor agent | Cartographer orchestrates researchers (boundary-disciplined); reuses proven fan-out; paradigm-agnostic by construction |
 | [dec-036](decisions/036-lens-framework-project-derived.md) | Lens framework is project-derived; SPIRIT is an exemplar, not the canonical default | 4-step derivation methodology (project values + domain constraints + exemplar lens sets + user gate); exemplars: SPIRIT, DORA, SPACE, FAIR, CNCF Platform Maturity, Custom; replaces hardcoded six-dimension assumption |
 | [dec-037](decisions/037-opportunities-forward-lines.md) | Opportunities (Forward Lines) as a first-class roadmap section; Motivation field generalization | Template expands 9 → 10 sections with new §4 Opportunities (O1…On) between Weaknesses and Improvement Roadmap; Improvement Roadmap items cite Motivation (Weakness / Opportunity / Evolution trend / Strategic bet / User request / Prior item) rather than only Weakness; cartographer Phase 4 classifies findings into four buckets (strengths / weaknesses / opportunities / improvements) |
+| [dec-040](decisions/040-eval-framework-out-of-band.md) | Eval framework out-of-band only (/eval command + CI, never hook-driven) | Eval code never runs inside a pipeline or from a hook; `eval/` package is standalone and side-effect-free; `.ai-state/evals/` holds baseline summary JSON (not raw traces) |
+| [dec-041](decisions/041-pyright-over-mypy.md) | Pyright over mypy for MCP type checking | Both MCP servers gain a `[tool.pyright]` section and a CI step between ruff and pytest; staged rollout (observe → fix → enforce) avoids large PRs |
+| [dec-042](decisions/042-scripts-filter-combined-predicate.md) | Scripts install filter: combined predicate + stale-symlink sweep | `install_claude.sh` filters by `-f && -x` plus `case` exclusion of `merge_driver_*` / `git-*-hook.sh`; `clean_stale_symlinks` extended to `~/.local/bin/` |
 
 [Add new rows as architecture-related ADRs are created.]

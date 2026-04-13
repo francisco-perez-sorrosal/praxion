@@ -154,7 +154,7 @@
           },
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/promote_learnings.py",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/cleanup_gate.sh ${CLAUDE_PLUGIN_ROOT}/hooks/promote_learnings.py",
             "timeout": 5,
             "async": false
           },

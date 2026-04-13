@@ -11,6 +11,9 @@ import re
 import sys
 from pathlib import Path
 
+# Source-of-truth for cleanup detection. hooks/cleanup_gate.sh mirrors a looser
+# variant of these patterns for the PreToolUse fast-path; Python remains
+# authoritative. Keep in sync when editing either side.
 CLEANUP_PATTERNS = [
     r"rm\s+.*\.ai-work",
     r"clean.work",

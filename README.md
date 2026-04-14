@@ -291,6 +291,9 @@ Read the user preferences from https://raw.githubusercontent.com/francisco-perez
 - **[Decision Tracking](docs/decision-tracking.md)** -- Architecture Decision Records (ADRs) in `.ai-state/decisions/` capture decisions from AI-assisted sessions. Agents write structured Markdown files with YAML frontmatter, with a lightweight reminder hook for architectural commits.
 - **[Claude Code vs Cursor](docs/cursor-compat.md)** -- Format differences, discovery paths, and adaptation details for each tool.
 - **[Core Concepts](docs/concepts.md)** -- Deep explanation of the building blocks, the layered architecture, and the agent pipeline.
+- **[Claude Cowork Learning Resources](docs/claude-cowork-learning-resources.md)** -- Curated external guides on Claude ecosystem, cowork setup, practical workflows, model selection, and strategic applications. Recommended for new users and skill authors.
+
+
 
 ---
 

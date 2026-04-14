@@ -155,3 +155,13 @@ The **platform knowledge layer** -- what the Claude API offers, which SDK to use
 - [API Reference](https://platform.claude.com/docs/en/api/messages) -- REST endpoint reference
 - [MCP Specification](https://modelcontextprotocol.io/specification/2025-11-25) -- Model Context Protocol spec
 - [Release Notes](https://platform.claude.com/docs/en/release-notes/overview) -- API, Claude Code, and model changelogs
+
+## Learning & Patterns
+
+- **[Claude Cowork Learning Resources](../../docs/claude-cowork-learning-resources.md)** -- Curated external guides covering model selection, cowork setup, practical workflows, and domain applications. Includes:
+  - Model capability guides (Opus 4.6, Sonnet 4.6)
+  - Cowork configuration patterns and persistent context strategies
+  - 10 ready-to-use workflows (research, financial analysis, SEO, presentations, spreadsheets)
+  - Strategic applications and practical prompts
+  
+  **Recommended reading:** New Praxion users should start with the [Setup Guide](../../docs/claude-cowork-learning-resources.md#claude-cowork-setup-the-complete-guide) and [Serious Builders](../../docs/claude-cowork-learning-resources.md#how-serious-builders-co-work-with-claude) sections to understand collaborative workflows.

@@ -158,10 +158,10 @@ The **platform knowledge layer** -- what the Claude API offers, which SDK to use
 
 ## Learning & Patterns
 
-- **[Claude Cowork Learning Resources](../../docs/claude-cowork-learning-resources.md)** -- Curated external guides covering model selection, cowork setup, practical workflows, and domain applications. Includes:
-  - Model capability guides (Opus 4.6, Sonnet 4.6)
+- **[Claude Ecosystem Learning Resources](../../docs/claude-ecosystem-learning-resources.md)** -- Curated external guides covering Claude models, collaborative workflows, setup patterns, and domain applications. Includes:
+  - Model capability guides (Opus 4.6, Sonnet 4.6, model selection heuristics)
   - Cowork configuration patterns and persistent context strategies
   - 10 ready-to-use workflows (research, financial analysis, SEO, presentations, spreadsheets)
   - Strategic applications and practical prompts
   
-  **Recommended reading:** New Praxion users should start with the [Setup Guide](../../docs/claude-cowork-learning-resources.md#claude-cowork-setup-the-complete-guide) and [Serious Builders](../../docs/claude-cowork-learning-resources.md#how-serious-builders-co-work-with-claude) sections to understand collaborative workflows.
+  **Recommended reading:** New Praxion users should start with the [Setup Guide](../../docs/claude-ecosystem-learning-resources.md#claude-cowork-setup-the-complete-guide) and [Serious Builders](../../docs/claude-ecosystem-learning-resources.md#how-serious-builders-co-work-with-claude) sections to understand collaborative workflows.

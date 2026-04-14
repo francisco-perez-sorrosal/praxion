@@ -8,13 +8,13 @@ A walkthrough of developing a small application using the Praxion agent pipeline
 2. Verify: `./install.sh --check`
 3. Start a Claude Code session in your project directory
 
-## Parallel Reading: Claude Cowork Setup
+## Parallel Reading: Claude Ecosystem Foundations
 
-To maximize collaboration with Claude, read the [Claude Cowork Learning Resources](claude-cowork-learning-resources.md) in parallel with this walkthrough:
+To maximize collaboration with Claude, read the [Claude Ecosystem Learning Resources](claude-ecosystem-learning-resources.md) in parallel with this walkthrough:
 
-- **First time?** Start with [How Serious Builders Co-Work With Claude](claude-cowork-learning-resources.md#how-serious-builders-co-work-with-claude) to understand the shift from one-off queries to sustained collaboration
-- **Configuring your setup?** See [Claude Cowork Setup Guide](claude-cowork-learning-resources.md#claude-cowork-setup-the-complete-guide) for context files, global instructions, and persistent context patterns
-- **Choosing a Claude model?** Consult [Claude Opus 4.6 Guide](claude-cowork-learning-resources.md#claude-opus-46-practical-guide) and [Sonnet 4.6 Guide](claude-cowork-learning-resources.md#sonnet-46-capabilities--computer-use) for model selection by task complexity
+- **First time?** Start with [How Serious Builders Co-Work With Claude](claude-ecosystem-learning-resources.md#how-serious-builders-co-work-with-claude) to understand the shift from one-off queries to sustained collaboration
+- **Configuring your setup?** See [Claude Cowork Setup Guide](claude-ecosystem-learning-resources.md#claude-cowork-setup-the-complete-guide) for context files, global instructions, and persistent context patterns
+- **Choosing a Claude model?** Consult [Claude Opus 4.6 Guide](claude-ecosystem-learning-resources.md#claude-opus-46-practical-guide) and [Sonnet 4.6 Guide](claude-ecosystem-learning-resources.md#sonnet-46-capabilities--computer-use) for model selection by task complexity
 
 The agent pipeline below automates many of these patterns — but understanding the underlying collaboration principles accelerates your effectiveness.
 

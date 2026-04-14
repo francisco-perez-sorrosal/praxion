@@ -1,8 +1,21 @@
-# Claude Cowork Learning Resources
+# Claude Ecosystem Learning Resources
 
-Curated external guides and references for building effective Claude workflows. These complement Praxion's automation framework with practical patterns, operational setups, and domain-specific applications.
+Curated external guides and references for building effective Claude workflows across models, collaborative patterns, and domain applications. These complement Praxion's automation framework with practical patterns, operational setups, and strategic context.
 
 **Attribution:** All resources from [The AI Corner](https://www.the-ai-corner.com/) by @eminence_front_ and collaborators.
+
+---
+
+## What's Here
+
+A curated collection spanning:
+- **Claude Models** — Opus 4.6, Sonnet 4.6 capabilities, computer use, adaptive reasoning, model selection heuristics
+- **Collaborative Workflows** — Setup patterns, persistent context, cowork methodology, sustained engagement patterns
+- **Practical Workflows** — 10 ready-to-use workflows across research, finance, productivity, and automation
+- **Domain Applications** — Presentations, financial modeling, SEO optimization, and strategic applications
+- **Strategic Context** — Autonomous execution paradigm shift, market implications, agentic future
+
+Use this collection to deepen your understanding of Claude's capabilities and integrate them into Praxion's agent pipeline.
 
 ---
 

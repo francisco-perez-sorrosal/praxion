@@ -1,3 +1,31 @@
+---
+paths:
+  - "**/*.py"
+  - "**/*.pyi"
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.js"
+  - "**/*.jsx"
+  - "**/*.mjs"
+  - "**/*.cjs"
+  - "**/*.go"
+  - "**/*.rs"
+  - "**/*.java"
+  - "**/*.kt"
+  - "**/*.kts"
+  - "**/*.rb"
+  - "**/*.swift"
+  - "**/*.c"
+  - "**/*.h"
+  - "**/*.cpp"
+  - "**/*.hpp"
+  - "**/*.cc"
+  - "**/*.m"
+  - "**/*.sh"
+  - "**/*.bash"
+  - "**/*.zsh"
+---
+
 ## Coding Style
 
 Language-independent structural and design conventions for writing and reviewing code.

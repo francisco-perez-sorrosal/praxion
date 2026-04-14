@@ -113,6 +113,21 @@ Convention checks (derived from `coding-style` rule):
 - Code organization (modular, no catch-all utils)
 - Code duplication (no repeated logic within files; for changed files, read sibling files in the same module — capped at 5 — and use LLM judgment to assess cross-module semantic similarity; report duplicated patterns with file paths and line ranges)
 
+#### Phase 5.5 -- Behavioral Contract Compliance
+
+Scan the change set for behavioral-contract violations and emit findings in the `### Behavioral Contract Findings` subsection of the report, using exactly the six canonical tags. Consult `rules/swe/agent-behavioral-contract.md` for the four behaviors and `skills/code-review/references/report-template.md` for tag definitions and emission syntax.
+
+| Tag | Emit when |
+|-----|-----------|
+| `[UNSURFACED-ASSUMPTION]` | Code, plan, or decision proceeds on an assumption that should have been stated (violates Surface Assumptions) |
+| `[MISSING-OBJECTION]` | A request conflicted with scope, structure, or evidence and the agent complied silently instead of registering the conflict with a reason (violates Register Objection) |
+| `[NON-SURGICAL]` | Changes touch files, modules, or behavior outside the declared scope without being load-bearing for the stated task (violates Stay Surgical) |
+| `[SCOPE-CREEP]` | Scope expanded mid-execution without being re-surfaced and re-approved (violates Stay Surgical) |
+| `[BLOAT]` | A simpler solution would have achieved the same behavior; unnecessary abstraction, speculative generality, or dead parameters were introduced (violates Simplicity First) |
+| `[DEAD-CODE-UNREMOVED]` | The change supersedes code that should have been deleted but was left in place (violates Simplicity First) |
+
+Tag emission is required whenever a violation is observed; "no violations" is a valid Phase 5.5 result and should be recorded explicitly. The sentinel aggregates tag frequencies across `VERIFICATION_REPORT.md` files.
+
 ### Phase 6 -- Security Review (when context-security-review skill is loaded)
 
 When the `context-security-review` skill is available, perform a security review in **diff mode** scoped to the current change set:

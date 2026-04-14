@@ -203,6 +203,19 @@ Conditional activation: skip DL checks when no `.ai-state/decisions/` directory 
 | DL04 | L | No orphaned supersession pointers | If an ADR has `supersedes: dec-NNN`, the referenced ADR file exists; if `superseded_by: dec-MMM`, that file exists and points back |
 | DL05 | L | Recent features have associated ADR files | Features with archived specs have corresponding ADR files (frequency check) |
 
+### Behavioral Contract (BC)
+
+Audit the four-behavior contract's single-source-of-truth architecture. Drift between the rule, CLAUDE.md anchors, agent pointers, and tag vocabulary is a contract failure.
+
+| ID | Tp | Rule | Pass |
+|----|----|------|------|
+| BC01 | A | Rule exists and is always-loaded | `rules/swe/agent-behavioral-contract.md` exists and has no `paths:` YAML frontmatter |
+| BC02 | L | Four canonical behaviors appear in canonical order in both CLAUDE.md anchors | `~/.claude/CLAUDE.md` (when readable) and project `CLAUDE.md` both name **Surface Assumptions → Register Objection → Stay Surgical → Simplicity First** in this order with identical spelling |
+| BC03 | A | Each of the 10 pipeline agents references the rule | Grep `rules/swe/agent-behavioral-contract.md` across `agents/*.md` returns exactly the 10 code-emitting agents (researcher, systems-architect, implementation-planner, context-engineer, implementer, test-engineer, verifier, doc-engineer, sentinel, cicd-engineer) |
+| BC04 | A | Tag vocabulary subsection exists with all 6 canonical tags | `skills/code-review/references/report-template.md` contains `### Behavioral Contract Findings` with `[UNSURFACED-ASSUMPTION]`, `[MISSING-OBJECTION]`, `[NON-SURGICAL]`, `[SCOPE-CREEP]`, `[BLOAT]`, `[DEAD-CODE-UNREMOVED]` |
+
+BC checks are unconditional — they run on every sentinel pass because the contract is an always-loaded ecosystem invariant, not a feature gated by presence of specs or ADRs.
+
 ### Architecture Completeness (AC)
 
 Conditional activation: skip AC01-AC04 checks when `.ai-state/ARCHITECTURE.md` does not exist and project has fewer than 3 interacting components. Skip AC05-AC09 checks when neither `.ai-state/ARCHITECTURE.md` nor `docs/architecture.md` exists.
@@ -302,7 +315,7 @@ Execute llm type checks by reading artifact content in batches:
 
 **Batch 2 — Agents**: Read all agent .md files. Apply C07, C08, N04-N06, F04, S06, T05-T06, X07-X08, EC03-EC04 checks.
 
-**Batch 3 — Rules + Config**: Read all rule files, CLAUDE.md files, plugin.json, latest `IDEA_LEDGER_*.md`. Apply remaining llm checks: C08, N04-N06, S03, S07, X07, EC05 checks.
+**Batch 3 — Rules + Config**: Read all rule files, CLAUDE.md files, plugin.json, latest `IDEA_LEDGER_*.md`. Apply remaining llm checks: C08, N04-N06, S03, S07, X07, EC05, BC02 checks.
 
 **Batch 4 — Pipeline Discipline** (conditional): If Task Chronograph MCP tools are available (`get_pipeline_status`, `get_agent_events`), query for pipeline data and apply P01-P05 checks. If unavailable, skip with a note in the report.
 

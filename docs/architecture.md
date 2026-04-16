@@ -15,7 +15,7 @@
 | **Type** | AI development meta-framework (plugin + MCP servers + knowledge artifacts) |
 | **Language / Framework** | Python 3.13+ (MCP servers), Markdown (skills/agents/rules/commands), Shell/Python (hooks, scripts) |
 | **Architecture pattern** | Plugin-based knowledge ecosystem with progressive disclosure and agent pipeline orchestration |
-| **Last verified against code** | 2026-04-16 |
+| **Last verified against code** | 2026-04-16 (dec-049 ADR added; `tier-templates.md` Designed, not yet Built — excluded from components table until implemented) |
 
 <!-- OWNER: systems-architect (creation), doc-engineer (verification) | LAST UPDATED: 2026-04-12 -->
 
@@ -280,5 +280,6 @@ graph LR
 | [dec-025](../.ai-state/decisions/025-memory-hygiene-rules.md) | Memory hygiene disposition rules (R1–R7) | Deterministic rules replace ad-hoc judgment for condense/consolidate/supersede operations |
 | [dec-027](../.ai-state/decisions/027-principles-embedding-strategy.md) | Principles embedded via compact CLAUDE.md bullet + README prose | Four durable principles cross-referenced in `CLAUDE.md`; rich narrative in `README.md#guiding-principles` |
 | [dec-028](../.ai-state/decisions/028-diagram-conventions-path-scoping.md) | Narrow `diagram-conventions.md` path scope | Reclaims budget on non-doc sessions by scoping the rule to doc-authoring surfaces only |
+| [dec-049](../.ai-state/decisions/049-reaffirm-dec022-coord-cohort.md) | Re-affirm dec-022; ship D1–D6 coordination cohort instead of extracting delegation checklists | Delegation Checklists remain always-loaded in the coordination rule; `claude/config/CLAUDE.md` condensed block gets conditional-deliverable symmetry; new satellite `skills/software-planning/references/tier-templates.md` registers under software-planning; Lightweight tier gains 5 inline gap closures + tier-selector fast-path decision tree; no new validator tooling |
 
 [Add new rows as architecture-related ADRs are created.]

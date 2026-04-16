@@ -17,7 +17,7 @@
 | **Language / Framework** | Python 3.13+ (MCP servers), Markdown (skills/agents/rules/commands), Shell/Python (hooks, scripts) |
 | **Architecture pattern** | Plugin-based knowledge ecosystem with progressive disclosure and agent pipeline orchestration |
 | **Source stage** | Phase 5 creation, 2026-04-10 by systems-architect |
-| **Last verified** | 2026-04-16 by doc-engineer (Phase 4 close: llm-prompt-engineering skill added; skill count 33 → 35) |
+| **Last verified** | 2026-04-16 by systems-architect (dec-049 re-affirmation cohort designed: D1–D6 deliverables; delegation-checklist extraction dropped) |
 
 Praxion is a meta-project that provides the operational infrastructure for AI-assisted software development. Rather than being an application itself, it is an ecosystem of reusable skills, specialized agents, declarative rules, slash commands, lifecycle hooks, and MCP servers that compose into a coherent development workflow. It ships as the `i-am` Claude Code plugin, with secondary targets for Claude Desktop and Cursor.
 
@@ -305,5 +305,6 @@ graph LR
 | [dec-046](decisions/046-staleness-detection-system.md) | Staleness detection via per-skill frontmatter + paths-scoped rule + sentinel checks | `last_reviewed` / `refresh_policy` frontmatter on skills; `rules/swe/staleness-policy.md` (paths-scoped, zero always-loaded budget); sentinel F07/F08/F09 checks; `/refresh-skill` manual entry point |
 | [dec-047](decisions/047-cross-reference-validator.md) | Cross-reference validator as stdlib sibling script with soft-launch CI | `validate_references.py` parses 6 link classes with per-class FAIL/WARN/OK; ignore-marker mechanism for templates; CI job with `continue-on-error: true`, strict flip 2026-04-30 |
 | [dec-048](decisions/048-observation-span-correlation.md) | Observation-span correlation via OpenInference `session.id` + W3C trace-context | Rename `praxion.session_id` → `session.id` on every chronograph span; add top-level `trace_id`/`span_id`/`parent_span_id` to Observation; memory-mcp extracts `params._meta.traceparent` at tool handlers; breaking schema accepted per user |
+| [dec-049](decisions/049-reaffirm-dec022-coord-cohort.md) | Re-affirm dec-022; ship orthogonal D1–D6 cohort instead of delegation-checklist extraction | Delegation Checklists stay always-loaded in `rules/swe/swe-agent-coordination-protocol.md`; `claude/config/CLAUDE.md` condensed block gains three conditional deliverables + sync-contract pointer; new on-demand satellite `skills/software-planning/references/tier-templates.md` registered under software-planning skill; Lightweight tier gains 5 inline gap closures + tier-selector decision tree; no new tooling (reuses dec-047 validator) |
 
 [Add new rows as architecture-related ADRs are created.]

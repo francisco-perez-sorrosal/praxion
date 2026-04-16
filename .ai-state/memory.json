@@ -5315,6 +5315,97 @@
         "invalid_at": null,
         "type": "pattern",
         "created_by": null
+      },
+      "dec-022-delegation-checklist-reaffirm-2026-04": {
+        "value": "ROADMAP 2.3 Point #1 proposed re-extracting the delegation-checklists block (rules/swe/swe-agent-coordination-protocol.md L60-86) to a new on-demand skill reference. This contradicted accepted ADR dec-022 (2026-04-11, Option 4 explicitly rejected the same extraction on three grounds: decision-quality risk at depth-0 ad-hoc delegation, extraction-loop blocks the observe/iterate learning loop, content-classification mismatch — delegation checklists describe what to put in prompts, not how to execute procedures). User confirmed Refined Path 2 after researcher + context-engineer independently objected: drop the extraction; ship six orthogonal deliverables as the D1-D6 cohort. Shipped (all 5 commits clean, 37/37 tests green): D1 condensed-block symmetry fix in claude/config/CLAUDE.md (adds SYSTEM_DEPLOYMENT/TEST_RESULTS deliverables + sync-contract pointer); D2 greenfield skills/software-planning/references/tier-templates.md (Standard/Full/Lightweight scaffolds, 7 angle-bracket placeholders, DRY-linked to rule's delegation checklists); D3 Lightweight gap closure (5 inline clauses) in rules/swe/swe-agent-coordination-protocol.md Process Calibration section; D4 tier-selector decision tree in the same section (5-branch fast path + pointer to calibration-procedure.md); D5 new test_coord_protocol_rule_passes_strict_validation in skills/skill-crafting/tests/test_validate_references.py (subprocess-invokes dec-047 validator; caught a real cross-file anchor defect on first run, validating the investment); D6 this memory entry + LEARNINGS.md structured entry + ADR-049 (.ai-state/decisions/049-reaffirm-dec022-coord-cohort.md, status accepted, supersedes empty — re-affirmation, not supersession). Before any future agent proposes the same extraction, surface this memory, re-read dec-022 + dec-049, and produce new evidence meeting the three bars in ADR-049 Prior Decision section: (1) new decision-quality measurements showing depth-0 loading of delegation checklists is not decision-critical, (2) changed loading semantics of the software-planning skill that make on-demand references safe at ad-hoc delegation time, or (3) a formal supersession ADR citing both dec-022 and dec-049. Absent new evidence, re-proposing extraction is a regression of dec-049 and violates the behavioral contract's Register-Objection clause.",
+        "created_at": "2026-04-16T22:52:38.889096Z",
+        "updated_at": "2026-04-16T22:52:38.889096Z",
+        "tags": [
+          "coordination-protocol",
+          "correction",
+          "dec-022",
+          "dec-049",
+          "decision",
+          "re-affirmation"
+        ],
+        "confidence": null,
+        "importance": 7,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "dec-022 re-affirmed 2026-04 via dec-049: delegation-checklist extraction re-evaluated and rejected; D1-D6 cohort shipped instead.",
+        "valid_at": "2026-04-16T22:52:38.889096Z",
+        "invalid_at": null,
+        "type": "decision",
+        "created_by": "main-agent-coord-burden-reduction-step5"
+      },
+      "architect-byte-targets-specify-encoding": {
+        "value": "coord-burden-reduction pipeline (2026-04-16) verifier WARN OQ-2 + behavioral-contract [surface-assumptions] tag: SYSTEMS_PLAN Decisions D3-A and D4-A prescribed verbatim text containing UTF-8 multi-byte characters (→ is 3 bytes, — and – are 3 bytes each). Step 3 target was ≤900 B for D3+D4; actual was +1,314 B — a 414 B (46%) overshoot driven entirely by encoding-reality vs ASCII-assumed budget target. The acceptance criteria (D3-AC-1..5, D4-AC-1..2) bound the verbatim strings, so the implementer could not mutate content to hit the target — creating a spec-internal conflict between verbatim requirement and byte budget. Corrective guidance for future architect specs: when setting byte targets, either (a) specify encoding and expected character class (\"≤900 B UTF-8 with up to N non-ASCII chars\"), or (b) target token counts instead (encoding-agnostic), or (c) count verbatim specs in raw bytes at spec-write time and set the target from that baseline. This pattern is most dangerous with English-language prose that uses em dashes, arrows, and smart quotes — all common in architectural documentation. Applies to: any architect writing SYSTEMS_PLAN.md, any planner validating implementer byte-delta deliverables, any verifier ruling on budget overage findings.",
+        "created_at": "2026-04-16T23:22:51.968182Z",
+        "updated_at": "2026-04-16T23:22:51.968182Z",
+        "tags": [
+          "architect",
+          "budget",
+          "gotcha",
+          "utf-8",
+          "verbatim-spec"
+        ],
+        "confidence": null,
+        "importance": 6,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "Architect byte-budget targets must specify encoding + character class; UTF-8 multi-byte chars inflate byte counts vs ASCII-assumed targets.",
+        "valid_at": "2026-04-16T23:22:51.968182Z",
+        "invalid_at": null,
+        "type": "correction",
+        "created_by": "main-agent-coord-burden-reduction-verifier-warn-oq2"
+      },
+      "commit-subject-50-char-discipline": {
+        "value": "coord-burden-reduction pipeline (2026-04-16) verifier WARN + behavioral-contract [simplicity-first] tag: all 5 commit subjects exceeded 50 chars despite git-conventions.md being always-loaded. Measurements: \"docs(coordination): Complete condensed-block deliverable symmetry (D1)\" = 62; \"feat(skills): Add tier-templates.md parametric scaffolds (D2)\" = 60; \"feat(rules): Lightweight gap closure + tier selector tree (D3+D4)\" = 65; \"test(rules): Regression test for coord protocol rule (D5)\" = 57; \"docs(decisions): ADR-049 re-affirm dec-022 + cohort persistence (D6)\" = 68. Root cause: type(scope): prefix + (Dn) scope-tag suffix together cost ~20 chars before the verb/description starts, leaving <30 chars for meaning — mathematically difficult with descriptive phrasing. Corrective discipline: (a) draft the subject, measure char count explicitly before committing, iterate if over; (b) when over-budget, drop the (Dn) suffix first (it's decoration — the description should convey the semantic anyway); (c) for multi-deliverable commits, prefer verb-first phrasing (\"Complete symmetry fix\" not \"Add symmetry fix for condensed-block\"); (d) if the change truly cannot fit in 50 chars, it's a signal the commit may be bundling too much — consider splitting. This is [simplicity-first] — the simplest commit subject is the one under budget. Applies to: every commit across every session.",
+        "created_at": "2026-04-16T23:23:04.890689Z",
+        "updated_at": "2026-04-16T23:23:04.890689Z",
+        "tags": [
+          "commit-messages",
+          "correction",
+          "git-conventions",
+          "self-indictment",
+          "simplicity-first"
+        ],
+        "confidence": null,
+        "importance": 6,
+        "source": {
+          "type": "session",
+          "detail": null,
+          "agent_type": null,
+          "agent_id": null,
+          "session_id": null
+        },
+        "access_count": 0,
+        "last_accessed": null,
+        "status": "active",
+        "links": [],
+        "summary": "Commit subjects must stay under 50 chars per git-conventions.md; type(scope): + (Dn) suffix alone consumes ~20 chars — budget the verb carefully.",
+        "valid_at": "2026-04-16T23:23:04.890689Z",
+        "invalid_at": null,
+        "type": "correction",
+        "created_by": "main-agent-coord-burden-reduction-verifier-warn-commit-subjects"
       }
     },
     "project": {

@@ -9,7 +9,7 @@ Assess the task before starting work. Each tier prescribes what to do — higher
 | Tier | Signals | Process |
 |------|---------|---------|
 | **Direct** | Single-file fix, config, doc, typo | Fix → verify → commit. No agents, no planning documents, no spec. |
-| **Lightweight** | 2-3 files, single behavior, clear scope | Optional researcher. Acceptance criteria inline. Task tools for tracking. No SDD, no three-document planning. |
+| **Lightweight** | 2-3 files, single behavior, clear scope | Optional researcher; no other agents (escalate to Standard if architect/planner needed). Acceptance criteria inline. Task tools for tracking. No SDD, no three-document planning. |
 | **Standard** | 4-8 files, 2-4 behaviors, architectural decisions | Full agent pipeline. [SDD](../../skills/spec-driven-development/SKILL.md) behavioral spec with REQ IDs. [Three-document model](../../skills/software-planning/SKILL.md). |
 | **Full** | 9+ files, 5+ behaviors, cross-cutting | Standard plus parallel execution, doc-engineer in groups, context-engineer shadowing, structured decisions, spec archival. |
 | **Spike** | Exploratory, outcome uncertain | Timeboxed researcher. Decision in LEARNINGS.md. No implementation until resolved. |
@@ -20,6 +20,20 @@ Assess the task before starting work. Each tier prescribes what to do — higher
 - Refactoring: Standard with `[Phase: Refactoring]` delegation to the [refactoring skill](../../skills/refactoring/SKILL.md).
 - The SDD skill's [complexity triage](../../skills/spec-driven-development/SKILL.md#complexity-triage) refines specification depth within Standard and Full tiers.
 - For structured calibration with signal scoring, see the SDD skill's [calibration procedure](../../skills/spec-driven-development/references/calibration-procedure.md).
+- Lightweight acceptance criteria live inline in the user request or in the task-tool description; no scratch file required.
+- Lightweight delegations (researcher) use the minimal scaffold in [tier-templates.md](../../skills/software-planning/references/tier-templates.md#lightweight-snippet).
+- Lightweight test runs use whatever test command the project defines; no `TEST_RESULTS.md` is created unless the work escalates to Standard.
+- Lightweight respects the same architecture-doc update expectation as Standard when structural changes occur (see `.ai-state/ARCHITECTURE.md` / `docs/architecture.md`).
+
+**Tier Selector (fast path).** When the main agent receives a new task, walk top-to-bottom and stop at the first match:
+
+- Exploratory, outcome uncertain → **Spike**
+- Single-file fix, config, doc, typo → **Direct**
+- 2–3 files, single behavior, clear scope → **Lightweight**
+- 4–8 files OR 2–4 behaviors OR architectural decision → **Standard**
+- 9+ files OR 5+ behaviors OR cross-cutting refactor → **Full**
+
+For ambiguous cases, use the SDD skill's [calibration-procedure.md](../../skills/spec-driven-development/references/calibration-procedure.md) signal scoring. User override wins; default to the lower tier when uncertain.
 
 ### Pipeline Isolation
 

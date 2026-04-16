@@ -17,7 +17,7 @@
 | **Language / Framework** | Python 3.13+ (MCP servers), Markdown (skills/agents/rules/commands), Shell/Python (hooks, scripts) |
 | **Architecture pattern** | Plugin-based knowledge ecosystem with progressive disclosure and agent pipeline orchestration |
 | **Source stage** | Phase 5 creation, 2026-04-10 by systems-architect |
-| **Last verified** | 2026-04-13 by systems-architect (Phase 3.1/3.6 design additions) |
+| **Last verified** | 2026-04-16 by doc-engineer (Phase 4 close: llm-prompt-engineering skill added; skill count 33 → 35) |
 
 Praxion is a meta-project that provides the operational infrastructure for AI-assisted software development. Rather than being an application itself, it is an ecosystem of reusable skills, specialized agents, declarative rules, slash commands, lifecycle hooks, and MCP servers that compose into a coherent development workflow. It ships as the `i-am` Claude Code plugin, with secondary targets for Claude Desktop and Cursor.
 
@@ -39,7 +39,7 @@ graph LR
         GH[GitHub]
     end
     subgraph Praxion["Praxion (i-am plugin)"]
-        Skills[Skills<br/>33 modules]
+        Skills[Skills<br/>35 modules]
         Agents[Agents<br/>12 types]
         Hooks[Hooks<br/>14 scripts]
         MCP[MCP Servers<br/>Memory + Chronograph]
@@ -111,7 +111,7 @@ graph TD
 
 | Component | Responsibility | Status | Key Files (illustrative) |
 |-----------|---------------|--------|--------------------------|
-| Skills | Domain expertise delivered via progressive disclosure (metadata, body, references) | Built | `skills/*/SKILL.md`, `skills/*/references/` |
+| Skills | Domain expertise delivered via progressive disclosure (metadata, body, references). 35 skills as of 2026-04-16; Phase 4 added `llm-prompt-engineering` (end-user prompt engineering — few-shot, CoT, structured output, injection hardening) | Built | `skills/*/SKILL.md`, `skills/*/references/`, `skills/llm-prompt-engineering/` |
 | Agents | Autonomous subprocesses with distinct specialties for multi-step software engineering work | Built | `agents/*.md` |
 | Rules | Declarative conventions auto-loaded by relevance into every session | Built | `rules/swe/`, `rules/writing/` |
 | Commands | User-invoked slash commands for repeatable workflows | Built | `commands/*.md` |
@@ -211,6 +211,8 @@ graph LR
     OTel -.->|OTLP| Phoenix
     Agent -->|recall/search| Curated
 ```
+
+**Cross-layer correlation (dec-048).** Observations (`observations.jsonl`) and chronograph spans both carry the canonical OpenInference `session.id` attribute — the chronograph relay emits it on every span type including tool spans (formerly `praxion.session_id`). Observations additionally carry top-level `trace_id`, `span_id`, `traceparent`, and `parent_span_id` fields populated from W3C trace-context. Flow: the MCP tool request envelope surfaces `params._meta.traceparent`; the memory-mcp `remember()` / `recall()` handlers parse it via `correlation.parse_traceparent()` and forward the parsed IDs through the response `additionalContext`; the `capture_memory.py` hook reads `additionalContext` and writes those IDs into the observation row. `ObservationStore.query(trace_id=...)` supports exact-match filtering. Historical JSONL rows lacking these fields deserialize as `None` via `dict.get`, preserving backward compatibility.
 
 ## 6. Dependencies
 

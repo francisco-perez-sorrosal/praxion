@@ -35,6 +35,12 @@ Reusable skill modules for AI coding assistants. Each skill is a self-contained 
 | --- | --- | --- |
 | **[doc-management](doc-management/)** | Writing and maintaining project documentation (README.md, catalogs, architecture docs, changelogs). Covers cross-reference validation, catalog maintenance, and structural integrity. | Creating or reviewing project documentation, maintaining catalog READMEs, validating cross-references, ensuring documentation freshness. |
 
+### Prompt Engineering
+
+| Skill | Description | When to Use |
+| --- | --- | --- |
+| **[llm-prompt-engineering](llm-prompt-engineering/)** | End-user-facing prompt engineering — few-shot, chain-of-thought, structured output, prompt testing, injection hardening. Provider-agnostic; companion contexts for Python and TypeScript. | Writing or refining prompts, designing few-shot examples, enforcing structured output, testing prompt robustness, hardening against injection. |
+
 ### Planning & Communication
 
 | Skill | Description | When to Use |

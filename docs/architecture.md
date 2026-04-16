@@ -15,7 +15,7 @@
 | **Type** | AI development meta-framework (plugin + MCP servers + knowledge artifacts) |
 | **Language / Framework** | Python 3.13+ (MCP servers), Markdown (skills/agents/rules/commands), Shell/Python (hooks, scripts) |
 | **Architecture pattern** | Plugin-based knowledge ecosystem with progressive disclosure and agent pipeline orchestration |
-| **Last verified against code** | 2026-04-12 |
+| **Last verified against code** | 2026-04-16 |
 
 <!-- OWNER: systems-architect (creation), doc-engineer (verification) | LAST UPDATED: 2026-04-12 -->
 
@@ -39,7 +39,7 @@ graph LR
         GH[GitHub]
     end
     subgraph Praxion["Praxion (i-am plugin)"]
-        Skills[Skills<br/>33 modules]
+        Skills[Skills<br/>35 modules]
         Agents[Agents<br/>12 types]
         Hooks[Hooks<br/>14 scripts]
         MCP[MCP Servers<br/>Memory + Chronograph]
@@ -109,7 +109,7 @@ graph TD
 
 | Component | Responsibility | Key Files |
 |-----------|---------------|-----------|
-| Skills | Delivers domain expertise via progressive disclosure (metadata at startup, body on activation, references on demand) | `skills/*/SKILL.md`, `skills/*/references/` |
+| Skills | Delivers domain expertise via progressive disclosure (metadata at startup, body on activation, references on demand). 35 skills on disk (2026-04-16); recent addition: `llm-prompt-engineering` | `skills/*/SKILL.md`, `skills/*/references/`, `skills/llm-prompt-engineering/` |
 | Agents | Runs as autonomous subprocesses for multi-step software engineering work | `agents/*.md` |
 | Rules | Provides declarative conventions auto-loaded by relevance into every session | `rules/swe/`, `rules/writing/` |
 | Commands | Exposes user-invoked slash commands for repeatable workflows | `commands/*.md` |
@@ -205,6 +205,8 @@ graph LR
     OTel -.->|OTLP| Phoenix
     Agent -->|recall/search| Curated
 ```
+
+**Correlating observations and spans.** Both layers carry the OpenInference canonical `session.id` attribute — chronograph spans set it on every span type including tool spans (see `task-chronograph-mcp/src/task_chronograph_mcp/otel_relay.py`). Observations additionally carry top-level `trace_id`, `span_id`, `traceparent`, and `parent_span_id` fields, extracted from the MCP `params._meta.traceparent` envelope by the memory-mcp tool handlers and forwarded to the hook via `additionalContext`. Filter by trace with `ObservationStore.query(trace_id=...)`. Historical rows without these fields parse cleanly as `None`.
 
 ## 6. Dependencies
 

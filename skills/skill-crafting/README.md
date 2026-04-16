@@ -38,6 +38,7 @@ Trigger explicitly by asking about "agent skills," "creating a skill," or refere
 | `scripts/init_skill.py` | Scaffold a new skill directory from template |
 | `scripts/package_skill.py` | Create a distributable .skill archive (validates first) |
 | `scripts/validate.py` | Quick validation of skill structure and frontmatter |
+| `scripts/validate_references.py` | Validate intra-repo Markdown cross-references (paths, anchors) across skills/agents/rules/commands/docs. Stdlib-only. `--file` / `--all` modes; exit 0 clean, 1 FAIL, 2 error. Per-class severity: FAIL/WARN/OK. Ignore via inline `<!-- validate-references:ignore -->` or frontmatter `validate-references: off` |
 
 ## Quick Start
 

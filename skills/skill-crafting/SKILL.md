@@ -257,6 +257,8 @@ python scripts/package_skill.py <path/to/skill-folder> [output-directory]
 
 To validate without packaging, run `scripts/validate.py` directly. Then check the deployment checklist at the end of this document.
 
+**Cross-reference validation.** Run `scripts/validate_references.py` to validate intra-repo Markdown links across the canonical skill/agent/rule/command/docs surface. Stdlib-only, no dependencies. Modes: `--file <path>` (single file) or `--all` (default include set). Per-class severity: broken relative paths and broken `.md` anchors are `FAIL`; ambiguous anchor slugs are `WARN`. Exit codes: `0` = clean (or only `WARN` under `--warn-only`), `1` = at least one `FAIL`, `2` = script error. Modifiers: `--warn-only` downgrades all `FAIL`s to `WARN` (exploratory runs); `--strict` upgrades all `WARN`s to `FAIL` (CI). Ignore mechanisms: inline `<!-- validate-references:ignore -->` suppresses links on that line; frontmatter `validate-references: off` suppresses all findings in the file.
+
 ### Step 6: Iterate
 
 Use the skill on real tasks. Observe behavior -- where it struggles, succeeds, or makes unexpected choices.

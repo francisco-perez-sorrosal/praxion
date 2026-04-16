@@ -8,9 +8,11 @@ Rules are **contextual domain knowledge files** that AI assistants load automati
 rules/
 ├── swe/
 │   ├── adr-conventions.md
+│   ├── agent-behavioral-contract.md
 │   ├── agent-intermediate-documents.md
 │   ├── coding-style.md
 │   ├── memory-protocol.md
+│   ├── staleness-policy.md
 │   ├── swe-agent-coordination-protocol.md
 │   ├── testing-conventions.md
 │   └── vcs/
@@ -23,9 +25,11 @@ rules/
 
 | File | Purpose |
 | ---- | ------- |
+| `swe/agent-behavioral-contract.md` | Four-behavior contract (Surface Assumptions, Register Objection, Stay Surgical, Simplicity First) for every write/plan/review agent. Always-loaded |
 | `swe/agent-intermediate-documents.md` | Agent document locations (`.ai-work/` ephemeral, `.ai-state/` persistent), lifecycle tiers, cleanup |
 | `swe/coding-style.md` | Immutability, function/file size, nesting, error handling, naming, validation |
 | `swe/adr-conventions.md` | ADR file format (YAML frontmatter + MADR body), naming convention, supersession protocol, agent authoring guidance |
+| `swe/staleness-policy.md` | Marker syntax and threshold protocol for drift-prone skill sections. Path-scoped: loads only when accessing `**/SKILL.md` |
 | `swe/swe-agent-coordination-protocol.md` | Agent selection, coordination pipeline, parallel execution — detailed tables in `software-planning` skill reference |
 | `swe/vcs/git-conventions.md` | Commit scope, staging discipline, secrets, exclusions, message format |
 | `swe/memory-protocol.md` | When and how to use the memory MCP — `remember()` triggers, tag vocabulary, conflict resolution between memory systems |
@@ -209,9 +213,11 @@ Two mechanisms, each serving a different purpose:
 `install.sh` symlinks all rules from this repo to `~/.claude/rules/`. Personal rules load automatically for **every project** when contextually relevant — no per-project setup needed.
 
 ```
+rules/swe/agent-behavioral-contract.md        →  ~/.claude/rules/swe/agent-behavioral-contract.md
 rules/swe/agent-intermediate-documents.md      →  ~/.claude/rules/swe/agent-intermediate-documents.md
 rules/swe/coding-style.md                     →  ~/.claude/rules/swe/coding-style.md
 rules/swe/adr-conventions.md                  →  ~/.claude/rules/swe/adr-conventions.md
+rules/swe/staleness-policy.md                 →  ~/.claude/rules/swe/staleness-policy.md
 rules/swe/swe-agent-coordination-protocol.md  →  ~/.claude/rules/swe/swe-agent-coordination-protocol.md
 rules/swe/vcs/git-conventions.md              →  ~/.claude/rules/swe/vcs/git-conventions.md
 rules/writing/diagram-conventions.md          →  ~/.claude/rules/writing/diagram-conventions.md

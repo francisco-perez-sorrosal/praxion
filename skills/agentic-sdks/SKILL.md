@@ -8,6 +8,10 @@ description: Building AI agents with production SDKs -- OpenAI Agents SDK and Cl
   safety patterns. Language modules available for Python and TypeScript.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
+staleness_sensitive_sections:
+  - "Tool Integration Patterns"
+  - "Function Tools"
+  - "MCP Integration"
 ---
 
 # Agentic SDKs
@@ -29,6 +33,7 @@ Build production AI agents using the OpenAI Agents SDK or Claude Agent SDK. Both
 **Related skills:**
 
 - For Claude model selection, API features, and Messages SDK patterns, see the `claude-ecosystem` skill
+- For prompt-level patterns that shape agent instructions and per-turn prompts (few-shot, chain-of-thought, structured output, injection hardening), see the [`llm-prompt-engineering`](../llm-prompt-engineering/SKILL.md) skill. This skill (agentic-sdks) owns the SDK loop mechanics; llm-prompt-engineering owns the prompt-body authoring patterns that fill them
 
 ## Gotchas
 

@@ -12,6 +12,8 @@ description: >
   Cloud Run, ECS, Modal, CoreWeave, or writing systemd units for Compose.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
+staleness_sensitive_sections:
+  - "Platform Quick Reference"
 ---
 
 # Deployment

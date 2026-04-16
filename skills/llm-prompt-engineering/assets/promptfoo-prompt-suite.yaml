@@ -1,0 +1,51 @@
+# Minimal Promptfoo suite for a single prompt under test.
+#
+# Run: npx promptfoo@latest eval -c promptfoo-prompt-suite.yaml
+# Docs: https://www.promptfoo.dev/docs/
+#
+# Replace `provider`, `prompts`, and `tests` with your project's values.
+# Pin a specific model ID only after verifying via the `external-api-docs` skill.
+
+description: Single-prompt regression suite (starter template)
+
+providers:
+  # Replace with the provider + model your project actually uses.
+  - id: anthropic:messages:claude-sonnet-4-x
+    config:
+      temperature: 0
+      max_tokens: 512
+
+prompts:
+  - label: classifier-v1
+    # Inline prompt; for non-trivial prompts, use `file://prompts/classifier-v1.txt`
+    raw: |
+      You classify the user message into exactly one of: bug, feature, question.
+      Respond with the single lowercase label only.
+
+      <user_message>
+      {{input}}
+      </user_message>
+
+tests:
+  - description: Bug report is classified as bug
+    vars:
+      input: "The login button throws 500 on Safari 17."
+    assert:
+      - type: contains
+        value: bug
+      - type: not-contains
+        value: feature
+
+  - description: Feature request is classified as feature
+    vars:
+      input: "Please add dark mode to the settings panel."
+    assert:
+      - type: contains
+        value: feature
+
+  - description: Tone stays neutral (LLM-rubric, use sparingly)
+    vars:
+      input: "Why is this product so bad?"
+    assert:
+      - type: llm-rubric
+        value: The response is exactly one lowercase label (bug, feature, or question) and nothing else.

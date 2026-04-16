@@ -9,6 +9,16 @@ description: Anthropic Claude platform knowledge -- Claude API features, Anthrop
   or navigating Anthropic documentation.
 allowed-tools: [Read, Glob, Grep]
 compatibility: Claude Code
+staleness_sensitive_sections:
+  - "Gotchas"
+  - "Current Model Lineup"
+  - "Server-Side Tools"
+  - "Client-Side Tools"
+  - "Tool Infrastructure"
+  - "Context Management"
+  - "Files"
+  - "SDK Quick Reference"
+  - "SDK Selection Guidance"
 ---
 
 # Claude Ecosystem
@@ -143,6 +153,7 @@ The **platform knowledge layer** -- what the Claude API offers, which SDK to use
 | [mcp-crafting](../mcp-crafting/SKILL.md) | Building MCP servers (transports, tools, resources, prompts) | MCP connector API feature, protocol context |
 | claude-code-guide (subagent) | Claude Code operations (hooks, plugins, settings, CLI) | Messages API, SDK patterns underlying Claude Code |
 | [python-development](../python-development/SKILL.md) | Python coding patterns, testing, tooling | Anthropic Python SDK specifics |
+| [llm-prompt-engineering](../llm-prompt-engineering/SKILL.md) | End-user-facing prompt engineering (few-shot, CoT, structured output, injection hardening) for any provider | Claude-specific API features (prompt caching, extended thinking, model selection) that downstream prompts use |
 
 **Rule of thumb:** If the question is "How do I use feature X in the Claude API?" -- consult this skill. If it is "What are the current endpoint signatures and parameters?" -- consult `external-api-docs` to fetch current reference from context-hub. If it is "How do I build an agent with the Claude Agent SDK or OpenAI Agents SDK?" -- consult `agentic-sdks`. If it is "How do I build an MCP server?" -- consult `mcp-crafting`. If it is "How do I configure Claude Code hooks?" -- consult `claude-code-guide`.
 

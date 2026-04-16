@@ -230,6 +230,7 @@ This mirrors the `spec-driven-development` skill's behavioral specification work
 - **`python-development`** -- pytest patterns, test organization, and code quality tools for eval implementations
 - **`agentic-sdks`** -- agent building patterns (the systems you are evaluating); SDK-specific testing hooks
 - **`spec-driven-development`** -- behavioral specifications and acceptance criteria inform eval design; REQ IDs thread into eval case naming
+- **[`llm-prompt-engineering`](../llm-prompt-engineering/SKILL.md)** -- single-prompt regression-assertion design (Promptfoo YAML, DeepEval pytest, LLM-judge bias mitigations); see [`references/prompt-testing.md`](../llm-prompt-engineering/references/prompt-testing.md). This skill (agent-evals) owns the full eval harness and agent-level metric design; llm-prompt-engineering owns prompt-level test authoring
 
 ## Resources
 

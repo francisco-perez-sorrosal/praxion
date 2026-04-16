@@ -85,6 +85,8 @@ Prompts define structured interaction patterns for LLMs. They accept parameters 
 
 Use prompts for: standardized analysis requests, review templates, multi-step workflows.
 
+For prompt-body authoring patterns (few-shot examples, chain-of-thought, structured-output instructions, injection hardening) used inside MCP prompt templates, see the [`llm-prompt-engineering`](../llm-prompt-engineering/SKILL.md) skill.
+
 **Do not mix primitives.** Tools execute logic (side effects OK). Resources expose data (no side effects). Prompts template interactions. If a function reads data and mutates state, make it a tool.
 
 See language context for SDK-specific decorator syntax and code examples.

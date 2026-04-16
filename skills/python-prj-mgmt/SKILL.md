@@ -3,11 +3,18 @@ name: python-prj-mgmt
 description: Python project management with pixi and uv package managers. Covers project initialization, dependency management, pyproject.toml configuration, lockfiles, virtual environments, workspaces, and CI/CD integration. Use when setting up Python projects, managing dependencies, configuring conda or PyPI packages, choosing between package managers, or working with pixi.lock or uv.lock. Defaults to pixi unless uv is explicitly requested.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
+staleness_sensitive_sections:
+  - "Project Initialization"
+  - "Dependency Management"
+  - "Running Commands"
+  - "CI/CD Integration"
+  - "Package Manager Comparison"
+  - "Command Quick Reference"
 ---
 
 # Python Project Management
 
-Managing Python projects with modern package managers and dependency tools. **Default: pixi** unless uv is explicitly requested.
+Managing Python projects with modern package managers and dependency tools. **Default: pixi — use pixi unless uv is explicitly requested.**
 
 **Satellite files** (loaded on-demand):
 
@@ -22,55 +29,24 @@ Managing Python projects with modern package managers and dependency tools. **De
 - [pixi](references/pixi.md) - **Default** - conda+PyPI ecosystem, tasks, multi-language support
 - [uv](references/uv.md) - Extremely fast PyPI-only installer and resolver
 
-## Default Behavior
-
-**Use pixi** unless the user explicitly mentions uv or requests uv-specific features.
-
 ## When to Use Which
 
-### Use pixi (Default)
-
-- Multi-ecosystem projects (Python + system libraries)
-- ML/Data science (PyTorch, TensorFlow, NumPy, SciPy)
-- Projects needing conda packages
-- Cross-platform reproducibility
-- Projects requiring C extensions or compiled libraries
-- Teams already using conda/mamba
-
-### Use uv (When Requested)
-
-- Pure Python projects
-- Need blazing fast installs (10-100x faster than pip)
-- pip/pip-tools migration
-- Minimal dependencies
-- Projects that don't need conda ecosystem
+| Use **pixi** (default) when | Use **uv** (when requested) when |
+|---|---|
+| Multi-ecosystem projects (Python + system libraries) | Pure Python projects |
+| ML/Data science (PyTorch, TensorFlow, NumPy, SciPy) | Need blazing fast installs (10-100x faster than pip) |
+| Projects needing conda packages | pip/pip-tools migration |
+| Cross-platform reproducibility | Minimal dependencies |
+| Projects requiring C extensions or compiled libraries | Projects that don't need conda ecosystem |
+| Teams already using conda/mamba | |
 
 ## Project Initialization
 
-### With pixi (Default)
-
-```bash
-pixi init my-project --format pyproject
-cd my-project
-
-# Creates:
-# - pyproject.toml (project config)
-# - src/my_project/ (source package)
-# - tests/ (test directory)
-# - pixi.lock (lockfile)
-```
-
-### With uv
-
-```bash
-uv init my-project
-cd my-project
-
-# Creates:
-# - pyproject.toml (project config)
-# - README.md
-# - .python-version (Python version pin)
-```
+| | pixi (default) | uv |
+|---|---|---|
+| **Command** | `pixi init my-project --format pyproject` | `uv init my-project` |
+| **Creates** | `pyproject.toml`, `src/my_project/`, `tests/`, `pixi.lock` | `pyproject.toml`, `README.md`, `.python-version` |
+| **Gotcha** | Missing `--format pyproject` creates `pixi.toml` instead | Not pinning Python version — use `uv python pin` |
 
 ## Project Structure
 
@@ -93,80 +69,39 @@ project/
 
 ## Dependency Management
 
-### With pixi
-
-```bash
-# PyPI packages (default for pure Python)
-pixi add --pypi requests pandas
-
-# Conda packages (for compiled libs, ML frameworks)
-pixi add numpy scipy pytorch
-
-# Development dependency group
-pixi add --pypi --feature dev pytest ruff mypy
-
-# Install all dependencies
-pixi install
-```
-
-### With uv
-
-```bash
-# Add dependencies
-uv add requests pandas numpy
-
-# Development dependency group
-uv add --dev pytest ruff mypy
-
-# Sync dependencies
-uv sync
-```
+| | pixi (default) | uv |
+|---|---|---|
+| **Add PyPI package** | `pixi add --pypi requests pandas` | `uv add requests pandas` |
+| **Add conda package** | `pixi add numpy scipy pytorch` | N/A — PyPI only |
+| **Add dev dependency** | `pixi add --pypi --feature dev pytest ruff mypy` | `uv add --dev pytest ruff mypy` |
+| **Install / sync** | `pixi install` | `uv sync` |
+| **Gotcha** | Mixing conda and PyPI incorrectly — use `--pypi` flag explicitly; set `system-requirements.cuda` for GPU; avoid mixing conda-forge with legacy pytorch channel | Forgetting to sync after adding dependencies |
 
 ## Running Commands
 
-### With pixi
+| | pixi (default) | uv |
+|---|---|---|
+| **Run script** | `pixi run python script.py` | `uv run python script.py` |
+| **Run tests** | `pixi run pytest` | `uv run pytest` |
+| **Type check** | `pixi run mypy src/` | `uv run mypy src/` |
+| **Interactive shell** | `pixi shell` | Not needed — `uv run` auto-activates |
+| **Gotcha** | — | Using venv activation instead of `uv run` (slower) |
 
-```bash
-pixi run python script.py      # Run script
-pixi run pytest               # Run tests
-pixi run mypy src/            # Type check
+## CI/CD Integration
 
-# Interactive shell
-pixi shell
-```
-
-### With uv
-
-```bash
-uv run python script.py       # Run script
-uv run pytest                # Run tests
-uv run mypy src/             # Type check
-
-# No activation needed with uv run
-```
-
-### CI/CD Integration
-
-#### pixi (GitHub Actions)
+GitHub Actions — pixi (default) and uv side-by-side:
 
 ```yaml
+# pixi
 - uses: prefix-dev/setup-pixi@v0.9.4
-  with:
-    pixi-version: latest
-    cache: true
-
+  with: { pixi-version: latest, cache: true }
 - run: pixi install
 - run: pixi run pytest
 - run: pixi run mypy src/
-```
 
-#### uv (GitHub Actions)
-
-```yaml
+# uv
 - uses: astral-sh/setup-uv@v7
-  with:
-    enable-cache: true
-
+  with: { enable-cache: true }
 - run: uv python install
 - run: uv sync --all-extras --dev
 - run: uv run pytest
@@ -240,21 +175,6 @@ For complete command references, see [pixi.md](references/pixi.md) and [uv.md](r
 5. **Define tasks** for common operations (pixi)
 6. **Version constraints**: Be specific for applications, flexible for libraries
 7. **Keep configs clean**: Don't specify transitive dependencies
-
-## Common Pitfalls
-
-### pixi
-
-- Mixing conda and PyPI sources incorrectly (use `--pypi` flag explicitly)
-- Missing `--format pyproject` on init (creates pixi.toml instead)
-- Not setting `system-requirements.cuda` for GPU packages
-- Mixing conda-forge with legacy pytorch channel
-
-### uv
-
-- Not pinning Python version (use `uv python pin`)
-- Forgetting to sync after adding dependencies
-- Using venv activation instead of `uv run` (slower)
 
 ## Reference Files
 

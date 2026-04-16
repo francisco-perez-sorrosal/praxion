@@ -2,14 +2,17 @@
 """
 Skill Validator -- validates SKILL.md structure and frontmatter.
 
-Usage: python validate.py <skill-directory>
+Usage:
+  python validate.py <skill-directory>   # validate a single skill
+  python validate.py --all               # validate every skills/<name>/ under repo root
 
 Validates:
   - YAML frontmatter exists (--- delimiters)
   - Required fields: name, description
   - name matches parent directory, 1-64 chars, lowercase/digits/hyphens
   - description is 1-1024 chars, no angle brackets
-  - Optional fields: allowed-tools, license, metadata, compatibility
+  - Optional fields: allowed-tools, license, metadata, compatibility,
+    staleness_sensitive_sections, staleness_threshold_days
   - No unknown top-level fields
 
 Exit 0 on success, exit 1 on failure.
@@ -20,7 +23,14 @@ import sys
 from pathlib import Path
 
 REQUIRED_FIELDS = {"name", "description"}
-OPTIONAL_FIELDS = {"allowed-tools", "license", "metadata", "compatibility"}
+OPTIONAL_FIELDS = {
+    "allowed-tools",
+    "license",
+    "metadata",
+    "compatibility",
+    "staleness_sensitive_sections",  # per rules/swe/staleness-policy.md
+    "staleness_threshold_days",  # per rules/swe/staleness-policy.md
+}
 ALL_KNOWN_FIELDS = REQUIRED_FIELDS | OPTIONAL_FIELDS
 
 NAME_PATTERN = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
@@ -74,7 +84,9 @@ def parse_frontmatter(raw: str) -> tuple[dict[str, str], list[str]]:
                 current_value_lines = []
             else:
                 current_value_lines = [value] if value else []
-        elif current_key is not None and (line.startswith("  ") or line.startswith("\t")):
+        elif current_key is not None and (
+            line.startswith("  ") or line.startswith("\t")
+        ):
             # Continuation line for current key
             current_value_lines.append(line.strip())
         elif line.strip() == "":
@@ -100,7 +112,9 @@ def validate_name(name: str, expected_dir: str) -> list[str]:
         )
 
     if name != expected_dir:
-        errors.append(f"'name' ({name!r}) does not match directory name ({expected_dir!r})")
+        errors.append(
+            f"'name' ({name!r}) does not match directory name ({expected_dir!r})"
+        )
 
     return errors
 
@@ -114,7 +128,9 @@ def validate_description(desc: str) -> list[str]:
         return errors
 
     if len(desc) > DESCRIPTION_MAX_LENGTH:
-        errors.append(f"'description' exceeds {DESCRIPTION_MAX_LENGTH} chars (got {len(desc)})")
+        errors.append(
+            f"'description' exceeds {DESCRIPTION_MAX_LENGTH} chars (got {len(desc)})"
+        )
 
     if re.search(r"[<>]", desc):
         errors.append("'description' must not contain angle brackets (< or >)")
@@ -125,7 +141,9 @@ def validate_description(desc: str) -> list[str]:
 def validate_compatibility(value: str) -> list[str]:
     """Validate the optional compatibility field."""
     if len(value) > COMPATIBILITY_MAX_LENGTH:
-        return [f"'compatibility' exceeds {COMPATIBILITY_MAX_LENGTH} chars (got {len(value)})"]
+        return [
+            f"'compatibility' exceeds {COMPATIBILITY_MAX_LENGTH} chars (got {len(value)})"
+        ]
     return []
 
 
@@ -173,12 +191,49 @@ def validate_skill(skill_dir: Path) -> list[str]:
     return errors
 
 
+def _repo_root_from_script() -> Path:
+    # Script lives at <repo>/skills/skill-crafting/scripts/validate.py
+    return Path(__file__).resolve().parents[3]
+
+
+def _validate_all(repo_root: Path) -> int:
+    skills_root = repo_root / "skills"
+    if not skills_root.is_dir():
+        print(f"Error: {skills_root} is not a directory", file=sys.stderr)
+        return 1
+    failed: list[tuple[str, list[str]]] = []
+    count = 0
+    for skill_dir in sorted(p for p in skills_root.iterdir() if p.is_dir()):
+        if not (skill_dir / "SKILL.md").is_file():
+            continue
+        count += 1
+        errors = validate_skill(skill_dir)
+        if errors:
+            failed.append((skill_dir.name, errors))
+    if failed:
+        print(f"\nFAILED -- {len(failed)}/{count} skills have errors:")
+        for name, errs in failed:
+            print(f"\n{name}:")
+            for err in errs:
+                print(f"  - {err}")
+        return 1
+    print(f"\nPASSED -- all {count} skills validated")
+    return 0
+
+
 def main() -> int:
     if len(sys.argv) != 2:
-        print(f"Usage: {sys.argv[0]} <skill-directory>", file=sys.stderr)
+        print(
+            f"Usage: {sys.argv[0]} <skill-directory> | --all",
+            file=sys.stderr,
+        )
         return 1
 
-    skill_dir = Path(sys.argv[1]).resolve()
+    arg = sys.argv[1]
+    if arg == "--all":
+        return _validate_all(_repo_root_from_script())
+
+    skill_dir = Path(arg).resolve()
     if not skill_dir.is_dir():
         print(f"Error: {skill_dir} is not a directory", file=sys.stderr)
         return 1

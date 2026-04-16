@@ -101,6 +101,11 @@ Convention: Each check has a unique ID, type (A=auto, L=llm), a rule, and a pass
 | F04 | L | Agent prompts reflect current pipeline | Collaboration sections reference correct agent names, outputs, stages |
 | F05 | A | `SYSTEM_DEPLOYMENT.md` referenced file paths exist | All file paths in deployment doc resolve to existing files |
 | F06 | L | Deployment doc service list matches compose.yaml | Service names and ports in deployment doc consistent with actual compose files |
+| F07 | A | Cataloged section missing marker | WARN when a skill declares `staleness_sensitive_sections` but a listed section has no `<!-- last-verified: -->` comment following its heading |
+| F08 | A | Marker age > threshold | WARN when section last verified more than `staleness_threshold_days` ago (default 120); escalates to FAIL beyond 2× threshold (~240 days by default) |
+| F09 | A | Marker invalid format / future-dated | FAIL when marker syntax does not match the spec OR the date is in the future |
+
+**Cold-start semantics** (F07): the first sentinel run after skills backfill their `staleness_sensitive_sections:` frontmatter will produce N WARNs — one per cataloged section that has not yet received a marker. This is intentional and **not** treated as a regression against prior runs. Subsequent runs shrink the WARN set as sections acquire markers (at which point F08 takes over for age tracking). F09 remains FAIL at all times — invalid or future-dated markers indicate authoring error and must be corrected, not tolerated. Staleness policy details live in [rules/swe/staleness-policy.md](../rules/swe/staleness-policy.md).
 
 ### Spec Compliance (S)
 

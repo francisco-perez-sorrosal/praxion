@@ -102,6 +102,8 @@ Keep agent prompts focused. When a prompt grows too long, use the `skills` field
 - Inline the content directly in the agent prompt (acceptable for agents since they run in their own context window and are not always-loaded)
 - Do NOT use satellite/reference files that the agent reads at runtime
 
+**End-user-facing prompt design:** This skill covers agent-loop plumbing and system-prompt role/boundary wiring. For end-user-facing prompt design (few-shot patterns, chain-of-thought, structured output via Pydantic/Zod, prompt versioning, injection hardening), consult the [`llm-prompt-engineering`](../llm-prompt-engineering/SKILL.md) skill.
+
 ## Agent Location Hierarchy
 
 Higher priority wins when names collide:

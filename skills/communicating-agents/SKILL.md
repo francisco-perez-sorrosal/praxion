@@ -10,6 +10,17 @@ description: Agent-to-agent communication protocols for multi-agent interoperabi
   communication, agent interoperability, cross-agent protocol.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
+staleness_sensitive_sections:
+  - "Gotchas"
+  - "A2A Protocol Summary"
+  - "Core Concepts"
+  - "Agent Discovery"
+  - "Authentication"
+  - "Architecture Layers"
+  - "SDK Selection"
+  - "Minimal Server Pattern"
+  - "Framework Integrations"
+staleness_threshold_days: 60
 ---
 
 # Communicating Agents

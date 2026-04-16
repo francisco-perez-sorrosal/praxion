@@ -51,17 +51,15 @@ Project rules take precedence over personal rules with the same name.
 
 ## Memory Hierarchy
 
-Claude resolves instructions in this priority order:
+| Priority | Source | Loading |
+|---|---|---|
+| 1 (highest) | Managed policy (enterprise) | always |
+| 2 | Project memory (`.claude/CLAUDE.md`) | always |
+| 3 | Project rules (`.claude/rules/`) | when relevant |
+| 4 | User memory (`~/.claude/CLAUDE.md`) | always |
+| 5 (lowest) | Project local (`.claude/CLAUDE.local.md`) | gitignored override |
 
-1. **Managed policy** (enterprise) — highest priority
-2. **Project memory** (`.claude/CLAUDE.md`) — always loaded
-3. **Project rules** (`.claude/rules/`) — loaded when relevant
-4. **User memory** (`~/.claude/CLAUDE.md`) — always loaded
-5. **Project local** (`.claude/CLAUDE.local.md`) — gitignored overrides
-
-Rules sit in the middle — they override user memory but yield to project memory and managed policy. This means a project's `CLAUDE.md` can override a rule when needed.
-
-Use `/memory` in Claude Code to see which rules are currently loaded.
+Rules override user memory but yield to project memory and managed policy. See `~/.claude/CLAUDE.md` and `rules/CLAUDE.md` for full coverage. Use `/memory` in Claude Code to inspect loaded rules.
 
 ## Rule File Structure
 
@@ -108,18 +106,17 @@ The rule loads only when Claude is working on files matching the glob patterns.
 
 ## Directory Organization
 
-Scale organization to project complexity:
+Scale organization to project complexity. Choose the simplest tier that fits.
 
-### Flat (small projects, <10 rules)
+| Tier | When | Structure | Example |
+|---|---|---|---|
+| **Flat** | <10 rules, no language divergence | All rules directly under `.claude/rules/` | `sql.md`, `security.md`, `git-commit-format.md` |
+| **Layered** | Multiple languages with divergent conventions | `common/` + `<language>/` subdirectories | See worked example below |
+| **Path-Scoped** | Granular per-path targeting needed | Rules with `paths` globs (see [REFERENCE.md](REFERENCE.md)) | `paths: ["src/api/**/*.ts"]` |
 
-```
-.claude/rules/
-├── sql.md
-├── security.md
-└── git-commit-format.md
-```
+Claude loads rules recursively from subdirectories. Language-specific files extend common ones — use the pattern: *"This file extends `common/coding-style.md` with TypeScript-specific conventions."*
 
-### Layered (medium+ projects, language-specific)
+**Layered worked example**:
 
 ```
 .claude/rules/
@@ -134,14 +131,6 @@ Scale organization to project complexity:
     ├── coding-style.md
     └── testing.md
 ```
-
-Claude loads rules recursively from subdirectories. Language-specific files extend common ones — use the pattern: *"This file extends `common/coding-style.md` with TypeScript-specific conventions."*
-
-### Path-Scoped (targeted loading)
-
-Rules with `paths` globs load only for matching files — useful when flat or layered organization isn't granular enough.
-
-Choose the simplest tier that fits the project. Flat works for most projects; upgrade to layered when language-specific rules diverge significantly.
 
 ## Naming Convention
 
@@ -167,21 +156,13 @@ Research:     citation-format.md, data-collection-ethics.md
 
 ### Be Declarative
 
-State what should be true, not steps to follow.
+State what should be true, not steps to follow. Procedural content belongs in a Skill, not a rule.
 
-**Good** — constraints:
-```markdown
-- Column names use snake_case
-- Foreign keys must be indexed
-- No implicit joins
-```
-
-**Bad** — procedure (this belongs in a Skill):
-```markdown
-Step 1: Open the query editor
-Step 2: Write the SELECT statement
-Step 3: Make sure to use snake_case
-```
+| Good (constraints) | Bad (procedure — move to Skill) |
+|---|---|
+| `- Column names use snake_case` | `Step 1: Open the query editor` |
+| `- Foreign keys must be indexed` | `Step 2: Write the SELECT statement` |
+| `- No implicit joins` | `Step 3: Make sure to use snake_case` |
 
 ### Content Guidelines
 
@@ -193,34 +174,9 @@ Step 3: Make sure to use snake_case
 
 ### Customization Sections
 
-Rules often mix universal conventions (applicable everywhere) with areas where users need to inject project-specific or team-specific content. Use `[CUSTOMIZE]` sections to separate the two clearly.
+For rules that cover domains with project variation (coding style, testing, security, deployment), use `### [CUSTOMIZE] <Topic>` sub-sections — placed at the end after universal content — to separate universal conventions from project-specific overrides. Use HTML comment placeholders (`<!-- -->`) for author guidance so they don't affect rule semantics. Fully universal rules (e.g., commit format) omit customization entirely.
 
-**When to use**: Rules that cover domains with inherent project variation — coding style, testing, security, deployment. Not every rule needs one; rules that are fully universal (e.g., commit message format) can omit customization sections entirely.
-
-**Pattern**: Add a `### [CUSTOMIZE] <Topic>` section header at the end of the rule, after all universal conventions. Include placeholder guidance listing what the user should add.
-
-```markdown
-## Coding Style
-
-### Naming
-- Variables: descriptive, intention-revealing names
-- Booleans: read as yes/no questions — `is_valid`, `has_permission`
-
-### [CUSTOMIZE] Project Naming Conventions
-<!-- Add project-specific naming patterns here:
-- Prefix conventions for modules/packages
-- Domain-specific naming (e.g., database models, API routes)
-- Abbreviations accepted in this codebase
--->
-```
-
-**Guidelines**:
-- Place all `[CUSTOMIZE]` sections at the end, after universal content
-- Never mix customizable content into universal sections — keep them separate
-- Each `[CUSTOMIZE]` section should have a clear topic and placeholder guidance
-- Use HTML comments (`<!-- -->`) for placeholder instructions so they don't affect rule semantics
-
-See [REFERENCE.md](REFERENCE.md) for complete examples with customization sections.
+See [REFERENCE.md#customization-section-examples](REFERENCE.md#customization-section-examples) for worked patterns.
 
 ## Rules vs Skills vs CLAUDE.md
 
@@ -240,13 +196,6 @@ Ask: **"Is this something Claude should _know_, or something Claude should _do_?
 | "Commit messages must use imperative mood" | Skill (not procedural) | Rule |
 | "Security checklist for auth code" | `CLAUDE.md` (too detailed, not always relevant) | Rule |
 
-## When to Split or Merge
-
-- **Split** when a rule file covers unrelated concerns (SQL naming + API auth in one file)
-- **Merge** when two files overlap heavily and are always loaded together
-- **Don't over-split** — closely related topics (commit format + commit rules) can coexist based on reuse patterns
-- Keep each file focused on a single coherent domain
-
 ## Creation Workflow
 
 1. **Identify** — recognize recurring contextual knowledge Claude needs
@@ -257,6 +206,10 @@ Ask: **"Is this something Claude should _know_, or something Claude should _do_?
 6. **Place** — project `.claude/rules/` or personal `~/.claude/rules/`
 7. **Verify** — use `/memory` to confirm the rule loads in the expected context
 8. **Iterate** — refine based on Claude's behavior; adjust scope, naming, or content
+   - **Split** when a rule file covers unrelated concerns (e.g., SQL naming + API auth in one file)
+   - **Merge** when two files overlap heavily and are always loaded together
+   - **Don't over-split** — closely related topics (commit format + commit rules) can coexist based on reuse patterns
+   - Keep each file focused on a single coherent domain
 
 ## Self-Containment Constraint
 

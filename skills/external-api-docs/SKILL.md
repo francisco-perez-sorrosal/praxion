@@ -48,78 +48,51 @@ This skill changes how the agent approaches external API work. When this skill i
 - APIs already fetched in this session (avoid redundant lookups)
 - Simple, well-known patterns where confidence is high
 
-## Retrieval: MCP Tools (Preferred)
+## Retrieval Protocol
 
-When the `chub` MCP server is configured (default after Praxion install), use MCP tools directly. These are native tools -- no shell required, no telemetry (disabled at the MCP server level).
+Two interfaces share one five-step flow: **MCP tools** (preferred, native, telemetry disabled at server) and **CLI fallback** (when MCP is unavailable — run via Bash with `CHUB_TELEMETRY=0 CHUB_FEEDBACK=1` prefixed to every command shown below).
 
 ### Step 1: Check Availability
 
-Call `chub_search` with the library or API name:
+Call with the library or API name; if results are returned, proceed to Step 2, otherwise skip to the Fallback Hierarchy.
 
-```
-chub_search({ query: "stripe", type: "docs" })
-```
-
-If results are returned, proceed to Step 2. If no results, skip to the Fallback Hierarchy.
+| | MCP | CLI |
+|---|---|---|
+| **Search** | `chub_search({ query: "stripe", type: "docs" })` | `chub search "stripe" --json` |
 
 ### Step 2: Fetch Targeted Content
 
-Call `chub_get` with the entry ID from search results:
+Fetch by entry ID; for large docs via CLI, use `-o` to write to a file and read sections on demand.
 
-```
-chub_get({ id: "stripe/api", language: "python" })
-```
-
-For a specific reference file within the doc:
-
-```
-chub_get({ id: "stripe/api", file: "references/webhooks.md" })
-```
+| | MCP | CLI |
+|---|---|---|
+| **Fetch by entry** | `chub_get({ id: "stripe/api", language: "python" })` | `chub get stripe/api --lang python` |
+| **Fetch specific file** | `chub_get({ id: "stripe/api", file: "references/webhooks.md" })` | `chub get stripe/api --file references/webhooks.md` |
+| **Save to file** | N/A (content returned directly) | `chub get stripe/api -o tmp/api-docs/` |
 
 ### Step 3: Use the Content
 
-The MCP tool returns the content directly. Extract only what is needed for the immediate task:
-
-- **Endpoint signatures** -- parameter names, types, required vs optional
-- **Auth patterns** -- how to authenticate, token formats, header names
-- **Error codes** -- what responses to handle, retry semantics
-- **Rate limits** -- request budgets, backoff strategies
-
-Do not paste the entire doc response into your work. Summarize or quote the relevant sections.
+Extract only what the task needs — endpoint signatures, auth patterns, error codes, rate limits. Summarize or quote relevant sections; do not paste the entire response.
 
 ### Step 4: Annotate Discoveries
 
-When you find a gotcha, correction, or non-obvious pattern, persist it. Every annotation note must end with the identity suffix derived per [Identity Attribution](#identity-attribution) below:
+When you find a gotcha, correction, or non-obvious pattern, persist it — e.g. "v2 PaymentIntents require idempotency keys for retries; omitting causes silent duplicate charges." Every note must end with the identity suffix (see [Identity Attribution](#identity-attribution)); annotations auto-append to future fetches of that entry.
 
-```
-chub_annotate({ id: "stripe/api", note: "v2 PaymentIntents require idempotency keys for retries. Omitting causes silent duplicate charges. — Francisco Perez-Sorrosal (fperezsorrosal@gmail.com)" })
-```
-
-Annotations auto-append to future fetches of that entry, improving quality over time.
+| | MCP | CLI |
+|---|---|---|
+| **Save a note** | `chub_annotate({ id: "stripe/api", note: "<body>. — <name> (<email>)" })` | `chub annotate stripe/api "<note>"` |
+| **List existing notes** | N/A | `chub annotate --list` |
 
 ### Step 5: Give Feedback
 
-After using a doc, **always** rate it. This is how the ecosystem improves — maintainers use feedback to fix problems and prioritize updates. Every rating must include a label, a concrete comment, and the identity suffix (see [Identity Attribution](#identity-attribution)). Be honest and straight to the point.
+After using a doc, **always** rate it — every rating needs a label, a concrete comment (specifics: endpoint names, parameter mismatches, version numbers, missing sections; vague comments waste maintainer time), and the identity suffix (see [Identity Attribution](#identity-attribution)).
 
-**Comment quality matters.** Vague comments ("good docs", "didn't work") waste maintainer time. State exactly what was correct or what was wrong, with specifics: endpoint names, parameter mismatches, version numbers, missing sections.
+**Always submit corrective feedback when you detect:** version drift (documented ≠ current library version); wrong model names, deprecated endpoints, or missing parameters; auth flow inaccuracies or incorrect header/signature schemes; code examples that fail or produce wrong output; missing sections (error codes, rate limits, webhook payloads, pagination); descriptions contradicted by the live API. Silent consumption of flawed docs is prohibited — every future agent inherits the same stale information unless you report it now. Example comments — *up/accurate*: "PaymentIntents create/confirm matches v2024-12 API; Python examples run unmodified." *down/outdated*: "Documents gpt-4o but gpt-5.4 is current; Structured outputs missing 'strict' param added 2025."
 
-**Trigger conditions — always submit corrective feedback when you detect:**
-
-- Version drift (documented version ≠ current published version of the library/API)
-- Wrong model names, deprecated endpoints, or missing parameters
-- Auth flow inaccuracies, incorrect header/signature schemes
-- Code examples that fail to run or produce wrong output
-- Missing sections (error codes, rate limits, webhook payloads, pagination)
-- Inaccurate descriptions contradicted by the live API
-
-Silent consumption of flawed docs is prohibited — every future agent will inherit the same stale information unless you report it now.
-
-```
-chub_feedback({ id: "stripe/api", vote: "up", label: "accurate", comment: "PaymentIntents create/confirm flow matches v2024-12 API. Python examples run without modification. — Francisco Perez-Sorrosal (fperezsorrosal@gmail.com)" })
-chub_feedback({ id: "openai/chat", vote: "down", label: "outdated", comment: "Documents gpt-4o as latest model but gpt-5.4 is current. Structured outputs section missing the 'strict' parameter added in 2025. — Francisco Perez-Sorrosal (fperezsorrosal@gmail.com)" })
-chub_feedback({ id: "anthropic/sdk", vote: "down", label: "incomplete", comment: "No coverage of streaming tool_use responses. Only shows non-streaming examples. — Francisco Perez-Sorrosal (fperezsorrosal@gmail.com)" })
-chub_feedback({ id: "fastapi/docs", vote: "up", label: "good-examples", comment: "Dependency injection examples cover all three scopes (request, session, app). Error handling patterns are production-ready. — Francisco Perez-Sorrosal (fperezsorrosal@gmail.com)" })
-```
+| | MCP | CLI |
+|---|---|---|
+| **Upvote** | `chub_feedback({ id, vote: "up", label: "accurate", comment: "<body>. — <name> (<email>)" })` | `chub feedback <id> up --label accurate "<comment>"` |
+| **Downvote** | `chub_feedback({ id, vote: "down", label: "outdated", comment: "<body>. — <name> (<email>)" })` | `chub feedback <id> down --label outdated "<comment>"` |
 
 ### Identity Attribution
 
@@ -161,51 +134,6 @@ Available labels:
 
 Never send feedback silently. The user must see every rating submitted to a third-party system.
 
-## Retrieval: CLI Fallback
-
-When MCP tools are not available (server not configured, running in a context without MCP), use the CLI via Bash. All commands disable telemetry (`CHUB_TELEMETRY=0`) and enable feedback (`CHUB_FEEDBACK=1`).
-
-### Search
-
-```bash
-CHUB_TELEMETRY=0 CHUB_FEEDBACK=1 chub search "<library>" --json
-```
-
-`chub search` with no query lists all available entries.
-
-### Fetch
-
-```bash
-CHUB_TELEMETRY=0 CHUB_FEEDBACK=1 chub get <author/entry-id> --lang <language>
-```
-
-### Fetch to File (for large docs)
-
-```bash
-CHUB_TELEMETRY=0 CHUB_FEEDBACK=1 chub get <author/entry-id> -o tmp/api-docs/
-```
-
-Then read only the relevant sections using the Read tool.
-
-### Annotate
-
-```bash
-CHUB_TELEMETRY=0 CHUB_FEEDBACK=1 chub annotate <author/entry-id> "<note>"
-```
-
-List existing annotations:
-
-```bash
-CHUB_TELEMETRY=0 CHUB_FEEDBACK=1 chub annotate --list
-```
-
-### Feedback
-
-```bash
-CHUB_TELEMETRY=0 CHUB_FEEDBACK=1 chub feedback <author/entry-id> up --label accurate "PaymentIntents flow matches v2024-12 API, Python examples run clean"
-CHUB_TELEMETRY=0 CHUB_FEEDBACK=1 chub feedback <author/entry-id> down --label outdated "Documents gpt-4o as latest but gpt-5.4 is current, missing strict param in structured outputs"
-```
-
 ### Quick Reference
 
 | Goal | MCP tool | CLI equivalent |
@@ -233,17 +161,13 @@ Each level down trades curation quality for breadth. Always prefer curated sourc
 
 ## Provider Architecture
 
-This skill defines the **methodology** for external API documentation retrieval. The actual retrieval is delegated to a provider. Currently supported:
+This skill defines the **methodology** for external API documentation retrieval; actual retrieval is delegated to a provider. The provider model is extensible — future providers follow the same five-step flow and the fallback hierarchy always applies.
 
 | Provider | Type | Coverage | Setup |
 |----------|------|----------|-------|
 | **[context-hub](references/context-hub.md)** (default) | MCP + CLI | ~600+ curated API doc packages | Praxion installer (Step 6) or `npm install -g @aisuite/chub` |
 
-The provider model is extensible. Future providers follow the same pattern: check availability → fetch targeted content → use selectively → annotate discoveries. The fallback hierarchy always applies regardless of provider.
-
---> See [references/context-hub.md](references/context-hub.md) for CLI reference, configuration, and telemetry controls.
-
---> See [references/mcp-setup.md](references/mcp-setup.md) for MCP server configuration details per tool.
+See [references/context-hub.md](references/context-hub.md) for CLI reference, configuration, and telemetry controls; [references/mcp-setup.md](references/mcp-setup.md) for MCP server configuration per tool.
 
 ## Pipeline Integration
 

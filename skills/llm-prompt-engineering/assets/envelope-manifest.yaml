@@ -1,0 +1,43 @@
+# Prompt-envelope pinning manifest.
+#
+# A "v3 prompt" is only meaningful with the full call envelope pinned.
+# Keep this file in git alongside the prompt body; each row is a deployable
+# artifact. Rollout labels (dev/canary/prod) and rollback targets are
+# first-class so traffic splits beat hard cutovers.
+
+prompts:
+  - prompt_id: issue-classifier
+    version: v3
+    model: claude-sonnet-4-x       # pin the exact dated ID at deploy time
+    created_at: 2026-04-16T00:00:00Z
+    created_by: fperezsorrosal@gmail.com
+    parent_version: v2              # previous version in the chain
+    rollout: prod                   # dev | canary | prod | percentage:N
+    rollback_version: v2            # target if rollout fails or metrics regress
+    evaluation_id: eval-2026-04-16-001   # link to the eval run that gated this release
+    envelope:
+      temperature: 0
+      top_p: 1
+      max_tokens: 512
+      stop: []
+      schema_hash: sha256:0000000000000000000000000000000000000000000000000000000000000000
+      tools: []
+      reasoning_effort: null         # null when the model has no effort knob
+
+  - prompt_id: issue-classifier
+    version: v2
+    model: claude-sonnet-4-x
+    created_at: 2026-03-01T00:00:00Z
+    created_by: fperezsorrosal@gmail.com
+    parent_version: v1
+    rollout: prod                   # remains live under canary split during v3 rollout
+    rollback_version: v1
+    evaluation_id: eval-2026-03-01-004
+    envelope:
+      temperature: 0
+      top_p: 1
+      max_tokens: 512
+      stop: []
+      schema_hash: sha256:0000000000000000000000000000000000000000000000000000000000000000
+      tools: []
+      reasoning_effort: null

@@ -188,18 +188,18 @@ graph LR
     end
     subgraph Memory["Memory MCP"]
         Curated[(memory.json<br/>Curated)]
-        Obs[(observations.jsonl<br/>Automatic)]
+        Obs[(observations.jsonl<br/>session.id + trace_id + span_id)]
     end
     subgraph Chronograph["Chronograph MCP"]
         ES[EventStore<br/>In-memory]
-        OTel[OTel Exporter]
+        OTel[OTel Exporter<br/>session.id on every span]
     end
     Phoenix[(Arize Phoenix<br/>SQLite)]
 
     Hook -->|inject_memory| Agent
     Agent -->|remember()| Curated
     Hook -->|capture_session| Obs
-    Hook -->|capture_memory| Obs
+    Hook -->|capture_memory + trace_id/span_id| Obs
     Hook -.->|send_event HTTP| ES
     ES --> OTel
     OTel -.->|OTLP| Phoenix

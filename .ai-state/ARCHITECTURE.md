@@ -194,18 +194,18 @@ graph LR
     end
     subgraph Memory["Memory MCP"]
         Curated[(memory.json<br/>Curated)]
-        Obs[(observations.jsonl<br/>Automatic)]
+        Obs[(observations.jsonl<br/>session.id + trace_id + span_id)]
     end
     subgraph Chronograph["Chronograph MCP"]
         ES[EventStore<br/>In-memory]
-        OTel[OTel Exporter]
+        OTel[OTel Exporter<br/>session.id on every span]
     end
     Phoenix[(Arize Phoenix<br/>SQLite)]
 
     Hook -->|inject_memory| Agent
     Agent -->|remember()| Curated
     Hook -->|capture_session| Obs
-    Hook -->|capture_memory| Obs
+    Hook -->|capture_memory + trace_id/span_id| Obs
     Hook -.->|send_event HTTP| ES
     ES --> OTel
     OTel -.->|OTLP| Phoenix
@@ -301,5 +301,9 @@ graph LR
 | [dec-042](decisions/042-scripts-filter-combined-predicate.md) | Scripts install filter: combined predicate + stale-symlink sweep | `install_claude.sh` filters by `-f && -x` plus `case` exclusion of `merge_driver_*` / `git-*-hook.sh`; `clean_stale_symlinks` extended to `~/.local/bin/` |
 | [dec-043](decisions/043-behavioral-contract-layer.md) | Four-behavior Agent Behavioral Contract as first-class operational pillar | Cross-cutting behavioral layer across all write/plan/review agents; always-loaded rule + on-demand skill reference + README principle + CLAUDE.md anchors + 10 per-agent pointers + 6 verifier tags + sentinel BC01–BC04 checks. No new components |
 | [dec-044](decisions/044-coding-style-path-scoping.md) | Path-scope `rules/swe/coding-style.md` to code-file globs | Reclaims ~1,900 always-loaded tokens on non-code sessions; funds the contract layer's ~498-token cost; executes ROADMAP Phase 1B |
+| [dec-045](decisions/045-llm-prompt-engineering-skill.md) | Create `llm-prompt-engineering` skill as framework-agnostic prompt-design discipline | Adds new skill under Knowledge Layer; defers Claude-specific API details to `claude-ecosystem`, agent loops to `agentic-sdks`, multi-turn evals to `agent-evals`; 6 references + python/typescript contexts |
+| [dec-046](decisions/046-staleness-detection-system.md) | Staleness detection via per-skill frontmatter + paths-scoped rule + sentinel checks | `last_reviewed` / `refresh_policy` frontmatter on skills; `rules/swe/staleness-policy.md` (paths-scoped, zero always-loaded budget); sentinel F07/F08/F09 checks; `/refresh-skill` manual entry point |
+| [dec-047](decisions/047-cross-reference-validator.md) | Cross-reference validator as stdlib sibling script with soft-launch CI | `validate_references.py` parses 6 link classes with per-class FAIL/WARN/OK; ignore-marker mechanism for templates; CI job with `continue-on-error: true`, strict flip 2026-04-30 |
+| [dec-048](decisions/048-observation-span-correlation.md) | Observation-span correlation via OpenInference `session.id` + W3C trace-context | Rename `praxion.session_id` → `session.id` on every chronograph span; add top-level `trace_id`/`span_id`/`parent_span_id` to Observation; memory-mcp extracts `params._meta.traceparent` at tool handlers; breaking schema accepted per user |
 
 [Add new rows as architecture-related ADRs are created.]

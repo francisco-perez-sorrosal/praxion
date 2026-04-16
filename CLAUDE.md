@@ -33,6 +33,10 @@ Extends `~/.claude/CLAUDE.md`. Four principles: **token budget first-class**, **
 
 Praxion enforces the four-behavior contract from the global philosophy (`~/.claude/CLAUDE.md`) — Surface Assumptions, Register Objection, Stay Surgical, Simplicity First — via the always-loaded `rules/swe/agent-behavioral-contract.md` rule, per-agent self-tests, and named failure-mode tags in verification reports. See `skills/software-planning/references/behavioral-contract.md`.
 
+## Compaction Guidance
+
+When compacting, always preserve: active pipeline stage and task slug, current WIP step number and status, acceptance criteria from the plan, and the list of modified files. The `PreCompact` hook snapshots pipeline documents to `.ai-work/PIPELINE_STATE.md` — re-read that file after compaction to restore orientation.
+
 ## Known Claude Code Limitations
 
 Tracked here so they can be revisited when Claude Code releases fixes:

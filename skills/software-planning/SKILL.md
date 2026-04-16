@@ -253,6 +253,16 @@ FOR EACH STEP:
 END: Verify all criteria met, merge learnings, delete all three docs
 ```
 
+### Context Compaction Checkpoints
+
+In long pipelines, the main agent should run `/compact` at natural phase boundaries to keep context clean. Recommended points:
+
+- **After research + architecture** (high file reading is done; implementation needs clean context)
+- **After each implementation group completes** (test output and diffs accumulate)
+- **Before verification** (verifier benefits from a focused context with just the plan and outcomes)
+
+The `PreCompact` hook snapshots pipeline documents to `.ai-work/PIPELINE_STATE.md` automatically. After compacting, re-read that file and `WIP.md` to restore orientation. Use `/compact Focus on [current phase]` with a hint when context is dominated by a prior phase's artifacts.
+
 ## End of Feature
 
 When all steps are complete: verify all acceptance criteria met, merge learnings to permanent locations (CLAUDE.md, ADRs, issue tracker), then delete all planning documents.

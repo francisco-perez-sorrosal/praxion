@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Snapshot .ai-work/ pipeline state before context compaction.
 
-Reads the first 20 lines of each pipeline document and writes a condensed
+Reads the first 30 lines of each pipeline document and writes a condensed
 PIPELINE_STATE.md that the agent can re-read after compaction to restore
 orientation. Exits 0 unconditionally -- must never block compaction.
 """
@@ -21,7 +21,7 @@ PIPELINE_DOCS = [
     "SKILL_GENESIS_REPORT.md",
 ]
 
-HEAD_LINES = 20
+HEAD_LINES = 30
 
 
 def _find_ai_work() -> Path | None:

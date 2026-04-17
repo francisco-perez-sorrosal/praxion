@@ -173,6 +173,7 @@ Samples implementation files for systemic quality patterns. The sentinel's only 
 | EC03 | L | Collaboration sections form consistent network | Bidirectional refs match — if A says "collaborates with B", B references A |
 | EC04 | L | Pipeline stages have complete handoff coverage | Every pipeline output doc has a producing and consuming agent; no dead ends |
 | EC05 | L | No structural gaps for stated purpose | Given CLAUDE.md description and Future Paths, are obvious artifact types missing? |
+| EC06 | L | Condensed pipeline-deliverables block matches authoritative Delegation Checklists | In `claude/config/CLAUDE.md`, locate the "Standard/Full pipeline deliverables to always include" block (the 4-bullet list covering systems-architect, implementation-planner, implementer, verifier). In `rules/swe/swe-agent-coordination-protocol.md`, locate the `### Delegation Checklists` section. **Scope: outputs only** — the condensed block names deliverables produced; ignore "Read X" / "Verify against X" input clauses in the rule. For each of the four agents, every **produced** deliverable named in the rule's checklist (files written or updated, including conditionals) must appear (verbatim or as a recognizable shorthand like "architecture doc validation" for "ARCHITECTURE.md + docs/architecture.md") in the condensed block. Every conditional clause ("if deployment in scope", "if structural", "if tests") must appear in both files or neither. Drift in either direction is a WARN — the rule is the authoritative source per the sync-contract pointer in CLAUDE.md, so when drift is detected the condensed block is the one to reconcile. Unconditional (always-loaded in both files). |
 
 ### Spec Health (SH)
 
@@ -320,7 +321,7 @@ Execute llm type checks by reading artifact content in batches:
 
 **Batch 2 — Agents**: Read all agent .md files. Apply C07, C08, N04-N06, F04, S06, T05-T06, X07-X08, EC03-EC04 checks.
 
-**Batch 3 — Rules + Config**: Read all rule files, CLAUDE.md files, plugin.json, latest `IDEA_LEDGER_*.md`. Apply remaining llm checks: C08, N04-N06, S03, S07, X07, EC05, BC02 checks.
+**Batch 3 — Rules + Config**: Read all rule files, CLAUDE.md files, plugin.json, latest `IDEA_LEDGER_*.md`. Apply remaining llm checks: C08, N04-N06, S03, S07, X07, EC05, EC06, BC02 checks.
 
 **Batch 4 — Pipeline Discipline** (conditional): If Task Chronograph MCP tools are available (`get_pipeline_status`, `get_agent_events`), query for pipeline data and apply P01-P05 checks. If unavailable, skip with a note in the report.
 

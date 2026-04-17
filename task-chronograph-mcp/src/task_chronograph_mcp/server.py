@@ -194,13 +194,6 @@ def _relay_event(relay: OTelRelay, event: Event) -> None:
                     project_dir=event.project_dir,
                     args=str(event.metadata.get("args", "")),
                 )
-            case EventType.COMMAND_USE:
-                relay.record_command(
-                    event.agent_id,
-                    event.metadata.get("artifact_name", event.tool_name),
-                    session_id=event.session_id,
-                    project_dir=event.project_dir,
-                )
             case EventType.PHASE_TRANSITION:
                 relay.add_phase_event(
                     event.agent_id, event.phase, event.total_phases, event.phase_name, event.message

@@ -51,7 +51,7 @@ uv run python -m task_chronograph_mcp
 
 ## Hook Events
 
-8 hook events are registered, forwarding to `send_event.py`:
+9 hook events are registered, forwarding to `send_event.py`:
 
 | Hook Event | Event Type | OTel Span |
 |---|---|---|
@@ -59,12 +59,15 @@ uv run python -m task_chronograph_mcp
 | `Stop` | session_stop | End SESSION span |
 | `SubagentStart` | agent_start | AGENT child span |
 | `SubagentStop` | agent_stop | End AGENT span |
-| `PostToolUse` | tool_use | TOOL child span (all tools) |
-| `PostToolUseFailure` | error | TOOL span with ERROR status |
+| `PreToolUse` (all tools) | tool_start | Opens a TOOL span (held open, not emitted yet) |
+| `PostToolUse` | tool_use | Closes the paired TOOL span with real duration |
+| `PostToolUseFailure` | error | Closes the paired TOOL span with ERROR status |
 | `PreToolUse` (Bash) | -- | Code quality gate (sync) |
 | `PreCompact` | -- | Pipeline state snapshot (sync) |
 
 PostToolUse additionally detects PROGRESS.md writes and emits phase_transition events.
+
+Pair correlation uses Claude Code's `tool_use_id`. When `PreToolUse` fires without a `tool_use_id` (or never fires), `PostToolUse` falls back to emitting an instant span -- Phoenix still sees the event, just without a duration.
 
 The hook script uses only Python stdlib and exits 0 unconditionally -- it never blocks agent execution.
 
@@ -80,16 +83,52 @@ Traces use [OpenInference](https://github.com/Arize-ai/openinference) semantic c
 
 ```
 SESSION (CHAIN) ← root, trace_id from session_id hash
-├── researcher (AGENT, origin: praxion)
-│   ├── Read (TOOL)
-│   ├── Bash (TOOL)
+├── researcher (AGENT, origin: praxion, fork_group: U1, sibling_index: 0)
+│   ├── Read (TOOL, real duration)
+│   ├── Bash (TOOL, real duration)
 │   └── [event: phase_transition] Phase 2/5
-├── general-purpose (AGENT, origin: claude-code)
-│   └── Edit (TOOL)
-└── verifier (AGENT, origin: praxion)
+├── implementer (AGENT, origin: praxion, fork_group: U1, sibling_index: 1)
+│   └── Edit (TOOL, real duration)
+└── verifier (AGENT, origin: praxion, fork_group: U2, sibling_index: 0)
 ```
 
-Key attributes: `praxion.agent_origin` (praxion vs claude-code), `praxion.trace_type` (pipeline vs native), `praxion.project_name` (multi-project isolation).
+### Span attribute reference
+
+Every TOOL span carries:
+
+| Attribute | Source | Purpose |
+|---|---|---|
+| `tool.name` | hook payload | Phoenix-displayed span name |
+| `tool.id` | `tool_use_id` from Claude Code | Correlates with upstream Anthropic tool-use objects |
+| `input.value`, `output.value` | hook payload (truncated, redacted) | Phoenix renders with JSON/text formatting |
+| `praxion.io.input_size_bytes`, `praxion.io.output_size_bytes` | raw size *before* truncation | Real size signal survives summary truncation |
+| `praxion.hook_event` | `PreToolUse` / `PostToolUse` / `PostToolUseFailure` | Which hook produced this span |
+| `praxion.mcp_server`, `praxion.mcp_tool` | MCP tool name classification | Filter MCP server invocations |
+
+Every AGENT span carries:
+
+| Attribute | Source | Purpose |
+|---|---|---|
+| `agent.name`, `graph.node.id`, `graph.node.parent_id` | event | OpenInference hierarchy |
+| `praxion.agent_type`, `praxion.agent_origin`, `praxion.trace_type` | agent_type classification | Filter praxion vs native, pipeline vs ad-hoc |
+| `praxion.fork_group` | time-clustered UUID | Query parallel subagent cohorts |
+| `praxion.sibling_index` | position in cluster | Ordering within a fan-out |
+| `praxion.git.branch`, `praxion.git.worktree_name`, `praxion.git.sha` | git subprocess | Bisect telemetry by git state |
+| `praxion.pipeline_tier` | `.ai-state/calibration_log.md` last row | Compare telemetry across tiers |
+| `user.id` | `git config user.email` | Phoenix filters by user |
+
+Every agent-summary span (emitted at `SubagentStop`) additionally carries:
+
+| Attribute | Purpose |
+|---|---|
+| `praxion.agent.duration_ms` | End-to-end wall-clock duration |
+| `praxion.agent.tools_used` (list) | Which tools this agent exercised (deduped) |
+| `praxion.agent.skills_used` (list) | Which skills this agent activated |
+| `praxion.agent.delegated_to` (list) | Agent types this agent spawned |
+| `llm.token_count.{prompt,completion,total}` | Parsed from the subagent's JSONL transcript (if available) |
+| `llm.model_name`, `llm.system`, `llm.provider` | Inferred from the transcript's assistant messages |
+
+Phoenix computes LLM cost locally from tokens + model name -- no external call. See [Privacy and cost knobs](#privacy-and-cost-knobs) to suppress LLM attribute emission.
 
 ## Configuration
 
@@ -97,9 +136,20 @@ Key attributes: `praxion.agent_origin` (praxion vs claude-code), `praxion.trace_
 |---|---|---|
 | `CHRONOGRAPH_PORT` | `8765` | Chronograph HTTP API port |
 | `CHRONOGRAPH_WATCH_DIR` | *(unset)* | Directory for PROGRESS.md file watching |
+| `CHRONOGRAPH_STRIP_LLM_ATTRS` | *(unset)* | Set to `1` to suppress `llm.*` span attributes (token counts, model, system). Structural telemetry stays intact. |
 | `PHOENIX_ENDPOINT` | `http://localhost:6006/v1/traces` | OTLP export target |
 | `PHOENIX_PROJECT_NAME` | `praxion-default` | Fallback project name |
 | `OTEL_ENABLED` | `false` | Set to `true` to enable OTel export |
+
+### Privacy and cost knobs
+
+Span attributes themselves never trigger external API calls -- emitting them is free. Three real cost/privacy surfaces to be aware of:
+
+1. **`CHRONOGRAPH_STRIP_LLM_ATTRS=1`** -- suppresses LLM-level attributes (`llm.token_count.*`, `llm.model_name`, `llm.system`, `llm.provider`) at parse time. Use when you want structural telemetry (agent hierarchy, tool calls, durations, fork groups) without per-agent model metadata.
+
+2. **Phoenix's PXI assistant** -- the built-in "chat with your traces" feature (Phoenix v14.3+) calls an LLM against an API key you configure in Phoenix. Toggle it off in Phoenix settings if you don't want Phoenix making LLM calls on your behalf.
+
+3. **Evaluators you explicitly run** -- e.g., `praxion-evals` / `trajectory_eval.py` run real LLM calls against configured provider keys. Those are opt-in, never triggered automatically.
 
 ## Development
 

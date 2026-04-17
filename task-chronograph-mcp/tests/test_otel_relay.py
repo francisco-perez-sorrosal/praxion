@@ -1005,25 +1005,6 @@ class TestSkillInvocationSpans:
 
 
 # ---------------------------------------------------------------------------
-# Command invocation spans
-# ---------------------------------------------------------------------------
-
-
-class TestCommandInvocationSpans:
-    """Verify that record_command creates CHAIN spans."""
-
-    def test_command_span_created(self, harness: OTelRelayTestHarness):
-        harness.relay.start_session(SESSION_ID, harness.project_dir)
-        harness.relay.record_command("", "co", session_id=SESSION_ID)
-        harness.relay.end_session(SESSION_ID)
-
-        cmd_spans = harness.spans_named("command:co")
-        assert len(cmd_spans) == 1
-        assert cmd_spans[0].attributes["praxion.artifact_type"] == "command"
-        assert cmd_spans[0].attributes["praxion.command_name"] == "co"
-
-
-# ---------------------------------------------------------------------------
 # MCP tool enrichment
 # ---------------------------------------------------------------------------
 

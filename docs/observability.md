@@ -44,10 +44,24 @@ Projects appear automatically when their first session runs. No manual configura
 ### What You See
 
 - **Trace list** -- each session appears as a trace, sorted by recency
-- **Trace waterfall** -- click a trace to see the agent hierarchy: session root, agent spans, tool calls, all with timing bars
-- **Span detail** -- click any span for attributes (agent type, tool name, input/output), events (phase transitions, decisions), and error status
+- **Trace waterfall** -- click a trace to see the agent hierarchy: session root, agent spans, tool calls, all with **real wall-clock durations** (paired `PreToolUse`/`PostToolUse` hooks produce one span per tool call with accurate start/end times)
+- **Span detail** -- click any span for attributes (agent type, tool name, input/output, I/O byte sizes before truncation, MCP server attribution), events (phase transitions, decisions), and error status
 - **Filtering** -- filter by span name, attribute values, error status, or time range
 - **Session grouping** -- traces from the same `session_id` are correlated
+- **Sessions view (Phoenix v14.6+)** -- paginated list with list-detail turn layout. Requires `arize-phoenix>=14.6` (see `eval/requirements.txt`).
+
+### Useful dashboard queries
+
+Phoenix's filter bar accepts attribute predicates. A few high-leverage queries:
+
+| Question | Query |
+|---|---|
+| Which subagents ran as a parallel cohort? | `praxion.fork_group = "<uuid>"` |
+| What did agent X actually do? | Open its `agent-summary` span -- `praxion.agent.tools_used`, `praxion.agent.skills_used`, `praxion.agent.delegated_to` are deduped lists |
+| Which tools took longest? | Sort `TOOL` spans by duration (now that `PreToolUse`/`PostToolUse` produce real start/end times) |
+| Which agents spent the most tokens? | Group `agent-summary` spans by `llm.token_count.total` (requires subagent transcript at `SubagentStop`; see Privacy and cost knobs below) |
+| What ran on branch X? | Filter spans by `praxion.git.branch = "<branch>"` -- also `praxion.git.worktree_name` and `praxion.git.sha` |
+| What was tool input/output size? | `praxion.io.input_size_bytes`, `praxion.io.output_size_bytes` -- raw sizes captured before the 4096-byte summary truncation |
 
 ### Trace Types
 
@@ -103,6 +117,18 @@ chronograph-ctl logs     # Tail the log file
 | `PHOENIX_DEFAULT_RETENTION_POLICY_DAYS` | `90` | Auto-prune traces older than this |
 | `PHOENIX_ENDPOINT` | `http://localhost:6006/v1/traces` | Chronograph's OTLP export target |
 | `OTEL_ENABLED` | `false` | Set to `true` to enable trace export |
+| `CHRONOGRAPH_STRIP_LLM_ATTRS` | *(unset)* | Set to `1` to suppress `llm.*` span attributes (token counts, model, system, provider). Structural telemetry unaffected. |
+| `PRAXION_DISABLE_OBSERVABILITY` | *(unset)* | Set to `1` to stop hooks from posting events entirely. Telemetry goes dark until unset. |
+
+### Privacy and cost knobs
+
+Span attributes themselves cost nothing -- they're bytes on the wire. Three real cost/privacy surfaces:
+
+1. **`CHRONOGRAPH_STRIP_LLM_ATTRS=1`** -- suppresses LLM-level attributes at parse time. Keep this if you want structural telemetry (agent tree, tools, durations, fork groups) but don't want per-agent token/model metadata visible.
+2. **Phoenix's PXI assistant** (Phoenix v14.3+) -- built-in chatbot over traces. Uses API keys you configure in Phoenix. Toggle off in Phoenix settings to prevent Phoenix from making LLM calls on your behalf.
+3. **Evaluators you explicitly run** -- e.g., `praxion-evals judge --provider openai` or `trajectory_eval.py`. These make real API calls against configured provider keys. Opt-in, never triggered automatically.
+
+None of the span attributes our relay emits trigger external API calls. Phoenix's cost computation (if it appears in the UI) is a local lookup in Phoenix's internal price table, keyed on `llm.model_name` + `llm.token_count.*` -- no network call.
 
 ## Ports
 
@@ -146,6 +172,23 @@ tail -f ~/.phoenix/phoenix.err   # stderr
 2. Verify chronograph is running: check MCP server in Claude Code
 3. Check `OTEL_ENABLED` is set to `true` (plugin.json sets this automatically)
 4. Verify hooks are registered: `./install.sh code --check`
+5. Check that `PRAXION_DISABLE_OBSERVABILITY` is not set to `1` in `.claude/settings.json`
+
+**Tool spans show zero duration:**
+
+The `PreToolUse` observability hook is not firing. Check that `hooks/hooks.json` has an empty-matcher entry for `send_event.py` under `PreToolUse`, and that Claude Code picked up the registration (restart the session after editing `hooks.json`). Without `PreToolUse`, the chronograph falls back to emitting instant spans with no duration.
+
+**No token counts on agent-summary spans:**
+
+Three possible causes:
+
+1. `CHRONOGRAPH_STRIP_LLM_ATTRS=1` is set -- that deliberately suppresses `llm.*` attributes.
+2. The subagent transcript file does not exist yet at `SubagentStop` time. Claude Code writes the transcript asynchronously; if you inspect a trace immediately, wait a few seconds and reload.
+3. The `agent_transcript_path` metadata is missing from the `SubagentStop` event -- check `send_event.py` is the current version (Phase 3 added this plumbing via `event.metadata.get("agent_transcript_path", "")` in `server.py`).
+
+**No fork_group on sibling subagents:**
+
+Siblings spawned more than 200ms apart get different `fork_group` UUIDs (by design -- the time-clustering heuristic errs on the side of separate cohorts). If you expected siblings to share a fork_group but they don't, check whether the main agent's dispatch was actually synchronous. The clustering window is `FORK_CLUSTER_WINDOW_S` in `otel_relay.py`.
 
 ## Backend Portability
 

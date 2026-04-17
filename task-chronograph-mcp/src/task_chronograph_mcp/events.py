@@ -21,7 +21,6 @@ class EventType(StrEnum):
     SESSION_START = "session_start"
     SESSION_STOP = "session_stop"
     SKILL_USE = "skill_use"
-    COMMAND_USE = "command_use"
 
 
 class AgentStatus(StrEnum):

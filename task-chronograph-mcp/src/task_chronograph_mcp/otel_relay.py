@@ -778,39 +778,6 @@ class OTelRelay:
         except Exception:
             logger.warning("Failed to record skill span for %s", skill_name, exc_info=True)
 
-    def record_command(
-        self,
-        agent_id: str,
-        command_name: str,
-        *,
-        session_id: str = "",
-        project_dir: str = "",
-    ) -> None:
-        """Create a CHAIN span for a command invocation under the given agent."""
-        if not _is_otel_enabled():
-            return
-        try:
-            self._ensure_initialized(session_id, project_dir=project_dir)
-            parent_context = self._get_parent_context(agent_id)
-            if parent_context is None or self._tracer is None:
-                return
-            span = self._tracer.start_span(
-                name=f"command:{command_name}",
-                context=parent_context,
-                kind=SpanKind.INTERNAL,
-                attributes={
-                    SpanAttributes.OPENINFERENCE_SPAN_KIND: (
-                        OpenInferenceSpanKindValues.CHAIN.value
-                    ),
-                    SpanAttributes.SESSION_ID: self._get_session_id_for_agent(agent_id),
-                    "praxion.artifact_type": "command",
-                    "praxion.command_name": command_name,
-                },
-            )
-            span.end()
-        except Exception:
-            logger.warning("Failed to record command span for %s", command_name, exc_info=True)
-
     # ------------------------------------------------------------------
     # Span events (emitted as child spans for immediate Phoenix visibility)
     # ------------------------------------------------------------------

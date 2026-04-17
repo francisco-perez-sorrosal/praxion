@@ -1,4 +1,6 @@
 # Evaluation dependencies (install in the Phoenix venv or a separate venv)
-arize-phoenix
-arize-phoenix-evals>=2.12
+# arize-phoenix>=14.6 unlocks Sessions pagination + list-detail session turns
+# (v14.6) and the span/trace annotation CLI (v14.5).
+arize-phoenix>=14.6
+arize-phoenix-evals>=3.0
 openai

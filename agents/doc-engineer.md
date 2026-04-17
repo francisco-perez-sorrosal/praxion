@@ -99,8 +99,9 @@ Apply the readme-style rule conventions to documentation content:
 4. **Scaling** -- long READMEs have TL;DR and/or table of contents where appropriate
 5. **Structural integrity** -- cross-reference and naming conventions from the readme-style rule
 6. **Content depth** -- documentation depth matches artifact complexity (no over-documentation, no under-documentation)
+7. **Progressive disclosure opportunities** -- for human-facing GitHub-rendered documents (`README.md`, `docs/*.md`, `CONTRIBUTING.md`, `CHANGELOG.md`) only: flag sections > 30 lines that are skippable (troubleshooting, advanced config, verbose examples) as `<details>` candidates; flag missing GitHub Alerts for high-consequence warnings or prerequisites buried in prose; flag inline clarifications that interrupt flow as footnote candidates; flag documents with 4+ sections and no table of contents as anchor-link candidates. Use the `advanced-markdown-patterns` reference in the doc-management skill for decision rules. Do not flag agent-intermediate documents or context artifacts.
 
-Classify each finding by severity: Critical (blocks correct understanding), Important (degrades documentation quality), Suggested (improves but not urgent).
+Classify each finding by severity: Critical (blocks correct understanding), Important (degrades documentation quality), Suggested (improves but not urgent). Progressive disclosure findings are always Suggested unless a missing alert conceals a data-loss or security risk (Important).
 
 ### Phase 6 -- Remediation (6/6)
 
@@ -141,6 +142,8 @@ Classify each finding by severity: Critical (blocks correct understanding), Impo
 3. Update stale structure trees and counts
 4. Add missing catalog entries
 5. Apply writing quality improvements only when they fix clear violations (not stylistic preferences)
+6. Apply `<details>`/`<summary>` wrapping to optional-depth sections flagged in Phase 5 (troubleshooting, advanced config, verbose examples) -- only in human-facing GitHub-rendered documents
+7. Add GitHub Alerts (`> [!WARNING]`, `> [!IMPORTANT]`, etc.) for high-consequence warnings or prerequisites flagged in Phase 5 that are buried in prose
 
 After fixing, list each change with the file path, what changed, and why.
 

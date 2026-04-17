@@ -13,6 +13,7 @@ Procedural expertise for writing, maintaining, and validating project-facing doc
 - [references/cross-reference-patterns.md](references/cross-reference-patterns.md) -- cross-reference validation procedures, catalog sync, drift scenarios
 - [references/documentation-types.md](references/documentation-types.md) -- per-type guidelines for README, architecture, changelog, contributing, API docs
 - [references/diagram-conventions.md](references/diagram-conventions.md) -- Mermaid diagram creation, decomposition methodology, type recipes, styling guide
+- [references/advanced-markdown-patterns.md](references/advanced-markdown-patterns.md) -- `<details>`/`<summary>`, GitHub Alerts, footnotes, anchor links: decision rules, syntax, and scope constraints for human-facing GitHub-rendered docs
 - [assets/ARCHITECTURE_GUIDE_TEMPLATE.md](assets/ARCHITECTURE_GUIDE_TEMPLATE.md) -- 8-section template for developer-facing `docs/architecture.md` navigation guide
 
 ## Gotchas
@@ -240,6 +241,8 @@ Before completing documentation work:
 - [ ] Each section earns its place -- no empty or placeholder sections
 - [ ] Documentation depth matches artifact complexity
 - [ ] Examples are provided where the reader needs process knowledge
+- [ ] Optional-depth sections in GitHub-rendered docs use `<details>`/`<summary>` where cognitive load is high (see advanced-markdown-patterns reference)
+- [ ] High-consequence warnings or prerequisites use GitHub Alerts rather than buried prose (see advanced-markdown-patterns reference)
 
 **Freshness**
 

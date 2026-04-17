@@ -49,6 +49,20 @@ Acceptable only when they reduce cognitive load (visual flow for sequences, stat
 
 Add TL;DR + table of contents at 4-5+ sections. Split into companion documents (`ARCHITECTURE.md`, `CONTRIBUTING.md`) when depth exceeds entry-point scope.
 
+### Markdown Enhancement Patterns
+
+For human-facing, GitHub-rendered documents only (`README.md`, `docs/*.md`, `CONTRIBUTING.md`, `CHANGELOG.md`). These patterns reduce cognitive load in long documents without hiding essential content. The default is plain Markdown — each pattern must earn its place.
+
+**`<details>`/`<summary>`** — collapse optional-depth content (troubleshooting, advanced config, long examples) that most readers can skip. Do not collapse core content, short sections (< 10 lines), or tables.
+
+**GitHub Alerts** — use `> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`, or `> [!CAUTION]` for information the reader must notice but that would be buried in prose. Limit to 2–3 per document; overuse degrades signal.
+
+**Footnotes** (`[^1]`) — annotate prose with clarifications that would interrupt flow if stated inline (version qualifications, edge-case notes, citations). Keep to 4 or fewer per document.
+
+**Anchor links** (`[text](#heading-slug)`) — for TL;DR sections, table-of-contents entries, and intra-document cross-references in documents with 4+ sections.
+
+**Scope constraint**: never apply to agent-intermediate documents (`.ai-work/`, `.ai-state/`), context artifacts (`CLAUDE.md`, `SKILL.md`), or agent/rule/command definitions — these are not GitHub-rendered and the markup adds noise.
+
 ### Structural Integrity and Naming
 
 - All filesystem paths, links, and cross-references must resolve to existing targets

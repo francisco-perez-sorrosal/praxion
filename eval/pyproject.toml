@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Out-of-band quality measurement framework for Praxion agent pipelines (Tier 1: behavioral + regression)."
 requires-python = ">=3.13"
 dependencies = [
-    "arize-phoenix-evals>=2.12",
+    "arize-phoenix-evals>=3.0",
     "openai",
     "anthropic",
     "pandas",

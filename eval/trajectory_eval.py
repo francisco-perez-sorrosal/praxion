@@ -11,8 +11,36 @@ Requirements: pip install arize-phoenix arize-phoenix-evals openai
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from datetime import datetime, timedelta, timezone
+from typing import Any
+
+
+def _count_label(results: Any, score_column: str, label: str) -> int:
+    """Count rows in an evaluate_dataframe result whose Score column has the given label.
+
+    evaluate_dataframe adds a `{score.name}_score` column holding JSON-serialized Score
+    objects (per the 3.x docstring). This parses each cell defensively — handling dicts,
+    JSON strings, and Score-like objects with a .label attribute — and tallies matches.
+    """
+    if score_column not in results.columns:
+        return 0
+    count = 0
+    for cell in results[score_column]:
+        if cell is None:
+            continue
+        if isinstance(cell, str):
+            try:
+                cell = json.loads(cell)
+            except (ValueError, TypeError):
+                continue
+        if isinstance(cell, dict):
+            if cell.get("label") == label:
+                count += 1
+        elif getattr(cell, "label", None) == label:
+            count += 1
+    return count
 
 
 def _parse_since(since: str) -> datetime:
@@ -62,12 +90,15 @@ def main() -> int:
 
     try:
         from phoenix.evals import (
-            OpenAIModel,
-            llm_classify,
+            LLM,
+            bind_evaluator,
+            create_classifier,
+            evaluate_dataframe,
         )
     except ImportError:
         print(
-            "Error: arize-phoenix-evals not installed. Run: pip install arize-phoenix-evals",
+            "Error: arize-phoenix-evals>=3.0 not installed. "
+            "Run: pip install 'arize-phoenix-evals>=3.0'",
             file=sys.stderr,
         )
         return 1
@@ -122,32 +153,44 @@ def main() -> int:
             print(f"  ... and {len(tool_spans) - 10} more")
         return 0
 
-    # Run evaluation
+    # Run evaluation — 3.x uses a unified LLM wrapper with first-class multi-provider support
     provider, model_name = args.judge.split("/", 1)
     print(f"\nEvaluating with judge: {args.judge}")
 
-    if provider == "openai":
-        judge_model = OpenAIModel(model=model_name)
-    else:
-        print(f"Warning: Provider '{provider}' not directly supported. Trying OpenAI-compatible.")
-        judge_model = OpenAIModel(model=model_name)
+    try:
+        judge_llm = LLM(provider=provider, model=model_name)
+    except Exception as exc:
+        print(
+            f"Error: Could not initialize LLM({provider=}, {model_name=}): {exc}", file=sys.stderr
+        )
+        return 1
 
-    # Tool Selection evaluation
+    # ClassificationEvaluator infers template variables from the prompt string, so dotted
+    # DataFrame columns need input_mapping to translate to flat placeholder names.
+    tool_selection = create_classifier(
+        name="tool_selection",
+        llm=judge_llm,
+        prompt_template=(
+            "Was the correct tool selected for the task? Tool: {tool_name}, Input: {tool_input}"
+        ),
+        choices=["correct", "incorrect", "unclear"],
+    )
+    tool_selection = bind_evaluator(
+        evaluator=tool_selection,
+        input_mapping={"tool_name": "name", "tool_input": "attributes.input.value"},
+    )
+
     print("Running ToolSelection evaluation...")
     try:
-        selection_results = llm_classify(
-            dataframe=tool_spans,
-            model=judge_model,
-            template="Was the correct tool selected for the task? "
-            "Tool: {name}, Input: {attributes.input.value}",
-            rails=["correct", "incorrect", "unclear"],
-            provide_explanation=True,
-        )
-        correct = (selection_results["label"] == "correct").sum()
-        total = len(selection_results)
-        print(f"  ToolSelection: {correct}/{total} correct ({correct / total * 100:.0f}%)")
+        results = evaluate_dataframe(dataframe=tool_spans, evaluators=[tool_selection])
     except Exception as exc:
         print(f"  ToolSelection evaluation failed: {exc}", file=sys.stderr)
+        return 1
+
+    correct = _count_label(results, score_column="tool_selection_score", label="correct")
+    total = len(results)
+    if total:
+        print(f"  ToolSelection: {correct}/{total} correct ({correct / total * 100:.0f}%)")
 
     print("\nEvaluation complete. Results are available in the Phoenix UI.")
     return 0

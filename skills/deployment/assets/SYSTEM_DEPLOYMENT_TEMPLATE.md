@@ -217,10 +217,9 @@ Deployment decisions are recorded as ADRs in `.ai-state/decisions/`. This sectio
 <!-- Template relative paths below resolve correctly when rendered at `.ai-state/SYSTEM_DEPLOYMENT.md`; suppressed from validator because the template source lives elsewhere. -->
 | ADR | Decision | Impact on Deployment |
 |-----|----------|---------------------|
-| [dec-017](decisions/017-deployment-skill-local-first-compose-center.md) | Docker Compose as deployment gravity center | Compose is the primary deployment descriptor | <!-- validate-references:ignore -->
-| [dec-018](decisions/018-deployment-skill-opinionated-defaults.md) | Opinionated tool defaults (Caddy, Railway/Render) | Default tool choices for proxy and PaaS | <!-- validate-references:ignore -->
+| [dec-NNN](decisions/NNN-your-decision-slug.md) | [Short decision title] | [How it shapes deployment] | <!-- validate-references:ignore -->
 
-[Add new rows as deployment-related ADRs are created.]
+[Add one row per deployment-related ADR in your project. Replace `NNN` with the ADR number and the slug with the decision's kebab-case title.]
 
 ## 10. Runbook Quick Reference
 

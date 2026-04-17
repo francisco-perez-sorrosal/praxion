@@ -93,7 +93,7 @@ When delegating to an agent, the main agent **must** include these deliverables 
 - "Execute step N from `WIP.md` at `.ai-work/<task-slug>/`"
 - "Update `WIP.md` with completion status"
 - "If structural changes: update `.ai-state/ARCHITECTURE.md` (step 7.6) and `docs/architecture.md` (step 7.7)"
-- "If the step runs tests: write `TEST_RESULTS.md` at `.ai-work/<task-slug>/` per ADR-038 schema"
+- "If the step runs tests: write `TEST_RESULTS.md` at `.ai-work/<task-slug>/` per the canonical schema in `skills/software-planning/references/agent-pipeline-details.md`"
 
 **verifier** — always include in prompt:
 - "Produce `VERIFICATION_REPORT.md` at `.ai-work/<task-slug>/`"

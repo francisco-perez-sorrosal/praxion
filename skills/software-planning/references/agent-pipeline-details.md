@@ -259,7 +259,7 @@ Append-only. Entries in chronological order by timestamp.
 
 ### TEST_RESULTS.md Reconciliation
 
-**Schema:** Step-scoped sections with `## Step N` headers, each following the ADR-038 schema (command, summary counts, failures, optional coverage, notes). Written by the implementer (sub-step 7.8) or test-engineer (Phase 4 step 6).
+**Schema:** Step-scoped sections with `## Step N` headers. Each step section contains: the test command, summary counts (pass/fail/skip + duration), failure blocks (test name, failure message, short traceback), optional coverage summary, and free-form notes. Written by the implementer (sub-step 7.8) or test-engineer (Phase 4 step 6).
 
 **Fragment naming:** `TEST_RESULTS_implementer.md` and `TEST_RESULTS_test-engineer.md` in `.ai-work/<task-slug>/`.
 

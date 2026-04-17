@@ -2,7 +2,7 @@
 
 Methodology for deriving a **project-specific lens set** — the 4-8 evaluation lenses the `roadmap-cartographer` applies to a target project. Lens derivation replaces hardcoded universal lenses with a project-aware composition.
 
-> Back to the skill: [../SKILL.md](../SKILL.md). Placement rationale: [`dec-033`](../../../.ai-state/decisions/033-six-dimension-lens-placement.md). Derivation decision: [`dec-036`](../../../.ai-state/decisions/036-lens-framework-project-derived.md).
+> Back to the skill: [../SKILL.md](../SKILL.md).
 
 ## Concepts
 
@@ -379,4 +379,4 @@ The worked example of a full exemplar lens set. This is the content originally i
 
 **Example findings**:
 - *Deterministic*: "Last three ADRs describe chosen option in depth; rejected options each get one sentence. Imagination signal low — may indicate foregone conclusions. Evidence: `.ai-state/decisions/NNN-*.md` body lengths."
-- *Agentic*: "Cartographer fans out to 6 researchers with distinct lenses; synthesis surfaces cross-lens tensions as 'Considered Angles'. Evidence: `dec-035`, `audit-methodology.md`."
+- *Agentic*: "Cartographer fans out to 6 researchers with distinct lenses; synthesis surfaces cross-lens tensions as 'Considered Angles'. Evidence: `audit-methodology.md`."

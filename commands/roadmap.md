@@ -14,7 +14,7 @@ Three modes parsed from `$ARGUMENTS`:
 
 | Argument | Mode | Behavior |
 |----------|------|----------|
-| _(none)_ | **Fresh** (default) | Full audit from scratch; produces a new `ROADMAP.md` (or replaces sections of an existing one while preserving the Decision Log per dec-032) |
+| _(none)_ | **Fresh** (default) | Full audit from scratch; produces a new `ROADMAP.md` (or replaces sections of an existing one while preserving its Decision Log) |
 | `diff` | **Incremental** | Reads existing `ROADMAP.md`, re-runs audit, surfaces deltas, updates in place; Decision Log entries preserved verbatim |
 | `<anything else>` | **Focused** | Narrows the audit to the given focus area (e.g., `testing`, `observability`, `docs`); still produces the full 10-section structure but weighted toward the focus |
 
@@ -69,4 +69,4 @@ Surface:
 - The cartographer operates on any project type — **deterministic** (libraries, CLIs, services) or **agentic** (LLM apps, agent frameworks, plugins) or **hybrid**. Paradigm detection happens in Phase 1 and feeds the lens-set derivation (which exemplar fits, which sub-questions fire within each lens). SPIRIT is the exemplar Praxion uses for its own audits; other projects get other exemplars or Custom sets (see [`lens-framework.md`](../skills/roadmap-synthesis/references/lens-framework.md)).
 - The audit involves external research (2026 state-of-the-art); expect several minutes for the parallel researcher fan-out.
 - Every quantitative claim in the output is grounded to a file, command, or cited source per the [grounding-protocol](../skills/roadmap-synthesis/references/grounding-protocol.md). If you see an ungrounded claim, flag it as a bug in the cartographer's Phase 7 self-verify.
-- For the roadmap lifecycle (living document, Decision Log preservation, per-run archival via git history), see [dec-032](../.ai-state/decisions/032-roadmap-md-location-and-lifecycle.md).
+- `ROADMAP.md` is a living document at the project root; its Decision Log is preserved across runs (never rewritten) and per-run archival happens via git history.

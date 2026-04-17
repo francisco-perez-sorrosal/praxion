@@ -116,4 +116,4 @@ Coordinator responsibility: after all variants complete, compare the per-variant
 
 ## DRY Boundary
 
-This reference defines **prompt structure only**. Every `<!-- Paste ... -->` marker points the main agent at the rule's Delegation Checklists as the single source of truth for per-agent deliverables. Copying the checklists here would re-open dec-022 (re-affirmed by dec-049). Add new placeholders here only when a new delegation pattern emerges; add new deliverables to the rule, not here.
+This reference defines **prompt structure only**. Every `<!-- Paste ... -->` marker points the main agent at the rule's Delegation Checklists as the single source of truth for per-agent deliverables. Copying the checklists here would duplicate them across two files — the rule is authoritative. Add new placeholders here only when a new delegation pattern emerges; add new deliverables to the rule, not here.

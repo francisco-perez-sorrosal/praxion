@@ -1,6 +1,6 @@
 # Pre-Implementation Design Synthesis
 
-Progressive-disclosure reference for the activation-gated design-synthesis capability introduced by [dec-051](../../../.ai-state/decisions/051-pre-impl-design-synthesis.md). Back to [SKILL.md](../SKILL.md).
+Progressive-disclosure reference for the activation-gated design-synthesis capability. Back to [SKILL.md](../SKILL.md).
 
 ## Purpose & Scope
 
@@ -31,10 +31,10 @@ The trailing `AND uncertainty == "multiple_plausible_paths"` is an **honest-unce
 - **Fires**: Full-tier pipeline redesigning auth middleware — touches 7 files across auth and session subsystems, one-way-door (migration), security stakes, architect can name ≥2 plausible token-storage paths. All clauses satisfied.
 - **Fires**: Standard-tier task introducing a new cache layer — 6 files, spans API and storage, novelty (no precedent in repo), architect weighs write-through vs. write-back. Structural + novelty + real choice.
 - **Does not fire**: Standard-tier bug fix in a single module — blast_radius = 2, reversibility = reversible, no novelty, no elevated stakes. Structural clause fails.
-- **Does not fire**: Full-tier refactor where the architect can only name one credible layout. Honest-uncertainty gate fails — proceeding would manufacture strawmen, violating REQ-DDL-02.
+- **Does not fire**: Full-tier refactor where the architect can only name one credible layout. Honest-uncertainty gate fails — proceeding would manufacture strawmen, violating the no-strawmen contract.
 - **Does not fire**: Lightweight or Direct tier (prerequisite gate closed) regardless of other signals — those tiers do not carry the ADR/SYSTEMS_PLAN surface the convergence check depends on.
 
-### Logging obligation (REQ-DDL-14)
+### Logging obligation
 
 When activation fires at S1/S2/S3/S5, the invoking agent appends one row to `.ai-state/calibration_log.md` with the following format:
 
@@ -44,18 +44,18 @@ When activation fires at S1/S2/S3/S5, the invoking agent appends one row to `.ai
 
 Reuse the existing calibration log — do not create a new artifact. `triggered-signals` enumerates which clauses of the 5-dimension formula fired (e.g., `structural+stakes`). `convergence-outcome` is one of `stable`, `churned`, `re-swept`, or `user-override`.
 
-### ADR obligation (REQ-DDL-15)
+### ADR obligation
 
 When the architect writes a Phase 7 ADR for a Standard- or Full-tier trade-off, the ADR body **must** record an `Activation:` line. This is a single line that distinguishes "considered and declined" from "not considered":
 
 - If activation fired: `Activation: fired — <triggered-signals>; lens set = <list>; convergence = <outcome>`.
 - If activation did not fire: `Activation: no — <reason>` (e.g., `no — reversibility: trivially revertible; uncertainty: single plausible path`).
 
-The line is load-bearing for the verifier's REQ-DDL audit and for future readers reconstructing why a given decision did or did not go through synthesis.
+The line is load-bearing for the verifier's synthesis audit and for future readers reconstructing why a given decision did or did not go through synthesis.
 
 ## Lens Catalog
 
-Each lens points at the Praxion artifact that owns it. **The reference never restates lens methodology** — consumers follow the pointer to the owning artifact and apply it there. This enforces REQ-DDL-08 (composition-not-knowledge) and keeps sentinel T06 (redundancy) clean.
+Each lens points at the Praxion artifact that owns it. **The reference never restates lens methodology** — consumers follow the pointer to the owning artifact and apply it there. This enforces the composition-not-knowledge contract and keeps sentinel T06 (redundancy) clean.
 
 | Lens | Owning artifact |
 |---|---|
@@ -68,6 +68,8 @@ Each lens points at the Praxion artifact that owns it. **The reference never res
 **How to run a lens sweep.** For each option under consideration, open the owning artifact, apply its framework, and record the outcome as a one-line note on the option (or `n/a` when the lens does not discriminate). Do not paraphrase the lens body back into `SYSTEMS_PLAN.md` or the ADR — cite the artifact and keep the finding terse. The sweep is an orchestration, not a restatement; its output is a per-option lens-annotation table, not a lens tutorial.
 
 **No new lenses.** If a future need arises for a lens not in this table, file an ADR supersession rather than editing this reference to introduce one. Inventing a lens here (a) duplicates knowledge better owned elsewhere, (b) trips sentinel T06, and (c) silently grows the composition layer into a knowledge layer — the exact failure mode this file was designed to prevent.
+
+
 
 ## Stage-Specific Invocation
 
@@ -95,9 +97,9 @@ Each subsection names the activation gate, lens set, and convergence outcome for
 - **Activation gate (Phase 7)**: full 5-dimension formula.
 - **Activation gate (Phase 9)**: same formula, or user-requested Tier 2 extended review.
 - **Lens set (Phase 7)**: Security + Performance + Simplicity + Testability — applied to each option under consideration.
-- **Lens set (Phase 9)**: Dev + Test + Ops (baseline) + Security + Performance + Simplicity + Testability (extended), each citing an existing Praxion artifact per REQ-DDL-03.
+- **Lens set (Phase 9)**: Dev + Test + Ops (baseline) + Security + Performance + Simplicity + Testability (extended), each citing an existing Praxion artifact (the owning skill or rule) rather than restating methodology.
 - **Convergence outcome**: REQ-ID stability + risk-budget satisfaction + blast-radius bound + user acceptance (see [Convergence Signals](#convergence-signals)).
-- **What the sweep produces**: ≥2 fleshed-out options under the Decision block (REQ-DDL-02; strawmen violate the honest-uncertainty gate) and an ADR body `Activation:` line per REQ-DDL-15.
+- **What the sweep produces**: ≥2 fleshed-out options under the Decision block (strawmen violate the honest-uncertainty gate) and an ADR body `Activation:` line per the [ADR obligation](#adr-obligation).
 
 ### S5 Refactoring
 
@@ -109,7 +111,7 @@ Each subsection names the activation gate, lens set, and convergence outcome for
 
 ## Convergence Signals
 
-Synthesis converges on four **mechanical** signals — observable, traceable, and verifier-checkable across ADR revisions. No LLM-as-judge confidence scalars are used (REQ-DDL-09).
+Synthesis converges on four **mechanical** signals — observable, traceable, and verifier-checkable across ADR revisions. No LLM-as-judge confidence scalars are used — they are uncalibrated and not mechanically checkable.
 
 1. **REQ-ID stability across ≥2 design sweeps.** When multiple pre-implementation sweeps produce the same REQ set, the design has converged on the *what*; Phase 7 then decides only the *how* (implementation trade-off). Formalized in [`spec-driven-development/SKILL.md#convergence-via-req-id-stability`](../../spec-driven-development/SKILL.md#convergence-via-req-id-stability). Churn across sweeps means REQs are leaking implementation detail — re-draft REQs before re-sweeping.
 2. **Risk-budget satisfaction.** Every High-likelihood × High-impact risk in the `SYSTEMS_PLAN.md` Risk Assessment has a concrete mitigation or is explicitly accepted with a rationale. An unmitigated high-high risk is a blocker — synthesis has not converged.
@@ -118,7 +120,7 @@ Synthesis converges on four **mechanical** signals — observable, traceable, an
 
 **Signal ordering.** Check 1 → 2 → 3 → 4 in order. If REQ-IDs are still churning (signal 1 fails), the risk budget is premature — the "what" is not yet stable, so arguing about "how" mitigations wastes cycles. If the risk budget fails (signal 2), blast-radius is irrelevant because the design itself is not acceptable. User acceptance (signal 4) is the last gate, not the first — it ratifies the three mechanical signals, it does not substitute for them.
 
-**Prohibited.** LLM-as-judge confidence scalars (e.g., `judge_threshold ≥ 0.80`) are **not** convergence signals for design synthesis. They are uncalibrated (see `skills/agent-evals/SKILL.md`), not spec-grounded, and not mechanically checkable. A numeric "confidence" value in an ADR body is a REQ-DDL-09 violation and a signal to return to the four mechanical signals above.
+**Prohibited.** LLM-as-judge confidence scalars (e.g., `judge_threshold ≥ 0.80`) are **not** convergence signals for design synthesis. They are uncalibrated (see `skills/agent-evals/SKILL.md`), not spec-grounded, and not mechanically checkable. A numeric "confidence" value in an ADR body violates the mechanical-signals contract and is a signal to return to the four mechanical signals above.
 
 ## Cost Envelope
 
@@ -130,12 +132,12 @@ Design synthesis must stay within the following budget tiers, derived from `RESE
 
 "Baseline" is the architect/researcher/promethean cost for the same stage without synthesis. Exceeding the envelope is a signal to re-scope (narrow the option set, drop a lens that is not discriminating) rather than a license to keep spending. Observed overruns should surface in `LEARNINGS.md` for post-pipeline review.
 
-Envelope observations accumulate in `.ai-state/calibration_log.md` via REQ-DDL-14 rows. After 5–10 fired activations, trend the cost-vs-outcome distribution: if routine activations regularly approach the 3× ceiling without discriminating signals, the formula is firing too broadly; if novel activations stay well under 10× with clean convergence, the envelope itself is worth revisiting in a supersession ADR.
+Envelope observations accumulate in `.ai-state/calibration_log.md` via the [Logging obligation](#logging-obligation) rows. After 5–10 fired activations, trend the cost-vs-outcome distribution: if routine activations regularly approach the 3× ceiling without discriminating signals, the formula is firing too broadly; if novel activations stay well under 10× with clean convergence, the envelope itself is worth revisiting in a supersession ADR.
 
 ## Anti-Patterns
 
-- **Do not invent new lenses in this file.** Every lens must cite an owning artifact from the [Lens Catalog](#lens-catalog). Adding a new lens body here duplicates knowledge, trips sentinel T06, and breaks the composition-not-knowledge contract (REQ-DDL-08). If a lens is genuinely missing, file an ADR supersession and add it to the owning skill, not here.
-- **Do not use LLM-as-judge confidence scalars.** Scalars are uncalibrated and not mechanically checkable (REQ-DDL-09). Use the four mechanical convergence signals.
+- **Do not invent new lenses in this file.** Every lens must cite an owning artifact from the [Lens Catalog](#lens-catalog). Adding a new lens body here duplicates knowledge, trips sentinel T06, and breaks the composition-not-knowledge contract. If a lens is genuinely missing, file an ADR supersession and add it to the owning skill, not here.
+- **Do not use LLM-as-judge confidence scalars.** Scalars are uncalibrated and not mechanically checkable. Use the four mechanical convergence signals.
 - **Do not spawn lens-critic subagents.** Research §15 evaluated and rejected the parallel-subagent-fan-out shape (Option 3) at 5–10× baseline cost for <30% activation rate. Synthesis is a single-agent sweep across existing-skill pointers, not a multi-agent debate.
 - **Do not promote this reference to a standalone skill without evidence of outgrowth.** The H3 escalation path (context-review §4) exists, but requires observed need — either this reference exceeding ~5K tokens in active use, or adoption outside the SWE pipeline. Premature promotion pays the always-loaded metadata tax for a discoverability gain that is not yet real.
 
@@ -147,4 +149,3 @@ Envelope observations accumulate in `.ai-state/calibration_log.md` via REQ-DDL-1
 - [`../../../agents/promethean.md`](../../../agents/promethean.md) — S1 invocation site (Phase 5).
 - [`../../../agents/researcher.md`](../../../agents/researcher.md) — S2 invocation site (Phase 4).
 - [`../../../agents/systems-architect.md`](../../../agents/systems-architect.md) — S3 invocation site (Phase 7 primary, Phase 9 extended review).
-- [`../../../.ai-state/decisions/051-pre-impl-design-synthesis.md`](../../../.ai-state/decisions/051-pre-impl-design-synthesis.md) — the ADR that introduced this capability.

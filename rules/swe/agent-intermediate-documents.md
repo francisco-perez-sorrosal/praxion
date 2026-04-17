@@ -101,7 +101,7 @@ Agents that update `.ai-state/`: promethean (idea ledger), sentinel (report, log
 | Tier | Location | Documents | Lifetime |
 |------|----------|-----------|----------|
 | Ephemeral | `.ai-work/<task-slug>/` | `IDEA_PROPOSAL.md`, `RESEARCH_FINDINGS.md`, `CONTEXT_REVIEW.md`, `SYSTEMS_PLAN.md`, `SPEC_DELTA.md`, `SKILL_GENESIS_REPORT.md`, `VERIFICATION_REPORT.md`, `PROGRESS.md` | Single pipeline run — delete after downstream consumption (merge `VERIFICATION_REPORT.md` patterns into `LEARNINGS.md` first) |
-| Ephemeral | `.ai-work/<task-slug>/` | `TEST_RESULTS.md` — implementer (or test-engineer) test-run handoff artifact, schema per ADR-038 | Single pipeline run — merge into `VERIFICATION_REPORT.md`, then delete |
+| Ephemeral | `.ai-work/<task-slug>/` | `TEST_RESULTS.md` — implementer (or test-engineer) test-run handoff artifact (canonical schema in `skills/software-planning/references/agent-pipeline-details.md`) | Single pipeline run — merge into `VERIFICATION_REPORT.md`, then delete |
 | Session-persistent | `.ai-work/<task-slug>/` | `IMPLEMENTATION_PLAN.md`, `WIP.md`, `LEARNINGS.md` | Across sessions — merge learnings into permanent locations at feature end |
 | Permanent | `.ai-state/` | `IDEA_LEDGER_*.md`, `SENTINEL_REPORT_*.md`, `SENTINEL_LOG.md`, `SPEC_*.md`, `calibration_log.md`, `decisions/<NNN>-<slug>.md`, `SYSTEM_DEPLOYMENT.md`, `ARCHITECTURE.md` | Project lifetime — committed to git, timestamped per run or living document |
 | Permanent | `docs/` | `architecture.md` | Project lifetime — committed to git, derived from `.ai-state/ARCHITECTURE.md`, maintained by pipeline agents |

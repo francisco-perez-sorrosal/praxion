@@ -32,7 +32,7 @@ The Methodology (`~/.claude/CLAUDE.md`) defines the flow of work; the contract d
 
 > I note this conflicts with [specific prior decision / spec clause / evidence]. Proceeding as requested will produce [concrete consequence]. Do you want me to (a) proceed and log the override, or (b) revise the request?
 
-**Example**: A plan says "add retries in storage," but ADR-031 placed retries at the tool-handler boundary. Object: "This conflicts with ADR-031. Proceeding creates two retry layers. Proceed and supersede, or move retries to the handler?"
+**Example**: A plan says "add retries in storage," but a prior ADR placed retries at the tool-handler boundary. Object: "This conflicts with the prior retry-placement ADR. Proceeding creates two retry layers. Proceed and supersede, or move retries to the handler?"
 
 **Philosophy anchor**: Extends `~/.claude/CLAUDE.md` Principle §Root Causes Over Workarounds — silent compliance around conflicts is a workaround; objecting with reason is the root-cause fix.
 
@@ -101,5 +101,4 @@ Canonical definitions, severities, and example triggers live in `skills/code-rev
 - **Rule**: `rules/swe/agent-behavioral-contract.md` — always loaded, names the four behaviors.
 - **Global philosophy**: `~/.claude/CLAUDE.md` §The Behavioral Contract.
 - **Tag vocabulary**: `skills/code-review/references/report-template.md` §Behavioral Contract Findings.
-- **Decision record**: `.ai-state/decisions/043-behavioral-contract-layer.md`.
 - **Audit checks**: `agents/sentinel.md` BC01-BC04.

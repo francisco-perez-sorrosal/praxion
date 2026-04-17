@@ -44,7 +44,7 @@ Example finding rows:
 
 | # | Severity | Location | Finding | Rule Reference |
 |---|----------|----------|---------|----------------|
-| 3 | FAIL | plan.md:step-7 | `[MISSING-OBJECTION]` Implementer applied retry-in-storage directive despite ADR-031 placing retries at handler boundary; no objection recorded. | agent-behavioral-contract.md: Register Objection |
+| 3 | FAIL | plan.md:step-7 | `[MISSING-OBJECTION]` Implementer applied retry-in-storage directive despite a prior ADR placing retries at handler boundary; no objection recorded. | agent-behavioral-contract.md: Register Objection |
 | 4 | WARN | tests/fixtures.py:12 | `[BLOAT]` Fixture factory introduced for a single test case; inline setup would suffice. | agent-behavioral-contract.md: Simplicity First |
 
 ## Test Coverage Assessment

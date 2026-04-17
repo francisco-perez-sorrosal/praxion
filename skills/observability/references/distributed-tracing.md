@@ -223,7 +223,7 @@ Install the conventions package for type-safe attribute access: `opentelemetry-s
 
 OpenInference spans are standard OTel spans with additional attributes -- they are compatible with any OTel backend. Phoenix (by Arize) natively understands these attributes for AI-specific visualization.
 
-**Practical example:** Praxion's `task-chronograph` MCP server uses OpenInference span kinds (CHAIN for session root, AGENT for pipeline agents) to create hierarchical traces of AI agent sessions. See [dec-004](../../../.ai-state/decisions/004-openinference-span-kinds.md) for the span kind rationale.
+**Practical example:** Praxion's `task-chronograph` MCP server uses OpenInference span kinds (CHAIN for session root, AGENT for pipeline agents) to create hierarchical traces of AI agent sessions.
 
 ## Context Propagation
 

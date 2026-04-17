@@ -10,7 +10,7 @@ See the mapping table in `~/.claude/CLAUDE.md` under "The Ecosystem as Philosoph
 
 - Load the matching crafting skill before modifying any component: `skill-crafting` for skills, `agent-crafting` for agents, `command-crafting` for commands, `rule-crafting` for rules
 - **Never modify `~/.claude/plugins/cache/`** — edit source files in this repo; installed copies get overwritten on reinstall
-- **Token budget**: Always-loaded content (CLAUDE.md files + rules) must stay under 25,000 tokens (~87,500 chars) as a failure-mode guardrail — the principle is that every always-loaded token must earn its attention share (applied in >30% of sessions, or unconditionally relevant). Prefer skills with reference files for procedural content; reserve rules for declarative domain knowledge. Rationale: `.ai-state/decisions/050-always-loaded-budget-revision.md`
+- **Token budget**: Always-loaded content (CLAUDE.md files + rules) must stay under 25,000 tokens (~87,500 chars) as a failure-mode guardrail — the principle is that every always-loaded token must earn its attention share (applied in >30% of sessions, or unconditionally relevant). Prefer skills with reference files for procedural content; reserve rules for declarative domain knowledge.
 - See `README.md` for user-facing docs, `README_DEV.md` for contributor conventions, `skills/README.md` for the skill catalog
 
 ## Session Protocol

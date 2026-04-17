@@ -11,7 +11,7 @@ Contextual domain knowledge files loaded automatically based on relevance. Rules
 
 ## Token Budget
 
-IMPORTANT: Rules without `paths:` frontmatter are **always loaded** — every new unconditional rule costs tokens on every session. The project budget for always-loaded content (CLAUDE.md files + rules) is **25,000 tokens** — a failure-mode guardrail, not a target. The principle is that every always-loaded token must earn its attention share (applied in >30% of sessions, or unconditionally relevant). Prefer `paths:` scoping or skills for content that isn't universally needed. Rationale: `.ai-state/decisions/050-always-loaded-budget-revision.md`.
+IMPORTANT: Rules without `paths:` frontmatter are **always loaded** — every new unconditional rule costs tokens on every session. The project budget for always-loaded content (CLAUDE.md files + rules) is **25,000 tokens** — a failure-mode guardrail, not a target. The principle is that every always-loaded token must earn its attention share (applied in >30% of sessions, or unconditionally relevant). Prefer `paths:` scoping or skills for content that isn't universally needed.
 
 ## Installation
 

@@ -16,4 +16,3 @@ Methodology for responsibly reporting bugs and contributing fixes to upstream op
 - `/report-upstream` command — user-facing trigger for the filing workflow
 - `.ai-state/UPSTREAM_ISSUES.md` — persistent tracker of filed upstream issues
 - `context-security-review` skill — credential pattern catalog referenced by sanitization pipeline
-- ADR [dec-014](../../.ai-state/decisions/014-upstream-stewardship-skill-command-composition.md) — artifact composition decision

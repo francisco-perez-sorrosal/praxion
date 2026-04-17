@@ -138,7 +138,7 @@ Convention: Each check has a unique ID, type (A=auto, L=llm), a rule, and a pass
 | ID | Tp | Rule | Pass |
 |----|----|------|------|
 | T01 | A | Skill SKILL.md line count within guideline | Under 500 lines (warn 400, fail 600) |
-| T02 | A | Combined always-loaded content size | CLAUDE.md + all rules under 25,000 tokens (heuristic: chars / 3.5); see dec-050 |
+| T02 | A | Combined always-loaded content size | CLAUDE.md + all rules under 25,000 tokens (heuristic: chars / 3.5) |
 | T03 | A | Agent prompt size within range | Under 400 lines (warn 300, fail 500) |
 | T04 | A | Individual reference file sizes | No single reference file >800 lines |
 | T05 | L | Progressive disclosure used where appropriate | Monolithic artifacts that could split core vs. reference without losing coherence |
@@ -444,7 +444,7 @@ After writing the report, append an entry to `.ai-state/SENTINEL_LOG.md` (create
 ```markdown
 | Timestamp | Report File | Health Grade | Artifacts | Findings (C/I/S) | Ecosystem Coherence |
 |-----------|-------------|-------------|-----------|-------------------|---------------------|
-| 2026-02-08 14:30:00 | SENTINEL_REPORT_2026-02-08_14-30-00.md | B | 31 | 0/2/5 | A |
+| YYYY-MM-DD HH:MM:SS | SENTINEL_REPORT_YYYY-MM-DD_HH-MM-SS.md | B | 31 | 0/2/5 | A |
 ```
 
 Where C/I/S = Critical/Important/Suggested finding counts, Ecosystem Coherence = the system-level composite grade (distinct from per-artifact coherence in the scorecard). The Report File column links each log entry to the specific report file in `.ai-state/`.

@@ -42,7 +42,7 @@ description: >-
   assistant: "Invoking roadmap-cartographer in diff mode — it will re-audit,
   surface deltas against the existing ROADMAP.md, and preserve the Decision Log."
   <commentary>
-  `diff` mode is incremental and Decision-Log-preserving (dec-032).
+  `diff` mode is incremental and Decision-Log-preserving.
   </commentary>
   </example>
 tools: Read, Glob, Grep, Bash(git:*), Bash(wc:*), Bash(grep:*), Bash(find:*), Bash(jq:*), Write, Edit, AskUserQuestion, Task
@@ -94,7 +94,7 @@ Mode is passed from the command as a single token:
 
 ## Output Contract
 
-- **`ROADMAP.md`** at the **project root** — living document (`dec-032`). In `diff` mode, the Decision Log is never rewritten; append a new entry.
+- **`ROADMAP.md`** at the **project root** — living document. In `diff` mode, the Decision Log is never rewritten; append a new entry.
 - **`.ai-work/<task-slug>/ROADMAP_DRAFT.md`** — intermediate draft before Gate 3.
 - **`.ai-work/<task-slug>/AUDIT_<lens>.md`** — one fragment per Phase 3 researcher.
 - **`.ai-work/<task-slug>/PROGRESS.md`** — append-only phase-transition log.
@@ -127,7 +127,7 @@ Spawn one researcher per lens from the derived set (from Phase 1b). N = lens_cou
 
 **Concurrency cap — wave-of-3**: Praxion's parallel-agent guidance caps concurrent Bg-Safe subagents at 3. When N > 3, fan out in waves of ≤3 researchers; wait for each wave's completion before launching the next. For N ≤ 3, spawn all in a single-wave fan-out. Fragment reconciliation is wave-order-insensitive. See [`audit-methodology.md §Lens count discipline`](../skills/roadmap-synthesis/references/audit-methodology.md#lens-count-discipline) for full detail.
 
-Pass each researcher the lens name, its sub-questions (paradigm-matched), the task slug, and the path to [`audit-fragment-template.md`](../skills/roadmap-synthesis/assets/audit-fragment-template.md). Each researcher writes `AUDIT_<lens-slug>.md` to `.ai-work/<task-slug>/`. Wait for all fragments; re-invoke any researcher whose fragment is missing required sections. Rationale for using researchers over a dedicated auditor agent: `dec-035`.
+Pass each researcher the lens name, its sub-questions (paradigm-matched), the task slug, and the path to [`audit-fragment-template.md`](../skills/roadmap-synthesis/assets/audit-fragment-template.md). Each researcher writes `AUDIT_<lens-slug>.md` to `.ai-work/<task-slug>/`. Wait for all fragments; re-invoke any researcher whose fragment is missing required sections. The cartographer delegates audit work to parallel researchers rather than introducing a dedicated auditor agent — researchers already own the evidence-gathering shape and scale cleanly across lenses.
 
 ### Phase 4 — Lens Synthesis
 
@@ -156,7 +156,7 @@ Activate the [`roadmap-planning`](../skills/roadmap-planning/SKILL.md) skill. Us
 Run the grounding-protocol checklist from [`grounding-protocol.md`](../skills/roadmap-synthesis/references/grounding-protocol.md): every quantitative claim must cite a source; regenerate any section that fails. **Gate 3**: use `AskUserQuestion` to confirm phase ordering and any remaining open questions. Emit `ROADMAP.md` at the project root:
 
 - **`fresh` mode**: write a new `ROADMAP.md`; start the Decision Log with this run's entry.
-- **`diff` mode**: update sections in place; **preserve** the existing Decision Log verbatim and **append** a new entry describing what changed (`dec-032`).
+- **`diff` mode**: update sections in place; **preserve** the existing Decision Log verbatim and **append** a new entry describing what changed.
 
 Write the final phase marker to `PROGRESS.md`.
 
@@ -215,19 +215,6 @@ If you hit an error or your turn budget is exhausted, write what you have to `.a
 | Gate scope / deprecations / ordering with `AskUserQuestion` | Silently destroy existing content |
 | Surface memory candidates to the main coordinator | Call `remember()` directly |
 | Produce the full output structure in `<focus-area>` mode | Produce a partial-only roadmap when a focus is requested |
-
-## Decision Trail
-
-This agent and its paired skill were shaped by:
-
-- `dec-029` — shape (agent + skill + command hybrid)
-- `dec-030` — coexistence with `roadmap-planning` (no absorption)
-- `dec-031` — user-initiated placement (standalone, not in promethean → SDD chain)
-- `dec-032` — `ROADMAP.md` location (project root) and lifecycle (living)
-- `dec-033` — lens content placement (skill references + template asset + SKILL.md summary)
-- `dec-034` — budget offset via rule prune
-- `dec-035` — parallel audit via researchers (not a new dedicated auditor)
-- `dec-036` — lens framework is project-derived; SPIRIT is an exemplar, not the default
 
 ## Constraints
 

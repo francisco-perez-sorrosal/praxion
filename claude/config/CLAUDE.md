@@ -45,7 +45,7 @@ Use subagents liberally to keep the main context window clean — one focus per 
 **Standard/Full pipeline deliverables to always include** (ephemeral `.ai-work/<slug>/` vs permanent `.ai-state/`):
 - `systems-architect` → `.ai-work/<slug>/SYSTEMS_PLAN.md` + `.ai-state/decisions/` (ADRs) + `.ai-state/ARCHITECTURE.md` + `docs/architecture.md` + (if deployment in scope) `.ai-state/SYSTEM_DEPLOYMENT.md`
 - `implementation-planner` → `.ai-work/<slug>/IMPLEMENTATION_PLAN.md` + `.ai-work/<slug>/WIP.md` + `.ai-work/<slug>/LEARNINGS.md`
-- `implementer` → code changes + `.ai-work/<slug>/WIP.md` update + (if structural) `.ai-state/ARCHITECTURE.md` + `docs/architecture.md` + (if step runs tests) `.ai-work/<slug>/TEST_RESULTS.md` per ADR-038
+- `implementer` → code changes + `.ai-work/<slug>/WIP.md` update + (if structural) `.ai-state/ARCHITECTURE.md` + `docs/architecture.md` + (if step runs tests) `.ai-work/<slug>/TEST_RESULTS.md`
 - `verifier` → `.ai-work/<slug>/VERIFICATION_REPORT.md` + architecture doc validation + read `.ai-work/<slug>/TEST_RESULTS.md` (missing → WARN, not FAIL)
 
 > Full per-agent delegation checklists live in `rules/swe/swe-agent-coordination-protocol.md#delegation-checklists` (authoritative source of truth). The bullets above are condensed reminders.

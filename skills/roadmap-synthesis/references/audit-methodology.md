@@ -2,7 +2,7 @@
 
 How the `roadmap-cartographer` agent (via the `roadmap-synthesis` skill) conducts a project audit, from lens selection through fragment reconciliation.
 
-> Back to the skill: [../SKILL.md](../SKILL.md). Companion references: [`lens-framework.md`](lens-framework.md), [`paradigm-detection.md`](paradigm-detection.md), [`grounding-protocol.md`](grounding-protocol.md). Decision rationale: [`dec-035`](../../../.ai-state/decisions/035-roadmap-parallel-audit-via-researchers.md), [`dec-036`](../../../.ai-state/decisions/036-lens-framework-project-derived.md).
+> Back to the skill: [../SKILL.md](../SKILL.md). Companion references: [`lens-framework.md`](lens-framework.md), [`paradigm-detection.md`](paradigm-detection.md), [`grounding-protocol.md`](grounding-protocol.md).
 
 ---
 
@@ -14,7 +14,7 @@ The cartographer reproduces this pattern for **any** project by spawning N resea
 
 The underlying principle is universal: parallel researchers with distinct lenses produce structurally diverse findings that a single synthesizer can compose; sequential single-agent analysis tends to converge on the first angle it considers. This is the Curiosity lens applied to the audit itself.
 
-Rationale for choosing parallel researchers over a new dedicated auditor agent lives in [`dec-035`](../../../.ai-state/decisions/035-roadmap-parallel-audit-via-researchers.md). Rationale for deriving lens sets per project rather than hardcoding a universal list lives in [`dec-036`](../../../.ai-state/decisions/036-lens-framework-project-derived.md).
+The cartographer uses parallel researchers rather than a new dedicated auditor agent because researchers already own the evidence-gathering shape and scale cleanly to N lenses. Lens sets are derived per project — project values + domain constraints + best-fit exemplar — rather than a single hardcoded universal list, because universal-list audits mis-fit projects outside the list's target class.
 
 ---
 

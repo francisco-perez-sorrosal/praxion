@@ -63,7 +63,7 @@ Present the assessment as a structured block so the user can inspect per-signal 
 | File count | 5 files mentioned (6 confirmed by glob) | 3 |
 | Behavior count | 3 distinct behaviors | 2 |
 | Architectural scope | 1 (new interface) | 1 |
-| Prior specs | Yes (SPEC_auth_2026-03-01.md) | 1 |
+| Prior specs | Yes (SPEC_auth_YYYY-MM-DD.md) | 1 |
 | Test coverage | Tests exist for 4/6 files | 0 |
 | Request complexity | Medium (2 conjunctions, 1 scope word) | 1 |
 | **Total** | | **8** |
@@ -129,7 +129,7 @@ Append each tier decision to `.ai-state/calibration_log.md`. Create the file on 
 | File count | ~5 implied (auth module, config, UI, tests, routes) | 3 |
 | Behavior count | 3 (Google login, existing login preserved, account linking) | 2 |
 | Architectural scope | 1 (new auth provider interface) | 1 |
-| Prior specs | Yes (SPEC_auth_2026-01-15.md) | 1 |
+| Prior specs | Yes (SPEC_auth_YYYY-MM-DD.md) | 1 |
 | Test coverage | Tests exist for auth module | 0 |
 | Request complexity | Medium ("alongside", "and") | 1 |
 | **Total** | | **8** |
@@ -145,7 +145,7 @@ Append each tier decision to `.ai-state/calibration_log.md`. Create the file on 
 | File count | 12+ (plugin loader, registry, dependency resolver, IPC, all plugin adapters) | 4 |
 | Behavior count | 4+ (hot-reload, versioning, cross-plugin IPC, backward compat) | 3 |
 | Architectural scope | 2+ (new abstractions, cross-cutting, interface changes) | 2 |
-| Prior specs | Yes (SPEC_plugins_2026-02-10.md) | 1 |
+| Prior specs | Yes (SPEC_plugins_YYYY-MM-DD.md) | 1 |
 | Test coverage | Partial (loader tested, no IPC tests) | 1 |
 | Request complexity | High ("all existing", "and...and...and") | 2 |
 | **Total** | | **13** |

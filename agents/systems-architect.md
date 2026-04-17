@@ -175,7 +175,7 @@ Skip this phase entirely when no prior spec was identified in Phase 1 (greenfiel
 
 For every significant design decision, make the trade-offs explicit:
 
-> When the activation gate fires (see [design-synthesis.md — When to Activate](../skills/software-planning/references/design-synthesis.md#when-to-activate)), run the lens sweep and the convergence check in that reference before writing the Decision block below. Record an **Activation:** line in the ADR body (either the fired outcome or `no — <reason>`) per REQ-DDL-15.
+> When the activation gate fires (see [design-synthesis.md — When to Activate](../skills/software-planning/references/design-synthesis.md#when-to-activate)), run the lens sweep and the convergence check in that reference before writing the Decision block below. Record an **Activation:** line in the ADR body (either the fired outcome or `no — <reason>`) per the [ADR obligation](../skills/software-planning/references/design-synthesis.md#adr-obligation).
 
 ```markdown
 ### Decision: [What was decided]

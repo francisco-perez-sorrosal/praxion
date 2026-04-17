@@ -22,12 +22,12 @@ allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 
 Produce a **ROADMAP.md** for any project by deriving a project-specific evaluation lens set, running an ultra-in-depth audit through those lenses, and reconciling parallel findings into a grounded, actionable plan. Paired with [`roadmap-planning`](../roadmap-planning/SKILL.md), which owns the prioritization and sequencing step.
 
-This skill is loaded by the [`roadmap-cartographer`](../../agents/roadmap-cartographer.md) agent via its `skills:` frontmatter. It is the audit-to-synthesis half of the roadmap capability (`dec-029`); prioritization logic stays in `roadmap-planning` (`dec-030`). The lens framework is project-derived, not hardcoded (`dec-036`).
+This skill is loaded by the [`roadmap-cartographer`](../../agents/roadmap-cartographer.md) agent via its `skills:` frontmatter. It is the audit-to-synthesis half of the roadmap capability; prioritization logic stays in the paired [`roadmap-planning`](../roadmap-planning/SKILL.md) skill — the two never absorb one another. The lens framework is derived per project from project values + domain constraints + best-fit exemplar, not hardcoded to a universal list.
 
 **Satellite files** (loaded on-demand):
 
 - [references/lens-framework.md](references/lens-framework.md) -- the 4-step lens-derivation methodology, exemplar lens sets catalog (SPIRIT, DORA, SPACE, FAIR, CNCF Platform Maturity, Custom), lens schema, and SPIRIT worked example
-- [references/audit-methodology.md](references/audit-methodology.md) -- parallel deep-dive pattern, lens selection rubric, fragment reconciliation (`dec-035`)
+- [references/audit-methodology.md](references/audit-methodology.md) -- parallel deep-dive pattern, lens selection rubric, fragment reconciliation
 - [references/paradigm-detection.md](references/paradigm-detection.md) -- deterministic / agentic / hybrid classification heuristics (feeds lens derivation Step 2)
 - [references/grounding-protocol.md](references/grounding-protocol.md) -- every quantitative claim cites a source; verification checklist
 - [assets/ROADMAP_TEMPLATE.md](assets/ROADMAP_TEMPLATE.md) -- the 10-section ROADMAP.md scaffold (Executive Summary → Weaknesses → **Opportunities (forward lines)** → Improvement Roadmap → Decision Log)
@@ -52,7 +52,7 @@ The two skills **compose**: `roadmap-synthesis` runs Phases 1–5 and 7; it dele
 
 ## Pipeline position
 
-Standalone capability — not inserted into the `promethean → researcher → systems-architect` chain (`dec-031`). Activated by:
+Standalone capability — not inserted into the `promethean → researcher → systems-architect` chain. Activated by:
 
 - `/roadmap` command with optional mode argument (`fresh` / `diff` / `<focus-area>`)
 - Explicit `@roadmap-cartographer` delegation
@@ -70,7 +70,7 @@ Seven phases. The cartographer mirrors this structure; procedural depth lives in
 4. **Lens Synthesis** — reduce fragments into draft roadmap sections through the derived lens set → [lens-framework.md](references/lens-framework.md).
 5. **Multi-Angle Reframe** — for each of the top 3 weaknesses, articulate ≥2 framings; record the runners-up as *Considered Angles*. Universal step regardless of lens set.
 6. **Prioritize & Sequence** — delegate to [`roadmap-planning`](../roadmap-planning/SKILL.md) for framework selection and Now/Next/Later formatting (Gate 2 on proposed deprecations).
-7. **Self-Verify & Emit** — grounding check on every quantitative claim → [grounding-protocol.md](references/grounding-protocol.md); Gate 3 on phase ordering; write `ROADMAP.md` preserving the Decision Log (`dec-032`).
+7. **Self-Verify & Emit** — grounding check on every quantitative claim → [grounding-protocol.md](references/grounding-protocol.md); Gate 3 on phase ordering; write `ROADMAP.md` preserving the Decision Log (never rewritten; append-only in `diff` mode).
 
 ## Lens framework summary
 
@@ -119,7 +119,7 @@ The cartographer does **not** re-implement any of this; it hands the synthesized
 
 ## Output
 
-The canonical output is `ROADMAP.md` at the **project root** (`dec-032`) — a living document preserved across runs. The cartographer also writes these working files under `.ai-work/<task-slug>/`:
+The canonical output is `ROADMAP.md` at the **project root** — a living document preserved across runs. The cartographer also writes these working files under `.ai-work/<task-slug>/`:
 
 - `ROADMAP_DRAFT.md` — intermediate draft before Gate 3
 - `AUDIT_<lens>.md` — one per researcher (Phase 3 fragments)
@@ -161,6 +161,5 @@ Distilled from pre-design research and validated by context-engineer review. Eac
 | Focused mode | `<area>` — narrows audit weighting to a focus area; still produces full structure |
 | Typical runtime (cartographer) | 3–6 parallel researchers + synthesis ≈ minutes, not hours |
 | Paired skill | [`roadmap-planning`](../roadmap-planning/SKILL.md) — activated at Phase 6 |
-| Output location | `ROADMAP.md` at project root (`dec-032`) |
+| Output location | `ROADMAP.md` at project root |
 | Common pitfall | Skipping paradigm detection or lens derivation → R4/R15 false findings (e.g., cargo-culting SPIRIT to a Python library) |
-| Decision trail | `dec-029` shape · `dec-030` coexistence · `dec-031` placement · `dec-032` location · `dec-033` lens file placement · `dec-034` budget · `dec-035` parallel audit · `dec-036` lens framework project-derived |

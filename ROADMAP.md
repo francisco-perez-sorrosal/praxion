@@ -181,7 +181,7 @@ Phase 1B recovery delivered: ~1,923 tokens from Point #2 alone (of the original 
 
 #### 1.7 Opportunistic Deprecations ✅ DONE (2026-04-12)
 
-Closed from the Deprecation & Cleanup table (Phase-1-tagged): deleted `claude/config/CLAUDE_OLD.md` and `claude/config/CLAUDE_UNPOLISHED.md` (historical trial-version prompts the user was iterating on). Confirmed `**/__pycache__/` in `.gitignore`. `TODO.md` disposition deferred.
+Closed from the Deprecation & Cleanup table (Phase-1-tagged): deleted `claude/config/CLAUDE_OLD.md` and `claude/config/CLAUDE_UNPOLISHED.md` (historical trial-version prompts the user was iterating on). Confirmed `**/__pycache__/` in `.gitignore`. `TODO.md` retired (2026-04-16) — single upstream-issue watch was either resolved or ROADMAP-tracked; stale include-glob removed from `skills/skill-crafting/scripts/validate_references.py`.
 
 **Kept intentionally**: `claude/config/CLAUDE.md` is a versioned mirror of the user's `~/.claude/CLAUDE.md` that the project preserves under git on purpose. It was initially deleted in commit `a4440e1` based on a bad inference ("byte-identical duplicate ⇒ safe to delete"); restored in a follow-up commit. The Deprecation & Cleanup entry below has been corrected.
 
@@ -580,11 +580,11 @@ Items to remove or retire during the roadmap execution:
 | `claude/config/CLAUDE.md` | **KEEP** — intentionally versioned mirror of `~/.claude/CLAUDE.md`; project preserves it under git so the user-level philosophy travels with the repo | — |
 | `claude/config/CLAUDE_OLD.md`, `CLAUDE_UNPOLISHED.md` | Deleted in Phase 1.7 (historical trial-version prompts) | 1 ✅ |
 | `github-star` skill | Move to command (procedure, not domain expertise). The `/star-repo` command already exists | 4 |
-| `TODO.md` | Either expand as canonical tracker or retire in favor of this ROADMAP | 1 |
+| `TODO.md` | Retired in Phase 1.7 (2026-04-16) — single upstream-issue watch folded into ROADMAP/resolved upstream | 1 ✅ |
 | `SOLID_FOUNDATION_IMPROVEMENTS.md` | Retire. Open items migrated to this ROADMAP. Done items are historical record | 1 |
 | `task-chronograph-mcp/.ai-work/` | Delete leftover pipeline artifacts | 1 |
 | `/co` + `/cop` duplication | Refactor: extract shared commit process, `/cop` adds push step | 2 |
-| `scripts/__pycache__` | Delete and add to `.gitignore` | 1 |
+| `scripts/__pycache__` | Confirmed in Phase 1.7 — `__pycache__/` + `*.pyc` in `.gitignore`; nothing tracked | 1 ✅ |
 | Rename `/cajalogic` | Create `/memory` alias for discoverability (keep `/cajalogic` for backward compatibility) | 2 |
 
 ---

@@ -32,7 +32,7 @@ ALLOWLIST_PREFIXES = ("memory-mcp/", "task-chronograph-mcp/", "hooks/", "scripts
 IGNORED_PATH_SEGMENTS = (".ai-work/", "node_modules/", ".venv/", "target/", "dist/", "build/")
 EXCLUDED_GLOB_PREFIXES = (".ai-work/", "node_modules/", ".venv/", "target/", "dist/", "build/", "memory-mcp/", "task-chronograph-mcp/")
 URL_SCHEMES = ("http://", "https://", "mailto:", "ftp://", "ftps://", "tel:")
-INCLUDE_PATTERNS = ("skills/*/SKILL.md", "skills/*/README.md", "skills/*/references/*.md", "skills/*/contexts/*.md", "skills/*/phases/*.md", "skills/*/assets/*.md", "rules/**/*.md", "agents/*.md", "commands/**/*.md", "docs/**/*.md", ".ai-state/decisions/*.md", "CLAUDE.md", "README.md", "ROADMAP.md", "README_DEV.md", "CHANGELOG.md", "TODO.md")
+INCLUDE_PATTERNS = ("skills/*/SKILL.md", "skills/*/README.md", "skills/*/references/*.md", "skills/*/contexts/*.md", "skills/*/phases/*.md", "skills/*/assets/*.md", "rules/**/*.md", "agents/*.md", "commands/**/*.md", "docs/**/*.md", ".ai-state/decisions/*.md", "CLAUDE.md", "README.md", "ROADMAP.md", "README_DEV.md", "CHANGELOG.md")
 # fmt: on
 
 INLINE_IGNORE_MARKER = "<!-- validate-references:ignore -->"

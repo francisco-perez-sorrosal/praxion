@@ -8,6 +8,7 @@ import os
 import subprocess
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -56,6 +57,15 @@ TRACE_TYPE_NATIVE = "native"
 # Context reaper configuration
 AGENT_SPAN_TIMEOUT_S = 60  # seconds of inactivity before reaping
 REAPER_INTERVAL_S = 10  # seconds between reaper sweeps
+
+# Spawn-correlation: a pending entry older than this is considered orphaned
+# (PreToolUse(Agent) fired but the matching SubagentStart never did).
+# PreToolUse→SubagentStart normally takes milliseconds; 60s is ample.
+SPAWN_PENDING_TIMEOUT_S = 60
+
+# Claude Code's subagent-spawning tool name -- PreToolUse(Agent) is the signal
+# we use to identify the spawning parent for the next SubagentStart.
+AGENT_SPAWN_TOOL_NAME = "Agent"
 
 # Phase 4 (ADR 052): time-clustering window for parallel-subagent fork detection.
 # Agents that start within this window under the same parent get the same
@@ -346,6 +356,13 @@ class OTelRelay:
         self._open_tool_spans: dict[str, trace.Span] = {}
         self._open_tool_start_times: dict[str, float] = {}
 
+        # Agent-spawn correlation: Claude Code fires PreToolUse(Agent) from the
+        # spawning agent's context, then SubagentStart for the spawnee (without
+        # any parent signal). We FIFO-queue pending spawns on PreToolUse(Agent)
+        # and dequeue in order on SubagentStart to resolve the real parent.
+        # Each entry: (parent_agent_id, tool_use_id, enqueued_at_monotonic).
+        self._pending_spawns: deque[tuple[str, str, float]] = deque()
+
         # Phase 4 fork clustering: one active cluster per parent_agent_id.
         # A new AGENT_START within FORK_CLUSTER_WINDOW_S of the cluster's
         # opened_at joins the cohort; otherwise a new UUID is minted.
@@ -400,6 +417,8 @@ class OTelRelay:
             self._create_session_summary()
             with self._span_lock:
                 self._agent_contexts.clear()
+                self._pending_spawns.clear()
+                self._fork_clusters.clear()
             self._session_span = None
             self._session_context = None
             self._session_stats = None
@@ -573,6 +592,12 @@ class OTelRelay:
         try:
             self._ensure_initialized(session_id, project_dir=project_dir)
             self._ensure_agent_context(agent_id, agent_type, session_id)
+
+            # If this is an Agent-spawn tool call, register the pending spawn
+            # so the next SubagentStart can resolve its parent via FIFO.
+            if tool_name == AGENT_SPAWN_TOOL_NAME:
+                self._register_spawn(agent_id, tool_use_id)
+
             parent_context = self._get_parent_context(agent_id)
             if parent_context is None or self._tracer is None:
                 return
@@ -860,6 +885,33 @@ class OTelRelay:
     # Fork-group clustering (Phase 4: ADR 052)
     # ------------------------------------------------------------------
 
+    def _register_spawn(self, caller_agent_id: str, tool_use_id: str) -> None:
+        """Record that PreToolUse(Agent) fired; bind caller as prospective parent.
+
+        Claude Code's Agent tool dispatches a subagent whose subsequent
+        SubagentStart carries no parent linkage. By enqueuing (caller, id) on
+        PreToolUse we can pop the FIFO-oldest entry on SubagentStart and treat
+        that caller as the real parent -- correct for sequential, parallel, and
+        nested spawns (PreToolUse always fires in caller's context).
+        """
+        caller = caller_agent_id or MAIN_AGENT_ID
+        with self._span_lock:
+            self._pending_spawns.append((caller, tool_use_id, time.monotonic()))
+
+    def _pop_spawn_parent(self) -> str:
+        """Pop the FIFO-oldest non-stale pending spawn, returning its caller.
+
+        Returns MAIN_AGENT_ID when the queue is empty or all entries are stale
+        (orphaned PreToolUse(Agent) without matching SubagentStart).
+        """
+        now = time.monotonic()
+        with self._span_lock:
+            while self._pending_spawns:
+                caller, _tool_use_id, ts = self._pending_spawns.popleft()
+                if now - ts <= SPAWN_PENDING_TIMEOUT_S:
+                    return caller
+        return MAIN_AGENT_ID
+
     def _assign_fork_group(self, parent_agent_id: str) -> tuple[str, int]:
         """Return (fork_group, sibling_index) for an agent starting now.
 
@@ -930,6 +982,13 @@ class OTelRelay:
                 self._open_tool_start_times.pop(tool_use_id, None)
                 if span is not None:
                     orphaned_spans.append((tool_use_id, span))
+
+            # Drop stale pending-spawn entries (PreToolUse(Agent) without a
+            # matching SubagentStart within SPAWN_PENDING_TIMEOUT_S).
+            while self._pending_spawns and (
+                now - self._pending_spawns[0][2] > SPAWN_PENDING_TIMEOUT_S
+            ):
+                self._pending_spawns.popleft()
 
         # End orphaned spans outside the lock to keep the critical section short.
         for tool_use_id, span in orphaned_spans:
@@ -1099,15 +1158,16 @@ class OTelRelay:
         git_context: dict[str, Any] | None = None,
         task_slug: str = "",
     ) -> None:
-        """Create an AGENT span parented under the spawning agent (hierarchy-aware).
+        """Create an AGENT span parented under the actual spawning agent.
 
         The span is ended right away so Phoenix shows the trace hierarchy
         without waiting for SubagentStop. The span's context is stored in
         ``_agent_contexts`` for parenting child spans (tools, phases, decisions).
 
-        Parent resolution:
-        - Look up MAIN_AGENT_ID as the default parent (depth-1 agents)
-        - This naturally handles the common case where the main agent spawns subagents
+        Parent resolution: pop the FIFO-oldest pending spawn from the queue
+        populated by PreToolUse(Agent). Falls back to MAIN_AGENT_ID when the
+        queue is empty (e.g., a lazy-created context for a background agent
+        whose Agent tool call never hit a hook).
         """
         if self._tracer is None or self._session_context is None:
             return
@@ -1115,10 +1175,16 @@ class OTelRelay:
         origin = _detect_agent_origin(agent_type)
         clean_type = _clean_agent_type(agent_type)
 
-        # Determine parent: use main-agent as default parent for depth-1 agents
-        parent_id = MAIN_AGENT_ID
+        # Determine parent: pop the oldest pending spawn registered by
+        # PreToolUse(Agent). Empty queue -> fall back to main-agent.
+        parent_id = self._pop_spawn_parent()
         with self._span_lock:
             parent_ctx = self._agent_contexts.get(parent_id)
+            if parent_ctx is None and parent_id != MAIN_AGENT_ID:
+                # Parent resolved from the queue but we have no context for it
+                # (shouldn't normally happen; degrade gracefully to main-agent).
+                parent_id = MAIN_AGENT_ID
+                parent_ctx = self._agent_contexts.get(MAIN_AGENT_ID)
         parent_otel_context = parent_ctx.otel_context if parent_ctx else self._session_context
         parent_depth = parent_ctx.depth if parent_ctx else 0
 

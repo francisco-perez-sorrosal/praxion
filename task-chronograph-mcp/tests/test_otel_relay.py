@@ -950,9 +950,100 @@ class TestAgentDepthAttribute:
         assert agent.attributes["praxion.depth"] == 1
 
     def test_parent_agent_id_attribute(self, harness: OTelRelayTestHarness):
+        """With no preceding PreToolUse(Agent), the FIFO queue is empty and the
+        agent falls back to main-agent as its parent -- the baseline behavior."""
         harness.relay.start_session(SESSION_ID, harness.project_dir)
         harness.relay.start_agent("agent-r1", "researcher", SESSION_ID)
         harness.relay.end_agent("agent-r1")
+        harness.relay.end_session(SESSION_ID)
+
+        agent = harness.spans_with_attribute("praxion.agent_type", "researcher")[0]
+        assert agent.attributes["praxion.parent_agent_id"] == "__main_agent__"
+
+
+# ---------------------------------------------------------------------------
+# Spawn correlation: PreToolUse(Agent) + SubagentStart FIFO hierarchy
+# ---------------------------------------------------------------------------
+
+
+class TestSpawnCorrelationHierarchy:
+    """Verify that PreToolUse(Agent) drives correct parent resolution for
+    subagent spans, so Phoenix shows depth-2+ agent chains properly."""
+
+    def _simulate_agent_tool(self, harness, *, caller_agent_id: str, tool_use_id: str):
+        """Fire a PreToolUse(Agent) as the given caller. The tool span itself
+        is a side effect; what matters is the pending-spawn registration."""
+        harness.relay.start_tool(
+            tool_use_id=tool_use_id,
+            agent_id=caller_agent_id,
+            tool_name="Agent",
+            session_id=SESSION_ID,
+        )
+
+    def test_depth_2_agent_is_child_of_spawning_subagent(self, harness: OTelRelayTestHarness):
+        """When subagent A invokes the Agent tool to spawn B, B's parent is A
+        -- not main-agent. This is the core regression this fix addresses."""
+        harness.relay.start_session(SESSION_ID, harness.project_dir)
+        # Main spawns A
+        self._simulate_agent_tool(harness, caller_agent_id="", tool_use_id="t1")
+        harness.relay.start_agent("agent-A", "architect", SESSION_ID)
+        # A spawns B
+        self._simulate_agent_tool(harness, caller_agent_id="agent-A", tool_use_id="t2")
+        harness.relay.start_agent("agent-B", "researcher", SESSION_ID)
+        harness.relay.end_agent("agent-B")
+        harness.relay.end_agent("agent-A")
+        harness.relay.end_session(SESSION_ID)
+
+        agent_b = harness.spans_with_attribute("praxion.agent_type", "researcher")[0]
+        agent_a = harness.spans_with_attribute("praxion.agent_type", "architect")[0]
+        assert agent_b.attributes["praxion.parent_agent_id"] == "agent-A"
+        assert agent_b.parent is not None
+        assert agent_b.parent.span_id == agent_a.context.span_id
+
+    def test_parallel_spawns_from_main_all_have_main_as_parent(self, harness: OTelRelayTestHarness):
+        """Main spawns three subagents in quick succession. Each subagent's
+        SubagentStart pops one FIFO entry; all three resolve to main-agent."""
+        harness.relay.start_session(SESSION_ID, harness.project_dir)
+        for i in range(3):
+            self._simulate_agent_tool(harness, caller_agent_id="", tool_use_id=f"t{i}")
+        for i in range(3):
+            harness.relay.start_agent(f"agent-p{i}", "researcher", SESSION_ID)
+            harness.relay.end_agent(f"agent-p{i}")
+        harness.relay.end_session(SESSION_ID)
+
+        subagents = harness.spans_with_attribute("praxion.agent_type", "researcher")
+        assert len(subagents) == 3
+        for s in subagents:
+            assert s.attributes["praxion.parent_agent_id"] == "__main_agent__"
+
+    def test_nested_chain_preserves_hierarchy_at_depth_3(self, harness: OTelRelayTestHarness):
+        """Main → A → B → C: each level parents under its spawner, not main."""
+        harness.relay.start_session(SESSION_ID, harness.project_dir)
+        self._simulate_agent_tool(harness, caller_agent_id="", tool_use_id="t1")
+        harness.relay.start_agent("agent-A", "architect", SESSION_ID)
+        self._simulate_agent_tool(harness, caller_agent_id="agent-A", tool_use_id="t2")
+        harness.relay.start_agent("agent-B", "researcher", SESSION_ID)
+        self._simulate_agent_tool(harness, caller_agent_id="agent-B", tool_use_id="t3")
+        harness.relay.start_agent("agent-C", "implementer", SESSION_ID)
+        harness.relay.end_agent("agent-C")
+        harness.relay.end_agent("agent-B")
+        harness.relay.end_agent("agent-A")
+        harness.relay.end_session(SESSION_ID)
+
+        agent_c = harness.spans_with_attribute("praxion.agent_type", "implementer")[0]
+        agent_b = harness.spans_with_attribute("praxion.agent_type", "researcher")[0]
+        assert agent_c.attributes["praxion.parent_agent_id"] == "agent-B"
+        assert agent_c.attributes["praxion.depth"] == 3
+        assert agent_c.parent.span_id == agent_b.context.span_id
+
+    def test_agent_start_without_pretool_use_falls_back_to_main(
+        self, harness: OTelRelayTestHarness
+    ):
+        """Background agents (hooks never fire PreToolUse before SubagentStart)
+        must still produce a valid span rooted under main-agent."""
+        harness.relay.start_session(SESSION_ID, harness.project_dir)
+        harness.relay.start_agent("agent-bg", "researcher", SESSION_ID)
+        harness.relay.end_agent("agent-bg")
         harness.relay.end_session(SESSION_ID)
 
         agent = harness.spans_with_attribute("praxion.agent_type", "researcher")[0]

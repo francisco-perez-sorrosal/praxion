@@ -199,18 +199,24 @@ def reconcile_observations(ours_text: str, theirs_text: str) -> str:
 
 
 def has_drafts_directory_changed_in_merge() -> bool:
-    """Return True if the most recent commit touched `.ai-state/decisions/drafts/`.
+    """Return True if the most recent commit touched a draft ADR file.
 
     Used by `reconcile_adr_numbers()` to decide whether to defer to
-    `scripts/finalize_adrs.py`. On git errors we fail safe to False so the
-    legacy path still runs and does something useful rather than skipping
-    based on unreliable signal.
+    `scripts/finalize_adrs.py`. Only counts `.md` files under
+    `.ai-state/decisions/drafts/` — runtime artifacts (locks, backups,
+    `CLAUDE.md` pointers) must not trigger the deferral because they
+    carry no ADR semantics. On git errors we fail safe to False so the
+    legacy path still runs rather than skipping based on unreliable signal.
     """
     result = git("diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD")
     if result.returncode != 0:
         return False
     for line in result.stdout.splitlines():
-        if line.startswith(".ai-state/decisions/drafts/"):
+        if (
+            line.startswith(".ai-state/decisions/drafts/")
+            and line.endswith(".md")
+            and not line.endswith("/CLAUDE.md")
+        ):
             return True
     return False
 

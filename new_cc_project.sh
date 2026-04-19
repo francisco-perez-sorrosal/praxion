@@ -110,8 +110,20 @@ if [ -z "$cmd_body_file" ]; then
     fi
 fi
 
+# Strip YAML frontmatter (the leading `---`...`---` block) before embedding the
+# command body. The frontmatter is metadata for Claude Code's slash dispatcher;
+# when embedded inline as a positional arg it is dead weight AND a parser
+# hazard — `claude` reads a leading `---description:` as an unknown long option
+# and aborts. Strip with awk: skip the first `---` line, then everything until
+# the closing `---`, then print the rest verbatim.
+strip_frontmatter() {
+    awk 'BEGIN{state=0} state==0 && /^---[[:space:]]*$/ {state=1; next}
+         state==1 && /^---[[:space:]]*$/ {state=2; next}
+         state==2 {print}' "$1"
+}
+
 if [ -n "$cmd_body_file" ] && [ -f "$cmd_body_file" ]; then
-    seed_prompt="$(cat "$cmd_body_file")
+    seed_prompt="$(strip_frontmatter "$cmd_body_file")
 
 ---
 
@@ -120,5 +132,6 @@ else
     seed_prompt="You are inside a freshly scaffolded Praxion greenfield project. Invoke the /new-cc-project slash command now to onboard it. If the slash command is not registered, locate its body under ~/.claude/plugins/ (Markdown file named new-cc-project.md) and follow its instructions."
 fi
 
-# Hand off (REQ-ONBOARD-08).
-exec claude --permission-mode acceptEdits "$seed_prompt"
+# Hand off (REQ-ONBOARD-08). `--` stops `claude` from interpreting any leading
+# dash in the seed prompt as a flag.
+exec claude --permission-mode acceptEdits -- "$seed_prompt"

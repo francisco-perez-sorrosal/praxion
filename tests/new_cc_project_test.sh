@@ -32,7 +32,7 @@ BASH_BIN="$(command -v bash)"
 # external commands the script + stub need; shell builtins are not listed.
 ESSENTIALS="$WORK_ROOT/essentials"
 mkdir -p "$ESSENTIALS"
-for tool in bash sh env basename dirname mkdir ls cat grep printf rm chmod readlink uname find pwd; do
+for tool in bash sh env basename dirname mkdir ls cat grep printf rm chmod readlink uname find pwd head awk; do
     p="$(command -v "$tool" 2>/dev/null || true)"
     [ -n "$p" ] && ln -sf "$p" "$ESSENTIALS/$tool"
 done
@@ -52,11 +52,23 @@ make_sandbox() {
     stub_log="$sandbox/stub.log"
     cat > "$sandbox/bin/claude" <<EOF
 #!/usr/bin/env bash
-# Stub: capture cwd + args, succeed.
+# Stub: capture cwd + args, succeed -- but reject leading-dash args that the
+# real CLI would treat as unknown options. This catches the historical bug
+# where the seed prompt began with YAML frontmatter ('---description: ...')
+# and aborted the real claude with 'unknown option'.
 {
   printf 'cwd=%s\n' "\$(pwd)"
   for a in "\$@"; do printf 'arg=%s\n' "\$a"; done
 } > "$stub_log"
+positional=0
+for a in "\$@"; do
+    if [ "\$a" = "--" ]; then positional=1; continue; fi
+    if [ "\$positional" -eq 1 ]; then continue; fi
+    case "\$a" in
+        --permission-mode|acceptEdits) ;;
+        --*) printf "stub-claude: unknown option '%s'\n" "\$a" >&2; exit 7 ;;
+    esac
+done
 exit 0
 EOF
     chmod +x "$sandbox/bin/claude"

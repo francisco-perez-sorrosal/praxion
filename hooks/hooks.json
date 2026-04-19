@@ -167,6 +167,17 @@
         ]
       },
       {
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/worktree_guard.py",
+            "timeout": 5,
+            "async": false
+          }
+        ]
+      },
+      {
         "matcher": "",
         "hooks": [
           {

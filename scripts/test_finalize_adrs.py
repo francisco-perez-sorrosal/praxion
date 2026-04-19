@@ -1,6 +1,6 @@
 """Tests for finalize_adrs.py -- draft-to-NNN promotion at merge-to-main.
 
-Behavioral tests driven from dec-draft-b6a212f0 (Finalize Protocol) and the
+Behavioral tests driven from dec-061 (Finalize Protocol) and the
 acceptance criteria AC-03, AC-04, AC-05, AC-06 in the concurrency-collab
 pipeline's SYSTEMS_PLAN.md.
 
@@ -219,7 +219,7 @@ class TestFinalizeSlugExtraction:
 
         AC-03: correct NNN+slug assignment requires correct slug extraction
         even when the branch contains hyphens. The canonical parse rule
-        (per dec-draft-b6a212f0) is: the last dash-segment before ``.md`` is
+        (per dec-061) is: the last dash-segment before ``.md`` is
         the slug; the fourth segment onward (excluding the final slug) is
         the branch.
 

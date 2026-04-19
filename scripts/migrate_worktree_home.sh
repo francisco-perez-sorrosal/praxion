@@ -7,7 +7,7 @@
 #   - For each worktree whose path matches `.trees/<name>/`, prints a human-readable
 #     block with a `git worktree move` command the user can review and run.
 #   - Performs NO automatic move. The user is responsible for running the emitted
-#     commands after reviewing them (per dec-draft-349abb5e / SYSTEMS_PLAN C2).
+#     commands after reviewing them (per dec-057 / SYSTEMS_PLAN C2).
 #
 # Usage:
 #   scripts/migrate_worktree_home.sh         # print migration commands

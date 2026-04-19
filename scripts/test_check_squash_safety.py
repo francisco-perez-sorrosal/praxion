@@ -1,6 +1,6 @@
 """Tests for check_squash_safety.py -- post-merge squash-merge detection.
 
-Behavioral tests driven from dec-draft-960eacfc (Squash-Merge Safety) and
+Behavioral tests driven from dec-059 (Squash-Merge Safety) and
 acceptance criterion AC-14 in the concurrency-collab pipeline's
 SYSTEMS_PLAN.md.
 
@@ -280,7 +280,7 @@ class TestErasureDetection:
     ) -> None:
         """AC-14: a removed .ai-state/ file appears in the warning output.
 
-        Per dec-draft-960eacfc, the warning block surfaces information about
+        Per dec-059, the warning block surfaces information about
         erased files. The implementer may print a count, list filenames,
         or both. This test asserts BOTH that the warning fires AND that the
         specific erased filename appears verbatim in the output.
@@ -318,7 +318,7 @@ class TestErasureDetection:
         marker).
 
         NOTE: This bound is from the Step 10b prompt; not codified in
-        dec-draft-960eacfc. The implementer MAY choose to print only the
+        dec-059. The implementer MAY choose to print only the
         count (no filenames) -- in that case the truncation marker does not
         apply. The assertion below is permissive: it accepts EITHER a
         truncation marker OR a count-only output (no filenames at all).
@@ -351,7 +351,7 @@ class TestErasureDetection:
     ) -> None:
         """AC-14: the warning surfaces actionable recovery steps.
 
-        Per dec-draft-960eacfc, the warning block must point users at:
+        Per dec-059, the warning block must point users at:
         - ``git reflog`` (locate the pre-squash tip)
         - ``git cherry-pick`` (replay the lost commit)
         - regular merge / rebase-and-merge as the prevention path

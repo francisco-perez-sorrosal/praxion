@@ -408,8 +408,12 @@ def rewrite_cross_references(repo_root: Path, old_id: str, new_id: str) -> int:
 
     Bounded scope:
     - All files under `.ai-state/decisions/` (both drafts/ and finalized).
+    - `.ai-state/ARCHITECTURE.md` and `docs/architecture.md` (Section 8 ADR
+      references land here during pipelines).
     - All `.ai-work/*/LEARNINGS.md`.
     - All `.ai-work/*/SYSTEMS_PLAN.md` and `.ai-work/*/IMPLEMENTATION_PLAN.md`.
+    - All `scripts/*.py` and `scripts/*.sh` (pipeline-authored test files and
+      migration scripts can carry draft-id references in docstrings/comments).
     - `.ai-state/specs/SPEC_*.md` files matching any active pipeline task slug.
 
     Returns the number of files modified.
@@ -429,6 +433,13 @@ def _cross_reference_targets(repo_root: Path) -> Iterator[Path]:
             if entry.is_file():
                 yield entry
 
+    for architecture_doc in (
+        repo_root / ".ai-state" / "ARCHITECTURE.md",
+        repo_root / "docs" / "architecture.md",
+    ):
+        if architecture_doc.is_file():
+            yield architecture_doc
+
     ai_work = repo_root / ".ai-work"
     if ai_work.is_dir():
         for subdir in ai_work.iterdir():
@@ -442,6 +453,13 @@ def _cross_reference_targets(repo_root: Path) -> Iterator[Path]:
                 candidate = subdir / filename
                 if candidate.is_file():
                     yield candidate
+
+    scripts_dir = repo_root / "scripts"
+    if scripts_dir.is_dir():
+        for pattern in ("*.py", "*.sh"):
+            for entry in scripts_dir.glob(pattern):
+                if entry.is_file():
+                    yield entry
 
     specs = repo_root / ".ai-state" / "specs"
     task_slugs = _active_task_slugs(repo_root)

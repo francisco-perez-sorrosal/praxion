@@ -462,6 +462,59 @@ class TestFinalizeCrossReferences:
         assert "dec-042" in content
         assert draft_id not in content
 
+    def test_architecture_docs_refs_rewritten(self, repo_root: Path) -> None:
+        """Expanded scope: .ai-state/ARCHITECTURE.md + docs/architecture.md rewrites."""
+        draft = make_draft(repo_root, "20260419-1810", "alice", "main", "arch-decision")
+        draft_id = f"dec-draft-{_draft_hash(draft.name)}"
+
+        architect_doc = repo_root / ".ai-state" / "ARCHITECTURE.md"
+        architect_doc.write_text(
+            f"# Architecture\n\n| {draft_id} (drafts/) | arch decision | ... |\n",
+            encoding="utf-8",
+        )
+        developer_doc = repo_root / "docs" / "architecture.md"
+        developer_doc.parent.mkdir(parents=True)
+        developer_doc.write_text(
+            f"# Dev Guide\n\nSee {draft_id} for the rationale.\n",
+            encoding="utf-8",
+        )
+
+        finalize.promote_draft(draft, 77, repo_root)
+        finalize.rewrite_cross_references(repo_root, draft_id, "dec-077")
+
+        assert draft_id not in architect_doc.read_text(encoding="utf-8")
+        assert "dec-077" in architect_doc.read_text(encoding="utf-8")
+        assert draft_id not in developer_doc.read_text(encoding="utf-8")
+        assert "dec-077" in developer_doc.read_text(encoding="utf-8")
+
+    def test_scripts_refs_rewritten(self, repo_root: Path) -> None:
+        """Expanded scope: scripts/*.py and scripts/*.sh docstring refs rewrite."""
+        draft = make_draft(
+            repo_root, "20260419-1810", "alice", "main", "script-decision"
+        )
+        draft_id = f"dec-draft-{_draft_hash(draft.name)}"
+
+        scripts_dir = repo_root / "scripts"
+        scripts_dir.mkdir()
+        py_file = scripts_dir / "helper.py"
+        py_file.write_text(
+            f'"""Helper script.\n\nDerived from {draft_id}."""\n',
+            encoding="utf-8",
+        )
+        sh_file = scripts_dir / "migrate.sh"
+        sh_file.write_text(
+            f"#!/usr/bin/env bash\n# per {draft_id} / SYSTEMS_PLAN\n",
+            encoding="utf-8",
+        )
+
+        finalize.promote_draft(draft, 88, repo_root)
+        finalize.rewrite_cross_references(repo_root, draft_id, "dec-088")
+
+        assert "dec-088" in py_file.read_text(encoding="utf-8")
+        assert draft_id not in py_file.read_text(encoding="utf-8")
+        assert "dec-088" in sh_file.read_text(encoding="utf-8")
+        assert draft_id not in sh_file.read_text(encoding="utf-8")
+
 
 # -- Idempotence --------------------------------------------------------------
 

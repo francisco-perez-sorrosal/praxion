@@ -27,6 +27,7 @@ __pycache__/
 
 # Runtime ephemeral files (concurrency locks, transient backups)
 .ai-state/*.lock
+.ai-state/**/*.lock
 .ai-state/*.backup.json
 .ai-state/*.pre-forget.json
 

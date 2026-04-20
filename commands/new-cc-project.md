@@ -9,17 +9,18 @@ Onboard the current (freshly scaffolded) directory. Ask one question first, show
 
 1. §Guard — shape check before doing anything
 2. §Flow — the sequential recipe this command executes
-3. §What is Praxion — canonical paragraph (sentinel-fenced, copied verbatim by the mushi doc)
-4. §How Claude drives Praxion — orchestrator preamble (sentinel-fenced; also mirrored into the mushi doc)
-5. §Default App — Pipeline Framing — literal task issued for the default build, shown to the user before execution
-6. §Custom App — Pipeline Framing — how the same shape adapts when the user describes their own app
-7. §Default App Spec — file inventory + invariants the pipeline must satisfy
-8. §SDK smoke check — the import probe and doc-staleness recovery
-9. §Init idempotency — predicate for appending the Agent Pipeline block
-10. §Mushi Doc Spec — the eight ordered sections
-11. §Five-to-Seven Lessons — L1–L7 "Put this in Claude" canonical ladder
-12. §Prereq Behaviors — `uv` missing, `ANTHROPIC_API_KEY` unset
-13. §Agent Pipeline Block — verbatim source
+3. §Phase Gates — `AskUserQuestion` pause points between phases, with escape hatch
+4. §What is Praxion — canonical paragraph (sentinel-fenced, copied verbatim by the mushi doc)
+5. §How Claude drives Praxion — orchestrator preamble (sentinel-fenced; also mirrored into the mushi doc)
+6. §Default App — Pipeline Framing — literal task issued for the default build, shown to the user before execution
+7. §Custom App — Pipeline Framing — how the same shape adapts when the user describes their own app
+8. §Default App Spec — file inventory + invariants the pipeline must satisfy
+9. §SDK smoke check — the import probe and doc-staleness recovery
+10. §Init idempotency — predicate for appending the Agent Pipeline block
+11. §Mushi Doc Spec — the eight ordered sections
+12. §Five-to-Seven Lessons — L1–L7 "Put this in Claude" canonical ladder
+13. §Prereq Behaviors — `uv` missing, `ANTHROPIC_API_KEY` unset
+14. §Agent Pipeline Block — verbatim source
 
 ## §Guard
 
@@ -42,17 +43,19 @@ Exit without writing anything.
 
 When the guard passes, follow these steps in order. Each step is a contract — tactics are your call, but the shape is fixed.
 
-1. **Ask the single content question FIRST.** Use `AskUserQuestion` with the exact prompt: `What would you like to build? Press enter for the default (mini coding agent with web UI), or describe your own project.` The question precedes `/init` so CLAUDE.md ends up reflecting the user's actual choice once the codebase exists.
+**Phase gates.** The thirteen steps below group into eight phases (Phase 1 = step 1; Phase 2 = step 2; Phase 3 = steps 3–4; Phase 4 = step 5; Phase 5 = steps 6–8; Phase 6 = steps 9–10; Phase 7 = step 11; Phase 8 = steps 12–13). **Between phases**, fire the `AskUserQuestion` gates defined in §Phase Gates so the user sees and acknowledges each phase before it runs. Once the user picks `Run all rest` at any gate, suppress every subsequent gate for the rest of this command run.
 
-2. **Print the orchestrator preamble to chat.** Copy the content between the `PRAXION-ORCHESTRATOR-START` and `PRAXION-ORCHESTRATOR-END` sentinel markers in §How Claude drives Praxion and print it verbatim — *before* the pipeline runs. The user should learn the model *before* watching it execute.
+1. **Ask the single content question FIRST.** Use `AskUserQuestion` with the exact prompt: `What would you like to build? Press enter for the default (mini coding agent with web UI), or describe your own project.` The question precedes `/init` so CLAUDE.md ends up reflecting the user's actual choice once the codebase exists. *(Phase 1 — no preceding gate; this question IS the entry point.)*
 
-3. **Branch on the answer.**
+2. **Print the orchestrator preamble to chat.** First, fire **GATE 2** per §Phase Gates. Then copy the content between the `PRAXION-ORCHESTRATOR-START` and `PRAXION-ORCHESTRATOR-END` sentinel markers in §How Claude drives Praxion and print it verbatim — *before* the pipeline runs. The user should learn the model *before* watching it execute.
+
+3. **Branch on the answer.** First, fire **GATE 3** per §Phase Gates. Then branch:
    - Empty, `default`, `yes`, `y`, `ok` (case-insensitive) → §Default App — Pipeline Framing.
    - Any non-trivial description → §Custom App — Pipeline Framing.
 
 4. **Show the pipeline-framed prompt you're about to execute.** Print the wrapped task (from §Default App — Pipeline Framing or the custom variant) in a fenced block, preceded by: `Here's the task I'm about to run through the pipeline — watch how Claude orchestrates researcher → architect → planner → implementer + test-engineer → verifier.` The shape of this prompt is the teaching.
 
-5. **Execute the pipeline.** You are the orchestrator — delegate to Praxion subagents via the `Task` tool per `rules/swe/swe-agent-coordination-protocol.md`. For the seed phase, use the **compact Standard-tier** variant:
+5. **Execute the pipeline.** First, fire **GATE 4** per §Phase Gates. Then act as orchestrator — delegate to Praxion subagents via the `Task` tool per `rules/swe/swe-agent-coordination-protocol.md`. For the seed phase, use the **compact Standard-tier** variant:
    - `researcher` — fetch current Claude Agent SDK + `uv` + FastAPI signatures via `external-api-docs` (chub)
    - `systems-architect` — inline module-shape + dependency-direction summary (do NOT create persistent ADRs for the seed)
    - `implementation-planner` — 3–5 step decomposition into `.ai-work/<task-slug>/IMPLEMENTATION_PLAN.md`
@@ -60,21 +63,51 @@ When the guard passes, follow these steps in order. Each step is a contract — 
    - `verifier` — one-paragraph acceptance check against §Default App Spec invariants (skip the formal report for the seed)
    Ephemeral plan docs live in `.ai-work/<task-slug>/`. Do not write to `.ai-state/` for the seed build.
 
-6. **Run the SDK smoke check** per §SDK smoke check. If the probe fails, follow the recovery path (re-fetch chub, introspect installed package, regenerate the affected file, submit `chub_feedback`).
+6. **Run the SDK smoke check** per §SDK smoke check. First, fire **GATE 5** per §Phase Gates. If the probe fails, follow the recovery path (re-fetch chub, introspect installed package, regenerate the affected file, submit `chub_feedback`).
 
 7. **Run the test gate.** `uv sync && uv run pytest -q`. If `uv` is absent, see §Prereq Behaviors.
 
 8. **Regenerate the `.gitignore` Python block.** Append (without duplicating) `__pycache__/`, `.venv/`, `*.egg-info/`, `.pytest_cache/`. Do NOT exclude `uv.lock` — it stays tracked.
 
-9. **Invoke `/init` NOW.** The codebase exists and reflects the user's choice, so `/init`'s CLAUDE.md describes reality. Do not author CLAUDE.md by hand.
+9. **Invoke `/init` NOW.** First, fire **GATE 6** per §Phase Gates. Then invoke `/init` — the codebase exists and reflects the user's choice, so `/init`'s CLAUDE.md describes reality. Do not author CLAUDE.md by hand.
 
 10. **Append the Agent Pipeline block idempotently.** Per §Init idempotency, check whether `CLAUDE.md` already has a `## Agent Pipeline` heading. If not, append the block verbatim from §Agent Pipeline Block.
 
-11. **Generate the mushi doc LAST.** File anchors (§Mushi Doc Spec) must be computed against the final on-disk state, so this step follows everything that writes source code.
+11. **Generate the mushi doc LAST.** First, fire **GATE 7** per §Phase Gates. Then generate the mushi doc — file anchors (§Mushi Doc Spec) must be computed against the final on-disk state, so this step follows everything that writes source code.
 
-12. **Stage the scaffold.** `git add -A` (the `.gitignore` keeps `.env` and `.ai-work/` out). Do NOT run `git commit`.
+12. **Stage the scaffold.** `git add -A` (the `.gitignore` keeps `.env` and `.ai-work/` out). Do NOT run `git commit`. *(Phase 8 — no preceding gate; the staging+handoff is short and the exit message itself is the natural pause.)*
 
 13. **Print the exit handoff** (verbatim wording at the end of this file).
+
+## §Phase Gates
+
+The seed onboarding is the densest pedagogical moment in a Praxion user's whole journey, and the default §Flow runs it end-to-end without pause. To let the user *learn* the orchestrator + subagent pattern instead of just *watching* it whoosh by, fire an `AskUserQuestion` gate at every phase boundary defined below. Each gate explains what's about to happen *before* it happens; the user clicks `Continue` to proceed (or opts out via `Run all rest`).
+
+**Escape hatch (one-way).** Each gate offers two options: `Continue` and `Run all rest`. If the user picks `Run all rest`, set an internal "no-more-gates" flag for the remainder of this command run and skip every subsequent gate without asking. The flag is one-way — once set, it persists until the command exits. This honors users who have run the onboarding before and want it to play through.
+
+**Fallback.** If `AskUserQuestion` is unavailable (tool error, headless invocation), print the headline as a chat message and proceed without blocking. Do not fail the onboarding because a gate cannot fire.
+
+**Format.** Every gate uses these `AskUserQuestion` parameters:
+
+- `header` — `"Next?"`
+- `question` — the headline from the table below (forward-looking; describes the phase about to start, not the one just finished)
+- `multiSelect` — `false`
+- `options` — exactly two:
+  - `{ label: "Continue", description: "Proceed with this phase. I'll pause again before the next." }`
+  - `{ label: "Run all rest", description: "Skip remaining gates and run the rest autonomously." }`
+
+**Phase-to-gate map.** Phase 1 (the content question) is itself an `AskUserQuestion`, so it needs no preceding gate. Phase 8 (stage + exit handoff) is a short close-out where the final message is itself the stopping point, so it also has no gate. The six gates between are:
+
+| Gate | Fires before §Flow step | Headline (use verbatim as `question`) |
+|------|------------------------|--------------------------------------|
+| 2 | step 2 (orchestrator preamble) | `Phase 2 of 7: I'll explain how Claude drives Praxion — orchestrator routes plain-English tasks to specialist subagents (researcher / architect / planner / implementer / test-engineer / verifier). Reading this once now means you won't need to memorize slash commands later. Continue?` |
+| 3 | step 3 (branch + framed prompt) | `Phase 3 of 7: I'll show you the exact English task I'm about to feed the orchestrator. The shape of this prompt — concrete behaviors + acceptance criteria + explicit pipeline invocation — is the pattern you'll reuse forever. Continue?` |
+| 4 | step 5 (execute pipeline) | `Phase 4 of 7: HEADLINE EVENT. I delegate to researcher → systems-architect → implementation-planner → implementer + test-engineer (concurrent) → verifier. Watch the orchestrator route the task across five specialists. Continue?` |
+| 5 | step 6 (SDK smoke check) | `Phase 5 of 7: I verify the Claude Agent SDK import surface (chub docs sometimes drift from the installed package), run the test suite via uv, and lock down the .gitignore Python block. Continue?` |
+| 6 | step 9 (/init) | `Phase 6 of 7: I run /init so CLAUDE.md describes the code that ACTUALLY exists (not what I imagined), then append the Agent Pipeline reference idempotently. Continue?` |
+| 7 | step 11 (mushi doc) | `Phase 7 of 7: I generate onboarding_for_mushi_busy_ppl.md — your project-specific map with a happy-path Mermaid diagram, file inventory, lesson ladder, and PoC-to-production journey. Continue?` |
+
+**Don't paraphrase the headlines.** Copy each cell verbatim into the `question` field — they're sized to teach the user *why* each phase exists, not just *what* it does, and the wording was chosen so the seven gates form a coherent narrative across the run.
 
 ## §What is Praxion
 

@@ -41,6 +41,12 @@ Optional second positional `[target-dir]` (defaults to `$PWD`) controls where `<
 new-cc-project my-app ~/code        # creates ~/code/my-app/
 ```
 
+Optional `PRAXION_NEW_CC_EDITOR` env var picks the surface the scaffold opens in so you can watch `.ai-work/` and `.ai-state/` populate as the pipeline runs. Values: `auto` (default — Cursor if present, else VS Code), `cursor`, `code`, `claude-desktop`, `none`. The `claude-desktop` value launches `Claude.app` and copies the project path to the clipboard — Anthropic does not ship a documented CLI flag or URL scheme to point the desktop app at a folder, so you click **Select folder** and paste. macOS only today.
+
+```bash
+PRAXION_NEW_CC_EDITOR=claude-desktop new-cc-project my-app
+```
+
 The script refuses to run if the project name does not match `^[A-Za-z0-9][A-Za-z0-9._-]*$` (letters/digits first, then letters/digits/`.`/`_`/`-`) or if the target path already exists and is non-empty.
 
 ## Expected prompt flow
@@ -144,7 +150,7 @@ Full rationale, considered options, and trade-offs: [`dec-053` — Prompt-over-t
 
 ## Limits for v1
 
-- **Claude Code only.** Cursor and Claude Desktop variants are deferred. The bash entry assumes a `claude` CLI binary; it is not portable to other Claude surfaces.
+- **Claude Code only as the AI surface running the pipeline.** Running the seed pipeline inside Cursor's AI assistant or Claude Desktop's chat (instead of the `claude` CLI) is deferred. The bash entry assumes a `claude` CLI binary; it is not portable to other AI surfaces. (The editor surface that *opens to view files* is independent — `PRAXION_NEW_CC_EDITOR` covers Cursor, VS Code, and Claude.app; see [How to run it](#how-to-run-it).)
 - **Default app is Python only** (`uv` + `claude-agent-sdk` + FastAPI). No JS/TS or other-language variants in the default branch.
 - **Custom-app branch tailors only L1 + L2** of the lesson ladder; L3–L7 stay generic Praxion-ecosystem lessons. Tailored count is fixed at 2 regardless of ladder size (5–7 total).
 - **Bash test (`tests/new_cc_project_test.sh`) is single-file**, runnable as `bash tests/new_cc_project_test.sh`. Not yet wired into a `Makefile` target or CI.

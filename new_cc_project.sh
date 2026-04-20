@@ -5,6 +5,14 @@
 # then exec's an interactive Claude Code session seeded with /new-cc-project.
 #
 # Usage: new_cc_project.sh <project-name> [target-dir]
+# Env vars:
+#   PRAXION_NEW_CC_EDITOR  Which editor surface to open the scaffold in.
+#                          Values: auto (default; cursor → code), cursor,
+#                          code, claude-desktop, none. The claude-desktop
+#                          option launches Claude.app and copies the project
+#                          path to the clipboard (macOS only) since the
+#                          desktop app has no documented CLI/URL hook to
+#                          open a folder programmatically.
 # Exit codes: 0 ok, 2 usage/invalid name, 3 no claude, 4 no plugin, 5 no git,
 #             6 target exists & non-empty.
 # See docs/project-onboarding.md for the full flow and troubleshooting matrix.
@@ -93,22 +101,93 @@ cat > .gitignore <<'EOF'
 .claude/settings.local.json
 EOF
 
-# Open the project in the user's editor (Cursor first, then VS Code) so the
-# user can watch .ai-work/ and .ai-state/ appear as the pipeline runs. Both
-# editors accept (dir, file) positional args and open the file in a tab next
-# to the file tree. Backgrounded with output silenced; absent editors are not
-# an error — onboarding still works in pure-terminal environments.
+# Open the project in the user's chosen surface so they can watch .ai-work/
+# and .ai-state/ appear as the pipeline runs. Selection is driven by the
+# PRAXION_NEW_CC_EDITOR env var:
+#   unset / auto    → cursor first, then VS Code (legacy behavior)
+#   cursor          → Cursor only
+#   code            → VS Code only
+#   claude-desktop  → Claude.app (the unified Claude Code desktop app); no
+#                     CLI flag or URL scheme exists to open a path directly,
+#                     so we launch the app + copy the path to the clipboard
+#                     and ask the user to paste into "Select folder".
+#   none            → no editor launch (pure-terminal environments)
+# Absent editors are not an error — onboarding still works without one.
+editor_choice="${PRAXION_NEW_CC_EDITOR:-auto}"
 editor_launched=""
-if command -v cursor >/dev/null 2>&1; then
-    cursor "$project_path" "$project_path/.gitignore" >/dev/null 2>&1 &
-    editor_launched="cursor"
-elif command -v code >/dev/null 2>&1; then
-    code "$project_path" "$project_path/.gitignore" >/dev/null 2>&1 &
-    editor_launched="code"
-fi
+desktop_path_announce=""
+
+launch_cursor_if_present() {
+    if command -v cursor >/dev/null 2>&1; then
+        cursor "$project_path" "$project_path/.gitignore" >/dev/null 2>&1 &
+        editor_launched="cursor"
+        return 0
+    fi
+    return 1
+}
+
+launch_code_if_present() {
+    if command -v code >/dev/null 2>&1; then
+        code "$project_path" "$project_path/.gitignore" >/dev/null 2>&1 &
+        editor_launched="code"
+        return 0
+    fi
+    return 1
+}
+
+# Launch Claude.app (bundle id com.anthropic.claudefordesktop). The desktop
+# app has no documented way to open a folder from the CLI — we launch it and
+# pre-stage the project path on the clipboard so the user only has to click
+# "Select folder" + paste. The path is also printed verbatim as a fallback
+# for environments without pbcopy.
+launch_claude_desktop() {
+    if [ "$(uname -s)" != "Darwin" ]; then
+        printf '→ PRAXION_NEW_CC_EDITOR=claude-desktop is only wired for macOS today.\n' >&2
+        printf '  Open Claude Code desktop manually and select this folder: %s\n' "$project_path" >&2
+        return 1
+    fi
+    if ! open -a "Claude" >/dev/null 2>&1; then
+        printf '→ Could not launch Claude.app (is the Claude Code desktop app installed?).\n' >&2
+        printf '  Install from https://claude.ai/download, then open it and select: %s\n' "$project_path" >&2
+        return 1
+    fi
+    if command -v pbcopy >/dev/null 2>&1; then
+        printf '%s' "$project_path" | pbcopy
+        desktop_path_announce="path copied to clipboard — paste into 'Select folder'"
+    else
+        desktop_path_announce="select this folder manually: $project_path"
+    fi
+    editor_launched="claude-desktop"
+    return 0
+}
+
+case "$editor_choice" in
+    auto)
+        launch_cursor_if_present || launch_code_if_present || true
+        ;;
+    cursor)
+        launch_cursor_if_present || \
+            printf '→ PRAXION_NEW_CC_EDITOR=cursor but the cursor CLI is not on PATH.\n' >&2
+        ;;
+    code)
+        launch_code_if_present || \
+            printf '→ PRAXION_NEW_CC_EDITOR=code but the code CLI is not on PATH.\n' >&2
+        ;;
+    claude-desktop)
+        launch_claude_desktop || true
+        ;;
+    none)
+        ;;
+    *)
+        printf '→ PRAXION_NEW_CC_EDITOR=%s is not recognized; valid: auto|cursor|code|claude-desktop|none.\n' \
+            "$editor_choice" >&2
+        ;;
+esac
 
 # Pre-flight announcement (REQ-ONBOARD-07).
-if [ -n "$editor_launched" ]; then
+if [ "$editor_launched" = "claude-desktop" ]; then
+    printf '→ Launched Claude Code desktop app — %s.\n' "$desktop_path_announce"
+elif [ -n "$editor_launched" ]; then
     printf '→ Opened project in %s (file tree will refresh as Praxion writes files).\n' \
         "$editor_launched"
 fi

@@ -213,10 +213,10 @@ The pipeline above takes you from idea to working code. Going from working code 
 
 | # | Milestone | Trigger | Produces |
 |---|-----------|---------|----------|
-| 1 | **Working PoC** | The pipeline (Steps 1–7 above) + `/co` to commit | Green tests, committed code on a feature branch |
+| 1 | **Working PoC + architecture baseline + first ADR** | The pipeline (Steps 1–7 above) + `/co` to commit | Green tests, committed code on a feature branch, plus `.ai-state/ARCHITECTURE.md`, `docs/architecture.md`, and one ADR draft under `.ai-state/decisions/drafts/` — the seed's systems-architect runs its full delegation checklist so the user's first pipeline observation includes Praxion's complete architecture artifact set |
 | 2 | **Health audit** | `sentinel` agent — e.g., "Run a sentinel audit" | `.ai-state/SENTINEL_REPORT_*.md` (timestamped) + append-only `.ai-state/SENTINEL_LOG.md` — coherence, freshness, completeness scorecard |
-| 3 | **Architecture record** | `systems-architect` (already runs in Standard/Full tier) | `.ai-state/ARCHITECTURE.md` (architect-facing design target) + `docs/architecture.md` (developer-facing navigation, Built components only) |
-| 4 | **Persistent decisions** | `systems-architect` or user, every meaningful trade-off | ADR draft → finalized `.ai-state/decisions/<NNN>-<slug>.md` at merge — Context, Decision, Considered Options, Consequences |
+| 3 | **Architecture evolves** | `systems-architect` on each feature — lands at seed, updates with every subsequent pipeline | `.ai-state/ARCHITECTURE.md` + `docs/architecture.md` get **updated**, not replaced, as new modules land or dependencies shift |
+| 4 | **ADR fleet accumulates** | `systems-architect` or user, every meaningful trade-off (seed writes the first; subsequent features add more) | New ADR drafts under `.ai-state/decisions/drafts/` → finalized `.ai-state/decisions/<NNN>-<slug>.md` at merge — Context, Decision, Considered Options, Consequences |
 | 5 | **CI/CD pipeline** | `cicd-engineer` agent — e.g., "Set up GitHub Actions for CI" | `.github/workflows/*.yml` — automated test, build, lint, security scan on every push |
 | 6 | **Deployment design** | `deployment` skill (consulted by systems-architect on demand) | `compose.yaml`, `Dockerfile`, `.ai-state/SYSTEM_DEPLOYMENT.md` — deployment runbook with section ownership across implementer + cicd-engineer + verifier |
 | 7 | **First release** | `/release` command | Bumped version in `pyproject.toml` (+ `.claude-plugin/plugin.json` for plugin projects), generated `CHANGELOG.md`, git tag, GitHub release |

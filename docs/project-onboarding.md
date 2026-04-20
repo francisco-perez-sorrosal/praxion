@@ -86,14 +86,19 @@ Claude: Here's the task I'm about to run through the pipeline — watch how
         │ Behaviors:  [agent loop, two safe-listed tools, FastAPI /chat] │
         │ Tech:       Python 3.11+, uv, Claude Agent SDK, FastAPI, pytest│
         │ Acceptance: [layer isolation, safe-list invariant, smoke test] │
-        │ Use Praxion's Standard-tier pipeline, compact variant.          │
+        │ Use Praxion's Standard-tier pipeline (full delegation).         │
         └─────────────────────────────────────────────────────────────────┘
 
 Claude: [researcher] Fetching Claude Agent SDK + uv + FastAPI docs via context-hub ...
         [systems-architect] Module shape: src/agent/{core,tools,prompts}, src/web/{app},
           tests/. One-way dependency src/agent → src/web.
+          → Wrote .ai-work/<slug>/SYSTEMS_PLAN.md, .ai-state/ARCHITECTURE.md,
+            docs/architecture.md, and one ADR draft in .ai-state/decisions/drafts/
+            for the dependency rule.
         [implementation-planner] 4 steps: (1) pyproject+env, (2) agent core+tools,
           (3) web app+static, (4) smoke test.
+          → Wrote .ai-work/<slug>/IMPLEMENTATION_PLAN.md + WIP.md + LEARNINGS.md
+            (full three-doc model on first invocation).
         [implementer ∥ test-engineer] Step 2: src/agent/*.py + tests/test_agent.py.
           [implementer ∥ test-engineer] Step 3: src/web/app.py + streaming assertions.
         [verifier] Layer isolation ✓ safe-list frozenset at module scope ✓ smoke green ✓.

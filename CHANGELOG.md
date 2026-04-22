@@ -1,3 +1,126 @@
+## v0.2.0 (2026-04-22)
+
+### Feat
+
+- **skills**: Add id-decontamination skill + /decontaminate-ids command
+- **hooks**: Add id-citation-discipline detector + commit gate
+- **sdd**: Externalize REQ/AC traceability, abolish in-code ID citations
+- **onboarding**: Produce full architect+planner artifacts in seed
+- **onboarding**: Add Claude.app as opt-in editor surface
+- **onboarding**: Pre-launch editor + per-subagent gates + tool allowlist
+- **onboarding**: Add phase gates to new-cc-project for pedagogical pacing
+- **agents**: Spawn test-engineer before implementer in paired BDD/TDD
+- **sentinel**: Add F10 check for git hook source-vs-installed drift
+- **hooks**: Add worktree cross-boundary write guard
+- **finalize**: Expand bounded walk to architecture docs and scripts/
+- **concurrency**: Unified concurrency & collaboration model
+- **pipeline**: Require library freshness checks across agents
+- **installer**: Template global CLAUDE.md for per-user personal identifiers
+- **onboarding**: Greenfield project scaffolding flow
+- **chronograph**: Resolve spawn parent via PreToolUse FIFO
+- **chronograph**: Fork-group clustering, agent rollups, and Phase 4 context attrs
+- **chronograph**: Openinference-standard attributes (tool.id, user.id, llm.*)
+- **chronograph**: Duration-correlated tool spans via PreToolUse pairing
+- **eval**: Port trajectory_eval to arize-phoenix-evals 3.x API
+- Add pre-impl design-synthesis capability
+- **skills**: Tier-template scaffolds (FW-4)
+- **rules**: Re-affirmation ADR status (FW-3)
+- **rules**: Lightweight tier clauses (FW-2)
+- **sentinel**: EC06 condensed-block drift (FW-1)
+- **hooks**: Memory MCP unified kill switch
+- **rules**: Lightweight gap closure + tier selector tree (D3+D4)
+- **skills**: Add tier-templates.md parametric scaffolds (D2)
+- **ecosystem**: LLM prompt engineering skill + staleness system + skill compression
+- **validation**: Cross-reference validator + CI soft-launch
+- **observability**: Correlate memory-MCP observations with OTel traces
+- **context**: Add compaction guidance and pipeline checkpoint strategy
+- **behavioral-contract**: Integrate four-behavior contract across ecosystem
+- **hooks**: Per-project opt-out for memory and observability
+- **agents**: Inject external-api-docs across pipeline
+- **eval**: emit TODO banner on regression and capture-baseline
+- **eval**: make regression diffs actually catch drift
+- Phase 3 quality & automation (ROADMAP 3.1, 3.2, 3.4, 3.5, 3.6)
+- Harden agent pipeline (ROADMAP Phase 2.1, 2.2, 2.4)
+- Add roadmap-cartographer + lens framework
+- Add SHA-pinned CI test workflow with MCP matrix
+- Extract coordination procedural content to on-demand skill reference
+- Add comprehensive spring cleaning ROADMAP.md
+- Add path-prefix lifecycle convention to document references
+- Add delegation checklists and deliverable awareness for agents
+- Split architecture docs into dual-audience model (dec-021)
+- Bootstrap ARCHITECTURE.md, remediate sentinel audit findings
+- Add living ARCHITECTURE.md capability to agent pipeline (dec-020)
+- Add batched improvement parallelism and ordered operations rules
+- Auto-migrate memory.json from v1.x to v2.0 schema
+- Add SYSTEM_DEPLOYMENT.md living artifact to agent pipeline
+- Add Mermaid diagram conventions as rule + skill reference
+- Add deployment skill with local-first Docker Compose core
+- Add project-exploration skill and /explore-project command
+- Add /save-changes command for persisting WIP to memory
+- Add upstream stewardship skill, /report-upstream command, and issue tracker
+- Add observability skill with structured logging, metrics, tracing, and alerting
+- Add /review-pr command and update improvements roadmap
+- Add memory metrics MCP tool
+- Add lazy agent span creation for background agents
+- Add hierarchical observability with git context and artifact tracking
+- Add commit-time memory reminder hook
+- Add memory enforcement gates to prevent empty memory.json
+- Add layered duplication prevention system
+- Automated .ai-state/ reconciliation for worktree merges
+- Inject ADR decision context into every subagent
+- Evolve memory system to v2.0 dual-layer architecture
+- Implement memory system v1.3 with progressive disclosure, consolidation, and enforcement
+
+### Fix
+
+- **hooks**: Broaden id-citation detector; fix user-project invocation
+- **onboarding**: Allow chub CLI in new-cc-project seed
+- **hooks**: Honor PRAXION_DISABLE_MEMORY_MCP in commit gate
+- **onboarding**: Strip frontmatter before passing command body to claude
+- **reconcile**: Tighten drafts-present guard to *.md files
+- **gitignore**: Recursive match for .ai-state/ lock files
+- **onboarding**: Deterministic seed, pipeline-driven app, orchestrator-first mushi doc
+- **tests**: sys.path prep for hook modules
+- **behavioral-contract**: Deliver verifier Phase 5.5 + sentinel BC01-BC04
+- Restore claude/config/CLAUDE.md (intentional user-CLAUDE mirror)
+- Skip memory gate when memory system is not active
+- Resolve memory metrics instrumentation gap and missing metrics tool
+- Increase verifier maxTurns and add budget awareness
+- Guard against string source field in memory metrics
+- Resolve worktree path to main repo root for chronograph port derivation
+- Increase maxTurns and add turn-budget awareness for 3 agents
+- Reduce sentinel maxTurns from 150 to 100
+- Prevent sentinel agent turn-budget exhaustion
+- Add key-naming convention to memory protocol
+- Make memory gate phase-aware and auto-write on ADD
+- Add background flag to all Bg Safe agents
+- Update hook-crafting docs for auto-discovery model
+- Move hooks to plugin root for auto-discovery
+- Quote argument-hint values in command frontmatter
+- Consolidate hooks to plugin authority, make commit gate blocking
+- Budget overflow in inject_memory.py obligation footer
+- Inject memory context at SessionStart for main agent
+- Strengthen memory gate hooks to verify remember() was called
+- Remove isolation: "worktree" from agent spawning to prevent worktree proliferation
+- Track observations.jsonl as persistent project intelligence
+- Add hookEventName to all hook outputs for proper context injection
+- Fill agent_id on all observations using session_id as fallback for main agent
+- Enrich observation capture with semantic summaries and better classification
+- Rename /memory command to /cajalogic and install memory hooks
+
+### Refactor
+
+- **tests**: Remove AC/step citations from scripts/test_*.py
+- **tests**: Remove REQ/EC citations from test_cleanup_gate.py
+- **tests**: Remove REQ/step citations from test_send_event.py
+- **skills**: Retire github-star; inline into /star-repo
+- Rename to Claude Ecosystem Learning Resources for broader scope
+- Path-scope coding-style.md to code-file globs
+- Derive session_count from observations; fix migration docs
+- Slim coordination rules with summary-plus-pointer stubs
+- Extract shared hook utils and broaden memory gate criteria
+- Consolidate symlink logic and add --relink subcommand
+
 ## v0.1.0 (2026-04-03)
 
 ### Feat

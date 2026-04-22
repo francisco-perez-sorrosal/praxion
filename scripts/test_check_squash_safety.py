@@ -1,16 +1,12 @@
 """Tests for check_squash_safety.py -- post-merge squash-merge detection.
 
-Behavioral tests driven from dec-059 (Squash-Merge Safety) and
-acceptance criterion AC-14 in the concurrency-collab pipeline's
-SYSTEMS_PLAN.md.
+Behavioral tests of the Squash-Merge Safety check (see dec-059):
 
-The script under test:
 1. Detects squash-merges that erase ``.ai-state/`` entries.
 2. Emits a loud warning with recovery steps when erasure is detected.
 3. Always exits 0 (non-blocking; post-merge cannot abort).
 
-Surfaced assumptions about the implementer's contract (per the Step 10b
-prompt; reconciled in Step 10c if the impl renames helpers):
+Expected public surface of the script under test:
 
     is_squash_merge()                  -> bool
     ai_state_entries_at(rev)           -> set[str] | list[str]
@@ -19,9 +15,10 @@ prompt; reconciled in Step 10c if the impl renames helpers):
     --since <ref>                      -- flag overriding HEAD~1 baseline
     --verbose                          -- flag setting logger to DEBUG
 
-Some scenarios the prompt requires (``--since``, ``--verbose``,
-20-file truncation cap) are not enumerated in Step 10a's impl spec and may
-require reconciliation at the Step 10c integration checkpoint.
+Some scenarios (``--since``, ``--verbose``, 20-file truncation cap) are
+extensions beyond the minimal script contract; if absent, argparse will
+exit non-zero on the unknown flag and those specific tests fail -- that
+failure signal is expected and surfaces the gap.
 
 Import strategy mirrors scripts/test_finalize_adrs.py: load via
 ``importlib.util`` so the script does not need to be on sys.path.
@@ -173,11 +170,11 @@ def _scenario(
     mock_git_router(monkeypatch, _router, captured=captured)
 
 
-# -- Regular merge detection (AC-14) ------------------------------------------
+# -- Regular merge detection ------------------------------------------
 
 
 class TestMergeRegularDetection:
-    """AC-14: regular merge commits (multi-parent) MUST NOT trigger a warning."""
+    """Regular merge commits (multi-parent) MUST NOT trigger a warning."""
 
     def test_regular_merge_commit_exits_clean(
         self,
@@ -185,7 +182,7 @@ class TestMergeRegularDetection:
         capsys: pytest.CaptureFixture[str],
         caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """AC-14: a 2-parent merge commit (regular merge) emits no warning.
+        """A 2-parent merge commit (regular merge) emits no warning.
 
         ``git rev-list --parents -n 1 HEAD`` returns 3 whitespace-separated
         SHAs (commit + 2 parents) for a regular merge. The script must short-
@@ -209,18 +206,18 @@ class TestMergeRegularDetection:
         )
 
 
-# -- Single-parent commit triggers inspection (AC-14) -------------------------
+# -- Single-parent commit triggers inspection -------------------------
 
 
 class TestSingleParentDetection:
-    """AC-14: single-parent commits proceed to .ai-state/ erasure inspection."""
+    """Single-parent commits proceed to .ai-state/ erasure inspection."""
 
     def test_single_parent_commit_triggers_inspection(
         self,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """AC-14: 2-word rev-list output (commit + 1 parent) is the squash signal.
+        """2-word rev-list output (commit + 1 parent) is the squash signal.
 
         With a strict decrease in ``.ai-state/`` count between HEAD~1 and HEAD,
         the warning MUST be emitted.
@@ -243,18 +240,18 @@ class TestSingleParentDetection:
         assert "WARNING" in combined.upper()
 
 
-# -- Erasure detection (AC-14) ------------------------------------------------
+# -- Erasure detection ------------------------------------------------
 
 
 class TestErasureDetection:
-    """AC-14: erasure of .ai-state/ entries triggers a loud, informative warning."""
+    """Erasure of .ai-state/ entries triggers a loud, informative warning."""
 
     def test_no_erasure_when_files_intact(
         self,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """AC-14: single-parent commit with no .ai-state/ count change -> no warning.
+        """Single-parent commit with no .ai-state/ count change -> no warning.
 
         A non-merge commit (e.g., a fast-forward or a regular commit) that does
         not erase anything in .ai-state/ MUST exit 0 silently.
@@ -278,7 +275,7 @@ class TestErasureDetection:
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """AC-14: a removed .ai-state/ file appears in the warning output.
+        """A removed .ai-state/ file appears in the warning output.
 
         Per dec-059, the warning block surfaces information about
         erased files. The implementer may print a count, list filenames,
@@ -310,16 +307,16 @@ class TestErasureDetection:
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """AC-14 (prompt-extension): when many files are erased, output stays bounded.
+        """(prompt-extension): when many files are erased, output stays bounded.
 
         25 .ai-state/ files removed in one squash. The warning must remain
         readable: at most 20 filenames listed, with the remaining count
         elided ("...", "more", "(+5 more)" or any equivalent truncation
         marker).
 
-        NOTE: This bound is from the Step 10b prompt; not codified in
-        dec-059. The implementer MAY choose to print only the
-        count (no filenames) -- in that case the truncation marker does not
+        NOTE: The 20-file cap is a display-bound heuristic, not codified
+        in dec-059. The implementer MAY choose to print only the count
+        (no filenames) -- in that case the truncation marker does not
         apply. The assertion below is permissive: it accepts EITHER a
         truncation marker OR a count-only output (no filenames at all).
         """
@@ -349,16 +346,16 @@ class TestErasureDetection:
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """AC-14: the warning surfaces actionable recovery steps.
+        """The warning surfaces actionable recovery steps.
 
         Per dec-059, the warning block must point users at:
         - ``git reflog`` (locate the pre-squash tip)
         - ``git cherry-pick`` (replay the lost commit)
         - regular merge / rebase-and-merge as the prevention path
 
-        Per the Step 10b prompt, all three phrases ('reflog', 'cherry-pick',
-        'rebase') must appear in the warning text. Step 10b in the plan
-        additionally requires 'pr-conventions.md' -- asserted as a bonus.
+        The test asserts that all three phrases ('reflog', 'cherry-pick',
+        'rebase') appear in the warning text, plus a pointer to
+        'pr-conventions.md' as a prevention-path hint.
         """
         _scenario(
             monkeypatch,
@@ -381,23 +378,23 @@ class TestErasureDetection:
         assert "rebase" in combined.lower(), (
             "warning must mention rebase-and-merge as the prevention path"
         )
-        # Bonus: pr-conventions.md pointer (Step 10b plan-level requirement)
+        # Bonus: pr-conventions.md pointer (prevention-path hint)
         assert "pr-conventions.md" in combined.lower(), (
             "warning must point at rules/swe/vcs/pr-conventions.md"
         )
 
 
-# -- Exit code (AC-14) --------------------------------------------------------
+# -- Exit code --------------------------------------------------------
 
 
 class TestExitCode:
-    """AC-14: exit code is ALWAYS 0 -- post-merge cannot abort."""
+    """Exit code is ALWAYS 0 -- post-merge cannot abort."""
 
     def test_always_exits_zero_even_on_warning(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """AC-14: even when the warning fires, the process returns 0.
+        """Even when the warning fires, the process returns 0.
 
         The hook is non-blocking; a non-zero exit would surface as a
         post-merge failure which is the wrong UX (the merge already
@@ -421,22 +418,23 @@ class TestExitCode:
 
 
 class TestSinceFlag:
-    """AC-14: --since <ref> overrides the auto-detected HEAD~1 baseline."""
+    """--since <ref> overrides the auto-detected HEAD~1 baseline."""
 
     def test_since_flag_overrides_auto_detection(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """AC-14 (prompt-extension): --since custom-ref is forwarded to git.
+        """(prompt-extension): --since custom-ref is forwarded to git.
 
         When the user passes --since some-ref, the script must enumerate
         ``.ai-state/`` files at ``some-ref`` (not at HEAD~1) when computing
         the baseline. We assert that ``some-ref`` appears in at least one
         captured git invocation.
 
-        NOTE: --since is not in Step 10a's impl spec; if the implementer did
-        not add it, this test will fail (e.g., argparse exits non-zero on
-        unknown flag) -- the Step 10c reconciliation point catches this.
+        NOTE: --since is an extension beyond the minimal script contract.
+        If the implementer omits it, argparse exits non-zero on the
+        unknown flag and this test fails -- that failure signal is
+        expected and surfaces the gap.
         """
         captured: list[list[str]] = []
         _scenario(
@@ -460,14 +458,14 @@ class TestSinceFlag:
 
 
 class TestVerboseFlag:
-    """AC-14: --verbose enables DEBUG-level logging (observable via caplog)."""
+    """--verbose enables DEBUG-level logging (observable via caplog)."""
 
     def test_verbose_enables_debug_logging(
         self,
         monkeypatch: pytest.MonkeyPatch,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """AC-14 (prompt-extension): --verbose -> at least one DEBUG record emitted.
+        """(prompt-extension): --verbose -> at least one DEBUG record emitted.
 
         Without --verbose, the script logs at INFO or above. With --verbose,
         DEBUG records become observable via caplog. We assert at least one
@@ -478,9 +476,10 @@ class TestVerboseFlag:
         squash-safety check"). This guarantees an observable DEBUG record on
         the happy ``--verbose`` path without depending on a git failure.
 
-        NOTE: --verbose is not in Step 10a's impl spec; if missing, argparse
-        will exit non-zero on the unknown flag and the test fails -- the
-        Step 10c reconciliation point catches this.
+        NOTE: --verbose is an extension beyond the minimal script
+        contract. If missing, argparse exits non-zero on the unknown
+        flag and the test fails -- that failure signal is expected and
+        surfaces the gap.
         """
 
         def _router(args: list[str]) -> str:

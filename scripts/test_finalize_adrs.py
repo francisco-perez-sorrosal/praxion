@@ -1,11 +1,13 @@
 """Tests for finalize_adrs.py -- draft-to-NNN promotion at merge-to-main.
 
-Behavioral tests driven from dec-061 (Finalize Protocol) and the
-acceptance criteria AC-03, AC-04, AC-05, AC-06 in the concurrency-collab
-pipeline's SYSTEMS_PLAN.md.
+Behavioral tests of the Finalize Protocol (see dec-061): fragment ADRs
+under .ai-state/decisions/drafts/ get promoted to <NNN>-<slug>.md,
+their identifiers rewrite from dec-draft-<hash> to dec-NNN, and
+cross-references resolve across sibling ADRs, LEARNINGS, and planning
+documents.
 
-Tests are ordered to match the public-helper contract the implementer is
-committing to:
+Tests are ordered to match the public-helper contract the implementer
+commits to:
     next_adr_number(decisions_dir)
     detect_drafts_to_promote(mode, branch)
     parse_fragment_filename(path) -> (datetime, user, branch, slug)
@@ -17,8 +19,9 @@ committing to:
 Import strategy: mirrors scripts/test_reconcile_ai_state.py -- load via
 importlib.util so the script does not need to be on sys.path.
 
-No real git calls: subprocess.run is monkeypatched where git detection is
-exercised. End-to-end hook wiring is verified manually in Step 5.
+No real git calls: subprocess.run is monkeypatched where git detection
+is exercised. End-to-end hook wiring is verified manually outside this
+suite.
 """
 
 from __future__ import annotations
@@ -143,7 +146,7 @@ def repo_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     The implementer's script derives paths from a module-level REPO_ROOT (or
     equivalent) constant. We redirect it to tmp_path so the script operates on
     the fixture tree. If the implementer chose a different constant name
-    (e.g., DECISIONS_DIR, DRAFTS_DIR), the Step 4c integration checkpoint will
+    (e.g., DECISIONS_DIR, DRAFTS_DIR), the integration checkpoint will
     surface the mismatch.
     """
     (tmp_path / ".ai-state" / "decisions" / "drafts").mkdir(parents=True)
@@ -178,7 +181,7 @@ def repo_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 class TestFinalizeSlugExtraction:
-    """Verify fragment filename parsing -- underpins NNN assignment (AC-03)."""
+    """Verify fragment filename parsing -- underpins NNN assignment."""
 
     @pytest.mark.parametrize(
         ("filename", "expected_user", "expected_branch", "expected_slug"),
@@ -217,18 +220,18 @@ class TestFinalizeSlugExtraction:
     ) -> None:
         """parse_fragment_filename returns (timestamp, user, branch, slug).
 
-        AC-03: correct NNN+slug assignment requires correct slug extraction
+        Correct NNN+slug assignment requires correct slug extraction
         even when the branch contains hyphens. The canonical parse rule
-        (per dec-061) is: the last dash-segment before ``.md`` is
-        the slug; the fourth segment onward (excluding the final slug) is
+        (per dec-061) is: the last dash-segment before ``.md`` is the
+        slug; the fourth segment onward (excluding the final slug) is
         the branch.
 
-        NOTE: When user or branch themselves contain hyphens, the split is
-        inherently ambiguous. The cases above pick the parse that matches
-        the pipeline's own fragment filenames. If the implementer chooses a
-        different canonical rule (e.g., "slug is the last TWO segments"),
-        tests and production will disagree -- the Step 4c integration
-        checkpoint is the reconciliation point.
+        NOTE: When user or branch themselves contain hyphens, the split
+        is inherently ambiguous. The cases above pick the parse that
+        matches the pipeline's own fragment filenames. If the
+        implementer chooses a different canonical rule (e.g., "slug is
+        the last TWO segments"), tests and production will disagree --
+        the integration checkpoint is the reconciliation point.
         """
         path = tmp_path / filename
         path.write_text("", encoding="utf-8")
@@ -247,10 +250,10 @@ class TestFinalizeSlugExtraction:
 
 
 class TestFinalizeSingleDraft:
-    """AC-03: one draft -> next NNN; id rewritten; drafts dir no longer holds it."""
+    """One draft -> next NNN; id rewritten; drafts dir no longer holds it."""
 
     def test_single_draft_promotes_to_next_nnn(self, repo_root: Path) -> None:
-        """AC-03: one draft becomes <NNN+1>-<slug>.md with rewritten id."""
+        """One draft becomes <NNN+1>-<slug>.md with rewritten id."""
         # Pre-existing finalized ADR at 042
         make_finalized(repo_root, 42, "prior-decision")
         draft_path = make_draft(
@@ -278,10 +281,10 @@ class TestFinalizeSingleDraft:
 
 
 class TestFinalizeMultipleDrafts:
-    """AC-03: multiple drafts get sequential NNN in filename-sort order."""
+    """Multiple drafts get sequential NNN in filename-sort order."""
 
     def test_multiple_drafts_promote_in_sorted_order(self, repo_root: Path) -> None:
-        """AC-03: three drafts -> NNN, NNN+1, NNN+2 in filename-sort order."""
+        """Three drafts -> NNN, NNN+1, NNN+2 in filename-sort order."""
         # Pre-existing finalized ADR at 050 so next is 051
         make_finalized(repo_root, 50, "baseline")
 
@@ -322,7 +325,7 @@ class TestFinalizeMultipleDrafts:
         assert finalize.next_adr_number(decisions_dir) == 1
 
     def test_next_adr_number_ignores_drafts_subdirectory(self, repo_root: Path) -> None:
-        """Drafts in drafts/ must NOT count toward NNN assignment (AC-03)."""
+        """Drafts in drafts/ must NOT count toward NNN assignment."""
         make_finalized(repo_root, 10, "foo")
         make_draft(repo_root, "20260419-1810", "alice", "main", "irrelevant")
 
@@ -335,10 +338,10 @@ class TestFinalizeMultipleDrafts:
 
 
 class TestFinalizeCrossReferences:
-    """AC-03, AC-06: every dec-draft-<hash> reference rewrites to dec-NNN."""
+    """Every dec-draft-<hash> reference rewrites to dec-NNN across all tracked locations."""
 
     def test_frontmatter_supersedes_rewritten(self, repo_root: Path) -> None:
-        """AC-06: draft A supersedes: dec-draft-<hashB> rewrites to dec-NNN_B.
+        """Draft A's supersedes: dec-draft-<hashB> rewrites to dec-NNN_B.
 
         After B is promoted to NNN, A's frontmatter must point at dec-NNN not
         at the draft hash.
@@ -370,7 +373,7 @@ class TestFinalizeCrossReferences:
         assert draft_b_id not in draft_a_content
 
     def test_frontmatter_re_affirms_rewritten(self, repo_root: Path) -> None:
-        """AC-06: re_affirms: dec-draft-<hashB> rewrites to dec-NNN_B."""
+        """re_affirms: dec-draft-<hashB> rewrites to dec-NNN_B."""
         draft_b = make_draft(repo_root, "20260419-1810", "alice", "main", "target")
         draft_b_id = f"dec-draft-{_draft_hash(draft_b.name)}"
 
@@ -391,7 +394,7 @@ class TestFinalizeCrossReferences:
         assert draft_b_id not in content
 
     def test_body_inline_refs_rewritten(self, repo_root: Path) -> None:
-        """AC-03: body references [dec-draft-<hash>] and bare dec-draft-<hash> both rewrite."""
+        """Body references [dec-draft-<hash>] and bare dec-draft-<hash> both rewrite."""
         draft_b = make_draft(repo_root, "20260419-1810", "alice", "main", "target")
         draft_b_id = f"dec-draft-{_draft_hash(draft_b.name)}"
         draft_b_hash = draft_b_id.removeprefix("dec-draft-")
@@ -421,7 +424,7 @@ class TestFinalizeCrossReferences:
         assert draft_b_hash not in content  # hash itself scrubbed from body
 
     def test_learnings_md_refs_rewritten(self, repo_root: Path) -> None:
-        """AC-03: .ai-work/<slug>/LEARNINGS.md references are rewritten."""
+        """.ai-work/<slug>/LEARNINGS.md references are rewritten."""
         draft = make_draft(repo_root, "20260419-1810", "alice", "main", "some-decision")
         draft_id = f"dec-draft-{_draft_hash(draft.name)}"
 
@@ -443,7 +446,7 @@ class TestFinalizeCrossReferences:
         assert draft_id not in content
 
     def test_systems_plan_refs_rewritten(self, repo_root: Path) -> None:
-        """AC-03: .ai-work/<slug>/SYSTEMS_PLAN.md references are rewritten."""
+        """.ai-work/<slug>/SYSTEMS_PLAN.md references are rewritten."""
         draft = make_draft(repo_root, "20260419-1810", "alice", "main", "sys-decision")
         draft_id = f"dec-draft-{_draft_hash(draft.name)}"
 
@@ -520,12 +523,12 @@ class TestFinalizeCrossReferences:
 
 
 class TestFinalizeIdempotent:
-    """AC-04: finalize is idempotent -- running twice is a no-op."""
+    """Finalize is idempotent -- running twice is a no-op."""
 
     def test_second_run_is_no_op(
         self, repo_root: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """AC-04: second invocation on the same batch exits 0 and changes nothing."""
+        """Second invocation on the same batch exits 0 and changes nothing."""
         make_draft(repo_root, "20260419-1810", "alice", "main", "idempotent")
 
         # Stub subprocess.run so the embedded call to regenerate_adr_index and
@@ -603,12 +606,12 @@ def _invoke_main(monkeypatch: pytest.MonkeyPatch, argv: list[str]) -> int:
 
 
 class TestFinalizeIndex:
-    """AC-05: after finalize, DECISIONS_INDEX.md lists only finalized ADRs."""
+    """After finalize, DECISIONS_INDEX.md lists only finalized ADRs."""
 
     def test_decisions_index_regenerates_after_finalize(
         self, repo_root: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """AC-05: the index after finalize matches regenerate_adr_index output.
+        """The index after finalize matches regenerate_adr_index output.
 
         Finalize is expected to invoke regenerate_adr_index.py as a subprocess
         or import. We stub subprocess.run to directly invoke the

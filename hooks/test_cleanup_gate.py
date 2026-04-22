@@ -1,12 +1,13 @@
 """Tests for hooks/cleanup_gate.sh — PreToolUse shell fast-path.
 
-Validates:
-  REQ-SG-01 — Fast-path for non-matching commands (exit 0, no Python).
-  REQ-SG-02 — Pass-through for matching commands (Python invoked, stdout propagated).
-  REQ-SG-03 — Conservative regex: ambiguous patterns fall through to Python,
-              obvious non-cleanups short-circuit.
-  EC-3.2.4  — Latency budget: non-match execution under 10 ms wall (measured
-              against subprocess floor; see LATENCY_BUDGET_MS).
+Verifies four behaviors of the gate:
+
+  - Fast-path for non-matching commands (exit 0, no Python invoked).
+  - Pass-through for matching commands (Python invoked, stdout propagated).
+  - Conservative regex: ambiguous patterns fall through to Python,
+    obvious non-cleanups short-circuit.
+  - Latency budget: non-match execution stays within the configured
+    threshold (measured against subprocess floor; see LATENCY_BUDGET_MS).
 
 The gate is an opaque shell script — tests treat it as a black box, feeding
 JSON payloads via stdin. Two modes of verification are used:
@@ -35,7 +36,7 @@ HOOKS_DIR = Path(__file__).resolve().parent
 GATE_SCRIPT = HOOKS_DIR / "cleanup_gate.sh"
 PROMOTE_HOOK = HOOKS_DIR / "promote_learnings.py"
 
-# Wall-clock budget for the no-match fast path on macOS (EC-3.2.4).
+# Wall-clock budget for the no-match fast path on macOS.
 # Floor includes Python subprocess.run fork+exec (~5 ms baseline on macOS),
 # sh interpreter startup, grep exec, and exit. Measured min ~13 ms; we
 # assert on the minimum across 10 warm runs to remove scheduling noise.
@@ -105,7 +106,7 @@ def test_gate_script_is_executable() -> None:
 
 
 # ---------------------------------------------------------------------------
-# REQ-SG-01 — Fast-path for non-matching commands
+# Fast-path for non-matching commands
 # ---------------------------------------------------------------------------
 
 
@@ -129,7 +130,7 @@ def test_non_matching_command_exits_fast(command: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# REQ-SG-02 — Pass-through for matching commands
+# Pass-through for matching commands
 # ---------------------------------------------------------------------------
 
 
@@ -193,7 +194,7 @@ def test_shell_gate_delegates_to_python(command: str, tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# REQ-SG-03 — Conservative regex (escape correctness)
+# Conservative regex (escape correctness)
 # ---------------------------------------------------------------------------
 
 
@@ -209,7 +210,7 @@ def test_regex_escapes_dot_correctly() -> None:
 
 
 # ---------------------------------------------------------------------------
-# EC-3.2.4 — Latency budget for fast-path
+# Latency budget for fast-path
 # ---------------------------------------------------------------------------
 
 

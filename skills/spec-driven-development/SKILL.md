@@ -85,37 +85,65 @@ The `and` clause is optional -- omit it when no precondition is needed. The `so 
 ## Requirement ID Conventions
 
 - **Format**: `REQ-NN` (zero-padded two digits, e.g., `REQ-01`, `REQ-12`)
-- **Scope**: per feature -- IDs reset for each new `SYSTEMS_PLAN.md`
-- **In test code**: prefix test names with `req{NN}_` (e.g., `test_req01_session_expired_returns_401`)
-- **In IMPLEMENTATION_PLAN.md**: reference in the `Testing` field (e.g., "Validates REQ-01, REQ-03")
-- **In VERIFICATION_REPORT.md**: use full `REQ-NN` format in the traceability matrix
-- **In persistent specs**: IDs preserved as-is for cross-session reference
+- **Scope**: per feature — IDs reset for each new `SYSTEMS_PLAN.md`
+- **In code, tests, docstrings, comments**: **never**. REQ/AC IDs are pipeline-local or feature-local metadata — they do not belong in durable source files. Tests describe behavior through their names; the archived SPEC's matrix holds the REQ-to-test mapping. See [`rules/swe/id-citation-discipline.md`](../../rules/swe/id-citation-discipline.md).
+- **In IMPLEMENTATION_PLAN.md**: reference in the `Testing` field (e.g., "Validates REQ-01, REQ-03") — pipeline document, not code
+- **In VERIFICATION_REPORT.md**: use full `REQ-NN` format in the traceability matrix — pipeline document
+- **In `.ai-work/<task-slug>/traceability.yml`**: first-class keys mapping REQs to test and implementation file paths — ephemeral pipeline document, the canonical in-flight source of truth
+- **In persistent archived specs** (`.ai-state/specs/SPEC_*.md`): IDs preserved in the rendered matrix for historical reference — the archived SPEC is the single source of truth post-archive
 
-**Traceability matrix format** (produced by the verifier):
+**Traceability matrix format** (produced by the verifier from `traceability.yml`):
 
 | Requirement | Test(s) | Implementation | Status |
 |-------------|---------|----------------|--------|
-| REQ-01 | test_req01_session_expired_returns_401 | src/auth/session.py:validate() | PASS |
-| REQ-02 | test_req02_new_user_gets_default_role | src/auth/roles.py:assign_default() | PASS |
-| REQ-03 | (none) | src/auth/audit.py:log_attempt() | UNTESTED |
+| REQ-01 | tests/auth/test_session.py::test_expired_token_returns_401 | src/auth/session.py::validate() | PASS |
+| REQ-02 | tests/auth/test_roles.py::test_new_user_gets_default_role | src/auth/roles.py::assign_default() | PASS |
+| REQ-03 | (none) | src/auth/audit.py::log_attempt() | UNTESTED |
 
-Status values: `PASS` (test exists and passes), `FAIL` (test fails or implementation missing), `UNTESTED` (no test found for this requirement).
+Status values: `PASS` (test exists and passes), `FAIL` (test fails or implementation missing), `UNTESTED` (no test recorded in `traceability.yml` for this requirement).
 
-**Mid-flight coverage**: The `/sdd-coverage` command produces this table at any time during development — not just at verification. The test-engineer also includes a coverage check when reporting step completion. Use these to catch gaps early rather than discovering them at the verifier stage.
+**Mid-flight coverage**: The `/sdd-coverage` command reads `traceability.yml` (during pipeline) or the archived SPEC's matrix (post-archive) and produces this table at any time during development — not just at verification. The test-engineer also includes a coverage check when reporting step completion. Use these to catch gaps early rather than discovering them at the verifier stage.
 
 ## Traceability Threading
 
-REQ IDs flow through the pipeline in five stages:
+REQ IDs flow through the pipeline in six stages via an **external two-layer mechanism** — ephemeral YAML during the pipeline, persistent matrix in the archived SPEC afterward. **IDs never appear in code, test names, docstrings, or comments** (see [`rules/swe/id-citation-discipline.md`](../../rules/swe/id-citation-discipline.md)).
 
 ```text
 1. Architect creates    --> REQ-01..REQ-NN in SYSTEMS_PLAN.md Behavioral Specification
-2. Planner threads      --> "Validates REQ-01, REQ-03" in test step Testing fields
-3. Test-engineer names  --> test_req01_... in test code names and docstrings
-4. Verifier produces    --> Traceability matrix in VERIFICATION_REPORT.md
-5. Planner archives     --> Spec + matrix + decisions in .ai-state/specs/
+2. Planner threads      --> "Validates REQ-01, REQ-03" in test step Testing fields;
+                            initializes empty .ai-work/<slug>/traceability.yml
+3. Test-engineer writes --> tests with behavioral names; appends REQ-to-test entries
+                            to traceability.yml (or traceability_test-engineer.yml fragment)
+4. Implementer writes   --> production code with behavioral names; appends REQ-to-impl
+                            entries to traceability.yml (or traceability_implementer.yml fragment)
+5. Verifier produces    --> Traceability matrix in VERIFICATION_REPORT.md by reading
+                            the YAML + TEST_RESULTS.md (never by grepping code)
+6. Planner archives     --> Renders YAML into archived SPEC's matrix at feature end;
+                            .ai-work/ cleanup then deletes the YAML
 ```
 
-Each stage consumes the output of the previous one. The verifier's matrix is the conformance checkpoint -- it shows whether every requirement has tests and implementation. The archived spec preserves the full traceability chain for cross-session reference.
+Each stage consumes the output of the previous one. `traceability.yml` is the single source of truth during the pipeline; the archived SPEC's matrix is the single source of truth afterward. The verifier's matrix in `VERIFICATION_REPORT.md` is a conformance snapshot.
+
+**YAML schema**:
+
+```yaml
+requirements:
+  REQ-01:
+    tests:
+      - tests/auth/test_session.py::test_expired_token_returns_401
+      - tests/auth/test_session.py::test_grace_period_allows_refresh
+    implementation:
+      - src/auth/session.py::validate()
+      - src/auth/session.py::refresh_grace_period()
+  REQ-02:
+    tests: []  # untested
+    implementation:
+      - src/auth/audit.py::log_attempt()
+```
+
+Absent `tests:` list (or empty list) means UNTESTED. Absent `implementation:` list means no implementation yet (pre-integration). An absent REQ key entirely means neither test nor implementation exists for that REQ.
+
+**Parallel fragments**: `traceability_implementer.yml`, `traceability_test-engineer.yml`. Reconciliation is a per-REQ merge of `tests` and `implementation` arrays — no conflicts by construction because the two agents write to disjoint fields within each REQ key. The implementation-planner performs the merge at batch completion.
 
 ## Convergence via REQ-ID Stability
 
@@ -220,10 +248,11 @@ For brownfield features — when `.ai-state/specs/` contains prior `SPEC_*.md` f
 | Artifact | Location |
 |----------|----------|
 | Behavioral specification | `SYSTEMS_PLAN.md` `## Behavioral Specification` section |
-| REQ threading | `IMPLEMENTATION_PLAN.md` step `Testing` fields |
-| Test naming | Test code: `test_req{NN}_description` |
-| Traceability matrix | `VERIFICATION_REPORT.md` `## Spec Conformance` section |
-| Archived spec | `.ai-state/specs/SPEC_<name>_YYYY-MM-DD.md` |
+| REQ threading (planning) | `IMPLEMENTATION_PLAN.md` step `Testing` fields |
+| Test naming | Test code: **behavioral names only** (e.g., `test_expired_token_returns_401`) — never `test_req{NN}_...` |
+| Traceability file (ephemeral) | `.ai-work/<task-slug>/traceability.yml` (fragment files in parallel mode) |
+| Traceability matrix (verification) | `VERIFICATION_REPORT.md` `## Spec Conformance` section |
+| Archived spec + matrix (persistent) | `.ai-state/specs/SPEC_<name>_YYYY-MM-DD.md` |
 | Spec delta (brownfield) | `.ai-work/<task-slug>/SPEC_DELTA.md` (ephemeral, produced by architect) |
 | Calibration log | `.ai-state/calibration_log.md` (persistent, append-only) |
 | Decision documentation | `LEARNINGS.md` `### Decisions Made` section |

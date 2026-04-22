@@ -101,8 +101,8 @@ If `WIP.md` shows no current step or your step is already `[COMPLETE]`, stop and
 
 Before writing code, design the test strategy from the acceptance criteria:
 
-1. **Map acceptance criteria to tests** — each acceptance criterion from `SYSTEMS_PLAN.md` becomes one or more test cases. Name tests after the behavior they specify.
-   When the step's `Testing` field references requirement IDs (e.g., "Validates REQ-01, REQ-03"), include those IDs in test names and docstrings following the convention from the `spec-driven-development` skill: prefix test names with `req{NN}_` (e.g., `test_req01_session_expired_returns_401`). This enables the verifier to produce a traceability matrix linking each requirement to its test(s).
+1. **Map acceptance criteria to tests** — each acceptance criterion from `SYSTEMS_PLAN.md` becomes one or more test cases. **Name tests after the behavior they specify, never after an identifier.** A test that validates REQ-03's behavior is named `test_rejects_expired_token`, not `test_req03_rejects_expired_token`. See [`rules/swe/id-citation-discipline.md`](../rules/swe/id-citation-discipline.md) for the full rule.
+   When the step's `Testing` field references requirement IDs (e.g., "Validates REQ-01, REQ-03"), record the test-to-REQ mapping in an external traceability file (see Phase 4 item 7). **Do not embed REQ/AC IDs in test names, docstrings, or comments** — the archived SPEC's matrix (populated from `traceability.yml`) is the single source of truth.
 2. **Define expected interfaces** — from the architecture in `SYSTEMS_PLAN.md`, determine what functions/classes/modules you will call and what they should return. This is the contract the implementer must satisfy.
 3. **Apply risk assessment** — which behaviors are critical? Which are low-risk?
 4. **Choose test granularity** — unit vs integration vs E2E for each behavior
@@ -142,6 +142,17 @@ Write the tests following these structural rules:
 4. If production code exists (sequential mode or post-integration), run the full test suite. If production code does not exist yet (concurrent mode), verify tests are structurally sound — they are expected to fail at the integration checkpoint. **Concurrent-mode RED handshake**: run `pytest` (or the project's test command) immediately after writing the skeleton and expect `ImportError`, `ModuleNotFoundError`, or `NameError` (the module being tested does not yet exist). Record this RED state in `TEST_RESULTS.md` before the implementer begins. A **GREEN result on the first run in concurrent mode is a Register Objection trigger** — either the implementer raced ahead of the paired-step contract or your tests are validating pre-existing code rather than the new behavior. Stop, flag in your report, and ask the planner to restart the group with stricter spawn ordering (test-engineer first, then implementer only after the RED handshake). Do not silently continue.
 5. If a failure reveals a test design issue, fix it. If it reveals a production code bug, document it in LEARNINGS.md and report `[BLOCKED]`.
 6. **Write test results** — after running the full test suite, write `.ai-work/<task-slug>/TEST_RESULTS.md` using the canonical schema (sections per step: command, pass/fail/skip counts, duration, optional coverage, failure blocks, notes). Presence of the file is the handoff signal to the verifier. **Canonical-writer rule**: when paired with an implementer on the same step (BDD/TDD execution), the test-engineer is the canonical writer of `TEST_RESULTS.md` — the implementer skips its own sub-step 7.8. In parallel mode, write fragment `TEST_RESULTS_test-engineer.md` — the planner merges fragments by concatenating `## Step N` sections in ascending step order.
+7. **Write traceability entries** — when `SYSTEMS_PLAN.md` contains a `## Behavioral Specification` section, record the test-to-REQ mapping in `.ai-work/<task-slug>/traceability.yml` (sequential mode) or `.ai-work/<task-slug>/traceability_test-engineer.yml` (parallel mode). Schema:
+
+   ```yaml
+   requirements:
+     REQ-01:
+       tests:
+         - tests/auth/test_session.py::test_expired_token_returns_401
+         - tests/auth/test_session.py::test_grace_period_allows_refresh
+   ```
+
+   Only record the REQ IDs whose tests you just wrote. Do not include implementation files — the implementer owns that layer. **Do not embed REQ/AC IDs in test names, docstrings, or comments** — the traceability lives in this YAML file, not in the source ([`rules/swe/id-citation-discipline.md`](../rules/swe/id-citation-discipline.md)). The planner merges fragments at batch completion and renders the matrix into the archived SPEC at feature end. Skip this item entirely if no `## Behavioral Specification` section exists (Direct/Lightweight/Spike tier).
 
 ### Phase 5 — Self-Review
 
@@ -186,7 +197,7 @@ Record: testing patterns that worked, gotchas with the test framework, flaky tes
 
 ### Phase 8 — Report
 
-**Spec coverage check**: When a `## Behavioral Specification` section exists in `.ai-work/<task-slug>/SYSTEMS_PLAN.md`, include a quick coverage table in your report. For each REQ-NN, grep test files for `req{NN}_` patterns and report which requirements now have tests and which still lack coverage. This gives the user immediate visibility into spec-to-test gaps without waiting for the verifier.
+**Spec coverage check**: When a `## Behavioral Specification` section exists in `.ai-work/<task-slug>/SYSTEMS_PLAN.md`, include a quick coverage table in your report. Read `.ai-work/<task-slug>/traceability.yml` (or `traceability_test-engineer.yml` in parallel mode) to enumerate which REQ IDs now have tests. Cross-reference against the REQ IDs in the spec and list any that remain uncovered. This gives the user immediate visibility into spec-to-test gaps without waiting for the verifier. **Never grep test code for REQ IDs** — code is ID-free per [`rules/swe/id-citation-discipline.md`](../rules/swe/id-citation-discipline.md); the YAML is the authoritative source.
 
 Stop and report one of:
 - `[COMPLETE]` — step done, tests pass, WIP.md updated, spec coverage table included (if applicable)

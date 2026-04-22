@@ -90,6 +90,17 @@ For your assigned step:
    - No Status column — omit Planned/Designed items
    If `docs/architecture.md` does not exist, skip — the systems-architect creates it.
 7.8. **Write test results** — if this step ran tests, write `.ai-work/<task-slug>/TEST_RESULTS.md` using the canonical schema (sections per step: command, pass/fail/skip counts, duration, optional coverage, failure blocks, notes). Presence of the file is the handoff signal to the verifier. In parallel mode, write fragment `TEST_RESULTS_implementer.md` — the planner merges fragments by concatenating `## Step N` sections in ascending step order. If a paired test-engineer ran the step's tests, they are the canonical writer and the implementer skips this sub-step.
+7.9. **Write traceability entries** — if this step implements behavior tied to specific REQ IDs from `SYSTEMS_PLAN.md`'s `## Behavioral Specification`, record the REQ-to-implementation mapping in `.ai-work/<task-slug>/traceability.yml` (sequential mode) or `.ai-work/<task-slug>/traceability_implementer.yml` (parallel mode). Schema:
+
+   ```yaml
+   requirements:
+     REQ-01:
+       implementation:
+         - src/auth/session.py::validate()
+         - src/auth/session.py::refresh_grace_period()
+   ```
+
+   Only record the REQ IDs whose implementation you just wrote. Do not include test files — the test-engineer owns that layer. **Do not embed REQ/AC IDs in code, docstrings, or comments** — the traceability lives in this YAML file, not in the source. See [`rules/swe/id-citation-discipline.md`](../rules/swe/id-citation-discipline.md). Skip this sub-step entirely if no `## Behavioral Specification` section exists (Direct/Lightweight/Spike tier).
 8. **Update WIP.md** — mark your step as complete (see WIP.md Update Protocol).
 9. **Update LEARNINGS.md** — record any discoveries (see LEARNINGS.md Protocol).
 10. **Report** — stop and report one of: `[COMPLETE]`, `[BLOCKED]`, or `[CONFLICT]`.

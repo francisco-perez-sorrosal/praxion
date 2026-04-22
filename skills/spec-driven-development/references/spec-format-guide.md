@@ -66,26 +66,26 @@ The i-am format sits between architecture and test design. GWT is downstream -- 
 
 ## Traceability Matrix Template
 
-The verifier produces this matrix in `VERIFICATION_REPORT.md` by matching REQ IDs to test names (`req{NN}_` prefix) and tracing implementation locations.
+The verifier produces this matrix in `VERIFICATION_REPORT.md` by reading `.ai-work/<task-slug>/traceability.yml` (pipeline in flight) or the archived SPEC's matrix (post-archive). Test names describe behavior; the YAML holds the REQ-to-test mapping — see [`id-citation-discipline.md`](../../../rules/swe/id-citation-discipline.md) for why test names never carry REQ prefixes.
 
 ```markdown
 ## Spec Conformance
 
 | Requirement | Test(s) | Implementation | Status |
 |-------------|---------|----------------|--------|
-| REQ-01 | test_req01_expired_session_returns_401 | src/auth/session.py:validate() | PASS |
-| REQ-02 | test_req02_workflow_transitions_to_review | src/workflow/engine.py:advance() | PASS |
-| REQ-03 | test_req03_invalid_input_returns_422 | src/api/validation.py:validate_payload() | PASS |
-| REQ-04 | (none) | src/api/resources.py:get_by_id() | UNTESTED |
-| REQ-05 | test_req05_transient_failure_retries | src/jobs/scheduler.py:retry() | FAIL |
+| REQ-01 | tests/auth/test_session.py::test_expired_session_returns_401 | src/auth/session.py::validate() | PASS |
+| REQ-02 | tests/workflow/test_engine.py::test_workflow_transitions_to_review | src/workflow/engine.py::advance() | PASS |
+| REQ-03 | tests/api/test_validation.py::test_invalid_input_returns_422 | src/api/validation.py::validate_payload() | PASS |
+| REQ-04 | (none) | src/api/resources.py::get_by_id() | UNTESTED |
+| REQ-05 | tests/jobs/test_scheduler.py::test_transient_failure_retries | src/jobs/scheduler.py::retry() | FAIL |
 ```
 
 **Column definitions:**
 
 - **Requirement**: the `REQ-NN` identifier from the behavioral specification
-- **Test(s)**: test function name(s) with the `req{NN}_` prefix; `(none)` if no test found
-- **Implementation**: source file and function/method implementing the behavior
-- **Status**: `PASS` (test exists and passes), `FAIL` (test fails or implementation missing), `UNTESTED` (no test found)
+- **Test(s)**: test file path + test function name (e.g., `tests/auth/test_session.py::test_expired_token_returns_401`) as recorded in `traceability.yml`; `(none)` if no test recorded
+- **Implementation**: source file and function/method as recorded in `traceability.yml`
+- **Status**: `PASS` (test exists and passes per `TEST_RESULTS.md`), `FAIL` (test fails or implementation missing), `UNTESTED` (no test recorded for this requirement)
 
 ## Persistent Spec Template
 
@@ -118,8 +118,8 @@ Archived to `.ai-state/specs/SPEC_<feature-name>_YYYY-MM-DD.md` during the end-o
 
 | Requirement | Test(s) | Implementation | Status |
 |-------------|---------|----------------|--------|
-| REQ-01 | test_req01_... | src/path:function() | PASS |
-| REQ-02 | test_req02_... | src/path:function() | PASS |
+| REQ-01 | tests/path/test_foo.py::test_behavioral_name | src/path/foo.py::function() | PASS |
+| REQ-02 | tests/path/test_bar.py::test_another_behavior | src/path/bar.py::function() | PASS |
 
 ## Key Decisions
 

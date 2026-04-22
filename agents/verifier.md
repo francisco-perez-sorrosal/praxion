@@ -76,13 +76,17 @@ Skip this phase entirely in standalone mode.
 
 When `SYSTEMS_PLAN.md` contains a `## Behavioral Specification` section with REQ IDs:
 
-1. Build a traceability matrix: for each REQ-NN, find the corresponding test(s) by searching test files for `req{NN}_` in test names, and find the implementation location by tracing the behavior described in the requirement
-2. Classify each requirement: `PASS` (test exists and passes), `FAIL` (test fails or implementation missing), `UNTESTED` (no test found for this requirement)
+1. Build the traceability matrix from the canonical external source — **never by grepping code or test names**. Code must not contain REQ/AC references per [`rules/swe/id-citation-discipline.md`](../rules/swe/id-citation-discipline.md); the YAML and the archived SPEC matrix are the only authoritative sources.
+   - **Pipeline active**: read `.ai-work/<task-slug>/traceability.yml`. In parallel mode, merge `traceability_implementer.yml` and `traceability_test-engineer.yml` per-REQ (tests/implementation arrays union).
+   - **Feature already archived**: read the archived SPEC at `.ai-state/specs/SPEC_<name>_YYYY-MM-DD.md` and extract its `## Traceability` matrix.
+2. Classify each requirement using the YAML/matrix contents and `TEST_RESULTS.md`: `PASS` (tests listed and passing), `FAIL` (tests listed but failing, or implementation empty), `UNTESTED` (no tests listed for this requirement)
 3. Add a `## Spec Conformance` section to `VERIFICATION_REPORT.md` with the traceability matrix:
 
 | Requirement | Test(s) | Implementation | Status |
 |-------------|---------|----------------|--------|
-| REQ-01 | test_req01_... | src/path:function() | PASS |
+| REQ-01 | tests/auth/test_session.py::test_expired_token_returns_401 | src/auth/session.py::validate() | PASS |
+
+4. If `traceability.yml` is missing while the feature is still in-pipeline (no archived SPEC exists yet), emit a FAIL finding tagged `[Spec Conformance: Missing traceability.yml]` — the implementer and test-engineer were expected to populate it per their step protocols.
 
 When `SPEC_DELTA.md` exists alongside the behavioral specification, add a `## Delta Validation` subsection after the traceability matrix. Compare the new traceability matrix against the prior spec's matrix (referenced in the delta's header). Verify: added requirements have new tests, modified requirements have updated tests, removed requirements have no orphaned tests. Classify each delta claim as CONFIRMED (evidence matches) or UNCONFIRMED (evidence missing or contradicts the claim).
 

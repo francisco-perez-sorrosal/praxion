@@ -184,7 +184,7 @@ The doc step's `Documentation` field describes which READMEs, catalogs, or archi
 
 **Requirement traceability threading:**
 
-When `SYSTEMS_PLAN.md` contains a `## Behavioral Specification` section with REQ IDs, thread those IDs into paired test steps. Each test step's `Testing` field must reference the specific requirement IDs it validates (e.g., "Validates REQ-01, REQ-03"). This enables the verifier to produce a traceability matrix and the test-engineer to include IDs in test names.
+When `SYSTEMS_PLAN.md` contains a `## Behavioral Specification` section with REQ IDs, thread those IDs into paired test steps. Each test step's `Testing` field must reference the specific requirement IDs it validates (e.g., "Validates REQ-01, REQ-03"). The test-engineer and implementer then record the test-to-REQ and implementation-to-REQ mappings in `.ai-work/<task-slug>/traceability.yml` (or fragment files in parallel mode). You reconcile fragments at batch merge and render the final YAML into the archived SPEC's matrix at feature end. **REQ/AC IDs never appear in code, test names, docstrings, or comments** — see [`rules/swe/id-citation-discipline.md`](../rules/swe/id-citation-discipline.md). Pipeline documents (`IMPLEMENTATION_PLAN.md` Testing fields, `traceability.yml`, archived SPEC matrices) carry the traceability; source files stay ID-free.
 
 **Post-completion integration:**
 
@@ -288,6 +288,19 @@ Parallel Mode (when parallel groups exist): Use the WIP.md parallel format from 
 
 **LEARNINGS.md** — initialize using the structure from the software-planning skill (sections: Gotchas, Patterns That Worked, Decisions Made, Edge Cases, Technical Debt). Every entry must be prefixed with the source agent in brackets (e.g., `**[implementation-planner]**`). Tag your own entries with `[implementation-planner]`. For medium/large features, initialize the `Decisions Made` section with structured format guidance: `**[agent-name] [Decision title]**: [What]. **Why**: [rationale]. **Alternatives**: [rejected options].` This enables the verifier to check for substantive decision documentation and the persistent spec to archive decisions with full context.
 
+**traceability.yml** — when `SYSTEMS_PLAN.md` contains a `## Behavioral Specification` section, initialize an empty traceability file at `.ai-work/<task-slug>/traceability.yml`:
+
+```yaml
+# Traceability map: REQ IDs to tests and implementation.
+# Populated by test-engineer (tests:) and implementer (implementation:) as steps complete.
+# Parallel mode writes fragment files (traceability_test-engineer.yml, traceability_implementer.yml)
+# that the planner reconciles at batch merge (per-REQ union of tests and implementation arrays).
+# Rendered into the archived SPEC's matrix at feature end; then deleted with .ai-work/.
+requirements: {}
+```
+
+This file is the single source of truth for REQ-to-test-to-implementation mapping during the pipeline. Code and tests must never embed REQ/AC IDs — see [`rules/swe/id-citation-discipline.md`](../rules/swe/id-citation-discipline.md). Skip initialization entirely when no `## Behavioral Specification` exists (Direct/Lightweight/Spike tier).
+
 **ADR write protocol:** When you document a significant decision in `LEARNINGS.md ### Decisions Made` (using the draft id: `**[implementation-planner] [Decision title] (dec-draft-<hash>)**: ...`), also create a draft ADR fragment. Finalize rewrites draft ids to `dec-NNN` at merge-to-main.
 
 1. Derive a fragment filename `<YYYYMMDD-HHMM>-<user>-<branch>-<slug>.md`. `<user>` is the username prefix of `git config user.email` (the part before `@`), falling back to `git config user.name`, then `anon`; sanitize to `[a-z0-9-]` and cap at 40 chars. `<branch>` is `git rev-parse --abbrev-ref HEAD`, same sanitization. `<slug>` is a short kebab-case label derived from the decision title.
@@ -355,12 +368,15 @@ The verifier only operates after Phase 7 confirms plan adherence. Verifying an i
 
 **Spec archival (end-of-feature):**
 
-When the completed feature used a behavioral specification (medium/large task), archive the spec during the end-of-feature workflow:
+When the completed feature used a behavioral specification (medium/large task), archive the spec during the end-of-feature workflow. **Archival sequence matters — render the traceability matrix into the archived SPEC *before* `.ai-work/` cleanup runs**, or the YAML vanishes before it can be baked in:
 
 1. Create `.ai-state/specs/` directory if it does not exist
-2. Extract the `## Behavioral Specification` from `SYSTEMS_PLAN.md`, the traceability matrix from `VERIFICATION_REPORT.md`, and the `Decisions Made` entries from `LEARNINGS.md`
-3. Write `SPEC_<feature-name>_YYYY-MM-DD.md` to `.ai-state/specs/` using the persistent spec template from the `spec-driven-development` skill
-4. Cross-reference ADR files in `.ai-state/decisions/` covering the feature period against the archived spec's `## Key Decisions`. Note any decisions in ADR files that are missing from the spec, or vice versa.
+2. Extract the `## Behavioral Specification` from `SYSTEMS_PLAN.md`
+3. **Render the traceability matrix**: read `.ai-work/<task-slug>/traceability.yml`, merge any un-reconciled fragments (`traceability_*.yml`) via per-REQ union of `tests` and `implementation` arrays, and render the result as a Markdown table (columns: Requirement | Test(s) | Implementation | Status). Status derives from `TEST_RESULTS.md` — PASS if tests passed, FAIL if failed, UNTESTED if the YAML lists no `tests:` for a REQ.
+4. Extract the `Decisions Made` entries from `LEARNINGS.md`
+5. Write `SPEC_<feature-name>_YYYY-MM-DD.md` to `.ai-state/specs/` using the persistent spec template from the `spec-driven-development` skill, with the rendered matrix in the `## Traceability` section
+6. Cross-reference ADR files in `.ai-state/decisions/` covering the feature period against the archived spec's `## Key Decisions`. Note any decisions in ADR files that are missing from the spec, or vice versa.
+7. **Then** allow `.ai-work/` cleanup to proceed — the YAML is now redundant because its content is frozen in the archived SPEC.
 
 ## Collaboration Points
 

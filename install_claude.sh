@@ -5,7 +5,7 @@
 # configures MCP servers for Claude Desktop. Invoked by install.sh for code|desktop.
 #
 # Usage:
-#   ./install_claude.sh code|desktop [--check] [--dry-run] [--uninstall] [--relink] [--help]
+#   ./install_claude.sh code|desktop [--check] [--dry-run] [--uninstall] [--relink] [--from-local] [--help]
 
 set -eo pipefail
 
@@ -463,6 +463,74 @@ EOF
     install_plugin_permissions
 
     return 0
+}
+
+install_plugin_from_local() {
+    header "Step 3 — i-am Plugin (local dev mode)"
+
+    if ! command -v git &>/dev/null; then
+        fail "git required for --from-local (needed to derive the cache key)"
+    fi
+    if ! command -v python3 &>/dev/null; then
+        fail "python3 required for --from-local (registry update)"
+    fi
+
+    local short_sha dirty dev_version target plugin_version now
+    short_sha=$(git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    dirty=""
+    if ! git -C "$SCRIPT_DIR" diff --quiet 2>/dev/null \
+        || ! git -C "$SCRIPT_DIR" diff --cached --quiet 2>/dev/null; then
+        dirty="-dirty"
+    fi
+    dev_version="local-${short_sha}${dirty}"
+    target="${PLUGIN_CACHE_DIR}/${dev_version}"
+    plugin_version=$(python3 -c "import json; print(json.load(open('${SCRIPT_DIR}/.claude-plugin/plugin.json'))['version'])")
+    now=$(python3 -c "import datetime; print(datetime.datetime.utcnow().isoformat(timespec='milliseconds') + 'Z')")
+
+    step "Source:  $SCRIPT_DIR"
+    step "Version: $plugin_version  (cache key: $dev_version)"
+
+    # Clear any existing cache entries for this plugin (marketplace snapshots
+    # from prior installs, or previous local-mode symlinks with different SHAs).
+    # Symlinks are removed safely — the target (working tree) is untouched.
+    if [ -d "$PLUGIN_CACHE_DIR" ]; then
+        find "$PLUGIN_CACHE_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+    fi
+    mkdir -p "$PLUGIN_CACHE_DIR"
+
+    # Point the plugin cache at the working tree. Claude Code reads the plugin
+    # body from this directory every time it loads the plugin — edits to skills,
+    # commands, agents, hooks, and plugin.json are visible immediately, no
+    # reinstall required.
+    ln -s "$SCRIPT_DIR" "$target"
+    info "Symlinked: $target -> $SCRIPT_DIR"
+
+    # Register in installed_plugins.json so Claude Code recognizes the install.
+    # The `localMode` key is advisory metadata — it flags this entry as
+    # symlinked to a working tree rather than a frozen marketplace snapshot.
+    python3 - <<PYEOF
+import json
+from pathlib import Path
+p = Path.home() / ".claude/plugins/installed_plugins.json"
+data = json.loads(p.read_text()) if p.exists() else {"version": 2, "plugins": {}}
+data.setdefault("plugins", {})["${PLUGIN_NAME}@${MARKETPLACE_NAME}"] = [{
+    "scope": "user",
+    "installPath": "${target}",
+    "version": "${plugin_version}",
+    "installedAt": "${now}",
+    "lastUpdated": "${now}",
+    "localMode": True,
+}]
+p.write_text(json.dumps(data, indent=2) + "\n")
+PYEOF
+    info "Registered ${PLUGIN_NAME}@${MARKETPLACE_NAME} v${plugin_version} (local mode)"
+
+    warn "'claude plugin update ${PLUGIN_NAME}' will overwrite the symlink."
+    warn "Re-run './install.sh code --from-local' to restore local mode if that happens."
+
+    # Plugin directory permissions are still required for Claude Code to read
+    # the symlinked content.
+    install_plugin_permissions
 }
 
 install_plugin_permissions() {
@@ -1026,7 +1094,11 @@ install_claude_code() {
 
     install_git_merge_infra
 
-    prompt_plugin_install
+    if $FROM_LOCAL; then
+        install_plugin_from_local
+    else
+        prompt_plugin_install
+    fi
 
     prompt_chub_mcp
     prompt_phoenix_install
@@ -1096,7 +1168,7 @@ dry_run_claude_desktop() {
 
 show_usage() {
     cat <<EOF
-Usage: $(basename "$0") code|desktop [--check] [--dry-run] [--uninstall] [--relink] [--reconfigure] [--help]
+Usage: $(basename "$0") code|desktop [--check] [--dry-run] [--uninstall] [--relink] [--reconfigure] [--from-local] [--help]
 
   code           Install for Claude Code
   desktop        Install for Claude Desktop
@@ -1121,6 +1193,7 @@ DRY_RUN=false
 UNINSTALL=false
 RELINK=false
 RECONFIGURE=false
+FROM_LOCAL=false
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -1130,11 +1203,17 @@ while [ $# -gt 0 ]; do
         --uninstall)   UNINSTALL=true ;;
         --relink)      RELINK=true ;;
         --reconfigure) RECONFIGURE=true ;;
+        --from-local)  FROM_LOCAL=true ;;
         -h|--help)     show_usage ;;
         *)             fail "Unknown argument: $1. Use --help for usage." ;;
     esac
     shift
 done
+
+# --from-local is only meaningful with 'code' mode (plugin install path).
+if $FROM_LOCAL && [ "$MODE" != "code" ]; then
+    fail "--from-local is only supported with 'code' mode."
+fi
 
 if [ -z "$MODE" ]; then
     fail "Missing mode. Use code or desktop. See --help."

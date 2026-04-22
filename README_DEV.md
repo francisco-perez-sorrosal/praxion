@@ -353,7 +353,7 @@ See [`rules/README.md`](rules/README.md) for the full rule specification, writin
 
 For user-facing installation instructions, see [`README.md`](README.md#installation).
 
-### Local testing (recommended for development)
+### Session-scoped local testing
 
 Load the plugin directly from the cloned repo for a single session. Changes to skills, commands, and agents are reflected immediately — no reinstall needed.
 
@@ -361,15 +361,47 @@ Load the plugin directly from the cloned repo for a single session. Changes to s
 claude --plugin-dir /path/to/Praxion
 ```
 
-Personal config and rules are **not** loaded. Use `./install.sh` if you also need those.
+Personal config and rules are **not** loaded. Use `./install.sh code --from-local` if you also need those.
+
+### Persistent local-mode install (recommended for active development)
+
+`./install.sh code` installs a hybrid state by default: the plugin body is pinned to the marketplace version (the current stable tag), while rules and CLI scripts symlink to your working tree. This asymmetry is fine for convention work (rules iterate freely) but surprising when you edit a skill or command and reinstall — the plugin body stays at the marketplace tag and your edit is invisible.
+
+`--from-local` is the developer mode that eliminates the asymmetry:
+
+```bash
+./install.sh code --from-local
+```
+
+What it does:
+
+- Clears any existing plugin cache entry for `i-am@bit-agora`
+- Creates a **symlink** from the plugin cache directly to your Praxion checkout, using a synthetic version key of the form `local-<short-sha>[-dirty]`
+- Registers the install in `~/.claude/plugins/installed_plugins.json` with a `localMode: true` marker and the real `plugin.json` version (e.g., `0.2.1.dev0`)
+- Reuses the existing rules + scripts symlink layer — now all three surfaces trace back to the same working tree
+
+Edits to any file under the checkout (skill, command, agent, hook, rule, script) are visible to Claude Code on the next load — no reinstall needed.
+
+**Caveat**: `claude plugin update i-am` will overwrite the symlink with a marketplace snapshot, silently exiting local mode. Re-run `./install.sh code --from-local` to restore it. `--uninstall` correctly tears down the symlink (it targets the cache directory, not the working tree).
+
+**Manual equivalent** (if you want to bypass `install.sh` entirely, e.g., in CI or a container):
+
+```bash
+rm -rf ~/.claude/plugins/cache/bit-agora/i-am/*
+ln -s "$(pwd)" ~/.claude/plugins/cache/bit-agora/i-am/local-dev
+# And manually update installed_plugins.json to register the new installPath
+```
+
+The `--from-local` flag does this plus the registry update atomically; prefer the flag unless you're deliberately bypassing the installer.
 
 ### Updating the plugin cache
 
 After modifying the plugin manifest or adding new components, update the installed copy:
 
 ```bash
-./install.sh                   # Re-run installer, choose "Install plugin" at Step 3
-claude plugin install i-am@bit-agora --scope user   # Or install directly
+./install.sh code              # Re-run installer (marketplace install — use for stable-tag testing)
+./install.sh code --from-local # Persistent local dev mode (recommended for active development)
+claude plugin install i-am@bit-agora --scope user   # Or install directly from the marketplace
 ```
 
 ### Verifying changes

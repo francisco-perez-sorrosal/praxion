@@ -164,7 +164,7 @@ EOF
 
 show_usage() {
     cat <<EOF
-Usage: $(basename "$0") [code|desktop|cursor [path]] [--check] [--dry-run] [--uninstall] [--help]
+Usage: $(basename "$0") [code|desktop|cursor [path]] [--check] [--dry-run] [--uninstall] [--from-local] [--help]
 
   code         Install for Claude Code (default)
   desktop      Install for Claude Desktop
@@ -174,6 +174,11 @@ Usage: $(basename "$0") [code|desktop|cursor [path]] [--check] [--dry-run] [--un
   --dry-run    Show what would be installed (no writes)
   --uninstall  Remove installation
   --relink     Re-symlink config, rules, and scripts (no prompts)
+  --from-local Dev mode: install plugin body from local working tree via
+               symlink (bypasses the marketplace). Rules/scripts already
+               symlink live; this extends uniform local state to the
+               plugin body so edits to skills/commands/agents are
+               immediate. Only valid with 'code'.
   --help       Show this help
 EOF
     exit 0
@@ -188,6 +193,7 @@ CHECK=false
 DRY_RUN=false
 UNINSTALL=false
 RELINK=false
+FROM_LOCAL=false
 CURSOR_TARGET=""
 
 while [ $# -gt 0 ]; do
@@ -199,6 +205,7 @@ while [ $# -gt 0 ]; do
         --dry-run)    DRY_RUN=true ;;
         --uninstall)  UNINSTALL=true ;;
         --relink)     RELINK=true ;;
+        --from-local) FROM_LOCAL=true ;;
         -h|--help)    show_usage ;;
         *)            fail "Unknown argument: $1. Use --help for usage." ;;
     esac
@@ -228,10 +235,11 @@ delegate_args=()
 case "$MODE" in
     code|desktop)
         delegate_args+=("$MODE")
-        $CHECK     && delegate_args+=(--check)
-        $DRY_RUN   && delegate_args+=(--dry-run)
-        $UNINSTALL && delegate_args+=(--uninstall)
-        $RELINK    && delegate_args+=(--relink)
+        $CHECK      && delegate_args+=(--check)
+        $DRY_RUN    && delegate_args+=(--dry-run)
+        $UNINSTALL  && delegate_args+=(--uninstall)
+        $RELINK     && delegate_args+=(--relink)
+        $FROM_LOCAL && delegate_args+=(--from-local)
         ;;
     cursor)
         [ -n "$CURSOR_TARGET" ] && delegate_args+=("$CURSOR_TARGET")

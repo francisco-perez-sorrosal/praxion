@@ -114,6 +114,39 @@ Each component maintains its own version and changelog. Best for projects where 
 - If users install individual components, use independent versioning
 - If in doubt, start with single-version -- splitting later is easier than merging
 
+## Plugin Marketplace Publishing
+
+When a project ships as a Claude Code plugin via an external marketplace manifest — a separate repo with `.claude-plugin/marketplace.json` pointing at the plugin's source — the marketplace version is a **separate publish surface** from the plugin's internal version files. Keeping the two in sync is not automatic.
+
+**Release-only marketplace policy:**
+
+- Marketplace manifests advertise **stable** versions only — never `.devN` pre-release markers.
+- Dev-cycle versions (`0.2.1.dev0`, etc.) are internal working state: they live in the plugin's `pyproject.toml`, `.claude-plugin/plugin.json`, sub-project `pyproject.toml` files, but MUST NOT be pushed to the marketplace.
+- When cutting a stable release, update the marketplace AFTER the plugin repo is tagged and pushed — never before.
+
+**Why:** Claude Code's plugin subsystem uses the version string as the cache key. A dev-cycle version like `0.1.1.dev0` stays the same across many commits; advertising it to the marketplace means every cached user install gets pinned to whichever `0.1.1.dev0` snapshot happened to land first, with no mechanism to invalidate. Stable semver versions change monotonically with each release — they work correctly as cache keys.
+
+**Two-repo release workflow:**
+
+1. **Plugin repo:** `cz bump --increment <MINOR|PATCH>` → updates version files, tags `vX.Y.Z`, commits.
+2. **Plugin repo:** `cz changelog --unreleased-version vX.Y.Z --incremental` → CHANGELOG entry, commit.
+3. **Plugin repo:** manually bump version files to next dev cycle (`X.Y.(Z+1).dev0`), commit with `bump: Open X.Y.(Z+1).dev0 development cycle`.
+4. **Plugin repo:** `git push origin main && git push origin vX.Y.Z`.
+5. **Marketplace repo:** edit `.claude-plugin/marketplace.json`, set the plugin's `version` to `X.Y.Z` (the stable tag, NOT the dev-cycle marker), commit with `bump(<plugin-name>): Advertise vX.Y.Z`, push.
+6. Users running `claude plugin update <plugin>` now see the new stable version and pull it.
+
+**Cache-staleness recovery:**
+
+If users already have a stale `.devN` snapshot cached (from before this policy was in force), a one-time cleanup is required:
+
+```bash
+rm -rf ~/.claude/plugins/cache/<marketplace>/<plugin>/<stale-version>
+# Also scrub the registry so next install is fresh:
+python3 -c "import json; from pathlib import Path; p=Path.home()/'.claude/plugins/installed_plugins.json'; d=json.loads(p.read_text()); d.get('plugins',{}).pop('<plugin>@<marketplace>', None); p.write_text(json.dumps(d, indent=2))"
+```
+
+Then `claude plugin install <plugin>` pulls fresh from the corrected marketplace version.
+
 ## Integration with Other Skills
 
 - **[CI/CD](../cicd/SKILL.md)** -- release workflow design, GitHub Actions for automated bumps

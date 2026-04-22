@@ -519,14 +519,22 @@ Claude Code's Agent Teams feature (peer-to-peer mailbox, direct teammate communi
 **Timeline**: Monitor Claude Code releases. Target evaluation when Agent Teams exits experimental.
 **Risk**: Experimental feature may change significantly or be deprecated.
 
-#### 5.2 HTTP Hook Handler for Chronograph
+#### 5.2 HTTP Hook Handler for Chronograph ❌ WON'T DO (2026-04-21)
 
-The hooks system now supports `http` handler type, which could simplify chronograph integration (direct POST instead of command-line wrapper with Python startup overhead per event).
+**Rationale**: Investigation contradicted the entry's "drop-in replacement with simpler architecture" framing. `send_event.py` is not a thin POST wrapper — it is an enrichment pipeline of eight stages: deterministic per-project port derivation (SHA-256 of project dir → `8765 + hash % 1000`), worktree-to-project-root resolution via `git rev-parse --git-common-dir`, git context capture (branch, toplevel, worktree name), task slug extraction from agent prompts, secret redaction across 10 regex patterns (OpenAI/Anthropic/GitHub PAT/AWS/Slack/bearer/generic), tool I/O size accounting with 4 KB truncation (pre-truncation byte counts preserved for span analytics), MCP tool classification (`mcp__plugin_i-am_<server>__<tool>` split), and hook-event → Chronograph-event mapping including `phase_transition` parsing from `PROGRESS.md` writes.
 
-**Action**: Evaluate replacing `send_event.py` (command handler) with an `http` handler pointing directly at chronograph's `/api/events` endpoint. This eliminates Python startup, git subprocess calls, and wrapper overhead for every hook event.
+Claude Code's `http` hook handler is POST-only with a **static URL**, no body template, no event-field substitution, and no pre-send transformation. None of the eight enrichment stages can run inside it. The most consequential blocker is URL templating: every project has a unique chronograph port to preserve multi-project isolation (called out as a strength in "What's Working"), but the `http` handler's URL is static. Moving enrichment server-side does not solve this, because the *address* of the server itself is project-derived.
 
-**Dependencies**: Verify `http` handler supports the required event payload format.
-**Risk**: Low. Performance improvement with simpler architecture.
+The ~400 ms Python startup is an honest tax for the capability `send_event.py` provides. The original "Low risk" assessment was based on an intuition the code does not support; actual risk on a naive swap is **High** (loss of secret redaction, git context, port derivation, MCP classification, phase-transition detection). Closed as out-of-scope by user decision after investigation, not a deferred item.
+
+If latency becomes a measured problem, reopen as a Standard-tier pipeline with a real architecture pass on the port-derivation-vs-static-URL trade-off — not a Lightweight swap.
+
+**Problem (preserved for audit)**: The hooks system now supports `http` handler type, which could simplify chronograph integration (direct POST instead of command-line wrapper with Python startup overhead per event).
+
+**Action (preserved for audit)**: Evaluate replacing `send_event.py` (command handler) with an `http` handler pointing directly at chronograph's `/api/events` endpoint.
+
+**Dependencies**: Verify `http` handler supports the required event payload format — verified 2026-04-21: it does not.
+**Risk**: Reassessed from "Low" to "High" on naive swap per the investigation above.
 
 #### 5.3 MCP Gateway Pattern
 

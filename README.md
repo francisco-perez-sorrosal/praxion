@@ -227,6 +227,8 @@ The main entry point is `install.sh`, which routes to `install_claude.sh` (Claud
 
 When installed as a plugin, commands are namespaced: `/co` becomes `/i-am:co`. Plugin permissions for skill reference files are auto-configured at Step 3. See [`README_DEV.md`](README_DEV.md#progressive-disclosure-and-satellite-files) for how progressive disclosure works with plugin-installed skills.
 
+**Developing on Praxion itself?** After the standard install, use `claude-dev` (placed at `~/.local/bin/` by `install.sh`) to launch a Claude Code session that loads the plugin directly from your working tree — edits to skills, commands, agents, or hooks are live, and `/reload-plugins` picks them up without restarting. See [`README_DEV.md`](README_DEV.md#session-scoped-local-testing) for the full dev workflow.
+
 **Manual plugin install** (marketplace-only, without cloning):
 
 ```bash

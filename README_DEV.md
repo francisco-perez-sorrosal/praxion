@@ -355,13 +355,18 @@ For user-facing installation instructions, see [`README.md`](README.md#installat
 
 ### Session-scoped local testing
 
-Load the plugin directly from the cloned repo for a single session. Changes to skills, commands, and agents are reflected immediately — no reinstall needed.
+For active development on Praxion itself, launch Claude Code with the working tree as the plugin source:
 
 ```bash
-claude --plugin-dir /path/to/Praxion
+claude-dev       # installed by install.sh at ~/.local/bin/claude-dev
+# equivalent to: claude --plugin-dir /path/to/Praxion
 ```
 
-Personal config and rules are **not** loaded — this mode only tests plugin content.
+The working-tree copy of the `i-am` plugin **shadows** any marketplace-installed copy for this session (per Claude Code docs: "the local copy takes precedence"). No uninstall or disable step is needed.
+
+Edits to skills, commands, agents, or hooks are live. Run `/reload-plugins` inside the session to re-read them without relaunching; a full restart is only needed when `plugin.json` itself changes.
+
+Personal config and rules are **not** plugin-scoped — they're handled separately by `install.sh code` (clone-based) or `/praxion-complete-install` (marketplace-only). Running `claude-dev` does not touch them.
 
 ### Updating the plugin cache
 
@@ -408,7 +413,7 @@ The inverse pair (`complete_uninstall_from_plugin()` + `/praxion-complete-uninst
 | `./install.sh code` | Marketplace @ latest tag | Local checkout | Clone-based install (default) |
 | `/praxion-complete-install` (after `claude plugin install ...`) | Marketplace @ latest tag | Plugin cache @ same tag | Marketplace-only, no clone |
 
-For live-edit development on Praxion itself, use `claude --plugin-dir /path/to/Praxion` to launch a session that loads the plugin directly from the working tree (see [Session-scoped local testing](#session-scoped-local-testing)).
+For live-edit development on Praxion itself, use `claude-dev` (a thin wrapper around `claude --plugin-dir`) to launch a session that loads the plugin directly from the working tree — see [Session-scoped local testing](#session-scoped-local-testing).
 
 ### Post-update refresh
 

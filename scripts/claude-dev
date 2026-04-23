@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Launch Claude Code with the Praxion working tree as the plugin source.
+#
+# Use this when developing on Praxion itself. The working-tree copy of the
+# i-am plugin shadows any marketplace-installed i-am@bit-agora for this
+# session (per Claude Code docs — no uninstall needed). Edits to skills,
+# commands, agents, or hooks are live; run /reload-plugins inside the
+# session to refresh without relaunching.
+
+set -euo pipefail
+
+# Resolve this script's real path even when invoked through a symlink
+# (e.g., via ~/.local/bin/claude-dev). macOS-safe — avoids GNU readlink -f
+# and handles nested symlinks.
+self="${BASH_SOURCE[0]}"
+while [ -L "$self" ]; do
+    dir="$(cd -P "$(dirname "$self")" && pwd)"
+    target="$(readlink "$self")"
+    [[ "$target" != /* ]] && target="$dir/$target"
+    self="$target"
+done
+praxion_root="$(cd -P "$(dirname "$self")/.." && pwd)"
+
+if [ ! -f "$praxion_root/.claude-plugin/plugin.json" ]; then
+    printf "claude-dev: %s does not look like the Praxion repo root\n" "$praxion_root" >&2
+    printf "  (expected %s/.claude-plugin/plugin.json)\n" "$praxion_root" >&2
+    exit 1
+fi
+
+exec claude --plugin-dir "$praxion_root" "$@"

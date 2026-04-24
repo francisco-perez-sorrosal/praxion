@@ -17,9 +17,9 @@ Compatible with **Claude Code** (mainly), **Claude Desktop**, and **Cursor**.
 
 ## What You Get
 
-- **35 skills** covering Python, API design, CI/CD, deployment, observability, refactoring, spec-driven development, external API docs, security review, testing strategy, roadmap synthesis, and more -- loaded automatically when the task matches
+- **36 skills** covering Python, API design, CI/CD, deployment, observability, refactoring, spec-driven development, external API docs, security review, testing strategy, test coverage, roadmap synthesis, and more -- loaded automatically when the task matches
 - **13 specialized agents** that collaborate on complex features (research, architecture, planning, implementation, testing, verification, roadmap cartography)
-- **24 slash commands** for daily workflows -- commits, worktrees, memory management, project scaffolding, testing, releases, code review, roadmap generation
+- **29 slash commands** for daily workflows -- commits, worktrees, memory management, project scaffolding, testing, releases, code review, roadmap generation, metrics
 - **Coding rules** auto-loaded by context -- coding style, git conventions, documentation standards, agent coordination
 - **MCP servers** for persistent memory and agent lifecycle observability
 
@@ -95,7 +95,7 @@ Reusable knowledge modules loaded automatically based on context. See [`skills/R
 | Planning & Communication | roadmap-planning, roadmap-synthesis, stakeholder-communications |
 | Design & Architecture | api-design, data-modeling, deployment, observability, performance-architecture |
 | Documentation | doc-management |
-| Software Development | python-development, python-prj-mgmt, project-exploration, refactoring, code-review, software-planning, spec-driven-development, agent-evals, cicd, testing-strategy, versioning |
+| Software Development | python-development, python-prj-mgmt, project-exploration, refactoring, code-review, software-planning, spec-driven-development, agent-evals, cicd, testing-strategy, test-coverage, versioning |
 | Security | context-security-review |
 | OSS Contribution | upstream-stewardship |
 | Project | memory, id-decontamination |
@@ -128,6 +128,13 @@ Slash commands invoked with `/<name>`. In Claude Code plugin mode, use `/i-am:<n
 | `/review-pr` | Code review a pull request |
 | `/save-changes` | Save current working changes to project memory with secret filtering |
 | `/star-repo` | Star the Praxion repo on GitHub |
+| `/project-metrics` | Compute project complexity/health metrics (churn, complexity, coupling, hot-spots, trends) and write a timestamped report triple to `.ai-state/` |
+| `/project-coverage` | Run the project's canonical coverage target and render a terminal summary via the `test-coverage` skill |
+| `/eval` | Run out-of-band quality evals (Tier 1 behavioral + regression) — opt-in, never hook-driven |
+| `/new-cc-project` | Scaffold a greenfield Claude-ready Python project and onboard it to Praxion |
+| `/refresh-skill` | Refresh version-sensitive sections of a skill against current upstream documentation |
+| `/praxion-complete-install` | Finish a marketplace-only Praxion install — symlink rules, CLI scripts, and optional context-hub MCP |
+| `/praxion-complete-uninstall` | Reverse `/praxion-complete-install` — remove rule/script symlinks and optional MCP |
 
 ### Agents
 

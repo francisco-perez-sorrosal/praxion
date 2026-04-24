@@ -35,6 +35,7 @@ import json
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -147,39 +148,49 @@ class ComplexipyCollector(Collector):
     # ------------------------------------------------------------------ collect
 
     def collect(self, ctx: CollectionContext) -> CollectorResult:
-        """Run ``uvx complexipy --output-json`` over ``ctx.repo_root``."""
+        """Run ``uvx complexipy --output-json`` over ``ctx.repo_root``.
 
-        try:
-            completed = subprocess.run(
-                ["uvx", "complexipy", ctx.repo_root, "--output-json"],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=_COLLECT_TIMEOUT_SECONDS,
-            )
-        except subprocess.TimeoutExpired:
-            return CollectorResult(
-                status="timeout",
-                data={},
-                issues=[
-                    "uvx complexipy --output-json timed out after "
-                    f"{int(_COLLECT_TIMEOUT_SECONDS)}s."
-                ],
-            )
-        except subprocess.CalledProcessError as exc:
-            return CollectorResult(
-                status="error",
-                data={},
-                issues=[
-                    f"uvx complexipy --output-json exited with status {exc.returncode}."
-                ],
-            )
-        except FileNotFoundError:
-            return CollectorResult(
-                status="error",
-                data={},
-                issues=["uvx not found on PATH during collect."],
-            )
+        Invoked inside a scratch cwd so that complexipy's cwd-relative
+        ``--output-json`` side-effect — a ``complexipy-results.json`` file
+        written next to wherever the tool is invoked — lands in a disposable
+        tempdir and is swept on scope exit, rather than polluting the project
+        root. The repo root is still passed as a positional argument, so the
+        scan target is unaffected.
+        """
+
+        with tempfile.TemporaryDirectory(prefix="praxion-complexipy-") as scratch:
+            try:
+                completed = subprocess.run(
+                    ["uvx", "complexipy", ctx.repo_root, "--output-json"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    timeout=_COLLECT_TIMEOUT_SECONDS,
+                    cwd=scratch,
+                )
+            except subprocess.TimeoutExpired:
+                return CollectorResult(
+                    status="timeout",
+                    data={},
+                    issues=[
+                        "uvx complexipy --output-json timed out after "
+                        f"{int(_COLLECT_TIMEOUT_SECONDS)}s."
+                    ],
+                )
+            except subprocess.CalledProcessError as exc:
+                return CollectorResult(
+                    status="error",
+                    data={},
+                    issues=[
+                        f"uvx complexipy --output-json exited with status {exc.returncode}."
+                    ],
+                )
+            except FileNotFoundError:
+                return CollectorResult(
+                    status="error",
+                    data={},
+                    issues=["uvx not found on PATH during collect."],
+                )
 
         return _parse_complexipy_json(completed.stdout)
 

@@ -46,6 +46,13 @@ Copy the block below into the project's `pyproject.toml`. When present, `pytest`
 [tool.pytest.ini_options]
 addopts = "--cov --cov-report=xml --cov-report=term-missing"
 testpaths = ["tests", "scripts"]
+# Repo root on sys.path so tests can import source modules without requiring
+# PYTHONPATH to be set by the invoker. Harmless for projects whose package is
+# already installed (editable or otherwise); load-bearing for flat-layout
+# projects that ship tests importing `<package>.<submodule>` directly from the
+# working tree. Override to `["src"]` for src-layout projects, or remove
+# entirely if all imports resolve via installed distributions.
+pythonpath = ["."]
 
 [tool.coverage.run]
 branch = true

@@ -1,0 +1,3 @@
+| schema_version | timestamp | commit_sha | window_days | sloc_total | file_count | language_count | ccn_p95 | cognitive_p95 | cyclic_deps | churn_total_90d | change_entropy_90d | truck_factor | hotspot_top_score | hotspot_gini | coverage_line_pct | report_file |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1.0.0 | 2026-04-24T06:46:35.975977+00:00 | 43cf8d06321bb3228f571f95ee6b3174d5457b53 | 90 | 77317 | 783 | 6 | 8.0 | — | — | 189242 | 587.0493547874245 | 1 | 0.0 | 0.0 | — | [METRICS_REPORT_2026-04-24_06-46-44.md](METRICS_REPORT_2026-04-24_06-46-44.md) |

@@ -18,6 +18,12 @@ version_files = [
     "memory-mcp/pyproject.toml:version",
     "task-chronograph-mcp/pyproject.toml:version",
     "eval/pyproject.toml:version",
+    # Root [project].version mirrors [tool.commitizen].version. The
+    # ^version =  anchor disambiguates from "version_files = [..." on the
+    # same file, while matching both [project].version and
+    # [tool.commitizen].version lines (both get rewritten to the new value
+    # on bump, which is the intended in-sync behavior).
+    "pyproject.toml:^version = ",
 ]
 tag_format = "v$version"
 changelog_start_rev = "v0.0.0"

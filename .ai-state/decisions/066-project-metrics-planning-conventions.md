@@ -1,5 +1,5 @@
 ---
-id: dec-draft-ceae80ca
+id: dec-066
 title: /project-metrics planning conventions — Full-tier escalation, test placement, committed fixture repo
 status: proposed
 category: implementation
@@ -13,7 +13,7 @@ affected_files:
   - .ai-work/project-metrics/IMPLEMENTATION_PLAN.md
   - scripts/project_metrics/tests/
   - scripts/project_metrics/tests/fixtures/minimal_repo/
-re_affirms: dec-draft-c566b978
+re_affirms: dec-063
 ---
 
 ## Context
@@ -86,6 +86,6 @@ None of these are architectural in the sense of the four ADR drafts from Phase 4
 
 ## Prior Decision
 
-This ADR `re_affirms: dec-draft-c566b978` (Collector Protocol). No supersession is implied; the protocol decision stands. The re-affirmation is structural: the Full-tier decomposition depends on collectors being first-class independent units (per dec-draft-c566b978), and bundling them to meet a Standard-tier step budget would have silently undermined the protocol's extension-seam value. Recording this cross-reference so a future reader understands why a planning-level tier choice is coupled to an architectural protocol choice.
+This ADR `re_affirms: dec-063` (Collector Protocol). No supersession is implied; the protocol decision stands. The re-affirmation is structural: the Full-tier decomposition depends on collectors being first-class independent units (per dec-063), and bundling them to meet a Standard-tier step budget would have silently undermined the protocol's extension-seam value. Recording this cross-reference so a future reader understands why a planning-level tier choice is coupled to an architectural protocol choice.
 
 No new evidence would be required to supersede either decision — the coupling is logical, not empirical.

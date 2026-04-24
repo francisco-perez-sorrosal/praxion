@@ -1,5 +1,5 @@
 ---
-id: dec-draft-b068ad8e
+id: dec-062
 title: Metrics storage schema — JSON canonical + MD derived + append-only METRICS_LOG.md
 status: proposed
 category: architectural

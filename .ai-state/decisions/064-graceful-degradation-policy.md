@@ -1,5 +1,5 @@
 ---
-id: dec-draft-8b26adef
+id: dec-064
 title: Graceful degradation policy — git+stdlib hard floor, everything else optional
 status: proposed
 category: behavioral

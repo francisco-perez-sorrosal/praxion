@@ -1,5 +1,5 @@
 ---
-id: dec-draft-c566b978
+id: dec-063
 title: Collector protocol as extension seam for /project-metrics
 status: proposed
 category: architectural
@@ -19,7 +19,7 @@ affected_files:
   - scripts/project_metrics/collectors/coverage_collector.py
   - scripts/project_metrics/runner.py
 re_affirmed_by:
-  - dec-draft-ceae80ca
+  - dec-066
 ---
 
 ## Context

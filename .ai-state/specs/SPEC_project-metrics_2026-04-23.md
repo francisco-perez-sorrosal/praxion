@@ -4,7 +4,7 @@
 **Tier**: Full (escalated from Standard — decomposition yielded 18 steps, exceeding the ~10-step threshold; file breadth is wide but depth remains shallow)
 **Archived**: (pipeline in flight — archival at merge-to-main)
 **Status**: Planned
-**ADRs**: `dec-draft-b068ad8e` (storage schema), `dec-draft-c566b978` (collector protocol), `dec-draft-8b26adef` (graceful degradation), `dec-draft-ad8b8286` (hotspot formula). Promoted to stable `dec-NNN` at merge-to-main via `scripts/finalize_adrs.py`.
+**ADRs**: `dec-062` (storage schema), `dec-063` (collector protocol), `dec-064` (graceful degradation), `dec-065` (hotspot formula). Promoted to stable `dec-NNN` at merge-to-main via `scripts/finalize_adrs.py`.
 
 ## Feature Summary
 
@@ -29,7 +29,7 @@ The 12 acceptance criteria in `SYSTEMS_PLAN.md` expand into 16 REQs below. One-t
 - **REQ-PM-06** — The JSON artifact carries a top-level `schema_version` field (semver), a top-level `timestamp` (ISO 8601 UTC), and an `aggregate` block whose keys exactly match the `METRICS_LOG.md` table header. *(AC3, part 1)*
 - **REQ-PM-07** — The JSON artifact contains a `tool_availability` block naming every optional tool that was considered for the run, with one of five documented statuses: `available`, `unavailable`, `not_applicable`, `error`, `timeout`. *(AC3, part 2)*
 - **REQ-PM-08** — Every metric skipped because an optional tool was unavailable appears in the JSON with a machine-readable marker (`{"status": "skipped", "reason": "tool_unavailable", "tool": "<name>"}` in its namespace block) so downstream consumers can treat all skips uniformly. *(AC4, JSON surface)*
-- **REQ-PM-09** — The `aggregate` block column set exactly matches the 16 columns declared in the Schema ADR (dec-draft-b068ad8e), in declaration order. Any attempt to add or reorder columns fails the test that asserts the header against the frozen list. *(AC7, v1.0.0 freeze)*
+- **REQ-PM-09** — The `aggregate` block column set exactly matches the 16 columns declared in the Schema ADR (dec-062), in declaration order. Any attempt to add or reorder columns fails the test that asserts the header against the frozen list. *(AC7, v1.0.0 freeze)*
 
 ### MD rendering
 
@@ -81,10 +81,10 @@ _Matrix rendered at feature-end from `traceability.yml` and `TEST_RESULTS.md`._
 
 See the four draft ADRs for full rationale. Summary:
 
-1. **Storage schema** (dec-draft-b068ad8e): JSON canonical + MD derived + append-only `METRICS_LOG.md`; 16-column aggregate frozen on v1.0.0; schema-mismatch policy defers deltas rather than fabricating.
-2. **Collector protocol** (dec-draft-c566b978): three-method protocol (`resolve` / `collect` / `describe`) with three resolution outcomes (`Available` / `Unavailable` / `NotApplicable`) and error isolation at the runner.
-3. **Graceful degradation** (dec-draft-8b26adef): only `git` + Python 3.11+ stdlib are hard floor; every other tool is soft with uniform skip markers in JSON and MD; never runs the test suite.
-4. **Hotspot formula** (dec-draft-ad8b8286): `churn_90d_lines × max_ccn`; lizard preferred, scc branch-count fallback, both unavailable → hotspots skipped; cross-language via cyclomatic, cognitive reserved for per-language Python breakdown.
+1. **Storage schema** (dec-062): JSON canonical + MD derived + append-only `METRICS_LOG.md`; 16-column aggregate frozen on v1.0.0; schema-mismatch policy defers deltas rather than fabricating.
+2. **Collector protocol** (dec-063): three-method protocol (`resolve` / `collect` / `describe`) with three resolution outcomes (`Available` / `Unavailable` / `NotApplicable`) and error isolation at the runner.
+3. **Graceful degradation** (dec-064): only `git` + Python 3.11+ stdlib are hard floor; every other tool is soft with uniform skip markers in JSON and MD; never runs the test suite.
+4. **Hotspot formula** (dec-065): `churn_90d_lines × max_ccn`; lizard preferred, scc branch-count fallback, both unavailable → hotspots skipped; cross-language via cyclomatic, cognitive reserved for per-language Python breakdown.
 
 ## Implementation-Planner Decisions (beyond architect's scope)
 

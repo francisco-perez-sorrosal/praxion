@@ -1,5 +1,5 @@
 ---
-id: dec-draft-ad8b8286
+id: dec-065
 title: Hot-spot composition formula — churn_lines × max CCN, cross-language default
 status: proposed
 category: architectural
@@ -24,7 +24,7 @@ The architectural question the user raised: define "churn" (commits-touching vs 
 
 - Whether the headline metric is cross-language comparable or Python-specific.
 - Whether the metric is gameable via micro-commits.
-- What happens when the preferred complexity tool is unavailable (degradation interaction with dec-draft-8b26adef).
+- What happens when the preferred complexity tool is unavailable (degradation interaction with dec-064).
 
 ## Decision
 

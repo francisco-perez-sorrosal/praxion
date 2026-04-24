@@ -103,6 +103,88 @@ uninstall_chub_cli() {
 }
 
 # =============================================================================
+# Shared — Optional Metrics Tool (scc for /project-metrics SLOC counts)
+# =============================================================================
+
+install_scc_cli() {
+    header "Shared — Optional Metrics Tool (scc)"
+
+    if command -v scc &>/dev/null; then
+        info "scc already installed ($(scc --version 2>/dev/null | head -1 || echo '?'))"
+        return
+    fi
+
+    cat <<EOF
+
+  ${B}[1] Install scc (recommended if you will run /project-metrics)${R}
+      ${D}scc is a fast source-lines-of-code counter used by the${R}
+      ${D}/project-metrics command to produce accurate SLOC and${R}
+      ${D}per-language breakdowns. Without it, the metrics report${R}
+      ${D}falls back to a stdlib counter that misses language-specific${R}
+      ${D}detail.${R}
+
+  ${B}[2] Skip${R}
+      ${D}No scc. /project-metrics will degrade gracefully and note${R}
+      ${D}the missing tool in its report. Install later via:${R}
+      ${D}  brew install scc            (macOS, preferred)${R}
+      ${D}  go install github.com/boyter/scc/v3@latest${R}
+EOF
+    ask 1 2
+
+    if [ "$REPLY" -eq 2 ]; then
+        step "scc skipped"
+        return
+    fi
+
+    # Prefer brew on macOS; fall back to go install; otherwise warn + instruct.
+    if command -v brew &>/dev/null; then
+        step "Installing scc via Homebrew..."
+        if brew install scc 2>&1 | tail -1; then
+            info "scc installed ($(scc --version 2>/dev/null | head -1 || echo '?'))"
+            return
+        fi
+        warn "brew install scc failed; trying 'go install' as fallback"
+    fi
+
+    if command -v go &>/dev/null; then
+        step "Installing scc via 'go install'..."
+        if go install github.com/boyter/scc/v3@latest 2>&1 | tail -1; then
+            info "scc installed ($(scc --version 2>/dev/null | head -1 || echo 'check PATH'))"
+            step "Ensure \$(go env GOPATH)/bin is on PATH for scc to be discoverable"
+        else
+            warn "go install scc failed; install manually: https://github.com/boyter/scc"
+        fi
+        return
+    fi
+
+    warn "Neither brew nor go found on PATH"
+    step "Install manually: https://github.com/boyter/scc"
+}
+
+check_scc_cli() {
+    printf "\n  ${B}Optional Metrics Tool (scc):${R}\n"
+    if command -v scc &>/dev/null; then
+        info "scc installed ($(scc --version 2>/dev/null | head -1 || echo '?'))"
+    else
+        warn "scc not installed (optional — /project-metrics degrades gracefully)"
+    fi
+}
+
+uninstall_scc_cli() {
+    if ! command -v scc &>/dev/null; then
+        return
+    fi
+    step "Removing scc..."
+    if command -v brew &>/dev/null && brew list scc &>/dev/null; then
+        brew uninstall scc 2>/dev/null \
+            && info "scc removed (brew)" \
+            || warn "scc removal via brew failed"
+    else
+        warn "scc was likely installed via 'go install'; remove manually from \$(go env GOPATH)/bin"
+    fi
+}
+
+# =============================================================================
 # Overview banner
 # =============================================================================
 
@@ -114,6 +196,7 @@ show_overview() {
 
   Shared:
     • External API docs (chub CLI — curated docs for 600+ libraries)
+    • Optional metrics tool (scc — SLOC counter used by /project-metrics)
 EOF
 
     case "$mode" in
@@ -277,15 +360,19 @@ elif $CHECK; then
     delegate_rc=0
     delegate || delegate_rc=$?
     check_chub_cli
+    check_scc_cli
     exit $delegate_rc
 elif $UNINSTALL; then
     delegate
     uninstall_chub_cli
+    uninstall_scc_cli
 elif $DRY_RUN; then
     check_chub_cli
+    check_scc_cli
     delegate
 else
-    # Install: shared CLI first, then tool-specific
+    # Install: shared CLIs first, then tool-specific
     install_chub_cli
+    install_scc_cli
     delegate
 fi

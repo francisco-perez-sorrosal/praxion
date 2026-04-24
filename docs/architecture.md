@@ -15,7 +15,7 @@
 | **Type** | AI development meta-framework (plugin + MCP servers + knowledge artifacts) |
 | **Language / Framework** | Python 3.13+ (MCP servers), Markdown (skills/agents/rules/commands), Shell/Python (hooks, scripts) |
 | **Architecture pattern** | Plugin-based knowledge ecosystem with progressive disclosure and agent pipeline orchestration |
-| **Last verified against code** | 2026-04-19 (concurrency-collaboration model shipped: `scripts/finalize_adrs.py`, `scripts/check_squash_safety.py`, `scripts/migrate_worktree_home.sh`, `commands/clean-auto-memory.md`, `rules/swe/vcs/pr-conventions.md`, updated `commands/create-worktree.md` + `commands/merge-worktree.md` + `scripts/git-post-merge-hook.sh` all verified on disk; `.claude/worktrees/` added to `.gitignore`; six draft ADRs under `.ai-state/decisions/drafts/` awaiting finalize at merge-to-main) |
+| **Last verified against code** | 2026-04-24 (project-metrics feature shipped Built: `/project-metrics` slash command + `scripts/project_metrics/` package + `docs/metrics/README.md` schema reference + `docs/metrics/index.html` trend visualization; five draft ADRs under `.ai-state/decisions/drafts/` awaiting finalize at merge-to-main) |
 
 <!-- OWNER: systems-architect (creation), doc-engineer (verification) | LAST UPDATED: 2026-04-12 -->
 
@@ -66,7 +66,7 @@ graph LR
 
 ## 3. Components
 
-<!-- OWNER: implementer (as-built), doc-engineer (verification) | LAST UPDATED: 2026-04-12 -->
+<!-- OWNER: implementer (as-built), doc-engineer (verification) | LAST UPDATED: 2026-04-23 by implementer (added Project metrics command row — command + package + tests + schema doc all verified on disk) -->
 <!-- L1 diagram: major building blocks and their relationships.
      Every component listed here MUST exist on disk — verify with ls/Glob before including. -->
 
@@ -122,6 +122,7 @@ graph TD
 | Scripts | Provides developer tooling: worktree management, merge drivers, daemon control | `scripts/` |
 | Greenfield project onboarding | Scaffolds a Claude-ready project into an empty directory and hands off to an interactive Claude session pre-loaded with `/new-cc-project`. Bash handles deterministic prereqs + minimal scaffold; the slash command runs the conversational flow, generates the default Python + `uv` + Claude Agent SDK + FastAPI app, and writes a per-run `onboarding_for_mushi_busy_ppl.md`. Integration-tested via bash. See [docs/project-onboarding.md](project-onboarding.md) for the user-facing guide | `new_cc_project.sh` (repo root), `commands/new-cc-project.md`, `docs/project-onboarding.md`, `tests/new_cc_project_test.sh` |
 | Concurrency & collaboration model | Unifies multi-worktree and multi-user coordination around shared primitives: fragment-named draft ADRs under `.ai-state/decisions/drafts/<YYYYMMDD-HHMM>-<user>-<branch>-<slug>.md` promoted to `<NNN>-<slug>.md` at merge-to-main, unified worktree home at `.claude/worktrees/`, two-layer squash-merge safety (command refuse + post-merge warn), opt-in auto-memory orphan cleanup. Post-merge hook runs reconcile → finalize → squash-safety in that order | `scripts/finalize_adrs.py`, `scripts/check_squash_safety.py`, `scripts/migrate_worktree_home.sh`, `scripts/git-post-merge-hook.sh`, `commands/clean-auto-memory.md`, `commands/create-worktree.md`, `commands/merge-worktree.md`, `rules/swe/vcs/pr-conventions.md`, `rules/swe/adr-conventions.md`, `.ai-state/decisions/drafts/` |
+| Project metrics command | `/project-metrics` slash command computes curated complexity/health metrics (SLOC, CCN, cognitive complexity, cyclic deps, churn, entropy, truck factor, hotspots, coverage) on any Praxion-onboarded repo. Two-tier collector plugin architecture: Tier 0 universal (`git` + stdlib, optional `scc`) and Tier 1 Python (`lizard` / `complexipy` / `pydeps` / `coverage.py` artifact parse) for v1. Produces a per-run JSON+MD artifact pair under `.ai-state/METRICS_REPORT_YYYY-MM-DD_HH-MM-SS.{json,md}` plus an append-only `.ai-state/METRICS_LOG.md`. Frozen aggregate-block column contract; graceful degradation with uniform skip markers when optional tools are absent. Draft ADRs under `.ai-state/decisions/drafts/` carry the design rationale (storage-schema-for-project-metrics, collector-protocol, graceful-degradation-policy, hotspot-formula) and finalize to stable NNN at merge-to-main | `commands/project-metrics.md`, `scripts/project_metrics/` (package: `cli.py`, `schema.py`, `runner.py`, `hotspot.py`, `trends.py`, `report.py`, `logappend.py`, `collectors/` with six collectors), `scripts/project_metrics/tests/` (16 test modules + `build_fixtures.py`-generated fixture repos), `docs/metrics/README.md` (complete JSON schema reference) |
 
 ## 4. Interfaces
 

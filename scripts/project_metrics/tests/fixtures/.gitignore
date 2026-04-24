@@ -1,0 +1,8 @@
+# Fixture repos are rebuilt on demand by build_fixtures.py via conftest.py.
+# Committing their .git/ directories is not viable — git rejects nested
+# repositories as embedded gitlinks rather than tracking their contents.
+minimal_repo/
+empty_repo/
+single_author_repo/
+coupling_repo/
+minimal_stdlib_repo/

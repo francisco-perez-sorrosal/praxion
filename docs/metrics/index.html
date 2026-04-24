@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>/project-metrics — Trends</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #181b22;
+      --panel-hover: #1f232c;
+      --border: #262b36;
+      --text: #e6e8ee;
+      --text-dim: #8a92a5;
+      --accent: #7cc7ff;
+      --accent-2: #a6e3a1;
+      --accent-3: #f4b8e4;
+      --warn: #f0c674;
+      --null: #4a4f5c;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      font-size: 14px; line-height: 1.5;
+    }
+    header {
+      padding: 2rem 2.5rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 {
+      margin: 0 0 0.25rem;
+      font-size: 1.5rem; font-weight: 600;
+    }
+    header .subtitle {
+      color: var(--text-dim); font-size: 0.9rem; font-family: ui-monospace, monospace;
+    }
+    main { padding: 1.5rem 2.5rem 3rem; max-width: 1600px; margin: 0 auto; }
+    .kpi-grid {
+      display: grid; gap: 0.75rem;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      margin-bottom: 2rem;
+    }
+    .kpi {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 6px; padding: 0.75rem 1rem;
+      position: relative;
+    }
+    .kpi-label {
+      color: var(--text-dim); font-size: 0.75rem;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      display: flex; align-items: center; gap: 0.35rem;
+    }
+    .kpi-value {
+      font-size: 1.5rem; font-weight: 600; margin-top: 0.25rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .kpi-value.null { color: var(--null); font-weight: 400; font-size: 1rem; }
+    .kpi-unit { color: var(--text-dim); font-size: 0.85rem; margin-left: 0.25rem; font-weight: 400; }
+
+    .charts-grid {
+      display: grid; gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    }
+    .chart-panel {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 6px; padding: 1rem;
+    }
+    .chart-panel h2 {
+      margin: 0 0 0.25rem; font-size: 0.95rem; font-weight: 600;
+      color: var(--text);
+      display: flex; align-items: center; gap: 0.35rem;
+    }
+    .chart-panel .chart-hint {
+      color: var(--text-dim); font-size: 0.75rem; margin: 0 0 0.75rem;
+    }
+    .chart-wrap { position: relative; height: 220px; }
+
+    /* ---------------------- Help icon + tooltip ---------------------- */
+    .help-icon {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--border); color: var(--text-dim);
+      font-size: 0.7rem; font-weight: 700; font-family: Georgia, serif;
+      font-style: italic;
+      cursor: help; user-select: none;
+      transition: background 0.15s, color 0.15s;
+    }
+    .help-icon:hover, .help-icon:focus { background: var(--accent); color: var(--bg); outline: none; }
+
+    #tooltip {
+      position: fixed; z-index: 1000;
+      max-width: 360px; min-width: 240px;
+      background: #0a0c10;
+      border: 1px solid var(--accent);
+      border-radius: 6px; padding: 0.9rem 1rem;
+      font-size: 0.85rem; line-height: 1.5;
+      color: var(--text);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.3);
+      pointer-events: none;
+      opacity: 0; visibility: hidden;
+      transition: opacity 0.12s, visibility 0.12s;
+    }
+    #tooltip.visible { opacity: 1; visibility: visible; }
+    #tooltip h3 {
+      margin: 0 0 0.5rem; font-size: 0.9rem; font-weight: 600;
+      color: var(--accent);
+    }
+    #tooltip p { margin: 0 0 0.5rem; }
+    #tooltip p:last-child { margin-bottom: 0; }
+    #tooltip .label-row {
+      color: var(--text-dim); font-size: 0.75rem;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      margin-top: 0.5rem; margin-bottom: 0.2rem;
+    }
+    #tooltip code {
+      background: var(--border); padding: 0.05rem 0.3rem;
+      border-radius: 3px; font-size: 0.85em;
+    }
+
+    .empty-state {
+      background: var(--panel); border: 1px dashed var(--border);
+      border-radius: 6px; padding: 2rem;
+      text-align: center; color: var(--text-dim);
+    }
+    .empty-state code {
+      background: var(--panel-hover); padding: 0.15rem 0.4rem;
+      border-radius: 3px; color: var(--accent); font-size: 0.9em;
+    }
+
+    footer {
+      padding: 1.5rem 2.5rem;
+      border-top: 1px solid var(--border);
+      color: var(--text-dim); font-size: 0.85rem;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    .error {
+      background: #2d1a1a; border: 1px solid #5a2d2d; color: #f4b8b8;
+      padding: 1rem 1.25rem; border-radius: 6px; margin-bottom: 1rem;
+      font-family: ui-monospace, monospace; font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>/project-metrics — trends</h1>
+    <div class="subtitle" id="subtitle">Loading…</div>
+  </header>
+
+  <main id="main">
+    <div id="status"></div>
+  </main>
+
+  <footer>
+    Data source: <code>.ai-state/METRICS_LOG.md</code>. Schema reference:
+    <a href="README.md">docs/metrics/README.md</a>.
+    Generated by the <code>/project-metrics</code> command — see
+    <a href="../../commands/project-metrics.md">commands/project-metrics.md</a>.
+    Hover any <span class="help-icon" style="cursor:default">i</span> for an explanation.
+  </footer>
+
+  <div id="tooltip" role="tooltip" aria-hidden="true"></div>
+
+  <script>
+    // ------------------------------------------------------------------
+    // Configuration — the 16 frozen aggregate columns, one per data row.
+    // Order here must match the METRICS_LOG.md header row (load-bearing).
+    // ------------------------------------------------------------------
+    const COLUMNS = [
+      "schema_version", "timestamp", "commit_sha", "window_days",
+      "sloc_total", "file_count", "language_count",
+      "ccn_p95", "cognitive_p95", "cyclic_deps",
+      "churn_total_90d", "change_entropy_90d", "truck_factor",
+      "hotspot_top_score", "hotspot_gini", "coverage_line_pct",
+      "report_file",
+    ];
+
+    // Chart groupings: each panel shows N series on one set of axes.
+    // `info` is the hover-tooltip content: { what, interpret, caveat }.
+    const PANELS = [
+      {
+        id: "size", title: "Size",
+        hint: "Codebase scale — lines, files, languages.",
+        series: [
+          { field: "sloc_total", label: "SLOC total" },
+          { field: "file_count", label: "File count" },
+          { field: "language_count", label: "Language count" },
+        ],
+        info: {
+          what: "Scale markers — total source lines, file count, and distinct languages in the committed repository.",
+          interpret: "None of these predict quality on their own. They predict navigation effort: a newcomer spends linear time proportional to file and SLOC count finding things.",
+          caveat: "Watch for runaway growth without proportional complexity/churn (deadweight code) or shrinking despite active development (unusual — investigate).",
+        },
+      },
+      {
+        id: "complexity", title: "Complexity",
+        hint: "p95 per-function complexity (cyclomatic + cognitive).",
+        series: [
+          { field: "ccn_p95", label: "CCN p95" },
+          { field: "cognitive_p95", label: "Cognitive p95" },
+        ],
+        info: {
+          what: "95th-percentile per-function complexity. Cyclomatic counts control-flow branches; cognitive (SonarSource) penalizes nesting and unstructured jumps.",
+          interpret: "Cognitive is the better predictor of review/understanding time. An aggressive upward slope over time = refactoring debt accruing faster than it's paid down.",
+          caveat: "p95 hides the worst offenders (that's what the hot-spot panel is for). Both metrics are ~0.9 correlated with SLOC — always interpret alongside size.",
+        },
+      },
+      {
+        id: "evolution", title: "Evolution (90d window)",
+        hint: "Churn, Hassan change entropy, and truck factor.",
+        series: [
+          { field: "churn_total_90d", label: "Churn total" },
+          { field: "change_entropy_90d", label: "Change entropy" },
+          { field: "truck_factor", label: "Truck factor" },
+        ],
+        info: {
+          what: "How the codebase changes over 90 days. Churn = lines added + deleted. Entropy (Hassan 2009) = Shannon dispersion of changes across files — low = focused; high = scattered.",
+          interpret: "Process metrics outperform product metrics for defect prediction (Rahman & Devanbu 2013). Rising entropy often precedes incident spikes — work is unfocused.",
+          caveat: "Churn alone doesn't mean 'bad code' — active development has churn. Combine with complexity (hot-spots panel) for the defect-predictive signal.",
+        },
+      },
+      {
+        id: "hotspots", title: "Hot-spots",
+        hint: "Top-score (max churn × complexity) and Gini concentration.",
+        series: [
+          { field: "hotspot_top_score", label: "Top score" },
+          { field: "hotspot_gini", label: "Gini (0–1)" },
+        ],
+        info: {
+          what: "Hot-spot = churn × complexity per file, computed across all files. Top score is the max; Gini (0–1) measures how concentrated the distribution is.",
+          interpret: "In Tornhill's study, 4% of files hold 72% of defects. The flagship metric. High Top-score + low Gini = many hot files; high Top-score + high Gini = one outlier file deserving attention.",
+          caveat: "Generated files (compiled output, vendored deps) can inflate churn spuriously. If hot-spot points at a `.pb.go` or minified asset, exclude it from next-run scope.",
+        },
+      },
+      {
+        id: "architecture", title: "Architecture",
+        hint: "Cyclic dependency count (Python, via pydeps).",
+        series: [
+          { field: "cyclic_deps", label: "Cyclic SCCs" },
+        ],
+        info: {
+          what: "Number of strongly-connected components of size > 1 in the Python import graph (Tarjan's SCC detection).",
+          interpret: "Zero is the goal; any non-zero is a concrete architectural defect. A growing cycle count is a leading indicator of coupling drift — module boundaries decaying.",
+          caveat: "Python-only in v1 (via pydeps). Non-Python projects show — (not computed). Circular imports can exist at runtime without breaking; the metric flags structural concern, not immediate bug.",
+        },
+      },
+      {
+        id: "quality", title: "Quality",
+        hint: "Line coverage (0–1) when a coverage artifact is present.",
+        series: [
+          { field: "coverage_line_pct", label: "Line coverage" },
+        ],
+        info: {
+          what: "Fraction of source lines executed by the test suite (0.0–1.0). Parsed from existing coverage.xml (Cobertura) or lcov.info — /project-metrics never runs the test suite.",
+          interpret: "Rising = more code exercised. Falling = new untested code or removed tests. Treat as a floor (\"at least this much is tested\") not a ceiling.",
+          caveat: "Coverage % is not strongly correlated with test effectiveness (Inozemtseva & Holmes, ICSE 2014). Covered-but-unasserted lines contribute to the number. Combine with mutation score if you have it.",
+        },
+      },
+    ];
+
+    // KPI tiles shown above the charts — the at-a-glance headline values.
+    // `info` is the hover-tooltip content, same shape as panel.info.
+    const KPIS = [
+      {
+        field: "sloc_total", label: "SLOC", fmt: fmtInt,
+        info: {
+          what: "Total source lines of code across all tracked files. Computed by scc (preferred) or a Python stdlib line-counter fallback.",
+          interpret: "A scale marker, not a quality signal. Useful as a denominator for densities (bugs per KLOC, etc.) and as a navigation hint.",
+          caveat: "Never use SLOC as a productivity or quality score. Deleting 1000 lines of cruft is often more valuable than adding 100 lines of feature.",
+        },
+      },
+      {
+        field: "file_count", label: "Files", fmt: fmtInt,
+        info: {
+          what: "Distinct files git tracks in the current commit.",
+          interpret: "The 'surface' a newcomer has to navigate. Grows roughly linearly with feature count. Sudden spikes often mean new modules or imports were committed.",
+          caveat: "File count without SLOC growth usually means excessive splitting (one-function-per-file); the inverse means files are getting larger and harder to navigate.",
+        },
+      },
+      {
+        field: "ccn_p95", label: "CCN p95", fmt: fmtFloat,
+        info: {
+          what: "95th percentile cyclomatic complexity (McCabe) across all functions. Measured by lizard across 17 languages.",
+          interpret: "Over 10 = review-required smell. Over 15 = extraction overdue. Over 20 = nearly always untestable. Watch the trend more than the absolute number.",
+          caveat: "Cyclomatic is ~0.9 correlated with SLOC — most apparent signal is just size in disguise. Prefer cognitive_p95 for readability; cyclomatic for testability.",
+        },
+      },
+      {
+        field: "cognitive_p95", label: "Cognitive p95", fmt: fmtFloat,
+        info: {
+          what: "95th percentile cognitive complexity (SonarSource definition). Penalizes nesting depth, broken linear flow, and unstructured control.",
+          interpret: "Better predictor of review/understanding time than cyclomatic. Aim for p95 ≤ 15 as a rough target; depends heavily on domain.",
+          caveat: "Python-only in v1 (via complexipy). Non-Python projects show — (not computed). Install complexipy and uvx to populate.",
+        },
+      },
+      {
+        field: "cyclic_deps", label: "Cyclic deps", fmt: fmtInt,
+        info: {
+          what: "Number of strongly-connected components of size > 1 in the Python module import graph.",
+          interpret: "Zero is the goal. Any non-zero is a concrete architectural defect — modules have cyclic dependencies and cannot be independently imported or tested.",
+          caveat: "Python-only (via pydeps). Non-Python projects show — (not computed). Cycles can work at runtime (lazy imports) but indicate coupling drift.",
+        },
+      },
+      {
+        field: "churn_total_90d", label: "Churn (90d)", fmt: fmtInt,
+        info: {
+          what: "Sum of lines added + deleted across all files in the last 90 days (git log --numstat, rolling window).",
+          interpret: "High churn ≠ bad. It reflects activity. Combined with complexity, it's the 'hot-spot' signal most predictive of defects.",
+          caveat: "Shallow git clones have no numstat — the collector falls back to commit-count per file, flagged as `churn_source: commit_count_fallback` in the JSON.",
+        },
+      },
+      {
+        field: "truck_factor", label: "Truck factor", fmt: fmtInt,
+        info: {
+          what: "Minimum number of authors whose combined contribution covers >50% of the codebase (Avelino method, ICPC 2016).",
+          interpret: "1 = critical risk (one person leaves and knowledge is lost). 2–3 = manageable. 5+ = resilient team. Most teams have never measured theirs — the honest result is usually uncomfortable.",
+          caveat: "Git-history based — counts commits, not contributions. Someone who reviews but never commits shows 0. Doesn't account for bus-vs-truck nuance; the name is tradition.",
+        },
+      },
+      {
+        field: "hotspot_top_score", label: "Hotspot top", fmt: fmtFloat,
+        info: {
+          what: "Highest per-file score of churn × max-CCN. The single file most likely to produce defects per Tornhill's empirical study.",
+          interpret: "A high top score on a low-Gini distribution = many hot files (systemic). High top score on high Gini = one outlier file (targeted refactor candidate).",
+          caveat: "Scc's sloc_total is used as a fallback complexity dimension when lizard is unavailable — less accurate. Check the JSON's `complexity_source` field.",
+        },
+      },
+      {
+        field: "hotspot_gini", label: "Hotspot Gini", fmt: fmtFloat,
+        info: {
+          what: "Gini coefficient (0–1) of the hot-spot score distribution across all files.",
+          interpret: "0 = uniform (everything equally hot, unusual). 1 = one file is everything (refactor candidate). Most codebases sit around 0.5–0.8 — concentrated but not pathological.",
+          caveat: "An all-zeros distribution (no churn or no complexity available) renders as 0 by convention; combine with Top score to distinguish 'uniformly cool' from 'no signal'.",
+        },
+      },
+      {
+        field: "coverage_line_pct", label: "Coverage", fmt: fmtPct,
+        info: {
+          what: "Fraction of source lines executed by at least one test (0–1). Parsed from existing coverage.xml or lcov.info — this command never runs tests.",
+          interpret: "A floor, not a ceiling. Rising = more code exercised; falling = new untested code or deletions. 80%+ is a common goal but coverage quality matters more than coverage quantity.",
+          caveat: "Coverage % is not strongly correlated with test effectiveness (Inozemtseva & Holmes, ICSE 2014). A covered-but-unasserted line contributes to the number but catches no bugs.",
+        },
+      },
+    ];
+
+    const SERIES_COLORS = ["#7cc7ff", "#a6e3a1", "#f4b8e4", "#f0c674", "#c4a7e7", "#eb6f92"];
+
+    // ------------------------------------------------------------------
+    // Parsing — METRICS_LOG.md is a markdown table. Header + separator +
+    // N data rows. Each data row yields one time-series point.
+    // ------------------------------------------------------------------
+    function parseMetricsLog(markdown) {
+      const lines = markdown.split("\n").map(l => l.trim()).filter(Boolean);
+      const dataRows = lines.slice(2).filter(l => l.startsWith("|"));
+      return dataRows.map(parseRow);
+    }
+
+    function parseRow(line) {
+      const cells = line.replace(/^\|/, "").replace(/\|$/, "").split("|").map(c => c.trim());
+      const row = {};
+      for (let i = 0; i < COLUMNS.length; i++) {
+        row[COLUMNS[i]] = cells[i] ?? "";
+      }
+      return row;
+    }
+
+    function parseValue(raw) {
+      if (raw === "—" || raw === "" || raw === "null") return null;
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function fmtInt(v) { return v === null ? "—" : Math.round(v).toLocaleString(); }
+    function fmtFloat(v) { return v === null ? "—" : v.toFixed(2); }
+    function fmtPct(v) { return v === null ? "—" : (v * 100).toFixed(1) + "%"; }
+
+    // ------------------------------------------------------------------
+    // Tooltip — single fixed-position overlay, positioned on hover.
+    // ------------------------------------------------------------------
+    function showTooltip(event, title, info) {
+      const tooltip = document.getElementById("tooltip");
+      tooltip.innerHTML = "";
+      const h = document.createElement("h3");
+      h.textContent = title;
+      tooltip.appendChild(h);
+
+      const whatLabel = document.createElement("div");
+      whatLabel.className = "label-row";
+      whatLabel.textContent = "What it measures";
+      tooltip.appendChild(whatLabel);
+      const what = document.createElement("p");
+      what.textContent = info.what;
+      tooltip.appendChild(what);
+
+      const interpLabel = document.createElement("div");
+      interpLabel.className = "label-row";
+      interpLabel.textContent = "How to interpret";
+      tooltip.appendChild(interpLabel);
+      const interp = document.createElement("p");
+      interp.textContent = info.interpret;
+      tooltip.appendChild(interp);
+
+      const caveatLabel = document.createElement("div");
+      caveatLabel.className = "label-row";
+      caveatLabel.textContent = "Caveat";
+      tooltip.appendChild(caveatLabel);
+      const caveat = document.createElement("p");
+      caveat.textContent = info.caveat;
+      tooltip.appendChild(caveat);
+
+      positionTooltip(event, tooltip);
+      tooltip.classList.add("visible");
+      tooltip.setAttribute("aria-hidden", "false");
+    }
+
+    function hideTooltip() {
+      const tooltip = document.getElementById("tooltip");
+      tooltip.classList.remove("visible");
+      tooltip.setAttribute("aria-hidden", "true");
+    }
+
+    function positionTooltip(event, tooltip) {
+      // Anchor near the cursor/icon; flip if too close to the right/bottom.
+      const x = event.clientX + 14;
+      const y = event.clientY + 14;
+      // Render offscreen first to measure.
+      tooltip.style.left = "0px";
+      tooltip.style.top = "0px";
+      tooltip.style.display = "block";
+      const rect = tooltip.getBoundingClientRect();
+      const viewportW = window.innerWidth;
+      const viewportH = window.innerHeight;
+      let finalX = x;
+      let finalY = y;
+      if (x + rect.width + 12 > viewportW) {
+        finalX = Math.max(8, event.clientX - rect.width - 14);
+      }
+      if (y + rect.height + 12 > viewportH) {
+        finalY = Math.max(8, event.clientY - rect.height - 14);
+      }
+      tooltip.style.left = finalX + "px";
+      tooltip.style.top = finalY + "px";
+      tooltip.style.display = "";
+    }
+
+    function attachHelpIcon(parent, title, info) {
+      const icon = document.createElement("span");
+      icon.className = "help-icon";
+      icon.textContent = "i";
+      icon.setAttribute("tabindex", "0");
+      icon.setAttribute("role", "button");
+      icon.setAttribute("aria-label", `Help: ${title}`);
+      icon.addEventListener("mouseenter", (e) => showTooltip(e, title, info));
+      icon.addEventListener("mouseleave", hideTooltip);
+      icon.addEventListener("focus", (e) => showTooltip(e, title, info));
+      icon.addEventListener("blur", hideTooltip);
+      parent.appendChild(icon);
+      return icon;
+    }
+
+    // ------------------------------------------------------------------
+    // Rendering.
+    // ------------------------------------------------------------------
+    function renderSubtitle(rows) {
+      if (rows.length === 0) return;
+      const latest = rows[rows.length - 1];
+      const sha = (latest.commit_sha || "").slice(0, 7);
+      const ts = latest.timestamp || "";
+      document.getElementById("subtitle").textContent =
+        `${rows.length} run${rows.length === 1 ? "" : "s"} · latest ${ts} · commit ${sha}`;
+    }
+
+    function renderKpis(rows) {
+      const main = document.getElementById("main");
+      const grid = document.createElement("div");
+      grid.className = "kpi-grid";
+      const latest = rows[rows.length - 1];
+      for (const k of KPIS) {
+        const v = parseValue(latest[k.field]);
+        const tile = document.createElement("div");
+        tile.className = "kpi";
+        const label = document.createElement("div");
+        label.className = "kpi-label";
+        const labelText = document.createElement("span");
+        labelText.textContent = k.label;
+        label.appendChild(labelText);
+        attachHelpIcon(label, k.label, k.info);
+        const val = document.createElement("div");
+        val.className = "kpi-value" + (v === null ? " null" : "");
+        val.textContent = v === null ? "not computed" : k.fmt(v);
+        tile.appendChild(label);
+        tile.appendChild(val);
+        grid.appendChild(tile);
+      }
+      main.appendChild(grid);
+    }
+
+    function renderCharts(rows) {
+      const main = document.getElementById("main");
+      const grid = document.createElement("div");
+      grid.className = "charts-grid";
+      for (const panel of PANELS) {
+        const wrap = document.createElement("div");
+        wrap.className = "chart-panel";
+        const h = document.createElement("h2");
+        const titleText = document.createElement("span");
+        titleText.textContent = panel.title;
+        h.appendChild(titleText);
+        attachHelpIcon(h, panel.title, panel.info);
+        wrap.appendChild(h);
+        const hint = document.createElement("p");
+        hint.className = "chart-hint";
+        hint.textContent = panel.hint;
+        wrap.appendChild(hint);
+        const canvasWrap = document.createElement("div");
+        canvasWrap.className = "chart-wrap";
+        const canvas = document.createElement("canvas");
+        canvasWrap.appendChild(canvas);
+        wrap.appendChild(canvasWrap);
+        grid.appendChild(wrap);
+        drawChart(canvas, rows, panel);
+      }
+      main.appendChild(grid);
+    }
+
+    function drawChart(canvas, rows, panel) {
+      const labels = rows.map(r => (r.timestamp || "").slice(0, 19));
+      const datasets = panel.series.map((s, i) => ({
+        label: s.label,
+        data: rows.map(r => parseValue(r[s.field])),
+        borderColor: SERIES_COLORS[i % SERIES_COLORS.length],
+        backgroundColor: SERIES_COLORS[i % SERIES_COLORS.length] + "22",
+        borderWidth: 2,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        tension: 0.25,
+        spanGaps: true,
+      }));
+      new Chart(canvas, {
+        type: "line",
+        data: { labels, datasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false },
+          plugins: {
+            legend: {
+              position: "bottom",
+              labels: { color: "#e6e8ee", boxWidth: 10, font: { size: 11 } },
+            },
+            tooltip: {
+              backgroundColor: "#0f1115",
+              borderColor: "#262b36", borderWidth: 1,
+              titleColor: "#e6e8ee", bodyColor: "#e6e8ee",
+              callbacks: {
+                label(ctx) {
+                  const v = ctx.parsed.y;
+                  return `${ctx.dataset.label}: ${v === null ? "—" : v.toLocaleString()}`;
+                },
+              },
+            },
+          },
+          scales: {
+            x: {
+              ticks: { color: "#8a92a5", font: { size: 10 }, maxRotation: 0, autoSkipPadding: 20 },
+              grid: { color: "#262b36" },
+            },
+            y: {
+              ticks: { color: "#8a92a5", font: { size: 10 } },
+              grid: { color: "#262b36" },
+            },
+          },
+        },
+      });
+    }
+
+    function renderEmpty(reason) {
+      const main = document.getElementById("main");
+      const box = document.createElement("div");
+      box.className = "empty-state";
+      box.innerHTML = `
+        <p><strong>No metrics data yet.</strong></p>
+        <p>${reason}</p>
+        <p>Run <code>/project-metrics</code> in this repository to produce the first report.</p>
+      `;
+      main.appendChild(box);
+    }
+
+    function renderError(err) {
+      const status = document.getElementById("status");
+      const box = document.createElement("div");
+      box.className = "error";
+      box.textContent = `Failed to load METRICS_LOG.md: ${err.message || err}. `
+        + `Serve via "python -m http.server" from the repo root and open docs/metrics/index.html.`;
+      status.appendChild(box);
+    }
+
+    async function main() {
+      try {
+        const resp = await fetch("../../.ai-state/METRICS_LOG.md");
+        if (!resp.ok) {
+          renderEmpty(`HTTP ${resp.status} fetching METRICS_LOG.md.`);
+          return;
+        }
+        const text = await resp.text();
+        const rows = parseMetricsLog(text);
+        if (rows.length === 0) {
+          renderEmpty("The log file exists but contains no data rows.");
+          return;
+        }
+        renderSubtitle(rows);
+        renderKpis(rows);
+        renderCharts(rows);
+      } catch (err) {
+        renderError(err);
+      }
+    }
+    main();
+  </script>
+</body>
+</html>

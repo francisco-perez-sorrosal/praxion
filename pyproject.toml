@@ -27,3 +27,45 @@ dev = [
     "pytest",
     "pytest-cov",
 ]
+
+# --- test-coverage skill: default Python coverage config -------------------
+# Produces `coverage.xml` (Cobertura format) at the project root, consumed by
+# scripts/project_metrics/collectors/coverage_collector.py and any caller that
+# loads the `test-coverage` skill. Override `omit`, `exclude_lines`, and the
+# fail-under floor per project needs; leave the output path at `coverage.xml`
+# so downstream tooling finds it at the first-candidate path.
+
+[tool.pytest.ini_options]
+addopts = "--cov --cov-report=xml --cov-report=term-missing"
+testpaths = ["tests", "scripts"]
+
+[tool.coverage.run]
+branch = true
+source = ["."]
+omit = [
+    "tests/*",
+    "**/tests/*",
+    "**/test_*.py",
+    "**/conftest.py",
+    ".venv/*",
+    "build/*",
+    "dist/*",
+]
+
+[tool.coverage.report]
+# Show missing line numbers in the terminal summary; do not fail the run on
+# coverage alone (projects that want a hard floor set `fail_under` explicitly).
+show_missing = true
+skip_covered = false
+precision = 1
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+
+[tool.coverage.xml]
+# Canonical artifact path. Changing this breaks downstream discovery.
+output = "coverage.xml"
+# --- end test-coverage skill defaults ---------------------------------------

@@ -55,7 +55,7 @@ Adopt a **hybrid** routing mechanism:
 
 **Positive:**
 
-- Cost savings: pipeline cost drops directionally 30–50% on multi-agent runs (rough back-of-envelope with 4H / 8M / 1L distribution and researcher-lookup L-mode).
+- Cost savings: **directional estimate, unmeasured** — pipeline cost should drop 30–50% on multi-agent runs based on a back-of-envelope calculation with 4H / 8M / 1L distribution and researcher-lookup L-mode. This is a hypothesis to be validated by post-ship telemetry; it is not evidence of a measured result. A revisit trigger fires one month from ship per the telemetry-deferral ADR.
 - Declarative clarity for authors: rule table is one source of truth for tier questions.
 - Task-sensitive flexibility where it matters: researcher and implementer handle variable workload.
 

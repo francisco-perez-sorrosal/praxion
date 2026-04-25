@@ -10,7 +10,7 @@ description: >
   or structural assessment of a codebase before implementation.
 tools: Read, Glob, Grep, Bash, Write, Edit
 skills: [claude-ecosystem, agentic-sdks, communicating-agents, mcp-crafting, external-api-docs]
-model: opus
+model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.
 permissionMode: acceptEdits
 background: true
 memory: user

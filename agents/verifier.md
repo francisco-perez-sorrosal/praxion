@@ -7,7 +7,7 @@ description: >
   implementation is complete, when the implementation-planner's Phase 7
   confirms plan adherence, or at milestones to validate quality before
   committing results.
-model: opus
+model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.
 tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit
 skills: [code-review, context-security-review, test-coverage]

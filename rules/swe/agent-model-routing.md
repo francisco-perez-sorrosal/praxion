@@ -38,13 +38,15 @@ Aliases only (`opus`/`sonnet`/`haiku`); pin full IDs at spawn time only when ver
 
 ### Researcher Routing Modes
 
-| Mode | Tier | Mechanism |
-|------|------|-----------|
-| Comparative analysis, multi-source synthesis (default) | M (`sonnet`) | rule-table tier |
-| Simple lookup (single-file grep, single-URL fetch) | L (`haiku`) | per-spawn override |
-| Contested evidence, heavy multi-option judgment | H (`opus`) | per-spawn override |
+| Mode | Tier | Mechanism | Selection signals |
+|------|------|-----------|-------------------|
+| Simple lookup | L (`haiku`) | per-spawn override | single file/URL named in the prompt; single grep target; "find/read/check X" framing; no comparison |
+| Default (comparative analysis, multi-source synthesis) | M (`sonnet`) | rule-table tier | external research; ≥2 sources to weigh; codebase exploration that returns prose synthesis; broad "how does X work" framing |
+| Contested evidence, heavy multi-option judgment | H (`opus`) | per-spawn override | ≥3 plausible options with conflicting evidence; trade-off resolution required; downstream architect explicitly asks for "feasibility verdict" or "decision rationale" |
 
 **Implementer step-level override.** Planner annotates `WIP.md` with `tier: H` (cross-cutting refactor) or `tier: L` (typo/mechanical); no hint = `sonnet`.
+
+**Direct-invocation entry points.** Slash commands and user-driven spawns (e.g. `/sentinel`, `/roadmap`, `/eval`, ad-hoc `Agent` calls) bypass the main orchestrator. The entry point is responsible for applying this rule: read the row for the agent being spawned and pass the listed alias as the Agent tool's `model:` parameter. `sentinel` and `skill-genesis` are the agents most often invoked this way; both default to `sonnet` unless the entry point overrides up.
 
 ### Operator Kill Switch — `CLAUDE_CODE_SUBAGENT_MODEL`
 
@@ -56,7 +58,7 @@ Aliases only (`opus`/`sonnet`/`haiku`); pin full IDs at spawn time only when ver
 
 **`availableModels` fallback.** If a routed alias is rejected by `availableModels`, fall back to the next-cheaper tier (Opus → Sonnet → Haiku). Log each fallback event: in-pipeline, append a one-line entry to `LEARNINGS.md` § Edge Cases naming the rejected alias, the chosen fallback, and the spawning agent; outside a pipeline, the orchestrator surfaces the fallback in its session text so the operator can correct the managed setting.
 
-**Opus 4.7 breaking changes.** Never pass `thinking.budget_tokens` or non-default `temperature`/`top_p`/`top_k` on routed Opus spawns — Opus 4.7 rejects with HTTP 400.
+**Opus breaking-change note.** Some Opus versions reject `thinking.budget_tokens` and non-default `temperature`/`top_p`/`top_k` with HTTP 400; never pass these on routed Opus spawns. *Specific to Opus 4.7 as of 2026-04-25 — verify against `claude-ecosystem` skill before relaxing if a later version restores the params.*
 
 ### Quality-Cliff Guards
 

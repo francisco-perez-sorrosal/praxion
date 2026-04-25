@@ -9,7 +9,7 @@ description: >
   fresh ideas, has no specific task, or when project gaps and opportunities
   should be explored.
 tools: Read, Glob, Grep, Bash, Write, Edit, AskUserQuestion
-model: opus
+model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.
 permissionMode: default
 memory: user
 maxTurns: 60

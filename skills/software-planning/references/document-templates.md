@@ -117,9 +117,6 @@ Update WIP.md:
 
 ## Edge Cases
 - **[implementer]** [Edge case]: How we handled it
-
-## Technical Debt
-- **[verifier]** [Item]: What was compromised, why, future improvement needed
 ```
 
 ### Attribution Convention
@@ -154,7 +151,6 @@ Review LEARNINGS.md and determine destination:
 | Gotchas | CLAUDE.md | Add to relevant section |
 | Patterns | CLAUDE.md | Document successful approaches |
 | Architectural decisions | ADR or CLAUDE.md | Significant decisions get ADRs |
-| Technical debt | Issue tracker or CLAUDE.md | Track future improvements |
 | Domain knowledge | Project docs | Update relevant documentation |
 
 ### 3. Verify ADR Consistency
@@ -170,4 +166,3 @@ After learnings are merged, delete all planning documents (see [agent intermedia
 - CLAUDE.md (gotchas, patterns, decisions)
 - Git history (what was done)
 - Project documentation (if applicable)
-- Issue tracker (technical debt)

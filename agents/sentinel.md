@@ -165,6 +165,22 @@ Samples implementation files for systemic quality patterns. The sentinel's only 
 |----|----|------|------|
 | CH01 | L | No significant code duplication across implementation files | Sample 3-5 implementation files from recent changes; check for structural similarity in functions and repeated logic blocks across modules |
 
+### Technical Debt (TD)
+
+Surfaces grounded debt — problems anchored in current source code with respect to current goals — by reading `METRICS_REPORT_*.md` and routing findings to `.ai-state/TECH_DEBT_LEDGER.md`. Distinct from CH: CH samples files for systemic patterns; TD turns metric signals into ledger rows that consumer agents can act on. Schema, field constraints, and the class-to-`owner-role` heuristic are defined once in [rules/swe/agent-intermediate-documents.md](../rules/swe/agent-intermediate-documents.md) under `TECH_DEBT_LEDGER.md` — do not duplicate them here. TD01–TD04 write ledger rows; TD05 audits the ledger and never writes rows.
+
+**Staleness WARN policy:** if `.ai-state/METRICS_LOG.md`'s latest row is older than 14 days OR `coverage.status = stale`, emit a TD-dimension WARN and produce findings from whatever data is available. Never block on staleness — the opt-in `--refresh-coverage` workflow makes stale a normal state, not a failure.
+
+**LLM-judgment gating (TD01–TD04):** a numeric threshold breach is necessary but not sufficient. Apply judgment before writing each row — not every p95 file is debt-worthy, and mechanical dumps would flood the ledger with noise. The Tech-Debt Findings report subsection must explain why each filed row was warranted.
+
+| ID | Tp | Rule | Pass |
+|----|----|------|------|
+| TD01 | L | Hotspots warrant ledger entries | Read `METRICS_REPORT_*.md` `hotspots` (churn × complexity); judge which warrant filing; write a ledger row per warranted item with `class = complexity` (severity `important` for top-3 impact, `suggested` otherwise); `owner-role = implementer` by default, escalate to `implementation-planner` when restructuring is required (per heuristic) |
+| TD02 | L | Non-trivial cyclic SCCs are structural defects | Read `METRICS_REPORT_*.md` `pydeps.cyclic_sccs`; for each SCC of size > 1, write a ledger row with `class = cyclic-dep`, `severity = important`, `owner-role = implementation-planner` (per heuristic — module-graph reshuffle is a planning concern) |
+| TD03 | L | Coverage below project floor | Read `METRICS_REPORT_*.md` `coverage` namespace; for each module under the project floor (default 70% when no project threshold is set), write a ledger row with `class = coverage-gap`, `owner-role = test-engineer` (per heuristic). `coverage.status = stale` triggers the staleness WARN above; produce findings from available data, never block |
+| TD04 | L | p95 complexity crossings | Read `METRICS_REPORT_*.md` `lizard` / `complexipy` namespaces; for each file crossing the project complexity p95 threshold, write a ledger row with `class = complexity`, `owner-role = implementer` (per heuristic) |
+| TD05 | L | Ledger status-update discipline | Read `.ai-state/TECH_DEBT_LEDGER.md`; flag (a) `status = resolved` rows missing `resolved-by`, (b) `status = in-flight` rows older than 30 days, (c) `owner-role = unassigned` rows older than 7 days. Surface findings in the Tech-Debt Findings report subsection at WARN severity. **Never writes ledger rows** |
+
 ### Ecosystem Coherence (EC)
 
 | ID | Tp | Rule | Pass |
@@ -437,6 +453,11 @@ Check codes reference dimensions above; Pipeline Discipline (P), Code Health (CH
 
 ### Pipeline Discipline
 [When Chronograph data available — or "Skipped: Task Chronograph unavailable"]
+
+### Tech-Debt Findings
+[Count of new TD rows filed this run by class; count of TD05 discipline issues; per-row "why filed" rationale (LLM-judgment trace).
+Forward-pointer: see `.ai-state/TECH_DEBT_LEDGER.md` for the canonical entries.
+When `METRICS_REPORT_*.md` is absent or its `METRICS_LOG.md` row is older than 14 days, note the WARN here and proceed with available data.]
 
 ### Recommended Actions (prioritized)
 [Numbered list with finding references and owning agents]

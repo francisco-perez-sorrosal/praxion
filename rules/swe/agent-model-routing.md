@@ -9,6 +9,8 @@ Tier table for Praxion subagents. Resolution order at spawn:
 
 Aliases only (`opus`/`sonnet`/`haiku`); pin full IDs at spawn time only when version-locking.
 
+**Orchestrator directive.** When spawning any agent in the table below, pass `model: <alias>` from that row as the Agent tool's `model` parameter on every spawn. Do not skip: an agent without an explicit override falls through to the session model and defeats the policy. Use a per-spawn override that differs from the table only on the sanctioned cases (researcher modes, implementer step-level hint) documented below.
+
 ### Tier Table
 
 | Agent | Tier | Alias | Rationale |
@@ -50,9 +52,9 @@ Aliases only (`opus`/`sonnet`/`haiku`); pin full IDs at spawn time only when ver
 |----------|-------|--------|
 | Emergency cost cap | `haiku` | All spawns on Haiku; accept quality degradation |
 | Emergency quality boost | `opus` | All spawns on Opus; accept cost spike |
-| Bypass to session model | `default` | Clears layer-2/3 overrides; inherits session |
+| Disable kill switch | (unset / not set) | Layer-1 disengages; per-spawn / frontmatter / session resume control per layers 2–4 |
 
-**`availableModels` fallback.** If a routed alias is rejected by `availableModels`, fall back to the next-cheaper tier (Opus → Sonnet → Haiku) and log it for the runbook.
+**`availableModels` fallback.** If a routed alias is rejected by `availableModels`, fall back to the next-cheaper tier (Opus → Sonnet → Haiku). Log each fallback event: in-pipeline, append a one-line entry to `LEARNINGS.md` § Edge Cases naming the rejected alias, the chosen fallback, and the spawning agent; outside a pipeline, the orchestrator surfaces the fallback in its session text so the operator can correct the managed setting.
 
 **Opus 4.7 breaking changes.** Never pass `thinking.budget_tokens` or non-default `temperature`/`top_p`/`top_k` on routed Opus spawns — Opus 4.7 rejects with HTTP 400.
 

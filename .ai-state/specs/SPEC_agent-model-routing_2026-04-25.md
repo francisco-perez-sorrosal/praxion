@@ -52,7 +52,7 @@ Praxion's main orchestrator chooses the Claude model tier (`opus` / `sonnet` / `
 
 ## Post-Ship Follow-ups (tracked for v2)
 
-1. **Refresh always-loaded budget baseline** in `CLAUDE.md` — the 16,200 figure was calculated against an older baseline. Recalibrate after this PR lands.
+1. ~~**Refresh always-loaded budget baseline** in `CLAUDE.md`~~ — RESOLVED in this PR via the post-review fix-pack. The 16,200-token AC1 target was a point-in-time figure recorded in `.ai-work/` pipeline docs (which don't ship); CLAUDE.md never carried a stale baseline. The fix-pack adds a measurement procedure to `rules/CLAUDE.md` so future readers compute current headroom against the 25K hard ceiling rather than referencing decay-prone baselines.
 2. **`skills/claude-ecosystem/SKILL.md` model-catalog refresh** — references stale models (Opus 4.6 / Sonnet 4.5) while current is 4.7 / 4.6 / Haiku 4.5. 32 hits across 15 skill files. Lightweight task, separate scope.
 3. **Routing telemetry revisit** — one month from ship, or sooner if cost overshoot or retry loops observed (especially on `doc-engineer` at Tier L or cartographer's 6-way researcher fan-out). Build transcript-scraper if Anthropic hasn't shipped a resolved-model API by then.
 4. **2D routing (model × effort) revisit** — when telemetry shows a specific agent spending most tokens on an easy-case pattern, OR Anthropic extends `effort` uniformly across tiers.

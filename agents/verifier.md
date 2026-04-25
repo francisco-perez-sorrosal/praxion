@@ -7,6 +7,7 @@ description: >
   implementation is complete, when the implementation-planner's Phase 7
   confirms plan adherence, or at milestones to validate quality before
   committing results.
+model: opus
 tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit
 skills: [code-review, context-security-review, test-coverage]

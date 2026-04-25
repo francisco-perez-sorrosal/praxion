@@ -42,6 +42,7 @@ Before writing any code, read the planning documents in this order:
 1. **`WIP.md`** — find your assigned step in `Current Step` (sequential mode) or `Current Batch` (parallel mode). If parallel, implement only the step assigned to you.
 2. **`IMPLEMENTATION_PLAN.md`** — read the full step details: Implementation, Testing, Done when, Files.
 3. **`LEARNINGS.md`** — read accumulated context, gotchas, and decisions from prior steps.
+4. **Tech-debt ledger awareness (permission, not obligation).** Read `.ai-state/TECH_DEBT_LEDGER.md`. Filter entries by `owner-role = implementer` and `location` overlapping your current scope. Address items where possible within your current task; update `status` to `resolved` (with `resolved-by`) or `in-flight` as appropriate. Out-of-scope items remain `open` — do not delete. This is permission, not obligation: addressing ledger items is allowed when natural to your current scope, never required.
 
 If any document is missing, stop and report: "Missing planning document: [name]. Cannot proceed without it."
 

@@ -67,6 +67,8 @@ This phase is brief — it catches drift between analysis and planning, not a fu
 
 ### Phase 3 — Step Decomposition
 
+**Tech-debt ledger awareness (permission, not obligation).** Before decomposing, read `.ai-state/TECH_DEBT_LEDGER.md` if it exists. Filter entries by `owner-role = implementation-planner` and `location` overlapping the modules your steps will touch. Where natural to the current task, bundle in-scope items into the step decomposition and update their `status` to `resolved` (with `resolved-by`) or `in-flight` as appropriate; out-of-scope items remain `open` — never delete them. Addressing ledger items is allowed when natural to your decomposition, never required, and non-action is a valid outcome.
+
 Break the architecture into incremental implementation steps.
 
 **Decomposition strategy:**

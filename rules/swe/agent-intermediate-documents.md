@@ -73,6 +73,7 @@ This scoping prevents collisions when multiple pipelines or multiple instances o
       SPEC_<name>_YYYY-MM-DD.md
     SYSTEM_DEPLOYMENT.md
     ARCHITECTURE.md
+    TECH_DEBT_LEDGER.md
 ```
 
 - Committed to git — versioned, shareable, accumulates value over time
@@ -93,9 +94,82 @@ This scoping prevents collisions when multiple pipelines or multiple instances o
 
 `ARCHITECTURE.md` — architect-facing design-target architecture document. Abstracts above concrete code to define the space of valid implementations. Created by systems-architect, updated by implementation-planner (planning-stage structural gaps) and implementer (structural changes), validated by verifier and sentinel. Section ownership prevents conflicts. Template at `skills/software-planning/assets/ARCHITECTURE_TEMPLATE.md`. The developer-facing counterpart `docs/architecture.md` is a derived document maintained by the pipeline but lives in the project's `docs/` directory, not in `.ai-state/` (see below).
 
-Agents that update `.ai-state/`: promethean (idea ledger), sentinel (report, log), implementation-planner (spec archival), main agent (calibration log), systems-architect and implementation-planner (ADR files in `decisions/`), systems-architect, implementer, and cicd-engineer (deployment doc), systems-architect, implementation-planner, and implementer (both architecture docs). Artifact inventory is not stored here — it is derivable from the filesystem.
+Agents that update `.ai-state/`: promethean (idea ledger), sentinel (report, log, tech-debt ledger), implementation-planner (spec archival), main agent (calibration log), systems-architect and implementation-planner (ADR files in `decisions/`), systems-architect, implementer, and cicd-engineer (deployment doc), systems-architect, implementation-planner, and implementer (both architecture docs), verifier and sentinel (tech-debt ledger writes — verifier per-change, sentinel repo-wide). Artifact inventory is not stored here — it is derivable from the filesystem.
 
 **`docs/architecture.md`** — developer-facing architecture navigation guide. Every component name and file path is verified against the codebase. Derived from `.ai-state/ARCHITECTURE.md` by filtering to Built components. Created by systems-architect alongside the architect doc, updated by implementation-planner (planning-stage structural gaps) and implementer (step 7.7), maintained by doc-engineer at pipeline checkpoints. Template at `skills/doc-management/assets/ARCHITECTURE_GUIDE_TEMPLATE.md`. Lives in `docs/`, not `.ai-state/`, because it is developer-facing project documentation.
+
+#### `TECH_DEBT_LEDGER.md` — living tech-debt ledger
+
+`.ai-state/TECH_DEBT_LEDGER.md` is a single, persistent, append-only Markdown table that holds grounded debt findings — problems anchored in current source code with respect to current system goals (or vice versa). It is structurally distinct from `LEARNINGS.md` (gotchas/patterns), idea ledgers (speculative future work), and roadmap narration (strategic weaknesses). Producers append rows; consumers update `status` in place; rows are never deleted.
+
+**Writers (only two):**
+
+- **verifier** — appends per-change debt findings (e.g., dead-code survivors of FAIL overrides, bloat, duplication, size/nesting violations) during Phase 5/5.5
+- **sentinel** — appends repo-wide debt findings via its TD dimension (hotspots, cyclic SCCs, coverage-floor breaches, p95 complexity crossings); TD05 status-update-discipline check reads the ledger but never writes to it
+
+No other agent writes ledger rows. Consumer agents (systems-architect, implementation-planner, implementer, test-engineer, doc-engineer) read the ledger, filter by their `owner-role`, and update `status` / `resolved-by` / `last-seen` on existing rows when they address an item.
+
+**Lifecycle conventions:**
+
+- **Append-only rows** — producers add new rows at the end of the table
+- **Status updates in place** — consumers update `status`, `resolved-by`, and `last-seen`; never delete rows. Resolved rows accumulate as a debt-fix audit trail
+- **`wontfix` is a tombstone** — once written, it stays; sentinel may re-surface it but never removes it
+- **No per-run regeneration** — unlike timestamped sentinel reports, the ledger is a single living file that accumulates
+- **No section ownership** — the artifact is a single Markdown table with a small header comment; section ownership is unnecessary
+
+**Schema (14 row fields + 1 structural `dedup_key` field):**
+
+| Field | Type | Constraint | Notes |
+|-------|------|-----------|-------|
+| `id` | string | `td-NNN` zero-padded sequence | Stable across status updates; assigned at write time by next-available-NNN scan |
+| `severity` | enum | `critical` \| `important` \| `suggested` | Aligned with sentinel severity tiering |
+| `class` | enum | `duplication` \| `complexity` \| `dead-code` \| `drift` \| `stale-todo` \| `coverage-gap` \| `cyclic-dep` \| `other` | `other` is an escape hatch for emergent classes; producers SHOULD propose a new enum value if `other` rows accumulate (>5) |
+| `direction` | enum | `code-to-goals` \| `goals-to-code` | The two debt directions in the operating definition |
+| `location` | list | Affected file paths + optional `:start-end` line ranges | One path per list entry; ranges use `path/to/file.py:42-58` syntax |
+| `goal-ref-type` | enum | `adr` \| `spec-req` \| `architecture` \| `claude-md` \| `code-quality` | `code-quality` covers universal engineering principles with no Praxion-specific anchor |
+| `goal-ref-value` | string | ADR id (`dec-NNN`) \| REQ id (`REQ-NN`) \| ARCHITECTURE.md section path \| CLAUDE.md principle name \| empty (only when `goal-ref-type = code-quality`) | |
+| `source` | enum | `verifier` \| `sentinel` | Producer identity |
+| `first-seen` | ISO date | `YYYY-MM-DD` | Set once at row creation; never updated |
+| `last-seen` | ISO date | `YYYY-MM-DD` | Updated on every re-detection by the same `source` |
+| `owner-role` | enum | `systems-architect` \| `implementation-planner` \| `implementer` \| `test-engineer` \| `doc-engineer` \| `unassigned` | Assigned by producer per the heuristic below; downstream consumer MAY re-assign with notes |
+| `status` | enum | `open` \| `in-flight` \| `resolved` \| `wontfix` | Updated in place by consumer agents |
+| `resolved-by` | string | ADR id, commit SHA, or PR URL when `status = resolved`; empty otherwise | `wontfix` SHOULD populate `notes` with rationale rather than `resolved-by` |
+| `notes` | string | Short prose — intent, rationale, scope hints, override-survivor flag | One sentence preferred; multi-line discouraged |
+| `dedup_key` | string | `sha1(f"{class}\|{normalize(location)}\|{direction}\|{goal-ref-type}\|{goal-ref-value}")[:12]` | Computed at write time; structural; used by post-merge dedupe |
+
+`normalize(location)` is the sorted, comma-joined list of paths (no line ranges) — so two rows that differ only in line range or path order produce the same `dedup_key`.
+
+**Owner-role heuristic (canonical class-to-role mapping):**
+
+Both producers reference this single table when assigning `owner-role` to a new row. Downstream consumers may re-assign with a note in the `notes` field.
+
+| `class` enum value | Default `owner-role` | Override conditions |
+|-------------------|---------------------|---------------------|
+| `duplication` | `implementer` | `architecture` goal-ref → `systems-architect`; cross-module systemic → `implementation-planner` |
+| `complexity` | `implementer` | Module restructuring required (interface split, layer reshuffle) → `implementation-planner`; invariant violation → `systems-architect` |
+| `dead-code` | `implementer` | In `tests/` directory → `test-engineer`; doc-only → `doc-engineer` |
+| `drift` | `doc-engineer` | `goal-ref-type = adr` or `architecture` → `systems-architect` |
+| `stale-todo` | `unassigned` | `notes` field tags an owner explicitly → that role; location in `tests/` → `test-engineer` |
+| `coverage-gap` | `test-engineer` | None — coverage is always test-engineer-owned |
+| `cyclic-dep` | `implementation-planner` | Always — module-graph reshuffle is a planning concern |
+| `other` | `unassigned` | Producer's `notes` field SHOULD propose an owner; downstream consumers may re-assign |
+
+**Worktree concurrency:** ledger rows are append-only and may be filed independently by pipelines running in separate worktrees. Conflicts surface only at merge-to-main, where a post-merge dedupe step (`scripts/finalize_tech_debt_ledger.py`, modeled on `scripts/finalize_adrs.py`: idempotent, advisory file lock, bounded scope, dry-run flag) collapses rows sharing a `dedup_key`. Status precedence on collapse is `resolved > in-flight > open > wontfix`; ties break by newer `last-seen`. Non-conflicting fields are merged (notes concatenated with ` | `; locations union-sorted).
+
+```mermaid
+sequenceDiagram
+    participant W as Worktree (pipeline)
+    participant G as Git
+    participant F as Post-merge finalize
+    participant L as TECH_DEBT_LEDGER.md (main)
+    W->>L: append rows during pipeline
+    W->>G: commit + merge to main
+    G->>F: post-merge hook fires (chain: finalize_adrs -> finalize_tech_debt_ledger -> squash-safety)
+    F->>L: dedupe by dedup_key; status precedence + tie-break by last-seen
+    F->>L: write back; idempotent
+```
+
+**Consumer-contract framing:** the ledger's input contract on its five consumer agents is "permission, not obligation" — adding the contract line does not make every consumer process every open item on every run. Non-action is a valid outcome. This framing prevents future agents from over-interpreting the contract as a mandate, which would degrade per-agent phase-budget discipline and produce noise.
 
 ### Document Lifecycle
 
@@ -105,7 +179,7 @@ Agents that update `.ai-state/`: promethean (idea ledger), sentinel (report, log
 | Ephemeral | `.ai-work/<task-slug>/` | `TEST_RESULTS.md` — implementer (or test-engineer) test-run handoff artifact (canonical schema in `skills/software-planning/references/agent-pipeline-details.md`) | Single pipeline run — merge into `VERIFICATION_REPORT.md`, then delete |
 | Ephemeral | `.ai-work/<task-slug>/` | `traceability.yml` — REQ-to-test/implementation mapping (canonical source of truth during the pipeline; rendered into the archived SPEC's matrix at feature end per [`id-citation-discipline.md`](id-citation-discipline.md)) | Single pipeline run — rendered into archived SPEC matrix, then deleted with `.ai-work/` |
 | Session-persistent | `.ai-work/<task-slug>/` | `IMPLEMENTATION_PLAN.md`, `WIP.md`, `LEARNINGS.md` | Across sessions — merge learnings into permanent locations at feature end |
-| Permanent | `.ai-state/` | `IDEA_LEDGER_*.md`, `SENTINEL_REPORT_*.md`, `SENTINEL_LOG.md`, `SPEC_*.md`, `calibration_log.md`, `decisions/<NNN>-<slug>.md`, `SYSTEM_DEPLOYMENT.md`, `ARCHITECTURE.md` | Project lifetime — committed to git, timestamped per run or living document |
+| Permanent | `.ai-state/` | `IDEA_LEDGER_*.md`, `SENTINEL_REPORT_*.md`, `SENTINEL_LOG.md`, `SPEC_*.md`, `calibration_log.md`, `decisions/<NNN>-<slug>.md`, `SYSTEM_DEPLOYMENT.md`, `ARCHITECTURE.md`, `TECH_DEBT_LEDGER.md` | Project lifetime — committed to git, timestamped per run or living document |
 | Permanent | `docs/` | `architecture.md` | Project lifetime — committed to git, derived from `.ai-state/ARCHITECTURE.md`, maintained by pipeline agents |
 
 ### Version Control and Cleanup

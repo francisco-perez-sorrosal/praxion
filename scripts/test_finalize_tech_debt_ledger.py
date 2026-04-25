@@ -45,8 +45,10 @@ import pytest
 
 # Policy: notes-merge separator between surviving and discarded rows.
 # Source: rules/swe/agent-intermediate-documents.md line 157 -- "notes
-# concatenated with ` | `". NOT a test-engineer choice.
-NOTES_SEPARATOR = " | "
+# concatenated with ` // `". NOT a test-engineer choice. The ` // `
+# separator was chosen over the previous ` | ` to avoid collision
+# with the Markdown table column delimiter.
+NOTES_SEPARATOR = " // "
 
 # Policy: status precedence on collapse. Source: rule line 157.
 STATUS_PRECEDENCE = ("resolved", "in-flight", "open", "wontfix")
@@ -185,7 +187,7 @@ def read_rows(path: Path) -> list[str]:
 
 def parse_row(row_line: str) -> dict[str, str]:
     """Parse a single table row line into a field-name-to-value dict."""
-    # Strip leading/trailing `|` and whitespace, then split on ` | `.
+    # Strip leading/trailing `|` and whitespace, then split on `|` (column delimiter).
     stripped = row_line.strip().strip("|")
     parts = [p.strip() for p in stripped.split("|")]
     if len(parts) != len(FIELD_ORDER):

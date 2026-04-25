@@ -154,7 +154,7 @@ Both producers reference this single table when assigning `owner-role` to a new 
 | `cyclic-dep` | `implementation-planner` | Always — module-graph reshuffle is a planning concern |
 | `other` | `unassigned` | Producer's `notes` field SHOULD propose an owner; downstream consumers may re-assign |
 
-**Worktree concurrency:** ledger rows are append-only and may be filed independently by pipelines running in separate worktrees. Conflicts surface only at merge-to-main, where a post-merge dedupe step (`scripts/finalize_tech_debt_ledger.py`, modeled on `scripts/finalize_adrs.py`: idempotent, advisory file lock, bounded scope, dry-run flag) collapses rows sharing a `dedup_key`. Status precedence on collapse is `resolved > in-flight > open > wontfix`; ties break by newer `last-seen`. Non-conflicting fields are merged (notes concatenated with ` | `; locations union-sorted).
+**Worktree concurrency:** ledger rows are append-only and may be filed independently by pipelines running in separate worktrees. Conflicts surface only at merge-to-main, where a post-merge dedupe step (`scripts/finalize_tech_debt_ledger.py`, modeled on `scripts/finalize_adrs.py`: idempotent, advisory file lock, bounded scope, dry-run flag) collapses rows sharing a `dedup_key`. Status precedence on collapse is `resolved > in-flight > open > wontfix`; ties break by newer `last-seen`. Non-conflicting fields are merged (notes concatenated with ` // ` — chosen to avoid collision with the Markdown table column delimiter `|`; locations union-sorted).
 
 ```mermaid
 sequenceDiagram

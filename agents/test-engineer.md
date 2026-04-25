@@ -101,6 +101,8 @@ If `WIP.md` shows no current step or your step is already `[COMPLETE]`, stop and
 
 Before writing code, design the test strategy from the acceptance criteria:
 
+**Tech-debt ledger awareness (permission, not obligation).** Read `.ai-state/TECH_DEBT_LEDGER.md`. Filter entries by `owner-role = test-engineer` and `location` overlapping your current scope. Address items where possible within your current task; update `status` to `resolved` (with `resolved-by`) or `in-flight` as appropriate. Out-of-scope items remain `open` — do not delete. This is permission, not obligation: addressing ledger items is allowed when natural to your current scope, never required.
+
 1. **Map acceptance criteria to tests** — each acceptance criterion from `SYSTEMS_PLAN.md` becomes one or more test cases. **Name tests after the behavior they specify, never after an identifier.** A test that validates REQ-03's behavior is named `test_rejects_expired_token`, not `test_req03_rejects_expired_token`. See [`rules/swe/id-citation-discipline.md`](../rules/swe/id-citation-discipline.md) for the full rule.
    When the step's `Testing` field references requirement IDs (e.g., "Validates REQ-01, REQ-03"), record the test-to-REQ mapping in an external traceability file (see Phase 4 item 7). **Do not embed REQ/AC IDs in test names, docstrings, or comments** — the archived SPEC's matrix (populated from `traceability.yml`) is the single source of truth.
 2. **Define expected interfaces** — from the architecture in `SYSTEMS_PLAN.md`, determine what functions/classes/modules you will call and what they should return. This is the contract the implementer must satisfy.

@@ -214,6 +214,41 @@ graph LR
 
 **Correlating observations and spans.** Both layers carry the OpenInference canonical `session.id` attribute — chronograph spans set it on every span type including tool spans (see `task-chronograph-mcp/src/task_chronograph_mcp/otel_relay.py`). Observations additionally carry top-level `trace_id`, `span_id`, `traceparent`, and `parent_span_id` fields, extracted from the MCP `params._meta.traceparent` envelope by the memory-mcp tool handlers and forwarded to the hook via `additionalContext`. Filter by trace with `ObservationStore.query(trace_id=...)`. Historical rows without these fields parse cleanly as `None`.
 
+### Tech-Debt Ledger Flow
+
+```mermaid
+graph LR
+    subgraph Producers
+        VER[Verifier<br/>per-change Phase 5/5.5]
+        SEN[Sentinel<br/>repo-wide TD dimension]
+    end
+    subgraph Artifact
+        LED[(.ai-state/<br/>TECH_DEBT_LEDGER.md)]
+    end
+    subgraph Consumers["5 Consumers<br/>permission-not-obligation"]
+        SA[systems-architect]
+        IP[implementation-planner]
+        IM[implementer]
+        TE[test-engineer]
+        DE[doc-engineer]
+    end
+    subgraph Excluded["Explicitly excluded"]
+        PR[promethean]
+        RC[roadmap-cartographer]
+    end
+    VER -->|append rows| LED
+    SEN -->|append rows| LED
+    LED -->|filter by owner-role| SA
+    LED -->|filter by owner-role| IP
+    LED -->|filter by owner-role| IM
+    LED -->|filter by owner-role| TE
+    LED -->|filter by owner-role| DE
+    PR -. excluded .- LED
+    RC -. excluded .- LED
+```
+
+The verifier writes per-change debt entries during Phase 5/5.5. The sentinel writes repo-wide entries via the TD dimension (`TD01–TD04` LLM-judgment-gated reads of `METRICS_REPORT_*.md`; `TD05` audits status discipline, never writes). Five existing consumer agents read the ledger, filter by their `owner-role`, and update row status in place — framed as permission, not obligation. `/project-metrics` and `/project-coverage` feed the sentinel as signal sources but never write rows. Promethean and roadmap-cartographer are intentionally excluded — they operate on strategic horizons, not in-flight debt. Worktree-merge dedupe runs in the post-merge hook chain via `scripts/finalize_tech_debt_ledger.py`; see `rules/swe/agent-intermediate-documents.md § TECH_DEBT_LEDGER.md` for the schema, owner-role heuristic, and merge-time sequence.
+
 ## 6. Dependencies
 
 <!-- OWNER: implementer (as-built), doc-engineer (verification) | LAST UPDATED: 2026-04-12 -->

@@ -244,6 +244,41 @@ sequenceDiagram
 
 The finalize flow activates only when `.ai-state/decisions/drafts/` has entries; the concurrency-model component (Section 3) describes the full primitive set. `scripts/finalize_adrs.py` is idempotent and guarded by an advisory `fcntl` lock.
 
+### Tech-Debt Ledger Flow
+
+```mermaid
+graph LR
+    subgraph Producers
+        VER[Verifier<br/>per-change Phase 5/5.5]
+        SEN[Sentinel<br/>repo-wide TD dimension]
+    end
+    subgraph Artifact
+        LED[(.ai-state/<br/>TECH_DEBT_LEDGER.md)]
+    end
+    subgraph Consumers["5 Consumers<br/>permission-not-obligation per dec-069"]
+        SA[systems-architect]
+        IP[implementation-planner]
+        IM[implementer]
+        TE[test-engineer]
+        DE[doc-engineer]
+    end
+    subgraph Excluded["Explicitly excluded"]
+        PR[promethean]
+        RC[roadmap-cartographer]
+    end
+    VER -->|append rows| LED
+    SEN -->|append rows| LED
+    LED -->|filter by owner-role| SA
+    LED -->|filter by owner-role| IP
+    LED -->|filter by owner-role| IM
+    LED -->|filter by owner-role| TE
+    LED -->|filter by owner-role| DE
+    PR -. excluded .- LED
+    RC -. excluded .- LED
+```
+
+Two producers write rows, five consumers read and filter by `owner-role`. `/project-metrics` and `/project-coverage` are signal sources for the sentinel TD dimension — their `METRICS_REPORT_*.md` outputs feed sentinel's `TD01–TD04` checks but neither command writes to the ledger directly. Promethean (project-level ideation) and roadmap-cartographer (lens-set audit synthesis) are explicitly excluded — strategic horizons, not in-flight debt. Append-only writes plus the post-merge dedupe sequence (`scripts/finalize_tech_debt_ledger.py` — see `rules/swe/agent-intermediate-documents.md § TECH_DEBT_LEDGER.md`) keep concurrent worktree pipelines safe.
+
 ## 6. Dependencies
 
 <!-- OWNER: systems-architect (initial), implementer (as-built) | LAST UPDATED: 2026-04-12 by systems-architect -->

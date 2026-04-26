@@ -8,7 +8,12 @@ A walkthrough of developing a small application using the Praxion agent pipeline
 2. Verify: `./install.sh --check`
 3. Start a Claude Code session in your project directory
 
-Starting a new project from scratch? See [Greenfield Project Onboarding](project-onboarding.md) for the `new_cc_project.sh` + `/new-cc-project` flow that scaffolds a Claude-ready Python starter app.
+**Two onboarding paths** — pick the one that matches your starting point:
+
+- **Greenfield (empty directory)**: `new_project.sh` + `/new-project` scaffolds a Claude-ready Python starter app, then chains to `/onboard-project` for the remaining surfaces. See [Greenfield Project Onboarding](greenfield-onboarding.md).
+- **Existing project (has code already)**: `/onboard-project` applies Praxion's surfaces — `.gitignore` block, `.ai-state/` skeleton, `.gitattributes` + merge drivers, git hooks (pre-commit + post-merge), `.claude/settings.json` toggles, `CLAUDE.md` blocks. See [Existing-Project Onboarding](existing-project-onboarding.md).
+
+Both paths converge on the same end state — Praxion-ready repo with a self-contained `## Agent Pipeline` block in `CLAUDE.md`.
 
 ## Parallel Reading: Claude Ecosystem Foundations
 
@@ -224,7 +229,7 @@ The pipeline above takes you from idea to working code. Going from working code 
 
 ### Suggested order for a brand-new project
 
-After `/new-cc-project` lands the seed app:
+After `/new-project` lands the seed app:
 
 1. Iterate on features using the **Lessons** in `onboarding_for_mushi_busy_ppl.md` (L1–L7, generated alongside the seed)
 2. Run a **sentinel audit** once the codebase has more than ~10 files — establishes the health baseline future audits diff against

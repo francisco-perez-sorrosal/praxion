@@ -1,10 +1,12 @@
 # Greenfield Project Onboarding
 
-Reference for `new_cc_project.sh` and the `/new-cc-project` slash command — the entry point that turns an empty directory into a Claude-ready Python project with a per-run `onboarding_for_mushi_busy_ppl.md` trail map.
+Reference for `new_project.sh` and the `/new-project` slash command — the entry point that turns an empty directory into a Claude-ready Python project with a per-run `onboarding_for_mushi_busy_ppl.md` trail map.
 
-The script lays a minimal pre-Claude scaffold (`.git/`, `.gitignore`, empty `.claude/`), validates host prereqs, then `exec`s an interactive Claude Code session seeded with the `/new-cc-project` command body embedded inline (Claude Code's CLI does not dispatch slash commands from positional arguments, so the body is passed directly). Claude asks one question, shows you the orchestrator model, then drives the build through Praxion's pipeline — researcher fetches current SDK signatures via `external-api-docs`, systems-architect sketches module shape, planner decomposes, implementer + test-engineer produce code + tests in parallel, verifier checks acceptance criteria. Only *after* the codebase exists does Claude run `/init` (so CLAUDE.md reflects what you chose), append the Agent Pipeline block, generate the per-run trail map, and stage the scaffold for `/co`.
+> **Two onboarding paths.** This doc covers **greenfield** (empty directory). For an **existing project** that already has code, use `/onboard-project` and read [Existing-Project Onboarding](existing-project-onboarding.md). The greenfield flow ends by chaining to `/onboard-project` so both paths converge on the same end state — Praxion-aware repo with git hooks, merge drivers, full `.gitignore`, `.ai-state/` skeleton, and `.claude/settings.json` toggles. The greenfield seed pipeline produces `.ai-state/ARCHITECTURE.md` + `docs/architecture.md` as part of the systems-architect's full delegation checklist (gate 4b), so when the user runs `/onboard-project` afterward, **its Phase 8 (Architecture Baseline) is a no-op** — the predicate detects the existing architecture docs and skips. No double-architect overhead.
 
-For the design rationale, see [Design decision](#design-decision). For the slash command's full contract, read `commands/new-cc-project.md`.
+The script lays a pre-Claude scaffold (`.git/`, full AI-assistants `.gitignore`, empty `.claude/`), validates host prereqs, then `exec`s an interactive Claude Code session seeded with the `/new-project` command body embedded inline (Claude Code's CLI does not dispatch slash commands from positional arguments, so the body is passed directly). Claude asks one question, shows you the orchestrator model, then drives the build through Praxion's pipeline — researcher fetches current SDK signatures via `external-api-docs`, systems-architect sketches module shape, planner decomposes, implementer + test-engineer produce code + tests in parallel, verifier checks acceptance criteria. Only *after* the codebase exists does Claude run `/init` (so CLAUDE.md reflects what you chose), append the Agent Pipeline block, generate the per-run trail map, recommend `/onboard-project` for the remaining surfaces, and stage the scaffold for `/co`.
+
+For the design rationale, see [Design decision](#design-decision). For the slash command's full contract, read `commands/new-project.md`.
 
 ## Contents
 
@@ -29,22 +31,22 @@ Two equivalent invocations:
 
 ```bash
 # From the Praxion checkout
-./new_cc_project.sh my-app
+./new_project.sh my-app
 
 # From anywhere, after './install.sh code' has symlinked the entry into ~/.local/bin/
-new-cc-project my-app
+new-project my-app
 ```
 
 Optional second positional `[target-dir]` (defaults to `$PWD`) controls where `<project-name>/` is created:
 
 ```bash
-new-cc-project my-app ~/code        # creates ~/code/my-app/
+new-project my-app ~/code        # creates ~/code/my-app/
 ```
 
-Optional `PRAXION_NEW_CC_EDITOR` env var picks the surface the scaffold opens in so you can watch `.ai-work/` and `.ai-state/` populate as the pipeline runs. Values: `auto` (default — Cursor if present, else VS Code), `cursor`, `code`, `claude-desktop`, `none`. The `claude-desktop` value launches `Claude.app` and copies the project path to the clipboard — Anthropic does not ship a documented CLI flag or URL scheme to point the desktop app at a folder, so you click **Select folder** and paste. macOS only today.
+Optional `PRAXION_NEW_PROJECT_EDITOR` env var picks the surface the scaffold opens in so you can watch `.ai-work/` and `.ai-state/` populate as the pipeline runs. Values: `auto` (default — Cursor if present, else VS Code), `cursor`, `code`, `claude-desktop`, `none`. The `claude-desktop` value launches `Claude.app` and copies the project path to the clipboard — Anthropic does not ship a documented CLI flag or URL scheme to point the desktop app at a folder, so you click **Select folder** and paste. macOS only today.
 
 ```bash
-PRAXION_NEW_CC_EDITOR=claude-desktop new-cc-project my-app
+PRAXION_NEW_PROJECT_EDITOR=claude-desktop new-project my-app
 ```
 
 The script refuses to run if the project name does not match `^[A-Za-z0-9][A-Za-z0-9._-]*$` (letters/digits first, then letters/digits/`.`/`_`/`-`) or if the target path already exists and is non-empty.
@@ -55,7 +57,7 @@ The transcript below is illustrative — actual output depends on the installed 
 
 ```text
 # illustrative; actual output will differ
-$ new-cc-project my-app
+$ new-project my-app
 → Scaffolded my-app at /Users/you/code/my-app. Launching Claude Code...
 
 [Claude Code session starts]
@@ -124,13 +126,13 @@ The bash layer creates the first three rows; Claude generates the rest. The mush
 | `.git/` | Git repo metadata | Never directly — use `git` commands |
 | `.gitignore` | Five-line AI-assistants block (`.ai-work/`, `.env*`, `.claude/settings.local.json`) | Append project-specific patterns; do not remove the AI-assistants block |
 | `.claude/` | Empty directory marking this as a Claude Code project | Drop project-scoped Claude config here later (e.g., custom `settings.json`) |
-| `CLAUDE.md` | Project-level Claude instructions; generated by `/init` **after** the pipeline has produced the codebase (so it describes the real code, not the empty scaffold); `/new-cc-project` then appends the Praxion `## Agent Pipeline` block | When project conventions, top-level layout, or pipeline expectations change |
+| `CLAUDE.md` | Project-level Claude instructions; generated by `/init` **after** the pipeline has produced the codebase (so it describes the real code, not the empty scaffold); `/new-project` then appends the Praxion `## Agent Pipeline` block | When project conventions, top-level layout, or pipeline expectations change |
 | `pyproject.toml` | uv-managed project metadata + deps (`claude-agent-sdk`, `fastapi`, `sse-starlette`, `httpx`, `pytest`) | Whenever you add a dependency — let `uv add` write it |
 | `src/agent/*` | Agent core (`core.py`), starter tools (`tools.py` — `read_file` + safe-listed `run_command`), prompts (`prompts.py`) | Add tools, change the system prompt, swap the agent loop |
 | `src/web/*` | FastAPI POST `/chat` endpoint streaming SSE (`app.py`) + minimal chat UI (`static/index.html`) | Change the API surface or the UI |
 | `tests/test_agent.py` | One smoke test — constructs the agent without hitting the network (uses the SDK's mock/stub hooks) | Add behavioral tests as you add features |
 | `.env.example` | Lists `ANTHROPIC_API_KEY=` placeholder; copy to `.env` (gitignored) for live runs | When you add new env vars — keep `.env.example` in sync |
-| `onboarding_for_mushi_busy_ppl.md` | Per-run trail map: TL;DR card, Mermaid happy-path diagram, "What got created" table, 5–7 lessons (`<details>` collapsibles), glossary, "what to read next" | Treat as run-specific output; regenerate by running `/new-cc-project` again in a fresh dir, or hand-edit lessons as the app evolves |
+| `onboarding_for_mushi_busy_ppl.md` | Per-run trail map: TL;DR card, Mermaid happy-path diagram, "What got created" table, 5–7 lessons (`<details>` collapsibles), glossary, "what to read next" | Treat as run-specific output; regenerate by running `/new-project` again in a fresh dir, or hand-edit lessons as the app evolves |
 
 ## Troubleshooting
 
@@ -143,9 +145,9 @@ The bash script uses distinct exit codes for each prereq failure so you can diag
 | Exit `4`, "the 'i-am' plugin is not installed" | `~/.claude/plugins/installed_plugins.json` does not contain `i-am@bit-agora` | Run `./install.sh code` from this Praxion checkout once, then re-run |
 | Exit `5`, "'git' not found in PATH" | `git` is not installed | Install git from your package manager (`brew install git`, `apt install git`, etc.) |
 | Exit `6`, "already exists and is not empty" | `<target-dir>/<project-name>` is a non-empty path | Pick a different name, pass a different `[target-dir]`, or remove the existing directory |
-| Claude session starts but `/new-cc-project` is not found | Plugin registered but command files are not symlinked into the active config | Re-run `./install.sh --relink code` to refresh plugin command links |
+| Claude session starts but `/new-project` is not found | Plugin registered but command files are not symlinked into the active config | Re-run `./install.sh --relink code` to refresh plugin command links |
 | `uv is not installed` printed; `uv sync && uv run pytest -q` skipped | `uv` not on PATH; the slash command degrades gracefully and continues | Install uv: `curl -LsSf https://astral.sh/uv/install.sh | sh`, then run `uv sync && uv run pytest -q` from the project root manually |
-| Slash command aborts with "doesn't look like a freshly-scaffolded Praxion greenfield project" | `/new-cc-project` was invoked outside a directory created by `new_cc_project.sh` (no `.git/`, missing AI-assistants `.gitignore`, non-empty `.claude/` or `src/`) | Run `new_cc_project.sh <name>` first; or, to onboard an existing project, use `/onboard-project` instead |
+| Slash command aborts with "doesn't look like a freshly-scaffolded Praxion greenfield project" | `/new-project` was invoked outside a directory created by `new_project.sh` (no `.git/`, missing AI-assistants `.gitignore`, non-empty `.claude/` or `src/`) | Run `new_project.sh <name>` first; or, to onboard an existing project, use `/onboard-project` instead |
 
 ## Design decision
 
@@ -155,8 +157,8 @@ Full rationale, considered options, and trade-offs: [`dec-053` — Prompt-over-t
 
 ## Limits for v1
 
-- **Claude Code only as the AI surface running the pipeline.** Running the seed pipeline inside Cursor's AI assistant or Claude Desktop's chat (instead of the `claude` CLI) is deferred. The bash entry assumes a `claude` CLI binary; it is not portable to other AI surfaces. (The editor surface that *opens to view files* is independent — `PRAXION_NEW_CC_EDITOR` covers Cursor, VS Code, and Claude.app; see [How to run it](#how-to-run-it).)
+- **Claude Code only as the AI surface running the pipeline.** Running the seed pipeline inside Cursor's AI assistant or Claude Desktop's chat (instead of the `claude` CLI) is deferred. The bash entry assumes a `claude` CLI binary; it is not portable to other AI surfaces. (The editor surface that *opens to view files* is independent — `PRAXION_NEW_PROJECT_EDITOR` covers Cursor, VS Code, and Claude.app; see [How to run it](#how-to-run-it).)
 - **Default app is Python only** (`uv` + `claude-agent-sdk` + FastAPI). No JS/TS or other-language variants in the default branch.
 - **Custom-app branch tailors only L1 + L2** of the lesson ladder; L3–L7 stay generic Praxion-ecosystem lessons. Tailored count is fixed at 2 regardless of ladder size (5–7 total).
-- **Bash test (`tests/new_cc_project_test.sh`) is single-file**, runnable as `bash tests/new_cc_project_test.sh`. Not yet wired into a `Makefile` target or CI.
+- **Bash test (`tests/new_project_test.sh`) is single-file**, runnable as `bash tests/new_project_test.sh`. Not yet wired into a `Makefile` target or CI.
 - **Plugin install is user-scope only.** The script checks `~/.claude/plugins/installed_plugins.json` for `i-am@bit-agora`; project-scope plugin install is not auto-detected. Re-run `./install.sh code` once per workstation.

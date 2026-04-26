@@ -299,10 +299,10 @@ relink_all() {
         info "Scripts: ${scripts_count} files linked"
     fi
 
-    # 4. new-cc-project entry (parked at repo root, not scripts/)
-    if [ -f "${SCRIPT_DIR}/new_cc_project.sh" ] && [ -x "${SCRIPT_DIR}/new_cc_project.sh" ]; then
+    # 4. new-project entry (parked at repo root, not scripts/)
+    if [ -f "${SCRIPT_DIR}/new_project.sh" ] && [ -x "${SCRIPT_DIR}/new_project.sh" ]; then
         mkdir -p "$bin_dir"
-        link_item "${SCRIPT_DIR}/new_cc_project.sh" "${bin_dir}/new-cc-project" "new-cc-project (greenfield project entry)"
+        link_item "${SCRIPT_DIR}/new_project.sh" "${bin_dir}/new-project" "new-project (greenfield project entry)"
     fi
 
     # PATH check for scripts
@@ -496,7 +496,7 @@ complete_install_from_plugin() {
     # ---- CLI scripts ----
     printf "\n  ${B}[1] Symlink CLI scripts to ~/.local/bin/?${R}\n"
     printf "      ${D}check_id_citation_discipline.py, ccwt (multi-worktree sessions),\n"
-    printf "      chronograph-ctl, phoenix-ctl, new-cc-project — runnable from any\n"
+    printf "      chronograph-ctl, phoenix-ctl, new-project — runnable from any\n"
     printf "      shell. Filters internal helpers (merge drivers, git hooks).${R}\n"
     printf "  ${B}[2] Skip scripts${R}\n"
     ask 1 2
@@ -517,10 +517,10 @@ complete_install_from_plugin() {
         done
         info "Scripts: ${scripts_count} files linked"
 
-        # new-cc-project (parked at repo root)
-        if [ -f "${SCRIPT_DIR}/new_cc_project.sh" ] && [ -x "${SCRIPT_DIR}/new_cc_project.sh" ]; then
-            ln -sf "${SCRIPT_DIR}/new_cc_project.sh" "${bin_dir}/new-cc-project"
-            info "new-cc-project: linked"
+        # new-project (parked at repo root)
+        if [ -f "${SCRIPT_DIR}/new_project.sh" ] && [ -x "${SCRIPT_DIR}/new_project.sh" ]; then
+            ln -sf "${SCRIPT_DIR}/new_project.sh" "${bin_dir}/new-project"
+            info "new-project: linked"
         fi
 
         if [[ ":$PATH:" != *":${HOME}/.local/bin:"* ]]; then
@@ -946,12 +946,12 @@ check_claude_code() {
         fi
     done
 
-    # new-cc-project entry (lives at repo root, not scripts/)
-    if [ -f "${SCRIPT_DIR}/new_cc_project.sh" ] && [ -x "${SCRIPT_DIR}/new_cc_project.sh" ]; then
-        if [ -L "${bin_dir}/new-cc-project" ] && [ "$(readlink "${bin_dir}/new-cc-project")" = "${SCRIPT_DIR}/new_cc_project.sh" ]; then
-            info "new-cc-project linked"
+    # new-project entry (lives at repo root, not scripts/)
+    if [ -f "${SCRIPT_DIR}/new_project.sh" ] && [ -x "${SCRIPT_DIR}/new_project.sh" ]; then
+        if [ -L "${bin_dir}/new-project" ] && [ "$(readlink "${bin_dir}/new-project")" = "${SCRIPT_DIR}/new_project.sh" ]; then
+            info "new-project linked"
         else
-            warn "new-cc-project not linked to ~/.local/bin/"
+            warn "new-project not linked to ~/.local/bin/"
             healthy=false
         fi
     fi
@@ -1102,10 +1102,10 @@ uninstall_claude_code() {
         fi
     done
 
-    # Remove new-cc-project entry (lives at repo root, not scripts/)
-    if [ -L "${bin_dir}/new-cc-project" ] && [ "$(readlink "${bin_dir}/new-cc-project")" = "${SCRIPT_DIR}/new_cc_project.sh" ]; then
-        rm "${bin_dir}/new-cc-project"
-        info "Removed new-cc-project from ~/.local/bin/"
+    # Remove new-project entry (lives at repo root, not scripts/)
+    if [ -L "${bin_dir}/new-project" ] && [ "$(readlink "${bin_dir}/new-project")" = "${SCRIPT_DIR}/new_project.sh" ]; then
+        rm "${bin_dir}/new-project"
+        info "Removed new-project from ~/.local/bin/"
     fi
 
     # Remove hooks from settings.json
@@ -1245,8 +1245,8 @@ dry_run_claude_code() {
     for script in "${SCRIPT_DIR}/scripts"/*; do
         [ -f "$script" ] && printf "    %s\n" "$(basename "$script")"
     done
-    if [ -f "${SCRIPT_DIR}/new_cc_project.sh" ]; then
-        printf "    new_cc_project.sh -> ~/.local/bin/new-cc-project (greenfield project entry)\n"
+    if [ -f "${SCRIPT_DIR}/new_project.sh" ]; then
+        printf "    new_project.sh -> ~/.local/bin/new-project (greenfield project entry)\n"
     fi
     printf "\n"
 }

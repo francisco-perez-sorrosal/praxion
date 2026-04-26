@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# new_cc_project.sh — Greenfield Claude-ready project bootstrap.
+# new_project.sh — Greenfield Claude-ready project bootstrap.
 #
 # Validates host prereqs, lays down a minimal scaffold (.git, .gitignore, .claude),
-# then exec's an interactive Claude Code session seeded with /new-cc-project.
+# then exec's an interactive Claude Code session seeded with /new-project.
 #
-# Usage: new_cc_project.sh <project-name> [target-dir]
+# Usage: new_project.sh <project-name> [target-dir]
 # Env vars:
-#   PRAXION_NEW_CC_EDITOR  Which editor surface to open the scaffold in.
+#   PRAXION_NEW_PROJECT_EDITOR  Which editor surface to open the scaffold in.
 #                          Values: auto (default; cursor → code), cursor,
 #                          code, claude-desktop, none. The claude-desktop
 #                          option launches Claude.app and copies the project
@@ -15,7 +15,10 @@
 #                          open a folder programmatically.
 # Exit codes: 0 ok, 2 usage/invalid name, 3 no claude, 4 no plugin, 5 no git,
 #             6 target exists & non-empty.
-# See docs/project-onboarding.md for the full flow and troubleshooting matrix.
+# See docs/greenfield-onboarding.md for the full flow and troubleshooting matrix.
+# (Companion: /onboard-project + docs/existing-project-onboarding.md cover the
+# existing-project path. /new-project ends by chaining to /onboard-project
+# so both paths converge on the same end state.)
 
 set -eo pipefail
 
@@ -31,7 +34,7 @@ readonly PLUGIN_FILE="${HOME}/.claude/plugins/installed_plugins.json"
 readonly PLUGIN_KEY='i-am@bit-agora'
 
 usage() {
-    printf 'Usage: new_cc_project.sh <project-name> [target-dir]\n' >&2
+    printf 'Usage: new_project.sh <project-name> [target-dir]\n' >&2
 }
 
 # Parse args.
@@ -96,14 +99,20 @@ mkdir -p .claude
 cat > .gitignore <<'EOF'
 # AI assistants
 .ai-work/
+.ai-state/*.lock
+.ai-state/**/*.lock
+.ai-state/*.backup.json
+.ai-state/*.pre-forget.json
+.claude/settings.local.json
+.claude/worktrees/
 .env
 .env.*
-.claude/settings.local.json
+.env.local
 EOF
 
 # Open the project in the user's chosen surface so they can watch .ai-work/
 # and .ai-state/ appear as the pipeline runs. Selection is driven by the
-# PRAXION_NEW_CC_EDITOR env var:
+# PRAXION_NEW_PROJECT_EDITOR env var:
 #   unset / auto    → cursor first, then VS Code (legacy behavior)
 #   cursor          → Cursor only
 #   code            → VS Code only
@@ -113,7 +122,7 @@ EOF
 #                     and ask the user to paste into "Select folder".
 #   none            → no editor launch (pure-terminal environments)
 # Absent editors are not an error — onboarding still works without one.
-editor_choice="${PRAXION_NEW_CC_EDITOR:-auto}"
+editor_choice="${PRAXION_NEW_PROJECT_EDITOR:-auto}"
 editor_launched=""
 desktop_path_announce=""
 
@@ -142,7 +151,7 @@ launch_code_if_present() {
 # for environments without pbcopy.
 launch_claude_desktop() {
     if [ "$(uname -s)" != "Darwin" ]; then
-        printf '→ PRAXION_NEW_CC_EDITOR=claude-desktop is only wired for macOS today.\n' >&2
+        printf '→ PRAXION_NEW_PROJECT_EDITOR=claude-desktop is only wired for macOS today.\n' >&2
         printf '  Open Claude Code desktop manually and select this folder: %s\n' "$project_path" >&2
         return 1
     fi
@@ -167,11 +176,11 @@ case "$editor_choice" in
         ;;
     cursor)
         launch_cursor_if_present || \
-            printf '→ PRAXION_NEW_CC_EDITOR=cursor but the cursor CLI is not on PATH.\n' >&2
+            printf '→ PRAXION_NEW_PROJECT_EDITOR=cursor but the cursor CLI is not on PATH.\n' >&2
         ;;
     code)
         launch_code_if_present || \
-            printf '→ PRAXION_NEW_CC_EDITOR=code but the code CLI is not on PATH.\n' >&2
+            printf '→ PRAXION_NEW_PROJECT_EDITOR=code but the code CLI is not on PATH.\n' >&2
         ;;
     claude-desktop)
         launch_claude_desktop || true
@@ -179,7 +188,7 @@ case "$editor_choice" in
     none)
         ;;
     *)
-        printf '→ PRAXION_NEW_CC_EDITOR=%s is not recognized; valid: auto|cursor|code|claude-desktop|none.\n' \
+        printf '→ PRAXION_NEW_PROJECT_EDITOR=%s is not recognized; valid: auto|cursor|code|claude-desktop|none.\n' \
             "$editor_choice" >&2
         ;;
 esac
@@ -194,16 +203,16 @@ fi
 printf '→ Scaffolded %s at %s. Launching Claude Code...\n' \
     "$project_name" "$project_path"
 
-# Locate the /new-cc-project command body so we can embed it as the seed prompt.
+# Locate the /new-project command body so we can embed it as the seed prompt.
 # Claude Code's CLI does NOT dispatch slash commands from positional args — they
 # are treated as literal user messages. Embedding the command body keeps the
 # handoff deterministic regardless of slash-command plumbing.
-cmd_body_file="$(find "$HOME/.claude/plugins" -maxdepth 6 -name new-cc-project.md -type f -print 2>/dev/null | head -n 1 || true)"
+cmd_body_file="$(find "$HOME/.claude/plugins" -maxdepth 6 -name new-project.md -type f -print 2>/dev/null | head -n 1 || true)"
 if [ -z "$cmd_body_file" ]; then
     # Dev fallback: invoked directly from a Praxion checkout.
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    if [ -f "$script_dir/commands/new-cc-project.md" ]; then
-        cmd_body_file="$script_dir/commands/new-cc-project.md"
+    if [ -f "$script_dir/commands/new-project.md" ]; then
+        cmd_body_file="$script_dir/commands/new-project.md"
     fi
 fi
 
@@ -224,9 +233,9 @@ if [ -n "$cmd_body_file" ] && [ -f "$cmd_body_file" ]; then
 
 ---
 
-The text above is the body of the /new-cc-project slash command. The bash bootstrap embeds it here because Claude Code's CLI does not dispatch slash commands from positional arguments. You are now inside a freshly scaffolded Praxion greenfield project. Execute those instructions in order, starting from the §Guard check. Do not ask me to invoke anything — begin now."
+The text above is the body of the /new-project slash command. The bash bootstrap embeds it here because Claude Code's CLI does not dispatch slash commands from positional arguments. You are now inside a freshly scaffolded Praxion greenfield project. Execute those instructions in order, starting from the §Guard check. Do not ask me to invoke anything — begin now."
 else
-    seed_prompt="You are inside a freshly scaffolded Praxion greenfield project. Invoke the /new-cc-project slash command now to onboard it. If the slash command is not registered, locate its body under ~/.claude/plugins/ (Markdown file named new-cc-project.md) and follow its instructions."
+    seed_prompt="You are inside a freshly scaffolded Praxion greenfield project. Invoke the /new-project slash command now to onboard it. If the slash command is not registered, locate its body under ~/.claude/plugins/ (Markdown file named new-project.md) and follow its instructions."
 fi
 
 # Pre-allow the tools the seed pipeline relies on so the user is not paged

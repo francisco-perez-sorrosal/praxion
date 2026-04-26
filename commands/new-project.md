@@ -3,24 +3,28 @@ description: Scaffold a greenfield Claude-ready Python project and onboard it to
 allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion, Task, mcp__chub__*]
 ---
 
-Onboard the current (freshly scaffolded) directory. Ask one question first, show the user *how* Praxion is driven (orchestrator + subagents), frame the build as a pipeline task so they watch the orchestrator in action, then — once the codebase exists — run `/init`, append the Agent Pipeline block, generate a per-run trail map, and hand off to `/co`.
+Onboard the current (freshly scaffolded) directory. Ask one question first, show the user *how* Praxion is driven (orchestrator + subagents), frame the build as a pipeline task so they watch the orchestrator in action, then — once the codebase exists — run `/init`, append the three Praxion blocks (Agent Pipeline + Compaction Guidance + Behavioral Contract) idempotently, generate a per-run trail map, and hand off to `/onboard-project` (which applies the remaining surfaces — git hooks, merge drivers, `.ai-state/` skeleton, `.claude/settings.json` toggles) before the user runs `/co` to commit. **Greenfield and existing-project paths converge on the same end state**: this command is the existing-project counterpart of `/onboard-project`'s Phase 6 ("CLAUDE.md blocks"); both produce byte-identical CLAUDE.md sections.
 
 ## Sections
 
 1. §Guard — shape check before doing anything
 2. §Flow — the sequential recipe this command executes
-3. §Phase Gates — `AskUserQuestion` pause points between phases, with escape hatch
-4. §What is Praxion — canonical paragraph (sentinel-fenced, copied verbatim by the mushi doc)
-5. §How Claude drives Praxion — orchestrator preamble (sentinel-fenced; also mirrored into the mushi doc)
-6. §Default App — Pipeline Framing — literal task issued for the default build, shown to the user before execution
-7. §Custom App — Pipeline Framing — how the same shape adapts when the user describes their own app
-8. §Default App Spec — file inventory + invariants the pipeline must satisfy
-9. §SDK smoke check — the import probe and doc-staleness recovery
-10. §Init idempotency — predicate for appending the Agent Pipeline block
-11. §Mushi Doc Spec — the eight ordered sections
-12. §Five-to-Seven Lessons — L1–L7 "Put this in Claude" canonical ladder
-13. §Prereq Behaviors — `uv` missing, `ANTHROPIC_API_KEY` unset
-14. §Agent Pipeline Block — verbatim source
+3. §Phase Contracts — what each Flow phase produces + idempotency predicate (mirror of `/onboard-project`'s §Flow table)
+4. §Phase Gates — `AskUserQuestion` pause points between phases, with escape hatch
+5. §What is Praxion — canonical paragraph (sentinel-fenced, copied verbatim by the mushi doc)
+6. §How Claude drives Praxion — orchestrator preamble (sentinel-fenced; also mirrored into the mushi doc)
+7. §Default App — Pipeline Framing — literal task issued for the default build, shown to the user before execution
+8. §Custom App — Pipeline Framing — how the same shape adapts when the user describes their own app
+9. §Default App Spec — file inventory + invariants the pipeline must satisfy
+10. §SDK smoke check — the import probe and doc-staleness recovery
+11. §Init idempotency — per-block predicates for the three CLAUDE.md appends
+12. §Mushi Doc Spec — the nine ordered sections
+13. §Five-to-Seven Lessons — L1–L7 "Put this in Claude" canonical ladder
+14. §Prereq Behaviors — `uv` missing, `ANTHROPIC_API_KEY` unset
+15. §Agent Pipeline Block — verbatim source (mirror of `/onboard-project`)
+16. §Compaction Guidance Block — verbatim source (mirror of `/onboard-project`)
+17. §Behavioral Contract Block — verbatim source (mirror of `/onboard-project`)
+18. §Idempotency Predicates — per-Flow-phase contracts
 
 ## §Guard
 
@@ -35,7 +39,7 @@ Run these four checks from the project root:
 
 If any check fails, abort with:
 
-> This directory doesn't look like a freshly-scaffolded Praxion greenfield project. `/new-cc-project` expects to run inside a directory produced by `new_cc_project.sh` (a `.git/` repo with the AI-assistants `.gitignore` block, an empty `.claude/`, and no `src/` tree yet). If you meant to onboard an existing project, run `/onboard-project` instead.
+> This directory doesn't look like a freshly-scaffolded Praxion greenfield project. `/new-project` expects to run inside a directory produced by `new_project.sh` (a `.git/` repo with the AI-assistants `.gitignore` block, an empty `.claude/`, and no `src/` tree yet). If you meant to onboard an existing project, run `/onboard-project` instead.
 
 Exit without writing anything.
 
@@ -71,13 +75,30 @@ When the guard passes, follow these steps in order. Each step is a contract — 
 
 9. **Invoke `/init` NOW.** First, fire **GATE 6** per §Phase Gates. Then invoke `/init` — the codebase exists and reflects the user's choice, so `/init`'s CLAUDE.md describes reality. Do not author CLAUDE.md by hand.
 
-10. **Append the Agent Pipeline block idempotently.** Per §Init idempotency, check whether `CLAUDE.md` already has a `## Agent Pipeline` heading. If not, append the block verbatim from §Agent Pipeline Block.
+10. **Append the three Praxion blocks idempotently.** Per §Init idempotency, check `CLAUDE.md` for each of three headings independently — `## Agent Pipeline`, `## Compaction Guidance`, `## Behavioral Contract`. For each missing heading, append the corresponding block verbatim from §Agent Pipeline Block, §Compaction Guidance Block, §Behavioral Contract Block respectively. Each block is guarded by its own predicate; one missing block does not force re-appending the others. **Smooth-integration contract:** if all three append, `/onboard-project`'s Phase 6 will be a complete no-op when the user runs it next.
 
 11. **Generate the mushi doc LAST.** First, fire **GATE 7** per §Phase Gates. Then generate the mushi doc — file anchors (§Mushi Doc Spec) must be computed against the final on-disk state, so this step follows everything that writes source code.
 
 12. **Stage the scaffold.** `git add -A` (the `.gitignore` keeps `.env` and `.ai-work/` out). Do NOT run `git commit`. *(Phase 8 — no preceding gate; the staging+handoff is short and the exit message itself is the natural pause.)*
 
 13. **Print the exit handoff** (verbatim wording at the end of this file).
+
+## §Phase Contracts
+
+Mirror of `/onboard-project`'s §Flow contracts table — what each Phase produces and the predicate that makes it idempotent. Phases here are coarser-grained than `/onboard-project`'s (greenfield is more pedagogical and the seed pipeline output is feature-driven), but the **CLAUDE.md block surfaces (§Init idempotency, §Phase 6 in `/onboard-project`) are byte-identical**.
+
+| Phase | Action | Predicate (skip if already done) |
+|-------|--------|----------------------------------|
+| 1 | Single content question (`AskUserQuestion`) — what to build | None — entry point |
+| 2 | Print orchestrator preamble | None — read-only chat output |
+| 3 | Branch on answer (default vs custom) + show pipeline-framed prompt | None — per-invocation framing |
+| 4 | Execute Standard-tier pipeline (researcher → architect → planner → implementer ∥ test-engineer → verifier) | None — produces feature artifacts each run |
+| 5 | SDK smoke check + test gate (`uv sync && uv run pytest -q`) + Python `.gitignore` block | Per §Idempotency Predicates: Python block detected by `# Python` header |
+| 6 | `/init` (if `CLAUDE.md` missing) + idempotent append of three blocks | Per §Init idempotency — three independent heading-detection predicates |
+| 7 | Generate the per-run mushi doc | None — file is regenerated each run by design |
+| 8 | Stage scaffold + print exit handoff (recommends `/onboard-project` then `/co`) | None — terminal phase |
+
+The §Guard at flow-start ensures the directory is in greenfield-shape (empty `.claude/`, no `src/`, AI-assistants `.gitignore` block from `new_project.sh`) — re-runs on a non-greenfield directory abort with a redirect to `/onboard-project`.
 
 ## §Phase Gates
 
@@ -109,7 +130,7 @@ The seed onboarding is the densest pedagogical moment in a Praxion user's whole 
 | 4d | step 5d (implementer + test-engineer) | `Pipeline step 4 of 5: implementer + test-engineer running concurrently on disjoint file sets. Writes src/agent/, src/web/, and tests/ — real code lands in your project tree. Watch your editor's file tree refresh as files appear. Continue?` |
 | 4e | step 5e (verifier) | `Pipeline step 5 of 5: verifier. Checks the three §Default App acceptance criteria — agent→web import isolation, SAFE_COMMANDS shape, pytest green. Compact-seed output is a one-paragraph in-chat report; the formal VERIFICATION_REPORT.md is reserved for full-tier features. Continue?` |
 | 5 | step 6 (SDK smoke check) | `Phase 5 of 7: I verify the Claude Agent SDK import surface (chub docs sometimes drift from the installed package), run the test suite via uv, and lock down the .gitignore Python block. Continue?` |
-| 6 | step 9 (/init) | `Phase 6 of 7: I run /init so CLAUDE.md describes the code that ACTUALLY exists (not what I imagined), then append the Agent Pipeline reference idempotently. Continue?` |
+| 6 | step 9 (/init) | `Phase 6 of 7: I run /init so CLAUDE.md describes the code that ACTUALLY exists (not what I imagined), then idempotently append three Praxion blocks — Agent Pipeline (how to delegate), Compaction Guidance (what to preserve when chat compacts), and Behavioral Contract (Surface Assumptions / Register Objection / Stay Surgical / Simplicity First). Each is guarded by its own heading-detection predicate. Continue?` |
 | 7 | step 11 (mushi doc) | `Phase 7 of 7: I generate onboarding_for_mushi_busy_ppl.md — your project-specific map with a happy-path Mermaid diagram, file inventory, lesson ladder, and PoC-to-production journey. Continue?` |
 
 **Don't paraphrase the headlines.** Copy each cell verbatim into the `question` field — they're sized to teach the user *why* each phase exists, not just *what* it does, and the wording was chosen so the seven gates form a coherent narrative across the run.
@@ -199,7 +220,7 @@ If Claude cannot produce a concrete `src/<path>:<line>` anchor for a tailored le
 
 ## §Default App Spec
 
-Structural reference — the pipeline (§Flow step 5) must produce these paths and honor these invariants.
+Structural reference — the pipeline (§Flow step 5) must produce these paths and honor these invariants. The architect agent honoring this spec runs per its standing contract in `agents/systems-architect.md` (full delegation checklist on first invocation), with the seed-specific tightening described in §Default App — Pipeline Framing.
 
 **File inventory (paths are mandatory):**
 
@@ -244,16 +265,20 @@ Never copy symbol names from this file into generated code — this file deliber
 
 ## §Init idempotency
 
-Before appending the §Agent Pipeline Block to `CLAUDE.md`, run:
+`/new-project` appends **three** blocks to `CLAUDE.md`: §Agent Pipeline Block, §Compaction Guidance Block, §Behavioral Contract Block. Each is guarded by an independent heading-detection predicate so re-runs are no-ops per block.
+
+For each of the three blocks, before appending:
 
 ```
-grep -q '^## Agent Pipeline' CLAUDE.md
+grep -q '^## <BLOCK_HEADING>$' CLAUDE.md
 ```
+
+…where `<BLOCK_HEADING>` is `Agent Pipeline`, `Compaction Guidance`, or `Behavioral Contract` respectively.
 
 - Exit `0` (match found) → block already exists; skip the append.
-- Exit non-zero → append the block verbatim from §Agent Pipeline Block.
+- Exit non-zero → append the block verbatim from its §-named source section.
 
-This predicate mirrors `/onboard-project`, so re-running either command does not duplicate the section.
+These predicates mirror `/onboard-project`'s §Phase 6 byte-for-byte. Re-running either command — or running both — never duplicates a section. If `/new-project` lands all three blocks during greenfield, `/onboard-project`'s Phase 6 becomes a complete no-op (every per-block predicate hits) — the smooth-integration contract.
 
 ## §Mushi Doc Spec
 
@@ -267,7 +292,7 @@ Generate `<project-root>/onboarding_for_mushi_busy_ppl.md` with these nine secti
 6. **Five-to-seven lesson ladder** — `<details>` collapsibles, one per lesson, in the "Put this in Claude" four-bullet format defined in §Five-to-Seven Lessons. L6 is mandatory.
 7. **Glossary collapsible** — short definitions for: Praxion, skill, agent, rule, command, **orchestrator**, **subagent**, pipeline, Understand/Plan/Verify, Claude Agent SDK, uv, `.ai-state/`, `.ai-work/`, `/co`, `/cop`, **ADR** (`dec-NNN`), **sentinel report**.
 8. **Journey to Production** — heading `## From PoC to Production`. Open content (NOT a `<details>` — this is core, not optional depth). Eight rows in a milestone table (`Milestone | Trigger | Produces`) covering: (1) Working PoC + architecture baseline + first ADR = the seed already lands all three (`.ai-state/ARCHITECTURE.md`, `docs/architecture.md`, and one ADR draft under `.ai-state/decisions/drafts/`), (2) Health audit via `sentinel` agent producing `.ai-state/SENTINEL_REPORT_*.md`, (3) Architecture *evolves* — each feature updates `.ai-state/ARCHITECTURE.md` + `docs/architecture.md` via `systems-architect`, (4) ADR fleet accumulates — each decision-worthy choice becomes a new draft in `.ai-state/decisions/drafts/` (promoted to stable `dec-NNN` at merge-to-main by `scripts/finalize_adrs.py`), (5) CI/CD via `cicd-engineer` producing `.github/workflows/*.yml`, (6) Deployment via `deployment` skill producing `compose.yaml` + `.ai-state/SYSTEM_DEPLOYMENT.md`, (7) First release via `/release` producing version bump + `CHANGELOG.md` + git tag, (8) Cross-session memory via `remember()` writing `.ai-state/memory.json`. Each `Trigger` cell shows the exact prompt or command. Each `Produces` cell names a real path the user will see. Close the section with a 6-step "Suggested order for this project" numbered list anchored to the just-generated app: iterate via L1–L7 (each feature evolves the architecture docs + may add an ADR) → sentinel audit at ~10 files → CI/CD before first user → deployment when ready to host → first release at stable behavior → record ADRs continuously as you go, never batched. The table mirrors `docs/getting-started.md#journey-poc-to-production` in shape; the language stack column reflects what was actually scaffolded (e.g., row 5 names `pyproject.toml` if uv was detected).
-9. **What to read next** — one-line pointer to `docs/project-onboarding.md` in the Praxion repo, plus: "Run `/co` to make your first commit (or `/cop` for commit+push); both apply `rules/swe/vcs/git-conventions.md` automatically, so you don't hand-craft commit messages."
+9. **What to read next** — three short bullets in this exact order: (1) "Run `/onboard-project` to apply the remaining onboarding surfaces — git hooks (ADR finalize, id-citation discipline), merge drivers for `.ai-state/memory.json` + `observations.jsonl`, `.ai-state/` skeleton, `.claude/settings.json` toggles. The greenfield scaffold leaves these for `/onboard-project` so both onboarding paths share one source of truth.", (2) "Run `/co` to make your first commit (or `/cop` for commit+push); both apply `rules/swe/vcs/git-conventions.md` automatically, so you don't hand-craft commit messages.", (3) "Open `docs/greenfield-onboarding.md` in the Praxion repo for the full greenfield walkthrough; `docs/existing-project-onboarding.md` covers the existing-project path that `/onboard-project` drives."
 
 **File anchors:** every lesson references at least one concrete anchor of the form `src/<path>:<line>` that resolves to a real line. Generate the mushi doc after all source files are written so anchors are stable.
 
@@ -355,25 +380,72 @@ Ship all seven by default; L1 / L2 / L7 may be omitted only if anchor generation
 
 ## §Agent Pipeline Block
 
-Append this block to `CLAUDE.md` when the idempotency predicate (§Init idempotency) reports no existing heading. **Source of truth:** the identical block lives in `commands/onboard-project.md`. If that file changes, mirror the change here — both commands must produce byte-identical CLAUDE.md sections.
+Append this block to `CLAUDE.md` when the §Init idempotency predicate reports no existing heading. **Source of truth:** `commands/onboard-project.md` § Agent Pipeline Block is the authoritative version; the block below is a verbatim mirror. If you need to change the block, change it in `commands/onboard-project.md` first, then mirror here. Both commands must produce byte-identical CLAUDE.md sections.
 
 ```markdown
 ## Agent Pipeline
 
-Follow the Understand, Plan, Verify methodology. For multi-step work (Standard/Full tier), delegate to specialized agents in pipeline order. Each pipeline operates in an ephemeral `.ai-work/<task-slug>/` directory (deleted after use); permanent artifacts go to `.ai-state/` (committed to git).
+Follow the **Understand, Plan, Verify** methodology. For multi-step work (Standard/Full tier), delegate to specialized agents in pipeline order. Each pipeline operates in an ephemeral `.ai-work/<task-slug>/` directory (deleted after use); permanent artifacts go to `.ai-state/` (committed to git).
 
 1. **researcher** → `.ai-work/<slug>/RESEARCH_FINDINGS.md` — codebase exploration, external docs
-2. **systems-architect** → `.ai-work/<slug>/SYSTEMS_PLAN.md` + ADR drafts under `.ai-state/decisions/drafts/` (promoted to stable `<NNN>-<slug>.md` at merge-to-main by `scripts/finalize_adrs.py`) + `.ai-state/ARCHITECTURE.md` (architect-facing) + `docs/architecture.md` (developer-facing)
+2. **systems-architect** → `.ai-work/<slug>/SYSTEMS_PLAN.md` + ADR drafts under `.ai-state/decisions/drafts/` (promoted to stable `<NNN>-<slug>.md` at merge-to-main by the post-merge hook) + `.ai-state/ARCHITECTURE.md` (architect-facing) + `docs/architecture.md` (developer-facing)
 3. **implementation-planner** → `.ai-work/<slug>/IMPLEMENTATION_PLAN.md` + `WIP.md` — step decomposition
-4. **implementer** + **test-engineer** (concurrent) → code + tests — execute steps from the plan
+4. **implementer** + **test-engineer** (concurrent, on disjoint file sets) → code + tests — execute steps from the plan
 5. **verifier** → `.ai-work/<slug>/VERIFICATION_REPORT.md` — post-implementation review
 
-**Independent audits**: the `sentinel` agent runs outside the pipeline and writes timestamped `.ai-state/SENTINEL_REPORT_*.md` plus an append-only `.ai-state/SENTINEL_LOG.md`. Trigger it for ecosystem health baselines (before first ideation, after major refactors).
+**Independent audits.** The `sentinel` agent runs outside the pipeline and writes timestamped `.ai-state/SENTINEL_REPORT_<timestamp>.md` plus an append-only `.ai-state/SENTINEL_LOG.md`. Trigger it for ecosystem health baselines (before first ideation, after major refactors).
 
-**From PoC to production**: the feature pipeline is one milestone of many. The full journey runs through sentinel audit → CI/CD (`cicd-engineer`) → deployment (`deployment` skill) → first release (`/release`) → persistent decisions as ADRs → cross-session memory (`memory.json` + `observations.jsonl`). See the milestone table at `docs/getting-started.md#journey-poc-to-production`.
+**From PoC to production.** The feature pipeline is one milestone of many. The full journey: baseline audit (`/sentinel`) → CI/CD setup (`cicd-engineer` agent) → deployment (`deployment` skill) → first release (`/release`) → ongoing decisions captured as ADRs in `.ai-state/decisions/` → cross-session memory in `.ai-state/memory.json` (when memory MCP is enabled).
 
 Always include expected deliverables when delegating to an agent. The agent coordination protocol rule has full delegation checklists.
 ```
+
+## §Compaction Guidance Block
+
+Append this block to `CLAUDE.md` when the §Init idempotency predicate for `## Compaction Guidance` reports no existing heading. **Source of truth:** `commands/onboard-project.md` § Compaction Guidance Block — verbatim mirror below.
+
+```markdown
+## Compaction Guidance
+
+When this conversation compacts, always preserve: the active pipeline stage and task slug, the current WIP step number and status, acceptance criteria from the systems plan, and the list of files modified in the current step. The Praxion `PreCompact` hook snapshots in-flight pipeline documents to `.ai-work/<slug>/PIPELINE_STATE.md` — re-read that file after compaction to restore orientation.
+```
+
+## §Behavioral Contract Block
+
+Append this block to `CLAUDE.md` when the §Init idempotency predicate for `## Behavioral Contract` reports no existing heading. **Source of truth:** `commands/onboard-project.md` § Behavioral Contract Block — verbatim mirror below.
+
+```markdown
+## Behavioral Contract
+
+Four non-negotiable behaviors for any agent (including Claude itself) writing, planning, or reviewing code in this project:
+
+- **Surface Assumptions** — list assumptions before acting; ask when ambiguity could produce the wrong artifact.
+- **Register Objection** — when a request violates scope, structure, or evidence, state the conflict with a reason before complying or declining. Silent agreement is a contract violation.
+- **Stay Surgical** — touch only what the change requires; if scope grew, stop and re-scope instead of silently expanding.
+- **Simplicity First** — prefer the smallest solution that meets the behavior; every added line, file, or dependency must earn its place.
+
+Self-test: did I state assumptions, flag conflicts with reasons, stay inside declared scope, and choose the simplest path?
+```
+
+## §Idempotency Predicates — per-Flow-phase contracts
+
+Per-phase predicates that govern §Flow steps. Re-running `/new-project` on a directory mid-flight (e.g., after a partial run) honors these checks so completed phases are not redone.
+
+| Flow step | Predicate (skip if true) |
+|-----------|--------------------------|
+| 8 (Python `.gitignore` block) | `grep -q '^# Python$' .gitignore` AND each of the four lines (`__pycache__/`, `.venv/`, `*.egg-info/`, `.pytest_cache/`) already present |
+| 10a (Agent Pipeline append) | `grep -q '^## Agent Pipeline$' CLAUDE.md` |
+| 10b (Compaction Guidance append) | `grep -q '^## Compaction Guidance$' CLAUDE.md` |
+| 10c (Behavioral Contract append) | `grep -q '^## Behavioral Contract$' CLAUDE.md` |
+
+Other §Flow steps (1–7, 9, 11–13) are not idempotent in the strict sense because the seed pipeline (researcher → architect → planner → implementer + test-engineer → verifier) produces new artifacts each run. The §Guard at flow-start refuses to run on a non-greenfield directory, so re-invocation is rare; if it does happen, the user gets a Guard abort and is directed to `/onboard-project` instead.
+
+**Smooth integration contract.** When `/new-project` finishes successfully and the user runs `/onboard-project` next (per the exit handoff recommendation), two phases of `/onboard-project` are complete no-ops because the seed pipeline already produced their outputs:
+
+- **`/onboard-project` Phase 6 (CLAUDE.md blocks)** — all three predicates hit (Agent Pipeline, Compaction Guidance, Behavioral Contract are present from this command's Flow step 10).
+- **`/onboard-project` Phase 8 (Architecture Baseline)** — the predicate `test -e .ai-state/ARCHITECTURE.md` hits because the seed pipeline's `systems-architect` (gate 4b) already produced both `.ai-state/ARCHITECTURE.md` and `docs/architecture.md`. Re-running the architect would overwrite a real-content baseline with another real-content baseline; the predicate prevents that.
+
+The other phases of `/onboard-project` (1, 2, 3, 4, 5, 7, 9) apply the surfaces this command does not — git hooks, merge drivers, `.ai-state/` skeleton (`DECISIONS_INDEX.md`, `TECH_DEBT_LEDGER.md`, `calibration_log.md`), `.gitattributes`, `.claude/settings.json` toggles, companion CLI advisories, and the verification handoff.
 
 ## Test gate
 
@@ -390,7 +462,9 @@ If `uv` is absent, see §Prereq Behaviors and skip gracefully. If tests fail, su
 Stage everything (`git add -A`). Do NOT commit. Print exactly:
 
 ```
-Scaffold staged. Run /co to make the first commit (or /cop for commit+push); both apply rules/swe/vcs/git-conventions.md automatically, so you don't hand-craft commit messages.
+Scaffold staged. Two recommended next steps:
+  1. Run /onboard-project — applies the remaining surfaces (git hooks, merge drivers, .ai-state/ skeleton, .claude/settings.json toggles, full CLAUDE.md blocks). Greenfield and existing-project paths converge here.
+  2. Run /co to commit (or /cop for commit+push); both apply rules/swe/vcs/git-conventions.md automatically, so you don't hand-craft commit messages.
 ```
 
-The mushi doc's "What to do next" carries the same language — `/co` as default, `/cop` as commit-and-push, and the explicit note that the user is outsourcing commit-message authoring to the git-conventions rule.
+The mushi doc's "What to read next" carries the same three-step language — `/onboard-project` first (smooth integration with the existing-project path), `/co` second (commit), and a pointer to `docs/greenfield-onboarding.md` (this command's companion doc) plus `docs/existing-project-onboarding.md` (the `/onboard-project` companion).

@@ -26,3 +26,15 @@ Utility and operational scripts for the Praxion ecosystem.
 ## Installer Filter
 
 `install_claude.sh` links scripts under `~/.local/bin/` only when they are `-f && -x` AND do not match `merge_driver_*` or `git-*-hook.sh`. User-facing tools must be executable (`chmod +x`); merge drivers and git hooks are invoked by git, not by PATH, so they are intentionally skipped. Orphaned symlinks (from renamed/removed scripts) are cleaned on upgrade by `clean_stale_symlinks`. See dec-042.
+
+## Wired into Onboarding
+
+The `/onboard-project` command installs several of these scripts as git hooks and merge drivers in user projects. When changing any of them, verify the onboarding flow's expectations still hold:
+
+- `git-post-merge-hook.sh` — symlinked into `.git/hooks/post-merge` by `/onboard-project` Phase 4 (universally useful — chains reconcile → finalize → tech-debt-dedup → squash-safety)
+- `git-pre-commit-hook.sh` — Praxion-author-only (shipped-artifact isolation). User projects get a *tailored* inline hook script written by Phase 4 that runs only `check_id_citation_discipline.py` — Praxion's shipped-artifact concern doesn't apply downstream
+- `merge_driver_memory.py`, `merge_driver_observations.py` — registered via `git config merge.<name>.driver` by `/onboard-project` Phase 3 (alongside the `.gitattributes` entries)
+- `check_id_citation_discipline.py` — invoked by the user-project pre-commit hook installed in Phase 4
+- `finalize_adrs.py`, `finalize_tech_debt_ledger.py`, `reconcile_ai_state.py`, `check_squash_safety.py` — invoked by the post-merge hook chain
+
+Path or interface changes to these scripts must update `/onboard-project` Phase 3 (`git config` driver line) and Phase 4 (inline pre-commit hook body) to match.

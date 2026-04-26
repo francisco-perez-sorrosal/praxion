@@ -1,9 +1,9 @@
 # Praxion
 
-[![Version](https://img.shields.io/github/v/release/francisco-perez-sorrosal/Praxion?style=flat-square&label=version)](https://github.com/francisco-perez-sorrosal/Praxion/releases/latest)
-[![Release Date](https://img.shields.io/github/release-date/francisco-perez-sorrosal/Praxion?style=flat-square)](https://github.com/francisco-perez-sorrosal/Praxion/releases/latest)
-[![License](https://img.shields.io/github/license/francisco-perez-sorrosal/Praxion?style=flat-square)](LICENSE)
-[![Last Commit](https://img.shields.io/github/last-commit/francisco-perez-sorrosal/Praxion?style=flat-square)](https://github.com/francisco-perez-sorrosal/Praxion/commits/main)
+[Version](https://github.com/francisco-perez-sorrosal/Praxion/releases/latest)
+[Release Date](https://github.com/francisco-perez-sorrosal/Praxion/releases/latest)
+[License](LICENSE)
+[Last Commit](https://github.com/francisco-perez-sorrosal/Praxion/commits/main)
 
 **A structured layer of reusable expertise, specialized agents, commands, rules, and memory that operationalizes spec-driven development and context engineering into reliable, context-aware results**.
 
@@ -53,7 +53,7 @@ MCP, AGENTS.md, and A2A under the Linux Foundation's AAIF let Praxion's patterns
 
 ### Curiosity over dogma
 
-Agent Teams, HTTP hooks, MCP Gateways, and other emerging patterns may reshape assumptions. Keep the architecture open — track known limitations in [`CLAUDE.md`](CLAUDE.md#known-claude-code-limitations) and revisit when fixes ship.
+Agent Teams, HTTP hooks, MCP Gateways, and other emerging patterns may reshape assumptions. Keep the architecture open — track known limitations in `[CLAUDE.md](CLAUDE.md#known-claude-code-limitations)` and revisit when fixes ship.
 
 ### Behavioral contract over polite compliance
 
@@ -79,86 +79,151 @@ cd Praxion
 
 For other targets: `./install.sh desktop` (Claude Desktop), `./install.sh cursor` (Cursor). See [Installation](#installation) for details.
 
+### Onboard a project
+
+Two distinct paths, picked by what's already in the directory. Both converge on the same Praxion-aware end state — same `.gitignore` block, same `.ai-state/` skeleton, same git hooks, same `CLAUDE.md` blocks.
+
+
+| Starting point                   | Entry point                                                                 | Companion doc                                                      |
+| -------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| **Empty directory** (greenfield) | `./new_project.sh <name>` then `/new-project` inside the launched session   | [Greenfield Project Onboarding](docs/greenfield-onboarding.md)     |
+| **Existing project** (has code)  | `/onboard-project` inside an active Claude Code session at the project root | [Existing-Project Onboarding](docs/existing-project-onboarding.md) |
+
+
+The greenfield flow ends by chaining to `/onboard-project` so there is one source of truth for what "Praxion-onboarded" means. `/onboard-project` runs nine phases with `AskUserQuestion` gates between them — including an opt-in **Phase 8 architecture baseline** that delegates to `systems-architect` to produce `.ai-state/ARCHITECTURE.md` + `docs/architecture.md` from the existing codebase (high leverage: every later sentinel audit, feature pipeline, and Memory MCP recall benefits from those docs landing on day one).
+
 For a pipeline walkthrough -- from ideation through implementation and verification -- see [Getting Started](docs/getting-started.md).
 
 ## What's Included
 
 ### Skills
 
-Reusable knowledge modules loaded automatically based on context. See [`skills/README.md`](skills/README.md) for the full catalog with descriptions and activation triggers.
+Reusable knowledge modules loaded automatically based on context. See `[skills/README.md](skills/README.md)` for the full catalog with descriptions and activation triggers.
 
-| Category | Skills |
-|----------|--------|
-| AI Assistant Crafting | skill-crafting, agent-crafting, command-crafting, mcp-crafting, rule-crafting, hook-crafting |
-| External Knowledge | external-api-docs |
-| Platform Knowledge | claude-ecosystem, agentic-sdks, communicating-agents, llm-prompt-engineering |
-| Planning & Communication | roadmap-planning, roadmap-synthesis, stakeholder-communications |
-| Design & Architecture | api-design, data-modeling, deployment, observability, performance-architecture |
-| Documentation | doc-management |
-| Software Development | python-development, python-prj-mgmt, project-exploration, refactoring, code-review, software-planning, spec-driven-development, agent-evals, cicd, testing-strategy, test-coverage, versioning |
-| Security | context-security-review |
-| OSS Contribution | upstream-stewardship |
-| Project | memory, id-decontamination |
+
+| Category                 | Skills                                                                                                                                                                                         |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AI Assistant Crafting    | skill-crafting, agent-crafting, command-crafting, mcp-crafting, rule-crafting, hook-crafting                                                                                                   |
+| External Knowledge       | external-api-docs                                                                                                                                                                              |
+| Platform Knowledge       | claude-ecosystem, agentic-sdks, communicating-agents, llm-prompt-engineering                                                                                                                   |
+| Planning & Communication | roadmap-planning, roadmap-synthesis, stakeholder-communications                                                                                                                                |
+| Design & Architecture    | api-design, data-modeling, deployment, observability, performance-architecture                                                                                                                 |
+| Documentation            | doc-management                                                                                                                                                                                 |
+| Software Development     | python-development, python-prj-mgmt, project-exploration, refactoring, code-review, software-planning, spec-driven-development, agent-evals, cicd, testing-strategy, test-coverage, versioning |
+| Security                 | context-security-review                                                                                                                                                                        |
+| OSS Contribution         | upstream-stewardship                                                                                                                                                                           |
+| Project                  | memory, id-decontamination                                                                                                                                                                     |
+
 
 ### Commands
 
-Slash commands invoked with `/<name>`. In Claude Code plugin mode, use `/i-am:<name>`. See [`commands/README.md`](commands/README.md) for the full list.
+Slash commands invoked with `/<name>`. In Claude Code plugin mode, use `/i-am:<name>`. See `[commands/README.md](commands/README.md)` for the full list.
 
-| Command | Description |
-|---------|-------------|
-| `/co` | Create a commit for staged (or all) changes |
-| `/cop` | Create a commit and push to remote |
-| `/create-worktree` | Create a new git worktree under `.claude/worktrees/` (legacy `.trees/` accepted by `/merge-worktree` during deprecation — run `scripts/migrate_worktree_home.sh` for migration commands) |
-| `/merge-worktree` | Merge a worktree branch back into current branch; runs `.ai-state/` reconciliation and finalizes any draft ADRs |
-| `/clean-auto-memory` | Opt-in cleanup of orphan Claude Code auto-memory directories for removed worktrees |
-| `/create-simple-python-prj` | Scaffold a Python project (defaults: pixi, `~/dev`) |
-| `/add-rules` | Copy rules into the current project for customization |
-| `/manage-readme` | Create or refine README.md files |
-| `/clean-work` | Clean the `.ai-work/` directory after pipeline completion |
-| `/decontaminate-ids` | Detect and remediate REQ/AC/step citations in project source code |
-| `/cajalogic` | Manage persistent memory (user prefs, learnings, conventions, observations) |
-| `/onboard-project` | Onboard the current project to work with the ecosystem |
-| `/sdd-coverage` | Report spec-to-test and spec-to-code coverage for REQ IDs |
-| `/full-security-scan` | Run a full-project security audit against all security-critical paths |
-| `/release` | Bump version, update changelog, and create a release tag |
-| `/test` | Auto-detect test framework and run tests |
-| `/explore-project` | Explore and understand an unfamiliar project's architecture, patterns, and workflow |
-| `/roadmap` | Produce a lens-audited `ROADMAP.md` for the current project with both deficit repairs (Weaknesses) and forward lines of work (Opportunities) via a project-derived evaluation lens set |
-| `/report-upstream` | File a well-formed bug report on an upstream open-source project |
-| `/review-pr` | Code review a pull request |
-| `/save-changes` | Save current working changes to project memory with secret filtering |
-| `/star-repo` | Star the Praxion repo on GitHub |
-| `/project-metrics` | Compute project complexity/health metrics (churn, complexity, coupling, hot-spots, trends) and write a timestamped report triple to `.ai-state/` |
-| `/project-coverage` | Run the project's canonical coverage target and render a terminal summary via the `test-coverage` skill |
-| `/eval` | Run out-of-band quality evals (Tier 1 behavioral + regression) — opt-in, never hook-driven |
-| `/new-cc-project` | Scaffold a greenfield Claude-ready Python project and onboard it to Praxion |
-| `/refresh-skill` | Refresh version-sensitive sections of a skill against current upstream documentation |
-| `/praxion-complete-install` | Finish a marketplace-only Praxion install — symlink rules, CLI scripts, and optional context-hub MCP |
-| `/praxion-complete-uninstall` | Reverse `/praxion-complete-install` — remove rule/script symlinks and optional MCP |
+
+| Command                       | Description                                                                                                                                                                              |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/co`                         | Create a commit for staged (or all) changes                                                                                                                                              |
+| `/cop`                        | Create a commit and push to remote                                                                                                                                                       |
+| `/create-worktree`            | Create a new git worktree under `.claude/worktrees/` (legacy `.trees/` accepted by `/merge-worktree` during deprecation — run `scripts/migrate_worktree_home.sh` for migration commands) |
+| `/merge-worktree`             | Merge a worktree branch back into current branch; runs `.ai-state/` reconciliation and finalizes any draft ADRs                                                                          |
+| `/clean-auto-memory`          | Opt-in cleanup of orphan Claude Code auto-memory directories for removed worktrees                                                                                                       |
+| `/create-simple-python-prj`   | Scaffold a Python project (defaults: pixi, `~/dev`)                                                                                                                                      |
+| `/add-rules`                  | Copy rules into the current project for customization                                                                                                                                    |
+| `/manage-readme`              | Create or refine README.md files                                                                                                                                                         |
+| `/clean-work`                 | Clean the `.ai-work/` directory after pipeline completion                                                                                                                                |
+| `/decontaminate-ids`          | Detect and remediate REQ/AC/step citations in project source code                                                                                                                        |
+| `/cajalogic`                  | Manage persistent memory (user prefs, learnings, conventions, observations)                                                                                                              |
+| `/onboard-project`            | Onboard the current project to work with the ecosystem                                                                                                                                   |
+| `/sdd-coverage`               | Report spec-to-test and spec-to-code coverage for REQ IDs                                                                                                                                |
+| `/full-security-scan`         | Run a full-project security audit against all security-critical paths                                                                                                                    |
+| `/release`                    | Bump version, update changelog, and create a release tag                                                                                                                                 |
+| `/test`                       | Auto-detect test framework and run tests                                                                                                                                                 |
+| `/explore-project`            | Explore and understand an unfamiliar project's architecture, patterns, and workflow                                                                                                      |
+| `/roadmap`                    | Produce a lens-audited `ROADMAP.md` for the current project with both deficit repairs (Weaknesses) and forward lines of work (Opportunities) via a project-derived evaluation lens set   |
+| `/report-upstream`            | File a well-formed bug report on an upstream open-source project                                                                                                                         |
+| `/review-pr`                  | Code review a pull request                                                                                                                                                               |
+| `/save-changes`               | Save current working changes to project memory with secret filtering                                                                                                                     |
+| `/star-repo`                  | Star the Praxion repo on GitHub                                                                                                                                                          |
+| `/project-metrics`            | Compute project complexity/health metrics (churn, complexity, coupling, hot-spots, trends) and write a timestamped report triple to `.ai-state/`                                         |
+| `/project-coverage`           | Run the project's canonical coverage target and render a terminal summary via the `test-coverage` skill                                                                                  |
+| `/eval`                       | Run out-of-band quality evals (Tier 1 behavioral + regression) — opt-in, never hook-driven                                                                                               |
+| `/new-project`                | Scaffold a greenfield Claude-ready Python project and onboard it to Praxion                                                                                                              |
+| `/refresh-skill`              | Refresh version-sensitive sections of a skill against current upstream documentation                                                                                                     |
+| `/praxion-complete-install`   | Finish a marketplace-only Praxion install — symlink rules, CLI scripts, and optional context-hub MCP                                                                                     |
+| `/praxion-complete-uninstall` | Reverse `/praxion-complete-install` — remove rule/script symlinks and optional MCP                                                                                                       |
+
+
+**Deep dive:** `/new-project` **(greenfield)**
+
+The bash wrapper `new_project.sh <name> [target-dir]` lays a pre-Claude scaffold (`.git/` repo, AI-assistants `.gitignore` block, empty `.claude/`), validates host prereqs, then `exec`s an interactive Claude Code session seeded with the `/new-project` command body. Inside that session, Claude:
+
+1. Asks one content question: what to build (default: a mini Claude Agent SDK + FastAPI coding agent with web UI)
+2. Prints an orchestrator preamble so you learn the model before watching it execute
+3. Runs the **Standard-tier seed pipeline** with phase gates and per-subagent sub-gates (researcher → systems-architect → implementation-planner → implementer + test-engineer → verifier) so you preview each agent's outputs before they appear
+4. Runs `/init` once the codebase exists (so `CLAUDE.md` describes reality), then idempotently appends three Praxion blocks: Agent Pipeline, Compaction Guidance, Behavioral Contract
+5. Generates a per-run `onboarding_for_mushi_busy_ppl.md` trail map with file inventory + lesson ladder
+6. Recommends `/onboard-project` for the remaining surfaces (git hooks, merge drivers, `.ai-state/` skeleton, `.claude/settings.json` toggles), then `/co` to commit
+
+Smooth-integration contract: the seed pipeline writes `.ai-state/ARCHITECTURE.md` + `docs/architecture.md` as part of the systems-architect's full delegation checklist, so `/onboard-project`'s Phase 8 (Architecture Baseline) becomes a no-op when chained — no double-architect overhead.
+
+Optional `PRAXION_NEW_PROJECT_EDITOR=cursor|code|claude-desktop|none` picks the editor surface the scaffold opens in so you can watch `.ai-work/` and `.ai-state/` populate as the pipeline runs.
+
+See [Greenfield Project Onboarding](docs/greenfield-onboarding.md) for the full transcript, troubleshooting, and design rationale.
+
+
+
+**Deep dive:** `/onboard-project` **(existing project)**
+
+Phased, idempotent retrofit for a repo that already has code. Each phase pauses with an `AskUserQuestion` gate that explains *what* and *why* before any write occurs. **Run all rest** (one-way) skips remaining gates.
+
+
+| Phase | Action                                                                                                                                                                                 |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Pre-flight diagnostic (writes nothing — prints stack detection + plugin scope + prior-onboarding signals)                                                                              |
+| 1     | Append the canonical 10-line AI-assistants block to `.gitignore`                                                                                                                       |
+| 2     | Create `.ai-state/` skeleton — `decisions/drafts/`, `DECISIONS_INDEX.md`, `TECH_DEBT_LEDGER.md`, `calibration_log.md`                                                                  |
+| 3     | Append `.gitattributes` entries + register Python semantic merge drivers via `git config`                                                                                              |
+| 4     | Install `pre-commit` (id-citation discipline) + `post-merge` (ADR finalize + tech-debt dedupe + squash safety) hooks                                                                   |
+| 5     | Multi-select `.claude/settings.json` toggles for memory MCP injection / memory gate / memory MCP / observability                                                                       |
+| 6     | Append three blocks to `CLAUDE.md`: Agent Pipeline + Compaction Guidance + Behavioral Contract                                                                                         |
+| 7     | Print install commands for missing companion CLIs (`chub`, `scc`, `uv`) — advisory only                                                                                                |
+| 8     | **Architecture baseline (opt-in, default-yes)** — delegate to `systems-architect` in baseline-audit mode → `.ai-state/ARCHITECTURE.md` + `docs/architecture.md` (+ optional ADR draft) |
+| 9     | Print summary, stage modified files (no commit)                                                                                                                                        |
+
+
+Every phase has an idempotency predicate — re-runs on an already-onboarded project are no-ops. The command never auto-commits. Phase 4 is skipped if the `i-am` plugin is not installed (the hooks need its `scripts/` directory). Phase 8 is skipped if either architecture doc already exists (e.g., produced by a prior seed pipeline or onboard run).
+
+If the directory looks like a freshly-scaffolded greenfield project (`.git/` + AI-assistants `.gitignore` + empty `.claude/` + no source tree), the command aborts with a redirect to `/new-project`.
+
+See [Existing-Project Onboarding](docs/existing-project-onboarding.md) for the full nine-phase contract, the architecture-baseline rationale, and troubleshooting.
+
+
 
 ### Agents
 
-Thirteen autonomous agents for complex, multi-step tasks. See [`agents/README.md`](agents/README.md) for the pipeline diagram and usage patterns.
+Thirteen autonomous agents for complex, multi-step tasks. See `[agents/README.md](agents/README.md)` for the pipeline diagram and usage patterns.
 
-| Agent | Description |
-|-------|-------------|
-| `promethean` | Feature-level ideation from project state |
-| `researcher` | Codebase exploration, external docs, alternative evaluation |
-| `systems-architect` | Trade-off analysis, system design |
-| `implementation-planner` | Step decomposition, execution supervision |
-| `context-engineer` | Context artifact auditing, optimization, ecosystem management |
-| `implementer` | Step execution with skill-augmented coding and self-review |
-| `test-engineer` | Complex test design, test suite refactoring, testing infrastructure |
-| `verifier` | Post-implementation review against acceptance criteria |
-| `doc-engineer` | Documentation quality management (READMEs, catalogs, changelogs) |
-| `sentinel` | Independent ecosystem quality auditor |
-| `skill-genesis` | Post-pipeline learning harvest and artifact proposal |
-| `cicd-engineer` | CI/CD pipeline design, GitHub Actions, deployment automation |
-| `roadmap-cartographer` | Project-level audit through a project-derived lens set (SPIRIT, DORA, SPACE, FAIR, CNCF Platform Maturity, or Custom) synthesized into a grounded `ROADMAP.md` covering strengths, weaknesses, **opportunities (forward lines of work)**, and phased improvements |
+
+| Agent                    | Description                                                                                                                                                                                                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `promethean`             | Feature-level ideation from project state                                                                                                                                                                                                                         |
+| `researcher`             | Codebase exploration, external docs, alternative evaluation                                                                                                                                                                                                       |
+| `systems-architect`      | Trade-off analysis, system design                                                                                                                                                                                                                                 |
+| `implementation-planner` | Step decomposition, execution supervision                                                                                                                                                                                                                         |
+| `context-engineer`       | Context artifact auditing, optimization, ecosystem management                                                                                                                                                                                                     |
+| `implementer`            | Step execution with skill-augmented coding and self-review                                                                                                                                                                                                        |
+| `test-engineer`          | Complex test design, test suite refactoring, testing infrastructure                                                                                                                                                                                               |
+| `verifier`               | Post-implementation review against acceptance criteria                                                                                                                                                                                                            |
+| `doc-engineer`           | Documentation quality management (READMEs, catalogs, changelogs)                                                                                                                                                                                                  |
+| `sentinel`               | Independent ecosystem quality auditor                                                                                                                                                                                                                             |
+| `skill-genesis`          | Post-pipeline learning harvest and artifact proposal                                                                                                                                                                                                              |
+| `cicd-engineer`          | CI/CD pipeline design, GitHub Actions, deployment automation                                                                                                                                                                                                      |
+| `roadmap-cartographer`   | Project-level audit through a project-derived lens set (SPIRIT, DORA, SPACE, FAIR, CNCF Platform Maturity, or Custom) synthesized into a grounded `ROADMAP.md` covering strengths, weaknesses, **opportunities (forward lines of work)**, and phased improvements |
+
 
 ### Rules
 
-Domain knowledge files loaded by the assistant within scope (personal = all projects, project = that project). See [`rules/README.md`](rules/README.md) for the full catalog and the rules-vs-skills decision model.
+Domain knowledge files loaded by the assistant within scope (personal = all projects, project = that project). See `[rules/README.md](rules/README.md)` for the full catalog and the rules-vs-skills decision model.
 
 ### Observability
 
@@ -186,22 +251,26 @@ Dual-layer persistent memory that gives every agent cross-session knowledge abou
 
 **Key tools**:
 
-| Tool | Purpose |
-|------|---------|
-| `remember` | Store a curated memory with type, importance, summary |
-| `search` | Multi-term ranked search with Markdown summaries |
-| `browse_index` | Full memory index as compact Markdown-KV |
-| `timeline` | Chronological view of observations |
-| `session_narrative` | Structured summary of a session |
-| `consolidate` | Merge, archive, or update entries atomically |
+
+| Tool                | Purpose                                               |
+| ------------------- | ----------------------------------------------------- |
+| `remember`          | Store a curated memory with type, importance, summary |
+| `search`            | Multi-term ranked search with Markdown summaries      |
+| `browse_index`      | Full memory index as compact Markdown-KV              |
+| `timeline`          | Chronological view of observations                    |
+| `session_narrative` | Structured summary of a session                       |
+| `consolidate`       | Merge, archive, or update entries atomically          |
+
 
 **Configuration** (per project, in `.ai-state/`):
 
-| File | Purpose | Git |
-|------|---------|-----|
-| `memory.json` | Curated memories (schema v2.0) | Committed |
-| `observations.jsonl` | Observation log (append-only) | Committed |
-| `*.lock` | File locks for concurrency | Gitignored |
+
+| File                 | Purpose                        | Git        |
+| -------------------- | ------------------------------ | ---------- |
+| `memory.json`        | Curated memories (schema v2.0) | Committed  |
+| `observations.jsonl` | Observation log (append-only)  | Committed  |
+| `*.lock`             | File locks for concurrency     | Gitignored |
+
 
 See [Memory Architecture](docs/memory-architecture.md) for the full guide: dual-layer design, data model, enforcement hooks, concurrency model, and scaling strategy.
 
@@ -221,20 +290,22 @@ The main entry point is `install.sh`, which routes to `install_claude.sh` (Claud
 
 ### Claude Code (`./install.sh` or `./install.sh code`)
 
-| Step | What | Interactive? |
-|------|------|-------------|
-| 1 | Personal config (CLAUDE.md, userPreferences.txt, settings.local.json) to `~/.claude/` | No -- always installed |
-| 2 | Rules to `~/.claude/rules/` (auto-loaded by Claude when relevant) | No -- always installed |
-| 3 | i-am plugin via [`bit-agora`](https://github.com/francisco-perez-sorrosal/bit-agora) marketplace (scope: user or project) | Yes -- recommended |
-| 4 | Task Chronograph hooks (agent lifecycle observability) | Yes -- recommended |
-| 5 | CLI scripts (ccwt — multi-worktree Claude sessions) to `~/.local/bin/` | No -- always installed |
-| 6 | External API docs ([context-hub](https://github.com/andrewyng/context-hub) MCP — curated API docs for 600+ libraries) | Yes -- recommended |
-| 7 | Phoenix observability daemon (persistent trace backend at `http://localhost:6006`) | Yes -- recommended |
-| 7 | Claude Desktop config link to official Desktop location | Yes -- skip by default |
 
-When installed as a plugin, commands are namespaced: `/co` becomes `/i-am:co`. Plugin permissions for skill reference files are auto-configured at Step 3. See [`README_DEV.md`](README_DEV.md#progressive-disclosure-and-satellite-files) for how progressive disclosure works with plugin-installed skills.
+| Step | What                                                                                                                      | Interactive?           |
+| ---- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| 1    | Personal config (CLAUDE.md, userPreferences.txt, settings.local.json) to `~/.claude/`                                     | No -- always installed |
+| 2    | Rules to `~/.claude/rules/` (auto-loaded by Claude when relevant)                                                         | No -- always installed |
+| 3    | i-am plugin via `[bit-agora](https://github.com/francisco-perez-sorrosal/bit-agora)` marketplace (scope: user or project) | Yes -- recommended     |
+| 4    | Task Chronograph hooks (agent lifecycle observability)                                                                    | Yes -- recommended     |
+| 5    | CLI scripts (ccwt — multi-worktree Claude sessions) to `~/.local/bin/`                                                    | No -- always installed |
+| 6    | External API docs ([context-hub](https://github.com/andrewyng/context-hub) MCP — curated API docs for 600+ libraries)     | Yes -- recommended     |
+| 7    | Phoenix observability daemon (persistent trace backend at `http://localhost:6006`)                                        | Yes -- recommended     |
+| 7    | Claude Desktop config link to official Desktop location                                                                   | Yes -- skip by default |
 
-**Developing on Praxion itself?** After the standard install, use `praxion-claude-dev` (placed at `~/.local/bin/` by `install.sh`) to launch a Claude Code session that loads the plugin directly from your working tree — edits to skills, commands, agents, or hooks are live, and `/reload-plugins` picks them up without restarting. See [`README_DEV.md`](README_DEV.md#session-scoped-local-testing) for the full dev workflow.
+
+When installed as a plugin, commands are namespaced: `/co` becomes `/i-am:co`. Plugin permissions for skill reference files are auto-configured at Step 3. See `[README_DEV.md](README_DEV.md#progressive-disclosure-and-satellite-files)` for how progressive disclosure works with plugin-installed skills.
+
+**Developing on Praxion itself?** After the standard install, use `praxion-claude-dev` (placed at `~/.local/bin/` by `install.sh`) to launch a Claude Code session that loads the plugin directly from your working tree — edits to skills, commands, agents, or hooks are live, and `/reload-plugins` picks them up without restarting. See `[README_DEV.md](README_DEV.md#session-scoped-local-testing)` for the full dev workflow.
 
 **Manual plugin install** (marketplace-only, without cloning):
 
@@ -270,19 +341,23 @@ Skills, commands, and agents are Claude Code features -- run `./install.sh code`
 
 Installs skills, rules, commands, and MCP into Cursor's discovery paths. Two targets:
 
-| Target | Command | Result |
-|--------|---------|--------|
-| **User profile (default)** | `./install.sh cursor` | Installs into `~/.cursor/`. Available in every Cursor project. |
-| **Per project** | `./install.sh cursor /path/to/repo` | Installs into `/path/to/repo/.cursor/`. Only that project sees these artifacts. |
+
+| Target                     | Command                             | Result                                                                          |
+| -------------------------- | ----------------------------------- | ------------------------------------------------------------------------------- |
+| **User profile (default)** | `./install.sh cursor`               | Installs into `~/.cursor/`. Available in every Cursor project.                  |
+| **Per project**            | `./install.sh cursor /path/to/repo` | Installs into `/path/to/repo/.cursor/`. Only that project sees these artifacts. |
+
 
 **What gets installed:**
 
-| What | How |
-|------|-----|
-| Skills | Symlinks to this repo's `skills/<name>/` |
-| Rules | Symlinks to this repo's `rules/` (preserving directory structure) |
-| Commands | Exported from `commands/*.md` (frontmatter stripped to plain Markdown) |
-| MCP | `mcp.json` with task-chronograph, memory, and [sub-agents-mcp](https://github.com/shinpr/sub-agents-mcp) |
+
+| What     | How                                                                                                      |
+| -------- | -------------------------------------------------------------------------------------------------------- |
+| Skills   | Symlinks to this repo's `skills/<name>/`                                                                 |
+| Rules    | Symlinks to this repo's `rules/` (preserving directory structure)                                        |
+| Commands | Exported from `commands/*.md` (frontmatter stripped to plain Markdown)                                   |
+| MCP      | `mcp.json` with task-chronograph, memory, and [sub-agents-mcp](https://github.com/shinpr/sub-agents-mcp) |
+
 
 **Agents prerequisite**: sub-agents-mcp uses `cursor-agent` as its backend. Run `cursor-agent login` to authenticate before using agents in Cursor.
 
@@ -318,8 +393,6 @@ Read the user preferences from https://raw.githubusercontent.com/francisco-perez
 - **[Core Concepts](docs/concepts.md)** -- Deep explanation of the building blocks, the layered architecture, and the agent pipeline.
 - **[Claude Ecosystem Learning Resources](docs/claude-ecosystem-learning-resources.md)** -- Curated external guides covering Claude models, cowork patterns, practical workflows, setup strategies, and domain applications. Recommended for new users and skill authors.
 
-
-
 ---
 
-For contributor and developer documentation, see [`README_DEV.md`](README_DEV.md).
+For contributor and developer documentation, see `[README_DEV.md](README_DEV.md)`.

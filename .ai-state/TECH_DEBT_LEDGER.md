@@ -13,7 +13,3 @@
 
 | id | severity | class | direction | location | goal-ref-type | goal-ref-value | source | first-seen | last-seen | owner-role | status | resolved-by | notes | dedup_key |
 |----|----------|-------|-----------|----------|---------------|----------------|--------|------------|-----------|-----------|--------|-------------|-------|-----------|
-
-<!-- EMPTY until the first producer writes a row. The verifier writes per-change findings
-     in Phase 5/5.5; the sentinel writes repo-wide findings via the TD dimension (TD01-TD04).
-     TD05 audits this file but never writes to it. -->

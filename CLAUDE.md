@@ -12,13 +12,23 @@ See the mapping table in `~/.claude/CLAUDE.md` under "The Ecosystem as Philosoph
 - **Never modify `~/.claude/plugins/cache/`** — edit source files in this repo; installed copies get overwritten on reinstall
 - **Token budget**: Always-loaded content (CLAUDE.md files + rules) must stay under 25,000 tokens (~87,500 chars) as a failure-mode guardrail — the principle is that every always-loaded token must earn its attention share (applied in >30% of sessions, or unconditionally relevant). Prefer skills with reference files for procedural content; reserve rules for declarative domain knowledge.
 - **Worktrees** use `.claude/worktrees/<name>/`. Pipeline worktrees via `EnterWorktree`; scratch worktrees via `/create-worktree`. Both share the same home. ADRs created in a pipeline land as fragments under `.ai-state/decisions/drafts/` and are promoted to stable `dec-NNN` at merge-to-main by `scripts/finalize_adrs.py`. PR-adjacent workflow conventions live in `rules/swe/vcs/pr-conventions.md` (path-scoped)
-- See `README.md` for user-facing docs, `README_DEV.md` for contributor conventions, `skills/README.md` for the skill catalog
+- **Onboarding artifacts dogfooding**: Praxion uses its own onboarding tools — Praxion's `.ai-state/`, `.gitattributes`, git hooks, and `CLAUDE.md` blocks are all results of the patterns `/onboard-project` applies to user projects. When updating `/onboard-project` or `/new-project`, verify the change still produces what Praxion itself has on disk (or, if the update is meant to evolve the contract, propose what changes Praxion's own state needs)
+- See `README.md` for user-facing docs, `README_DEV.md` for contributor conventions, `skills/README.md` for the skill catalog, `docs/greenfield-onboarding.md` + `docs/existing-project-onboarding.md` for the two onboarding paths
 
 ## Session Protocol
 
 At session start, call `session_start` on the memory MCP to load context about the user, project conventions, and past learnings (Recall). Store discoveries proactively during the session (Learn). Apply past insights to current tasks (Apply). This implements the Learning Loop from the global philosophy.
 
 If `memories.assistant.name` is missing, pick a random name and store it immediately. Be curious about the user — learn their interests, background, and working style over time.
+
+## Onboarding (Praxion → User Project)
+
+Praxion ships **two onboarding paths** that converge on the same end state — `.gitignore` block, `.ai-state/` skeleton, `.gitattributes` + merge drivers, git hooks, `.claude/settings.json` toggles, three `CLAUDE.md` blocks (Agent Pipeline + Compaction Guidance + Behavioral Contract), opt-in architecture baseline:
+
+- **Greenfield** (empty directory): `new_project.sh` + `/new-project` — bash entry validates prereqs and scaffolds, then `exec`s a Claude Code session that runs the seed pipeline (researcher → architect → planner → implementer + test-engineer → verifier) and chains to `/onboard-project` for the surfaces it doesn't cover. Companion doc: `docs/greenfield-onboarding.md`.
+- **Existing project** (has code): `/onboard-project` — phased, gated, idempotent (9 phases, 8 gates with one-way Run-all-rest). Phase 8 optionally delegates to `systems-architect` in baseline-audit mode to produce `.ai-state/ARCHITECTURE.md` + `docs/architecture.md`. Companion doc: `docs/existing-project-onboarding.md`.
+
+When working on Praxion's onboarding artifacts, the source-of-truth chain runs: `commands/onboard-project.md` (canonical CLAUDE.md blocks + idempotency predicates) → `commands/new-project.md` (mirror for greenfield) → `new_project.sh` (greenfield bootstrap). Changes to the canonical blocks must mirror across both commands for byte-identical output.
 
 ## Design Principles
 

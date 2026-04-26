@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for new_cc_project.sh greenfield onboarding script.
+# Tests for new_project.sh greenfield onboarding script.
 #
 # Validates the bash-observable behaviors of the scaffold:
 # T1: no args -> usage on stderr, exit 2
@@ -11,13 +11,13 @@
 # T7: happy path -- scaffold + pre-flight + exec claude
 #
 # Run from repo root:
-#   bash tests/new_cc_project_test.sh
+#   bash tests/new_project_test.sh
 #
 # Exits 0 on full pass, 1 on any failure. Portable to macOS (BSD) + Linux.
 
 set -u
 
-SCRIPT_UNDER_TEST="$(cd "$(dirname "$0")/.." && pwd)/new_cc_project.sh"
+SCRIPT_UNDER_TEST="$(cd "$(dirname "$0")/.." && pwd)/new_project.sh"
 
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -212,11 +212,11 @@ EOF
     # The bash layer embeds the slash command body as the seed prompt (CLI does
     # not dispatch /-prefixed positional args as slash commands). Verify both the
     # permission flags and that the seed prompt mentions the command — whether
-    # as the literal `/new-cc-project` fallback or as a substring inside the
+    # as the literal `/new-project` fallback or as a substring inside the
     # embedded markdown body.
     if ! grep -q 'arg=--permission-mode' "$stub_log" || \
        ! grep -q 'arg=acceptEdits' "$stub_log" || \
-       ! grep -qF 'new-cc-project' "$stub_log"; then
+       ! grep -qF 'new-project' "$stub_log"; then
         fail "T7: claude stub args missing expected flags or seed prompt; log=$(cat "$stub_log")"; return
     fi
     pass "T7: happy path scaffolds .git/.claude/.gitignore and execs claude correctly"

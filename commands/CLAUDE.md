@@ -16,3 +16,7 @@ Commands use a directory glob in `.claude-plugin/plugin.json`: `"commands": ["./
 ## Modifying Commands
 
 Load the `command-crafting` skill before creating or modifying commands. It covers frontmatter syntax, argument handling, and tool permissions.
+
+## Flagship Pair — Onboarding
+
+`/new-project` (greenfield) and `/onboard-project` (existing project) are the primary entry points for users adopting Praxion. They share a source-of-truth chain — the canonical `## Agent Pipeline`, `## Compaction Guidance`, and `## Behavioral Contract` blocks live in `commands/onboard-project.md`; `commands/new-project.md` mirrors them verbatim. Idempotency predicates are paired across both commands so re-runs and cross-runs (greenfield → onboard-project) compose without duplication. When updating either command, update both. User-facing docs at `docs/greenfield-onboarding.md` and `docs/existing-project-onboarding.md`.

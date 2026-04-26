@@ -2,16 +2,23 @@
 # Launch Claude Code with the Praxion working tree as the plugin source.
 #
 # Use this when developing on Praxion itself. The working-tree copy of the
-# i-am plugin shadows any marketplace-installed i-am@bit-agora for this
-# session (per Claude Code docs — no uninstall needed). Edits to skills,
-# commands, agents, or hooks are live; run /reload-plugins inside the
-# session to refresh without relaunching.
+# i-am plugin is loaded via --plugin-dir, and a session-scoped --settings
+# overlay disables the marketplace-installed copy (i-am@bit-agora) for this
+# session only.
 #
-# By default the launcher also passes --dangerously-skip-permissions,
-# because dev loops against your own working tree rarely benefit from
-# per-tool prompts and those prompts break the "edit → reload → retry"
-# flow. To keep permission prompts enabled (e.g., when testing a hook's
-# permission behavior), run with PRAXION_DEV_SAFE=1 in the environment.
+# Why the overlay? Without it, the user-settings line
+# `"i-am@bit-agora": true` in `enabledPlugins` force-enables the marketplace
+# copy alongside the working tree. Per Claude Code docs, force-enables
+# override --plugin-dir's shadowing, so /context loads both copies and
+# doubles skill/agent/command tokens. The overlay flips that one entry to
+# false for the session — your global settings.json is untouched, so
+# non-Praxion sessions still get the marketplace copy as usual.
+#
+# By default the launcher passes --dangerously-skip-permissions because dev
+# loops against your own working tree rarely benefit from per-tool prompts
+# and those prompts break the "edit → reload → retry" flow. To keep the
+# prompts (e.g., when testing a hook's permission behavior), run with
+# PRAXION_DEV_SAFE=1 in the environment.
 
 set -euo pipefail
 
@@ -33,10 +40,31 @@ if [ ! -f "$praxion_root/.claude-plugin/plugin.json" ]; then
     exit 1
 fi
 
+# Build a session-scoped settings overlay that disables the marketplace
+# i-am@bit-agora install. Start from the user's current settings so all
+# other enabledPlugins entries remain intact for the session, then flip
+# just the i-am entry to false. Deterministic temp path — overwritten on
+# each launch; no cleanup trap needed since `exec` replaces this shell.
+overlay_file="${TMPDIR:-/tmp}/praxion-claude-dev-settings-overlay.json"
+python3 - "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json" "$overlay_file" <<'PY'
+import json, os, sys
+src, dst = sys.argv[1], sys.argv[2]
+data = {}
+if os.path.isfile(src):
+    try:
+        with open(src) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        data = {}
+data.setdefault("enabledPlugins", {})["i-am@bit-agora"] = False
+with open(dst, "w") as f:
+    json.dump(data, f)
+PY
+
 # Safe mode: caller opted out of --dangerously-skip-permissions.
 if [ "${PRAXION_DEV_SAFE:-0}" = "1" ]; then
-    exec claude --plugin-dir "$praxion_root" "$@"
+    exec claude --plugin-dir "$praxion_root" --settings "$overlay_file" "$@"
 fi
 
 # Default: skip per-tool permission prompts during the dev loop.
-exec claude --plugin-dir "$praxion_root" --dangerously-skip-permissions "$@"
+exec claude --plugin-dir "$praxion_root" --settings "$overlay_file" --dangerously-skip-permissions "$@"

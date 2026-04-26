@@ -359,10 +359,10 @@ For active development on Praxion itself, launch Claude Code with the working tr
 
 ```bash
 praxion-claude-dev       # installed by install.sh at ~/.local/bin/praxion-claude-dev
-# equivalent to: claude --plugin-dir /path/to/Praxion --dangerously-skip-permissions
+# equivalent to: claude --plugin-dir /path/to/Praxion --settings <session-overlay> --dangerously-skip-permissions
 ```
 
-The working-tree copy of the `i-am` plugin **shadows** any marketplace-installed copy for this session (per Claude Code docs: "the local copy takes precedence"). No uninstall or disable step is needed.
+The working-tree copy is loaded via `--plugin-dir`, and a session-scoped `--settings` overlay disables the marketplace-installed `i-am@bit-agora` for the session. Without the overlay, the user-settings line `"i-am@bit-agora": true` in `enabledPlugins` force-enables the marketplace copy alongside the working tree (per Claude Code docs, force-enables override `--plugin-dir`'s shadowing) — so `/context` would load both copies and double the skill, agent, and command tokens. The overlay flips that one entry to `false` for the session only; your global `~/.claude/settings.json` is untouched, so non-Praxion sessions still get the marketplace copy as usual.
 
 Edits to skills, commands, agents, or hooks are live. Run `/reload-plugins` inside the session to re-read them without relaunching; a full restart is only needed when `plugin.json` itself changes.
 

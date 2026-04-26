@@ -1,0 +1,21 @@
+diff --git a/config.py b/config.py
+index 55c2e4b..cf92781 100644
+--- a/config.py
++++ b/config.py
+@@ -14,3 +14,16 @@ def merge_config(base: dict, overrides: dict) -> dict:
+ def config_path_for(env: str) -> Path:
+     """Return the conventional config path for a given environment name."""
+     return Path("config") / f"{env}.json"
++
++
++def load_config(path: str) -> dict:
++    """Load a JSON config from disk; fall back to defaults on any error.
++
++    NOTE: silently swallows ALL errors, including SyntaxError, KeyboardInterrupt,
++    permission failures, and corrupted JSON. Real bugs are hidden as if the file
++    simply did not exist.
++    """
++    try:
++        return json.loads(Path(path).read_text())
++    except:
++        return DEFAULT_CONFIG

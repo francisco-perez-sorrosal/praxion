@@ -42,3 +42,9 @@ coverage.xml
 .env
 .env.*
 .env.local
+# Re-include the example template so users can copy it
+!.env.example
+!**/.env.example
+
+# hackathon runtime artifacts
+hackathon/artifacts/

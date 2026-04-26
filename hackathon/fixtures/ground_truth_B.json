@@ -1,0 +1,5 @@
+{
+  "file": "cache.py",
+  "line_range": [22, 34],
+  "defect_class": "mutable default,shared state"
+}

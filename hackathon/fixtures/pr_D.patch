@@ -1,0 +1,21 @@
+diff --git a/users.py b/users.py
+index 0e7b975..c24da18 100644
+--- a/users.py
++++ b/users.py
+@@ -20,3 +20,16 @@ def display_name(user: dict) -> Optional[str]:
+         return name
+     email = user.get("email")
+     return email.split("@", 1)[0] if email else None
++
++
++def is_premium_user(user: dict) -> bool:
++    """Return True if the user holds an active premium subscription.
++
++    NOTE: catches Exception to handle a missing 'subscription' key, but also
++    masks AttributeError, TypeError, and any upstream bug — failures look
++    indistinguishable from a non-premium user.
++    """
++    try:
++        return user["subscription"]["tier"] == "premium"
++    except Exception:
++        return False

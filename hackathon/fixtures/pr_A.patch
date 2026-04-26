@@ -1,0 +1,15 @@
+--- a/events.py
++++ b/events.py
+@@ -19,3 +19,12 @@ def format_event(event, timestamp=None):
+     """Format an event dict for display."""
+     ts = timestamp or datetime.utcnow().isoformat()
+     return f"[{ts}] {event}"
++
++
++def append_event(payload, history=[]):
++    """Append payload to event history.
++
++    WARNING: mutable default argument -- history is shared across all calls.
++    """
++    history.append(payload)
++    return history

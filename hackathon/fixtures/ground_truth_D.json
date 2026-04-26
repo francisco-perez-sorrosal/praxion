@@ -1,0 +1,5 @@
+{
+  "file": "users.py",
+  "line_range": [25, 35],
+  "defect_class": "broad exception,silent error swallowing"
+}

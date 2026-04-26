@@ -1,0 +1,5 @@
+{
+  "file": "config.py",
+  "line_range": [19, 29],
+  "defect_class": "bare except,silent error swallowing"
+}

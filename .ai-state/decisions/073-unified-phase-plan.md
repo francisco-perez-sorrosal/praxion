@@ -1,5 +1,5 @@
 ---
-id: dec-draft-37233460
+id: dec-073
 title: Praxion-first-class — unified four-phase implementation plan
 status: proposed
 category: implementation
@@ -24,7 +24,7 @@ affected_files:
   - README_DEV.md
   - commands/praxion-complete-install.md
 affected_reqs: [REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-06, REQ-07, REQ-08, REQ-09, REQ-10, REQ-11, REQ-12, REQ-13, REQ-14, REQ-15, REQ-16]
-re_affirms: dec-draft-a78ca85b
+re_affirms: dec-075
 ---
 
 ## Context

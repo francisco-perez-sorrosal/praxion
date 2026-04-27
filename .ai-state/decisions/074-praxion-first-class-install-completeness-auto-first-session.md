@@ -1,5 +1,5 @@
 ---
-id: dec-draft-cf9449f3
+id: dec-074
 title: Install-path completeness via first-session auto-completion + retain /praxion-complete-install
 status: proposed
 category: architectural
@@ -95,6 +95,6 @@ Move the personal-info substitution into a hook that runs on plugin install. Avo
 
 ## Related Decision
 
-This ADR is the install-completeness counterpart to `dec-draft-a78ca85b` (Praxion-as-First-Class — process-driven development with universal rule-inheritance). dec-draft-a78ca85b establishes the principle and the rule-inheritance mechanism (Workstream A); this ADR resolves the install-path completeness question (Workstream B) that dec-draft-a78ca85b implicitly assumed.
+This ADR is the install-completeness counterpart to `dec-075` (Praxion-as-First-Class — process-driven development with universal rule-inheritance). dec-075 establishes the principle and the rule-inheritance mechanism (Workstream A); this ADR resolves the install-path completeness question (Workstream B) that dec-075 implicitly assumed.
 
-The two ADRs are coupled by the requirement that Channel D be universal across install paths — which dec-draft-a78ca85b stated as an assumption and this ADR delivers as a mechanism. This ADR's auto-install hook is the mechanism by which dec-draft-a78ca85b's three-layer architecture becomes universally available across install paths. Without this ADR, the Workstream A design would have a gap for marketplace-only operators in non-onboarded projects (no L1, no Channel D). The two records are intentionally split because they address distinct concerns (process enforcement vs. install topology) and may evolve independently. Neither supersedes nor re-affirms the other in the formal ADR-conventions sense; they are coupled-but-independent.
+The two ADRs are coupled by the requirement that Channel D be universal across install paths — which dec-075 stated as an assumption and this ADR delivers as a mechanism. This ADR's auto-install hook is the mechanism by which dec-075's three-layer architecture becomes universally available across install paths. Without this ADR, the Workstream A design would have a gap for marketplace-only operators in non-onboarded projects (no L1, no Channel D). The two records are intentionally split because they address distinct concerns (process enforcement vs. install topology) and may evolve independently. Neither supersedes nor re-affirms the other in the formal ADR-conventions sense; they are coupled-but-independent.

@@ -401,25 +401,32 @@ When `claude plugin install i-am@bit-agora` runs, Claude Code clones the entire 
 
 ### Marketplace-only install flow (internal architecture)
 
-The three system-level surfaces (rules, scripts, context-hub MCP) that the plugin mechanism doesn't cover are reached through two cooperating artifacts:
+The three system-level surfaces (rules, scripts, context-hub MCP) that the plugin mechanism doesn't cover are handled transparently via a first-session auto-completion hook:
 
-- `install_claude.sh::complete_install_from_plugin()` — the actual logic. Prompts per-surface for consent, reuses `link_rules()` from `lib/install_shared.sh` and the same filter predicate as `relink_all()` for scripts, delegates to `prompt_chub_mcp()` for the MCP entry.
-- `commands/praxion-complete-install.md` — thin slash command that resolves `CLAUDE_PLUGIN_ROOT` and invokes `install.sh code --complete-install` from the cache.
+- `hooks/auto_complete_install.py` — SessionStart hook that detects missing surfaces and completes setup automatically on first session. Uses sensible defaults from `git config` (name, email) with optional operator override via single prompt.
+- `install_claude.sh::complete_install_from_plugin()` — the underlying logic (shared with explicit re-invocation). Prompts per-surface for consent, reuses `link_rules()` from `lib/install_shared.sh` and the same filter predicate as `relink_all()` for scripts, delegates to `prompt_chub_mcp()` for the MCP entry.
+- `commands/praxion-complete-install.md` — optional slash command for explicit re-invocation. Resolves `CLAUDE_PLUGIN_ROOT` and invokes `install.sh code --complete-install` from the cache.
 
 The inverse pair (`complete_uninstall_from_plugin()` + `/praxion-complete-uninstall`) removes only symlinks whose target begins with the plugin cache path. Hand-installed rules/scripts from other sources are left alone.
 
 ### Two install modes coexist
 
-| Flag | Plugin body source | Rules + scripts source | When to use |
-|---|---|---|---|
-| `./install.sh code` | Marketplace @ latest tag | Local checkout | Clone-based install (default) |
-| `/praxion-complete-install` (after `claude plugin install ...`) | Marketplace @ latest tag | Plugin cache @ same tag | Marketplace-only, no clone |
+| Target | Install Command | Plugin body source | Rules + scripts source | Flow |
+|---|---|---|---|---|
+| **Clone-based (full)** | `./install.sh code` | Local checkout | Local checkout | One-step installer; no follow-up needed |
+| **Marketplace (plugin only)** | `claude plugin install i-am@bit-agora` | Plugin cache | Plugin cache via auto-completion hook | Auto-completes on first session (no manual step required) |
+| **Marketplace (explicit reconfigure)** | `/praxion-complete-install` | Plugin cache | Plugin cache | Optional: re-invoke for reconfiguration/recovery/re-link |
 
 For live-edit development on Praxion itself, use `praxion-claude-dev` (a thin wrapper around `claude --plugin-dir`) to launch a session that loads the plugin directly from the working tree — see [Session-scoped local testing](#session-scoped-local-testing).
 
 ### Post-update refresh
 
-`claude plugin update i-am` replaces the cache directory entirely. Any symlinks that pointed at the old cache dir now dangle. Re-run `/praxion-complete-install` (or `./install.sh code --relink` for clone-based installs) to rewire symlinks to the new version. No automatic refresh hook exists today because Claude Code doesn't expose a PostPluginUpdate event — filed as a watch-item for when that API lands.
+`claude plugin update i-am` replaces the cache directory entirely. Existing symlinks in `~/.claude/rules/` and `~/.local/bin/` continue pointing to the old cache version. Refresh by either:
+- Start a fresh Claude Code session (triggers auto-completion automatically), OR
+- Explicitly run `/praxion-complete-install` to re-link against the new version, OR
+- For clone-based installs: run `./install.sh code --relink`
+
+No automatic refresh hook exists today because Claude Code doesn't expose a PostPluginUpdate event — filed as a watch-item for when that API lands.
 
 ### Uninstall ordering
 

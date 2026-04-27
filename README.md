@@ -307,26 +307,22 @@ When installed as a plugin, commands are namespaced: `/co` becomes `/i-am:co`. P
 
 **Developing on Praxion itself?** After the standard install, use `praxion-claude-dev` (placed at `~/.local/bin/` by `install.sh`) to launch a Claude Code session that loads the plugin directly from your working tree — edits to skills, commands, agents, or hooks are live, and `/reload-plugins` picks them up without restarting. See `[README_DEV.md](README_DEV.md#session-scoped-local-testing)` for the full dev workflow.
 
-**Manual plugin install** (marketplace-only, without cloning):
+**Marketplace plugin install** (Claude Code only):
 
 ```bash
 claude plugin marketplace add francisco-perez-sorrosal/bit-agora
 claude plugin install i-am@bit-agora --scope user
 ```
 
-This installs the plugin body only (skills, commands, agents, hooks, MCP servers). The Claude Code plugin mechanism does not natively cover rules (auto-loaded globally) or CLI scripts on `$PATH`. To finish the setup, start a Claude Code session and run:
+Praxion auto-completes the setup on your first Claude Code session — rules are symlinked to `~/.claude/rules/`, CLI scripts are linked to `~/.local/bin/`, and the configuration is finalized without any manual completion step. The plugin is fully self-sufficient; no action required beyond the standard `plugin install` command.
 
-```
-/praxion-complete-install
-```
+**Optional: explicit reconfiguration.** If you want to reconfigure personal settings, recover from corruption, or re-link after manual tampering with `~/.claude/`, the `/praxion-complete-install` command remains available for explicit re-invocation. It prompts for consent before each system-level change and is idempotent — safe to run multiple times.
 
-The command prompts for consent before each system-level change (rules in `~/.claude/rules/`, scripts in `~/.local/bin/`, context-hub MCP in `~/.claude.json`). Idempotent — safe to re-run.
+**How it works.** `claude plugin install` already fetches the *full Praxion repo* at the marketplace-pinned tag into `~/.claude/plugins/cache/bit-agora/i-am/<version>/`. Auto-completion at first session symlinks from that cache; it does not clone, download, or require internet access.
 
-**No additional download needed.** `claude plugin install` already fetched the *full Praxion repo* at the marketplace-pinned tag into `~/.claude/plugins/cache/bit-agora/i-am/<version>/`. The plugin mechanism only *loads* skills, commands, agents, hooks, and MCP servers from it, but the rest of the repo — rules, CLI scripts, `install.sh` itself — is already on disk in the cache. `/praxion-complete-install` symlinks from that cache; it does not clone, download, or require internet access.
+**After plugin updates.** When you run `claude plugin update i-am`, existing symlinks in `~/.claude/rules/` and `~/.local/bin/` continue pointing to the old version. Re-run `/praxion-complete-install` (or start a fresh Claude Code session, which triggers auto-completion automatically) to refresh them against the new version.
 
-**Refresh after plugin update.** When you run `claude plugin update i-am`, the cache directory is replaced with the new version. Existing symlinks in `~/.claude/rules/` and `~/.local/bin/` now point at the previous cache dir which no longer exists. Re-run `/praxion-complete-install` to refresh them against the new version.
-
-**Uninstall order matters.** If you want to remove Praxion completely, run `/praxion-complete-uninstall` **first**, then `claude plugin uninstall i-am`. Doing the reverse order leaves dangling symlinks that target a deleted cache directory. If that happens, `/praxion-complete-uninstall` will still clean them up (it filters by "target begins with plugin cache path"; an absent target doesn't matter, the link itself gets removed).
+**Uninstall order matters.** If you want to remove Praxion completely, run `/praxion-complete-uninstall` **first**, then `claude plugin uninstall i-am`. Doing the reverse order leaves dangling symlinks that target a deleted cache directory. If that happens, `/praxion-complete-uninstall` still cleans them up (it filters by "target begins with plugin cache path"; an absent target doesn't matter, the link itself gets removed).
 
 ### Claude Desktop (`./install.sh desktop`)
 

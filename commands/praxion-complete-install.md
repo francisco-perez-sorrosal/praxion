@@ -1,11 +1,11 @@
 ---
-description: Finish a marketplace-only Praxion install — symlink rules, CLI scripts, and optional context-hub MCP. Prompts before each system-level change.
+description: Reconfigure or recover a marketplace-installed Praxion setup — symlink rules, CLI scripts, and optional context-hub MCP. Optional (auto-completes on first session).
 allowed-tools: [Bash]
 ---
 
-Complete the Praxion setup for users who installed via `claude plugin install i-am@bit-agora`.
+Most users will not need this command — Praxion auto-completes the setup on your first Claude Code session. Use this command only if auto-install was disabled (`PRAXION_DISABLE_AUTO_COMPLETE=1`), to reconfigure personal settings, or to recover from a corrupted install state.
 
-The plugin body is already present; this command adds the system-level surfaces the plugin mechanism does not cover natively: rules (auto-loaded by Claude Code globally), CLI scripts on `$PATH`, and optional context-hub MCP configuration.
+The plugin body is already present; this command adds or refreshes the system-level surfaces the plugin mechanism does not cover natively: rules (auto-loaded by Claude Code globally), CLI scripts on `$PATH`, and optional context-hub MCP configuration.
 
 ## Procedure
 

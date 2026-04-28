@@ -1,9 +1,10 @@
 """Trend computation against the most-recent-prior report and schema-mismatch policy.
 
 Discovers prior `METRICS_REPORT_*.json` artifacts in the caller-supplied
-`.ai-state/` directory, selects the most-recent-strictly-prior by embedded
-`aggregate.timestamp`, and returns a discriminated `TrendBlock` per the
-storage-schema ADR's four-outcome contract:
+reports directory (`.ai-state/metrics_reports/`), selects the
+most-recent-strictly-prior by embedded `aggregate.timestamp`, and returns
+a discriminated `TrendBlock` per the storage-schema ADR's four-outcome
+contract:
 
 * ``first_run`` — no usable prior on disk.
 * ``schema_mismatch`` — prior's major/minor schema differs from current.
@@ -29,9 +30,12 @@ __all__ = ["compute_trends"]
 _METRICS_REPORT_GLOB = "METRICS_REPORT_*.json"
 
 
-def compute_trends(current: Report, ai_state_dir: Path) -> TrendBlock:
+def compute_trends(current: Report, reports_dir: Path) -> TrendBlock:
     """Return a `TrendBlock` describing the delta between `current` and the
-    most-recent-strictly-prior report found under `ai_state_dir`.
+    most-recent-strictly-prior report found under `reports_dir`.
+
+    ``reports_dir`` is the directory holding ``METRICS_REPORT_*.json``
+    artifacts (canonically ``.ai-state/metrics_reports/``).
 
     The selection predicate excludes any candidate whose embedded
     ``aggregate.timestamp`` is greater than or equal to
@@ -43,7 +47,7 @@ def compute_trends(current: Report, ai_state_dir: Path) -> TrendBlock:
     current_schema = current.aggregate.schema_version
 
     prior_path, prior_payload, load_error = _load_most_recent_prior(
-        ai_state_dir, current_timestamp
+        reports_dir, current_timestamp
     )
 
     if prior_path is None:
@@ -95,7 +99,7 @@ def _unreadable(prior_path: Path, error: str) -> TrendBlock:
 
 
 def _load_most_recent_prior(
-    ai_state_dir: Path, current_timestamp: str
+    reports_dir: Path, current_timestamp: str
 ) -> tuple[Path | None, dict[str, Any] | None, str | None]:
     """Return (path, payload, error) for the most-recent-strictly-prior file.
 
@@ -112,13 +116,13 @@ def _load_most_recent_prior(
     cannot mask a perfectly good prior.
     """
 
-    if not ai_state_dir.is_dir():
+    if not reports_dir.is_dir():
         return (None, None, None)
 
     eligible: list[tuple[str, Path, dict[str, Any]]] = []
     unreadable: list[tuple[Path, str]] = []
 
-    for candidate in ai_state_dir.glob(_METRICS_REPORT_GLOB):
+    for candidate in reports_dir.glob(_METRICS_REPORT_GLOB):
         if candidate.suffix != ".json" or not candidate.is_file():
             # Glob is already `*.json`; the extra suffix check defends
             # against a directory ending in `.json` sneaking through.

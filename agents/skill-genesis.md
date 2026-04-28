@@ -45,7 +45,7 @@ Determine the analysis scope:
 
 1. **Check invocation context** -- were you launched post-pipeline (`.ai-work/<task-slug>/LEARNINGS.md` and/or `.ai-work/<task-slug>/VERIFICATION_REPORT.md` exist) or standalone (user requesting a learning harvest)?
 2. **Read the existing artifact inventory** -- `Glob skills/*/SKILL.md` for skills, `Glob rules/**/*.md` for rules. Record names and descriptions for deduplication in Phase 3
-3. **Read the latest idea ledger** -- find the most recent `.ai-state/IDEA_LEDGER_*.md` (by timestamp in filename) to understand what has already been proposed, implemented, or discarded
+3. **Read the latest idea ledger** -- find the most recent `.ai-state/idea_ledgers/IDEA_LEDGER_*.md` (by timestamp in filename) to understand what has already been proposed, implemented, or discarded
 4. **State the scope** -- "Analyzing [N learning sources] for artifact promotion candidates"
 
 If no learning sources exist (no LEARNINGS.md, no memory entries, no verification report, no sentinel findings), report that there is nothing to harvest and stop.
@@ -58,8 +58,8 @@ Consume all available learning sources in priority order. Skip any source that d
 2. **Memory MCP `learnings` category** -- cross-session insights via `recall` tool with category `learnings`
 3. **Memory MCP `project` category** -- project conventions via `recall` with category `project`
 4. **VERIFICATION_REPORT.md** (`.ai-work/<task-slug>/`) -- recurring quality patterns
-5. **Latest SENTINEL_REPORT_*.md** (`.ai-state/`) -- ecosystem patterns and recurring findings
-6. **Latest IDEA_LEDGER_*.md** (`.ai-state/`) -- avoid re-proposing implemented or discarded ideas
+5. **Latest SENTINEL_REPORT_*.md** (`.ai-state/sentinel_reports/`) -- ecosystem patterns and recurring findings
+6. **Latest IDEA_LEDGER_*.md** (`.ai-state/idea_ledgers/`) -- avoid re-proposing implemented or discarded ideas
 7. **ADR files** -- read `.ai-state/decisions/DECISIONS_INDEX.md` for a scannable overview. Recurring decision patterns across multiple features (same category, similar rationale in the summary column) are candidates for rule or skill formalization. Read the full ADR files for promising matches.
 
 For each source, extract discrete learning items. A learning item is a pattern, gotcha, convention, workflow, decision rationale, or recurring issue that appears actionable and reusable beyond its original context.

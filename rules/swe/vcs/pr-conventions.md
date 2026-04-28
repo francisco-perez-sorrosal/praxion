@@ -38,7 +38,7 @@ PRs that touch `.ai-state/` carry obligations beyond regular code PRs because th
 
 - Merged-main ADRs whose cross-references were rewritten at finalize can regress to pre-finalize draft ids.
 - `.ai-state/observations.jsonl` events captured on main while the branch was alive are deleted.
-- `SENTINEL_REPORT_*.md` and `calibration_log.md` entries are lost.
+- `sentinel_reports/SENTINEL_REPORT_*.md` and `calibration_log.md` entries are lost.
 
 Enforcement is layered:
 - `/merge-worktree` refuses `git merge --squash` locally when the source branch touched `.ai-state/`.

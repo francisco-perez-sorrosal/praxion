@@ -41,7 +41,7 @@ Given any project — Praxion itself or any codebase Praxion helps develop — p
 
 | Use `roadmap-synthesis` when… | Use `roadmap-planning` when… |
 |---|---|
-| Producing a fresh `ROADMAP.md` from a full-project audit | Ordering an existing set of ideas (e.g., `IDEA_LEDGER_*.md`) |
+| Producing a fresh `ROADMAP.md` from a full-project audit | Ordering an existing set of ideas (e.g., `idea_ledgers/IDEA_LEDGER_*.md`) |
 | Input is the repository itself (filesystem, CI, docs) | Input is a pre-existing list of candidates with impact/effort fields |
 | User asks "what should we build next" without a backlog | User asks "which of these should we do first" |
 | Phrases: "spring cleaning", "state of the project", "ultra-in-depth audit" | Phrases: "prioritize backlog", "RICE/MoSCoW", "sequence releases" |
@@ -65,7 +65,7 @@ The `roadmap-cartographer` agent owns the end-to-end workflow and loads this ski
 Seven phases. The cartographer mirrors this structure; procedural depth lives in the linked references, not here.
 
 1. **Scope, Paradigm & Lens Derivation** — classify target as deterministic / agentic / hybrid → [paradigm-detection.md](references/paradigm-detection.md), then derive the project-specific lens set (4-8 lenses drawn from project values + domain constraints + exemplar lens sets) → [lens-framework.md](references/lens-framework.md). Surface paradigm **and** proposed lens set to the user (Gate 1).
-2. **Ecosystem Inventory** — filesystem scan of skills, agents, rules, commands, hooks, tests, CI, `AGENTS.md`/`CLAUDE.md`, `.ai-state/ARCHITECTURE.md`, `.ai-state/decisions/`, memory; read the latest `SENTINEL_REPORT_*.md` if present; detect an existing `ROADMAP.md` for `diff` mode.
+2. **Ecosystem Inventory** — filesystem scan of skills, agents, rules, commands, hooks, tests, CI, `AGENTS.md`/`CLAUDE.md`, `.ai-state/ARCHITECTURE.md`, `.ai-state/decisions/`, memory; read the latest `.ai-state/sentinel_reports/SENTINEL_REPORT_*.md` if present; detect an existing `ROADMAP.md` for `diff` mode.
 3. **Parallel Audit Fan-out** — spawn N researcher agents (N = lens_count, capped at 6) in parallel, one per lens from the derived set; each writes an `AUDIT_<lens>.md` fragment via the fragment template → [audit-methodology.md](references/audit-methodology.md).
 4. **Lens Synthesis** — reduce fragments into draft roadmap sections through the derived lens set → [lens-framework.md](references/lens-framework.md).
 5. **Multi-Angle Reframe** — for each of the top 3 weaknesses, articulate ≥2 framings; record the runners-up as *Considered Angles*. Universal step regardless of lens set.

@@ -311,7 +311,7 @@ def _reference_trends() -> Any:
 
     return TrendBlock(
         status="computed",
-        prior_report=".ai-state/METRICS_REPORT_2026-04-22_12-00-00.json",
+        prior_report="METRICS_REPORT_2026-04-22_12-00-00.json",
         prior_schema="1.0.0",
         current_schema="1.0.0",
         deltas={
@@ -661,7 +661,7 @@ class TestReportTrendsBlock:
             status="schema_mismatch",
             prior_schema="1.0.0",
             current_schema="2.0.0",
-            prior_report=".ai-state/METRICS_REPORT_OLD.json",
+            prior_report="METRICS_REPORT_OLD.json",
         )
         mismatch_report = _replace_trends(report, mismatch_block)
 

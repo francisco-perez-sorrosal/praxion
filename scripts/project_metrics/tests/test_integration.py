@@ -82,7 +82,8 @@ def _copy_fixture(fixture_name: str, destination: Path) -> Path:
 def _read_report_json(ai_state_dir: Path) -> dict[str, Any]:
     """Return the parsed JSON for the single ``METRICS_REPORT_*.json`` file."""
 
-    candidates = sorted(ai_state_dir.glob("METRICS_REPORT_*.json"))
+    reports_dir = ai_state_dir / "metrics_reports"
+    candidates = sorted(reports_dir.glob("METRICS_REPORT_*.json"))
     assert len(candidates) == 1, (
         f"Expected exactly one METRICS_REPORT_*.json under {ai_state_dir}; "
         f"found {[p.name for p in candidates]}"
@@ -93,16 +94,18 @@ def _read_report_json(ai_state_dir: Path) -> dict[str, Any]:
 def _read_all_report_jsons(ai_state_dir: Path) -> list[dict[str, Any]]:
     """Return all ``METRICS_REPORT_*.json`` files sorted by filename."""
 
+    reports_dir = ai_state_dir / "metrics_reports"
     return [
         json.loads(path.read_text(encoding="utf-8"))
-        for path in sorted(ai_state_dir.glob("METRICS_REPORT_*.json"))
+        for path in sorted(reports_dir.glob("METRICS_REPORT_*.json"))
     ]
 
 
 def _read_report_md(ai_state_dir: Path) -> str:
     """Return the single ``METRICS_REPORT_*.md`` file contents."""
 
-    candidates = sorted(ai_state_dir.glob("METRICS_REPORT_*.md"))
+    reports_dir = ai_state_dir / "metrics_reports"
+    candidates = sorted(reports_dir.glob("METRICS_REPORT_*.md"))
     assert len(candidates) >= 1, (
         f"Expected at least one METRICS_REPORT_*.md under {ai_state_dir}; found none"
     )
@@ -151,9 +154,10 @@ def test_full_pipeline_on_minimal_repo_produces_three_files(
     ai_state = repo_copy / ".ai-state"
     assert ai_state.is_dir(), "CLI must create .ai-state/ under the repo root"
 
-    json_files = sorted(ai_state.glob("METRICS_REPORT_*.json"))
-    md_files = sorted(ai_state.glob("METRICS_REPORT_*.md"))
-    log_file = ai_state / "METRICS_LOG.md"
+    reports_dir = ai_state / "metrics_reports"
+    json_files = sorted(reports_dir.glob("METRICS_REPORT_*.json"))
+    md_files = sorted(reports_dir.glob("METRICS_REPORT_*.md"))
+    log_file = reports_dir / "METRICS_LOG.md"
 
     assert len(json_files) == 1, (
         f"Expected exactly 1 JSON report; found {[p.name for p in json_files]}"
@@ -212,9 +216,10 @@ def test_pipeline_completes_when_optional_tools_are_hidden(
     )
 
     ai_state = repo_copy / ".ai-state"
-    json_files = sorted(ai_state.glob("METRICS_REPORT_*.json"))
-    md_files = sorted(ai_state.glob("METRICS_REPORT_*.md"))
-    log_file = ai_state / "METRICS_LOG.md"
+    reports_dir = ai_state / "metrics_reports"
+    json_files = sorted(reports_dir.glob("METRICS_REPORT_*.json"))
+    md_files = sorted(reports_dir.glob("METRICS_REPORT_*.md"))
+    log_file = reports_dir / "METRICS_LOG.md"
     assert len(json_files) == 1, "JSON report must be produced"
     assert len(md_files) == 1, "MD report must be produced"
     assert log_file.is_file(), "METRICS_LOG.md must be produced"
@@ -378,7 +383,9 @@ def test_schema_mismatch_surfaced_when_prior_report_has_older_schema(
         "tool_availability": {},
         "collectors": {},
     }
-    prior_path = ai_state / "METRICS_REPORT_2026-04-22_10-00-00.json"
+    reports_dir = ai_state / "metrics_reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    prior_path = reports_dir / "METRICS_REPORT_2026-04-22_10-00-00.json"
     prior_path.write_text(json.dumps(prior_payload, sort_keys=True), encoding="utf-8")
 
     exit_code = main(["--window-days", "30", "--top-n", "5"])
@@ -388,7 +395,7 @@ def test_schema_mismatch_surfaced_when_prior_report_has_older_schema(
     # file that is NOT the planted prior.
     current_candidates = [
         p
-        for p in sorted(ai_state.glob("METRICS_REPORT_*.json"))
+        for p in sorted((ai_state / "metrics_reports").glob("METRICS_REPORT_*.json"))
         if p.name != prior_path.name
     ]
     assert len(current_candidates) == 1, (

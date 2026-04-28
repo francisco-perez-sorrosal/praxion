@@ -38,10 +38,10 @@ The promethean produces ideas with impact/effort assessments. Consume those asse
 
 Collect candidate items from available sources:
 
-- **IDEA_LEDGER**: Read the latest `.ai-state/IDEA_LEDGER_*.md`. Extract pending ideas with their impact/effort ratings
+- **IDEA_LEDGER**: Read the latest `.ai-state/idea_ledgers/IDEA_LEDGER_*.md`. Extract pending ideas with their impact/effort ratings
 - **IDEA_PROPOSAL**: Check `.ai-work/<task-slug>/IDEA_PROPOSAL.md` for newly validated ideas not yet in the ledger
 - **User input**: Accept ad-hoc items the user wants on the roadmap
-- **Sentinel findings**: Review `.ai-state/SENTINEL_REPORT_*.md` for ecosystem health issues that warrant roadmap slots
+- **Sentinel findings**: Review `.ai-state/sentinel_reports/SENTINEL_REPORT_*.md` for ecosystem health issues that warrant roadmap slots
 
 ### 2. Select Prioritization Framework
 
@@ -114,7 +114,7 @@ Write the roadmap and backlog to `.ai-work/<task-slug>/`:
 **Created**: [ISO 8601 timestamp]
 **Framework**: [prioritization framework used]
 **Format**: [now-next-later | timeline | theme | outcome]
-**Source**: IDEA_LEDGER_[timestamp].md
+**Source**: idea_ledgers/IDEA_LEDGER_[timestamp].md
 
 ## Now (Active / In Progress)
 
@@ -236,7 +236,7 @@ Resist the urge to estimate in hours or days. Relative sizing communicates uncer
 ## Quick Reference
 
 **Typical workflow**:
-1. Read latest `IDEA_LEDGER_*.md` and `SENTINEL_REPORT_*.md`
+1. Read latest `idea_ledgers/IDEA_LEDGER_*.md` and `sentinel_reports/SENTINEL_REPORT_*.md`
 2. Select prioritization framework (ICE for speed, RICE for rigor)
 3. Score and rank candidates
 4. Map dependencies between items
@@ -250,7 +250,7 @@ Resist the urge to estimate in hours or days. Relative sizing communicates uncer
 |----------|----------|-----------|
 | ROADMAP.md | `.ai-work/<task-slug>/` | Session-persistent; updated as items move |
 | BACKLOG.md | `.ai-work/<task-slug>/` | Optional; flat prioritized list |
-| IDEA_LEDGER_*.md | `.ai-state/` | Permanent; promethean-maintained |
+| IDEA_LEDGER_*.md | `.ai-state/idea_ledgers/` | Permanent; promethean-maintained |
 | IDEA_PROPOSAL.md | `.ai-work/<task-slug>/` | Ephemeral; consumed during Gather Input |
 
 **Related skills**:

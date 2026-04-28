@@ -3,9 +3,10 @@
 This module is the final step of the ``/project-metrics`` storage contract:
 take one fully-populated :class:`~scripts.project_metrics.schema.Report`,
 derive a single pipe-separated Markdown row from its aggregate block, and
-append that row to ``<ai_state_dir>/METRICS_LOG.md`` behind an exclusive
-POSIX advisory lock (``fcntl.flock``) so that concurrent invocations
-serialize without corrupting the shared log.
+append that row to ``<log_dir>/METRICS_LOG.md`` (canonically
+``.ai-state/metrics_reports/METRICS_LOG.md``) behind an exclusive POSIX
+advisory lock (``fcntl.flock``) so that concurrent invocations serialize
+without corrupting the shared log.
 
 Design choices:
 
@@ -73,7 +74,7 @@ _LOCK_FILENAME = "METRICS_LOG.lock"
 _TEMP_PREFIX = "metrics_log_pending_"
 
 
-def append_log(report: Report, ai_state_dir: Path, report_md_filename: str) -> None:
+def append_log(report: Report, log_dir: Path, report_md_relpath: str) -> None:
     """Append one row derived from ``report`` to ``METRICS_LOG.md``.
 
     If the log does not yet exist, this call creates it with the two-line
@@ -85,29 +86,30 @@ def append_log(report: Report, ai_state_dir: Path, report_md_filename: str) -> N
     covers the full read-compute-write sequence so two concurrent workers
     cannot race into duplicate headers or interleaved rows.
 
-    Atomicity: new content is written to a temp file in ``ai_state_dir``
-    and swapped into place via ``os.replace``. On replacement failure the
+    Atomicity: new content is written to a temp file in ``log_dir`` and
+    swapped into place via ``os.replace``. On replacement failure the
     temp file is unlinked and the pre-existing log remains unchanged.
 
     :param report: fully-populated :class:`Report` — aggregate fields may
         include ``None`` for nullable columns.
-    :param ai_state_dir: destination directory; created (with parents) if
-        absent.
-    :param report_md_filename: filename of the sibling Markdown report
-        (e.g., ``METRICS_REPORT_2026-04-23_14-30-00.md``); surfaces as the
-        trailing ``[filename](filename)`` Markdown-link cell.
+    :param log_dir: directory holding ``METRICS_LOG.md`` (canonically
+        ``.ai-state/metrics_reports/``); created (with parents) if absent.
+    :param report_md_relpath: path of the sibling Markdown report relative
+        to ``log_dir`` (typically a bare basename when log + report are
+        co-located, e.g., ``METRICS_REPORT_2026-04-23_14-30-00.md``).
+        Surfaces as the trailing ``[basename](relpath)`` Markdown-link cell.
     """
-    ai_state_dir.mkdir(parents=True, exist_ok=True)
+    log_dir.mkdir(parents=True, exist_ok=True)
 
-    log_path = ai_state_dir / _LOG_FILENAME
-    lock_path = ai_state_dir / _LOCK_FILENAME
+    log_path = log_dir / _LOG_FILENAME
+    lock_path = log_dir / _LOCK_FILENAME
 
     with _acquire_exclusive_lock(lock_path):
         existing = log_path.read_text(encoding="utf-8") if log_path.exists() else ""
         new_content = _compose_log_content(
             existing=existing,
             report=report,
-            report_md_filename=report_md_filename,
+            report_md_relpath=report_md_relpath,
         )
         _atomic_write_text(log_path, new_content)
 
@@ -160,10 +162,10 @@ def _acquire_exclusive_lock(lock_path: Path) -> _ExclusiveLock:
 
 
 def _compose_log_content(
-    *, existing: str, report: Report, report_md_filename: str
+    *, existing: str, report: Report, report_md_relpath: str
 ) -> str:
     """Build the full new file content: header (if first run) + all rows + new row."""
-    row = _render_data_row(report, report_md_filename)
+    row = _render_data_row(report, report_md_relpath)
     if existing.strip() == "":
         header = aggregate_header_for_log()
         return header + "\n" + row + "\n"
@@ -171,17 +173,20 @@ def _compose_log_content(
     return existing + suffix + row + "\n"
 
 
-def _render_data_row(report: Report, report_md_filename: str) -> str:
+def _render_data_row(report: Report, report_md_relpath: str) -> str:
     """Render one pipe-separated Markdown row from ``report.aggregate``.
 
     Column order is :data:`AGGREGATE_COLUMNS` (16 aggregate fields) plus a
     trailing ``report_file`` cell rendered as a Markdown link. Nullable
     columns render as the em-dash placeholder; all other values use their
-    standard ``str()`` representation.
+    standard ``str()`` representation. Link text is the file basename;
+    link href is the full relative path so the link resolves regardless of
+    whether the report lives in ``.ai-state/`` directly or in a subdirectory.
     """
     aggregate_dict = asdict(report.aggregate)
     cells = [_render_cell(aggregate_dict[name]) for name in AGGREGATE_COLUMNS]
-    cells.append(f"[{report_md_filename}]({report_md_filename})")
+    basename = Path(report_md_relpath).name
+    cells.append(f"[{basename}]({report_md_relpath})")
     return "| " + " | ".join(cells) + " |"
 
 

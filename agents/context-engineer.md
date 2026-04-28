@@ -93,7 +93,7 @@ Perform cross-artifact analysis across six dimensions:
 
 **Token waste** — Verbose content that could use progressive disclosure, consolidation, or restructuring. Example: a skill that dumps 500 lines at activation when 50 lines of core content plus reference files would suffice.
 
-**Note:** For ecosystem-wide health checks across all dimensions, use the sentinel agent. The context-engineer's audit is deep and focused on individual artifact types; the sentinel's is broad and systematic across the full ecosystem. The sentinel produces timestamped `SENTINEL_REPORT_*.md` reports with prioritized findings that the context-engineer can consume as a remediation work queue.
+**Note:** For ecosystem-wide health checks across all dimensions, use the sentinel agent. The context-engineer's audit is deep and focused on individual artifact types; the sentinel's is broad and systematic across the full ecosystem. The sentinel produces timestamped `SENTINEL_REPORT_*.md` reports (in `.ai-state/sentinel_reports/`) with prioritized findings that the context-engineer can consume as a remediation work queue.
 
 ### Phase 4 — Recommendations
 

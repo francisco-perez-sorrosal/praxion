@@ -12,7 +12,7 @@ Thirteen agents that collaborate on software development tasks, each with a dedi
 
 ```mermaid
 flowchart TD
-    P["<b>promethean</b>"] -->|"IDEA_PROPOSAL.md +<br/>IDEA_LEDGER_*.md"| R
+    P["<b>promethean</b>"] -->|"IDEA_PROPOSAL.md +<br/>idea_ledgers/IDEA_LEDGER_*.md"| R
 
     R["<b>researcher</b>"] -->|"RESEARCH_FINDINGS.md"| SA
     CE1["context-engineer<br/>(shadow)"] -.->|"CONTEXT_REVIEW.md<br/>(research stage)"| SA
@@ -33,14 +33,14 @@ flowchart TD
     V -.->|"SKILL_GENESIS_REPORT.md"| SG["<b>skill-genesis</b><br/>(optional)"]
 
     SE["<b>sentinel</b><br/>(independent audit)"]
-    SE -.->|"SENTINEL_REPORT_*.md +<br/>SENTINEL_LOG.md<br/>(.ai-state/)"| ANY["Any agent or user<br/>can consume reports"]
+    SE -.->|"SENTINEL_REPORT_*.md +<br/>SENTINEL_LOG.md<br/>(.ai-state/sentinel_reports/)"| ANY["Any agent or user<br/>can consume reports"]
 
     style SE fill:#f0f0f0,stroke:#999,stroke-dasharray: 5 5
 ```
 
 | Agent | Description | Skills Used |
 |-------|-------------|-------------|
-| `promethean` | Analyzes project state, optionally consuming sentinel reports for health context, generates feature-level improvement ideas through dialog, writes `IDEA_PROPOSAL.md` for downstream agents and timestamped `IDEA_LEDGER_*.md` to `.ai-state/` | — |
+| `promethean` | Analyzes project state, optionally consuming sentinel reports for health context, generates feature-level improvement ideas through dialog, writes `IDEA_PROPOSAL.md` for downstream agents and timestamped `IDEA_LEDGER_*.md` to `.ai-state/idea_ledgers/` | — |
 | `researcher` | Explores codebases, gathers external documentation, evaluates alternatives, and distills findings into `RESEARCH_FINDINGS.md` | — |
 | `systems-architect` | Evaluates trade-offs, assesses codebase readiness, and produces architectural decisions in `SYSTEMS_PLAN.md` | — |
 | `implementation-planner` | Breaks architecture into incremental steps (`IMPLEMENTATION_PLAN.md`, `WIP.md`, `LEARNINGS.md`) and supervises execution | `software-planning` |
@@ -49,7 +49,7 @@ flowchart TD
 | `test-engineer` | Designs, writes, and refactors test suites with expert-level test strategy. Handles dedicated testing steps: complex test scenarios (property-based, contract, integration), test suite refactoring, and testing infrastructure. Operates at the same pipeline level as the implementer | `software-planning`, `code-review`, `refactoring` |
 | `verifier` | Verifies completed implementation against acceptance criteria, coding conventions, and test coverage; produces `VERIFICATION_REPORT.md` with pass/fail/warn findings | `code-review` |
 | `doc-engineer` | Maintains project-facing documentation quality (README.md, catalogs, architecture docs, changelogs); runs in parallel with implementer and test-engineer on planner-assigned doc steps; validates cross-references, catalog completeness, naming consistency, and writing quality | `doc-management` |
-| `sentinel` | Independent read-only ecosystem quality auditor scanning all context artifacts across ten dimensions (eight per-artifact + code health + ecosystem coherence as system-level composite); produces timestamped `SENTINEL_REPORT_*.md` (accumulates) and `SENTINEL_LOG.md` (historical metrics) in `.ai-state/` — any agent or user can consume its reports | — |
+| `sentinel` | Independent read-only ecosystem quality auditor scanning all context artifacts across ten dimensions (eight per-artifact + code health + ecosystem coherence as system-level composite); produces timestamped `SENTINEL_REPORT_*.md` (accumulates) and `SENTINEL_LOG.md` (historical metrics) in `.ai-state/sentinel_reports/` — any agent or user can consume its reports | — |
 | `skill-genesis` | Post-implementation learning harvester that triages entries from `LEARNINGS.md` and `VERIFICATION_REPORT.md`, deduplicates patterns, proposes artifacts (memory entries, rules, skills, agent definitions) through interactive dialog, and produces `SKILL_GENESIS_REPORT.md` with artifact specifications ready for handoff | `skill-crafting`, `rule-crafting` |
 | `cicd-engineer` | Designs, writes, reviews, and debugs CI/CD pipelines with deep GitHub Actions expertise; creates workflows, optimizes pipelines, hardens security, configures caching, sets up deployment automation, troubleshoots failures, and reviews configuration for best practices | `cicd` |
 | `roadmap-cartographer` | Runs an ultra-in-depth project audit (deterministic, agentic, or hybrid) through a **project-derived lens set** (drawn from project values + domain constraints + exemplar sets: SPIRIT, DORA, SPACE, FAIR, CNCF Platform Maturity, or Custom), orchestrates one researcher per lens in parallel, synthesizes findings into a 10-section `ROADMAP.md` covering both deficit repairs (Weaknesses) and **forward lines of work** (Opportunities — new capabilities, strategic bets, evolution trends), and emits it at the project root; activated by `/roadmap` or by phrases like "spring cleaning" and "state of the project" | `roadmap-synthesis` |

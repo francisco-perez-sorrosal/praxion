@@ -166,13 +166,18 @@ def _write_prior_report(
 
 @pytest.fixture
 def ai_state(tmp_path: Path) -> Path:
-    """Return a fresh (empty) ``.ai-state/`` directory under `tmp_path`.
+    """Return a fresh (empty) ``.ai-state/metrics_reports/`` directory under `tmp_path`.
+
+    The fixture returns the metrics-reports subdirectory because
+    ``compute_trends`` consumes ``reports_dir`` directly (post-reorg
+    from a flat ``.ai-state/``). Tests that need to write a sibling
+    file outside the reports directory derive it via ``ai_state.parent``.
 
     Using a fixture rather than inline construction keeps every test
-    hermetic: no test can pollute another's ``.ai-state/`` state.
+    hermetic: no test can pollute another's reports directory.
     """
-    d = tmp_path / ".ai-state"
-    d.mkdir()
+    d = tmp_path / ".ai-state" / "metrics_reports"
+    d.mkdir(parents=True)
     return d
 
 
@@ -225,7 +230,7 @@ class TestTrendsFirstRun:
         prior reports."""
         from scripts.project_metrics.trends import compute_trends
 
-        (ai_state / "SENTINEL_LOG.md").write_text("# sentinel log\n")
+        (ai_state.parent / "SENTINEL_LOG.md").write_text("# sentinel log\n")
         (ai_state / "METRICS_LOG.md").write_text("# metrics log\n")
         (ai_state / "METRICS_REPORT_summary.txt").write_text("not json\n")
 
@@ -725,8 +730,8 @@ class TestDeltaRecordsCarryCurrentAndPrior:
     def test_numeric_delta_carries_current_and_prior(self, tmp_path: Path) -> None:
         from scripts.project_metrics.trends import compute_trends
 
-        ai_state = tmp_path / ".ai-state"
-        ai_state.mkdir()
+        ai_state = tmp_path / ".ai-state" / "metrics_reports"
+        ai_state.mkdir(parents=True)
         _write_prior_report(
             ai_state,
             timestamp="2026-04-22T12:00:00Z",
@@ -755,8 +760,8 @@ class TestDeltaRecordsCarryCurrentAndPrior:
 
         from scripts.project_metrics.trends import compute_trends
 
-        ai_state = tmp_path / ".ai-state"
-        ai_state.mkdir()
+        ai_state = tmp_path / ".ai-state" / "metrics_reports"
+        ai_state.mkdir(parents=True)
         _write_prior_report(
             ai_state,
             timestamp="2026-04-22T12:00:00Z",

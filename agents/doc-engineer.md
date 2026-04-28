@@ -50,7 +50,7 @@ Determine what documentation to evaluate:
 3. **Set mode** -- audit (report only) or fix (report and remediate).
 4. **Echo the scope** before proceeding so the user can correct misinterpretation.
 
-If invoked with a sentinel report (latest `SENTINEL_REPORT_*.md` from `.ai-state/`), extract documentation-related findings as the remediation work queue.
+If invoked with a sentinel report (latest `SENTINEL_REPORT_*.md` from `.ai-state/sentinel_reports/`), extract documentation-related findings as the remediation work queue.
 
 **Tech-debt ledger awareness (permission, not obligation).** Read `.ai-state/TECH_DEBT_LEDGER.md`. Filter entries by `owner-role = doc-engineer` and `location` overlapping your current scope. Address items where possible within your current task; update `status` to `resolved` (with `resolved-by`) or `in-flight` as appropriate. Out-of-scope items remain `open` — do not delete. This is permission, not obligation: addressing ledger items is allowed when natural to your current scope, never required.
 
@@ -205,7 +205,7 @@ When both agents are invoked, the doc-engineer runs AFTER the context-engineer t
 ### With the Sentinel
 
 - The sentinel detects ecosystem-wide documentation drift across its ten audit dimensions
-- The doc-engineer consumes sentinel findings from the latest `.ai-state/SENTINEL_REPORT_*.md` as a remediation work queue
+- The doc-engineer consumes sentinel findings from the latest `.ai-state/sentinel_reports/SENTINEL_REPORT_*.md` as a remediation work queue
 - Boundary: the sentinel diagnoses broadly; the doc-engineer remediates documentation specifically
 
 ### With the Implementation Planner

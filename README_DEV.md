@@ -180,8 +180,14 @@ eval/                                # Out-of-band quality evals (praxion-evals 
 │   ├── 001-skill-wrapper-over-mcp-server.md
 │   ├── ...
 │   └── DECISIONS_INDEX.md           # Auto-generated summary table
-├── SENTINEL_REPORT_*.md
-├── SENTINEL_LOG.md
+├── sentinel_reports/                # Timestamped audit reports + log
+│   ├── SENTINEL_REPORT_*.md
+│   └── SENTINEL_LOG.md
+├── metrics_reports/                 # /project-metrics report triples + log
+│   ├── METRICS_REPORT_*.{md,json}
+│   └── METRICS_LOG.md
+├── idea_ledgers/                    # Promethean ideation history
+│   └── IDEA_LEDGER_*.md
 └── ...
 install.sh                           # Installer router
 install_claude.sh                    # Claude Code / Desktop installer

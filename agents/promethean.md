@@ -56,14 +56,14 @@ Determine the ideation focus. The **task slug** (provided in your prompt as `Tas
 
 Establish the ecosystem's current health state before ideating. The sentinel's persistent reports in `.ai-state/` are the authoritative source.
 
-1. **Read `.ai-state/SENTINEL_LOG.md`** — find the latest row. Extract the timestamp, health grade, and ecosystem coherence grade
-2. **If a report exists and is recent** (within 7 days based on the log's timestamp), read the latest `.ai-state/SENTINEL_REPORT_*.md` (identified by timestamp in the filename or from the log's Report File column). Extract:
+1. **Read `.ai-state/sentinel_reports/SENTINEL_LOG.md`** — find the latest row. Extract the timestamp, health grade, and ecosystem coherence grade
+2. **If a report exists and is recent** (within 7 days based on the log's timestamp), read the latest `.ai-state/sentinel_reports/SENTINEL_REPORT_*.md` (identified by timestamp in the filename or from the log's Report File column). Extract:
    - **Ecosystem health grade** — overall system state
    - **Ecosystem coherence grade** — system-level integration quality (orphaned artifacts, pipeline handoff gaps, structural blind spots)
    - **Critical/Important findings** — active problems to avoid aggravating
    - **Per-artifact coherence scores** — which artifacts are poorly connected to their ecosystem context
    - **Recommended actions** — what the sentinel thinks needs fixing (do not re-propose these as ideas; they are maintenance, not features)
-3. **If no report exists**, halt with this message: _"No sentinel report found in `.ai-state/`. Run the sentinel agent first to establish an ecosystem baseline before ideation. Recommended: invoke sentinel with a full ecosystem sweep."_
+3. **If no report exists**, halt with this message: _"No sentinel report found in `.ai-state/sentinel_reports/`. Run the sentinel agent first to establish an ecosystem baseline before ideation. Recommended: invoke sentinel with a full ecosystem sweep."_
 4. **Record the sentinel report reference** — save the timestamp from the log entry for inclusion in the idea ledger output
 5. **Carry health data forward** — use it in Phase 4 (Idea Generation) to prioritize ideas that address ecosystem gaps and avoid proposing ideas that would worsen existing issues
 
@@ -84,13 +84,13 @@ Build a picture of what exists from three information sources:
 - Structure gaps: thin or missing categories
 
 **Source 2 — Idea ledger** (ideation history):
-- Read the latest `.ai-state/IDEA_LEDGER_*.md` file (by timestamp in filename), or `.ai-state/IDEA_LEDGER.md` if no timestamped files exist
+- Read the latest `.ai-state/idea_ledgers/IDEA_LEDGER_*.md` file (by timestamp in filename); if `.ai-state/idea_ledgers/` does not yet exist, fall back to a legacy `.ai-state/IDEA_LEDGER.md` if present
 - Review implemented ideas — avoid re-proposing past work
 - Review pending ideas — build on them when relevant
 - Review discarded ideas — understand why they were rejected
 - Check future paths — align ideation with stated project directions
 
-**Source 3 — Sentinel report** (latest `.ai-state/SENTINEL_REPORT_*.md`, loaded in Phase 2):
+**Source 3 — Sentinel report** (latest `.ai-state/sentinel_reports/SENTINEL_REPORT_*.md`, loaded in Phase 2):
 - Use the per-artifact scorecard to identify weak artifacts worth improving
 - Use ecosystem coherence findings (system-level) to spot structural opportunities
 - Use the findings list to understand what is already flagged for remediation
@@ -211,18 +211,18 @@ In non-interactive mode, include the `[AUTO-VALIDATED]` marker after the title. 
 
 Create the `.ai-work/<task-slug>/` directory if it does not exist. If an `IDEA_PROPOSAL.md` already exists, confirm with the user before overwriting.
 
-After writing the proposal, produce the idea ledger in `.ai-state/`:
+After writing the proposal, produce the idea ledger in `.ai-state/idea_ledgers/`:
 
-1. **Read the previous ledger** — find the latest `.ai-state/IDEA_LEDGER_*.md` (by timestamp in filename), or `.ai-state/IDEA_LEDGER.md` if no timestamped files exist. Carry forward all existing entries.
+1. **Read the previous ledger** — find the latest `.ai-state/idea_ledgers/IDEA_LEDGER_*.md` (by timestamp in filename); if `.ai-state/idea_ledgers/` does not yet exist, fall back to a legacy `.ai-state/IDEA_LEDGER.md` if present. Carry forward all existing entries.
 2. **Update the content**:
    - Add validated ideas to the **Pending** section
    - Add discarded ideas to the **Discarded** section with a brief reason
    - Update **Future Paths** if the discussion revealed new project directions
    - Set `Sentinel baseline` to the sentinel run timestamp from Phase 2 (e.g., `2026-02-08 14:30:00`)
    - Update the `Last updated` timestamp
-3. **Write to `.ai-state/IDEA_LEDGER_YYYY-MM-DD_HH-MM-SS.md`** — timestamped per-run file. Use `-` (not `:`) in the timestamp for filename safety.
+3. **Write to `.ai-state/idea_ledgers/IDEA_LEDGER_YYYY-MM-DD_HH-MM-SS.md`** — timestamped per-run file. Use `-` (not `:`) in the timestamp for filename safety.
 
-Create the `.ai-state/` directory if it does not exist.
+Create the `.ai-state/idea_ledgers/` directory if it does not exist.
 
 The idea ledger header should include:
 ```markdown
@@ -264,8 +264,8 @@ When the idea's scope is clear and no research is needed, the systems-architect 
 
 The promethean consumes sentinel reports as input for ideation. The sentinel operates independently — it does not exist to feed the promethean, and the promethean's consumption of its reports is a unilateral decision. Data flows through specific files:
 
-- **`.ai-state/SENTINEL_LOG.md`** — Phase 2 reads this to check report recency, get summary metrics, and identify the latest report file
-- **`.ai-state/SENTINEL_REPORT_*.md`** — Phase 2 reads the latest report (by timestamp in filename) for health grade, ecosystem coherence grade, findings, and per-artifact scores
+- **`.ai-state/sentinel_reports/SENTINEL_LOG.md`** — Phase 2 reads this to check report recency, get summary metrics, and identify the latest report file
+- **`.ai-state/sentinel_reports/SENTINEL_REPORT_*.md`** — Phase 2 reads the latest report (by timestamp in filename) for health grade, ecosystem coherence grade, findings, and per-artifact scores
 - The idea ledger records which sentinel run was used as baseline (`Sentinel baseline` timestamp), creating a traceable link between ecosystem state and the ideas it informed
 - Ecosystem coherence gaps from the report inform Phase 4 idea generation — structural holes are high-value opportunities
 - Critical/Important findings constrain ideation — don't propose changes that conflict with known issues

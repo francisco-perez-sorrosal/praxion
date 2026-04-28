@@ -27,7 +27,7 @@ Load explicitly with `roadmap-planning` or reference prioritization, roadmap, ba
 
 ## Quick Start
 
-1. **Gather input**: read the latest `IDEA_LEDGER_*.md` from `.ai-state/` and any pending `IDEA_PROPOSAL.md`
+1. **Gather input**: read the latest `IDEA_LEDGER_*.md` from `.ai-state/idea_ledgers/` and any pending `IDEA_PROPOSAL.md`
 2. **Select framework**: use the decision table in SKILL.md (ICE for speed, RICE for rigor)
 3. **Score and rank**: apply the framework to each candidate item
 4. **Map dependencies**: identify blocking and enhancing relationships between items

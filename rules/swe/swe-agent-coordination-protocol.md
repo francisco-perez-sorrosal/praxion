@@ -59,7 +59,7 @@ Outputs use path prefixes to signal lifecycle: `.ai-work/<slug>/` = ephemeral (d
 
 | Agent | Purpose | Output | Bg Safe |
 |-------|---------|--------|---------|
-| `promethean` | Feature-level ideation from project state | `.ai-work/<slug>/IDEA_PROPOSAL.md`, `.ai-state/IDEA_LEDGER_*.md` | No |
+| `promethean` | Feature-level ideation from project state | `.ai-work/<slug>/IDEA_PROPOSAL.md`, `.ai-state/idea_ledgers/IDEA_LEDGER_*.md` | No |
 | `researcher` | Codebase exploration, external docs, comparative analysis | `.ai-work/<slug>/RESEARCH_FINDINGS.md` | Yes |
 | `systems-architect` | Trade-off analysis, system design | `.ai-work/<slug>/SYSTEMS_PLAN.md`, `.ai-state/decisions/` (ADRs), `.ai-state/ARCHITECTURE.md`^1, `docs/architecture.md`^1 | Yes |
 | `implementation-planner` | Step decomposition, execution supervision | `.ai-work/<slug>/IMPLEMENTATION_PLAN.md`, `.ai-work/<slug>/WIP.md`, `.ai-work/<slug>/LEARNINGS.md` | Yes |
@@ -68,7 +68,7 @@ Outputs use path prefixes to signal lifecycle: `.ai-work/<slug>/` = ephemeral (d
 | `test-engineer` | Dedicated testing: complex test design, test suite refactoring, testing infrastructure | Test code + `.ai-work/<slug>/WIP.md` update + `.ai-work/<slug>/TEST_RESULTS.md` (canonical when paired with implementer on tests) | Yes |
 | `verifier` | Post-implementation review against acceptance criteria | `.ai-work/<slug>/VERIFICATION_REPORT.md` | Yes |
 | `doc-engineer` | Documentation quality (READMEs, catalogs, changelogs, developer architecture guide) | Doc report or file fixes | Yes |
-| `sentinel` | Read-only ecosystem auditor (independent, not a pipeline stage) | `.ai-state/SENTINEL_REPORT_*.md`, `.ai-state/SENTINEL_LOG.md` | Yes |
+| `sentinel` | Read-only ecosystem auditor (independent, not a pipeline stage) | `.ai-state/sentinel_reports/SENTINEL_REPORT_*.md`, `.ai-state/sentinel_reports/SENTINEL_LOG.md` | Yes |
 | `skill-genesis` | Learning triage, artifact proposal from experience | `.ai-work/<slug>/SKILL_GENESIS_REPORT.md` | No |
 | `cicd-engineer` | CI/CD pipeline design, GitHub Actions, deployment automation | Workflow files + pipeline config | Yes |
 | `roadmap-cartographer` | Project-level audit-to-roadmap through a project-derived lens set (SPIRIT, DORA, SPACE, FAIR, CNCF, or Custom); invoked via `/roadmap` | `ROADMAP.md` at project root, `.ai-work/<slug>/ROADMAP_DRAFT.md`, `.ai-work/<slug>/AUDIT_<lens>.md` fragments | No |
@@ -111,7 +111,7 @@ Spawn agents without waiting for the user to ask:
 - Architecture approved --> `implementation-planner`; resuming work --> same agent to re-assess `WIP.md`
 - Plan ready --> `implementer` + `test-engineer` concurrently (paired steps on disjoint file sets); both complete --> run tests --> fix cycle if needed --> `verifier`
 - Context artifacts stale/conflicting or plan touches them --> `context-engineer` (parallel with `researcher`/`systems-architect` as shadow; see context-engineer shadowing rule below)
-- Ecosystem health or regression check --> `sentinel`; stale check: `.ai-state/SENTINEL_LOG.md` vs `git log -1 --format=%ci`
+- Ecosystem health or regression check --> `sentinel`; stale check: `.ai-state/sentinel_reports/SENTINEL_LOG.md` vs `git log -1 --format=%ci`
 - Documentation impact likely --> `doc-engineer`: at pipeline checkpoints (after planning, after implementation, after refactoring), or in parallel with `implementer` + `test-engineer` when the planner assigns a doc step to the parallel group
 - Pipeline complete + LEARNINGS.md has content --> `skill-genesis`
 

@@ -280,9 +280,11 @@ Append-only. Entries in chronological order by timestamp.
 | `decisions/<NNN>-<slug>.md` | Low — unique sequence numbers, but two worktrees may pick the same NNN | Run `python scripts/reconcile_ai_state.py`. Auto-detects duplicate NNN prefixes, renumbers the later ADR, updates its `id` field |
 | `decisions/DECISIONS_INDEX.md` | Medium — both worktrees regenerate the full index | Run `python scripts/reconcile_ai_state.py`. Always regenerated from ADR files — never merge textually |
 | `calibration_log.md` | Low — append-only | Keep both entries in timestamp order. Git usually auto-merges concurrent appends. If conflict, concatenate and re-sort by timestamp |
-| `SENTINEL_LOG.md` | Medium — append-only index referencing report files | After merge: (1) keep both entries, (2) re-sort all rows by timestamp, (3) verify every `Report File` cell points to an existing `SENTINEL_REPORT_*.md` — delete orphan rows, add missing rows for reports present on disk but absent from the log |
-| `SENTINEL_REPORT_*.md` | None — timestamped filenames are unique | Git merge handles distinct file additions natively |
-| `IDEA_LEDGER_*.md` | Medium — each promethean run carries forward previous entries | If two worktrees both run promethean, the later ledger may miss the earlier's new entries. Create a reconciled ledger with suffix `_reconciled` containing the union of both |
+| `sentinel_reports/SENTINEL_LOG.md` | Medium — append-only index referencing report files | After merge: (1) keep both entries, (2) re-sort all rows by timestamp, (3) verify every `Report File` cell points to an existing `sentinel_reports/SENTINEL_REPORT_*.md` — delete orphan rows, add missing rows for reports present on disk but absent from the log |
+| `sentinel_reports/SENTINEL_REPORT_*.md` | None — timestamped filenames are unique | Git merge handles distinct file additions natively |
+| `metrics_reports/METRICS_REPORT_*.{md,json}` | None — timestamped filenames are unique | Git merge handles distinct file additions natively |
+| `metrics_reports/METRICS_LOG.md` | Medium — append-only aggregate-row table | After merge: keep both entries, re-sort by timestamp, verify every `report_file` link target exists as a sibling under `metrics_reports/` |
+| `idea_ledgers/IDEA_LEDGER_*.md` | Medium — each promethean run carries forward previous entries | If two worktrees both run promethean, the later ledger may miss the earlier's new entries. Create a reconciled ledger with suffix `_reconciled` containing the union of both |
 | `specs/SPEC_*.md` | None — unique feature-name + date filenames | Git merge handles distinct file additions natively |
 | `SYSTEM_DEPLOYMENT.md` | Low — single evolving file, section ownership prevents concurrent edits | Standard git merge. If conflict, later worktree's version wins for architect-owned sections; review implementer/cicd-owned sections manually |
 | `ARCHITECTURE.md` | Low — single evolving file, section ownership prevents concurrent edits | Standard git merge. If conflict, later worktree's version wins for architect-owned sections; review implementer-owned sections manually |
@@ -313,11 +315,11 @@ Beyond `.ai-state/`, pipelines modify project files that are committed to git. M
 After merging a pipeline worktree branch back into the target branch, run this checklist to confirm nothing was lost:
 
 1. **`.ai-state/` referential integrity**
-   - Every `SENTINEL_LOG.md` row points to an existing `SENTINEL_REPORT_*.md` file
+   - Every `sentinel_reports/SENTINEL_LOG.md` row points to an existing `sentinel_reports/SENTINEL_REPORT_*.md` file
    - Every ADR `id` field matches its filename number — no duplicate NNNs
    - `DECISIONS_INDEX.md` lists every ADR file in `decisions/` (regenerate if needed)
 2. **Registered artifacts** — if context-engineer added skills/agents/commands, verify they appear in `.claude-plugin/plugin.json` and the referenced files exist
-3. **Append-only logs** — `calibration_log.md` and `SENTINEL_LOG.md` entries are in chronological order
+3. **Append-only logs** — `calibration_log.md`, `sentinel_reports/SENTINEL_LOG.md`, and `metrics_reports/METRICS_LOG.md` entries are in chronological order
 4. **Spec archival** — if the pipeline completed a feature, verify `SPEC_<name>_*.md` exists in `.ai-state/specs/` and cross-references the correct ADR files
 5. **No orphan ADRs** — every ADR with `supersedes` has the corresponding old ADR marked `superseded_by` and status `superseded`
 6. **JSON/YAML validity** — `plugin.json` parses cleanly; workflow files pass syntax check

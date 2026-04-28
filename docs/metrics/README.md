@@ -25,17 +25,17 @@ Authoritative reference for the `/project-metrics` artifact format. This documen
 
 ## 2. The artifact triple
 
-Every successful run writes exactly three files to `.ai-state/`:
+Every successful run writes exactly three files to `.ai-state/metrics_reports/`:
 
 | File | Role | Content |
 |------|------|---------|
-| `.ai-state/METRICS_REPORT_<timestamp>.json` | Canonical machine-readable payload | Full report — aggregate, tool_availability, every collector namespace, hotspots, trends, run_metadata |
-| `.ai-state/METRICS_REPORT_<timestamp>.md` | Derived human-readable rendering | Deterministic nine-section layout; no information that is not also in the JSON |
-| `.ai-state/METRICS_LOG.md` | Append-only table | One row per run, columns match the frozen aggregate block plus a trailing `report_file` link |
+| `.ai-state/metrics_reports/METRICS_REPORT_<timestamp>.json` | Canonical machine-readable payload | Full report — aggregate, tool_availability, every collector namespace, hotspots, trends, run_metadata |
+| `.ai-state/metrics_reports/METRICS_REPORT_<timestamp>.md` | Derived human-readable rendering | Deterministic nine-section layout; no information that is not also in the JSON |
+| `.ai-state/metrics_reports/METRICS_LOG.md` | Append-only table | One row per run, columns match the frozen aggregate block plus a trailing `report_file` link |
 
 **Naming convention.** `<timestamp>` is `YYYY-MM-DD_HH-MM-SS` in UTC — no colons (portable across macOS, Linux, Windows). The log filename has no timestamp; it accumulates across every run.
 
-**Lifecycle.** All three files are committed to git. Deleting a `METRICS_REPORT_*.json` after the fact affects trend computation on the next run — see [§9 Mid-history pruning policy](#9-mid-history-pruning-policy).
+**Lifecycle.** All three files are committed to git. Deleting a `metrics_reports/METRICS_REPORT_*.json` after the fact affects trend computation on the next run — see [§9 Mid-history pruning policy](#9-mid-history-pruning-policy).
 
 **Atomicity.** The three files are written as a unit. A run that fails partway through does not leave a half-written JSON + a fresh log row — argparse rejection exits before any file is touched, and the final write sequence is JSON → MD → log row. If the JSON write fails, no MD or log row lands.
 
@@ -239,7 +239,7 @@ The composer reads churn from the `git` namespace and complexity from the `lizar
 
 ## 6. Trends block
 
-The `trends` block reports the delta between the current run and the most-recent-strictly-prior `METRICS_REPORT_*.json` found in `.ai-state/`. It is a tagged union discriminated by `status` — one of four values.
+The `trends` block reports the delta between the current run and the most-recent-strictly-prior `METRICS_REPORT_*.json` found in `.ai-state/metrics_reports/`. It is a tagged union discriminated by `status` — one of four values.
 
 ### `first_run`
 
@@ -331,7 +331,7 @@ The top-level `schema_version` field carries a semver string. v1 ships `1.0.0`.
 
 ## 9. Mid-history pruning policy
 
-If a user deletes a `METRICS_REPORT_<timestamp>.json` between runs, the next run's trend computation selects the **most-recent-strictly-prior** surviving report by its embedded `aggregate.timestamp` — not the filename, not the filesystem mtime. This means:
+If a user deletes a `metrics_reports/METRICS_REPORT_<timestamp>.json` between runs, the next run's trend computation selects the **most-recent-strictly-prior** surviving report by its embedded `aggregate.timestamp` — not the filename, not the filesystem mtime. This means:
 
 - Deleting the most recent prior report causes the next run to compare against the one before it; deltas widen but stay coherent.
 - Deleting every prior report causes the next run to report `status: "first_run"` — indistinguishable on the wire from a genuinely new project.
@@ -386,7 +386,7 @@ Nullable columns (`ccn_p95`, `coverage_line_pct`, etc.) render as gaps in the ch
 
 ### Path B — Local MCP-driven server
 
-A few-hundred-line FastAPI or Streamlit app that watches the `.ai-state/` directory and serves REST endpoints. Useful when the UI needs to filter, search, or combine multiple projects. Minimal FastAPI stub:
+A few-hundred-line FastAPI or Streamlit app that watches the `.ai-state/metrics_reports/` directory and serves REST endpoints. Useful when the UI needs to filter, search, or combine multiple projects. Minimal FastAPI stub:
 
 ```python
 # metrics_mcp.py
@@ -395,12 +395,12 @@ from pathlib import Path
 import json
 
 app = FastAPI()
-AI_STATE = Path(".ai-state")
+METRICS_DIR = Path(".ai-state/metrics_reports")
 
 @app.get("/history")
 def history():
     reports = []
-    for p in sorted(AI_STATE.glob("METRICS_REPORT_*.json")):
+    for p in sorted(METRICS_DIR.glob("METRICS_REPORT_*.json")):
         with p.open() as f:
             data = json.load(f)
         reports.append({
@@ -434,7 +434,7 @@ conn.execute("""
     coverage_line_pct REAL
   )
 """)
-for p in Path(".ai-state").glob("METRICS_REPORT_*.json"):
+for p in Path(".ai-state/metrics_reports").glob("METRICS_REPORT_*.json"):
     agg = json.loads(p.read_text())["aggregate"]
     conn.execute(
       "INSERT OR REPLACE INTO aggregate VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",

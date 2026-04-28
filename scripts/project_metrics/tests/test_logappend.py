@@ -1,8 +1,9 @@
 """Behavioral tests for ``logappend.py`` -- file-locked append to METRICS_LOG.md.
 
 These tests encode the contract for the final composition-layer step: a
-single ``append_log(report, ai_state_dir, report_md_filename)`` call that
-produces one pipe-separated Markdown row in ``.ai-state/METRICS_LOG.md``,
+single ``append_log(report, log_dir, report_md_relpath)`` call that
+produces one pipe-separated Markdown row in
+``.ai-state/metrics_reports/METRICS_LOG.md``,
 serialized across concurrent invocations by ``fcntl.flock(LOCK_EX)``, and
 atomic against mid-write interruption via a temp-file-then-rename pattern.
 

@@ -62,27 +62,38 @@ This scoping prevents collisions when multiple pipelines or multiple instances o
 ```
 <project-root>/
   .ai-state/
-    IDEA_LEDGER_*.md
-    SENTINEL_REPORT_*.md
-    SENTINEL_LOG.md
     calibration_log.md
+    ARCHITECTURE.md
+    SYSTEM_DEPLOYMENT.md
+    TECH_DEBT_LEDGER.md
     decisions/
       <NNN>-<slug>.md
       DECISIONS_INDEX.md
     specs/
       SPEC_<name>_YYYY-MM-DD.md
-    SYSTEM_DEPLOYMENT.md
-    ARCHITECTURE.md
-    TECH_DEBT_LEDGER.md
+    sentinel_reports/
+      SENTINEL_REPORT_*.md
+      SENTINEL_LOG.md
+    metrics_reports/
+      METRICS_REPORT_*.{md,json}
+      METRICS_LOG.md
+    idea_ledgers/
+      IDEA_LEDGER_*.md
+    token_budgeting/
+      TOKEN_BUDGETING_*.md
 ```
 
 - Committed to git — versioned, shareable, accumulates value over time
 - **Worktree-aware** — when a pipeline operates in a worktree, `.ai-state/` changes are committed on the pipeline branch and reconciled at merge time (see [.ai-state/ Reconciliation](../../skills/software-planning/references/agent-pipeline-details.md#ai-state-reconciliation-for-worktree-merges))
 - Created on first use — agents create `.ai-state/` when writing their first persistent document
 
-`IDEA_LEDGER_*.md` — promethean's timestamped ideation records (sentinel baseline, implemented/pending/discarded ideas, future paths). Each run carries forward all previous entries.
+`idea_ledgers/IDEA_LEDGER_*.md` — promethean's timestamped ideation records (sentinel baseline, implemented/pending/discarded ideas, future paths). Each run carries forward all previous entries. Lives under `.ai-state/idea_ledgers/`.
 
-`SENTINEL_REPORT_*.md` — timestamped audit reports (`SENTINEL_REPORT_YYYY-MM-DD_HH-MM-SS.md`). `SENTINEL_LOG.md` — append-only run summary table (timestamp, report file, health grade, finding counts, coherence grade).
+`sentinel_reports/SENTINEL_REPORT_*.md` — timestamped audit reports (`SENTINEL_REPORT_YYYY-MM-DD_HH-MM-SS.md`) under `.ai-state/sentinel_reports/`. `sentinel_reports/SENTINEL_LOG.md` — append-only run summary table (timestamp, report file, health grade, finding counts, coherence grade), co-located with the reports.
+
+`metrics_reports/METRICS_REPORT_*.{md,json}` — `/project-metrics` per-run JSON+MD report pairs under `.ai-state/metrics_reports/`. `metrics_reports/METRICS_LOG.md` — append-only aggregate row per run, co-located with the reports.
+
+`token_budgeting/TOKEN_BUDGETING_*.md` — historical token-budget audits under `.ai-state/token_budgeting/`. No active producer in the current ecosystem; retained for history.
 
 `SPEC_<name>_YYYY-MM-DD.md` — archived behavioral specifications with traceability matrices. Created by the implementation-planner at end-of-feature for medium/large tasks.
 
@@ -179,7 +190,7 @@ sequenceDiagram
 | Ephemeral | `.ai-work/<task-slug>/` | `TEST_RESULTS.md` — implementer (or test-engineer) test-run handoff artifact (canonical schema in `skills/software-planning/references/agent-pipeline-details.md`) | Single pipeline run — merge into `VERIFICATION_REPORT.md`, then delete |
 | Ephemeral | `.ai-work/<task-slug>/` | `traceability.yml` — REQ-to-test/implementation mapping (canonical source of truth during the pipeline; rendered into the archived SPEC's matrix at feature end per [`id-citation-discipline.md`](id-citation-discipline.md)) | Single pipeline run — rendered into archived SPEC matrix, then deleted with `.ai-work/` |
 | Session-persistent | `.ai-work/<task-slug>/` | `IMPLEMENTATION_PLAN.md`, `WIP.md`, `LEARNINGS.md` | Across sessions — merge learnings into permanent locations at feature end |
-| Permanent | `.ai-state/` | `IDEA_LEDGER_*.md`, `SENTINEL_REPORT_*.md`, `SENTINEL_LOG.md`, `SPEC_*.md`, `calibration_log.md`, `decisions/<NNN>-<slug>.md`, `SYSTEM_DEPLOYMENT.md`, `ARCHITECTURE.md`, `TECH_DEBT_LEDGER.md` | Project lifetime — committed to git, timestamped per run or living document |
+| Permanent | `.ai-state/` | `idea_ledgers/IDEA_LEDGER_*.md`, `sentinel_reports/{SENTINEL_REPORT_*.md, SENTINEL_LOG.md}`, `metrics_reports/{METRICS_REPORT_*.{md,json}, METRICS_LOG.md}`, `specs/SPEC_*.md`, `calibration_log.md`, `decisions/<NNN>-<slug>.md`, `SYSTEM_DEPLOYMENT.md`, `ARCHITECTURE.md`, `TECH_DEBT_LEDGER.md` | Project lifetime — committed to git, timestamped per run or living document |
 | Permanent | `docs/` | `architecture.md` | Project lifetime — committed to git, derived from `.ai-state/ARCHITECTURE.md`, maintained by pipeline agents |
 
 ### Version Control and Cleanup

@@ -25,7 +25,7 @@ Accept any of the following as grounding:
 | External URL | `[title](url) (fetched YYYY-MM-DD)` | `[CNCF Roadmap Guide](https://contribute.cncf.io/...) (fetched 2026-04-12)` |
 | ADR | `dec-NNN` (linked to `.ai-state/decisions/`) | `dec-NNN` |
 | Memory entry | `memory: category/key (updated_at YYYY-MM-DD)` | `memory: learnings/aaif-standards-convergence-2026 (updated_at 2026-04-12)` |
-| Sentinel report | `SENTINEL_REPORT_<timestamp>.md §<section>` | `SENTINEL_REPORT_YYYY-MM-DD_HH-MM-SS.md §coherence` |
+| Sentinel report | `sentinel_reports/SENTINEL_REPORT_<timestamp>.md §<section>` | `sentinel_reports/SENTINEL_REPORT_YYYY-MM-DD_HH-MM-SS.md §coherence` |
 
 ## Verification checklist (Phase 7 self-verify)
 

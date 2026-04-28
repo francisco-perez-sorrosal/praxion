@@ -11,11 +11,11 @@ paths:
 
 Shipped artifacts — the contents of `rules/`, `skills/`, `agents/`, `commands/`, and `claude/config/` that `install_claude.sh` installs into a user's global Claude config — must not reference **specific entries** inside `.ai-state/` or `.ai-work/`.
 
-`.ai-state/` is a per-project meta-instrument (Praxion's own dogfooding state when working on this repo; the *user's* state once the plugin is installed elsewhere). `.ai-work/` is ephemeral per-pipeline-run state. Neither location is part of the Praxion product. Any specific `dec-NNN`, `ADR-NN`, `REQ-<slug>-NN`, `SPEC_<name>_YYYY-MM-DD.md`, `SENTINEL_REPORT_<timestamp>.md`, or `IDEA_LEDGER_<timestamp>.md` embedded in a shipped artifact dangles the moment the plugin lands in another project.
+`.ai-state/` is a per-project meta-instrument (Praxion's own dogfooding state when working on this repo; the *user's* state once the plugin is installed elsewhere). `.ai-work/` is ephemeral per-pipeline-run state. Neither location is part of the Praxion product. Any specific `dec-NNN`, `ADR-NN`, `REQ-<slug>-NN`, `SPEC_<name>_YYYY-MM-DD.md`, `sentinel_reports/SENTINEL_REPORT_<timestamp>.md`, or `idea_ledgers/IDEA_LEDGER_<timestamp>.md` embedded in a shipped artifact dangles the moment the plugin lands in another project.
 
 ### What to do instead
 
-- **Path *shapes* are fine and encouraged.** `.ai-state/decisions/<NNN>-<slug>.md`, `.ai-work/<task-slug>/`, `SPEC_<name>_YYYY-MM-DD.md`, `SENTINEL_REPORT_<timestamp>.md` all describe conventions without hardcoding entries.
+- **Path *shapes* are fine and encouraged.** `.ai-state/decisions/<NNN>-<slug>.md`, `.ai-work/<task-slug>/`, `.ai-state/specs/SPEC_<name>_YYYY-MM-DD.md`, `.ai-state/sentinel_reports/SENTINEL_REPORT_<timestamp>.md`, `.ai-state/idea_ledgers/IDEA_LEDGER_<timestamp>.md`, `.ai-state/metrics_reports/METRICS_REPORT_<timestamp>.{md,json}` all describe conventions without hardcoding entries.
 - **Inline the rationale.** When a shipped artifact wants to explain *why* a behavior exists, state the reason in words. Do not point at an ADR number — the reader has no way to resolve it.
 - **Illustrative placeholders are fine.** Format examples like `REQ-01`, `dec-NNN`, `SPEC_auth_YYYY-MM-DD.md` teach a convention without referencing an entry. Prefer obviously-placeholder-looking values (`YYYY-MM-DD`, `NNN`) over plausible-looking concrete values that could be mistaken for real entries.
 

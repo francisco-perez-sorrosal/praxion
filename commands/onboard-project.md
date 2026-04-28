@@ -386,7 +386,7 @@ The architect operates in a fresh context window (`Task` tool spawn) and reports
 2. **Print verification next-steps** verbatim:
    ```
    Verify the onboarding:
-     1. Run /sentinel for an ecosystem health baseline (writes .ai-state/SENTINEL_REPORT_<timestamp>.md).
+     1. Run /sentinel for an ecosystem health baseline (writes .ai-state/sentinel_reports/SENTINEL_REPORT_<timestamp>.md).
      2. Run 'git status' to review staged work — every file this command modified is staged for review.
      3. Run /co to commit (the git-conventions rule will write a precise commit message), or unstage and review individually.
 
@@ -412,7 +412,7 @@ Follow the **Understand, Plan, Verify** methodology. For multi-step work (Standa
 4. **implementer** + **test-engineer** (concurrent, on disjoint file sets) → code + tests — execute steps from the plan
 5. **verifier** → `.ai-work/<slug>/VERIFICATION_REPORT.md` — post-implementation review
 
-**Independent audits.** The `sentinel` agent runs outside the pipeline and writes timestamped `.ai-state/SENTINEL_REPORT_<timestamp>.md` plus an append-only `.ai-state/SENTINEL_LOG.md`. Trigger it for ecosystem health baselines (before first ideation, after major refactors).
+**Independent audits.** The `sentinel` agent runs outside the pipeline and writes timestamped `.ai-state/sentinel_reports/SENTINEL_REPORT_<timestamp>.md` plus an append-only `.ai-state/sentinel_reports/SENTINEL_LOG.md`. Trigger it for ecosystem health baselines (before first ideation, after major refactors).
 
 **From PoC to production.** The feature pipeline is one milestone of many. The full journey: baseline audit (`/sentinel`) → CI/CD setup (`cicd-engineer` agent) → deployment (`deployment` skill) → first release (`/release`) → ongoing decisions captured as ADRs in `.ai-state/decisions/` → cross-session memory in `.ai-state/memory.json` (when memory MCP is enabled).
 

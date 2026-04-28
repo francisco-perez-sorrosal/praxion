@@ -15,8 +15,9 @@ computed by a dedicated module (``runner``, ``hotspot``, ``trends``,
    ``Runner.run -> compose_hotspots -> compute_trends -> render_json &
    render_markdown -> atomic writes -> append_log``.
 4. Atomically write the JSON+MD report pair (tempfile + ``os.replace``) to
-   ``<repo_root>/.ai-state/METRICS_REPORT_<ts>.{json,md}``, then append one
-   aggregate row to ``METRICS_LOG.md`` via ``logappend.append_log``.
+   ``<repo_root>/.ai-state/metrics_reports/METRICS_REPORT_<ts>.{json,md}``,
+   then append one aggregate row to the sibling ``METRICS_LOG.md`` via
+   ``logappend.append_log``.
 5. Print the three absolute paths that were touched, one per line, on
    stdout so a shell wrapper can consume them.
 
@@ -56,6 +57,7 @@ __all__ = ["main"]
 # ---------------------------------------------------------------------------
 
 _AI_STATE_DIRNAME = ".ai-state"
+_REPORTS_SUBDIR_NAME = "metrics_reports"
 _REPORT_BASENAME_PREFIX = "METRICS_REPORT_"
 _TIMESTAMP_FORMAT = "%Y-%m-%d_%H-%M-%S"
 _METRICS_LOG_BASENAME = "METRICS_LOG.md"
@@ -512,7 +514,7 @@ def _run_pipeline(
     report = runner.run(window_days=args.window_days, top_n=args.top_n)
     report = compose_aggregate(report, repo_root=repo_root)
     report = compose_hotspots(report)
-    trend_block = compute_trends(report, ai_state_dir)
+    trend_block = compute_trends(report, ai_state_dir / _REPORTS_SUBDIR_NAME)
     run_metadata = RunMetadata(
         command_version="1.0.0",
         python_version=sys.version.split(" ", 1)[0],
@@ -532,14 +534,17 @@ def _write_report(report: Report, ai_state_dir: Path) -> None:
     timestamp = datetime.now(UTC).strftime(_TIMESTAMP_FORMAT)
     json_basename = f"{_REPORT_BASENAME_PREFIX}{timestamp}.json"
     md_basename = f"{_REPORT_BASENAME_PREFIX}{timestamp}.md"
-    json_path = ai_state_dir / json_basename
-    md_path = ai_state_dir / md_basename
-    log_path = ai_state_dir / _METRICS_LOG_BASENAME
+    reports_dir = ai_state_dir / _REPORTS_SUBDIR_NAME
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    json_path = reports_dir / json_basename
+    md_path = reports_dir / md_basename
+    log_path = reports_dir / _METRICS_LOG_BASENAME
 
     _atomic_write_bytes(json_path, json_bytes)
     _atomic_write_bytes(md_path, md_text.encode("utf-8"))
 
-    append_log(report, ai_state_dir, md_basename)
+    # Log lives co-located with the reports; the link cell uses a bare basename.
+    append_log(report, reports_dir, md_basename)
 
     for written in (json_path, md_path, log_path):
         print(str(written.resolve()))

@@ -562,8 +562,9 @@ class TestCliHappyPath:
         # render_json returned bytes, mocked render_markdown returned str).
         # append_log is mocked so METRICS_LOG.md is not actually created here;
         # we assert append_log was invoked with the expected args instead.
-        json_files = sorted(ai_state.glob("METRICS_REPORT_*.json"))
-        md_files = sorted(ai_state.glob("METRICS_REPORT_*.md"))
+        reports_dir = ai_state / "metrics_reports"
+        json_files = sorted(reports_dir.glob("METRICS_REPORT_*.json"))
+        md_files = sorted(reports_dir.glob("METRICS_REPORT_*.md"))
         assert len(json_files) == 1, (
             f"Expected exactly 1 METRICS_REPORT_*.json; found {len(json_files)}: "
             f"{[str(p) for p in json_files]}"
@@ -597,7 +598,9 @@ class TestCliHappyPath:
         ts_pattern = re.compile(
             r"^METRICS_REPORT_(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})\.(json|md)$"
         )
-        written = sorted(p.name for p in ai_state.glob("METRICS_REPORT_*"))
+        written = sorted(
+            p.name for p in (ai_state / "metrics_reports").glob("METRICS_REPORT_*")
+        )
         assert len(written) == 2, f"Expected 2 artifact files; got {written}"
         for name in written:
             m = ts_pattern.match(name)
@@ -625,8 +628,9 @@ class TestCliHappyPath:
             for p in patchers:
                 p.stop()
 
-        json_files = list(ai_state.glob("METRICS_REPORT_*.json"))
-        md_files = list(ai_state.glob("METRICS_REPORT_*.md"))
+        reports_dir = ai_state / "metrics_reports"
+        json_files = list(reports_dir.glob("METRICS_REPORT_*.json"))
+        md_files = list(reports_dir.glob("METRICS_REPORT_*.md"))
         assert len(json_files) == 1 and len(md_files) == 1, (
             "Precondition: one JSON + one MD for the pair contract to hold"
         )
@@ -823,9 +827,9 @@ class TestCliOrchestration:
             "breaks the single-source-of-truth contract."
         )
 
-    def test_compute_trends_receives_ai_state_dir(self, tmp_path: Path) -> None:
-        """compute_trends signature is (report, ai_state_dir) -- the CLI must
-        pass the target directory for prior-report discovery."""
+    def test_compute_trends_receives_reports_dir(self, tmp_path: Path) -> None:
+        """compute_trends signature is (report, reports_dir) -- the CLI must
+        pass the metrics-reports subdirectory for prior-report discovery."""
         ai_state = tmp_path / ".ai-state"
         ai_state.mkdir()
 
@@ -841,23 +845,24 @@ class TestCliOrchestration:
                 p.stop()
 
         call = mocks.compute_trends.call_args
-        # The ai_state_dir should be present either positionally or as kwarg.
-        # Assert by value, not identity, since Path(ai_state) may be a fresh
+        # The reports_dir should be present either positionally or as kwarg.
+        # Assert by value, not identity, since Path(...) may be a fresh
         # Path instance; compare resolved paths.
         positional_dir: Path | None = None
         if len(call.args) >= 2:
             maybe = call.args[1]
             if isinstance(maybe, Path):
                 positional_dir = maybe
-        kwarg_dir = call.kwargs.get("ai_state_dir")
+        kwarg_dir = call.kwargs.get("reports_dir")
         actual_dir = kwarg_dir or positional_dir
         assert actual_dir is not None, (
-            "compute_trends must be called with an ai_state_dir path "
+            "compute_trends must be called with a reports_dir path "
             f"(positional[1] or kwarg); got call_args={call!r}"
         )
-        assert Path(actual_dir).resolve() == ai_state.resolve(), (
-            f"compute_trends must receive the target .ai-state/ path; "
-            f"expected {ai_state.resolve()} got {Path(actual_dir).resolve()}"
+        expected = (ai_state / "metrics_reports").resolve()
+        assert Path(actual_dir).resolve() == expected, (
+            f"compute_trends must receive the metrics_reports subdirectory; "
+            f"expected {expected} got {Path(actual_dir).resolve()}"
         )
 
     def test_append_log_receives_report_and_md_filename(self, tmp_path: Path) -> None:

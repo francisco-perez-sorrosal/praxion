@@ -1,5 +1,5 @@
 ---
-id: dec-draft-8954ef47
+id: dec-087
 title: Pilot strategy — trunk-only at this pipeline; defer behavioral pilot to first consumer project
 status: proposed
 category: architectural

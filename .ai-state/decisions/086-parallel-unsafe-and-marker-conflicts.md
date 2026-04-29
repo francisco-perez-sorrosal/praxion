@@ -1,5 +1,5 @@
 ---
-id: dec-draft-a295fc62
+id: dec-086
 title: Parallel-unsafe groups isolate at runner level; kebab-id → snake_case marker form; reserved-name set
 status: proposed
 category: behavioral

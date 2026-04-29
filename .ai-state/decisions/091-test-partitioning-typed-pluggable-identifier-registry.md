@@ -1,5 +1,5 @@
 ---
-id: dec-draft-9de2a93b
+id: dec-091
 title: Typed-pluggable-identifier registries (selector_strategy and parallel_runner) as the trunk's language-additive primitive
 status: proposed
 category: architectural

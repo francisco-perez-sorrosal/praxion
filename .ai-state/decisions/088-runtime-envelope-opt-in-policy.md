@@ -1,5 +1,5 @@
 ---
-id: dec-draft-3810612a
+id: dec-088
 title: expected_runtime_envelope is opt-in at M1 and M2; required from M3 (sentinel TT04 activation)
 status: proposed
 category: behavioral

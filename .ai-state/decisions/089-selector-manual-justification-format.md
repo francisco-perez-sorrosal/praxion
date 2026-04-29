@@ -1,5 +1,5 @@
 ---
-id: dec-draft-ea2aa5fd
+id: dec-089
 title: selector=manual justification is a closed enum with an "other" escape hatch
 status: proposed
 category: implementation

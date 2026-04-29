@@ -1,5 +1,5 @@
 ---
-id: dec-draft-84a8a0c2
+id: dec-085
 title: Test-topology protocol does not activate at Lightweight tier; escalation path is the sole exit
 status: proposed
 category: behavioral

@@ -1,5 +1,5 @@
 ---
-id: dec-draft-05bc228e
+id: dec-084
 title: Integration checkpoint runs the full pipeline-tier suite
 status: proposed
 category: behavioral
@@ -53,7 +53,7 @@ Run pipeline-tier only over pockets that any step in this pipeline modified, plu
 **Cons (decisive):**
 - The first false-negative the protocol fails to catch in production becomes an outage / rollback. The full-suite backstop is the cheapest possible insurance against this.
 - "Touched pockets" is computed from the pipeline's step `Files` field — a planner-derived set. If the planner missed a file in step decomposition, the touched-pockets set is wrong, and the integration checkpoint silently narrows.
-- The integration_boundaries closure is one-hop per ADR `dec-draft-05bc228e`'s sibling decision (in the SYSTEMS_PLAN). Multi-hop coupling that the topology has not yet mapped becomes invisible. The full-suite floor is the only mechanism that catches multi-hop coupling without requiring the topology to be perfect.
+- The integration_boundaries closure is one-hop per ADR `dec-084`'s sibling decision (in the SYSTEMS_PLAN). Multi-hop coupling that the topology has not yet mapped becomes invisible. The full-suite floor is the only mechanism that catches multi-hop coupling without requiring the topology to be perfect.
 - The optimization is reversible — a project that demonstrably suffers from the full-suite cost can adopt Option Y in a future ADR. The reverse (going from "we had Option Y in production" to "we now need Option X because we found false negatives") is harder, since by then the protocol is trusted.
 - "Premature optimization" is the dominant axis at Praxion's scale (1,623 tests, 35 s aggregate). Optimizing the integration checkpoint is solving a problem that does not yet exist.
 

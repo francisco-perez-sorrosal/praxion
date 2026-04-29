@@ -1,5 +1,5 @@
 ---
-id: dec-draft-005764a9
+id: dec-090
 title: Topology regeneration is human-initiated or sentinel-triggered, never automatic per-pipeline
 status: proposed
 category: behavioral

@@ -65,6 +65,7 @@ This scoping prevents collisions when multiple pipelines or multiple instances o
     calibration_log.md
     ARCHITECTURE.md
     SYSTEM_DEPLOYMENT.md
+    TEST_TOPOLOGY.md
     TECH_DEBT_LEDGER.md
     decisions/
       <NNN>-<slug>.md
@@ -105,7 +106,9 @@ This scoping prevents collisions when multiple pipelines or multiple instances o
 
 `ARCHITECTURE.md` — architect-facing design-target architecture document. Abstracts above concrete code to define the space of valid implementations. Created by systems-architect, updated by implementation-planner (planning-stage structural gaps) and implementer (structural changes), validated by verifier and sentinel. Section ownership prevents conflicts. Template at `skills/software-planning/assets/ARCHITECTURE_TEMPLATE.md`. The developer-facing counterpart `docs/architecture.md` is a derived document maintained by the pipeline but lives in the project's `docs/` directory, not in `.ai-state/` (see below).
 
-Agents that update `.ai-state/`: promethean (idea ledger), sentinel (report, log, tech-debt ledger), implementation-planner (spec archival), main agent (calibration log), systems-architect and implementation-planner (ADR files in `decisions/`), systems-architect, implementer, and cicd-engineer (deployment doc), systems-architect, implementation-planner, and implementer (both architecture docs), verifier and sentinel (tech-debt ledger writes — verifier per-change, sentinel repo-wide). Artifact inventory is not stored here — it is derivable from the filesystem.
+`TEST_TOPOLOGY.md` — per-project test group topology (populated by systems-architect/test-engineer at M2+; Praxion itself defers population to the first consumer project that activates the protocol behaviorally). Multi-agent section ownership: systems-architect owns the Subsystems table; test-engineer owns per-group definitions; implementation-planner owns per-pipeline `integration_boundaries` additions. Schema defined in `skills/testing-strategy/references/test-topology.md`.
+
+Agents that update `.ai-state/`: promethean (idea ledger), sentinel (report, log, tech-debt ledger), implementation-planner (spec archival), main agent (calibration log), systems-architect and implementation-planner (ADR files in `decisions/`), systems-architect, implementer, and cicd-engineer (deployment doc), systems-architect, implementation-planner, and implementer (both architecture docs), systems-architect, test-engineer, and implementation-planner (TEST_TOPOLOGY.md — topology population and per-pipeline integration_boundaries), verifier and sentinel (tech-debt ledger writes — verifier per-change, sentinel repo-wide). Artifact inventory is not stored here — it is derivable from the filesystem.
 
 **`docs/architecture.md`** — developer-facing architecture navigation guide. Every component name and file path is verified against the codebase. Derived from `.ai-state/ARCHITECTURE.md` by filtering to Built components. Created by systems-architect alongside the architect doc, updated by implementation-planner (planning-stage structural gaps) and implementer (step 7.7), maintained by doc-engineer at pipeline checkpoints. Template at `skills/doc-management/assets/ARCHITECTURE_GUIDE_TEMPLATE.md`. Lives in `docs/`, not `.ai-state/`, because it is developer-facing project documentation.
 
@@ -134,7 +137,7 @@ No other agent writes ledger rows. Consumer agents (systems-architect, implement
 |-------|------|-----------|-------|
 | `id` | string | `td-NNN` zero-padded sequence | Stable across status updates; assigned at write time by next-available-NNN scan |
 | `severity` | enum | `critical` \| `important` \| `suggested` | Aligned with sentinel severity tiering |
-| `class` | enum | `duplication` \| `complexity` \| `dead-code` \| `drift` \| `stale-todo` \| `coverage-gap` \| `cyclic-dep` \| `other` | `other` is an escape hatch for emergent classes; producers SHOULD propose a new enum value if `other` rows accumulate (>5) |
+| `class` | enum | `duplication` \| `complexity` \| `dead-code` \| `drift` \| `stale-todo` \| `coverage-gap` \| `cyclic-dep` \| `topology-drift` \| `other` | `other` is an escape hatch for emergent classes; producers SHOULD propose a new enum value if `other` rows accumulate (>5). `topology-drift` is now a named class (re-classify any `other` rows whose notes describe a test-topology staleness symptom) |
 | `direction` | enum | `code-to-goals` \| `goals-to-code` | The two debt directions in the operating definition |
 | `location` | list | Affected file paths + optional `:start-end` line ranges | One path per list entry; ranges use `path/to/file.py:42-58` syntax |
 | `goal-ref-type` | enum | `adr` \| `spec-req` \| `architecture` \| `claude-md` \| `code-quality` | `code-quality` covers universal engineering principles with no Praxion-specific anchor |
@@ -163,6 +166,7 @@ Both producers reference this single table when assigning `owner-role` to a new 
 | `stale-todo` | `unassigned` | `notes` field tags an owner explicitly → that role; location in `tests/` → `test-engineer` |
 | `coverage-gap` | `test-engineer` | None — coverage is always test-engineer-owned |
 | `cyclic-dep` | `implementation-planner` | Always — module-graph reshuffle is a planning concern |
+| `topology-drift` | `implementation-planner` | Always — topology refresh requires a planning-level decision (group splits, merges, or integration_boundary changes) |
 | `other` | `unassigned` | Producer's `notes` field SHOULD propose an owner; downstream consumers may re-assign |
 
 **Worktree concurrency:** ledger rows are append-only and may be filed independently by pipelines running in separate worktrees. Conflicts surface only at merge-to-main, where a post-merge dedupe step (`scripts/finalize_tech_debt_ledger.py`, modeled on `scripts/finalize_adrs.py`: idempotent, advisory file lock, bounded scope, dry-run flag) collapses rows sharing a `dedup_key`. Status precedence on collapse is `resolved > in-flight > open > wontfix`; ties break by newer `last-seen`. Non-conflicting fields are merged (notes concatenated with ` // ` — chosen to avoid collision with the Markdown table column delimiter `|`; locations union-sorted).
@@ -190,7 +194,7 @@ sequenceDiagram
 | Ephemeral | `.ai-work/<task-slug>/` | `TEST_RESULTS.md` — implementer (or test-engineer) test-run handoff artifact (canonical schema in `skills/software-planning/references/agent-pipeline-details.md`) | Single pipeline run — merge into `VERIFICATION_REPORT.md`, then delete |
 | Ephemeral | `.ai-work/<task-slug>/` | `traceability.yml` — REQ-to-test/implementation mapping (canonical source of truth during the pipeline; rendered into the archived SPEC's matrix at feature end per [`id-citation-discipline.md`](id-citation-discipline.md)) | Single pipeline run — rendered into archived SPEC matrix, then deleted with `.ai-work/` |
 | Session-persistent | `.ai-work/<task-slug>/` | `IMPLEMENTATION_PLAN.md`, `WIP.md`, `LEARNINGS.md` | Across sessions — merge learnings into permanent locations at feature end |
-| Permanent | `.ai-state/` | `idea_ledgers/IDEA_LEDGER_*.md`, `sentinel_reports/{SENTINEL_REPORT_*.md, SENTINEL_LOG.md}`, `metrics_reports/{METRICS_REPORT_*.{md,json}, METRICS_LOG.md}`, `specs/SPEC_*.md`, `calibration_log.md`, `decisions/<NNN>-<slug>.md`, `SYSTEM_DEPLOYMENT.md`, `ARCHITECTURE.md`, `TECH_DEBT_LEDGER.md` | Project lifetime — committed to git, timestamped per run or living document |
+| Permanent | `.ai-state/` | `idea_ledgers/IDEA_LEDGER_*.md`, `sentinel_reports/{SENTINEL_REPORT_*.md, SENTINEL_LOG.md}`, `metrics_reports/{METRICS_REPORT_*.{md,json}, METRICS_LOG.md}`, `specs/SPEC_*.md`, `calibration_log.md`, `decisions/<NNN>-<slug>.md`, `SYSTEM_DEPLOYMENT.md`, `ARCHITECTURE.md`, `TEST_TOPOLOGY.md`, `TECH_DEBT_LEDGER.md` | Project lifetime — committed to git, timestamped per run or living document |
 | Permanent | `docs/` | `architecture.md` | Project lifetime — committed to git, derived from `.ai-state/ARCHITECTURE.md`, maintained by pipeline agents |
 
 ### Version Control and Cleanup

@@ -325,5 +325,59 @@ The verifier writes per-change debt entries during Phase 5/5.5. The sentinel wri
 | [dec-027](../.ai-state/decisions/027-principles-embedding-strategy.md) | Principles embedded via compact CLAUDE.md bullet + README prose | Four durable principles cross-referenced in `CLAUDE.md`; rich narrative in `README.md#guiding-principles` |
 | [dec-028](../.ai-state/decisions/028-diagram-conventions-path-scoping.md) | Narrow `diagram-conventions.md` path scope | Reclaims budget on non-doc sessions by scoping the rule to doc-authoring surfaces only |
 | [dec-049](../.ai-state/decisions/049-reaffirm-dec022-coord-cohort.md) | Re-affirm dec-022; ship D1–D6 coordination cohort instead of extracting delegation checklists | Delegation Checklists remain always-loaded in the coordination rule; `claude/config/CLAUDE.md` condensed block gets conditional-deliverable symmetry; new satellite `skills/software-planning/references/tier-templates.md` registers under software-planning; Lightweight tier gains 5 inline gap closures + tier-selector fast-path decision tree; no new validator tooling |
+| [dec-draft-9de2a93b](../.ai-state/decisions/drafts/20260428-2335-fperezsorrosal-worktree-test-partitioning-typed-pluggable-identifier-registry.md) (pending finalize) | Typed-pluggable-identifier registries as the test-topology trunk's language-additive primitive | Two trunk-owned Markdown-table registries (`selector_strategy`, `parallel_runner`) hosted in `skills/testing-strategy/references/test-topology.md`; Python leaf is the first registered set |
+| [dec-draft-8954ef47](../.ai-state/decisions/drafts/20260428-2335-fperezsorrosal-worktree-test-partitioning-pilot-strategy-trunk-only-then-defer-behavioral-pilot.md) (pending finalize) | Test-topology pilot strategy: trunk-only at this pipeline; behavioral pilot deferred | Praxion ships the schema, sentinel TT01–TT05, ledger `topology-drift` class, and document conventions; no populated `.ai-state/TEST_TOPOLOGY.md`; first consumer project's M2 pipeline activates behaviorally |
 
 [Add new rows as architecture-related ADRs are created.]
+
+## 9. Test Topology
+
+<!-- Developer-facing navigation guide. Components named in this section have been verified
+     against the codebase. Items marked Designed are not on disk yet (they ship in this pipeline);
+     items marked Planned are not on disk and will be created by future projects.
+     For design rationale and ADR cross-references, see .ai-state/ARCHITECTURE.md §9. -->
+
+### 9.1 Where to find what
+
+The test-topology subsystem lets each implementation step run only the tests covering its affected subsystems plus their integration boundaries. Three execution tiers (`step` / `phase` / `pipeline`) and a sentinel-driven refactor trigger emerge from a per-project topology declaration.
+
+| You want to... | Look at | Status |
+|---|---|---|
+| Read the language-agnostic schema | `skills/testing-strategy/references/test-topology.md` | Designed (lands in this pipeline) |
+| Read the Python-specific tooling concretization | `skills/testing-strategy/references/python-testing.md` (test-topology section) | Designed (lands in this pipeline) |
+| See whether your project has populated its topology | `.ai-state/TEST_TOPOLOGY.md` (per-project) | Planned (no Praxion population by design) |
+| Read the sentinel checks for topology health | `agents/sentinel.md` `### Test Topology (TT)` | Designed (lands in this pipeline) |
+| See the debt class for topology drift | `rules/swe/agent-intermediate-documents.md` (`class` enum) | Designed (`topology-drift` value lands in this pipeline) |
+| Add a Tests: field to a step in your IMPLEMENTATION_PLAN.md | `skills/software-planning/SKILL.md` step schema | Designed (additive optional field lands in this pipeline) |
+
+### 9.2 Activation status in Praxion
+
+Praxion itself ships the schema and conventions but does **not** populate `.ai-state/TEST_TOPOLOGY.md` — see [`dec-draft-8954ef47`](../.ai-state/decisions/drafts/20260428-2335-fperezsorrosal-worktree-test-partitioning-pilot-strategy-trunk-only-then-defer-behavioral-pilot.md). The first consumer project that adopts the i-am plugin and decides to activate the protocol creates the populated topology in its own `.ai-state/`.
+
+For Praxion development today, this means:
+
+- The implementer continues to run the project's default test command (`uv run pytest` or `cd <pocket> && uv run pytest`) per pocket. The `Tests:` step-schema field, while documented, is not emitted in Praxion plans.
+- Sentinel TT01–TT05 self-deactivate (no `.ai-state/TEST_TOPOLOGY.md` to check).
+- The full-suite integration checkpoint at the end of each pipeline remains today's behavior.
+
+### 9.3 Adding a new language leaf (procedure)
+
+If a future contributor extends the test-topology to a new language (Go, TypeScript, Rust, etc.), the procedure is purely additive:
+
+1. Create `skills/testing-strategy/references/<language>-testing.md` (or extend an existing language reference).
+2. In the trunk reference (`skills/testing-strategy/references/test-topology.md`), append rows to the two registry tables:
+   - `selector_strategy` — at minimum one identifier (e.g., `go-test-packages`) with its argument shape.
+   - `parallel_runner` — at minimum one identifier (e.g., `go-test-parallel`) with its concrete invocation.
+3. Document the leaf's `shared_fixture_scope` mapping (which language-framework scope keyword maps to each of `none / per-test / per-file / per-process / per-suite`).
+4. Provide a worked invocation example.
+
+No edits to the trunk schema, the sentinel TT01–TT05 wording, the closure semantics, or any other agent definition are required. The hypothetical Go module worked example in this pipeline's `.ai-work/test-partitioning/SYSTEMS_PLAN.md` (Hypothetical Go Module Worked Example section) is the proof artifact.
+
+### 9.4 Caveats developers should know
+
+- **Marker name shape**: when a project does populate the topology and its language leaf is Python, group ids in `TEST_TOPOLOGY.md` are kebab-case (`memory-store-core`) but the corresponding pytest marker is snake_case (`memory_store_core`). The kebab → snake mapping is mechanical (`-` → `_`).
+- **Reserved marker names**: do NOT use `parametrize`, `skipif`, `usefixtures`, `xfail`, `xdist_group`, `parallel_unsafe`, or any of `unit / integration / contract / e2e` as group ids — they collide with built-in or reserved markers. Sentinel TT05 enforces this.
+- **`integration_boundaries` are one-hop**: a `phase`-tier selection runs the named groups plus their direct boundary neighbors, not the transitive closure. The `pipeline`-tier (full suite) covers the transitive case.
+- **Lightweight tier**: the protocol does NOT activate at Lightweight tier. Lightweight tasks run today's default test command. If a Lightweight task grows beyond 3 files, escalate to Standard rather than half-engaging the topology.
+
+For the design rationale behind any of the above, see [`.ai-state/ARCHITECTURE.md` §9](../.ai-state/ARCHITECTURE.md#9-test-topology).

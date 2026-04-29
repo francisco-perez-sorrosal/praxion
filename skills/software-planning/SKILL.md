@@ -202,15 +202,19 @@ Only proceed with commit after explicit approval.
 ### Step 1: [One sentence description]
 
 **Implementation**: What code will we write?
+**Tests**: groups=[<group_id>, ...] tier=<step|phase|pipeline> selector=<auto|manual> [reason=<enum> when selector=manual]
 **Testing**: What needs testing? (if critical/complex)
 **Done when**: How do we know it's complete?
 
 ### Step N: [One sentence description]
 
 **Implementation**: ...
+**Tests**: groups=[...] tier=... selector=...
 **Testing**: ...
 **Done when**: ...
 ```
+
+**`Tests:` field** (optional): activates the test-topology protocol for this step. Absence means the protocol is inactive — the full suite runs (today's default behavior, backward-compatible). When present: `groups` lists group ids from `.ai-state/TEST_TOPOLOGY.md`; `tier` is `step` (narrow), `phase` (medium), or `pipeline` (full); `selector` is `auto` (runner derives the invocation from the group's `selectors` entries) or `manual` (implementer specifies the invocation directly). When `selector=manual`, `reason` must be one of: `scope-mismatch`, `cross-pocket-bridge`, `topology-stale`, `tier-escalation-debug`, `other`; `other` requires `note=...`. See `skills/testing-strategy/references/test-topology.md` for the full protocol. The topology protocol activates at Standard and Full tiers only.
 
 **Acceptance criteria source**: In the agent pipeline, copy criteria verbatim from `SYSTEMS_PLAN.md` — the architect's criteria are authoritative and drive test design downstream. In manual planning (no `SYSTEMS_PLAN.md`), define criteria directly in the plan as concrete, testable conditions for "done."
 

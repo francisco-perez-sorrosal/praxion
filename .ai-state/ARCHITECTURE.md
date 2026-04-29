@@ -394,5 +394,75 @@ Two producers write rows, five consumers read and filter by `owner-role`. `/proj
 | [dec-draft-b63e3623](decisions/drafts/20260424-1550-fperezsorrosal-worktree-tech-debt-integration-tech-debt-consumer-contract.md) (pending finalize) | Tech-debt consumer contract — single line, permission-not-obligation | Five existing agents (systems-architect, implementation-planner, implementer, test-engineer, doc-engineer) gain a single-line input contract; promethean / roadmap-cartographer / `/project-metrics` / `/project-coverage` explicitly excluded; re-affirms dec-069 ("permission, not obligation"). All 5 contract lines on disk. Per `rules/swe/shipped-artifact-isolation.md`, the rationale is inlined in each agent body rather than ID-cited (no `dec-NNN` embedded in the shipped agent files); a known reconciliation between AC4's "cite dec-069" prose and shipped-artifact-isolation that all 5 implementers independently surfaced. Built. |
 | [dec-075](decisions/drafts/20260427-0413-fperezsorrosal-worktree-praxion-first-class-praxion-first-class-process.md) (pending finalize) | Praxion-as-First-Class — process-driven development with universal rule-inheritance | Three-layer enforcement: L1 existing always-loaded rules + L2 new `§Praxion Process` canonical block in onboarded `CLAUDE.md` files (mirrored byte-identically across `commands/onboard-project.md` Phase 6 and `commands/new-project.md`) + L3 new hooks (`hooks/inject_subagent_context.py` PreToolUse(Agent\|Task) compact preamble injection; `hooks/inject_process_framing.py` UserPromptSubmit conditional reminder). PreToolUse(Agent) is the only mechanism that reaches host-native subagents (Explore, Plan, general-purpose) which do not load CLAUDE.md. Hygiene: dead `inject_memory.py::SubagentStart` `additionalContext` branch removed (event is observational-only per official docs); `skills/hook-crafting/references/output-patterns.md` corrected to remove SubagentStart from the additionalContext-supporting list. Built (2026-04-26). |
 | [dec-074](decisions/drafts/20260427-0413-fperezsorrosal-worktree-praxion-first-class-install-completeness-auto-first-session.md) (pending finalize) | Install-path completeness via first-session auto-completion + retain `/praxion-complete-install` | Marketplace plugin install becomes self-sufficient via a new `hooks/auto_complete_install.py` (SessionStart) that detects missing global surfaces (`~/.claude/CLAUDE.md` symlink, `~/.claude/rules/`, marker file) and runs the completion logic non-interactively (using `git config user.email`/`user.name` defaults) or interactively (single confirm prompt with 30-second timeout-accept). `install_claude.sh::render_claude_md()` is extracted to `scripts/render_claude_md.py` so the existing clone-install flow and the new hook reuse the same renderer. `/praxion-complete-install` is retained as an explicit re-invocation path for reconfiguration / recovery / power-user use. Idempotent — fast-skips in <50 ms after first successful run. Eliminates the no-asymmetry gap between marketplace-only operators and clone-installers. Built (2026-04-26). |
+| [dec-draft-9de2a93b](decisions/drafts/20260428-2335-fperezsorrosal-worktree-test-partitioning-typed-pluggable-identifier-registry.md) (pending finalize) | Typed-pluggable-identifier registries (`selector_strategy`, `parallel_runner`) as the test-topology trunk's language-additive primitive | Two trunk-owned registries hosted as Markdown tables in `skills/testing-strategy/references/test-topology.md`; new language leaves register rows additively without modifying the trunk schema; satisfies the Go-portability acceptance test for the test-topology trunk schema |
+| [dec-draft-3810612a](decisions/drafts/20260428-2335-fperezsorrosal-worktree-test-partitioning-runtime-envelope-opt-in-policy.md) (pending finalize) | `expected_runtime_envelope` opt-in at M1+M2; required from M3 | Per-group p50/p95 wall-clock seconds field is optional during the trunk-only and behavioral-pilot milestones; sentinel TT04 (runtime drift) self-deactivates when fewer than 7 metrics reports with per-group data exist; field becomes required at M3 refactor-trigger activation |
+| [dec-draft-a295fc62](decisions/drafts/20260428-2335-fperezsorrosal-worktree-test-partitioning-parallel-unsafe-and-marker-conflicts.md) (pending finalize) | Parallel-unsafe runner separation + kebab-id → snake_case marker form + reserved-name set | Trunk: parallel-unsafe groups isolate at runner level; Python leaf: separate `pytest -n 0` invocation chained after the parallel one; group ids are kebab-case in the trunk and snake_case at marker form; reserved set (parametrize, skipif, usefixtures, xfail, xdist_group, parallel_unsafe, plus tier keywords) sentinel TT05 enforces |
+| [dec-draft-05bc228e](decisions/drafts/20260428-2335-fperezsorrosal-worktree-test-partitioning-integration-checkpoint-scope.md) (pending finalize) | Integration checkpoint runs full pipeline-tier suite | Final integration step runs every pocket and every group regardless of what the pipeline touched; "touched-pockets-pipeline-tier" optimization rejected as premature for Praxion-scale projects; reversible later via additive `integration_checkpoint_scope` field |
+| [dec-draft-ea2aa5fd](decisions/drafts/20260428-2335-fperezsorrosal-worktree-test-partitioning-selector-manual-justification-format.md) (pending finalize) | `selector=manual` justification — closed enum with "other" escape hatch | Step body's manual-override reason is one of `scope-mismatch / cross-pocket-bridge / topology-stale / tier-escalation-debug / other`; `other` requires a one-line `note=...` field; parseable for future "manual override frequency" sentinel checks while preserving an escape hatch |
+| [dec-draft-84a8a0c2](decisions/drafts/20260428-2335-fperezsorrosal-worktree-test-partitioning-lightweight-tier-activation-policy.md) (pending finalize) | Test-topology protocol does not activate at Lightweight tier | Lightweight (2-3 files, single behavior) does not derive groups, does not consult `TEST_TOPOLOGY.md`, does not emit per-group results; existing escalation-to-Standard rule covers scope-creep cases; sentinel TT statistics are clean (Standard-and-up only) |
+| [dec-draft-005764a9](decisions/drafts/20260428-2335-fperezsorrosal-worktree-test-partitioning-topology-regeneration-cadence.md) (pending finalize) | Topology regeneration is human-initiated or sentinel-triggered, never automatic per-pipeline | `TEST_TOPOLOGY.md` is not regenerated at any pipeline boundary; refresh comes from a future `/refresh-topology` command or a sentinel "3+ accumulated `topology-drift` ledger rows" recommendation; preserves multi-agent section ownership |
+| [dec-draft-8954ef47](decisions/drafts/20260428-2335-fperezsorrosal-worktree-test-partitioning-pilot-strategy-trunk-only-then-defer-behavioral-pilot.md) (pending finalize) | Pilot strategy: trunk-only at this pipeline; behavioral pilot deferred to first consumer project | Praxion's ~35 s aggregate naive wall-clock makes step-tier ROI marginal; the trunk artifacts (schema, sentinel TT01–TT05, ledger `topology-drift` class, document conventions) ship without populating `.ai-state/TEST_TOPOLOGY.md` or activating implementer/verifier surfaces; sidesteps the 8 unrelated memory-mcp pre-existing test failures; first consumer project's M2 pipeline is the field test |
 
 [Add new rows as architecture-related ADRs are created.]
+
+## 9. Test Topology
+
+<!-- OWNER: systems-architect (skeleton, ownership boundaries) | LAST UPDATED: 2026-04-28 by systems-architect -->
+<!-- Architect-facing design-target view of the test-topology subsystem. The artifact at
+     .ai-state/TEST_TOPOLOGY.md is created on first-write by whichever agent populates the first group;
+     this section names ownership boundaries, sentinel/ledger integration, and ADR cross-references.
+     For the developer-facing code-verified view, see docs/architecture.md §9. -->
+
+### 9.1 Purpose
+
+The test-topology subsystem makes test selection and execution a first-class concern of the agent pipeline. It declares **what** tests cover **which** subsystems, **how** they execute (parallel-safe, fixture scope, runtime envelope), and **which integration boundaries** they cross. Three execution tiers (`step` / `phase` / `pipeline`) and a sentinel-driven refactor trigger emerge from this declaration.
+
+The subsystem is **language-agnostic at the trunk** and **per-language at the leaves** — see ADR `dec-draft-9de2a93b` for the registry primitive that makes this true.
+
+### 9.2 Artifact Map
+
+| Artifact | Path | Status | Owner | Purpose |
+|---|---|---|---|---|
+| Trunk reference | `skills/testing-strategy/references/test-topology.md` | Designed (this pipeline) | testing-strategy skill maintainer | Schema, identifier registries, document conventions, refactor-trigger semantics |
+| Python leaf | `skills/testing-strategy/references/python-testing.md` (extension) | Designed (this pipeline) | testing-strategy skill maintainer | pytest-globs, pytest-markers registry rows; xdist scheduler; filelock recipe; pyproject snippet |
+| Project topology | `.ai-state/TEST_TOPOLOGY.md` | **Planned** (no population in Praxion per ADR `dec-draft-8954ef47`) | systems-architect (Subsystems table) + test-engineer (groups) + implementation-planner (per-pipeline integration_boundaries) | Per-project populated topology; first consumer project's M2 pipeline creates it |
+| Sentinel TT family | `agents/sentinel.md` Check Catalog `### Test Topology (TT)` | Designed (this pipeline) | sentinel agent maintainer | TT01 subsystem cross-ref, TT02 glob expansion, TT03 coupling drift, TT04 envelope drift, TT05 marker-id consistency |
+| Tech-debt class | `rules/swe/agent-intermediate-documents.md` `class` enum row | Designed (this pipeline) | rule maintainer | New `topology-drift` value; producer = sentinel; owner-role = implementation-planner |
+| Document-schema additions | `IMPLEMENTATION_PLAN.md` `**Tests:**` field; `WIP.md` `Tests:`; `TEST_RESULTS.md` `Tier:` `Groups:` `Parallelism:` `Per-group results:` lines | Designed (this pipeline) | software-planning skill + agent-pipeline-details reference maintainer | Optional additive fields; absence preserves today's full-suite behavior |
+
+### 9.3 Section Ownership (per `.ai-state/TEST_TOPOLOGY.md`)
+
+When a project populates the topology, the file's sections are governed by section ownership:
+
+| Section | Owner | Edit conditions |
+|---|---|---|
+| `## 2. Subsystems` (cross-reference table) | systems-architect | Updated when ARCHITECTURE.md §3 components change |
+| `## 3. Groups` per-group YAML blocks | test-engineer | Updated when test code is added/refactored within an existing group |
+| Per-group `integration_boundaries` field | implementation-planner | Updated during a pipeline when a step crosses a previously-undeclared bridge |
+| `## 1. Overview` metadata | systems-architect | Updated alongside Subsystems table |
+
+### 9.4 Cross-References
+
+- **Components (§3)** — every `subsystems` value in `TEST_TOPOLOGY.md` resolves to a `Status: Built` component in this document's §3 (sentinel TT01 enforces).
+- **Constraints (§7)** — the four-behavior contract row applies to test-topology agents; the "no leaf code in trunk artifacts" rule from `HANDOFF_CONSTRAINTS.md` is registered as an additional behavioral expectation in the trunk reference file.
+- **Decisions (§8)** — eight test-topology ADRs (`dec-draft-9de2a93b`, `dec-draft-3810612a`, `dec-draft-a295fc62`, `dec-draft-05bc228e`, `dec-draft-ea2aa5fd`, `dec-draft-84a8a0c2`, `dec-draft-005764a9`, `dec-draft-8954ef47`) — each row appears in §8 above.
+
+### 9.5 Trunk / Leaf Boundary
+
+The architect's primary structural commitment, restated:
+
+- **Trunk** owns the schema fields, the `tier` vocabulary, the `integration_boundaries` closure semantics (one-hop), the registries' existence and shape, the document conventions (`Tests:` field, `TEST_RESULTS.md` extension), the sentinel TT01–TT05 wording, the tech-debt-ledger `topology-drift` class.
+- **Leaves** own the registered identifier rows (e.g., Python's `pytest-globs`, `pytest-markers`, `pytest-xdist-loadfile`), the marker registration recipe (Python: pyproject markers list), the parallel runner's concrete invocation, and any per-language helper recipes (Python: `filelock` for session fixtures).
+
+A new language leaf is purely additive: a new reference file, new registry rows, no trunk modifications. The hypothetical Go module worked example in `.ai-work/test-partitioning/SYSTEMS_PLAN.md` is the proof.
+
+### 9.6 Activation State
+
+At this milestone (M1, post-this-pipeline), the test-topology subsystem is structurally complete but behaviorally inert in Praxion:
+
+- All trunk and leaf artifacts exist (`Built`).
+- Sentinel TT01–TT05 dimensions are defined (`Built`) but **conditionally inactive** — they self-deactivate when `.ai-state/TEST_TOPOLOGY.md` does not exist.
+- `IMPLEMENTATION_PLAN.md` `**Tests:**` field is documented as optional in the schema (`Built`); current Praxion pipelines do not emit it.
+- No populated `.ai-state/TEST_TOPOLOGY.md` exists in Praxion (`Planned`); the first consumer project that adopts the protocol creates it.
+
+This dual state (Built schema + Planned activation) is the load-bearing record. It allows future agents to find the structural surface without confusing the "schema exists" signal with a "Praxion uses this protocol" signal.

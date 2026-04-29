@@ -21,6 +21,7 @@ Language-independent testing knowledge for making strategic testing decisions: w
 **Satellite files** (loaded on-demand):
 
 - [references/python-testing.md](references/python-testing.md) -- advanced pytest patterns: conftest architecture, hypothesis property-based testing, fixture composition, coverage strategy, plugin ecosystem
+- [references/test-topology.md](references/test-topology.md) -- language-agnostic test topology schema: trunk schema fields, identifier registries (selector_strategy, parallel_runner), tier vocabulary, closure semantics, and document conventions
 
 Future language references (e.g., `references/typescript-testing.md`, `references/rust-testing.md`) are added here without changes to this file's body.
 

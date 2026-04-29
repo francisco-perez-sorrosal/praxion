@@ -182,6 +182,22 @@ Surfaces grounded debt — problems anchored in current source code with respect
 | TD04 | L | p95 complexity crossings | Read `METRICS_REPORT_*.md` `lizard` / `complexipy` namespaces; for each file crossing the project complexity p95 threshold, write a ledger row with `class = complexity`, `owner-role = implementer` (per heuristic) |
 | TD05 | L | Ledger status-update discipline | Read `.ai-state/TECH_DEBT_LEDGER.md`; flag (a) `status = resolved` rows missing `resolved-by`, (b) `status = in-flight` rows older than 30 days, (c) `owner-role = unassigned` rows older than 7 days. Surface findings in the Tech-Debt Findings report subsection at WARN severity. **Never writes ledger rows** |
 
+### Test Topology (TT)
+
+**Conditional activation**: skip the entire TT dimension when `.ai-state/TEST_TOPOLOGY.md` does not exist in the project. When absent, emit a single TT-dimension INFO note: "TEST_TOPOLOGY.md not present; TT checks skipped. The topology protocol is opt-in — see `skills/testing-strategy/references/test-topology.md`." Do not WARN or FAIL for absence.
+
+Schema definitions, identifier registries, and closure semantics referenced by TT01–TT05 live in `skills/testing-strategy/references/test-topology.md`. Read that file before executing this dimension.
+
+| ID | Tp | Rule | Pass |
+|----|----|------|------|
+| TT01 | A | Every group's `subsystems` values resolve to a `Status: Built` component in `.ai-state/ARCHITECTURE.md` §3 | For each group in `TEST_TOPOLOGY.md`, each `subsystems` entry appears in the Built-components table of §3; FAIL for each missing cross-ref |
+| TT02 | A | Every `selectors` entry has a registered `strategy` identifier | For each group's `selectors` list, the `strategy` value appears as an identifier in Registry 1 of `skills/testing-strategy/references/test-topology.md`; FAIL for unregistered values; WARN for optional identifiers documented as such in the leaf |
+| TT03 | L | Accumulated `topology-drift` ledger rows signal a topology refresh need | Read `.ai-state/TECH_DEBT_LEDGER.md`; count open rows with `class = topology-drift`; if count ≥ 3, emit WARN with "Run `/refresh-topology` — 3+ topology-drift items accumulated." TT03 reads ledger rows but does not write them |
+| TT04 | L | Per-group runtime does not chronically exceed declared envelope | Skip when fewer than 7 `metrics_reports/METRICS_REPORT_*.json` files contain per-group data. Skip per-group when `expected_runtime_envelope` is absent. Otherwise: for each group, compare actual P95 over available reports vs declared `p95_seconds`; FAIL when actual > 1.5× declared for ≥ 3 consecutive reports; file a `class = topology-drift`, `owner-role = implementation-planner` ledger row |
+| TT05 | A | Marker-name consistency and reserved-name set compliance | For each group that declares a language-leaf marker-selector entry: (a) the snake_case form of the group id (kebab id with `-` replaced by `_`) is registered in the pocket's build-tool marker configuration; (b) the snake_case form does not collide with the reserved-name set defined in `skills/testing-strategy/references/test-topology.md` §"Reserved Name Set" and extended by any active language leaf; FAIL (not WARN) for both conditions — reserved-name collisions and missing registrations produce silent selection failures under strict-marker enforcement |
+
+**TT-to-ledger integration:** TT findings that warrant a ledger entry file rows with `class = topology-drift`, `owner-role = implementation-planner`. TT03 reads ledger rows but does not write them (information-only). TT04 writes ledger rows when drift is sustained across 3+ consecutive reports.
+
 ### Ecosystem Coherence (EC)
 
 | ID | Tp | Rule | Pass |

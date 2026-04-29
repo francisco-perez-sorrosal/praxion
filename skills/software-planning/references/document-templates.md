@@ -39,6 +39,10 @@ Step N of M: [Description]
 ## Notes
 
 [Optional: Brief notes about current work]
+
+Tests: groups=[<group_id>, ...] tier=<step|phase|pipeline> selector=<auto|manual>
+(Optional. Absence means topology protocol inactive — full suite runs. Mirrors the
+**Tests**: field in IMPLEMENTATION_PLAN.md. See `skills/testing-strategy/references/test-topology.md`.)
 ```
 
 ### Parallel Mode
@@ -166,3 +170,9 @@ After learnings are merged, delete all planning documents (see [agent intermedia
 - CLAUDE.md (gotchas, patterns, decisions)
 - Git history (what was done)
 - Project documentation (if applicable)
+
+## TEST_RESULTS.md Schema
+
+The canonical `TEST_RESULTS.md` schema (section headers, pass/fail/skip counts, failure blocks, coverage, fragment naming) is defined in [`agent-pipeline-details.md`](agent-pipeline-details.md) under `### TEST_RESULTS.md Reconciliation`.
+
+**Test-topology optional fields**: when a step has a `Tests:` field activating the topology protocol, the `TEST_RESULTS.md` step section may include additional topology lines after the standard counts. These lines are optional and backward-compatible — see `agent-pipeline-details.md` for the extended schema.

@@ -269,6 +269,18 @@ Append-only. Entries in chronological order by timestamp.
 
 **Post-merge invariants:** Every `## Step N` present at most once per writer. All failure blocks preserved. No re-sorting within a step (ordering inside a step reflects test-run order).
 
+**Test Topology optional fields**: when a step has a `Tests:` field activating the topology protocol, the step section may include these optional lines after the standard pass/fail/skip counts:
+
+```
+Tier: <step|phase|pipeline>
+Groups: [<group_id>, ...]
+Parallelism: <parallel-safe | sequential | mixed>
+Per-group results:
+  <group_id>: pass=N fail=N skip=N duration=<s>
+```
+
+These lines are **optional and backward-compatible**. Existing `TEST_RESULTS.md` consumers that do not know about the topology protocol continue to work without modification. Producers that have topology data available should include these lines to enable sentinel TT04 monitoring.
+
 ### .ai-state/ Reconciliation for Worktree Merges
 
 `.ai-state/` is committed to git, so its contents survive worktree merges via normal git merge semantics. Most artifacts avoid conflicts by design, but concurrent pipelines can produce overlapping writes. The table below covers every `.ai-state/` artifact:
@@ -288,6 +300,7 @@ Append-only. Entries in chronological order by timestamp.
 | `specs/SPEC_*.md` | None — unique feature-name + date filenames | Git merge handles distinct file additions natively |
 | `SYSTEM_DEPLOYMENT.md` | Low — single evolving file, section ownership prevents concurrent edits | Standard git merge. If conflict, later worktree's version wins for architect-owned sections; review implementer/cicd-owned sections manually |
 | `ARCHITECTURE.md` | Low — single evolving file, section ownership prevents concurrent edits | Standard git merge. If conflict, later worktree's version wins for architect-owned sections; review implementer-owned sections manually |
+| `TEST_TOPOLOGY.md` | Low — section ownership (architect / test-engineer / planner) prevents concurrent edits | Standard git merge. If conflict, later worktree's version wins per section; section ownership rules apply. Group splits and merges require an ADR; group-level additions are append-only. |
 | `docs/architecture.md` | Low — developer-facing, derived from `.ai-state/ARCHITECTURE.md` | Standard git merge. Developer doc is regenerable from architect doc + filesystem verification. If conflict, prefer later version (freshest data) and re-verify paths against disk |
 
 **Automated reconciliation:** Three layers of protection:

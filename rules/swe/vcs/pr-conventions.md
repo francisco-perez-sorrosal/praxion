@@ -32,7 +32,7 @@ PRs that touch `.ai-state/` carry obligations beyond regular code PRs because th
 
 ### Merge Policy
 
-**Default: regular merge commit.** Preserves both parents in the DAG; post-merge git hooks fire with full history visibility; merge drivers on `.ai-state/memory.json` and `.ai-state/observations.jsonl` run correctly.
+**Default: fast-forward only (`git merge --ff-only`).** Preserves a linear history on the target branch; post-merge git hooks fire as expected on the moved tip. When the source branch has diverged from the target, rebase the source onto the target first (`git rebase <target>` from inside the worktree) so the next attempt fast-forwards — the rebase exercises the merge drivers on `.ai-state/memory.json` and `.ai-state/observations.jsonl` if any conflicts in those files exist. Do not silently fall back to a non-fast-forward merge commit.
 
 **Do not squash-merge PRs that touch `.ai-state/`.** Squash collapses the source-branch history into a single commit on the target; the resulting tree replaces the target's `.ai-state/` wholesale, erasing any state the target accumulated since the branch diverged. Consequences include:
 

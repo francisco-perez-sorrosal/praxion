@@ -84,58 +84,34 @@ graph TD
 
 ## 5. Data Flow
 
-<!-- How data moves through the system for key scenarios.
-     Use sequence diagrams for request flows, flowcharts for data pipelines.
-     Focus on the 2-3 most important scenarios, not exhaustive coverage.
-     Only describe flows that exist in the current codebase. -->
+<!-- Data-flow diagrams are maintained in .ai-state/ARCHITECTURE.md §5 (the architect-facing doc).
+     This section is a pointer — diagrams duplicated here drift against the architect doc.
+     Add a brief developer-relevant orientation (entry points, key trace IDs) only if it adds
+     navigation value beyond the architect doc. -->
 
-### [Primary Scenario Name]
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant A as Component A
-    participant B as Component B
-    participant DB as Database
-    User->>A: Request
-    A->>B: Process
-    B->>DB: Store
-    DB-->>B: Confirm
-    B-->>A: Result
-    A-->>User: Response
-```
+Data flows are diagrammed in [`.ai-state/ARCHITECTURE.md` §5](../.ai-state/ARCHITECTURE.md#5-data-flow). [Optional: 1-2 sentences of developer-relevant orientation — entry points, where to start tracing, key correlation IDs.]
 
 ## 6. Dependencies
 
-<!-- External dependencies the system relies on.
-     Verify against pyproject.toml, package.json, or equivalent before including.
-     Only list dependencies that are currently installed and used. -->
+<!-- External dependencies are maintained in .ai-state/ARCHITECTURE.md §6.
+     Single source of truth — never duplicate the dependency table here. -->
 
-| Dependency | Version | Purpose | Criticality |
-|-----------|---------|---------|-------------|
-| [e.g., PostgreSQL] | [17.x] | [Primary data store] | Critical |
-| [e.g., Redis] | [7.x] | [Caching layer] | Non-critical (degrades gracefully) |
+External dependencies, versions, and criticality classifications are listed in [`.ai-state/ARCHITECTURE.md` §6](../.ai-state/ARCHITECTURE.md#6-dependencies). Verified against `pyproject.toml` (or equivalent) and project config.
 
 ## 7. Constraints
 
-<!-- Known limitations that affect developers working in this codebase.
-     Type: Performance, Security, Compatibility, Regulatory, Technical, Quality. -->
+<!-- System constraints are maintained in .ai-state/ARCHITECTURE.md §7.
+     Single source of truth — never duplicate constraints here.
+     Note any architect-only rows (behavioral, architectural) that exist there but are
+     out-of-scope for developers. -->
 
-| Constraint | Type | Rationale |
-|-----------|------|-----------|
-| [e.g., Response time < 200ms for API endpoints] | Performance | [User experience requirement] |
-| [e.g., Must run on Python 3.11+] | Compatibility | [Minimum supported runtime] |
-| [e.g., All data at rest must be encrypted] | Security | [Compliance requirement] |
+System constraints (performance, compatibility, technical, behavioral, architectural) are listed in [`.ai-state/ARCHITECTURE.md` §7](../.ai-state/ARCHITECTURE.md#7-constraints).
 
 ## 8. Decisions
 
 <!-- Architectural decisions are recorded as ADRs in .ai-state/decisions/.
-     This section provides quick cross-references to decisions that shaped the architecture.
-     Never duplicate ADR rationale here -- just link. -->
+     This section is a single pointer — never duplicate ADR titles or summaries here.
+     The canonical, auto-generated index lives in .ai-state/decisions/DECISIONS_INDEX.md.
+     For design-target rationale, the architect doc (.ai-state/ARCHITECTURE.md) is authoritative. -->
 
-<!-- Template placeholder below uses NNN-slug convention (user fills in real ADR path) — suppressed from validator. -->
-| ADR | Decision | Impact on Architecture |
-|-----|----------|----------------------|
-| [dec-NNN](../.ai-state/decisions/NNN-slug.md) | [Decision title] | [How it shapes the architecture] | <!-- validate-references:ignore -->
-
-[Add new rows as architecture-related ADRs are created.]
+Architectural decisions are recorded as ADRs in [`.ai-state/decisions/`](../.ai-state/decisions/). The canonical, auto-generated cross-reference is [`DECISIONS_INDEX.md`](../.ai-state/decisions/DECISIONS_INDEX.md). For design-target rationale, see [`.ai-state/ARCHITECTURE.md`](../.ai-state/ARCHITECTURE.md) — this developer guide intentionally does not summarize decisions inline.

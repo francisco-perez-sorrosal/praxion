@@ -135,13 +135,9 @@ sequenceDiagram
 ## 8. Decisions
 
 <!-- Architectural decisions are recorded as ADRs in .ai-state/decisions/.
-     This section provides quick cross-references to decisions that shaped the architecture.
-     Never duplicate ADR rationale here -- just link.
-     Include ALL architecture-related ADRs -- omissions weaken the design record. -->
+     This section is a single pointer — the canonical, auto-generated index lives in
+     .ai-state/decisions/DECISIONS_INDEX.md. Do NOT duplicate ADR titles or summaries here:
+     summaries drift, indexes regenerate. Inline `dec-NNN` references in the section bodies
+     above (Components, Interfaces, Constraints) are validated by sentinel AC04. -->
 
-<!-- Template placeholder below uses NNN-slug convention (user fills in real ADR path) — suppressed from validator. -->
-| ADR | Decision | Impact on Architecture |
-|-----|----------|----------------------|
-| [dec-NNN](decisions/NNN-slug.md) | [Decision title] | [How it shapes the architecture] | <!-- validate-references:ignore -->
-
-[Add new rows as architecture-related ADRs are created.]
+Architectural decisions are recorded as ADRs in [`.ai-state/decisions/`](decisions/). The canonical, auto-generated cross-reference is [`DECISIONS_INDEX.md`](decisions/DECISIONS_INDEX.md). In-flight pipeline ADRs live as fragments under [`decisions/drafts/`](decisions/drafts/) and are promoted to stable `dec-NNN` at merge-to-main by `scripts/finalize_adrs.py`.

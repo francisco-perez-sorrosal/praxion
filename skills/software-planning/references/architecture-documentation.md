@@ -38,7 +38,7 @@ Both documents use the same 8 sections (Overview, System Context, Components, In
 - Section 3 (Components): skeleton with known components, Status column populated
 - Section 5 (Data Flow): key scenario flows
 - Section 7 (Constraints): known limitations and quality attributes
-- Section 8 (Decisions): cross-references to architecture-related ADRs
+- Section 8 (Decisions): a single pointer to `.ai-state/decisions/DECISIONS_INDEX.md` — no inline ADR table. Architectural cross-references appear inline in Sections 3/4/7 as `dec-NNN` mentions.
 
 Sections 4 (Interfaces) and 6 (Dependencies) are left with template guidance for the implementer to fill as-built.
 
@@ -52,14 +52,15 @@ Skip creation for trivially simple projects (single module, no external dependen
 | Interface/API changes | 4 (Interfaces: update contract table) |
 | Data model changes | 5 (Data Flow: update flow descriptions) |
 | New dependency added/removed | 6 (Dependencies: update table) |
-| ADR created | 8 (Decisions: add cross-reference row) |
+| ADR created | None — Section 8 is a stable pointer to `DECISIONS_INDEX.md` (auto-regenerated). When a new ADR materially shapes a component/interface/constraint, cite `dec-NNN` inline in the affected row instead. |
 
 If `.ai-state/ARCHITECTURE.md` does not exist, the implementer skips — the systems-architect creates it.
 
 **Validation:** The **verifier** checks design coherence during Phase 8:
 - Components referenced in Data Flow (Section 5) appear in Components (Section 3)
 - Status column is present with valid values
-- ADR IDs in Section 8 correspond to actual files in `.ai-state/decisions/`
+- Every inline `dec-NNN` reference (anywhere in the document) resolves to a finalized ADR file under `.ai-state/decisions/` or a draft under `.ai-state/decisions/drafts/`
+- Section 8 contains a pointer to `DECISIONS_INDEX.md` — does not embed an ADR summary table
 - File paths, when present, are advisory — WARN if many are broken, not FAIL
 - Internal consistency: component names are used consistently across sections
 
@@ -69,7 +70,7 @@ A stale architect doc is a WARN, not a FAIL — it's advisory, not a gate.
 - **AC01**: Architecture doc exists when project has 3+ interacting components
 - **AC02**: Design coherence — component names are internally consistent and the design accounts for existing modules (abstract names allowed)
 - **AC03**: File paths, when present, are illustrative — WARN if >50% are broken, PASS otherwise
-- **AC04**: ADR cross-references in Section 8 are valid
+- **AC04**: Every inline `dec-NNN` reference in the document resolves to a finalized ADR or live draft (Section 8 is a stable pointer to `DECISIONS_INDEX.md`, not an inline table)
 
 ### Developer Guide (`docs/architecture.md`)
 
@@ -142,7 +143,7 @@ Finding routing for architect doc (`.ai-state/ARCHITECTURE.md`):
 | AC01 | 3+ components, no architecture doc | systems-architect | Create both docs from templates on next pipeline |
 | AC02 | Design incoherence (components internally inconsistent) | systems-architect | Reconcile Section 3 component inventory |
 | AC03 | >50% of file paths broken | implementer or main agent | Update illustrative file references |
-| AC04 | ADR reference in Section 8 invalid | systems-architect | Fix or remove broken ADR reference |
+| AC04 | Inline `dec-NNN` reference invalid (does not resolve to an ADR file or live draft) | systems-architect | Fix or remove broken ADR reference |
 
 Finding routing for developer guide (`docs/architecture.md`):
 
@@ -158,11 +159,12 @@ The sentinel detects but never fixes (read-only). Its report routes findings to 
 
 ## Relationship to ADRs
 
-ADRs document *why* an architectural decision was made. Both architecture documents reference ADR IDs in Section 8 for rationale:
+ADRs document *why* an architectural decision was made. The canonical, auto-generated cross-reference is `.ai-state/decisions/DECISIONS_INDEX.md`. Both architecture documents reach ADRs via two channels:
 
-- Architecture-related ADRs include `ARCHITECTURE.md` in `affected_files`
-- Never duplicate ADR rationale in either architecture document — just link
-- Both documents independently cross-reference the same ADRs
+- **Section 8** is a single pointer to `DECISIONS_INDEX.md` — never an inline summary table. Summary tables drift; auto-generated indexes do not.
+- **Inline `dec-NNN` mentions** appear in Sections 3 (Components), 4 (Interfaces), and 7 (Constraints) when an ADR materially shaped that row. These are validated by sentinel AC04.
+- Architecture-related ADRs include `ARCHITECTURE.md` in `affected_files`.
+- Never duplicate ADR rationale in either architecture document — just cite by `dec-NNN`.
 
 ## Relationship to SYSTEM_DEPLOYMENT.md
 
@@ -204,5 +206,5 @@ For projects that already have code but no architecture docs:
 1. The sentinel's AC01 check flags the gap (3+ interacting components, no ARCHITECTURE.md)
 2. The systems-architect creates both documents when next invoked for a Standard/Full pipeline
 3. Read existing code structure, imports, and config to populate components, interfaces, and dependencies
-4. Read existing ADRs in `.ai-state/decisions/` to populate Section 8
+4. Section 8 needs no per-bootstrap population — it is a stable pointer to `DECISIONS_INDEX.md`. Inline `dec-NNN` references should be added in Sections 3/4/7 only when an existing ADR materially shaped a row
 5. The developer guide is derived from the architect doc by filtering to Built components and verifying all paths

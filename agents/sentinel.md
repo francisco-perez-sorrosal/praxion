@@ -267,7 +267,7 @@ Conditional activation: skip AC01-AC04 checks when `.ai-state/ARCHITECTURE.md` d
 | AC01 | L | Architecture doc exists when project has 3+ interacting components | `.ai-state/ARCHITECTURE.md` exists when project has 3+ modules with inter-module dependencies |
 | AC02 | L | Component names in `.ai-state/ARCHITECTURE.md` are internally consistent and account for existing modules | Component names in Section 3 are internally consistent (every component in Data Flow appears in Components table); abstract names are allowed |
 | AC03 | A | File paths in `.ai-state/ARCHITECTURE.md` are illustrative | WARN if >50% of file paths in component table do not resolve to existing files; PASS otherwise |
-| AC04 | A | ADR cross-references in `.ai-state/ARCHITECTURE.md` Section 8 are valid | Every `dec-NNN` in Section 8 has a corresponding `.ai-state/decisions/NNN-*.md` file |
+| AC04 | A | Inline `dec-NNN` references in `.ai-state/ARCHITECTURE.md` and `docs/architecture.md` resolve | Every `dec-NNN` mentioned anywhere in either document resolves to a finalized `.ai-state/decisions/<NNN>-*.md` file. Section 8 is a stable pointer to `DECISIONS_INDEX.md`, not an inline table — pointer presence is sufficient |
 | AC05 | A | `docs/architecture.md` exists when `.ai-state/ARCHITECTURE.md` exists | `docs/architecture.md` exists |
 | AC06 | A | Every component name in developer guide matches actual module | Component names in `docs/architecture.md` Section 3 match `Glob` of module names |
 | AC07 | A | File paths in developer guide resolve | Every file path in `docs/architecture.md` component table points to existing file |

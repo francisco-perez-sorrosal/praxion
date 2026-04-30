@@ -67,12 +67,13 @@ fi
 generate_format() {
     local src="$1"   # path to <name>.c4
     local fmt="$2"   # format: d2 | mermaid | png | ...
-    local out_dir="${src%.c4}"  # strip .c4 suffix to get the output directory
+    local out_dir="${src%.c4}"     # strip .c4 suffix → output directory name
+    local workspace="${src%/*}"    # parent directory → LikeC4 workspace (likec4 gen takes a dir, not a file)
 
     echo "[diagram-regen] Generating ${fmt} from ${src} → ${out_dir}/" >&2
 
     local gen_stderr
-    if ! gen_stderr="$(likec4 gen "${fmt}" "${src}" -o "${out_dir}/" 2>&1)"; then
+    if ! gen_stderr="$(likec4 gen "${fmt}" "${workspace}" -o "${out_dir}/" 2>&1)"; then
         echo "[diagram-regen] ERROR: likec4 gen ${fmt} failed for ${src}" >&2
         echo "${gen_stderr}" >&2
         return 1

@@ -40,6 +40,10 @@ Before any phase runs, gather facts. Pre-flight writes nothing — it produces a
    - JavaScript/TypeScript: `package.json`
    - Rust: `Cargo.toml`
    - Go: `go.mod`
+4b. **Diagram-toolchain probes.** Probe both diagram toolchain binaries and record their presence in the pre-flight report. Do NOT block onboarding on missing binaries.
+   - `command -v likec4 >/dev/null 2>&1` → record `likec4` present/absent; if present, capture `likec4 --version`
+   - `command -v d2 >/dev/null 2>&1` → record `d2` present/absent; if present, capture `d2 --version`
+   If either is missing AND the project contains `**/diagrams/*.c4` files (or the user opts into Phase 8 architecture baseline), emit in the pre-flight report: "Install LikeC4 + D2 for architectural diagram regeneration — see `docs/architecture-diagrams.md`."
 5. **Prior-onboarding signals.** Check for any of:
    - `## Agent Pipeline` heading in `CLAUDE.md` (re-onboard scenario — Phase 6 will skip the append)
    - `.ai-state/` directory exists with non-empty contents (re-onboard or pipeline-active)
@@ -349,14 +353,14 @@ Delegate to `systems-architect` via the `Task` tool. The delegation prompt MUST 
 1. **Mode.** `Baseline-audit mode — no specific feature scope. Read the existing codebase and produce architecture docs that describe the as-built state, not a future design target.`
 2. **Inputs.** Point the agent at the project root. Tell it which language/framework signals were detected in §Pre-flight (Python, JavaScript, Rust, Go, etc.) so it scopes the codebase scan correctly.
 3. **Outputs (required).**
-   - `.ai-state/ARCHITECTURE.md` — architect-facing design-target document. Use the `skills/software-planning/assets/ARCHITECTURE_TEMPLATE.md` template. Sections: System Overview, System Context (L0 mermaid), Components (L1 mermaid + table), Data Flow, Quality Attributes (testing, observability, deployment current state), Open Questions / Known Gaps. Mark unverified-by-code claims with section ownership tags so future updates can supersede cleanly.
+   - `.ai-state/ARCHITECTURE.md` — architect-facing design-target document. Use the `skills/software-planning/assets/ARCHITECTURE_TEMPLATE.md` template. Sections: System Overview, System Context (L0 — LikeC4+D2 `c4` block + committed SVG reference), Components (L1 — LikeC4+D2 `c4` block + committed SVG reference + table), Data Flow, Quality Attributes (testing, observability, deployment current state), Open Questions / Known Gaps. Mark unverified-by-code claims with section ownership tags so future updates can supersede cleanly.
    - `docs/architecture.md` — developer-facing navigation guide. Use the `skills/doc-management/assets/ARCHITECTURE_GUIDE_TEMPLATE.md` template. Filter `.ai-state/ARCHITECTURE.md` to the **Built** components only — every component name and file path must resolve on disk (verify with `Glob` or `ls`). Skip components that exist only in the design-target document.
 4. **Outputs (optional, agent's call).**
    - One ADR draft under `.ai-state/decisions/drafts/` if the baseline reading surfaces a load-bearing architectural invariant worth preserving (e.g., a one-way module dependency, a layer boundary, a data-flow constraint). The ADR is *only* warranted when the invariant is non-obvious from the code; do not write a ceremonial "architecture is now baselined" ADR.
 5. **Anti-instructions.**
    - Do NOT produce `SYSTEMS_PLAN.md` — there is no feature in scope for a baseline audit, and a SYSTEMS_PLAN without a feature is anti-pattern.
-   - Do NOT invent components that don't exist on disk. Every Mermaid node and table row must be code-verified.
-   - Do NOT exceed L1 detail in mermaid diagrams (≤10 nodes per `rules/writing/diagram-conventions.md`). L2 internals are deferred to feature-pipeline updates.
+   - Do NOT invent components that don't exist on disk. Every component table row and SVG reference must be code-verified.
+   - Do NOT exceed L1 detail in C4 diagrams (≤10 nodes per `rules/writing/diagram-conventions.md`). Use LikeC4 DSL for C4-architectural views; Mermaid for sequence/state/ER/flowchart. L2 internals are deferred to feature-pipeline updates.
    - Do NOT modify any source code, tests, or non-architecture documentation.
 
 The architect operates in a fresh context window (`Task` tool spawn) and reports completion when both docs are written. The main agent reads the produced docs at completion to confirm shape, then proceeds to Phase 9.

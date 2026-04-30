@@ -199,3 +199,23 @@ When the `claude-mermaid` plugin is available, use its MCP tools for diagram aut
 - `mermaid_save` — export to file when a persistent image is needed (e.g., GitHub issue embeds)
 
 Use preview to check layout before committing — Mermaid's auto-layout can produce unexpected results with complex graphs. If the layout is unclear, restructure the graph (reorder nodes, change direction) rather than fighting the renderer.
+
+## Integration with LikeC4 + D2
+
+For C4-architectural diagrams (System Context L0, Container/Component L1), use LikeC4 + D2:
+
+1. **Author** the model in `docs/diagrams/<name>.c4` using LikeC4 DSL.
+2. **Generate** D2 sources: `likec4 gen d2 docs/diagrams/ -o docs/diagrams/<name>/`
+3. **Render** SVG: `d2 docs/diagrams/<name>/<view>.d2 docs/diagrams/<name>/<view>.svg`
+4. **Reference** rendered SVGs from architecture docs: `![Alt text](diagrams/<name>/<view>.svg)`
+
+The pre-commit hook (installed by `/onboard-project` Phase 4) runs steps 2–3 automatically
+when `.c4` files are staged.
+
+**Decision tree:** Multiple views over one architectural model? → LikeC4. Single standalone diagram? → Mermaid.
+
+When components change, search for `*.c4` sources alongside Mermaid blocks, re-run the
+LikeC4/D2 regenerator, and verify rendered SVGs are committed.
+
+Install: `npm install -g likec4` + `brew install d2` (macOS) or the curl installer
+(Linux). Pin: `likec4 ^1.56`, `d2 v0.7.1`. See `docs/architecture-diagrams.md`.

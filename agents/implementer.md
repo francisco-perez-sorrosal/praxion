@@ -83,6 +83,7 @@ For your assigned step:
    - Data model changes → update Section 5 (Data Flow: update flow descriptions)
    - New dependency added/removed → update Section 6 (Dependencies: update dependencies table)
    - ADR created → update Section 8 (Decisions: add cross-reference row)
+   - **Diagram regen:** if the structural change touches a C4 view (System Context or Components), update the relevant `.c4` source in `docs/diagrams/` and run `scripts/diagram-regen-hook.sh` (or stage the `.c4` file so the pre-commit hook auto-regenerates) so the committed `.d2` and `.svg` stay in sync with the model.
    If `.ai-state/ARCHITECTURE.md` does not exist, skip this step — the systems-architect creates it.
 7.7. **Update developer architecture guide** — if `.ai-state/ARCHITECTURE.md` was updated in step 7.6 AND `docs/architecture.md` exists, propagate the change to `docs/architecture.md` with developer framing:
    - Only include components that exist on disk (verify with Glob/ls)

@@ -101,4 +101,18 @@ EOF
     fi
 fi
 
+# ---------------------------------------------------------------------------
+# Block C: Diagram regeneration
+# ---------------------------------------------------------------------------
+
+# Run the diagram-regen-hook if it exists alongside this script and is
+# executable. Produces .d2 and .svg artifacts from staged .c4 sources.
+# Gracefully skips when likec4 or d2 binaries are absent.
+DIAGRAM_HOOK="$(dirname "$0")/diagram-regen-hook.sh"
+if [ -f "$DIAGRAM_HOOK" ] && [ -x "$DIAGRAM_HOOK" ]; then
+    if ! "$DIAGRAM_HOOK"; then
+        exit 1
+    fi
+fi
+
 exit 0

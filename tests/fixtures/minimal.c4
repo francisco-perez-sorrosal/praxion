@@ -1,0 +1,30 @@
+/**
+ * Minimal valid LikeC4 DSL fixture for the diagram-regen-hook test harness.
+ *
+ * Structure: specification + model + views — the three required top-level blocks
+ * in a LikeC4 workspace. This fixture is intentionally minimal: one actor element
+ * kind, one system element kind, two instances, one relationship, one view.
+ *
+ * Used by test case T5 (happy-path: both binaries present + DSL valid).
+ * When likec4 and d2 are installed, `likec4 gen d2 minimal.c4 -o minimal/`
+ * should produce `minimal/index.d2` and `d2 minimal/index.d2 minimal/index.svg`
+ * should produce a valid SVG.
+ *
+ * DSL reference: https://likec4.dev/llms-full.txt
+ */
+specification {
+  element actor
+  element system
+}
+
+model {
+  user = actor "User"
+  app = system "App"
+  user -> app "uses"
+}
+
+views {
+  view index {
+    include *
+  }
+}

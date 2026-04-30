@@ -25,89 +25,26 @@ The architecture is organized around three core concerns: **knowledge delivery**
 
 ## 2. System Context
 
-<!-- OWNER: systems-architect | LAST UPDATED: 2026-04-12 by systems-architect -->
+<!-- OWNER: systems-architect | LAST UPDATED: 2026-04-30 by implementer (migrated Mermaid block to LikeC4-sourced SVG — structurizr-d2-diagrams pipeline Step 6) -->
 <!-- L0 diagram: system boundary + external actors/dependencies. -->
 
-```mermaid
-graph LR
-    subgraph External
-        Dev[Developer]
-        CC[Claude Code]
-        CD[Claude Desktop]
-        Cursor[Cursor IDE]
-        Phoenix[Arize Phoenix]
-        GH[GitHub]
-    end
-    subgraph Praxion["Praxion (i-am plugin)"]
-        Skills[Skills<br/>35 modules]
-        Agents[Agents<br/>12 types]
-        Hooks[Hooks<br/>14 scripts]
-        MCP[MCP Servers<br/>Memory + Chronograph]
-        Rules[Rules<br/>13 files]
-        Cmds[Commands<br/>24 slash commands]
-    end
-    Dev --> CC
-    Dev --> CD
-    Dev --> Cursor
-    CC -->|plugin system| Skills
-    CC -->|plugin system| Agents
-    CC -->|lifecycle events| Hooks
-    CC -->|stdio| MCP
-    CC -->|slash commands| Cmds
-    CC -.->|auto-loaded| Rules
-    CD -->|MCP only| MCP
-    Cursor -->|skills + MCP| Skills
-    MCP -.->|OTLP export| Phoenix
-    Hooks -.->|HTTP events| MCP
-    CC -.->|git ops| GH
-```
+<img src="../docs/diagrams/architecture/context.svg" alt="Praxion System Context (L0)" />
+
+*LikeC4 source: [`docs/diagrams/architecture.c4`](../docs/diagrams/architecture.c4). The pre-commit hook (`scripts/diagram-regen-hook.sh`) regenerates the SVG above when the source changes.*
 
 > **Component detail:** [Components](#3-components)
 > **Code-verified paths:** [docs/architecture.md](../docs/architecture.md)
 
 ## 3. Components
 
-<!-- OWNER: systems-architect (skeleton), implementer (as-built) | LAST UPDATED: 2026-04-24 by implementer (Tech-debt ledger fully Built end-to-end: `.ai-state/TECH_DEBT_LEDGER.md` empty artifact on disk; 15-field schema + owner-role heuristic registered in `rules/swe/agent-intermediate-documents.md`; `scripts/finalize_tech_debt_ledger.py` post-merge dedupe wired into `scripts/git-post-merge-hook.sh`; verifier Phase 5/5.5 + sentinel TD01-TD05 producers integrated; single-line consumer contract added to systems-architect / implementation-planner / implementer / test-engineer / doc-engineer; three draft ADRs pending finalize) -->
+<!-- OWNER: systems-architect (skeleton), implementer (as-built) | LAST UPDATED: 2026-04-30 by implementer (migrated Mermaid block to LikeC4-sourced SVG — structurizr-d2-diagrams pipeline Step 6) -->
 <!-- L1 diagram: major building blocks and their relationships.
      Status values: Designed (interface defined, not yet implemented), Built (code exists on disk),
      Planned (roadmap item, no interface yet), Deprecated (scheduled for removal). -->
 
-```mermaid
-graph TD
-    subgraph Knowledge["Knowledge Layer"]
-        SK[Skills<br/>Domain expertise modules]
-        RL[Rules<br/>Declarative conventions]
-        CM[Commands<br/>User-invoked workflows]
-    end
-    subgraph Orchestration["Orchestration Layer"]
-        AG[Agent Pipeline<br/>12 specialized agents]
-        HK[Hooks<br/>Lifecycle enforcement]
-        AIWORK[".ai-work/<br/>Ephemeral pipeline docs"]
-    end
-    subgraph Intelligence["Persistent Intelligence Layer"]
-        MEM[Memory MCP<br/>Curated + observations]
-        CHR[Chronograph MCP<br/>OTel relay]
-        AIST[".ai-state/<br/>ADRs, specs, reports"]
-    end
-    subgraph Tooling["Tooling Layer"]
-        INS[Installers<br/>3 targets]
-        SCR[Scripts<br/>Worktrees, merge, Phoenix]
-        VER[Versioning<br/>Commitizen]
-    end
-    SK -.->|injected into| AG
-    AG -->|read/write| AIWORK
-    AG -->|persist| AIST
-    HK -->|enforce| AG
-    HK -.->|POST events| CHR
-    HK -->|inject context| MEM
-    CM -->|trigger| AG
-    RL -.->|shape behavior| AG
-    MEM -->|recall/remember| AIST
-    CHR -.->|OTLP| Phoenix["Phoenix<br/>(external)"]
-    INS -->|deploy| SK
-    INS -->|deploy| RL
-    INS -->|deploy| CM
-```
+<img src="../docs/diagrams/architecture/components.svg" alt="Praxion Components (L1)" />
+
+*LikeC4 source: [`docs/diagrams/architecture.c4`](../docs/diagrams/architecture.c4). The pre-commit hook (`scripts/diagram-regen-hook.sh`) regenerates the SVG above when the source changes.*
 
 | Component | Responsibility | Status | Key Files (illustrative) |
 |-----------|---------------|--------|--------------------------|

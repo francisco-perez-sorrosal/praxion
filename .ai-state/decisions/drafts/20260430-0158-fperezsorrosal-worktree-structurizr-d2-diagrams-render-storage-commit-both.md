@@ -15,7 +15,6 @@ affected_files:
   - skills/doc-management/references/diagram-conventions.md
   - rules/writing/diagram-conventions.md
   - commands/onboard-project.md
-re_affirms: dec-draft-55bf38a6
 ---
 
 ## Context

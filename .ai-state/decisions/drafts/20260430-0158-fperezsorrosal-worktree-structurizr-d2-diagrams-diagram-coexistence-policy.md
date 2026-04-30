@@ -1,7 +1,7 @@
 ---
 id: dec-draft-05e16d0e
 title: Two-toolchain coexistence policy — LikeC4 for C4-architectural; Mermaid for everything else
-status: proposed
+status: re-affirmation
 category: configuration
 date: 2026-04-30
 summary: 'Replace the Mermaid-only mandate in `rules/writing/diagram-conventions.md` with a coexistence policy: LikeC4+D2 for C4-architectural diagrams, Mermaid for sequence/state/ER/flowchart/topology, no retroactive migration of existing Mermaid blocks.'

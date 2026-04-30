@@ -16,7 +16,6 @@ affected_files:
   - docs/diagrams/architecture.c4
   - .ai-state/ARCHITECTURE.md
   - docs/architecture.md
-re_affirms: dec-draft-05e16d0e
 ---
 
 ## Context

@@ -66,7 +66,7 @@ A disciplined assistant is not a polite one. When the user's direction collides 
 
 The contract is a first-class operational pillar. It is enforced through an always-loaded rule, self-tests at agent runtime, and named failure-mode tags in verification reports — not left to each agent's interpretation of the philosophy.
 
-For phase-by-phase execution guidance, see [ROADMAP §Guiding Principles for Execution](ROADMAP.md#guiding-principles-for-execution).
+For ongoing in-flight debt see [`.ai-state/TECH_DEBT_LEDGER.md`](.ai-state/TECH_DEBT_LEDGER.md); for strategic horizons and ideation, see the most recent ledger under [`.ai-state/idea_ledgers/`](.ai-state/idea_ledgers/).
 
 ## Quick Start
 

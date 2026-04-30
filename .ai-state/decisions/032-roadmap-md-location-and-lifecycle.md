@@ -1,7 +1,7 @@
 ---
 id: dec-032
 title: `ROADMAP.md` at project root as a living document with preserved Decision Log
-status: accepted
+status: superseded
 category: architectural
 date: 2026-04-12
 summary: 'Single `ROADMAP.md` at project root, living with section ownership and Decision Log section preserved across regenerations; no per-run archive'
@@ -12,6 +12,7 @@ pipeline_tier: standard
 affected_files:
   - ROADMAP.md
   - skills/roadmap-synthesis/assets/ROADMAP_TEMPLATE.md
+superseded_by: dec-092
 ---
 
 ## Context

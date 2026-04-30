@@ -38,7 +38,7 @@ When working on Praxion's onboarding artifacts, the source-of-truth chain runs: 
 
 ## Guiding Principles (Praxion-specific)
 
-Extends `~/.claude/CLAUDE.md`. Four principles: **token budget first-class**, **measure before optimize**, **standards convergence as opportunity**, **curiosity over dogma**. Rationale: `README.md#guiding-principles` and `ROADMAP.md#guiding-principles-for-execution`.
+Extends `~/.claude/CLAUDE.md`. Four principles: **token budget first-class**, **measure before optimize**, **standards convergence as opportunity**, **curiosity over dogma**. Rationale: `README.md#guiding-principles`.
 
 ## Behavioral Contract (applied)
 

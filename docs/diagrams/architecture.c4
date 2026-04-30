@@ -1,0 +1,117 @@
+/**
+ * Praxion Architecture — LikeC4 source model
+ *
+ * Two views:
+ *   context    — L0 System Context: Praxion + external actors (boundary view)
+ *   components — L1 Components: internals grouped by architectural layer
+ *
+ * Layer structure (R1):
+ *   Knowledge Layer      — Skills, Rules, Commands
+ *   Orchestration Layer  — Agent Pipeline, Hooks, .ai-work/
+ *   Persistence Layer    — Memory MCP, Chronograph MCP, .ai-state/
+ *   Tooling              — Installers, Scripts, Versioning
+ *
+ * Regen:
+ *   likec4 gen d2 docs/diagrams/ -o docs/diagrams/architecture/
+ *   d2 docs/diagrams/architecture/context.d2    docs/diagrams/architecture/context.svg
+ *   d2 docs/diagrams/architecture/components.d2 docs/diagrams/architecture/components.svg
+ *
+ * DSL reference: https://likec4.dev/llms-full.txt
+ */
+specification {
+  element person
+  element system
+  element external
+  element component
+}
+
+model {
+  // ── External Actors ──────────────────────────────────────────────────────
+  developer      = person   "Developer"
+  claude_code    = external "Claude Code"
+  claude_desktop = external "Claude Desktop"
+  cursor         = external "Cursor"
+  arize_phoenix  = external "Arize Phoenix"
+  github         = external "GitHub"
+
+  // ── Praxion System ───────────────────────────────────────────────────────
+  praxion = system "Praxion" {
+
+    // Knowledge Layer: static assets loaded into agent context
+    knowledge = component "Knowledge Layer" {
+      skills   = component "Skills"         { description "Domain expertise modules" }
+      rules    = component "Rules"          { description "Declarative conventions" }
+      commands = component "Commands"       { description "User-invoked workflows" }
+    }
+
+    // Orchestration Layer: runtime execution and ephemeral state
+    orchestration = component "Orchestration Layer" {
+      agents = component "Agent Pipeline"   { description "12 specialized agents" }
+      hooks  = component "Hooks"            { description "Lifecycle enforcement" }
+      aiwork = component ".ai-work/"        { description "Ephemeral pipeline docs" }
+    }
+
+    // Persistence Layer: durable intelligence and observability
+    persistence = component "Persistence Layer" {
+      memory      = component "Memory MCP"      { description "Curated + observations" }
+      chronograph = component "Chronograph MCP" { description "OTel relay" }
+      aistate     = component ".ai-state/"      { description "ADRs, specs, reports" }
+    }
+
+    // Tooling: deployment and release automation
+    tooling = component "Tooling" {
+      installers = component "Installers"   { description "3 targets" }
+      scripts    = component "Scripts"      { description "Worktrees, merge, Phoenix" }
+      versioning = component "Versioning"   { description "Commitizen" }
+    }
+
+    // ── Intra-system Relationships ──────────────────────────────────────────
+    knowledge.skills    -> orchestration.agents "injects"
+    knowledge.rules     -> orchestration.agents "constrains"
+    knowledge.commands  -> orchestration.agents "triggers"
+    orchestration.hooks -> orchestration.agents "enforces"
+    orchestration.hooks -> persistence.chronograph "emits events"
+    orchestration.hooks -> persistence.memory "injects context"
+    orchestration.agents -> orchestration.aiwork "reads/writes"
+    orchestration.agents -> persistence.aistate "persists"
+    persistence.memory  -> persistence.aistate "reads/writes"
+    tooling.installers  -> knowledge.skills   "deploys"
+    tooling.installers  -> knowledge.rules    "deploys"
+    tooling.installers  -> knowledge.commands "deploys"
+  }
+
+  // ── Cross-boundary Relationships ─────────────────────────────────────────
+  praxion.persistence.chronograph -> arize_phoenix "streams via OTLP"
+  developer      -> praxion "develops"
+  claude_code    -> praxion "executes agents"
+  claude_desktop -> praxion "loads skills"
+  cursor         -> praxion "loads rules"
+  github         -> praxion "hosts"
+}
+
+views {
+  // L0 — System Context: Praxion as a single box plus external actors.
+  // Intentionally omits internal components to show the boundary.
+  view context {
+    title "Praxion System Context (L0)"
+    description "Praxion system boundary and external actors"
+
+    include developer, claude_code, claude_desktop, cursor, arize_phoenix, github, praxion
+  }
+
+  // L1 — Components: internals exposed with layer grouping (R1).
+  // Each layer cluster contains its constituent components.
+  view components {
+    title "Praxion Components (L1)"
+    description "Major building blocks grouped by architectural layer"
+
+    include
+      developer, claude_code, claude_desktop, cursor, arize_phoenix, github,
+      praxion,
+      praxion.knowledge, praxion.orchestration, praxion.persistence, praxion.tooling,
+      praxion.knowledge.skills, praxion.knowledge.rules, praxion.knowledge.commands,
+      praxion.orchestration.agents, praxion.orchestration.hooks, praxion.orchestration.aiwork,
+      praxion.persistence.memory, praxion.persistence.chronograph, praxion.persistence.aistate,
+      praxion.tooling.installers, praxion.tooling.scripts, praxion.tooling.versioning
+  }
+}

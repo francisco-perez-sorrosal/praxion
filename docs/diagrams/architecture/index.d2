@@ -1,0 +1,30 @@
+direction: down
+
+Developer: {
+  label: "Developer"
+}
+Claude_code: {
+  label: "Claude Code"
+}
+Claude_desktop: {
+  label: "Claude Desktop"
+}
+Cursor: {
+  label: "Cursor"
+}
+Github: {
+  label: "GitHub"
+}
+Praxion: {
+  label: "Praxion"
+}
+Arize_phoenix: {
+  label: "Arize Phoenix"
+}
+
+Developer -> Praxion: "develops"
+Claude_code -> Praxion: "executes agents"
+Claude_desktop -> Praxion: "loads skills"
+Cursor -> Praxion: "loads rules"
+Praxion -> Arize_phoenix: "streams via OTLP"
+Github -> Praxion: "hosts"

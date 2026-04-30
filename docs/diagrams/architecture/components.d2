@@ -1,0 +1,95 @@
+direction: down
+
+Praxion: {
+  label: "Praxion"
+
+  Tooling: {
+    label: "Tooling"
+
+    Installers: {
+      label: "Installers"
+    }
+    Scripts: {
+      label: "Scripts"
+    }
+    Versioning: {
+      label: "Versioning"
+    }
+  }
+  Knowledge: {
+    label: "Knowledge Layer"
+
+    Skills: {
+      label: "Skills"
+    }
+    Rules: {
+      label: "Rules"
+    }
+    Commands: {
+      label: "Commands"
+    }
+  }
+  Orchestration: {
+    label: "Orchestration Layer"
+
+    Hooks: {
+      label: "Hooks"
+    }
+    Agents: {
+      label: "Agent Pipeline"
+    }
+    Aiwork: {
+      label: ".ai-work/"
+    }
+  }
+  Persistence: {
+    label: "Persistence Layer"
+
+    Memory: {
+      label: "Memory MCP"
+    }
+    Chronograph: {
+      label: "Chronograph MCP"
+    }
+    Aistate: {
+      label: ".ai-state/"
+    }
+  }
+}
+Developer: {
+  label: "Developer"
+}
+Claude_code: {
+  label: "Claude Code"
+}
+Claude_desktop: {
+  label: "Claude Desktop"
+}
+Cursor: {
+  label: "Cursor"
+}
+Github: {
+  label: "GitHub"
+}
+Arize_phoenix: {
+  label: "Arize Phoenix"
+}
+
+Praxion.Knowledge.Skills -> Praxion.Orchestration.Agents: "injects"
+Praxion.Knowledge.Rules -> Praxion.Orchestration.Agents: "constrains"
+Praxion.Knowledge.Commands -> Praxion.Orchestration.Agents: "triggers"
+Praxion.Orchestration.Hooks -> Praxion.Orchestration.Agents: "enforces"
+Praxion.Orchestration.Agents -> Praxion.Orchestration.Aiwork: "reads/writes"
+Praxion.Orchestration.Hooks -> Praxion.Persistence.Memory: "injects context"
+Praxion.Orchestration.Hooks -> Praxion.Persistence.Chronograph: "emits events"
+Praxion.Persistence.Chronograph -> Arize_phoenix: "streams via OTLP"
+Praxion.Orchestration.Agents -> Praxion.Persistence.Aistate: "persists"
+Praxion.Persistence.Memory -> Praxion.Persistence.Aistate: "reads/writes"
+Praxion.Tooling.Installers -> Praxion.Knowledge.Skills: "deploys"
+Praxion.Tooling.Installers -> Praxion.Knowledge.Rules: "deploys"
+Praxion.Tooling.Installers -> Praxion.Knowledge.Commands: "deploys"
+Developer -> Praxion: "develops"
+Claude_code -> Praxion: "executes agents"
+Claude_desktop -> Praxion: "loads skills"
+Cursor -> Praxion: "loads rules"
+Github -> Praxion: "hosts"

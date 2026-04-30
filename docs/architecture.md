@@ -28,46 +28,15 @@ The system-boundary L0 diagram is rendered in [`.ai-state/ARCHITECTURE.md` §2](
 
 ## 3. Components
 
-<!-- OWNER: implementer (as-built), doc-engineer (verification) | LAST UPDATED: 2026-04-24 by implementer (added Tech-debt ledger row — `.ai-state/TECH_DEBT_LEDGER.md` empty artifact verified on disk; schema registered in `rules/swe/agent-intermediate-documents.md`; producer wiring and consumer contracts pending downstream steps) -->
+<!-- OWNER: implementer (as-built), doc-engineer (verification) | LAST UPDATED: 2026-04-28 by implementer (migrated L1 Mermaid block to LikeC4-sourced SVG — structurizr-d2-diagrams pipeline) -->
 <!-- L1 diagram: major building blocks and their relationships.
-     Every component listed here MUST exist on disk — verify with ls/Glob before including. -->
+     Every component listed here MUST exist on disk — verify with ls/Glob before including.
+     Source: docs/diagrams/architecture.c4 | Generated: docs/diagrams/architecture/components.d2
+     Regen: likec4 gen d2 docs/diagrams/ -o docs/diagrams/architecture/ && d2 docs/diagrams/architecture/components.d2 docs/diagrams/architecture/components.svg -->
 
-```mermaid
-graph TD
-    subgraph Knowledge["Knowledge Layer"]
-        SK[Skills<br/>Domain expertise modules]
-        RL[Rules<br/>Declarative conventions]
-        CM[Commands<br/>User-invoked workflows]
-    end
-    subgraph Orchestration["Orchestration Layer"]
-        AG[Agent Pipeline<br/>12 specialized agents]
-        HK[Hooks<br/>Lifecycle enforcement]
-        AIWORK[".ai-work/<br/>Ephemeral pipeline docs"]
-    end
-    subgraph Intelligence["Persistent Intelligence Layer"]
-        MEM[Memory MCP<br/>Curated + observations]
-        CHR[Chronograph MCP<br/>OTel relay]
-        AIST[".ai-state/<br/>ADRs, specs, reports"]
-    end
-    subgraph Tooling["Tooling Layer"]
-        INS[Installers<br/>3 targets]
-        SCR[Scripts<br/>Worktrees, merge, Phoenix]
-        VER[Versioning<br/>Commitizen]
-    end
-    SK -.->|injected into| AG
-    AG -->|read/write| AIWORK
-    AG -->|persist| AIST
-    HK -->|enforce| AG
-    HK -.->|POST events| CHR
-    HK -->|inject context| MEM
-    CM -->|trigger| AG
-    RL -.->|shape behavior| AG
-    MEM -->|recall/remember| AIST
-    CHR -.->|OTLP| Phoenix["Phoenix<br/>(external)"]
-    INS -->|deploy| SK
-    INS -->|deploy| RL
-    INS -->|deploy| CM
-```
+<img src="diagrams/architecture/components.svg" alt="Praxion Components (L1)" />
+
+*LikeC4 source: [`docs/diagrams/architecture.c4`](diagrams/architecture.c4). The pre-commit hook (`scripts/diagram-regen-hook.sh`) regenerates the SVG above when the source changes.*
 
 | Component | Responsibility | Key Files |
 |-----------|---------------|-----------|

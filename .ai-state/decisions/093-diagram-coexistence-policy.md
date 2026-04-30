@@ -1,5 +1,5 @@
 ---
-id: dec-draft-05e16d0e
+id: dec-093
 title: Two-toolchain coexistence policy — LikeC4 for C4-architectural; Mermaid for everything else
 status: re-affirmation
 category: configuration
@@ -20,7 +20,7 @@ re_affirms: dec-028
 
 `rules/writing/diagram-conventions.md` currently declares: *"All diagrams in project documentation use **Mermaid** syntax. No other diagram format … is acceptable for committed documentation."* This rule was authored before the modeling-first / multi-view requirement emerged, and it is path-scoped (per dec-028 to documentation-authoring surfaces).
 
-Adopting LikeC4 + D2 for C4-architectural diagrams (per `dec-draft-55bf38a6`) requires a substantive change to the rule body. Without this change, the sentinel will flag every committed `.c4` and `.d2` file as a convention violation, and reviewers will reasonably challenge the new format.
+Adopting LikeC4 + D2 for C4-architectural diagrams (per `dec-095`) requires a substantive change to the rule body. Without this change, the sentinel will flag every committed `.c4` and `.d2` file as a convention violation, and reviewers will reasonably challenge the new format.
 
 A binary "switch all to LikeC4" or "ban Mermaid" decision is unwarranted: 21 of the 27 Mermaid diagrams in the repo (per the internal research fragment) are sequence diagrams, state machines, ER diagrams, generic flowcharts, or pipeline-topology maps for which Mermaid is the right tool. Migrating those would burn effort against zero benefit.
 

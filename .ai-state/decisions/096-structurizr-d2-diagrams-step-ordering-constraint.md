@@ -1,5 +1,5 @@
 ---
-id: dec-draft-1814704c
+id: dec-096
 title: Step ordering constraint — rule update must commit before any .c4/.d2 file
 status: proposed
 category: implementation
@@ -82,6 +82,6 @@ note, not a process change.
 
 ## Prior Decision
 
-This ADR re-affirms `dec-draft-05e16d0e` (coexistence policy) — the two-toolchain rule change
-is the prerequisite that makes the ordering constraint necessary. Without `dec-draft-05e16d0e`,
+This ADR re-affirms `dec-093` (coexistence policy) — the two-toolchain rule change
+is the prerequisite that makes the ordering constraint necessary. Without `dec-093`,
 there would be no need for a separate rule-update-first step.

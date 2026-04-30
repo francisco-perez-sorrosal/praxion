@@ -1,5 +1,5 @@
 ---
-id: dec-draft-9e43c4f6
+id: dec-094
 title: Commit both diagram source DSL and rendered SVG; regenerate via repo hook
 status: proposed
 category: configuration
@@ -21,7 +21,7 @@ affected_files:
 
 The user's confirmed scope explicitly requires both the source DSL/D2 *and* the rendered SVG/PNG to be committed, and asks for a hook-based regeneration mechanism. Three storage shapes were nonetheless on the table; the architect must record which is canonical, where artifacts live, and what the hook does on failure.
 
-The decision is downstream of the toolchain choice (`dec-draft-55bf38a6`); it re-affirms that decision in passing because the storage strategy presupposes LikeC4 source + D2 generated + D2-rendered SVG.
+The decision is downstream of the toolchain choice (`dec-095`); it re-affirms that decision in passing because the storage strategy presupposes LikeC4 source + D2 generated + D2-rendered SVG.
 
 ## Decision
 
@@ -79,4 +79,4 @@ A repo-local pre-commit hook detects staged changes to `**/diagrams/*.c4` and re
 
 ## Prior Decision
 
-This ADR re-affirms `dec-draft-55bf38a6` (toolchain choice) by presupposing it: storage paths and the hook command line both name LikeC4 and D2 specifically. Re-evaluating storage strategy without re-evaluating toolchain is not a reasonable cleavage; if the toolchain ADR is later superseded, this ADR's commands change but the *commit-both* policy carries over to whatever toolchain replaces LikeC4 + D2.
+This ADR re-affirms `dec-095` (toolchain choice) by presupposing it: storage paths and the hook command line both name LikeC4 and D2 specifically. Re-evaluating storage strategy without re-evaluating toolchain is not a reasonable cleavage; if the toolchain ADR is later superseded, this ADR's commands change but the *commit-both* policy carries over to whatever toolchain replaces LikeC4 + D2.

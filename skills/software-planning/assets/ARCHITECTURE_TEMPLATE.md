@@ -28,20 +28,41 @@
      May include planned external integrations with a note.
      Cross-reference docs/architecture.md for code-verified component details. -->
 
-```mermaid
-graph LR
-    subgraph External
-        User[User]
-        ExtAPI[External API]
-    end
-    subgraph System["[Project Name]"]
-        Core[Core Module]
-        DB[(Database)]
-    end
-    User --> Core
-    Core --> DB
-    Core -.->|async| ExtAPI
+<!-- After editing diagrams/architecture.c4, run scripts/diagram-regen-hook.sh (or commit to trigger pre-commit) to regenerate this SVG. -->
+<img src="diagrams/architecture/context.svg" alt="System Context (L0)" />
+
+<details>
+<summary>LikeC4 source (edit diagrams/architecture.c4 to update this diagram)</summary>
+
+```c4
+// System Context view — L0
+// Edit the shared .c4 model, then run the regeneration hook (pre-commit) or:
+//   likec4 gen d2 diagrams/architecture.c4 -o diagrams/architecture/
+//   d2 diagrams/architecture/context.d2 diagrams/architecture/context.svg
+specification {
+  element person
+  element system
+}
+
+model {
+  user = person "User" {
+    description "Primary actor"
+  }
+  mySystem = system "[System Name]" {
+    description "The system being documented"
+  }
+  user -> mySystem "uses"
+}
+
+views {
+  view context of mySystem {
+    title "System Context"
+    include *
+  }
+}
 ```
+
+</details>
 
 > **Component detail:** [Components](#3-components)
 
@@ -54,20 +75,50 @@ graph LR
      Status values: Designed (interface defined, not yet implemented), Built (code exists on disk),
      Planned (roadmap item, no interface yet), Deprecated (scheduled for removal). -->
 
-```mermaid
-graph TD
-    subgraph Core["Core Layer"]
-        A[Component A]
-        B[Component B]
-    end
-    subgraph Infrastructure["Infrastructure Layer"]
-        C[Component C]
-        D[(Storage)]
-    end
-    A --> B
-    B --> C
-    C --> D
+<!-- After editing diagrams/architecture.c4, run scripts/diagram-regen-hook.sh (or commit to trigger pre-commit) to regenerate this SVG. -->
+<img src="diagrams/architecture/components.svg" alt="Components (L1)" />
+
+<details>
+<summary>LikeC4 source (edit diagrams/architecture.c4 to update this diagram)</summary>
+
+```c4
+// Components view — L1
+// Edit the shared .c4 model, then run the regeneration hook (pre-commit) or:
+//   likec4 gen d2 diagrams/architecture.c4 -o diagrams/architecture/
+//   d2 diagrams/architecture/components.d2 diagrams/architecture/components.svg
+specification {
+  element person
+  element system
+  element component
+}
+
+model {
+  user = person "User" {
+    description "Primary actor"
+  }
+  mySystem = system "[System Name]" {
+    description "The system being documented"
+
+    coreLayer = component "Core Layer" {
+      description "Primary business logic"
+    }
+    infraLayer = component "Infrastructure Layer" {
+      description "Storage and external adapters"
+    }
+  }
+  user -> mySystem.coreLayer "calls"
+  mySystem.coreLayer -> mySystem.infraLayer "reads/writes"
+}
+
+views {
+  view components of mySystem {
+    title "Components"
+    include *
+  }
+}
 ```
+
+</details>
 
 | Component | Responsibility | Status | Key Files |
 |-----------|---------------|--------|-----------|

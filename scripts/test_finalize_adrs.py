@@ -761,6 +761,149 @@ class TestFinalizeEmptyDirectory:
         assert "nothing to do" in combined
 
 
+# -- Merge-range detection (td-011 fix) ---------------------------------------
+
+
+class TestDraftsAddedDetection:
+    """Verify _drafts_added_in_last_merge handles FF-merges spanning N commits.
+
+    Regression for td-011: under the prior `HEAD^1..HEAD` heuristic, FF-merges
+    that landed multiple commits at once would only diff the most recent commit
+    against its parent, missing drafts added in earlier commits of the FF range.
+    The reflog-based primary path uses HEAD@{1} so the diff covers every commit
+    landed by the most recent HEAD update.
+    """
+
+    def _stub_git(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        responses: dict[tuple[str, ...], str | None],
+    ) -> list[tuple[str, ...]]:
+        """Replace finalize.subprocess.run with a lookup-based stub.
+
+        responses maps the args tuple (after `git`) → stdout (or None for non-zero
+        exit). Returns a list that records every git invocation in call order so
+        the test can verify the function attempted reflog before falling back.
+        """
+        calls: list[tuple[str, ...]] = []
+
+        def _fake_run(
+            args: list[str], **_kwargs: Any
+        ) -> subprocess.CompletedProcess[str]:
+            assert args[0] == "git"
+            key = tuple(args[1:])
+            calls.append(key)
+            if key not in responses:
+                # Default: success with empty output keeps tests deterministic.
+                return subprocess.CompletedProcess(
+                    args=args, returncode=0, stdout="", stderr=""
+                )
+            stdout = responses[key]
+            if stdout is None:
+                return subprocess.CompletedProcess(
+                    args=args, returncode=128, stdout="", stderr="fatal"
+                )
+            return subprocess.CompletedProcess(
+                args=args, returncode=0, stdout=stdout, stderr=""
+            )
+
+        monkeypatch.setattr(finalize.subprocess, "run", _fake_run)
+        return calls
+
+    def test_reflog_path_captures_ff_merge_with_multiple_commits(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Reflog-based detection finds drafts in earlier commits of an FF range.
+
+        Simulates an FF-merge that landed 3 commits, each adding one draft.
+        Under the old heuristic, only the latest commit's draft would be seen.
+        With the reflog path, all three are detected.
+        """
+        responses = {
+            ("rev-parse", "--is-inside-work-tree"): "true",
+            ("rev-parse", "HEAD@{1}"): "abc123prev",
+            (
+                "log",
+                "--diff-filter=A",
+                "--name-only",
+                "--pretty=format:",
+                "abc123prev..HEAD",
+                "--",
+                ".ai-state/decisions/drafts/",
+            ): (
+                ".ai-state/decisions/drafts/20260508-1000-alice-feat-x-step-1.md\n"
+                ".ai-state/decisions/drafts/20260508-1010-alice-feat-x-step-2.md\n"
+                ".ai-state/decisions/drafts/20260508-1020-alice-feat-x-step-3.md\n"
+            ),
+        }
+        calls = self._stub_git(monkeypatch, responses)
+
+        result = finalize._drafts_added_in_last_merge()
+
+        assert result is not None
+        assert result == {
+            "20260508-1000-alice-feat-x-step-1.md",
+            "20260508-1010-alice-feat-x-step-2.md",
+            "20260508-1020-alice-feat-x-step-3.md",
+        }
+        # Reflog was consulted before any first-parent fallback.
+        assert ("rev-parse", "HEAD@{1}") in calls
+        # First-parent fallback was NOT exercised because the primary path succeeded.
+        assert ("rev-list", "--parents", "-n", "1", "HEAD") not in calls
+
+    def test_falls_back_to_first_parent_when_reflog_unavailable(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """When HEAD@{1} returns non-zero (no reflog), use first-parent detection.
+
+        Edge case: shallow clones or freshly initialized repos may have no prior
+        HEAD position recorded. The fallback preserves the old behavior so
+        true merge commits are still detected.
+        """
+        responses = {
+            ("rev-parse", "--is-inside-work-tree"): "true",
+            ("rev-parse", "HEAD@{1}"): None,  # reflog miss
+            ("rev-list", "--parents", "-n", "1", "HEAD"): "deadbeef parent_a parent_b",
+            (
+                "log",
+                "--diff-filter=A",
+                "--name-only",
+                "--pretty=format:",
+                "parent_a..HEAD",
+                "--",
+                ".ai-state/decisions/drafts/",
+            ): (".ai-state/decisions/drafts/20260508-1000-alice-feat-x-step-1.md\n"),
+        }
+        calls = self._stub_git(monkeypatch, responses)
+
+        result = finalize._drafts_added_in_last_merge()
+
+        assert result == {"20260508-1000-alice-feat-x-step-1.md"}
+        # Both paths were attempted: reflog first, then first-parent fallback.
+        assert ("rev-parse", "HEAD@{1}") in calls
+        assert ("rev-list", "--parents", "-n", "1", "HEAD") in calls
+
+    def test_returns_empty_set_for_root_commit(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Root commit (no parents) yields empty set, not None.
+
+        A None return signals "git unavailable / lookup failed" and triggers
+        a warning log; an empty set means "we looked and found nothing,"
+        which is the correct outcome for a fresh repo with no prior merges.
+        """
+        responses = {
+            ("rev-parse", "--is-inside-work-tree"): "true",
+            ("rev-parse", "HEAD@{1}"): None,  # no reflog yet
+            ("rev-list", "--parents", "-n", "1", "HEAD"): "rootcommit",  # no parent
+        }
+        self._stub_git(monkeypatch, responses)
+
+        result = finalize._drafts_added_in_last_merge()
+
+        assert result == set()
+
+
 # -- Locking ------------------------------------------------------------------
 
 

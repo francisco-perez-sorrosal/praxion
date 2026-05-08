@@ -396,13 +396,33 @@ def detect_drafts_to_promote(mode: str, branch: str | None) -> list[Path]:
 
 
 def _drafts_added_in_last_merge() -> set[str] | None:
-    """Detect drafts added by the most recent merge.
+    """Detect drafts added by the most recent HEAD advance (merge or FF).
 
-    Uses `HEAD^1..HEAD` when HEAD has two parents (a merge commit), falling
-    back to `HEAD~1..HEAD` for linear history.
+    Uses the reflog ``HEAD@{1}`` reference as the primary detection point
+    so the diff range captures every commit landed by the most recent
+    HEAD update — including fast-forward merges that span multiple
+    commits, where the parent-pointer alone (``HEAD^1``) only sees the
+    most recent commit and misses drafts added in earlier ones (td-011).
+
+    Falls back to first-parent detection when reflog lookup fails (e.g.,
+    shallow clones or freshly initialized repos with no prior HEAD).
     """
     if not _is_git_worktree():
         return None
+
+    # Primary: reflog. ``HEAD@{1}`` is the position of HEAD before its
+    # most recent update. Whether the advance was a true merge commit or
+    # a fast-forward of N commits, the diff prev_head..HEAD captures
+    # every newly-landed file.
+    prev_head = _git("rev-parse", "HEAD@{1}")
+    if prev_head is not None:
+        added = _diff_added_names(prev_head, "HEAD")
+        if added is not None:
+            return added
+
+    # Fallback: first-parent. Correct for true merge commits; under-
+    # detects on FF-merges that span multiple commits but is the safe
+    # last resort when reflog is unavailable.
     parents = _git("rev-list", "--parents", "-n", "1", "HEAD")
     if parents is None:
         return None

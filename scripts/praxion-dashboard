@@ -83,7 +83,7 @@ _get_pid() {
 _resolve_root_and_port() {
     local path_arg="${1:-$(pwd)}"
     local root
-    root="$(python3 -c "import os, sys; print(os.path.realpath('$path_arg'))" 2>/dev/null || cd "$path_arg" && pwd)"
+    root="$(cd "$path_arg" && pwd -P)"
     local port
     port="${PRAXION_DASHBOARD_PORT:-$(_derive_port "$root")}"
     echo "$root $port"
@@ -155,6 +155,7 @@ cmd_start() {
     printf "  Port:    %s\n" "$PORT"
 
     PRAXION_PROJECT_ROOT="$ROOT" \
+    PYTHONPATH="$PRAXION_ROOT${PYTHONPATH:+:$PYTHONPATH}" \
         "$VENV_DIR/bin/streamlit" run "$app_py" \
         --server.port "$PORT" \
         --server.address "127.0.0.1" \

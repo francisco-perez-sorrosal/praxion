@@ -5,9 +5,13 @@ with `@st.cache_data` keyed on (path_str, mtime).
 
 Convention 1 exception: this is the ONLY module under `streamlit_app/data/`
 that imports streamlit. The import is limited to `from streamlit import cache_data`.
-Convention 2: every ``cached_*`` function takes ``mtime: float`` as its
-cache-busting parameter.  The leading underscore tells Streamlit not to include
-the value in its internal hash — it acts as an external invalidation signal only.
+Convention 2: every ``cached_parse_*`` function takes ``mtime: float`` as its
+cache-busting parameter — note the parameter name does NOT start with an
+underscore. Streamlit excludes ``_``-prefixed args from the cache hash; using
+``_mtime`` would silently disable invalidation. The discovery wrappers below
+DO use a leading-underscore ``_now_bucket`` arg deliberately, paired with
+``ttl=15`` — that pattern is for unhashable cache-key contributors, not for
+file-content invalidation. See `rules/swe/dashboard-conventions.md` §2.
 
 Invalidation model
 ------------------

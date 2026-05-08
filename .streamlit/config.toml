@@ -1,0 +1,24 @@
+# Praxion Pipeline Dashboard — Streamlit theme & runtime config.
+#
+# Palette mirrors the legacy metrics viewer at
+# .ai-state/metrics_reports/index.html so the Streamlit dashboard reads
+# as the same product as the static HTML report. See
+# rules/swe/dashboard-conventions.md for the runtime invariants this
+# theme must coexist with (mtime-keyed caching, fragment-only refresh).
+
+[theme]
+base = "dark"
+primaryColor = "#7cc7ff"
+backgroundColor = "#0f1115"
+secondaryBackgroundColor = "#181b22"
+textColor = "#e6e8ee"
+font = "sans serif"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"

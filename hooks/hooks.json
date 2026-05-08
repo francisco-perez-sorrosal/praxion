@@ -27,6 +27,12 @@
             "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/auto_complete_install.py",
             "timeout": 35,
             "async": false
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/measure_context_surface.py 2>/dev/null",
+            "timeout": 5,
+            "async": true
           }
         ]
       }

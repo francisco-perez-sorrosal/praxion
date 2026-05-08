@@ -379,21 +379,89 @@ install_git_merge_infra() {
     # Blocks commits that leak specific .ai-state/ or .ai-work/ entries
     # into shipped surfaces (rules/, skills/, agents/, commands/,
     # claude/config/). Rationale: rules/swe/shipped-artifact-isolation.md.
+    #
+    # Idempotency contract (td-021 fix): the Praxion-managed block is wrapped
+    # in sentinel comments so a re-install replaces JUST that block, leaving
+    # any user-authored content above/below untouched. Four paths:
+    #   (1) no pre-commit on disk          -> write fresh, sentinel-wrapped
+    #   (2) sentinels already present       -> in-place replace block content
+    #   (3) legacy Praxion content (no sent) -> warn + append new wrapped block
+    #   (4) user pre-commit, no Praxion yet -> append wrapped block, preserve user
+    install_praxion_pre_commit "$repo_root"
+}
+
+# Sentinel comments delimit the Praxion-managed pre-commit block. Anything
+# between these markers is owned by Praxion and may be replaced verbatim on
+# re-install; anything outside is user-owned and never touched.
+PRAXION_PRECOMMIT_SENTINEL_START="# >>> Praxion shipped-artifact isolation (managed; do not edit between sentinels) >>>"
+PRAXION_PRECOMMIT_SENTINEL_END="# <<< Praxion shipped-artifact isolation <<<"
+
+install_praxion_pre_commit() {
+    local repo_root="$1"
     local precommit_src="${SCRIPT_DIR}/scripts/git-pre-commit-hook.sh"
     local precommit_dst="${repo_root}/.git/hooks/pre-commit"
 
-    if [ -f "$precommit_src" ]; then
-        # Preserve existing pre-commit hook if present
-        if [ -f "$precommit_dst" ] && ! grep -q "check_shipped_artifact_isolation" "$precommit_dst" 2>/dev/null; then
-            warn "Existing pre-commit hook found — appending isolation check"
-            printf '\n# Praxion shipped-artifact isolation check\n' >> "$precommit_dst"
-            cat "$precommit_src" >> "$precommit_dst"
-        else
-            cp "$precommit_src" "$precommit_dst"
-        fi
-        chmod +x "$precommit_dst"
-        info "Pre-commit hook: shipped-artifact isolation check"
+    [ -f "$precommit_src" ] || return 0
+
+    # The source script's body without its shebang — the shebang lives once
+    # at the top of the destination file.
+    local praxion_body
+    praxion_body="$(tail -n +2 "$precommit_src")"
+
+    if [ ! -f "$precommit_dst" ]; then
+        # Path (1): write fresh, sentinel-wrapped from the start.
+        {
+            printf '#!/usr/bin/env bash\n'
+            printf '%s\n%s\n%s\n' \
+                "$PRAXION_PRECOMMIT_SENTINEL_START" \
+                "$praxion_body" \
+                "$PRAXION_PRECOMMIT_SENTINEL_END"
+        } > "$precommit_dst"
+        info "Pre-commit hook: installed (fresh, sentinel-wrapped)"
+    elif grep -qF "$PRAXION_PRECOMMIT_SENTINEL_START" "$precommit_dst"; then
+        # Path (2): sentinels found — in-place replace just the managed block.
+        # Python is available everywhere install_claude.sh runs (used elsewhere).
+        python3 - \
+            "$precommit_dst" \
+            "$PRAXION_PRECOMMIT_SENTINEL_START" \
+            "$PRAXION_PRECOMMIT_SENTINEL_END" \
+            "$praxion_body" <<'PY'
+import sys
+dst, start_marker, end_marker, body = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+with open(dst, "r", encoding="utf-8") as f:
+    text = f.read()
+i = text.find(start_marker)
+j = text.find(end_marker, i)
+if i == -1 or j == -1 or j < i:
+    sys.stderr.write("install_claude.sh: pre-commit sentinels malformed; refusing to replace\n")
+    sys.exit(1)
+new_block = f"{start_marker}\n{body}\n{end_marker}"
+new_text = text[:i] + new_block + text[j + len(end_marker):]
+with open(dst, "w", encoding="utf-8") as f:
+    f.write(new_text)
+PY
+        info "Pre-commit hook: Praxion block updated in-place (user content preserved)"
+    elif grep -q "check_shipped_artifact_isolation" "$precommit_dst"; then
+        # Path (3): legacy Praxion content from before sentinels existed.
+        # We cannot safely identify the old block's boundaries — appending the
+        # new wrapped block is safer than overwriting. Operator removes the
+        # legacy block manually.
+        warn "Existing pre-commit hook contains a legacy Praxion block (no sentinels)"
+        warn "Appending sentinel-wrapped block; remove the legacy block manually after verifying"
+        printf '\n%s\n%s\n%s\n' \
+            "$PRAXION_PRECOMMIT_SENTINEL_START" \
+            "$praxion_body" \
+            "$PRAXION_PRECOMMIT_SENTINEL_END" >> "$precommit_dst"
+    else
+        # Path (4): user pre-commit exists, no Praxion content yet — append.
+        printf '\n%s\n%s\n%s\n' \
+            "$PRAXION_PRECOMMIT_SENTINEL_START" \
+            "$praxion_body" \
+            "$PRAXION_PRECOMMIT_SENTINEL_END" >> "$precommit_dst"
+        info "Pre-commit hook: Praxion block appended (user content preserved)"
     fi
+
+    chmod +x "$precommit_dst"
 }
 
 # =============================================================================

@@ -408,8 +408,10 @@ By default, the Codex install generates Codex custom-agent wrappers under the
 target project's `.codex/agents/`. These wrappers are intentionally thin: each
 one points back to the canonical Praxion agent file instead of copying the full
 body, so agent behavior stays source-of-truth aligned with Claude and Cursor.
-It also symlinks Praxion skills into the project `.agents/skills/` directory,
-which is Codex's native project skill discovery path.
+It also generates compact Codex skill wrappers under the project
+`.agents/skills/` directory, which is Codex's native project skill discovery
+path. The wrappers keep startup metadata within Codex limits and point back to
+canonical Praxion skills on activation.
 Use `--compat-only` only for non-Codex AGENTS.md-aware tools or when debugging
 the bootstrap pointer without native Codex surfaces.
 

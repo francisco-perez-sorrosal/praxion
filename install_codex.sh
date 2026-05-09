@@ -128,7 +128,8 @@ architect-validator, doc-engineer, sentinel, skill-genesis, cicd-engineer, and
 roadmap-cartographer.
 
 Praxion skills are exposed to Codex through project-local \`.agents/skills\`
-symlinks. Load matching skills on demand; do not copy skill bodies.
+wrapper skills. Load matching skills on demand; canonical skill files remain
+the source of truth.
 
 Do not copy Praxion rules, skills, commands, or agents into this file. Keep this
 adapter small and update Praxion at the source.
@@ -240,25 +241,9 @@ install_native_codex() {
     python3 "$PRAXION_ROOT/codex/config/export-codex-agents.py" \
         --repo-root "$PRAXION_ROOT" \
         --out-dir "$CODEX_AGENTS_DIR" >/dev/null
-    install_codex_skills
-}
-
-install_codex_skills() {
-    local skill_name source_dir target_link
-    mkdir -p "$AGENT_SKILLS_DIR"
-    while IFS= read -r skill_name; do
-        [ -n "$skill_name" ] || continue
-        source_dir="$PRAXION_ROOT/skills/$skill_name"
-        target_link="$AGENT_SKILLS_DIR/$skill_name"
-        if [ -e "$target_link" ] || [ -L "$target_link" ]; then
-            if [ -L "$target_link" ] && [ "$(readlink "$target_link")" = "$source_dir" ]; then
-                continue
-            fi
-            warn "Skipping existing non-Praxion skill path: $target_link"
-            continue
-        fi
-        ln -s "$source_dir" "$target_link"
-    done < <(praxion_skill_names)
+    python3 "$PRAXION_ROOT/codex/config/export-codex-skills.py" \
+        --repo-root "$PRAXION_ROOT" \
+        --out-dir "$AGENT_SKILLS_DIR" >/dev/null
 }
 
 uninstall_native_codex() {
@@ -270,26 +255,26 @@ uninstall_native_codex() {
     rmdir "$CODEX_AGENTS_DIR" 2>/dev/null || true
     rmdir "$CODEX_DIR" 2>/dev/null || true
     uninstall_codex_skills
+    rmdir "$TARGET_ROOT/.agents" 2>/dev/null || true
 }
 
 uninstall_codex_skills() {
     [ -d "$AGENT_SKILLS_DIR" ] || return 0
-    local skill_name source_dir target_link
+    local skill_name wrapper_file
     while IFS= read -r skill_name; do
         [ -n "$skill_name" ] || continue
-        source_dir="$PRAXION_ROOT/skills/$skill_name"
-        target_link="$AGENT_SKILLS_DIR/$skill_name"
-        if [ -L "$target_link" ] && [ "$(readlink "$target_link")" = "$source_dir" ]; then
-            rm -f "$target_link"
+        wrapper_file="$AGENT_SKILLS_DIR/$skill_name/SKILL.md"
+        if [ -f "$wrapper_file" ] && grep -qF "This is a Codex skill wrapper for Praxion." "$wrapper_file"; then
+            rm -f "$wrapper_file"
+            rmdir "$AGENT_SKILLS_DIR/$skill_name" 2>/dev/null || true
         fi
     done < <(praxion_skill_names)
     rmdir "$AGENT_SKILLS_DIR" 2>/dev/null || true
-    rmdir "$TARGET_ROOT/.agents" 2>/dev/null || true
 }
 
 check_native_codex() {
     local researcher_file="$CODEX_AGENTS_DIR/researcher.toml"
-    local software_planning_link="$AGENT_SKILLS_DIR/software-planning"
+    local software_planning_skill="$AGENT_SKILLS_DIR/software-planning/SKILL.md"
     if [ ! -f "$researcher_file" ]; then
         warn "Codex native agent missing: $researcher_file"
         return 1
@@ -298,16 +283,16 @@ check_native_codex() {
         warn "Codex researcher wrapper is stale: $researcher_file"
         return 1
     fi
-    if [ ! -L "$software_planning_link" ]; then
-        warn "Codex skill symlink missing: $software_planning_link"
+    if [ ! -f "$software_planning_skill" ]; then
+        warn "Codex skill wrapper missing: $software_planning_skill"
         return 1
     fi
-    if [ "$(readlink "$software_planning_link")" != "$PRAXION_ROOT/skills/software-planning" ]; then
-        warn "Codex skill symlink stale: $software_planning_link"
+    if ! grep -qF '`skills/software-planning/SKILL.md`' "$software_planning_skill"; then
+        warn "Codex skill wrapper stale: $software_planning_skill"
         return 1
     fi
     info "Codex native agents present in $CODEX_AGENTS_DIR"
-    info "Codex skills linked in $AGENT_SKILLS_DIR"
+    info "Codex skill wrappers present in $AGENT_SKILLS_DIR"
 }
 
 header "Codex / AGENTS.md Adapter"
@@ -326,7 +311,7 @@ if $DO_DRY_RUN; then
     fi
     if $DO_NATIVE; then
         step "Would export Praxion agents to $CODEX_AGENTS_DIR"
-        step "Would link Praxion skills into $AGENT_SKILLS_DIR"
+        step "Would export Praxion skill wrappers to $AGENT_SKILLS_DIR"
     fi
     exit 0
 fi
@@ -360,6 +345,6 @@ info "Praxion adapter installed in $AGENTS_FILE"
 if $DO_NATIVE; then
     install_native_codex
     info "Codex native agents exported to $CODEX_AGENTS_DIR"
-    info "Codex skills linked in $AGENT_SKILLS_DIR"
+    info "Codex skill wrappers exported to $AGENT_SKILLS_DIR"
 fi
 step "Start a fresh AGENTS.md-aware agent session in the target project to auto-load it."

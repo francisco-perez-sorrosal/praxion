@@ -19,3 +19,17 @@ The exporter preserves:
 It intentionally does not translate Claude-specific tool, hook, permission,
 memory, or model frontmatter yet. Those fields have different Codex semantics
 and need explicit design instead of lossy copying.
+
+## Skill Export
+
+`export-codex-skills.py` converts `skills/*/SKILL.md` into Codex skill wrappers
+under a target `.agents/skills/` directory.
+
+The exporter preserves:
+
+- the canonical skill name
+- a compact description that fits Codex startup limits
+- a thin wrapper body that points back to `skills/<name>/SKILL.md`
+
+It intentionally does not copy canonical skill bodies into the wrapper. Codex
+loads the wrapper at startup and can read the canonical skill on activation.

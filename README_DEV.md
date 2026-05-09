@@ -265,17 +265,18 @@ contract and points agents back to canonical source artifacts.
 The Codex installer writes that project-local adapter block and, by default,
 adds generated Codex custom-agent wrappers under the target project's
 `.codex/agents/`; those wrappers point back to canonical `agents/*.md` files
-instead of copying their bodies. It also symlinks canonical Praxion skills into
-the target project's `.agents/skills/` directory. It does not yet install hooks,
-configure MCP, create `.ai-state/`, or export slash commands. Those surfaces
-require explicit tool-specific adapters:
+instead of copying their bodies. It also generates compact Codex skill wrappers
+under the target project's `.agents/skills/` directory, pointing back to
+canonical `skills/*/SKILL.md` files while keeping startup metadata within Codex
+limits. It does not yet install hooks, configure MCP, create `.ai-state/`, or
+export slash commands. Those surfaces require explicit tool-specific adapters:
 
 | Surface | Native adapter needed |
 |---|---|
 | `commands/*.md` | Slash-command exporter or installer |
 | `agents/*.md` | `install_codex.sh` generates thin `.codex/agents/*.toml` wrappers by default |
 | `rules/**/*.md` frontmatter | Path matcher and rule loader |
-| `skills/*/SKILL.md` metadata | `install_codex.sh` symlinks project `.agents/skills/*` by default; user-global `$HOME/.agents/skills` is later work |
+| `skills/*/SKILL.md` metadata | `install_codex.sh` generates project `.agents/skills/*` wrappers by default; user-global `$HOME/.agents/skills` is later work |
 | MCP servers | Target framework MCP config writer |
 | hooks | Target framework lifecycle hook integration |
 

@@ -269,8 +269,9 @@ instead of copying their bodies. It also generates Codex skill wrappers
 under the target project's `.agents/skills/` directory, pointing back to
 canonical `skills/*/SKILL.md` files while preserving the full skill
 description in the wrapper metadata. Adapter fidelity matters here: preserve
-canonical Praxion wording for agent and skill metadata unless a hard platform
-constraint forces a lossless transformation.
+canonical Praxion wording for agent and skill metadata. If Codex warns that
+skill descriptions were shortened to fit its startup budget, accept that
+runtime warning instead of pre-trimming generated wrappers.
 
 For rules, the installer now generates a **Codex rules bridge** rather than a
 lossy direct export to native `.codex/rules/`:
@@ -279,7 +280,12 @@ lossy direct export to native `.codex/rules/`:
 - `.codex/hooks/praxion-*.py` route always-on, prompt-scoped, and file-scoped
   rule matches back to canonical `rules/**/*.md`
 - `.codex/hooks.json` registers those Praxion-managed hooks
-- `.codex/config.toml` is updated surgically to enable `codex_hooks = true`
+- `.codex/config.toml` is updated surgically to enable `hooks = true` and
+  remove deprecated `codex_hooks` entries
+
+Codex still treats newly installed project-local hooks as reviewable security
+surfaces, so a fresh target project may show pending hook review in `/hooks`
+until the user approves those generated commands.
 
 This is intentionally different from native Codex `.rules`, which remain the
 surface for command approval / sandbox policy semantics. The Praxion rule

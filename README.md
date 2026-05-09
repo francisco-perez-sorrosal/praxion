@@ -410,7 +410,9 @@ body, so agent behavior stays source-of-truth aligned with Claude and Cursor.
 It also generates Codex skill wrappers under the project `.agents/skills/`
 directory, which is Codex's native project skill discovery path. The wrappers
 preserve the canonical skill description in their metadata and point back to
-canonical Praxion skills on activation.
+canonical Praxion skills on activation. Codex may warn that skill descriptions
+were shortened to fit its startup budget; that runtime warning is preferred
+over pre-trimming Praxion's canonical descriptions.
 
 For rules, the Codex install now generates a Praxion-managed rules bridge under
 the target project's `.codex/` directory:
@@ -419,7 +421,12 @@ the target project's `.codex/` directory:
 - `.codex/hooks/praxion-*.py` inject always-on, prompt-scoped, and file-scoped
   Praxion rule routing
 - `.codex/hooks.json` registers those Praxion-managed hooks
-- `.codex/config.toml` is updated surgically to enable Codex hooks
+- `.codex/config.toml` is updated surgically to enable Codex hooks and remove
+  the deprecated `codex_hooks` flag
+
+Codex may still require one-time manual review of newly installed project-local
+hooks via `/hooks`; that review is a Codex security gate, not a Praxion drift
+condition.
 
 This preserves the original semantics of Praxion's Claude-style semantic rules
 without repurposing native Codex `.rules`, which remain reserved for approval

@@ -46,6 +46,10 @@ Praxion worktree home, `.claude/worktrees/<slug>/`, for isolated work.
 - Preserve canonical wording when adapting Praxion skills or agents to another
   tool. Do not truncate, summarize, or rewrite source text unless a hard
   platform constraint makes that unavoidable.
+- For Codex skill wrappers specifically, preserve the full canonical skill
+  `description` metadata. Codex may warn that descriptions were shortened to
+  fit its startup skill budget; accept that runtime warning rather than
+  pre-trimming Praxion's source descriptions or generated wrappers.
 - Do not modify `~/.claude/plugins/cache/`; edit source files in this repo.
 - Keep assistant-specific configuration in assistant-specific directories.
   Shared assets remain at the repository root.

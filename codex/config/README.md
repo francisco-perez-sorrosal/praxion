@@ -75,7 +75,8 @@ codex:
 `manage-codex-rules-bridge.py` installs, checks, and uninstalls the
 Praxion-managed Codex rule bridge state in a target project:
 
-- ensures `.codex/config.toml` has `codex_hooks = true`
+- ensures `.codex/config.toml` has `hooks = true` and removes deprecated
+  `codex_hooks` entries during install
 - merges Praxion-managed hook registrations into `.codex/hooks.json`
 - preserves non-Praxion Codex config and hook entries
 - removes only Praxion-managed entries during uninstall

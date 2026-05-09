@@ -15,6 +15,8 @@ STATE_DIR = Path(".codex/praxion")
 STATE_FILE = STATE_DIR / "config_state.json"
 HOOKS_FILE = Path(".codex/hooks.json")
 CONFIG_FILE = Path(".codex/config.toml")
+HOOKS_FEATURE_KEY = "hooks"
+LEGACY_HOOKS_FEATURE_KEY = "codex_hooks"
 
 
 def load_rules_bridge_exporter(repo_root: Path):
@@ -155,9 +157,9 @@ def find_features_section(lines: list[str]) -> tuple[int | None, int | None]:
     return section_start, section_end
 
 
-def find_codex_hooks_line(lines: list[str], start: int, end: int) -> int | None:
+def find_feature_line(lines: list[str], start: int, end: int, key: str) -> int | None:
     for index in range(start, end):
-        if re.match(r"^\s*codex_hooks\s*=\s*(true|false)\s*$", lines[index]):
+        if re.match(rf"^\s*{re.escape(key)}\s*=\s*(true|false)\s*$", lines[index]):
             return index
     return None
 
@@ -170,14 +172,19 @@ def install_config(project_root: Path) -> None:
     if state is None:
         lines = original_text.splitlines()
         start, end = find_features_section(lines)
-        original_value = None
+        original_hooks_value = None
+        original_legacy_value = None
         if start is not None and end is not None:
-            line_index = find_codex_hooks_line(lines, start + 1, end)
+            line_index = find_feature_line(lines, start + 1, end, HOOKS_FEATURE_KEY)
             if line_index is not None:
-                original_value = "true" in lines[line_index]
+                original_hooks_value = "true" in lines[line_index]
+            legacy_line_index = find_feature_line(lines, start + 1, end, LEGACY_HOOKS_FEATURE_KEY)
+            if legacy_line_index is not None:
+                original_legacy_value = "true" in lines[legacy_line_index]
         state = {
             "config_original_exists": original_exists,
-            "config_original_codex_hooks": original_value,
+            "config_original_hooks": original_hooks_value,
+            "config_original_codex_hooks": original_legacy_value,
         }
         save_state(project_root, state)
 
@@ -187,13 +194,18 @@ def install_config(project_root: Path) -> None:
         new_text = original_text.rstrip()
         if new_text:
             new_text += "\n\n"
-        new_text += "[features]\ncodex_hooks = true\n"
+        new_text += f"[features]\n{HOOKS_FEATURE_KEY} = true\n"
     else:
-        line_index = find_codex_hooks_line(lines, start + 1, end)
+        legacy_line_index = find_feature_line(lines, start + 1, end, LEGACY_HOOKS_FEATURE_KEY)
+        if legacy_line_index is not None:
+            del lines[legacy_line_index]
+            if legacy_line_index < end:
+                end -= 1
+        line_index = find_feature_line(lines, start + 1, end, HOOKS_FEATURE_KEY)
         if line_index is None:
-            lines.insert(start + 1, "codex_hooks = true")
+            lines.insert(start + 1, f"{HOOKS_FEATURE_KEY} = true")
         else:
-            lines[line_index] = "codex_hooks = true"
+            lines[line_index] = f"{HOOKS_FEATURE_KEY} = true"
         new_text = "\n".join(lines).rstrip() + "\n"
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(new_text, encoding="utf-8")
@@ -206,26 +218,42 @@ def uninstall_config(project_root: Path) -> None:
         return
 
     original_exists = state.get("config_original_exists", False)
-    original_value = state.get("config_original_codex_hooks", None)
+    original_hooks_value = state.get("config_original_hooks", None)
+    original_legacy_value = state.get("config_original_codex_hooks", None)
 
     if config_path.exists():
         lines = config_path.read_text(encoding="utf-8").splitlines()
         start, end = find_features_section(lines)
         if start is not None and end is not None:
-            line_index = find_codex_hooks_line(lines, start + 1, end)
-            if original_value is None:
+            line_index = find_feature_line(lines, start + 1, end, HOOKS_FEATURE_KEY)
+            if original_hooks_value is None:
                 if line_index is not None:
                     del lines[line_index]
                     end -= 1
-                feature_has_content = any(lines[index].strip() for index in range(start + 1, end))
-                if not feature_has_content:
-                    del lines[start:end]
             else:
-                restored = "true" if original_value else "false"
+                restored = "true" if original_hooks_value else "false"
                 if line_index is None:
-                    lines.insert(start + 1, f"codex_hooks = {restored}")
+                    lines.insert(start + 1, f"{HOOKS_FEATURE_KEY} = {restored}")
+                    end += 1
                 else:
-                    lines[line_index] = f"codex_hooks = {restored}"
+                    lines[line_index] = f"{HOOKS_FEATURE_KEY} = {restored}"
+
+            legacy_line_index = find_feature_line(lines, start + 1, end, LEGACY_HOOKS_FEATURE_KEY)
+            if original_legacy_value is None:
+                if legacy_line_index is not None:
+                    del lines[legacy_line_index]
+                    end -= 1
+            else:
+                restored = "true" if original_legacy_value else "false"
+                if legacy_line_index is None:
+                    lines.insert(start + 1, f"{LEGACY_HOOKS_FEATURE_KEY} = {restored}")
+                    end += 1
+                else:
+                    lines[legacy_line_index] = f"{LEGACY_HOOKS_FEATURE_KEY} = {restored}"
+
+            feature_has_content = any(lines[index].strip() for index in range(start + 1, end))
+            if not feature_has_content:
+                del lines[start:end]
 
         new_text = "\n".join(lines).strip()
         if new_text:
@@ -252,13 +280,16 @@ def check_config(project_root: Path) -> tuple[bool, list[str]]:
     lines = config_path.read_text(encoding="utf-8").splitlines()
     start, end = find_features_section(lines)
     if start is None or end is None:
-        return False, ["Codex config missing [features] section for codex_hooks"]
+        return False, ["Codex config missing [features] section for hooks"]
 
-    line_index = find_codex_hooks_line(lines, start + 1, end)
+    line_index = find_feature_line(lines, start + 1, end, HOOKS_FEATURE_KEY)
     if line_index is None:
-        return False, ["Codex config missing codex_hooks = true"]
+        return False, ["Codex config missing hooks = true"]
     if "true" not in lines[line_index]:
-        return False, ["Codex config has stale codex_hooks setting"]
+        return False, ["Codex config has stale hooks setting"]
+    legacy_line_index = find_feature_line(lines, start + 1, end, LEGACY_HOOKS_FEATURE_KEY)
+    if legacy_line_index is not None:
+        return False, ["Codex config still contains deprecated codex_hooks setting"]
     return True, []
 
 

@@ -35,7 +35,8 @@ def test_install_codex_exports_canonical_paths_and_check_passes(tmp_path: Path):
     assert (project_dir / ".codex" / "praxion" / "rules_manifest.json").exists()
     assert (project_dir / ".codex" / "hooks.json").exists()
     config_text = (project_dir / ".codex" / "config.toml").read_text(encoding="utf-8")
-    assert "codex_hooks = true" in config_text
+    assert "hooks = true" in config_text
+    assert "codex_hooks" not in config_text
 
     check = run_install(str(project_dir), "--check")
     assert check.returncode == 0, check.stderr or check.stdout
@@ -95,7 +96,10 @@ def test_install_codex_uninstall_preserves_user_codex_config_and_hooks(tmp_path:
     project_dir.mkdir()
     codex_dir = project_dir / ".codex"
     codex_dir.mkdir()
-    (codex_dir / "config.toml").write_text('[features]\nother_flag = true\ncodex_hooks = false\n', encoding="utf-8")
+    (codex_dir / "config.toml").write_text(
+        '[features]\nother_flag = true\nhooks = false\ncodex_hooks = false\n',
+        encoding="utf-8",
+    )
     (codex_dir / "hooks.json").write_text(
         '{\n  "hooks": {\n    "SessionStart": [\n      {\n        "hooks": [\n          {\n            "type": "command",\n            "command": "python3 user-hook.py",\n            "statusMessage": "User hook"\n          }\n        ]\n      }\n    ]\n  }\n}\n',
         encoding="utf-8",
@@ -106,7 +110,8 @@ def test_install_codex_uninstall_preserves_user_codex_config_and_hooks(tmp_path:
 
     installed_config = (codex_dir / "config.toml").read_text(encoding="utf-8")
     assert "other_flag = true" in installed_config
-    assert "codex_hooks = true" in installed_config
+    assert "hooks = true" in installed_config
+    assert "codex_hooks" not in installed_config
     hooks_text = (codex_dir / "hooks.json").read_text(encoding="utf-8")
     assert "python3 user-hook.py" in hooks_text
     assert "praxion-session-start.py" in hooks_text
@@ -116,6 +121,7 @@ def test_install_codex_uninstall_preserves_user_codex_config_and_hooks(tmp_path:
 
     final_config = (codex_dir / "config.toml").read_text(encoding="utf-8")
     assert "other_flag = true" in final_config
+    assert "hooks = false" in final_config
     assert "codex_hooks = false" in final_config
     final_hooks = (codex_dir / "hooks.json").read_text(encoding="utf-8")
     assert "python3 user-hook.py" in final_hooks

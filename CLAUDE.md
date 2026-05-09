@@ -1,57 +1,112 @@
 # Praxion
 
-The operational infrastructure for the development philosophy defined in `~/.claude/CLAUDE.md`. This repo provides the skills, agents, rules, commands, and MCP servers that make the philosophy actionable across projects.
+The operational infrastructure for the development philosophy in `~/.claude/CLAUDE.md`. This repo provides the skills, agents, rules, commands, and MCP servers that make the philosophy actionable across projects.
 
-## How the Ecosystem Serves the Philosophy
+## Agent reading order
 
-See the mapping table in `~/.claude/CLAUDE.md` under "The Ecosystem as Philosophy's Implementation." This repo is where those components live — skills, agents, rules, commands, and MCP servers are all authored and maintained here.
+1. **CLAUDE.md** (this file) — Praxion-specific agent baseline
+2. **`rules/**/*.md` without `paths:` frontmatter** — always-on conventions (coordination protocol, behavioral contract, ADR conventions, agent intermediate documents, model routing, memory protocol, git conventions)
+3. **`rules/**/*.md` with `paths:` frontmatter** — load when matching files are touched (diagram conventions, coding style, dashboard conventions, PR conventions, etc.)
+4. **`skills/<name>/SKILL.md`** — load when description matches the task
+5. **`skills/<name>/references/*.md`** — on demand from the skill body
+6. **`.ai-state/DESIGN.md`** — when reasoning about Praxion's system design
+7. **`docs/architecture.md`** — when navigating the code-verified component map
 
-## Working Here
+## Build / test / lint
 
-- Load the matching crafting skill before modifying any component: `skill-crafting` for skills, `agent-crafting` for agents, `command-crafting` for commands, `rule-crafting` for rules
-- **Never modify `~/.claude/plugins/cache/`** — edit source files in this repo; installed copies get overwritten on reinstall
-- **Token budget**: Always-loaded content (CLAUDE.md files + rules) must stay under 25,000 tokens (~87,500 chars) as a failure-mode guardrail — the principle is that every always-loaded token must earn its attention share (applied in >30% of sessions, or unconditionally relevant). Prefer skills with reference files for procedural content; reserve rules for declarative domain knowledge.
-- **Worktrees** use `.claude/worktrees/<name>/`. Pipeline worktrees via `EnterWorktree`; scratch worktrees via `/create-worktree`. Both share the same home. ADRs created in a pipeline land as fragments under `.ai-state/decisions/drafts/` and are promoted to stable `dec-NNN` at merge-to-main by `scripts/finalize_adrs.py`. PR-adjacent workflow conventions live in `rules/swe/vcs/pr-conventions.md` (path-scoped)
-- **Onboarding artifacts dogfooding**: Praxion uses its own onboarding tools — Praxion's `.ai-state/`, `.gitattributes`, git hooks, and `CLAUDE.md` blocks are all results of the patterns `/onboard-project` applies to user projects. When updating `/onboard-project` or `/new-project`, verify the change still produces what Praxion itself has on disk (or, if the update is meant to evolve the contract, propose what changes Praxion's own state needs)
-- **Dashboard**: `streamlit_app/` — multi-page Streamlit control room reading `.ai-state/` and `.ai-work/` artifacts. Launch via `/dashboard`; manage via `scripts/praxion-dashboard`.
-- See `README.md` for user-facing docs, `README_DEV.md` for contributor conventions, `skills/README.md` for the skill catalog, `docs/greenfield-onboarding.md` + `docs/existing-project-onboarding.md` for the two onboarding paths
+- `bash install.sh` — install plugin to `~/.claude` (registers rules, hooks, settings)
+- `bash install.sh --check` — verify install without applying
+- `python3 -m pytest tests/ -q` — Praxion's own tests
+- `cd eval && PYTHONPATH=src python3 -m pytest -q` — eval framework tests
+- `python3 -m pytest scripts/test_finalize_adrs.py -q` — ADR finalize tests
+- `python3 scripts/sync_canonical_blocks.py --check` — verify shipped blocks are in sync
+- `streamlit run streamlit_app/app.py` (or `/dashboard` from a Claude Code session)
 
-## Session Protocol
+## Repository layout
 
-At session start, call `session_start` on the memory MCP to load context about the user, project conventions, and past learnings (Recall). Store discoveries proactively during the session (Learn). Apply past insights to current tasks (Apply). This implements the Learning Loop from the global philosophy.
+| Path | Purpose |
+|---|---|
+| `agents/` | Subagent definitions; pipeline overview in `agents/README.md` |
+| `commands/` | Slash commands; catalog in `commands/README.md` |
+| `skills/` | Domain expertise + references; catalog in `skills/README.md` |
+| `rules/` | Always-loaded + path-scoped conventions; catalog in `rules/README.md` |
+| `hooks/` | Hook scripts |
+| `claude/canonical-blocks/` | Source of truth for content shipped into managed projects (sync via `scripts/sync_canonical_blocks.py`) |
+| `claude/aac-templates/` | Architecture-as-Code templates installed by `/onboard-project` |
+| `streamlit_app/` | Multi-page dashboard reading `.ai-state/` and `.ai-work/` |
+| `docs/` | Long-form human-facing documentation, Diátaxis-shaped (index in `docs/README.md`) |
+| `.ai-state/` | Persistent project intelligence (committed) — `DESIGN.md`, `decisions/`, sentinel reports, tech-debt ledger |
+| `.ai-work/` | Ephemeral pipeline intermediates (gitignored) |
+| `tests/` | Test suites |
+| `scripts/` | Operational scripts (install, sync, finalize) — see `scripts/CLAUDE.md` when working there |
+| `eval/` | Out-of-band quality eval framework |
+| `memory-mcp/` | Memory MCP server (when enabled) |
 
-If `memories.assistant.name` is missing, pick a random name and store it immediately. Be curious about the user — learn their interests, background, and working style over time.
+## Critical conventions
 
-## Onboarding (Praxion → User Project)
+- **Token budget**: always-loaded content (CLAUDE.md files + always-on rules) stays under **25,000 tokens** (~87,500 chars). Adding to it requires `wc -c` measurement. The principle is that every always-loaded token must earn its attention share (applied in >30% of sessions, or unconditionally relevant). Prefer skills with reference files for procedural content; reserve rules for declarative domain knowledge.
+- **Never modify `~/.claude/plugins/cache/`** — edit source files here; installed copies overwrite on reinstall.
+- **No AI authorship** in commit messages — see `rules/swe/vcs/git-conventions.md`.
+- **Build output to `/dev/null`**, temp files in `tmp/` (gitignored), debug prints prefixed `# DEBUG:` for grep-removal.
+- **Praxion-specific principles** (extend `~/.claude/CLAUDE.md`): token budget first-class, measure before optimize, standards convergence as opportunity, curiosity over dogma. Full rationale in `README.md#guiding-principles`.
+- **Assistant-agnostic shared assets** at repo root (`skills/`, `commands/`, `agents/`); assistant-specific config in subdirectories (`claude/config/`, `cursor/config/`).
+- **Progressive disclosure** in skills (metadata at startup, body on activation, references on demand) is a load-bearing pattern — preserve it when crafting new skills.
+- **Memory MCP disabled for Praxion** (`PRAXION_DISABLE_MEMORY_MCP=1`): skip `remember`, `recall`, `search`, `browse_index` calls. The protocol in `rules/swe/memory-protocol.md` applies when memory is available; here it is not.
 
-Praxion ships **two onboarding paths** that converge on the same end state — `.gitignore` block, `.ai-state/` skeleton, `.gitattributes` + merge drivers, git hooks, `.claude/settings.json` toggles, three `CLAUDE.md` blocks (Agent Pipeline + Compaction Guidance + Behavioral Contract), opt-in architecture baseline:
+## When NOT to use the full pipeline
 
-- **Greenfield** (empty directory): `new_project.sh` + `/new-project` — bash entry validates prereqs and scaffolds, then `exec`s a Claude Code session that runs the seed pipeline (researcher → architect → planner → implementer + test-engineer → verifier) and chains to `/onboard-project` for the surfaces it doesn't cover. Companion doc: `docs/greenfield-onboarding.md`.
-- **Existing project** (has code): `/onboard-project` — phased, gated, idempotent (10 phases, 9 gates with one-way Run-all-rest). Phase 8 optionally delegates to `systems-architect` in baseline-audit mode to produce `.ai-state/DESIGN.md` + `docs/architecture.md`; Phase 8b installs the AaC tier (fence convention, fitness scaffold, golden-rule pre-commit, CI workflow, diagram stub); Phase 8c scaffolds ML/AI training conventions (`program.md`, experiment tracking, GPU budget) when ML signals are detected. Companion doc: `docs/existing-project-onboarding.md`.
+Match process weight to task scale. Tier table from `rules/swe/swe-agent-coordination-protocol.md`:
 
-When working on Praxion's onboarding artifacts, the source-of-truth chain runs: `commands/onboard-project.md` (canonical CLAUDE.md blocks + idempotency predicates) → `commands/new-project.md` (mirror for greenfield) → `new_project.sh` (greenfield bootstrap). Changes to the canonical blocks must mirror across both commands for byte-identical output.
+| Tier | Signals | Process |
+|---|---|---|
+| Direct | Single-file fix, config, doc, typo | Fix → verify → commit; no agents |
+| Lightweight | 2–3 files, single behavior | Optional researcher; inline acceptance criteria |
+| Standard | 4–8 files, architectural decisions | Full pipeline (researcher → architect → planner → implementer ∥ test-engineer → verifier) |
+| Full | 9+ files, cross-cutting | Standard + parallel execution + context-engineer shadowing |
+| Spike | Exploratory | Timeboxed researcher; decision in `LEARNINGS.md` |
 
-## Design Principles
+Default to the lower tier when uncertain — process can be added; overhead cannot be reclaimed.
 
-- **Assistant-agnostic shared assets**: `skills/`, `commands/`, `agents/` at the repo root, reusable across tools
-- **Assistant-specific config in subdirectories**: `claude/config/` for Claude, `cursor/config/` for Cursor
-- **Progressive disclosure**: Skills load metadata at startup, full content on activation, reference files on demand — keeping token cost minimal
+## How to verify your work
 
-## Guiding Principles (Praxion-specific)
+- Run `pytest` over the relevant module(s) — behavior verification
+- `python3 scripts/sync_canonical_blocks.py --check` — shipped-block drift
+- `/sentinel` — ecosystem coherence audit
+- For doc changes: render-time check via the dashboard; for HTML companions, browser preview
+- Anthropic's "single highest-leverage" practice: pair every claim a doc makes with a verification path
 
-Extends `~/.claude/CLAUDE.md`. Four principles: **token budget first-class**, **measure before optimize**, **standards convergence as opportunity**, **curiosity over dogma**. Rationale: `README.md#guiding-principles`.
+## Claude-Code-specific machinery
 
-## Behavioral Contract (applied)
+**Component crafting**: load the matching skill before modifying any component — `skill-crafting`, `agent-crafting`, `command-crafting`, `rule-crafting`, `hook-crafting`.
 
-Praxion enforces the four-behavior contract — Surface Assumptions, Register Objection, Stay Surgical, Simplicity First. Canonical text in `rules/swe/agent-behavioral-contract.md` (always loaded); deep dive in `skills/software-planning/references/behavioral-contract.md`. Operationalized via per-agent self-tests and named failure-mode tags in verification reports.
+**Worktrees**: `.claude/worktrees/<name>/`. Pipeline worktrees via `EnterWorktree`; scratch via `/create-worktree`. ADRs created in a pipeline land as fragments under `.ai-state/decisions/drafts/` and are promoted to `dec-NNN` at merge-to-main by `scripts/finalize_adrs.py`. PR-adjacent workflow conventions live in `rules/swe/vcs/pr-conventions.md` (path-scoped).
 
-## Compaction Guidance
+**Onboarding artifacts dogfooding**: Praxion uses its own onboarding tools — Praxion's `.ai-state/`, `.gitattributes`, git hooks, and `CLAUDE.md` blocks are all results of patterns `/onboard-project` applies to user projects. When updating `/onboard-project` or `/new-project`, verify the change still produces what Praxion has on disk (or, if evolving the contract, propose what changes Praxion's own state needs).
 
-When compacting, always preserve: active pipeline stage and task slug, current WIP step number and status, acceptance criteria from the plan, and the list of modified files. The `PreCompact` hook snapshots pipeline documents to `.ai-work/PIPELINE_STATE.md` — re-read that file after compaction to restore orientation.
+**Onboarding contract**: Praxion ships **two onboarding paths** converging on the same end state — `.gitignore` block, `.ai-state/` skeleton, `.gitattributes` + merge drivers, git hooks, `.claude/settings.json` toggles, three `CLAUDE.md` blocks (Agent Pipeline + Compaction Guidance + Behavioral Contract), opt-in architecture baseline:
+
+- **Greenfield** (empty dir): `new_project.sh` + `/new-project` — bash entry validates prereqs and scaffolds, then `exec`s a Claude Code session that runs the seed pipeline and chains to `/onboard-project`. Companion: `docs/greenfield-onboarding.md`.
+- **Existing project** (has code): `/onboard-project` — phased, gated, idempotent (10 phases, 9 gates). Phase 8 optionally produces `.ai-state/DESIGN.md` + `docs/architecture.md`; Phase 8b installs the AaC tier; Phase 8c scaffolds ML/AI training conventions when detected. Companion: `docs/existing-project-onboarding.md`.
+
+Source-of-truth chain for canonical blocks: `commands/onboard-project.md` → `commands/new-project.md` → `new_project.sh`. Changes to canonical blocks must mirror across both commands for byte-identical output.
+
+**Behavioral Contract (applied)**: Praxion enforces the four-behavior contract — Surface Assumptions, Register Objection, Stay Surgical, Simplicity First. Canonical text in `rules/swe/agent-behavioral-contract.md` (always loaded); deep dive in `skills/software-planning/references/behavioral-contract.md`. Operationalized via per-agent self-tests and named failure-mode tags in verification reports.
+
+**Compaction Guidance**: When compacting, always preserve: active pipeline stage and task slug, current WIP step number and status, acceptance criteria from the plan, and the list of modified files. The `PreCompact` hook snapshots pipeline documents to `.ai-work/PIPELINE_STATE.md` — re-read after compaction to restore orientation.
+
+## Where to find more
+
+- `README.md` — first-contact narrative, install, project pitch, full Guiding Principles rationale
+- `README_DEV.md` — contributor conventions, dev workflow
+- `docs/README.md` — long-form Diátaxis-shaped documentation index
+- `docs/architecture.md` — code-verified Praxion architecture (developer-facing)
+- `.ai-state/DESIGN.md` — design-target architecture (architect-facing)
+- `agents/README.md`, `skills/README.md`, `commands/README.md`, `rules/README.md` — component catalogs
+- `.ai-state/decisions/DECISIONS_INDEX.md` — auto-generated ADR index
 
 ## Known Claude Code Limitations
 
 Tracked here so they can be revisited when Claude Code releases fixes:
 
-- **`isolation: "worktree"` on Agent tool creates nested worktrees** — when the session is already in a worktree (via `EnterWorktree`), agent worktrees nest inside it with opaque `agent-<hex>` names, fragmenting work. Workaround: never use `isolation: "worktree"`, rely on `EnterWorktree` + fragment files. Claude Code issues: [#27881](https://github.com/anthropics/claude-code/issues/27881) (nested creation), [#33045](https://github.com/anthropics/claude-code/issues/33045) (silent ignore for team agents). If these are fixed and worktree naming becomes controllable, reconsider the single-worktree policy in `swe-agent-coordination-protocol.md`
-- **Shipped `Explore` subagent crashes during init in many-skill sessions** (Claude Code 2.1.136, observed 2026-05-08) — `Agent(subagent_type="Explore", ...)` returns `undefined is not an object (evaluating 'K.length')` before the agent starts. Reproducible with a minimal 50-word prompt — not prompt-size dependent. Failure mode is a silent JS crash inside the bundled CLI: orphaned-tool-start in chronograph (input context billed, no output). Same root-cause family as upstream [#38868](https://github.com/anthropics/claude-code/issues/38868) (CLOSED on 2.1.83) which surfaced as "Prompt is too long" — our variant is a hard JS exception with no recoverable error. Workaround: prefer `i-am:researcher` (Praxion) for substantive code inventory and codebase research; reserve shipped `Explore` only for quick single-file lookups, and even then expect occasional failures. Use `find`/`grep` via Bash directly when neither agent is warranted. Tracked as `td-021`; upstream report drafted via `i-am:upstream-stewardship`
+- **`isolation: "worktree"` on Agent tool creates nested worktrees** — when the session is already in a worktree (via `EnterWorktree`), agent worktrees nest inside it with opaque `agent-<hex>` names, fragmenting work. Workaround: never use `isolation: "worktree"`, rely on `EnterWorktree` + fragment files. Claude Code issues: [#27881](https://github.com/anthropics/claude-code/issues/27881) (nested creation), [#33045](https://github.com/anthropics/claude-code/issues/33045) (silent ignore for team agents). If these are fixed and worktree naming becomes controllable, reconsider the single-worktree policy in `swe-agent-coordination-protocol.md`.
+- **Shipped `Explore` subagent crashes during init in many-skill sessions** (Claude Code 2.1.136, observed 2026-05-08) — `Agent(subagent_type="Explore", ...)` returns `undefined is not an object (evaluating 'K.length')` before the agent starts. Reproducible with a minimal 50-word prompt — not prompt-size dependent. Failure mode is a silent JS crash inside the bundled CLI: orphaned-tool-start in chronograph (input context billed, no output). Same root-cause family as upstream [#38868](https://github.com/anthropics/claude-code/issues/38868) (CLOSED on 2.1.83) which surfaced as "Prompt is too long" — our variant is a hard JS exception with no recoverable error. Workaround: prefer `i-am:researcher` (Praxion) for substantive code inventory and codebase research; reserve shipped `Explore` only for quick single-file lookups, and even then expect occasional failures. Use `find`/`grep` via Bash directly when neither agent is warranted. Tracked as `td-021`; upstream report drafted via `i-am:upstream-stewardship`.

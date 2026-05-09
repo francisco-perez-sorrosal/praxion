@@ -64,11 +64,11 @@ _REGISTRY: dict[str, _RegisterT] = {
     "default_markdown": _lazy("default_markdown"),
     "tutorial_shell": _lazy("tutorial_shell"),
     "plan_view": _lazy("plan_view"),
-    # Tier 2 — adr_card + reference_shell + explanation_shell shipped
+    # Tier 2 — full Diátaxis quadrant set + adr_card shipped
     "adr_card": _lazy("adr_card"),
     "reference_shell": _lazy("reference_shell"),
     "explanation_shell": _lazy("explanation_shell"),
-    "how_to_shell": _lazy("default_markdown"),
+    "how_to_shell": _lazy("how_to_shell"),
     "verification_report": _lazy("default_markdown"),
     "architecture_explorer": _lazy("default_markdown"),
     "traceability_matrix": _lazy("default_markdown"),

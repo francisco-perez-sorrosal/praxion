@@ -1,6 +1,6 @@
 schema_version: 1
 generator_version: praxion-0.7.0
-generated_at: '2026-05-09T02:31:28Z'
+generated_at: '2026-05-09T04:53:38Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -96,7 +96,8 @@ surfaces:
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
-  summary: <!-- aac:authored owner=praxion-maintainers last-reviewed=2026-05-01 -->
+  summary: "Praxion treats architectural knowledge as two co-equal halves. **Architecture-as-Code (AaC)**: structural facts live in machine-readable models \u2014 a LikeC4 DSL, ADRs, traceability matrices\
+    \ \u2014 that can be queried, diffed, and validated programmatically. **Documentation-as-Code (DaC)..."
   frontmatter:
     diataxis: explanation
     audience: developer
@@ -125,8 +126,8 @@ surfaces:
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
-  summary: <!-- Developer navigation guide. Every component name and file path in this document has been verified against the codebase. Only components that exist on disk are included. For design rationale,
-    planned components, and architectural evolution, see .ai-state/DESIGN.md. Maintained...
+  summary: "| Attribute | Value | |-----------|-------| | **System** | Praxion | | **Last verified against code** | 2026-05-03 (ai-training-onramp feature landed: four new ML/AI skills \u2014 `ml-training`,\
+    \ `llm-training-eval`, `neo-cloud-abstraction`, `experiment-tracking` \u2014 plus two reference e..."
   frontmatter:
     diataxis: reference
     audience: developer
@@ -354,8 +355,8 @@ surfaces:
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
-  summary: <!-- Design-target architecture document. Abstracts above concrete code to define the space of valid implementations. Component names may be abstract; file paths are illustrative; planned components
-    are included with Status markers. For code-verified developer navigation, see doc...
+  summary: '| Attribute | Value | |-----------|-------| | **System** | Praxion | | **Type** | AI development meta-framework (plugin + MCP servers + knowledge artifacts) | | **Language / Framework** | Python
+    3.13+ (MCP servers), Markdown (skills/agents/rules/commands), Shell/Python (hooks, sc...'
   frontmatter:
     diataxis: explanation
     audience: architect
@@ -368,8 +369,8 @@ surfaces:
   title: System Deployment
   last_modified: '2026-05-08'
   renderer: default_markdown
-  summary: <!-- Living deployment architecture document. Maintained by pipeline agents via section ownership. Created by systems-architect, updated by implementer/cicd-engineer, validated by verifier/sentinel.
-    See skills/deployment/references/deployment-documentation.md for the full methodo...
+  summary: '| Attribute | Value | |-----------|-------| | **System** | Praxion | | **Primary runtime** | Claude Code plugin (npm package `i-am@bit-agora`) plus secondary targets for Claude Desktop and Cursor
+    | | **Deployment level** | Plugin distribution (npm + git clone) + per-project insta...'
   surfaces_referenced:
   - ai-state-decisions-116-ai-training-results-schema-owner
   - ai-state-decisions-118-ai-training-tiered-backend-strategy
@@ -379,8 +380,8 @@ surfaces:
   title: Technical Debt Ledger
   last_modified: '2026-05-08'
   renderer: default_markdown
-  summary: '<!-- Living, append-only ledger of grounded debt findings. Producers: verifier (per-change Phase 5/5.5), sentinel (repo-wide TD dimension). Consumers: systems-architect, implementation-planner,
-    implementer, test-engineer, doc-engineer. Schema, owner-role heuristic, worktree-merge...'
+  summary: "**Schema**: 14 row fields + 1 structural `dedup_key`. See [`skills/software-planning/references/tech-debt-ledger.md`](../skills/software-planning/references/tech-debt-ledger.md) \xA7 `TECH_DEBT_LEDGER.md`\
+    \ for field definitions, enum values, the owner-role heuristic, and the post-mer..."
   surfaces_referenced:
   - ai-state-tech-debt-resolved
 - id: ai-state-tech-debt-resolved
@@ -389,8 +390,7 @@ surfaces:
   title: Resolved Tech Debt
   last_modified: '2026-05-08'
   renderer: default_markdown
-  summary: <!-- Sibling of TECH_DEBT_LEDGER.md holding rows with terminal status (resolved / wontfix). Rows arrive via scripts/finalize_tech_debt_ledger.py migration when status transitions to a terminal
-    value. Schema, lifecycle, and re-open semantics are defined canonically in rules/swe/ag...
+  summary: "**Schema**: 14 row fields + 1 structural `dedup_key`. See [`rules/swe/agent-intermediate-documents.md`](../rules/swe/agent-intermediate-documents.md) \xA7 `TECH_DEBT_LEDGER.md` for field definitions."
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
@@ -4364,42 +4364,42 @@ surfaces:
   type: markdown
   title: Idea Ledger
   last_modified: '2026-02-08'
-  renderer: default_markdown
+  renderer: idea_grid
   summary: 'Last updated: 2026-02-08T18:00:00Z Sentinel baseline: none (pre-sentinel era entries)'
 - id: ai-state-idea-ledgers-idea-ledger-2026-02-09-17-30-00
   path: .ai-state/idea_ledgers/IDEA_LEDGER_2026-02-09_17-30-00.md
   type: markdown
   title: Idea Ledger
   last_modified: '2026-02-23'
-  renderer: default_markdown
+  renderer: idea_grid
   summary: 'Last updated: 2026-02-09T17:30:00Z Sentinel baseline: 2026-02-08T14:30:00Z'
 - id: ai-state-idea-ledgers-idea-ledger-2026-03-30-22-10-00
   path: .ai-state/idea_ledgers/IDEA_LEDGER_2026-03-30_22-10-00.md
   type: markdown
   title: Idea Ledger
   last_modified: '2026-03-30'
-  renderer: default_markdown
+  renderer: idea_grid
   summary: 'Last updated: 2026-03-30T22:10:00Z Sentinel baseline: 2026-03-20T01:19:06Z'
 - id: ai-state-idea-ledgers-idea-ledger-2026-04-06-10-06-00
   path: .ai-state/idea_ledgers/IDEA_LEDGER_2026-04-06_10-06-00.md
   type: markdown
   title: Idea Ledger
   last_modified: '2026-04-06'
-  renderer: default_markdown
+  renderer: idea_grid
   summary: 'Last updated: 2026-04-06T10:06:00Z Sentinel baseline: 2026-04-05T22:13:53Z'
 - id: ai-state-idea-ledgers-idea-ledger-2026-04-29-02-52-30
   path: .ai-state/idea_ledgers/IDEA_LEDGER_2026-04-29_02-52-30.md
   type: markdown
   title: Idea Ledger
   last_modified: '2026-04-28'
-  renderer: default_markdown
+  renderer: idea_grid
   summary: 'Last updated: 2026-04-29T02:52:30Z Sentinel baseline: not gated (operator-initiated migration, not a promethean run)'
 - id: ai-state-idea-ledgers-idea-ledger-2026-04-30-20-56-00
   path: .ai-state/idea_ledgers/IDEA_LEDGER_2026-04-30_20-56-00.md
   type: markdown
   title: Idea Ledger
   last_modified: '2026-04-30'
-  renderer: default_markdown
+  renderer: idea_grid
   summary: 'Last updated: 2026-04-30T20:56:00Z Sentinel baseline: 2026-04-17T19:25:00Z (grade A, coherence A, 0 critical, 0 important findings)'
 - id: ai-state-sentinel-reports-sentinel-report-2026-02-08-14-30-00
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-02-08_14-30-00.md

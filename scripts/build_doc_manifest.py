@@ -111,6 +111,7 @@ _RENDERER_BY_NAME: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"^IMPLEMENTATION_PLAN\.md$"), "plan_view"),
     (re.compile(r"^VERIFICATION_REPORT\.md$"), "verification_report"),
     (re.compile(r"^IDEA_PROPOSAL\.md$"), "idea_grid"),
+    (re.compile(r"^IDEA_LEDGER_.*\.md$"), "idea_grid"),
     (re.compile(r"^DESIGN\.md$"), "architecture_explorer"),
     (re.compile(r"^architecture\.md$"), "architecture_explorer"),
     (re.compile(r"^\d{3}-[a-z0-9-]+\.md$"), "adr_card"),
@@ -155,7 +156,10 @@ def _first_h1(body: str) -> str | None:
 def _first_paragraph(body: str) -> str | None:
     for block in re.split(r"\n\s*\n", body.strip()):
         block = block.strip()
-        if block and not block.startswith("#"):
+        # Skip headings and HTML comments (e.g. `<!-- aac:authored ... -->`)
+        # — both render as empty/no-op markdown but the comment shape would
+        # surface as a useless italic in any consuming renderer.
+        if block and not block.startswith("#") and not block.startswith("<!--"):
             text = re.sub(r"\s+", " ", block)
             return text[:280] + ("..." if len(text) > 280 else "")
     return None

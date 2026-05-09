@@ -1,3 +1,8 @@
+---
+diataxis: how-to
+audience: developer
+---
+
 # External API Documentation
 
 How to use Praxion to retrieve current, curated API documentation for external libraries during development. This prevents the agent from hallucinating endpoints, using deprecated methods, or guessing at parameter names.

@@ -1,3 +1,8 @@
+---
+diataxis: explanation
+audience: developer
+---
+
 # Core Concepts
 
 The building blocks of the Praxion ecosystem and how they compose into a layered system for AI-assisted development.

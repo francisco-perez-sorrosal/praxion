@@ -1,3 +1,8 @@
+---
+diataxis: explanation
+audience: developer
+---
+
 <!-- aac:authored owner=praxion-maintainers last-reviewed=2026-05-01 -->
 
 # Architecture-as-Code + Documentation-as-Code

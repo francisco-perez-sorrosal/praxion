@@ -1,3 +1,8 @@
+---
+diataxis: tutorial
+audience: developer
+---
+
 # Greenfield Project Onboarding
 
 Reference for `new_project.sh` and the `/new-project` slash command — the entry point that turns an empty directory into a Claude-ready Python project with a per-run `onboarding_for_mushi_busy_ppl.md` trail map.

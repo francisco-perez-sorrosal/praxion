@@ -1,3 +1,8 @@
+---
+diataxis: how-to
+audience: developer
+---
+
 # Observability
 
 Praxion traces every agent session -- pipeline runs, native Claude Code agents, tool calls, decisions, and phase transitions -- via OpenTelemetry. Traces are stored in a local Phoenix daemon and visualized through its web UI.

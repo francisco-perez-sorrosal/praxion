@@ -1,3 +1,8 @@
+---
+diataxis: explanation
+audience: developer
+---
+
 # Memory Architecture
 
 Praxion's memory system gives every agent persistent, cross-session knowledge about the project -- user preferences, architectural decisions, discovered patterns, gotchas, and a chronological record of what happened. It operates as a dual-layer store with automatic enforcement, designed to work as an optional context-enhancer that never blocks the agent pipeline.

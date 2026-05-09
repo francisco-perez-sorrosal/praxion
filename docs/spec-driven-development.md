@@ -1,3 +1,8 @@
+---
+diataxis: reference
+audience: developer
+---
+
 # Spec-Driven Development
 
 This project uses behavioral specifications to bridge the gap between architectural design and implementation. Each requirement gets a unique ID that threads through the entire pipeline -- from the architect's design through planning, testing, verification, and archival. The approach scales proportionally: trivial and small tasks skip specs entirely, while medium and large features activate the full specification workflow with requirement traceability, structured decision documentation, and spec health monitoring.

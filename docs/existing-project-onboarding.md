@@ -1,3 +1,8 @@
+---
+diataxis: tutorial
+audience: developer
+---
+
 # Existing-Project Onboarding
 
 Reference for the `/onboard-project` slash command — the entry point that retrofits an **existing repository** (one that already has code) with the Praxion ecosystem's surfaces. This is the existing-project counterpart to [Greenfield Project Onboarding](greenfield-onboarding.md), which uses `new_project.sh` + `/new-project` to scaffold from an empty directory.

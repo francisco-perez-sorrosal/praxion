@@ -1,3 +1,8 @@
+---
+diataxis: reference
+audience: developer
+---
+
 # Project Metrics — Storage Schema and Consumption Reference
 
 Authoritative reference for the `/project-metrics` artifact format. This document is the contract a third party relies on to write a UI, ingest the log into a time-series store, or consume the JSON from another tool. If the code and this document disagree, treat that as a documentation bug and file it.

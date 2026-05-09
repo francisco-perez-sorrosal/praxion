@@ -1,3 +1,8 @@
+---
+diataxis: explanation
+audience: developer
+---
+
 # Decision Tracking
 
 AI-assisted development sessions produce many decisions -- architecture choices, implementation trade-offs, rejected alternatives, calibration judgments. Most are lost: buried in conversation transcripts, trapped in ephemeral documents, or visible only as unexplained code. This project captures decisions as structured Architecture Decision Records (ADRs) in `.ai-state/decisions/`, following the MADR format with YAML frontmatter for agent queryability and human browsability.

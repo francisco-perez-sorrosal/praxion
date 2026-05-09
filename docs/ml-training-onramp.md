@@ -1,3 +1,8 @@
+---
+diataxis: tutorial
+audience: developer
+---
+
 # ML Training Onramp
 
 Companion doc for Praxion's third project archetype: ML/AI training. Where the SWE archetype reaches code via tests and the Agentic-AI archetype reaches deployable agents via behavioral acceptance, the ML archetype reaches a checkpoint that meets a metric threshold via evals. This doc covers the artifacts, modes, commands, and rules that make Praxion eval-aware. Pre-training v1; the [autoresearch case study](#the-autoresearch-case-study) is the proof target, not the only target.

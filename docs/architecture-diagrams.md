@@ -1,3 +1,8 @@
+---
+diataxis: reference
+audience: developer
+---
+
 # Architecture Diagrams
 
 Praxion uses a **LikeC4 → D2 → SVG** toolchain for C4-style architectural diagrams. A

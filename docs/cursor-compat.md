@@ -1,3 +1,8 @@
+---
+diataxis: how-to
+audience: developer
+---
+
 # Claude Code vs Cursor: differences
 
 This doc explains how the same repo artifacts (skills, rules, commands, agents, MCP) are used by **Claude Code** and **Cursor**. For installation and configuration, see the main [README.md](../README.md). The top-level `install.sh` routes to `install_claude.sh` (code/desktop) or `install_cursor.sh` (cursor).

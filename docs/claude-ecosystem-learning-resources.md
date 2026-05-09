@@ -1,3 +1,8 @@
+---
+diataxis: explanation
+audience: developer
+---
+
 # Claude Ecosystem Learning Resources
 
 Curated external guides and references for building effective Claude workflows across models, collaborative patterns, and domain applications. These complement Praxion's automation framework with practical patterns, operational setups, and strategic context.

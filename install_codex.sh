@@ -4,6 +4,7 @@
 #
 # Usage (from this repo root, or via install.sh):
 #   ./install_codex.sh /path/to/project              # Install/update AGENTS.md
+#   ./install_codex.sh /path/to/project --compat-only # Only install AGENTS.md
 #   ./install_codex.sh /path/to/project --dry-run   # Show what would change
 #   ./install_codex.sh /path/to/project --check     # Verify adapter block
 #   ./install_codex.sh /path/to/project --uninstall # Remove adapter block
@@ -31,6 +32,11 @@ show_usage() {
 Usage: $(basename "$0") PATH [--check] [--dry-run] [--uninstall] [--help]
 
   PATH         Target project directory. Required.
+  --native     Also install Codex-native adapter files under PATH/.codex/.
+               This is the default; the flag is accepted for readability.
+  --compat-only
+               Only install the AGENTS.md compatibility pointer. Intended for
+               non-Codex AGENTS.md-aware tools or debugging the bootstrap layer.
   --check      Verify PATH/AGENTS.md contains the Praxion adapter block.
   --dry-run    Show what would be installed, without writing files.
   --uninstall  Remove the Praxion adapter block from PATH/AGENTS.md.
@@ -43,9 +49,12 @@ TARGET_PATH=""
 DO_CHECK=false
 DO_DRY_RUN=false
 DO_UNINSTALL=false
+DO_NATIVE=true
 
 while [ $# -gt 0 ]; do
     case "$1" in
+        --native) DO_NATIVE=true ;;
+        --compat-only) DO_NATIVE=false ;;
         --check) DO_CHECK=true ;;
         --dry-run|--status) DO_DRY_RUN=true ;;
         --uninstall) DO_UNINSTALL=true ;;
@@ -68,6 +77,9 @@ done
 
 TARGET_ROOT="$(cd "$TARGET_PATH" && pwd)"
 AGENTS_FILE="$TARGET_ROOT/AGENTS.md"
+CODEX_DIR="$TARGET_ROOT/.codex"
+CODEX_AGENTS_DIR="$CODEX_DIR/agents"
+AGENT_SKILLS_DIR="$TARGET_ROOT/.agents/skills"
 PRAXION_ROOT="$SCRIPT_DIR"
 
 render_block() {
@@ -93,6 +105,30 @@ When working in this project:
    skill references only when needed.
 5. Treat \`$PRAXION_ROOT/commands/*.md\` and \`$PRAXION_ROOT/agents/*.md\` as
    workflow specs unless this agentic framework has a native adapter for them.
+
+Always-on Praxion stance:
+
+- Surface Assumptions.
+- Register Objection.
+- Stay Surgical.
+- Simplicity First.
+
+Task sizing:
+
+- Direct: single-file fix, config, doc, typo.
+- Lightweight: 2-3 files, one behavior, clear scope.
+- Standard: 4-8 files, 2-4 behaviors, architectural decisions.
+- Full: 9+ files, 5+ behaviors, cross-cutting work.
+- Spike: exploratory, uncertain outcome.
+
+Praxion agents available through Codex custom-agent wrappers when the native
+adapter is installed: promethean, researcher, systems-architect,
+implementation-planner, context-engineer, implementer, test-engineer, verifier,
+architect-validator, doc-engineer, sentinel, skill-genesis, cicd-engineer, and
+roadmap-cartographer.
+
+Praxion skills are exposed to Codex through project-local \`.agents/skills\`
+symlinks. Load matching skills on demand; do not copy skill bodies.
 
 Do not copy Praxion rules, skills, commands, or agents into this file. Keep this
 adapter small and update Praxion at the source.
@@ -184,6 +220,96 @@ uninstall_block() {
     fi
 }
 
+praxion_agent_names() {
+    for agent_file in "$PRAXION_ROOT"/agents/*.md; do
+        case "$(basename "$agent_file")" in
+            CLAUDE.md|README.md) continue ;;
+        esac
+        sed -n 's/^name:[[:space:]]*//p' "$agent_file" | head -1
+    done
+}
+
+praxion_skill_names() {
+    for skill_file in "$PRAXION_ROOT"/skills/*/SKILL.md; do
+        [ -f "$skill_file" ] || continue
+        basename "$(dirname "$skill_file")"
+    done
+}
+
+install_native_codex() {
+    python3 "$PRAXION_ROOT/codex/config/export-codex-agents.py" \
+        --repo-root "$PRAXION_ROOT" \
+        --out-dir "$CODEX_AGENTS_DIR" >/dev/null
+    install_codex_skills
+}
+
+install_codex_skills() {
+    local skill_name source_dir target_link
+    mkdir -p "$AGENT_SKILLS_DIR"
+    while IFS= read -r skill_name; do
+        [ -n "$skill_name" ] || continue
+        source_dir="$PRAXION_ROOT/skills/$skill_name"
+        target_link="$AGENT_SKILLS_DIR/$skill_name"
+        if [ -e "$target_link" ] || [ -L "$target_link" ]; then
+            if [ -L "$target_link" ] && [ "$(readlink "$target_link")" = "$source_dir" ]; then
+                continue
+            fi
+            warn "Skipping existing non-Praxion skill path: $target_link"
+            continue
+        fi
+        ln -s "$source_dir" "$target_link"
+    done < <(praxion_skill_names)
+}
+
+uninstall_native_codex() {
+    [ -d "$CODEX_AGENTS_DIR" ] || return 0
+    while IFS= read -r agent_name; do
+        [ -n "$agent_name" ] || continue
+        rm -f "$CODEX_AGENTS_DIR/$agent_name.toml"
+    done < <(praxion_agent_names)
+    rmdir "$CODEX_AGENTS_DIR" 2>/dev/null || true
+    rmdir "$CODEX_DIR" 2>/dev/null || true
+    uninstall_codex_skills
+}
+
+uninstall_codex_skills() {
+    [ -d "$AGENT_SKILLS_DIR" ] || return 0
+    local skill_name source_dir target_link
+    while IFS= read -r skill_name; do
+        [ -n "$skill_name" ] || continue
+        source_dir="$PRAXION_ROOT/skills/$skill_name"
+        target_link="$AGENT_SKILLS_DIR/$skill_name"
+        if [ -L "$target_link" ] && [ "$(readlink "$target_link")" = "$source_dir" ]; then
+            rm -f "$target_link"
+        fi
+    done < <(praxion_skill_names)
+    rmdir "$AGENT_SKILLS_DIR" 2>/dev/null || true
+    rmdir "$TARGET_ROOT/.agents" 2>/dev/null || true
+}
+
+check_native_codex() {
+    local researcher_file="$CODEX_AGENTS_DIR/researcher.toml"
+    local software_planning_link="$AGENT_SKILLS_DIR/software-planning"
+    if [ ! -f "$researcher_file" ]; then
+        warn "Codex native agent missing: $researcher_file"
+        return 1
+    fi
+    if ! grep -qF 'agents/researcher.md' "$researcher_file"; then
+        warn "Codex researcher wrapper is stale: $researcher_file"
+        return 1
+    fi
+    if [ ! -L "$software_planning_link" ]; then
+        warn "Codex skill symlink missing: $software_planning_link"
+        return 1
+    fi
+    if [ "$(readlink "$software_planning_link")" != "$PRAXION_ROOT/skills/software-planning" ]; then
+        warn "Codex skill symlink stale: $software_planning_link"
+        return 1
+    fi
+    info "Codex native agents present in $CODEX_AGENTS_DIR"
+    info "Codex skills linked in $AGENT_SKILLS_DIR"
+}
+
 header "Codex / AGENTS.md Adapter"
 step "Target: $TARGET_ROOT"
 step "Praxion source: $PRAXION_ROOT"
@@ -198,19 +324,32 @@ if $DO_DRY_RUN; then
     else
         step "Would create $AGENTS_FILE"
     fi
+    if $DO_NATIVE; then
+        step "Would export Praxion agents to $CODEX_AGENTS_DIR"
+        step "Would link Praxion skills into $AGENT_SKILLS_DIR"
+    fi
     exit 0
 fi
 
 if $DO_CHECK; then
+    check_rc=0
     if has_complete_block && grep -qF "$PRAXION_ROOT" "$AGENTS_FILE"; then
         info "Praxion adapter block present in $AGENTS_FILE"
-        exit 0
+    else
+        warn "Praxion adapter block missing or stale in $AGENTS_FILE"
+        check_rc=1
     fi
-    warn "Praxion adapter block missing or stale in $AGENTS_FILE"
-    exit 1
+    if $DO_NATIVE; then
+        check_native_codex || check_rc=1
+    fi
+    exit "$check_rc"
 fi
 
 if $DO_UNINSTALL; then
+    if $DO_NATIVE; then
+        uninstall_native_codex
+        info "Codex native adapter files removed from $CODEX_DIR"
+    fi
     uninstall_block
     info "Praxion adapter block removed from $AGENTS_FILE"
     exit 0
@@ -218,4 +357,9 @@ fi
 
 install_block
 info "Praxion adapter installed in $AGENTS_FILE"
+if $DO_NATIVE; then
+    install_native_codex
+    info "Codex native agents exported to $CODEX_AGENTS_DIR"
+    info "Codex skills linked in $AGENT_SKILLS_DIR"
+fi
 step "Start a fresh AGENTS.md-aware agent session in the target project to auto-load it."

@@ -401,9 +401,17 @@ to this Praxion checkout as the canonical source.
 source, and `.ai-state/` data by reference.
 
 **What still needs adapters for native behavior:** slash commands from
-`commands/*.md`, runnable subagents from `agents/*.md`, automatic rule
-frontmatter matching, automatic skill activation, MCP registration, and hook
-lifecycle integration.
+`commands/*.md`, automatic rule frontmatter matching, MCP registration, and
+hook lifecycle integration.
+
+By default, the Codex install generates Codex custom-agent wrappers under the
+target project's `.codex/agents/`. These wrappers are intentionally thin: each
+one points back to the canonical Praxion agent file instead of copying the full
+body, so agent behavior stays source-of-truth aligned with Claude and Cursor.
+It also symlinks Praxion skills into the project `.agents/skills/` directory,
+which is Codex's native project skill discovery path.
+Use `--compat-only` only for non-Codex AGENTS.md-aware tools or when debugging
+the bootstrap pointer without native Codex surfaces.
 
 Start a fresh Codex or AGENTS.md-aware agent session inside the target project
 after installation so the new `AGENTS.md` is loaded at startup.

@@ -262,16 +262,20 @@ contract and points agents back to canonical source artifacts.
 <!-- PRAXION:AGENTS_ADAPTER:END -->
 ```
 
-The Codex installer v1 only writes that project-local adapter block. It does
-not install hooks, configure MCP, create `.ai-state/`, export slash commands,
-or register subagents. Those surfaces require explicit tool-specific adapters:
+The Codex installer writes that project-local adapter block and, by default,
+adds generated Codex custom-agent wrappers under the target project's
+`.codex/agents/`; those wrappers point back to canonical `agents/*.md` files
+instead of copying their bodies. It also symlinks canonical Praxion skills into
+the target project's `.agents/skills/` directory. It does not yet install hooks,
+configure MCP, create `.ai-state/`, or export slash commands. Those surfaces
+require explicit tool-specific adapters:
 
 | Surface | Native adapter needed |
 |---|---|
 | `commands/*.md` | Slash-command exporter or installer |
-| `agents/*.md` | Framework-specific subagent registration |
+| `agents/*.md` | `install_codex.sh` generates thin `.codex/agents/*.toml` wrappers by default |
 | `rules/**/*.md` frontmatter | Path matcher and rule loader |
-| `skills/*/SKILL.md` metadata | Skill discovery and activation bridge |
+| `skills/*/SKILL.md` metadata | `install_codex.sh` symlinks project `.agents/skills/*` by default; user-global `$HOME/.agents/skills` is later work |
 | MCP servers | Target framework MCP config writer |
 | hooks | Target framework lifecycle hook integration |
 
@@ -281,6 +285,7 @@ Use this flow to test a pet project from a Praxion checkout:
 ./install.sh codex /path/to/pet-project --dry-run
 ./install.sh codex /path/to/pet-project
 ./install.sh codex /path/to/pet-project --check
+./install.sh codex /path/to/pet-project --compat-only
 ```
 
 Start a fresh Codex or AGENTS.md-aware agent session in the target project after

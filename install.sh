@@ -5,7 +5,7 @@
 # install_cursor.sh (Cursor), or install_codex.sh (AGENTS.md-aware agents).
 # See --help for usage.
 #
-#   ./install.sh [code|desktop|cursor [path]|codex path] [--check] [--dry-run] [--uninstall] [--help]
+#   ./install.sh [code|desktop|cursor [path]|codex path] [--native|--compat-only] [--check] [--dry-run] [--uninstall] [--help]
 
 set -eo pipefail
 
@@ -359,6 +359,7 @@ EOF
   Components:
     • Project-local AGENTS.md adapter block
     • Pointers to Praxion source artifacts (no copied rules/skills/agents)
+    • Codex custom-agent wrappers generated from agents/*.md
     • Compatibility map for direct reuse vs adapter-required surfaces
 EOF
             ;;
@@ -379,6 +380,10 @@ Usage: $(basename "$0") [code|desktop|cursor [path]|codex path] [--check] [--dry
   cursor PATH  Install for Cursor: per-project at PATH/.cursor/
   codex PATH   Install project-local AGENTS.md adapter for Codex and other
                AGENTS.md-aware coding agents
+  --native     With 'codex', export Codex-native Praxion agent wrappers
+               (default; accepted for readability)
+  --compat-only
+               With 'codex', only install the AGENTS.md compatibility pointer
   --check      Verify installation health
   --dry-run    Show what would be installed (no writes)
   --uninstall  Remove installation
@@ -412,6 +417,8 @@ UNINSTALL=false
 RELINK=false
 COMPLETE_INSTALL=false
 COMPLETE_UNINSTALL=false
+NATIVE=false
+COMPAT_ONLY=false
 CURSOR_TARGET=""
 CODEX_TARGET=""
 
@@ -422,6 +429,8 @@ while [ $# -gt 0 ]; do
                       if [ -n "$2" ] && [[ "$2" != --* ]]; then CURSOR_TARGET="$2"; shift; fi ;;
         codex)        MODE="codex"
                       if [ -n "$2" ] && [[ "$2" != --* ]]; then CODEX_TARGET="$2"; shift; fi ;;
+        --native)     NATIVE=true ;;
+        --compat-only) COMPAT_ONLY=true ;;
         --check)      CHECK=true ;;
         --dry-run)    DRY_RUN=true ;;
         --uninstall)  UNINSTALL=true ;;
@@ -473,6 +482,8 @@ case "$MODE" in
         ;;
     codex)
         [ -n "$CODEX_TARGET" ] && delegate_args+=("$CODEX_TARGET")
+        $NATIVE       && delegate_args+=(--native)
+        $COMPAT_ONLY && delegate_args+=(--compat-only)
         $CHECK     && delegate_args+=(--check)
         $DRY_RUN   && delegate_args+=(--dry-run)
         $UNINSTALL && delegate_args+=(--uninstall)

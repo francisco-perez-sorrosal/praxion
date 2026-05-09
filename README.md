@@ -386,9 +386,9 @@ For **Claude Code vs Cursor** format differences (discovery paths, command expor
 
 Installs a small Praxion adapter block into the target project's `AGENTS.md`.
 This is intentionally lighter than the Claude Code and Cursor installers: it
-does not copy Praxion rules, skills, commands, or agents, and it does not
-copy rule bodies into native Codex `.rules/` files. The generated block points
-AGENTS.md-aware agents back to this Praxion checkout as the canonical source.
+does not copy Praxion rule, skill, command, or agent bodies into Codex-native
+files. Generated wrappers point AGENTS.md-aware agents back to this Praxion
+checkout as the canonical source.
 
 ```bash
 ./install.sh codex /path/to/repo --dry-run
@@ -400,19 +400,22 @@ AGENTS.md-aware agents back to this Praxion checkout as the canonical source.
 `CLAUDE.md`, `rules/`, `skills/`, docs, source, tests, scripts, MCP server
 source, and `.ai-state/` data by reference.
 
-**What still needs adapters for native behavior:** slash commands from
-`commands/*.md` and MCP registration.
+**What still needs adapters for native behavior:** MCP registration.
 
 By default, the Codex install generates Codex custom-agent wrappers under the
 target project's `.codex/agents/`. These wrappers are intentionally thin: each
 one points back to the canonical Praxion agent file instead of copying the full
 body, so agent behavior stays source-of-truth aligned with Claude and Cursor.
 It also generates Codex skill wrappers under the project `.agents/skills/`
-directory, which is Codex's native project skill discovery path. The wrappers
+directory, which is Codex's native project skill discovery path. Skill wrappers
 preserve the canonical skill description in their metadata and point back to
-canonical Praxion skills on activation. Codex may warn that skill descriptions
-were shortened to fit its startup budget; that runtime warning is preferred
-over pre-trimming Praxion's canonical descriptions.
+canonical Praxion skills on activation. Command wrappers expose Praxion
+`commands/*.md` through the same documented Codex skill surface as
+`praxion-command-<name>` wrappers; they preserve each command description and
+point back to the canonical slash-command file without copying its body. Codex
+may warn that skill descriptions were shortened to fit its startup budget; that
+runtime warning is preferred over pre-trimming Praxion's canonical
+descriptions.
 
 For rules, the Codex install now generates a Praxion-managed rules bridge under
 the target project's `.codex/` directory:

@@ -27,6 +27,12 @@ fail() { printf "  ✗ %s\n" "$*" >&2; exit 1; }
 header() { printf "\n${B}%s${R}\n" "$*"; }
 step() { printf "  %s\n" "$*"; }
 
+print_codex_hook_review_note() {
+    warn "Codex may require one-time review for the Praxion rules bridge hooks."
+    step "If Codex reports '3 hooks need review', open /hooks and approve the Praxion PreToolUse, SessionStart, and UserPromptSubmit hooks."
+    step "This is a Codex security gate for project-local commands; install.sh cannot pre-approve it."
+}
+
 show_usage() {
     cat <<EOF
 Usage: $(basename "$0") PATH [--check] [--dry-run] [--uninstall] [--help]
@@ -247,6 +253,9 @@ install_native_codex() {
     python3 "$PRAXION_ROOT/codex/config/export-codex-skills.py" \
         --repo-root "$PRAXION_ROOT" \
         --out-dir "$AGENT_SKILLS_DIR" >/dev/null
+    python3 "$PRAXION_ROOT/codex/config/export-codex-command-skills.py" \
+        --repo-root "$PRAXION_ROOT" \
+        --out-dir "$AGENT_SKILLS_DIR" >/dev/null
     install_codex_rules_bridge
 }
 
@@ -255,7 +264,10 @@ is_generated_agent_wrapper() {
 }
 
 is_generated_skill_wrapper() {
-    [ -f "$1" ] && grep -qF "This is a Codex skill wrapper for Praxion." "$1"
+    [ -f "$1" ] && {
+        grep -qF "This is a Codex skill wrapper for Praxion." "$1" ||
+        grep -qF "This is a Codex command-skill wrapper for a Praxion slash command." "$1"
+    }
 }
 
 export_expected_native_codex() {
@@ -264,6 +276,9 @@ export_expected_native_codex() {
         --repo-root "$PRAXION_ROOT" \
         --out-dir "$expected_root/agents" >/dev/null
     python3 "$PRAXION_ROOT/codex/config/export-codex-skills.py" \
+        --repo-root "$PRAXION_ROOT" \
+        --out-dir "$expected_root/skills" >/dev/null
+    python3 "$PRAXION_ROOT/codex/config/export-codex-command-skills.py" \
         --repo-root "$PRAXION_ROOT" \
         --out-dir "$expected_root/skills" >/dev/null
 }
@@ -487,7 +502,7 @@ check_native_codex() {
 
     if [ "$check_rc" -eq 0 ]; then
         info "Codex native agents present in $CODEX_AGENTS_DIR"
-        info "Codex skill wrappers present in $AGENT_SKILLS_DIR"
+        info "Codex skill and command wrappers present in $AGENT_SKILLS_DIR"
         info "Codex rules bridge present in $CODEX_DIR"
     fi
     return "$check_rc"
@@ -509,7 +524,7 @@ if $DO_DRY_RUN; then
     fi
     if $DO_NATIVE; then
         step "Would export Praxion agents to $CODEX_AGENTS_DIR"
-        step "Would export Praxion skill wrappers to $AGENT_SKILLS_DIR"
+        step "Would export Praxion skill and command wrappers to $AGENT_SKILLS_DIR"
         step "Would export Praxion rules bridge to $CODEX_DIR"
     fi
     exit 0
@@ -525,6 +540,9 @@ if $DO_CHECK; then
     fi
     if $DO_NATIVE; then
         check_native_codex || check_rc=1
+        if [ "$check_rc" -eq 0 ]; then
+            print_codex_hook_review_note
+        fi
     fi
     exit "$check_rc"
 fi
@@ -544,7 +562,8 @@ info "Praxion adapter installed in $AGENTS_FILE"
 if $DO_NATIVE; then
     install_native_codex
     info "Codex native agents exported to $CODEX_AGENTS_DIR"
-    info "Codex skill wrappers exported to $AGENT_SKILLS_DIR"
+    info "Codex skill and command wrappers exported to $AGENT_SKILLS_DIR"
     info "Codex rules bridge exported to $CODEX_DIR"
+    print_codex_hook_review_note
 fi
 step "Start a fresh AGENTS.md-aware agent session in the target project to auto-load it."

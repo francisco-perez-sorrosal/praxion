@@ -29,9 +29,14 @@ def test_install_codex_exports_canonical_paths_and_check_passes(tmp_path: Path):
     planning = (project_dir / ".agents" / "skills" / "software-planning" / "SKILL.md").read_text(
         encoding="utf-8"
     )
+    command = (project_dir / ".agents" / "skills" / "praxion-command-co" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
 
     assert str((REPO_ROOT / "agents" / "researcher.md").resolve()).replace("\\", "/") in researcher
     assert str((REPO_ROOT / "skills" / "software-planning" / "SKILL.md").resolve()).replace("\\", "/") in planning
+    assert str((REPO_ROOT / "commands" / "co.md").resolve()).replace("\\", "/") in command
+    assert "Treat any user text after the command name as `$ARGUMENTS`." in command
     assert (project_dir / ".codex" / "praxion" / "rules_manifest.json").exists()
     assert (project_dir / ".codex" / "hooks.json").exists()
     config_text = (project_dir / ".codex" / "config.toml").read_text(encoding="utf-8")
@@ -59,6 +64,13 @@ def test_install_codex_check_fails_on_unexpected_generated_wrappers(tmp_path: Pa
         "---\nname: fake-skill\ndescription: 'bogus'\n---\n\nThis is a Codex skill wrapper for Praxion.\n",
         encoding="utf-8",
     )
+    fake_command_dir = project_dir / ".agents" / "skills" / "praxion-command-fake"
+    fake_command_dir.mkdir(parents=True)
+    (fake_command_dir / "SKILL.md").write_text(
+        "---\nname: praxion-command-fake\ndescription: 'bogus'\n---\n\n"
+        "This is a Codex command-skill wrapper for a Praxion slash command.\n",
+        encoding="utf-8",
+    )
 
     check = run_install(str(project_dir), "--check")
     assert check.returncode == 1
@@ -84,11 +96,20 @@ def test_install_codex_reinstall_prunes_unexpected_generated_wrappers(tmp_path: 
         "---\nname: fake-skill\ndescription: 'bogus'\n---\n\nThis is a Codex skill wrapper for Praxion.\n",
         encoding="utf-8",
     )
+    fake_command_dir = project_dir / ".agents" / "skills" / "praxion-command-fake"
+    fake_command_dir.mkdir(parents=True)
+    fake_command = fake_command_dir / "SKILL.md"
+    fake_command.write_text(
+        "---\nname: praxion-command-fake\ndescription: 'bogus'\n---\n\n"
+        "This is a Codex command-skill wrapper for a Praxion slash command.\n",
+        encoding="utf-8",
+    )
 
     reinstall = run_install(str(project_dir))
     assert reinstall.returncode == 0, reinstall.stderr or reinstall.stdout
     assert not fake_agent.exists()
     assert not fake_skill.exists()
+    assert not fake_command.exists()
 
 
 def test_install_codex_uninstall_preserves_user_codex_config_and_hooks(tmp_path: Path):

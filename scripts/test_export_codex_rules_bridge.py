@@ -61,6 +61,8 @@ def test_export_rules_bridge_writes_prefixed_hooks_and_manifest(tmp_path: Path):
     assert "praxion-session-start.py" in hooks["SessionStart"][0]["hooks"][0]["command"]
     assert "git rev-parse" not in hooks["SessionStart"][0]["hooks"][0]["command"]
     assert "__PRAXION_PROJECT_ROOT__" in hooks["SessionStart"][0]["hooks"][0]["command"]
+    pre_tool_matcher = hooks["PreToolUse"][0]["matcher"]
+    assert pre_tool_matcher == "Edit|MultiEdit|NotebookEdit|Write"
 
 
 def test_generated_hooks_route_always_on_prompt_and_path_rules(tmp_path: Path):
@@ -95,12 +97,35 @@ def test_generated_hooks_route_always_on_prompt_and_path_rules(tmp_path: Path):
         pre_hook,
         {
             "hook_event_name": "PreToolUse",
+            "tool_name": "Edit",
             "cwd": str(tmp_path),
             "tool_input": {"file_path": "tests/test_example.py"},
         },
     )
     pre_context = pre_output["hookSpecificOutput"]["additionalContext"]
     assert "rules/swe/testing-conventions.md" in pre_context
+
+    read_output = run_hook(
+        pre_hook,
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Read",
+            "cwd": str(tmp_path),
+            "tool_input": {"file_path": "tests/test_example.py"},
+        },
+    )
+    assert read_output == {}
+
+    bash_output = run_hook(
+        pre_hook,
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "cwd": str(tmp_path),
+            "tool_input": {"command": "sed -n '1,20p' tests/test_example.py"},
+        },
+    )
+    assert bash_output == {}
 
 
 def test_prompt_matching_avoids_generic_false_positives(tmp_path: Path):

@@ -468,6 +468,10 @@ def main() -> int:
 """
     elif kind == "pre-tool-use":
         body = """
+MUTATING_TOOL_NAMES = {"Edit", "MultiEdit", "NotebookEdit", "Write", "apply_patch", "ApplyPatch"}
+READ_ONLY_TOOL_NAMES = {"Glob", "Grep", "LS", "Read"}
+
+
 def _extract_paths(value: object, key_hint: str = "") -> list[str]:
     paths: list[str] = []
     if isinstance(value, dict):
@@ -491,6 +495,12 @@ def _extract_paths(value: object, key_hint: str = "") -> list[str]:
 
 def main() -> int:
     payload = json.loads(sys.stdin.read() or "{}")
+    tool_name = str(payload.get("tool_name", ""))
+    if tool_name in READ_ONLY_TOOL_NAMES:
+        return 0
+    if tool_name and tool_name not in MUTATING_TOOL_NAMES:
+        return 0
+
     manifest = load_manifest()
     cwd = payload.get("cwd", "")
     raw_paths = _extract_paths(payload.get("tool_input", {}))
@@ -571,7 +581,7 @@ def render_hook_registrations() -> dict[str, object]:
             ],
             "PreToolUse": [
                 {
-                    "matcher": "Read|Edit|Write|Glob|Grep|Bash",
+                    "matcher": "Edit|MultiEdit|NotebookEdit|Write",
                     "hooks": [
                         {
                             "type": "command",

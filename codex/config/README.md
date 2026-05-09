@@ -65,7 +65,7 @@ Generated surfaces:
   context at session start
 - `.codex/hooks/praxion-user-prompt-submit.py` -- routes prompt-matched rules
 - `.codex/hooks/praxion-pre-tool-use.py` -- routes file-scoped rules before
-  read/edit/write-style tool activity
+  mutating file tool activity
 - `.codex/praxion/hook_registrations.json` -- expected Praxion hook
   registrations for merge/check logic
 

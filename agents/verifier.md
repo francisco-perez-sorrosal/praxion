@@ -161,7 +161,7 @@ Convention checks (derived from `coding-style` rule):
 
 #### Tech-Debt Ledger Writes
 
-For each per-change debt finding surfaced by Phase 5 or Phase 5.5 (`[DEAD-CODE-UNREMOVED]`, `[BLOAT]`, duplication, function-size or file-size ceiling breaches, nesting-depth violations), append a row to `.ai-state/TECH_DEBT_LEDGER.md` per the canonical schema in `rules/swe/agent-intermediate-documents.md` (`#### TECH_DEBT_LEDGER.md` — 14 row fields + `dedup_key`).
+For each per-change debt finding surfaced by Phase 5 or Phase 5.5 (`[DEAD-CODE-UNREMOVED]`, `[BLOAT]`, duplication, function-size or file-size ceiling breaches, nesting-depth violations), append a row to `.ai-state/TECH_DEBT_LEDGER.md` per the canonical schema in `skills/software-planning/references/tech-debt-ledger.md` (`#### TECH_DEBT_LEDGER.md` — 14 row fields + `dedup_key`).
 
 Writing a row means:
 
@@ -195,7 +195,7 @@ Scan the change set for behavioral-contract violations and emit findings in the 
 | `[NON-SURGICAL]` | Changes touch files, modules, or behavior outside the declared scope without being load-bearing for the stated task (violates Stay Surgical) |
 | `[SCOPE-CREEP]` | Scope expanded mid-execution without being re-surfaced and re-approved (violates Stay Surgical) |
 | `[BLOAT]` | A simpler solution would have achieved the same behavior; unnecessary abstraction, speculative generality, or dead parameters were introduced (violates Simplicity First) |
-| `[DEAD-CODE-UNREMOVED]` | The change supersedes code that should have been deleted but was left in place (violates Simplicity First). When a `[DEAD-CODE-UNREMOVED]` FAIL is overridden by the user or scope-deferred, also promote the finding to a tech-debt ledger row with `severity = suggested`, `status = open`, and a survivor flag in `notes` per the schema in `rules/swe/agent-intermediate-documents.md` — survivors must persist as tracked debt rather than be lost. |
+| `[DEAD-CODE-UNREMOVED]` | The change supersedes code that should have been deleted but was left in place (violates Simplicity First). When a `[DEAD-CODE-UNREMOVED]` FAIL is overridden by the user or scope-deferred, also promote the finding to a tech-debt ledger row with `severity = suggested`, `status = open`, and a survivor flag in `notes` per the schema in `skills/software-planning/references/tech-debt-ledger.md` — survivors must persist as tracked debt rather than be lost. |
 
 Tag emission is required whenever a violation is observed; "no violations" is a valid Phase 5.5 result and should be recorded explicitly. The sentinel aggregates tag frequencies across `VERIFICATION_REPORT.md` files.
 

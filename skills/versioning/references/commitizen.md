@@ -106,41 +106,6 @@ Controls bump behavior during `0.x` development:
 
 When ready to release `1.0.0`, either remove `major_version_zero` or set it to `false`, then make a breaking change commit.
 
-## PEP 440 Pre-Release Workflow
-
-Commitizen supports PEP 440 pre-release versions for development releases between milestones.
-
-### Dev Releases
-
-```bash
-# From 0.0.1, create a dev release:
-cz bump --prerelease dev --changelog
-# Produces: 0.0.2.dev0
-
-# Subsequent dev bumps increment the dev number:
-cz bump --prerelease dev --changelog
-# Produces: 0.0.2.dev1
-```
-
-### Pre-release Types
-
-| Type | Flag | Example | PEP 440 |
-|------|------|---------|---------|
-| Dev | `--prerelease dev` | `0.0.2.dev0` | Development release |
-| Alpha | `--prerelease alpha` | `0.0.2a0` | Alpha release |
-| Beta | `--prerelease beta` | `0.0.2b0` | Beta release |
-| RC | `--prerelease rc` | `0.0.2rc0` | Release candidate |
-
-### Finalizing a Pre-release
-
-To go from a pre-release to a final release:
-
-```bash
-# Currently at 0.0.2.dev1
-cz bump --changelog
-# Produces: 0.0.2 (strips the pre-release suffix, auto-detects increment)
-```
-
 ## Changelog Settings
 
 ### `update_changelog_on_bump`
@@ -176,7 +141,6 @@ The `style` config field customizes grouping and display names.
 | `--dry-run` | Show what would happen without making changes. Does not modify files, create commits, or tags. |
 | `--changelog` | Regenerate `CHANGELOG.md` as part of the bump. |
 | `--increment PATCH\|MINOR\|MAJOR` | Force a specific bump type instead of auto-detecting from commits. |
-| `--prerelease dev\|alpha\|beta\|rc` | Create a pre-release version. |
 | `--yes` | Skip confirmation prompts. Required for CI/CD automation. |
 | `--check-consistency` | Verify that all `version_files` targets contain the current version before bumping. |
 | `--no-verify` | Skip pre-commit and commit-msg hooks during the bump commit. |

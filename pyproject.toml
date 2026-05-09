@@ -6,13 +6,13 @@
 # [tool.commitizen].version_files with a disambiguating regex.
 [project]
 name = "praxion"
-version = "0.2.1.dev0"
+version = "0.2.0"
 description = "Operational infrastructure for spec-driven development and context engineering"
 requires-python = ">=3.11"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.2.1.dev0"
+version = "0.2.0"
 version_files = [
     ".claude-plugin/plugin.json:version",
     "memory-mcp/pyproject.toml:version",

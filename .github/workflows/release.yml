@@ -2,11 +2,8 @@
 #
 # Commitizen computes the proper semver bump from conventional commits since
 # the last stable tag, generates CHANGELOG.md, creates a git tag, and publishes
-# a GitHub release.
-#
-# No CI runs on push to main. After a release, the workflow bumps version files
-# to the next patch dev version (e.g., 0.2.0 → 0.2.1.dev0) so main always
-# signals "unreleased development."
+# a GitHub release. Between releases, every version file equals the last
+# released stable; cz bump is the only mechanism that changes version strings.
 
 name: Release
 
@@ -67,26 +64,3 @@ jobs:
           # Extract this version's section from CHANGELOG.md for the release body
           BODY=$(sed -n "/^## $VERSION/,/^## v/{/^## v[^$]/!p;}" CHANGELOG.md | sed '1d')
           gh release create "$VERSION" --title "$VERSION" --notes "$BODY"
-
-      - name: Bump to next dev version
-        run: |
-          STABLE=$(cz version --project)
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$STABLE"
-          NEXT_DEV="${MAJOR}.${MINOR}.$((PATCH + 1)).dev0"
-          cz bump "$NEXT_DEV" --files-only --yes
-          # Marketplace-facing manifest stays at the stable version. Claude
-          # Code uses .claude-plugin/plugin.json's `version` field as the
-          # cache key for marketplace installs, so leaving it on `.dev0`
-          # between releases caches every user install under the dev
-          # snapshot directory (e.g., bit-agora/i-am/0.2.1.dev0/) — see
-          # skills/versioning/SKILL.md "Marketplace versions vs. dev cycle".
-          python3 - "$STABLE" <<'PY'
-          import json, pathlib, sys
-          p = pathlib.Path(".claude-plugin/plugin.json")
-          d = json.loads(p.read_text())
-          d["version"] = sys.argv[1]
-          p.write_text(json.dumps(d, indent=2) + "\n")
-          PY
-          git add -A
-          git commit -m "bump: Open $NEXT_DEV development cycle"
-          git push

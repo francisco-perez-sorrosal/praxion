@@ -46,7 +46,6 @@ Map user intent to tool-specific CLI flags. The `/release` command uses this tab
 | Intent | Commitizen | python-semantic-release | bump-my-version | Knope | semantic-release (JS) |
 |--------|-----------|------------------------|----------------|-------|----------------------|
 | **auto** | `cz bump --changelog` | `semantic-release version` | N/A (requires explicit part) | `knope release` | `npx semantic-release` |
-| **dev** | `cz bump --prerelease dev --changelog` | `semantic-release version --prerelease` | `bump-my-version bump dev` | N/A | N/A |
 | **patch** | `cz bump --increment PATCH --changelog` | `semantic-release version --patch` | `bump-my-version bump patch` | N/A | N/A |
 | **minor** | `cz bump --increment MINOR --changelog` | `semantic-release version --minor` | `bump-my-version bump minor` | N/A | N/A |
 | **major** | `cz bump --increment MAJOR --changelog` | `semantic-release version --major` | `bump-my-version bump major` | N/A | N/A |
@@ -116,36 +115,9 @@ Each component maintains its own version and changelog. Best for projects where 
 
 ## Plugin Marketplace Publishing
 
-When a project ships as a Claude Code plugin via an external marketplace manifest — a separate repo with `.claude-plugin/marketplace.json` pointing at the plugin's source — the marketplace version is a **separate publish surface** from the plugin's internal version files. Keeping the two in sync is not automatic.
+When a project ships as a Claude Code plugin via an external marketplace manifest — a separate repo with `.claude-plugin/marketplace.json` pointing at the plugin's source — the marketplace `version` field is read by Claude Code as a cache key. Keep it equal to the plugin's released version: bump it in lockstep when the plugin tags a new release.
 
-**Release-only marketplace policy:**
-
-- Marketplace manifests advertise **stable** versions only — never `.devN` pre-release markers.
-- Dev-cycle versions (`0.2.1.dev0`, etc.) are internal working state: they live in the plugin's `pyproject.toml`, `.claude-plugin/plugin.json`, sub-project `pyproject.toml` files, but MUST NOT be pushed to the marketplace.
-- When cutting a stable release, update the marketplace AFTER the plugin repo is tagged and pushed — never before.
-
-**Why:** Claude Code's plugin subsystem uses the version string as the cache key. A dev-cycle version like `0.1.1.dev0` stays the same across many commits; advertising it to the marketplace means every cached user install gets pinned to whichever `0.1.1.dev0` snapshot happened to land first, with no mechanism to invalidate. Stable semver versions change monotonically with each release — they work correctly as cache keys.
-
-**Two-repo release workflow:**
-
-1. **Plugin repo:** `cz bump --increment <MINOR|PATCH>` → updates version files, tags `vX.Y.Z`, commits.
-2. **Plugin repo:** `cz changelog --unreleased-version vX.Y.Z --incremental` → CHANGELOG entry, commit.
-3. **Plugin repo:** manually bump version files to next dev cycle (`X.Y.(Z+1).dev0`), commit with `bump: Open X.Y.(Z+1).dev0 development cycle`.
-4. **Plugin repo:** `git push origin main && git push origin vX.Y.Z`.
-5. **Marketplace repo:** edit `.claude-plugin/marketplace.json`, set the plugin's `version` to `X.Y.Z` (the stable tag, NOT the dev-cycle marker), commit with `bump(<plugin-name>): Advertise vX.Y.Z`, push.
-6. Users running `claude plugin update <plugin>` now see the new stable version and pull it.
-
-**Cache-staleness recovery:**
-
-If users already have a stale `.devN` snapshot cached (from before this policy was in force), a one-time cleanup is required:
-
-```bash
-rm -rf ~/.claude/plugins/cache/<marketplace>/<plugin>/<stale-version>
-# Also scrub the registry so next install is fresh:
-python3 -c "import json; from pathlib import Path; p=Path.home()/'.claude/plugins/installed_plugins.json'; d=json.loads(p.read_text()); d.get('plugins',{}).pop('<plugin>@<marketplace>', None); p.write_text(json.dumps(d, indent=2))"
-```
-
-Then `claude plugin install <plugin>` pulls fresh from the corrected marketplace version.
+The simplest workflow is to make `.claude-plugin/plugin.json` a `version_files` target so `cz bump` rewrites it atomically alongside `pyproject.toml`. After tagging and pushing, update the external marketplace manifest to advertise the same version. Avoid keeping the marketplace manifest at a different version than the plugin's `pyproject.toml` — divergence breaks the cache-key contract.
 
 ## Integration with Other Skills
 

@@ -1,6 +1,6 @@
 ---
 description: Bump version, update changelog, and create a release tag
-argument-hint: [dev|patch|minor|major]
+argument-hint: [patch|minor|major]
 allowed-tools: [Bash(cz:*), Bash(git:*), Bash(gh:*), Bash(pip:*), Read, Grep, Glob]
 ---
 
@@ -12,7 +12,6 @@ Bump the project version, generate a changelog entry, and create a release tag u
 2. **Load the versioning skill**: Activate the `versioning` skill and load the appropriate tool reference file for flag mappings and configuration details
 3. **Map argument to intent**:
    - No argument -- auto-detect bump type from conventional commit history
-   - `dev` -- dev pre-release increment
    - `patch` -- patch increment
    - `minor` -- minor increment
    - `major` -- major increment

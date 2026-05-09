@@ -69,7 +69,7 @@ _REGISTRY: dict[str, _RegisterT] = {
     "reference_shell": _lazy("reference_shell"),
     "explanation_shell": _lazy("explanation_shell"),
     "how_to_shell": _lazy("how_to_shell"),
-    "verification_report": _lazy("default_markdown"),
+    "verification_report": _lazy("verification_report"),
     "architecture_explorer": _lazy("default_markdown"),
     "traceability_matrix": _lazy("default_markdown"),
     "idea_grid": _lazy("default_markdown"),

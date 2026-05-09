@@ -1,6 +1,6 @@
 # Commands
 
-Reusable slash commands for AI coding assistants. Each `.md` file becomes a `/command-name` invocable during interactive sessions. **Tool-agnostic:** compatible with Claude Code (plugin) and Cursor (exported as plain Markdown by `./install.sh cursor`).
+Reusable slash commands for AI coding assistants. Each `.md` file becomes a `/command-name` invocable during interactive sessions where the assistant supports slash commands. **Tool-agnostic:** compatible with Claude Code (plugin), Cursor (exported as plain Markdown by `./install.sh cursor`), and Codex (exposed as `praxion-command-<name>` skill wrappers by `./install.sh codex`).
 
 ## Available Commands
 
@@ -38,5 +38,6 @@ Reusable slash commands for AI coding assistants. Each `.md` file becomes a `/co
 
 - **Claude Code**: Loaded from plugin `commands/`, `.claude/commands/` (project), or `~/.claude/commands/` (personal). Invoke with `/` (plugin commands may be namespaced, e.g. `/i-am:co`).
 - **Cursor**: Exported to `.cursor/commands/` or `~/.cursor/commands/` by `./install.sh cursor` (frontmatter stripped). Invoke with `/`.
+- **Codex**: Exported to `.agents/skills/praxion-command-<name>/SKILL.md` by `./install.sh codex`. Invoke by asking Codex to run the Praxion command, e.g. `run /co with message ...`; the wrapper reads the canonical `commands/<name>.md` file before acting.
 
 For authoring guidance, see the [`command-crafting`](../skills/command-crafting/) skill.

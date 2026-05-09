@@ -70,6 +70,8 @@ installer:
 - `CLAUDE.md` as project baseline context, read by reference.
 - `rules/**/*.md` as conventions, loaded by reading the relevant files.
 - `skills/*/SKILL.md` and skill references as progressive-disclosure guidance.
+- `commands/*.md` as canonical slash-command workflow specs, exposed to Codex
+  through generated `praxion-command-<name>` skill wrappers when installed.
 - Human-facing docs such as `README.md`, `README_DEV.md`, and `docs/`.
 - Source code, tests, hooks, scripts, MCP server source, and `.ai-state/` data
   as normal repository files.
@@ -77,7 +79,6 @@ installer:
 Requires an adapter or tool-specific installer before it becomes native in a
 given agentic coding framework:
 
-- `commands/*.md` -> slash-command exporter or installer.
 - `agents/*.md` -> framework-specific subagent registration that preserves
   Praxion pipeline semantics.
 - `rules/**/*.md` frontmatter -> path matcher and rule loader.

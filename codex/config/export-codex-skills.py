@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export Praxion skills to Codex skill wrappers with compact descriptions."""
+"""Export Praxion skills to Codex skill wrappers with full descriptions."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from pathlib import Path
 
 FRONTMATTER_BOUNDARY = "---"
 SKIP_SKILL_FILES = {"CLAUDE.md", "README.md"}
-MAX_DESCRIPTION_LENGTH = 120
 
 
 class SkillParseError(ValueError):
@@ -76,23 +75,13 @@ def parse_simple_yaml(lines: list[str], path: Path) -> dict[str, str]:
     return metadata
 
 
-def shorten_description(description: str, limit: int = MAX_DESCRIPTION_LENGTH) -> str:
-    compact = " ".join(description.split())
-    if len(compact) <= limit:
-        return compact
-    cutoff = compact.rfind(" ", 0, limit - 1)
-    if cutoff <= 0:
-        return compact[: limit - 1] + "…"
-    return compact[:cutoff] + "…"
-
-
 def yaml_single_quote(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
 
 
 def render_codex_skill(metadata: dict[str, str], source_path: Path) -> str:
     name = metadata["name"]
-    description = shorten_description(metadata["description"])
+    description = metadata["description"]
 
     return "\n".join(
         [
@@ -106,7 +95,7 @@ def render_codex_skill(metadata: dict[str, str], source_path: Path) -> str:
             "This is a Codex skill wrapper for Praxion.",
             "",
             f"Before using this skill, read the canonical skill definition at `{source_path.as_posix()}` and follow it as the authoritative source.",
-            "Do not treat this wrapper as a fork; it exists only to expose concise Codex startup metadata.",
+            "Do not treat this wrapper as a fork; it exists only to expose Codex startup metadata.",
             "",
         ]
     )

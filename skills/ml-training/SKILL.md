@@ -3,18 +3,17 @@ name: ml-training
 description: >
   ML/AI pre-training project management and execution within Praxion. Covers the
   ML/AI training archetype vocabulary (six artifact types: frozen eval harness,
-  pinned dataset, experiment log, checkpoints, compute budget, hyperparameter block),
-  three operational modes (A: co-located owned GPU; B: co-located rented GPU; C:
-  separated cloud), program.md as the project-local experiment-loop meta-prompt,
-  compute-budget requirements for every training-dispatch step, and cross-references
-  to llm-training-eval, neo-cloud-abstraction, and experiment-tracking skills.
-  Use when onboarding a project that trains neural networks, when a project has
-  train.py / prepare.py, when the user mentions GPUs / compute budget / checkpoints
-  / loss curves / perplexity, when the user mentions autoresearch or Karpathy, or
-  when a pipeline is managing a project with torch / jax / tensorflow dependencies.
-  Activate alongside agentic-sdks and agent-evals for dual-archetype compositions
-  where an autonomous agent drives an ML training loop (autoresearch is one such
-  composition).
+  pinned dataset, experiment log, checkpoints, compute budget, hyperparameter
+  block), three operational modes (A: co-located owned GPU; B: co-located rented
+  GPU; C: separated cloud), program.md as the project-local experiment-loop
+  meta-prompt, compute-budget requirements for training-dispatch steps, and
+  cross-references to llm-training-eval, neo-cloud-abstraction, and
+  experiment-tracking skills. Use when onboarding projects that train neural
+  networks, when a project has train.py / prepare.py, when the user mentions GPUs
+  / compute budget / checkpoints / loss curves / perplexity / autoresearch /
+  Karpathy, or when a pipeline manages torch / jax / tensorflow dependencies.
+  Activate alongside agentic-sdks and agent-evals for dual-archetype
+  compositions where an autonomous agent drives an ML training loop.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

@@ -28,7 +28,7 @@ under a target `.agents/skills/` directory.
 The exporter preserves:
 
 - the canonical skill name
-- a compact description that fits Codex startup limits
+- the full canonical description
 - a thin wrapper body that points back to `skills/<name>/SKILL.md`
 
 It intentionally does not copy canonical skill bodies into the wrapper. Codex

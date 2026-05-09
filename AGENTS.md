@@ -89,3 +89,55 @@ changes to shipped blocks or onboarding behavior, run:
 
 For Python behavior, run the relevant pytest target from `CLAUDE.md` or
 `README_DEV.md`.
+
+
+<!-- PRAXION:AGENTS_ADAPTER:START -->
+## Praxion Adapter
+
+This project uses Praxion guidance through AGENTS.md-compatible tooling.
+Praxion's source artifacts are canonical; this block is only a pointer.
+
+Praxion source:
+
+```text
+/Users/fperez/dev/praxion
+```
+
+When working in this project:
+
+1. Read `/Users/fperez/dev/praxion/AGENTS.md` for the compatibility contract.
+2. Read `/Users/fperez/dev/praxion/CLAUDE.md` for Praxion baseline context.
+3. Load relevant rules from `/Users/fperez/dev/praxion/rules/` by reading the files.
+4. Load matching skills from `/Users/fperez/dev/praxion/skills/<name>/SKILL.md` and
+   skill references only when needed.
+5. Treat `/Users/fperez/dev/praxion/commands/*.md` and `/Users/fperez/dev/praxion/agents/*.md` as
+   workflow specs unless this agentic framework has a native adapter for them.
+
+Always-on Praxion stance:
+
+- Surface Assumptions.
+- Register Objection.
+- Stay Surgical.
+- Simplicity First.
+
+Task sizing:
+
+- Direct: single-file fix, config, doc, typo.
+- Lightweight: 2-3 files, one behavior, clear scope.
+- Standard: 4-8 files, 2-4 behaviors, architectural decisions.
+- Full: 9+ files, 5+ behaviors, cross-cutting work.
+- Spike: exploratory, uncertain outcome.
+
+Praxion agents available through Codex custom-agent wrappers when the native
+adapter is installed: promethean, researcher, systems-architect,
+implementation-planner, context-engineer, implementer, test-engineer, verifier,
+architect-validator, doc-engineer, sentinel, skill-genesis, cicd-engineer, and
+roadmap-cartographer.
+
+Praxion skills are exposed to Codex through project-local `.agents/skills`
+wrapper skills. Load matching skills on demand; canonical skill files remain
+the source of truth.
+
+Do not copy Praxion rules, skills, commands, or agents into this file. Keep this
+adapter small and update Praxion at the source.
+<!-- PRAXION:AGENTS_ADAPTER:END -->

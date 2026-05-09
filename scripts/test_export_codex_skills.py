@@ -17,7 +17,7 @@ def load_exporter():
     return module
 
 
-def test_export_skills_writes_wrapper_with_short_description(tmp_path: Path):
+def test_export_skills_writes_wrapper_with_full_description(tmp_path: Path):
     exporter = load_exporter()
     out_dir = tmp_path / "skills"
 
@@ -33,7 +33,9 @@ def test_export_skills_writes_wrapper_with_short_description(tmp_path: Path):
     description_line = next(line for line in text.splitlines() if line.startswith("description: "))
     description = description_line.split(": ", 1)[1]
     assert description.startswith("'") and description.endswith("'")
-    assert len(description[1:-1]) <= exporter.MAX_DESCRIPTION_LENGTH
+    source_metadata, _ = exporter.parse_frontmatter_skill(REPO_ROOT / "skills" / "ml-training" / "SKILL.md")
+    source_description = source_metadata["description"]
+    assert description[1:-1] == source_description
 
 
 def test_parse_rejects_missing_frontmatter(tmp_path: Path):

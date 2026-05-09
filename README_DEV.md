@@ -265,11 +265,12 @@ contract and points agents back to canonical source artifacts.
 The Codex installer writes that project-local adapter block and, by default,
 adds generated Codex custom-agent wrappers under the target project's
 `.codex/agents/`; those wrappers point back to canonical `agents/*.md` files
-instead of copying their bodies. It also generates compact Codex skill wrappers
+instead of copying their bodies. It also generates Codex skill wrappers
 under the target project's `.agents/skills/` directory, pointing back to
-canonical `skills/*/SKILL.md` files while keeping startup metadata within Codex
-limits. It does not yet install hooks, configure MCP, create `.ai-state/`, or
-export slash commands. Those surfaces require explicit tool-specific adapters:
+canonical `skills/*/SKILL.md` files while preserving the full skill
+description in the wrapper metadata. It does not yet install hooks, configure
+MCP, create `.ai-state/`, or export slash commands. Those surfaces require
+explicit tool-specific adapters:
 
 | Surface | Native adapter needed |
 |---|---|

@@ -13,12 +13,15 @@ The exporter preserves:
 
 - `name`
 - `description`
+- translated `model` / `model_reasoning_effort` values from the canonical
+  Praxion routing table
 - a thin `developer_instructions` wrapper that tells Codex to read the
-  canonical Praxion agent file before acting
+  canonical Praxion agent file before acting and carries the source
+  frontmatter contract as a compact capsule
 
-It intentionally does not translate Claude-specific tool, hook, permission,
-memory, or model frontmatter yet. Those fields have different Codex semantics
-and need explicit design instead of lossy copying.
+The source frontmatter capsule preserves Claude-specific tool, hook,
+permission, memory, background, max-turn, and skill semantics that Codex
+does not model natively in the wrapper TOML.
 
 ## Skill Export
 
@@ -104,6 +107,12 @@ Generated surfaces:
   state snapshots before compaction when Codex emits the event
 - `.codex/praxion/hook_registrations.json` -- expected Praxion hook
   registrations for merge/check logic
+
+Codex does not currently accept an `async` field in `.codex/hooks.json`.
+The exporter therefore omits `async` from all hook registrations, including
+observability hooks. Codex launches multiple matching command hooks
+concurrently at runtime, so the unsupported field is not needed to preserve
+non-blocking fan-out behavior.
 
 This bridge intentionally does **not** export semantic Praxion Markdown rules
 into `.codex/rules/`. Native Codex `.rules` remain reserved for command

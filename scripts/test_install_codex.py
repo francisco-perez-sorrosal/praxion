@@ -56,6 +56,9 @@ def test_install_codex_exports_canonical_paths_and_check_passes(tmp_path: Path):
         str((REPO_ROOT / "agents" / "researcher.md").resolve()).replace("\\", "/")
         in researcher
     )
+    assert 'model = "gpt-5.4"' in researcher
+    assert 'model_reasoning_effort = "medium"' in researcher
+    assert "Praxion agent contract:" in researcher
     assert (
         str(
             (REPO_ROOT / "skills" / "software-planning" / "SKILL.md").resolve()
@@ -70,15 +73,17 @@ def test_install_codex_exports_canonical_paths_and_check_passes(tmp_path: Path):
     assert (project_dir / ".codex" / "praxion" / "hook_runtime.py").exists()
     assert (project_dir / ".codex" / "praxion" / "pipeline_semantics.json").exists()
     assert (project_dir / ".codex" / "praxion" / "model_routing.json").exists()
-    assert (project_dir / ".codex" / "hooks" / "praxion-memory-session-start.py").exists()
+    assert (
+        project_dir / ".codex" / "hooks" / "praxion-memory-session-start.py"
+    ).exists()
     assert (project_dir / ".codex" / "hooks" / "praxion-memory-stop.py").exists()
-    assert (project_dir / ".codex" / "hooks" / "praxion-subagent-pre-tool-use.py").exists()
+    assert (
+        project_dir / ".codex" / "hooks" / "praxion-subagent-pre-tool-use.py"
+    ).exists()
     assert (
         project_dir / ".codex" / "hooks" / "praxion-commit-memory-pre-tool-use.py"
     ).exists()
-    assert (
-        project_dir / ".codex" / "hooks" / "praxion-precompact-state.py"
-    ).exists()
+    assert (project_dir / ".codex" / "hooks" / "praxion-precompact-state.py").exists()
     assert (
         project_dir / ".codex" / "hooks" / "praxion-observability-post-tool-use.py"
     ).exists()
@@ -88,7 +93,8 @@ def test_install_codex_exports_canonical_paths_and_check_passes(tmp_path: Path):
     assert "Claude-only routing rule" in agents_md
     assert (project_dir / ".codex" / "hooks.json").exists()
     config_text = (project_dir / ".codex" / "config.toml").read_text(encoding="utf-8")
-    assert "hooks = true" in config_text
+    config_lines = set(config_text.splitlines())
+    assert "hooks = true" in config_lines
     assert "codex_hooks" not in config_text
     hooks_text = (project_dir / ".codex" / "hooks.json").read_text(encoding="utf-8")
     assert "praxion-memory-session-start.py" in hooks_text
@@ -97,6 +103,7 @@ def test_install_codex_exports_canonical_paths_and_check_passes(tmp_path: Path):
     assert "praxion-commit-memory-pre-tool-use.py" in hooks_text
     assert "praxion-precompact-state.py" in hooks_text
     assert "praxion-observability-post-tool-use.py" in hooks_text
+    assert '"async"' not in hooks_text
     shared_config = tomllib.loads(
         (home_dir / ".codex" / "config.toml").read_text(encoding="utf-8")
     )
@@ -222,8 +229,9 @@ def test_install_codex_uninstall_preserves_user_codex_config_and_hooks(tmp_path:
     assert install.returncode == 0, install.stderr or install.stdout
 
     installed_config = (codex_dir / "config.toml").read_text(encoding="utf-8")
+    installed_config_lines = set(installed_config.splitlines())
     assert "other_flag = true" in installed_config
-    assert "hooks = true" in installed_config
+    assert "hooks = true" in installed_config_lines
     assert "codex_hooks" not in installed_config
     hooks_text = (codex_dir / "hooks.json").read_text(encoding="utf-8")
     assert "python3 user-hook.py" in hooks_text

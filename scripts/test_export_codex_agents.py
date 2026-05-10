@@ -31,11 +31,43 @@ def test_export_agents_writes_required_codex_fields(tmp_path: Path):
     assert 'name = "researcher"' in text
     assert "description =" in text
     assert "developer_instructions =" in text
-    assert str((REPO_ROOT / "agents" / "researcher.md").resolve()).replace("\\", "/") in text
-    assert "source file is authoritative" in text
+    assert (
+        str((REPO_ROOT / "agents" / "researcher.md").resolve()).replace("\\", "/")
+        in text
+    )
+    assert "source file remains authoritative" in text
     assert "Surface Assumptions" in text
     developer_instructions = text.split("developer_instructions =", maxsplit=1)[1]
-    assert "RESEARCH_FINDINGS.md" not in developer_instructions
+    assert "You do not implement." not in developer_instructions
+
+
+def test_export_agents_translates_routing_and_keeps_contract_capsule(tmp_path: Path):
+    exporter = load_exporter()
+    out_dir = tmp_path / "agents"
+
+    exporter.export_agents(REPO_ROOT, out_dir)
+
+    researcher = (out_dir / "researcher.toml").read_text(encoding="utf-8")
+    promethean = (out_dir / "promethean.toml").read_text(encoding="utf-8")
+
+    assert 'model = "gpt-5.4"' in researcher
+    assert 'model_reasoning_effort = "medium"' in researcher
+    assert "Praxion agent contract:" in researcher
+
+    assert 'model = "gpt-5.5"' in promethean
+    assert 'model_reasoning_effort = "high"' in promethean
+    assert (
+        "tools: Read, Glob, Grep, Bash, Write, Edit, AskUserQuestion, WebFetch"
+        in promethean
+    )
+    assert "permissionMode: default" in promethean
+    assert "hooks:" in promethean
+    assert "async: true" in promethean
+    assert "Do not duplicate the canonical agent body here." in promethean
+    assert (
+        str((REPO_ROOT / "agents" / "promethean.md").resolve()).replace("\\", "/")
+        in promethean
+    )
 
 
 def test_parse_rejects_missing_frontmatter(tmp_path: Path):

@@ -264,14 +264,16 @@ contract and points agents back to canonical source artifacts.
 
 The Codex installer writes that project-local adapter block and, by default,
 adds generated Codex custom-agent wrappers under the target project's
-`.codex/agents/`; those wrappers point back to canonical `agents/*.md` files
-instead of copying their bodies. It also generates Codex skill wrappers
-under the target project's `.agents/skills/` directory, pointing back to
-canonical `skills/*/SKILL.md` files while preserving the full skill
-description in the wrapper metadata. Adapter fidelity matters here: preserve
-canonical Praxion wording for agent and skill metadata. If Codex warns that
-skill descriptions were shortened to fit its startup budget, accept that
-runtime warning instead of pre-trimming generated wrappers.
+`.codex/agents/`; those wrappers point back to canonical `agents/*.md` files,
+translate Praxion's current routing table into Codex model settings, and carry
+the source frontmatter contract instead of copying the full body. It also
+generates Codex skill wrappers under the target project's `.agents/skills/`
+directory, pointing back to canonical `skills/*/SKILL.md` files while
+preserving the full skill description in the wrapper metadata. Adapter
+fidelity matters here: preserve canonical Praxion wording for agent and skill
+metadata. If Codex warns that skill descriptions were shortened to fit its
+startup budget, accept that runtime warning instead of pre-trimming generated
+wrappers.
 
 When native Codex surfaces are installed, the project-local `AGENTS.md` adapter
 is also the current consumer for the generated pipeline metadata. It points
@@ -293,8 +295,13 @@ lossy direct export to native `.codex/rules/`:
 - `.codex/praxion/hook_runtime.py` runs canonical Praxion hook scripts with
   Codex-specific MCP tool names
 - `.codex/hooks.json` registers those Praxion-managed hooks
-- `.codex/config.toml` is updated surgically to enable `hooks = true` and
-  remove deprecated `codex_hooks` entries
+- `.codex/config.toml` is updated surgically to enable `hooks = true`
+  and remove deprecated `codex_hooks` entries
+
+Codex hook registrations omit the Claude-style `async` field because current
+Codex builds reject async hook handlers at startup. Observability hooks still
+fan out through Codex's command-hook runner, and the wrappers fail open when
+Chronograph or Phoenix is unavailable.
 
 Codex still treats newly installed project-local hooks as reviewable security
 surfaces, so a fresh target project may show pending hook review in `/hooks`

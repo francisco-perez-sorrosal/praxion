@@ -118,7 +118,7 @@ This bridge intentionally does **not** export semantic Praxion Markdown rules
 into `.codex/rules/`. Native Codex `.rules` remain reserved for command
 approval / sandbox policy semantics.
 
-The bridge also does **not** create `.ai-state/`. Generic project onboarding
+The bridge also does **not** create `.ai-state/`. Claude project onboarding
 owns that lifecycle; generated Codex memory hooks and file-backed observation
 capture activate against an existing `.ai-state/` directory.
 

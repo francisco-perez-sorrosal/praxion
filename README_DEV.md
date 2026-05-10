@@ -320,7 +320,7 @@ For MCP, `install_codex.sh` now reuses the canonical `.claude-plugin/plugin.json
 uninstall restores any pre-existing user server blocks instead of clobbering
 unrelated Codex MCP config.
 
-The installer still does not create `.ai-state/`; generic project onboarding
+The installer still does not create `.ai-state/`; Claude project onboarding
 owns that lifecycle. Codex memory hooks and file-backed observation capture
 activate only when the target project already has `.ai-state/`. Current Codex
 adapter status:

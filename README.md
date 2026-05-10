@@ -400,7 +400,7 @@ checkout as the canonical source.
 `CLAUDE.md`, `rules/`, `skills/`, docs, source, tests, scripts, MCP server
 source, and `.ai-state/` data by reference.
 
-**What still needs explicit later work:** generic project onboarding owns
+**What still needs explicit later work:** Claude onboarding owns
 `.ai-state/` creation, Codex-native slash-command UX is still represented by
 skill wrappers, and user-global `$HOME/.agents/skills` export remains a future
 surface. Claude marketplace auto-completion remains Claude-only by design.
@@ -460,7 +460,7 @@ run, so new rules are picked up automatically. When a rule needs an explicit
 Codex portability or load override, that metadata lives in the rule's own
 frontmatter rather than in a separate Python allowlist.
 
-The Codex installer does not create `.ai-state/`; generic project onboarding
+The Codex installer does not create `.ai-state/`; Claude project onboarding
 owns that lifecycle. Memory hooks and file-backed observation capture are
 installed by the Codex adapter, but they activate only when the target project
 already has `.ai-state/`.

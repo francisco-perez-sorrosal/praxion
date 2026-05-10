@@ -28,7 +28,3 @@ Can user execute/apply this information independently? If no, add missing proces
 Extras
 
 Be aware of the tools that you have at your service to accomplish tasks more effectively.
-
-After each Claude response (unless it's explicitly denied by the user or is meta-management of memories -see below-,) use Memento to  manage (retrieve, encode, consolidate, erase) the memories of the user through the tools provided.
-
-Important: Avoid Meta-Management with Memento after getting assistant response; That is, never try to manage memories related to the management of memories themselves (e.g. after retrieval, encoding, consolidating or erasing memories.)

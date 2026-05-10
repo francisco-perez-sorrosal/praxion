@@ -401,9 +401,8 @@ checkout as the canonical source.
 source, and `.ai-state/` data by reference.
 
 **What still needs explicit later work:** Claude onboarding owns
-`.ai-state/` creation, and Codex-native slash-command UX is still represented by
-skill wrappers. Claude marketplace auto-completion remains Claude-only by
-design.
+`.ai-state/` creation. Claude marketplace auto-completion remains Claude-only
+by design.
 
 By default, the Codex install generates Codex custom-agent wrappers under the
 target project's `.codex/agents/`. These wrappers are intentionally thin: each

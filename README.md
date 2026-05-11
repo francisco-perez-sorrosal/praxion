@@ -18,7 +18,7 @@ AGENTS.md-aware agents such as **Codex**.
 
 ## What You Get
 
-- **42 skills** covering Python, API design, CI/CD, deployment, observability, refactoring, spec-driven development, external API docs, security review, testing strategy, test coverage, roadmap synthesis, ML/AI training, and more -- loaded automatically when the task matches
+- **43 skills** covering Python, API design, CI/CD, deployment, observability, refactoring, spec-driven development, external API docs, security review, testing strategy, test coverage, roadmap synthesis, ML/AI training, and more -- loaded automatically when the task matches
 - **13 specialized agents** that collaborate on complex features (research, architecture, planning, implementation, testing, verification, roadmap cartography)
 - **32 slash commands** for daily workflows -- commits, worktrees, memory management, project scaffolding, testing, releases, code review, roadmap generation, metrics, ML experiment dispatch
 - **Coding rules** auto-loaded by context -- coding style, git conventions, documentation standards, agent coordination
@@ -384,19 +384,19 @@ For **Claude Code vs Cursor** format differences (discovery paths, command expor
 
 ### Codex / AGENTS.md-aware agents (`./install.sh codex /path/repo`)
 
-Installs a Praxion-managed block into the target project's `AGENTS.md` and
-manages project-local Codex adapter surfaces under the target project's
-`.codex/` and `.agents/`. That managed block is installed first in the file and
-contains two layers:
+Compiles the target project's `AGENTS.md` from two sources and manages
+project-local Codex adapter surfaces under the target project's `.codex/` and
+`.agents/`. The compiled file starts with two shared layers:
 
 - the shared Praxion Codex philosophy derived from `codex/config/AGENTS.md.tmpl`
 - the Praxion project adapter that points Codex back to canonical repository
   artifacts
 
-Any project-specific `AGENTS.md` content already present in the target project
-is preserved after the managed Praxion block. This keeps Praxion philosophy
-ahead of project-local refinements without requiring Praxion to own shared
-`~/.codex` startup instructions.
+The project-specific source is `<project>/AGENTS.md.tmpl`. If that file is
+missing, `install.sh codex` generates it once from the project's root
+`CLAUDE.md` via Praxion's Claude-to-Agents adaptation workflow, then compiles
+the final `AGENTS.md`. After first install, `AGENTS.md.tmpl` is the source to
+review and edit; `AGENTS.md` is compiled output.
 
 ```bash
 ./install.sh codex /path/to/repo --dry-run
@@ -427,9 +427,9 @@ may warn that skill descriptions were shortened to fit its startup budget; that
 runtime warning is preferred over pre-trimming Praxion's canonical
 descriptions.
 
-When native Codex surfaces are installed, the managed project `AGENTS.md`
-block also points AGENTS.md-aware tools at `.codex/praxion/pipeline_semantics.json`
-and `.codex/praxion/model_routing.json` when present. That keeps task sizing,
+When native Codex surfaces are installed, the compiled project `AGENTS.md` also
+points AGENTS.md-aware tools at `.codex/praxion/pipeline_semantics.json` and
+`.codex/praxion/model_routing.json` when present. That keeps task sizing,
 delegation, and model-routing guidance at the main-session project layer rather
 than copying Claude-only routing text into Codex wrappers.
 
@@ -472,10 +472,7 @@ frontmatter rather than in a separate Python allowlist.
 For project Codex config, the installer reuses the canonical
 `.claude-plugin/plugin.json` `mcpServers` entries and writes the corresponding
 `memory` and `task-chronograph` registrations into
-`<project>/.codex/config.toml`. That same managed project-config surface also
-ensures `project_doc_fallback_filenames` includes `CLAUDE.md`, so Codex can
-load Praxion's canonical Claude-first project doc without requiring each repo
-to rename it to `AGENTS.md`. A project-local state file at
+`<project>/.codex/config.toml`. A project-local state file at
 `<project>/.codex/praxion/mcp_state.json` tracks the original project-owned
 blocks so uninstall restores them instead of clobbering unrelated Codex config.
 
@@ -489,11 +486,9 @@ Codex hook wrappers also honor an optional project-local
 Claude Code settings. Use it to disable memory, process framing, observability,
 or worktree-guard behavior for Codex without touching `.claude/settings.json`.
 
-Shared `~/.codex/AGENTS.md`, `~/.codex/AGENTS.override.md`, and
-`~/.codex/config.toml` remain user-owned in the current Codex flow. Praxion
-does not install or overwrite them by default because Codex treats
-`AGENTS.override.md` as higher priority than `AGENTS.md` at the same scope,
-and because Praxion's current Codex support is intentionally project-oriented.
+Shared `~/.codex/AGENTS.md` and `~/.codex/config.toml` remain user-owned in the
+current Codex flow. Praxion does not install or overwrite them by default
+because the current Codex support is intentionally project-oriented.
 
 Use `--compat-only` only for non-Codex AGENTS.md-aware tools or when debugging
 the bootstrap pointer without native Codex surfaces.

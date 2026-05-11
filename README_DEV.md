@@ -262,33 +262,30 @@ a second copy of Claude-facing guidance for Codex, Cursor, or any future
 AGENTS.md-aware coding agent. The root `AGENTS.md` names the compatibility
 contract and points agents back to canonical source artifacts.
 
-`install_codex.sh` installs a marked Praxion-managed block into a target
-project's `AGENTS.md` and manages project-local Codex adapter surfaces under
-`<project>/.codex/` and `<project>/.agents/`. The managed block is safe to
-update or remove because it is delimited by:
+`install_codex.sh` compiles a target project's `AGENTS.md` from two sources:
 
-```md
-<!-- PRAXION:AGENTS_ADAPTER:START -->
-<!-- PRAXION:AGENTS_ADAPTER:END -->
-```
+- the shared Praxion Codex baseline in `codex/config/AGENTS.md.tmpl`
+- the project-local source template at `<project>/AGENTS.md.tmpl`
 
-The Codex installer writes that managed project block by prepending the shared
-Praxion Codex philosophy derived from `codex/config/AGENTS.md.tmpl`, then the
-Praxion project adapter, ahead of any pre-existing project-specific
-`AGENTS.md` content. By default it also adds generated Codex custom-agent
-wrappers under the target project's `.codex/agents/`; those wrappers point
-back to canonical `agents/*.md` files, translate Praxion's current routing
-table into Codex model settings, and carry the source frontmatter contract
-instead of copying the full body. It also generates Codex skill wrappers under
-the target project's `.agents/skills/` directory, pointing back to canonical
-`skills/*/SKILL.md` files while preserving the full skill description in the
-wrapper metadata. Adapter fidelity matters here: preserve canonical Praxion
-wording for agent and skill metadata. If Codex warns that skill descriptions
-were shortened to fit its startup budget, accept that runtime warning instead
-of pre-trimming generated wrappers.
+If `<project>/AGENTS.md.tmpl` is missing, the installer generates it once from
+the project's root `CLAUDE.md` via the `adapt-claude-to-agents` skill workflow,
+then compiles the final `AGENTS.md`. After that first install,
+`AGENTS.md.tmpl` is the source to edit and `AGENTS.md` is compiled output.
 
-When native Codex surfaces are installed, the managed project `AGENTS.md`
-block is also the current consumer for the generated pipeline metadata. It points
+By default the installer also adds generated Codex custom-agent wrappers under
+the target project's `.codex/agents/`; those wrappers point back to canonical
+`agents/*.md` files, translate Praxion's current routing table into Codex model
+settings, and carry the source frontmatter contract instead of copying the full
+body. It also generates Codex skill wrappers under the target project's
+`.agents/skills/` directory, pointing back to canonical `skills/*/SKILL.md`
+files while preserving the full skill description in the wrapper metadata.
+Adapter fidelity matters here: preserve canonical Praxion wording for agent and
+skill metadata. If Codex warns that skill descriptions were shortened to fit
+its startup budget, accept that runtime warning instead of pre-trimming
+generated wrappers.
+
+When native Codex surfaces are installed, the compiled project `AGENTS.md` is
+also the current consumer for the generated pipeline metadata. It points
 AGENTS.md-aware tools to `.codex/praxion/pipeline_semantics.json` for task
 sizing and delegation and to `.codex/praxion/model_routing.json` for Codex-side
 routing, rather than asking Codex to reinterpret the Claude-only routing rule
@@ -331,11 +328,6 @@ For MCP, `install_codex.sh` reuses the canonical `.claude-plugin/plugin.json`
 `.codex/praxion/mcp_state.json` tracks any original project-owned blocks so
 uninstall can restore them without clobbering unrelated Codex config.
 
-The same project-local config manager also ensures
-`project_doc_fallback_filenames` includes `CLAUDE.md`, which is the Codex-side
-equivalent of teaching the agent to read Praxion's canonical Claude-first
-project doc without forcing every project to rename that file.
-
 The installer still does not create `.ai-state/`; Claude project onboarding
 owns that lifecycle. Codex memory hooks and file-backed observation capture
 activate only when the target project already has `.ai-state/`. Current Codex
@@ -350,8 +342,7 @@ instead of extending adapter code.
 | Surface | Current Codex adapter status |
 |---|---|
 | `~/.codex/AGENTS.md` | User-owned global Codex baseline; Praxion does not install or overwrite it in the current project-local flow |
-| `~/.codex/AGENTS.override.md` | User-owned global override; Praxion does not install it because Codex shadows `AGENTS.md` with `AGENTS.override.md` at the same scope |
-| `<project>/.codex/config.toml` project-doc fallback | `install_codex.sh` ensures `project_doc_fallback_filenames` includes `CLAUDE.md`, with restoration of any pre-existing project value on uninstall |
+| `<project>/AGENTS.md.tmpl` | Project-local Codex source template; generated from `CLAUDE.md` on first install when missing |
 | `commands/*.md` | `install_codex.sh` generates `praxion-command-<name>` wrappers under project `.agents/skills/` |
 | `agents/*.md` | `install_codex.sh` generates thin `.codex/agents/*.toml` wrappers by default |
 | `rules/**/*.md` frontmatter | `install_codex.sh` now generates a hook-backed rules bridge under `.codex/praxion/` plus `.codex/hooks.json`; native `.codex/rules` stays reserved for approval policy |

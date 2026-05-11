@@ -48,7 +48,6 @@ def test_manage_codex_mcp_install_and_check_round_trip(tmp_path: Path):
 
     config_path = project_dir / ".codex" / "config.toml"
     parsed = tomllib.loads(config_path.read_text(encoding="utf-8"))
-    assert parsed["project_doc_fallback_filenames"] == ["CLAUDE.md"]
     memory_config = parsed["mcp_servers"]["memory"]
     chronograph_config = parsed["mcp_servers"]["task-chronograph"]
 
@@ -122,10 +121,7 @@ def test_manage_codex_mcp_uninstall_restores_project_config(tmp_path: Path):
     assert install.returncode == 0, install.stderr or install.stdout
 
     installed = tomllib.loads((codex_dir / "config.toml").read_text(encoding="utf-8"))
-    assert installed["project_doc_fallback_filenames"] == [
-        "TEAM_GUIDE.md",
-        "CLAUDE.md",
-    ]
+    assert installed["project_doc_fallback_filenames"] == ["TEAM_GUIDE.md"]
     assert installed["profiles"]["default"]["model"] == "gpt-5"
     assert installed["mcp_servers"]["memory"]["command"] == "uv"
 

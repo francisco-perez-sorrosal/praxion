@@ -15,8 +15,6 @@ STATE_VERSION = 1
 CONFIG_DIR_NAME = ".codex"
 CONFIG_FILE_NAME = "config.toml"
 STATE_RELATIVE_PATH = Path("praxion/mcp_state.json")
-PROJECT_DOC_FALLBACK_KEY = "project_doc_fallback_filenames"
-CLAUDE_FALLBACK_FILENAME = "CLAUDE.md"
 
 
 @dataclass(frozen=True)
@@ -179,88 +177,6 @@ def normalize_config_text(text: str) -> str:
     return stripped + "\n"
 
 
-TOP_LEVEL_ASSIGNMENT_RE = re.compile(r"^\s*([A-Za-z0-9_-]+)\s*=")
-
-
-def toml_array(values: list[str]) -> str:
-    return "[" + ", ".join(toml_quote(value) for value in values) + "]"
-
-
-def find_top_level_assignment_span(text: str, key: str) -> tuple[int, int, str] | None:
-    lines = text.splitlines(keepends=True)
-    section_started = False
-    index = 0
-
-    while index < len(lines):
-        line = lines[index]
-        if TABLE_HEADER_RE.match(line):
-            section_started = True
-        if section_started:
-            index += 1
-            continue
-
-        match = TOP_LEVEL_ASSIGNMENT_RE.match(line)
-        if match is None or match.group(1) != key:
-            index += 1
-            continue
-
-        end_index = index + 1
-        bracket_balance = line.split("=", 1)[1].split("#", 1)[0].count(
-            "["
-        ) - line.split("=", 1)[1].split("#", 1)[0].count("]")
-        while bracket_balance > 0 and end_index < len(lines):
-            next_line = lines[end_index]
-            bracket_balance += next_line.split("#", 1)[0].count("[")
-            bracket_balance -= next_line.split("#", 1)[0].count("]")
-            end_index += 1
-
-        return index, end_index, "".join(lines[index:end_index])
-
-    return None
-
-
-def remove_top_level_assignment(text: str, key: str) -> tuple[str, str | None]:
-    span = find_top_level_assignment_span(text, key)
-    if span is None:
-        return normalize_config_text(text), None
-
-    start_index, end_index, removed = span
-    lines = text.splitlines(keepends=True)
-    kept = "".join(lines[:start_index] + lines[end_index:])
-    return normalize_config_text(kept), removed
-
-
-def set_top_level_assignment(text: str, key: str, rendered_value: str) -> str:
-    cleaned_text, _removed = remove_top_level_assignment(text, key)
-    line = f"{key} = {rendered_value}\n"
-    if not cleaned_text:
-        return line
-
-    lines = cleaned_text.splitlines(keepends=True)
-    insert_at = len(lines)
-    for index, existing_line in enumerate(lines):
-        if TABLE_HEADER_RE.match(existing_line):
-            insert_at = index
-            break
-
-    while insert_at > 0 and not lines[insert_at - 1].strip():
-        insert_at -= 1
-
-    updated = lines[:insert_at] + [line] + lines[insert_at:]
-    return normalize_config_text("".join(updated))
-
-
-def merge_project_doc_fallbacks(parsed: dict) -> list[str]:
-    existing = parsed.get(PROJECT_DOC_FALLBACK_KEY)
-    if isinstance(existing, list):
-        merged = [str(item) for item in existing]
-    else:
-        merged = []
-    if CLAUDE_FALLBACK_FILENAME not in merged:
-        merged.append(CLAUDE_FALLBACK_FILENAME)
-    return merged
-
-
 def remove_server_blocks(
     text: str, server_names: set[str]
 ) -> tuple[str, dict[str, str | None]]:
@@ -383,14 +299,11 @@ def expected_blocks_for_repo(repo_root: Path, server_order: list[str]) -> list[s
 
 def install(repo_root: Path, project_root: Path) -> None:
     current_text = read_config_text(project_root)
-    parsed = ensure_valid_toml(current_text, config_path(project_root))
+    ensure_valid_toml(current_text, config_path(project_root))
 
     expected = load_plugin_mcp_servers(repo_root)
     server_order = list(expected)
     cleaned_text, removed_blocks = remove_server_blocks(current_text, set(server_order))
-    cleaned_text, removed_fallback_assignment = remove_top_level_assignment(
-        cleaned_text, PROJECT_DOC_FALLBACK_KEY
-    )
 
     state = load_state(project_root)
     if state is None:
@@ -399,28 +312,19 @@ def install(repo_root: Path, project_root: Path) -> None:
             "original_blocks": {
                 name: removed_blocks.get(name) for name in server_order
             },
-            "original_project_doc_fallback_assignment": removed_fallback_assignment,
             "project_root": project_root.as_posix(),
             "repo_root": repo_root.as_posix(),
         }
     else:
         state.setdefault("version", STATE_VERSION)
         state.setdefault("original_blocks", {})
-        state.setdefault(
-            "original_project_doc_fallback_assignment", removed_fallback_assignment
-        )
         state.setdefault("project_root", project_root.as_posix())
         state.setdefault("repo_root", repo_root.as_posix())
         for name in server_order:
             state["original_blocks"].setdefault(name, removed_blocks.get(name))
 
-    new_text = set_top_level_assignment(
-        cleaned_text,
-        PROJECT_DOC_FALLBACK_KEY,
-        toml_array(merge_project_doc_fallbacks(parsed)),
-    )
     new_text = append_server_blocks(
-        new_text,
+        cleaned_text,
         [render_server_block(name, expected[name]) for name in server_order],
     )
     write_config_text(project_root, new_text)
@@ -436,22 +340,9 @@ def uninstall(repo_root: Path, project_root: Path) -> None:
     ensure_valid_toml(current_text, config_path(project_root))
 
     original_blocks = state.get("original_blocks", {})
-    original_fallback_assignment = state.get(
-        "original_project_doc_fallback_assignment", None
-    )
-
     server_names = set(str(name) for name in original_blocks)
     server_names.update(load_plugin_mcp_servers(repo_root))
     cleaned_text, _removed_blocks = remove_server_blocks(current_text, server_names)
-    cleaned_text, _removed_fallback_assignment = remove_top_level_assignment(
-        cleaned_text, PROJECT_DOC_FALLBACK_KEY
-    )
-    if original_fallback_assignment:
-        cleaned_text = set_top_level_assignment(
-            cleaned_text,
-            PROJECT_DOC_FALLBACK_KEY,
-            original_fallback_assignment.split("=", 1)[1].strip(),
-        )
     restored_blocks = [
         original_blocks[name] for name in original_blocks if original_blocks[name]
     ]
@@ -480,12 +371,6 @@ def check(repo_root: Path, project_root: Path) -> tuple[bool, list[str]]:
             continue
         if actual != server:
             problems.append(f"Codex project MCP server is stale: {name}")
-
-    fallback_filenames = parsed.get(PROJECT_DOC_FALLBACK_KEY) or []
-    if CLAUDE_FALLBACK_FILENAME not in fallback_filenames:
-        problems.append(
-            "Codex project config missing Praxion project-doc fallback: CLAUDE.md"
-        )
 
     return not problems, problems
 

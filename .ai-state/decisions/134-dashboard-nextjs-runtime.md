@@ -1,7 +1,7 @@
 ---
-id: dec-draft-448eb3cc
+id: dec-134
 title: Dashboard rewrite uses Next.js with isolated local Node runtime
-status: proposed
+status: accepted
 category: architectural
 date: 2026-05-10
 summary: Replace the Streamlit dashboard runtime with a Next.js App Router TypeScript app while preserving /dashboard, praxion-dashboard, project-root selection, deterministic local ports, and read-only filesystem semantics.

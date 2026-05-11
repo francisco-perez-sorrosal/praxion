@@ -37,7 +37,7 @@ The operational infrastructure for the development philosophy in `~/.claude/CLAU
 ## Build / test / lint
 
 - `bash install.sh` — install plugin to `~/.claude` (registers rules, hooks, settings)
-- `streamlit run app.py` (or `/dashboard` from a Claude Code session)
+- `scripts/praxion-dashboard start /path/to/project`
 
 ## How to verify your work
 
@@ -68,7 +68,7 @@ This whole section should disappear too.
     assert "Claude-Code-specific machinery" not in rendered
     assert "Known Claude Code Limitations" not in rendered
     assert "~/.claude/plugins/cache/" not in rendered
-    assert "/dashboard" not in rendered
+    assert "praxion-dashboard start /path/to/project" in rendered
     assert "canonical Praxion project baseline" in rendered
     assert "install or refresh Praxion-managed assistant surfaces" in rendered
     assert "Run the `sentinel` agent" in rendered

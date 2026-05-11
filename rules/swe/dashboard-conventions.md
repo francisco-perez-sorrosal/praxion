@@ -1,5 +1,7 @@
 ---
 paths:
+  - "dashboard_app/**/*.ts"
+  - "dashboard_app/**/*.tsx"
   - "streamlit_app/**/*.py"
   - "streamlit_app/**/*.toml"
   - "scripts/praxion-dashboard"
@@ -7,102 +9,55 @@ paths:
 
 ## Dashboard Conventions
 
-Declarative constraints for any agent editing files under `streamlit_app/` or `scripts/praxion-dashboard`. These encode non-obvious invariants that the dashboard's correctness depends on. For how to build Streamlit pages, use the [Streamlit docs](https://docs.streamlit.io/) directly.
+Declarative constraints for the active dashboard runtime in `dashboard_app/`, the stable launcher contract in `scripts/praxion-dashboard`, and the legacy migration reference in `streamlit_app/`.
 
-### 1. Pure Data Layer
+### 1. Filesystem Is The Source Of Truth
 
-Modules under `streamlit_app/data/` MUST be pure functions. They MUST NOT import or call any Streamlit rendering primitive (`st.write`, `st.markdown`, `st.dataframe`, `st.metric`, etc.). The only Streamlit symbol permitted in `data/` modules is `st.cache_data` from `streamlit`. No global mutable state.
+The dashboard MUST read live project artifacts at render/request time. It MUST NOT create a secondary persistent store, background sync cache, or shadow copy of `.ai-state/`, `.ai-work/`, `docs/`, or other approved project-root surfaces.
 
-Rationale: purity makes the data layer unit-testable with plain `pytest` and no Streamlit runtime. Any rendering import in `data/` is a convention violation, not a style preference.
+Rationale: the product contract is a read-only window over canonical project files. Duplicating that state creates drift and breaks Praxion's "filesystem is the source of truth" model.
 
-### 2. mtime-Keyed Caching
+### 2. Launcher Contract Stays Stable
 
-Every `@st.cache_data` decorator on a data-layer function MUST declare an `mtime: float` parameter as its first non-`path` argument. Callers pass `data.cache.mtime_of(path)` as the value. The cache SHOULD use `ttl=None` for path-keyed parser wrappers; `mtime` is the file-content invalidation key.
+Edits to `scripts/praxion-dashboard` MUST preserve these invariants unless an ADR explicitly changes them:
 
-```python
-# Correct — mtime is part of the cache hash; file change → new hash → cache miss → fresh read
-@st.cache_data(ttl=None)
-def cached_read_file(path: Path, mtime: float) -> Optional[str]: ...
+- `/dashboard` remains the user-facing entrypoint through `praxion-dashboard`
+- `PRAXION_PROJECT_ROOT` remains the target-project selection contract
+- `PRAXION_DASHBOARD_PORT` remains the override hook
+- default ports remain deterministic per absolute project path in the 8501-9500 range
+- the server binds to `127.0.0.1`
+- runtime dependencies live under `~/.praxion-dashboard/`, not in the target project
 
-# WRONG — leading underscore tells Streamlit to EXCLUDE the parameter from the cache hash;
-# the cache will silently serve stale data forever (until ttl expires or clear_all() is called).
-# This is the most consequential gotcha in the data layer — the underscore convention is for
-# unhashable args (database connections, file handles), not for invalidation keys.
-@st.cache_data(ttl=None)
-def cached_read_file(path: Path, _mtime: float) -> Optional[str]: ...
+Rationale: users should not need to relearn the dashboard contract because the internal runtime changed from Streamlit to Next.js.
 
-# Wrong — missing mtime; relies on TTL alone, which causes stale reads up to ttl seconds.
-@st.cache_data
-def read_file(path: Path) -> Optional[str]: ...
-```
+### 3. Server-Only Filesystem Access
 
-Rationale: Streamlit's `@st.cache_data` excludes underscore-prefixed parameters from the cache key hash. To make `mtime` actually invalidate, the parameter name must NOT start with an underscore — file change → new mtime → new hash → cache miss → fresh read. TTL-only caching causes the dashboard to serve stale data for up to `ttl` seconds after a file changes; mtime-keyed hashing is precise and immediate.
+In `dashboard_app/`, filesystem reads MUST stay in server-only modules, server components, or route handlers. Client components MUST NOT import Node filesystem modules or server readers.
 
-### 3. Fragment-Based Auto-Refresh Only
+In the legacy `streamlit_app/` reference, `streamlit_app/data/` MUST remain pure: no rendering imports or global mutable state. The only permitted Streamlit symbol in that legacy data layer is `st.cache_data`.
 
-Live-data refresh MUST use `@st.fragment(run_every=<seconds>)`. Adding `streamlit-autorefresh` or any other package that triggers full-page reruns is prohibited.
+Rationale: the active runtime depends on a clean server/client boundary, while the legacy runtime remains maintainable only if its data layer stays isolated from rendering concerns.
 
-```python
-# Correct
-@st.fragment(run_every=config.POLL_SECONDS)
-def _render_workshop(slug_dir: Path) -> None: ...
+### 4. Narrow Live Refresh Only
 
-# Wrong — full-page rerun destroys scroll position and causes flicker
-st_autorefresh(interval=15000)
-```
+Live refresh MUST be confined to in-flight workshop surfaces or similarly narrow status views. Full-dashboard polling, whole-route reload loops, or client refresh paths that invalidate unrelated pages are prohibited.
 
-Rationale: full-page reruns destroy scroll position and cause visible flicker. `@st.fragment` confines reruns to the subtree that needs live data.
+Rationale: most dashboard surfaces are read-mostly reference views. Broad polling adds noise, load, and visual instability without improving operator value.
 
-### 4. Frontmatter Stripped Before Markdown
+### 5. Frontmatter Never Renders Raw
 
-When passing Markdown content to `st.markdown`, YAML frontmatter MUST be parsed out first via `data.parsers.parse_frontmatter()`. Frontmatter is presented as a metadata table or popover, never as raw text inside the Markdown body.
+Markdown artifacts with YAML frontmatter MUST strip or parse the frontmatter before presentation. Raw `---` blocks and unparsed metadata MUST NOT appear in rendered dashboard surfaces.
 
-```python
-# Correct
-metadata, body = parse_frontmatter(raw_text)
-st.markdown(body)
+Rationale: ADRs, sentinel reports, idea ledgers, and related artifacts carry machine-oriented metadata that is not part of the human-readable body.
 
-# Wrong — frontmatter appears verbatim as --- blocks in the rendered page
-st.markdown(raw_text)
-```
+### 6. Empty-State Degradation
 
-Rationale: ADRs, sentinel reports, idea ledgers, and other artifacts carry YAML frontmatter that is not part of the human-readable body. Rendering it raw produces a broken page with visible `---` delimiters and unescaped YAML fields.
+Every dashboard surface MUST handle missing or unreadable source artifacts gracefully. Pages MUST NOT crash on absent files that are legitimately sparse or ephemeral; they degrade to an informative empty/error state.
 
-### 5. Empty-State Degradation
+Rationale: `.ai-work/` directories disappear after cleanup, `.ai-state/` grows incrementally, and freshly onboarded projects often start without the full artifact set.
 
-Every page module's `render()` MUST handle the case where its source artifact(s) do not exist or are unreadable. Pages MUST NOT raise an exception on missing files; they degrade to `widgets.empty_state(artifact_name, producer_skill_path)`.
+### 7. Legacy Streamlit Modules Stay Import-Safe
 
-```python
-# Correct
-def render() -> None:
-    path = discovery.find_roadmap(config.PROJECT_ROOT)
-    if path is None:
-        empty_state("ROADMAP.md", "commands/roadmap.md")
-        return
-    ...
+Each module under `streamlit_app/pages/` MUST continue to export exactly one `render() -> None` callable and MUST NOT execute Streamlit calls at import time.
 
-# Wrong — raises FileNotFoundError when ROADMAP.md is absent
-def render() -> None:
-    text = config.PROJECT_ROOT.joinpath("ROADMAP.md").read_text()
-    ...
-```
-
-Rationale: transient and sparse projects are first-class. `.ai-work/` directories disappear when a pipeline completes; `.ai-state/` artifacts are absent in freshly onboarded projects. A page that raises on missing files is broken for the common case.
-
-### 6. Single `render()` Entry Per Page
-
-Each module under `streamlit_app/pages/` MUST export exactly one `render() -> None` callable. Modules MUST NOT execute Streamlit calls at import time: no module-level `st.set_page_config`, no module-level `st.write`, no module-level data fetches.
-
-```python
-# Correct
-def render() -> None:
-    st.header("Roadmap")
-    ...
-
-# Wrong — st.write executes at import time, breaking app.py composition
-st.write("Roadmap")
-
-def render() -> None: ...
-```
-
-Rationale: `app.py` uses `st.navigation` and passes page modules as callable references. Import-time rendering executes before `st.set_page_config` runs, breaks page composition, and makes pages un-testable in isolation.
+Rationale: `streamlit_app/` still serves as a migration reference. Keeping its modules import-safe preserves the option to diff behavior or retire it cleanly later.

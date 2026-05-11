@@ -2,8 +2,8 @@
 Behavioral tests for scripts/praxion-dashboard bash ctl.
 
 Tests invoke the ctl via ``subprocess.run`` to verify lifecycle subcommand
-behavior: install idempotency, status exit codes, unknown subcommand handling,
-uninstall with --yes flag, and help/usage output.
+behavior: install/build idempotency, start/status/stop lifecycle behavior,
+unknown subcommand handling, uninstall with --yes flag, and help/usage output.
 
 All tests that modify filesystem state (install, uninstall) monkeypatch HOME
 to a tmp_path so the real ``~/.praxion-dashboard/`` is never touched.
@@ -26,18 +26,9 @@ removes state without prompting, unknown subcommands exit non-zero.
 
 Slow-test marking
 -----------------
-Tests that actually run ``install`` (which pip-installs packages into a temp
-venv) are marked ``@pytest.mark.slow`` and are skipped by default.  Run them
-with ``pytest -m slow`` or ``pytest --run-slow``.
-
-The install tests use a mock pip (a tiny no-op shell script) to keep the suite
-fast while still verifying the install subcommand's filesystem effects and
-idempotency.
-
-macOS scope
------------
-The ctl is macOS-only v1 (per ADR dec-draft-df080384).  Tests that exercise
-launchd-dependent code paths are skipped on non-Darwin platforms.
+Tests use a mock ``pnpm`` that creates a minimal built Next.js runtime inside
+the isolated dashboard home, so the suite stays fast while still verifying the
+launcher contract.
 """
 
 from __future__ import annotations
@@ -46,7 +37,7 @@ import os
 import stat
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import pytest
 
@@ -54,27 +45,25 @@ import pytest
 # Helpers
 # ---------------------------------------------------------------------------
 
-_WORKTREE_ROOT = Path(__file__).resolve().parents[2]
-CTL = _WORKTREE_ROOT / "scripts" / "praxion-dashboard"
+_WORKTREE_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
+CTL: Final[Path] = _WORKTREE_ROOT / "scripts" / "praxion-dashboard"
 
 
 def _run_ctl(
     *args: str,
     home: Path | None = None,
+    env_overrides: dict[str, str] | None = None,
     capture_output: bool = True,
     check: bool = False,
     **kwargs: Any,
 ) -> subprocess.CompletedProcess:
-    """Run praxion-dashboard ctl with optional HOME override.
-
-    Never raises on non-zero exit (unless check=True) so tests can
-    assert on the exit code explicitly.
-    """
+    """Run praxion-dashboard ctl with optional HOME override."""
     env = os.environ.copy()
     if home is not None:
         env["HOME"] = str(home)
-    # Prevent real launchd interaction in CI / test environments
     env.setdefault("PRAXION_DASHBOARD_TEST_MODE", "1")
+    if env_overrides:
+        env.update(env_overrides)
 
     return subprocess.run(
         [str(CTL), *args],
@@ -86,35 +75,42 @@ def _run_ctl(
     )
 
 
-def _make_mock_pip(tmp_path: Path) -> Path:
-    """Write a no-op pip replacement that exits 0 and creates a venv skeleton.
-
-    Returned path is the directory that should be prepended to PATH so that
-    ``python3 -m venv ... && pip install ...`` calls succeed without actually
-    downloading anything.
-
-    The mock pip creates a minimal venv structure (bin/python, bin/pip, bin/streamlit)
-    so the ctl's venv-check passes.
-    """
+def _make_mock_pnpm(tmp_path: Path) -> Path:
+    """Write a mock pnpm that materializes a minimal built Next.js runtime."""
     bin_dir = tmp_path / "mock-bin"
     bin_dir.mkdir()
 
-    # Mock pip script — creates a fake streamlit binary in the target venv
-    mock_pip = bin_dir / "pip"
-    mock_pip.write_text(
+    mock_pnpm = bin_dir / "pnpm"
+    mock_pnpm.write_text(
         "#!/bin/sh\n"
-        # pip install is called as: venv/bin/pip install -r requirements.txt
-        # We just exit 0 and leave the venv intact.
+        "set -eu\n"
+        "mkdir -p node_modules/.bin .next\n"
+        "cat > node_modules/.bin/next <<'EOF'\n"
+        "#!/bin/sh\n"
+        "set -eu\n"
+        "command_name=${1:-}\n"
+        "shift || true\n"
+        "case \"$command_name\" in\n"
+        "  build)\n"
+        "    mkdir -p .next\n"
+        "    printf 'test-build\\n' > .next/BUILD_ID\n"
+        "    exit 0\n"
+        "    ;;\n"
+        "  start)\n"
+        "    trap 'exit 0' TERM INT\n"
+        "    while :; do\n"
+        "      sleep 1\n"
+        "    done\n"
+        "    ;;\n"
+        "  *)\n"
+        "    exit 0\n"
+        "    ;;\n"
+        "esac\n"
+        "EOF\n"
+        "chmod +x node_modules/.bin/next\n"
         "exit 0\n"
     )
-    mock_pip.chmod(mock_pip.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
-
-    # Mock streamlit so the venv validation passes
-    mock_streamlit = bin_dir / "streamlit"
-    mock_streamlit.write_text("#!/bin/sh\nexit 0\n")
-    mock_streamlit.chmod(
-        mock_streamlit.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH
-    )
+    mock_pnpm.chmod(mock_pnpm.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
     return bin_dir
 
@@ -156,7 +152,6 @@ def test_unknown_subcommand_exits_nonzero() -> None:
 
 def test_status_exits_nonzero_when_not_installed(tmp_path: Path) -> None:
     """praxion-dashboard status exits non-zero when nothing is installed."""
-    # Use a fresh HOME so ~/.praxion-dashboard/ does not exist
     result = _run_ctl("status", home=tmp_path)
     assert result.returncode != 0, (
         "status should exit non-zero when the dashboard is not installed. "
@@ -164,43 +159,56 @@ def test_status_exits_nonzero_when_not_installed(tmp_path: Path) -> None:
     )
 
 
+def test_status_reports_distinct_ports_for_distinct_project_roots(tmp_path: Path) -> None:
+    """Different project roots keep the deterministic per-root port contract."""
+    first_root = tmp_path / "project-alpha"
+    second_root = tmp_path / "project-beta"
+    first_root.mkdir()
+    second_root.mkdir()
+
+    first = _run_ctl("status", str(first_root), home=tmp_path)
+    second = _run_ctl("status", str(second_root), home=tmp_path)
+
+    def extract_port(output: str) -> str:
+        for line in output.splitlines():
+            if line.strip().startswith("Port:"):
+                return line.split(":", maxsplit=1)[1].strip()
+        raise AssertionError(f"Port line not found in output:\n{output}")
+
+    assert extract_port(first.stdout) != extract_port(second.stdout)
+
+
 # ---------------------------------------------------------------------------
-# Install idempotency tests (uses mock pip to avoid real pip download)
+# Install idempotency tests (uses mock pnpm to avoid real downloads)
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.slow
 def test_install_creates_venv_directory(tmp_path: Path) -> None:
-    """praxion-dashboard install creates ~/.praxion-dashboard/venv/."""
-    mock_bin = _make_mock_pip(tmp_path)
+    """praxion-dashboard install creates the isolated dashboard app home."""
+    mock_bin = _make_mock_pnpm(tmp_path)
     env_path = f"{mock_bin}:{os.environ.get('PATH', '')}"
 
-    result = subprocess.run(
-        [str(CTL), "install"],
-        capture_output=True,
-        text=True,
-        env={**os.environ, "HOME": str(tmp_path), "PATH": env_path},
+    result = _run_ctl(
+        "install",
+        home=tmp_path,
+        env_overrides={"PATH": env_path}
     )
-    venv_dir = tmp_path / ".praxion-dashboard" / "venv"
-    assert venv_dir.exists(), (
-        f"install should create ~/.praxion-dashboard/venv/. "
+    app_dir = tmp_path / ".praxion-dashboard" / "app"
+    assert app_dir.exists(), (
+        f"install should create ~/.praxion-dashboard/app/. "
         f"returncode={result.returncode}, stderr={result.stderr}"
     )
+    assert (app_dir / "node_modules" / ".bin" / "next").exists()
+    assert (app_dir / ".next" / "BUILD_ID").exists()
 
 
-@pytest.mark.slow
 def test_install_is_idempotent(tmp_path: Path) -> None:
     """Calling praxion-dashboard install twice succeeds both times."""
-    mock_bin = _make_mock_pip(tmp_path)
+    mock_bin = _make_mock_pnpm(tmp_path)
     env_path = f"{mock_bin}:{os.environ.get('PATH', '')}"
-    run_env = {**os.environ, "HOME": str(tmp_path), "PATH": env_path}
 
-    first = subprocess.run(
-        [str(CTL), "install"], capture_output=True, text=True, env=run_env
-    )
-    second = subprocess.run(
-        [str(CTL), "install"], capture_output=True, text=True, env=run_env
-    )
+    first = _run_ctl("install", home=tmp_path, env_overrides={"PATH": env_path})
+    second = _run_ctl("install", home=tmp_path, env_overrides={"PATH": env_path})
 
     assert first.returncode == 0, f"First install failed: {first.stderr}"
     assert second.returncode == 0, (
@@ -213,22 +221,18 @@ def test_install_is_idempotent(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.slow
 def test_uninstall_with_yes_flag_does_not_prompt(tmp_path: Path) -> None:
     """praxion-dashboard uninstall --yes removes state without interactive prompt."""
-    mock_bin = _make_mock_pip(tmp_path)
+    mock_bin = _make_mock_pnpm(tmp_path)
     env_path = f"{mock_bin}:{os.environ.get('PATH', '')}"
-    run_env = {**os.environ, "HOME": str(tmp_path), "PATH": env_path}
 
-    # Install first so there is something to uninstall
-    subprocess.run([str(CTL), "install"], capture_output=True, text=True, env=run_env)
+    _run_ctl("install", home=tmp_path, env_overrides={"PATH": env_path})
 
-    # Uninstall with --yes — must complete without blocking on stdin
-    result = subprocess.run(
-        [str(CTL), "uninstall", "--yes"],
-        capture_output=True,
-        text=True,
-        env=run_env,
+    result = _run_ctl(
+        "uninstall",
+        "--yes",
+        home=tmp_path,
+        env_overrides={"PATH": env_path},
         input="",  # Simulate empty stdin in case --yes is ignored
         timeout=10,
     )
@@ -241,3 +245,48 @@ def test_uninstall_with_yes_flag_does_not_prompt(tmp_path: Path) -> None:
     assert not dashboard_dir.exists(), (
         "uninstall --yes should remove ~/.praxion-dashboard/"
     )
+
+
+def test_start_status_stop_roundtrip(tmp_path: Path) -> None:
+    """start/status/stop work against the isolated app home and deterministic port."""
+    mock_bin = _make_mock_pnpm(tmp_path)
+    env_path = f"{mock_bin}:{os.environ.get('PATH', '')}"
+    project_root = tmp_path / "project-root"
+    project_root.mkdir()
+
+    install = _run_ctl("install", home=tmp_path, env_overrides={"PATH": env_path})
+    assert install.returncode == 0, f"Install failed: {install.stderr}"
+
+    start = _run_ctl(
+        "start",
+        str(project_root),
+        home=tmp_path,
+        env_overrides={"PATH": env_path},
+    )
+    assert start.returncode == 0, f"Start failed: {start.stderr}"
+
+    status = _run_ctl(
+        "status",
+        str(project_root),
+        home=tmp_path,
+        env_overrides={"PATH": env_path},
+    )
+    assert status.returncode == 0, f"Status should report running: {status.stderr}"
+    assert "Running" in status.stdout
+
+    stop = _run_ctl(
+        "stop",
+        str(project_root),
+        home=tmp_path,
+        env_overrides={"PATH": env_path},
+    )
+    assert stop.returncode == 0, f"Stop failed: {stop.stderr}"
+
+    final_status = _run_ctl(
+        "status",
+        str(project_root),
+        home=tmp_path,
+        env_overrides={"PATH": env_path},
+    )
+    assert final_status.returncode != 0, "Status should be non-zero after stop"
+    assert not (project_root / "node_modules").exists()

@@ -19,6 +19,7 @@ Reusable slash commands for AI coding assistants. Each `.md` file becomes a `/co
 | `/manage-readme` | Create or refine README.md files |
 | `/cajalogic` | Manage persistent memory (user prefs, assistant learnings, project conventions, observations) |
 | `/check-experiment` | Poll an in-flight or report a completed ML training experiment |
+| `/dashboard` | Launch the Praxion pipeline dashboard for the current project |
 | `/merge-worktree` | Merge a worktree branch back into current branch |
 | `/new-project` | Scaffold a greenfield Claude-ready Python project and onboard it to Praxion |
 | `/onboard-project` | Onboard the current project for the Praxion plugin ecosystem |

@@ -1,22 +1,27 @@
 #!/usr/bin/env bash
-# praxion-dashboard — Manage the Praxion Pipeline Dashboard Streamlit app.
+# praxion-dashboard — Manage the Praxion Pipeline Dashboard Next.js app.
 #
-# One dashboard venv (~/.praxion-dashboard/venv/) is installed once per user.
+# One dashboard home (~/.praxion-dashboard/) is installed once per user.
+# The dashboard source is synced from <praxion-root>/dashboard_app into that
+# home, where pnpm dependencies, build artifacts, pidfiles, and logs live.
+#
 # Each project gets its own port (sha256-derived, range 8501–9500) and its
 # own pidfile / logfile keyed by that port.
 #
 # Usage: praxion-dashboard {install|start [path]|stop [path]|restart [path]|status [path]|uninstall [--yes]}
 #
 # Cross-platform scope: macOS only (v1 per ADR dashboard-cross-platform-scope).
-# Linux/Windows users: set PRAXION_PROJECT_ROOT and run manually:
-#   PRAXION_PROJECT_ROOT=$(pwd) ~/.praxion-dashboard/venv/bin/streamlit \
-#     run <praxion-root>/streamlit_app/app.py --server.port <port>
+# Linux/Windows users: set PRAXION_PROJECT_ROOT and run manually after install:
+#   PRAXION_PROJECT_ROOT=$(pwd) ~/.praxion-dashboard/app/node_modules/.bin/next \
+#     start --hostname 127.0.0.1 --port <port>
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PRAXION_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 HOME_DIR="$HOME/.praxion-dashboard"
-VENV_DIR="$HOME_DIR/venv"
+APP_SOURCE_DIR="$PRAXION_ROOT/dashboard_app"
+APP_DIR="$HOME_DIR/app"
+STORE_DIR="$HOME_DIR/store"
 
 B='\033[1m'
 R='\033[0m'
@@ -24,30 +29,42 @@ info()  { printf "  \xE2\x9C\x93 %s\n" "$*"; }
 warn()  { printf "  \xE2\x9A\xA0 %s\n" "$*"; }
 fail()  { printf "  \xE2\x9C\x97 %s\n" "$*" >&2; exit 1; }
 
-# ── Platform guard ─────────────────────────────────────────────────────────────
+_is_test_mode() {
+    [[ "${PRAXION_DASHBOARD_TEST_MODE:-0}" == "1" ]]
+}
 
 _require_macos() {
+    if _is_test_mode; then
+        return
+    fi
     if [[ "$(uname -s)" != "Darwin" ]]; then
         fail "praxion-dashboard v1 requires macOS. Linux/Windows users: see header for manual-launch instructions."
     fi
 }
 
-# ── Port derivation ────────────────────────────────────────────────────────────
+_require_command() {
+    local command_name="$1"
+    if ! command -v "$command_name" >/dev/null 2>&1; then
+        fail "Required command not found: $command_name"
+    fi
+}
 
 _derive_port() {
     local dir="$1"
-    python3 -c "
-import hashlib, sys
-abs_path = '$dir'.encode('utf-8')
-digest = hashlib.sha256(abs_path).digest()
-print(8501 + int.from_bytes(digest[:2], 'big') % 1000)
-"
-}
+    python3 - "$dir" <<'PY'
+import hashlib
+import sys
 
-# ── Process helpers ────────────────────────────────────────────────────────────
+abs_path = sys.argv[1].encode("utf-8")
+digest = hashlib.sha256(abs_path).digest()
+print(8501 + int.from_bytes(digest[:2], "big") % 1000)
+PY
+}
 
 _pidfile() { echo "$HOME_DIR/$1.pid"; }
 _logfile() { echo "$HOME_DIR/$1.log"; }
+_next_bin() { echo "$APP_DIR/node_modules/.bin/next"; }
+_build_marker() { echo "$APP_DIR/.next/BUILD_ID"; }
 
 _is_running() {
     local port="$1"
@@ -78,10 +95,10 @@ _get_pid() {
     fi
 }
 
-# ── Resolve project root + port ────────────────────────────────────────────────
-
 _resolve_root_and_port() {
     local path_arg="${1:-$(pwd)}"
+    [[ -d "$path_arg" ]] || fail "Project root does not exist: $path_arg"
+
     local root
     root="$(cd "$path_arg" && pwd -P)"
     local port
@@ -89,32 +106,54 @@ _resolve_root_and_port() {
     echo "$root $port"
 }
 
-# ── Subcommands ────────────────────────────────────────────────────────────────
+_sync_dashboard_source() {
+    [[ -d "$APP_SOURCE_DIR" ]] || fail "dashboard_app not found at $APP_SOURCE_DIR"
+    _require_command rsync
+
+    mkdir -p "$APP_DIR"
+    rsync -a --delete \
+        --exclude node_modules \
+        --exclude .next \
+        --exclude tsconfig.tsbuildinfo \
+        "$APP_SOURCE_DIR/" "$APP_DIR/" >/dev/null
+}
+
+_is_installed() {
+    [[ -x "$(_next_bin)" && -f "$(_build_marker)" ]]
+}
+
+_install_dashboard_app() {
+    _require_command python3
+    _require_command pnpm
+
+    mkdir -p "$HOME_DIR" "$STORE_DIR"
+    _sync_dashboard_source
+
+    (
+        cd "$APP_DIR"
+        CI=true pnpm install --frozen-lockfile --store-dir "$STORE_DIR"
+    )
+
+    [[ -x "$(_next_bin)" ]] || fail "next binary not found after install."
+
+    (
+        cd "$APP_DIR"
+        "$(_next_bin)" build
+    )
+
+    [[ -f "$(_build_marker)" ]] || fail "Next.js build did not produce .next/BUILD_ID."
+}
 
 cmd_install() {
     _require_macos
     printf "\n${B}Installing Praxion Dashboard${R}\n"
 
     mkdir -p "$HOME_DIR"
-    info "Home directory: $HOME_DIR"
+    info "Dashboard home: $HOME_DIR"
+    info "Runtime source: $APP_SOURCE_DIR"
 
-    if [[ -d "$VENV_DIR" ]]; then
-        info "Venv already exists at $VENV_DIR"
-    else
-        printf "  Creating venv at %s ...\n" "$VENV_DIR"
-        python3 -m venv "$VENV_DIR"
-        info "Venv created"
-    fi
-
-    local req="$PRAXION_ROOT/streamlit_app/requirements.txt"
-    if [[ ! -f "$req" ]]; then
-        fail "requirements.txt not found at $req"
-    fi
-
-    printf "  Installing dependencies (this may take a minute) ...\n"
-    "$VENV_DIR/bin/pip" install -q -r "$req"
-    info "Dependencies installed"
-
+    printf "  Installing runtime into %s ...\n" "$APP_DIR"
+    _install_dashboard_app
     info "Installation complete — run: praxion-dashboard start [project-path]"
     printf "\n"
 }
@@ -137,17 +176,8 @@ cmd_start() {
         exit 0
     fi
 
-    if [[ ! -d "$VENV_DIR" ]]; then
+    if ! _is_installed; then
         fail "Not installed. Run: praxion-dashboard install"
-    fi
-
-    if [[ ! -f "$VENV_DIR/bin/streamlit" ]]; then
-        fail "streamlit not found in venv. Re-run: praxion-dashboard install"
-    fi
-
-    local app_py="$PRAXION_ROOT/streamlit_app/app.py"
-    if [[ ! -f "$app_py" ]]; then
-        fail "app.py not found at $app_py"
     fi
 
     printf "\n${B}Starting Praxion Dashboard${R}\n"
@@ -155,20 +185,17 @@ cmd_start() {
     printf "  Port:    %s\n" "$PORT"
 
     PRAXION_PROJECT_ROOT="$ROOT" \
-    PYTHONPATH="$PRAXION_ROOT${PYTHONPATH:+:$PYTHONPATH}" \
-        "$VENV_DIR/bin/streamlit" run "$app_py" \
-        --server.port "$PORT" \
-        --server.address "127.0.0.1" \
-        --browser.gatherUsageStats false \
+        "$(_next_bin)" start --hostname "127.0.0.1" --port "$PORT" \
         >> "$logfile" 2>&1 &
     local pid=$!
     echo "$pid" > "$pidfile"
 
     info "Dashboard starting (PID: $pid)"
+    info "App: $APP_DIR"
     info "Log: $logfile"
     info "URL: $url"
 
-    if [[ "$(uname -s)" == "Darwin" ]]; then
+    if ! _is_test_mode && [[ "$(uname -s)" == "Darwin" ]]; then
         open "$url" 2>/dev/null || true
     fi
     printf "\n"
@@ -207,8 +234,15 @@ cmd_status() {
     printf "  Project: %s\n" "$ROOT"
     printf "  Port:    %s\n" "$PORT"
     printf "  URL:     http://127.0.0.1:%s\n" "$PORT"
-    printf "  Venv:    %s\n" "$VENV_DIR"
+    printf "  Home:    %s\n" "$HOME_DIR"
+    printf "  App:     %s\n" "$APP_DIR"
     printf "  Log:     %s\n" "$(_logfile "$PORT")"
+
+    if [[ ! -d "$HOME_DIR" ]]; then
+        warn "Dashboard is not installed"
+        printf "\n"
+        return 1
+    fi
 
     if _is_running "$PORT"; then
         local pid
@@ -242,7 +276,6 @@ cmd_uninstall() {
 
     printf "\n${B}Uninstalling Praxion Dashboard${R}\n"
 
-    # Stop all running dashboards by killing all known pidfiles
     local pidfile pid
     for pidfile in "$HOME_DIR"/*.pid; do
         [[ -f "$pidfile" ]] || continue
@@ -256,8 +289,6 @@ cmd_uninstall() {
     info "Removed $HOME_DIR"
     printf "\n"
 }
-
-# ── Main ───────────────────────────────────────────────────────────────────────
 
 case "${1:-}" in
     install)
@@ -280,14 +311,14 @@ case "${1:-}" in
         ;;
     --help|-h)
         printf "Usage: praxion-dashboard {install|start [path]|stop [path]|restart [path]|status [path]|uninstall [--yes]}\n"
-        printf "\nManage the Praxion Pipeline Dashboard Streamlit application.\n\n"
+        printf "\nManage the Praxion Pipeline Dashboard local web application.\n\n"
         printf "Commands:\n"
-        printf "  install            Install the dashboard venv (once per machine)\n"
+        printf "  install            Sync, install, and build the dashboard runtime\n"
         printf "  start  [path]      Start dashboard for project at path (default: pwd)\n"
         printf "  stop   [path]      Stop dashboard for project at path\n"
         printf "  restart [path]     Stop + start\n"
         printf "  status  [path]     Show running status and URL\n"
-        printf "  uninstall [--yes]  Stop all dashboards and remove the venv\n\n"
+        printf "  uninstall [--yes]  Stop all dashboards and remove the runtime home\n\n"
         printf "Port derivation: sha256(abs_project_path) → 8501–9500\n"
         printf "Override:        PRAXION_DASHBOARD_PORT=<port> praxion-dashboard start\n"
         printf "\nmacOS only (v1). Linux/Windows: see script header for manual launch.\n"

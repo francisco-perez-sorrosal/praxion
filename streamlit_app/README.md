@@ -1,9 +1,14 @@
 # Praxion Pipeline Dashboard
 
-A multi-page Streamlit control room for Praxion-onboarded projects.  Turns
+> [!IMPORTANT]
+> `streamlit_app/` remains as a temporary migration reference. The active
+> dashboard runtime is `dashboard_app/` (Next.js App Router + TypeScript),
+> served through `scripts/praxion-dashboard`.
+
+A multi-page dashboard control room for Praxion-onboarded projects. It turns
 each project's `.ai-state/` and `.ai-work/` filesystem into a visual,
 educational entry point covering architecture, in-flight workshops, ADRs,
-sentinel health, roadmap, and metrics.
+sentinel health, roadmap, metrics, and documentation.
 
 **Read-only.** The dashboard never writes to `.ai-state/` or `.ai-work/`,
 calls no external APIs, and makes no LLM calls.
@@ -18,16 +23,17 @@ scripts/praxion-dashboard install
 ```
 
 Requirements: Python 3.11+, macOS (v1; Linux manual-launch supported).
+Requirements: Python 3.11+ for the lifecycle ctl, macOS (v1; Linux manual-launch supported), and the user-scoped Node home under `~/.praxion-dashboard/` created by `scripts/praxion-dashboard install`.
 
 ## Run
 
 ```bash
 # Via lifecycle ctl (recommended)
 scripts/praxion-dashboard start /path/to/project
-
-# Or directly (dev mode)
-PRAXION_PROJECT_ROOT=/path/to/project streamlit run streamlit_app/app.py
 ```
+
+Work on `dashboard_app/` directly when changing the UI or server layer, but
+keep `scripts/praxion-dashboard` as the stable launch contract.
 
 The port is derived deterministically from the project root path
 (sha256-based, range 8501–9500), so the URL is stable across restarts.
@@ -36,7 +42,7 @@ The port is derived deterministically from the project root path
 
 ```
 praxion-dashboard install    # create venv, install deps, register launchd plist
-praxion-dashboard start      # launch Streamlit and open browser
+praxion-dashboard start      # launch the dashboard server and open browser
 praxion-dashboard stop       # terminate the running process
 praxion-dashboard restart    # stop + start
 praxion-dashboard status     # show running/stopped + URL
@@ -53,6 +59,7 @@ praxion-dashboard uninstall  # remove plist and venv
 | Sentinel       | `.ai-state/sentinel_reports/`                     | REQ-07 |
 | Roadmap        | `ROADMAP.md`                                      | REQ-08 |
 | Metrics        | `.ai-state/metrics_reports/`                      | REQ-09 |
+| Documentation  | `docs/architecture.md`, `docs/*.md`               | REQ-10 |
 
 All pages degrade gracefully to an empty-state widget when their source
 artifact is absent.
@@ -62,9 +69,10 @@ artifact is absent.
 - **Single install, per-project usage**: set `PRAXION_PROJECT_ROOT` to select
   the project; the app never uses `os.getcwd()` as the root.
 - **No data writing**: purely read-only filesystem access.
-- **Auto-refresh on Workshops only**: uses `st.fragment(run_every=)` (default
-  15 s, override via `PRAXION_DASHBOARD_POLL_SECONDS`).  Other pages require
-  a manual browser refresh.
+- **Auto-refresh on Workshops only**: uses the dashboard server's refresh
+  loop with a default 15 s interval, override via
+  `PRAXION_DASHBOARD_POLL_SECONDS`. Other pages require a manual browser
+  refresh.
 - **No Mermaid in v1**: deferred to v2 per ADR dec-draft-d57dc712.
 
 ## Development
@@ -84,33 +92,7 @@ bash streamlit_app/tests/test_ctl.sh
 ## Package layout
 
 ```
-streamlit_app/
-  app.py          — Streamlit entrypoint (Step 2a)
-  launcher.py     — subprocess wrapper (Step 14a)
-  config.py       — env var reader (Step 2a)
-  data/
-    discovery.py  — filesystem discovery (Step 3a)
-    parsers.py    — pure parsing functions (Step 4a)
-    cache.py      — @st.cache_data wrappers (Step 5a)
-  pages/
-    architecture.py  (Step 10a)
-    workshops.py     (Step 7a)
-    adrs.py          (Step 8a)
-    sentinel.py      (Step 9a)
-    roadmap.py       (Step 11a)
-    metrics.py       (Step 12a)
-  widgets/
-    artifact_card.py   (Step 6a)
-    educational.py     (Step 6a)
-    graph.py           (Step 6a)
-    empty_state.py     (Step 6a)
-  tests/
-    conftest.py
-    test_discovery.py  test_parsers.py  test_cache.py
-    test_widgets.py
-    test_page_*.py  (one per page)
-    test_e2e_smoke.py
-    test_ctl.sh
+streamlit_app/  — migration reference only; retained until retirement
 ```
 
 ## Links

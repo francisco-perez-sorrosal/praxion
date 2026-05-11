@@ -4,7 +4,7 @@ argument-hint: [project-root]
 allowed-tools: Bash
 ---
 
-Launch the Praxion pipeline dashboard for the current project. The dashboard is a read-only Streamlit control room that reads `.ai-state/` and `.ai-work/` artifacts — it never invokes an LLM.
+Launch the Praxion pipeline dashboard for the current project. The dashboard is a read-only local web application over `.ai-state/` and `.ai-work/` artifacts — it never invokes an LLM.
 
 ## Process
 
@@ -24,7 +24,7 @@ Delegate to `praxion-dashboard start`:
 scripts/praxion-dashboard start "$PROJECT_ROOT"
 ```
 
-The script derives a deterministic port from the project root path, starts the Streamlit process in the background, and prints the URL. If the dashboard is already running for this project, the script reports it as already running (idempotent — no duplicate process is started).
+The script derives a deterministic port from the project root path, starts the dashboard process in the background, and prints the URL. If the dashboard is already running for this project, the script reports it as already running (idempotent — no duplicate process is started).
 
 ### 3. Surface the result
 

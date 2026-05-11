@@ -20,7 +20,9 @@ The operational infrastructure for the development philosophy in `~/.claude/CLAU
 - `cd eval && PYTHONPATH=src python3 -m pytest -q` — eval framework tests
 - `python3 -m pytest scripts/test_finalize_adrs.py -q` — ADR finalize tests
 - `python3 scripts/sync_canonical_blocks.py --check` — verify shipped blocks are in sync
-- `streamlit run streamlit_app/app.py` (or `/dashboard` from a Claude Code session)
+- `cd dashboard_app && ./node_modules/.bin/vitest run` — dashboard package tests
+- `cd dashboard_app && ./node_modules/.bin/next build` — dashboard production build
+- `scripts/praxion-dashboard start /path/to/project` — launch the read-only dashboard for a target project
 
 ## Repository layout
 
@@ -33,7 +35,8 @@ The operational infrastructure for the development philosophy in `~/.claude/CLAU
 | `hooks/` | Hook scripts |
 | `claude/canonical-blocks/` | Source of truth for content shipped into managed projects (sync via `scripts/sync_canonical_blocks.py`) |
 | `claude/aac-templates/` | Architecture-as-Code templates installed by `/onboard-project` |
-| `streamlit_app/` | Multi-page dashboard reading `.ai-state/` and `.ai-work/` |
+| `dashboard_app/` | Active Next.js dashboard runtime reading `.ai-state/`, `.ai-work/`, and selected project-root artifacts through a server-only layer |
+| `streamlit_app/` | Legacy Streamlit dashboard retained temporarily as a migration reference until retirement |
 | `docs/` | Long-form human-facing documentation, Diátaxis-shaped (index in `docs/README.md`) |
 | `.ai-state/` | Persistent project intelligence (committed) — `DESIGN.md`, `decisions/`, sentinel reports, tech-debt ledger |
 | `.ai-work/` | Ephemeral pipeline intermediates (gitignored) |

@@ -384,12 +384,19 @@ For **Claude Code vs Cursor** format differences (discovery paths, command expor
 
 ### Codex / AGENTS.md-aware agents (`./install.sh codex /path/repo`)
 
-Installs a small Praxion adapter block into the target project's `AGENTS.md`
-and renders Codex shared user instructions into `~/.codex/`. This is
-intentionally lighter than the Claude Code and Cursor installers: it does not
-copy Praxion rule, skill, command, or agent bodies into Codex-native files.
-Generated wrappers point AGENTS.md-aware agents back to this Praxion checkout
-as the canonical source.
+Installs a Praxion-managed block into the target project's `AGENTS.md` and
+manages project-local Codex adapter surfaces under the target project's
+`.codex/` and `.agents/`. That managed block is installed first in the file and
+contains two layers:
+
+- the shared Praxion Codex philosophy derived from `codex/config/AGENTS.md.tmpl`
+- the Praxion project adapter that points Codex back to canonical repository
+  artifacts
+
+Any project-specific `AGENTS.md` content already present in the target project
+is preserved after the managed Praxion block. This keeps Praxion philosophy
+ahead of project-local refinements without requiring Praxion to own shared
+`~/.codex` startup instructions.
 
 ```bash
 ./install.sh codex /path/to/repo --dry-run
@@ -420,20 +427,11 @@ may warn that skill descriptions were shortened to fit its startup budget; that
 runtime warning is preferred over pre-trimming Praxion's canonical
 descriptions.
 
-When native Codex surfaces are installed, the project-local `AGENTS.md` adapter
-also points AGENTS.md-aware tools at `.codex/praxion/pipeline_semantics.json`
+When native Codex surfaces are installed, the managed project `AGENTS.md`
+block also points AGENTS.md-aware tools at `.codex/praxion/pipeline_semantics.json`
 and `.codex/praxion/model_routing.json` when present. That keeps task sizing,
-delegation, and model-routing guidance at the main-session adapter layer rather
+delegation, and model-routing guidance at the main-session project layer rather
 than copying Claude-only routing text into Codex wrappers.
-
-The installer also renders:
-
-- `codex/config/AGENTS.md.tmpl` -> `~/.codex/AGENTS.md`
-- `codex/config/userPreferences.txt` -> `~/.codex/AGENTS.override.md`
-
-That preserves the same baseline/preferences split used by Claude's
-`CLAUDE.md` plus `userPreferences.txt`, but on Codex's native shared
-instruction surfaces.
 
 For rules, the Codex install now generates a Praxion-managed rules bridge under
 the target project's `.codex/` directory:
@@ -471,16 +469,15 @@ run, so new rules are picked up automatically. When a rule needs an explicit
 Codex portability or load override, that metadata lives in the rule's own
 frontmatter rather than in a separate Python allowlist.
 
-For shared Codex config, the installer reuses the canonical
+For project Codex config, the installer reuses the canonical
 `.claude-plugin/plugin.json` `mcpServers` entries and writes the corresponding
-`memory` and `task-chronograph` registrations into `~/.codex/config.toml`.
-That same managed shared-config surface also ensures
-`project_doc_fallback_filenames` includes `CLAUDE.md`, so Codex can load
-Praxion's canonical Claude-first project doc without requiring each repo to
-rename it to `AGENTS.md`. A refcounted state file at
-`~/.codex/praxion/mcp_state.json` tracks which projects installed Praxion so
-uninstall restores any pre-existing user config instead of clobbering
-unrelated Codex MCP settings.
+`memory` and `task-chronograph` registrations into
+`<project>/.codex/config.toml`. That same managed project-config surface also
+ensures `project_doc_fallback_filenames` includes `CLAUDE.md`, so Codex can
+load Praxion's canonical Claude-first project doc without requiring each repo
+to rename it to `AGENTS.md`. A project-local state file at
+`<project>/.codex/praxion/mcp_state.json` tracks the original project-owned
+blocks so uninstall restores them instead of clobbering unrelated Codex config.
 
 The Codex installer does not create `.ai-state/`; Claude project onboarding
 owns that lifecycle. Memory hooks and file-backed observation capture are
@@ -492,13 +489,11 @@ Codex hook wrappers also honor an optional project-local
 Claude Code settings. Use it to disable memory, process framing, observability,
 or worktree-guard behavior for Codex without touching `.claude/settings.json`.
 
-For MCP, the Codex install now reuses the canonical `.claude-plugin/plugin.json`
-`mcpServers` definitions and writes the corresponding `memory` and
-`task-chronograph` registrations into the shared Codex user config at
-`~/.codex/config.toml`. A small shared state file under
-`~/.codex/praxion/mcp_state.json` tracks which projects installed Praxion so
-uninstall can restore any pre-existing user server blocks instead of
-clobbering unrelated Codex MCP configuration.
+Shared `~/.codex/AGENTS.md`, `~/.codex/AGENTS.override.md`, and
+`~/.codex/config.toml` remain user-owned in the current Codex flow. Praxion
+does not install or overwrite them by default because Codex treats
+`AGENTS.override.md` as higher priority than `AGENTS.md` at the same scope,
+and because Praxion's current Codex support is intentionally project-oriented.
 
 Use `--compat-only` only for non-Codex AGENTS.md-aware tools or when debugging
 the bootstrap pointer without native Codex surfaces.
@@ -517,9 +512,8 @@ Read the user preferences from https://raw.githubusercontent.com/francisco-perez
 **Config directories** -- Installer resources live in tool-specific dirs:
 
 - **claude/config/** -- Personal config files (CLAUDE.md, userPreferences.txt, claude_desktop_config.json) and lists. See [claude/config/README.md](claude/config/README.md).
-- **codex/config/** -- Codex-native shared instruction templates
-  (`AGENTS.md.tmpl`, `userPreferences.txt`), installer manifest
-  (`config_items.txt`), and adapter docs. See
+- **codex/config/** -- Codex adapter generators, reference guidance, and
+  project-local bridge management. See
   [codex/config/README.md](codex/config/README.md).
 - **cursor/config/** -- MCP template and expected servers. See [cursor/config/README.md](cursor/config/README.md).
 

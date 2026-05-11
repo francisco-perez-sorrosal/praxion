@@ -135,11 +135,11 @@ claude/config/                       # Claude personal config (symlinked to ~/.c
 ├── config_items.txt
 ├── stale_symlinks.txt
 └── settings.local.json              # gitignored
-codex/config/                        # Codex shared instruction templates + adapter docs
+codex/config/                        # Codex adapter sources, generators, and reference guidance
 ├── README.md
 ├── AGENTS.md.tmpl
 ├── userPreferences.txt
-└── config_items.txt
+└── ...
 cursor/config/                       # Cursor installer config
 ├── mcp.json.template
 ├── expected-mcp-servers.txt
@@ -198,7 +198,7 @@ eval/                                # Out-of-band quality evals (praxion-evals 
 install.sh                           # Installer router
 install_claude.sh                    # Claude Code / Desktop installer
 install_cursor.sh                    # Cursor installer
-install_codex.sh                     # Codex adapter installer (project-local + shared ~/.codex/)
+install_codex.sh                     # Codex adapter installer (project-local)
 Makefile                             # Development targets
 ```
 
@@ -250,7 +250,7 @@ The flags are read by each hook via `is_disabled()` in `hooks/_hook_utils.py`. T
 - **AGENTS.md compatibility shim**: root `AGENTS.md` points AGENTS.md-aware tools to Praxion's canonical artifacts without copying their bodies
 - **Assistant-specific config**: Personal settings live in config directories (`claude/config/` for Claude, `codex/config/` for Codex, `cursor/config/` for Cursor, future tool directories as needed)
 - **Plugin distribution**: Skills, commands, and agents are installed via Claude Code's plugin system (`.claude-plugin/plugin.json`)
-- **Personal config ownership**: `install_claude.sh` symlinks Claude config to `~/.claude/`; `install_codex.sh` renders shared instruction files into `~/.codex/` and merges managed settings into `~/.codex/config.toml`; `install_cursor.sh` symlinks skills and rules into `.cursor/` or `~/.cursor/`
+- **Personal config ownership**: `install_claude.sh` symlinks Claude config to `~/.claude/`; `install_codex.sh` installs project-local adapter surfaces under the target repo's `.codex/` and `.agents/`; shared `~/.codex/` user surfaces remain user-owned; `install_cursor.sh` symlinks skills and rules into `.cursor/` or `~/.cursor/`
 - **Progressive disclosure**: Skills load metadata at startup, full content on activation, reference files on demand
 - **CLAUDE.md stays lean**: Skills, commands, agents, and rules are auto-discovered by Claude via filesystem scanning -- listing them in `CLAUDE.md` wastes always-loaded tokens and creates a sync burden. `README.md` and per-directory READMEs serve as the human-facing catalogs
 - **Nested CLAUDE.md for progressive disclosure**: Each artifact directory has its own `CLAUDE.md` with conventions specific to that directory. These are lazily loaded -- Claude reads them only when it accesses files in that directory, adding zero cost to sessions that don't touch the directory
@@ -262,30 +262,33 @@ a second copy of Claude-facing guidance for Codex, Cursor, or any future
 AGENTS.md-aware coding agent. The root `AGENTS.md` names the compatibility
 contract and points agents back to canonical source artifacts.
 
-`install_codex.sh` installs a marked Praxion block into a target project's
-`AGENTS.md` and renders Codex shared instruction files into `~/.codex/`. The
-project-local block is safe to update or remove because it is delimited by:
+`install_codex.sh` installs a marked Praxion-managed block into a target
+project's `AGENTS.md` and manages project-local Codex adapter surfaces under
+`<project>/.codex/` and `<project>/.agents/`. The managed block is safe to
+update or remove because it is delimited by:
 
 ```md
 <!-- PRAXION:AGENTS_ADAPTER:START -->
 <!-- PRAXION:AGENTS_ADAPTER:END -->
 ```
 
-The Codex installer writes that project-local adapter block and, by default,
-adds generated Codex custom-agent wrappers under the target project's
-`.codex/agents/`; those wrappers point back to canonical `agents/*.md` files,
-translate Praxion's current routing table into Codex model settings, and carry
-the source frontmatter contract instead of copying the full body. It also
-generates Codex skill wrappers under the target project's `.agents/skills/`
-directory, pointing back to canonical `skills/*/SKILL.md` files while
-preserving the full skill description in the wrapper metadata. Adapter
-fidelity matters here: preserve canonical Praxion wording for agent and skill
-metadata. If Codex warns that skill descriptions were shortened to fit its
-startup budget, accept that runtime warning instead of pre-trimming generated
-wrappers.
+The Codex installer writes that managed project block by prepending the shared
+Praxion Codex philosophy derived from `codex/config/AGENTS.md.tmpl`, then the
+Praxion project adapter, ahead of any pre-existing project-specific
+`AGENTS.md` content. By default it also adds generated Codex custom-agent
+wrappers under the target project's `.codex/agents/`; those wrappers point
+back to canonical `agents/*.md` files, translate Praxion's current routing
+table into Codex model settings, and carry the source frontmatter contract
+instead of copying the full body. It also generates Codex skill wrappers under
+the target project's `.agents/skills/` directory, pointing back to canonical
+`skills/*/SKILL.md` files while preserving the full skill description in the
+wrapper metadata. Adapter fidelity matters here: preserve canonical Praxion
+wording for agent and skill metadata. If Codex warns that skill descriptions
+were shortened to fit its startup budget, accept that runtime warning instead
+of pre-trimming generated wrappers.
 
-When native Codex surfaces are installed, the project-local `AGENTS.md` adapter
-is also the current consumer for the generated pipeline metadata. It points
+When native Codex surfaces are installed, the managed project `AGENTS.md`
+block is also the current consumer for the generated pipeline metadata. It points
 AGENTS.md-aware tools to `.codex/praxion/pipeline_semantics.json` for task
 sizing and delegation and to `.codex/praxion/model_routing.json` for Codex-side
 routing, rather than asking Codex to reinterpret the Claude-only routing rule
@@ -321,15 +324,14 @@ surface for command approval / sandbox policy semantics. The Praxion rule
 bridge preserves Claude-style semantic rule meaning without repurposing that
 native Codex policy surface.
 
-For MCP, `install_codex.sh` now reuses the canonical `.claude-plugin/plugin.json`
+For MCP, `install_codex.sh` reuses the canonical `.claude-plugin/plugin.json`
 `mcpServers` entries and writes the corresponding `memory` and
-`task-chronograph` registrations into the shared Codex user config at
-`~/.codex/config.toml`. A refcounted state file at
-`~/.codex/praxion/mcp_state.json` tracks which projects installed Praxion so
-uninstall restores any pre-existing user server blocks instead of clobbering
-unrelated Codex MCP config.
+`task-chronograph` registrations into the target project's
+`.codex/config.toml`. A project-local state file at
+`.codex/praxion/mcp_state.json` tracks any original project-owned blocks so
+uninstall can restore them without clobbering unrelated Codex config.
 
-The same shared-config manager also ensures
+The same project-local config manager also ensures
 `project_doc_fallback_filenames` includes `CLAUDE.md`, which is the Codex-side
 equivalent of teaching the agent to read Praxion's canonical Claude-first
 project doc without forcing every project to rename that file.
@@ -347,14 +349,14 @@ instead of extending adapter code.
 
 | Surface | Current Codex adapter status |
 |---|---|
-| `~/.codex/AGENTS.md` | `install_codex.sh` renders `codex/config/AGENTS.md.tmpl` into the Codex user config dir as the user baseline |
-| `~/.codex/AGENTS.override.md` | `install_codex.sh` copies `codex/config/userPreferences.txt` into the Codex user config dir as the user preference layer |
-| `~/.codex/config.toml` project-doc fallback | `install_codex.sh` ensures `project_doc_fallback_filenames` includes `CLAUDE.md`, with restoration of any pre-existing user value on uninstall |
+| `~/.codex/AGENTS.md` | User-owned global Codex baseline; Praxion does not install or overwrite it in the current project-local flow |
+| `~/.codex/AGENTS.override.md` | User-owned global override; Praxion does not install it because Codex shadows `AGENTS.md` with `AGENTS.override.md` at the same scope |
+| `<project>/.codex/config.toml` project-doc fallback | `install_codex.sh` ensures `project_doc_fallback_filenames` includes `CLAUDE.md`, with restoration of any pre-existing project value on uninstall |
 | `commands/*.md` | `install_codex.sh` generates `praxion-command-<name>` wrappers under project `.agents/skills/` |
 | `agents/*.md` | `install_codex.sh` generates thin `.codex/agents/*.toml` wrappers by default |
 | `rules/**/*.md` frontmatter | `install_codex.sh` now generates a hook-backed rules bridge under `.codex/praxion/` plus `.codex/hooks.json`; native `.codex/rules` stays reserved for approval policy |
 | `skills/*/SKILL.md` metadata | `install_codex.sh` generates project `.agents/skills/*` wrappers by default |
-| MCP servers | `install_codex.sh` now syncs canonical `.claude-plugin/plugin.json` `mcpServers` into shared `~/.codex/config.toml`, with refcounted restore state under `~/.codex/praxion/mcp_state.json` |
+| MCP servers | `install_codex.sh` syncs canonical `.claude-plugin/plugin.json` `mcpServers` into project `.codex/config.toml`, with restore state under `.codex/praxion/mcp_state.json` |
 | hooks | `install_codex.sh` now installs Praxion rule routing plus portable canonical hooks for process framing, subagent contract injection, memory gates, observability, Bash commit/cleanup gates, worktree guard, post-write quality checks, and precompact state snapshots; Claude marketplace auto-completion remains Claude-only |
 
 Use this flow to test a pet project from a Praxion checkout:

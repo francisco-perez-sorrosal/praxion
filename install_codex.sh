@@ -1,21 +1,24 @@
 #!/usr/bin/env bash
 # Install AGENTS.md-facing Praxion guidance into a target project.
-# Repo remains source of truth; this script writes a small marked adapter block.
+# Repo remains source of truth; this script writes a marked managed block.
 #
 # Usage (from this repo root, or via install.sh):
 #   ./install_codex.sh /path/to/project              # Install/update AGENTS.md
 #   ./install_codex.sh /path/to/project --compat-only # Only install AGENTS.md
 #   ./install_codex.sh /path/to/project --dry-run   # Show what would change
-#   ./install_codex.sh /path/to/project --check     # Verify adapter block
-#   ./install_codex.sh /path/to/project --uninstall # Remove adapter block
+#   ./install_codex.sh /path/to/project --check     # Verify managed block
+#   ./install_codex.sh /path/to/project --uninstall # Remove managed block
 
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 START_MARKER="<!-- PRAXION:AGENTS_ADAPTER:START -->"
 END_MARKER="<!-- PRAXION:AGENTS_ADAPTER:END -->"
-CODEX_CONFIG_DIR="${SCRIPT_DIR}/codex/config"
-CLAUDE_PERSONAL_INFO_ENV="${SCRIPT_DIR}/claude/config/.personal_info.env"
+PROJECT_BASELINE_TEMPLATE="${SCRIPT_DIR}/codex/config/AGENTS.md.tmpl"
+PROJECT_BASELINE_START="<!-- PRAXION:PROJECT_BASELINE:START -->"
+PROJECT_BASELINE_END="<!-- PRAXION:PROJECT_BASELINE:END -->"
+CLAUDE_PERSONAL_INFO_ENV_DEFAULT="${SCRIPT_DIR}/claude/config/.personal_info.env"
+CLAUDE_PERSONAL_INFO_ENV="${PRAXION_PERSONAL_INFO_ENV:-$CLAUDE_PERSONAL_INFO_ENV_DEFAULT}"
 
 if [ -t 1 ]; then
     B=$'\033[1m' D=$'\033[2m' R=$'\033[0m'
@@ -41,15 +44,15 @@ Usage: $(basename "$0") PATH [--check] [--dry-run] [--uninstall] [--help]
 
   PATH         Target project directory. Required.
   --native     Also install Codex-native adapter files under PATH/.codex/.
-               This is the default; the flag is accepted for readability. It
-               also renders shared Codex instruction files into ~/.codex/ and
-               updates shared Codex config in ~/.codex/config.toml.
+               This is the default; the flag is accepted for readability.
+               Native Codex install is project-local by default and updates
+               PATH/.codex plus PATH/.agents only.
   --compat-only
                Only install the AGENTS.md compatibility pointer. Intended for
                non-Codex AGENTS.md-aware tools or debugging the bootstrap layer.
-  --check      Verify PATH/AGENTS.md contains the Praxion adapter block.
+  --check      Verify PATH/AGENTS.md contains the Praxion managed block.
   --dry-run    Show what would be installed, without writing files.
-  --uninstall  Remove the Praxion adapter block from PATH/AGENTS.md.
+  --uninstall  Remove the Praxion managed block from PATH/AGENTS.md.
   --help       Show this help.
 EOF
     exit 0
@@ -88,18 +91,71 @@ done
 TARGET_ROOT="$(cd "$TARGET_PATH" && pwd)"
 AGENTS_FILE="$TARGET_ROOT/AGENTS.md"
 CODEX_DIR="$TARGET_ROOT/.codex"
-CODEX_SHARED_DIR="${HOME}/.codex"
-CODEX_SHARED_CONFIG_ITEMS="${CODEX_CONFIG_DIR}/config_items.txt"
-CODEX_SHARED_CONFIG="$CODEX_SHARED_DIR/config.toml"
 CODEX_AGENTS_DIR="$CODEX_DIR/agents"
 CODEX_HOOKS_DIR="$CODEX_DIR/hooks"
 CODEX_PRAXION_DIR="$CODEX_DIR/praxion"
 AGENT_SKILLS_DIR="$TARGET_ROOT/.agents/skills"
 PRAXION_ROOT="$SCRIPT_DIR"
 
+load_render_personal_info_args() {
+    if [ -f "$CLAUDE_PERSONAL_INFO_ENV" ]; then
+        # shellcheck source=/dev/null
+        source "$CLAUDE_PERSONAL_INFO_ENV"
+        if [ -n "${PRAXION_USERNAME:-}" ] &&
+           [ -n "${PRAXION_EMAIL:-}" ] &&
+           [ -n "${PRAXION_GITHUB_URL:-}" ]; then
+            printf '%s\n' "$PRAXION_USERNAME" "$PRAXION_EMAIL" "$PRAXION_GITHUB_URL"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+render_template_file() {
+    local template_path="$1"
+    local output_path="$2"
+    local values
+
+    if values="$(load_render_personal_info_args)"; then
+        mapfile -t personal_info < <(printf '%s\n' "$values")
+        python3 "$PRAXION_ROOT/scripts/render_claude_md.py" \
+            "$template_path" "$output_path" \
+            "${personal_info[0]}" "${personal_info[1]}" "${personal_info[2]}" >/dev/null
+        return
+    fi
+
+    python3 "$PRAXION_ROOT/scripts/render_claude_md.py" \
+        "$template_path" "$output_path" >/dev/null
+}
+
+render_project_baseline() {
+    local rendered_template
+    [ -f "$PROJECT_BASELINE_TEMPLATE" ] || fail "Codex AGENTS template not found: $PROJECT_BASELINE_TEMPLATE"
+    rendered_template="$(mktemp)"
+    render_template_file "$PROJECT_BASELINE_TEMPLATE" "$rendered_template"
+    awk -v start="$PROJECT_BASELINE_START" -v end="$PROJECT_BASELINE_END" '
+        $0 == start { in_block = 1; next }
+        $0 == end { in_block = 0; next }
+        in_block { print }
+    ' "$rendered_template"
+    rm -f "$rendered_template"
+}
+
 render_block() {
     cat <<EOF
 $START_MARKER
+# Development Guidelines for Codex
+
+$(render_project_baseline)
+
+## Project Layering
+
+This managed Praxion block is installed first so Codex sees the shared Praxion
+Codex philosophy before any project-specific instructions that may also live in
+this project's \`AGENTS.md\`.
+
+Project-specific instructions are expected to appear after this managed block.
+
 ## Praxion Adapter
 
 This project uses Praxion guidance through AGENTS.md-compatible tooling.
@@ -172,18 +228,19 @@ require_well_formed_block() {
     [ -f "$AGENTS_FILE" ] || return 0
     if grep -qF "$START_MARKER" "$AGENTS_FILE" &&
        ! grep -qF "$END_MARKER" "$AGENTS_FILE"; then
-        fail "Malformed Praxion adapter block in $AGENTS_FILE: missing end marker"
+        fail "Malformed Praxion managed block in $AGENTS_FILE: missing end marker"
     fi
     if grep -qF "$END_MARKER" "$AGENTS_FILE" &&
        ! grep -qF "$START_MARKER" "$AGENTS_FILE"; then
-        fail "Malformed Praxion adapter block in $AGENTS_FILE: missing start marker"
+        fail "Malformed Praxion managed block in $AGENTS_FILE: missing start marker"
     fi
 }
 
 install_block() {
-    local block_file tmp_file
+    local block_file remainder_file tmp_file
     require_well_formed_block
     block_file="$(mktemp)"
+    remainder_file="$(mktemp)"
     tmp_file="$(mktemp)"
     render_block > "$block_file"
 
@@ -192,36 +249,28 @@ install_block() {
             cat "$block_file"
             printf "\n"
         } > "$AGENTS_FILE"
-        rm -f "$block_file" "$tmp_file"
+        rm -f "$block_file" "$remainder_file" "$tmp_file"
         return
     fi
 
-    if has_block; then
-        awk -v start="$START_MARKER" -v end="$END_MARKER" -v block="$block_file" '
-            $0 == start {
-                while ((getline line < block) > 0) print line
-                close(block)
-                in_block = 1
-                next
-            }
-            $0 == end {
-                in_block = 0
-                next
-            }
-            !in_block { print }
-        ' "$AGENTS_FILE" > "$tmp_file"
-        mv "$tmp_file" "$AGENTS_FILE"
-    else
-        {
-            cat "$AGENTS_FILE"
-            printf "\n\n"
-            cat "$block_file"
-            printf "\n"
-        } > "$tmp_file"
-        mv "$tmp_file" "$AGENTS_FILE"
-    fi
+    awk -v start="$START_MARKER" -v end="$END_MARKER" '
+        $0 == start { in_block = 1; next }
+        $0 == end { in_block = 0; next }
+        !in_block { print }
+    ' "$AGENTS_FILE" > "$remainder_file"
 
-    rm -f "$block_file" "$tmp_file"
+    {
+        cat "$block_file"
+        if grep -q '[^[:space:]]' "$remainder_file"; then
+            printf "\n\n"
+            cat "$remainder_file"
+        else
+            printf "\n"
+        fi
+    } > "$tmp_file"
+    mv "$tmp_file" "$AGENTS_FILE"
+
+    rm -f "$block_file" "$remainder_file" "$tmp_file"
 }
 
 uninstall_block() {
@@ -229,17 +278,20 @@ uninstall_block() {
     require_well_formed_block
     has_block || return 0
 
-    local tmp_file
+    local tmp_file trimmed_file
     tmp_file="$(mktemp)"
+    trimmed_file="$(mktemp)"
     awk -v start="$START_MARKER" -v end="$END_MARKER" '
         $0 == start { in_block = 1; next }
         $0 == end { in_block = 0; next }
         !in_block { print }
     ' "$AGENTS_FILE" > "$tmp_file"
-    mv "$tmp_file" "$AGENTS_FILE"
+    sed '/./,$!d' "$tmp_file" > "$trimmed_file"
+    mv "$trimmed_file" "$AGENTS_FILE"
     if ! grep -q '[^[:space:]]' "$AGENTS_FILE"; then
         rm -f "$AGENTS_FILE"
     fi
+    rm -f "$tmp_file" "$trimmed_file"
 }
 
 praxion_agent_names() {
@@ -258,113 +310,7 @@ praxion_skill_names() {
     done
 }
 
-load_render_personal_info_args() {
-    if [ -f "$CLAUDE_PERSONAL_INFO_ENV" ]; then
-        # shellcheck source=/dev/null
-        source "$CLAUDE_PERSONAL_INFO_ENV"
-        if [ -n "${PRAXION_USERNAME:-}" ] &&
-           [ -n "${PRAXION_EMAIL:-}" ] &&
-           [ -n "${PRAXION_GITHUB_URL:-}" ]; then
-            printf '%s\n' "$PRAXION_USERNAME" "$PRAXION_EMAIL" "$PRAXION_GITHUB_URL"
-            return 0
-        fi
-    fi
-    return 1
-}
-
-render_codex_shared_item() {
-    local template_path="$1"
-    local output_path="$2"
-    local values
-
-    if values="$(load_render_personal_info_args)"; then
-        mapfile -t personal_info < <(printf '%s\n' "$values")
-        python3 "$PRAXION_ROOT/scripts/render_claude_md.py" \
-            "$template_path" "$output_path" \
-            "${personal_info[0]}" "${personal_info[1]}" "${personal_info[2]}" >/dev/null
-        return
-    fi
-
-    python3 "$PRAXION_ROOT/scripts/render_claude_md.py" \
-        "$template_path" "$output_path" >/dev/null
-}
-
-codex_shared_item_target() {
-    printf '%s/%s\n' "$CODEX_SHARED_DIR" "$1"
-}
-
-codex_shared_item_source() {
-    case "$1" in
-        AGENTS.md) printf '%s/AGENTS.md.tmpl\n' "$CODEX_CONFIG_DIR" ;;
-        AGENTS.override.md) printf '%s/userPreferences.txt\n' "$CODEX_CONFIG_DIR" ;;
-        *) printf '%s/%s\n' "$CODEX_CONFIG_DIR" "$1" ;;
-    esac
-}
-
-install_codex_shared_user_config() {
-    [ -f "$CODEX_SHARED_CONFIG_ITEMS" ] || fail "Codex config item list not found: $CODEX_SHARED_CONFIG_ITEMS"
-    mkdir -p "$CODEX_SHARED_DIR"
-
-    local item source_path target_path
-    while IFS= read -r item || [ -n "$item" ]; do
-        [ -n "$item" ] || continue
-        source_path="$(codex_shared_item_source "$item")"
-        target_path="$(codex_shared_item_target "$item")"
-        [ -f "$source_path" ] || fail "Codex config source not found: $source_path"
-        render_codex_shared_item "$source_path" "$target_path"
-    done < "$CODEX_SHARED_CONFIG_ITEMS"
-}
-
-uninstall_codex_shared_user_config() {
-    local item target_path
-    if [ -f "$CODEX_SHARED_CONFIG_ITEMS" ]; then
-        while IFS= read -r item || [ -n "$item" ]; do
-            [ -n "$item" ] || continue
-            target_path="$(codex_shared_item_target "$item")"
-            rm -f "$target_path" 2>/dev/null || true
-        done < "$CODEX_SHARED_CONFIG_ITEMS"
-    fi
-    rmdir "$CODEX_SHARED_DIR" 2>/dev/null || true
-}
-
-check_codex_shared_user_config() {
-    [ -f "$CODEX_SHARED_CONFIG_ITEMS" ] || fail "Codex config item list not found: $CODEX_SHARED_CONFIG_ITEMS"
-
-    local check_rc=0 item source_path target_path expected_file label
-    while IFS= read -r item || [ -n "$item" ]; do
-        [ -n "$item" ] || continue
-        source_path="$(codex_shared_item_source "$item")"
-        target_path="$(codex_shared_item_target "$item")"
-        expected_file="$(mktemp)"
-        render_codex_shared_item "$source_path" "$expected_file"
-
-        case "$item" in
-            AGENTS.md) label="Codex shared AGENTS baseline" ;;
-            AGENTS.override.md) label="Codex shared AGENTS override" ;;
-            *) label="Codex shared config item" ;;
-        esac
-
-        if [ ! -f "$target_path" ]; then
-            warn "$label missing: $target_path"
-            check_rc=1
-            rm -f "$expected_file"
-            continue
-        fi
-        if ! cmp -s "$expected_file" "$target_path"; then
-            warn "$label is stale: $target_path"
-            check_rc=1
-            rm -f "$expected_file"
-            continue
-        fi
-        info "$label present in $target_path"
-        rm -f "$expected_file"
-    done < "$CODEX_SHARED_CONFIG_ITEMS"
-
-    return "$check_rc"
-}
-
 install_native_codex() {
-    install_codex_shared_user_config
     prune_stale_native_codex
     python3 "$PRAXION_ROOT/codex/config/export-codex-agents.py" \
         --repo-root "$PRAXION_ROOT" \
@@ -508,7 +454,6 @@ prune_stale_native_codex() {
 }
 
 uninstall_native_codex() {
-    uninstall_codex_shared_user_config
     if [ -d "$CODEX_AGENTS_DIR" ]; then
         while IFS= read -r agent_file; do
             [ -n "$agent_file" ] || continue
@@ -570,9 +515,6 @@ uninstall_codex_mcp() {
 check_native_codex() {
     local expected_root expected_file actual_file rel_path check_rc=0
     expected_root="$(mktemp -d)"
-    if ! check_codex_shared_user_config; then
-        check_rc=1
-    fi
     export_expected_native_codex "$expected_root"
     export_expected_rules_bridge "$expected_root/rules_bridge"
     export_expected_pipeline_adapter "$expected_root/pipeline_adapter"
@@ -698,7 +640,7 @@ check_native_codex() {
         info "Codex skill and command wrappers present in $AGENT_SKILLS_DIR"
         info "Codex rules bridge present in $CODEX_DIR"
         info "Codex pipeline adapter present in $CODEX_PRAXION_DIR"
-        info "Codex shared MCP config present in $CODEX_SHARED_CONFIG"
+        info "Codex project MCP config present in $CODEX_DIR/config.toml"
     fi
     return "$check_rc"
 }
@@ -722,8 +664,7 @@ if $DO_DRY_RUN; then
         step "Would export Praxion skill and command wrappers to $AGENT_SKILLS_DIR"
         step "Would export Praxion rules bridge to $CODEX_DIR"
         step "Would export Praxion pipeline adapter to $CODEX_PRAXION_DIR"
-        step "Would install shared Codex instruction files in $CODEX_SHARED_DIR"
-        step "Would update shared Codex config in $CODEX_SHARED_CONFIG"
+        step "Would update project Codex config in $CODEX_DIR/config.toml"
     fi
     exit 0
 fi
@@ -731,9 +672,9 @@ fi
 if $DO_CHECK; then
     check_rc=0
     if has_complete_block && grep -qF "$PRAXION_ROOT" "$AGENTS_FILE"; then
-        info "Praxion adapter block present in $AGENTS_FILE"
+        info "Praxion managed block present in $AGENTS_FILE"
     else
-        warn "Praxion adapter block missing or stale in $AGENTS_FILE"
+        warn "Praxion managed block missing or stale in $AGENTS_FILE"
         check_rc=1
     fi
     if $DO_NATIVE; then
@@ -749,11 +690,10 @@ if $DO_UNINSTALL; then
     if $DO_NATIVE; then
         uninstall_native_codex
         info "Codex native adapter files removed from $CODEX_DIR"
-        info "Codex shared instruction files removed from $CODEX_SHARED_DIR"
-        info "Codex shared MCP config updated in $CODEX_SHARED_CONFIG"
+        info "Codex project config updated in $CODEX_DIR/config.toml"
     fi
     uninstall_block
-    info "Praxion adapter block removed from $AGENTS_FILE"
+    info "Praxion managed block removed from $AGENTS_FILE"
     exit 0
 fi
 
@@ -765,8 +705,7 @@ if $DO_NATIVE; then
     info "Codex skill and command wrappers exported to $AGENT_SKILLS_DIR"
     info "Codex rules bridge exported to $CODEX_DIR"
     info "Codex pipeline adapter exported to $CODEX_PRAXION_DIR"
-    info "Codex shared instruction files installed in $CODEX_SHARED_DIR"
-    info "Codex shared MCP config updated in $CODEX_SHARED_CONFIG"
+    info "Codex project config updated in $CODEX_DIR/config.toml"
     print_codex_hook_review_note
 fi
 step "Start a fresh AGENTS.md-aware agent session in the target project to auto-load it."

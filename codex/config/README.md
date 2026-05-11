@@ -6,33 +6,62 @@ Codex-native surfaces from those sources.
 
 ## User Baseline
 
-`install_codex.sh` owns three shared Codex user surfaces:
+`install_codex.sh` does not own shared Codex user surfaces. The current Codex
+install path is project-local only: it writes into the target project's
+`AGENTS.md`, `.codex/`, and `.agents/` directories.
 
-- `AGENTS.md.tmpl` renders to `~/.codex/AGENTS.md`
-- `userPreferences.txt` installs as `~/.codex/AGENTS.override.md`
-- `config_items.txt` enumerates which rendered instruction files belong to the
-  Codex installer
+`AGENTS.md.tmpl` serves two purposes:
 
-This preserves the same baseline/preferences split Claude uses with
-`CLAUDE.md` plus `userPreferences.txt`, but mapped onto Codex's native startup
-surfaces.
+- its project-safe baseline body is merged into the managed project
+  `AGENTS.md` block that `install_codex.sh` prepends at install time
+- the full file remains a reference draft for an optional user-owned Codex
+  baseline
+
+`userPreferences.txt` remains reference material only; it is not installed by
+default. That boundary is intentional for two reasons:
+
+- Codex does not layer `AGENTS.md` plus `AGENTS.override.md` the way Claude
+  layers `CLAUDE.md` plus `userPreferences.txt`; at a given scope,
+  `AGENTS.override.md` shadows `AGENTS.md`.
+- Praxion's current Codex support is project-oriented. Installer-owned writes
+  to `~/.codex/` would leak Praxion behavior into unrelated Codex projects.
 
 ## Claude-to-Codex Parity Map
 
 Files in `claude/config/` do not all have a literal one-file Codex twin. The
 goal is semantic parity, not blind duplication:
 
-- `claude/config/CLAUDE.md.tmpl` -> `codex/config/AGENTS.md.tmpl`
-- `claude/config/userPreferences.txt` ->
-  `codex/config/userPreferences.txt`
-- `claude/config/config_items.txt` -> `codex/config/config_items.txt`
+- `claude/config/CLAUDE.md.tmpl` -> no installer-owned Codex twin in the
+  current project-local flow; Praxion baseline context reaches Codex through
+  the managed project `AGENTS.md` block plus canonical `CLAUDE.md`
+- `claude/config/userPreferences.txt` -> no installer-owned Codex twin in the
+  current project-local flow; user-owned `~/.codex/AGENTS.md` remains outside
+  Praxion installer scope
+- `claude/config/config_items.txt` -> no Codex analogue in the current
+  project-local flow
 - `claude/config/claude_desktop_config.json` -> no static Codex template;
-  Codex shared config is managed in-place through `~/.codex/config.toml`
-- `claude/config/stale_symlinks.txt` -> no Codex analogue; Codex shared files
-  are rendered/merged, not symlink-managed
+  Codex project config is managed in-place through `<project>/.codex/config.toml`
+- `claude/config/stale_symlinks.txt` -> no Codex analogue; Codex adapter files
+  are generated/merged project-locally, not symlink-managed
 - `claude/config/.personal_info.env` remains the shared source for stable
-  rendered identity fields when present, so Claude and Codex baselines carry
-  the same personal metadata without duplicating per-user state
+  rendered identity fields when present if a future user-level Codex baseline
+  is ever reintroduced
+
+The project-safe portion of `AGENTS.md.tmpl` is delimited by:
+
+```md
+<!-- PRAXION:PROJECT_BASELINE:START -->
+<!-- PRAXION:PROJECT_BASELINE:END -->
+```
+
+`install_codex.sh` extracts that region and prepends it to the managed project
+`AGENTS.md` block before the Praxion adapter content.
+
+Before extraction, the installer renders the template through
+`scripts/render_claude_md.py`. If `claude/config/.personal_info.env` exists
+or `PRAXION_PERSONAL_INFO_ENV` points to a compatible file, the installer uses
+that explicit personal-info source. Otherwise it falls back to the renderer's
+git-config-derived defaults.
 
 ## Agent Export
 
@@ -201,23 +230,23 @@ All Praxion-managed rule-bridge assets are prefixed `praxion-` or live under
 ## MCP Adapter
 
 `manage-codex-mcp.py` installs, checks, and uninstalls the Praxion-managed
-Codex MCP adapter in the shared Codex user config:
+Codex MCP adapter in the target project's Codex config:
 
 - reads the canonical `mcpServers` definitions from `.claude-plugin/plugin.json`
-- ensures `project_doc_fallback_filenames` in `~/.codex/config.toml` includes
-  `CLAUDE.md`, so Codex can discover Claude-first Praxion projects without
-  renaming their canonical project doc
+- ensures `project_doc_fallback_filenames` in `<project>/.codex/config.toml`
+  includes `CLAUDE.md`, so Codex can discover Claude-first Praxion projects
+  without renaming their canonical project doc
 - writes the corresponding `memory` and `task-chronograph` entries into
-  `~/.codex/config.toml` as `mcp_servers.*` tables with concrete repo-root
-  paths
-- preserves unrelated Codex config sections and non-Praxion MCP entries
-- tracks installed Praxion projects in `~/.codex/praxion/mcp_state.json`
-- restores any pre-existing user server blocks when the last Praxion-installed
-  project is uninstalled
+  `<project>/.codex/config.toml` as `mcp_servers.*` tables with concrete
+  repo-root paths
+- preserves unrelated project Codex config sections and non-Praxion MCP entries
+- tracks the original project-owned blocks in
+  `<project>/.codex/praxion/mcp_state.json`
+- restores any pre-existing project config blocks on uninstall
 
-This shared-config ownership model is intentional: the rules bridge is
-project-local under the target repo's `.codex/`, but Codex MCP registration is
-managed through the shared user config surface.
+This project-local ownership model is intentional: the rules bridge, MCP
+registration, hook registration, and pipeline metadata all live under the
+target repo's `.codex/` so Praxion does not alter unrelated Codex projects.
 
 ## Pipeline Adapter
 
@@ -237,6 +266,6 @@ The adapter metadata is intentionally machine-readable and pointer-based. It
 does not copy canonical agent, rule, or planning bodies; Codex orchestration
 must still read the canonical Praxion source files before acting.
 
-Current consumer: the installed project `AGENTS.md` adapter block points
+Current consumer: the installed project `AGENTS.md` managed block points
 AGENTS.md-aware main sessions at these files when present, so task sizing,
-delegation, and model routing stay in the Codex adapter layer.
+delegation, and model routing stay in the Codex project layer.

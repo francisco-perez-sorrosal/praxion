@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import tomllib
 from dataclasses import dataclass
@@ -27,29 +26,16 @@ class ServerConfig:
     env: tuple[tuple[str, str], ...]
 
 
-def _home() -> Path:
-    """Return the current user's home directory.
-
-    Reads ``os.environ["HOME"]`` directly so tests can isolate the shared
-    Codex config without depending on ``Path.home()`` platform behavior.
-    """
-
-    home_env = os.environ.get("HOME")
-    if home_env:
-        return Path(home_env)
-    return Path.home()
+def codex_dir(project_root: Path) -> Path:
+    return project_root / CONFIG_DIR_NAME
 
 
-def codex_home() -> Path:
-    return _home() / CONFIG_DIR_NAME
+def config_path(project_root: Path) -> Path:
+    return codex_dir(project_root) / CONFIG_FILE_NAME
 
 
-def config_path() -> Path:
-    return codex_home() / CONFIG_FILE_NAME
-
-
-def state_path() -> Path:
-    return codex_home() / STATE_RELATIVE_PATH
+def state_path(project_root: Path) -> Path:
+    return codex_dir(project_root) / STATE_RELATIVE_PATH
 
 
 def load_json(path: Path) -> dict:
@@ -329,19 +315,19 @@ def append_server_blocks(text: str, blocks: list[str]) -> str:
     return addition + "\n"
 
 
-def load_state() -> dict | None:
-    path = state_path()
+def load_state(project_root: Path) -> dict | None:
+    path = state_path(project_root)
     if not path.exists():
         return None
     return load_json(path)
 
 
-def save_state(state: dict) -> None:
-    dump_json(state_path(), state)
+def save_state(project_root: Path, state: dict) -> None:
+    dump_json(state_path(project_root), state)
 
 
-def unlink_state() -> None:
-    path = state_path()
+def unlink_state(project_root: Path) -> None:
+    path = state_path(project_root)
     if path.exists():
         path.unlink()
         try:
@@ -361,15 +347,15 @@ def ensure_valid_toml(text: str, path: Path) -> dict:
         raise RuntimeError(f"Invalid Codex config TOML at {path}: {exc}") from exc
 
 
-def read_config_text() -> str:
-    path = config_path()
+def read_config_text(project_root: Path) -> str:
+    path = config_path(project_root)
     if not path.exists():
         return ""
     return path.read_text(encoding="utf-8")
 
 
-def write_config_text(text: str) -> None:
-    path = config_path()
+def write_config_text(project_root: Path, text: str) -> None:
+    path = config_path(project_root)
     normalized = normalize_config_text(text)
     if not normalized:
         if path.exists():
@@ -396,8 +382,8 @@ def expected_blocks_for_repo(repo_root: Path, server_order: list[str]) -> list[s
 
 
 def install(repo_root: Path, project_root: Path) -> None:
-    current_text = read_config_text()
-    parsed = ensure_valid_toml(current_text, config_path())
+    current_text = read_config_text(project_root)
+    parsed = ensure_valid_toml(current_text, config_path(project_root))
 
     expected = load_plugin_mcp_servers(repo_root)
     server_order = list(expected)
@@ -406,37 +392,27 @@ def install(repo_root: Path, project_root: Path) -> None:
         cleaned_text, PROJECT_DOC_FALLBACK_KEY
     )
 
-    state = load_state()
+    state = load_state(project_root)
     if state is None:
         state = {
             "version": STATE_VERSION,
-            "installs": [],
             "original_blocks": {
                 name: removed_blocks.get(name) for name in server_order
             },
             "original_project_doc_fallback_assignment": removed_fallback_assignment,
+            "project_root": project_root.as_posix(),
+            "repo_root": repo_root.as_posix(),
         }
     else:
         state.setdefault("version", STATE_VERSION)
-        state.setdefault("installs", [])
         state.setdefault("original_blocks", {})
         state.setdefault(
             "original_project_doc_fallback_assignment", removed_fallback_assignment
         )
+        state.setdefault("project_root", project_root.as_posix())
+        state.setdefault("repo_root", repo_root.as_posix())
         for name in server_order:
             state["original_blocks"].setdefault(name, removed_blocks.get(name))
-
-    project_entry = {
-        "project_root": project_root.as_posix(),
-        "repo_root": repo_root.as_posix(),
-    }
-    installs = [
-        entry
-        for entry in state["installs"]
-        if entry.get("project_root") != project_entry["project_root"]
-    ]
-    installs.append(project_entry)
-    state["installs"] = installs
 
     new_text = set_top_level_assignment(
         cleaned_text,
@@ -447,53 +423,22 @@ def install(repo_root: Path, project_root: Path) -> None:
         new_text,
         [render_server_block(name, expected[name]) for name in server_order],
     )
-    write_config_text(new_text)
-    save_state(state)
+    write_config_text(project_root, new_text)
+    save_state(project_root, state)
 
 
 def uninstall(repo_root: Path, project_root: Path) -> None:
-    state = load_state()
+    state = load_state(project_root)
     if state is None:
         return
 
-    current_text = read_config_text()
-    ensure_valid_toml(current_text, config_path())
+    current_text = read_config_text(project_root)
+    ensure_valid_toml(current_text, config_path(project_root))
 
-    project_root_str = project_root.as_posix()
-    installs = [
-        entry
-        for entry in state.get("installs", [])
-        if entry.get("project_root") != project_root_str
-    ]
     original_blocks = state.get("original_blocks", {})
     original_fallback_assignment = state.get(
         "original_project_doc_fallback_assignment", None
     )
-
-    if installs:
-        active_repo_root = Path(installs[-1]["repo_root"])
-        expected = load_plugin_mcp_servers(active_repo_root)
-        server_order = list(expected)
-        cleaned_text, _removed_blocks = remove_server_blocks(
-            current_text, set(server_order)
-        )
-        parsed_cleaned = ensure_valid_toml(cleaned_text, config_path())
-        cleaned_text, _removed_fallback_assignment = remove_top_level_assignment(
-            cleaned_text, PROJECT_DOC_FALLBACK_KEY
-        )
-        cleaned_text = set_top_level_assignment(
-            cleaned_text,
-            PROJECT_DOC_FALLBACK_KEY,
-            toml_array(merge_project_doc_fallbacks(parsed_cleaned)),
-        )
-        new_text = append_server_blocks(
-            cleaned_text,
-            expected_blocks_for_repo(active_repo_root, server_order),
-        )
-        write_config_text(new_text)
-        state["installs"] = installs
-        save_state(state)
-        return
 
     server_names = set(str(name) for name in original_blocks)
     server_names.update(load_plugin_mcp_servers(repo_root))
@@ -510,43 +455,36 @@ def uninstall(repo_root: Path, project_root: Path) -> None:
     restored_blocks = [
         original_blocks[name] for name in original_blocks if original_blocks[name]
     ]
-    write_config_text(append_server_blocks(cleaned_text, restored_blocks))
-    unlink_state()
+    write_config_text(project_root, append_server_blocks(cleaned_text, restored_blocks))
+    unlink_state(project_root)
 
 
 def check(repo_root: Path, project_root: Path) -> tuple[bool, list[str]]:
-    path = config_path()
+    path = config_path(project_root)
     problems: list[str] = []
     if not path.exists():
-        return False, [f"Codex shared MCP config missing: {path}"]
+        return False, [f"Codex project MCP config missing: {path}"]
 
     text = path.read_text(encoding="utf-8")
     parsed = ensure_valid_toml(text, path)
-    state = load_state()
+    state = load_state(project_root)
     if state is None:
-        problems.append(f"Praxion Codex MCP state missing: {state_path()}")
-    else:
-        installs = state.get("installs", [])
-        project_root_str = project_root.as_posix()
-        if all(entry.get("project_root") != project_root_str for entry in installs):
-            problems.append(
-                f"Praxion Codex MCP state missing project registration for {project_root_str}"
-            )
+        problems.append(f"Praxion Codex MCP state missing: {state_path(project_root)}")
 
     expected = load_plugin_mcp_servers(repo_root)
     actual_servers = parsed.get("mcp_servers") or {}
     for name, server in expected.items():
         actual = normalize_server_payload(actual_servers.get(name))
         if actual is None:
-            problems.append(f"Codex shared MCP server missing: {name}")
+            problems.append(f"Codex project MCP server missing: {name}")
             continue
         if actual != server:
-            problems.append(f"Codex shared MCP server is stale: {name}")
+            problems.append(f"Codex project MCP server is stale: {name}")
 
     fallback_filenames = parsed.get(PROJECT_DOC_FALLBACK_KEY) or []
     if CLAUDE_FALLBACK_FILENAME not in fallback_filenames:
         problems.append(
-            "Codex shared config missing Praxion project-doc fallback: CLAUDE.md"
+            "Codex project config missing Praxion project-doc fallback: CLAUDE.md"
         )
 
     return not problems, problems

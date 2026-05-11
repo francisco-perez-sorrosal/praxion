@@ -1,5 +1,11 @@
 # Development Guidelines for Codex
 
+Reference draft for an optional user-owned Codex baseline. Praxion's current
+project-local installer does not write this full file into `~/.codex/`.
+Instead, it extracts the project-safe baseline section below and prepends it to
+the managed project `AGENTS.md` block.
+
+<!-- PRAXION:PROJECT_BASELINE:START -->
 ## Principles
 
 Together these form a coherent worldview - not a list of preferences.
@@ -121,8 +127,10 @@ Delegate to the coding-style rule and language-specific toolchains. The philosop
 ### Config Root
 
 - `~/.codex/config.toml` is configuration, not instruction content
-- `~/.codex/AGENTS.md` carries the user baseline installed by Praxion
-- `~/.codex/praxion/` stores generated adapter metadata and state
+- `~/.codex/AGENTS.md` may carry a user-owned global baseline if you choose to
+  use one
+- project-local Praxion adapter metadata and state live under
+  `<project>/.codex/praxion/`
 
 ### Adapter Boundaries
 
@@ -141,3 +149,4 @@ Delegate to the coding-style rule and language-specific toolchains. The philosop
 - Username: `{{USERNAME}}` - refer to actions by this user as "you"
 - Email/GitHub: `{{EMAIL}}`
 - GitHub: `{{GITHUB_URL}}`
+<!-- PRAXION:PROJECT_BASELINE:END -->

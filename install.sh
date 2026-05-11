@@ -357,11 +357,10 @@ EOF
   Target: ${B}AGENTS.md-aware agents${R}
 
   Components:
-    • Shared Codex instructions  (~/.codex/AGENTS.md and AGENTS.override.md)
-    • Shared Codex config merge  (~/.codex/config.toml for MCP + CLAUDE.md fallback)
-    • Project-local AGENTS.md adapter block
-    • Pointers to Praxion source artifacts (no copied rules/skills/agents)
-    • Codex custom-agent wrappers generated from agents/*.md
+    • Project-local AGENTS.md managed preamble  (Praxion Codex philosophy + adapter)
+    • Project-local Codex config merge  (<path>/.codex/config.toml for hooks, MCP, and CLAUDE.md fallback)
+    • Project-local skill and agent wrappers  (<path>/.agents/, <path>/.codex/agents/)
+    • Pointers to Praxion source artifacts (no copied canonical rules/skills/agents)
     • Compatibility map for direct reuse vs adapter-required surfaces
 EOF
             ;;
@@ -380,11 +379,11 @@ Usage: $(basename "$0") [code|desktop|cursor [path]|codex path] [--check] [--dry
   desktop      Install for Claude Desktop
   cursor       Install for Cursor: user profile ~/.cursor/ (default)
   cursor PATH  Install for Cursor: per-project at PATH/.cursor/
-  codex PATH   Install project-local AGENTS.md adapter for Codex and other
-               AGENTS.md-aware coding agents plus shared ~/.codex instruction
-               files and shared ~/.codex/config.toml updates
+  codex PATH   Install a project-local AGENTS.md managed preamble for Codex and other
+               AGENTS.md-aware coding agents plus project-local .codex/.agents
+               adapter surfaces
   --native     With 'codex', export Codex-native Praxion agent wrappers and the
-               shared ~/.codex instruction/config surfaces
+               project-local .codex/.agents adapter surfaces
                (default; accepted for readability)
   --compat-only
                With 'codex', only install the AGENTS.md compatibility pointer

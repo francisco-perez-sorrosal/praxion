@@ -1,8 +1,9 @@
 # Codex Working Preferences
 
-These are global user preferences layered after `~/.codex/AGENTS.md`. Keep
-them short, high-signal, and focused on stable working agreements rather than
-project-specific policy.
+Reference user preferences for an optional user-owned Codex baseline. Praxion's
+current project-local installer does not place them into `~/.codex/` by
+default. Keep them short, high-signal, and focused on stable working
+agreements rather than project-specific policy.
 
 ## Adaptive Precision Mode
 

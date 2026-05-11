@@ -46,7 +46,7 @@ def test_manage_codex_mcp_install_and_check_round_trip(tmp_path: Path):
     )
     assert install.returncode == 0, install.stderr or install.stdout
 
-    config_path = home_dir / ".codex" / "config.toml"
+    config_path = project_dir / ".codex" / "config.toml"
     parsed = tomllib.loads(config_path.read_text(encoding="utf-8"))
     assert parsed["project_doc_fallback_filenames"] == ["CLAUDE.md"]
     memory_config = parsed["mcp_servers"]["memory"]
@@ -72,15 +72,11 @@ def test_manage_codex_mcp_install_and_check_round_trip(tmp_path: Path):
     ]
     assert chronograph_config["env"]["OTEL_ENABLED"] == "true"
 
-    state_path = home_dir / ".codex" / "praxion" / "mcp_state.json"
+    state_path = project_dir / ".codex" / "praxion" / "mcp_state.json"
     assert state_path.exists()
     state = json.loads(state_path.read_text(encoding="utf-8"))
-    assert state["installs"] == [
-        {
-            "project_root": str(project_dir.resolve()),
-            "repo_root": str(REPO_ROOT.resolve()),
-        }
-    ]
+    assert state["project_root"] == str(project_dir.resolve())
+    assert state["repo_root"] == str(REPO_ROOT.resolve())
 
     check = run_manager(
         "--repo-root",
@@ -93,19 +89,20 @@ def test_manage_codex_mcp_install_and_check_round_trip(tmp_path: Path):
     )
     assert check.returncode == 0, check.stderr or check.stdout
     assert check.stdout == ""
+    assert not (home_dir / ".codex").exists()
 
 
-def test_manage_codex_mcp_uninstall_restores_user_server_blocks(tmp_path: Path):
+def test_manage_codex_mcp_uninstall_restores_project_config(tmp_path: Path):
     home_dir = tmp_path / "home"
     project_dir = tmp_path / "project"
     home_dir.mkdir()
     project_dir.mkdir()
     env = make_env(home_dir)
 
-    codex_dir = home_dir / ".codex"
+    codex_dir = project_dir / ".codex"
     codex_dir.mkdir()
     original_config = (
-        '# shared comment\nproject_doc_fallback_filenames = ["TEAM_GUIDE.md"]\n\n'
+        '# project comment\nproject_doc_fallback_filenames = ["TEAM_GUIDE.md"]\n\n'
         '[profiles.default]\nmodel = "gpt-5"\n\n'
         '[mcp_servers.memory]\n# preserve me\ncommand = "python3"\n'
         'args = ["-m", "user_memory"]\nstartup_timeout_sec = 30\n\n'
@@ -146,75 +143,47 @@ def test_manage_codex_mcp_uninstall_restores_user_server_blocks(tmp_path: Path):
     restored = (codex_dir / "config.toml").read_text(encoding="utf-8")
     assert restored == original_config
     assert not (codex_dir / "praxion" / "mcp_state.json").exists()
+    assert not (home_dir / ".codex").exists()
 
 
-def test_manage_codex_mcp_refcounts_multiple_projects(tmp_path: Path):
+def test_manage_codex_mcp_does_not_touch_home_config(tmp_path: Path):
     home_dir = tmp_path / "home"
-    project_a = tmp_path / "project-a"
-    project_b = tmp_path / "project-b"
+    project_dir = tmp_path / "project"
     home_dir.mkdir()
-    project_a.mkdir()
-    project_b.mkdir()
+    project_dir.mkdir()
     env = make_env(home_dir)
 
-    install_a = run_manager(
+    shared_codex_dir = home_dir / ".codex"
+    shared_codex_dir.mkdir()
+    original_shared = '[profiles.default]\nmodel = "gpt-5"\n'
+    (shared_codex_dir / "config.toml").write_text(original_shared, encoding="utf-8")
+
+    install = run_manager(
         "--repo-root",
         str(REPO_ROOT),
         "--project-root",
-        str(project_a),
+        str(project_dir),
         "--mode",
         "install",
         env=env,
     )
-    assert install_a.returncode == 0, install_a.stderr or install_a.stdout
+    assert install.returncode == 0, install.stderr or install.stdout
 
-    install_b = run_manager(
+    shared_after_install = (shared_codex_dir / "config.toml").read_text(encoding="utf-8")
+    assert shared_after_install == original_shared
+
+    uninstall = run_manager(
         "--repo-root",
         str(REPO_ROOT),
         "--project-root",
-        str(project_b),
-        "--mode",
-        "install",
-        env=env,
-    )
-    assert install_b.returncode == 0, install_b.stderr or install_b.stdout
-
-    uninstall_a = run_manager(
-        "--repo-root",
-        str(REPO_ROOT),
-        "--project-root",
-        str(project_a),
+        str(project_dir),
         "--mode",
         "uninstall",
         env=env,
     )
-    assert uninstall_a.returncode == 0, uninstall_a.stderr or uninstall_a.stdout
+    assert uninstall.returncode == 0, uninstall.stderr or uninstall.stdout
 
-    config_path = home_dir / ".codex" / "config.toml"
-    parsed = tomllib.loads(config_path.read_text(encoding="utf-8"))
-    assert parsed["project_doc_fallback_filenames"] == ["CLAUDE.md"]
-    assert parsed["mcp_servers"]["memory"]["command"] == "uv"
-
-    check_b = run_manager(
-        "--repo-root",
-        str(REPO_ROOT),
-        "--project-root",
-        str(project_b),
-        "--mode",
-        "check",
-        env=env,
-    )
-    assert check_b.returncode == 0, check_b.stderr or check_b.stdout
-
-    uninstall_b = run_manager(
-        "--repo-root",
-        str(REPO_ROOT),
-        "--project-root",
-        str(project_b),
-        "--mode",
-        "uninstall",
-        env=env,
-    )
-    assert uninstall_b.returncode == 0, uninstall_b.stderr or uninstall_b.stdout
-    assert not config_path.exists()
-    assert not (home_dir / ".codex" / "praxion" / "mcp_state.json").exists()
+    shared_after_uninstall = (
+        shared_codex_dir / "config.toml"
+    ).read_text(encoding="utf-8")
+    assert shared_after_uninstall == original_shared

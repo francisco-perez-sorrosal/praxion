@@ -18,6 +18,30 @@ def make_home(tmp_path: Path) -> tuple[dict[str, str], Path]:
     return env, home_dir
 
 
+def make_personal_info_env(
+    tmp_path: Path,
+    env: dict[str, str],
+    *,
+    username: str = "@test-user",
+    email: str = "test-user@example.com",
+    github_url: str = "https://github.com/test-user",
+) -> Path:
+    personal_info_env = tmp_path / ".personal_info.env"
+    personal_info_env.write_text(
+        "\n".join(
+            [
+                f"PRAXION_USERNAME={username}",
+                f"PRAXION_EMAIL={email}",
+                f"PRAXION_GITHUB_URL={github_url}",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    env["PRAXION_PERSONAL_INFO_ENV"] = str(personal_info_env)
+    return personal_info_env
+
+
 def run_install(
     *args: str, env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
@@ -31,20 +55,16 @@ def run_install(
     )
 
 
-def assert_headings_in_order(text: str, headings: list[str]) -> None:
-    positions = [text.index(heading) for heading in headings]
-    assert positions == sorted(positions), positions
-
-
 def test_install_codex_exports_canonical_paths_and_check_passes(tmp_path: Path):
     project_dir = tmp_path / "project"
     project_dir.mkdir()
     env, home_dir = make_home(tmp_path)
+    make_personal_info_env(tmp_path, env)
 
     install = run_install(str(project_dir), env=env)
     assert install.returncode == 0, install.stderr or install.stdout
     assert "Codex pipeline adapter exported" in install.stdout
-    assert "Codex shared MCP config updated" in install.stdout
+    assert "Codex project config updated" in install.stdout
 
     researcher = (project_dir / ".codex" / "agents" / "researcher.toml").read_text(
         encoding="utf-8"
@@ -56,10 +76,7 @@ def test_install_codex_exports_canonical_paths_and_check_passes(tmp_path: Path):
         project_dir / ".agents" / "skills" / "praxion-command-co" / "SKILL.md"
     ).read_text(encoding="utf-8")
     agents_md = (project_dir / "AGENTS.md").read_text(encoding="utf-8")
-    shared_agents = (home_dir / ".codex" / "AGENTS.md").read_text(encoding="utf-8")
-    shared_override = (home_dir / ".codex" / "AGENTS.override.md").read_text(
-        encoding="utf-8"
-    )
+    adapter_end = "<!-- PRAXION:AGENTS_ADAPTER:END -->"
 
     assert (
         str((REPO_ROOT / "agents" / "researcher.md").resolve()).replace("\\", "/")
@@ -68,39 +85,6 @@ def test_install_codex_exports_canonical_paths_and_check_passes(tmp_path: Path):
     assert 'model = "gpt-5.4"' in researcher
     assert 'model_reasoning_effort = "medium"' in researcher
     assert "Praxion agent contract:" in researcher
-    assert_headings_in_order(
-        shared_agents,
-        [
-            "# Development Guidelines for Codex",
-            "## Principles",
-            "### Pragmatism",
-            "### Context Engineering",
-            "### Behavior-Driven Development",
-            "### Incremental Evolution",
-            "### Structural Beauty",
-            "### Root Causes Over Workarounds",
-            "## Methodology: Understand, Plan, Verify",
-            "## The Behavioral Contract",
-            "## The Learning Loop",
-            "## The Ecosystem as Philosophy's Implementation",
-            "## Operating Conventions",
-            "### Response Style",
-            "### Technical Conventions",
-            "### Code Style",
-            "## Codex Particularities",
-            "### Config Root",
-            "### Adapter Boundaries",
-            "### Platform Limits",
-            "## Personal Info",
-        ],
-    )
-    assert "{{USERNAME}}" not in shared_agents
-    assert "{{EMAIL}}" not in shared_agents
-    assert "{{GITHUB_URL}}" not in shared_agents
-    assert "~/.codex/config.toml" in shared_agents
-    assert "# Codex Working Preferences" in shared_override
-    assert "## Adaptive Precision Mode" in shared_override
-    assert "## Memory" in shared_override
     assert (
         str(
             (REPO_ROOT / "skills" / "software-planning" / "SKILL.md").resolve()
@@ -111,6 +95,16 @@ def test_install_codex_exports_canonical_paths_and_check_passes(tmp_path: Path):
         str((REPO_ROOT / "commands" / "co.md").resolve()).replace("\\", "/") in command
     )
     assert "Treat any user text after the command name as `$ARGUMENTS`." in command
+    assert agents_md.startswith("<!-- PRAXION:AGENTS_ADAPTER:START -->")
+    assert "# Development Guidelines for Codex" in agents_md
+    assert "## Principles" in agents_md
+    assert "## Project Layering" in agents_md
+    assert "{{USERNAME}}" not in agents_md
+    assert "{{EMAIL}}" not in agents_md
+    assert "{{GITHUB_URL}}" not in agents_md
+    assert "- Username: `@test-user`" in agents_md
+    assert "- Email/GitHub: `test-user@example.com`" in agents_md
+    assert "- GitHub: `https://github.com/test-user`" in agents_md
     assert (project_dir / ".codex" / "praxion" / "rules_manifest.json").exists()
     assert (project_dir / ".codex" / "praxion" / "hook_runtime.py").exists()
     assert (project_dir / ".codex" / "praxion" / "pipeline_semantics.json").exists()
@@ -133,6 +127,8 @@ def test_install_codex_exports_canonical_paths_and_check_passes(tmp_path: Path):
     assert ".codex/praxion/model_routing.json" in agents_md
     assert "Codex-native translation of Praxion" in agents_md
     assert "Claude-only routing rule" in agents_md
+    assert agents_md.index("## Principles") < agents_md.index("## Praxion Adapter")
+    assert agents_md.index("## Praxion Adapter") < agents_md.index(adapter_end)
     assert (project_dir / ".codex" / "hooks.json").exists()
     config_text = (project_dir / ".codex" / "config.toml").read_text(encoding="utf-8")
     config_lines = set(config_text.splitlines())
@@ -146,12 +142,10 @@ def test_install_codex_exports_canonical_paths_and_check_passes(tmp_path: Path):
     assert "praxion-precompact-state.py" in hooks_text
     assert "praxion-observability-post-tool-use.py" in hooks_text
     assert '"async"' not in hooks_text
-    shared_config = tomllib.loads(
-        (home_dir / ".codex" / "config.toml").read_text(encoding="utf-8")
-    )
-    assert shared_config["project_doc_fallback_filenames"] == ["CLAUDE.md"]
-    memory_config = shared_config["mcp_servers"]["memory"]
-    chronograph_config = shared_config["mcp_servers"]["task-chronograph"]
+    project_config = tomllib.loads(config_text)
+    assert project_config["project_doc_fallback_filenames"] == ["CLAUDE.md"]
+    memory_config = project_config["mcp_servers"]["memory"]
+    chronograph_config = project_config["mcp_servers"]["task-chronograph"]
     assert memory_config["command"] == "uv"
     assert memory_config["args"][2] == str((REPO_ROOT / "memory-mcp").resolve())
     assert memory_config["env"]["MEMORY_FILE"] == ".ai-state/memory.json"
@@ -159,14 +153,13 @@ def test_install_codex_exports_canonical_paths_and_check_passes(tmp_path: Path):
         (REPO_ROOT / "task-chronograph-mcp").resolve()
     )
     assert chronograph_config["env"]["OTEL_ENABLED"] == "true"
-    assert (home_dir / ".codex" / "praxion" / "mcp_state.json").exists()
+    assert (project_dir / ".codex" / "praxion" / "mcp_state.json").exists()
+    assert not (home_dir / ".codex").exists()
 
     check = run_install(str(project_dir), "--check", env=env)
     assert check.returncode == 0, check.stderr or check.stdout
     assert "Codex pipeline adapter present" in check.stdout
-    assert "Codex shared AGENTS baseline present" in check.stdout
-    assert "Codex shared AGENTS override present" in check.stdout
-    assert "Codex shared MCP config present" in check.stdout
+    assert "Codex project MCP config present" in check.stdout
 
 
 def test_install_codex_dry_run_reports_pipeline_adapter(tmp_path: Path):
@@ -178,8 +171,7 @@ def test_install_codex_dry_run_reports_pipeline_adapter(tmp_path: Path):
 
     assert dry_run.returncode == 0, dry_run.stderr or dry_run.stdout
     assert "Would export Praxion pipeline adapter" in dry_run.stdout
-    assert "Would install shared Codex instruction files" in dry_run.stdout
-    assert "Would update shared Codex config" in dry_run.stdout
+    assert "Would update project Codex config" in dry_run.stdout
 
 
 def test_install_codex_compat_only_skips_native_codex_surfaces(tmp_path: Path):
@@ -193,8 +185,38 @@ def test_install_codex_compat_only_skips_native_codex_surfaces(tmp_path: Path):
     assert (project_dir / "AGENTS.md").exists()
     assert not (project_dir / ".codex").exists()
     assert not (project_dir / ".agents").exists()
-    assert not (home_dir / ".codex" / "AGENTS.md").exists()
-    assert not (home_dir / ".codex" / "AGENTS.override.md").exists()
+    assert not (home_dir / ".codex").exists()
+
+
+def test_install_codex_prepends_managed_block_before_existing_project_content(
+    tmp_path: Path,
+):
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    env, _home_dir = make_home(tmp_path)
+    make_personal_info_env(tmp_path, env, username="@project-user")
+    (project_dir / "AGENTS.md").write_text(
+        "# Project Instructions\n\nAlways include PROJECT_ONLY_RULE.\n",
+        encoding="utf-8",
+    )
+
+    install = run_install(str(project_dir), env=env)
+
+    assert install.returncode == 0, install.stderr or install.stdout
+    agents_md = (project_dir / "AGENTS.md").read_text(encoding="utf-8")
+    adapter_end = "<!-- PRAXION:AGENTS_ADAPTER:END -->"
+    assert agents_md.startswith("<!-- PRAXION:AGENTS_ADAPTER:START -->")
+    assert "# Development Guidelines for Codex" in agents_md
+    assert "- Username: `@project-user`" in agents_md
+    assert "# Project Instructions" in agents_md
+    assert "PROJECT_ONLY_RULE" in agents_md
+    assert agents_md.index(adapter_end) < agents_md.index("# Project Instructions")
+
+    uninstall = run_install(str(project_dir), "--uninstall", env=env)
+    assert uninstall.returncode == 0, uninstall.stderr or uninstall.stdout
+    assert (project_dir / "AGENTS.md").read_text(encoding="utf-8") == (
+        "# Project Instructions\n\nAlways include PROJECT_ONLY_RULE.\n"
+    )
 
 
 def test_install_codex_check_fails_on_unexpected_generated_wrappers(tmp_path: Path):
@@ -301,8 +323,10 @@ def test_install_codex_uninstall_preserves_user_codex_config_and_hooks(tmp_path:
         (shared_codex_dir / "config.toml").read_text(encoding="utf-8")
     )
     assert shared_config["profiles"]["default"]["model"] == "gpt-5"
-    assert shared_config["project_doc_fallback_filenames"] == ["CLAUDE.md"]
-    assert shared_config["mcp_servers"]["memory"]["command"] == "uv"
+    assert shared_config["mcp_servers"]["memory"]["command"] == "python3"
+    project_config = tomllib.loads(installed_config)
+    assert project_config["project_doc_fallback_filenames"] == ["CLAUDE.md"]
+    assert project_config["mcp_servers"]["memory"]["command"] == "uv"
 
     uninstall = run_install(str(project_dir), "--uninstall", env=env)
     assert uninstall.returncode == 0, uninstall.stderr or uninstall.stdout
@@ -317,8 +341,7 @@ def test_install_codex_uninstall_preserves_user_codex_config_and_hooks(tmp_path:
     assert not (codex_dir / "praxion" / "config_state.json").exists()
     assert not (codex_dir / "praxion" / "pipeline_semantics.json").exists()
     assert not (codex_dir / "praxion" / "model_routing.json").exists()
-    assert not (shared_codex_dir / "AGENTS.md").exists()
-    assert not (shared_codex_dir / "AGENTS.override.md").exists()
+    assert not (codex_dir / "praxion" / "mcp_state.json").exists()
     restored_shared_config = (shared_codex_dir / "config.toml").read_text(
         encoding="utf-8"
     )
@@ -327,4 +350,6 @@ def test_install_codex_uninstall_preserves_user_codex_config_and_hooks(tmp_path:
     assert 'args = ["-m", "user_memory"]' in restored_shared_config
     assert "startup_timeout_sec = 30" in restored_shared_config
     assert "project_doc_fallback_filenames" not in restored_shared_config
+    assert not (shared_codex_dir / "AGENTS.md").exists()
+    assert not (shared_codex_dir / "AGENTS.override.md").exists()
     assert not (shared_codex_dir / "praxion" / "mcp_state.json").exists()

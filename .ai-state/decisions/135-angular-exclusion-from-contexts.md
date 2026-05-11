@@ -1,7 +1,7 @@
 ---
-id: dec-draft-0fca1a23
+id: dec-135
 title: Angular intentionally excluded from first-class typescript-development contexts
-status: proposed
+status: accepted
 category: architectural
 date: 2026-05-11
 summary: Praxion will not ship contexts/angular.md as a first-class context in typescript-development. Angular projects use Angular's own CLI and opinionated toolchain.
@@ -12,7 +12,7 @@ branch: worktree-multi-language-support
 pipeline_tier: full
 affected_files:
   - skills/typescript-development/SKILL.md
-re_affirms: dec-draft-5530be05
+re_affirms: dec-137
 ---
 
 ## Context

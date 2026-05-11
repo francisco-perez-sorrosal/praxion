@@ -1,7 +1,7 @@
 ---
-id: dec-draft-de6d2f9b
+id: dec-136
 title: Biome / ESLint coexistence in typescript-development — one context file, conditional guidance
-status: proposed
+status: accepted
 category: architectural
 date: 2026-05-11
 summary: typescript-development/contexts/typescript.md documents both Biome (default for greenfield/library) and ESLint+Prettier (default for framework projects with required plugins) in one file with a clear decision rule.
@@ -14,7 +14,7 @@ affected_files:
   - skills/typescript-development/contexts/typescript.md
   - skills/typescript-development/contexts/react.md
   - skills/typescript-development/contexts/vue.md
-re_affirms: dec-draft-849b9356
+re_affirms: dec-139
 ---
 
 ## Context

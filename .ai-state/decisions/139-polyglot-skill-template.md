@@ -1,7 +1,7 @@
 ---
-id: dec-draft-849b9356
+id: dec-139
 title: Polyglot skill template — references/ vs contexts/ separation with extension protocol
-status: proposed
+status: accepted
 category: architectural
 date: 2026-05-11
 summary: Formalize the polyglot skill pattern — language-agnostic SKILL.md body + references/ for cross-language concepts + contexts/ for runnable language-specific mechanics, with a documented extension protocol.

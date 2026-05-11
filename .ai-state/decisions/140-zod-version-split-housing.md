@@ -1,7 +1,7 @@
 ---
-id: dec-draft-a5387191
+id: dec-140
 title: Zod v3/v4 cross-skill version split — canonical home in node-prj-mgmt
-status: proposed
+status: accepted
 category: architectural
 date: 2026-05-11
 summary: The Zod v3 (MCP TS SDK v1) vs Zod v4 (OpenAI Agents SDK JS) coexistence gotcha lives in node-prj-mgmt/SKILL.md Gotchas. mcp-crafting and agentic-sdks contexts cross-reference. Establishes a protocol for future cross-skill version conflicts.
@@ -14,7 +14,7 @@ affected_files:
   - skills/node-prj-mgmt/SKILL.md
   - skills/mcp-crafting/contexts/typescript.md
   - skills/agentic-sdks/contexts/openai-agents-typescript.md
-re_affirms: dec-draft-849b9356
+re_affirms: dec-139
 ---
 
 ## Context

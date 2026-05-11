@@ -1,7 +1,7 @@
 ---
-id: dec-draft-5530be05
+id: dec-137
 title: Frontend framework contexts nest inside typescript-development, not as sibling skills
-status: proposed
+status: accepted
 category: architectural
 date: 2026-05-11
 summary: React 19 and Vue 3 contexts live under typescript-development/contexts/, layered above the baseline typescript.md context, rather than as sibling skills (react-development, vue-development).
@@ -15,12 +15,12 @@ affected_files:
   - skills/typescript-development/contexts/typescript.md
   - skills/typescript-development/contexts/react.md
   - skills/typescript-development/contexts/vue.md
-re_affirms: dec-draft-849b9356
+re_affirms: dec-139
 ---
 
 ## Context
 
-The Phase 1b research lock decided that Praxion will support Node.js + TypeScript + React 19 + Vue 3 as first-class. The Polyglot Skill Template ADR (`dec-draft-849b9356`) formalizes the general polyglot pattern, but no existing Praxion precedent covers **frontend framework nesting** — stacking framework-specific contexts (React, Vue) above a language-baseline context (TypeScript).
+The Phase 1b research lock decided that Praxion will support Node.js + TypeScript + React 19 + Vue 3 as first-class. The Polyglot Skill Template ADR (`dec-139`) formalizes the general polyglot pattern, but no existing Praxion precedent covers **frontend framework nesting** — stacking framework-specific contexts (React, Vue) above a language-baseline context (TypeScript).
 
 The two structural options are: (a) frameworks as sibling skills (`skills/react-development/`, `skills/vue-development/`), or (b) frameworks nested as contexts inside a language-rooted skill (`typescript-development/contexts/react.md`). The decision matters because every future frontend framework (Svelte, Solid, etc.) inherits this pattern.
 

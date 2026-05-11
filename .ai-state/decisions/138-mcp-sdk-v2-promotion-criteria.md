@@ -1,7 +1,7 @@
 ---
-id: dec-draft-c8652a92
+id: dec-138
 title: MCP TypeScript SDK v2 promotion — trigger-based review, not date-based
-status: proposed
+status: accepted
 category: architectural
 date: 2026-05-11
 summary: mcp-crafting/contexts/typescript.md ships v1.x stable patterns; v2.0 alpha sub-package architecture is noted as preview. Promotion to v2 patterns triggered by upstream events, not calendar.

@@ -53,10 +53,11 @@ HTML rendering is **not hand-authored per artifact**. The as-built Next.js App R
 | Layer | Location | Role |
 |---|---|---|
 | **Server view-models** | `dashboard_app/src/server/view-models/<surface>.ts` | Data shaping — reads MD/JSON/YAML from disk, returns typed props |
-| **Presentation primitives** | `dashboard_app/src/components/` | Stateless React components: `EmptyState`, `MarkdownSurface`, `LiveRefresh`, `MetricsDashboard`, `SidebarNav`, `MetricsSummaryCards`, `MetricsTrends`, `ArtifactCard`, `MetadataChips`, `EducationalPopover` |
+| **Presentation primitives** | `dashboard_app/src/components/` | Stateless React components: `EmptyState`, `MarkdownSurface`, `LiveRefresh`, `MetricsDashboard`, `SidebarNav`, `MetricsSummaryCards`, `MetricsTrends`, `ArtifactCard`, `MetadataChips`, `EducationalPopover`, `AppHeader`, `PageShell`, `MarkdownToc` |
 | **Diátaxis shells** | `dashboard_app/src/components/shells/` | Layout chrome wrapping `MarkdownSurface`: `ReferenceShell`, `ExplanationShell`, `DefaultShell`; `TutorialShell`/`HowToShell`/`ConceptsShell` are default-aliasing stubs (see Diátaxis-Typed Shells) |
 | **Renderer registry** | `dashboard_app/src/components/registry.ts` | `RENDERER_REGISTRY: Map<string, ComponentType<{body: string; surface?: ManifestSurface}>>` + `resolveRenderer(diataxis?, contentType?)` |
-| **Viz components** | `dashboard_app/src/components/viz/` | Interactive: `DiagramViewer`, `DecisionGraph`, `TrendChart`, `Sparkline`, `usePanZoom` |
+| **Viz components** | `dashboard_app/src/components/viz/` | Interactive: `DiagramFrame`, `DiagramModal`, `DecisionGraph`, `TrendChart`, `Sparkline`, `usePanZoom` |
+| **Library utilities** | `dashboard_app/src/lib/`, `dashboard_app/src/server/` | Pure utilities: `markdown-headings.ts` (slugify, extractToc), `health-tone.ts` (metrics aggregation), `sidebar-signals.ts` (view-model for sidebar state), `normalize-svg.ts` (SVG attribute normalization) |
 | **Chrome components** | `dashboard_app/src/components/chrome/` | `Chip`, `Tabs`, `ErrorState` |
 | **Page routes** | `dashboard_app/src/app/<surface>/page.tsx` | 7 surface pages: `adrs`, `architecture`, `documentation`, `metrics`, `roadmap`, `sentinel`, `workshops` |
 
@@ -95,7 +96,7 @@ Two embedding strategies apply depending on the context:
 
 | Context | Strategy | Rationale |
 |---|---|---|
-| Committed Markdown (`.md` files) | Markdown image syntax `![alt](diagrams/<name>/rendered/<name>.svg)` | Renderer-agnostic; GitHub-renderable; renders correctly in react-markdown (the dashboard's renderer) without raw-HTML parsing — `<img>` in a `.md` body shows as literal text in react-markdown |
+| Committed Markdown (`.md` files) | Markdown image syntax `![alt](diagrams/<name>/rendered/<name>.svg)` | Renderer-agnostic; GitHub-renderable; renders correctly in react-markdown (the dashboard's renderer) — security posture: no raw-HTML re-parse step (rehype-raw stays out), but HAST-transform plugins (rehype-slug, rehype-autolink-headings) are compatible and in use. `<img>` in a `.md` body shows as literal text unless preprocessed via `MarkdownSurface`'s normalization helper. |
 | Committed `.html` share-out files | `<img>` tag referencing `diagrams/<name>/rendered/<name>.svg` | HTML files allow raw tags; no react-markdown involved |
 | Dashboard server (interactive surfaces) | Inline SVG via `dangerouslySetInnerHTML` or the `/api/diagram` route | Enables pan/zoom, node events, CSS interaction — only the dashboard server may use this pattern |
 
@@ -176,7 +177,7 @@ This is the same single-author-per-surface discipline already enforced for MD do
 
 ### Integration with `diagram-conventions.md`
 
-The diagram source/render separation already established in [`diagram-conventions.md`](diagram-conventions.md) composes cleanly. For committed Markdown and HTML artifacts, SVG renders are embedded as `<img>` tags. When the dashboard server renders SVGs inline for interactive surfaces (e.g., `DiagramViewer`, `DecisionGraph`), the SVG source path still follows the `diagrams/<name>/rendered/<name>.svg` convention — only the delivery mechanism changes (route-served or inline-injected vs. `<img>` tag). The committed Markdown source never changes.
+The diagram source/render separation already established in [`diagram-conventions.md`](diagram-conventions.md) composes cleanly. For committed Markdown and HTML artifacts, SVG renders are embedded as `<img>` tags. When the dashboard server renders SVGs inline for interactive surfaces (e.g., `DiagramFrame`, `DecisionGraph`), the SVG source path still follows the `diagrams/<name>/rendered/<name>.svg` convention — only the delivery mechanism changes (route-served or inline-injected vs. `<img>` tag). The committed Markdown source never changes.
 
 ### Self-test Before Committing HTML-Layer Changes
 

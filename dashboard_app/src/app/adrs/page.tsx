@@ -1,5 +1,6 @@
 import { EducationalPopover } from "@/components/educational-popover";
 import { EmptyState } from "@/components/empty-state";
+import { PageShell } from "@/components/page-shell";
 import { getConfig } from "@/lib/config";
 import { getAdrData } from "@/server/view-models/adrs";
 
@@ -10,27 +11,29 @@ export default async function AdrsPage() {
   const cfg = getConfig();
   const { records: adrs, graph } = await getAdrData(cfg.projectRoot);
 
+  const sources = (
+    <>
+      <p>
+        Reads <code>.ai-state/decisions/</code> (finalized) and{" "}
+        <code>.ai-state/decisions/drafts/</code> (in-pipeline fragments).
+      </p>
+    </>
+  );
+
   return (
-    <section className="page-card">
-      <header className="page-intro">
-        <div>
-          <p className="eyebrow">Decision record</p>
-          <h2>ADRs</h2>
-          <p>
-            Finalized and draft architecture decisions rendered directly from the
-            canonical Markdown files.{" "}
-            <EducationalPopover
-              title="Architecture Decision Records"
-              body="ADRs capture significant decisions: context, the decision, options considered, consequences. The graph shows supersedes (solid) and re-affirms (dashed) relationships."
-              href="rules/swe/adr-conventions.md"
-            />
-          </p>
-        </div>
-        <aside>
-          <span>Current count</span>
-          <strong>{adrs.length} decision surfaces</strong>
-        </aside>
-      </header>
+    <PageShell
+      title="ADRs"
+      sourcesContent={sources}
+    >
+      <p className="page-intro__lede muted">
+        Finalized and draft architecture decisions rendered directly from the canonical
+        Markdown files.{" "}
+        <EducationalPopover
+          title="Architecture Decision Records"
+          body="ADRs capture significant decisions: context, the decision, options considered, consequences. The graph shows supersedes (solid) and re-affirms (dashed) relationships."
+          href="rules/swe/adr-conventions.md"
+        />
+      </p>
 
       {adrs.length === 0 ? (
         <EmptyState
@@ -52,6 +55,6 @@ export default async function AdrsPage() {
           <AdrFilterClient records={adrs} />
         </div>
       )}
-    </section>
+    </PageShell>
   );
 }

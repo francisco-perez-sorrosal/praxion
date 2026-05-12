@@ -4,6 +4,7 @@ import { DecisionGraph } from "@/components/viz/decision-graph";
 import { EducationalPopover } from "@/components/educational-popover";
 import { EmptyState } from "@/components/empty-state";
 import { LiveRefresh } from "@/components/live-refresh";
+import { PageShell } from "@/components/page-shell";
 import { getConfig } from "@/lib/config";
 import type { AdrGraphNode } from "@/server/view-models/adr-graph";
 import { getWorkshopsData } from "@/server/view-models/workshops";
@@ -30,31 +31,31 @@ export default async function WorkshopsPage() {
   const cfg = getConfig();
   const workshops = await getWorkshopsData(cfg.projectRoot);
 
+  const sources = (
+    <>
+      <p>
+        Reads <code>.ai-work/&lt;task-slug&gt;/</code> — in-flight pipeline state refreshed on a
+        fixed cadence without a secondary data store.
+      </p>
+      <p>
+        Refresh cadence: <strong>{cfg.pollIntervalSeconds}s server refresh on this page only.</strong>
+      </p>
+    </>
+  );
+
   return (
-    <section className="page-card">
+    <PageShell title="Workshops" sourcesContent={sources}>
       <LiveRefresh seconds={cfg.pollIntervalSeconds} />
 
-      <header className="page-intro">
-        <div>
-          <p className="eyebrow">Live supervision</p>
-          <h2>
-            Workshops
-            <EducationalPopover
-              title="Pipeline workshops"
-              body="In-flight agent pipelines surface here: the current WIP step, the step plan, the PROGRESS.md transition log, and which intermediate artifacts exist. Workshop directories disappear after the pipeline completes and is cleaned."
-              href="rules/swe/agent-intermediate-documents.md"
-            />
-          </h2>
-          <p>
-            In-flight pipeline state from `.ai-work/&lt;task-slug&gt;/`, refreshed on a
-            fixed cadence without introducing a secondary data store.
-          </p>
-        </div>
-        <aside>
-          <span>Refresh cadence</span>
-          <strong>{cfg.pollIntervalSeconds}s server refresh on this page only.</strong>
-        </aside>
-      </header>
+      <p className="page-intro__lede muted">
+        In-flight pipeline state from <code>.ai-work/&lt;task-slug&gt;/</code>, refreshed on a
+        fixed cadence.{" "}
+        <EducationalPopover
+          title="Pipeline workshops"
+          body="In-flight agent pipelines surface here: the current WIP step, the step plan, the PROGRESS.md transition log, and which intermediate artifacts exist. Workshop directories disappear after the pipeline completes and is cleaned."
+          href="rules/swe/agent-intermediate-documents.md"
+        />
+      </p>
 
       {workshops.length === 0 ? (
         <EmptyState
@@ -128,6 +129,6 @@ export default async function WorkshopsPage() {
           ))}
         </div>
       )}
-    </section>
+    </PageShell>
   );
 }

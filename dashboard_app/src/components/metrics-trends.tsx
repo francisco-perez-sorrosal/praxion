@@ -2,7 +2,6 @@
 
 import { TrendChart } from "@/components/viz/trend-chart";
 import type { TrendSeries } from "@/components/viz/trend-chart";
-import { EducationalPopover } from "@/components/educational-popover";
 import type {
   MetricChartSection,
   MetricKey,
@@ -11,9 +10,7 @@ import type {
 } from "@/lib/metrics";
 import {
   formatChartAxisValue,
-  formatMetricValue,
   formatSnapshotLabel,
-  getMetricDirectionCopy,
   METRIC_CHART_SECTIONS,
   METRIC_DEFINITIONS
 } from "@/lib/metrics";
@@ -73,19 +70,40 @@ function buildSectionSeries(
   );
 }
 
+/** Derives the x-value for the selected snapshot so TrendChart can mark it. */
+function resolveSelectedX(
+  activeSnapshot: MetricsSnapshot | null,
+  logSeries: MetricsLogPoint[]
+): string | null {
+  if (!activeSnapshot) return null;
+
+  if (logSeries.length > 0) {
+    // Log series uses timestamp date prefix as x.
+    return activeSnapshot.aggregate.timestamp
+      ? activeSnapshot.aggregate.timestamp.slice(0, 10)
+      : null;
+  }
+
+  // Snapshot fallback uses formatSnapshotLabel.
+  return formatSnapshotLabel(activeSnapshot.aggregate.timestamp);
+}
+
 // ─── MetricTrendSection ────────────────────────────────────────────────────────
 
 function MetricTrendSection({
+  activeSnapshot,
   logSeries,
   section,
   snapshots
 }: {
+  activeSnapshot: MetricsSnapshot | null;
   logSeries: MetricsLogPoint[];
   section: MetricChartSection;
   snapshots: MetricsSnapshot[];
 }) {
   const series = buildSectionSeries(section, snapshots, logSeries);
   const hasPoints = series.some((s) => s.points.length > 0);
+  const selectedX = resolveSelectedX(activeSnapshot, logSeries);
 
   return (
     <section className="artifact-card metric-trend-card">
@@ -94,21 +112,13 @@ function MetricTrendSection({
           <h3>{section.title}</h3>
           <p className="muted">{section.note}</p>
         </div>
-        <div className="metric-trend-card__hints">
-          {section.metrics.map((metricKey) => (
-            <EducationalPopover
-              key={metricKey}
-              body={`${METRIC_DEFINITIONS[metricKey].summary} ${getMetricDirectionCopy(metricKey)}`}
-              title={METRIC_DEFINITIONS[metricKey].label}
-            />
-          ))}
-        </div>
       </div>
       {hasPoints ? (
         <TrendChart
           series={series}
           height={CHART_HEIGHT}
           yFormatter={(v) => formatChartAxisValue(v)}
+          selectedX={selectedX}
         />
       ) : (
         <p className="muted">Not enough data points yet for this metric group.</p>
@@ -120,17 +130,31 @@ function MetricTrendSection({
 // ─── MetricsTrends ────────────────────────────────────────────────────────────
 
 export function MetricsTrends({
+  activeSnapshot,
   logSeries,
   snapshots
 }: {
+  activeSnapshot: MetricsSnapshot | null;
   logSeries: MetricsLogPoint[];
   snapshots: MetricsSnapshot[];
 }) {
+  if (snapshots.length < 2) {
+    return (
+      <section className="artifact-card">
+        <h3>Trends</h3>
+        <p className="muted">
+          Trends appear after the second <code>/project-metrics</code> run.
+        </p>
+      </section>
+    );
+  }
+
   return (
     <div className="grid-two">
       {METRIC_CHART_SECTIONS.map((section) => (
         <MetricTrendSection
           key={section.title}
+          activeSnapshot={activeSnapshot}
           logSeries={logSeries}
           section={section}
           snapshots={snapshots}

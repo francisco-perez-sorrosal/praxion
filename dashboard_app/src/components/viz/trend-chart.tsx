@@ -2,13 +2,16 @@
 
 import {
   CartesianGrid,
+  type DotItemDotProps,
+  Label,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   type TooltipContentProps,
   XAxis,
-  YAxis,
+  YAxis
 } from "recharts";
 
 export type TrendPoint = { x: string | number; y: number | null };
@@ -24,6 +27,11 @@ export type TrendChartProps = {
   xLabel?: string;
   yFormatter?: (n: number) => string;
   height?: number;
+  /**
+   * When provided, the x-value for the currently selected snapshot is marked
+   * with a larger filled dot and the x-axis shows only [first, last, selected].
+   */
+  selectedX?: string | null;
 };
 
 /** A single recharts data row: keys are the x-axis value key plus one key per series. */
@@ -112,20 +120,35 @@ function CustomTooltip({ active, payload, label, yFormatter }: CustomTooltipProp
 }
 
 // ---------------------------------------------------------------------------
-// TrendChart
+// TrendChart — Tufte pass
 // ---------------------------------------------------------------------------
 
 const DEFAULT_HEIGHT = 200;
 const DEFAULT_Y_FORMATTER = String;
 const DOT_RADIUS = 3;
 const ACTIVE_DOT_RADIUS = 5;
+const SELECTED_DOT_RADIUS = 5;
 
 /**
- * Generic recharts line chart wrapper.
+ * Generic recharts line chart wrapper — Tufte discipline applied:
+ * - No CartesianGrid (gridlines removed; only a single faint baseline at y=0
+ *   when relevant)
+ * - No Legend box — direct-label the line at its right end via <Label>
+ * - X-axis ticks: first / last / selected snapshot only (≤ 3)
+ * - Y-axis: ≤ 3 ticks
+ * - Thin line (~1.5px), neutral color
+ * - Selected snapshot marked with a larger filled dot
+ *
  * Accepts arbitrary series — no metric names or grade values hardcoded.
  * null y values produce gaps (`connectNulls={false}`).
  */
-export function TrendChart({ series, xLabel, yFormatter = DEFAULT_Y_FORMATTER, height = DEFAULT_HEIGHT }: TrendChartProps) {
+export function TrendChart({
+  series,
+  xLabel,
+  yFormatter = DEFAULT_Y_FORMATTER,
+  height = DEFAULT_HEIGHT,
+  selectedX = null
+}: TrendChartProps) {
   if (series.length === 0) {
     return null;
   }
@@ -136,20 +159,35 @@ export function TrendChart({ series, xLabel, yFormatter = DEFAULT_Y_FORMATTER, h
     return null;
   }
 
+  // Compute x-axis ticks: first, last, and selected — deduplicated.
+  const allXValues = data.map((row) => row["x"]).filter((x): x is string | number => x !== null && x !== undefined);
+  const firstX = allXValues[0];
+  const lastX = allXValues.at(-1);
+
+  const xTicks = Array.from(
+    new Set(
+      [firstX, lastX, selectedX].filter((x): x is string | number => x !== null && x !== undefined)
+    )
+  );
+
   return (
     <div className="trend-chart-wrapper">
       <ResponsiveContainer width="100%" height={height}>
-        <LineChart data={data} margin={{ top: 8, right: 8, bottom: xLabel ? 24 : 8, left: 8 }}>
-          <CartesianGrid
-            strokeDasharray="4 8"
+        <LineChart data={data} margin={{ top: 8, right: 56, bottom: xLabel ? 24 : 8, left: 8 }}>
+          {/* Tufte: no grid — only a faint baseline */}
+          <CartesianGrid horizontal={false} vertical={false} />
+          <ReferenceLine
+            y={0}
             stroke="var(--color-border)"
-            vertical={false}
+            strokeWidth={1}
+            ifOverflow="hidden"
           />
           <XAxis
             dataKey="x"
             tick={{ fill: "var(--color-text-muted)", fontSize: 11 }}
             tickLine={false}
             axisLine={{ stroke: "var(--color-border)" }}
+            ticks={xTicks as string[]}
             label={
               xLabel
                 ? { value: xLabel, position: "insideBottom", offset: -12, fill: "var(--color-text-muted)", fontSize: 11 }
@@ -161,6 +199,7 @@ export function TrendChart({ series, xLabel, yFormatter = DEFAULT_Y_FORMATTER, h
             tick={{ fill: "var(--color-text-muted)", fontSize: 11 }}
             tickLine={false}
             axisLine={false}
+            tickCount={3}
             width={48}
           />
           <Tooltip
@@ -174,13 +213,39 @@ export function TrendChart({ series, xLabel, yFormatter = DEFAULT_Y_FORMATTER, h
               key={s.label}
               type="monotone"
               dataKey={s.label}
-              stroke={s.color}
-              strokeWidth={2}
-              dot={{ r: DOT_RADIUS, fill: s.color, strokeWidth: 0 }}
-              activeDot={{ r: ACTIVE_DOT_RADIUS, fill: s.color, stroke: "var(--color-surface-raised)", strokeWidth: 2 }}
+              stroke="var(--color-text-muted)"
+              strokeWidth={1.5}
+              dot={(dotProps: DotItemDotProps) => {
+                const payloadX = (dotProps.payload as ChartRow)["x"];
+                const isSelected = payloadX === selectedX;
+                const r = isSelected ? SELECTED_DOT_RADIUS : DOT_RADIUS;
+                const fillColor = isSelected ? "var(--color-accent)" : s.color;
+                const cx = dotProps.cx ?? 0;
+                const cy = dotProps.cy ?? 0;
+                return (
+                  <circle
+                    key={`dot-${String(payloadX)}`}
+                    cx={cx}
+                    cy={cy}
+                    r={r}
+                    fill={fillColor}
+                    stroke="none"
+                  />
+                );
+              }}
+              activeDot={{ r: ACTIVE_DOT_RADIUS, fill: s.color, stroke: "var(--color-surface-1)", strokeWidth: 2 }}
               connectNulls={false}
               isAnimationActive={false}
-            />
+            >
+              {/* Direct-label the line at its right end — Tufte: no legend box */}
+              <Label
+                value={s.label}
+                position="right"
+                fill="var(--color-text-muted)"
+                fontSize={11}
+                offset={4}
+              />
+            </Line>
           ))}
         </LineChart>
       </ResponsiveContainer>

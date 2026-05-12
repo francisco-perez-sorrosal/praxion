@@ -1,4 +1,6 @@
 import ReactMarkdown from "react-markdown";
+import rehypeAutolinkHeadings from "rehype-autolink-headings";
+import rehypeSlug from "rehype-slug";
 import remarkGfm from "remark-gfm";
 
 // react-markdown escapes raw HTML by default (security posture: no rehype-raw).
@@ -11,10 +13,10 @@ import remarkGfm from "remark-gfm";
 //      so react-markdown renders them as real <img> elements.
 // Markdown image syntax (![alt](url)) is untouched — it already renders correctly.
 export function prepareMarkdownBody(raw: string): string {
-  // Step 1: strip HTML comments
+  // 1) strip HTML comments
   const noComments = raw.replace(/<!--[\s\S]*?-->/g, "");
 
-  // Step 2: convert raw <img ...> tags to markdown image syntax.
+  // 2) convert raw <img ...> tags to markdown image syntax.
   // Handles both double- and single-quoted attribute values, optional whitespace,
   // self-closing slash, and any attribute order.
   const noRawImg = noComments.replace(
@@ -32,10 +34,37 @@ export function prepareMarkdownBody(raw: string): string {
   return noRawImg;
 }
 
+// rehype-slug adds id="kebab-slug" to every h1–h6 element by operating on the
+// HAST (HTML Abstract Syntax Tree) that react-markdown has already parsed from
+// Markdown. rehype-autolink-headings then appends a focusable anchor element.
+//
+// These are pure HAST AST transforms — they do NOT re-introduce a raw-HTML parse
+// step (that would be rehype-raw, which is deliberately omitted). The no-raw-HTML
+// security posture is fully preserved.
+//
+// Plugin order matters: rehype-slug must run before rehype-autolink-headings
+// because autolink reads the id that slug just added.
+const REHYPE_AUTOLINK_OPTIONS = {
+  behavior: "append" as const,
+  properties: {
+    className: ["heading-anchor"],
+    "aria-label": "Link to this section",
+  },
+  content: {
+    type: "element" as const,
+    tagName: "span",
+    properties: { "aria-hidden": "true" },
+    children: [{ type: "text" as const, value: "§" }],
+  },
+};
+
 export function MarkdownSurface({ body }: { body: string }) {
   return (
     <div className="markdown-surface">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeSlug, [rehypeAutolinkHeadings, REHYPE_AUTOLINK_OPTIONS]]}
+      >
         {prepareMarkdownBody(body)}
       </ReactMarkdown>
     </div>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import path from "node:path";
 
 import { EmptyState } from "@/components/empty-state";
+import { PageShell } from "@/components/page-shell";
 import { resolveRenderer } from "@/components/registry";
 import { getConfig } from "@/lib/config";
 import {
@@ -22,27 +23,23 @@ export default async function DocumentationPage({
   const selectedSurfaceId = typeof params.surface === "string" ? params.surface : null;
 
   if (!data) {
+    const emptySources = (
+      <p>
+        Required artifact: <code>.ai-state/doc_manifest.yaml</code>
+      </p>
+    );
+
     return (
-      <section className="page-card">
-        <header className="page-intro">
-          <div>
-            <p className="eyebrow">Manifest-driven content</p>
-            <h2>Documentation</h2>
-            <p>
-              Generated documentation surfaces discovered from the project filesystem.
-            </p>
-          </div>
-          <aside>
-            <span>Required artifact</span>
-            <strong>.ai-state/doc_manifest.yaml</strong>
-          </aside>
-        </header>
+      <PageShell title="Documentation" sourcesContent={emptySources}>
+        <p className="page-intro__lede muted">
+          Generated documentation surfaces discovered from the project filesystem.
+        </p>
 
         <EmptyState
           title="No doc manifest found"
           body="Run `python3 scripts/build_doc_manifest.py` in the target project to generate `.ai-state/doc_manifest.yaml`."
         />
-      </section>
+      </PageShell>
     );
   }
 
@@ -82,22 +79,17 @@ export default async function DocumentationPage({
     renderedBody = <p className="muted">{selectedSurfaceData.errorMessage}</p>;
   }
 
+  const sources = (
+    <p>
+      Manifest: <code>{path.relative(cfg.projectRoot, data.manifestPath)}</code>
+    </p>
+  );
+
   return (
-    <section className="page-card">
-      <header className="page-intro">
-        <div>
-          <p className="eyebrow">Manifest-driven content</p>
-          <h2>Documentation</h2>
-          <p>
-            Live rendering of documentation surfaces discovered through the generated
-            doc manifest.
-          </p>
-        </div>
-        <aside>
-          <span>Manifest</span>
-          <strong>{path.relative(cfg.projectRoot, data.manifestPath)}</strong>
-        </aside>
-      </header>
+    <PageShell title="Documentation" sourcesContent={sources}>
+      <p className="page-intro__lede muted">
+        Live rendering of documentation surfaces discovered through the generated doc manifest.
+      </p>
 
       <div className="grid-two">
         <section className="artifact-card">
@@ -144,6 +136,6 @@ export default async function DocumentationPage({
           {renderedBody}
         </section>
       </div>
-    </section>
+    </PageShell>
   );
 }

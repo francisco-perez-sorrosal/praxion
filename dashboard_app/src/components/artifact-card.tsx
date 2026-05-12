@@ -17,6 +17,7 @@ export function ArtifactCard({
     <article className="artifact-card artifact-card--collapsible">
       <details open={defaultOpen}>
         <summary className="artifact-card__summary">
+          <span className="artifact-card__chevron" aria-hidden="true" />
           <span className="artifact-card__title">{title}</span>
           {meta ? <div className="artifact-card__meta">{meta}</div> : null}
         </summary>

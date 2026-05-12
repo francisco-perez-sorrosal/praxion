@@ -45,7 +45,7 @@ For LikeC4 sources that compile to multiple views, all views render into the sam
 
 Use a descriptive alt-text — it serves both accessibility and the agent's text-mode read.
 
-**Dashboard server exception:** The `![alt](path)` embedding rule applies to committed Markdown artifacts; the `<img>` tag applies to committed `.html` share-out artifacts. The dashboard server may rewrite those refs to its `/api/diagram` route or render SVGs inline for interactive surfaces (e.g., `DiagramViewer`, `DecisionGraph`) — provided the SVG source path follows the `diagrams/<name>/rendered/<name>.svg` convention. The committed Markdown source never changes.
+**Dashboard server exception:** The `![alt](path)` embedding rule applies to committed Markdown artifacts; the `<img>` tag applies to committed `.html` share-out artifacts. The dashboard server may rewrite those refs to its `/api/diagram` route or render SVGs inline for interactive surfaces (e.g., `DiagramFrame`, `DecisionGraph`) — provided the SVG source path follows the `diagrams/<name>/rendered/<name>.svg` convention. The committed Markdown source never changes.
 
 **Rationale:**
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { EducationalPopover } from "@/components/educational-popover";
+import { Sparkline } from "@/components/viz/sparkline";
 import type {
   MetricTone,
   MetricsSnapshot,
@@ -15,14 +15,28 @@ import {
   METRIC_DEFINITIONS,
   SUMMARY_METRICS
 } from "@/lib/metrics";
+import type { TrendSeries } from "@/components/viz/trend-chart";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function toneLabel(tone: MetricTone): string {
+export function toneLabel(tone: MetricTone): string {
   if (tone === "good") return "Improving";
   if (tone === "bad") return "Worsening";
   if (tone === "steady") return "Stable";
   return "Informational";
+}
+
+function toneArrow(tone: MetricTone): string {
+  if (tone === "good") return "↘";
+  if (tone === "bad") return "↗";
+  return "→";
+}
+
+function toneCssVar(tone: MetricTone): string {
+  if (tone === "good") return "var(--color-success-text)";
+  if (tone === "bad") return "var(--color-danger-text)";
+  if (tone === "steady") return "var(--color-warn-text)";
+  return "var(--color-info-text)";
 }
 
 export function summarizeCollector(tool: string, details: ToolAvailability): string {
@@ -36,35 +50,53 @@ export function summarizeCollector(tool: string, details: ToolAvailability): str
 
 function SummaryCard({
   metricKey,
-  snapshot
+  snapshot,
+  sparklineSeries,
+  hasMultipleSnapshots
 }: {
   metricKey: SummaryMetricKey;
   snapshot: MetricsSnapshot;
+  sparklineSeries: TrendSeries | null;
+  hasMultipleSnapshots: boolean;
 }) {
   const definition = METRIC_DEFINITIONS[metricKey];
   const delta = snapshot.deltas[metricKey]?.delta ?? null;
   const tone = getMetricTone(metricKey, delta);
-  const deltaLabel = formatMetricDelta(metricKey, delta);
+  const deltaLabel = hasMultipleSnapshots ? formatMetricDelta(metricKey, delta) : null;
+  const accentColor = toneCssVar(tone);
 
   return (
-    <article className={`metric-summary-card tone-${tone} accent-${definition.accent}`}>
-      <div className="metric-summary-card__header">
-        <div>
-          <p>{definition.label}</p>
-          <EducationalPopover
-            body={`${definition.summary} ${getMetricDirectionCopy(metricKey)}`}
-            title={definition.label}
-          />
-        </div>
-        <span className={`metric-summary-card__tone metric-summary-card__tone--${tone}`}>
-          {toneLabel(tone)}
+    <article
+      className={`kpi-tile tone-${tone} accent-${definition.accent}`}
+      style={{ "--kpi-accent-color": accentColor } as React.CSSProperties}
+    >
+      <div className="kpi-tile__header">
+        <p className="kpi-tile__label">{definition.label}</p>
+        <span className={`kpi-tile__tone kpi-tile__tone--${tone}`}>
+          {toneArrow(tone)} {toneLabel(tone)}
         </span>
       </div>
-      <p className="metric-summary-card__value">
+
+      <p className="kpi-tile__value">
         {formatMetricValue(metricKey, snapshot.aggregate[metricKey])}
       </p>
-      <p className="metric-summary-card__footer">
-        {deltaLabel ? `${deltaLabel} vs previous comparable run` : getMetricDirectionCopy(metricKey)}
+
+      {hasMultipleSnapshots && sparklineSeries && sparklineSeries.points.length >= 2 ? (
+        <div className="kpi-tile__sparkline">
+          <Sparkline
+            series={[sparklineSeries]}
+            height={28}
+            color={accentColor}
+          />
+        </div>
+      ) : null}
+
+      <p className="kpi-tile__footer">
+        {deltaLabel
+          ? `${deltaLabel} vs previous`
+          : hasMultipleSnapshots
+            ? getMetricDirectionCopy(metricKey)
+            : "Baseline — no prior run to compare"}
       </p>
     </article>
   );
@@ -72,11 +104,27 @@ function SummaryCard({
 
 // ─── MetricsSummaryCards ──────────────────────────────────────────────────────
 
-export function MetricsSummaryCards({ snapshot }: { snapshot: MetricsSnapshot }) {
+export type SparklineSeriesMap = Partial<Record<SummaryMetricKey, TrendSeries>>;
+
+export function MetricsSummaryCards({
+  snapshot,
+  sparklineSeriesMap,
+  hasMultipleSnapshots
+}: {
+  snapshot: MetricsSnapshot;
+  sparklineSeriesMap: SparklineSeriesMap;
+  hasMultipleSnapshots: boolean;
+}) {
   return (
     <div className="metrics-summary-grid">
       {SUMMARY_METRICS.map((metricKey) => (
-        <SummaryCard key={metricKey} metricKey={metricKey} snapshot={snapshot} />
+        <SummaryCard
+          key={metricKey}
+          metricKey={metricKey}
+          snapshot={snapshot}
+          sparklineSeries={sparklineSeriesMap[metricKey] ?? null}
+          hasMultipleSnapshots={hasMultipleSnapshots}
+        />
       ))}
     </div>
   );

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 
+import { LiveRefresh } from "@/components/live-refresh";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { getShellConfig } from "@/lib/config";
+import { getSidebarSignals } from "@/server/view-models/sidebar-signals";
 
 import "./globals.css";
 
@@ -13,43 +15,43 @@ export const metadata: Metadata = {
   title: "Praxion Dashboard Web"
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   const cfg = getShellConfig();
+  const signals = await getSidebarSignals(cfg.projectRoot);
 
   return (
     <html lang="en">
       <body>
         <div className="app-shell">
           <aside className="sidebar">
+            {/* Brand: glyph + product · project name, root path below */}
             <div className="brand">
-              <p className="eyebrow">Praxion project status</p>
-              <h1>{cfg.projectName}</h1>
-              <p className="brand-body">
-                Read-only portal over live `.ai-state`, `.ai-work`, and documentation
-                surfaces.
+              <p className="brand__line">
+                <span className="brand__glyph" aria-hidden="true">◆</span>
+                <span className="brand__name">Praxion · {cfg.projectName}</span>
+              </p>
+              <p
+                className="brand__root"
+                title={cfg.projectRoot}
+              >
+                {cfg.projectRoot}
               </p>
             </div>
 
-            <dl className="project-meta">
-              <div>
-                <dt>Root</dt>
-                <dd>{cfg.projectRoot}</dd>
-              </div>
-              <div>
-                <dt>Refresh</dt>
-                <dd>{cfg.pollIntervalSeconds}s workshops cadence</dd>
-              </div>
-              <div>
-                <dt>Version</dt>
-                <dd>{cfg.dashboardVersion}</dd>
-              </div>
-            </dl>
+            <SidebarNav signals={signals} />
 
-            <SidebarNav />
+            {/* Sidebar footer: live refresh indicator + version */}
+            <footer className="sidebar-footer">
+              <LiveRefresh seconds={cfg.pollIntervalSeconds} />
+              <span className="sidebar-footer__refresh">
+                live · {cfg.pollIntervalSeconds}s
+              </span>
+              <span className="sidebar-footer__version">v{cfg.dashboardVersion}</span>
+            </footer>
           </aside>
 
           <main className="content">{children}</main>

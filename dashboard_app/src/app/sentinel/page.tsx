@@ -4,6 +4,7 @@ import { ArtifactCard } from "@/components/artifact-card";
 import { EducationalPopover } from "@/components/educational-popover";
 import { EmptyState } from "@/components/empty-state";
 import { MarkdownSurface } from "@/components/markdown-surface";
+import { PageShell } from "@/components/page-shell";
 import { getConfig } from "@/lib/config";
 import { getSentinelData } from "@/server/view-models/sentinel";
 import type { SentinelLogPoint } from "@/server/view-models/sentinel";
@@ -41,31 +42,37 @@ export default async function SentinelPage() {
   const cfg = getConfig();
   const sentinel = await getSentinelData(cfg.projectRoot);
 
+  const latestReport =
+    sentinel.reports.length > 0
+      ? path.basename(sentinel.reports[0] ?? "")
+      : "None";
+
+  const sources = (
+    <>
+      <p>
+        Reads <code>.ai-state/sentinel_reports/</code> — timestamped audit reports and
+        the <code>SENTINEL_LOG.md</code> run summary.
+      </p>
+      <p>
+        Latest report: <code>{latestReport}</code>
+      </p>
+    </>
+  );
+
   return (
-    <section className="page-card">
-      <header className="page-intro">
-        <div>
-          <p className="eyebrow">Ecosystem quality</p>
-          <h2>Sentinel</h2>
-          <p>
-            Health history and the latest audit rendered from{" "}
-            <code>.ai-state/sentinel_reports/</code>.{" "}
-            <EducationalPopover
-              title="Sentinel audits"
-              body="The sentinel agent audits the project's context artifacts across ten dimensions and grades overall health. Findings are tiered Critical / Important / Suggested."
-              href="agents/sentinel.md"
-            />
-          </p>
-        </div>
-        <aside>
-          <span>Latest report</span>
-          <strong>
-            {sentinel.reports.length > 0
-              ? path.basename(sentinel.reports[0] ?? "")
-              : "None"}
-          </strong>
-        </aside>
-      </header>
+    <PageShell
+      title="Sentinel"
+      sourcesContent={sources}
+    >
+      <p className="page-intro__lede muted">
+        Health history and the latest audit rendered from{" "}
+        <code>.ai-state/sentinel_reports/</code>.{" "}
+        <EducationalPopover
+          title="Sentinel audits"
+          body="The sentinel agent audits the project's context artifacts across ten dimensions and grades overall health. Findings are tiered Critical / Important / Suggested."
+          href="agents/sentinel.md"
+        />
+      </p>
 
       {sentinel.latest === null ? (
         <EmptyState
@@ -136,6 +143,6 @@ export default async function SentinelPage() {
           </ArtifactCard>
         </div>
       )}
-    </section>
+    </PageShell>
   );
 }

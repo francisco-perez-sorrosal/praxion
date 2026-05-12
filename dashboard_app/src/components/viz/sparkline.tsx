@@ -5,18 +5,22 @@ import { Line, LineChart, ResponsiveContainer } from "recharts";
 
 export type SparklineProps = Omit<TrendChartProps, "xLabel"> & {
   compact?: true;
+  /** Override stroke color for all series. Takes precedence over `colorForValue`. */
+  color?: string;
   colorForValue?: (y: number) => string;
 };
 
 const SPARKLINE_HEIGHT = 56;
 const DOT_RADIUS = 2;
+const DEFAULT_COLOR = "var(--color-text-muted)";
 
 /**
  * Compact line preview — no axes, no grid, no tooltip.
  * Suitable for inline health-grade trends next to the latest sentinel report.
- * `colorForValue` overrides the series color per-render based on the most recent y value.
+ * `color` overrides the stroke color for all series uniformly.
+ * `colorForValue` overrides per-render based on the most recent y value (ignored when `color` is set).
  */
-export function Sparkline({ series, height = SPARKLINE_HEIGHT, colorForValue }: SparklineProps) {
+export function Sparkline({ series, height = SPARKLINE_HEIGHT, color, colorForValue }: SparklineProps) {
   if (series.length === 0) {
     return null;
   }
@@ -26,13 +30,18 @@ export function Sparkline({ series, height = SPARKLINE_HEIGHT, colorForValue }: 
     return null;
   }
 
-  // If colorForValue is provided, compute stroke from the last non-null y value.
+  // Resolve stroke: static `color` prop wins; then `colorForValue` from last non-null y; then series color.
   const resolveColor = (s: TrendSeries): string => {
-    if (!colorForValue) {
-      return s.color;
+    if (color !== undefined) {
+      return color;
     }
-    const lastPoint = [...s.points].reverse().find((pt) => pt.y !== null);
-    return lastPoint?.y !== undefined && lastPoint.y !== null ? colorForValue(lastPoint.y) : s.color;
+    if (colorForValue) {
+      const lastPoint = [...s.points].reverse().find((pt) => pt.y !== null);
+      return lastPoint?.y !== undefined && lastPoint.y !== null
+        ? colorForValue(lastPoint.y)
+        : s.color ?? DEFAULT_COLOR;
+    }
+    return s.color ?? DEFAULT_COLOR;
   };
 
   return (

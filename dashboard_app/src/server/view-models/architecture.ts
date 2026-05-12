@@ -5,6 +5,7 @@ import path from "node:path";
 import { readText, walkRenderedSvgs } from "@/server/artifacts/files";
 import { assertAllowedArtifactPath, validateProjectRoot } from "@/server/artifacts/project-root";
 import { sanitizeSvg } from "@/server/diagrams/sanitize";
+import { normalizeSvg } from "@/server/diagrams/normalize-svg";
 import { rewriteRelativeImageRefs } from "@/server/diagrams/rewrite-image-refs";
 import { readMarkdown } from "@/server/parsers/content";
 import { splitAacRegions } from "@/server/aac/parse-fences";
@@ -34,8 +35,10 @@ export async function getArchitectureData(projectRoot: string) {
       diagramPaths.map(async (diagramPath) => {
         const safePath = await assertAllowedArtifactPath(validatedRoot, diagramPath);
         const raw = await readText(safePath);
+        const sanitized = raw !== null ? sanitizeSvg(raw) : null;
+        const markup = sanitized !== null ? normalizeSvg(sanitized) : null;
         return {
-          markup: raw !== null ? sanitizeSvg(raw) : null,
+          markup,
           path: safePath
         };
       })

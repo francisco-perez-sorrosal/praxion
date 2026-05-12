@@ -191,6 +191,12 @@ cmd_start() {
     printf "  Project: %s\n" "$ROOT"
     printf "  Port:    %s\n" "$PORT"
 
+    # `next start` resolves `.next/` relative to its working directory, so it MUST
+    # run from $APP_DIR (where the build lives) — not from wherever the user invoked
+    # `praxion-dashboard start`. Otherwise it dies with "Could not find a production
+    # build in the '.next' directory" the instant after the start banner prints.
+    # $APP_DIR is guaranteed to exist here (the _is_installed check above passed).
+    cd "$APP_DIR"
     PRAXION_PROJECT_ROOT="$ROOT" \
         "$(_next_bin)" start --hostname "127.0.0.1" --port "$PORT" \
         >> "$logfile" 2>&1 &

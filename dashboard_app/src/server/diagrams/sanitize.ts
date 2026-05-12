@@ -229,6 +229,14 @@ export function sanitizeSvg(raw: string): string {
       image: ["http", "https", "data"]
     },
     disallowedTagsMode: "discard",
+    // <style> is in the allowlist because LikeC4 / D2 / Mermaid embed their styling
+    // there. sanitize-html warns on every call that <style> is "vulnerable", flooding
+    // the dashboard server log. The real XSS vectors (<script>, on* handlers, javascript:
+    // URIs) are already stripped above, and the SVGs come from the project's own
+    // diagrams/ (trusted generators), so the CSS-injection risk a bare <style> carries
+    // is acceptable here. Acknowledge it explicitly to silence the warning rather than
+    // dropping <style> (which would break diagram styling).
+    allowVulnerableTags: true,
     // Do not strip style= attribute values — they are in the allowlist above and
     // carry visual-only CSS; parsing them as security surface is unnecessary overhead.
     parseStyleAttributes: false

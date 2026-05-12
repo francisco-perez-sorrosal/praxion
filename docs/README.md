@@ -46,6 +46,7 @@ Discursive explanations of design decisions and ideas. Read for understanding, n
 - [Architecture-as-Code (AaC) and Documentation-as-Code (DaC)](aac-dac.md) — the toolchain and rationale for the LikeC4 + Diátaxis approach
 - [Memory architecture](memory-architecture.md) — Praxion memory MCP design and lifecycle
 - [Claude ecosystem learning resources](claude-ecosystem-learning-resources.md) — curated external links for Claude API/SDK/Code
+- [Context-engineering comparison study (2026-05-12)](context-prj-comparison-2026-05-12/README.md) — four "Karpathy-inspired CLAUDE.md" projects vs. Praxion; adoptable-ideas roadmap at [`../.ai-state/ROADMAP.md`](../.ai-state/ROADMAP.md)
 
 ## Diagrams
 

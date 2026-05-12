@@ -284,6 +284,7 @@ Write the line immediately upon entering each new phase. Include optional hashta
 - **No git commits.** Write tests and update planning documents, but never commit. The user or planner handles commits.
 - **File conflict stop.** If you discover you need to modify a file outside your step's declared `Files` set (parallel mode), stop immediately and report `[CONFLICT]` with the file path and reason.
 - **Read before write.** Never modify a file you have not read in this session.
+- **Path-scoped rules load on Read, not Write.** Before creating a *new* test file, read an existing test in the same area first (or, if there is none, a canonical example elsewhere) so the path-scoped test conventions (`id-citation-discipline`'s behavior-naming rule, the language test conventions, etc.) load into context — otherwise they silently do not.
 - **Respect existing test patterns.** Match the test framework, directory structure, fixture conventions, and naming patterns already in use.
 - **Keep WIP.md accurate.** Update it before reporting — your status must reflect reality.
 - **Token discipline.** Verbose tool output (test runs, lint, typecheck) compounds in cumulative agent context — every output token rides along in every subsequent turn, raising the cost of every later round-trip. Default to the loaded language skill's compact-output flags (short tracebacks, suppress per-test verbosity, summary-mode lint). Escalate to verbose output only when investigating a specific failure that compact output doesn't explain, and only for the next single invocation.

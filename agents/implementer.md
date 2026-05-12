@@ -203,6 +203,7 @@ Write the line immediately upon entering each new phase. Include optional hashta
 - **No git commits.** Write code and update planning documents, but never commit. The user or planner handles commits.
 - **File conflict stop.** If you discover you need to modify a file outside your step's declared `Files` set (parallel mode), stop immediately and report `[CONFLICT]` with the file path and reason.
 - **Read before write.** Never modify a file you have not read in this session.
+- **Path-scoped rules load on Read, not Write.** Before creating a *new* file in a directory, read an existing sibling first (or, if there is none, a canonical example of that file type elsewhere) so the path-scoped conventions for it (`coding-style`, `readme-style`, diagram/HTML/PR conventions, `id-citation-discipline`, etc.) load into context — otherwise they silently do not.
 - **Respect existing patterns.** Match the conventions, naming, and structure of the codebase you are modifying.
 - **Keep WIP.md accurate.** Update it before reporting — your status must reflect reality.
 - **Token discipline.** Verbose tool output (test runs, lint, typecheck) compounds in cumulative agent context — every output token rides along in every subsequent turn, raising the cost of every later round-trip. Default to the loaded language skill's compact-output flags (short tracebacks, suppress per-test verbosity, summary-mode lint). Escalate to verbose output only when investigating a specific failure that compact output doesn't explain, and only for the next single invocation.

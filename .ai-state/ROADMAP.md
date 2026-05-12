@@ -24,7 +24,9 @@ Each item carries: **Rationale** (why) · **Source** (which external + the dimen
 
 ---
 
-## P1 — [Defensive · do first] Path-scoped-rule Read-only-trigger: document + mitigate · ☐ not started
+## P1 — [Defensive · do first] Path-scoped-rule Read-only-trigger: document + mitigate · ☑ done (2026-05-12)
+
+> **Done 2026-05-12.** Caveat documented in `rules/CLAUDE.md` (next to the `paths:` convention), `skills/rule-crafting/SKILL.md` (new "Path-Scoped Rules: Read-Only Loading Trigger" section + `<!-- last-verified -->` marker), `CLAUDE.md § Known Claude Code Limitations` (new bullet, issue links, `td-033` ref). "Read an existing sibling before creating a new file" mitigation added to the Constraints sections of `agents/implementer.md`, `agents/doc-engineer.md`, `agents/test-engineer.md`. Windows caveat (#21858) added to `docs/existing-project-onboarding.md § Limits and known issues`. Debt row `td-033` (important / `other` / owner-role `unassigned` — gated on upstream #38487) added to `.ai-state/TECH_DEBT_LEDGER.md`. Optional `InstructionsLoaded`/`PostToolUse(Write)` hook follow-up left unscheduled per the lean recommendation.
 
 **Rationale.** Verified ([`08`](../docs/context-prj-comparison-2026-05-12/08-claude-code-behavior-verification.md) V1, official docs + GitHub issues [#23478](https://github.com/anthropics/claude-code/issues/23478)/[#38487](https://github.com/anthropics/claude-code/issues/38487)/[#16853](https://github.com/anthropics/claude-code/issues/16853)): path-scoped rules (`paths:` frontmatter) inject **only when Claude reads a matching file** — not on Write/Edit/MultiEdit. So an agent that *creates* a new file via Write without first reading a matching sibling misses the rule: a new `.py`/`.ts` misses `coding-style.md`; a new doc misses `readme-style.md` / `diagram-conventions.md` / `html-output-conventions.md` / `aac-dac-conventions.md`; a new `.github/*.md` misses `pr-conventions.md`; new files miss `id-citation-discipline.md`, `staleness-policy.md`, etc. This is the one finding that touches Praxion's *guarantee* surface — the rules-as-guardrails contract — directly. Moderate severity (agents usually read files in a directory before working there, which incidentally loads the rule), real for greenfield file creation.
 
@@ -73,7 +75,9 @@ Each item carries: **Rationale** (why) · **Source** (which external + the dimen
 
 ---
 
-## P3 — [Contract sharpening · low cost] Behavioral-contract phrasing handles + calibration notice · ☐ not started
+## P3 — [Contract sharpening · low cost] Behavioral-contract phrasing handles + calibration notice · ☑ done (2026-05-12)
+
+> **Done 2026-05-12.** `**Handles**` lines added under *Surface Assumptions* (present interpretations, don't pick silently / stop-name-ask), *Stay Surgical* (every changed line traces to the request / own-mess-only dead-code rule), and *Simplicity First* (forbidden-category list + senior-engineer overcomplication check + "200→50" mnemonic) in `skills/software-planning/references/behavioral-contract.md`; new `## Effectiveness Indicators` section there (fewer collateral diffs / fewer over-engineering rewrites / clarifying questions before mistakes) with a consolidated attribution paragraph (Karpathy Jan-2026 X post as source; AlphaSignal + `andrej-karpathy-skills` as community condensations, not Karpathy's work). One calibration sentence added to the always-loaded `rules/swe/agent-behavioral-contract.md` ("biases toward caution over speed; at Direct tier apply with proportionate judgment — Surface Assumptions and Stay Surgical always hold, don't ceremony-fy a typo"). Always-loaded delta: ~1 sentence (re-measure at P6 — net target ≤ 0).
 
 **Rationale.** Praxion's behavioral contract (`Surface Assumptions / Register Objection / Stay Surgical / Simplicity First`) has the *behaviors* but not the *checkable handles* — the crisp, in-the-moment self-tests that make forrestchang's 60-line file effective. Adding them to the **deep-dive reference** (on-demand) costs ~zero always-loaded budget; adding one calibration sentence to the always-loaded rule closes the "is this overkill for a typo?" ambiguity. *(Flagged by the maintainer as a real Praxion gap to fix.)*
 

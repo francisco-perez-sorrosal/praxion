@@ -16,6 +16,8 @@ The Methodology (`~/.claude/CLAUDE.md`) defines the flow of work; the contract d
 
 **Self-test**: Can I name every fact I'm relying on? If the opposite were true, would my plan change?
 
+**Handles**: If multiple interpretations exist, present them — don't pick one silently. If something is unclear, stop, name what's confusing, and ask before proceeding.
+
 **Example**: A step says "retry on failure." State: "Assuming failure means HTTP 5xx only; backoff capped at 3 attempts; retries do not apply to non-idempotent operations." Ask before proceeding if an assumption is load-bearing.
 
 **Philosophy anchor**: `~/.claude/CLAUDE.md` Methodology §Understand — "Close the gap between what you assume and what is actually true."
@@ -44,6 +46,8 @@ The Methodology (`~/.claude/CLAUDE.md`) defines the flow of work; the contract d
 
 **Self-test**: Did I edit anything not on the `Files` list? Did I rewrite prose already correct? Did I "clean up while I was in there"?
 
+**Handles**: Every changed line should trace directly to the user's request. Remove imports/variables/functions that *your* changes orphaned — but don't delete pre-existing dead code unless asked; mention it instead.
+
 **Example**: A step says "add a new endpoint in `api/users.py`." The implementer spots duplication in `api/items.py`. Surgical: finish the step; record the duplication as tech debt; propose a separate refactor step. Non-surgical: refactor both "while I'm here."
 
 **Philosophy anchor**: `~/.claude/CLAUDE.md` Principle §Behavior-Driven Development — "minimal scope, minimal blast radius."
@@ -60,6 +64,8 @@ Stay Surgical governs **change scope**; DRY governs **code shape**. When DRY dem
 
 **Self-test**: Is any part of this solution for a future that does not yet exist? Could the behavior be met with fewer lines, files, or concepts?
 
+**Handles**: No features beyond what was asked; no abstractions for single-use code; no "flexibility"/"configurability" that wasn't requested; no error handling for scenarios that cannot occur. Final check — would a senior engineer call this overcomplicated? (Mnemonic: *if 200 lines could be 50, rewrite it*.)
+
 **Example**: A test needs one fixture. Simplest: inline setup/teardown. Bloat: a fixture factory parameterized for edge cases that do not exist yet.
 
 **Philosophy anchor**: `~/.claude/CLAUDE.md` Principle §Pragmatism — "When something doesn't serve a purpose, remove it."
@@ -72,6 +78,12 @@ Run before closing any step:
 - [ ] Conflicts flagged with reason (not silent compliance)
 - [ ] Changes confined to declared scope (Files field, module boundaries)
 - [ ] Smallest working solution chosen (no speculative abstraction, no dead code)
+
+## Effectiveness Indicators
+
+The contract is working if, over time: fewer collateral changes show up in diffs, fewer rewrites happen because something was over-engineered, and clarifying questions arrive *before* mistakes rather than after. If the opposite trend appears, the handles aren't being applied — not that the contract is wrong.
+
+**On the handles above and these indicators**: they sharpen the four behaviors into in-the-moment self-tests. They distill the AI-coding-assistant discipline failure modes Andrej Karpathy described (X post, January 2026) — silently picking one interpretation, "cleaning up" unrelated code, and over-engineering — together with community condensations of those (the AlphaSignal write-up; the `andrej-karpathy-skills` micro-rule phrasings). The Karpathy post is the source; the community artifacts are condensations of it, not Karpathy's own work or endorsement.
 
 ## Per-Agent Application
 

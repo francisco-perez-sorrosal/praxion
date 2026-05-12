@@ -8,6 +8,7 @@ Contextual domain knowledge files loaded automatically based on relevance. Rules
 - Further nesting for related rules (e.g., `swe/vcs/` for version control)
 - Each rule is a `.md` file — rules without frontmatter load unconditionally at session start
 - Add `paths:` YAML frontmatter to scope a rule to specific file patterns (loaded only when matching files are accessed)
+  - Path-scoped rules inject **on Read, not on Write/Edit** — an agent that *creates* a new file without first reading a matching sibling misses that file type's conventions. Mitigated by a "read a sibling first" instruction in the pipeline agent prompts (`implementer`/`doc-engineer`/`test-engineer`); `skills/rule-crafting/SKILL.md` documents the symptom and full mitigation.
 
 ## Token Budget
 

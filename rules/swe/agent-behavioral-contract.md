@@ -9,4 +9,6 @@ The Methodology defines the flow; the contract defines the stance. Four non-nego
 
 Self-test: did I state assumptions, flag conflicts with reasons, stay inside declared scope, and choose the simplest path?
 
+This contract biases toward caution over speed; at Direct tier apply it with proportionate judgment — Surface Assumptions and Stay Surgical always hold, but don't ceremony-fy a typo. See the tier table in `swe-agent-coordination-protocol.md`.
+
 Deep dive: `skills/software-planning/references/behavioral-contract.md`.

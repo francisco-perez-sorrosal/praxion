@@ -21,6 +21,7 @@ import fnmatch
 import json
 import os
 import re
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -176,6 +177,36 @@ def _read_rule_body(plugin_root: Path, rule: dict) -> str:
 # -- additionalContext emitter -------------------------------------------------
 
 
+def _ensure_template_present(cwd: Path, plugin_root: Path) -> None:
+    """Copy the shipped blacklist template into the project's .claude/ if absent.
+
+    Idempotent. Skips when EITHER `.claude/praxion-rules.yaml.example` OR
+    `.claude/praxion-rules.yaml` already exists. Fail-safe: any exception
+    is logged and swallowed (template placement is auxiliary; never breaks
+    SessionStart).
+    """
+    try:
+        claude_dir = cwd / ".claude"
+        example_path = claude_dir / "praxion-rules.yaml.example"
+        live_path = claude_dir / "praxion-rules.yaml"
+        if example_path.exists() or live_path.exists():
+            return
+        template_src = plugin_root / "claude" / "config" / "praxion-rules.yaml.example"
+        if not template_src.is_file():
+            return
+        claude_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(template_src, example_path)
+        print(
+            f"[inject_rules] Created blacklist template at {example_path}",
+            file=sys.stderr,
+        )
+    except Exception as exc:
+        print(
+            f"[inject_rules] Template placement skipped: {exc}",
+            file=sys.stderr,
+        )
+
+
 def _emit_additional_context(context: str) -> None:
     """Emit additionalContext JSON for the SessionStart hook contract."""
     output = {
@@ -223,6 +254,11 @@ def main() -> None:
     rules = _load_manifest(plugin_root)
     if rules is None:
         return  # warning already emitted; exit 0 (non-fatal)
+
+    # Praxion is active in this project — ensure the user-facing template
+    # exists in .claude/ so projects discover the blacklist mechanism
+    # without manual cp or running /onboard-project. Idempotent.
+    _ensure_template_present(cwd, plugin_root)
 
     all_rule_ids = [r["id"] for r in rules if "id" in r]
 

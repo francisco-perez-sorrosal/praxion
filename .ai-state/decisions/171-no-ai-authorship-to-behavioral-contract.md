@@ -1,7 +1,7 @@
 ---
-id: dec-draft-7a5bf52b
+id: dec-171
 title: Relocate "No AI authorship" clause to agent-behavioral-contract.md
-status: proposed
+status: accepted
 category: implementation
 date: 2026-05-13
 summary: The "no AI authorship in commit messages" clause relocates from git-conventions.md to agent-behavioral-contract.md (not rules/CLAUDE.md) before git-conventions.md is flipped to hook-delivered.
@@ -22,7 +22,7 @@ supersedes: null
 
 ## Context
 
-The systems-architect (`dec-draft-e7a70873`) decided to make `rules/swe/vcs/git-conventions.md` blacklistable, and to relocate the "No AI authorship in commit messages" clause to a core, always-loaded rule before the install mode flips. The architect deferred the relocation target choice to implementation time, stating: "Defer to the implementer; document in LEARNINGS.md." The two candidate targets were `rules/swe/agent-behavioral-contract.md` (more semantically aligned) and `rules/CLAUDE.md` (minimum edit).
+The systems-architect (`dec-169`) decided to make `rules/swe/vcs/git-conventions.md` blacklistable, and to relocate the "No AI authorship in commit messages" clause to a core, always-loaded rule before the install mode flips. The architect deferred the relocation target choice to implementation time, stating: "Defer to the implementer; document in LEARNINGS.md." The two candidate targets were `rules/swe/agent-behavioral-contract.md` (more semantically aligned) and `rules/CLAUDE.md` (minimum edit).
 
 ## Decision
 
@@ -48,7 +48,7 @@ The clause also remains in `rules/swe/vcs/git-conventions.md` (intentional dual 
 ### Option 3 — New `rules/swe/core/git-essentials.md`
 
 **Pros:** Clean isolation.
-**Cons:** Adds a new always-loaded rule, increasing the token budget. The architect explicitly rejected this option on token-budget grounds in `dec-draft-e7a70873`. Rejected here for the same reason.
+**Cons:** Adds a new always-loaded rule, increasing the token budget. The architect explicitly rejected this option on token-budget grounds in `dec-169`. Rejected here for the same reason.
 
 ## Consequences
 
@@ -67,5 +67,5 @@ The clause also remains in `rules/swe/vcs/git-conventions.md` (intentional dual 
 - The clause is NOT removed from `git-conventions.md`; removal is implicit for blacklisting projects.
 
 **Cross-cutting:**
-- Depends on `dec-draft-e7a70873` (git-conventions classified blacklistable; relocation mandated).
-- Pairs with `dec-draft-0ba86152` (core protection) — `agent-behavioral-contract.md` has `core: true`, so the clause is protected.
+- Depends on `dec-169` (git-conventions classified blacklistable; relocation mandated).
+- Pairs with `dec-168` (core protection) — `agent-behavioral-contract.md` has `core: true`, so the clause is protected.

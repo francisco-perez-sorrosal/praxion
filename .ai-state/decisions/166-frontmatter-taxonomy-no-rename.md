@@ -1,7 +1,7 @@
 ---
-id: dec-draft-82f98766
+id: dec-166
 title: Frontmatter-metadata taxonomy for rules; no directory rename
-status: proposed
+status: accepted
 category: architectural
 date: 2026-05-13
 summary: Express the rules taxonomy (core / blacklistable / domain) via frontmatter and a generated `rules/_manifest.yaml` rather than reorganizing directories, preserving zero blast radius for broadcast rules.
@@ -113,5 +113,5 @@ Take Option 3 as the default; permit new rules to land in semantic subdirectorie
 
 **Cross-cutting:**
 
-- This decision pairs with `dec-draft-efb4ac76` (hook-delivered blacklist mechanism) — the manifest is consumed by both the installer and the new hook.
-- The decision implicitly supports `dec-draft-0ba86152` (frontmatter as single source of truth for core protection).
+- This decision pairs with `dec-167` (hook-delivered blacklist mechanism) — the manifest is consumed by both the installer and the new hook.
+- The decision implicitly supports `dec-168` (frontmatter as single source of truth for core protection).

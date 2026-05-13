@@ -1,7 +1,7 @@
 ---
-id: dec-draft-efb4ac76
+id: dec-167
 title: Hook-delivered blacklist for always-loaded rules; symlink-based for core and path-scoped
-status: proposed
+status: accepted
 category: architectural
 date: 2026-05-13
 summary: Move blacklistable always-loaded rules out of the global symlink set and deliver them via a SessionStart hook reading a per-project `.claude/praxion-rules.yaml`; core rules and path-scoped rules continue using native symlinks.
@@ -48,7 +48,7 @@ The user's behavioral contract item "Surface Assumptions" requires me to be expl
 Adopt a **two-channel delivery** for rules:
 
 1. **Channel 1 — Symlink (native Claude Code loading):**
-   - Core always-loaded rules (per the taxonomy ADR `dec-draft-82f98766`): `agent-behavioral-contract.md`, `swe-agent-coordination-protocol.md`, `agent-intermediate-documents.md`, `adr-conventions.md`, `rules/CLAUDE.md`.
+   - Core always-loaded rules (per the taxonomy ADR `dec-166`): `agent-behavioral-contract.md`, `swe-agent-coordination-protocol.md`, `agent-intermediate-documents.md`, `adr-conventions.md`, `rules/CLAUDE.md`.
    - All path-scoped rules.
    - Symlinked into `~/.claude/rules/` exactly as today.
 
@@ -127,8 +127,8 @@ Blacklistable rules are not symlinked. They are delivered via `additionalContext
 
 **Cross-cutting:**
 
-- Depends on `dec-draft-82f98766` (frontmatter taxonomy + manifest) — the manifest is the data structure this mechanism reads.
-- Depends on `dec-draft-0ba86152` (core protection invariant) — the hook implements the invariant.
+- Depends on `dec-166` (frontmatter taxonomy + manifest) — the manifest is the data structure this mechanism reads.
+- Depends on `dec-168` (core protection invariant) — the hook implements the invariant.
 - Future v2 could extend this hook to blacklist path-scoped rules (by removing their symlinks) but that's out of scope for v1; path-scoped rules cost 0 tokens until matched, so token-reduction motivation doesn't apply.
 
 **Security:**

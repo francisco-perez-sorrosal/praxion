@@ -1,7 +1,7 @@
 ---
-id: dec-draft-dc859220
+id: dec-172
 title: inject_rules.py schema version > 1 behavior is fail-open
-status: proposed
+status: accepted
 category: implementation
 date: 2026-05-13
 summary: When .claude/praxion-rules.yaml carries version > 1, inject_rules.py logs a clear error to stderr but injects ALL blacklistable rules rather than blocking or injecting nothing.
@@ -74,4 +74,4 @@ Exit non-zero to block session start.
 - Test case 7 in `hooks/test_inject_rules.py` validates this behavior.
 
 **Cross-cutting:**
-- Pairs with the general non-fatal hook contract from `dec-draft-efb4ac76`.
+- Pairs with the general non-fatal hook contract from `dec-167`.

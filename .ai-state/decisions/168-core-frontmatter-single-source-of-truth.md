@@ -1,7 +1,7 @@
 ---
-id: dec-draft-0ba86152
+id: dec-168
 title: Frontmatter `core: true` is the single source of truth for non-disableability
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-05-13
 summary: A rule's `core: true` frontmatter is the canonical declaration of non-disableability; the generated manifest derives from it; the SessionStart hook refuses to suppress any rule marked core, emitting a stderr warning on attempted disable.
@@ -126,5 +126,5 @@ This warning is informative, non-fatal, and points the user to the relevant doc.
 
 **Cross-cutting:**
 
-- Depends on `dec-draft-82f98766` (taxonomy by frontmatter and manifest) — this ADR specifies HOW the `core` axis works within that taxonomy.
-- Consumed by `dec-draft-efb4ac76` (hook-delivered blacklist) — the hook implements this invariant.
+- Depends on `dec-166` (taxonomy by frontmatter and manifest) — this ADR specifies HOW the `core` axis works within that taxonomy.
+- Consumed by `dec-167` (hook-delivered blacklist) — the hook implements this invariant.

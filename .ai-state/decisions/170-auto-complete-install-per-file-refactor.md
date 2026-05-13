@@ -1,7 +1,7 @@
 ---
-id: dec-draft-7f1d11c5
+id: dec-170
 title: Refactor auto_complete_install.py _link_rules() to per-file symlinking
-status: proposed
+status: accepted
 category: implementation
 date: 2026-05-13
 summary: _link_rules() in auto_complete_install.py is refactored from directory-level to per-file symlinking to enable manifest-based hook-deliver filtering, matching the behavior of lib/install_shared.sh link_rules().
@@ -26,7 +26,7 @@ supersedes: null
 
 `lib/install_shared.sh:link_rules()` iterates individual `.md` files recursively with `find`, creating per-file symlinks.
 
-The systems-architect (`dec-draft-efb4ac76`) requires both functions to skip files with `install: hook-deliver` in the manifest. Directory-level skipping in `auto_complete_install.py` cannot achieve per-file granularity — it can only skip an entire top-level directory (e.g., skip all of `rules/swe/` to avoid `swe/memory-protocol.md`), which would also skip core rules in the same directory.
+The systems-architect (`dec-167`) requires both functions to skip files with `install: hook-deliver` in the manifest. Directory-level skipping in `auto_complete_install.py` cannot achieve per-file granularity — it can only skip an entire top-level directory (e.g., skip all of `rules/swe/` to avoid `swe/memory-protocol.md`), which would also skip core rules in the same directory.
 
 This divergence was not visible in the architect's analysis (which described both functions as "almost the same logic"). The planner discovered it during codebase verification (Phase 2).
 
@@ -84,5 +84,5 @@ Symlink top-level directory objects, but for dirs that contain any hook-deliver 
 - The divergence between `_link_rules()` and `link_rules()` was pre-existing tech debt (two implementations of the same concern). This refactor eliminates it.
 
 **Cross-cutting:**
-- Depends on `dec-draft-efb4ac76` (hook-delivery mechanism) — that ADR mandates per-file filtering.
+- Depends on `dec-167` (hook-delivery mechanism) — that ADR mandates per-file filtering.
 - Enables AC-05 (marketplace install produces functioning blacklist).

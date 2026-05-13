@@ -1,7 +1,7 @@
 ---
-id: dec-draft-e7a70873
+id: dec-169
 title: Classify `vcs/git-conventions.md` as blacklistable; relocate behavioral-contract clauses to core
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-05-13
 summary: `rules/swe/vcs/git-conventions.md` is project-policy (commit message format, staging discipline) and is reclassified as blacklistable; the one behavioral-contract clause it carries ("no AI authorship") is relocated to a core always-loaded surface before this blacklisting takes effect.
@@ -92,5 +92,5 @@ But ONE clause is genuinely behavioral and load-bearing: "No AI authorship in co
 
 **Cross-cutting:**
 
-- Depends on the `core: true` invariant from `dec-draft-0ba86152` — the relocation target must be a core rule for the invariant to hold.
-- Pairs with `dec-draft-efb4ac76` — the hook-delivery mechanism is what makes the blacklisting effective.
+- Depends on the `core: true` invariant from `dec-168` — the relocation target must be a core rule for the invariant to hold.
+- Pairs with `dec-167` — the hook-delivery mechanism is what makes the blacklisting effective.

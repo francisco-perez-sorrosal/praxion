@@ -34,7 +34,7 @@ The agent pipeline below automates many of these patterns — but understanding 
 
 Agents communicate through documents in `.ai-work/<task-slug>/`, not through direct invocation. Each pipeline run gets its own task-scoped subdirectory (a kebab-case 2–4 word identifier generated at pipeline start). Each agent reads upstream documents and writes its own, forming a chain:
 
-![Agent pipeline flow — promethean → researcher → systems-architect → implementation-planner → (implementer ∥ test-engineer ∥ doc-engineer) → verifier; context-engineer shadows research and architecture phases](diagrams/getting-started-pipeline/rendered/getting-started-pipeline.svg)
+![Agent pipeline flow — promethean → researcher → systems-architect → implementation-planner → (implementer ∥ test-engineer ∥ doc-engineer) → verifier; context-engineer and interface-designer shadow the research + architecture phases (forward-only), with one orchestrator-mediated loop-back from interface-designer to systems-architect when architectural decisions constrain a materially-better interface design](diagrams/getting-started-pipeline/rendered/getting-started-pipeline.svg)
 
 You drive the pipeline by telling Claude what you need. It delegates to the right agent based on context. You can also name agents explicitly.
 

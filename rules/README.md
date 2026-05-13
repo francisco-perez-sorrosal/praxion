@@ -16,14 +16,21 @@ rules/
 │   ├── agent-intermediate-documents.md
 │   ├── agent-model-routing.md
 │   ├── coding-style.md
+│   ├── coding-style-typescript.md
+│   ├── dashboard-conventions.md
+│   ├── id-citation-discipline.md
 │   ├── memory-protocol.md
+│   ├── shipped-artifact-isolation.md
 │   ├── staleness-policy.md
 │   ├── swe-agent-coordination-protocol.md
 │   ├── testing-conventions.md
 │   └── vcs/
-│       └── git-conventions.md
+│       ├── git-conventions.md
+│       └── pr-conventions.md
 ├── writing/
+│   ├── aac-dac-conventions.md
 │   ├── diagram-conventions.md
+│   ├── html-output-conventions.md
 │   └── readme-style.md
 └── README.md
 ```
@@ -51,9 +58,15 @@ Path-scoped rules load only when editing files matching their `paths:` pattern. 
 | ---- | ------- |
 | `ml/experiment-tracking-conventions.md` | Experiment lineage, run-tag mapping, tracker selection (MLflow/W&B/Aim). Paths: `runs/**`, `experiments/**`, `program.md` |
 | `swe/coding-style-typescript.md` | TypeScript coding style — strict-mode requirements, import ordering, no-`any` discipline, named-exports preference; links to typescript-development skill for toolchain depth. Paths: `**/*.ts`, `**/*.tsx`, `**/*.mts`, `**/*.cts` |
+| `swe/dashboard-conventions.md` | Declarative constraints for the `dashboard_app/` Next.js runtime and the `scripts/praxion-dashboard` launcher. Paths: `dashboard_app/**`, `scripts/praxion-dashboard` |
+| `swe/id-citation-discipline.md` | Detection and remediation rules for ephemeral identifier citations (REQ, AC, step numbers) leaking into production source. Paths: source files across all tracked languages |
+| `swe/shipped-artifact-isolation.md` | Isolation rules preventing shipped artifacts (`rules/`, `skills/`, `agents/`, `commands/`) from referencing project-specific `.ai-state/` entries. Paths: `rules/**`, `skills/**`, `agents/**`, `commands/**`, `claude/config/**` |
 | `swe/staleness-policy.md` | Marker syntax and threshold protocol for drift-prone skill sections. Paths: `**/SKILL.md` |
 | `swe/testing-conventions.md` | Test file placement, naming, coverage expectations, and test isolation. Paths: `tests/**` |
+| `swe/vcs/pr-conventions.md` | PR workflow, merge policy, and the `.ai-state/` safety contract at PR time. Paths: `.github/**`, PR/merge/release commands, `git-conventions.md` |
+| `writing/aac-dac-conventions.md` | Architecture-as-Code + Documentation-as-Code fence convention (`aac:generated` / `aac:authored`) for `ARCHITECTURE.md` and `.c4` sources. Paths: `**/ARCHITECTURE.md`, `docs/architecture.md`, `**/*.c4` |
 | `writing/diagram-conventions.md` | Mermaid syntax, layered decomposition (L0/L1/L2), diagram type selection. Paths: documentation-authoring surfaces (`docs/`, architecture docs, `.ai-state/`) |
+| `writing/html-output-conventions.md` | HTML output conventions for the dashboard runtime — Markdown stays source of truth; HTML is a presentation veneer. Paths: `dashboard_app/**`, `**/doc_manifest.yaml` |
 | `writing/readme-style.md` | Precision-first technical writing and structural integrity conventions for README.md files. Paths: `**/README.md`, `**/README_DEV.md` |
 
 ## How Rules Work

@@ -197,7 +197,7 @@ The loop:
 The Mermaid diagram below represents this loop. It is authored prose today and could become an
 `aac:generated` region once a corresponding LikeC4 view (`docs/diagrams/aac-dac-loop.c4`) is created.
 
-![AaC+DaC Feedback Loop — author writes ADR + DSL + ARCHITECTURE.md; pre-commit gate, CI, architect-validator, and sentinel close the loop via TECH_DEBT_LEDGER](diagrams/aac-dac-feedback-loop/rendered/aac-dac-feedback-loop.svg)
+![AaC+DaC feedback loop: author writes ADR + LikeC4 DSL + ARCHITECTURE.md with aac fences; pre-commit golden-rule gate, CI jobs, and architect-validator feed FAILs into the tech-debt ledger; sentinel performs periodic AC-dimension audits; feedback routes back to author for resolution](diagrams/aac-dac-feedback-loop/rendered/aac-dac-feedback-loop.svg)
 
 ## Adopting It
 

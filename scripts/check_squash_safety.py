@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Diagnose whether the just-completed merge erased `.ai-state/` via squash.
 
-Invoked by `scripts/git-post-merge-hook.sh` (or manually) after a merge
+Invoked by `scripts/git-finalize-hook.sh` (post-merge entry, via `finalize_chain.sh`) after a merge
 completes. Detects the case where HEAD is a single-parent commit whose tree
 has `.ai-state/` files present in the parent but removed at HEAD -- the
 signature of a `git merge --squash` or a fast-forward that dropped state.

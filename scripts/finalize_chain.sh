@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # scripts/finalize_chain.sh — shared library for the .ai-state/ finalize chain.
 #
-# Sourced by git-post-merge-hook.sh, git-post-commit-hook.sh, and
-# git-post-checkout-hook.sh. Single source of truth for:
+# Sourced by git-finalize-hook.sh (the multiplexed dispatcher symlinked to
+# .git/hooks/{post-merge,post-commit,post-checkout}). Single source of truth for:
 #
 #   - Path resolution (works for both cp-installed and symlink-installed hooks)
 #   - Repo-state predicates (on_main, drafts_present, state_was_touched)

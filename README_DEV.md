@@ -152,7 +152,8 @@ scripts/                             # Utility scripts
 ├── check_squash_safety.py           # Post-merge diagnostic: warn on .ai-state/ erasure from squash
 ├── chronograph-ctl                  # Task Chronograph dev helper (start/stop/status)
 ├── finalize_adrs.py                 # Promote draft ADRs to NNN at merge-to-main
-├── git-post-merge-hook.sh           # Post-merge hook: reconcile -> finalize -> squash-safety
+├── git-finalize-hook.sh             # Multiplexed lifecycle dispatcher (post-merge/post-commit/post-checkout); post-merge runs reconcile -> finalize -> squash-safety
+├── finalize_chain.sh                # Shared library sourced by git-finalize-hook.sh — path resolution, state-driven gates, three entry points
 ├── merge_driver_memory.py           # Custom merge driver for memory.json
 ├── merge_driver_observations.py     # Custom merge driver for observations.jsonl
 ├── migrate_worktree_home.sh         # Print migration commands for legacy .trees/ worktrees

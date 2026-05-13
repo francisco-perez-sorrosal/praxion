@@ -12,6 +12,8 @@ Every action serves a purpose. Every line of code, every tool invocation, every 
 
 Output quality is bounded by context quality. Wrong context produces wrong plans, wrong code, wrong decisions. Actively engineer the information you work with: gather what you need before acting, maintain accurate state while working, persist what you learn for future use, and curate the artifacts that shape behavior across sessions. The right information must reach the right place at the right time.
 
+The empirical ground for this is that the context window *is* the programming surface for LLMs, and that LLMs don't consolidate knowledge beyond it. Stale or polluted context produces stale or polluted output — no matter how well-engineered the surrounding system.
+
 This is the most operationally consequential principle. The entire ecosystem — skills, rules, memory, progressive disclosure — exists to serve it.
 
 ### Behavior-Driven Development
@@ -62,6 +64,8 @@ The Methodology defines the flow; the contract defines the stance. Four named be
 - **Register Objection** when a request violates scope, structure, or evidence
 - **Stay Surgical** — minimal scope, minimal blast radius
 - **Simplicity First** — the smallest solution that achieves the behavior
+
+The contract is universal in stance but calibrated in expression — Surface Assumptions and Stay Surgical always hold; at Direct tier, apply Register Objection and Simplicity First with proportionate judgment rather than ceremony. The tier table governs calibration; this contract governs stance.
 
 The contract is operationalized by the `agent-behavioral-contract` rule (always loaded) and the behavioral-contract reference in the software-planning skill (progressive disclosure). Verification reports tag contract violations with named failure-mode labels so patterns surface across features. Compliance is not politeness — it is the entry condition for trust.
 

@@ -89,29 +89,23 @@ This scoping prevents collisions when multiple pipelines or multiple instances o
 - **Worktree-aware** — when a pipeline operates in a worktree, `.ai-state/` changes are committed on the pipeline branch and reconciled at merge time (see [.ai-state/ Reconciliation](../../skills/software-planning/references/agent-pipeline-details.md#ai-state-reconciliation-for-worktree-merges))
 - Created on first use — agents create `.ai-state/` when writing their first persistent document
 
-`idea_ledgers/IDEA_LEDGER_*.md` — promethean's timestamped ideation records (sentinel baseline, implemented/pending/discarded ideas, future paths). Each run carries forward all previous entries. Lives under `.ai-state/idea_ledgers/`.
+Per-artifact inventory (the directory tree above is the canonical list; `TECH_DEBT_LEDGER.md` has its own subsection below; `docs/architecture.md` lives in `docs/`, not `.ai-state/`, but is included here for the pipeline-doc relationship):
 
-`sentinel_reports/SENTINEL_REPORT_*.md` — timestamped audit reports (`SENTINEL_REPORT_YYYY-MM-DD_HH-MM-SS.md`) under `.ai-state/sentinel_reports/`. `sentinel_reports/SENTINEL_LOG.md` — append-only run summary table (timestamp, report file, health grade, finding counts, coherence grade), co-located with the reports.
+| Artifact | Writers / updaters | Shape · lifecycle · reference |
+|---|---|---|
+| `idea_ledgers/IDEA_LEDGER_*.md` | promethean | Timestamped; each run carries forward all prior entries (sentinel baseline, implemented/pending/discarded ideas, future paths). |
+| `sentinel_reports/SENTINEL_REPORT_*.md` + `SENTINEL_LOG.md` | sentinel | Timestamped audit reports + an append-only run-summary table (timestamp, report file, health grade, finding counts, coherence grade), co-located. |
+| `metrics_reports/METRICS_REPORT_*.{md,json}` + `METRICS_LOG.md` | `/project-metrics` | Per-run JSON+MD report pairs + an append-only aggregate row per run, co-located. |
+| `token_budgeting/TOKEN_BUDGETING_*.md` | — (no active producer) | Historical token-budget audits; retained for history. |
+| `specs/SPEC_<name>_YYYY-MM-DD.md` | implementation-planner | Archived behavioral spec + traceability matrix; created at end-of-feature for medium/large tasks. |
+| `calibration_log.md` | main agent (append-only) | Tier-selection log (timestamp, task, signals, recommended/actual tier, source, retrospective); consumed by sentinel for calibration-trend analysis. |
+| `decisions/<NNN>-<slug>.md` + `DECISIONS_INDEX.md` | systems-architect, implementation-planner, interface-designer (write fragments); index auto-generated from ADR frontmatter | Numbered ADR files (YAML frontmatter + MADR body). Format in [`adr-conventions.md`](adr-conventions.md). |
+| `SYSTEM_DEPLOYMENT.md` | systems-architect (creates); implementer (configs), cicd-engineer (CI/CD); verifier + sentinel validate | Living single file; section ownership prevents conflicts. Template: `skills/deployment/assets/SYSTEM_DEPLOYMENT_TEMPLATE.md`. |
+| `ARCHITECTURE.md` | systems-architect (creates); implementation-planner / implementer on structural changes; verifier + sentinel validate | Living single file; section ownership; architect-facing design-target (abstracts above concrete code to define the space of valid implementations). Template: `skills/software-planning/assets/ARCHITECTURE_TEMPLATE.md`. Dev-facing counterpart: `docs/architecture.md` (below). |
+| `TEST_TOPOLOGY.md` | systems-architect (Subsystems table), test-engineer (per-group definitions), implementation-planner (per-pipeline `integration_boundaries`) | Per-project test-group topology; populated at M2+ (Praxion defers to the first consumer project that activates the protocol). Schema: `skills/testing-strategy/references/test-topology.md`. |
+| `docs/architecture.md` *(in `docs/`, not `.ai-state/`)* | systems-architect (creates alongside `ARCHITECTURE.md`); implementation-planner (planning-stage structural gaps), implementer (step 7.7); doc-engineer at pipeline checkpoints | Dev-facing architecture navigation guide; every component name + file path verified against the codebase; derived from `.ai-state/DESIGN.md` filtered to Built components. Template: `skills/doc-management/assets/ARCHITECTURE_GUIDE_TEMPLATE.md`. |
 
-`metrics_reports/METRICS_REPORT_*.{md,json}` — `/project-metrics` per-run JSON+MD report pairs under `.ai-state/metrics_reports/`. `metrics_reports/METRICS_LOG.md` — append-only aggregate row per run, co-located with the reports.
-
-`token_budgeting/TOKEN_BUDGETING_*.md` — historical token-budget audits under `.ai-state/token_budgeting/`. No active producer in the current ecosystem; retained for history.
-
-`SPEC_<name>_YYYY-MM-DD.md` — archived behavioral specifications with traceability matrices. Created by the implementation-planner at end-of-feature for medium/large tasks.
-
-`calibration_log.md` — append-only tier selection log (timestamp, task, signals, recommended tier, actual tier, source, retrospective). Used for calibration trend analysis by the sentinel.
-
-`decisions/` — structured ADR (Architecture Decision Record) files tracking decisions made during AI-assisted development. Each ADR is a numbered Markdown file (`<NNN>-<slug>.md`) with YAML frontmatter and MADR body sections. Written by decision-making agents (systems-architect, implementation-planner) using the Write tool. `DECISIONS_INDEX.md` is auto-generated from ADR frontmatter. Format defined in the [adr-conventions](adr-conventions.md) rule.
-
-`SYSTEM_DEPLOYMENT.md` — living deployment architecture document. Created by systems-architect, updated by implementer (configurations), cicd-engineer (CI/CD), and validated by verifier and sentinel. Section ownership prevents conflicts. Unlike timestamped artifacts, this is a single evolving file. Template at `skills/deployment/assets/SYSTEM_DEPLOYMENT_TEMPLATE.md`.
-
-`ARCHITECTURE.md` — architect-facing design-target document; abstracts above concrete code to define the space of valid implementations. Created by systems-architect, updated by implementation-planner / implementer on structural changes, validated by verifier + sentinel. Section ownership prevents conflicts. Template: `skills/software-planning/assets/ARCHITECTURE_TEMPLATE.md`. Developer-facing counterpart is `docs/architecture.md` (see below).
-
-`TEST_TOPOLOGY.md` — per-project test group topology (populated by systems-architect/test-engineer at M2+; Praxion itself defers population to the first consumer project that activates the protocol behaviorally). Multi-agent section ownership: systems-architect owns the Subsystems table; test-engineer owns per-group definitions; implementation-planner owns per-pipeline `integration_boundaries` additions. Schema defined in `skills/testing-strategy/references/test-topology.md`.
-
-Agents that update `.ai-state/`: promethean (idea ledger), sentinel (report, log, tech-debt ledger), implementation-planner (spec archival), main agent (calibration log), systems-architect and implementation-planner (ADR files in `decisions/`), systems-architect, implementer, and cicd-engineer (deployment doc), systems-architect, implementation-planner, and implementer (both architecture docs), systems-architect, test-engineer, and implementation-planner (TEST_TOPOLOGY.md — topology population and per-pipeline integration_boundaries), verifier and sentinel (tech-debt ledger writes — verifier per-change, sentinel repo-wide). Artifact inventory is not stored here — it is derivable from the filesystem.
-
-**`docs/architecture.md`** — developer-facing architecture navigation guide. Every component name and file path is verified against the codebase. Derived from `.ai-state/DESIGN.md` by filtering to Built components. Created by systems-architect alongside the architect doc, updated by implementation-planner (planning-stage structural gaps) and implementer (step 7.7), maintained by doc-engineer at pipeline checkpoints. Template at `skills/doc-management/assets/ARCHITECTURE_GUIDE_TEMPLATE.md`. Lives in `docs/`, not `.ai-state/`, because it is developer-facing project documentation.
+Artifact inventory is not stored here — it is derivable from the filesystem.
 
 #### `TECH_DEBT_LEDGER.md` + `TECH_DEBT_RESOLVED.md` — living tech-debt ledger pair {#tech_debt_ledger-summary}
 

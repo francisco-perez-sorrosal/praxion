@@ -85,7 +85,7 @@ When a new ADR re-affirms an existing one without superseding it (a re-opening w
 5. Add a `## Prior Decision` section in the new ADR body explaining what was considered and why the prior decision still holds; name the evidence that would be required to justify a future supersession
 6. `DECISIONS_INDEX.md` regenerates automatically at finalize
 
-Re-affirmation is intentionally stronger than silent concurrence (it forces a public record of the re-opening) and gentler than supersession (the prior decision is untouched). Use it when a prior decision is challenged, re-examined, and found still correct — not as a routine acknowledgment.
+Use re-affirmation only when a prior decision is challenged, re-examined, and found still correct — not as routine acknowledgment. (Rationale: [`adr-authoring-protocols.md` § Re-affirmation Protocol](../../skills/software-planning/references/adr-authoring-protocols.md#re-affirmation-protocol).)
 
 ### Finalize Protocol
 

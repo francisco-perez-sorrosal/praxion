@@ -116,8 +116,8 @@ Agents communicate through shared documents, not direct invocation. The pipeline
 | Context-engineer shadowing | Conditional on context artifacts being touched; runs parallel to researcher / systems-architect; appends to cumulative `CONTEXT_REVIEW.md` |
 | Context-engineer scope | Single artifact → direct invocation any stage; 3+ artifacts → full pipeline; also runs for standalone audits |
 | Sentinel | Independent of pipeline; reports (`SENTINEL_REPORT_*.md`) public to any agent or user |
-| Doc-engineer parallel | When planner assigns to parallel group, runs concurrently with implementer / test-engineer on disjoint files; also runs at pipeline checkpoints |
-| Interface-designer shadowing + challenge loop | Conditional on interface surface in scope; parallel to researcher + systems-architect; forward-only `INTERFACE_DESIGN.md`; one orchestrator-mediated loop-back when `## Architecture Challenges` is populated; see [`coordination-details.md`](../../skills/software-planning/references/coordination-details.md) |
+| Doc-engineer parallel | When the planner assigns it to the parallel group: concurrent with implementer / test-engineer on disjoint files; also at pipeline checkpoints |
+| Interface-designer shadowing + challenge loop | When an interface surface is in scope: parallel to researcher + systems-architect; forward-only `INTERFACE_DESIGN.md` with one orchestrator-mediated loop-back when `## Architecture Challenges` is populated |
 
 ### Agent Selection Criteria
 

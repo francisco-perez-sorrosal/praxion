@@ -46,7 +46,7 @@ model {
 
     // Orchestration Layer: runtime execution and ephemeral state
     orchestration = component "Orchestration Layer" {
-      agents = component "Agent Pipeline"   { description "12 specialized agents" }
+      agents = component "Agent Pipeline"   { description "15 specialized agents" }
       hooks  = component "Hooks"            { description "Lifecycle enforcement" }
       aiwork = component ".ai-work/"        { description "Ephemeral pipeline docs" }
     }

@@ -38,6 +38,8 @@ mmdc -i docs/diagrams/<name>/src/<name>.mmd -o docs/diagrams/<name>/rendered/<na
 
 The pre-commit hook (`scripts/diagram-regen-hook.sh`) regenerates LikeC4 outputs automatically when staged `.c4` files change. Mermaid has no auto-regen hook yet — invoke `mmdc` manually after editing a `.mmd` source.
 
+**Regen-hash volatility:** LikeC4-generated SVGs carry a deterministic `d2-<hash>` class on the root `<svg>` element that depends on the layout pass, not the model content. Views that don't reference layer internals (e.g. `context.svg` / `index.svg` of the architecture model when only internal components change) can therefore appear in `git diff` with a different hash but **byte-identical structural content**. This is expected; do not bisect for "what changed?" when the visual output is unchanged. If the hash churn is noisy in a PR review, regenerate only the affected view rather than the whole `docs/diagrams/architecture/rendered/` directory.
+
 ## Tooling
 
 - `mmdc` — `npm install -g @mermaid-js/mermaid-cli`

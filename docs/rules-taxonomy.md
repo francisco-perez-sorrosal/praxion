@@ -3,26 +3,26 @@ diataxis: reference
 audience: developer
 ---
 
-# Rules Taxonomy and Blacklist Guide
+# Rules Taxonomy and Disable Guide
 
-Every Praxion-onboarded project inherits a curated set of always-loaded rules: coding style, behavioral contract, agent coordination protocol, ADR conventions, and more. These rules cost tokens on every session. This guide explains how rules are categorized, which ones you can disable, and how to measure the cost of your choices.
+Every Praxion-onboarded project inherits a curated set of rules: coding style, behavioral contract, agent coordination protocol, ADR conventions, and more. Some are always-loaded (cost tokens on every session); others load only when their trigger paths are read. This guide explains how rules are categorized, how the per-project disable mechanism reaches each category, and how to measure the cost of your choices.
 
-## Two-Channel Delivery
+## Two-Channel Delivery, One Disable List
 
-Praxion delivers rules through two channels to balance consistency with flexibility:
+Praxion delivers rules through two channels. The per-project `.claude/praxion-rules.yaml` disable list reaches **both** — different mechanism under the hood, single YAML interface.
 
-| Channel | Rules | Delivery | Disableable | Use case |
-|---------|-------|----------|-------------|----------|
-| **Symlinked** | 5 core + 14 path-scoped | Installed to `~/.claude/rules/` | No | Non-negotiable behavioral invariants + optional-depth guides |
-| **Hook-injected** | 3 blacklistable | Injected at SessionStart via `additionalContext` | Yes | Project-specific conventions (agent lifecycle, memory, commit format) |
+| Channel | Delivery | Disable mechanism |
+|---------|----------|-------------------|
+| **Hook-deliver** | Body shipped at SessionStart via `additionalContext` JSON from `inject_rules.py` | Filtered out of `additionalContext` when in the YAML disable list |
+| **Symlink** | File installed to `~/.claude/rules/<id>.md`; Claude Code's native runtime loads it (unconditionally for always-on rules; on matching `Read` for path-scoped rules) | Portable glob (`**/.claude/rules/<id>.md`) reconciled into `claudeMdExcludes` in `.claude/settings.json`; Claude Code's runtime skips the file |
 
-Core rules are always present. Path-scoped rules are loaded only when you read or edit files matching their patterns — they cost zero tokens until triggered. Blacklistable rules are always-loaded by default, but you can disable them per-project via `.claude/praxion-rules.yaml`.
+Together the two mechanisms give the YAML uniform reach: **any rule named in the disable list is guaranteed not to load**. The one exception is core rules (`core: true`) — they remain non-disableable, and attempts to disable them emit a stderr warning.
 
-## Three Rule Categories
+## Three Categories of Rules
 
 ### 1. Core Rules (non-disableable, always-loaded)
 
-Five rules encode Praxion's behavioral contract and coordination protocol. They are **never disableable** — attempting to disable one produces a warning and the rule remains loaded.
+Five rules encode Praxion's operating contract. They are **immune to the disable mechanism** — attempting to disable one emits a stderr warning and the rule remains loaded.
 
 | ID | Rule file | Purpose | Token cost |
 |----|-----------|---------|------------|
@@ -34,104 +34,104 @@ Five rules encode Praxion's behavioral contract and coordination protocol. They 
 
 **Total core tokens:** ~11,575
 
-### 2. Blacklistable Always-Loaded Rules (disableable)
+### 2. Always-Loaded Hook-Deliver Rules (disableable, biggest token savings)
 
-Three rules are always-loaded by default but can be disabled per-project if your team follows different conventions.
+Three rules ship at SessionStart and contribute to the always-loaded token baseline. Disabling them via the YAML filters them out of `additionalContext` — the most direct way to reclaim always-loaded tokens.
 
 | ID | Rule file | Purpose | Token cost | Typical disabler |
 |----|-----------|---------|------------|------------------|
-| `swe/memory-protocol` | `rules/swe/memory-protocol.md` | Memory MCP usage, recall, remember, conflict resolution | ~1248 tokens | Projects with memory-mcp disabled |
-| `swe/agent-model-routing` | `rules/swe/agent-model-routing.md` | Claude model tier routing table, per-agent allocation | ~1619 tokens | Projects with custom model strategy |
-| `swe/vcs/git-conventions` | `rules/swe/vcs/git-conventions.md` | Commit scope, message format, secrets discipline | ~2180 tokens | Projects with different VCS policy or no Git |
+| `swe/memory-protocol` | `rules/swe/memory-protocol.md` | Memory MCP usage, recall, remember, conflict resolution | ~1500 tokens | Projects with `PRAXION_DISABLE_MEMORY_MCP=1` or no memory MCP server |
+| `swe/agent-model-routing` | `rules/swe/agent-model-routing.md` | Claude model tier routing table, per-agent allocation | ~2300 tokens | Projects using default model routing only |
+| `swe/vcs/git-conventions` | `rules/swe/vcs/git-conventions.md` | Commit scope, message format, secrets discipline | ~1300 tokens | Projects with different VCS policy or no Git |
 
-**Total blacklistable tokens:** ~5,047
+**Total hook-deliver tokens reclaimable:** ~5,100
 
-### 3. Path-Scoped Rules (optional-depth, zero cost until triggered)
+### 3. Path-Scoped Rules (disableable, declarative-only — zero baseline cost)
 
-Fourteen rules load only when you read or edit files matching their patterns. They cost zero tokens until then, so they don't appear in the blacklist mechanism.
+Fourteen rules load only when their `paths:` frontmatter matches a `Read` target. They cost **zero tokens at SessionStart** regardless of whether they appear in the YAML disable list.
 
 | Category | Rule ID(s) | Activation pattern | Purpose |
 |----------|------------|-------------------|---------|
-| **SWE** | `swe/coding-style` | `.py`, `.ts`, `.rs`, `.go` | Language-specific code formatting |
-| | `swe/id-citation-discipline` | Spec files, implementation docs | REQ-to-code traceability conventions |
+| **SWE** | `swe/coding-style` | `.py`, `.ts`, `.rs`, `.go`, etc. | Language-specific code formatting |
+| | `swe/id-citation-discipline` | Source files in language extensions | REQ-to-code traceability conventions |
 | | `swe/shipped-artifact-isolation` | Rules, skills, commands, agents | Constraints on project-portable artifacts |
-| | `swe/staleness-policy` | `.md` files | Documentation freshness conventions |
-| | `swe/testing-conventions` | Test code, specs | Testing strategy and terminology |
+| | `swe/staleness-policy` | `skills/**/SKILL.md` | Skill freshness conventions |
+| | `swe/testing-conventions` | Test code, test files | Testing strategy and terminology |
 | | `swe/vcs/pr-conventions` | `.github/`, PR-adjacent surfaces | Pull request workflow and merge policy |
-| **ML/AI** | `ml/eval-driven-verification` | Training plans with metric thresholds | ML eval-driven acceptance criteria |
-| | `ml/experiment-tracking-conventions` | `program.md`, experiment tracking | Experiment tracking tool conventions |
-| | `ml/gpu-budget-conventions` | Training steps, WIP.md | GPU compute budget enforcement |
-| **Writing** | `writing/aac-dac-conventions` | `ARCHITECTURE.md` | Architecture-as-Code fence conventions |
-| | `writing/diagram-conventions` | Diagram source files, rendered SVGs | Diagram toolchain and layout rules |
-| | `writing/html-output-conventions` | `.html` files | HTML output generation |
-| | `writing/readme-style` | `README.md`, documentation | Markdown writing quality and structure |
+| **ML/AI** | `ml/eval-driven-verification` | Training plans, `runs/`, `experiments/` | ML eval-driven acceptance criteria |
+| | `ml/experiment-tracking-conventions` | `runs/`, `experiments/`, `program.md` | Experiment tracking tool conventions |
+| | `ml/gpu-budget-conventions` | Training steps, WIP.md, `program.md` | GPU compute budget enforcement |
+| **Writing** | `writing/aac-dac-conventions` | `ARCHITECTURE.md`, `*.c4` | Architecture-as-Code fence conventions |
+| | `writing/diagram-conventions` | `docs/**`, READMEs, design docs | Diagram toolchain and layout rules |
+| | `writing/html-output-conventions` | `dashboard_app/**`, doc manifests | HTML output generation |
+| | `writing/readme-style` | `**/README.md`, `**/README_DEV.md` | Markdown writing quality and structure |
 
-## Creating a Project Blacklist
+**Why disable a path-scoped rule?** Path-scoping itself is a cost control — adding a path-scoped rule to the disable list yields no SessionStart token savings. The reason to disable is **declarative**: you want a guarantee that the rule never applies in this project, even if a trigger file (e.g., a generically-named `prepare.py` in a non-ML project) is added later for unrelated reasons. The disable list translates to a `claudeMdExcludes` entry in `.claude/settings.json`, and Claude Code's runtime then skips the rule on every matching Read.
+
+## Creating a Project Disable List
 
 ### Step 1: Create `.claude/praxion-rules.yaml`
 
-Create a YAML file in your project root (committed to git) specifying which blacklistable rules to suppress:
+Create a YAML file in your project (committed to git, since the derived `.claude/settings.json` is also committed and team-shared):
 
 ```yaml
 # .claude/praxion-rules.yaml — Project-local rule configuration
-# 
+#
 # Optional file. If absent, all rules load (backward compatible).
-# Schema version 1 only (non-negotiable).
+# Schema version 1 only.
 
 version: 1
 
-# Disable specific rules by ID
+# Disable specific rules by ID. fnmatch globs supported (e.g., ml/*).
 disable:
-  - swe/memory-protocol  # Our team uses cloud storage, not memory MCP
+  - swe/memory-protocol  # Project sets PRAXION_DISABLE_MEMORY_MCP=1
 
 # Or disable all rules in a category with globs
 # disable:
-#   - ml/*                # This project is not ML-focused
-#   - writing/*           # We use a different documentation standard
+#   - ml/*                # Not an ML project — guaranteed never to fire
+#   - writing/*           # Project uses a different documentation standard
 ```
 
 ### Step 2: Understand the Behavior
 
-- **No config file** → all rules load (no change from today)
-- **Empty `disable` list** → all rules load
-- **`disable: [swe/memory-protocol]`** → load core rules + other blacklistable rules, skip memory-protocol
-- **`disable: [ml/*]`** → disable all ML rules in one entry (glob support)
-- **Attempting `disable: [swe/agent-behavioral-contract]`** → warning emitted, rule stays loaded (core protection)
+- **No config file** → all rules load (backward compatible; no settings.json mutation)
+- **Empty `disable:` list** → all rules load (same)
+- **`disable: [swe/memory-protocol]`** → suppressed from `additionalContext` at SessionStart (reclaims ~1.5k always-loaded tokens)
+- **`disable: [ml/*]`** → 3 `**/.claude/rules/ml/*.md` patterns written to `claudeMdExcludes`; ML rules guaranteed not to load even if trigger files appear (no SessionStart token savings — path-scoped rules already cost zero baseline)
+- **Attempting `disable: [swe/agent-behavioral-contract]`** → stderr warning emitted, rule stays loaded (core protection)
+
+The hook is **idempotent**: it recomputes the derived `claudeMdExcludes` on every SessionStart, replacing only Praxion-managed entries (those whose pattern starts with `**/.claude/rules/`) and preserving any other `claudeMdExcludes` entries you added by hand. Removing an entry from the YAML cleans up the corresponding `claudeMdExcludes` entry on the next session.
 
 ### Step 3: Measure the Effect
 
-Use `measure_context_surface.py` to see the token delta:
+Use `measure_context_surface.py` to see the always-loaded token delta:
 
 ```bash
-# Baseline (all rules)
-python3 measure_context_surface.py
-
-# After adding a blacklist
 python3 measure_context_surface.py
 ```
 
-The tool reports always-loaded token totals before and after your configuration change.
+The tool reports the always-loaded token total. Disabling hook-deliver rules reduces this number directly; disabling path-scoped rules does not (they were not counted in the baseline to begin with).
 
 ## Category Globs
 
-The disable list supports glob patterns for categories:
+The disable list supports fnmatch glob patterns. Note that fnmatch's `*` crosses `/` (unlike gitignore), so `swe/*` matches deep IDs like `swe/vcs/pr-conventions`.
 
-| Glob | Matches |
-|------|---------|
-| `ml/*` | All three ML rules: `ml/eval-driven-verification`, `ml/experiment-tracking-conventions`, `ml/gpu-budget-conventions` |
-| `writing/*` | All four writing rules: `writing/aac-dac-conventions`, `writing/diagram-conventions`, `writing/html-output-conventions`, `writing/readme-style` |
-| `swe/vcs/*` | Both VCS rules: `swe/vcs/git-conventions`, `swe/vcs/pr-conventions` (note: `vcs/pr-conventions` is path-scoped, not disableable) |
-| `swe/*` | All SWE rules in the category (only `swe/memory-protocol` and `swe/agent-model-routing` are disableable; core rules are protected) |
+| Glob | Matches | Effect |
+|------|---------|--------|
+| `ml/*` | 3 ML rules (all path-scoped) | `claudeMdExcludes` patterns added; no SessionStart token savings; declarative-only guarantee |
+| `writing/*` | 4 writing rules (all path-scoped) | Same as above |
+| `swe/vcs/*` | 2 VCS rules: `git-conventions` (hook-deliver) + `pr-conventions` (path-scoped) | `git-conventions` filtered from `additionalContext` (reclaims ~1.3k tokens); `pr-conventions` added to `claudeMdExcludes` |
+| `swe/*` | 13 SWE rules | 4 core: warnings emitted, kept loaded; 3 hook-deliver: filtered from `additionalContext` (~5.1k tokens reclaimed); 6 path-scoped: `claudeMdExcludes` patterns added |
 
 ## Core Rule Protection
 
 If you attempt to disable a core rule, the SessionStart hook emits a warning to stderr:
 
 ```
-[inject_rules] WARNING: rule swe/agent-behavioral-contract is core and cannot be disabled
+[inject_rules] WARNING: cannot disable core rule 'swe/agent-behavioral-contract' — kept loaded
 ```
 
-The rule remains loaded. Core rules protect Praxion's behavioral contract (Surface Assumptions, Register Objection, Stay Surgical, Simplicity First) and are non-negotiable.
+The rule remains loaded. Core rules protect Praxion's operating contract (Surface Assumptions, Register Objection, Stay Surgical, Simplicity First; ADR conventions; agent coordination protocol; `.ai-work/`/`.ai-state/` conventions) and are structurally load-bearing for the rest of the ecosystem to reason on top of.
 
 ## Schema Version Handling
 
@@ -141,70 +141,55 @@ The `.claude/praxion-rules.yaml` format uses semantic versioning. The current sc
 - **Schema 2+**: not yet released
 
 If your config specifies `version: 2` or higher:
-- The hook emits an error: `schema version N is not supported; using schema 1 behavior`
-- The hook falls back to injecting all blacklistable rules (fail-open)
+- The hook emits a stderr warning: `Schema version N is not supported by this version of Praxion; falling back to no suppression`
+- The hook falls back to injecting all rules (fail-open)
 - Update your `.claude/praxion-rules.yaml` to `version: 1` and remove any unsupported fields
 
-## Kill Switch: Disable Rule Injection Entirely
+## Kill Switch: `PRAXION_DISABLE_RULE_INJECTION`
 
-For debugging or temporary disabling of all Praxion rule injection (including core and blacklistable rules delivered via hook), set the environment variable:
+For debugging or temporary disabling, set the environment variable:
 
 ```bash
 PRAXION_DISABLE_RULE_INJECTION=1 claude-code
 ```
 
-This disables the `inject_rules.py` hook entirely for that session. Core rules symlinked into `~/.claude/rules/` are still loaded by Claude Code's native mechanism; only the hook-delivered blacklistable rules are suppressed.
+This skips the `inject_rules.py` hook entirely. Effects:
+
+- Hook-deliver rule bodies are absent from `additionalContext` (the three blacklistable always-loaded rules are not delivered)
+- The hook does **not** run `claudeMdExcludes` reconciliation; any existing entries from prior sessions remain in effect via Claude Code's native runtime, so previously-disabled symlinked rules stay disabled
+- Core rules symlinked into `~/.claude/rules/` continue to load via Claude Code's native rule mechanism
 
 **Use case:** Troubleshooting rule interaction issues without uninstalling the plugin.
 
-## Verification and Measurement
-
-### `measure_context_surface.py` — Token Accounting
-
-After configuring a blacklist, measure the impact:
-
-```bash
-python3 measure_context_surface.py
-```
-
-This script:
-1. Counts characters in your project's always-loaded CLAUDE.md files
-2. Counts characters in core + non-blacklisted rules
-3. Applies a conservative character→token ratio (÷3.6)
-4. Reports the total always-loaded token budget
-
-**Expected output:**
-```
-Always-loaded token budget:
-  CLAUDE.md files:      2,000 tokens
-  Core rules:          11,575 tokens
-  Blacklistable rules:  3,000 tokens (2 of 3 enabled)
-  Total:               16,575 tokens
-```
-
-If you disable `swe/memory-protocol` (~1,248 tokens), the total drops to ~15,327 tokens.
-
-### SessionStart Logging
+## SessionStart Logging
 
 When a session starts, the `inject_rules.py` hook logs a summary line to stderr:
 
 ```
-[inject_rules] Loaded 5 core rules; injected 3/3 blacklistable rules (suppressed: none)
+[inject_rules] Loaded 5 core rules; injected 3/3 hook-deliver rules (suppressed: none); symlink suppressions via claudeMdExcludes: none
 ```
 
-or
+With suppressions active (e.g., `disable: [ml/*, swe/memory-protocol]`):
 
 ```
-[inject_rules] Loaded 5 core rules; injected 2/3 blacklistable rules (suppressed: swe/memory-protocol)
+[inject_rules] Loaded 5 core rules; injected 2/3 hook-deliver rules (suppressed: swe/memory-protocol); symlink suppressions via claudeMdExcludes: ml/eval-driven-verification, ml/experiment-tracking-conventions, ml/gpu-budget-conventions
 ```
 
-This line confirms which rules were loaded and which were suppressed for that session.
+This confirms which rules were loaded, which hook-deliver rules were filtered, and which symlink rules were added to `claudeMdExcludes` for the session.
+
+If reconciliation wrote to `settings.json`, a second line appears:
+
+```
+[inject_rules] Reconciled claudeMdExcludes in /path/.claude/settings.json: 3 Praxion-managed, 0 user-managed preserved
+```
+
+When the YAML matches the existing `settings.json` state exactly, the reconciliation step is silently skipped (idempotency).
 
 ## Example Configurations
 
 ### Minimal Project (Token-Conscious)
 
-Disable everything that's project-specific:
+Disable hook-deliver baseline + declare path-scoped categories as out-of-scope:
 
 ```yaml
 version: 1
@@ -216,11 +201,11 @@ disable:
   - writing/*
 ```
 
-**Token reduction:** ~5,047 (all blacklistable + path-scoped category blocks) → ~11,575 (core only)
+**SessionStart token reduction:** ~5,100 (all hook-deliver). Path-scoped categories contribute zero baseline cost regardless — disabling them adds declarative guarantees but no SessionStart savings.
 
 ### ML Project
 
-Disable non-ML rules:
+Disable non-ML conventions while keeping training discipline:
 
 ```yaml
 version: 1
@@ -230,17 +215,19 @@ disable:
   - writing/*
 ```
 
-**Rationale:** This project uses its own model routing and experiment tracking; writing rules are out-of-scope. ML rules stay enabled for training discipline.
+**Rationale:** Project uses its own model routing and skips Praxion's memory protocol; writing rules are out-of-scope. ML rules stay enabled for training discipline.
 
 ### Standard Project
 
-No blacklist — accept all rules:
+No disable list — accept all rules:
 
 ```yaml
-# .claude/praxion-rules.yaml (empty or omitted entirely)
+# .claude/praxion-rules.yaml omitted entirely, or:
+version: 1
+disable: []
 ```
 
-**Behavior:** Identical to current Praxion installations; all rules load.
+**Behavior:** Identical to original Praxion installations; all non-core rules load when their conditions are met.
 
 ## Further Reading
 

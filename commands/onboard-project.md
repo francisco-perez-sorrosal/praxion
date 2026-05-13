@@ -324,7 +324,7 @@ If `.claude/settings.json` already exists with other keys (e.g., `permissions`, 
 
 ### Optional: Rule Blacklist Configuration
 
-Praxion rules are now categorized into core (always-loaded, non-disableable) and blacklistable (always-loaded by default, but suppressible per-project). To customize which rules your project inherits, create an optional `.claude/praxion-rules.yaml` file:
+Praxion rules are categorized into core (always-loaded, non-disableable) and disableable (every other rule — hook-deliver and symlinked alike). The per-project `.claude/praxion-rules.yaml` disable list reaches both delivery channels uniformly: hook-deliver rules are filtered from `additionalContext` at SessionStart; symlinked rules get `claudeMdExcludes` entries reconciled into `.claude/settings.json`. To customize which rules your project inherits, create an optional `.claude/praxion-rules.yaml` file:
 
 ```yaml
 version: 1
@@ -341,9 +341,9 @@ disable:
   cp "$CLAUDE_PLUGIN_ROOT/claude/config/praxion-rules.yaml.example" .claude/praxion-rules.yaml.example
 ```
 
-The user can then rename `.example` to `.claude/praxion-rules.yaml` and edit the `disable:` list to activate the blacklist (or keep `.example` for reference and author a fresh `praxion-rules.yaml` from scratch).
+The user can then rename `.example` to `.claude/praxion-rules.yaml` and uncomment entries in the `disable:` list to activate them (or keep `.example` for reference and author a fresh `praxion-rules.yaml` from scratch).
 
-See [`docs/rules-taxonomy.md`](../../docs/rules-taxonomy.md) for the complete reference on rule categories, token accounting, and blacklist configuration. A project with no `.claude/praxion-rules.yaml` loads all rules identically to the current behavior — backward compatible, opt-out default.
+See [`docs/rules-taxonomy.md`](../../docs/rules-taxonomy.md) for the complete reference on rule categories, token accounting, and disable-list configuration. A project with no `.claude/praxion-rules.yaml` loads all rules identically to the original behavior — backward compatible, opt-out default.
 
 ## §Phase 6 — `CLAUDE.md` Praxion blocks
 

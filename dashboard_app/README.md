@@ -145,7 +145,7 @@ dashboard_app/
 
 - Coordination protocol: `rules/swe/swe-agent-coordination-protocol.md`
 - ADR conventions: `rules/swe/adr-conventions.md`
-- Dashboard conventions: `rules/swe/dashboard-conventions.md`
-- HTML output conventions: `rules/writing/html-output-conventions.md`
+- Launcher contract (entrypoint, env vars, port range, bind, runtime home): `.ai-state/decisions/165-praxion-dashboard-launcher-contract.md`
+- Dashboard runtime conventions (filesystem-as-source-of-truth, server-only fs access, frontmatter stripping, narrow live refresh, empty-state degradation): `rules/writing/html-output-conventions.md`
 - Diagram conventions: `rules/writing/diagram-conventions.md`
 - Architecture-as-Code fence convention: `rules/writing/aac-dac-conventions.md`

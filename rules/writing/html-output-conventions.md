@@ -101,7 +101,7 @@ Two embedding strategies apply depending on the context:
 
 The dashboard server's `/api/diagram` route streams allowlisted SVGs from the project root. SVGs served through this route or injected inline in the React tree must be sanitized via `sanitize-html` (see `dashboard_app/src/server/diagrams/sanitize.ts`). Committed Markdown source never uses raw `<img>` — the `![alt](path)` convention stays.
 
-The dashboard server's `MarkdownSurface` component strips `<!-- ... -->` comments and normalises any stray raw `<img>` to markdown image syntax at render-time, providing a safety net for legacy `.md` files. New commits always use `![alt](path)` directly.
+The dashboard server's `MarkdownSurface` component strips YAML frontmatter (`---` blocks at the head of the document), strips `<!-- ... -->` comments, and normalises any stray raw `<img>` to markdown image syntax at render-time, providing a safety net for legacy `.md` files. Raw frontmatter, unparsed metadata blocks, and unstripped HTML comments must never appear in rendered dashboard surfaces — they are machine-oriented metadata, not part of the human-readable body. New commits always use `![alt](path)` directly.
 
 ### No JavaScript in Committed HTML
 
@@ -162,6 +162,13 @@ For dashboard-rendered artifacts:
 - The dashboard is launched via `/dashboard` (delegates to `praxion-dashboard`).
 - The same MD source feeds both human-via-dashboard and agent-direct-read.
 - A "share" button in the dashboard page can export a snapshot HTML for one-time send-out.
+
+### Runtime Constraints
+
+Two operational invariants apply to every dashboard surface:
+
+- **Narrow live refresh.** Live-refresh / polling MUST be confined to in-flight workshop surfaces or similarly narrow status views (e.g., `PROGRESS.md` while a pipeline is running). Full-dashboard polling, whole-route reload loops, or client refresh paths that invalidate unrelated read-mostly pages are prohibited. Most dashboard surfaces are read-mostly reference views; broad polling adds noise, load, and visual instability without improving operator value.
+- **Empty-state degradation.** Every surface MUST handle missing or unreadable source artifacts gracefully. Pages MUST NOT crash on absent files that are legitimately sparse or ephemeral; they degrade to an informative empty/error state. `.ai-work/` directories disappear after cleanup, `.ai-state/` grows incrementally, and freshly-onboarded projects often start without the full artifact set.
 
 ### Authorship Boundary (Who Writes HTML?)
 

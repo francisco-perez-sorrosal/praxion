@@ -231,4 +231,4 @@ Never fire heavy operations on every keystroke.
 - **`tui-design`** — sibling hat for terminal/CLI output design; when a surface has both web UI and CLI components, use both skills.
 - **`api-design-craft`** — sibling hat for the API quality and taste lens; the web UI and the API it consumes are both interface surfaces.
 - **`agentic-interface-design`** — when the web UI exposes a tool surface or is consumed by an agent rather than a human.
-- **Dashboard conventions rule** (`rules/writing/dashboard-conventions.md`) — Praxion's own dashboard-specific conventions (Next.js App Router, CSS custom properties token system, sidebar+main layout); load when working on `dashboard_app/`.
+- **HTML output conventions rule** (`rules/writing/html-output-conventions.md`) — Praxion's dashboard runtime conventions (Markdown-as-source-of-truth, server-only filesystem access, renderer registry, narrow live refresh, empty-state degradation); auto-loads when working on `dashboard_app/`.

@@ -186,6 +186,54 @@ pnpm add -D @tsconfig/node22
 
 ---
 
+## Type-system discipline
+
+Three constraints that the strict-mode flags above cannot enforce on their own.
+Apply them as conventions across every TypeScript file.
+
+### `any` usage
+
+No `any` without an explicit disable comment and a reason. Prefer `unknown` for
+genuinely-unknown values — it forces a type-narrowing check before use, where
+`any` silently bypasses the type system.
+
+```typescript
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party callback has no typings
+const handler: any = thirdPartyLib.registerCallback(fn);
+```
+
+### Import ordering
+
+Keep imports sorted consistently. The sorter follows the linter choice from
+§ "Code quality toolchain":
+
+- **Biome projects**: Biome's built-in import sorter (`biome check --write`).
+  No extra config needed.
+- **ESLint projects**: `eslint-plugin-import` with the `import/order` rule
+  configured.
+
+Do not mix both sorters in one project.
+
+### Named exports
+
+Prefer named exports over default exports:
+
+```typescript
+// preferred
+export function parseConfig(raw: unknown): Config { /* ... */ }
+export type Config = { /* ... */ };
+
+// avoid
+export default function parseConfig(raw: unknown): Config { /* ... */ }
+```
+
+Named exports produce more stable import paths across renames and enable
+better IDE auto-import. Default exports are acceptable only when a framework
+convention requires them (e.g., Next.js page components, React lazy
+boundaries).
+
+---
+
 ## Type checking gate — `tsc --noEmit`
 
 `tsc --noEmit` is a **mandatory gate**, not optional. Add it to every CI pipeline and

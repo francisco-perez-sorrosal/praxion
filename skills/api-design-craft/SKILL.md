@@ -1,13 +1,10 @@
 ---
 name: api-design-craft
 description: "API design quality, taste, and review craft — the layer above api-design methodology. Covers canonical APIs (Stripe idempotency keys, S3 20-year stability, Linear errors in the type system), Bloch core as review checklist (minimal surface area, names matter, hard-to-misuse, fail-fast, consistency over cleverness), robust-API canon (RFC 9457 errors, cursor pagination, idempotency, versioning discipline), REST vs GraphQL vs gRPC selection, misused HTTP status codes (400 vs 422, 403 vs 404, 429 with Retry-After), PATCH semantics, webhook design (sign payloads, at-least-once, thin-payload-plus-fetch), long-running ops (202+Location+303), low-latency ergonomics (N+1 via expansion/DataLoader, ETag caching, streaming, chattiness vs over-fetch modeling). Use when reviewing API quality, applying a taste lens, choosing a paradigm, designing error contracts or pagination or webhooks, or evaluating latency ergonomics. Methodology in api-design; agentic tool design in agentic-interface-design."
-metadata:
-  staleness_sensitive_sections:
-    - "api-canon.md: RFC 9457/RFC 9110 status (these are 2022–2023 RFCs; stable but verify if superseded)"
-    - "api-canon.md: Relay Connection spec (verify against current graphql.org/relay)"
-    - "api-canon.md: OpenAPI 3.1 (stable; verify if 4.0 has landed)"
-    - "rest-patterns.md: IETF RateLimit header draft (draft-ietf-httpapi-ratelimit-headers — verify RFC status)"
-    - "low-latency-ergonomics.md: gRPC latency numbers (~25ms) — verify against current benchmark data"
+staleness_sensitive_sections:
+  - "The Standards Canon"
+  - "Rate Limiting"
+  - "Connection Reuse"
 ---
 
 # API Design Craft

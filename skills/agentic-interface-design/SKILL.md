@@ -1,10 +1,9 @@
 ---
 name: agentic-interface-design
 description: "Interface design craft for the model as consumer: MCP tools, function-calling schemas, A2A contracts. A tool's name and description ARE its interface — the model re-reads them every call. Covers: human-vs-agent ergonomics, tool naming (verb-noun, no acronyms, namespace past 20 tools), error grammar (X failed because Y; to fix: Z), fat-vs-thin decomposition (quality degrades past 20-25 tools), progressive disclosure (400-tool server needs lazy loading for 85-100x token reduction), idempotency for retries (request_id pattern), response pagination (10-20 items, next_cursor, has_more), JSON-schema craft (enum over open strings, description on every property, max 3 nesting levels), A2A contracts (Agent Cards, clear terminal states). Use when designing or reviewing MCP tools, tool descriptions, function-calling schemas, agent error ergonomics, fat-vs-thin decomposition, progressive disclosure, or A2A contracts. Not for web/CLI design (web-ui-design, tui-design) or REST/GraphQL quality (api-design-craft)."
-metadata:
-  staleness_sensitive_sections:
-    - "progressive-disclosure-of-tools.md: token economy numbers (verify against current MCP server production data)"
-    - "agent-contracts.md: A2A spec section (verify against current google/A2A spec)"
+staleness_sensitive_sections:
+  - "The Token Economy Problem"
+  - "A2A Contract Design"
 ---
 
 # Agentic Interface Design

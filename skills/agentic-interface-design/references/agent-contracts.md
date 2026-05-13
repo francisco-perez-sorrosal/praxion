@@ -235,6 +235,7 @@ GET /orders/ord_123?expand=customer
 Apply the expansion pattern to tool responses: if 80% of calls to `get_order` are followed by `get_customer` for the same customer, return the customer inline by default (or as an optional `include_customer` boolean parameter).
 
 ## A2A Contract Design
+<!-- last-verified: 2026-05-12 -->
 
 When designing agent-to-agent interfaces (one agent calling another), the design primitives are: the Agent Card (the API declaration), and the Task (the unit of work).
 

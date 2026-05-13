@@ -137,7 +137,7 @@ Examples:
 
 - `tests/**` conventions -> `tests/AGENTS.md`
 - `docs/**` writing conventions -> `docs/AGENTS.md`
-- `streamlit_app/**` UI/dashboard conventions -> `streamlit_app/AGENTS.md`
+- `dashboard_app/**` UI/dashboard conventions -> `dashboard_app/AGENTS.md`
 - `skills/**` maintenance rules -> `skills/AGENTS.md`
 
 ### Design Principle

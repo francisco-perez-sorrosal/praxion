@@ -46,7 +46,6 @@ What you'll most often be asked to do in this repo:
 | `claude/canonical-blocks/` | Source of truth for content shipped into managed projects (sync via `scripts/sync_canonical_blocks.py`) |
 | `claude/aac-templates/` | Architecture-as-Code templates installed by `/onboard-project` |
 | `dashboard_app/` | Active Next.js dashboard runtime reading `.ai-state/`, `.ai-work/`, and selected project-root artifacts through a server-only layer |
-| `streamlit_app/` | Legacy Streamlit dashboard retained temporarily as a migration reference until retirement |
 | `docs/` | Long-form human-facing documentation, Diátaxis-shaped (index in `docs/README.md`) |
 | `.ai-state/` | Persistent project intelligence (committed) — `DESIGN.md`, `decisions/`, sentinel reports, tech-debt ledger |
 | `.ai-work/` | Ephemeral pipeline intermediates (gitignored) |

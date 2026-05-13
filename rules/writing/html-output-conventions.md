@@ -1,7 +1,6 @@
 ---
 paths:
   - "dashboard_app/**"
-  - "streamlit_app/**"
   - "**/doc_manifest.yaml"
   - "dashboard_app/**/*.ts"
   - "dashboard_app/**/*.tsx"
@@ -9,7 +8,7 @@ paths:
 
 ## HTML Output Conventions
 
-Praxion uses HTML as a **presentation veneer over Markdown source**, never as a replacement. Markdown stays the canonical source of truth for both human and agent reading; HTML enhances the human reading experience by adding visual structure, hides dense content behind anchored links to MD sections, and is assembled by the per-project dashboard server. `dashboard_app/` is the active runtime (Next.js App Router + TypeScript); `streamlit_app/` remains in-tree as a retirement-pending reference — parity with the redesign has been reached; it is NOT a migration target. Active development targets `dashboard_app/` exclusively. This rule applies when authoring or modifying anything in the rendering layer — dashboard pages, component library files, doc manifests, and committed `.html` artifacts.
+Praxion uses HTML as a **presentation veneer over Markdown source**, never as a replacement. Markdown stays the canonical source of truth for both human and agent reading; HTML enhances the human reading experience by adding visual structure, hides dense content behind anchored links to MD sections, and is assembled by the per-project dashboard server. `dashboard_app/` is the active runtime (Next.js App Router + TypeScript). This rule applies when authoring or modifying anything in the rendering layer — dashboard pages, component library files, doc manifests, and committed `.html` artifacts.
 
 ### The Architectural Pattern
 

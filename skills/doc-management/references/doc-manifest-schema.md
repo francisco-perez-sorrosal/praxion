@@ -124,7 +124,7 @@ The manifest is regenerated per worktree (each worktree has its own `.ai-state/d
 
 ## Migration from the existing implicit structure
 
-Historical note: prior to the Next.js dashboard migration, pages were hardcoded per `streamlit_app/`'s file structure. The active dashboard (`dashboard_app/`) reads the manifest at startup via `getDocumentationData()` and dispatches through the renderer registry. The migration is complete; `streamlit_app/` remains in-tree as a retirement-pending reference only.
+Historical note: prior to the Next.js dashboard migration, pages were hardcoded per `streamlit_app/`'s file structure. The active dashboard (`dashboard_app/`) reads the manifest at startup via `getDocumentationData()` and dispatches through the renderer registry. The migration is complete; `streamlit_app/` has been removed (commit `313a50e`).
 
 ## Self-test before committing manifest changes
 

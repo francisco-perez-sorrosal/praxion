@@ -127,6 +127,7 @@ Vary: Accept-Encoding, Authorization
 Without `Vary: Authorization`, a CDN might serve one user's authenticated response to another user.
 
 ## Connection Reuse
+<!-- last-verified: 2026-05-12 -->
 
 Each new TCP connection incurs a handshake cost (1–3 RTTs). Avoiding new connections is significant latency optimization.
 

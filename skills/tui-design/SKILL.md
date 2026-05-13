@@ -13,10 +13,9 @@ description: >
   or reviewing CLI tools, agent/tool terminal output, TUIs, help text, error messages,
   exit codes, or choosing a TUI framework. Do NOT use for web UI (web-ui-design) or
   API/agent-tool design (api-design-craft, agentic-interface-design).
-metadata:
-  staleness_sensitive_sections:
-    - "Framework Selection Decision"
-    - "The clig.dev Principles (Full Distillation)"
+staleness_sensitive_sections:
+  - "Framework Selection Decision"
+  - "The clig.dev Principles (Full Distillation)"
 ---
 
 # TUI Design

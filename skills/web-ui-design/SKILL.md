@@ -68,7 +68,7 @@ A design token system is a prerequisite for consistent, maintainable UI. Without
 
 Use 4px as the atomic spacing unit. All spacing values must be multiples of 4. The 8px major rhythm (inter-section spacing) aligns with 16px base font size (16 = 2 × 8). Never use ad-hoc values like 13px or 22px for spacing.
 
-**Praxion dashboard observation**: CSS custom-property tokens already in use (`globals.css`). Current gaps: no spacing scale, no typography scale, no radius scale, no z-index scale, no dark-mode token swap via `prefers-color-scheme`.
+**Praxion dashboard observation**: Design tokens live in `tokens.css` (one of 6 cascade-layer files that `globals.css` now `@import`s). The token layer is complete — typography scale, 4px-grid spacing scale, radii scale, z-index scale, motion tokens, semantic + sentinel-grade color tokens, and dark-mode swap via `@media (prefers-color-scheme: dark)`. `globals.css` is a ~16-line `@import` manifest; `tokens.css` is the single source of truth for all custom-property values.
 
 ---
 

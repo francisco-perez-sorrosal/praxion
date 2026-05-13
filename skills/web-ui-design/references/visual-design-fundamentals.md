@@ -203,18 +203,18 @@ Inter-section spacing should be multiples of 8: `8, 16, 24, 32, 48, 64px`. The b
 
 Current state of `dashboard_app/`:
 
+**Token layer:** Design tokens live in `tokens.css` (imported by `globals.css`, which is now a ~16-line `@import` manifest across 6 cascade layers). The token layer is complete:
+- Typography scale (`--font-size-sm` through `--font-size-5xl`), 4px-grid spacing scale (`--space-1` through `--space-16`)
+- Border-radius scale (`--radius-sm`, `--radius-md`, `--radius-full`), z-index scale (`--z-dropdown`, `--z-modal`, `--z-toast`)
+- Motion tokens (`--duration-micro`, `--duration-enter`, `--ease-out`)
+- Semantic + sentinel-grade color tokens (`--accent`, `--danger`, `--good`, `--warning`, `--info`, `--muted`)
+- Dark-mode swap via `@media (prefers-color-scheme: dark)`
+
 **What works well:**
-- CSS custom-property design tokens in `globals.css` — the pattern is correct
-- Semantic color tokens (`--accent`, `--danger`, `--good`, `--warning`, `--info`, `--muted`)
 - Semantic HTML (`<aside>`, `<nav>`, `aria-label`)
 - Three-font-stack (display/sans/mono)
 - Sidebar+main layout
 
-**Current gaps** (opportunities, not failures):
-- No spacing scale (`--space-1` through `--space-16`)
-- No typography scale (`--font-size-sm` through `--font-size-5xl`)
-- No border-radius scale (`--radius-sm`, `--radius-md`, `--radius-full`)
-- No z-index scale (`--z-dropdown`, `--z-modal`, `--z-toast`)
-- No dark-mode token swap (`prefers-color-scheme`)
+**Remaining opportunities:**
 - No skeleton loading states for data surfaces
 - No skip-to-content link (keyboard accessibility gap)

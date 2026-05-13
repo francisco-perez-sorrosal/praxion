@@ -40,6 +40,8 @@ This is the **authoritative source of truth** for per-agent delegation deliverab
 
 The pipeline worktree lifecycle — entry, during-execution rules, exit procedure, multi-instance guidance, when not to isolate, and the "Do NOT use `isolation: \"worktree\"`" constraint — is fully specified in [agent-pipeline-details.md#pipeline-worktree-lifecycle](agent-pipeline-details.md#pipeline-worktree-lifecycle).
 
+**Runtime reinforcement (two hooks).** `inject_worktree_banner.py` (SessionStart) injects an orientation banner — worktree root, canonical checkout, the `.ai-work/` (gitignored, worktree-local) vs `.ai-state/` (committed, reconciled at merge) distinction, and a pointer to `/merge-worktree` — whenever a session opens inside a worktree. `worktree_guard.py` (PreToolUse on `Write`/`Edit`/`NotebookEdit`) hard-blocks any target that resolves into a *different* git tree (a sibling worktree or the main checkout). The banner is the heads-up; the guard is the backstop. Both honor a `PRAXION_DISABLE_WORKTREE_*` env opt-out.
+
 **Key constraint for callers**: Standard/Full tiers use `EnterWorktree`/`ExitWorktree` directly from the main agent; never pass `isolation: "worktree"` to the Agent tool (see the nested-worktree limitation in the linked section).
 
 ## Task Slug Propagation

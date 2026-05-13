@@ -45,6 +45,8 @@ Standard and Full tier pipelines **must** operate in a dedicated worktree to pre
 
 See [coordination-details.md#pipeline-worktree-lifecycle](../../skills/software-planning/references/coordination-details.md#pipeline-worktree-lifecycle) for the full entry, during-execution, and exit procedures, plus multi-instance guidance.
 
+Two hooks reinforce this boundary: `inject_worktree_banner.py` (SessionStart) announces the worktree root and the canonical checkout when a session opens inside a worktree; `worktree_guard.py` (PreToolUse) blocks `Write`/`Edit` that resolve outside the session worktree.
+
 ### Available Agents
 
 Outputs use path prefixes to signal lifecycle: `.ai-work/<slug>/` = ephemeral (deleted after pipeline), `.ai-state/` = permanent (committed to git).

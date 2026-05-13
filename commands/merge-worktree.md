@@ -6,6 +6,8 @@ allowed-tools: [Bash(git:*), Bash(python*), Bash(test:*), Read, Grep]
 
 Merge the $ARGUMENTS worktree into the current branch. Primary worktree home is `.claude/worktrees/$ARGUMENTS`; `.trees/$ARGUMENTS` is supported as a transitional fallback during the deprecation window.
 
+> Agents working inside the worktree see a SessionStart banner (`hooks/inject_worktree_banner.py`) that names this command as the `.ai-state/` reconciliation point — Steps 7–8 below are what it promises.
+
 ## Steps
 
 1. Locate the worktree:

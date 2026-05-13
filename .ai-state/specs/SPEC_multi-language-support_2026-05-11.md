@@ -89,7 +89,7 @@ No new technical debt introduced by this pipeline. All implementations are on-de
 - `rules/README.md` (new path-scoped rule entry added)
 - `.ai-state/DESIGN.md` (polyglot skill plane component row added)
 - `docs/architecture.md` (TypeScript surfaces added with Built status)
-- `skills/mcp-crafting/references/python-resources.md` (deleted — migrated to contexts/python.md)
+- Deleted in this pipeline: skills/mcp-crafting/references/python-resources.md — content merged into `skills/mcp-crafting/contexts/python.md`
 
 **Parallel execution**: 6 parallel groups (A–F); Group C had 7 concurrent implementers on disjoint file sets. Maximum wall clock savings achieved within the pipeline's dependency graph.
 

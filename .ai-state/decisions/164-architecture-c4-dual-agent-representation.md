@@ -1,7 +1,7 @@
 ---
-id: dec-draft-38d89318
+id: dec-164
 title: Architecture C4 dual-agent representation (knowledge.agents + orchestration.pipeline)
-status: proposed
+status: accepted
 category: architectural
 date: 2026-05-13
 summary: Dual-represent Agents in the LikeC4 model — authored Markdown family in the Knowledge layer (knowledge.agents) and the spawned-subprocess runtime in the Orchestration layer (orchestration.pipeline, renamed from orchestration.agents) — linked by a "spawns" edge.

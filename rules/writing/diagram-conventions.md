@@ -73,13 +73,13 @@ Existing inline ` ```mermaid `, ` ```c4 `, and ` ```d2 ` blocks must be migrated
 
 ### Clarity First
 
-- **10-12 nodes maximum** per diagram — group related items into their parent module when exceeding this
+- **Node budget — Mermaid only**: a Mermaid flowchart or sequence should target **~10-12 nodes per view** — its auto-layout degrades past that; group related items into a parent subgraph when you would exceed it. **LikeC4 and D2 architecture models are exempt from any flat node cap** — they support arbitrary nesting (groups, boundaries) and project multiple focused views from one model, so they manage complexity through hierarchy and view scoping rather than a hard count. Author the full model; project views that each stay legible.
 - **One concept per diagram** — if a diagram explains both data flow and component hierarchy, split it into two
 - **Every arrow must be verifiable** against actual code — diagrams are claims about the system, not decorations
 
 ### Decomposition Strategy
 
-When a system has more than 12 components, use layered decomposition:
+When a Mermaid diagram would exceed the node budget — or whenever a system has natural structural levels (LikeC4 models are layered by default: a context view, then container/component views) — use layered decomposition:
 
 - **L0 — Context**: System boundary + external actors. Shows what interacts with the system, not internals
 - **L1 — Components**: Major building blocks and their relationships. The default level for architecture documentation

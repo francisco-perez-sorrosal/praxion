@@ -425,6 +425,8 @@ The main agent writes one `VERIFIER_FINDINGS.md` per rework worktree. Its conten
 
 The `## Evidence` section must be a **filtered subset** — only the findings belonging to this cluster. Do not copy findings from other clusters into a rework's Evidence section.
 
+**Success-Criteria test-target derivation.** When a Success Criterion nominates a pytest target, derive it from `grep -rn '<changed-file-basename>' tests/` — the consumer test that imports or reads the changed file, not the tests near it by directory or topical proximity. For test fixtures specifically, the consumer is the test that opens or imports the fixture; routing-layer tests near the fixture's *topic* do not constitute the consumer and will report green on a broken fixture. When grep returns multiple consumers, list them all; when it returns none, say so explicitly in the criterion (`no consumer test exists — verification by inspection`).
+
 #### Disposition vocabulary pointer
 
 After writing `REWORK_MANIFEST.md`, surface this one-liner to the user:

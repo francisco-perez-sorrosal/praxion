@@ -1,6 +1,6 @@
 ---
 description: "Dispatch the appropriate agent for a rework worktree. Reads VERIFIER_FINDINGS.md from the current worktree's .ai-work/ tree. Run inside a rework worktree created by the main agent from REWORK_MANIFEST.md."
-allowed-tools: [Read, Bash, Agent]
+allowed-tools: [Read, Glob, Grep, Bash(git:*), Agent]
 argument-hint: ""
 ---
 

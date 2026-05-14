@@ -5,7 +5,7 @@ Source: [VERIFICATION_REPORT.md](VERIFICATION_REPORT.md). 2 rework worktrees pro
 
 | # | Worktree | Agent | Severity | Tier | Class | Headline |
 |---|----------|-------|----------|------|-------|----------|
-| 1 | `fix-auth-validation` | implementation-planner | critical | standard | implementation | Session validator silently accepts expired tokens |
+| 1 | `fix-auth-validation` | systems-architect | critical | standard | implementation | Session validator silently accepts expired tokens |
 | 2 | `redesign-token-cache` | systems-architect | important | standard | architecture | Token cache layer mixes responsibilities |
 
 ## Row details
@@ -16,7 +16,7 @@ Source: [VERIFICATION_REPORT.md](VERIFICATION_REPORT.md). 2 rework worktrees pro
 {
   "id": "rw-3b9f6ba0",
   "worktree_name": "fix-auth-validation",
-  "target_agent": "implementation-planner",
+  "target_agent": "systems-architect",
   "severity": "critical",
   "recommended_tier": "standard",
   "class": "implementation",

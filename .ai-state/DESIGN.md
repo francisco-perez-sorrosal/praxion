@@ -134,9 +134,9 @@ The finalize flow activates only when `.ai-state/decisions/drafts/` has entries;
 
 Two producers write rows, five consumers read and filter by `owner-role`. `/project-metrics` and `/project-coverage` are signal sources for the sentinel TD dimension — their `METRICS_REPORT_*.md` outputs feed sentinel's `TD01–TD04` checks but neither command writes to the ledger directly. Promethean (project-level ideation) and roadmap-cartographer (lens-set audit synthesis) are explicitly excluded — strategic horizons, not in-flight debt. Append-only writes plus the post-merge dedupe sequence (`scripts/finalize_tech_debt_ledger.py` — see `rules/swe/agent-intermediate-documents.md § TECH_DEBT_LEDGER.md`) keep concurrent worktree pipelines safe.
 
-### Verifier Rework Loop (Designed)
+### Verifier Rework Loop (Built)
 
-The rework loop is a closed feedback path that automates today's manual self-healing-loop contract documented in `agents/verifier.md`. Status: `Designed` — implementer flips to `Built` when components ship. (Diagram source pending: `docs/diagrams/verifier-rework-loop/src/data-flow.mmd` will be authored in the implementation phase per `rules/writing/diagram-conventions.md`.)
+The rework loop is a closed feedback path that automates today's manual self-healing-loop contract documented in `agents/verifier.md`. Status: `Built` — all Groups A–H landed (verifier Phase 12.5, `/resume-rework` command, `inject_worktree_banner.py` rework-affordance extension, `hooks/test_worktree_guard_subagent.py` harness, architect/planner Phase 1 adapter sentences, disposition-vocabulary skill reference, always-loaded rule additions, and architecture documentation in `docs/architecture.md` §10), matching the §3 row for this component.
 
 Flow:
 

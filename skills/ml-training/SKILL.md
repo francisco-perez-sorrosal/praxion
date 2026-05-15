@@ -1,19 +1,17 @@
 ---
 name: ml-training
 description: >
-  ML/AI pre-training project management and execution within Praxion. Covers the
-  ML/AI training archetype vocabulary (six artifact types: frozen eval harness,
-  pinned dataset, experiment log, checkpoints, compute budget, hyperparameter
-  block), three operational modes (A: co-located owned GPU; B: co-located rented
-  GPU; C: separated cloud), program.md as the project-local experiment-loop
-  meta-prompt, compute-budget requirements for training-dispatch steps, and
-  cross-references to llm-training-eval, neo-cloud-abstraction, and
-  experiment-tracking skills. Use when onboarding projects that train neural
-  networks, when a project has train.py / prepare.py, when the user mentions GPUs
-  / compute budget / checkpoints / loss curves / perplexity / autoresearch /
-  Karpathy, or when a pipeline manages torch / jax / tensorflow dependencies.
-  Activate alongside agentic-sdks and agent-evals for dual-archetype
-  compositions where an autonomous agent drives an ML training loop.
+  ML/AI pre-training project management in Praxion. Covers the training
+  archetype vocabulary (eval harness, datasets, experiment log, checkpoints,
+  compute budget, hyperparameters), three operational modes (owned-GPU,
+  rented-GPU, separated-cloud), program.md as the experiment-loop meta-prompt,
+  and compute-budget requirements for training-dispatch steps. Use when
+  onboarding neural-network training projects, when train.py / prepare.py /
+  program.md are present, when the user mentions GPUs / checkpoints / loss
+  curves / perplexity / autoresearch / Karpathy / torch / jax / tensorflow, or
+  for dual-archetype work where an autonomous agent drives a training loop.
+  Compose with agentic-sdks and agent-evals; siblings: llm-training-eval,
+  neo-cloud-abstraction, experiment-tracking.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

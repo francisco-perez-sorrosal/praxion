@@ -1,18 +1,15 @@
 ---
 name: tui-design
 description: >
-  CLI/TUI design craft. Covers: clig.dev CLI contract (human-first, composable); output
-  discipline (data→stdout, messages→stderr, TTY/NO_COLOR/TERM=dumb/--no-color, --json,
-  $COLUMNS truncation, progress in non-TTY, --quiet/--verbose); help-text levels (short
-  usage / --help examples-first / man page); three-part error messages (what/why/fix; no
-  stack traces); TTY detection (--no-input, never block a pipe); exit codes (0/1/2 +
-  custom); TUI frameworks (Python textual+rich, Node Ink; Go Charm/Bubble Tea+Lip Gloss
-  as quality exemplar — Model-Update-View); TUI render (diff-before-render, DECSET 2026
-  synchronized output, stream-as-it-arrives, ≤50ms budget); terminal accessibility
-  (NO_COLOR, 16-color fallback, no ANSI outside TTY, screen readers). Use when designing
-  or reviewing CLI tools, agent/tool terminal output, TUIs, help text, error messages,
-  exit codes, or choosing a TUI framework. Do NOT use for web UI (web-ui-design) or
-  API/agent-tool design (api-design-craft, agentic-interface-design).
+  CLI/TUI design craft. Covers the clig.dev CLI contract, output discipline
+  (data→stdout, messages→stderr, NO_COLOR, --json), help-text levels, three-part error
+  messages (what/why/fix), TTY detection, exit codes, TUI frameworks (Python
+  textual+rich, Node Ink, Go Charm/Bubble Tea+Lip Gloss), TUI render discipline
+  (diff-before-render, DECSET 2026 synchronized output, stream-as-it-arrives), and
+  terminal accessibility. Use when designing or reviewing CLI tools, agent/tool
+  terminal output, TUIs, help text, error messages, exit codes, or choosing a TUI
+  framework. Do NOT use for web UI (web-ui-design) or API/agent-tool design
+  (api-design-craft, agentic-interface-design).
 staleness_sensitive_sections:
   - "Framework Selection Decision"
   - "The clig.dev Principles (Full Distillation)"

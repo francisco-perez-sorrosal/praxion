@@ -1,82 +1,37 @@
 # Praxion
 
-[Version](https://github.com/francisco-perez-sorrosal/Praxion/releases/latest)
-[Release Date](https://github.com/francisco-perez-sorrosal/Praxion/releases/latest)
-[License](LICENSE)
-[Last Commit](https://github.com/francisco-perez-sorrosal/Praxion/commits/main)
+[![License](https://img.shields.io/github/license/francisco-perez-sorrosal/Praxion)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/francisco-perez-sorrosal/Praxion)](https://github.com/francisco-perez-sorrosal/Praxion/releases/latest)
+[![Last Commit](https://img.shields.io/github/last-commit/francisco-perez-sorrosal/Praxion)](https://github.com/francisco-perez-sorrosal/Praxion/commits/main)
 
-**A structured layer of reusable expertise, specialized agents, commands, rules, and memory that operationalizes spec-driven development and context engineering into reliable, context-aware results**.
+**A structured layer of reusable expertise — skills, agents, commands, rules, and memory — that operationalizes spec-driven development and context engineering into reliable, context-aware results.**
 
-This is my vision for turning AI assistance into a disciplined engineering system. There are many frameworks like this, but this is mine; It's my orchestration of established engineering conventions, workflows, and architectural thinking into the assistant's loop so it operates with continuity and stronger judgment.
+This is my vision for turning AI assistance into a disciplined engineering system. There are many frameworks like this, but this one is mine: an orchestration of established engineering conventions, workflows, and architectural thinking into the assistant's loop, so it operates with continuity and stronger judgment.
 
 Every non-trivial feature starts from a behavioral spec with traceable requirements that thread through architecture, planning, implementation, and verification.
 
-The name comes from *praxis* (knowledge into action) combined with *axon* (signal transmission), representing the bridge between cognition and implementation.
+The name combines *praxis* (knowledge into action) and *axon* (signal transmission) — the bridge between cognition and implementation.
 
-Compatible with **Claude Code** (mainly), **Claude Desktop**, **Cursor**, and
-AGENTS.md-aware agents such as **Codex**.
+Compatible with **Claude Code** (primary), **Claude Desktop**, **Cursor**, and AGENTS.md-aware agents such as **Codex**.
+
+## Contents
+
+- [What You Get](#what-you-get)
+- [Quick Start](#quick-start)
+- [Core Concepts](#core-concepts)
+- [Guiding Principles](#guiding-principles)
+- [What's Included](#whats-included)
+- [Installation](#installation)
+- [Documentation](#documentation)
 
 ## What You Get
 
-- **49 skills** covering Python, API design, CI/CD, deployment, observability, refactoring, spec-driven development, external API docs, security review, testing strategy, test coverage, roadmap synthesis, ML/AI training, web/TUI/API interface design, and more -- loaded automatically when the task matches
-- **15 specialized agents** that collaborate on complex features (research, architecture, interface design, planning, implementation, testing, verification, structural validation, roadmap cartography)
-- **34 slash commands** for daily workflows -- commits, worktrees, memory management, project scaffolding, testing, releases, code review, roadmap generation, metrics, ML experiment dispatch
-- **Coding rules** auto-loaded by context -- coding style, git conventions, documentation standards, agent coordination
-- **MCP servers** for persistent memory and agent lifecycle observability
-- **Architecture-as-Code + Documentation-as-Code stack** -- fence convention, fitness functions, golden-rule pre-commit gate, architect-validator agent, architecture CI workflow, REQ↔arch traceability, sentinel periodic audit, Diátaxis-aligned doc taxonomy. See [docs/aac-dac.md](docs/aac-dac.md) for the philosophy and how the mechanisms compose.
-
-## Core Concepts
-
-The ecosystem has five building blocks that layer from always-on background knowledge down to delegated complex work.
-
-- **Rules** -- Domain knowledge loaded automatically by relevance. Declarative constraints (coding style, git conventions) the assistant applies without explicit invocation.
-- **Skills** -- Reusable knowledge modules loaded on demand. Deeper than rules: workflows, procedures, and reference material for specific domains (Python development, refactoring, CI/CD).
-- **Commands** -- Slash commands for frequent workflows. User-invoked quick actions (`/co` for commits, `/create-worktree` for git worktrees, `/cajalogic` for cross-session memory).
-- **Agents** -- Autonomous subprocesses for complex multi-step tasks. Each runs in its own context with a specialty (research, architecture, implementation, testing, verification). They communicate through shared documents, forming a pipeline.
-- **MCP Servers** -- External tool servers for capabilities like persistent memory and task observability.
-
-For a full explanation of how these compose -- including the layered architecture, rules-vs-skills decision model, and agent pipeline flow -- see [Core Concepts](docs/concepts.md).
-
-### Project Archetypes
-
-Praxion manages three project archetypes through one shared pipeline:
-
-- **Traditional SWE** — the default; covered by the full skill catalog (Python, API design, CI/CD, deployment, etc.)
-- **Agentic-AI apps** — agents-as-products; activated by `agentic-sdks`, `agent-evals`, `mcp-crafting`, `communicating-agents`
-- **ML/AI training** — pre-training projects with compute budgets, eval thresholds, and experiment loops; activated by `ml-training`, `llm-training-eval`, `neo-cloud-abstraction`, `experiment-tracking`. The canonical proof target is `karpathy/autoresearch`, which sits at the intersection of agentic-AI and ML training. Run `/run-experiment` to dispatch a training run; `/check-experiment` to poll an in-flight run; `/onboard-project` Phase 8c scaffolds the ML conventions. **Full guide: [ML/AI Training Onramp](docs/ml-training-onramp.md)**.
-
-## Guiding Principles
-
-Five durable principles shape how Praxion evolves, extending the global philosophy in `~/.claude/CLAUDE.md`.
-
-### Token budget is a first-class constraint
-
-Every artifact added must justify its token cost; every artifact removed is a gift to every project that consumes Praxion. Always-loaded content (CLAUDE.md files + unscoped rules) ships into the first 25,000 tokens of every session — a failure-mode guardrail, not a target. `paths:` scoping and progressive-disclosure skills keep that ceiling inviolate.
-
-### Measure before optimizing
-
-Don't guess what improves output quality — measure it. The eval framework (ROADMAP Phase 3), sentinel audits, and the memory MCP observation store turn intuition-driven tuning into evidence-driven design.
-
-### Standards convergence is an opportunity
-
-MCP, AGENTS.md, and A2A under the Linux Foundation's AAIF let Praxion's patterns reach beyond any single assistant. Cross-tool portability to Cursor, Claude Desktop, and the next wave of agentic tooling is intentional.
-
-### Curiosity over dogma
-
-Agent Teams, HTTP hooks, MCP Gateways, and other emerging patterns may reshape assumptions. Keep the architecture open — track known limitations in `[CLAUDE.md](CLAUDE.md#known-claude-code-limitations)` and revisit when fixes ship.
-
-### Behavioral contract over polite compliance
-
-A disciplined assistant is not a polite one. When the user's direction collides with the philosophy, the assistant surfaces the collision instead of quietly executing around it. Four named behaviors define this contract, extending the `Understand, Plan, Verify` methodology with an explicit operational stance every agent is held to:
-
-- **Surface Assumptions** — name every assumption before acting on it; ask when ambiguity could produce the wrong artifact
-- **Register Objection** — when a request violates scope, structure, or evidence, flag the conflict with a reason before complying or before declining
-- **Stay Surgical** — touch only what the change requires; if the change grew mid-execution, stop and re-scope instead of silently expanding
-- **Simplicity First** — prefer the smallest solution that meets the behavior; treat every added line, file, or dependency as a claim that must earn its place
-
-The contract is a first-class operational pillar. It is enforced through an always-loaded rule, self-tests at agent runtime, and named failure-mode tags in verification reports — not left to each agent's interpretation of the philosophy.
-
-For ongoing in-flight debt see [`.ai-state/TECH_DEBT_LEDGER.md`](.ai-state/TECH_DEBT_LEDGER.md); for strategic horizons and ideation, see the most recent ledger under [`.ai-state/idea_ledgers/`](.ai-state/idea_ledgers/).
+- **49 skills** — Python, API design, CI/CD, deployment, observability, refactoring, spec-driven development, security review, testing, ML/AI training, web/TUI/API interface design, and more. Loaded automatically when the task matches.
+- **15 specialized agents** — research, architecture, interface design, planning, implementation, testing, verification, structural validation, roadmap cartography. They collaborate on complex features through a shared-document pipeline.
+- **38 slash commands** — commits, worktrees, memory management, project scaffolding, testing, releases, code review, roadmap generation, metrics, ML experiment dispatch.
+- **20 rules** — coding style, git conventions, documentation standards, agent coordination. Auto-loaded by context.
+- **MCP servers** — persistent cross-session memory and agent-lifecycle observability.
+- **Architecture-as-Code + Documentation-as-Code stack** — fence convention, fitness functions, golden-rule pre-commit gate, `architect-validator` agent, architecture CI workflow, REQ↔architecture traceability, periodic `sentinel` audit, Diátaxis-aligned doc taxonomy. See [docs/aac-dac.md](docs/aac-dac.md) for how the mechanisms compose.
 
 ## Quick Start
 
@@ -87,316 +42,195 @@ cd Praxion
 ./install.sh --check    # Verify installation
 ```
 
-For other targets: `./install.sh desktop` (Claude Desktop), `./install.sh cursor` (Cursor), or `./install.sh codex /path/repo` (Codex / AGENTS.md-aware agents). See [Installation](#installation) for details.
+Other targets: `./install.sh desktop` (Claude Desktop), `./install.sh cursor` (Cursor), `./install.sh codex /path/repo` (Codex / AGENTS.md-aware agents). See [Installation](#installation) for the per-target detail.
 
-### Onboard a project
+### Onboard a Project
 
-Two distinct paths, picked by what's already in the directory. Both converge on the same Praxion-aware end state — same `.gitignore` block, same `.ai-state/` skeleton, same git hooks, same `CLAUDE.md` blocks.
-
+Two entry points, picked by what is already in the directory. Both converge on the same Praxion-aware end state — identical `.gitignore` block, `.ai-state/` skeleton, git hooks, and `CLAUDE.md` blocks.
 
 | Starting point                   | Entry point                                                                 | Companion doc                                                      |
 | -------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| **Empty directory** (greenfield) | `./new_project.sh <name>` then `/new-project` inside the launched session   | [Greenfield Project Onboarding](docs/greenfield-onboarding.md)     |
-| **Existing project** (has code)  | `/onboard-project` inside an active Claude Code session at the project root | [Existing-Project Onboarding](docs/existing-project-onboarding.md) |
+| **Empty directory** (greenfield) | `./new_project.sh <name>`, then `/new-project` inside the launched session  | [Greenfield Project Onboarding](docs/greenfield-onboarding.md)     |
+| **Existing project** (has code)  | `/onboard-project` inside a Claude Code session at the project root         | [Existing-Project Onboarding](docs/existing-project-onboarding.md) |
 
+The greenfield flow ends by chaining to `/onboard-project`, so there is one source of truth for what "Praxion-onboarded" means. `/onboard-project` runs ten idempotent phases with `AskUserQuestion` gates — including an opt-in architecture baseline that produces `.ai-state/DESIGN.md` + `docs/architecture.md` from the existing codebase. For a pipeline walkthrough from ideation through verification, see [Getting Started](docs/getting-started.md).
 
-The greenfield flow ends by chaining to `/onboard-project` so there is one source of truth for what "Praxion-onboarded" means. `/onboard-project` runs ten phases with `AskUserQuestion` gates between them — including an opt-in **Phase 8 architecture baseline** that delegates to `systems-architect` to produce `.ai-state/DESIGN.md` + `docs/architecture.md` from the existing codebase (high leverage: every later sentinel audit, feature pipeline, and Memory MCP recall benefits from those docs landing on day one), an opt-in **Phase 8b architecture-as-code seeding** that lays the AaC fence convention and fitness functions, and an opt-in **Phase 8c ML conventions** that scaffolds `program.md` + ML rules + experiment-tracking config when the project is detected as an ML/AI training archetype.
+## Core Concepts
 
-For a pipeline walkthrough -- from ideation through implementation and verification -- see [Getting Started](docs/getting-started.md).
+The ecosystem has five building blocks that layer from always-on background knowledge down to delegated complex work.
+
+- **Rules** — domain knowledge loaded automatically by relevance. Declarative constraints (coding style, git conventions) the assistant applies without explicit invocation.
+- **Skills** — reusable knowledge modules loaded on demand. Deeper than rules: workflows, procedures, and reference material for specific domains.
+- **Commands** — slash commands for frequent workflows. User-invoked quick actions (`/co` for commits, `/create-worktree` for git worktrees, `/cajalogic` for cross-session memory).
+- **Agents** — autonomous subprocesses for complex multi-step tasks. Each runs in its own context with a specialty and communicates through shared documents, forming a pipeline.
+- **MCP servers** — external tool servers for capabilities like persistent memory and task observability.
+
+For the layered architecture, the rules-vs-skills decision model, and the agent pipeline flow, see [Core Concepts](docs/concepts.md).
+
+### Project Archetypes
+
+Praxion manages three project archetypes through one shared pipeline:
+
+- **Traditional SWE** — the default; covered by the full skill catalog.
+- **Agentic-AI apps** — agents-as-products; activated by `agentic-sdks`, `agent-evals`, `mcp-crafting`, `communicating-agents`.
+- **ML/AI training** — pre-training projects with compute budgets, eval thresholds, and experiment loops; activated by `ml-training`, `llm-training-eval`, `neo-cloud-abstraction`, `experiment-tracking`. Run `/run-experiment` to dispatch a training run, `/check-experiment` to poll one. See the [ML/AI Training Onramp](docs/ml-training-onramp.md).
+
+## Guiding Principles
+
+Five durable principles shape how Praxion evolves, extending the global philosophy in `~/.claude/CLAUDE.md`.
+
+- **Token budget is a first-class constraint.** Always-loaded content (CLAUDE.md files + unscoped rules) ships into the first 25,000 tokens of every session — a failure-mode guardrail, not a target. `paths:` scoping and progressive-disclosure skills keep that ceiling inviolate.
+- **Measure before optimizing.** Don't guess what improves output quality — measure it. The eval framework, sentinel audits, and the memory observation store turn intuition-driven tuning into evidence-driven design.
+- **Standards convergence is an opportunity.** MCP, AGENTS.md, and A2A let Praxion's patterns reach beyond any single assistant. Cross-tool portability to Cursor, Claude Desktop, and the next wave of agentic tooling is intentional.
+- **Curiosity over dogma.** Emerging patterns may reshape assumptions. Keep the architecture open — known limitations are tracked in [`CLAUDE.md`](CLAUDE.md#known-claude-code-limitations) and revisited when fixes ship.
+- **Behavioral contract over polite compliance.** A disciplined assistant is not a polite one. When the user's direction collides with the philosophy, the assistant surfaces the collision instead of quietly executing around it.
+
+The behavioral contract is a first-class operational pillar — enforced through an always-loaded rule, agent-runtime self-tests, and named failure-mode tags in verification reports. Four named behaviors define it:
+
+- **Surface Assumptions** — name every assumption before acting; ask when ambiguity could produce the wrong artifact.
+- **Register Objection** — when a request violates scope, structure, or evidence, flag the conflict with a reason before complying or declining.
+- **Stay Surgical** — touch only what the change requires; if scope grew mid-execution, stop and re-scope.
+- **Simplicity First** — prefer the smallest solution that meets the behavior; every added line, file, or dependency must earn its place.
 
 ## What's Included
 
 ### Skills
 
-Reusable knowledge modules loaded automatically based on context. See `[skills/README.md](skills/README.md)` for the full catalog with descriptions and activation triggers.
+Reusable knowledge modules loaded automatically based on context. See [skills/README.md](skills/README.md) for the full catalog with activation triggers.
 
-
-| Category                 | Skills                                                                                                                                                                                         |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Category                 | Skills                                                                                                                                                                                        |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | AI Assistant Crafting    | skill-crafting, agent-crafting, command-crafting, mcp-crafting, rule-crafting, hook-crafting                                                                                                   |
-| External Knowledge       | external-api-docs                                                                                                                                                                              |
-| Platform Knowledge       | claude-ecosystem, agentic-sdks, communicating-agents, llm-prompt-engineering                                                                                                                   |
-| Planning & Communication | roadmap-planning, roadmap-synthesis, stakeholder-communications                                                                                                                                |
-| Design & Architecture    | api-design, data-modeling, deployment, observability, performance-architecture                                                                                                                 |
-| ML/AI Training           | ml-training, llm-training-eval, neo-cloud-abstraction, experiment-tracking                                                                                                                     |
-| Documentation            | doc-management                                                                                                                                                                                 |
+| External Knowledge       | external-api-docs                                                                                                                                                                             |
+| Platform Knowledge       | claude-ecosystem, agentic-sdks, communicating-agents, llm-prompt-engineering                                                                                                                  |
+| Planning & Communication | roadmap-planning, roadmap-synthesis, stakeholder-communications                                                                                                                               |
+| Design & Architecture    | api-design, data-modeling, deployment, observability, performance-architecture                                                                                                                |
+| ML/AI Training           | ml-training, llm-training-eval, neo-cloud-abstraction, experiment-tracking                                                                                                                    |
+| Documentation            | doc-management                                                                                                                                                                                |
 | Software Development     | python-development, python-prj-mgmt, project-exploration, refactoring, code-review, software-planning, spec-driven-development, agent-evals, cicd, testing-strategy, test-coverage, versioning |
-| Security                 | context-security-review                                                                                                                                                                        |
-| OSS Contribution         | upstream-stewardship                                                                                                                                                                           |
-| Project                  | memory, id-decontamination                                                                                                                                                                     |
-
+| Security                 | context-security-review                                                                                                                                                                       |
+| OSS Contribution         | upstream-stewardship                                                                                                                                                                          |
+| Project                  | memory, id-decontamination                                                                                                                                                                    |
 
 ### Commands
 
-Slash commands invoked with `/<name>`. In Claude Code plugin mode, use `/i-am:<name>`. See `[commands/README.md](commands/README.md)` for the full list.
+38 slash commands invoked with `/<name>` (`/i-am:<name>` in Claude Code plugin mode). Frequently used:
 
+- `/co`, `/cop` — create a commit (and push)
+- `/create-worktree`, `/merge-worktree` — git worktree lifecycle
+- `/onboard-project`, `/new-project` — bring a project into the ecosystem
+- `/roadmap` — produce a lens-audited `ROADMAP.md`
+- `/project-metrics`, `/eval` — health metrics and out-of-band quality evals
+- `/run-experiment`, `/check-experiment` — ML training experiment dispatch
 
-| Command                       | Description                                                                                                                                                                              |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/co`                         | Create a commit for staged (or all) changes                                                                                                                                              |
-| `/cop`                        | Create a commit and push to remote                                                                                                                                                       |
-| `/create-worktree`            | Create a new git worktree under `.claude/worktrees/` (legacy `.trees/` accepted by `/merge-worktree` during deprecation — run `scripts/migrate_worktree_home.sh` for migration commands) |
-| `/merge-worktree`             | Merge a worktree branch back into current branch; runs `.ai-state/` reconciliation and finalizes any draft ADRs                                                                          |
-| `/clean-auto-memory`          | Opt-in cleanup of orphan Claude Code auto-memory directories for removed worktrees                                                                                                       |
-| `/create-simple-python-prj`   | Scaffold a Python project (defaults: pixi, `~/dev`)                                                                                                                                      |
-| `/add-rules`                  | Copy rules into the current project for customization                                                                                                                                    |
-| `/manage-readme`              | Create or refine README.md files                                                                                                                                                         |
-| `/clean-work`                 | Clean the `.ai-work/` directory after pipeline completion                                                                                                                                |
-| `/decontaminate-ids`          | Detect and remediate REQ/AC/step citations in project source code                                                                                                                        |
-| `/cajalogic`                  | Manage persistent memory (user prefs, learnings, conventions, observations)                                                                                                              |
-| `/onboard-project`            | Onboard the current project to work with the ecosystem                                                                                                                                   |
-| `/sdd-coverage`               | Report spec-to-test and spec-to-code coverage for REQ IDs                                                                                                                                |
-| `/full-security-scan`         | Run a full-project security audit against all security-critical paths                                                                                                                    |
-| `/release`                    | Bump version, update changelog, and create a release tag                                                                                                                                 |
-| `/test`                       | Auto-detect test framework and run tests                                                                                                                                                 |
-| `/explore-project`            | Explore and understand an unfamiliar project's architecture, patterns, and workflow                                                                                                      |
-| `/roadmap`                    | Produce a lens-audited `ROADMAP.md` for the current project with both deficit repairs (Weaknesses) and forward lines of work (Opportunities) via a project-derived evaluation lens set   |
-| `/report-upstream`            | File a well-formed bug report on an upstream open-source project                                                                                                                         |
-| `/review-pr`                  | Code review a pull request                                                                                                                                                               |
-| `/save-changes`               | Save current working changes to project memory with secret filtering                                                                                                                     |
-| `/star-repo`                  | Star the Praxion repo on GitHub                                                                                                                                                          |
-| `/project-metrics`            | Compute project complexity/health metrics (churn, complexity, coupling, hot-spots, trends) and write a timestamped report triple to `.ai-state/`                                         |
-| `/project-coverage`           | Run the project's canonical coverage target and render a terminal summary via the `test-coverage` skill                                                                                  |
-| `/eval`                       | Run out-of-band quality evals (Tier 1 behavioral + regression) — opt-in, never hook-driven                                                                                               |
-| `/run-experiment`             | Dispatch an ML training experiment, validate compute budget, stream metrics, write `TRAINING_RESULTS.md`                                                                                 |
-| `/check-experiment`           | Poll an in-flight or report a completed ML training experiment                                                                                                                           |
-| `/new-project`                | Scaffold a greenfield Claude-ready Python project and onboard it to Praxion                                                                                                              |
-| `/refresh-skill`              | Refresh version-sensitive sections of a skill against current upstream documentation                                                                                                     |
-| `/praxion-complete-install`   | Finish a marketplace-only Praxion install — symlink rules, CLI scripts, and optional context-hub MCP                                                                                     |
-| `/praxion-complete-uninstall` | Reverse `/praxion-complete-install` — remove rule/script symlinks and optional MCP                                                                                                       |
-
-
-**Deep dive:** `/new-project` **(greenfield)**
-
-The bash wrapper `new_project.sh <name> [target-dir]` lays a pre-Claude scaffold (`.git/` repo, AI-assistants `.gitignore` block, empty `.claude/`), validates host prereqs, then `exec`s an interactive Claude Code session seeded with the `/new-project` command body. Inside that session, Claude:
-
-1. Asks one content question: what to build (default: a mini Claude Agent SDK + FastAPI coding agent with web UI)
-2. Prints an orchestrator preamble so you learn the model before watching it execute
-3. Runs the **Standard-tier seed pipeline** with phase gates and per-subagent sub-gates (researcher → systems-architect → implementation-planner → implementer + test-engineer → verifier) so you preview each agent's outputs before they appear
-4. Runs `/init` once the codebase exists (so `CLAUDE.md` describes reality), then idempotently appends three Praxion blocks: Agent Pipeline, Compaction Guidance, Behavioral Contract
-5. Generates a per-run `onboarding_for_mushi_busy_ppl.md` trail map with file inventory + lesson ladder
-6. Recommends `/onboard-project` for the remaining surfaces (git hooks, merge drivers, `.ai-state/` skeleton, `.claude/settings.json` toggles), then `/co` to commit
-
-Smooth-integration contract: the seed pipeline writes `.ai-state/DESIGN.md` + `docs/architecture.md` as part of the systems-architect's full delegation checklist, so `/onboard-project`'s Phase 8 (Architecture Baseline) becomes a no-op when chained — no double-architect overhead.
-
-Optional `PRAXION_NEW_PROJECT_EDITOR=cursor|code|claude-desktop|none` picks the editor surface the scaffold opens in so you can watch `.ai-work/` and `.ai-state/` populate as the pipeline runs.
-
-See [Greenfield Project Onboarding](docs/greenfield-onboarding.md) for the full transcript, troubleshooting, and design rationale.
-
-
-
-**Deep dive:** `/onboard-project` **(existing project)**
-
-Phased, idempotent retrofit for a repo that already has code. Each phase pauses with an `AskUserQuestion` gate that explains *what* and *why* before any write occurs. **Run all rest** (one-way) skips remaining gates.
-
-
-| Phase | Action                                                                                                                                                                                 |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | Pre-flight diagnostic (writes nothing — prints stack detection + plugin scope + prior-onboarding signals)                                                                              |
-| 1     | Append the canonical 10-line AI-assistants block to `.gitignore`                                                                                                                       |
-| 2     | Create `.ai-state/` skeleton — `decisions/drafts/`, `DECISIONS_INDEX.md`, `TECH_DEBT_LEDGER.md`, `calibration_log.md`                                                                  |
-| 3     | Append `.gitattributes` entries + register Python semantic merge drivers via `git config`                                                                                              |
-| 4     | Install `pre-commit` (id-citation discipline) + `post-merge` (ADR finalize + tech-debt dedupe + squash safety) hooks                                                                   |
-| 5     | Multi-select `.claude/settings.json` toggles for memory MCP injection / memory gate / memory MCP / observability                                                                       |
-| 6     | Append three blocks to `CLAUDE.md`: Agent Pipeline + Compaction Guidance + Behavioral Contract                                                                                         |
-| 7     | Print install commands for missing companion CLIs (`chub`, `scc`, `uv`) — advisory only                                                                                                |
-| 8     | **Architecture baseline (opt-in, default-yes)** — delegate to `systems-architect` in baseline-audit mode → `.ai-state/DESIGN.md` + `docs/architecture.md` (+ optional ADR draft) |
-| 8b    | **AaC tier install (opt-in, default-skip)** — fence-region examples, `fitness/` scaffold, golden-rule pre-commit block, `architecture.yml` CI workflow, `docs/diagrams/` stub        |
-| 8c    | **ML/AI training scaffold (opt-in; default-yes when ML signals detected)** — `program.md` template, `.ai-state/experiments/`, checkpoint `.gitignore` entries, GPU budget declaration |
-| 9     | Print summary, stage modified files (no commit)                                                                                                                                        |
-
-
-Every phase has an idempotency predicate — re-runs on an already-onboarded project are no-ops. The command never auto-commits. Phase 4 is skipped if the `i-am` plugin is not installed (the hooks need its `scripts/` directory). Phase 8 is skipped if either architecture doc already exists (e.g., produced by a prior seed pipeline or onboard run). Phase 8c is skipped when no ML signals are detected (`train.py`, `prepare.py`, ML framework dependency, or pre-existing `program.md`).
-
-If the directory looks like a freshly-scaffolded greenfield project (`.git/` + AI-assistants `.gitignore` + empty `.claude/` + no source tree), the command aborts with a redirect to `/new-project`.
-
-See [Existing-Project Onboarding](docs/existing-project-onboarding.md) for the full phase contract, the architecture-baseline rationale, the AaC tier install, the ML scaffold, and troubleshooting.
-
-
+See [commands/README.md](commands/README.md) for the complete list with descriptions.
 
 ### Agents
 
-Thirteen autonomous agents for complex, multi-step tasks. See `[agents/README.md](agents/README.md)` for the pipeline diagram and usage patterns.
+15 autonomous agents for complex, multi-step tasks, organized by pipeline role. See [agents/README.md](agents/README.md) for the pipeline diagram and usage patterns.
 
+| Role            | Agents                                                                              |
+| --------------- | ----------------------------------------------------------------------------------- |
+| Ideation        | `promethean` — feature-level ideation from project state                            |
+| Research & design | `researcher`, `systems-architect`, `interface-designer`, `context-engineer`       |
+| Planning        | `implementation-planner` — step decomposition and execution supervision             |
+| Build           | `implementer`, `test-engineer`, `doc-engineer`                                      |
+| Verification    | `verifier`, `architect-validator` — acceptance review and code↔DSL↔ADR validation   |
+| Independent     | `sentinel` (ecosystem audit), `skill-genesis` (learning harvest), `roadmap-cartographer`, `cicd-engineer` |
 
-| Agent                    | Description                                                                                                                                                                                                                                                       |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `promethean`             | Feature-level ideation from project state                                                                                                                                                                                                                         |
-| `researcher`             | Codebase exploration, external docs, alternative evaluation                                                                                                                                                                                                       |
-| `systems-architect`      | Trade-off analysis, system design                                                                                                                                                                                                                                 |
-| `implementation-planner` | Step decomposition, execution supervision                                                                                                                                                                                                                         |
-| `context-engineer`       | Context artifact auditing, optimization, ecosystem management                                                                                                                                                                                                     |
-| `implementer`            | Step execution with skill-augmented coding and self-review                                                                                                                                                                                                        |
-| `test-engineer`          | Complex test design, test suite refactoring, testing infrastructure                                                                                                                                                                                               |
-| `verifier`               | Post-implementation review against acceptance criteria                                                                                                                                                                                                            |
-| `doc-engineer`           | Documentation quality management (READMEs, catalogs, changelogs)                                                                                                                                                                                                  |
-| `sentinel`               | Independent ecosystem quality auditor                                                                                                                                                                                                                             |
-| `skill-genesis`          | Post-pipeline learning harvest and artifact proposal                                                                                                                                                                                                              |
-| `cicd-engineer`          | CI/CD pipeline design, GitHub Actions, deployment automation                                                                                                                                                                                                      |
-| `roadmap-cartographer`   | Project-level audit through a project-derived lens set (SPIRIT, DORA, SPACE, FAIR, CNCF Platform Maturity, or Custom) synthesized into a grounded `ROADMAP.md` covering strengths, weaknesses, **opportunities (forward lines of work)**, and phased improvements |
-
+`skill-genesis` runs as an autonomous, on-demand learning-harvest report writer (invoked via `/skill-genesis`); proposals are dispositioned later via `/skill-genesis-review`.
 
 ### Rules
 
-Domain knowledge files loaded by the assistant within scope (personal = all projects, project = that project). See `[rules/README.md](rules/README.md)` for the full catalog and the rules-vs-skills decision model.
+Domain knowledge files loaded by the assistant within scope (personal = all projects, project = that project). See [rules/README.md](rules/README.md) for the full catalog and the rules-vs-skills decision model.
 
 ### Observability
 
-Agent pipeline tracing via OpenTelemetry and [Arize Phoenix](https://github.com/Arize-ai/phoenix). Every session -- pipeline runs, native Claude Code agents, tool calls -- is traced and persisted. One Phoenix instance serves all projects on the machine with per-project isolation.
+Agent pipeline tracing via OpenTelemetry and [Arize Phoenix](https://github.com/Arize-ai/phoenix). Every session — pipeline runs, native Claude Code agents, tool calls — is traced and persisted. One Phoenix instance serves all projects on the machine with per-project isolation.
 
 ```bash
-phoenix-ctl install    # Install daemon (~300MB, starts on login)
+phoenix-ctl install         # Install daemon (~300MB, starts on login)
 open http://localhost:6006  # Trace UI
 ```
 
-See [Observability](docs/observability.md) for the full guide: architecture, multi-project workflow, configuration, and troubleshooting.
+See [Observability](docs/observability.md) for architecture, multi-project workflow, configuration, and troubleshooting.
 
 ### Memory
 
-Dual-layer persistent memory that gives every agent cross-session knowledge about the project. Curated memories (facts, decisions, gotchas) live in `memory.json`; automatic observations (tool events, session lifecycle) accumulate in `observations.jsonl`. Both live in each project's `.ai-state/` directory and are committed to git.
+Dual-layer persistent memory gives every agent cross-session knowledge about the project. Curated memories (facts, decisions, gotchas) live in `memory.json`; automatic observations (tool events, session lifecycle) accumulate in `observations.jsonl`. Both live in each project's `.ai-state/` directory and are committed to git.
 
-**Setup**: Memory activates automatically per project. The first `remember()` call or tool event creates `.ai-state/memory.json` and `.ai-state/observations.jsonl`. No manual initialization required.
+Memory activates automatically per project — the first `remember()` call or tool event creates the files. At agent spawn, a hook injects a Markdown summary of curated entries into the agent's context; during work, agents call `remember()` for cross-task discoveries; tool events are captured automatically.
 
-**How agents use it**:
-
-1. At agent spawn, the `inject_memory.py` hook injects a Markdown summary of all curated entries into the agent's context -- no tool call needed
-2. During work, agents call `remember()` when they discover something that applies beyond the current task (guided by the always-loaded `memory-protocol.md` rule)
-3. Tool events are captured automatically to the observation log by the `capture_memory.py` hook
-4. At agent completion, `validate_memory.py` warns if LEARNINGS.md was written without `remember()`
-
-**Key tools**:
-
-
-| Tool                | Purpose                                               |
-| ------------------- | ----------------------------------------------------- |
-| `remember`          | Store a curated memory with type, importance, summary |
-| `search`            | Multi-term ranked search with Markdown summaries      |
-| `browse_index`      | Full memory index as compact Markdown-KV              |
-| `timeline`          | Chronological view of observations                    |
-| `session_narrative` | Structured summary of a session                       |
-| `consolidate`       | Merge, archive, or update entries atomically          |
-
-
-**Configuration** (per project, in `.ai-state/`):
-
-
-| File                 | Purpose                        | Git        |
-| -------------------- | ------------------------------ | ---------- |
-| `memory.json`        | Curated memories (schema v2.0) | Committed  |
-| `observations.jsonl` | Observation log (append-only)  | Committed  |
-| `*.lock`             | File locks for concurrency     | Gitignored |
-
-
-See [Memory Architecture](docs/memory-architecture.md) for the full guide: dual-layer design, data model, enforcement hooks, concurrency model, and scaling strategy.
+See [Memory Architecture](docs/memory-architecture.md) for the dual-layer design, data model, enforcement hooks, and concurrency model.
 
 ## Installation
 
-The main entry point is `install.sh`, which routes to `install_claude.sh` (Claude Code/Desktop), `install_cursor.sh` (Cursor), or `install_codex.sh` (Codex / AGENTS.md-aware agents). The interactive installer walks through each choice, defaulting to the recommended option at each step.
+The main entry point is `install.sh`, which routes to `install_claude.sh` (Claude Code/Desktop), `install_cursor.sh` (Cursor), or `install_codex.sh` (Codex / AGENTS.md-aware agents). The interactive installer defaults to the recommended option at each step.
 
 ```bash
 ./install.sh                    # Claude Code (default)
 ./install.sh desktop            # Claude Desktop
 ./install.sh cursor             # Cursor (user profile ~/.cursor/)
 ./install.sh cursor /path/repo  # Cursor (per-project at /path/repo/.cursor/)
-./install.sh codex /path/repo   # Codex / AGENTS.md-aware agents (project AGENTS.md)
+./install.sh codex /path/repo   # Codex / AGENTS.md-aware agents
 ./install.sh --check            # Verify installation health
 ./install.sh --uninstall        # Remove installation
-./install.sh code --dry-run     # Dry-run: show what would be installed
+./install.sh code --dry-run     # Show what would be installed
 ```
 
-### Claude Code (`./install.sh` or `./install.sh code`)
+### Claude Code
 
+`./install.sh` (or `./install.sh code`) walks through seven steps:
 
 | Step | What                                                                                                                      | Interactive?           |
 | ---- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| 1    | Personal config (CLAUDE.md, userPreferences.txt, settings.local.json) to `~/.claude/`                                     | No -- always installed |
-| 2    | Rules to `~/.claude/rules/` (auto-loaded by Claude when relevant)                                                         | No -- always installed |
-| 3    | i-am plugin via `[bit-agora](https://github.com/francisco-perez-sorrosal/bit-agora)` marketplace (scope: user or project) | Yes -- recommended     |
-| 4    | Task Chronograph hooks (agent lifecycle observability)                                                                    | Yes -- recommended     |
-| 5    | CLI scripts (ccwt — multi-worktree Claude sessions) to `~/.local/bin/`                                                    | No -- always installed |
-| 6    | External API docs ([context-hub](https://github.com/andrewyng/context-hub) MCP — curated API docs for 600+ libraries)     | Yes -- recommended     |
-| 7    | Phoenix observability daemon (persistent trace backend at `http://localhost:6006`)                                        | Yes -- recommended     |
-| 7    | Claude Desktop config link to official Desktop location                                                                   | Yes -- skip by default |
+| 1    | Personal config (CLAUDE.md, userPreferences.txt, settings.local.json) to `~/.claude/`                                     | No — always installed  |
+| 2    | Rules to `~/.claude/rules/` (auto-loaded when relevant)                                                                   | No — always installed  |
+| 3    | i-am plugin via [bit-agora](https://github.com/francisco-perez-sorrosal/bit-agora) marketplace (scope: user or project)   | Yes — recommended      |
+| 4    | Task Chronograph hooks (agent lifecycle observability)                                                                    | Yes — recommended      |
+| 5    | CLI scripts (`ccwt` — multi-worktree Claude sessions) to `~/.local/bin/`                                                  | No — always installed  |
+| 6    | External API docs ([context-hub](https://github.com/andrewyng/context-hub) MCP — curated docs for 600+ libraries)         | Yes — recommended      |
+| 7    | Phoenix observability daemon (persistent trace backend at `http://localhost:6006`)                                        | Yes — recommended      |
 
+When installed as a plugin, commands are namespaced: `/co` becomes `/i-am:co`.
 
-When installed as a plugin, commands are namespaced: `/co` becomes `/i-am:co`. Plugin permissions for skill reference files are auto-configured at Step 3. See `[README_DEV.md](README_DEV.md#progressive-disclosure-and-satellite-files)` for how progressive disclosure works with plugin-installed skills.
+> [!TIP]
+> Developing on Praxion itself? After the standard install, use `praxion-claude-dev` (placed at `~/.local/bin/`) to launch a session that loads the plugin from your working tree — edits to skills, commands, agents, and hooks are live. See [README_DEV.md](README_DEV.md#session-scoped-local-testing).
 
-**Developing on Praxion itself?** After the standard install, use `praxion-claude-dev` (placed at `~/.local/bin/` by `install.sh`) to launch a Claude Code session that loads the plugin directly from your working tree — edits to skills, commands, agents, or hooks are live, and `/reload-plugins` picks them up without restarting. See `[README_DEV.md](README_DEV.md#session-scoped-local-testing)` for the full dev workflow.
-
-**Marketplace plugin install** (Claude Code only):
+<details>
+<summary><strong>Marketplace plugin install</strong> (Claude Code only)</summary>
 
 ```bash
 claude plugin marketplace add francisco-perez-sorrosal/bit-agora
 claude plugin install i-am@bit-agora --scope user
 ```
 
-Praxion auto-completes the setup on your first Claude Code session — rules are symlinked to `~/.claude/rules/`, CLI scripts are linked to `~/.local/bin/`, and the configuration is finalized without any manual completion step. The plugin is fully self-sufficient; no action required beyond the standard `plugin install` command.
+Praxion auto-completes setup on the first Claude Code session — rules are symlinked to `~/.claude/rules/`, CLI scripts to `~/.local/bin/`, no manual step required. `claude plugin install` fetches the full repo at the marketplace-pinned tag into `~/.claude/plugins/cache/`; auto-completion symlinks from that cache without cloning or network access.
 
-**Optional: explicit reconfiguration.** If you want to reconfigure personal settings, recover from corruption, or re-link after manual tampering with `~/.claude/`, the `/praxion-complete-install` command remains available for explicit re-invocation. It prompts for consent before each system-level change and is idempotent — safe to run multiple times.
+**After plugin updates** — `claude plugin update i-am` leaves existing symlinks pointing at the old version. Start a fresh session (auto-completion refreshes them) or run `/praxion-complete-install`.
 
-**How it works.** `claude plugin install` already fetches the *full Praxion repo* at the marketplace-pinned tag into `~/.claude/plugins/cache/bit-agora/i-am/<version>/`. Auto-completion at first session symlinks from that cache; it does not clone, download, or require internet access.
+**Uninstall order** — run `/praxion-complete-uninstall` **first**, then `claude plugin uninstall i-am`. The reverse order leaves dangling symlinks (still cleanable by `/praxion-complete-uninstall`).
 
-**After plugin updates.** When you run `claude plugin update i-am`, existing symlinks in `~/.claude/rules/` and `~/.local/bin/` continue pointing to the old version. Re-run `/praxion-complete-install` (or start a fresh Claude Code session, which triggers auto-completion automatically) to refresh them against the new version.
+To reconfigure personal settings or recover from corruption, `/praxion-complete-install` is idempotent and prompts before each system-level change.
 
-**Uninstall order matters.** If you want to remove Praxion completely, run `/praxion-complete-uninstall` **first**, then `claude plugin uninstall i-am`. Doing the reverse order leaves dangling symlinks that target a deleted cache directory. If that happens, `/praxion-complete-uninstall` still cleans them up (it filters by "target begins with plugin cache path"; an absent target doesn't matter, the link itself gets removed).
+</details>
 
-### Claude Desktop (`./install.sh desktop`)
+### Claude Desktop
 
-Links `claude_desktop_config.json` to the official Desktop location:
+`./install.sh desktop` links `claude_desktop_config.json` to the official Desktop location (`~/Library/Application Support/Claude/` on macOS, `~/.config/Claude/` on Linux). Skills, commands, and agents are Claude Code features — run `./install.sh code` for the full feature set.
 
-- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+### Cursor
 
-Skills, commands, and agents are Claude Code features -- run `./install.sh code` for the full feature set.
+`./install.sh cursor` installs skills, rules, commands, and MCP into Cursor's discovery paths — either the user profile (`~/.cursor/`, default) or per-project (`./install.sh cursor /path/to/repo` → `/path/to/repo/.cursor/`). Skills and rules are symlinked to this repo; commands are exported as plain Markdown; `mcp.json` registers task-chronograph, memory, and [sub-agents-mcp](https://github.com/shinpr/sub-agents-mcp).
 
-### Cursor (`./install.sh cursor`)
+> [!NOTE]
+> Agents in Cursor use `cursor-agent` as the sub-agents-mcp backend — run `cursor-agent login` before using them.
 
-Installs skills, rules, commands, and MCP into Cursor's discovery paths. Two targets:
+Verify with `./install.sh cursor --check` (add a path for per-project). For Claude Code vs Cursor format differences, see [docs/cursor-compat.md](docs/cursor-compat.md).
 
+### Codex / AGENTS.md-Aware Agents
 
-| Target                     | Command                             | Result                                                                          |
-| -------------------------- | ----------------------------------- | ------------------------------------------------------------------------------- |
-| **User profile (default)** | `./install.sh cursor`               | Installs into `~/.cursor/`. Available in every Cursor project.                  |
-| **Per project**            | `./install.sh cursor /path/to/repo` | Installs into `/path/to/repo/.cursor/`. Only that project sees these artifacts. |
-
-
-**What gets installed:**
-
-
-| What     | How                                                                                                      |
-| -------- | -------------------------------------------------------------------------------------------------------- |
-| Skills   | Symlinks to this repo's `skills/<name>/`                                                                 |
-| Rules    | Symlinks to this repo's `rules/` (preserving directory structure)                                        |
-| Commands | Exported from `commands/*.md` (frontmatter stripped to plain Markdown)                                   |
-| MCP      | `mcp.json` with task-chronograph, memory, and [sub-agents-mcp](https://github.com/shinpr/sub-agents-mcp) |
-
-
-**Agents prerequisite**: sub-agents-mcp uses `cursor-agent` as its backend. Run `cursor-agent login` to authenticate before using agents in Cursor.
-
-**Verification:**
-
-```bash
-./install.sh cursor --check           # user profile
-./install.sh cursor /path --check     # per-project
-```
-
-For **Claude Code vs Cursor** format differences (discovery paths, command export, MCP config), see [docs/cursor-compat.md](docs/cursor-compat.md).
-
-### Codex / AGENTS.md-aware agents (`./install.sh codex /path/repo`)
-
-Compiles the target project's `AGENTS.md` from two sources and manages
-project-local Codex adapter surfaces under the target project's `.codex/` and
-`.agents/`. The compiled file starts with two shared layers:
-
-- the shared Praxion Codex philosophy derived from `codex/config/AGENTS.md.tmpl`
-- the Praxion project adapter that points Codex back to canonical repository
-  artifacts
-
-The project-specific source is `<project>/AGENTS.md.tmpl`. If that file is
-missing, `install.sh codex` generates it once from the project's root
-`CLAUDE.md` via Praxion's Claude-to-Agents adaptation workflow, then compiles
-the final `AGENTS.md`. After first install, `AGENTS.md.tmpl` is the source to
-review and edit; `AGENTS.md` is compiled output.
+`./install.sh codex /path/repo` compiles the target project's `AGENTS.md` from the shared Praxion Codex philosophy plus a project adapter, and manages project-local adapter surfaces under `.codex/` and `.agents/` (thin agent/skill/command wrappers that point back to canonical Praxion sources, plus a rules bridge).
 
 ```bash
 ./install.sh codex /path/to/repo --dry-run
@@ -404,124 +238,30 @@ review and edit; `AGENTS.md` is compiled output.
 ./install.sh codex /path/to/repo --check
 ```
 
-**What is directly reusable:** the target agent can read Praxion's `AGENTS.md`,
-`CLAUDE.md`, `rules/`, `skills/`, docs, source, tests, scripts, MCP server
-source, and `.ai-state/` data by reference.
-
-**What still needs explicit later work:** Claude onboarding owns
-`.ai-state/` creation. Claude marketplace auto-completion remains Claude-only
-by design.
-
-By default, the Codex install generates Codex custom-agent wrappers under the
-target project's `.codex/agents/`. These wrappers are intentionally thin: each
-one points back to the canonical Praxion agent file instead of copying the full
-body, so agent behavior stays source-of-truth aligned with Claude and Cursor.
-It also generates Codex skill wrappers under the project `.agents/skills/`
-directory, which is Codex's native project skill discovery path. Skill wrappers
-preserve the canonical skill description in their metadata and point back to
-canonical Praxion skills on activation. Command wrappers expose Praxion
-`commands/*.md` through the same documented Codex skill surface as
-`praxion-command-<name>` wrappers; they preserve each command description and
-point back to the canonical slash-command file without copying its body. Codex
-may warn that skill descriptions were shortened to fit its startup budget; that
-runtime warning is preferred over pre-trimming Praxion's canonical
-descriptions.
-
-When native Codex surfaces are installed, the compiled project `AGENTS.md` also
-points AGENTS.md-aware tools at `.codex/praxion/pipeline_semantics.json` and
-`.codex/praxion/model_routing.json` when present. That keeps task sizing,
-delegation, and model-routing guidance at the main-session project layer rather
-than copying Claude-only routing text into Codex wrappers.
-
-For rules, the Codex install now generates a Praxion-managed rules bridge under
-the target project's `.codex/` directory:
-
-- `.codex/praxion/rules_manifest.json` indexes canonical Praxion rules
-- `.codex/hooks/praxion-*.py` inject always-on, prompt-scoped, and file-scoped
-  Praxion rule routing
-- `.codex/hooks/praxion-*.py` also bridge the portable canonical hook families:
-  process framing, subagent contract injection, memory gates, observability,
-  Bash commit/cleanup gates, worktree guard, post-write quality checks, and
-  precompact state snapshots
-- `.codex/praxion/hook_runtime.py` runs canonical Praxion hook scripts with
-  Codex-specific MCP tool names
-- `.codex/praxion/settings.json` optionally supplies project-local env
-  overrides for Codex hook toggles
-- `.codex/hooks.json` registers those Praxion-managed hooks
-- `.codex/config.toml` is updated surgically to enable `hooks = true`
-  and remove the stale Praxion-generated `codex_hooks` flag
-
-Codex hook registrations intentionally omit the Claude-style `async` field:
-current Codex builds reject async hook handlers during startup. Observability
-hooks still fan out through Codex's command-hook runner; the wrappers fail open
-if Chronograph or Phoenix is unavailable.
-
-Codex may still require one-time manual review of newly installed project-local
-hooks via `/hooks`; that review is a Codex security gate, not a Praxion drift
-condition.
-
-This preserves the original semantics of Praxion's Claude-style semantic rules
-without repurposing native Codex `.rules`, which remain reserved for approval
-policy and sandbox semantics.
-
-The rules bridge rescans canonical `rules/**/*.md` on every Codex install/check
-run, so new rules are picked up automatically. When a rule needs an explicit
-Codex portability or load override, that metadata lives in the rule's own
-frontmatter rather than in a separate Python allowlist.
-
-For project Codex config, the installer reuses the canonical
-`.claude-plugin/plugin.json` `mcpServers` entries and writes the corresponding
-`memory` and `task-chronograph` registrations into
-`<project>/.codex/config.toml`. A project-local state file at
-`<project>/.codex/praxion/mcp_state.json` tracks the original project-owned
-blocks so uninstall restores them instead of clobbering unrelated Codex config.
-
-The Codex installer does not create `.ai-state/`; Claude project onboarding
-owns that lifecycle. Memory hooks and file-backed observation capture are
-installed by the Codex adapter, but they activate only when the target project
-already has `.ai-state/`.
-
-Codex hook wrappers also honor an optional project-local
-`.codex/praxion/settings.json` overlay with the same `{"env": {...}}` shape as
-Claude Code settings. Use it to disable memory, process framing, observability,
-or worktree-guard behavior for Codex without touching `.claude/settings.json`.
-
-Shared `~/.codex/AGENTS.md` and `~/.codex/config.toml` remain user-owned in the
-current Codex flow. Praxion does not install or overwrite them by default
-because the current Codex support is intentionally project-oriented.
-
-Use `--compat-only` only for non-Codex AGENTS.md-aware tools or when debugging
-the bootstrap pointer without native Codex surfaces.
-
-Start a fresh Codex or AGENTS.md-aware agent session inside the target project
-after installation so the new `AGENTS.md` is loaded at startup.
+`AGENTS.md.tmpl` is the editable source; `AGENTS.md` is compiled output. If the template is missing, the installer generates it once from the project's `CLAUDE.md`. Start a fresh Codex session after installation so the new `AGENTS.md` loads. Claude project onboarding owns `.ai-state/` creation — the Codex adapter installs memory and observability hooks but they activate only once `.ai-state/` exists. See [codex/config/README.md](codex/config/README.md) for the adapter mechanics.
 
 ### User Preferences (Claude Desktop / iOS)
 
-On devices without filesystem access (e.g., Claude iOS app) or when using Claude Desktop without the CLI, paste the following into the **User Preferences** field in Claude's settings:
+On devices without filesystem access, paste this into the **User Preferences** field in Claude's settings:
 
 ```text
 Read the user preferences from https://raw.githubusercontent.com/francisco-perez-sorrosal/Praxion/main/claude/config/userPreferences.txt and follow them before any other interaction
 ```
 
-**Config directories** -- Installer resources live in tool-specific dirs:
+Installer resources live in tool-specific config directories: [claude/config/](claude/config/README.md), [codex/config/](codex/config/README.md), [cursor/config/](cursor/config/README.md).
 
-- **claude/config/** -- Personal config files (CLAUDE.md, userPreferences.txt, claude_desktop_config.json) and lists. See [claude/config/README.md](claude/config/README.md).
-- **codex/config/** -- Codex adapter generators, reference guidance, and
-  project-local bridge management. See
-  [codex/config/README.md](codex/config/README.md).
-- **cursor/config/** -- MCP template and expected servers. See [cursor/config/README.md](cursor/config/README.md).
+## Documentation
 
-## Advanced Topics
+- **[Core Concepts](docs/concepts.md)** — the building blocks, the layered architecture, and the agent pipeline.
+- **[Memory Architecture](docs/memory-architecture.md)** — dual-layer memory: curated JSON + observation JSONL, enforcement hooks, concurrency model, scaling strategy.
+- **[External API Docs](docs/external-api-docs.md)** — retrieve current API documentation for external libraries during development.
+- **[Spec-Driven Development](docs/spec-driven-development.md)** — behavioral specifications with requirement IDs for medium/large features.
+- **[Decision Tracking](docs/decision-tracking.md)** — Architecture Decision Records in `.ai-state/decisions/` capturing decisions from AI-assisted sessions.
+- **[Claude Code vs Cursor](docs/cursor-compat.md)** — format differences, discovery paths, and adaptation details.
+- **[Claude Ecosystem Learning Resources](docs/claude-ecosystem-learning-resources.md)** — curated external guides for new users and skill authors.
 
-- **[Memory Architecture](docs/memory-architecture.md)** -- Dual-layer memory system: curated JSON + observation JSONL, enforcement hooks, concurrency model, temporal consistency, scaling strategy, and agent integration.
-- **[External API Docs](docs/external-api-docs.md)** -- Retrieve current, curated API documentation for external libraries (Stripe, OpenAI, AWS, etc.) during development. Setup guide, workflow examples, and the annotation learning loop.
-- **[Spec-Driven Development](docs/spec-driven-development.md)** -- Behavioral specifications with requirement IDs for medium/large features. The pipeline scales proportionally: small tasks skip specs; substantive features get full traceability.
-- **[Decision Tracking](docs/decision-tracking.md)** -- Architecture Decision Records (ADRs) in `.ai-state/decisions/` capture decisions from AI-assisted sessions. Agents write structured Markdown files with YAML frontmatter, with a lightweight reminder hook for architectural commits.
-- **[Claude Code vs Cursor](docs/cursor-compat.md)** -- Format differences, discovery paths, and adaptation details for each tool.
-- **[Core Concepts](docs/concepts.md)** -- Deep explanation of the building blocks, the layered architecture, and the agent pipeline.
-- **[Claude Ecosystem Learning Resources](docs/claude-ecosystem-learning-resources.md)** -- Curated external guides covering Claude models, cowork patterns, practical workflows, setup strategies, and domain applications. Recommended for new users and skill authors.
+For in-flight tech debt see [`.ai-state/TECH_DEBT_LEDGER.md`](.ai-state/TECH_DEBT_LEDGER.md); for strategic horizons and ideation, see the most recent ledger under [`.ai-state/idea_ledgers/`](.ai-state/idea_ledgers/).
 
 ---
 
-For contributor and developer documentation, see `[README_DEV.md](README_DEV.md)`.
+For contributor and developer documentation, see [README_DEV.md](README_DEV.md).

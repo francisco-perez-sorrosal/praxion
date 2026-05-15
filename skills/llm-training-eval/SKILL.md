@@ -1,18 +1,16 @@
 ---
 name: llm-training-eval
 description: >
-  LLM pre-training evaluation methodology for Praxion ML/AI training projects.
-  Covers primary metrics (val_bpb = bits-per-byte on validation set; vocab-independent),
-  validation perplexity (vocab-dependent; secondary), tolerance bands for PASS/FAIL/WARN
-  classification, baseline comparison syntax for SYSTEMS_PLAN.md acceptance criteria,
-  and the EleutherAI lm-evaluation-harness as the standard external eval harness.
-  Owns the canonical TRAINING_RESULTS.md schema: verifier reads it; /run-experiment
-  writes it. Use when designing acceptance criteria for a training run, when setting
-  metric thresholds in SYSTEMS_PLAN.md, when the verifier evaluates training results,
-  when /run-experiment completes a run and needs to write TRAINING_RESULTS.md, or
-  when a user asks about val_bpb / bits-per-byte / perplexity / lm-eval-harness /
-  training evaluation / metric thresholds / tolerance bands.
-  Activate alongside ml-training and neo-cloud-abstraction for training pipeline work.
+  LLM pre-training evaluation methodology for Praxion. Covers the primary metric
+  (val_bpb / bits-per-byte; vocab-independent), validation perplexity (secondary,
+  vocab-dependent), tolerance bands for PASS/FAIL/WARN classification, baseline-
+  comparison syntax for SYSTEMS_PLAN.md acceptance criteria, and the EleutherAI
+  lm-evaluation-harness. Owns the canonical TRAINING_RESULTS.md schema (verifier
+  reads, /run-experiment writes). Use when designing training-run acceptance
+  criteria, setting metric thresholds, when the verifier evaluates training
+  results, or for keywords val_bpb / bits-per-byte / perplexity / lm-eval-harness
+  / training evaluation / metric thresholds / tolerance bands. Compose with
+  ml-training and neo-cloud-abstraction.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

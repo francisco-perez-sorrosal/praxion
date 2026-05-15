@@ -62,9 +62,14 @@ link_rules() {
     local hook_deliver_paths=""
     local manifest_file="${rules_source_dir}/_manifest.yaml"
     if [ -f "$manifest_file" ]; then
+        # `|| hook_deliver_paths=""` bypasses `set -e` when python exits
+        # non-zero (e.g. PyYAML missing) — falling back to "link all rules"
+        # is the documented safe default; without it the script terminates
+        # silently because `var=$(cmd)` propagates the failure under set -e.
         hook_deliver_paths=$(python3 - "$manifest_file" <<'PYEOF' 2>/dev/null
-import yaml, sys
+import sys
 try:
+    import yaml
     with open(sys.argv[1]) as f:
         m = yaml.safe_load(f)
     for r in m.get("rules", []):
@@ -73,7 +78,7 @@ try:
 except Exception as e:
     sys.stderr.write(f"[link_rules] manifest parse failed: {e}; linking all rules\n")
 PYEOF
-        )
+        ) || hook_deliver_paths=""
     fi
 
     LINK_RULES_COUNT=0
@@ -124,7 +129,10 @@ sweep_stale_rule_symlinks() {
     local manifest_file="${rules_source_dir}/_manifest.yaml"
     [ -f "$manifest_file" ] || return 0
 
-    local keep_paths rc
+    local keep_paths="" rc=0
+    # `|| rc=$?` is the canonical set-e-safe pattern: a plain `var=$(cmd)`
+    # would terminate the script before `rc=$?` could capture the exit
+    # code, defeating the fail-safe bail-out a few lines below.
     keep_paths=$(python3 - "$manifest_file" <<'PYEOF' 2>/dev/null
 import sys
 try:
@@ -139,8 +147,7 @@ try:
 except Exception:
     sys.exit(1)
 PYEOF
-)
-    rc=$?
+) || rc=$?
     # Fail-safe: a parse error must NOT trigger an empty whitelist (which
     # would delete every Praxion-managed symlink). Bail out instead.
     if [ "$rc" -ne 0 ]; then

@@ -169,7 +169,7 @@ def _load_hook_deliver_set(rules_src: Path) -> frozenset[Path] | None:
     Reads rules/_manifest.yaml from the plugin cache.  Returns None when the manifest
     is missing or unparseable, signalling the caller to fall back to linking all files.
     """
-    import yaml  # stdlib pyyaml; available in all supported Pythons via Claude Code env
+    import yaml  # third-party PyYAML; declared in pyproject.toml dev group
 
     manifest_path = rules_src / "_manifest.yaml"
     if not manifest_path.exists():

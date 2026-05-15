@@ -45,6 +45,7 @@ dev = [
     "pytest",
     "pytest-cov",
     "import-linter",
+    "pyyaml",
 ]
 
 # --- test-coverage skill: default Python coverage config -------------------

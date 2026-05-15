@@ -2,18 +2,13 @@
 name: web-ui-design
 description: >
   Web UI and visual interface design craft for React, Next.js, and component-based UIs.
-  Covers visual hierarchy (Fitts/Hick/Miller), design canon (Rams/Norman/Nielsen/Tufte/
-  Refactoring UI/Linear/Stripe/Vercel), design tokens (color/spacing/typography/shadow/
-  radius/motion/z-index) and 4px/8px grid, typography (16px min, 45-75ch measure), WCAG
-  2.2 AA (4.5:1/3:1 contrast, focus indicators, 24x24 touch targets,
-  prefers-reduced-motion), component taste (modal vs drawer vs inline, table vs card vs
-  list, form patterns, five UI states), motion timing (100-200ms micro, 200-300ms
-  entrance, ease-out/ease-in, no linear), perceived performance (RAIL, skeleton vs
-  spinner, optimistic UI, debounce/throttle), and Radix/shadcn accessible-primitives
-  pattern. Use when designing or reviewing web UI, design systems, tokens, component
-  ergonomics, UI framework selection, or auditing React/Next.js for quality and
-  accessibility. Do NOT use for CLI/terminal (tui-design) or API/tools
-  (api-design-craft, agentic-interface-design).
+  Covers visual hierarchy (Laws of UX), the design canon (Rams/Norman/Nielsen/Tufte/
+  Refactoring UI/Linear/Stripe/Vercel), design tokens and the 4px/8px grid, typography,
+  WCAG 2.2 AA accessibility, component taste, motion timing, perceived performance
+  (RAIL), and the Radix/shadcn accessible-primitives pattern. Use when designing or
+  reviewing web UI, design systems, tokens, component ergonomics, UI framework
+  selection, or auditing React/Next.js for quality and accessibility. Do NOT use for
+  CLI/terminal (tui-design) or API/tools (api-design-craft, agentic-interface-design).
 metadata:
   staleness_sensitive_sections:
     - "WCAG 2.2 AA — The Numbers (last-verified: 2026-05-12, review threshold: 120 days)"

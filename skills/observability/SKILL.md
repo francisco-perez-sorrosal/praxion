@@ -2,16 +2,15 @@
 name: observability
 description: >
   Application observability strategy: structured logging, metrics design,
-  distributed tracing, and alerting. Covers the three pillars model,
-  RED/USE methodologies, SLI/SLO/error budgets, OpenTelemetry instrumentation
-  strategy, and cardinality management. Use when adding observability to a
-  system, choosing logging or metrics or tracing strategies, designing alert
-  rules, defining SLIs and SLOs, instrumenting code with OpenTelemetry,
-  reviewing observability coverage, or setting up structured logging. Also
-  activates for monitoring, telemetry, OTel, spans, log levels, error budgets,
-  burn rate alerting, Prometheus naming, Grafana dashboards, trace context
-  propagation, metrics cardinality, runbooks, on-call, SLA, dashboards,
-  log aggregation, and trace analysis.
+  distributed tracing, and alerting. Covers the three pillars, RED/USE
+  methodologies, SLI/SLO/error budgets, OpenTelemetry instrumentation strategy,
+  and cardinality management. Use when adding observability, choosing
+  logging/metrics/tracing strategies, designing alert rules, defining SLIs/SLOs,
+  instrumenting with OpenTelemetry, or reviewing observability coverage. Trigger
+  keywords: monitoring, telemetry, OTel, spans, log levels, error budgets, burn
+  rate alerting, Prometheus naming, Grafana dashboards, trace context
+  propagation, metrics cardinality, runbooks, on-call, SLA, log aggregation,
+  trace analysis.
 allowed-tools: [Read, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

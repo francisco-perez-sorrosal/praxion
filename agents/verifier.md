@@ -273,12 +273,18 @@ Skip this sub-phase if `docs/architecture.md` does not exist.
 
 When tests exist or are expected:
 
-1. **Read `.ai-work/<task-slug>/TEST_RESULTS.md`** — this is the implementer/test-engineer's test-run handoff. If the file is missing and the plan expected tests, log a `WARN` (not a `FAIL`) — the artifact is advisory during rollout.
-2. Classify each failure block in `TEST_RESULTS.md` against the current code state.
-3. Check whether critical paths in the new code have test coverage.
-4. Note untested edge cases in complex logic.
-5. Flag if the plan required tests that were not written.
-6. When verifying agent-based systems, consult the `agent-evals` skill for agent-specific evaluation methodology (non-determinism handling, trajectory evaluation, grader design).
+1. **Read `.ai-work/<task-slug>/TEST_RESULTS.md`** — the implementer/test-engineer's test-run handoff. If the file is missing and the plan expected tests, log a `WARN` (not a `FAIL`) — the artifact is advisory during rollout.
+2. **Read `.ai-work/<task-slug>/TEST_BASELINE.md`** — the failing-test set captured by the implementation-planner at pipeline setup, before any code change. If the file is absent (standalone mode, or capture skipped), treat the baseline as unknown and apply the conservative branch in step 3.
+3. **Disposition every failing test** in `TEST_RESULTS.md`. A failure is never closeable by calling it "pre-existing" — classify each one and act:
+   - **Regression** — failing now, not listed in `TEST_BASELINE.md`. This pipeline caused it. Emit `FAIL`; the failure routes to rework via Phase 12.5.
+   - **Pre-existing** — failing now and listed in `TEST_BASELINE.md`. Disposition it: if the fix is trivial and adjacent to the change under review, note it as an in-scope boy-scout fix and confirm it lands; otherwise append a `td-NNN` row to `.ai-state/TECH_DEBT_LEDGER.md` (Phase 5 schema) and emit a `WARN` citing the row id.
+   - **Undisposed pre-existing** — a failure labelled pre-existing with neither a fix nor a `td-NNN` row is a report-completeness `FAIL`: "pre-existing" alone is not a disposition.
+   - **No baseline** — when `TEST_BASELINE.md` is absent, every current failure is unverified; disposition each as pre-existing (fix or `td-NNN` row) and record one `WARN` that the baseline was missing.
+   - **Fixed** — listed in `TEST_BASELINE.md`, passing now: record as a boy-scout win.
+4. Check whether critical paths in the new code have test coverage.
+5. Note untested edge cases in complex logic.
+6. Flag if the plan required tests that were not written.
+7. When verifying agent-based systems, consult the `agent-evals` skill for agent-specific evaluation methodology (non-determinism handling, trajectory evaluation, grader design).
 
 #### Invoking the `test-coverage` skill (permission, not obligation)
 

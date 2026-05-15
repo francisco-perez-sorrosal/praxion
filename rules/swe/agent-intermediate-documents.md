@@ -26,6 +26,7 @@ Agent documents live in two locations based on their lifecycle:
       IMPLEMENTATION_PLAN.md
       WIP.md
       LEARNINGS.md
+      TEST_BASELINE.md
       TEST_RESULTS.md
       traceability.yml
       VERIFICATION_REPORT.md
@@ -129,6 +130,7 @@ Full schema (14 fields + `dedup_key`), owner-role heuristic, lifecycle conventio
 |------|----------|-----------|----------|
 | Ephemeral | `.ai-work/<task-slug>/` | `IDEA_PROPOSAL.md`, `RESEARCH_FINDINGS.md`, `CONTEXT_REVIEW.md`, `INTERFACE_DESIGN.md`, `SYSTEMS_PLAN.md`, `SPEC_DELTA.md`, `VERIFICATION_REPORT.md`, `REWORK_MANIFEST.md`, `PROGRESS.md` | Single pipeline run — delete after downstream consumption (merge `VERIFICATION_REPORT.md` patterns into `LEARNINGS.md` first). `INTERFACE_DESIGN.md` is the interface-designer's pipeline-mode output (interface architecture, framework decisions, UI/UX + API/tool sketches, trade-offs, `## Architecture Challenges` section); consumed by planner, implementer, and verifier. `REWORK_MANIFEST.md` — writer: verifier (Phase 12.5); reader: main agent; cleanup gated on rework completion. |
 | Ephemeral | `.ai-work/<rework-slug>/` | `VERIFIER_FINDINGS.md` — writer: main agent; reader: `/resume-rework` + spawned session | Worktree-local ephemeral. |
+| Ephemeral | `.ai-work/<task-slug>/` | `TEST_BASELINE.md` — implementation-planner's pre-pipeline failing-test snapshot (failing node IDs + base commit SHA), captured before any code change; verifier Phase 10 reads it to separate regressions from pre-existing failures | Single pipeline run — delete with `.ai-work/` |
 | Ephemeral | `.ai-work/<task-slug>/` | `TEST_RESULTS.md` — implementer (or test-engineer) test-run handoff artifact (canonical schema in `skills/software-planning/references/agent-pipeline-details.md`) | Single pipeline run — merge into `VERIFICATION_REPORT.md`, then delete |
 | Ephemeral | `.ai-work/<task-slug>/` | `traceability.yml` — REQ-to-test/implementation mapping (canonical source of truth during the pipeline; rendered into the archived SPEC's matrix at feature end per [`id-citation-discipline.md`](id-citation-discipline.md)) | Single pipeline run — rendered into archived SPEC matrix, then deleted with `.ai-work/` |
 | Session-persistent | `.ai-work/<task-slug>/` | `IMPLEMENTATION_PLAN.md`, `WIP.md`, `LEARNINGS.md` | Across sessions — merge learnings into permanent locations at feature end |

@@ -1,0 +1,6 @@
+version: 1
+disable:
+  # Hackathon mode preset — saves ~3,500 tokens (ambient, every session)
+  - swe/agent-model-routing    # default model routing — hackathon uses inherited defaults
+  - swe/memory-protocol        # memory MCP off in hackathon by default
+  - swe/vcs/git-conventions    # PoC commits don't need full conventional-commit rigor

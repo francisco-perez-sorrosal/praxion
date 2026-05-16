@@ -1,0 +1,148 @@
+## Hackathon Mode
+
+This project is in **hackathon mode** (`PRAXION_HACKATHON_MODE=1` in `.claude/settings.json`).
+The mode applies to every agent and command in this project until the env var is removed
+and this block is deleted (see "To exit" below).
+
+### Process — the Hackathon Spine
+
+In hackathon mode the 5-tier selector (Direct/Lightweight/Standard/Full/Spike) is REPLACED
+by the **Hackathon Spine** — a pipeline you ENTER, MOVE AROUND IN, and EXIT. The spine has
+a fixed ORDER but not a fixed MEMBERSHIP:
+
+    promethean → researcher → systems-architect → implementation-planner
+      → (implementer ∥ test-engineer) → verifier
+
+**Entry by natural language.** You declare where to start in plain language; the main
+agent infers the entry point:
+- "ideate / explore options for X"          → enter at promethean
+- "research how X works"                    → enter at researcher
+- "design X / work out the approach"        → enter at systems-architect
+- "I have the approach — plan and build X"  → enter at implementation-planner
+- "fix this typo / implement X exactly so"  → enter at implementer
+
+Everything UPSTREAM of the entry point is SKIPPED — including systems-architect and
+implementation-planner. There is no separate "Direct" path: a trivial fix is just
+"enter at implementer."
+
+**Ambiguous entry → the main agent ASKS.** If your prompt does not make the entry point
+clear, the main agent asks one short question ("start from ideation, or go straight to
+planning/implementation?") — it does not silently pick a default.
+
+**Free mid-task movement.** At any point you may move the work to a different stage
+("go back and research this properly," "this needs a real design — move it to the
+architect," "skip ahead and just build it"). User-driven movement is unbounded — it is
+your call. The orchestrator re-routes and records the movement in PROGRESS.md.
+
+**Creative-blocker signal.** If an agent hits a genuine design dead-end (the current
+approach is exhausted and fresh ideation is needed — NOT "this is hard," NOT "I need more
+research"), it appends a `CREATIVE-BLOCKER: <desc> #blocker` line to
+`.ai-work/<slug>/PROGRESS.md`, STOPS at that stage, and surfaces it to you. YOU decide
+whether to move the work back to ideation. The agent does not auto-loop.
+
+To run a single task at full 5-tier ceremony instead, say so explicitly; that one task
+yields back to the normal selector.
+
+### The verifier — default-on, skippable
+
+The verifier runs by DEFAULT as the implementation harness, whatever entry point you
+chose. It is skippable ONLY if you explicitly say so ("skip verification on this one").
+When the verifier is skipped, the main agent tells you at task end exactly what process
+was (not) applied.
+
+### Skipping the architect — the main agent may HOLD
+
+When you direct "just implement X" (entry at implementer, skipping the architect and
+planner), the main agent complies — UNLESS it has a genuinely strong, well-founded reason
+to believe skipping design is a real mistake. It HOLDS and asks you only when the task:
+- touches a SECURITY-SENSITIVE surface (auth, authorization, secrets, trust-boundary input);
+- carries DATA-LOSS RISK (schema migration, destructive data operation);
+- is VISIBLY FAR BEYOND your framing (many files / multiple subsystems / cross-cutting
+  structural change that no incremental step can absorb).
+For minor or speculative doubts, it complies silently. The bar to hold is "a really good
+motive," not "a doubt."
+
+### Skipped rigor is recorded — the safety net is transparency
+
+Because you can skip the architect, the planner, and the verifier, and move freely
+mid-task, the safety net is that NONE of it is invisible:
+- Every skipped stage is recorded in PROGRESS.md and in the VERIFICATION_REPORT.md header
+  (or, if the verifier was skipped, a one-line terminal note at task end).
+- Every mid-task movement is recorded in PROGRESS.md.
+A reviewer or a graduation audit can always reconstruct exactly what process was applied
+to any change.
+
+### Discovery is full-strength — only delivery ceremony is relaxed
+
+When promethean and researcher run, they run at FULL depth: unbounded internet research,
+multi-source synthesis, idea ledgers. External web research via `WebSearch`/`WebFetch` is
+unbounded — those are TOOLS, unaffected by `--disable-slash-commands`. A wrapper-launched
+researcher loses skill auto-trigger only — invoke `/external-api-docs` explicitly for
+curated API docs; raw web access is always available. The relaxation below applies ONLY
+to the delivery ceremony, NEVER to discovery.
+
+### The Behavioral Contract still applies — in every mode
+
+Hackathon mode is NOT license to skip the four-behavior contract. Every agent that
+writes, plans, or reviews code still honors:
+- **Surface Assumptions** — list assumptions before acting; ask when ambiguity could
+  produce the wrong artifact.
+- **Register Objection** — when a request violates scope, structure, or evidence, state
+  the conflict with a reason before complying or declining. Silent agreement is a violation.
+- **Stay Surgical** — touch only what the change requires; re-scope rather than silently expand.
+- **Simplicity First** — prefer the smallest solution that meets the behavior.
+The architect's Surface Assumptions and Registered Objections sections are MANDATORY
+even in the slim SYSTEMS_PLAN shape.
+
+### Launching for full context trimming
+
+Start sessions with the `praxion-hackathon` wrapper (`scripts/praxion-hackathon`). It
+adds `--disable-slash-commands` (skills resolve only via explicit `/name`) and
+`--effort low`. A plain `claude` launch still gets hackathon mode (env var + this block)
+but NOT the skill-surface token trim. To resume, use `praxion-hackathon --resume`.
+
+### SDD ceremony — OFF by default
+
+- Do NOT add a `## Behavioral Specification` section to `SYSTEMS_PLAN.md`.
+- Do NOT initialize `traceability.yml`.
+- Do NOT archive specs to `.ai-state/specs/` at end-of-feature.
+- Acceptance Criteria stays — write 3-7 testable AC bullets, no REQ IDs. If the architect
+  was skipped, the planner emits light ACs; if the planner was also skipped, the verifier
+  derives what to check from the diff.
+
+### ADR ceremony — deferred by default
+
+- Do NOT auto-write ADR fragments under `.ai-state/decisions/drafts/`.
+- IF the user explicitly says "write an ADR for X" — use the direct-tier path
+  (`.ai-state/decisions/<NNN>-<slug>.md`, no fragment, no draft lifecycle).
+- The `remind_adr.py` hook's advisory warning is silenced; its check still runs.
+
+### Test discipline — RELAXED
+
+- Implementer writes production code AND a happy-path smoke test in the same step.
+- test-engineer is invoked only on explicit request (property/contract/integration suites).
+- Tests still run; `pytest` failures still surface honestly — but a red test is a WARN,
+  not a FAIL, and does NOT gate the verifier or the pipeline. A happy-path smoke test is
+  still expected; its ABSENCE for new behavior is also a WARN.
+
+### Slim artifact shapes
+
+- **Architect (`SYSTEMS_PLAN.md`):** Surface Assumptions, Registered Objections, Goals &
+  Non-Goals, Context (1 para), Architecture (Overview, Components, Data Flow if
+  non-trivial), Acceptance Criteria, Risks (top 3), Out-of-scope. Skip: Behavioral
+  Specification, ADR fragment, tech-debt sweep, Tier-2 Stakeholder Review, DESIGN.md /
+  docs/architecture.md updates.
+- **Planner (`IMPLEMENTATION_PLAN.md`):** numbered steps + file paths + per-step
+  acceptance. WIP.md and LEARNINGS.md still produced. No traceability.yml, no REQ IDs,
+  no paired test-engineer step required. Coarser decomposition (3-5 steps for 4-8 files
+  is fine). If the architect was skipped, add a short top-level "what 'done' means" list.
+- **Verifier (`VERIFICATION_REPORT.md`):** Phases 1, 2, 3 (AC), 5 (lint/typecheck),
+  5.5 (Behavioral Contract), 10 (test status), 12 (report). Auto-skip 4, 7, 8, 9, 11.
+  FAIL: lint/typecheck/behavioral-contract failure. WARN (not FAIL): a failing or
+  absent test. The report header records the entry point and the skipped stages.
+
+### To exit hackathon mode
+
+Set `PRAXION_HACKATHON_MODE=0`, delete this `## Hackathon Mode` block from `CLAUDE.md`,
+remove the `hackathon` preset from `.claude/praxion-rules.yaml`, and stop launching via
+the `praxion-hackathon` wrapper. Subsequent sessions resume the full 5-tier process.

@@ -91,6 +91,7 @@ BLOCKS: dict[str, BlockSpec] = {
     "compaction-guidance": BlockSpec(consumers=_ONBOARDING_PAIR),
     "behavioral-contract": BlockSpec(consumers=_ONBOARDING_PAIR),
     "praxion-process": BlockSpec(consumers=_ONBOARDING_PAIR),
+    "hackathon-mode": BlockSpec(consumers=_ONBOARDING_PAIR),
     "project-essentials": BlockSpec(consumers=_ONBOARDING_PAIR),
     "commit-process": BlockSpec(
         consumers=_COMMIT_PAIR,
@@ -272,7 +273,9 @@ def check_file(
     """Check one command file for drift across the slugs it owns.
 
     Returns a list of (slug, diff_lines) for each drifted block.  Empty list
-    means the file is fully in sync.  Exits 2 on script errors.
+    means the file is fully in sync.  A slug whose canonical-source anchor is
+    absent from the consumer is reported as full drift (the entire canonical
+    content is missing).  Exits 2 on script errors.
     """
     try:
         content = cmd_path.read_text(encoding="utf-8")
@@ -290,6 +293,13 @@ def check_file(
             _error(f"canonical file not found: {canonical_path}")
         except OSError as exc:
             _error(f"cannot read {canonical_path}: {exc}")
+
+        # When the canonical-source anchor is absent the block has never been
+        # embedded — treat as full drift rather than a parse error.
+        if _find_canonical_source_line(lines, slug) is None:
+            diff = _diff_text(slug, canonical_body, "")
+            drifted.append((slug, diff))
+            continue
 
         loc = extract_block(lines, slug, cmd_path)
         if loc.body != canonical_body:
@@ -323,6 +333,13 @@ def write_file(cmd_path: Path, dry_run: bool = False) -> list[str]:
             _error(f"canonical file not found: {canonical_path}")
         except OSError as exc:
             _error(f"cannot read {canonical_path}: {exc}")
+
+        # When the canonical-source anchor is absent the block has never been
+        # embedded — skip silently (check_file reports this as drift; write_file
+        # cannot inject the anchor position, so it skips and lets the user add
+        # the anchor manually before re-running --write).
+        if _find_canonical_source_line(lines, slug) is None:
+            continue
 
         loc = extract_block(lines, slug, cmd_path)
         if loc.body == canonical_body:

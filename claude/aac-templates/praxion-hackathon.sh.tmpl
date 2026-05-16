@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# praxion-hackathon — launch `claude` with hackathon-mode context trimming.
+# Mode activation itself comes from PRAXION_HACKATHON_MODE in settings.json;
+# this wrapper adds the launch-time skill-surface trim that settings.json cannot.
+#
+# Template: copy to scripts/praxion-hackathon and make executable (chmod +x).
+# The PRAXION_DIR default below resolves relative to the script location using
+# a symlink-safe dirname expansion.
+set -euo pipefail
+
+PRAXION_DIR="${PRAXION_HACKATHON_DIR:-$(cd "$(dirname "$0")" && pwd)/../.claude}"
+
+# Situational-awareness prompt marker (opt out with PRAXION_HACKATHON_NO_PS1=1)
+[ -z "${PRAXION_HACKATHON_NO_PS1:-}" ] && export PS1="[hackathon] ${PS1:-}"
+
+exec claude \
+  --disable-slash-commands \
+  --effort low \
+  --append-system-prompt "$(cat "${PRAXION_DIR}/hackathon-directive.md")" \
+  --settings "${PRAXION_DIR}/hackathon-settings.json" \
+  "$@"

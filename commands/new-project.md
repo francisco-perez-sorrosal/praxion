@@ -5,6 +5,8 @@ allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion, Task, mcp_
 
 Onboard the current (freshly scaffolded) directory. Ask one question first, show the user *how* Praxion is driven (orchestrator + subagents), frame the build as a pipeline task so they watch the orchestrator in action, then — once the codebase exists — run `/init`, append the five Praxion blocks (Agent Pipeline + Compaction Guidance + Behavioral Contract + Praxion Process + Working in this project) idempotently, generate a per-run trail map, and hand off to `/onboard-project` (which applies the remaining surfaces — git hooks, merge drivers, `.ai-state/` skeleton, `.claude/settings.json` toggles) before the user runs `/co` to commit. **Greenfield and existing-project paths converge on the same end state**: this command is the existing-project counterpart of `/onboard-project`'s Phase 6 ("CLAUDE.md blocks"); both produce byte-identical CLAUDE.md sections.
 
+**`--hackathon` flag.** When the command is invoked as `/new-project --hackathon`, the handoff to `/onboard-project` automatically defaults Phase 5b to `[Enable hackathon mode]` — writing the six hackathon artifacts (env var, `## Hackathon Mode` CLAUDE.md block, `praxion-rules.yaml` preset, `scripts/praxion-hackathon` wrapper, `.claude/hackathon-directive.md`, `.claude/hackathon-settings.json`) without prompting. The `## Hackathon Mode` block is also appended to `CLAUDE.md` by Flow step 10 (guarded by heading detection). Pass `--hackathon` when the user explicitly wants to start this project in hackathon mode from day one.
+
 ## Sections
 
 1. §Guard — shape check before doing anything
@@ -25,9 +27,10 @@ Onboard the current (freshly scaffolded) directory. Ask one question first, show
 16. §Compaction Guidance Block — verbatim source (mirror of `/onboard-project`)
 17. §Behavioral Contract Block — verbatim source (mirror of `/onboard-project`)
 18. §Praxion Process Block — verbatim source (mirror of `/onboard-project`)
-19. §Project Essentials Block — verbatim source (mirror of `/onboard-project`)
-20. §AaC Scaffolding Sub-flow — five per-project AaC surfaces (default ON; opt-out via `--no-aac` / `PRAXION_NEW_PROJECT_NO_AAC=1`)
-21. §Idempotency Predicates — per-Flow-phase contracts
+19. §Hackathon Mode Block — verbatim source (mirror of `/onboard-project`); installed only when `--hackathon` is passed
+20. §Project Essentials Block — verbatim source (mirror of `/onboard-project`)
+21. §AaC Scaffolding Sub-flow — five per-project AaC surfaces (default ON; opt-out via `--no-aac` / `PRAXION_NEW_PROJECT_NO_AAC=1`)
+22. §Idempotency Predicates — per-Flow-phase contracts
 
 ## §Guard
 
@@ -80,7 +83,7 @@ When the guard passes, follow these steps in order. Each step is a contract — 
 
 9. **Invoke `/init` NOW.** First, fire **GATE 6** per §Phase Gates. Then invoke `/init` — the codebase exists and reflects the user's choice, so `/init`'s CLAUDE.md describes reality. Do not author CLAUDE.md by hand.
 
-10. **Append the five Praxion blocks idempotently.** Per §Init idempotency, check `CLAUDE.md` for each of five headings independently — `## Agent Pipeline`, `## Compaction Guidance`, `## Behavioral Contract`, `## Praxion Process`, `## Working in this project`. For each missing heading, append the corresponding block verbatim from §Agent Pipeline Block, §Compaction Guidance Block, §Behavioral Contract Block, §Praxion Process Block, §Project Essentials Block respectively. Each block is guarded by its own predicate; one missing block does not force re-appending the others. **After appending the §Project Essentials Block**, fill its `<placeholders>` from the just-scaffolded codebase — `<typecheck command>` / `<test command>` / `<lint command>` / `<build command>` from `pyproject.toml` / `package.json` / the test gate, `<list 3–5 of this project's most common task intents>` from the seed app's purpose; leave a `# TODO:` for anything undeterminable; renumber the Verification list if a step is omitted. **Smooth-integration contract:** if all five append, `/onboard-project`'s Phase 6 will be a complete no-op when the user runs it next.
+10. **Append the Praxion blocks idempotently.** Per §Init idempotency, check `CLAUDE.md` for each heading independently — `## Agent Pipeline`, `## Compaction Guidance`, `## Behavioral Contract`, `## Praxion Process`, `## Hackathon Mode` (only when `--hackathon` was passed), `## Working in this project`. For each missing heading, append the corresponding block verbatim from §Agent Pipeline Block, §Compaction Guidance Block, §Behavioral Contract Block, §Praxion Process Block, §Hackathon Mode Block (if `--hackathon`), §Project Essentials Block respectively. Each block is guarded by its own predicate; one missing block does not force re-appending the others. **After appending the §Project Essentials Block**, fill its `<placeholders>` from the just-scaffolded codebase — `<typecheck command>` / `<test command>` / `<lint command>` / `<build command>` from `pyproject.toml` / `package.json` / the test gate, `<list 3–5 of this project's most common task intents>` from the seed app's purpose; leave a `# TODO:` for anything undeterminable; renumber the Verification list if a step is omitted. **Smooth-integration contract:** if the standard five append (plus hackathon block when `--hackathon`), `/onboard-project`'s Phase 6 will be a complete no-op when the user runs it next.
 
 11. **Generate the mushi doc LAST.** First, fire **GATE 7** per §Phase Gates. Then generate the mushi doc — file anchors (§Mushi Doc Spec) must be computed against the final on-disk state, so this step follows everything that writes source code.
 
@@ -100,7 +103,7 @@ Mirror of `/onboard-project`'s §Flow contracts table — what each Phase produc
 | 4 | Execute Standard-tier pipeline (researcher → architect → planner → implementer ∥ test-engineer → verifier) | None — produces feature artifacts each run |
 | 4f | AaC scaffolding sub-flow (fence seed, `fitness/`, Block D hook append, `architecture.yml`, `docs/diagrams/`) — default ON; skipped if `# AaC scaffolding: false` in bootstrap context | Per §Idempotency Predicates — five independent per-surface predicates; skip entire sub-flow when opt-out signal present |
 | 5 | SDK smoke check + test gate (`uv sync && uv run pytest -q`) + Python `.gitignore` block | Per §Idempotency Predicates: Python block detected by `# Python` header |
-| 6 | `/init` (if `CLAUDE.md` missing) + idempotent append of five blocks | Per §Init idempotency — five independent heading-detection predicates |
+| 6 | `/init` (if `CLAUDE.md` missing) + idempotent append of Praxion blocks (five standard + `## Hackathon Mode` when `--hackathon`) | Per §Init idempotency — independent heading-detection predicate per block |
 | 7 | Generate the per-run mushi doc | None — file is regenerated each run by design |
 | 8 | Stage scaffold + print exit handoff (recommends `/onboard-project` then `/co`) | None — terminal phase |
 
@@ -531,13 +534,14 @@ Per-phase predicates that govern §Flow steps. Re-running `/new-project` on a di
 | 10b (Compaction Guidance append) | `grep -q '^## Compaction Guidance$' CLAUDE.md` |
 | 10c (Behavioral Contract append) | `grep -q '^## Behavioral Contract$' CLAUDE.md` |
 | 10d (Praxion Process append) | `grep -q '^## Praxion Process$' CLAUDE.md` |
-| 10e (Working-in-this-project append) | `grep -q '^## Working in this project$' CLAUDE.md` |
+| 10e (Hackathon Mode append — only when `--hackathon`) | `grep -q '^## Hackathon Mode$' CLAUDE.md` |
+| 10f (Working-in-this-project append) | `grep -q '^## Working in this project$' CLAUDE.md` |
 
 Other §Flow steps (1–7, 9, 11–13) are not idempotent in the strict sense because the seed pipeline (researcher → architect → planner → implementer + test-engineer → verifier) produces new artifacts each run. The §Guard at flow-start refuses to run on a non-greenfield directory, so re-invocation is rare; if it does happen, the user gets a Guard abort and is directed to `/onboard-project` instead.
 
 **Smooth integration contract.** When `/new-project` finishes successfully and the user runs `/onboard-project` next (per the exit handoff recommendation), three phases of `/onboard-project` are complete no-ops because the seed pipeline already produced their outputs:
 
-- **`/onboard-project` Phase 6 (CLAUDE.md blocks)** — all five predicates hit (Agent Pipeline, Compaction Guidance, Behavioral Contract, Praxion Process, and Working in this project are present from this command's Flow step 10).
+- **`/onboard-project` Phase 6 (CLAUDE.md blocks)** — all five standard predicates hit (Agent Pipeline, Compaction Guidance, Behavioral Contract, Praxion Process, and Working in this project are present from this command's Flow step 10). When `--hackathon` was passed, the `## Hackathon Mode` block is also present; `/onboard-project`'s Phase 5b will treat it as already installed and skip the append.
 - **`/onboard-project` Phase 8 (Architecture Baseline)** — the predicate `test -e .ai-state/DESIGN.md` hits because the seed pipeline's `systems-architect` (gate 4b) already produced both `.ai-state/DESIGN.md` and `docs/architecture.md`. Re-running the architect would overwrite a real-content baseline with another real-content baseline; the predicate prevents that.
 - **`/onboard-project` Phase 8b (AaC scaffolding)** — when AaC was not opted out of (the default), all five sub-step predicates hit (`fitness/` exists, Block D is present, `architecture.yml` exists, fence markers are in `ARCHITECTURE.md`, `docs/diagrams/.gitkeep` exists). The `/onboard-project --with-aac` path becomes a clean no-op.
 
@@ -578,6 +582,171 @@ Apply Praxion's tier-driven pipeline for non-trivial work. Use the tier selector
 
 **Orchestrator obligation.** Every delegation prompt must name the task slug, expected deliverables, and the behavioral contract (Surface Assumptions · Register Objection · Stay Surgical · Simplicity First).
 ```
+
+## §Hackathon Mode Block
+
+<!-- canonical-source: claude/canonical-blocks/hackathon-mode.md — edit the canonical file, then run: python3 scripts/sync_canonical_blocks.py --write -->
+
+```markdown
+## Hackathon Mode
+
+This project is in **hackathon mode** (`PRAXION_HACKATHON_MODE=1` in `.claude/settings.json`).
+The mode applies to every agent and command in this project until the env var is removed
+and this block is deleted (see "To exit" below).
+
+### Process — the Hackathon Spine
+
+In hackathon mode the 5-tier selector (Direct/Lightweight/Standard/Full/Spike) is REPLACED
+by the **Hackathon Spine** — a pipeline you ENTER, MOVE AROUND IN, and EXIT. The spine has
+a fixed ORDER but not a fixed MEMBERSHIP:
+
+    promethean → researcher → systems-architect → implementation-planner
+      → (implementer ∥ test-engineer) → verifier
+
+**Entry by natural language.** You declare where to start in plain language; the main
+agent infers the entry point:
+- "ideate / explore options for X"          → enter at promethean
+- "research how X works"                    → enter at researcher
+- "design X / work out the approach"        → enter at systems-architect
+- "I have the approach — plan and build X"  → enter at implementation-planner
+- "fix this typo / implement X exactly so"  → enter at implementer
+
+Everything UPSTREAM of the entry point is SKIPPED — including systems-architect and
+implementation-planner. There is no separate "Direct" path: a trivial fix is just
+"enter at implementer."
+
+**Ambiguous entry → the main agent ASKS.** If your prompt does not make the entry point
+clear, the main agent asks one short question ("start from ideation, or go straight to
+planning/implementation?") — it does not silently pick a default.
+
+**Free mid-task movement.** At any point you may move the work to a different stage
+("go back and research this properly," "this needs a real design — move it to the
+architect," "skip ahead and just build it"). User-driven movement is unbounded — it is
+your call. The orchestrator re-routes and records the movement in PROGRESS.md.
+
+**Worktree policy by entry point.** The spine maps entry points onto Praxion's existing
+worktree isolation rule: entering at `promethean`, `researcher`, or `systems-architect`
+→ the main agent creates a worktree (`EnterWorktree`) before spawning any agent (same as
+a Standard/Full pipeline). Entering at `implementation-planner` or `implementer` → the
+user decides; on-the-fly, no-worktree work in the current checkout is allowed (mirrors
+Direct/Lightweight). If mid-task movement crosses into a worktree-requiring stage, the
+orchestrator creates the worktree at that transition and records it in PROGRESS.md.
+
+**Creative-blocker signal.** If an agent hits a genuine design dead-end (the current
+approach is exhausted and fresh ideation is needed — NOT "this is hard," NOT "I need more
+research"), it appends a `CREATIVE-BLOCKER: <desc> #blocker` line to
+`.ai-work/<slug>/PROGRESS.md`, STOPS at that stage, and surfaces it to you. YOU decide
+whether to move the work back to ideation. The agent does not auto-loop.
+
+To run a single task at full 5-tier ceremony instead, say so explicitly; that one task
+yields back to the normal selector.
+
+### The verifier — default-on, skippable
+
+The verifier runs by DEFAULT as the implementation harness, whatever entry point you
+chose. It is skippable ONLY if you explicitly say so ("skip verification on this one").
+When the verifier is skipped, the main agent tells you at task end exactly what process
+was (not) applied.
+
+### Skipping the architect — the main agent may HOLD
+
+When you direct "just implement X" (entry at implementer, skipping the architect and
+planner), the main agent complies — UNLESS it has a genuinely strong, well-founded reason
+to believe skipping design is a real mistake. It HOLDS and asks you only when the task:
+- touches a SECURITY-SENSITIVE surface (auth, authorization, secrets, trust-boundary input);
+- carries DATA-LOSS RISK (schema migration, destructive data operation);
+- is VISIBLY FAR BEYOND your framing (many files / multiple subsystems / cross-cutting
+  structural change that no incremental step can absorb).
+For minor or speculative doubts, it complies silently. The bar to hold is "a really good
+motive," not "a doubt."
+
+### Skipped rigor is recorded — the safety net is transparency
+
+Because you can skip the architect, the planner, and the verifier, and move freely
+mid-task, the safety net is that NONE of it is invisible:
+- Every skipped stage is recorded in PROGRESS.md and in the VERIFICATION_REPORT.md header
+  (or, if the verifier was skipped, a one-line terminal note at task end).
+- Every mid-task movement is recorded in PROGRESS.md.
+A reviewer or a graduation audit can always reconstruct exactly what process was applied
+to any change.
+
+### Discovery is full-strength — only delivery ceremony is relaxed
+
+When promethean and researcher run, they run at FULL depth: unbounded internet research,
+multi-source synthesis, idea ledgers. External web research via `WebSearch`/`WebFetch` is
+unbounded — those are TOOLS, unaffected by `--disable-slash-commands`. A wrapper-launched
+researcher loses skill auto-trigger only — invoke `/external-api-docs` explicitly for
+curated API docs; raw web access is always available. The relaxation below applies ONLY
+to the delivery ceremony, NEVER to discovery.
+
+### The Behavioral Contract still applies — in every mode
+
+Hackathon mode is NOT license to skip the four-behavior contract. Every agent that
+writes, plans, or reviews code still honors:
+- **Surface Assumptions** — list assumptions before acting; ask when ambiguity could
+  produce the wrong artifact.
+- **Register Objection** — when a request violates scope, structure, or evidence, state
+  the conflict with a reason before complying or declining. Silent agreement is a violation.
+- **Stay Surgical** — touch only what the change requires; re-scope rather than silently expand.
+- **Simplicity First** — prefer the smallest solution that meets the behavior.
+The architect's Surface Assumptions and Registered Objections sections are MANDATORY
+even in the slim SYSTEMS_PLAN shape.
+
+### Launching for full context trimming
+
+Start sessions with the `praxion-hackathon` wrapper (`scripts/praxion-hackathon`). It
+adds `--disable-slash-commands` (skills resolve only via explicit `/name`) and
+`--effort low`. A plain `claude` launch still gets hackathon mode (env var + this block)
+but NOT the skill-surface token trim. To resume, use `praxion-hackathon --resume`.
+
+### SDD ceremony — OFF by default
+
+- Do NOT add a `## Behavioral Specification` section to `SYSTEMS_PLAN.md`.
+- Do NOT initialize `traceability.yml`.
+- Do NOT archive specs to `.ai-state/specs/` at end-of-feature.
+- Acceptance Criteria stays — write 3-7 testable AC bullets, no REQ IDs. If the architect
+  was skipped, the planner emits light ACs; if the planner was also skipped, the verifier
+  derives what to check from the diff.
+
+### ADR ceremony — deferred by default
+
+- Do NOT auto-write ADR fragments under `.ai-state/decisions/drafts/`.
+- IF the user explicitly says "write an ADR for X" — use the direct-tier path
+  (`.ai-state/decisions/<NNN>-<slug>.md`, no fragment, no draft lifecycle).
+- The `remind_adr.py` hook's advisory warning is silenced; its check still runs.
+
+### Test discipline — RELAXED
+
+- Implementer writes production code AND a happy-path smoke test in the same step.
+- test-engineer is invoked only on explicit request (property/contract/integration suites).
+- Tests still run; `pytest` failures still surface honestly — but a red test is a WARN,
+  not a FAIL, and does NOT gate the verifier or the pipeline. A happy-path smoke test is
+  still expected; its ABSENCE for new behavior is also a WARN.
+
+### Slim artifact shapes
+
+- **Architect (`SYSTEMS_PLAN.md`):** Surface Assumptions, Registered Objections, Goals &
+  Non-Goals, Context (1 para), Architecture (Overview, Components, Data Flow if
+  non-trivial), Acceptance Criteria, Risks (top 3), Out-of-scope. Skip: Behavioral
+  Specification, ADR fragment, tech-debt sweep, Tier-2 Stakeholder Review, DESIGN.md /
+  docs/architecture.md updates.
+- **Planner (`IMPLEMENTATION_PLAN.md`):** numbered steps + file paths + per-step
+  acceptance. WIP.md and LEARNINGS.md still produced. No traceability.yml, no REQ IDs,
+  no paired test-engineer step required. Coarser decomposition (3-5 steps for 4-8 files
+  is fine). If the architect was skipped, add a short top-level "what 'done' means" list.
+- **Verifier (`VERIFICATION_REPORT.md`):** Phases 1, 2, 3 (AC), 5 (lint/typecheck),
+  5.5 (Behavioral Contract), 10 (test status), 12 (report). Auto-skip 4, 7, 8, 9, 11.
+  FAIL: lint/typecheck/behavioral-contract failure. WARN (not FAIL): a failing or
+  absent test. The report header records the entry point and the skipped stages.
+
+### To exit hackathon mode
+
+Set `PRAXION_HACKATHON_MODE=0`, delete this `## Hackathon Mode` block from `CLAUDE.md`,
+remove the `hackathon` preset from `.claude/praxion-rules.yaml`, and stop launching via
+the `praxion-hackathon` wrapper. Subsequent sessions resume the full 5-tier process.
+```
+
+This block is installed into the user project's `CLAUDE.md` by Flow step 10 **only when `/new-project --hackathon` is passed**. It is guarded by `grep -q '^## Hackathon Mode$' CLAUDE.md` (predicate 10e). When installed, it activates the Hackathon Spine in the project's agent sessions. The fence is kept byte-identical to `claude/canonical-blocks/hackathon-mode.md` by `scripts/sync_canonical_blocks.py`.
 
 ## §Project Essentials Block
 

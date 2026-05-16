@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# praxion-hackathon — launch `claude` with hackathon-mode context trimming.
+# Mode activation itself comes from PRAXION_HACKATHON_MODE in settings.json;
+# this wrapper adds the launch-time skill-surface trim that settings.json cannot.
+#
+# This is Praxion's own dogfooding copy of the wrapper (installed by Phase 5b for
+# opted-in projects via the template at claude/aac-templates/praxion-hackathon.sh.tmpl).
+#
+# Usage: scripts/praxion-hackathon [claude-args...]
+#        scripts/praxion-hackathon --resume
+#
+# Environment:
+#   PRAXION_HACKATHON_DIR   Override path to the .claude directory
+#                           (default: resolved relative to this script's real location)
+#   PRAXION_HACKATHON_NO_PS1=1  Suppress the [hackathon] PS1 prefix
+set -euo pipefail
+
+# Symlink-safe resolution: resolve this script's real directory so that
+# ~/.local/bin/praxion-hackathon symlinks work correctly on macOS and Linux.
+_self="${BASH_SOURCE[0]}"
+while [ -L "$_self" ]; do
+    _dir="$(cd -P "$(dirname "$_self")" && pwd)"
+    _self="$(readlink "$_self")"
+    [[ "$_self" != /* ]] && _self="$_dir/$_self"
+done
+_script_dir="$(cd -P "$(dirname "$_self")" && pwd)"
+
+PRAXION_DIR="${PRAXION_HACKATHON_DIR:-$(cd "${_script_dir}/../.claude" && pwd)}"
+
+# Situational-awareness prompt marker (opt out with PRAXION_HACKATHON_NO_PS1=1)
+[ -z "${PRAXION_HACKATHON_NO_PS1:-}" ] && export PS1="[hackathon] ${PS1:-}"
+
+exec claude \
+  --disable-slash-commands \
+  --effort low \
+  --append-system-prompt "$(cat "${PRAXION_DIR}/hackathon-directive.md")" \
+  --settings "${PRAXION_DIR}/hackathon-settings.json" \
+  "$@"

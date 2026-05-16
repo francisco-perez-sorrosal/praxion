@@ -287,6 +287,14 @@ Conditional activation: skip AC01-AC04 checks when `.ai-state/DESIGN.md` does no
 | AC11 | L | Model↔markdown agreement | When both LikeC4 model substrate AND markdown substrate are present, fetch element id+title set via MCP `read-project-summary` (or fallback `find docs/diagrams -name '*.c4'` + grep, emitting one WARN `validator-unable-to-query-likec4-mcp` on fallback); compute symmetric diff against component names referenced in architecture markdown; emit WARN per orphan on either side. Skip with INFO note when either substrate absent |
 | AC12 | L | Traceability orphans (bidirectional) | When specs (`.ai-state/specs/SPEC_*.md`) AND LikeC4 model AND populated bidirectional convention all present, query MCP `query-by-metadata { key: "req_ids", matchMode: "exists" }` and parse SPEC frontmatter `architectural_elements:`; emit WARN per orphan REQ (REQ in spec with no element claiming it) and per orphan element-citation (LikeC4 element with `req_ids` containing a REQ absent from all archived SPECs); severity Suggested per orphan, escalate to Important when ≥10% of REQs orphaned across all archived specs. Skip with INFO note when convention not yet populated |
 
+### Hackathon Mode Graduation (HK)
+
+Conditional activation: **skip all HK checks and emit nothing** when `PRAXION_HACKATHON_MODE` is unset or `0` in the project's `.claude/settings.json` `env` block. This check is inert on non-hackathon projects. When `PRAXION_HACKATHON_MODE=1`, run the single check below.
+
+| ID | Tp | Rule | Pass |
+|----|----|------|------|
+| HK01 | A | Hackathon mode graduation nudge when project exceeds PoC size | **Check** (run only when `PRAXION_HACKATHON_MODE=1`): count non-test Python source files via `find . -name "*.py" -not -path "*/test*" -not -path "*/.git/*" \| wc -l`; count commits via `git rev-list --count HEAD`. **Advisory finding** (not WARN, not FAIL) when source-file count > 40 OR commit count > 150: "This project is in hackathon mode and has outgrown typical PoC size (source files: N, commits: M). Consider graduating to full 5-tier ceremony — see the `### To exit hackathon mode` section in `CLAUDE.md`." **Pass condition**: `PRAXION_HACKATHON_MODE` is unset/0 (check skipped), OR project is below both thresholds (≤40 source files AND ≤150 commits). |
+
 ### Self-Verification (V)
 
 The sentinel includes itself in the audit.

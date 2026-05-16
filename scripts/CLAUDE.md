@@ -4,6 +4,7 @@ Utility and operational scripts for the Praxion ecosystem.
 
 ## Available Scripts
 
+- `praxion-hackathon` — Launch Claude Code in hackathon mode with launch-time context trimming: passes `--disable-slash-commands` (~5–8K skill tokens trimmed), `--effort low`, `--append-system-prompt` (from `.claude/hackathon-directive.md`), and `--settings` (`.claude/hackathon-settings.json`). Mode activation (env var, CLAUDE.md block, rules preset) is project-scoped and works on any launch; this wrapper adds the skill-surface trim layer that `settings.json` cannot. Use `scripts/praxion-hackathon --resume` to re-attach. Set `PRAXION_HACKATHON_NO_PS1=1` to suppress the `[hackathon]` PS1 prefix. Dogfooding copy — template source at `claude/aac-templates/praxion-hackathon.sh.tmpl`
 - `praxion-claude-dev` — Launch Claude Code with the Praxion working tree as the plugin source (wraps `claude --plugin-dir`). Passes `--dangerously-skip-permissions` by default; set `PRAXION_DEV_SAFE=1` to keep prompts. See [Session-scoped local testing](../README_DEV.md#session-scoped-local-testing)
 - `ccwt` — Claude Code Worktrees: opens a tmux session with one pane per git worktree, each running Claude Code
 - `chronograph-ctl` — Development helper for the Task Chronograph MCP server (start/stop/restart/status/logs from source)

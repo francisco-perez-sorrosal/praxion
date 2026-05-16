@@ -27,6 +27,20 @@ from _hook_utils import is_disabled
 # -- Constants -----------------------------------------------------------------
 
 _DISABLE_FLAG = "PRAXION_DISABLE_PROCESS_INJECT"
+_HACKATHON_FLAG = "PRAXION_HACKATHON_MODE"
+_HACKATHON_HEADING = "## Hackathon Mode"
+
+_CONSISTENCY_WARNING = (
+    "[Praxion] Warning: a `## Hackathon Mode` block is present in CLAUDE.md "
+    "but `PRAXION_HACKATHON_MODE` is not set. "
+    "Remove the block or set the env var."
+)
+
+_TEST_DISCIPLINE_REMINDER = (
+    "[Praxion] Hackathon mode disabled — test discipline is now active. "
+    "Red tests will block the pipeline again. "
+    "Consider a coverage pass before adding new behavior."
+)
 
 # Short-reply threshold: prompts at or under 60 chars without '?' are skipped.
 # A 60-char prompt without '?' is still considered a short reply.
@@ -120,6 +134,13 @@ def _process(payload: dict) -> None:
     if is_disabled(_DISABLE_FLAG):
         return
 
+    # Hackathon consistency checks — both are no-ops when the flag is active
+    # (is_disabled returns True when PRAXION_HACKATHON_MODE=1).
+    # When the flag is OFF but the CLAUDE.md block is present, emit advisory
+    # messages to help the user restore full ceremony.
+    if not is_disabled(_HACKATHON_FLAG):
+        _check_hackathon_consistency(cwd)
+
     # Gate (c): continuation turn
     if _is_continuation(payload):
         return
@@ -142,6 +163,36 @@ def _emit_framing() -> None:
     key, not nested under hookSpecificOutput.
     """
     print(json.dumps({"additionalContext": _FRAMING}))
+
+
+def _emit_advisory(message: str) -> None:
+    """Emit an advisory additionalContext message to stdout."""
+    print(json.dumps({"additionalContext": message}))
+
+
+def _has_hackathon_block(cwd: str) -> bool:
+    """Return True if the project CLAUDE.md contains the hackathon heading."""
+    claude_md = Path(cwd, "CLAUDE.md")
+    try:
+        return _HACKATHON_HEADING in claude_md.read_text(encoding="utf-8")
+    except OSError:
+        return False
+
+
+def _check_hackathon_consistency(cwd: str) -> None:
+    """Emit advisory messages when the hackathon block is present but the flag is off.
+
+    Both advisories (consistency warning + test-discipline reminder) fire when
+    PRAXION_HACKATHON_MODE is unset/off and the CLAUDE.md block is still present.
+    This is the exit-procedure reminder: the block has not been deleted yet.
+    Fail-open: any exception exits silently.
+    """
+    try:
+        if _has_hackathon_block(cwd):
+            _emit_advisory(_CONSISTENCY_WARNING)
+            _emit_advisory(_TEST_DISCIPLINE_REMINDER)
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

@@ -36,6 +36,8 @@ Assess the task before starting work. Each tier prescribes what to do — higher
 
 For ambiguous cases, use the SDD skill's [calibration-procedure.md](../../skills/spec-driven-development/references/calibration-procedure.md) signal scoring. User override wins; default to the lower tier when uncertain.
 
+*Hackathon mode: if a project sets `PRAXION_HACKATHON_MODE=1`, the 5-tier selector above is replaced by the Hackathon Spine — a flexible-entry pipeline the user enters by natural language — see that project's `## Hackathon Mode` CLAUDE.md block for the definition.*
+
 ### Pipeline Isolation
 
 <!-- Anchor preserved for cross-rule links; do not remove -->

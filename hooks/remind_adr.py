@@ -15,7 +15,10 @@ import re
 import subprocess
 import sys
 
+from _hook_utils import is_disabled
+
 GIT_COMMIT_RE = re.compile(r"git\s+commit")
+_HACKATHON_FLAG = "PRAXION_HACKATHON_MODE"
 PREFIX = "[adr-reminder]"
 SUBPROCESS_TIMEOUT_SECONDS = 5
 
@@ -149,6 +152,11 @@ def main():
 
     command = payload.get("tool_input", {}).get("command", "")
     if not GIT_COMMIT_RE.search(command):
+        return
+
+    # Hackathon mode: ADR advisory is silenced when the mode is active.
+    # is_disabled() returns True when the env var is set to a truthy value ("1").
+    if is_disabled(_HACKATHON_FLAG):
         return
 
     staged_files = _staged_files()

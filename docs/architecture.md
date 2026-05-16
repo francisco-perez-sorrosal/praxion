@@ -248,3 +248,32 @@ Forward-feeding loop that turns ecosystem opportunity into recorded architectura
 **Last verified against code:** 2026-05-14
 
 **Built:** all components above resolve to files on disk; CIS semantics canonical in the researcher and systems-architect agent definitions, with the shared disposition vocabulary in [`disposition-vocabulary.md`](../skills/software-planning/references/disposition-vocabulary.md) ([`dec-179`](../.ai-state/decisions/179-verifier-rework-loop-shared-disposition-vocabulary.md)).
+
+## 11. Hackathon Mode
+
+<!-- OWNER: implementer (as-built) | LAST UPDATED: 2026-05-15 — hackathon-mode pipeline Step 14 -->
+<!-- Only Built components appear here — every path was verified with `test -e` before listing.
+     For the design-target rationale (four-channel activation, independence guarantee), see
+     .ai-state/DESIGN.md §3 (Hackathon Mode row). -->
+
+### 11.1 Where to find what
+
+Hackathon mode is a project-scoped, opt-in **second process path**. When a project sets `PRAXION_HACKATHON_MODE=1`, the 5-tier Direct/Lightweight/Standard/Full/Spike selector is replaced by the **Hackathon Spine** — a fixed-order, variable-membership pipeline (`promethean → researcher → systems-architect → implementation-planner → (implementer ∥ test-engineer) → verifier`) the user enters at a natural-language-inferred entry point, moves around in freely, and exits. With the env var unset, every agent, hook, and rule behaves byte-identically to the pre-hackathon baseline.
+
+The mode activates through **four channels**: the `PRAXION_HACKATHON_MODE=1` env var (runtime source of truth for hooks), the `## Hackathon Mode` CLAUDE.md block (instruction text every agent reads each session — the spine definition), the `praxion-rules.yaml` hackathon preset (suppresses three non-core rules), and the `praxion-hackathon` wrapper script (launch-time skill-surface trim). For the design rationale, see [`.ai-state/DESIGN.md` §3](../.ai-state/DESIGN.md#3-components) (Hackathon Mode row) and [`dec-draft-ef6b8065`](../.ai-state/decisions/drafts/20260515-2028-fperezsorrosal-worktree-hackathon-mode-design-hackathon-mode-activation-and-tier-integration.md).
+
+| Component | File | Role |
+|-----------|------|------|
+| Canonical block | `claude/canonical-blocks/hackathon-mode.md` | Source of truth for the `## Hackathon Mode` CLAUDE.md block; embedded into the two onboarding commands and sync-checked by `scripts/sync_canonical_blocks.py` |
+| Spine definition channel | `commands/onboard-project.md` (Phase 5b), `commands/new-project.md` (`--hackathon`) | Phase 5b idempotently writes the six hackathon artifacts on opt-in; `/new-project --hackathon` auto-enables the mode end-to-end |
+| Always-loaded pointer | `rules/swe/swe-agent-coordination-protocol.md` | ~25-token pointer sentence after the Tier Selector fast-path block — the single always-loaded exception to the independence guarantee |
+| AaC template set | `claude/aac-templates/praxion-rules.hackathon-preset.yaml`, `claude/aac-templates/praxion-hackathon.sh.tmpl`, `claude/aac-templates/hackathon-directive.md.tmpl`, `claude/aac-templates/hackathon-settings.json.tmpl`, `claude/aac-templates/hackathon-mode.md.tmpl` | Install-time payloads Phase 5b copies into an opted-in project to produce the six artifacts |
+| Praxion-dogfooding companions | `scripts/praxion-hackathon` (executable wrapper), `.claude/hackathon-directive.md`, `.claude/hackathon-settings.json` | The project-local copies Praxion itself uses when a developer works on Praxion in hackathon mode |
+| ADR-reminder silencing | `hooks/remind_adr.py` | Early-exits when `PRAXION_HACKATHON_MODE=1`, suppressing the ADR advisory in hackathon mode |
+| Exit-procedure consistency check | `hooks/inject_process_framing.py` | When the env var is off but the `## Hackathon Mode` block is still present, emits a consistency warning and a test-discipline-reactivated reminder |
+| Graduation advisory | `agents/sentinel.md` (`HK01` check) | Advisory finding when a hackathon project exceeds the PoC-size threshold (>40 source files OR >150 commits); inert on non-hackathon projects |
+| Behavioral test suite | `tests/test_hackathon_mode.py` | Exercises the hackathon path and the flag-OFF independence guarantee; verifies the canonical block passes `sync_canonical_blocks.py --check` |
+
+**Last verified against code:** 2026-05-15 — every path above confirmed present on disk with `test -e`.
+
+**Built:** all components above resolve to files on disk. *Recommended follow-up: a Hackathon Spine pipeline diagram (per `rules/writing/diagram-conventions.md`) would aid navigation of §11 — not allocated to this pipeline's plan.*

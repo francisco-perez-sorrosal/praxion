@@ -25,7 +25,7 @@ If `staleness_sensitive_sections:` is missing or empty: report "no sensitive sec
 
 For every entry in `staleness_sensitive_sections:`:
 
-- Find the matching h2/h3 heading in `SKILL.md` (case-sensitive exact match)
+- Find the matching h2/h3 heading — search `SKILL.md` first, then the skill's `references/*.md` and `contexts/*.md` files (case-sensitive exact match). A cataloged section may live in any of these files under progressive disclosure
 - Identify the `<!-- last-verified: ... -->` marker directly below it (may be missing)
 - Capture the current section body — from the heading to the next heading of equal or greater level
 

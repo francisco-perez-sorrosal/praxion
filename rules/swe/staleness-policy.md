@@ -50,6 +50,12 @@ staleness_threshold_days: 120   # optional per-skill override
 
 Titles are matched **case-sensitively against the rendered h2/h3 text** — not against slug anchors. Rename a heading and the sentinel's F07 check catches the drift on the next pass.
 
+### Section Location
+
+The `staleness_sensitive_sections:` frontmatter always lives in `SKILL.md`, but a cataloged section's **heading and marker** may live in `SKILL.md` *or* in any of the skill's own reference/context files (`references/*.md`, `contexts/*.md`). Progressive disclosure legitimately moves drift-prone material out of `SKILL.md`; staleness tracking follows the content, not the file.
+
+The frontmatter stays a flat list of bare heading texts — the heading is the key regardless of which file holds the section. The sentinel's F07/F08 checks and `/refresh-skill` resolve each cataloged title by searching `SKILL.md` first, then the skill's `references/*.md`, then its `contexts/*.md` (each set alphabetically); the first file containing the heading is authoritative. Keep cataloged headings unique within a skill so the resolution is unambiguous.
+
 ### Threshold Defaults
 
 - **Global default**: 120 days (skills without `staleness_threshold_days:` use this value).

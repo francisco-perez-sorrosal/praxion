@@ -34,6 +34,7 @@ Reusable slash commands for AI coding assistants. Each `.md` file becomes a `/co
 | `/praxion-complete-uninstall` | Reverse `/praxion-complete-install` — remove rule/script symlinks and optional context-hub MCP; plugin body is preserved |
 | `/review-interface` | Run an interface design review on a file, PR, branch, or named surface via the interface-designer agent |
 | `/review-pr` | Code review a pull request |
+| `/dispatch-reworks` | Fan out `/resume-rework` into every rework worktree from `REWORK_MANIFEST.md` — background sessions by default, `--terminals` for visible windows |
 | `/resume-rework` | Dispatch the appropriate agent for a rework worktree; cwd-driven auto-discovery of `VERIFIER_FINDINGS.md` (cite `commands/resume-rework.md`) |
 | `/roadmap` | Produce a project-audited `ROADMAP.md` via a project-derived evaluation lens set (SPIRIT, DORA, SPACE, FAIR, CNCF Platform Maturity, or Custom) through the roadmap-cartographer agent; covers strengths, weaknesses, **opportunities (forward lines of work)**, phased improvements, and deprecations |
 | `/run-experiment` | Dispatch an ML training experiment, validate compute budget, stream metrics, write `TRAINING_RESULTS.md` |

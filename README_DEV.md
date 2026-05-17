@@ -75,11 +75,13 @@ agents/                              # Shared agent definitions
 ├── promethean.md
 ├── researcher.md
 ├── systems-architect.md
+├── interface-designer.md
 ├── implementation-planner.md
 ├── context-engineer.md
 ├── implementer.md
 ├── test-engineer.md
 ├── verifier.md
+├── architect-validator.md
 ├── doc-engineer.md
 ├── sentinel.md
 ├── skill-genesis.md

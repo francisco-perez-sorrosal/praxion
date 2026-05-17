@@ -182,9 +182,15 @@ t7_happy_path_full_scaffold() {
     cat > "$expected_gitignore" <<'EOF'
 # AI assistants
 .ai-work/
+.ai-state/*.lock
+.ai-state/**/*.lock
+.ai-state/*.backup.json
+.ai-state/*.pre-forget.json
+.claude/settings.local.json
+.claude/worktrees/
 .env
 .env.*
-.claude/settings.local.json
+.env.local
 EOF
     run_script "$s" test-app "$s/target"
     project_dir="$s/target/test-app"

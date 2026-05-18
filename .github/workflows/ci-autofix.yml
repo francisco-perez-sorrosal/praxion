@@ -94,10 +94,14 @@ jobs:
           # an error string). Writing them to a file the agent reads as DATA —
           # rather than interpolating them into the prompt — keeps log content
           # out of the instruction channel (prompt-injection mitigation).
+          # Sanitize to shrink that surface further: strip ANSI escape codes
+          # and truncate every line to 500 chars (defeats long crafted lines).
           mkdir -p tmp
-          gh run view "${{ github.event.workflow_run.id }}" --log-failed \
-            > tmp/ci-failure.log 2>&1 || true
-          echo "[ci-autofix] wrote $(wc -l < tmp/ci-failure.log) log lines"
+          gh run view "${{ github.event.workflow_run.id }}" --log-failed 2>&1 \
+            | sed -E 's/\x1b\[[0-9;]*m//g' \
+            | cut -c1-500 \
+            > tmp/ci-failure.log || true
+          echo "[ci-autofix] wrote $(wc -l < tmp/ci-failure.log) sanitized log lines"
 
       - name: Diagnose failure and open a fix PR
         if: steps.dedup.outputs.open_autofix == '0'
@@ -148,3 +152,29 @@ jobs:
             --model opus
             --max-turns 30
             --allowedTools "Read,Glob,Grep,Edit,Write,Bash(git checkout:*),Bash(git add:*),Bash(git commit:*),Bash(git branch:*),Bash(git status:*),Bash(git diff:*),Bash(gh pr create:*),Bash(gh pr list:*),Bash(gh issue create:*),Bash(gh run view:*)"
+
+      - name: Flag sensitive-path changes for review
+        # Tripwire: autofix is allowed to change CI/automation surfaces
+        # (.github/, scripts/, hooks/) — CI failures often live there — but
+        # such a PR must never be rubber-stamped. If the agent's PR touches
+        # those paths, convert it to a draft and post a prominent warning so
+        # a human verifies the change is the intended fix and injection-free.
+        if: always() && steps.dedup.outputs.open_autofix == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pr=$(gh pr list --state open --json number,headRefName \
+            --jq '[.[] | select(.headRefName | startswith("ci-autofix/"))][0].number')
+          if [ -z "${pr}" ]; then
+            echo "[ci-autofix] no autofix PR was opened — nothing to flag"
+            exit 0
+          fi
+          sensitive=$(gh pr diff "${pr}" --name-only \
+            | grep -E '^(\.github/|scripts/|hooks/)' || true)
+          if [ -z "${sensitive}" ]; then
+            echo "[ci-autofix] PR #${pr} touches no CI/automation surfaces"
+            exit 0
+          fi
+          gh pr ready "${pr}" --undo || true
+          gh pr comment "${pr}" --body "$(printf '⚠️ **Human security review required**\n\nThis autofix PR modifies CI/automation surfaces:\n\n```\n%s\n```\n\nConverted to draft. Verify the change is the intended fix and contains no content injected via CI logs before marking it ready.' "${sensitive}")"
+          echo "[ci-autofix] PR #${pr} touches sensitive paths — marked draft"

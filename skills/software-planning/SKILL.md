@@ -238,7 +238,7 @@ Track current step, status (IMPLEMENTING/TESTING/REVIEWING/WAITING/COMPLETE), pr
 
 ## LEARNINGS.md Structure
 
-Sections: Gotchas, Patterns That Worked, Decisions Made, Edge Cases, Technical Debt. Capture learnings immediately as they occur -- don't wait until the end. Every entry must be tagged with the source: `**[agent-name]**` (e.g., `[implementation-planner]`, `[implementer]`, `[verifier]`, `[main-agent]`).
+Sections: Assumptions & Constraints Taken, Gotchas, Patterns That Worked, Decisions Made, Edge Cases, Technical Debt. Capture learnings immediately as they occur -- don't wait until the end. Every entry must be tagged with the source: `**[agent-name]**` (e.g., `[implementation-planner]`, `[implementer]`, `[verifier]`, `[main-agent]`).
 
 --> See [references/document-templates.md](references/document-templates.md#learningsmd-structure) for the full template.
 
@@ -268,6 +268,10 @@ In long pipelines, the main agent should run `/compact` at natural phase boundar
 - **Before verification** (verifier benefits from a focused context with just the plan and outcomes)
 
 The `PreCompact` hook snapshots pipeline documents to `.ai-work/PIPELINE_STATE.md` automatically. After compacting, re-read that file and `WIP.md` to restore orientation. Use `/compact Focus on [current phase]` with a hint when context is dominated by a prior phase's artifacts.
+
+### Conversation Checkpoints
+
+At phase boundaries and before verification, the orchestrator pauses to surface the critical assumptions and constraints taken — digested from the `## Assumptions & Constraints Taken` section of `LEARNINGS.md` — so the user can reflect or roll back. See [coordination-details.md#conversation-checkpoints](references/coordination-details.md#conversation-checkpoints) for the digest shape, rollback routing, and automated-mode behavior.
 
 ## End of Feature
 
@@ -337,6 +341,7 @@ The `implementation-planner` agent uses this skill directly for step decompositi
 | Start new step | WIP.md status and progress |
 | Discover gotcha | LEARNINGS.md gotchas section |
 | Make decision | LEARNINGS.md decisions section |
+| Take load-bearing assumption | LEARNINGS.md assumptions section |
 | Complete step | WIP.md progress checklist |
 | Hit blocker | WIP.md blockers section |
 | Plan changes | IMPLEMENTATION_PLAN.md + get approval |

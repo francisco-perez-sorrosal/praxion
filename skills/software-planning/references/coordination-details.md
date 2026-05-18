@@ -207,6 +207,62 @@ Information flows **forward only between concurrent agents**: the architect read
 
 `INTERFACE_DESIGN.md` is single-writer (interface-designer only) and cumulative per pipeline run. It is ephemeral — deleted with `.ai-work/<task-slug>/` after the pipeline completes. It is not subject to fragment file patterns.
 
+<a id="conversation-checkpoints"></a>
+## Conversation Checkpoints
+
+Operational depth for the **Conversation Checkpoints** summarized in `rules/swe/swe-agent-coordination-protocol.md`. These are the human-in-the-loop half of the Conversation discipline; the agent-side half (`Surface Assumptions`) is in the behavioral contract. The orchestrator owns and runs them — they fire at the seams between subagent spawns, where the orchestrator session is interactive.
+
+### Where the pauses fire
+
+- **Phase boundaries** — `research → architecture`, `architecture → planning`, `planning → implementation`. A wrong assumption is cheapest to unwind at a phase boundary.
+- **Load-bearing steps** — a step that took an assumption which is load-bearing and hard to reverse pauses on completion, even mid-phase.
+- **Not** intra-phase agent handoffs — `implementer ∥ test-engineer` and `doc-engineer` parallel work are tight loops working as designed; pausing there interrupts them for no gain.
+
+Per-step assumptions are logged quietly in `LEARNINGS.md` (the `### Assumptions & Constraints Taken` section); the *loud pause* is reserved for the points above, so each pause stays meaningful (anti-pause-fatigue).
+
+### The digest
+
+At each pause the orchestrator presents a **curated executive digest** — not a raw dump. It carries only: critical assumptions taken, load-bearing constraints, decisions made, and deviations from the plan. A digest that lists everything gets rubber-stamped; curation is what keeps the pause an inspection rather than a formality.
+
+Digests are **incremental** — each surfaces the delta since the last checkpoint, never a cumulative re-list of assumptions already dispositioned upstream.
+
+Digest shape:
+
+```markdown
+## Checkpoint Digest — <phase boundary | pre-verification>
+
+### Critical assumptions taken (delta since last checkpoint)
+- **[agent]** <assumption> — load-bearing: <yes/no>; self-challenge: <result>
+
+### Load-bearing constraints
+- <constraint, and why it matters>
+
+### Decisions & deviations from the plan
+- <decision or deviation>
+
+### To revisit (pre-verification only)
+- <load-bearing assumptions offered for multi-select acknowledgement>
+```
+
+### The pre-verification checkpoint
+
+Before the orchestrator invokes the `verifier`, it presents the curated digest of the whole pipeline run plus an **acknowledgement of the load-bearing residue** — the load-bearing assumptions not already dispositioned at an earlier checkpoint. The acknowledgement is a single multi-select ("which of these do you want to revisit before verification?"), not one dialog per assumption — the user inspects every major item but in one interaction.
+
+The user then either:
+
+- **proceeds** to verification, or
+- **rolls back** — the orchestrator re-invokes a specific upstream agent (`systems-architect` for a design fix, `implementation-planner` for a plan fix, `implementer` + `test-engineer` for an implementation fix) per what needs modifying. This runs with the pipeline still in flight — it is **not** a rework worktree and **not** the verifier rework loop.
+
+Two rollback paths bracket the verifier by design: the pre-verification checkpoint (user-driven, before verification) and the verifier rework loop (verifier-driven, after — the automated backstop for whatever the user did not catch). The pre-verification checkpoint catches what the verifier structurally cannot: the verifier checks the build against the plan's acceptance criteria, so a plan that drifted from intent passes verification; only a human intent-level inspect catches plan-level drift.
+
+### Tier scaling
+
+Direct and Lightweight tiers have no phases. The discipline collapses to the intake `Surface Assumptions` ritual plus a **pre-commit digest** — the existing commit-approval gate, enriched with the assumptions and constraints taken so the user is aware before approving the commit.
+
+### Automated mode
+
+Interactive (pauses on) is the default. When the user **explicitly** requests an automated run, the pauses are suppressed — but assumption capture and digest composition are **retained**: the digest is written as a post-hoc record for review instead of presented as a live pause. The loop degrades to a record; it is not deleted. Automated is an execution mode orthogonal to the Direct/Lightweight/Standard/Full tier.
+
 ## Doc-Engineer Parallel Execution
 
 When the planner assigns a doc step to a parallel group, the doc-engineer runs concurrently with the implementer and test-engineer on **disjoint file sets**: documentation files (READMEs, catalogs, architecture guides) vs production code vs test code.

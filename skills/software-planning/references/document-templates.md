@@ -109,6 +109,9 @@ Update WIP.md:
 ```markdown
 # Learnings: [Feature Name]
 
+## Assumptions & Constraints Taken
+- **[agent-name] [Title]**: The gap-filling assumption or constraint taken; mark the load-bearing ones and record the self-challenge result. Captured as taken — the orchestrator harvests this section to compose Conversation-checkpoint digests.
+
 ## Gotchas
 - **[implementation-planner] [Title]**: Context, issue, solution
 - **[implementer] [Title]**: Context, issue, solution
@@ -134,6 +137,8 @@ Don't wait until the end. When you discover something:
 1. Add it to LEARNINGS.md immediately with your `**[agent-name]**` tag
 2. Continue with current work
 3. At end of feature, learnings are ready to merge
+
+The `## Assumptions & Constraints Taken` section follows the same rule — record each load-bearing assumption the moment you take it, not batched at end-of-task, so a [Conversation Checkpoint](coordination-details.md#conversation-checkpoints) digests an accurate, current set.
 
 ## End of Feature
 

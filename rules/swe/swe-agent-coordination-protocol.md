@@ -128,6 +128,17 @@ Agents communicate through shared documents, not direct invocation. The pipeline
 | Interface-designer shadowing + challenge loop | When an interface surface is in scope: parallel to researcher + systems-architect; forward-only `INTERFACE_DESIGN.md` with one orchestrator-mediated loop-back when `## Architecture Challenges` is populated |
 | Verifier rework loop | When `REWORK_MANIFEST.md` is present in `.ai-work/<slug>/`, main agent creates a rework worktree per row via `EnterWorktree`, writes `VERIFIER_FINDINGS.md` inside, flips `td-NNN` rows to `in-flight`, and surfaces `/resume-rework` to the user. See `commands/resume-rework.md` for the fresh-session dispatch path. |
 
+### Conversation Checkpoints
+
+The human-in-the-loop half of the Conversation discipline (the agent-side half is `Surface Assumptions` in the behavioral contract). The orchestrator owns two checkpoints, run at the seams between subagent spawns where the orchestrator is interactive:
+
+- **Phase-transition surfacing** (Standard/Full) — at phase boundaries (research→architecture→planning→implementation) and load-bearing steps, *not* intra-phase agent handoffs, the orchestrator pauses, digests the critical assumptions and constraints taken, and lets the user reflect or roll back.
+- **Pre-verification checkpoint** — before invoking the verifier, the orchestrator presents a curated executive digest plus an acknowledgement of the load-bearing assumptions; the user proceeds, or rolls back to a specific upstream agent with the pipeline still in flight. This is distinct from the verifier rework loop (the verifier-driven backstop) — the two rollback paths bracket the verifier by design.
+
+Direct/Lightweight tiers have no phases — the discipline collapses to intake `Surface Assumptions` plus a pre-commit digest. Interactive (pauses on) is the default; an explicitly requested automated run suppresses the pauses but still captures assumptions and writes the digest as a post-hoc record. Automated is an execution mode orthogonal to the tier.
+
+Procedure — digest curation, acknowledgement shape, rollback routing, degraded-mode behavior: [coordination-details.md#conversation-checkpoints](../../skills/software-planning/references/coordination-details.md#conversation-checkpoints).
+
 ### Agent Selection Criteria
 
 Use an agent when the task benefits from a separate context window (large scope, multiple phases, structured output). Work directly for quick lookups, single changes, one-step edits. Per-agent Claude model tier is governed by [`agent-model-routing.md`](agent-model-routing.md).

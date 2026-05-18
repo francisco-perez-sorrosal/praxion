@@ -1,5 +1,5 @@
 ---
-id: dec-draft-133a6756
+id: dec-191
 title: Operationalize the Conversation C as a human↔agent inspect discipline
 status: accepted
 category: behavioral

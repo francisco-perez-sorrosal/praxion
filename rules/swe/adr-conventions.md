@@ -122,6 +122,10 @@ The 7-step procedure agents follow when creating a fragment ADR (identity deriva
 4. Read full ADR files for matching decisions
 5. Fallback (if index missing): `Glob .ai-state/decisions/[0-9]*.md` + `Glob .ai-state/decisions/drafts/*.md` + Grep frontmatter
 
+### Linking to ADRs
+
+Persistent files — `docs/`, `ARCHITECTURE.md`, READMEs — link the **finalized** record at `.ai-state/decisions/<NNN>-<slug>.md`, never a `.ai-state/decisions/drafts/<…>.md` fragment. Draft files are promoted to finalized `<NNN>-<slug>.md` records at finalize-on-merge, so a `drafts/` path stops resolving the moment the authoring pipeline merges. While a pipeline is in flight, cite an unfinalized ADR inline by its `dec-draft-<hash>` id (resolvable from the draft frontmatter), not by file path — the id survives finalize as a rewritten `dec-NNN`; the path does not. (ADR-to-ADR cross-references use the `id` form in frontmatter, governed by the Supersession and Re-affirmation protocols above — not file-path links.)
+
 ### Consumption
 
 | Consumer | Purpose |

@@ -185,7 +185,7 @@ Use this collection to deepen your understanding of Claude's capabilities and in
 ### For Praxion Users
 
 - **New to Claude:** Start with [Serious Builders](#how-serious-builders-co-work-with-claude) + [Cowork Setup](#claude-cowork-setup-the-complete-guide)
-- **Model selection:** Consult [Opus Guide](#claude-opus-46-practical-guide) and [Sonnet Guide](#sonnet-46-capabilities-computer-use)
+- **Model selection:** Consult [Opus Guide](#claude-opus-46-practical-guide) and [Sonnet Guide](#sonnet-46-capabilities--computer-use)
 - **Quick wins:** Implement one workflow from [10 Workflows](#10-claude-cowork-workflows-that-actually-work)
 - **Integration:** Use [Setup Guide](#claude-cowork-setup-the-complete-guide) context layers to bootstrap Praxion's CLAUDE.md and project instructions
 

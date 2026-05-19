@@ -725,3 +725,26 @@ def test_coord_protocol_rule_passes_strict_validation() -> None:
         f"validate_references.py --file {target} --strict failed: "
         f"stdout={result.stdout!r} stderr={result.stderr!r}"
     )
+
+
+@skip_if_no_validator
+def test_emdash_heading_double_hyphen_anchor_not_flagged(tmp_path: Path) -> None:
+    """Regression: GitHub slugifies each space individually -- no run collapse.
+
+    An em-dash heading (`## Ignore mechanism — inline`) leaves two spaces once
+    the em-dash is stripped, so its GitHub anchor is `ignore-mechanism--inline`
+    (double hyphen). The validator must reproduce that exact slug; collapsing
+    the whitespace run to a single hyphen would false-FAIL a correct anchor.
+    """
+    repo = _copy_fixture_repo(tmp_path)
+    result = _run("--all", "--format", "json", repo_root=repo)
+
+    flagged = _findings_for(
+        result,
+        file_suffix="skills/alpha/SKILL.md",
+        target_contains="ignore-mechanism--inline",
+    )
+    assert flagged == [], (
+        "Double-hyphen anchor for an em-dash heading is GitHub-correct and "
+        f"must not be flagged; got {flagged}"
+    )

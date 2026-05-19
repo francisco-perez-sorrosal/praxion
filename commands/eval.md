@@ -6,7 +6,7 @@ allowed-tools: [Bash(uv run --project eval praxion-evals:*)]
 
 User-invoked entrypoint for the `eval/` package. This command is opt-in; eval code never runs from hooks, never during a pipeline — the invocation contract is out-of-band by design so eval bugs cannot break agent work. Load the [`agent-evals`](../skills/agent-evals/SKILL.md) skill for eval design guidance.
 
-> ⚠️ **Known limitation — regression mode is effectively useless today.** Baselines are keyed by `task_slug`, but Praxion slugs are one-shot: each feature generates a unique slug, runs once, then `.ai-work/<slug>/` is deleted. There is no "next run" on that slug to compare against. Behavioral and judge modes work as documented; `regression` and `capture-baseline` are proofs-of-concept until the tier/shape-keyed envelope redesign in [ROADMAP 3.7](../ROADMAP.md#37-eval-framework-redesign-tiershape-keyed-baselines) lands. **Before running `regression` or `capture-baseline`, surface this limitation to the user and suggest that `behavioral` is the only Tier 1 mode currently worth running for real quality gating.**
+> ⚠️ **Known limitation — regression mode is effectively useless today.** Baselines are keyed by `task_slug`, but Praxion slugs are one-shot: each feature generates a unique slug, runs once, then `.ai-work/<slug>/` is deleted. There is no "next run" on that slug to compare against. Behavioral and judge modes work as documented; `regression` and `capture-baseline` are proofs-of-concept until the tier/shape-keyed envelope redesign lands. **Before running `regression` or `capture-baseline`, surface this limitation to the user and suggest that `behavioral` is the only Tier 1 mode currently worth running for real quality gating.**
 
 ## Process
 

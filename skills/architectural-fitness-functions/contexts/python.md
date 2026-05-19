@@ -18,8 +18,8 @@ the generic [Architectural Fitness Functions](../SKILL.md) skill.
   - [AST-Based Assertions](#ast-based-assertions)
   - [Filesystem Assertions](#filesystem-assertions)
 - [Meta-Citation Rule](#meta-citation-rule)
-- [Citation Locations — Python](#citation-locations----python)
-- [Authoring Workflow — Python](#authoring-workflow----python)
+- [Citation Locations — Python](#citation-locations--python)
+- [Authoring Workflow — Python](#authoring-workflow--python)
 - [References](#references)
 
 ## Tooling Overview

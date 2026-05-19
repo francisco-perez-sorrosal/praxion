@@ -32,7 +32,9 @@ ALLOWLIST_PREFIXES = ("memory-mcp/", "task-chronograph-mcp/", "hooks/", "scripts
 IGNORED_PATH_SEGMENTS = (".ai-work/", "node_modules/", ".venv/", "target/", "dist/", "build/")
 EXCLUDED_GLOB_PREFIXES = (".ai-work/", "node_modules/", ".venv/", "target/", "dist/", "build/", "memory-mcp/", "task-chronograph-mcp/")
 URL_SCHEMES = ("http://", "https://", "mailto:", "ftp://", "ftps://", "tel:")
-INCLUDE_PATTERNS = ("skills/*/SKILL.md", "skills/*/README.md", "skills/*/references/*.md", "skills/*/contexts/*.md", "skills/*/phases/*.md", "skills/*/assets/*.md", "rules/**/*.md", "agents/*.md", "commands/**/*.md", "docs/**/*.md", ".ai-state/decisions/*.md", "CLAUDE.md", "README.md", "ROADMAP.md", "README_DEV.md", "CHANGELOG.md")
+# skills/*/assets/*.md (templates) are intentionally excluded: their links are
+# instantiation-relative placeholders, unresolvable at the template's own path.
+INCLUDE_PATTERNS = ("skills/*/SKILL.md", "skills/*/README.md", "skills/*/references/*.md", "skills/*/contexts/*.md", "skills/*/phases/*.md", "rules/**/*.md", "agents/*.md", "commands/**/*.md", "docs/**/*.md", ".ai-state/decisions/*.md", "CLAUDE.md", "README.md", "ROADMAP.md", "README_DEV.md", "CHANGELOG.md")
 # fmt: on
 
 INLINE_IGNORE_MARKER = "<!-- validate-references:ignore -->"
@@ -46,7 +48,10 @@ INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
 LINK_TITLE_RE = re.compile(r'^(\S+)(?:\s+".*")?$')
 FRONTMATTER_RE = re.compile(r"^([a-zA-Z][\w-]*)\s*:\s*(.*?)\s*$")
 SLUG_STRIP_RE = re.compile(r"[^\w\- ]+", re.UNICODE)
-SLUG_SPACE_RE = re.compile(r"\s+")
+# One hyphen per whitespace char -- GitHub's slugger does not collapse runs,
+# so a heading like "A  B" (two spaces, e.g. left by a stripped em-dash)
+# slugifies to "a--b". Collapsing here would false-FAIL correct GitHub anchors.
+SLUG_SPACE_RE = re.compile(r"\s")
 
 FAIL = "FAIL"
 WARN = "WARN"

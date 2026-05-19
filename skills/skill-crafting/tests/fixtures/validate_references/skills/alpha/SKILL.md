@@ -29,6 +29,7 @@ description: Fixture skill hosting link-class scenarios for validate_references
 ## Same-file anchors
 
 - OK same-file: [jump to section](#same-file-anchors)
+- OK em-dash slug: [double-hyphen anchor](#ignore-mechanism--inline)
 - FAIL same-file: [nonexistent heading](#this-heading-does-not-exist)
 
 ## Cross-file anchors

@@ -17,8 +17,8 @@ the generic [Architectural Fitness Functions](../SKILL.md) skill.
   - [Running dependency-cruiser](#running-dependency-cruiser)
 - [ESLint `no-restricted-imports` Patterns](#eslint-no-restricted-imports-patterns)
 - [ArchUnitTS Alternative](#archunitts-alternative)
-- [Citation Locations — TypeScript](#citation-locations----typescript)
-- [Authoring Workflow — TypeScript](#authoring-workflow----typescript)
+- [Citation Locations — TypeScript](#citation-locations--typescript)
+- [Authoring Workflow — TypeScript](#authoring-workflow--typescript)
 - [CI Integration](#ci-integration)
 - [Diagram Output](#diagram-output)
 

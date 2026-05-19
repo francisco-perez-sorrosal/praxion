@@ -16,7 +16,7 @@ User-invoked entrypoint for the `eval/` package. This command is opt-in; eval co
 
 3. **`behavioral --task-slug <slug>`**: run `uv run --project eval praxion-evals behavioral --task-slug <slug>` and stream the Markdown artifact-manifest report. Pass through any optional `--tier lightweight|standard|full` flag the user provides. **This is the only Tier 1 mode currently useful for real quality gating.**
 
-4. **`regression --baseline <path>`**: **[PROOF-OF-CONCEPT — see banner above.]** Run `uv run --project eval praxion-evals regression --baseline <path>`. Reports drift findings (numeric drift + missing expected deliverables) against the committed baseline; never mutates Phoenix traces. Emits a stderr WARNING when the baseline has no numeric fields. The CLI will itself print a TODO banner pointing to ROADMAP 3.7.
+4. **`regression --baseline <path>`**: **[PROOF-OF-CONCEPT — see banner above.]** Run `uv run --project eval praxion-evals regression --baseline <path>`. Reports drift findings (numeric drift + missing expected deliverables) against the committed baseline; never mutates Phoenix traces. Emits a stderr WARNING when the baseline has no numeric fields. The CLI will itself print a TODO banner describing the limitation.
 
 5. **`capture-baseline --task-slug <slug>`**: **[PROOF-OF-CONCEPT — see banner above.]** Run `uv run --project eval praxion-evals capture-baseline --task-slug <slug>`. Snapshots current Phoenix traces + `.ai-work/<slug>/*.md` deliverables into a baseline JSON at `.ai-state/evals/baselines/<slug>.json` (override with `--output`). Read-only against Phoenix. Also blocked by a dep gap — `arize-phoenix` is missing from `eval/pyproject.toml`, so live Phoenix capture currently returns empty.
 

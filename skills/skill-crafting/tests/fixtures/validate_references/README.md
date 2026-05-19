@@ -19,8 +19,10 @@ validate_references/
 │   │   ├── references/
 │   │   │   ├── valid_target.md      # real target for intra-skill OK link
 │   │   │   └── anchored.md          # hosts cross-file anchors
-│   │   └── contexts/
-│   │       └── ignored_via_frontmatter.md   # file-level opt-out
+│   │   ├── contexts/
+│   │   │   └── ignored_via_frontmatter.md   # file-level opt-out
+│   │   └── assets/
+│   │       └── sample-template.md   # walk-exclusion: assets/ not validated
 │   └── beta/
 │       └── SKILL.md                 # sibling-skill link target
 ├── rules/

@@ -29,9 +29,7 @@ _SLUG_KEYED_BASELINE_WARNING = (
     "is deleted, so no comparison target exists for any captured baseline). "
     "Treat this output as a proof-of-concept. Replacement design "
     "(tier/shape-keyed envelope baselines sampled across many past pipelines) "
-    "tracked in ROADMAP 3.7: "
-    "https://github.com/francisco-perez-sorrosal/praxion/blob/main/ROADMAP.md"
-    "#37-eval-framework-redesign-tiershape-keyed-baselines"
+    "tracked as td-005 in .ai-state/TECH_DEBT_LEDGER.md."
 )
 
 

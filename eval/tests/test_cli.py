@@ -89,7 +89,7 @@ def test_regression_prints_slug_keyed_banner(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ):
-    """regression must emit the ROADMAP 3.7 TODO banner before running."""
+    """regression must emit the slug-keyed-baseline TODO banner before running."""
     from types import SimpleNamespace
 
     from praxion_evals.regression.baselines import (
@@ -115,7 +115,7 @@ def test_regression_prints_slug_keyed_banner(
     captured = capsys.readouterr()
     assert "TODO" in captured.err
     assert "slug-keyed" in captured.err
-    assert "ROADMAP 3.7" in captured.err
+    assert "td-005" in captured.err
 
 
 def test_capture_baseline_prints_slug_keyed_banner(
@@ -123,7 +123,7 @@ def test_capture_baseline_prints_slug_keyed_banner(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ):
-    """capture-baseline must emit the ROADMAP 3.7 TODO banner before running."""
+    """capture-baseline must emit the slug-keyed-baseline TODO banner before running."""
     from types import SimpleNamespace
 
     import pandas as pd
@@ -149,7 +149,7 @@ def test_capture_baseline_prints_slug_keyed_banner(
     captured = capsys.readouterr()
     assert "TODO" in captured.err
     assert "slug-keyed" in captured.err
-    assert "ROADMAP 3.7" in captured.err
+    assert "td-005" in captured.err
 
 
 def test_regression_warns_when_baseline_has_no_numeric_fields(

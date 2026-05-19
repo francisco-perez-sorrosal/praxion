@@ -509,8 +509,8 @@ class TestWarnings:
 
 @skip_if_no_validator
 class TestWalkExclusions:
-    """`.ai-work/` must not be walked, even though the fixture contains a
-    deliberately broken link inside it."""
+    """`.ai-work/` and `skills/*/assets/` must not be walked, even though the
+    fixture contains a deliberately broken link inside each."""
 
     def test_ai_work_is_not_walked(self, tmp_path: Path) -> None:
         repo = _copy_fixture_repo(tmp_path)
@@ -520,6 +520,21 @@ class TestWalkExclusions:
         assert walked == [], (
             ".ai-work/ must be excluded from the walk; "
             f"but findings were produced for files inside it: {walked}"
+        )
+
+    def test_assets_templates_are_not_walked(self, tmp_path: Path) -> None:
+        """skills/*/assets/ holds templates whose links are instantiation-
+        relative -- resolvable only once copied into a target project. The
+        assets/ tree must be excluded from the walk, or the placeholder paths
+        false-FAIL (the Category B failure mode this exclusion was added for).
+        """
+        repo = _copy_fixture_repo(tmp_path)
+        result = _run("--all", "--format", "json", repo_root=repo)
+
+        walked = _findings_for(result, file_suffix="assets/sample-template.md")
+        assert walked == [], (
+            "skills/*/assets/ templates must be excluded from the walk -- their "
+            f"links are instantiation-relative placeholders; got: {walked}"
         )
 
 

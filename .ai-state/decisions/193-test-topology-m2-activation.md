@@ -1,5 +1,5 @@
 ---
-id: dec-draft-19082bdc
+id: dec-193
 title: Test-topology M2 — behavioral agent wiring plus advisory growth trigger
 status: re-affirmation
 category: architectural

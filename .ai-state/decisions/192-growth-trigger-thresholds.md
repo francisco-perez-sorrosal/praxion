@@ -1,7 +1,7 @@
 ---
-id: dec-draft-f6986093
+id: dec-192
 title: Test-topology growth-trigger thresholds — two-factor gate with calibratable values
-status: proposed
+status: accepted
 category: configuration
 date: 2026-05-19
 summary: The advisory growth trigger fires on a two-factor gate — primary signal is full-suite wall-clock runtime, co-factor is structural feasibility (Built-component count plus a test-count floor). Starting values are 90 s runtime, 4 Built components, 200 tests, all recorded as explicitly calibratable guesses.
@@ -23,7 +23,7 @@ The M2 growth trigger (sentinel TT06 and the systems-architect Phase 2 readiness
 
 `dec-087` rejected a Praxion pilot specifically because Praxion's full test fleet runs in ~35 s — scoped invocation saves nothing at that scale — and because the topology groups would have recapitulated the whole repo rather than mapping to real subsystems. Both halves of that reasoning are signals: runtime (does scoping save anything?) and structural feasibility (do groups map to real subsystems?).
 
-This decision does not contradict `dec-draft-19082bdc` (the M2 activation decision); it *refines* it by fixing the specific threshold values that decision left to "the architect finalizes." It is filed as a separate ADR because the threshold values are independently calibratable and will likely be tuned on their own cadence, separate from the structural M2 decision.
+This decision does not contradict `dec-193` (the M2 activation decision); it *refines* it by fixing the specific threshold values that decision left to "the architect finalizes." It is filed as a separate ADR because the threshold values are independently calibratable and will likely be tuned on their own cadence, separate from the structural M2 decision.
 
 ## Decision
 
@@ -75,4 +75,4 @@ Use the number of declared subsystems rather than a raw test count as the co-fac
 
 ## Relationship to the M2 Activation Decision
 
-This ADR refines `dec-draft-19082bdc` (test-topology M2 activation), which established the two-factor-gate *shape* and named the growth-trigger homes but explicitly left the threshold *values* for the architect to finalize. This ADR fixes those values. No supersession relationship is recorded: the M2 decision's structural content (agent wiring, growth-trigger homes, re-affirmations) remains fully authoritative; this ADR only makes its "thresholds TBD" placeholder concrete. The two are co-authored in the same pipeline and stand together — the values here are expected to be re-tuned independently of the structural decision, which is why they live in a separate `configuration`-category ADR.
+This ADR refines `dec-193` (test-topology M2 activation), which established the two-factor-gate *shape* and named the growth-trigger homes but explicitly left the threshold *values* for the architect to finalize. This ADR fixes those values. No supersession relationship is recorded: the M2 decision's structural content (agent wiring, growth-trigger homes, re-affirmations) remains fully authoritative; this ADR only makes its "thresholds TBD" placeholder concrete. The two are co-authored in the same pipeline and stand together — the values here are expected to be re-tuned independently of the structural decision, which is why they live in a separate `configuration`-category ADR.

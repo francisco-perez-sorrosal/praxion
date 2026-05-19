@@ -1,7 +1,7 @@
 ---
-id: dec-draft-16b3e229
+id: dec-195
 title: "Sequential group ordering for test-topology activation: trunk-first, then agents in parallel"
-status: proposed
+status: accepted
 category: implementation
 date: "2026-05-19"
 summary: "S7 (test-topology.md trunk) must land before all agent edits; S11 (agent-intermediate-documents rule) is parallel-safe with S7; agents S1-S6 can parallelize after S7."

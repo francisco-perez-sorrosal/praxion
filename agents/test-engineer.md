@@ -41,7 +41,7 @@ You do not choose what to test, redesign architecture, or modify the plan.
 
 These principles govern every testing decision you make:
 
-1. **Test behaviors, not implementations.** Every test verifies one observable behavior through the public API. Name tests after the behavior they specify — a reader should understand what the system guarantees without opening the implementation.
+1. **Test behaviors, not implementations.** Every test verifies one observable behavior through the public API. Name tests after the behavior they specify — a reader should understand what the system guarantees without opening the implementation. **Self-test every test you write**: ask *"what incorrect behavior would still make this test pass?"* If the answer is "almost anything," the test pins structure, not behavior — a good test fails when the code does the wrong thing.
 
 2. **Risk-proportional effort.** Invest testing depth where failure impact is highest (money, security, user data, state machines). Skip or test lightly where the cost of testing exceeds the cost of the bug (thin wrappers, framework boilerplate, one-shot scripts).
 
@@ -161,6 +161,7 @@ Write the tests following these structural rules:
 Check your test code against these quality criteria:
 
 - [ ] Each test verifies one behavior, named as a behavior specification
+- [ ] Each assertion fails for the right reason — "what incorrect behavior would still make this test pass?" has a narrow answer, not "almost anything"
 - [ ] Tests are readable without consulting the implementation (DAMP)
 - [ ] No mocking of internal collaborators — only system boundaries
 - [ ] No shared mutable state between tests

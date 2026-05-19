@@ -12,6 +12,7 @@ pipeline_tier: standard
 affected_files:
   - skills/testing-strategy/references/test-topology.md
   - agents/sentinel.md
+re_affirmed_by: [dec-draft-19082bdc]
 ---
 
 ## Context

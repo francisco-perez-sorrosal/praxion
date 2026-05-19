@@ -68,6 +68,7 @@ Evaluate the codebase for structural readiness to receive the proposed changes:
 - Missing abstractions where the feature needs extension points
 - Code duplication that the feature would worsen
 - Absent or inadequate test coverage for critical paths being modified
+- **Test-topology readiness** — when the project has no `.ai-state/TEST_TOPOLOGY.md`, check whether it has grown past the topology-adoption thresholds (full-suite wall-clock runtime, Built-component count in `.ai-state/DESIGN.md` §3, total test count — see `skills/testing-strategy/references/test-topology.md` §"Growth-Trigger Policy"). If all three are crossed, record an advisory recommendation in Codebase Readiness to run `/refresh-topology --init`. This is advisory — not a blocking prerequisite for the current feature.
 
 **API version drift check:**
 
@@ -160,6 +161,8 @@ If this is a Standard or Full tier pipeline:
 **Diagram toolchain convention:** C4-architectural diagrams (System Context L0, Container/Component L1) use LikeC4 DSL + D2 rendering per `rules/writing/diagram-conventions.md`. Author the model in `docs/diagrams/<name>.c4`; generated `.d2` and rendered `.svg` are committed alongside. Sequence diagrams and non-C4 architectural diagrams remain Mermaid. See `docs/architecture-diagrams.md` for install and hook behavior.
 
 The software-planning skill provides the methodology; `.ai-state/DESIGN.md` captures THIS project's architecture as a design target; `docs/architecture.md` provides developer-facing navigation verified against the codebase. Reference ADR IDs for architectural decisions rather than duplicating rationale. Follow diagram conventions from `rules/writing/diagram-conventions.md` for all diagrams. Cross-reference `SYSTEM_DEPLOYMENT.md` in sections 2 and 6 if it exists.
+
+**Test-topology Subsystems table (when the project has a populated `.ai-state/TEST_TOPOLOGY.md`).** When this feature adds, renames, or removes Built components in `.ai-state/DESIGN.md` §3, update the `## Subsystems` cross-reference table of `TEST_TOPOLOGY.md` to match. You own that section; the per-group YAML blocks belong to the test-engineer and `integration_boundaries` to the implementation-planner — do not edit those.
 
 Skip this phase for trivially simple projects (single module, no external dependencies).
 

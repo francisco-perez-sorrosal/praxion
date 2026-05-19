@@ -19,7 +19,7 @@ audience: developer
 | Attribute | Value |
 |-----------|-------|
 | **System** | Praxion |
-| **Last verified against code** | 2026-05-12 (dashboard-redesign: full UX overhaul — interactive viz, Sentrux purge, diagram serving, design tokens) |
+| **Last verified against code** | 2026-05-19 (test-topology M2 — §9 agent wiring; other sections last verified 2026-05-12) |
 
 This document is the **developer-facing** navigation guide: every component, file path, and interface listed here exists on disk and resolves at the cited path. It is the code-verified subset of [`.ai-state/DESIGN.md`](../.ai-state/DESIGN.md), which is the design-target architect-facing document. Use this guide to navigate the codebase; consult the architect doc for system attributes (type, language, pattern), design rationale, planned components, and architectural evolution.
 
@@ -119,31 +119,35 @@ Architectural decisions are recorded as ADRs in [`.ai-state/decisions/`](../.ai-
 ## 9. Test Topology
 
 <!-- Developer-facing navigation guide. Components named in this section have been verified
-     against the codebase. Items marked Designed are not on disk yet (they ship in this pipeline);
-     items marked Planned are not on disk and will be created by future projects.
-     For design rationale and ADR cross-references, see .ai-state/DESIGN.md §9. -->
+     against the codebase. Items marked Planned are not on disk and will be created by
+     consumer projects, not Praxion.
+     For design rationale and ADR cross-references, see .ai-state/DESIGN.md §9.
+     Last verified against code: 2026-05-19. -->
 
 ### 9.1 Where to find what
 
-The test-topology subsystem lets each implementation step run only the tests covering its affected subsystems plus their integration boundaries. Three execution tiers (`step` / `phase` / `pipeline`) and a sentinel-driven refactor trigger emerge from a per-project topology declaration.
+The test-topology subsystem lets each implementation step run only the tests covering its affected subsystems plus their integration boundaries. Three execution tiers (`step` / `phase` / `pipeline`) and a sentinel-driven refactor trigger emerge from a per-project topology declaration. At M2 the six pipeline agents are wired to author and honor the topology when a project has one.
 
 | You want to... | Look at | Status |
 |---|---|---|
-| Read the language-agnostic schema | `skills/testing-strategy/references/test-topology.md` | Designed (lands in this pipeline) |
-| Read the Python-specific tooling concretization | `skills/testing-strategy/references/python-testing.md` (test-topology section) | Designed (lands in this pipeline) |
+| Read the language-agnostic schema | `skills/testing-strategy/references/test-topology.md` | Built |
+| Read the Python-specific tooling concretization | `skills/testing-strategy/references/python-testing.md` (test-topology section) | Built |
+| Read the growth-trigger policy and `--init` path | `skills/testing-strategy/references/test-topology.md` §"Growth-Trigger Policy" | Built (M2) |
 | See whether your project has populated its topology | `.ai-state/TEST_TOPOLOGY.md` (per-project) | Planned (no Praxion population by design) |
-| Read the sentinel checks for topology health | `agents/sentinel.md` `### Test Topology (TT)` | Designed (lands in this pipeline) |
-| See the debt class for topology drift | `rules/swe/agent-intermediate-documents.md` (`class` enum) | Designed (`topology-drift` value lands in this pipeline) |
-| Add a Tests: field to a step in your IMPLEMENTATION_PLAN.md | `skills/software-planning/SKILL.md` step schema | Designed (additive optional field lands in this pipeline) |
+| Read the sentinel checks for topology health | `agents/sentinel.md` `### Test Topology (TT)` (TT01–TT06) | Built |
+| See the debt class for topology drift | `rules/swe/agent-intermediate-documents.md` (`class` enum) | Built (`topology-drift`) |
+| Add a Tests: field to a step in your IMPLEMENTATION_PLAN.md | `skills/software-planning/SKILL.md` step schema | Built |
+| Create or refresh a project's topology | `commands/refresh-topology.md` (`--init` / default) | Built (M2) |
 
 ### 9.2 Activation status in Praxion
 
-Praxion itself ships the schema and conventions but does **not** populate `.ai-state/TEST_TOPOLOGY.md` — see [`dec-087`](../.ai-state/decisions/087-pilot-strategy-trunk-only-then-defer-behavioral-pilot.md). The first consumer project that adopts the i-am plugin and decides to activate the protocol creates the populated topology in its own `.ai-state/`.
+Praxion ships the schema, conventions, agent wiring, and the `/refresh-topology` command, but does **not** populate `.ai-state/TEST_TOPOLOGY.md` for itself — Praxion's ~35 s test fleet is below the growth-trigger thresholds, and the behavioral pilot is deliberately deferred to the first consumer project that crosses the gate. A consumer project that adopts the i-am plugin and grows past the thresholds runs `/refresh-topology --init` to create its topology.
 
 For Praxion development today, this means:
 
-- The implementer continues to run the project's default test command (`uv run pytest` or `cd <pocket> && uv run pytest`) per pocket. The `Tests:` step-schema field, while documented, is not emitted in Praxion plans.
-- Sentinel TT01–TT05 self-deactivate (no `.ai-state/TEST_TOPOLOGY.md` to check).
+- The implementer continues to run the project's default test command (`uv run pytest` or `cd <pocket> && uv run pytest`) per pocket. The `Tests:` step-schema field is not emitted in Praxion plans because Praxion has no populated topology.
+- Sentinel TT01–TT05 self-deactivate (no `.ai-state/TEST_TOPOLOGY.md` to check). TT06 (advisory growth trigger) is evaluated but does not fire — Praxion's runtime is below threshold.
+- The systems-architect's Phase 2 topology-readiness check is evaluated but does not fire.
 - The full-suite integration checkpoint at the end of each pipeline remains today's behavior.
 
 ### 9.3 Adding a new language leaf (procedure)
@@ -157,7 +161,7 @@ If a future contributor extends the test-topology to a new language (Go, TypeScr
 3. Document the leaf's `shared_fixture_scope` mapping (which language-framework scope keyword maps to each of `none / per-test / per-file / per-process / per-suite`).
 4. Provide a worked invocation example.
 
-No edits to the trunk schema, the sentinel TT01–TT05 wording, the closure semantics, or any other agent definition are required. The hypothetical Go module worked example in this pipeline's `.ai-work/test-partitioning/SYSTEMS_PLAN.md` (Hypothetical Go Module Worked Example section) is the proof artifact.
+No edits to the trunk schema, the sentinel TT01–TT06 wording, the closure semantics, or any agent definition are required. The hypothetical Go module worked example in the trunk reference (`skills/testing-strategy/references/test-topology.md` §"Go Module — Portability Proof") is the proof artifact.
 
 ### 9.4 Caveats developers should know
 

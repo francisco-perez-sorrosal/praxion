@@ -136,6 +136,10 @@ Write the tests following these structural rules:
 - **Boundary value analysis**: for numeric ranges, string lengths, collection sizes — test at and around boundaries
 - **Mutation testing**: to assess test suite quality on existing code — verify assertions are strong enough to catch code mutations
 
+**Test-topology per-group definitions (when the project has a populated `.ai-state/TEST_TOPOLOGY.md`):**
+
+You own the per-group YAML blocks in `TEST_TOPOLOGY.md`. When you add, split, or re-scope a logical test group, update its block per the schema in `skills/testing-strategy/references/test-topology.md` — `id`, `title`, `subsystems`, `tier`, `selectors`, `file_dependencies`, `parallel_safe`, `shared_fixture_scope`. Use the project's language leaf (`references/<lang>-testing.md`) for the concrete `selectors` strategy identifiers and the parallel-runner choice. Do not edit the `## Subsystems` table (architect-owned) or `integration_boundaries` (planner-owned).
+
 ### Phase 4 — Format, Lint, and Validate
 
 1. Run the project's formatters and linters in fix mode on the test files you wrote. Detect tools from project config files. Consult the loaded language skill for specific tools and commands. Fix any violations that auto-fix cannot resolve.

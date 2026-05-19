@@ -58,6 +58,8 @@ Use subagents liberally to keep the main context window clean — one focus per 
 
 **Match response weight to task scale.** A typo fix doesn't need a pipeline. A one-line bug doesn't need a researcher. Use the full machinery for multi-step, multi-file, architecturally significant work — and work directly for quick lookups, single changes, and obvious fixes.
 
+**Test topology.** When a pipeline runs in a project with a populated `.ai-state/TEST_TOPOLOGY.md`, the implementation-planner authors `Tests:` fields on implementation steps and the implementer runs scoped test invocations — speeding the inner loop. If the sentinel or systems-architect flags topology readiness (no topology, growth thresholds crossed), surface `/refresh-topology --init` to the user. See `skills/testing-strategy` for the full protocol.
+
 ## The Behavioral Contract
 
 The Methodology defines the flow; the contract defines the stance. Four named behaviors are non-negotiable for every agent that writes, plans, or reviews code:

@@ -286,6 +286,17 @@ When tests exist or are expected:
 6. Flag if the plan required tests that were not written.
 7. When verifying agent-based systems, consult the `agent-evals` skill for agent-specific evaluation methodology (non-determinism handling, trajectory evaluation, grader design).
 
+#### Topology tier-appropriateness (when steps carried `Tests:` fields)
+
+When the pipeline's `IMPLEMENTATION_PLAN.md` steps include any `Tests:` fields, perform a document cross-check — do not run tests:
+
+1. For each step with a `Tests:` field: read `.ai-state/TEST_TOPOLOGY.md` and map the step's `Files` to topology groups via each group's `file_dependencies` field.
+2. If the step's `Files` span components belonging to more than one group but the step declared `tier=step` (single-group, no closure), emit a `WARN`: "Step <N>: Files touch groups [<group-ids>] but declared tier=step (no closure). Scoped run may have missed cross-group regressions. Recommend re-running at tier=phase or higher."
+3. A step that declared `selector=manual` and includes a justification `reason` is not a finding — the manual escape hatch is correctly invoked.
+4. When no step carried a `Tests:` field, skip this sub-step silently (the topology protocol was not active for this pipeline).
+
+This is a document cross-check only. The verifier does not re-run tests to confirm coverage.
+
 #### Invoking the `test-coverage` skill (permission, not obligation)
 
 The `test-coverage` skill is loaded into your context and is available to locate, invoke, and render the project's canonical coverage target. Use it at your discretion when the following signals suggest coverage measurement is worth the time:

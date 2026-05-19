@@ -28,6 +28,7 @@ Reusable slash commands for AI coding assistants. Each `.md` file becomes a `/co
 | `/project-coverage` | Run the project's canonical coverage target and render a terminal summary via the `test-coverage` skill |
 | `/project-metrics` | Compute project complexity/health metrics (churn, complexity, coupling, hot-spots, trends) and write a timestamped report triple to `.ai-state/` |
 | `/refresh-skill` | Refresh version-sensitive sections of a skill against current upstream documentation |
+| `/refresh-topology` | Create or refresh the project's test-group topology for scoped test execution (`--init` for first-time creation, no flag for drift-response refresh) |
 | `/release` | Bump version, update changelog, and create a release tag |
 | `/report-upstream` | File a well-formed bug report on an upstream open-source project |
 | `/praxion-complete-install` | Reconfigure or recover a marketplace-installed Praxion setup — symlink rules, CLI scripts, and optional context-hub MCP |

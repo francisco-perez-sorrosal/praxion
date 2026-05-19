@@ -112,6 +112,14 @@ When a parallel group adds, removes, or renames files, introduces new APIs, or c
 - Doc steps target documentation files only (disjoint with production and test code)
 - Skip the doc step when changes are internal with no documentation impact
 
+**Test-topology `Tests:` field (when the project has a populated `.ai-state/TEST_TOPOLOGY.md`):**
+
+For each implementation step, add a `Tests:` field naming the topology group ids the step's `Files` affect and an execution tier — `step` for a single-group change, `phase` for a change spanning a group plus its declared boundaries. The closing integration-checkpoint step always uses `tier=pipeline` (full suite). The `Tests:` field schema and the `selector=manual` justification enum live in `skills/testing-strategy/references/test-topology.md` §"Document Conventions". When the project has no topology, omit the field — its absence means "full suite," today's default.
+
+**Test-topology `integration_boundaries` ownership:**
+
+You own the per-group `integration_boundaries` field in `TEST_TOPOLOGY.md`. When step decomposition reveals a step that bridges two groups not already linked, add the missing group id to the relevant group's `integration_boundaries`. Do not edit the `## Subsystems` table (architect-owned) or the per-group definitions (test-engineer-owned).
+
 **Deployment step annotations:**
 
 When a step creates or modifies deployment configuration files (`compose.yaml`, `Dockerfile`, `Caddyfile`, `systemd` units, `.env.example`), annotate it with `[Deployment]`. This signals the implementer to update `.ai-state/SYSTEM_DEPLOYMENT.md` as part of step completion. When multiple deployment steps exist, the last one in sequence should include a `Done when` clause verifying the deployment doc is consistent with actual configs.
@@ -229,6 +237,7 @@ Complete the planning documents:
 **Assignee**: implementer
 **Implementation**: What code will we write?
 **Files**: [production files]
+**Tests:** groups=[<group_id>, ...] tier=<step|phase|pipeline> selector=<auto|manual>   # schema in test-topology.md §"Document Conventions"; only when the project has a populated TEST_TOPOLOGY.md
 **Done when**: How do we know it's complete?
 
 ### Step 2: Design behavioral tests for [acceptance criteria] [parallel-group: A]

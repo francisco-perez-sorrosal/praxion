@@ -291,12 +291,42 @@ The `Tests:` field in `IMPLEMENTATION_PLAN.md` and `WIP.md` is optional at the s
 
 `TEST_TOPOLOGY.md` is **not regenerated automatically** at any pipeline boundary.
 
-Refresh is triggered by one of two events:
+Refresh is triggered by one of three events:
 
-1. **Human-initiated**: the architect or test-engineer runs `/refresh-topology` (a future command; not yet available at M1).
-2. **Sentinel-triggered**: sentinel TT03 accumulates 3 or more open `topology-drift` ledger rows and emits a WARN with "Run `/refresh-topology` — 3+ topology-drift items accumulated."
+1. **First-time creation**: the user runs `/refresh-topology --init` to scaffold the initial topology from `.ai-state/DESIGN.md` §3 Built components, spawning the systems-architect (Subsystems table) and test-engineer (per-group YAML blocks). `integration_boundaries` populate lazily during subsequent normal pipelines.
+2. **Human-initiated drift reconciliation**: the user runs `/refresh-topology` (no flag) to reconcile an existing topology against the current `DESIGN.md` components and open `topology-drift` ledger rows.
+3. **Sentinel-triggered**: sentinel TT03 accumulates 3 or more open `topology-drift` ledger rows and emits a WARN with "Run `/refresh-topology` — 3+ topology-drift items accumulated."
 
 **Rationale for no automatic regeneration:** The `TEST_TOPOLOGY.md` file uses section ownership (architect owns the Subsystems table; test-engineer owns groups; planner owns `integration_boundaries`). Per-pipeline auto-regeneration would nullify section ownership — whichever agent regenerates the file becomes the de-facto owner of everything. The same model applies to `TECH_DEBT_LEDGER.md`: append-only with explicit refresh, not auto-regenerate.
+
+---
+
+## Growth-Trigger Policy
+
+The test-topology protocol is **opt-in**. A project that has not yet run `/refresh-topology --init` has no `.ai-state/TEST_TOPOLOGY.md`, and the protocol is dormant — the pipeline runs the full suite at every step, which is today's default behavior.
+
+**Two-factor gate.** Adoption becomes advisable when a project has grown large enough that splitting tests into logical groups would yield a meaningful speedup. The advisory fires when **all three** of the following signals are simultaneously crossed:
+
+1. **Full-suite wall-clock runtime ≥ 90 seconds** — the suite is slow enough that a scoped inner loop would save meaningful developer time.
+2. **Built components in `.ai-state/DESIGN.md` §3 ≥ 4** — the architecture has enough distinct subsystems that group boundaries would be non-trivial (fewer than 4 components would produce groups that recapitulate the whole project).
+3. **Total test count ≥ 200** — the test corpus is large enough that a scoped run would execute significantly fewer tests than the full suite.
+
+These thresholds are calibratable guesses — reasonable starting points, not empirically derived constants. If your project's suite is expensive at 60 seconds, or its architecture warrants groups at 3 components, adjust the thresholds before the advisory ever fires. The right threshold is the one that reflects your project's reality, not this document's defaults.
+
+**Two trigger homes.** The advisory is evaluated in two places:
+
+- **Sentinel TT06** (periodic check, outside any pipeline) — evaluates the three signals at each sentinel run when no `TEST_TOPOLOGY.md` exists. If all three are crossed, emits an INFO advisory naming each crossed threshold and recommending `/refresh-topology --init`. Never writes a file or creates a ledger row.
+- **Systems-architect Phase 2** (in-pipeline) — when the project has no `TEST_TOPOLOGY.md`, the architect checks the same signals during the Structural Health Checks pass. If all three are crossed, records an advisory recommendation in the Codebase Readiness section of the systems plan. This is advisory — not a blocking prerequisite for the current feature.
+
+---
+
+## Protocol Milestones
+
+**M1 — Trunk-only:** The schema, tier vocabulary, registries, sentinel TT01–TT05, and document conventions are defined in this file. No pipeline agents author or honor `TEST_TOPOLOGY.md`. The protocol is specifiable but not yet wired into any pipeline agent behavior.
+
+**M2 — Behavioral activation:** The pipeline agents are wired to author and honor `TEST_TOPOLOGY.md` and the `Tests:` field, and an advisory growth trigger proposes adoption. The protocol is now usable by any consumer project; Praxion itself still does not populate its own topology (pilot deferral unchanged).
+
+**M3 (future):** The `expected_runtime_envelope` field becomes required for groups that have been running for more than three pipeline cycles; sentinel TT04 activates and files `topology-drift` ledger rows for runtime envelope violations.
 
 ---
 

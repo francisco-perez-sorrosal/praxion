@@ -263,7 +263,7 @@ Inline `dec-NNN` references in this document's component, interface, and constra
 
 ## 9. Test Topology
 
-<!-- OWNER: systems-architect (skeleton, ownership boundaries) | LAST UPDATED: 2026-04-28 by systems-architect -->
+<!-- OWNER: systems-architect (skeleton, ownership boundaries) | LAST UPDATED: 2026-05-19 by systems-architect -->
 <!-- Architect-facing design-target view of the test-topology subsystem. The artifact at
      .ai-state/TEST_TOPOLOGY.md is created on first-write by whichever agent populates the first group;
      this section names ownership boundaries, sentinel/ledger integration, and ADR cross-references.
@@ -282,9 +282,11 @@ The subsystem is **language-agnostic at the trunk** and **per-language at the le
 | Trunk reference | `skills/testing-strategy/references/test-topology.md` | Designed (this pipeline) | testing-strategy skill maintainer | Schema, identifier registries, document conventions, refactor-trigger semantics |
 | Python leaf | `skills/testing-strategy/references/python-testing.md` (extension) | Designed (this pipeline) | testing-strategy skill maintainer | pytest-globs, pytest-markers registry rows; xdist scheduler; filelock recipe; pyproject snippet |
 | Project topology | `.ai-state/TEST_TOPOLOGY.md` | **Planned** (no population in Praxion per ADR `dec-087`) | systems-architect (Subsystems table) + test-engineer (groups) + implementation-planner (per-pipeline integration_boundaries) | Per-project populated topology; first consumer project's M2 pipeline creates it |
-| Sentinel TT family | `agents/sentinel.md` Check Catalog `### Test Topology (TT)` | Designed (this pipeline) | sentinel agent maintainer | TT01 subsystem cross-ref, TT02 glob expansion, TT03 coupling drift, TT04 envelope drift, TT05 marker-id consistency |
-| Tech-debt class | `rules/swe/agent-intermediate-documents.md` `class` enum row | Designed (this pipeline) | rule maintainer | New `topology-drift` value; producer = sentinel; owner-role = implementation-planner |
-| Document-schema additions | `IMPLEMENTATION_PLAN.md` `**Tests:**` field; `WIP.md` `Tests:`; `TEST_RESULTS.md` `Tier:` `Groups:` `Parallelism:` `Per-group results:` lines | Designed (this pipeline) | software-planning skill + agent-pipeline-details reference maintainer | Optional additive fields; absence preserves today's full-suite behavior |
+| Sentinel TT family | `agents/sentinel.md` Check Catalog `### Test Topology (TT)` | Built | sentinel agent maintainer | TT01 subsystem cross-ref, TT02 selector-strategy, TT03 drift accumulation, TT04 envelope drift, TT05 marker-id consistency, TT06 advisory growth trigger |
+| Tech-debt class | `rules/swe/agent-intermediate-documents.md` `class` enum row | Built | rule maintainer | `topology-drift` value; producer = sentinel; owner-role = implementation-planner |
+| Document-schema additions | `IMPLEMENTATION_PLAN.md` `**Tests:**` field; `WIP.md` `Tests:`; `TEST_RESULTS.md` `Tier:` `Groups:` `Parallelism:` `Per-group results:` lines | Built | software-planning skill + agent-pipeline-details reference maintainer | Optional additive fields; absence preserves today's full-suite behavior |
+| Agent behavioral wiring | `agents/{systems-architect,implementation-planner,implementer,test-engineer,verifier,sentinel}.md` conditional clauses | Built (M2 wiring) | each agent's maintainer | Each agent authors or honors `TEST_TOPOLOGY.md` / the `Tests:` field when a project has a populated topology; gated on file presence |
+| Refresh command | `commands/refresh-topology.md` | Built (M2) | command maintainer | `--init` creates a topology (spawns architect + test-engineer); default mode runs the drift-response refresh (spawns implementation-planner) |
 
 ### 9.3 Section Ownership (per `.ai-state/TEST_TOPOLOGY.md`)
 
@@ -292,7 +294,7 @@ When a project populates the topology, the file's sections are governed by secti
 
 | Section | Owner | Edit conditions |
 |---|---|---|
-| `## 2. Subsystems` (cross-reference table) | systems-architect | Updated when ARCHITECTURE.md §3 components change |
+| `## 2. Subsystems` (cross-reference table) | systems-architect | Updated when `.ai-state/DESIGN.md` §3 components change |
 | `## 3. Groups` per-group YAML blocks | test-engineer | Updated when test code is added/refactored within an existing group |
 | Per-group `integration_boundaries` field | implementation-planner | Updated during a pipeline when a step crosses a previously-undeclared bridge |
 | `## 1. Overview` metadata | systems-architect | Updated alongside Subsystems table |
@@ -314,11 +316,13 @@ A new language leaf is purely additive: a new reference file, new registry rows,
 
 ### 9.6 Activation State
 
-At this milestone (M1, post-this-pipeline), the test-topology subsystem is structurally complete but behaviorally inert in Praxion:
+At this milestone (**M2 — behavioral activation**, post-this-pipeline), the test-topology subsystem is both structurally complete and behaviorally wired, while remaining behaviorally inert *in Praxion itself*:
 
 - All trunk and leaf artifacts exist (`Built`).
-- Sentinel TT01–TT05 dimensions are defined (`Built`) but **conditionally inactive** — they self-deactivate when `.ai-state/TEST_TOPOLOGY.md` does not exist.
-- `IMPLEMENTATION_PLAN.md` `**Tests:**` field is documented as optional in the schema (`Built`); current Praxion pipelines do not emit it.
-- No populated `.ai-state/TEST_TOPOLOGY.md` exists in Praxion (`Planned`); the first consumer project that adopts the protocol creates it.
+- Sentinel TT01–TT06 dimensions are defined (`Built`). TT01–TT05 self-deactivate when `.ai-state/TEST_TOPOLOGY.md` does not exist; **TT06** (advisory growth trigger) is the deliberate exception — it is evaluated *because* the file is absent and fires only when the two-factor growth gate is crossed.
+- The six pipeline agents are wired (`Built`, M2): the systems-architect, implementation-planner, implementer, test-engineer, verifier, and sentinel each carry a conditional clause that authors or honors the topology when a project has a populated `TEST_TOPOLOGY.md`. Every clause is gated on file presence — a topology-less project (including Praxion) sees no behavior change.
+- `/refresh-topology` exists (`Built`, M2): `--init` creates a topology; default mode runs the drift-response refresh.
+- The advisory growth trigger (sentinel TT06 + architect Phase 2) proposes adoption when a project grows past the calibrated thresholds — but never auto-creates a topology.
+- No populated `.ai-state/TEST_TOPOLOGY.md` exists in Praxion (`Planned`). Praxion's ~35 s test fleet is below the growth-trigger thresholds, and the pilot deferral is re-affirmed — the first real behavioral pilot happens in a consumer project that crosses the gate.
 
-This dual state (Built schema + Planned activation) is the load-bearing record. It allows future agents to find the structural surface without confusing the "schema exists" signal with a "Praxion uses this protocol" signal.
+This state (Built schema + Built agent wiring + Planned Praxion activation) is the load-bearing record. M2 made the protocol *usable* by any consumer project; it did not make Praxion a pilot. Future agents must not confuse "the agents can use this protocol" with "Praxion uses this protocol."

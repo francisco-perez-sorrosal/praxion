@@ -1,7 +1,7 @@
 ---
-id: dec-draft-a22564b9
+id: dec-197
 title: Ship kepano/obsidian-skills via fetch-at-install (shallow git clone) to a global location
-status: proposed
+status: accepted
 category: architectural
 date: 2026-05-19
 summary: Procedure 1 fetches kepano/obsidian-skills via `git clone --depth 1` into ~/.local/share/praxion/kepano-skills at install time; Procedure 2 links into per-project .claude/skills/obsidian/. No vendoring, no submodule.
@@ -15,7 +15,7 @@ affected_files:
   - scripts/install-obsidian-deps.sh
   - commands/onboard-project.md
   - commands/new-project.md
-re_affirms: dec-draft-c556ea55
+re_affirms: dec-198
 ---
 
 ## Context
@@ -85,4 +85,4 @@ If kepano-skills is later vendored as a follow-up, the marker file's recorded pa
 
 ## Prior Decision
 
-This ADR re-affirms `dec-draft-c556ea55` (Shape B default-on) by specifying the shipping mechanism that makes the default-on choice operationally tractable. No prior decision is being superseded; the re-affirmation here is the cross-reference between the two coupled choices.
+This ADR re-affirms `dec-198` (Shape B default-on) by specifying the shipping mechanism that makes the default-on choice operationally tractable. No prior decision is being superseded; the re-affirmation here is the cross-reference between the two coupled choices.

@@ -1,7 +1,7 @@
 ---
-id: dec-draft-69d6b46f
+id: dec-196
 title: Obsidian CLI agent allowlist — enforced via .claude/settings.json tool-permission denies + prose policy in CLAUDE.md
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-05-19
 summary: Agents may invoke documented file/search/links/properties/tags/outline/base:query commands; `eval`, plugin lifecycle, theme:set, and `delete --permanent` are denied. Enforcement is mechanical via .claude/settings.json `tool_permissions` deny rules (primary); canonical CLAUDE.md prose block describes the policy so agents see it in-context (secondary). Decision amended at planner stage per user override at the architect→planner phase-transition checkpoint.
@@ -106,4 +106,4 @@ The architect's original choice (Option 1, prose-only) was proposed in the same 
 
 ## Prior Decision
 
-No prior decision; this is a new policy area. References ADR fragment `dec-draft-c556ea55` (Shape B default-on) and `dec-draft-a22564b9` (kepano shipping mechanism) as the integration context that makes this allowlist necessary.
+No prior decision; this is a new policy area. References ADR fragment `dec-198` (Shape B default-on) and `dec-197` (kepano shipping mechanism) as the integration context that makes this allowlist necessary.

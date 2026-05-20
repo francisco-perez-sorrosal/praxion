@@ -1,7 +1,7 @@
 ---
-id: dec-draft-c556ea55
+id: dec-198
 title: Adopt Obsidian Shape B as default-on integration for Praxion-managed projects
-status: proposed
+status: accepted
 category: architectural
 date: 2026-05-19
 summary: Shape B (Praxion repo as Obsidian vault, kepano/obsidian-skills in .claude/skills/) is the default-on integration shape for /onboard-project and /new-project; opt-out via --no-obsidian.

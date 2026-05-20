@@ -21,14 +21,16 @@ Onboard the **current existing** project to work cleanly with the Praxion plugin
 12. §Phase 8 — Architecture Baseline (opt-in, default-yes — delegates to `systems-architect`)
 13. §Phase 8b — AaC Tier Install (opt-in, default-skip — fence seed, fitness scaffold, hook block, workflow, diagrams)
 14. §Phase 8c — ML/AI Training Scaffold (opt-in, default-skip; default-yes when ML signals detected)
-15. §Phase 9 — Verification + handoff
-16. §Agent Pipeline Block — canonical source of truth
-17. §Compaction Guidance Block
-18. §Behavioral Contract Block
-19. §Praxion Process Block
-20. §Hackathon Mode Block — installed only when Phase 5b enables hackathon mode
-21. §Project Essentials Block
-22. §Idempotency Predicates — per-phase contracts
+15. §Phase 8d — Obsidian integration (opt-in, default-yes)
+16. §Phase 9 — Verification + handoff
+17. §Agent Pipeline Block — canonical source of truth
+18. §Compaction Guidance Block
+19. §Behavioral Contract Block
+20. §Praxion Process Block
+21. §Hackathon Mode Block — installed only when Phase 5b enables hackathon mode
+22. §Project Essentials Block
+23. §Obsidian Integration Block — installed only when Phase 8d runs
+24. §Idempotency Predicates — per-phase contracts
 
 ## §Pre-flight
 
@@ -90,6 +92,7 @@ Execute these phases in order. Each phase honors §Idempotency Predicates — re
 | 8 | Architecture baseline — delegate to `systems-architect` in baseline mode → `.ai-state/DESIGN.md` + `docs/architecture.md` (+ optional ADR draft) | `test -e .ai-state/DESIGN.md` OR `test -e docs/architecture.md` (skip if either exists) OR user picks "Skip" at Gate 8 |
 | 8b | AaC tier install — fence seed, `fitness/` scaffold, golden-rule Block D, `architecture.yml` workflow, `docs/diagrams/` scaffold | User picks "Skip AaC" (default) at Gate 8b; or per-sub-step predicates (see §Phase 8b) |
 | 8c | ML/AI training scaffold — experiment tracking config, checkpoint `.gitignore` block, GPU budget declaration, `program.md` template, mode callout | No ML signals detected (skip) OR user picks "Skip" at Gate 8c; per-sub-step predicates (see §Phase 8c) |
+| 8d | Obsidian integration — `.gitignore` Obsidian block, kepano-skills symlink, `CLAUDE.md` Obsidian Integration block, `settings.json` deny entries | User picks "Skip" at Gate 8d; per-sub-step predicates (see §Phase 8d) |
 | 9 | Print summary + stage modified files (no commit) | None — terminal phase |
 
 ## §Phase Gates
@@ -112,6 +115,7 @@ The default §Flow runs end-to-end without pause. To let users *learn* the model
   - Three-option `Run baseline now` (default) / `Skip` / `Run all rest` — Gate 8 (see §Phase 8)
   - Three-option `Skip AaC` (default) / `Install AaC tier` / `Run all rest` — Gate 8b (see §Phase 8b)
   - Three-option `Skip ML scaffold` (default for non-ML) / `Run ML scaffold` / `Run all rest` — Gate 8c (see §Phase 8c); default is `Run ML scaffold` when ML signals detected
+  - Three-option `Install Obsidian integration (default)` / `Skip` / `Run all rest` — Gate 8d (see §Phase 8d)
 
 **Gate map.** Gate 1 doubles as the entry gate — its headline carries both the high-level orientation and the Phase 1 specifics, so the user is not double-prompted before the first phase. Gates 2–8 fire one-per-phase as expected. Gate 5b fires between Phase 5 and Phase 6.
 
@@ -128,6 +132,7 @@ The default §Flow runs end-to-end without pause. To let users *learn* the model
 | 8 | 8 | (Three-option pick — see §Phase 8 for the exact AskUserQuestion form. Default is `Run baseline now`. Headline: `Phase 8 of 9: Architecture baseline. I delegate to systems-architect in baseline mode to read your codebase and produce .ai-state/DESIGN.md (architect-facing, design-target) + docs/architecture.md (developer-facing, navigation guide). These docs become the architectural anchor for every future feature pipeline. Takes ~5–15 minutes for a medium project. Skip if you'd rather wait for your first feature pipeline to produce them. Pick:`) |
 | 8b | 8b | (Three-option pick — see §Phase 8b for the exact AskUserQuestion form. Default is `Skip AaC`. Headline: `Phase 8b: AaC tier install. I can install the Architecture-as-Code surfaces for this project: fence-region examples in your architecture docs, fitness/ scaffold for architectural fitness tests, a golden-rule pre-commit block, a .github/workflows/architecture.yml CI workflow, and a docs/diagrams/ directory stub. All five installs are idempotent — re-running is safe. The AaC convention requires the i-am plugin to be installed for enforcement to fire. Sentinel-only surfaces (traceability convention, sentinel AC dimension) need no per-project install. Pick:`) |
 | 8c | 8c | (Three-option pick — see §Phase 8c for the exact AskUserQuestion form. Default is `Skip ML scaffold` for non-ML projects; default is `Run ML scaffold` when ML signals are detected. Headline: `Phase 8c: ML/AI training scaffold. I detected signals that this is an ML/AI training project. I can scaffold: experiment tracking config (.ai-state/experiments/), checkpoint directory entries in .gitignore, compute-budget declaration (.ai-state/gpu_budget.yaml), and a program.md template at repo root. All scaffolding is idempotent. Pick:`) |
+| 8d | 8d | (Three-option pick — see §Phase 8d for the exact AskUserQuestion form. Default is `Install Obsidian integration`. Headline: `Phase 8d: Obsidian integration. I can wire this project for Obsidian vault-as-repo: a .gitignore Obsidian block, a symlink from .claude/skills/obsidian/ to kepano-skills, an ## Obsidian Integration block in CLAUDE.md, and permissions.deny entries in .claude/settings.json blocking the dangerous obsidian CLI subcommands. All installs are idempotent. Pick:`) |
 
 ## §Phase 1 — `.gitignore` hygiene
 
@@ -385,13 +390,14 @@ See [`docs/rules-taxonomy.md`](../docs/rules-taxonomy.md) for the complete refer
 
 ## §Phase 6 — `CLAUDE.md` Praxion blocks
 
-**Predicate.** Five independent heading checks:
+**Predicate.** Six independent heading checks (five core blocks + Obsidian Integration when Phase 8d ran):
 
 - `## Agent Pipeline` heading present → skip the Agent Pipeline append
 - `## Compaction Guidance` heading present → skip the Compaction Guidance append
 - `## Behavioral Contract` heading present → skip the Behavioral Contract append
 - `## Praxion Process` heading present → skip the Praxion Process append
 - `## Working in this project` heading present → skip the Project Essentials append
+- `## Obsidian Integration` heading present → skip the Obsidian Integration append (Phase 8d appends this block; Phase 6 honors the predicate for re-runs)
 
 **Action.**
 
@@ -749,6 +755,153 @@ ML scaffold summary:
 
 Phase 9 verification handoff lists every staged file across all phases — Phase 8c's surfaces are included in that enumeration.
 
+## §Phase 8d — Obsidian Integration (opt-in, default-yes)
+
+**Why this phase exists.** Projects that use Obsidian as a vault inside the repository benefit from three surfaces: a `.gitignore` block that keeps workspace state files out of commits, a symlink from `.claude/skills/obsidian/` to the kepano-skills library so agents can navigate the vault, and a `permissions.deny` block in `.claude/settings.json` that mechanically blocks the dangerous `obsidian` CLI subcommands. Without these, an agent can inadvertently commit Obsidian workspace noise, miss vault-navigation tools, or be denied permissions silently without knowing why. Phase 8d installs all three idempotently.
+
+**Gate 8d — three-option AskUserQuestion.** Use `AskUserQuestion` with `header: "Next?"`, `multiSelect: false`, the Gate 8d headline from the gate map, and these three options:
+
+| Option label | Description |
+|---|---|
+| `Install Obsidian integration (recommended)` | **Default.** Run all sub-steps (8d.1–8d.6). Each is independently idempotent; already-installed surfaces are silently skipped. |
+| `Skip` | Skip Phase 8d entirely. Re-run `/onboard-project` or `/onboard-project-obsidian` later when ready — all sub-steps are idempotent. |
+| `Run all rest` | Skip remaining gates; default the Obsidian choice to `Install Obsidian integration`; run autonomously through Phase 9. |
+
+When the `no-more-gates` flag is set (user previously picked `Run all rest`), default to `Install Obsidian integration` without prompting.
+
+**Action when "Install Obsidian integration" is chosen.** Run sub-steps 8d.1 through 8d.6 in order. Each sub-step prints one line on completion or skip.
+
+### Sub-step 8d.1 — `.gitignore` Obsidian block
+
+**Predicate.** `grep -q '^# Obsidian$' .gitignore`. If present: skip with notice `8d.1: skipped (.gitignore Obsidian block already present)`.
+
+**Action.** Append to `.gitignore` (create if absent):
+
+```gitignore
+# Obsidian
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache/
+.obsidian/appearance.json
+.obsidian/*.compat.json
+.obsidian/hotkeys.json
+```
+
+Print: `8d.1: Obsidian .gitignore block appended`.
+
+### Sub-step 8d.2 — Resolve `KEPANO_SKILLS_ROOT`
+
+Resolve the kepano-skills path using this priority order:
+
+1. **Marker file** (highest priority): `KEPANO_SKILLS_ROOT=$(cat "${HOME}/.config/praxion/obsidian-skills.path" 2>/dev/null)` — written by `./install.sh code` during kepano-skills installation.
+2. **Env var fallback**: if the marker file is absent or empty, check `$KEPANO_SKILLS_ROOT` env var.
+3. **Literal default**: if both are absent, use `${HOME}/.local/share/praxion/kepano-skills`.
+
+After resolution, verify the path exists: `test -d "$KEPANO_SKILLS_ROOT"`. If it does not exist, warn:
+
+> `kepano-skills not found at $KEPANO_SKILLS_ROOT. Run ./install.sh code first (from a Praxion checkout), then re-run this phase.`
+
+Skip sub-steps 8d.3–8d.6. Print: `8d.2: kepano-skills resolution failed — skipping remaining sub-steps`.
+
+If the path exists, continue. Print: `8d.2: kepano-skills resolved at ${KEPANO_SKILLS_ROOT}`.
+
+### Sub-step 8d.3 — `.claude/skills/obsidian/` symlink
+
+**Predicates (evaluated in order):**
+
+1. `test -L .claude/skills/obsidian` — symlink already exists. Skip with notice `8d.3: skipped (.claude/skills/obsidian symlink already present)`.
+2. `test -d .claude/skills/obsidian && ! test -L .claude/skills/obsidian` — a real directory exists (e.g., user copied the skills manually). Skip with notice `8d.3: skipped (.claude/skills/obsidian exists as a directory, not a symlink — manual install preserved)`.
+
+**Action when neither predicate holds.** Create `.claude/skills/` directory if absent, then:
+
+```bash
+ln -s "${KEPANO_SKILLS_ROOT}" .claude/skills/obsidian
+```
+
+Print: `8d.3: .claude/skills/obsidian → ${KEPANO_SKILLS_ROOT} symlink created`.
+
+### Sub-step 8d.4 — `.obsidian/` starter config (v1 no-op)
+
+**Why this exists.** In v1, writing starter `.obsidian/` config (e.g., `app.json`, `community-plugins.json`) is deferred. Obsidian's plugin ecosystem is volatile and any config we write may conflict with the user's existing vault or community plugin set. The user's own Obsidian app manages `.obsidian/` after the vault opens.
+
+**Action.** No-op. Print: `8d.4: .obsidian/ starter config — skipped in v1 (Obsidian manages this directory; no agent-written config needed)`.
+
+### Sub-step 8d.5 — Append `## Obsidian Integration` block to `CLAUDE.md`
+
+**Predicate.** `grep -q '^## Obsidian Integration$' CLAUDE.md`. If present: skip with notice `8d.5: skipped (## Obsidian Integration block already in CLAUDE.md)`.
+
+**Action.** If `CLAUDE.md` does not exist, print: `No CLAUDE.md found — run /init first, then re-run /onboard-project.` and skip. Otherwise, append the §Obsidian Integration Block verbatim from this command's body. Append at the end of the file with one blank line separating from preceding content.
+
+Print: `8d.5: ## Obsidian Integration block appended to CLAUDE.md`.
+
+### Sub-step 8d.5b — Write `permissions.deny` to `.claude/settings.json`
+
+**Predicate.** Check whether the eval deny entry is already present:
+```bash
+jq '.permissions.deny // [] | map(select(startswith("Bash(obsidian eval"))) | length > 0' \
+  .claude/settings.json 2>/dev/null
+```
+If `true`: skip with notice `8d.5b: skipped (permissions.deny obsidian eval entry already present)`.
+
+**Action.** Read `.claude/settings.json` (create `{"permissions":{}}` if absent). Merge `permissions.deny` non-destructively:
+- Preserve all existing top-level keys.
+- Preserve the existing `permissions.allow` array.
+- Add the eight deny entries below. If any entry already exists in the deny array, do not duplicate it.
+
+Deny entries:
+
+```json
+"Bash(obsidian eval*)",
+"Bash(obsidian plugin:install*)",
+"Bash(obsidian plugin:enable*)",
+"Bash(obsidian plugin:disable*)",
+"Bash(obsidian plugin:uninstall*)",
+"Bash(obsidian theme:set*)",
+"Bash(obsidian theme:install*)",
+"Bash(obsidian delete --permanent*)"
+```
+
+Use `jq` to perform the merge:
+
+```bash
+jq '.permissions.deny = ((.permissions.deny // []) +
+  ["Bash(obsidian eval*)",
+   "Bash(obsidian plugin:install*)",
+   "Bash(obsidian plugin:enable*)",
+   "Bash(obsidian plugin:disable*)",
+   "Bash(obsidian plugin:uninstall*)",
+   "Bash(obsidian theme:set*)",
+   "Bash(obsidian theme:install*)",
+   "Bash(obsidian delete --permanent*)"]
+  | unique)' .claude/settings.json > .claude/settings.json.tmp && \
+  mv .claude/settings.json.tmp .claude/settings.json
+```
+
+Print: `8d.5b: permissions.deny Obsidian CLI block written to .claude/settings.json`.
+
+**Security note.** The denied subcommands are blocked at the tool-permission layer. `obsidian eval` executes arbitrary JavaScript in the Obsidian renderer (remote code execution risk); the plugin lifecycle commands expose OS-level attack surface; `obsidian delete --permanent` bypasses the trash and is unrecoverable. The `*` wildcard after each subcommand blocks all argument forms. Live end-to-end verification (actually calling a denied subcommand and observing the harness reject it) is deferred to first use in a Claude Code session with this `settings.json` applied.
+
+### Sub-step 8d.6 — Print summary
+
+Print:
+
+```text
+Obsidian integration install complete:
+  kepano-skills: ${KEPANO_SKILLS_ROOT}
+  .claude/skills/obsidian/: symlink created (or already present)
+  CLAUDE.md: ## Obsidian Integration block appended (or already present)
+  .claude/settings.json: permissions.deny Obsidian CLI block written (or already present)
+
+CLI allowlist policy: obsidian file CRUD, search, link analysis, properties, tags, and
+read-only diagnostics are ALLOWED. Dangerous subcommands (eval, plugin lifecycle, theme:set,
+delete --permanent) are DENIED via .claude/settings.json permissions.deny.
+
+See docs/obsidian-integration.md for installation, configuration, troubleshooting, and the
+full allowlist rationale.
+```
+
+**Verification handoff.** After all sub-steps complete, the summary above serves as the handoff. Phase 9 verification handoff lists every staged file across all phases — Phase 8d's surfaces are included in that enumeration.
+
 ## §Phase 9 — Verification + handoff
 
 **Predicate.** None — terminal phase.
@@ -768,6 +921,7 @@ Phase 9 verification handoff lists every staged file across all phases — Phase
      Phase 8: architecture baseline produced — .ai-state/DESIGN.md + docs/architecture.md (+ N ADR draft(s))
      Phase 8b: AaC tier — fence seed, fitness/, Block D, architecture.yml, docs/diagrams/ (or skipped per sub-step)
      Phase 8c: ML scaffold — .ai-state/experiments/, .gitignore block, gpu_budget.yaml, program.md (or skipped per sub-step)
+     Phase 8d: Obsidian integration — .gitignore Obsidian block, .claude/skills/obsidian symlink, CLAUDE.md ## Obsidian Integration block, .claude/settings.json deny entries (or skipped per sub-step)
    ```
    For each skipped phase (idempotency hit OR user opt-out), print `Phase N: skipped (<reason>)` instead.
 
@@ -1042,6 +1196,43 @@ You'll most often be asked to:
 
 The fenced content above is a **template** — `/onboard-project` Phase 6 appends it and then fills the `<placeholders>` from the project's config (see §Phase 6 Action step 3); `/new-project` fills them at scaffold time. The fence is kept byte-identical to `claude/canonical-blocks/project-essentials.md` by `scripts/sync_canonical_blocks.py`; the `<placeholders>` are intentional and must survive the sync.
 
+## §Obsidian Integration Block
+
+<!-- canonical-source: claude/canonical-blocks/obsidian-integration.md — edit the canonical file, then run: python3 scripts/sync_canonical_blocks.py --write -->
+
+```markdown
+## Obsidian Integration
+
+This project is configured for **Obsidian integration**: the vault lives inside the project repository, and the agent has access to kepano/obsidian-skills for vault navigation and note manipulation. Kepano skills are discovered automatically from `$KEPANO_SKILLS_ROOT` (default: `~/.local/share/praxion/kepano-skills`). If that path is absent, run `./install.sh code` in your Praxion checkout first.
+
+### CLI Allowlist
+
+The `obsidian` CLI is available for file CRUD, search, link analysis, properties, tags, outline, structured queries (`base:query`), templates, and read-only sync/publish diagnostics.
+
+**Allowed subcommands include:** `read`, `create`, `append`, `prepend`, `move`, `rename`, `delete` (without `--permanent`), `search`, `search:context`, `backlinks`, `links`, `unresolved`, `orphans`, `deadends`, `outline`, `tags`, `tag`, `properties`, `base:query`, `daily`, `daily:read`, `daily:append`, `template:read`, `template:insert`, `unique`, `publish:list`, `publish:status`, `sync:status`, `sync:history`, `sync:read`.
+
+**Denied subcommands — blocked at the tool-permission layer:**
+
+| Subcommand | Reason |
+|---|---|
+| `obsidian eval` (any args) | Executes arbitrary JavaScript in the renderer — remote code execution risk |
+| `obsidian plugin:install`, `plugin:enable`, `plugin:disable`, `plugin:uninstall` | Plugin lifecycle commands expose OS-level attack surface |
+| `obsidian theme:set`, `theme:install` | Theme code runs with full app privileges |
+| `obsidian delete --permanent` | Bypasses Obsidian's trash; operation is unrecoverable |
+
+**Why you may see permission errors:** The denied subcommands above are enforced mechanically via `.claude/settings.json` `permissions.deny` rules written by the onboarding step. If a `Bash(obsidian ...)` call is rejected by the harness, check this list — the subcommand is intentionally blocked, not broken. Use an allowed alternative or ask the user to perform the operation manually.
+
+### Opt-out
+
+Obsidian integration can be skipped by passing `--no-obsidian` to `/onboard-project` or `/new-project`. To retrofit integration later, run `/onboard-project-obsidian`.
+
+### Reference
+
+See `docs/obsidian-integration.md` for installation, configuration, troubleshooting, and the full allowlist rationale.
+```
+
+This block is installed into the user project's `CLAUDE.md` by Phase 8d sub-step 8d.5. It is guarded by `grep -q '^## Obsidian Integration$' CLAUDE.md`. The fence is kept byte-identical to `claude/canonical-blocks/obsidian-integration.md` by `scripts/sync_canonical_blocks.py`.
+
 ## §Idempotency Predicates — per-phase contracts
 
 | Phase | Predicate (skip if true) |
@@ -1057,6 +1248,7 @@ The fenced content above is a **template** — `/onboard-project` Phase 6 append
 | 8 | `test -e .ai-state/DESIGN.md` OR `test -e docs/architecture.md` (skip phase if either doc exists — covers re-runs and greenfield-followed-by-onboard); also skipped if the user picks `Skip` at Gate 8 |
 | 8b | User picks `Skip AaC` (or `Run all rest`) at Gate 8b — skips entire phase. Per-sub-step: 8b.1 — arch doc contains `aac:generated` or `aac:authored`; 8b.2 — `test -d fitness/`; 8b.3 — `grep -q 'check_aac_golden_rule\|Block D' .git/hooks/pre-commit`; 8b.4 — `test -e .github/workflows/architecture.yml`; 8b.5 — `test -d docs/diagrams/` |
 | 8c | No ML signals detected (skip entire phase). User picks `Skip ML scaffold` at Gate 8c — skips entire phase. Per-sub-step: 8c.1 — `test -d .ai-state/experiments/`; 8c.2 — `grep -q '# ML training checkpoints' .gitignore`; 8c.3 — `test -e .ai-state/gpu_budget.yaml`; 8c.4 — `test -e program.md`; 8c.5 — none (always prints) |
+| 8d | User picks `Skip` at Gate 8d — skips entire phase. Per-sub-step: 8d.1 — `grep -q '^# Obsidian$' .gitignore`; 8d.2 — marker file / env var / default resolution (no skip predicate — always resolves); 8d.3 — `test -L .claude/skills/obsidian` (symlink) or `test -d .claude/skills/obsidian && ! test -L .claude/skills/obsidian` (directory copy); 8d.4 — always no-op in v1; 8d.5 — `grep -q '^## Obsidian Integration$' CLAUDE.md`; 8d.5b — `jq '.permissions.deny // [] | map(select(startswith("Bash(obsidian eval"))) | length > 0' .claude/settings.json` returns `true` |
 | 9 | None — terminal phase always runs |
 
 **Re-running the command** on an already-onboarded project should print mostly `skipped (already onboarded)` lines in Phase 9's summary. The only writes on a clean re-run come from Phase 7 (which writes nothing — only prints) and Phase 9 (which only stages changed files). Phase 8 is naturally idempotent — once `.ai-state/DESIGN.md` exists, any subsequent re-run skips. Future *updates* to architecture docs come from feature pipelines (`systems-architect` updates them in Phase 4 of the agent pipeline), not from re-running `/onboard-project`.

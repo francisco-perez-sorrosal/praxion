@@ -4,16 +4,21 @@
 # Validates host prereqs, lays down a minimal scaffold (.git, .gitignore, .claude),
 # then exec's an interactive Claude Code session seeded with /new-project.
 #
-# Usage: new_project.sh <project-name> [target-dir] [--no-aac] [--hackathon]
+# Usage: new_project.sh <project-name> [target-dir] [--no-aac] [--no-obsidian] [--hackathon]
 # Flags:
-#   --no-aac     Opt out of the Architecture-as-Code scaffolding sub-flow
-#                (also: PRAXION_NEW_PROJECT_NO_AAC=1).
-#   --hackathon  Start the project in hackathon mode (also:
-#                PRAXION_NEW_PROJECT_HACKATHON=1). Emits a
-#                '# Hackathon mode: true' trailer in the seed prompt; the
-#                seeded /new-project enables hackathon mode and recommends
-#                /onboard-project --hackathon, whose Phase 5b writes the
-#                hackathon artifacts. Opt-in; default off.
+#   --no-aac       Opt out of the Architecture-as-Code scaffolding sub-flow
+#                  (also: PRAXION_NEW_PROJECT_NO_AAC=1).
+#   --no-obsidian  Opt out of the Obsidian integration sub-flow
+#                  (also: PRAXION_NEW_PROJECT_NO_OBSIDIAN=1). Emits a
+#                  '# Obsidian integration: false' trailer in the seed prompt so
+#                  the seeded /new-project skips the Phase 8d sub-flow.
+#                  Opt-out; default-on (Obsidian integration is installed by default).
+#   --hackathon    Start the project in hackathon mode (also:
+#                  PRAXION_NEW_PROJECT_HACKATHON=1). Emits a
+#                  '# Hackathon mode: true' trailer in the seed prompt; the
+#                  seeded /new-project enables hackathon mode and recommends
+#                  /onboard-project --hackathon, whose Phase 5b writes the
+#                  hackathon artifacts. Opt-in; default off.
 # Env vars:
 #   PRAXION_NEW_PROJECT_EDITOR  Which editor surface to open the scaffold in.
 #                          Values: auto (default; cursor → code), cursor,
@@ -26,6 +31,10 @@
 #                          sub-flow (fitness/, architecture.yml, fence seed,
 #                          docs/diagrams/). Equivalent to --no-aac flag.
 #                          Useful for headless / IDE-launch contexts.
+#   PRAXION_NEW_PROJECT_NO_OBSIDIAN  Set to 1 to opt out of the Obsidian
+#                          integration sub-flow. Equivalent to the
+#                          --no-obsidian flag. Useful for headless /
+#                          IDE-launch contexts.
 #   PRAXION_NEW_PROJECT_HACKATHON  Set to 1 to start the project in hackathon
 #                          mode. Equivalent to the --hackathon flag. Useful
 #                          for headless / IDE-launch contexts.
@@ -64,11 +73,15 @@ shift
 
 target_dir="$PWD"
 no_aac_flag=""
+no_obsidian_flag=""
 hackathon_flag=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --no-aac)
             no_aac_flag="1"
+            ;;
+        --no-obsidian)
+            no_obsidian_flag="1"
             ;;
         --hackathon)
             hackathon_flag="1"
@@ -90,6 +103,17 @@ if [ "${no_aac_flag:-}" = "1" ] || [ "${PRAXION_NEW_PROJECT_NO_AAC:-}" = "1" ]; 
     AAC_ENABLED="false"
 else
     AAC_ENABLED="true"
+fi
+
+# Resolve Obsidian integration opt-out: --no-obsidian flag OR
+# PRAXION_NEW_PROJECT_NO_OBSIDIAN=1 env var (opt-out; default-on).
+# The seed prompt carries the resolved value as a '# Obsidian integration:' trailer
+# so the seeded /new-project command can detect it (mirrors the AaC trailer and
+# the --no-aac / PRAXION_NEW_PROJECT_NO_AAC pair).
+if [ "${no_obsidian_flag:-}" = "1" ] || [ "${PRAXION_NEW_PROJECT_NO_OBSIDIAN:-}" = "1" ]; then
+    OBSIDIAN_ENABLED="false"
+else
+    OBSIDIAN_ENABLED="true"
 fi
 
 # Resolve hackathon opt-in: --hackathon flag OR PRAXION_NEW_PROJECT_HACKATHON=1
@@ -293,11 +317,13 @@ if [ -n "$cmd_body_file" ] && [ -f "$cmd_body_file" ]; then
 The text above is the body of the /new-project slash command. The bash bootstrap embeds it here because Claude Code's CLI does not dispatch slash commands from positional arguments. You are now inside a freshly scaffolded Praxion greenfield project. Execute those instructions in order, starting from the §Guard check. Do not ask me to invoke anything — begin now.
 
 # AaC scaffolding: ${AAC_ENABLED}
+# Obsidian integration: ${OBSIDIAN_ENABLED}
 # Hackathon mode: ${HACKATHON_ENABLED}"
 else
     seed_prompt="You are inside a freshly scaffolded Praxion greenfield project. Invoke the /new-project slash command now to onboard it. If the slash command is not registered, locate its body under ~/.claude/plugins/ (Markdown file named new-project.md) and follow its instructions.
 
 # AaC scaffolding: ${AAC_ENABLED}
+# Obsidian integration: ${OBSIDIAN_ENABLED}
 # Hackathon mode: ${HACKATHON_ENABLED}"
 fi
 

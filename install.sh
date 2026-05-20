@@ -295,6 +295,27 @@ uninstall_python_tooling() {
 }
 
 # =============================================================================
+# Shared — Obsidian integration (kepano/obsidian-skills + soft-check)
+# =============================================================================
+
+install_obsidian_deps() {
+    header "Shared — Obsidian integration (kepano/obsidian-skills)"
+    bash "${SCRIPT_DIR}/scripts/install-obsidian-deps.sh"
+}
+
+check_obsidian_deps() {
+    bash "${SCRIPT_DIR}/scripts/install-obsidian-deps.sh" --check
+}
+
+uninstall_obsidian_deps() {
+    bash "${SCRIPT_DIR}/scripts/install-obsidian-deps.sh" --uninstall
+}
+
+relink_obsidian_deps() {
+    bash "${SCRIPT_DIR}/scripts/install-obsidian-deps.sh" --relink
+}
+
+# =============================================================================
 # Overview banner
 # =============================================================================
 
@@ -309,6 +330,7 @@ show_overview() {
     • External API docs (chub CLI — curated docs for 600+ libraries)
     • Optional metrics tool (scc — SLOC counter used by /project-metrics)
     • Python tooling (uv + pytest/pytest-cov for Praxion's own tests and coverage)
+    • Obsidian integration (kepano/obsidian-skills checkout — activates Obsidian integration)
 EOF
     fi
 
@@ -511,27 +533,32 @@ if [ "$MODE" = "codex" ]; then
     delegate
 elif $RELINK; then
     delegate
+    relink_obsidian_deps
 elif $CHECK; then
     delegate_rc=0
     delegate || delegate_rc=$?
     check_chub_cli
     check_scc_cli
     check_python_tooling
+    check_obsidian_deps
     exit $delegate_rc
 elif $UNINSTALL; then
     delegate
     uninstall_chub_cli
     uninstall_scc_cli
     uninstall_python_tooling
+    uninstall_obsidian_deps
 elif $DRY_RUN; then
     check_chub_cli
     check_scc_cli
     check_python_tooling
+    check_obsidian_deps
     delegate
 else
     # Install: shared CLIs first, then tool-specific
     install_chub_cli
     install_scc_cli
     install_python_tooling
+    install_obsidian_deps
     delegate
 fi

@@ -10,5 +10,17 @@
     "PRAXION_DISABLE_MEMORY_INJECTION": "1",
     "PRAXION_DISABLE_MEMORY_MCP": "1",
     "PRAXION_DISABLE_OBSERVABILITY": "0"
+  },
+  "permissions": {
+    "deny": [
+      "Bash(obsidian delete --permanent*)",
+      "Bash(obsidian eval*)",
+      "Bash(obsidian plugin:disable*)",
+      "Bash(obsidian plugin:enable*)",
+      "Bash(obsidian plugin:install*)",
+      "Bash(obsidian plugin:uninstall*)",
+      "Bash(obsidian theme:install*)",
+      "Bash(obsidian theme:set*)"
+    ]
   }
 }

@@ -115,3 +115,32 @@ Tracked here so they can be revisited when Claude Code releases fixes. Each entr
 - **Path-scoped rules (`paths:` frontmatter) inject on Read, not on Write/Edit/MultiEdit** (verified 2026-05-12) — an agent that *creates* a new file without first reading a matching sibling misses that file type's conventions (`coding-style.md` for a new `.py`/`.ts`, `readme-style.md`/`diagram-conventions.md` for a new doc, `pr-conventions.md` for a new `.github/*.md`, etc.). The one verified gap in the rules-as-guardrails surface; moderate severity — agents usually read a directory before working there, which incidentally loads the rule. **Upstream stance is now settled (2026-05-12 re-check):** [#23478](https://github.com/anthropics/claude-code/issues/23478) closed `NOT_PLANNED` 2026-03-14 and feature request [#38487](https://github.com/anthropics/claude-code/issues/38487) closed `NOT_PLANNED` 2026-04-30 — Claude Code has **explicitly declined** to load path-scoped rules on Write/Edit. The mitigation is therefore **permanent**: the `implementer`/`doc-engineer`/`test-engineer` prompts carry a "read a sibling first" instruction; `rules/CLAUDE.md` notes the caveat and `skills/rule-crafting/SKILL.md` carries the full mitigation. [#16853](https://github.com/anthropics/claude-code/issues/16853) remains open with a useful syntactic workaround signal — multi-entry YAML-list `paths:` may fail under the `_9A()` CSV parser, while inline-array (`paths: ["**/*.py", ...]`) and single-entry brace-expansion (`paths: ["**/*.{py,pyi}"]`) work consistently; `scripts/check_paths_syntax.py` flags at-risk Praxion rule files. Tracked as `td-033`. Windows variant [#21858](https://github.com/anthropics/claude-code/issues/21858) closed `COMPLETED` 2026-03-24 — the existing Windows caveat in `docs/existing-project-onboarding.md` stays in place as historical guidance, no further action.
 - **Subagent `Write` to `.ai-work/<task-slug>/` can be denied by the sandbox** while the main agent's `Write` to the same path succeeds (observed 2026-05-14 with `i-am:systems-architect` writing `SYSTEMS_PLAN.md`). The architect agent has `Write` in its tools whitelist and the target resolves inside the session worktree (so `worktree_guard.py` allows it); the denial appears to be Claude Code's per-tool permission prompt that the main agent had already auto-allowed for this session but the subagent cannot answer interactively. Workaround: when a subagent reports a Write denial for `.ai-work/`, the main agent should place the file from the subagent's returned content — the same pipeline contract is honored, just routed through the orchestrator. Distinct from `td-034` (subagent writes resolve to the wrong tree); same root-cause family in that subagent settings/permission inheritance differs from the orchestrator session. Tracked as `td-035`.
 - **`claude agents` is silently refused from inside any Claude Code session** (observed 2026-05-15 during Phase 2 dispatch-reworks pipeline) — the `claude agents` subcommand (the agent-view TUI for monitoring `--bg` sessions) returns `'claude agents' is not available in this environment.` exit 1 when invoked from any child process of `claude`, including the Bash tool inside subagents. The gate is parent-process-based: works from a fresh terminal pane with no `claude` ancestor; fails from inside any Claude session. Workaround: when dispatching `--bg` sessions and wanting to monitor them via agent-view, open a fresh Cursor terminal pane (no `claude` running there) and run `claude agents` from it. Praxion's `scripts/dispatch-reworks` surfaces this instruction in its post-dispatch output. Filed as [#59340](https://github.com/anthropics/claude-code/issues/59340) requesting a more informative error string (the behavior itself is reasonable nested-session defense; the silent generic error cost ~30 min of diagnostic time ruling out env, daemon-state, auth-mode, subscription tier, and binary version before identifying the actual gate). No `td-NNN` row — resolution is upstream-side only.
+
+## Obsidian Integration
+
+This project is configured for **Obsidian integration**: the vault lives inside the project repository, and the agent has access to kepano/obsidian-skills for vault navigation and note manipulation. Kepano skills are discovered automatically from `$KEPANO_SKILLS_ROOT` (default: `~/.local/share/praxion/kepano-skills`). If that path is absent, run `./install.sh code` in your Praxion checkout first.
+
+### CLI Allowlist
+
+The `obsidian` CLI is available for file CRUD, search, link analysis, properties, tags, outline, structured queries (`base:query`), templates, and read-only sync/publish diagnostics.
+
+**Allowed subcommands include:** `read`, `create`, `append`, `prepend`, `move`, `rename`, `delete` (without `--permanent`), `search`, `search:context`, `backlinks`, `links`, `unresolved`, `orphans`, `deadends`, `outline`, `tags`, `tag`, `properties`, `base:query`, `daily`, `daily:read`, `daily:append`, `template:read`, `template:insert`, `unique`, `publish:list`, `publish:status`, `sync:status`, `sync:history`, `sync:read`.
+
+**Denied subcommands — blocked at the tool-permission layer:**
+
+| Subcommand | Reason |
+|---|---|
+| `obsidian eval` (any args) | Executes arbitrary JavaScript in the renderer — remote code execution risk |
+| `obsidian plugin:install`, `plugin:enable`, `plugin:disable`, `plugin:uninstall` | Plugin lifecycle commands expose OS-level attack surface |
+| `obsidian theme:set`, `theme:install` | Theme code runs with full app privileges |
+| `obsidian delete --permanent` | Bypasses Obsidian's trash; operation is unrecoverable |
+
+**Why you may see permission errors:** The denied subcommands above are enforced mechanically via `.claude/settings.json` `permissions.deny` rules written by the onboarding step. If a `Bash(obsidian ...)` call is rejected by the harness, check this list — the subcommand is intentionally blocked, not broken. Use an allowed alternative or ask the user to perform the operation manually.
+
+### Opt-out
+
+Obsidian integration can be skipped by passing `--no-obsidian` to `/onboard-project` or `/new-project`. To retrofit integration later, run `/onboard-project-obsidian`.
+
+### Reference
+
+See `docs/obsidian-integration.md` for installation, configuration, troubleshooting, and the full allowlist rationale.

@@ -12,6 +12,8 @@ Onboard the current (freshly scaffolded) directory. Ask one question first, show
 
 The six-artifact write-set has a **single source of truth — `/onboard-project` Phase 5b** — and this command never re-implements it; it only appends the CLAUDE.md block and propagates the `--hackathon` signal forward in its handoff. Pass `--hackathon` when the user explicitly wants to start this project in hackathon mode from day one.
 
+**Obsidian integration.** Obsidian integration is signaled to this command by a `# Obsidian integration: false` line in the bootstrap context — injected by `new_project.sh --no-obsidian` or `PRAXION_NEW_PROJECT_NO_OBSIDIAN=1` (opt-out; default-on). When the opt-out signal is **absent** (Obsidian enabled), Flow step 5g runs the Phase 8d sub-flow (`.gitignore` Obsidian block, kepano-skills symlink, `CLAUDE.md` Obsidian Integration block, `settings.json` deny entries) and step 10g appends the `## Obsidian Integration` block to `CLAUDE.md`. When the opt-out signal is **present**, both steps are skipped and the command prints: `Obsidian integration skipped (--no-obsidian). Re-enable later via /onboard-project-obsidian or /onboard-project.`
+
 ## Sections
 
 1. §Guard — shape check before doing anything
@@ -35,7 +37,8 @@ The six-artifact write-set has a **single source of truth — `/onboard-project`
 19. §Hackathon Mode Block — verbatim source (mirror of `/onboard-project`); installed only when hackathon mode is enabled (see the **Hackathon mode** note above)
 20. §Project Essentials Block — verbatim source (mirror of `/onboard-project`)
 21. §AaC Scaffolding Sub-flow — five per-project AaC surfaces (default ON; opt-out via `--no-aac` / `PRAXION_NEW_PROJECT_NO_AAC=1`)
-22. §Idempotency Predicates — per-Flow-phase contracts
+22. §Obsidian Integration Block — verbatim source (mirror of `/onboard-project`); installed only when Obsidian integration is enabled
+23. §Idempotency Predicates — per-Flow-phase contracts
 
 ## §Guard
 
@@ -78,6 +81,7 @@ When the guard passes, follow these steps in order. Each step is a contract — 
    - **5d.** Fire **GATE 4d**, then delegate to `implementer` + `test-engineer` concurrently on disjoint file sets. Output: code under `src/agent/`, `src/web/`, `tests/` (full file inventory in §Default App Spec).
    - **5e.** Fire **GATE 4e**, then delegate to `verifier` — one-paragraph acceptance check against §Default App Spec invariants (skip the formal report for the seed). Output: in-chat pass/fail summary.
    - **5f.** Apply the AaC scaffolding sub-flow per §AaC Scaffolding Sub-flow. No gate — runs inline after the verifier and before the SDK smoke check. If `# AaC scaffolding: false` appears in the bootstrap context (injected by `new_project.sh --no-aac` or `PRAXION_NEW_PROJECT_NO_AAC=1`), skip the entire sub-flow and print: `AaC scaffolding skipped (--no-aac). Re-enable later via /onboard-project --with-aac.`
+   - **5g.** Apply the Obsidian integration sub-flow. No gate — runs inline after the AaC sub-flow and before the SDK smoke check. If `# Obsidian integration: false` appears in the bootstrap context (injected by `new_project.sh --no-obsidian` or `PRAXION_NEW_PROJECT_NO_OBSIDIAN=1`), skip the entire sub-flow and print: `Obsidian integration skipped (--no-obsidian). Re-enable later via /onboard-project-obsidian or /onboard-project.` Otherwise, run Phase 8d sub-steps 8d.1–8d.6 per §Phase 8d in `/onboard-project`. Each sub-step is idempotent.
    Ephemeral plan docs live in `.ai-work/<task-slug>/`; persistent design docs live in `.ai-state/` (architecture + ADR drafts) and `docs/` (developer-facing architecture guide). The seed writes every canonical artifact so the user's first pipeline observation includes the full document set — the subsequent `/co` will commit them.
 
 6. **Run the SDK smoke check** per §SDK smoke check. First, fire **GATE 5** per §Phase Gates. If the probe fails, follow the recovery path (re-fetch chub, introspect installed package, regenerate the affected file, submit `chub_feedback`).
@@ -88,7 +92,7 @@ When the guard passes, follow these steps in order. Each step is a contract — 
 
 9. **Invoke `/init` NOW.** First, fire **GATE 6** per §Phase Gates. Then invoke `/init` — the codebase exists and reflects the user's choice, so `/init`'s CLAUDE.md describes reality. Do not author CLAUDE.md by hand.
 
-10. **Append the Praxion blocks idempotently.** Per §Init idempotency, check `CLAUDE.md` for each heading independently — `## Agent Pipeline`, `## Compaction Guidance`, `## Behavioral Contract`, `## Praxion Process`, `## Hackathon Mode` (only when hackathon mode is enabled), `## Working in this project`. For each missing heading, append the corresponding block verbatim from §Agent Pipeline Block, §Compaction Guidance Block, §Behavioral Contract Block, §Praxion Process Block, §Hackathon Mode Block (when hackathon mode is enabled), §Project Essentials Block respectively. Each block is guarded by its own predicate; one missing block does not force re-appending the others. **After appending the §Project Essentials Block**, fill its `<placeholders>` from the just-scaffolded codebase — `<typecheck command>` / `<test command>` / `<lint command>` / `<build command>` from `pyproject.toml` / `package.json` / the test gate, `<list 3–5 of this project's most common task intents>` from the seed app's purpose; leave a `# TODO:` for anything undeterminable; renumber the Verification list if a step is omitted. **Smooth-integration contract:** if the standard five append (plus the hackathon block when hackathon mode is enabled), `/onboard-project`'s Phase 6 will be a complete no-op when the user runs it next.
+10. **Append the Praxion blocks idempotently.** Per §Init idempotency, check `CLAUDE.md` for each heading independently — `## Agent Pipeline`, `## Compaction Guidance`, `## Behavioral Contract`, `## Praxion Process`, `## Hackathon Mode` (only when hackathon mode is enabled), `## Working in this project`, `## Obsidian Integration` (only when Obsidian integration is enabled, i.e., `# Obsidian integration: false` is NOT in bootstrap context). For each missing heading, append the corresponding block verbatim from §Agent Pipeline Block, §Compaction Guidance Block, §Behavioral Contract Block, §Praxion Process Block, §Hackathon Mode Block (when hackathon mode is enabled), §Project Essentials Block, §Obsidian Integration Block (when Obsidian integration is enabled) respectively. Each block is guarded by its own predicate; one missing block does not force re-appending the others. **After appending the §Project Essentials Block**, fill its `<placeholders>` from the just-scaffolded codebase — `<typecheck command>` / `<test command>` / `<lint command>` / `<build command>` from `pyproject.toml` / `package.json` / the test gate, `<list 3–5 of this project's most common task intents>` from the seed app's purpose; leave a `# TODO:` for anything undeterminable; renumber the Verification list if a step is omitted. **Smooth-integration contract:** if the standard five append (plus the hackathon block when hackathon mode is enabled, and the Obsidian Integration block when Obsidian integration is enabled), `/onboard-project`'s Phase 6 will be a complete no-op when the user runs it next.
 
 11. **Generate the mushi doc LAST.** First, fire **GATE 7** per §Phase Gates. Then generate the mushi doc — file anchors (§Mushi Doc Spec) must be computed against the final on-disk state, so this step follows everything that writes source code.
 
@@ -107,6 +111,7 @@ Mirror of `/onboard-project`'s §Flow contracts table — what each Phase produc
 | 3 | Branch on answer (default vs custom) + show pipeline-framed prompt | None — per-invocation framing |
 | 4 | Execute Standard-tier pipeline (researcher → architect → planner → implementer ∥ test-engineer → verifier) | None — produces feature artifacts each run |
 | 4f | AaC scaffolding sub-flow (fence seed, `fitness/`, Block D hook append, `architecture.yml`, `docs/diagrams/`) — default ON; skipped if `# AaC scaffolding: false` in bootstrap context | Per §Idempotency Predicates — five independent per-surface predicates; skip entire sub-flow when opt-out signal present |
+| 4g | Obsidian integration sub-flow (Phase 8d: `.gitignore` block, kepano-skills symlink, `CLAUDE.md` Obsidian Integration block, `settings.json` deny entries) — default ON; skipped if `# Obsidian integration: false` in bootstrap context | Per §Idempotency Predicates — per-surface predicates; skip entire sub-flow when opt-out signal present |
 | 5 | SDK smoke check + test gate (`uv sync && uv run pytest -q`) + Python `.gitignore` block | Per §Idempotency Predicates: Python block detected by `# Python` header |
 | 6 | `/init` (if `CLAUDE.md` missing) + idempotent append of Praxion blocks (five standard + `## Hackathon Mode` when hackathon mode is enabled) | Per §Init idempotency — independent heading-detection predicate per block |
 | 7 | Generate the per-run mushi doc | None — file is regenerated each run by design |
@@ -523,6 +528,45 @@ After rendering, YAML-load the output to validate syntax before writing. If YAML
 
 ---
 
+## §Obsidian Integration Block
+
+<!-- canonical-source: claude/canonical-blocks/obsidian-integration.md — edit the canonical file, then run: python3 scripts/sync_canonical_blocks.py --write -->
+
+```markdown
+## Obsidian Integration
+
+This project is configured for **Obsidian integration**: the vault lives inside the project repository, and the agent has access to kepano/obsidian-skills for vault navigation and note manipulation. Kepano skills are discovered automatically from `$KEPANO_SKILLS_ROOT` (default: `~/.local/share/praxion/kepano-skills`). If that path is absent, run `./install.sh code` in your Praxion checkout first.
+
+### CLI Allowlist
+
+The `obsidian` CLI is available for file CRUD, search, link analysis, properties, tags, outline, structured queries (`base:query`), templates, and read-only sync/publish diagnostics.
+
+**Allowed subcommands include:** `read`, `create`, `append`, `prepend`, `move`, `rename`, `delete` (without `--permanent`), `search`, `search:context`, `backlinks`, `links`, `unresolved`, `orphans`, `deadends`, `outline`, `tags`, `tag`, `properties`, `base:query`, `daily`, `daily:read`, `daily:append`, `template:read`, `template:insert`, `unique`, `publish:list`, `publish:status`, `sync:status`, `sync:history`, `sync:read`.
+
+**Denied subcommands — blocked at the tool-permission layer:**
+
+| Subcommand | Reason |
+|---|---|
+| `obsidian eval` (any args) | Executes arbitrary JavaScript in the renderer — remote code execution risk |
+| `obsidian plugin:install`, `plugin:enable`, `plugin:disable`, `plugin:uninstall` | Plugin lifecycle commands expose OS-level attack surface |
+| `obsidian theme:set`, `theme:install` | Theme code runs with full app privileges |
+| `obsidian delete --permanent` | Bypasses Obsidian's trash; operation is unrecoverable |
+
+**Why you may see permission errors:** The denied subcommands above are enforced mechanically via `.claude/settings.json` `permissions.deny` rules written by the onboarding step. If a `Bash(obsidian ...)` call is rejected by the harness, check this list — the subcommand is intentionally blocked, not broken. Use an allowed alternative or ask the user to perform the operation manually.
+
+### Opt-out
+
+Obsidian integration can be skipped by passing `--no-obsidian` to `/onboard-project` or `/new-project`. To retrofit integration later, run `/onboard-project-obsidian`.
+
+### Reference
+
+See `docs/obsidian-integration.md` for installation, configuration, troubleshooting, and the full allowlist rationale.
+```
+
+This block is installed into the user project's `CLAUDE.md` by Flow step 10g (when Obsidian integration is enabled) and by Phase 8d sub-step 8d.5 in `/onboard-project`. It is guarded by `grep -q '^## Obsidian Integration$' CLAUDE.md`. The fence is kept byte-identical to `claude/canonical-blocks/obsidian-integration.md` by `scripts/sync_canonical_blocks.py`.
+
+---
+
 ## §Idempotency Predicates — per-Flow-phase contracts
 
 Per-phase predicates that govern §Flow steps. Re-running `/new-project` on a directory mid-flight (e.g., after a partial run) honors these checks so completed phases are not redone.
@@ -541,6 +585,13 @@ Per-phase predicates that govern §Flow steps. Re-running `/new-project` on a di
 | 10d (Praxion Process append) | `grep -q '^## Praxion Process$' CLAUDE.md` |
 | 10e (Hackathon Mode append — only when hackathon mode is enabled) | `grep -q '^## Hackathon Mode$' CLAUDE.md` |
 | 10f (Working-in-this-project append) | `grep -q '^## Working in this project$' CLAUDE.md` |
+| 10g (Obsidian Integration append — only when Obsidian integration is enabled) | `grep -q '^## Obsidian Integration$' CLAUDE.md` |
+| 5g.1 (Obsidian .gitignore block) | `grep -q '^# Obsidian$' .gitignore` |
+| 5g.2 (kepano-skills resolution) | No skip predicate — always resolves; fails fast if path absent |
+| 5g.3 (.claude/skills/obsidian symlink) | `test -L .claude/skills/obsidian` OR `test -d .claude/skills/obsidian && ! test -L .claude/skills/obsidian` |
+| 5g.4 (.obsidian/ starter config) | Always no-op in v1 |
+| 5g.5 (## Obsidian Integration CLAUDE.md append) | `grep -q '^## Obsidian Integration$' CLAUDE.md` |
+| 5g.5b (permissions.deny block) | `jq '.permissions.deny // [] \| map(select(startswith("Bash(obsidian eval"))) \| length > 0' .claude/settings.json` returns `true` |
 
 Other §Flow steps (1–7, 9, 11–13) are not idempotent in the strict sense because the seed pipeline (researcher → architect → planner → implementer + test-engineer → verifier) produces new artifacts each run. The §Guard at flow-start refuses to run on a non-greenfield directory, so re-invocation is rare; if it does happen, the user gets a Guard abort and is directed to `/onboard-project` instead.
 
@@ -549,6 +600,7 @@ Other §Flow steps (1–7, 9, 11–13) are not idempotent in the strict sense be
 - **`/onboard-project` Phase 6 (CLAUDE.md blocks)** — all five standard predicates hit (Agent Pipeline, Compaction Guidance, Behavioral Contract, Praxion Process, and Working in this project are present from this command's Flow step 10). When hackathon mode was enabled, the `## Hackathon Mode` block is also present; `/onboard-project --hackathon`'s Phase 5b finds its per-artifact CLAUDE.md-block predicate already satisfied and skips just that artifact while still writing the remaining five (env var, preset, wrapper, directive, settings) — Phase 5b is not skipped wholesale, only its block-append sub-step.
 - **`/onboard-project` Phase 8 (Architecture Baseline)** — the predicate `test -e .ai-state/DESIGN.md` hits because the seed pipeline's `systems-architect` (gate 4b) already produced both `.ai-state/DESIGN.md` and `docs/architecture.md`. Re-running the architect would overwrite a real-content baseline with another real-content baseline; the predicate prevents that.
 - **`/onboard-project` Phase 8b (AaC scaffolding)** — when AaC was not opted out of (the default), all five sub-step predicates hit (`fitness/` exists, Block D is present, `architecture.yml` exists, fence markers are in `ARCHITECTURE.md`, `docs/diagrams/.gitkeep` exists). The `/onboard-project --with-aac` path becomes a clean no-op.
+- **`/onboard-project` Phase 8d (Obsidian integration)** — when Obsidian was not opted out of (the default), all sub-step predicates hit (`.gitignore` Obsidian block present, `.claude/skills/obsidian` symlink present, `## Obsidian Integration` block in `CLAUDE.md`, `permissions.deny` entries present). `/onboard-project`'s Phase 8d becomes a complete no-op.
 
 The other phases of `/onboard-project` (1, 2, 3, 4, 5, 7, 9) apply the surfaces this command does not — git hooks, merge drivers, `.ai-state/` skeleton (`DECISIONS_INDEX.md`, `TECH_DEBT_LEDGER.md`, `calibration_log.md`), `.gitattributes`, `.claude/settings.json` toggles, companion CLI advisories, and the verification handoff.
 

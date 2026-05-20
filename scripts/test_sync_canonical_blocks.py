@@ -41,12 +41,13 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 SYNC_SCRIPT = SCRIPTS_DIR / "sync_canonical_blocks.py"
 REPO_ROOT = SCRIPTS_DIR.parent
 
-# The four block slugs the script must resolve.
+# The block slugs the script must resolve.
 ALL_BLOCK_SLUGS = [
     "agent-pipeline",
     "compaction-guidance",
     "behavioral-contract",
     "praxion-process",
+    "obsidian-integration",
 ]
 
 # Canonical-source comment prefix (matches CANONICAL_SOURCE_PREFIX in script).

@@ -16,7 +16,7 @@ affected_files:
   - commands/onboard-project.md
   - commands/new-project.md
 re_affirms: dec-198
-superseded_by: dec-draft-754fe078
+superseded_by: dec-199
 ---
 
 ## Context

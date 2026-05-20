@@ -14,7 +14,7 @@ Git and GitHub remain the version-control and collaboration layer. Obsidian inte
 The integration activates in two ways:
 
 - **Default-on gate** in `/onboard-project` (Gate 8d) and `/new-project` — the operator picks `Install Obsidian integration (recommended)` or `Skip`.
-- **Standalone retrofit** via `/onboard-project-obsidian` — run after the fact on any already-Praxion-onboarded project.
+- **Retrofit existing projects** via re-running `/onboard-project` — it is idempotent and re-enters Phase 8d to apply any missing sub-steps.
 
 ## Installation (machine-level)
 
@@ -26,9 +26,9 @@ Run once per developer machine from a Praxion checkout:
 
 `install.sh code` calls `scripts/install-obsidian-deps.sh`, which:
 
-1. Clones [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) into `~/.local/share/praxion/kepano-skills` (override the destination via the `KEPANO_SKILLS_ROOT` environment variable).
-2. Writes the resolved path to `~/.config/praxion/obsidian-skills.path` so the onboarding commands can locate it without requiring `KEPANO_SKILLS_ROOT` to be set in every shell.
-3. Performs a soft check for the `obsidian` CLI. If Obsidian Desktop 1.12+ is absent, the script warns but exits 0 — all other install steps still complete.
+1. Runs `claude plugin marketplace add kepano/obsidian-skills` to register the kepano marketplace source.
+2. Runs `claude plugin install obsidian@obsidian-skills` to install the plugin at user scope. If already installed, this step is skipped automatically.
+3. Performs a soft check for the `obsidian` CLI. If Obsidian Desktop 1.12+ is absent, the script warns but exits 0 — all other steps still complete.
 
 **Prerequisite:** Obsidian Desktop 1.12+ must be installed separately. Praxion does not install Obsidian itself. Download from [obsidian.md](https://obsidian.md).
 
@@ -38,7 +38,7 @@ Verify machine-level state at any time:
 ./install.sh code --check
 ```
 
-This prints the kepano-skills HEAD revision and whether the `obsidian` CLI is detected on PATH.
+This prints whether `obsidian@obsidian-skills` is installed at user scope and whether the `obsidian` CLI is detected on PATH.
 
 ## Onboarding a project
 
@@ -53,20 +53,16 @@ When the session reaches Gate 8d, pick `Install Obsidian integration (recommende
 | Sub-step | What it does |
 |----------|-------------|
 | 8d.1 | Appends the Obsidian per-user-state block to `.gitignore` (workspace files, cache, appearance, hotkeys) |
-| 8d.2 | Resolves `KEPANO_SKILLS_ROOT` from the marker file or env var |
-| 8d.3 | Creates `.claude/skills/obsidian/` → `$KEPANO_SKILLS_ROOT` symlink |
+| 8d.2 | Verifies `claude` CLI is present on PATH |
+| 8d.3 | Verifies `obsidian@obsidian-skills` marketplace plugin is installed at user scope |
 | 8d.4 | No-op in v1 (`.obsidian/` starter config deferred) |
 | 8d.5 | Appends `## Obsidian Integration` block to project `CLAUDE.md` |
 | 8d.5b | Writes eight `permissions.deny` entries to `.claude/settings.json` |
 | 8d.6 | Prints install summary |
 
-**Idempotency.** Re-running `/onboard-project` or `/onboard-project-obsidian` on a project that already has Phase 8d applied produces zero `git diff` — each sub-step's predicate detects the prior install and skips silently.
+**Idempotency.** Re-running `/onboard-project` on a project that already has Phase 8d applied produces zero `git diff` — each sub-step's predicate detects the prior install and skips silently.
 
-**Retrofit existing projects.** If you picked `Skip` at Gate 8d, run the standalone command at any time:
-
-```
-/onboard-project-obsidian
-```
+**Retrofit existing projects.** If you picked `Skip` at Gate 8d, re-run `/onboard-project` — it is idempotent and will enter Phase 8d to apply any missing sub-steps.
 
 ## Opt-out
 
@@ -77,14 +73,19 @@ When the session reaches Gate 8d, pick `Install Obsidian integration (recommende
 
 ### After onboarding (manual removal)
 
-No automated uninstall exists for per-project surfaces. Remove four artifacts:
+No automated uninstall exists for per-project surfaces. Remove three artifacts:
 
 - **`.gitignore`** — delete the `# Obsidian` block (six lines starting with `.obsidian/workspace.json`).
-- **`.claude/skills/obsidian/`** — `rm .claude/skills/obsidian` (symlink; use `rm`, not `rm -r`).
 - **`CLAUDE.md`** — delete the `## Obsidian Integration` section.
 - **`.claude/settings.json`** — remove the eight `Bash(obsidian ...)` entries from `permissions.deny`.
 
-Or restore from a pre-onboarding commit: `git checkout <sha> -- .gitignore CLAUDE.md .claude/settings.json`, then `rm .claude/skills/obsidian`.
+To remove the machine-level plugin as well:
+
+```bash
+./install.sh code --uninstall
+```
+
+This runs `claude plugin uninstall obsidian@obsidian-skills`. See `rules/swe/plugin-install-conventions.md` for the general plugin lifecycle convention.
 
 ## CLI agent allowlist
 
@@ -117,18 +118,18 @@ The in-context rationale for agents (shorter form of this table) lives in the `#
 
 | Symptom | Fix |
 |---------|-----|
-| "Obsidian not found" warning during `./install.sh code` | kepano-skills still clones; install [Obsidian Desktop 1.12+](https://obsidian.md), then `./install.sh code --relink` |
-| kepano-skills missing when `/onboard-project` reaches Gate 8d | `./install.sh code` first, then `/onboard-project-obsidian` |
-| `.obsidian/workspace.json` in `git status` | `.gitignore` block missing — run `/onboard-project-obsidian` (sub-step 8d.1 is idempotent) |
+| "Obsidian not found" warning during `./install.sh code` | Plugin still installs; install [Obsidian Desktop 1.12+](https://obsidian.md), then `./install.sh code --relink` (runs `claude plugin update obsidian@obsidian-skills`) |
+| Plugin not installed when `/onboard-project` reaches Gate 8d | `./install.sh code` first, then re-run `/onboard-project` |
+| `.obsidian/workspace.json` in `git status` | `.gitignore` block missing — re-run `/onboard-project` (sub-step 8d.1 is idempotent) |
 | Permission error on `obsidian eval`, plugin lifecycle, `theme:set`, or `delete --permanent` | Intentional — see [CLI agent allowlist](#cli-agent-allowlist). Use an allowed alternative or perform the action manually. |
-| kepano-skills out of date | `./install.sh code --relink` (runs `git pull --ff-only` on the checkout) |
+| Plugin out of date | `./install.sh code --relink` (runs `claude plugin update obsidian@obsidian-skills`) |
 
 ## Revision
 
 | Operation | Command |
 |-----------|---------|
-| Show kepano revision + Obsidian presence | `./install.sh code --check` |
-| Update kepano-skills to latest | `./install.sh code --relink` |
-| Uninstall kepano-skills entirely | `./install.sh code --uninstall` |
+| Show plugin status + Obsidian presence | `claude plugin list` |
+| Update plugin to latest | `./install.sh code --relink` (runs `claude plugin update obsidian@obsidian-skills`) |
+| Uninstall plugin | `./install.sh code --uninstall` (runs `claude plugin uninstall obsidian@obsidian-skills`) |
 
-Uninstall removes the kepano-skills checkout and the marker file. It does not touch per-project surfaces (`.gitignore` block, symlink, `CLAUDE.md` block, `settings.json` entries) — remove those manually if needed (see [Opt-out](#opt-out)).
+Uninstall removes the marketplace plugin from user scope. It does not touch per-project surfaces (`.gitignore` block, `CLAUDE.md` block, `settings.json` entries) — remove those manually if needed (see [Opt-out](#opt-out)).

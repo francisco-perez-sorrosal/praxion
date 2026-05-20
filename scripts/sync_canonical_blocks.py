@@ -68,11 +68,27 @@ COMMENT_FENCE_CLOSER = "<!-- canonical-content-end -->"
 
 @dataclass(frozen=True)
 class BlockSpec:
-    """Per-block configuration: which files embed it, and which fence to use."""
+    """Per-block configuration: which files embed it, and which fence to use.
+
+    `consumer_overrides` lets one block target multiple consumers with different
+    fence styles — e.g., the same canonical block can be code-fenced inside a
+    command file (where it's displayed as a payload preview) and comment-fenced
+    inside a CLAUDE.md (where it IS rendered content). Each override entry is
+    a `(path, opener, closer)` triple; the fence is looked up per consumer via
+    `fence_for`, falling back to the block-level defaults.
+    """
 
     consumers: tuple[Path, ...]
     fence_opener: str = CODE_FENCE_OPENER
     fence_closer: str = CODE_FENCE_CLOSER
+    consumer_overrides: tuple[tuple[Path, str, str], ...] = ()
+
+    def fence_for(self, consumer: Path) -> tuple[str, str]:
+        """Return `(opener, closer)` for `consumer`, honoring overrides."""
+        for path, opener, closer in self.consumer_overrides:
+            if path == consumer:
+                return opener, closer
+        return self.fence_opener, self.fence_closer
 
 
 _ONBOARDING_PAIR = (
@@ -93,7 +109,17 @@ BLOCKS: dict[str, BlockSpec] = {
     "praxion-process": BlockSpec(consumers=_ONBOARDING_PAIR),
     "hackathon-mode": BlockSpec(consumers=_ONBOARDING_PAIR),
     "project-essentials": BlockSpec(consumers=_ONBOARDING_PAIR),
-    "obsidian-integration": BlockSpec(consumers=_ONBOARDING_PAIR),
+    "obsidian-integration": BlockSpec(
+        # Onboarded-project commands embed the block code-fenced (as a payload
+        # preview); Praxion's own CLAUDE.md embeds it comment-fenced (the block
+        # IS its rendered `## Obsidian Integration` section). Praxion is
+        # effectively self-onboarded — registering it as a consumer keeps
+        # Praxion's dogfooded block sync-tracked against the canonical source.
+        consumers=_ONBOARDING_PAIR + (REPO_ROOT / "CLAUDE.md",),
+        consumer_overrides=(
+            (REPO_ROOT / "CLAUDE.md", COMMENT_FENCE_OPENER, COMMENT_FENCE_CLOSER),
+        ),
+    ),
     "commit-process": BlockSpec(
         consumers=_COMMIT_PAIR,
         fence_opener=COMMENT_FENCE_OPENER,
@@ -206,21 +232,22 @@ def extract_block(lines: list[str], slug: str, file_path: Path) -> BlockLocation
     Raises SystemExit(2) on parse failure.
     """
     spec = BLOCKS[slug]
+    opener, closer = spec.fence_for(file_path)
     marker_idx = _find_canonical_source_line(lines, slug)
     if marker_idx is None:
         _error(f"canonical-source marker for '{slug}' not found in {file_path}")
 
-    fence_start = _find_fence_after(lines, marker_idx + 1, spec.fence_opener)
+    fence_start = _find_fence_after(lines, marker_idx + 1, opener)
     if fence_start is None:
         _error(
-            f"no '{spec.fence_opener}' fence found after canonical-source marker "
+            f"no '{opener}' fence found after canonical-source marker "
             f"for '{slug}' in {file_path}"
         )
 
-    fence_end = _find_fence_closer(lines, fence_start + 1, spec.fence_closer)
+    fence_end = _find_fence_closer(lines, fence_start + 1, closer)
     if fence_end is None:
         _error(
-            f"no '{spec.fence_closer}' closing fence found after '{spec.fence_opener}' "
+            f"no '{closer}' closing fence found after '{opener}' "
             f"for '{slug}' in {file_path}"
         )
 

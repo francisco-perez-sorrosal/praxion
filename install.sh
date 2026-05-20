@@ -330,7 +330,7 @@ show_overview() {
     • External API docs (chub CLI — curated docs for 600+ libraries)
     • Optional metrics tool (scc — SLOC counter used by /project-metrics)
     • Python tooling (uv + pytest/pytest-cov for Praxion's own tests and coverage)
-    • Obsidian integration (kepano/obsidian-skills checkout — activates Obsidian integration)
+    • Obsidian integration (kepano/obsidian-skills marketplace plugin — activates Obsidian integration)
 EOF
     fi
 

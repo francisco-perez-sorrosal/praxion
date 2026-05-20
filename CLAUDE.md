@@ -116,9 +116,11 @@ Tracked here so they can be revisited when Claude Code releases fixes. Each entr
 - **Subagent `Write` to `.ai-work/<task-slug>/` can be denied by the sandbox** while the main agent's `Write` to the same path succeeds (observed 2026-05-14 with `i-am:systems-architect` writing `SYSTEMS_PLAN.md`). The architect agent has `Write` in its tools whitelist and the target resolves inside the session worktree (so `worktree_guard.py` allows it); the denial appears to be Claude Code's per-tool permission prompt that the main agent had already auto-allowed for this session but the subagent cannot answer interactively. Workaround: when a subagent reports a Write denial for `.ai-work/`, the main agent should place the file from the subagent's returned content — the same pipeline contract is honored, just routed through the orchestrator. Distinct from `td-034` (subagent writes resolve to the wrong tree); same root-cause family in that subagent settings/permission inheritance differs from the orchestrator session. Tracked as `td-035`.
 - **`claude agents` is silently refused from inside any Claude Code session** (observed 2026-05-15 during Phase 2 dispatch-reworks pipeline) — the `claude agents` subcommand (the agent-view TUI for monitoring `--bg` sessions) returns `'claude agents' is not available in this environment.` exit 1 when invoked from any child process of `claude`, including the Bash tool inside subagents. The gate is parent-process-based: works from a fresh terminal pane with no `claude` ancestor; fails from inside any Claude session. Workaround: when dispatching `--bg` sessions and wanting to monitor them via agent-view, open a fresh Cursor terminal pane (no `claude` running there) and run `claude agents` from it. Praxion's `scripts/dispatch-reworks` surfaces this instruction in its post-dispatch output. Filed as [#59340](https://github.com/anthropics/claude-code/issues/59340) requesting a more informative error string (the behavior itself is reasonable nested-session defense; the silent generic error cost ~30 min of diagnostic time ruling out env, daemon-state, auth-mode, subscription tier, and binary version before identifying the actual gate). No `td-NNN` row — resolution is upstream-side only.
 
+<!-- canonical-source: claude/canonical-blocks/obsidian-integration.md — edit the canonical file, then run: python3 scripts/sync_canonical_blocks.py --write -->
+<!-- canonical-content-start -->
 ## Obsidian Integration
 
-This project is configured for **Obsidian integration**: the vault lives inside the project repository, and the agent has access to kepano/obsidian-skills for vault navigation and note manipulation. Kepano skills are discovered automatically from `$KEPANO_SKILLS_ROOT` (default: `~/.local/share/praxion/kepano-skills`). If that path is absent, run `./install.sh code` in your Praxion checkout first.
+This project is configured for **Obsidian integration**: the vault lives inside the project repository, and the agent has access to kepano/obsidian-skills for vault navigation and note manipulation. Kepano skills are discovered automatically once `obsidian@obsidian-skills` is installed at user scope. If the plugin is absent from a session, run `./install.sh code` in your Praxion checkout first.
 
 ### CLI Allowlist
 
@@ -139,8 +141,9 @@ The `obsidian` CLI is available for file CRUD, search, link analysis, properties
 
 ### Opt-out
 
-Obsidian integration can be skipped by passing `--no-obsidian` to `/onboard-project` or `/new-project`. To retrofit integration later, run `/onboard-project-obsidian`.
+Obsidian integration can be skipped by passing `--no-obsidian` to `/onboard-project` or `/new-project`. To retrofit integration later, re-run `/onboard-project` — it is idempotent on Phase 8d.
 
 ### Reference
 
 See `docs/obsidian-integration.md` for installation, configuration, troubleshooting, and the full allowlist rationale.
+<!-- canonical-content-end -->

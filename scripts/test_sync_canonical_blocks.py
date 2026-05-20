@@ -186,6 +186,52 @@ def test_help_flag_exits_zero_and_prints_usage() -> None:
     assert result.stdout, "--help produced no output"
 
 
+# ---------------------------------------------------------------------------
+# BlockSpec.fence_for: per-consumer fence override behavior
+# ---------------------------------------------------------------------------
+
+
+def test_block_spec_returns_default_fence_when_no_overrides_present() -> None:
+    """fence_for falls back to the block-level opener/closer when the consumer
+    has no entry in consumer_overrides."""
+    mod = _load_module()
+    spec = mod.BlockSpec(
+        consumers=(Path("/repo/commands/a.md"),),
+        fence_opener=mod.CODE_FENCE_OPENER,
+        fence_closer=mod.CODE_FENCE_CLOSER,
+    )
+    opener, closer = spec.fence_for(Path("/repo/commands/a.md"))
+    assert opener == mod.CODE_FENCE_OPENER
+    assert closer == mod.CODE_FENCE_CLOSER
+
+
+def test_block_spec_returns_override_fence_when_consumer_has_entry() -> None:
+    """fence_for returns the override opener/closer when the consumer path
+    matches an entry in consumer_overrides; other consumers fall back to the
+    block-level default. This unlocks one block targeting consumers that
+    require different fence styles (e.g., code-fenced payload preview in a
+    command file plus comment-fenced inline content in a CLAUDE.md)."""
+    mod = _load_module()
+    code_consumer = Path("/repo/commands/a.md")
+    comment_consumer = Path("/repo/CLAUDE.md")
+    spec = mod.BlockSpec(
+        consumers=(code_consumer, comment_consumer),
+        consumer_overrides=(
+            (comment_consumer, mod.COMMENT_FENCE_OPENER, mod.COMMENT_FENCE_CLOSER),
+        ),
+    )
+
+    # Override consumer returns the override fence
+    opener, closer = spec.fence_for(comment_consumer)
+    assert opener == mod.COMMENT_FENCE_OPENER
+    assert closer == mod.COMMENT_FENCE_CLOSER
+
+    # Non-override consumer returns the block-level default
+    opener, closer = spec.fence_for(code_consumer)
+    assert opener == mod.CODE_FENCE_OPENER
+    assert closer == mod.CODE_FENCE_CLOSER
+
+
 def test_check_exits_zero_on_in_sync_real_repo() -> None:
     """--check exits 0 against the real repo when canonical blocks are in sync.
 

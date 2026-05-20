@@ -1,7 +1,7 @@
 ---
 id: dec-197
 title: Ship kepano/obsidian-skills via fetch-at-install (shallow git clone) to a global location
-status: accepted
+status: superseded
 category: architectural
 date: 2026-05-19
 summary: Procedure 1 fetches kepano/obsidian-skills via `git clone --depth 1` into ~/.local/share/praxion/kepano-skills at install time; Procedure 2 links into per-project .claude/skills/obsidian/. No vendoring, no submodule.
@@ -16,6 +16,7 @@ affected_files:
   - commands/onboard-project.md
   - commands/new-project.md
 re_affirms: dec-198
+superseded_by: dec-draft-754fe078
 ---
 
 ## Context

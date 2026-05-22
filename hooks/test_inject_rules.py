@@ -199,8 +199,12 @@ def _run_hook(
     env = {
         **os.environ,
         "CLAUDE_PLUGIN_ROOT": str(plugin_root),
-        **(extra_env or {}),
     }
+    # Neutralize the ambient memory-MCP opt-out (set in this repo's
+    # .claude/settings.json) so tests are deterministic regardless of the
+    # session env. Tests that exercise it pass it explicitly via extra_env.
+    env.pop("PRAXION_DISABLE_MEMORY_MCP", None)
+    env.update(extra_env or {})
     return subprocess.run(
         [sys.executable, str(HOOK_SCRIPT)],
         capture_output=True,
@@ -319,6 +323,39 @@ def test_disabling_one_rule_removes_it_from_injection(
     )
     assert _GIT_CONVENTIONS_BODY.strip() in context, (
         "vcs/git-conventions body must still appear when only memory-protocol is disabled. "
+        f"Context snippet: {context[:200]!r}"
+    )
+
+
+# ===========================================================================
+# Test 2b: PRAXION_DISABLE_MEMORY_MCP=1 (no blacklist) → memory-protocol absent
+# ===========================================================================
+
+
+def test_memory_mcp_disabled_env_suppresses_memory_protocol(
+    plugin_root: Path, project_dir: Path
+) -> None:
+    """PRAXION_DISABLE_MEMORY_MCP=1 structurally suppresses memory-protocol even
+    with no project blacklist; the other two hook-deliver rules still inject."""
+    result = _run_hook(
+        plugin_root,
+        project_dir,
+        extra_env={"PRAXION_DISABLE_MEMORY_MCP": "1"},
+    )
+    assert result.returncode == 0, (
+        f"Hook must exit 0 when memory MCP is disabled via env. stderr: {result.stderr!r}"
+    )
+    context = _additional_context(result)
+    assert _MEMORY_PROTOCOL_BODY.strip() not in context, (
+        "memory-protocol body must NOT appear when PRAXION_DISABLE_MEMORY_MCP=1. "
+        f"Context snippet: {context[:200]!r}"
+    )
+    assert _AGENT_MODEL_ROUTING_BODY.strip() in context, (
+        "agent-model-routing must still appear when only memory MCP is disabled. "
+        f"Context snippet: {context[:200]!r}"
+    )
+    assert _GIT_CONVENTIONS_BODY.strip() in context, (
+        "vcs/git-conventions must still appear when only memory MCP is disabled. "
         f"Context snippet: {context[:200]!r}"
     )
 

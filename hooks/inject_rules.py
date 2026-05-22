@@ -69,6 +69,12 @@ from _hook_utils import is_disabled
 # -- Constants -----------------------------------------------------------------
 
 DISABLE_FLAG = "PRAXION_DISABLE_RULE_INJECTION"
+# When the memory MCP is disabled, the memory-protocol rule is inert (its body
+# says "skip all memory operations"). Suppress its delivery structurally so
+# opted-out projects do not pay its always-loaded token cost — the env var alone
+# is sufficient, no per-project blacklist entry required.
+MEMORY_MCP_DISABLE_FLAG = "PRAXION_DISABLE_MEMORY_MCP"
+MEMORY_PROTOCOL_RULE_ID = "swe/memory-protocol"
 SUPPORTED_SCHEMA_VERSION = 1
 
 _INJECT_HEADER = "## Praxion Rules (auto-injected)\n\n"
@@ -496,6 +502,13 @@ def main() -> None:
             " scripts/regenerate_rules_manifest.py` to see valid IDs.",
             file=sys.stderr,
         )
+
+    # Memory MCP opt-out (env-driven, blacklist-independent): when the memory MCP
+    # is disabled, memory-protocol is a no-op rule — suppress it so the project
+    # does not pay its always-loaded cost. Non-core, so it survives the core
+    # filter below and flows through the normal suppression path.
+    if is_disabled(MEMORY_MCP_DISABLE_FLAG) and MEMORY_PROTOCOL_RULE_ID in all_rule_ids:
+        disable_set.add(MEMORY_PROTOCOL_RULE_ID)
 
     # Remove core rules from disable set; warn for each attempted suppression.
     disable_set = _filter_core_rules(disable_set, rules)

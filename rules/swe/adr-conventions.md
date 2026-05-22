@@ -72,26 +72,11 @@ The frontmatter schema is shared between draft and finalized ADRs. Only the `id`
 
 ### Supersession Protocol
 
-When a new ADR supersedes an existing one:
-
-1. Set `supersedes: <target-id>` in the **new** ADR frontmatter (`dec-draft-<hash>` while both are drafts, `dec-NNN` when the target is finalized)
-2. Set `superseded_by: <new-id>` in the **old** ADR frontmatter (same id-form rule)
-3. Change the old ADR status to `superseded`
-4. Add a `## Prior Decision` section in the new ADR body
-5. `DECISIONS_INDEX.md` regenerates automatically at finalize — do not manually invoke the index-regeneration script
+When a new ADR supersedes an existing one: set `supersedes`/`superseded_by` cross-references (draft-vs-finalized id rules apply), flip the old ADR to `status: superseded`, and add a `## Prior Decision` section to the new ADR. `DECISIONS_INDEX.md` regenerates at finalize — never invoke the index script manually. Full step sequence: [`adr-authoring-protocols.md` § Supersession Protocol](../../skills/software-planning/references/adr-authoring-protocols.md#supersession-protocol).
 
 ### Re-affirmation Protocol
 
-When a new ADR re-affirms an existing one without superseding it (a re-opening was considered and rejected for lack of new evidence):
-
-1. Set `status: re-affirmation` on the **new** ADR (signals meta-decision — a decision *about* another decision)
-2. Set `re_affirms: <target-id>` in the **new** ADR frontmatter (same draft-vs-finalized id-form rule as Supersession)
-3. Append `<new-id>` to the **old** ADR's `re_affirmed_by` list (create the list if absent)
-4. **Do not** change the old ADR's status — it stays `accepted`; no `superseded_by` is set
-5. Add a `## Prior Decision` section in the new ADR body explaining what was considered and why the prior decision still holds; name the evidence that would be required to justify a future supersession
-6. `DECISIONS_INDEX.md` regenerates automatically at finalize
-
-Use re-affirmation only when a prior decision is challenged, re-examined, and found still correct — not as routine acknowledgment. (Rationale: [`adr-authoring-protocols.md` § Re-affirmation Protocol](../../skills/software-planning/references/adr-authoring-protocols.md#re-affirmation-protocol).)
+When a new ADR re-affirms an existing one *without* superseding it (a re-opening was considered and rejected for lack of new evidence): set `status: re-affirmation` + `re_affirms`, append `<new-id>` to the old ADR's `re_affirmed_by` (the old ADR stays `accepted`, no `superseded_by`), and add a `## Prior Decision` section naming the evidence a future supersession would require. Use only when a prior decision is challenged, re-examined, and found still correct — not routine acknowledgment. Full step sequence: [`adr-authoring-protocols.md` § Re-affirmation Protocol](../../skills/software-planning/references/adr-authoring-protocols.md#re-affirmation-protocol).
 
 ### Finalize Protocol
 

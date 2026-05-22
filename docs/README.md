@@ -38,6 +38,7 @@ Authoritative tables and schemas. Look up, don't read sequentially.
 - [Spec-driven development](spec-driven-development.md) — REQ ID conventions, traceability protocol, sentinel checks
 - [Rules Taxonomy](rules-taxonomy.md) — rule categories (core, hook-deliver, path-scoped), per-project disable list reaching both delivery channels, token accounting
 - [Metrics schema](metrics/README.md) — `/project-metrics` JSON output schema and field reference
+- [Known Claude Code limitations](claude-code-limitations.md) — tracked Claude Code bugs/constraints, workarounds, and their upstream issues + `td-NNN` rows
 
 ## Concepts — mental models (the why)
 

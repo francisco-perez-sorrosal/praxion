@@ -31,16 +31,20 @@ from _hook_utils import is_disabled
 _DISABLE_FLAG = "PRAXION_DISABLE_SUBAGENT_INJECT"
 _INJECT_NATIVE_FLAG = "PRAXION_INJECT_NATIVE_SUBAGENTS"
 
-# Preamble content (tokens ≤50 / chars ≤180).
+# Preamble content (chars ≤300 incl. separator — enforced by test).
 # Structural keywords required by test contract:
 #   "Surface Assumptions", "Register Objection", "Stay Surgical", "Simplicity First"
-# Plus tier-selector and delegation-back references.
-# 168 bytes / 3.6 ≈ 46.7 tokens — within budget.
+# Plus tier-selector, delegation-back, and return-contract references.
+# ~292 chars / 3.6 ≈ 81 tokens — paid in the subagent prompt, not orchestrator context.
+# The return clause reaches host-native agents (Explore/Plan/general-purpose) that have
+# no `## Output` block and do not load the always-on coordination rule.
 _PREAMBLE = (
     "[Praxion process active] "
     "Apply the behavioral contract: "
     "Surface Assumptions, Register Objection, Stay Surgical, Simplicity First. "
-    "Use the tier selector; carry this contract into every delegation."
+    "Use the tier selector; carry this contract into every delegation. "
+    "Return a pointer, not a payload: a summary plus your .ai-work/ "
+    "artifact path, not the full report."
 )
 
 # Per-session-id cache: maps session_id → bool (True = .ai-state/ present)

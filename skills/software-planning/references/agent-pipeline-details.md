@@ -175,6 +175,25 @@ When the Task Chronograph MCP server is registered, call `report_interaction(sou
 | Making pipeline decision | `"main_agent"` | `"main_agent"` | `"decision"` |
 | Responding to user | `"main_agent"` | `"user"` | `"response"` |
 
+## Agent Return Contract
+
+A subagent's full output lives in its `.ai-work/<task-slug>/` artifact. Its **return message to the orchestrator is a pointer, not a payload** — a terse executive summary plus the artifact path, never a reproduction of the artifact body.
+
+**Why it matters.** The orchestrator's context window is the scarcest shared resource in a fan-out pipeline: one orchestrator accumulates *every* subagent's return, permanently, for the life of the session. A pipeline that spawns 9–29 agents (the observed mean–max) and echoes full reports back fills the window in a few steps. Returning a pointer keeps the orchestrator lean and defers detail to on-demand reads — progressive disclosure applied to inter-agent communication.
+
+**Return-message template (target ≤ ~15 lines):**
+
+1. **Outcome** — one line (verdict / goal met / what was produced)
+2. **Key points** — top 3–5 findings or decisions, one line each
+3. **Follow-ups** — anything the orchestrator must act on or decide
+4. **Artifact** — the `.ai-work/<task-slug>/<NAME>.md` path for full detail
+
+**Do not** paste tables, code blocks, full file contents, or long enumerations into the return message — write them to the artifact and cite the path. If the orchestrator needs a detail, it reads the artifact.
+
+**Orchestrator reciprocal.** When delegating, ask for the artifact + a summary — never instruct an agent to "return X in full" or "paste the complete report." Read an artifact only when a decision depends on its detail. This is the `Return contract` row in the coordination protocol's pipeline rules, and the reciprocal of the delegation-deliverables rule in the philosophy.
+
+**Reach.** Praxion-native (`i-am:*`) agents carry a conformant `## Output` block in their definition (concise summary + pointer to the artifact). Host-native agents (`Explore`, `Plan`, `general-purpose`) receive the contract via the `inject_subagent_context.py` spawn preamble, since they have no definition block and do not load the always-on rules.
+
 ## Semantic Document Reconciliation
 
 When concurrent agents write to fragment files (`WIP_<agent>.md`, `LEARNINGS_<agent>.md`, `PROGRESS_<agent>.md`), the supervising agent (implementation-planner) merges fragments into canonical documents after all agents in a batch complete. All fragment files and canonical documents live inside the task-scoped directory (`.ai-work/<task-slug>/`). Each document type has its own schema and merge semantics -- naive concatenation produces structurally invalid documents.

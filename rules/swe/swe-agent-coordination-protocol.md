@@ -118,6 +118,7 @@ Agents communicate through shared documents, not direct invocation. The pipeline
 
 | Rule | Behavior |
 |------|----------|
+| Return contract | A subagent's final message is a **pointer, not a payload**: a terse summary (≤ ~15 lines) + its `.ai-work/<task-slug>/` artifact path — never the artifact body. The orchestrator delegates for summaries and reads an artifact only when it needs the detail. Deep-dive: [agent-pipeline-details.md](../../skills/software-planning/references/agent-pipeline-details.md#agent-return-contract). |
 | Do not skip stages | Research before architecture (unless codebase context suffices); re-invoke upstream when downstream input is incomplete |
 | BDD/TDD execution | Paired implementation + test steps; concurrent on disjoint file sets; tests run until green |
 | Batched improvements | Evaluate independence; execute with maximum parallelism via Classify / Pair-spawn / Sequence / Full-suite-gate procedure |

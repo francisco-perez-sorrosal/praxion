@@ -191,6 +191,18 @@ def test_preamble_contains_behavioral_contract_keywords(
         assert keyword in prompt, f"Keyword {keyword!r} missing from preamble"
 
 
+def test_preamble_contains_return_contract(praxion_project: Path) -> None:
+    """Preamble carries the pointer-not-payload return contract for host-native
+    agents that have no `## Output` block and do not load the always-on rule."""
+    payload = _pretooluse_payload(subagent_type="Explore", cwd=str(praxion_project))
+    result = _run_hook(payload)
+    assert result.returncode == 0
+    output = json.loads(result.stdout)
+    prompt = output["hookSpecificOutput"]["updatedInput"]["tool_input"]["prompt"]
+    for phrase in ["pointer, not a payload", ".ai-work/"]:
+        assert phrase in prompt, f"Return-contract phrase {phrase!r} missing"
+
+
 def test_preamble_length_is_compact(praxion_project: Path) -> None:
     """The injected preamble stays within the ~180 char spec limit."""
     payload = _pretooluse_payload(subagent_type="Explore", cwd=str(praxion_project))

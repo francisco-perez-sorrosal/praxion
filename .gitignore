@@ -69,3 +69,6 @@ coverage.xml
 .obsidian/appearance.json
 .obsidian/*.compat.json
 .obsidian/hotkeys.json
+# Third-party community plugin code — per-user install, not vendored.
+# community-plugins.json (the enabled-list) IS committed as a recommendation.
+.obsidian/plugins/

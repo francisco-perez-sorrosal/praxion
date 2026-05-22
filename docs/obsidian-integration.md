@@ -123,6 +123,8 @@ Praxion ships `.ai-state/decisions/decisions.base` — an Obsidian Bases file de
 
 **As a user (GUI).** Click `decisions.base` in Obsidian. It renders as interactive tables with a view dropdown — **All ADRs**, **Superseded**, **By category**, **Obsidian-tagged**. Sort by clicking a column header; click a row to open the ADR's markdown.
 
+> **Prerequisite — make `.ai-state/` visible.** `decisions.base` lives in `.ai-state/decisions/`, a dot-prefixed directory Obsidian hides by default (as it does `.claude/`, `.ai-work/`, and the rest of Praxion's state). Install the **`show-hidden-files`** community plugin (Settings → Community plugins → Browse) so the hidden directories — and the base — appear in the file explorer. Praxion commits `.obsidian/community-plugins.json` listing it as a recommendation; Obsidian prompts you to install the code on first open. The plugin code itself (`.obsidian/plugins/`) is gitignored — each contributor installs it locally.
+
 **As an agent (CLI).**
 
 ```bash

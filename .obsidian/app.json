@@ -1,4 +1,5 @@
 {
   "useMarkdownLinks": true,
-  "alwaysUpdateLinks": false
+  "alwaysUpdateLinks": false,
+  "showUnsupportedFiles": false
 }

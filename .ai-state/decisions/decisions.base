@@ -1,0 +1,62 @@
+filters:
+  and:
+    - file.folder == ".ai-state/decisions"
+    - status
+properties:
+  id:
+    displayName: ID
+  title:
+    displayName: Title
+  status:
+    displayName: Status
+  category:
+    displayName: Category
+  date:
+    displayName: Date
+  superseded_by:
+    displayName: Superseded by
+  re_affirms:
+    displayName: Re-affirms
+views:
+  - type: table
+    name: All ADRs
+    order:
+      - id
+      - title
+      - status
+      - category
+      - date
+      - tags
+    sort: []
+    columnSize:
+      note.id: 89
+  - type: table
+    name: Superseded
+    filters:
+      and:
+        - status == "superseded"
+    order:
+      - id
+      - title
+      - superseded_by
+      - date
+  - type: table
+    name: By category
+    groupBy:
+      property: category
+      direction: ASC
+    order:
+      - id
+      - title
+      - status
+      - date
+  - type: table
+    name: Obsidian-tagged
+    filters:
+      and:
+        - file.hasTag("obsidian")
+    order:
+      - id
+      - title
+      - status
+      - date

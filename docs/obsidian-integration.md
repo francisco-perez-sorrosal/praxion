@@ -117,6 +117,27 @@ The plugin-lifecycle risk is not theoretical. The [PhantomPulse RAT](https://www
 
 The in-context rationale for agents (shorter form of this table) lives in the `## Obsidian Integration` block appended to your project's `CLAUDE.md` by Phase 8d.5.
 
+## Querying ADRs with Bases
+
+Praxion ships `.ai-state/decisions/decisions.base` — an Obsidian Bases file defining declarative views over the finalized ADRs in `.ai-state/decisions/`. It is the one net-new capability the integration adds beyond the existing dashboard and sentinel: a single query definition consumed by both humans (GUI tables) and agents (CLI JSON), where each of those tools otherwise hardcodes its own query logic.
+
+**As a user (GUI).** Click `decisions.base` in Obsidian. It renders as interactive tables with a view dropdown — **All ADRs**, **Superseded**, **By category**, **Obsidian-tagged**. Sort by clicking a column header; click a row to open the ADR's markdown.
+
+**As an agent (CLI).**
+
+```bash
+obsidian base:query vault=<vault> path=".ai-state/decisions/decisions.base" view="Superseded" format=json
+```
+
+Returns the matching rows as JSON. This replaces "grep every ADR file, parse each one's YAML, filter in code" with one declarative call — the `.base` is the spec, the CLI runs it. `base:query` is on the allowlist (read-only).
+
+**Caveats.**
+
+- `base:query` needs Obsidian running (it is a remote control for the GUI app) — it is **not** a headless/CI replacement for Praxion's Python scripts (sentinel, `finalize_adrs.py`). Use it in interactive sessions; keep the scripts canonical for CI.
+- Obsidian rewrites `.base` files to its canonical form on GUI interaction (strips comments, adds `sort`/`columnSize` state). Edit views in the GUI or hand-edit the YAML — do not rely on comments persisting.
+
+**Extending the pattern.** The same approach applies to any frontmatter-bearing `.ai-state/` artifact — a `.base` over `sentinel_reports/` for a health timeline, or one over a per-row tech-debt ledger for a priority kanban. Each is a `.base` file plus the views you want.
+
 ## Link safety
 
 Because the repository doubles as a vault, Obsidian's default link behavior would let vault tooling corrupt project-artifact links — the standard Markdown `[text](path)` links and ADR id cross-references that Praxion's docs and cross-reference validators depend on. Two default behaviors are the risk:

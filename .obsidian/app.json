@@ -1,5 +1,14 @@
 {
   "useMarkdownLinks": true,
   "alwaysUpdateLinks": false,
-  "showUnsupportedFiles": false
+  "showUnsupportedFiles": false,
+  "userIgnoreFilters": [
+    ".claude/",
+    ".codex/",
+    ".complexipy_cache/",
+    ".ai-work/",
+    ".venv/",
+    ".pytest_cache/",
+    ".ruff_cache/"
+  ]
 }

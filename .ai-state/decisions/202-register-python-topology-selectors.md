@@ -1,7 +1,7 @@
 ---
-id: dec-draft-fc34719e
+id: dec-202
 title: Register Python selector & parallel-runner identifiers in the test-topology registries (M1→M2 for Python)
-status: proposed
+status: accepted
 category: architectural
 date: 2026-05-23
 summary: Promote the five Python test-topology identifiers (pytest-globs/markers/keywords selectors; pytest-xdist-loadfile/load parallel runners) from indicative to registered in the trunk registries, completing M2 for Python consumer projects.

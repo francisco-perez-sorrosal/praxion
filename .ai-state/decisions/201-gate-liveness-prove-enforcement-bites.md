@@ -1,7 +1,7 @@
 ---
-id: dec-draft-f3a65f5a
+id: dec-201
 title: Gate Liveness — prove Praxion's enforcement layer bites
-status: proposed
+status: accepted
 category: architectural
 date: 2026-05-23
 summary: Introduce a gate-liveness discipline — a CODE/PROMPT gate taxonomy, a canary requirement for code gates enforced by a fitness meta-test, a path-scoped authoring rule, and a sentinel Gate Liveness (GL) family — so verification machinery is proven to fail on bad input rather than passing vacuously.

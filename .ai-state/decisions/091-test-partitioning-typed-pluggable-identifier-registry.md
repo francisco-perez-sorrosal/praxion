@@ -13,7 +13,7 @@ affected_files:
   - skills/testing-strategy/references/test-topology.md
   - skills/testing-strategy/references/python-testing.md
 re_affirmed_by:
-  - dec-draft-fc34719e
+  - dec-202
 ---
 
 ## Context

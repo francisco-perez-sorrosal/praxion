@@ -16,6 +16,7 @@ rules/
 │   ├── agent-intermediate-documents.md
 │   ├── agent-model-routing.md
 │   ├── coding-style.md
+│   ├── gate-liveness.md
 │   ├── id-citation-discipline.md
 │   ├── memory-protocol.md
 │   ├── shipped-artifact-isolation.md
@@ -55,6 +56,7 @@ Path-scoped rules load only when editing files matching their `paths:` pattern. 
 | File | Purpose |
 | ---- | ------- |
 | `ml/experiment-tracking-conventions.md` | Experiment lineage, run-tag mapping, tracker selection (MLflow/W&B/Aim). Paths: `runs/**`, `experiments/**`, `program.md` |
+| `swe/gate-liveness.md` | A gate must be proven to bite: substance-over-structure, a named producer for every consumer, no self-contradiction, and a verification path per gate (a canary for CODE gates, a golden bad-case for PROMPT gates). Paths: gate-authoring surfaces (`fitness/**`, `scripts/check_*`/`validate_*`, `hooks/*.py`, sentinel/verifier/planner agents) |
 | `swe/id-citation-discipline.md` | Detection and remediation rules for ephemeral identifier citations (REQ, AC, step numbers) leaking into production source. Paths: source files across all tracked languages |
 | `swe/shipped-artifact-isolation.md` | Isolation rules preventing shipped artifacts (`rules/`, `skills/`, `agents/`, `commands/`) from referencing project-specific `.ai-state/` entries. Paths: `rules/**`, `skills/**`, `agents/**`, `commands/**`, `claude/config/**` |
 | `swe/staleness-policy.md` | Marker syntax and threshold protocol for drift-prone skill sections. Paths: `**/SKILL.md` |

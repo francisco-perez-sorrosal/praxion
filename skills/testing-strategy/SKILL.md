@@ -22,6 +22,7 @@ Language-independent testing knowledge for making strategic testing decisions: w
 
 - [references/python-testing.md](references/python-testing.md) -- advanced pytest patterns: conftest architecture, hypothesis property-based testing, fixture composition, coverage strategy, plugin ecosystem
 - [references/test-topology.md](references/test-topology.md) -- language-agnostic test topology schema: trunk schema fields, identifier registries (selector_strategy, parallel_runner), tier vocabulary, closure semantics, document conventions, growth-trigger policy (advisory adoption thresholds), and `/refresh-topology --init` and default-refresh paths
+- [references/gate-canaries.md](references/gate-canaries.md) -- how to author the canary that proves a CODE gate bites: the negative-case contract, naming + co-location convention, a worked example, and how canary coverage is enforced (companion to the `gate-liveness` rule)
 
 Future language references (e.g., `references/typescript-testing.md`, `references/rust-testing.md`) are added here without changes to this file's body.
 

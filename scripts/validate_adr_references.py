@@ -26,7 +26,11 @@ def parse_affected_files(text: str) -> list[str]:
     Supports both inline-list (`["a", "b"]`) and block-list (`- a\n  - b`)
     YAML forms. Returns paths exactly as written in the ADR.
     """
-    frontmatter = re.match(r"^---\n(.*?)\n---", text, re.DOTALL)
+    # Capture the trailing newline inside the group (`\n)---`, not `)\n---`) so the
+    # last frontmatter line keeps its `\n`. Otherwise the block-list regex below —
+    # which requires each `- entry` line to end in `\n` — silently drops the final
+    # affected_files entry whenever affected_files is the last frontmatter field.
+    frontmatter = re.match(r"^---\n(.*?\n)---", text, re.DOTALL)
     if not frontmatter:
         return []
 

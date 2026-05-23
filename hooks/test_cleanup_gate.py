@@ -260,3 +260,27 @@ def test_non_matching_command_under_latency_budget() -> None:
         f"{LATENCY_BUDGET_MS} ms (samples: "
         f"{[f'{s:.2f}' for s in samples_ms]})"
     )
+
+
+# ---------------------------------------------------------------------------
+# Canary: gate blocks (rejects fast-path) for .ai-work cleanup commands
+# ---------------------------------------------------------------------------
+
+
+def test_blocks_fast_path_for_ai_work_rm_command(tmp_path: Path) -> None:
+    """Canary: a `rm -rf .ai-work/...` command is NOT swallowed by the fast-path.
+
+    The gate's job is to intercept cleanup commands and forward them to the
+    Python hook. A command matching the cleanup regex must reach Python — the
+    fast-path (silent exit 0 with empty stdout) must NOT fire.
+
+    We use a spy hook so the test does not depend on promote_learnings.py's
+    own CLEANUP_PATTERNS matching the payload.
+    """
+    spy_hook = _write_delegation_spy(tmp_path)
+    result = _run_gate(_make_bash_payload("rm -rf .ai-work/my-task"), hook=spy_hook)
+    assert result.returncode == 0
+    assert DELEGATION_MARKER in result.stdout, (
+        "cleanup_gate.sh must delegate an `rm -rf .ai-work/` command to Python "
+        f"(fast-path must NOT silence it); stdout={result.stdout!r}"
+    )

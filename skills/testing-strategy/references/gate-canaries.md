@@ -8,7 +8,7 @@ A **gate** is any mechanism whose job is to catch a defect class (a `check_*`/`v
 
 Every CODE gate ships a sibling test containing **at least one negative-case test**: it constructs or points at a known-bad input and asserts the gate flags it (non-zero exit, raised error, or a non-empty findings list).
 
-- **Location** — co-located sibling, mirroring source structure: `scripts/check_foo.py` → `scripts/test_check_foo.py`; fitness rules already live in `fitness/tests/`; `hooks/foo_gate.py` → `hooks/test_foo_gate.py`.
+- **Location** — co-located sibling, mirroring source structure: `scripts/check_foo.py` → `scripts/test_check_foo.py`; fitness rules already live in `fitness/tests/`; `hooks/foo_gate.py` → `hooks/test_foo_gate.py`. A canary in the project's central `tests/` dir (`tests/test_check_foo.py`) also satisfies the coverage meta-test, for projects that centralize tests rather than co-locate — but prefer co-location for new gates.
 - **Naming** — the negative-case test's name must signal the bad-case outcome so the coverage meta-test can find it. Use one of: `*_rejects_*`, `*_flags_*`, `*_fails_*`, `*_blocks_*`, `*_denies_*`, `*_detects_*`, `*_nonzero_*`, `*_violation_*`, `*_invalid_*`, `*_missing_*`, `*_empty_*`, `*_bad_*`.
 - **A happy-path test is not a canary.** "Passes on the real repo" or "accepts valid input" proves the gate runs, not that it bites. The canary is in addition to any happy-path test.
 

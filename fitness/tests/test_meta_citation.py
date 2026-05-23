@@ -24,6 +24,32 @@ CITATION_REGEX = re.compile(r"dec-\d{3,}|CLAUDE\.md§[A-Z][A-Za-z ]+")
 WAIVER_REGEX = re.compile(r"#\s*fitness-waiver:\s*(\S+)\s+(.+)")
 
 
+# ---------------------------------------------------------------------------
+# Callable helpers exposed for the canary and for reuse
+# ---------------------------------------------------------------------------
+
+
+def check_file_citation(source: str, filename: str) -> str | None:
+    """Return a failure string if `source` lacks a valid citation, else None.
+
+    Parses the module docstring from `source` and checks it against
+    CITATION_REGEX. Returns a human-readable error string if the check fails,
+    or None if the citation contract is satisfied.
+    """
+    try:
+        module = ast.parse(source)
+    except SyntaxError as exc:
+        return f"{filename}: SyntaxError ({exc})"
+    docstring = ast.get_docstring(module)
+    if docstring is None:
+        return f"{filename}: missing module docstring"
+    if not CITATION_REGEX.search(docstring):
+        return (
+            f"{filename}: docstring lacks citation matching {CITATION_REGEX.pattern!r}"
+        )
+    return None
+
+
 def test_every_fitness_test_has_citation(project_root: Path) -> None:
     """Every fitness/tests/test_*.py module docstring contains a citation."""
     fitness_tests = sorted((project_root / "fitness" / "tests").glob("test_*.py"))
@@ -32,20 +58,9 @@ def test_every_fitness_test_has_citation(project_root: Path) -> None:
         # Skip self
         if test_file.name == "test_meta_citation.py":
             continue
-        source = test_file.read_text()
-        try:
-            module = ast.parse(source)
-        except SyntaxError as exc:
-            failures.append(f"{test_file.name}: SyntaxError ({exc})")
-            continue
-        docstring = ast.get_docstring(module)
-        if docstring is None:
-            failures.append(f"{test_file.name}: missing module docstring")
-            continue
-        if not CITATION_REGEX.search(docstring):
-            failures.append(
-                f"{test_file.name}: docstring lacks citation matching {CITATION_REGEX.pattern!r}"
-            )
+        failure = check_file_citation(test_file.read_text(), test_file.name)
+        if failure:
+            failures.append(failure)
     assert not failures, "Citation contract violations:\n  " + "\n  ".join(failures)
 
 
@@ -95,3 +110,55 @@ def test_every_waiver_has_anchor_and_reason(project_root: Path) -> None:
                         f"{source_file.relative_to(project_root)}:{line_no} waiver missing reason"
                     )
     assert not failures, "Waiver violations:\n  " + "\n  ".join(failures)
+
+
+# ---------------------------------------------------------------------------
+# Canary: prove the citation check bites on a known-bad fixture
+# ---------------------------------------------------------------------------
+
+
+def test_flags_fitness_file_missing_citation(tmp_path: Path) -> None:
+    """Canary: a fitness file with no citation in its docstring is reported.
+
+    This proves the citation gate fails on a known-bad input — not just passes
+    on the current good state.
+    """
+    source_without_citation = (
+        '"""Some fitness rule without any citation.\n\n'
+        "It describes something important but forgot to cite the decision.\n"
+        '"""\n'
+        "def test_something_holds() -> None:\n"
+        "    assert True\n"
+    )
+    result = check_file_citation(source_without_citation, "test_uncited_rule.py")
+    assert result is not None, (
+        "check_file_citation must return a failure string for a file with no citation; "
+        "got None (i.e. check passed when it should have failed)"
+    )
+    assert "citation" in result.lower() or "docstring" in result.lower(), (
+        f"failure message must mention 'citation' or 'docstring'; got: {result!r}"
+    )
+
+
+def test_flags_fitness_file_with_no_docstring(tmp_path: Path) -> None:
+    """Canary: a fitness file with no module docstring is reported."""
+    source_no_docstring = "def test_something() -> None:\n    assert True\n"
+    result = check_file_citation(source_no_docstring, "test_no_docstring.py")
+    assert result is not None, (
+        "check_file_citation must return a failure for a file with no docstring"
+    )
+
+
+def test_accepts_fitness_file_with_valid_citation(tmp_path: Path) -> None:
+    """Happy path: a fitness file with a valid dec-NNN citation passes."""
+    source_with_citation = (
+        '"""Fitness rule with a proper citation.\n\n'
+        "Cites: CLAUDE.md§Pragmatism (every action serves a purpose).\n"
+        '"""\n'
+        "def test_rule_holds() -> None:\n"
+        "    assert True\n"
+    )
+    result = check_file_citation(source_with_citation, "test_cited_rule.py")
+    assert result is None, (
+        f"check_file_citation must return None for a file with a valid citation; got: {result!r}"
+    )

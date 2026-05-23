@@ -41,28 +41,7 @@ Each requirement follows the `When/and/the system/so that` pattern with a unique
 
 ## Why This Format
 
-### Comparison with EARS
-
-EARS (Easy Approach to Requirements Syntax) classifies requirements into behavior types: ubiquitous ("The system shall..."), event-driven ("When X, the system shall..."), state-driven ("While X, the system shall..."), optional ("Where X, the system shall..."), and unwanted ("If X, the system shall not...").
-
-**Why the i-am format diverges:**
-
-- Behavior type classification adds formalism that the ecosystem does not need -- the trigger description already implies whether the behavior is event-driven, state-driven, or boundary-related
-- EARS' "shall" phrasing is suited to contractual/regulatory contexts, not iterative agent-driven development
-- The `so that` clause (absent from EARS) captures intent, which is what agents need to make traceoff decisions during implementation
-
-### Comparison with Given/When/Then
-
-Given/When/Then (GWT) is the standard BDD notation used by Cucumber, Behave, and SpecFlow. A GWT scenario specifies preconditions (Given), actions (When), and assertions (Then).
-
-**Why the i-am format diverges:**
-
-- GWT couples to BDD test frameworks -- it is a test specification format, not a behavioral requirement format
-- The `so that` clause serves a different purpose than `Then`: it documents *why* the behavior matters, not just *what* is observable
-- GWT's `Given` clause often duplicates system state that the `When` trigger makes implicit
-- Our `and` clause is optional and covers preconditions without a separate keyword
-
-The i-am format sits between architecture and test design. GWT is downstream -- the test-engineer translates requirements into test assertions.
+The `When / and / the system / so that` format is deliberately neither EARS nor Given/When/Then. The `so that` clause — absent from both — captures *intent*, which agents need to make trade-off decisions during implementation. The format stays framework-neutral: GWT couples to BDD test runners (Cucumber/Behave/SpecFlow), whereas this format sits between architecture and test design, with the test-engineer translating requirements into test assertions downstream. No behavior-type taxonomy (EARS' ubiquitous/event/state/optional/unwanted) is needed — the trigger description already implies the behavior class, and the optional `and` clause covers preconditions without a separate keyword.
 
 ## Traceability Matrix Template
 

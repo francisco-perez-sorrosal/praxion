@@ -259,7 +259,7 @@ This section is the Python leaf for the language-agnostic test topology protocol
 
 ### Registry 1 — Selector Strategy Identifiers (Python)
 
-The following identifiers are registered by this leaf in the trunk's Selector Strategy Registry (Registry 1). Each maps the abstract `strategy` value in a group's `selectors` entry to a concrete pytest invocation.
+These three identifiers are **registered** by this leaf in the trunk's Selector Strategy Registry (Registry 1) — they are live, not indicative, and may be used in populated `TEST_TOPOLOGY.md` files. Each maps the abstract `strategy` value in a group's `selectors` entry to a concrete pytest invocation.
 
 | Identifier | Pytest invocation | Argument shape |
 |-----------|------------------|----------------|
@@ -267,18 +267,24 @@ The following identifiers are registered by this leaf in the trunk's Selector St
 | `pytest-markers` | `<runner> pytest -m "<m1> or <m2> or ..."` | List of snake_case marker name strings (e.g., `["memory_store_core", "hooks_inject_memory"]`) |
 | `pytest-keywords` | `<runner> pytest -k "<expr>"` | A keyword expression string (e.g., `"memory and not slow"`) — use for ad-hoc filtering; prefer `pytest-markers` for declared groups |
 
+**Argument-shape edge cases (contract):**
+
+- `pytest-globs` — `arg` is a list of 1+ path/glob strings; an empty list is invalid (a group must select at least one path). Multiple entries are passed positionally and unioned by pytest (all paths run). No `pyproject.toml` marker registration is required.
+- `pytest-markers` — `arg` is a list of 1+ snake_case marker names; an empty list is invalid. The runner OR-joins the entries into one expression: a single entry `["x"]` materializes as `-m "x"`; two entries `["x","y"]` materialize as `-m "x or y"`. Every marker must be registered in the pocket's `pyproject.toml` (see §"Marker Registration Recipe") or `--strict-markers` fails collection.
+- `pytest-keywords` — `arg` is a single keyword expression **string**, not a list; an empty string is invalid. The string is passed verbatim to `-k`.
+
 `pytest-keywords` is optional within the Python leaf; it requires no pyproject marker registration. Use it only for transient or debug-scope selections where a named marker would be premature. For declared topology groups, always prefer `pytest-markers`.
 
 ### Registry 2 — Parallel Runner Identifiers (Python)
 
-The following identifiers are registered by this leaf in the trunk's Parallel Runner Registry (Registry 2).
+These two identifiers are **registered** by this leaf in the trunk's Parallel Runner Registry (Registry 2) — they are live, not indicative.
 
 | Identifier | Concrete invocation | When to use |
 |-----------|--------------------|-----------| 
-| `pytest-xdist-loadfile` | `<runner> pytest -n auto --dist loadfile` | Default for parallel-safe groups. Workers are assigned by file; file-scoped fixture state is stable across tests in the same file. Preferred when groups have `shared_fixture_scope: per-file` or narrower. |
+| `pytest-xdist-loadfile` | `<runner> pytest -n auto --dist loadfile` | **Recommended default** for parallel-safe groups. Workers are assigned whole files; file-scoped fixture state is stable across tests in the same file. Preferred when groups have `shared_fixture_scope: per-file` or narrower. |
 | `pytest-xdist-load` | `<runner> pytest -n auto --dist load` | Load-balanced distribution. Less robust when tests in the same file share fixture state. Use only when groups have `shared_fixture_scope: none` or `per-test`. |
 
-The trunk's `none` identifier (sequential, no parallel runner) covers `parallel_safe: false` groups — these groups are never passed to xdist.
+**Recommended default: `pytest-xdist-loadfile`.** Loadfile is the safer default because it keeps every test in a file on one worker, so file-scoped (and narrower) fixture state never has to cross a worker boundary — the most common cause of flaky parallel runs. Choose `pytest-xdist-load` only when you have measured that a group's tests share no per-file fixture state and load-balancing meaningfully improves wall-clock time. The trunk's `none` identifier (sequential, no parallel runner) covers `parallel_safe: false` groups — these groups are never passed to xdist.
 
 ### shared_fixture_scope — Mapping to pytest Scope Keywords
 

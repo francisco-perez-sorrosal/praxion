@@ -157,23 +157,23 @@ The `selector_strategy` registry maps the abstract `strategy` identifier in the 
 | Identifier | Argument shape | Registered by | Concrete meaning |
 |-----------|----------------|---------------|-----------------|
 | `manual` | List of explicit test identifiers | Trunk (default) | Explicitly enumerated test cases. Used for ad-hoc curation or when no automated selector fits. Rare. |
+| `pytest-globs` | List of path/glob strings (1+ entries; empty list is invalid) | Python leaf (`references/python-testing.md`) | `pytest <args>` — the strings are passed positionally to pytest. Multiple entries are unioned (all paths run). No marker registration required. |
+| `pytest-markers` | List of snake_case marker name strings (1+ entries; empty list is invalid) | Python leaf (`references/python-testing.md`) | `pytest -m "<m1> or <m2> or ..."` — entries are OR-joined into a single marker expression. A single entry materializes as `pytest -m "<m1>"`. Each marker must be registered in the pocket's `pyproject.toml` (`--strict-markers`). |
+| `pytest-keywords` | A single keyword expression string (not a list; empty string is invalid) | Python leaf (`references/python-testing.md`) | `pytest -k "<expr>"` — the string is passed verbatim to `-k`. Optional within the Python leaf; requires no marker registration. Prefer `pytest-markers` for declared groups; use `pytest-keywords` only for transient/debug-scope selections. |
 
-<!-- last-verified: 2026-04-29 -->
+<!-- last-verified: 2026-05-23 -->
 
 ### Indicative Future Identifiers
 
-The following identifiers are illustrative — they show the additive pattern language leaves follow. They are **not registered at this milestone** and must not be used in `TEST_TOPOLOGY.md` files until the corresponding leaf file ships.
+The following identifiers are illustrative — they show the additive pattern language leaves follow. They are **not registered at this milestone** and must not be used in `TEST_TOPOLOGY.md` files until the corresponding leaf file ships. (The Python selector identifiers — `pytest-globs`, `pytest-markers`, `pytest-keywords` — were promoted into the registered table above when the Python leaf shipped.)
 
 | Identifier (future) | Registered by (future) | Indicative concrete meaning |
 |--------------------|-----------------------|-----------------------------|
-| `pytest-globs` | Python leaf | `pytest <args>` where args is a list of path/glob strings |
-| `pytest-markers` | Python leaf | `pytest -m "<m1> or <m2>"` where args is a list of marker name strings |
-| `pytest-keywords` | Python leaf (optional) | `pytest -k "<expr>"` where args is a keyword expression |
 | `go-test-packages` | Go leaf | `go test <args>` where args is a list of package paths |
 | `vitest-projects` | TypeScript leaf | `vitest run --project <args>` |
 | `cargo-test-filters` | Rust leaf | `cargo test <filter>` where args is a list of filter strings |
 
-Python projects register `pytest-globs`, `pytest-markers`, and `pytest-keywords` via the Python leaf reference file at `references/python-testing.md`. A Go project would register `go-test-packages` via a future `references/go-testing.md`. No trunk file needs modification.
+A Go project would register `go-test-packages` via a future `references/go-testing.md`. No trunk schema file needs modification — leaves add rows to the registered table above.
 
 ---
 
@@ -187,15 +187,17 @@ The `parallel_runner` registry records the runners a language leaf supports. Unl
 | Identifier | Registered by | Concrete meaning |
 |-----------|---------------|-----------------|
 | `none` | Trunk (default) | Sequential — no parallel runner. All tests in the group run in a single process. |
+| `pytest-xdist-loadfile` | Python leaf (`references/python-testing.md`) | `pytest -n auto --dist loadfile` — workers are assigned whole files; file-scoped fixture state is stable across tests in the same file. **Recommended default** for parallel-safe Python groups; safe for `shared_fixture_scope: per-file` or narrower. |
+| `pytest-xdist-load` | Python leaf (`references/python-testing.md`) | `pytest -n auto --dist load` — load-balanced distribution across workers; less robust when tests in the same file share fixture state. Use only for groups with `shared_fixture_scope: none` or `per-test`. |
 
-<!-- last-verified: 2026-04-29 -->
+<!-- last-verified: 2026-05-23 -->
 
 ### Indicative Future Identifiers
 
+(The Python parallel-runner identifiers — `pytest-xdist-loadfile`, `pytest-xdist-load` — were promoted into the registered table above when the Python leaf shipped.)
+
 | Identifier (future) | Registered by (future) | Indicative concrete meaning |
 |--------------------|-----------------------|-----------------------------|
-| `pytest-xdist-loadfile` | Python leaf | `pytest -n auto --dist loadfile` — workers are assigned by file; file-scoped fixture state is stable |
-| `pytest-xdist-load` | Python leaf | `pytest -n auto --dist load` — load-balanced; less robust when tests in the same file share fixture state |
 | `go-test-parallel` | Go leaf | `go test -parallel N` |
 | `vitest-threads` | TypeScript leaf | Vitest worker threads parallelism |
 | `cargo-test-jobs` | Rust leaf | `cargo test -- --test-threads N` |

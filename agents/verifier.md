@@ -10,7 +10,7 @@ description: >
 model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.
 tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit
-skills: [code-review, context-security-review, test-coverage, web-ui-design, tui-design, agentic-interface-design, api-design-craft]
+skills: [code-review, context-security-review, web-ui-design, tui-design, agentic-interface-design, api-design-craft]
 permissionMode: default
 background: true
 memory: user
@@ -297,16 +297,16 @@ When the pipeline's `IMPLEMENTATION_PLAN.md` steps include any `Tests:` fields, 
 
 This is a document cross-check only. The verifier does not re-run tests to confirm coverage.
 
-#### Invoking the `test-coverage` skill (permission, not obligation)
+#### Loading and invoking the `test-coverage` skill (permission, not obligation)
 
-The `test-coverage` skill is loaded into your context and is available to locate, invoke, and render the project's canonical coverage target. Use it at your discretion when the following signals suggest coverage measurement is worth the time:
+The `test-coverage` skill is **not** pre-loaded into your context — coverage measurement applies to a minority of verifications, so loading it unconditionally would tax every spawn for a capability most spawns never use. Load it on demand (`Read skills/test-coverage/SKILL.md` plus the relevant language reference) only when the following signals suggest coverage measurement is worth the time:
 
 - The pipeline tier is Standard or Full.
 - Test files were changed in this pipeline.
 - Acceptance criteria in `SYSTEMS_PLAN.md` mention coverage (threshold, minimum, goal).
 - `TEST_RESULTS.md` is missing or ambiguous about coverage.
 
-These signals are permission, not obligation. Invocation is never mandatory — coverage runs are expensive, and many verifications touch no coverage-relevant code. Not invoking the skill is a valid outcome and never produces a FAIL on its own. When you do invoke the skill, fold its output into your test-coverage findings; when you do not, proceed with the qualitative assessment above.
+These signals are permission, not obligation. Loading and invoking are never mandatory — coverage runs are expensive, and many verifications touch no coverage-relevant code. Not loading the skill is a valid outcome and never produces a FAIL on its own. When you do load and invoke the skill, fold its output into your test-coverage findings; when you do not, proceed with the qualitative assessment above.
 
 ### Phase 11 -- Context Artifact Completeness (pipeline mode only)
 
@@ -553,7 +553,7 @@ When `.ai-work/<task-slug>/INTERFACE_DESIGN.md` is present in a pipeline run, ru
 After creating `VERIFICATION_REPORT.md`, return a concise summary:
 
 1. **Verdict** -- PASS / PASS WITH FINDINGS / FAIL
-2. **Key findings** -- top 3-5 findings by severity
+2. **Key findings** -- top 3-5 findings by severity, **one line each** (verdict tag + finding anchor + one-clause description). Do not paste evidence, traceability tables, code excerpts, or `REWORK_MANIFEST.md` rows inline — they live in `VERIFICATION_REPORT.md`. On a FAIL run the urge to justify rework by enumerating everything is exactly what bloats the orchestrator window.
 3. **Recommendations** -- prioritized corrective actions (if any)
 4. **Scope** -- files reviewed, commits reviewed
 5. **Ready for review** -- point the user to `VERIFICATION_REPORT.md` for full details

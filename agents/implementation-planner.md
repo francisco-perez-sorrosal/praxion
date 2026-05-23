@@ -329,7 +329,7 @@ See the [ADR conventions rule](../rules/swe/adr-conventions.md) for the full sch
 
 After the plan is approved and implementation begins, the implementation planner can be re-invoked to supervise execution.
 
-**Checkpoint reviews:** At defined milestones (after phases, after critical steps), compare codebase state against planned steps. When a `## Behavioral Specification` exists, include a spec coverage check at checkpoints — scan test files for `req{NN}_` patterns against the REQ IDs to surface untested requirements early rather than at verification time.
+**Checkpoint reviews:** At defined milestones (after phases, after critical steps), compare codebase state against planned steps. When a `## Behavioral Specification` exists, include a spec coverage check at checkpoints — read `.ai-work/<task-slug>/traceability.yml` (merging any `traceability_*.yml` fragments) and surface every REQ whose `tests:` list is empty or absent as UNTESTED, so untested requirements appear at the checkpoint rather than at verification time. Do **not** grep test files for REQ-derived names: `id-citation-discipline` forbids REQ identifiers in test names, so the traceability YAML — not the code — is the source of truth for coverage.
 
 **Deviation detection:** For each planned step, assess:
 
@@ -387,6 +387,7 @@ When the completed feature used a behavioral specification (medium/large task), 
 1. Create `.ai-state/specs/` directory if it does not exist
 2. Extract the `## Behavioral Specification` from `SYSTEMS_PLAN.md`
 3. **Render the traceability matrix**: read `.ai-work/<task-slug>/traceability.yml`, merge any un-reconciled fragments (`traceability_*.yml`) via per-REQ union of `tests` and `implementation` arrays, and render the result as a Markdown table (columns: Requirement | Test(s) | Implementation | Status). Status derives from `TEST_RESULTS.md` — PASS if tests passed, FAIL if failed, UNTESTED if the YAML lists no `tests:` for a REQ.
+   - **Self-test before archiving**: the rendered matrix must have at least one data row — for a code feature, at least one REQ with a `tests:` entry; for a context-artifact feature, at least one REQ with an `implementation:` entry. An empty matrix means `traceability.yml` was never populated during the pipeline. Do not archive a hollow spec silently: emit a `[WARNING: EMPTY TRACEABILITY MATRIX]` naming the REQs with no evidence, and resolve (populate the YAML, or confirm the feature genuinely had no traceable units) before allowing cleanup in step 7.
 4. Extract the `Decisions Made` entries from `LEARNINGS.md`
 5. Write `SPEC_<feature-name>_YYYY-MM-DD.md` to `.ai-state/specs/` using the persistent spec template from the `spec-driven-development` skill, with the rendered matrix in the `## Traceability` section
 6. Cross-reference ADR files in `.ai-state/decisions/` covering the feature period against the archived spec's `## Key Decisions`. Note any decisions in ADR files that are missing from the spec, or vice versa.

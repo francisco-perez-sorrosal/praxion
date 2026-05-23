@@ -150,6 +150,8 @@ You write ONLY to your own step's fields:
 
 Record anything that would help future steps: unexpected file structures, gotchas, patterns that worked, decisions made and why.
 
+**Load-bearing assumptions**: when you make an assumption that, if wrong, would invalidate your step's work, record it immediately under `### Assumptions & Constraints Taken` (create the section if absent) — not batched at the end. The orchestrator harvests this section to compose conversation checkpoints, so it must be populated as you work. Gate on load-bearing only; routine assumptions do not belong here.
+
 For medium/large features (when `SYSTEMS_PLAN.md` contains a `## Behavioral Specification` section), record decisions using structured format in the `Decisions Made` section: `**[implementer] [Decision title]**: [What was decided]. **Why**: [rationale]. **Alternatives**: [what was considered and rejected].`
 
 When running concurrently (parallel mode), write to `LEARNINGS_implementer.md` instead of `LEARNINGS.md`.

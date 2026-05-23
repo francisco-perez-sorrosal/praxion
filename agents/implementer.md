@@ -196,6 +196,18 @@ At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS
 
 Write the line immediately upon entering each new phase. Include optional hashtag labels at the end for categorization (e.g., `#observability #feature=auth`).
 
+## Output
+
+After updating `WIP.md` with the step's completion status, return a terse status line — a **pointer, not a payload**. The artifacts (`WIP.md`, `LEARNINGS.md`, `TEST_RESULTS.md`, the code diff) hold the detail; the orchestrator reads them on demand.
+
+Report one of:
+
+- `[COMPLETE]` — one-line summary of what changed + the `WIP.md` path
+- `[BLOCKED]` — the blocker in one or two sentences + path to the evidence (failing test, conflicting file)
+- `[CONFLICT]` — the out-of-scope file path that forced the stop + one-line reason
+
+Keep the return to ≤5 lines. Do not echo diff content, test output, or `LEARNINGS.md` entries inline — they already live in the artifacts. Echoing them back duplicates content the orchestrator can read on demand and inflates its context on every step.
+
 ## Constraints
 
 - **Single-step scope.** Implement only the step assigned to you. Do not look ahead or implement the next step.

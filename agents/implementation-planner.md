@@ -439,7 +439,7 @@ After completing the planning documents, return a concise summary:
 
 1. **Goal** — one sentence
 2. **Step count** — total steps, any refactoring phases noted
-3. **Step overview** — numbered list of step titles
+3. **Step overview** — a 2–3 sentence phase summary (the phases and what each accomplishes), **not** a per-step numbered list. The full step list is in `IMPLEMENTATION_PLAN.md`; reproducing it here duplicates the artifact and inflates the orchestrator's context.
 4. **Testing strategy** — paired test steps, which acceptance criteria they validate, integration checkpoints
 5. **Supervision checkpoints** — milestones for execution review
 6. **Ready for review** — point the user to `IMPLEMENTATION_PLAN.md` for full details

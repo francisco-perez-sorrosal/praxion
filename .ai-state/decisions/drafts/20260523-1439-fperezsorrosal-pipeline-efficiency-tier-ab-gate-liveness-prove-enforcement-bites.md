@@ -41,7 +41,7 @@ Adopt a **gate-liveness discipline** with a foundational taxonomy and three laye
 
 **L2 — Canary discipline (CODE gates).** A canary is a deterministic negative-case test that feeds the gate a known-bad input and asserts it flags it. A fitness meta-test (`fitness/tests/test_gate_canary_coverage.py`, generalizing the existing `test_meta_citation.py` pattern) globs the gate set and asserts each gate has a sibling test with a negative-case-named test. Forward mandate for new gates; bounded one-time retrofit of existing canary-less gates. The meta-test ships with its own canary.
 
-**L3 — Detection (PROMPT gates + cross-cutting).** A new sentinel **Gate Liveness (GL)** family: GL01 orphaned-consumer, GL02 forbidden-pattern-contradiction (both authored as the committed script `scripts/check_gate_liveness.py` the sentinel invokes in Pass 1, each with a canary), GL03 substance-not-presence audit (Pass 2 judgment with a golden bad-case). ADR cross-reference reciprocity goes to the existing **Decision Log** family as **DL06**, not GL.
+**L3 — Detection (PROMPT gates + cross-cutting).** A new sentinel **Gate Liveness (GL)** family: GL02 forbidden-pattern-contradiction as a committed script `scripts/check_gate_liveness.py` (a dead grep is a hard mechanical contradiction) shipped with a canary; GL01 orphaned-consumer and GL03 substance-not-presence as Pass-2 LLM judgment. (GL01 was prototyped as a regex but moved to LLM judgment after the prototype produced 7 false positives and 0 true positives on the real repo — "is this section produced anywhere?" is semantic, and the D0 taxonomy says route it to the proof that works.) ADR cross-reference reciprocity goes to the existing **Decision Log** family as **DL06**, not GL.
 
 **Convention clarification.** `re_affirms` may accompany `status: proposed`/`accepted` when the ADR's primary purpose is a new decision that also confirms a prior one; `status: re-affirmation` is reserved for ADRs whose sole purpose is re-affirmation. Both link directions are mandatory (enforced by DL06).
 
@@ -74,7 +74,7 @@ Adopt a **gate-liveness discipline** with a foundational taxonomy and three laye
 
 **Negative / accepted:**
 - One-time retrofit of ~8 existing gates' canaries.
-- GL01 (orphaned-consumer) is heuristic at Pass 1; Pass 2 confirms — some false positives expected, tuned over time.
+- GL01 (orphaned-consumer) and GL03 (substance-not-presence) are LLM-judgment checks, not deterministic — their reliability depends on the sentinel's Pass-2 reasoning, not a pinned test.
 - Small bounded overlap between GL and EC/N/X lenses, accepted for the visibility a named family buys.
 
 **Dogfood invariant:** every artifact this decision introduces must itself satisfy the discipline — the canary meta-test, each GL check, and DL06 each ship with a canary or golden bad-case. A gate-liveness mechanism that does not bite would refute its own thesis.

@@ -246,6 +246,7 @@ ADRs exist in two lifecycle stages — drafts (pipeline-authored, pre-merge) and
 | DL03 | A | `DECISIONS_INDEX.md` is consistent with finalized ADRs only | Row count in index table matches `Glob .ai-state/decisions/[0-9]*.md` file count; IDs match. Drafts under `drafts/` are **intentionally excluded** from the index by design — the finalize protocol regenerates the index post-merge, so draft-stage fragments never appear and MUST NOT be flagged as missing index rows |
 | DL04 | L | No orphaned supersession or re-affirmation pointers | Finalized ADR with `supersedes: dec-NNN` / `superseded_by: dec-MMM` / `re_affirms: dec-NNN` / `re_affirmed_by: [dec-MMM]`: referenced file must exist under `.ai-state/decisions/`. Draft ADR with `supersedes: dec-draft-<hash>` / `re_affirms: dec-draft-<hash>`: referenced draft file must exist under `.ai-state/decisions/drafts/`. Mixed pointers — a finalized ADR pointing at `dec-draft-<hash>`, or a draft pointing at a `dec-NNN` it could not have legitimately known at authoring time — are a WARN (finalize should have rewritten them) |
 | DL05 | L | Recent features have associated ADR files | Features with archived specs have corresponding ADR files (frequency check). Draft fragments under `drafts/` count toward the check — a feature whose ADRs are still pre-finalize satisfies DL05 without waiting for stable `dec-NNN` assignment |
+| DL06 | A | Cross-reference pointers are reciprocal (both directions set) | DL04 checks the target *exists*; DL06 checks the back-link is *present*. For each ADR with `re_affirms: <id>`, the target's `re_affirmed_by` list must include this ADR's id; for each `supersedes: <id>`, the target's `superseded_by` must equal this ADR's id (and the symmetric checks from the other side). A one-directional link is a WARN — the author or finalize should set both sides. Draft-stage `dec-draft-<hash>` pointers are checked within `drafts/`; cross-stage links inherit DL04's mixed-pointer WARN |
 
 ### Behavioral Contract (BC)
 
@@ -295,6 +296,20 @@ Conditional activation: **skip all HK checks and emit nothing** when `PRAXION_HA
 | ID | Tp | Rule | Pass |
 |----|----|------|------|
 | HK01 | A | Hackathon mode graduation nudge when project exceeds PoC size | **Check** (run only when `PRAXION_HACKATHON_MODE=1`): count non-test Python source files via `find . -name "*.py" -not -path "*/test*" -not -path "*/.git/*" \| wc -l`; count commits via `git rev-list --count HEAD`. **Advisory finding** (not WARN, not FAIL) when source-file count > 40 OR commit count > 150: "This project is in hackathon mode and has outgrown typical PoC size (source files: N, commits: M). Consider graduating to full 5-tier ceremony — see the `### To exit hackathon mode` section in `CLAUDE.md`." **Pass condition**: `PRAXION_HACKATHON_MODE` is unset/0 (check skipped), OR project is below both thresholds (≤40 source files AND ≤150 commits). |
+
+### Gate Liveness (GL)
+
+Audits whether the ecosystem's *enforcement machinery actually fires* on the defects it claims to catch — the lens no other dimension centers (EC asks "are artifacts connected," X "do refs resolve," N "are things consistent"; GL asks "would this gate bite, or does it pass on bad input?"). Grounded in `rules/swe/gate-liveness.md`. GL02 is delegated to the committed detector `scripts/check_gate_liveness.py` (a dead grep is a hard, mechanical contradiction); GL01 and GL03 are LLM judgment ("is this produced anywhere?" and "does this check substance?" are semantic questions a regex answers with too many false positives).
+
+Conditional activation: skip GL02 with a GL-dimension INFO note when `scripts/check_gate_liveness.py` is absent (substrate trigger, TT idiom — never WARN/FAIL on substrate absence). GL01 and GL03 are LLM judgment and run whenever `agents/` exists.
+
+| ID | Tp | Rule | Pass |
+|----|----|------|------|
+| GL01 | L | No orphaned consumer: an instruction reads/harvests a named section/artifact no instruction produces | For each named section/artifact an agent is told to read, harvest, or digest, confirm some instruction is told to produce it (write/record/initialize/append). Use `grep` across `agents/`,`rules/` for the section name and judge whether any hit is a producer. WARN per consumed-but-unproduced section. Golden bad-case: a `### Foo` an agent is told to "harvest" that no agent is told to "write/record/initialize" |
+| GL02 | A | No forbidden-pattern contradiction: an instruction greps/asserts a pattern another rule forbids | Run `python3 scripts/check_gate_liveness.py --json`; each finding (an instruction directing a grep/scan for a literal pattern that `id-citation-discipline`/`shipped-artifact-isolation` forbid in the scanned location) is a FAIL — the check is dead. Golden bad-case: a checkpoint that searches test names for a REQ-id prefix the citation rule bans |
+| GL03 | L | Substance over structure in PROMPT gates | Sample this catalog's own checks and the verifier's phase gates; flag any whose Pass condition asserts a container *exists* without asserting it has substantive *content* (e.g., "section present" with no "≥1 row" clause). WARN per gate that checks presence where substance is the real contract. Golden bad-case: a spec-conformance gate that passes on an empty traceability matrix |
+
+GL03 is the sentinel auditing its own bite — when it flags one of its own checks, propose the substance assertion that would fix it.
 
 ### Self-Verification (V)
 
@@ -369,7 +384,7 @@ Guidelines:
 3. Record PASS/WARN/FAIL for each check with evidence
 4. Target: **~15-20 turns total** for all auto checks (not 50+)
 
-When `.ai-state/specs/` exists with spec files, include SH01-SH02 (auto) in this pass. When `.ai-state/calibration_log.md` exists, include CA01 (auto) in this pass. When `scripts/check_aac_golden_rule.py` exists, include EC07 (auto) in this pass: `python3 scripts/check_aac_golden_rule.py --mode=audit --json`. When ≥1 architecture markdown file exists (AC10 substrate trigger), include AC10 in this pass: `python3 scripts/aac_fence_validator.py <file>` per in-scope architecture markdown; skip with AC-dimension INFO note when substrate absent.
+When `.ai-state/specs/` exists with spec files, include SH01-SH02 (auto) in this pass. When `.ai-state/calibration_log.md` exists, include CA01 (auto) in this pass. When `scripts/check_aac_golden_rule.py` exists, include EC07 (auto) in this pass: `python3 scripts/check_aac_golden_rule.py --mode=audit --json`. When ≥1 architecture markdown file exists (AC10 substrate trigger), include AC10 in this pass: `python3 scripts/aac_fence_validator.py <file>` per in-scope architecture markdown; skip with AC-dimension INFO note when substrate absent. When `scripts/check_gate_liveness.py` exists (GL substrate trigger), include GL02 (auto) in this pass: `python3 scripts/check_gate_liveness.py --json`; skip with a GL-dimension INFO note when absent. GL01 and GL03 are LLM-judgment checks — run them in Pass 2.
 
 This pass is deterministic and fast. Complete it fully before starting Pass 2.
 

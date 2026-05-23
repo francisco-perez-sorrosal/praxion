@@ -382,6 +382,12 @@ def _build_adr_output(rows: list[dict], budget: int) -> str:
     if not rows:
         return ""
 
+    # Inject the most recently authored decisions first: they are the ones most
+    # likely to constrain current work. Rows arrive in index order (oldest
+    # dec-NNN first), so the soft cap would otherwise surface only the earliest
+    # decisions. Sort by (date, id) descending before applying the cap.
+    rows = sorted(rows, key=lambda row: (row["date"], row["id"]), reverse=True)
+
     effective_cap = min(budget, ADR_SOFT_CAP)
     footer_reserve = 60  # reserve for truncation footer if needed
     lines: list[str] = []

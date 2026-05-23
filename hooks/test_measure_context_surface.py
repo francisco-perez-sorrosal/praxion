@@ -103,6 +103,43 @@ class TestCollectAlwaysLoaded:
         # Total bytes equals the sum of records' bytes — sanity check.
         assert total == sum(r["bytes"] for r in records)
 
+    def test_plugin_tree_adds_hook_deliver_rules_and_dedups_symlinks(
+        self, tmp_path: Path
+    ):
+        """Hook-deliver rules live only in the plugin tree and must be counted;
+        a rule symlinked into the global dir must count exactly once."""
+        m = _load_module()
+
+        plugin_rules = tmp_path / "plugin" / "rules"
+        (plugin_rules / "swe").mkdir(parents=True)
+        shared = plugin_rules / "swe" / "shared.md"
+        shared.write_text("## Shared\n\nSymlink-installed rule.\n", encoding="utf-8")
+        (plugin_rules / "swe" / "hook-deliver.md").write_text(
+            "## Hook Deliver\n\nInjected at runtime, not symlinked.\n",
+            encoding="utf-8",
+        )
+
+        # Global dir mirrors only the symlink-installed rule (not hook-deliver).
+        rules_dir = tmp_path / "global_rules"
+        rules_dir.mkdir()
+        (rules_dir / "shared.md").symlink_to(shared)
+
+        project_md = tmp_path / "CLAUDE.md"
+        project_md.write_text("# Project\n", encoding="utf-8")
+        global_md = tmp_path / "global_CLAUDE.md"
+        global_md.write_text("# Global\n", encoding="utf-8")
+
+        total, records = m._collect_always_loaded(
+            project_md, global_md, rules_dir, plugin_rules
+        )
+
+        rule_paths = [r["path"] for r in records if r["type"] == "rule"]
+        # hook-deliver rule is reachable only via the plugin tree
+        assert any("hook-deliver.md" in p for p in rule_paths)
+        # shared rule counted exactly once despite appearing in both dirs
+        assert sum("shared.md" in p for p in rule_paths) == 1
+        assert total == sum(r["bytes"] for r in records)
+
     def test_missing_files_skipped_silently(self, tmp_path: Path):
         m = _load_module()
         missing_project = tmp_path / "does-not-exist.md"

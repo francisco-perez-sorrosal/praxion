@@ -4,8 +4,9 @@ Fires on SessionStart. Async hook (async: true) -- never blocks the session.
 Exit 0 unconditionally.
 
 For each session, compute the byte size and approximate token count of the
-always-loaded context surface (CLAUDE.md files + rules without `paths:`
-frontmatter) and emit one observation to `.ai-state/observations.jsonl`.
+always-loaded context surface (CLAUDE.md files + all rules without `paths:`
+frontmatter, including the `install: hook-deliver` rules that live only in the
+plugin tree) and emit one observation to `.ai-state/observations.jsonl`.
 
 Future context audits become data-driven instead of one-off `wc` exercises:
 - Which rules earn their >30% session-relevance threshold? (count appearances)
@@ -19,6 +20,7 @@ from __future__ import annotations
 
 import fcntl
 import json
+import os
 import re
 import sys
 from datetime import datetime, timezone
@@ -88,12 +90,23 @@ def _collect_always_loaded(
     project_claude_md: Path,
     global_claude_md: Path,
     rules_dir: Path,
+    plugin_rules_dir: Path | None = None,
 ) -> tuple[int, list[dict]]:
     """Return (total_bytes, [file_record, ...]) for every always-loaded file.
 
     file_record schema: {"path": str, "bytes": int, "type": "claude_md"|"rule"}.
     Missing files are skipped silently — graceful degradation across hosts
     where the global config or rules tree may be absent.
+
+    Rules are collected from the union of `rules_dir` (the symlink-installed
+    rules under ~/.claude/rules/) and `plugin_rules_dir` (the plugin's own
+    rules/ tree). The plugin tree additionally holds `install: hook-deliver`
+    rules (memory-protocol, agent-model-routing, git-conventions) that are NOT
+    symlinked into ~/.claude/rules/ — without scanning it those always-loaded
+    rules were silently undercounted (~3.6K tokens). Entries are deduplicated
+    by resolved path so a symlink and its target count once. The result is an
+    upper bound on the *installable* surface; per-project suppression (memory
+    MCP disabled, or the project rules blacklist) may inject fewer at runtime.
     """
     records: list[dict] = []
     total = 0
@@ -109,11 +122,18 @@ def _collect_always_loaded(
         records.append({"path": str(path), "bytes": size, "type": kind})
         total += size
 
-    if rules_dir.is_dir():
-        for path in sorted(rules_dir.rglob("*.md")):
-            if not path.is_file():
+    seen: set[str] = set()
+    for base in (rules_dir, plugin_rules_dir):
+        if base is None or not base.is_dir():
+            continue
+        for path in sorted(base.rglob("*.md")):
+            if not path.is_file() or _is_rule_README(path):
                 continue
-            if _is_rule_README(path):
+            try:
+                resolved = str(path.resolve())
+            except OSError:
+                resolved = str(path)
+            if resolved in seen:
                 continue
             try:
                 content = path.read_text(encoding="utf-8")
@@ -121,6 +141,7 @@ def _collect_always_loaded(
                 continue
             if _has_paths_frontmatter(content):
                 continue
+            seen.add(resolved)
             size = len(content.encode("utf-8"))
             records.append({"path": str(path), "bytes": size, "type": "rule"})
             total += size
@@ -179,8 +200,10 @@ def main() -> None:
         return  # graceful degradation: no state dir means no project to measure
 
     project_claude_md = Path(cwd) / "CLAUDE.md"
+    plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT", "")
+    plugin_rules_dir = Path(plugin_root) / "rules" if plugin_root else None
     total_bytes, records = _collect_always_loaded(
-        project_claude_md, _GLOBAL_CLAUDE_MD, _GLOBAL_RULES_DIR
+        project_claude_md, _GLOBAL_CLAUDE_MD, _GLOBAL_RULES_DIR, plugin_rules_dir
     )
 
     if total_bytes == 0:

@@ -2,9 +2,9 @@
 
 **Task slug**: `project-metrics`
 **Tier**: Full (escalated from Standard — decomposition yielded 18 steps, exceeding the ~10-step threshold; file breadth is wide but depth remains shallow)
-**Archived**: (pipeline in flight — archival at merge-to-main)
-**Status**: Planned
-**ADRs**: `dec-062` (storage schema), `dec-063` (collector protocol), `dec-064` (graceful degradation), `dec-065` (hotspot formula). Promoted to stable `dec-NNN` at merge-to-main via `scripts/finalize_adrs.py`.
+**Archived**: 2026-04-23
+**Status**: Shipped
+**ADRs**: `dec-062` (storage schema), `dec-063` (collector protocol), `dec-064` (graceful degradation), `dec-065` (hotspot formula), `dec-066` (planning conventions). Finalized at merge-to-main via `scripts/finalize_adrs.py`.
 
 ## Feature Summary
 
@@ -73,9 +73,28 @@ The 12 acceptance criteria in `SYSTEMS_PLAN.md` expand into 16 REQs below. One-t
 
 ## Traceability Matrix
 
-The per-REQ traceability map (tests + implementation files) is maintained in `.ai-work/project-metrics/traceability.yml` during the pipeline and rendered into this section at feature-end archival. **Code and tests do not embed REQ IDs** (per `rules/swe/id-citation-discipline.md`) — the YAML is the canonical source of truth during the pipeline.
+The per-REQ traceability map was maintained in `.ai-work/project-metrics/traceability.yml` during the pipeline. **Code and tests do not embed REQ IDs** (per `rules/swe/id-citation-discipline.md`) — the YAML was the canonical source of truth in-flight. The ephemeral `.ai-work/` tree was cleaned post-merge, so the matrix below was reconstructed at archival-completion from the shipped implementation under `scripts/project_metrics/`, its test suite under `scripts/project_metrics/tests/`, and ADRs `dec-062`–`dec-066`.
 
-_Matrix rendered at feature-end from `traceability.yml` and `TEST_RESULTS.md`._
+| REQ | Implementing file(s) | Test reference |
+|-----|----------------------|----------------|
+| REQ-PM-01 | `commands/project-metrics.md`, `scripts/project_metrics/cli.py`, `scripts/project_metrics/runner.py` | `scripts/project_metrics/tests/test_cli.py`, `scripts/project_metrics/tests/test_integration.py` |
+| REQ-PM-02 | `scripts/project_metrics/runner.py`, `scripts/project_metrics/collectors/base.py` | `scripts/project_metrics/tests/test_integration.py` (`fixtures/minimal_repo/`) |
+| REQ-PM-03 | `scripts/project_metrics/cli.py` | `scripts/project_metrics/tests/test_cli.py` |
+| REQ-PM-04 | `scripts/project_metrics/__init__.py`, `scripts/project_metrics/collectors/base.py` | `scripts/project_metrics/tests/test_cli.py`, `scripts/project_metrics/tests/test_collectors_base.py` |
+| REQ-PM-05 | `commands/project-metrics.md`, `scripts/project_metrics/`, `scripts/check_shipped_artifact_isolation.py` | `scripts/project_metrics/tests/test_integration.py`; `scripts/check_shipped_artifact_isolation.py` (CI gate) |
+| REQ-PM-06 | `scripts/project_metrics/schema.py`, `scripts/project_metrics/aggregate.py` | `scripts/project_metrics/tests/test_schema.py`, `scripts/project_metrics/tests/test_aggregate.py` |
+| REQ-PM-07 | `scripts/project_metrics/schema.py`, `scripts/project_metrics/runner.py`, `scripts/project_metrics/collectors/base.py` | `scripts/project_metrics/tests/test_schema.py`, `scripts/project_metrics/tests/test_collectors_base.py` |
+| REQ-PM-08 | `scripts/project_metrics/runner.py`, `scripts/project_metrics/collectors/base.py` | `scripts/project_metrics/tests/test_collectors_base.py`, `scripts/project_metrics/tests/test_runner.py` |
+| REQ-PM-09 | `scripts/project_metrics/schema.py`, `scripts/project_metrics/aggregate.py` | `scripts/project_metrics/tests/test_schema.py`, `scripts/project_metrics/tests/test_aggregate.py` |
+| REQ-PM-10 | `scripts/project_metrics/report.py` | `scripts/project_metrics/tests/test_report.py` |
+| REQ-PM-11 | `scripts/project_metrics/trends.py`, `scripts/project_metrics/report.py` | `scripts/project_metrics/tests/test_trends.py`, `scripts/project_metrics/tests/test_report.py` |
+| REQ-PM-12 | `scripts/project_metrics/trends.py` | `scripts/project_metrics/tests/test_trends.py` |
+| REQ-PM-13 | `scripts/project_metrics/hotspot.py`, `scripts/project_metrics/report.py` | `scripts/project_metrics/tests/test_hotspot.py`, `scripts/project_metrics/tests/test_report.py` |
+| REQ-PM-14 | `docs/metrics/README.md` | Contract-reference document; validated against `scripts/project_metrics/schema.py` via `scripts/project_metrics/tests/test_schema.py` |
+| REQ-PM-15 | `scripts/project_metrics/runner.py`, `scripts/project_metrics/collectors/base.py` | `scripts/project_metrics/tests/test_integration.py` (determinism), `scripts/project_metrics/tests/test_runner.py` |
+| REQ-PM-16 | `scripts/project_metrics/collectors/coverage_collector.py` | `scripts/project_metrics/tests/test_coverage_collector.py`, `scripts/project_metrics/tests/test_refresh_coverage_flag.py` |
+
+Per-collector and per-utility unit tests (`test_git_collector.py`, `test_lizard_collector.py`, `test_scc_collector.py`, `test_complexipy_collector.py`, `test_pydeps_collector.py`, `test_path_filter.py`, `test_stdlib_sloc.py`, `test_logappend.py`) provide module-level coverage feeding the REQ-level behaviors above.
 
 ## Key Decisions (Cross-Reference)
 

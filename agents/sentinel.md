@@ -256,7 +256,7 @@ Audit the four-behavior contract's single-source-of-truth architecture. Drift be
 |----|----|------|------|
 | BC01 | A | Rule exists and is always-loaded | `rules/swe/agent-behavioral-contract.md` exists and has no `paths:` YAML frontmatter |
 | BC02 | L | Four canonical behaviors appear in canonical order in both CLAUDE.md anchors | `~/.claude/CLAUDE.md` (when readable) and project `CLAUDE.md` both name **Surface Assumptions → Register Objection → Stay Surgical → Simplicity First** in this order with identical spelling |
-| BC03 | A | Each of the 11 pipeline agents references the rule | Grep `rules/swe/agent-behavioral-contract.md` across `agents/*.md` returns exactly the 11 code-emitting agents (researcher, systems-architect, implementation-planner, context-engineer, implementer, test-engineer, verifier, doc-engineer, sentinel, cicd-engineer, interface-designer) |
+| BC03 | A | Each of the 12 contract-bound agents references the rule | Grep `rules/swe/agent-behavioral-contract.md` across `agents/*.md` returns exactly the 12 agents that write, plan, or review code (researcher, systems-architect, implementation-planner, context-engineer, implementer, test-engineer, verifier, doc-engineer, sentinel, cicd-engineer, interface-designer, architect-validator) |
 | BC04 | A | Tag vocabulary subsection exists with all 6 canonical tags | `skills/code-review/references/report-template.md` contains `### Behavioral Contract Findings` with `[UNSURFACED-ASSUMPTION]`, `[MISSING-OBJECTION]`, `[NON-SURGICAL]`, `[SCOPE-CREEP]`, `[BLOAT]`, `[DEAD-CODE-UNREMOVED]` |
 
 BC checks are unconditional — they run on every sentinel pass because the contract is an always-loaded ecosystem invariant, not a feature gated by presence of specs or ADRs.

@@ -37,9 +37,9 @@ Replaced the Mermaid-only diagram convention with a dual-toolchain policy: LikeC
 **so that** GitHub renders the diagram without a Mermaid plugin and the source model is a single `.c4` file.
 
 ### REQ-DIAGRAM-05
-**When** a contributor reads `.ai-state/ARCHITECTURE.md`
+**When** a contributor reads `.ai-state/DESIGN.md`
 **and** inspects §2 (System Context) and §3 (Components)
-**the system** renders both diagrams from committed SVGs sourced from `docs/diagrams/architecture.c4`
+**the system** renders both diagrams from committed SVGs sourced from `docs/diagrams/architecture/src/architecture.c4`
 **so that** the design-target document shares the single-model SSOT with the developer guide.
 
 ### REQ-DIAGRAM-06
@@ -89,9 +89,9 @@ Replaced the Mermaid-only diagram convention with a dual-toolchain policy: LikeC
 | REQ-DIAGRAM-01 | `rules/writing/diagram-conventions.md` | VERIFICATION_REPORT §2 (grep-c 'LikeC4 → D2 → SVG' → 1) |
 | REQ-DIAGRAM-02 | `skills/software-planning/assets/ARCHITECTURE_TEMPLATE.md`, `skills/doc-management/assets/ARCHITECTURE_GUIDE_TEMPLATE.md` | VERIFICATION_REPORT §2 (grep-cE '^\`\`\`c4' → 2 each) |
 | REQ-DIAGRAM-03 | `skills/software-planning/assets/ARCHITECTURE_TEMPLATE.md` §5 (untouched) | VERIFICATION_REPORT §2 (sequenceDiagram → 1) |
-| REQ-DIAGRAM-04 | `docs/architecture.md`, `docs/diagrams/architecture.c4`, `docs/diagrams/architecture/components.d2`, `docs/diagrams/architecture/components.svg` | VERIFICATION_REPORT §2 (grep-cE '^\`\`\`mermaid' → 0) |
-| REQ-DIAGRAM-05 | `.ai-state/ARCHITECTURE.md`, `docs/diagrams/architecture.c4`, `docs/diagrams/architecture/context.svg`, `docs/diagrams/architecture/components.svg` | VERIFICATION_REPORT §2 (2 SVG refs in §2+§3) |
-| REQ-DIAGRAM-06 | `docs/diagrams/architecture.c4`, `docs/diagrams/architecture/{context,components,index}.{d2,svg}` | VERIFICATION_REPORT §2 (ls -la, mtime ≥ source mtime within 60s) |
+| REQ-DIAGRAM-04 | `docs/architecture.md`, `docs/diagrams/architecture/src/architecture.c4`, `docs/diagrams/architecture/rendered/components.d2`, `docs/diagrams/architecture/rendered/components.svg` | VERIFICATION_REPORT §2 (grep-cE '^\`\`\`mermaid' → 0) |
+| REQ-DIAGRAM-05 | `.ai-state/DESIGN.md`, `docs/diagrams/architecture/src/architecture.c4`, `docs/diagrams/architecture/rendered/context.svg`, `docs/diagrams/architecture/rendered/components.svg` | VERIFICATION_REPORT §2 (2 SVG refs in §2+§3) |
+| REQ-DIAGRAM-06 | `docs/diagrams/architecture/src/architecture.c4`, `docs/diagrams/architecture/rendered/{context,components,index}.{d2,svg}` | VERIFICATION_REPORT §2 (ls -la, mtime ≥ source mtime within 60s) |
 | REQ-DIAGRAM-07 | `scripts/diagram-regen-hook.sh`, `scripts/git-pre-commit-hook.sh` (Block C) | `tests/test_diagram_regen_hook.sh` (T1–T5); VERIFICATION_REPORT §4 (4 PASS / 0 FAIL) |
 | REQ-DIAGRAM-08 | `skills/doc-management/references/diagram-conventions.md` §Integration with LikeC4 + D2 | VERIFICATION_REPORT §2 (grep -c 'LikeC4' → 5) |
 | REQ-DIAGRAM-09 | `commands/onboard-project.md` Phase 0 + Phase 8 | VERIFICATION_REPORT §2 (grep -ic 'likec4' → 4) |

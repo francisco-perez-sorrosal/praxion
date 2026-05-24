@@ -74,40 +74,9 @@ Skip this phase entirely in standalone mode.
 
 #### Phase 3a -- ML Metric Threshold Evaluation (conditional sub-branch)
 
-**Activation condition:** Phase 3a fires when EITHER of the following signals is present:
+**Activation:** fires when EITHER (1) `SYSTEMS_PLAN.md` acceptance criteria contain metric-threshold syntax (e.g., `val_bpb < 1.75 ± 0.02`, `val_perplexity ≤ 8.5`), OR (2) the project has ML training signals (`program.md` or `train.py` at repo root, or `pyproject.toml` declares `torch`/`jax`/`tensorflow`). When neither is present, skip Phase 3a and continue with Phase 4.
 
-1. `SYSTEMS_PLAN.md` acceptance criteria contain metric threshold syntax
-   (e.g., `val_bpb < 1.75`, `val_bpb < 1.75 ± 0.02`, `val_perplexity ≤ 8.5`)
-2. The project has ML training signals: `program.md` exists at repo root, or `train.py`
-   exists, or `pyproject.toml` declares `torch`, `jax`, or `tensorflow` as a dependency
-
-When neither signal is present, skip Phase 3a entirely and continue with Phase 4.
-When at least one signal is present:
-
-1. **Locate `TRAINING_RESULTS.md`** — check `.ai-work/<task-slug>/TRAINING_RESULTS.md`
-   first (ephemeral primary). If absent, check `.ai-state/training_runs/<run-tag>.md`
-   using the run-tag named in the acceptance criteria (archival fallback).
-2. **If `TRAINING_RESULTS.md` is absent in both locations** and the plan has metric-threshold
-   criteria, emit WARN (not FAIL — run may not have executed yet) and stop Phase 3a:
-   ```
-   [WARN] TRAINING_RESULTS.md not found — metric threshold criteria not evaluated.
-   Run /run-experiment and re-invoke verifier, or confirm training was not expected for this step.
-   ```
-3. **When `TRAINING_RESULTS.md` is found**, read its `metrics:` block per the field layout
-   in `skills/llm-training-eval/references/training-results-schema.md` (section
-   "Verifier Consumption (Phase 3a)").
-4. **Evaluate each metric-threshold AC item:**
-   - Parse threshold syntax: `<metric> <op> <value>` or `<metric> <op> <value> ± <tolerance>`
-   - Apply tolerance band if declared (from plan or `verdict.tolerance_band_applied` in results)
-   - Classify per `rules/ml/eval-driven-verification.md`: PASS (criterion met within
-     tolerance), FAIL (criterion missed outside tolerance), WARN (within tolerance but
-     directionally missed)
-5. **Emit findings** in the Acceptance Criteria section of `VERIFICATION_REPORT.md`:
-   ```
-   [PASS] AC-N: val_bpb=1.72 vs threshold=1.75 (no tolerance band)
-   [WARN] AC-N: val_bpb=1.76 vs threshold=1.75 ± 0.02 (within tolerance)
-   [FAIL] AC-N: val_perplexity=14.1 vs threshold=12.4 (outside tolerance)
-   ```
+When activated: locate `TRAINING_RESULTS.md` (ephemeral `.ai-work/<task-slug>/TRAINING_RESULTS.md` first, then archival `.ai-state/training_runs/<run-tag>.md` using the run-tag from the acceptance criteria). An absent file with metric-threshold criteria is a WARN (not FAIL — the run may not have executed). When found, load `skills/llm-training-eval/references/training-results-schema.md` § "Verifier Consumption (Phase 3a)" and follow its evaluation steps — parse each threshold, apply tolerance bands, classify PASS/FAIL/WARN per `rules/ml/eval-driven-verification.md`, and emit findings in the Acceptance Criteria section.
 
 After Phase 3a, continue with standard Phase 3 evaluation for all non-metric criteria.
 

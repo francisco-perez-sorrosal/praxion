@@ -138,7 +138,7 @@ Convention: Each check has a unique ID, type (A=auto, L=llm), a rule, and a pass
 |----|----|------|------|
 | T01 | A | Skill SKILL.md line count within guideline | Under 500 lines (warn 400, fail 600) |
 | T02 | A | Combined always-loaded content size | CLAUDE.md + all rules under 25,000 tokens (heuristic: chars / 3.5) |
-| T03 | A | Agent prompt size within range | Under 400 lines (warn 300, fail 500). **Exception**: `agents/sentinel.md` is assessed at warn 550 / fail 700 — its `## Check Catalog` (~260 lines, one row per distinct check) is irreducible gate substance that cannot be externalized without dead-gate risk (the catalog is executed inline) or trimmed without removing checks. All other agents use the standard thresholds. |
+| T03 | A | Agent prompt size within range | Under 400 lines (warn 300, fail 500). **Exception**: the two gate-encoding agents `agents/sentinel.md` and `agents/verifier.md` are assessed at warn 550 / fail 700 — their size is substantially intrinsic (the sentinel's `## Check Catalog` is ~260 rows of distinct checks executed inline; the verifier's comprehensive Process plus its tested-in-place rework-spawn contract). Forcing either under 500 risks a dead gate or guts tested substance. All other agents use the standard thresholds. |
 | T04 | A | Individual reference file sizes | No single reference file >800 lines |
 | T05 | L | Progressive disclosure used where appropriate | Monolithic artifacts that could split core vs. reference without losing coherence |
 | T06 | L | No significant redundancy across artifacts | Same info in multiple places = token waste; flag duplicates |

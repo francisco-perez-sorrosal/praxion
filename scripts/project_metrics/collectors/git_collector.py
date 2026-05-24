@@ -40,7 +40,7 @@ import shutil
 import subprocess
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from scripts.project_metrics._path_filter import is_excluded_path
@@ -174,7 +174,7 @@ class GitCollector(Collector):
         issues: list[str] = []
 
         is_shallow = _is_shallow_repository(repo_root)
-        commits = _run_git_log(repo_root, ctx.window_days)
+        commits = _run_git_log(repo_root, ctx.window_days, reference_time)
         # Drop excluded paths (.ai-state, .ai-work, build caches, etc.) at the
         # commit level so every downstream metric -- churn, entropy, coupling,
         # ownership, age, file_count -- sees the same filtered view. Filtering
@@ -256,20 +256,31 @@ def _is_shallow_repository(repo_root: Path) -> bool:
     return completed.stdout.strip() == "true"
 
 
-def _run_git_log(repo_root: Path, window_days: int) -> list[_Commit]:
+def _run_git_log(
+    repo_root: Path, window_days: int, reference_time: datetime
+) -> list[_Commit]:
     """Run ``git log`` with pinned formatting and return parsed commits.
 
     Format emits one block per commit in four lines followed by numstat
     rows and a blank line separator. The parser below reconstructs the
     ``_Commit`` list from that shape.
+
+    The window lower bound is an absolute ``--since`` cutoff derived from
+    ``reference_time`` minus ``window_days``, not git's relative
+    ``'N days ago'`` string. This keeps a single reference clock governing
+    *both* the window boundary and age computation: a relative string
+    resolves against git's wall clock, which diverges from an injected
+    ``PROJECT_METRICS_REFERENCE_TIME`` and makes fixture-based tests fail
+    once wall-clock time drifts past the fixture's window.
     """
 
+    since = (reference_time - timedelta(days=window_days)).isoformat()
     pretty = "--pretty=format:__PM_COMMIT__%n%H%n%an%n%at%n"
     completed = subprocess.run(
         [
             "git",
             "log",
-            f"--since={window_days} days ago",
+            f"--since={since}",
             "--numstat",
             pretty,
         ],

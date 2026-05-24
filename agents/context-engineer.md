@@ -1,14 +1,14 @@
 ---
 name: context-engineer
 description: >
-  Context engineering specialist that audits, architects, and optimizes
-  AI assistant context artifacts (CLAUDE.md, skills, rules, commands, agents).
-  Operates standalone for audits and small-scope artifact work, or collaborates
-  with pipeline agents (researcher, systems-architect, implementation-planner)
-  as a domain expert when work involves context artifacts. Use proactively when
-  the user wants to audit context quality, decide where information belongs,
-  optimize context window usage, grow the context ecosystem, resolve conflicts
-  between artifacts, or when pipeline work involves context engineering.
+  Context-engineering specialist that audits, architects, and optimizes
+  AI-assistant context artifacts (CLAUDE.md, skills, rules, commands, agents).
+  Works standalone for audits and small-scope artifact changes, or shadows
+  pipeline agents (researcher, systems-architect, implementation-planner) as
+  domain expert when work touches context artifacts. Use proactively to audit
+  context quality, decide where information belongs, optimize context-window
+  usage, grow the context ecosystem, resolve artifact conflicts, or when pipeline
+  work involves context engineering.
 tools: Read, Glob, Grep, Bash, Write, Edit
 skills: skill-crafting, rule-crafting, command-crafting, agent-crafting
 permissionMode: acceptEdits

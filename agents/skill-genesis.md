@@ -1,14 +1,13 @@
 ---
 name: skill-genesis
 description: >
-  Autonomous pull-driven learning harvester that analyzes accumulated experience
-  (LEARNINGS.md, verification reports, sentinel findings, ADR patterns) and
-  triages learnings into artifact proposals (skills, rules, memory entries,
-  CLAUDE.md additions). Writes a timestamped report to
-  .ai-state/skill_genesis_reports/SKILL_GENESIS_REPORT_<TS>.md with a sibling
-  SKILL_GENESIS_LOG.md. Never presents proposals interactively — user dispositions
-  proposals later via /skill-genesis-review. Invoked on-demand via /skill-genesis;
-  never pipeline-spawned.
+  Autonomous learning harvester that mines accumulated experience (LEARNINGS.md,
+  verification reports, sentinel findings, ADR patterns) and triages it into
+  artifact proposals (skills, rules, memory entries, CLAUDE.md additions). Writes
+  a timestamped report plus sibling SKILL_GENESIS_LOG.md to
+  .ai-state/skill_genesis_reports/. Never proposes interactively — the user
+  dispositions later via /skill-genesis-review. Invoked on-demand via
+  /skill-genesis; never pipeline-spawned.
 tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit
 skills: [skill-crafting, rule-crafting]

@@ -1,12 +1,11 @@
 ---
 name: implementation-planner
 description: >
-  Implementation planning specialist that breaks architectural designs into
-  small, safe, incremental steps using the software-planning methodology
+  Implementation-planning specialist that decomposes architecture into small,
+  safe, incremental steps via the software-planning three-document model
   (IMPLEMENTATION_PLAN.md, WIP.md, LEARNINGS.md). Use proactively when a
-  systems architecture (SYSTEMS_PLAN.md) is ready and needs to be decomposed
-  into implementation steps, when resuming multi-session work, or when
-  supervising execution against a plan.
+  SYSTEMS_PLAN.md is ready to decompose into steps, when resuming multi-session
+  work, or when supervising execution against a plan.
 tools: Read, Glob, Grep, Bash, Write, Edit
 skills: [software-planning, external-api-docs]
 permissionMode: acceptEdits

@@ -1,49 +1,40 @@
 ---
 name: roadmap-cartographer
 description: >-
-  Project-level roadmap cartographer. Performs an ultra-in-depth audit of any
-  project (deterministic, agentic, or hybrid) through a project-derived
-  evaluation lens set and emits a grounded ROADMAP.md at the project root.
-  Derives the lens set from the project's own values + domain constraints +
-  exemplar lens sets (SPIRIT, DORA, SPACE, FAIR, CNCF Platform Maturity, or
-  Custom) — no hardcoded universal list. Activated by the `/roadmap` command,
-  by phrases like "spring cleaning", "state of the project", "what should we
-  build next", or "produce a ROADMAP.md", and by direct @roadmap-cartographer
-  delegation. For ultra-in-depth audits and fresh ROADMAP.md generation —
-  distinct from `roadmap-planning` skill which prioritizes and sequences an
-  existing backlog. Use proactively when the user requests a project review,
-  spring cleaning, or roadmap synthesis.
+  Project-level roadmap cartographer. Runs an ultra-in-depth audit of any project
+  (deterministic, agentic, or hybrid) through a project-derived evaluation lens
+  set and emits a grounded ROADMAP.md at the project root. Derives the lens set
+  from the project's own values, domain constraints, and exemplar sets (SPIRIT,
+  DORA, SPACE, FAIR, CNCF Platform Maturity, or Custom) — no hardcoded universal
+  list. Activated by `/roadmap`, by phrases like "spring cleaning", "state of the
+  project", "what should we build next", or "produce a ROADMAP.md", and by direct
+  @roadmap-cartographer delegation. For audit-to-roadmap synthesis — distinct from
+  the `roadmap-planning` skill, which prioritizes and sequences an existing
+  backlog. Use proactively when the user requests a project review, spring
+  cleaning, or roadmap synthesis.
 
   <example>
-  Context: User asks for a project-wide review.
+  Context: Project-wide review.
   user: "Let's do spring cleaning on the whole project and produce a ROADMAP.md."
-  assistant: "I'll delegate this to the roadmap-cartographer agent — it derives
-  a project-specific lens set, runs parallel researchers per lens, and emits a
-  grounded ROADMAP.md."
-  <commentary>
-  Spring-cleaning + ROADMAP.md is the canonical cartographer trigger.
-  </commentary>
+  assistant: "Delegating to roadmap-cartographer — it derives a project-specific
+  lens set, runs parallel researchers per lens, and emits a grounded ROADMAP.md."
+  <commentary>Spring-cleaning + ROADMAP.md is the canonical cartographer trigger.</commentary>
   </example>
 
   <example>
-  Context: User has an IDEA_LEDGER and asks for prioritization.
+  Context: User has a backlog and asks for prioritization.
   user: "Here's our backlog — help us decide what to build first."
-  assistant: "This is backlog prioritization, not a full audit. The
-  `roadmap-planning` skill is the right fit here, not the cartographer."
-  <commentary>
-  Cartographer is for audit-to-roadmap; roadmap-planning is for backlog
-  sequencing. Keep them disjoint.
-  </commentary>
+  assistant: "That's backlog prioritization, not a full audit — the
+  `roadmap-planning` skill fits here, not the cartographer."
+  <commentary>Cartographer is for audit-to-roadmap; roadmap-planning is for backlog sequencing. Keep them disjoint.</commentary>
   </example>
 
   <example>
-  Context: User runs `/roadmap diff` on a project that already has a ROADMAP.md.
+  Context: `/roadmap diff` on a project that already has a ROADMAP.md.
   user: "/roadmap diff"
-  assistant: "Invoking roadmap-cartographer in diff mode — it will re-audit,
-  surface deltas against the existing ROADMAP.md, and preserve the Decision Log."
-  <commentary>
-  `diff` mode is incremental and Decision-Log-preserving.
-  </commentary>
+  assistant: "Invoking roadmap-cartographer in diff mode — re-audits, surfaces
+  deltas against the existing ROADMAP.md, and preserves the Decision Log."
+  <commentary>`diff` mode is incremental and Decision-Log-preserving.</commentary>
   </example>
 tools: Read, Glob, Grep, Bash(git:*), Bash(wc:*), Bash(grep:*), Bash(find:*), Bash(jq:*), Write, Edit, AskUserQuestion, Task
 model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.

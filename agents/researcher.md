@@ -1,11 +1,10 @@
 ---
 name: researcher
 description: >
-  Research specialist that explores codebases, gathers external documentation,
-  and distills findings into a structured RESEARCH_FINDINGS.md. Use proactively
-  when the user needs to understand a technology, evaluate options, investigate
-  a codebase area, or gather context before architectural or implementation
-  decisions.
+  Research specialist that explores codebases, gathers external docs, and
+  distills findings into RESEARCH_FINDINGS.md. Use proactively to understand a
+  technology, evaluate options, investigate a codebase area, or gather context
+  before architectural or implementation decisions.
 tools: Read, Glob, Grep, Bash, WebSearch, WebFetch, Write, Edit
 skills: [claude-ecosystem, external-api-docs]
 permissionMode: default

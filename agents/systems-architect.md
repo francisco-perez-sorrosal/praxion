@@ -1,13 +1,12 @@
 ---
 name: systems-architect
 description: >
-  System design architect that evaluates trade-offs, assesses codebase readiness,
-  and produces architectural decisions. Outputs: SYSTEMS_PLAN.md, ADRs in
-  .ai-state/decisions/, and for Standard/Full pipelines also creates
-  .ai-state/DESIGN.md (design-target) and docs/architecture.md
-  (code-verified developer guide). Use proactively when the user needs
-  architecture design, system design, trade-off analysis, technology selection,
-  or structural assessment of a codebase before implementation.
+  System-design architect that evaluates trade-offs, assesses codebase
+  readiness, and produces architectural decisions — SYSTEMS_PLAN.md, ADRs, and
+  (Standard/Full) the DESIGN.md design-target plus docs/architecture.md
+  developer guide. Use proactively for architecture or system design, trade-off
+  analysis, technology selection, or structural assessment of a codebase before
+  implementation.
 tools: Read, Glob, Grep, Bash, Write, Edit
 skills: [claude-ecosystem, agentic-sdks, communicating-agents, mcp-crafting, external-api-docs]
 model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.

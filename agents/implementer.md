@@ -1,11 +1,11 @@
 ---
 name: implementer
 description: >
-  Principal software engineer that implements individual steps from an
-  implementation plan. Receives a single step via WIP.md, writes production
-  code, runs tests and linters, self-reviews against coding conventions, and
-  reports completion. Use when an IMPLEMENTATION_PLAN.md exists with steps
-  ready for execution, or when the implementation-planner delegates a step.
+  Principal software engineer that executes one implementation-plan step at a
+  time. Receives the step via WIP.md, writes production code, runs tests and
+  linters, self-reviews against coding conventions, and reports completion. Use
+  when an IMPLEMENTATION_PLAN.md has steps ready to execute, or when the
+  implementation-planner delegates a step.
 tools: Read, Write, Edit, Glob, Grep, Bash
 skills: [software-planning, code-review, refactoring, external-api-docs, web-ui-design, tui-design, agentic-interface-design, api-design-craft]
 permissionMode: acceptEdits

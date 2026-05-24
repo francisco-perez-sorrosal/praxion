@@ -2,12 +2,11 @@
 name: promethean
 description: >
   Ideation engine that analyzes a project's current state and generates concrete
-  improvement ideas at the feature level. Accepts an optional seed (topic, gist,
-  or domain direction) to focus ideation. Consumes sentinel reports when available
-  for health context. Produces an IDEA_PROPOSAL.md that feeds into the
-  researcher → systems-architect pipeline. Use proactively when the user wants
-  fresh ideas, has no specific task, or when project gaps and opportunities
-  should be explored.
+  feature-level improvement ideas. Accepts an optional seed (topic, gist, or
+  domain direction); consumes sentinel reports for health context when available;
+  produces IDEA_PROPOSAL.md feeding the researcher → systems-architect pipeline.
+  Use proactively when the user wants fresh ideas, has no specific task, or when
+  project gaps and opportunities should be explored.
 tools: Read, Glob, Grep, Bash, Write, Edit, AskUserQuestion, WebFetch
 skills: [software-planning, external-api-docs, web-ui-design, tui-design, agentic-interface-design, api-design-craft]
 model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.

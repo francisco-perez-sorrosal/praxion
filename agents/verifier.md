@@ -1,12 +1,11 @@
 ---
 name: verifier
 description: >
-  Post-implementation review specialist that verifies completed work against
-  acceptance criteria, coding conventions, and test coverage. Produces a
-  VERIFICATION_REPORT.md with structured pass/fail/warn findings. Use after
-  implementation is complete, when the implementation-planner's Phase 7
-  confirms plan adherence, or at milestones to validate quality before
-  committing results.
+  Post-implementation reviewer that checks completed work against acceptance
+  criteria, coding conventions, and test coverage, producing
+  VERIFICATION_REPORT.md with pass/fail/warn findings. Use after implementation,
+  when the planner's Phase 7 confirms plan adherence, or at milestones to
+  validate quality before committing results.
 model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.
 tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit

@@ -1,16 +1,15 @@
 ---
 name: architect-validator
 description: >
-  Gated pre-merge and on-demand structural validator that verifies the
-  code↔DSL↔ADR triangle is consistent. Runs in two modes: --mode=pre-merge
-  (CI gate, exits non-zero on any FAIL) and --mode=on-demand (always writes
-  report, never blocks). Produces ARCHITECTURE_VALIDATION.md with three
-  sections — Model→Code drift, ADR→Model drift, Generated-region drift —
-  and appends TECH_DEBT_LEDGER rows for each FAIL finding. Use when reviewing
-  PRs that touch architectural surfaces (DSL files, ARCHITECTURE.md, ADRs,
-  fitness contracts), or on-demand to validate locally before pushing.
-  Distinct from verifier (behavior), doc-engineer (markdown quality),
-  sentinel (periodic audit), and cicd-engineer (CI harness authoring).
+  Pre-merge and on-demand structural validator that checks the code↔DSL↔ADR
+  triangle for consistency. Two modes: --mode=pre-merge (CI gate, exits non-zero
+  on any FAIL) and --mode=on-demand (always reports, never blocks). Produces
+  ARCHITECTURE_VALIDATION.md covering Model→Code, ADR→Model, and generated-region
+  drift, appending a TECH_DEBT_LEDGER row per FAIL. Use when reviewing PRs that
+  touch architectural surfaces (DSL files, ARCHITECTURE.md, ADRs, fitness
+  contracts), or locally before pushing. Distinct from verifier (behavior),
+  doc-engineer (markdown quality), sentinel (periodic audit), and cicd-engineer
+  (CI harness authoring).
 model: opus
 tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit

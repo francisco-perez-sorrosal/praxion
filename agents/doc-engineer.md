@@ -1,13 +1,13 @@
 ---
 name: doc-engineer
 description: >
-  Documentation quality specialist that maintains project-facing documentation
-  (README.md, catalogs, architecture docs, changelogs). Validates cross-reference
-  integrity, catalog completeness, naming consistency, and writing quality. Use
-  proactively when documentation may be stale after code changes, when creating
-  new project documentation, or when auditing documentation quality. Does NOT
-  manage context artifacts (CLAUDE.md, skills, rules, commands, agents) -- that
-  is the context-engineer's domain.
+  Documentation-quality specialist that maintains project-facing docs (README.md,
+  catalogs, architecture docs, changelogs), validating cross-reference integrity,
+  catalog completeness, naming consistency, and writing quality. Use proactively
+  when docs may be stale after code changes, when creating new project
+  documentation, or when auditing doc quality. Does NOT manage context artifacts
+  (CLAUDE.md, skills, rules, commands, agents) -- that is the context-engineer's
+  domain.
 tools: Read, Write, Edit, Glob, Grep, Bash
 skills: [doc-management, web-ui-design]
 permissionMode: acceptEdits

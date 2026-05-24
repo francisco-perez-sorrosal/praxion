@@ -1,23 +1,20 @@
 ---
 name: sentinel
 description: >
-  Read-only ecosystem quality auditor that scans all context artifacts
-  (skills, agents, rules, commands, CLAUDE.md, plugin.json) across ten
-  dimensions. Eight dimensions evaluate individual artifacts: completeness,
-  consistency, freshness, spec compliance, cross-reference integrity, token
-  efficiency, pipeline discipline, and spec health. A code health dimension
-  samples implementation files for systemic duplication. The tenth — ecosystem coherence —
-  operates at two distinct levels: per-artifact coherence (how well each
-  artifact aligns with its goals, spec, and related agents/skills) and
-  system-level coherence (whether the ecosystem works as a connected whole:
-  orphaned artifacts, pipeline handoff coverage, structural gaps). Produces
-  SENTINEL_REPORT_YYYY-MM-DD_HH-MM-SS.md in .ai-state/sentinel_reports/
-  (timestamped, accumulates) with a SENTINEL_LOG.md sibling for
-  historical metric tracking.
-  Operates independently — not a pipeline stage. Any agent or user can
-  consume its reports. Use proactively when commits exist after the last
-  report timestamp in SENTINEL_LOG.md. When no new commits exist but
-  another agent needs the report, ask the user before triggering.
+  Read-only ecosystem quality auditor that scans all context artifacts (skills,
+  agents, rules, commands, CLAUDE.md, plugin.json) across ten dimensions: eight
+  per-artifact (completeness, consistency, freshness, spec compliance,
+  cross-reference integrity, token efficiency, pipeline discipline, spec health),
+  a code-health dimension sampling implementation files for systemic duplication,
+  and ecosystem coherence — assessed both per-artifact (alignment with goals,
+  spec, related agents/skills) and system-level (orphaned artifacts,
+  pipeline-handoff coverage, structural gaps). Produces a timestamped,
+  accumulating SENTINEL_REPORT in .ai-state/sentinel_reports/ with a
+  SENTINEL_LOG.md sibling for historical metrics. Operates independently, not as
+  a pipeline stage; any agent or user can consume its reports. Use proactively
+  when commits exist after the last report timestamp in SENTINEL_LOG.md; when no
+  new commits exist but another agent needs the report, ask the user before
+  triggering.
 tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit
 permissionMode: default

@@ -10,7 +10,7 @@ Architecture Decision Records live in `.ai-state/decisions/` as Markdown files w
 
 ### File Format
 
-ADRs authored during a pipeline follow the **fragment-name-at-create, finalize-at-merge** path: the ADR lands as a fragment file under `.ai-state/decisions/drafts/` with a collision-safe filename and a provisional `dec-draft-<hash>` id, and is promoted to a stable `<NNN>-<slug>.md` finalized record at merge-to-main. The legacy NNN-at-create path is retained only for direct-tier user-authored ADRs that bypass a pipeline (see [Finalized ADRs (post-merge)](#finalized-adrs-post-merge) below).
+Pipeline-authored ADRs follow the **fragment-name-at-create, finalize-at-merge** path: the ADR lands as a fragment under `.ai-state/decisions/drafts/` with a collision-safe filename and a provisional `dec-draft-<hash>` id, then is promoted to a stable `<NNN>-<slug>.md` record at merge-to-main. The legacy NNN-at-create path survives only for direct-tier user-authored ADRs that bypass a pipeline (see [Finalized ADRs (post-merge)](#finalized-adrs-post-merge)).
 
 #### Fragment Filename Schema
 
@@ -36,7 +36,7 @@ After finalize runs at merge-to-main (see [Finalize Protocol](#finalize-protocol
 
 **Naming**: `<NNN>-<slug>.md` — zero-padded 3-digit sequence number, kebab-case slug. The `<NNN>` is assigned by the finalize script at merge-to-main, not at creation; pipeline-authored ADRs never pick their own `<NNN>`.
 
-**Direct-tier user-authored ADRs** (no pipeline, no agent involvement) MAY still be created directly at `.ai-state/decisions/<NNN>-<slug>.md` with the next sequential `<NNN>` assigned by scanning existing filenames (ignoring `drafts/`). This legacy path exists for simplicity when a human writes a one-off decision outside a pipeline; it is deprecated for all agent-authored and pipeline-authored ADRs.
+**Direct-tier user-authored ADRs** (no pipeline, no agent) MAY be created directly at `.ai-state/decisions/<NNN>-<slug>.md`, the next `<NNN>` assigned by scanning existing filenames (ignoring `drafts/`). This legacy path is for one-off human decisions outside a pipeline; it is deprecated for all agent- and pipeline-authored ADRs.
 
 #### Frontmatter
 
@@ -57,10 +57,10 @@ The frontmatter schema is shared between draft and finalized ADRs. Only the `id`
 | `pipeline_tier` | string | No | `direct` / `lightweight` / `standard` / `full` / `spike` |
 | `affected_files` | list | No | Paths impacted by the decision |
 | `affected_reqs` | list | No | REQ IDs linked to the decision |
-| `supersedes` | string | No | id of prior decision (`dec-draft-<hash>` in drafts; `dec-NNN` after finalize) |
-| `superseded_by` | string | No | id of replacing decision (same id-form rule) |
-| `re_affirms` | string | No | id of prior decision this ADR re-affirms without superseding (same id-form rule) |
-| `re_affirmed_by` | list | No | ids of later ADRs that re-affirmed this decision (same id-form rule) |
+| `supersedes` | string | No | id of prior decision |
+| `superseded_by` | string | No | id of replacing decision |
+| `re_affirms` | string | No | id of prior decision this ADR re-affirms without superseding |
+| `re_affirmed_by` | list | No | ids of later ADRs that re-affirmed this decision |
 
 **Body sections** (after frontmatter):
 
@@ -72,7 +72,7 @@ The frontmatter schema is shared between draft and finalized ADRs. Only the `id`
 
 ### Supersession Protocol
 
-When a new ADR supersedes an existing one: set `supersedes`/`superseded_by` cross-references (draft-vs-finalized id rules apply), flip the old ADR to `status: superseded`, and add a `## Prior Decision` section to the new ADR. `DECISIONS_INDEX.md` regenerates at finalize — never invoke the index script manually. Full step sequence: [`adr-authoring-protocols.md` § Supersession Protocol](../../skills/software-planning/references/adr-authoring-protocols.md#supersession-protocol).
+When a new ADR supersedes an existing one: set `supersedes`/`superseded_by` cross-references, flip the old ADR to `status: superseded`, and add a `## Prior Decision` section to the new ADR. `DECISIONS_INDEX.md` regenerates at finalize — never invoke the index script manually. Full step sequence: [`adr-authoring-protocols.md` § Supersession Protocol](../../skills/software-planning/references/adr-authoring-protocols.md#supersession-protocol).
 
 ### Re-affirmation Protocol
 
@@ -80,7 +80,7 @@ When a new ADR re-affirms an existing one *without* superseding it (a re-opening
 
 ### Finalize Protocol
 
-Finalize promotes drafts in `.ai-state/decisions/drafts/` to finalized `<NNN>-<slug>.md` records at merge-to-main. Invoked by the post-merge git hook and `/merge-worktree`; the protocol is **idempotent**, advisory-locked, and rewrites `dec-draft-<hash>` cross-references across a **bounded** walk scope (sibling ADR files, in-flight `.ai-work/*/LEARNINGS.md` / `SYSTEMS_PLAN.md` / `IMPLEMENTATION_PLAN.md`, and `.ai-state/specs/SPEC_*` matching the current task slug — never an arbitrary repo sweep). The bounded scope is the contract; finalize never rewrites unrelated text. `DECISIONS_INDEX.md` regenerates as the last step.
+Finalize promotes drafts in `.ai-state/decisions/drafts/` to finalized `<NNN>-<slug>.md` records at merge-to-main. Invoked by the post-merge git hook and `/merge-worktree`; the protocol is **idempotent**, advisory-locked, and rewrites `dec-draft-<hash>` cross-references across a **bounded** walk scope (sibling ADR files, in-flight `.ai-work/*/LEARNINGS.md` / `SYSTEMS_PLAN.md` / `IMPLEMENTATION_PLAN.md`, and `.ai-state/specs/SPEC_*` matching the current task slug — never an arbitrary repo sweep). The bounded scope is the contract — finalize never touches unrelated text. `DECISIONS_INDEX.md` regenerates last.
 
 For the full step sequence (draft detection, NNN assignment, file rename + frontmatter `id:`/`status:` rewrites, the cross-reference-rewrite location table, concurrency safety, and exit codes), see [`adr-authoring-protocols.md § Finalize at Merge-to-Main`](../../skills/software-planning/references/adr-authoring-protocols.md#finalize-at-merge-to-main).
 
@@ -109,7 +109,7 @@ The 7-step procedure agents follow when creating a fragment ADR (identity deriva
 
 ### Linking to ADRs
 
-Persistent files — `docs/`, `ARCHITECTURE.md`, READMEs — link the **finalized** record at `.ai-state/decisions/<NNN>-<slug>.md`, never a `.ai-state/decisions/drafts/<…>.md` fragment. Draft files are promoted to finalized `<NNN>-<slug>.md` records at finalize-on-merge, so a `drafts/` path stops resolving the moment the authoring pipeline merges. While a pipeline is in flight, cite an unfinalized ADR inline by its `dec-draft-<hash>` id (resolvable from the draft frontmatter), not by file path — the id survives finalize as a rewritten `dec-NNN`; the path does not. (ADR-to-ADR cross-references use the `id` form in frontmatter, governed by the Supersession and Re-affirmation protocols above — not file-path links.)
+Persistent files — `docs/`, `ARCHITECTURE.md`, READMEs — link the **finalized** record at `.ai-state/decisions/<NNN>-<slug>.md`, never a `drafts/<…>.md` fragment: a `drafts/` path stops resolving the moment the authoring pipeline merges. While a pipeline is in flight, cite an unfinalized ADR inline by its `dec-draft-<hash>` id (from the draft frontmatter), not by path — the id survives finalize as a rewritten `dec-NNN`; the path does not. (ADR-to-ADR cross-references use the frontmatter `id` form per the Supersession and Re-affirmation protocols above, not file-path links.)
 
 ### Consumption
 

@@ -3,56 +3,56 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-05-14T04:36:51Z'
+generated_at: '2026-05-24T01:47:33Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
   load: always_on
   core: true
   install: symlink
-  chars: 2308
+  chars: 2118
 - id: swe/adr-conventions
   path: rules/swe/adr-conventions.md
   load: always_on
   core: true
   install: symlink
-  chars: 11213
+  chars: 11089
 - id: swe/agent-behavioral-contract
   path: rules/swe/agent-behavioral-contract.md
   load: always_on
   core: true
   install: symlink
-  chars: 1353
+  chars: 1572
 - id: swe/agent-intermediate-documents
   path: rules/swe/agent-intermediate-documents.md
   load: always_on
   core: true
   install: symlink
-  chars: 11535
+  chars: 11940
 - id: swe/swe-agent-coordination-protocol
   path: rules/swe/swe-agent-coordination-protocol.md
   load: always_on
   core: true
   install: symlink
-  chars: 15281
+  chars: 17978
 - id: swe/memory-protocol
   path: rules/swe/memory-protocol.md
   load: always_on
   core: false
   install: hook-deliver
-  chars: 4496
+  chars: 4113
 - id: swe/agent-model-routing
   path: rules/swe/agent-model-routing.md
   load: always_on
   core: false
   install: hook-deliver
-  chars: 5827
+  chars: 5505
 - id: swe/vcs/git-conventions
   path: rules/swe/vcs/git-conventions.md
   load: always_on
   core: false
   install: hook-deliver
-  chars: 3618
+  chars: 3575
 - id: ml/eval-driven-verification
   path: rules/ml/eval-driven-verification.md
   load: path_scoped
@@ -127,6 +127,20 @@ rules:
   - '**/*.sh'
   - '**/*.bash'
   - '**/*.zsh'
+- id: swe/gate-liveness
+  path: rules/swe/gate-liveness.md
+  load: path_scoped
+  core: false
+  install: symlink
+  chars: 3818
+  paths:
+  - fitness/**
+  - scripts/check_*.py
+  - scripts/validate_*.py
+  - hooks/*.py
+  - agents/sentinel.md
+  - agents/verifier.md
+  - agents/implementation-planner.md
 - id: swe/id-citation-discipline
   path: rules/swe/id-citation-discipline.md
   load: path_scoped
@@ -151,6 +165,19 @@ rules:
   - '**/*.c'
   - '**/*.h'
   - '**/*.hpp'
+- id: swe/plugin-install-conventions
+  path: rules/swe/plugin-install-conventions.md
+  load: path_scoped
+  core: false
+  install: symlink
+  chars: 3659
+  paths:
+  - install*.sh
+  - scripts/install*.sh
+  - claude/canonical-blocks/**/*.md
+  - commands/onboard-project*.md
+  - commands/new-project.md
+  - new_project.sh
 - id: swe/shipped-artifact-isolation
   path: rules/swe/shipped-artifact-isolation.md
   load: path_scoped
@@ -168,7 +195,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 4002
+  chars: 4863
   paths:
   - skills/**/SKILL.md
 - id: swe/testing-conventions
@@ -233,7 +260,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 15168
+  chars: 17337
   paths:
   - dashboard_app/**
   - '**/doc_manifest.yaml'
@@ -244,7 +271,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 4906
+  chars: 6177
   paths:
   - '**/README.md'
   - '**/README_DEV.md'

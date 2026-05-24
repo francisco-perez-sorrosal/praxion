@@ -17,7 +17,7 @@ Tier table for Praxion subagents. Resolution order at spawn:
 
 Aliases only (`opus`/`sonnet`/`haiku`); pin full IDs at spawn time only when version-locking.
 
-**Orchestrator directive.** When spawning any agent in the table below, pass `model: <alias>` from that row as the Agent tool's `model` parameter on every spawn. Do not skip: an agent without an explicit override falls through to the session model and defeats the policy. Use a per-spawn override that differs from the table only on the sanctioned cases (researcher modes, implementer step-level hint) documented below.
+**Orchestrator directive.** When spawning any agent below, pass that row's `model: <alias>` as the Agent tool's `model` parameter on every spawn. Skipping it lets the agent fall through to the session model, defeating the policy. Deviate from the table only on the sanctioned cases below (researcher modes, implementer step-level hint).
 
 ### Tier Table
 
@@ -28,7 +28,7 @@ Aliases only (`opus`/`sonnet`/`haiku`); pin full IDs at spawn time only when ver
 | `roadmap-cartographer` | H | `opus` | Multi-phase synthesis, 6-way fan-out |
 | `verifier` | H | `opus` | Quality-critical gate; structural reasoning |
 | `architect-validator` | H | `opus` | Structural reasoning across DSL + code graph + ADR set; pre-merge gate |
-| `interface-designer` | H | `opus` | Interface-layer design decisions and taste under trade-offs across web/TUI/API/agentic surfaces; same rationale as systems-architect and verifier — the agent's value is quality judgement across a broad design space |
+| `interface-designer` | H | `opus` | Design taste under trade-offs across web/TUI/API/agentic surfaces; like systems-architect/verifier, value is quality judgement across a broad space |
 | `implementation-planner` | M | `sonnet` | Feature-scoped decomposition |
 | `implementer` | M | `sonnet` | Single-step execution; step-H/L override |
 | `test-engineer` | M | `sonnet` | Per-step judgment paired with implementer |
@@ -56,7 +56,7 @@ Aliases only (`opus`/`sonnet`/`haiku`); pin full IDs at spawn time only when ver
 
 **Implementer step-level override.** Planner annotates `WIP.md` with `tier: H` (cross-cutting refactor) or `tier: L` (typo/mechanical); no hint = `sonnet`.
 
-**Direct-invocation entry points.** Slash commands and user-driven spawns (e.g. `/sentinel`, `/roadmap`, `/eval`, ad-hoc `Agent` calls) bypass the main orchestrator. The entry point is responsible for applying this rule: read the row for the agent being spawned and pass the listed alias as the Agent tool's `model:` parameter. `sentinel` and `skill-genesis` are the agents most often invoked this way; both default to `sonnet` unless the entry point overrides up.
+**Direct-invocation entry points.** Slash commands and user-driven spawns (e.g. `/sentinel`, `/roadmap`, `/eval`, ad-hoc `Agent` calls) bypass the orchestrator, so the entry point applies this rule: read the agent's row and pass its alias as the `model:` parameter. `sentinel` and `skill-genesis` are most often invoked this way; both default to `sonnet` unless overridden up.
 
 ### Operator Kill Switch — `CLAUDE_CODE_SUBAGENT_MODEL`
 
@@ -66,7 +66,7 @@ Aliases only (`opus`/`sonnet`/`haiku`); pin full IDs at spawn time only when ver
 | Emergency quality boost | `opus` | All spawns on Opus; accept cost spike |
 | Disable kill switch | (unset / not set) | Layer-1 disengages; per-spawn / frontmatter / session resume control per layers 2–4 |
 
-**`availableModels` fallback.** If a routed alias is rejected by `availableModels`, fall back to the next-cheaper tier (Opus → Sonnet → Haiku). Log each fallback event: in-pipeline, append a one-line entry to `LEARNINGS.md` § Edge Cases naming the rejected alias, the chosen fallback, and the spawning agent; outside a pipeline, the orchestrator surfaces the fallback in its session text so the operator can correct the managed setting.
+**`availableModels` fallback.** If a routed alias is rejected, fall back to the next-cheaper tier (Opus → Sonnet → Haiku) and log it: in-pipeline, a one-line `LEARNINGS.md` § Edge Cases entry naming the rejected alias, the fallback, and the spawning agent; outside a pipeline, surface it in session text so the operator can fix the managed setting.
 
 **Opus breaking-change note.** Some Opus versions reject `thinking.budget_tokens` and non-default `temperature`/`top_p`/`top_k` with HTTP 400; never pass these on routed Opus spawns. *Specific to Opus 4.7 as of 2026-04-25 — verify against `claude-ecosystem` skill before relaxing if a later version restores the params.*
 

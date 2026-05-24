@@ -6,7 +6,7 @@ install: symlink
 
 ## SWE Agent Coordination Protocol
 
-Conventions for when and how to use the available software agents -- autonomous subprocesses that run in separate context windows.
+Conventions for when and how to use the software agents — autonomous subprocesses in separate context windows.
 
 ### Process Calibration
 
@@ -22,19 +22,11 @@ Assess the task before starting work. Each tier prescribes what to do — higher
 
 - The main agent selects the tier at task intake. User override always wins. Default to the lower tier when uncertain — process can be added later, but overhead cannot be reclaimed.
 - Bug fixes: Direct unless 4+ files or structural issue (escalate to Standard). Refactoring: Standard with `[Phase: Refactoring]` delegation to the [refactoring skill](../../skills/refactoring/SKILL.md).
-- The SDD skill's [complexity triage](../../skills/spec-driven-development/SKILL.md#complexity-triage) refines specification depth within Standard/Full; [calibration-procedure.md](../../skills/spec-driven-development/references/calibration-procedure.md) handles signal-scored ambiguous cases.
+- The SDD skill's [complexity triage](../../skills/spec-driven-development/SKILL.md#complexity-triage) refines specification depth within Standard/Full.
 - All tiers append a row to `.ai-state/calibration_log.md` on task completion (calibration accuracy analysis stays unbiased) and may create ADRs in `.ai-state/decisions/` when a decision is worth preserving — see [adr-conventions.md](adr-conventions.md).
 - **Lightweight specifics** (acceptance criteria inline, researcher scaffold, no `TEST_RESULTS.md`, architecture-doc update on structural change, mid-task escalation to Standard rather than silent scope-creep): see [tier-templates.md#lightweight-snippet](../../skills/software-planning/references/tier-templates.md#lightweight-snippet).
 
-**Tier Selector (fast path).** When the main agent receives a new task, walk top-to-bottom and stop at the first match:
-
-- Exploratory, outcome uncertain → **Spike**
-- Single-file fix, config, doc, typo → **Direct**
-- 2–3 files, single behavior, clear scope → **Lightweight**
-- 4–8 files OR 2–4 behaviors OR architectural decision → **Standard**
-- 9+ files OR 5+ behaviors OR cross-cutting refactor → **Full**
-
-For ambiguous cases, use the SDD skill's [calibration-procedure.md](../../skills/spec-driven-development/references/calibration-procedure.md) signal scoring. User override wins; default to the lower tier when uncertain.
+**Tier Selector (fast path).** Walk top-to-bottom, stop at the first match: **Spike** (exploratory, uncertain) → **Direct** (single-file fix/config/doc/typo) → **Lightweight** (2–3 files, single behavior, clear scope) → **Standard** (4–8 files, or 2–4 behaviors, or an architectural decision) → **Full** (9+ files, or 5+ behaviors, or cross-cutting refactor). For ambiguous cases, use the SDD skill's [calibration-procedure.md](../../skills/spec-driven-development/references/calibration-procedure.md) signal scoring.
 
 *Hackathon mode: if a project sets `PRAXION_HACKATHON_MODE=1`, the 5-tier selector above is replaced by the Hackathon Spine — a flexible-entry pipeline the user enters by natural language — see that project's `## Hackathon Mode` CLAUDE.md block for the definition.*
 
@@ -93,7 +85,7 @@ Spawn agents without waiting for the user to ask:
 
 - Complex feature --> `researcher` then `systems-architect` (skip researcher if codebase context suffices)
 - Architecture approved --> `implementation-planner`; resuming work --> same agent to re-assess `WIP.md`
-- Plan ready --> `implementer` + `test-engineer` concurrently (paired steps on disjoint file sets) **at Standard/Full tier only**; both complete --> run tests --> fix cycle if needed --> `verifier`. Direct/Lightweight rarely reach the planner; if they do, the implementer's own test sub-step suffices — do not spawn the `test-engineer`
+- Plan ready --> `implementer` + `test-engineer` concurrently (paired steps, disjoint file sets) **at Standard/Full only**; both done --> run tests --> fix cycle if needed --> `verifier`. Direct/Lightweight rarely reach the planner; if they do, the implementer's own test sub-step suffices — don't spawn `test-engineer`
 - Context artifacts stale/conflicting or plan touches them --> `context-engineer` (parallel with `researcher`/`systems-architect` as shadow; see context-engineer shadowing rule below)
 - Ecosystem health or regression check --> `sentinel`; stale check: `.ai-state/sentinel_reports/SENTINEL_LOG.md` vs `git log -1 --format=%ci`
 - Documentation impact likely --> `doc-engineer`: at pipeline checkpoints (after planning, after implementation, after refactoring), or in parallel with `implementer` + `test-engineer` when the planner assigns a doc step to the parallel group
@@ -102,13 +94,13 @@ Spawn agents without waiting for the user to ask:
 
 **Depth check:** Before spawning an agent recommended by another agent's output, confirm with the user if doing so would create a chain of 3+ agents from the original request.
 
-**Multiplicity check:** Before spawning any Bg Safe agent, check whether the work decomposes into N independent targets with disjoint file sets. If so, spawn N instances (up to 2-3 concurrent) rather than one sequential agent. Each instance receives the same task slug — they share a task-scoped directory and use fragment files to avoid collisions (see [agent-intermediate-documents](agent-intermediate-documents.md)).
+**Multiplicity check:** Before spawning any Bg Safe agent, check whether the work decomposes into N independent targets with disjoint file sets; if so, spawn N instances (up to 2-3 concurrent) instead of one sequential agent. Each gets the same task slug — they share a task-scoped directory and use fragment files to avoid collisions (see [agent-intermediate-documents](agent-intermediate-documents.md)).
 
 **Task slug propagation:** At pipeline start, the main agent generates a kebab-case task slug (2–4 words) derived from the task description; every subagent prompt must include `Task slug: <slug>`, and all `.ai-work/` reads and writes use `.ai-work/<task-slug>/`. See [coordination-details.md#task-slug-propagation](../../skills/software-planning/references/coordination-details.md#task-slug-propagation) for the full propagation contract; see the [task slug convention](agent-intermediate-documents.md#task-slug-convention) for naming guidelines.
 
 ### Cross-Agent Skill Conventions
 
-Conventions that apply across multiple pipeline agents independent of their phase: external API docs are mandatory (use `external-api-docs` skill before writing/designing/testing against any external API or SDK; submit `chub_feedback` on drift), and library version/capability checks are mandatory (verify before committing to a library; record confirmed versions in canonical outputs). Full text and per-agent obligations live in [`skills/software-planning/references/cross-agent-skill-conventions.md`](../../skills/software-planning/references/cross-agent-skill-conventions.md).
+Phase-independent conventions for all pipeline agents: external API docs are mandatory (use the `external-api-docs` skill before writing/designing/testing against any external API or SDK; submit `chub_feedback` on drift); library version/capability checks are mandatory (verify before committing to a library; record confirmed versions in canonical outputs). Full text and per-agent obligations: [`skills/software-planning/references/cross-agent-skill-conventions.md`](../../skills/software-planning/references/cross-agent-skill-conventions.md).
 
 ### Coordination Pipeline
 
@@ -144,7 +136,7 @@ Procedure — digest curation, acknowledgement shape, rollback routing, degraded
 
 Use an agent when the task benefits from a separate context window (large scope, multiple phases, structured output). Work directly for quick lookups, single changes, one-step edits. Per-agent Claude model tier is governed by [`agent-model-routing.md`](agent-model-routing.md).
 
-**Shipped-Explore fallback.** If `Agent(subagent_type="Explore", ...)` fails before producing output (harness-level error, orphaned-tool-start, no agent-start event in observability), do not retry the same input — input tokens are spent and a second attempt re-spends them. Fall back to `i-am:researcher` for substantive code surveys (returns a structured `RESEARCH_FINDINGS.md`) or to direct `find`/`grep` via Bash for narrow lookups. Many-skill / many-MCP environments are particularly prone to this failure mode.
+**Shipped-Explore fallback.** If `Agent(subagent_type="Explore", ...)` fails before producing output (harness error, orphaned-tool-start, no agent-start event), don't retry the same input — its tokens are already spent. Fall back to `i-am:researcher` for substantive code surveys (returns a structured `RESEARCH_FINDINGS.md`) or to direct `find`/`grep` via Bash for narrow lookups. Many-skill / many-MCP environments are especially prone to this.
 
 ### Delegation Depth
 
@@ -159,4 +151,4 @@ Run agents in the background when their output is not immediately needed. Check 
 
 Launch independent agents concurrently whenever possible. Each agent has strict boundaries — when an agent encounters work outside its boundary, it flags the need and recommends invoking the appropriate agent.
 
-For detailed tables on boundary discipline, parallel execution rules, intra-stage parallelism, multi-perspective analysis, context-engineer and doc-engineer pipeline engagement, and interaction reporting, load the `software-planning` skill's [agent-pipeline-details.md](../../skills/software-planning/references/agent-pipeline-details.md) reference.
+For detailed tables — boundary discipline, parallel execution, intra-stage parallelism, multi-perspective analysis, context-engineer and doc-engineer engagement, interaction reporting — load the `software-planning` skill's [agent-pipeline-details.md](../../skills/software-planning/references/agent-pipeline-details.md).

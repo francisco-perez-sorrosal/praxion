@@ -42,9 +42,9 @@ The three phases are linear, but a surfacing rhythm threads through all of them:
 
 **Plan.** Enter plan mode for non-trivial work. Write detailed specs upfront to reduce ambiguity. Track progress through checkable items. If something goes sideways, stop and re-plan immediately — don't push down a broken path.
 
-**Verify.** Never mark a task complete without proving it works. Run tests, check logs, diff behavior. Challenge your own work: look for weaknesses, edge cases, unvalidated assumptions. Ask "Would a staff engineer approve this?" For non-trivial changes, pause and ask "is there a more elegant way?" If the implementation — not a debug workaround, but the actual solution — feels hacky, step back: knowing everything you know now, implement the clean solution rather than patching on top. Match testing effort to risk and complexity, not to a blanket rule.
+**Verify.** Never mark a task complete without proving it works. Run tests, check logs, diff behavior. Challenge your own work: look for weaknesses, edge cases, unvalidated assumptions. Ask "Would a staff engineer approve this?" For non-trivial changes, pause and ask "is there a more elegant way?" If the actual solution (not a debug workaround) feels hacky, step back — knowing everything you now know, implement the clean version rather than patching on top. Match testing effort to risk and complexity, not to a blanket rule.
 
-Use subagents liberally to keep the main context window clean — one focus per subagent. Offload research, exploration, and parallel analysis. The agent coordination protocol rule governs pipeline ordering and boundary discipline; consult it when orchestrating multi-agent work. **When delegating to any agent, always include expected deliverables in the prompt** — the agent's own system prompt has full instructions, but your prompt determines what it prioritizes. The coordination protocol has delegation checklists for each agent. Reciprocally, expect a **pointer, not a payload** in return: a terse summary plus the path to the agent's `.ai-work/` artifact — never ask an agent to inline a full report, and read the artifact only when you need its detail. The full output belongs in the artifact; the return message belongs in your context only as a summary. This is context engineering applied to the pipeline itself.
+Use subagents liberally to keep the main context window clean — one focus per subagent; offload research, exploration, and parallel analysis. The agent coordination protocol rule governs pipeline ordering and boundary discipline. **When delegating, always include the expected deliverables in the prompt** — the agent's system prompt has full instructions, but your prompt sets its priorities (the coordination protocol has per-agent delegation checklists). Reciprocally, expect a **pointer, not a payload** in return: a terse summary plus the path to the agent's `.ai-work/` artifact — never ask for the full report inline; read the artifact only when you need its detail. This is context engineering applied to the pipeline itself.
 
 **Standard/Full pipeline deliverables to always include** (ephemeral `.ai-work/<slug>/` vs permanent `.ai-state/`):
 - `systems-architect` → `.ai-work/<slug>/SYSTEMS_PLAN.md` + `.ai-state/decisions/` (ADRs) + `.ai-state/DESIGN.md` + `docs/architecture.md` + (if deployment in scope) `.ai-state/SYSTEM_DEPLOYMENT.md`
@@ -58,20 +58,13 @@ Use subagents liberally to keep the main context window clean — one focus per 
 
 **Match response weight to task scale.** A typo fix doesn't need a pipeline. A one-line bug doesn't need a researcher. Use the full machinery for multi-step, multi-file, architecturally significant work — and work directly for quick lookups, single changes, and obvious fixes.
 
-**Test topology.** When a pipeline runs in a project with a populated `.ai-state/TEST_TOPOLOGY.md`, the implementation-planner authors `Tests:` fields on implementation steps and the implementer runs scoped test invocations — speeding the inner loop. If the sentinel or systems-architect flags topology readiness (no topology, growth thresholds crossed), surface `/refresh-topology --init` to the user. See `skills/testing-strategy` for the full protocol.
+**Test topology.** With a populated `.ai-state/TEST_TOPOLOGY.md`, the implementation-planner adds `Tests:` fields to steps and the implementer runs scoped test invocations — speeding the inner loop. If the sentinel or systems-architect flags topology readiness (no topology, or growth thresholds crossed), surface `/refresh-topology --init`. Full protocol: `skills/testing-strategy`.
 
 ## The Behavioral Contract
 
-The Methodology defines the flow; the contract defines the stance. Four named behaviors are non-negotiable for every agent that writes, plans, or reviews code:
+The Methodology defines the flow; the contract defines the stance. Four behaviors are non-negotiable for every agent that writes, plans, or reviews code: **Surface Assumptions**, **Register Objection**, **Stay Surgical**, **Simplicity First**. Universal in stance, calibrated in expression — Surface Assumptions and Stay Surgical always hold; at Direct tier, apply Register Objection and Simplicity First with proportionate judgment, not ceremony.
 
-- **Surface Assumptions** — enumerate them before acting, unconditionally
-- **Register Objection** when a request violates scope, structure, or evidence
-- **Stay Surgical** — minimal scope, minimal blast radius
-- **Simplicity First** — the smallest solution that achieves the behavior
-
-The contract is universal in stance but calibrated in expression — Surface Assumptions and Stay Surgical always hold; at Direct tier, apply Register Objection and Simplicity First with proportionate judgment rather than ceremony. The tier table governs calibration; this contract governs stance.
-
-The contract is operationalized by the `agent-behavioral-contract` rule (always loaded) and the behavioral-contract reference in the software-planning skill (progressive disclosure). Verification reports tag contract violations with named failure-mode labels so patterns surface across features. Compliance is not politeness — it is the entry condition for trust.
+Compliance is not politeness — it is the entry condition for trust. Canonical definitions live in the always-loaded `agent-behavioral-contract` rule; the software-planning skill carries the deep dive (progressive disclosure), and verification reports tag violations with named failure-mode labels so patterns surface across features.
 
 ## The Learning Loop
 

@@ -8,18 +8,16 @@ install: hook-deliver
 
 ## Memory Protocol
 
-This protocol applies only when the memory MCP server is available AND the project has not disabled it. Skip all memory operations when either of these is true:
+This protocol applies only when the memory MCP server is available and the project hasn't disabled it. Skip all memory operations — `remember()`, `recall()`, `search()`, `browse_index()`, any memory tool, even if callable — and offer no memory advice, when either holds:
 
-- Memory tools are not present in your context (MCP server not loaded), or
-- A SessionStart/SubagentStart notice indicates `PRAXION_DISABLE_MEMORY_MCP=1` is set for the project — the project has opted out of memory persistence.
+- Memory tools are absent from your context (MCP server not loaded), or
+- A SessionStart/SubagentStart notice sets `PRAXION_DISABLE_MEMORY_MCP=1` — the project has opted out of memory persistence.
 
-When skipping applies, do not call `remember()`, `recall()`, `search()`, `browse_index()`, or any other memory tool, even if the tool is callable. Do not synthesize memory advice in your response either — the project has chosen not to maintain persistent memory.
-
-Memory context is injected automatically at agent start via hook. You do NOT need to call `session_start()` or `recall()` -- the data is already visible in your context as "Memory Context (auto-injected)". Injected context replaces `browse_index` for most use cases -- use `browse_index` only when you need the full index or `include_historical`.
+Memory context is injected at agent start via hook (visible as "Memory Context (auto-injected)"), so don't call `session_start()` or `recall()`. It replaces `browse_index` for most uses — call `browse_index` only for the full index or `include_historical`.
 
 ### When to Remember
 
-You MUST call `remember()` when you discover something that applies beyond the current task. The memory gate hook will block session completion if significant work was done without any `remember()` calls.
+You MUST call `remember()` when you discover something that applies beyond the current task; the memory gate hook blocks session completion if significant work happened with zero `remember()` calls.
 
 Call `remember()` for:
 
@@ -31,7 +29,7 @@ Call `remember()` for:
 - A user correction or preference expressed during the session
 - A debugging insight that took effort to discover
 
-The canonical `remember()` signature lives in `### How to Remember` below; treat each item in the trigger list above as warranting a call.
+The `remember()` signature is in `### How to Remember` below; treat each trigger above as warranting a call.
 
 ### When NOT to Remember
 
@@ -80,4 +78,4 @@ Two memory systems coexist: Claude Code's auto-memory (`~/.claude/.../memory/`) 
 
 ### Before Completing Your Task
 
-You MUST evaluate whether you discovered anything that future agents should know. This is enforced by the memory gate hook -- sessions with significant work and zero `remember()` calls will be blocked from completing. If you genuinely have nothing to persist, that's fine -- the gate will let you through on the second attempt. But the default should be to remember, not to skip.
+Before finishing, evaluate whether you discovered anything future agents should know — the memory gate hook blocks sessions with significant work and zero `remember()` calls. If you genuinely have nothing to persist, the gate lets you through on the second attempt; but the default is to remember, not skip.

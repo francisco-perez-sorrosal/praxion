@@ -1,6 +1,6 @@
 # Praxion
 
-The operational infrastructure for the development philosophy in `~/.claude/CLAUDE.md`. This repo provides the skills, agents, rules, commands, and MCP servers that make the philosophy actionable across projects.
+Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.md` — the skills, agents, rules, commands, and MCP servers that make it actionable across projects.
 
 ## Agent reading order
 
@@ -25,8 +25,6 @@ The operational infrastructure for the development philosophy in `~/.claude/CLAU
 - `scripts/praxion-dashboard start /path/to/project` — launch the read-only dashboard for a target project
 
 ## Frequent operations
-
-What you'll most often be asked to do in this repo:
 
 - **Craft or modify a component** (skill / rule / agent / command / hook) — load the matching `*-crafting` skill first, then run that skill's validator.
 - **Update content shipped into managed projects** — edit `claude/canonical-blocks/<slug>.md`, run `python3 scripts/sync_canonical_blocks.py --write`, mirror the change in `commands/onboard-project.md` + `commands/new-project.md` (the sync-check is in *Build / test / lint* above).
@@ -56,7 +54,7 @@ What you'll most often be asked to do in this repo:
 
 ## Critical conventions
 
-- **Token budget**: always-loaded content (CLAUDE.md files + always-on rules) stays under **25,000 tokens** (~87,500 chars). Adding to it requires `wc -c` measurement. The principle is that every always-loaded token must earn its attention share (applied in >30% of sessions, or unconditionally relevant). Prefer skills with reference files for procedural content; reserve rules for declarative domain knowledge.
+- **Token budget**: always-loaded content (CLAUDE.md files + always-on rules) stays under **25,000 tokens** (~87,500 chars); measure with `wc -c` before adding. Full protocol — attention-share principle, skills-vs-rules placement — in `rules/CLAUDE.md`.
 - **Never modify `~/.claude/plugins/cache/`** — edit source files here; installed copies overwrite on reinstall.
 - **No AI authorship** in commit messages — see `rules/swe/vcs/git-conventions.md`.
 - **Build output to `/dev/null`**, temp files in `tmp/` (gitignored), debug prints prefixed `# DEBUG:` for grep-removal.
@@ -67,7 +65,7 @@ What you'll most often be asked to do in this repo:
 
 ## When NOT to use the full pipeline
 
-Match process weight to task scale. The tier table + fast-path selector — Direct → Lightweight → Standard → Full, plus Spike (per-tier signals and process) — live in `rules/swe/swe-agent-coordination-protocol.md` § Process Calibration (always loaded). Default to the lower tier when uncertain — process can be added; overhead cannot be reclaimed.
+Match process weight to task scale. The tier table + fast-path selector (Direct → Lightweight → Standard → Full, plus Spike) live in `rules/swe/swe-agent-coordination-protocol.md` § Process Calibration (always loaded). Default lower when uncertain — process can be added; overhead cannot be reclaimed.
 
 ## How to verify your work
 
@@ -83,7 +81,7 @@ Match process weight to task scale. The tier table + fast-path selector — Dire
 
 **Worktrees**: `.claude/worktrees/<name>/`. Pipeline worktrees via `EnterWorktree`; scratch via `/create-worktree`. ADRs created in a pipeline land as fragments under `.ai-state/decisions/drafts/` and are promoted to `dec-NNN` at merge-to-main by `scripts/finalize_adrs.py`. PR-adjacent workflow conventions live in `rules/swe/vcs/pr-conventions.md` (path-scoped).
 
-**Onboarding artifacts dogfooding**: Praxion uses its own onboarding tools — Praxion's `.ai-state/`, `.gitattributes`, git hooks, and `CLAUDE.md` blocks are all results of patterns `/onboard-project` applies to user projects. When updating `/onboard-project` or `/new-project`, verify the change still produces what Praxion has on disk (or, if evolving the contract, propose what changes Praxion's own state needs).
+**Onboarding artifacts dogfooding**: Praxion's own `.ai-state/`, `.gitattributes`, git hooks, and `CLAUDE.md` blocks are products of the patterns `/onboard-project` applies to user projects. When updating `/onboard-project` or `/new-project`, verify the change still produces what Praxion has on disk — or, if evolving the contract, propose what Praxion's own state must change.
 
 **Onboarding contract**: Praxion ships **two onboarding paths** converging on the same end state — `.gitignore` block, `.ai-state/` skeleton, `.gitattributes` + merge drivers, git hooks, `.claude/settings.json` toggles, three `CLAUDE.md` blocks (Agent Pipeline + Compaction Guidance + Behavioral Contract), opt-in architecture baseline:
 
@@ -92,7 +90,7 @@ Match process weight to task scale. The tier table + fast-path selector — Dire
 
 Source-of-truth chain for canonical blocks: `commands/onboard-project.md` → `commands/new-project.md` → `new_project.sh`. Changes to canonical blocks must mirror across both commands for byte-identical output.
 
-**Behavioral Contract (applied)**: Praxion enforces the four-behavior contract — Surface Assumptions, Register Objection, Stay Surgical, Simplicity First. Canonical text in `rules/swe/agent-behavioral-contract.md` (always loaded); deep dive in `skills/software-planning/references/behavioral-contract.md`. Operationalized via per-agent self-tests and named failure-mode tags in verification reports.
+**Behavioral Contract (applied)**: Praxion enforces the four behaviors — Surface Assumptions, Register Objection, Stay Surgical, Simplicity First — via per-agent self-tests and named failure-mode tags in verification reports. Canonical text: `rules/swe/agent-behavioral-contract.md` (always loaded); deep dive: `skills/software-planning/references/behavioral-contract.md`.
 
 **Compaction Guidance**: When compacting, always preserve: active pipeline stage and task slug, current WIP step number and status, acceptance criteria from the plan, and the list of modified files. The `PreCompact` hook snapshots pipeline documents to `.ai-work/PIPELINE_STATE.md` — re-read after compaction to restore orientation.
 

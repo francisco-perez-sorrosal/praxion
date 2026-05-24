@@ -12,15 +12,19 @@
 # Public entry points (called from hooks):
 #
 #   finalize_chain_post_merge       — reconcile + state-driven finalize + squash-safety
-#   finalize_chain_post_commit      — state-driven finalize (gated on main + drafts)
+#   finalize_chain_post_commit      — state-driven finalize on main (ADR promotion sub-gated on drafts)
 #   finalize_chain_post_checkout    — state-driven finalize on branch switch to main
 #
 # Design rules:
 #
-#   - State-triggered, not event-triggered. Gate on "are we on main with drafts?"
-#     so that any path landing drafts on main (ff merge, direct commit, rebase,
-#     squash, fresh clone, branch reset) eventually triggers finalize. Rationale:
-#     the original `--merged` event-detection silently skipped non-merge paths.
+#   - State-triggered, not event-triggered. Each finalizer gates on its OWN
+#     state: ADR-draft promotion fires when drafts are present on main; tech-debt
+#     ledger reconciliation fires on any on-main commit (byte-equivalent no-op
+#     when idle). So any path landing work on main (ff merge, direct commit,
+#     rebase, squash, fresh clone, branch reset) eventually triggers the
+#     relevant finalizer. Rationale: the original `--merged` event-detection
+#     silently skipped non-merge paths, and bundling tech-debt finalize behind
+#     the drafts gate stranded resolutions committed without a concurrent ADR draft.
 #
 #   - Non-blocking. A failed step warns; a missing script is skipped. Hooks
 #     cannot abort an already-completed git operation, so the exit code is
@@ -100,35 +104,44 @@ _finalize_chain_run_script() {
         echo "${label}: warned (non-blocking) — inspect output above"
 }
 
-# Run the on-main finalize subset: ADR drafts + tech-debt ledger.
-# Caller has already gated on (on_main && drafts_present). Idempotent — both
-# scripts no-op when nothing to do.
-_finalize_chain_run_finalize_subset() {
-    _finalize_chain_run_script "finalize_adrs" \
-        "${FINALIZE_CHAIN_DIR}/finalize_adrs.py" --all
+# Run the on-main finalize steps. Caller has already gated on `on_main`; each
+# finalizer is then gated on its OWN input rather than a shared condition:
+#   - ADR-draft promotion runs only when draft fragments are present.
+#   - Tech-debt ledger reconciliation runs unconditionally. Its work (migrating
+#     terminal rows to RESOLVED, re-opening on cross-file dedup_key matches) is
+#     independent of ADR drafts, and the script is a byte-equivalent no-op that
+#     skips the write entirely when there is nothing to migrate — so running it
+#     on every on-main commit costs one cheap read and never churns the tree.
+#     Bundling it behind drafts_present (the prior behavior) stranded tech-debt
+#     resolutions committed without a concurrent ADR draft.
+_finalize_chain_run_on_main() {
+    local repo_root="$1"
+    if _finalize_chain_drafts_present "$repo_root"; then
+        _finalize_chain_run_script "finalize_adrs" \
+            "${FINALIZE_CHAIN_DIR}/finalize_adrs.py" --all
+    fi
     _finalize_chain_run_script "finalize_tech_debt_ledger" \
         "${FINALIZE_CHAIN_DIR}/finalize_tech_debt_ledger.py" --all
 }
 
 # -- Public entry points ------------------------------------------------------
 
-# State-driven finalize: promote drafts when on main with drafts present.
-# Shared body for post-commit and post-checkout entry points. Inlined into
-# both for clarity (the entry name is part of the hook's contract).
+# State-driven finalize on main. Shared body for post-commit and post-checkout
+# entry points. Inlined into both for clarity (the entry name is part of the
+# hook's contract).
 _finalize_chain_state_driven() {
     local repo_root
     repo_root="$(_finalize_chain_repo_root)"
     [ -n "$repo_root" ] || return 0
-    if _finalize_chain_on_main && _finalize_chain_drafts_present "$repo_root"; then
-        _finalize_chain_run_finalize_subset
-    fi
+    _finalize_chain_on_main || return 0
+    _finalize_chain_run_on_main "$repo_root"
 }
 
 # Post-merge entry point.
 #
 # Sequence (load-bearing):
 #   1. reconcile_ai_state.py --post-merge      — only if .ai-state/ was touched
-#   2. finalize subset (ADR + ledger)           — only on main with drafts
+#   2. finalize on main (ADR if drafts; ledger always) — only on main
 #   3. check_squash_safety.py                   — diagnostic, always runs
 #
 # Rationale: reconcile settles orthogonal file conflicts first; finalize
@@ -144,8 +157,8 @@ finalize_chain_post_merge() {
             "${FINALIZE_CHAIN_DIR}/reconcile_ai_state.py" --post-merge
     fi
 
-    if _finalize_chain_on_main && _finalize_chain_drafts_present "$repo_root"; then
-        _finalize_chain_run_finalize_subset
+    if _finalize_chain_on_main; then
+        _finalize_chain_run_on_main "$repo_root"
     fi
 
     _finalize_chain_run_script "post-merge: check_squash_safety" \

@@ -1,6 +1,7 @@
 {
   "claudeMdExcludes": [
     "**/.claude/rules/ml/eval-driven-verification.md",
+    "**/.claude/rules/ml/experiment-commit-conventions.md",
     "**/.claude/rules/ml/experiment-tracking-conventions.md",
     "**/.claude/rules/ml/gpu-budget-conventions.md",
     "**/.claude/rules/swe/memory-protocol.md"

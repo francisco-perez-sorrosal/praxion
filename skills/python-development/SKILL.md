@@ -1,6 +1,12 @@
 ---
 name: python-development
-description: Modern Python development conventions covering type hints, testing with pytest, code quality tools (ruff, mypy, pyright), data modeling (dataclasses, Pydantic), async patterns, and error handling. Use when writing Python code, implementing tests, configuring linting or formatting, choosing between dataclasses and Pydantic, working with structural pattern matching, or setting up pytest fixtures and parametrize. Also activates for Python coding tasks, Python testing questions, ruff formatting or linting issues, mypy type checking, and pytest configuration work.
+description: >
+  Python development conventions: type hints, pytest, code quality tools (ruff,
+  mypy, pyright), data modeling (dataclasses, Pydantic), async patterns, error
+  handling, structural pattern matching. Triggers: writing Python code, implementing
+  tests, configuring linting/formatting, choosing between dataclasses and Pydantic,
+  pytest fixtures and parametrize, ruff formatting/linting, mypy type checking,
+  pytest configuration.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

@@ -1,14 +1,13 @@
 ---
 name: experiment-tracking
 description: >
-  ML experiment lineage tracking — NOT app observability (different domain; use
-  observability for RED/OTel/Prometheus/Grafana). Covers the experiment log
-  artifact type: per-run hyperparameters, metrics (val_bpb, loss curves),
-  artifact URIs, run-to-run comparison. Tools: MLflow, W&B / Weights & Biases,
-  Aim. Use when setting up experiment tracking, connecting a training loop to
-  MLflow or W&B, mapping run IDs to TRAINING_RESULTS.md, or when the user
-  mentions run lineage / hyperparameter logging / metric curves / mlruns /
-  wandb.init / mlflow.start_run / program.md tracker declaration / experiment
+  ML experiment lineage tracking — NOT app observability (use observability for
+  RED/OTel/Prometheus/Grafana). Covers the experiment log artifact: per-run
+  hyperparameters, metrics (val_bpb, loss curves), artifact URIs, run-to-run
+  comparison. Tools: MLflow, W&B / Weights & Biases, Aim. Triggers: setting up
+  experiment tracking, connecting a training loop to MLflow or W&B, mapping run
+  IDs to TRAINING_RESULTS.md; run lineage, hyperparameter logging, metric curves,
+  mlruns, wandb.init, mlflow.start_run, program.md tracker declaration, experiment
   log. Activate alongside ml-training and llm-training-eval.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code

@@ -1,13 +1,14 @@
 ---
 name: llm-prompt-engineering
-description: Prompt engineering for LLMs -- few-shot patterns, chain-of-thought, reasoning-effort
-  control, structured output via Pydantic/Zod, prompt versioning, and prompt testing
-  (single-prompt regression assertions). Use when designing prompts for production
-  LLM calls, writing system prompts, debugging output-quality issues, migrating across
-  model versions, picking a prompt-management platform, or establishing prompt regression
-  tests. Framework-agnostic; defers to claude-ecosystem for Claude-specific API features,
-  agentic-sdks for agent-loop plumbing, agent-evals for deeper eval design, and external-api-docs
-  for current SDK signatures.
+description: >
+  Prompt engineering for LLMs: few-shot patterns, chain-of-thought, reasoning-effort
+  control, structured output via Pydantic/Zod, prompt versioning, prompt testing
+  (single-prompt regression assertions). Framework-agnostic. Triggers: designing
+  prompts for production LLM calls, writing system prompts, debugging output-quality
+  issues, migrating across model versions, picking a prompt-management platform,
+  establishing prompt regression tests. Defers to claude-ecosystem for Claude-specific
+  features, agentic-sdks for agent-loop plumbing, agent-evals for eval design,
+  external-api-docs for current SDK signatures.
 compatibility: Claude Code
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 staleness_sensitive_sections:

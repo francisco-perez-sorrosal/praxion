@@ -1,11 +1,12 @@
 ---
 name: versioning
-description: Version bumping, changelog generation, release automation, and tool
-  detection for multi-file projects. Covers SemVer strategy, tool-agnostic detection
-  logic, flag mapping for common versioning tools, and breaking change guidelines
-  for textual/config ecosystems. Use when bumping versions, generating changelogs,
-  configuring release automation, choosing a versioning tool, or defining what
-  constitutes a breaking change in a non-library project.
+description: >
+  Version bumping, changelog generation, release automation, and tool detection
+  for multi-file projects: SemVer strategy, tool-agnostic detection logic, flag
+  mapping for common versioning tools, breaking change guidelines for
+  textual/config ecosystems. Triggers: bumping versions, generating changelogs,
+  configuring release automation, choosing a versioning tool, defining breaking
+  changes in a non-library project.
 allowed-tools: [Read, Bash, Grep, Glob]
 compatibility: Claude Code
 ---

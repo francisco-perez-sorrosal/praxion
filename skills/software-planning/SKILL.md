@@ -1,6 +1,11 @@
 ---
 name: software-planning
-description: Planning complex software tasks using a three-document model (IMPLEMENTATION_PLAN.md, WIP.md, LEARNINGS.md) for tracking work in small, known-good increments. Use when starting significant development work, breaking down complex features, doing architecture planning, managing multi-session projects, or when the user mentions feature breakdown, work planning, work breakdown, task tracking, WIP management, or incremental development.
+description: >
+  Planning complex software tasks via a three-document model (IMPLEMENTATION_PLAN.md,
+  WIP.md, LEARNINGS.md) in small, known-good increments. Triggers: starting
+  significant development, breaking down complex features, architecture planning,
+  multi-session projects, feature breakdown, work planning, task tracking, WIP
+  management, incremental development.
 compatibility: Claude Code
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 ---

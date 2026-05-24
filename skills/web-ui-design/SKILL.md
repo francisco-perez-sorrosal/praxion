@@ -1,14 +1,15 @@
 ---
 name: web-ui-design
 description: >
-  Web UI and visual interface design craft for React, Next.js, and component-based UIs.
-  Covers visual hierarchy (Laws of UX), the design canon (Rams/Norman/Nielsen/Tufte/
-  Refactoring UI/Linear/Stripe/Vercel), design tokens and the 4px/8px grid, typography,
-  WCAG 2.2 AA accessibility, component taste, motion timing, perceived performance
-  (RAIL), and the Radix/shadcn accessible-primitives pattern. Use when designing or
-  reviewing web UI, design systems, tokens, component ergonomics, UI framework
-  selection, or auditing React/Next.js for quality and accessibility. Do NOT use for
-  CLI/terminal (tui-design) or API/tools (api-design-craft, agentic-interface-design).
+  Web UI design craft for React, Next.js, and component-based UIs. Visual
+  hierarchy (Laws of UX),
+  design canon (Rams/Norman/Nielsen/Tufte/Refactoring UI/Linear/Stripe/Vercel),
+  design tokens, 4px/8px grid, typography, WCAG 2.2 AA accessibility, component
+  taste, motion timing, RAIL perceived performance, Radix/shadcn
+  accessible-primitives. Triggers: designing/reviewing web UI, design systems,
+  tokens, component ergonomics, UI framework selection, auditing React/Next.js
+  quality and accessibility. Not for CLI/terminal (tui-design) or API/tools
+  (api-design-craft, agentic-interface-design).
 staleness_sensitive_sections:
   - "WCAG 2.2 AA — The Numbers"
   - "RAIL Model"

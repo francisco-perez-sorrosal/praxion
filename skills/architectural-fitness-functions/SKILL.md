@@ -1,12 +1,11 @@
 ---
 name: architectural-fitness-functions
 description: >
-  Architectural fitness functions: codifying ArchUnit-style invariants with
-  import-graph tooling and per-language assertion-based tests. Covers the decision
-  rubric (when to use which), the citation contract (every rule cites an ADR or
-  CLAUDE.md principle), and the waiver pattern. Use when authoring fitness rules,
-  deciding between graph-rule and assertion-based invariants, or authoring a fitness
-  waiver. Language modules available for Python and TypeScript.
+  Architectural fitness functions: ArchUnit-style invariants via import-graph
+  tooling and assertion-based tests, decision rubric (graph-rule vs assertion),
+  citation contract (ADR/CLAUDE.md), waiver pattern. Triggers: authoring fitness
+  rules, deciding between graph-rule and assertion-based invariants, authoring a
+  fitness waiver. Language modules: Python, TypeScript.
 allowed-tools: [Read, Grep, Bash, Write, Edit]
 compatibility: Claude Code
 ---

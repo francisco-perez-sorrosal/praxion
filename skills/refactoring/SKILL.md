@@ -1,6 +1,11 @@
 ---
 name: refactoring
-description: Pragmatic refactoring practices emphasizing modularity, low coupling, high cohesion, and incremental improvement. Use when restructuring code, improving design, reducing coupling, organizing codebases, extracting modules, eliminating code smells, discussing refactoring patterns and code organization, cleaning up code, addressing technical debt, splitting modules, or simplifying complex code.
+description: >
+  Pragmatic refactoring: modularity, low coupling, high cohesion, incremental
+  improvement. Triggers: restructuring code, improving design, reducing
+  coupling, organizing codebases, extracting modules, eliminating code smells,
+  refactoring patterns/code organization, cleaning up code, addressing
+  technical debt, splitting modules, simplifying complex code.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

@@ -1,15 +1,13 @@
 ---
 name: project-exploration
 description: >
-  Systematic methodology for understanding unfamiliar software projects.
-  Covers project characterization (language, framework, architecture pattern
-  detection), codebase structure analysis, dependency mapping, development
-  workflow discovery, and layered output from executive summary to deep dives.
-  Use when joining a new project, exploring an unfamiliar codebase, needing a
-  project overview, wanting to understand a project's architecture, or
-  performing initial codebase orientation. Also activates for project
-  understanding, codebase walkthrough, code exploration, project analysis,
-  and developer onboarding to a codebase.
+  Systematic methodology for understanding unfamiliar software projects: project
+  characterization (language, framework, architecture pattern detection), codebase
+  structure analysis, dependency mapping, development workflow discovery, layered
+  output from executive summary to deep dives. Triggers: joining a new project,
+  exploring an unfamiliar codebase, project overview, architecture understanding,
+  codebase orientation, codebase walkthrough, code exploration, project analysis,
+  developer onboarding.
 allowed-tools: [Read, Glob, Grep, Bash(git:*), Bash(wc:*), Bash(find:*)]
 compatibility: Claude Code
 ---

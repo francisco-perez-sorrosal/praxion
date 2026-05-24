@@ -1,13 +1,13 @@
 ---
 name: communicating-agents
-description: Agent-to-agent communication protocols for multi-agent interoperability.
-  Covers A2A (Agent2Agent) protocol -- Agent Cards, task-based messaging, discovery,
-  streaming, push notifications, and SDK implementation in Python and TypeScript.
-  Use when building multi-agent systems that communicate across frameworks or
-  organizations, exposing agents via A2A endpoints, implementing agent discovery,
-  or integrating A2A with AI frameworks (ADK, LangGraph, CrewAI, Pydantic AI).
-  Trigger terms -- A2A, agent-to-agent, Agent Card, agent discovery, multi-agent
-  communication, agent interoperability, cross-agent protocol.
+description: >
+  Agent-to-agent communication protocols for multi-agent interoperability: A2A
+  (Agent2Agent) protocol — Agent Cards, task-based messaging, discovery, streaming,
+  push notifications, SDK implementation in Python and TypeScript, integration with
+  ADK, LangGraph, CrewAI, Pydantic AI. Triggers: building multi-agent systems across
+  frameworks or organizations, exposing agents via A2A endpoints, implementing agent
+  discovery; A2A, agent-to-agent, Agent Card, multi-agent communication, agent
+  interoperability, cross-agent protocol.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

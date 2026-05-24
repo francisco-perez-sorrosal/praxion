@@ -1,18 +1,14 @@
 ---
 name: roadmap-synthesis
-description: >-
-  Runs an ultra-in-depth project analysis that produces a ROADMAP.md from a
-  full-project audit through a project-derived evaluation lens set. Triggers
-  on "ultra-in-depth project analysis", "spring cleaning roadmap", "project
-  state of the union", "lens-based audit", "strengths, weaknesses,
-  deprecations roadmap", "agentic-era project evaluation", "AGENTS.md-aware
-  audit", and "SDLC health audit". Covers paradigm detection (deterministic /
-  agentic / hybrid), lens-set derivation (SPIRIT, DORA, SPACE, FAIR, CNCF
-  Platform Maturity, Custom), parallel audit fan-out, lens synthesis,
-  multi-angle reframing, and grounded claim generation. Use when producing a
-  ROADMAP.md from a full-project audit rather than ordering an existing
-  backlog — contrast with `roadmap-planning` which prioritizes an existing
-  idea set.
+description: >
+  Produces ROADMAP.md from a full-project audit via a project-derived lens set.
+  Covers paradigm detection (deterministic/agentic/hybrid), lens-set derivation
+  (SPIRIT, DORA, SPACE, FAIR, CNCF Platform Maturity, Custom), parallel audit
+  fan-out, lens synthesis, multi-angle reframing, grounded claim generation.
+  Triggers: ultra-in-depth project analysis, spring cleaning roadmap, project
+  state of the union, lens-based audit, strengths/weaknesses/deprecations
+  roadmap, agentic-era project evaluation, AGENTS.md-aware audit, SDLC health
+  audit. Contrast with `roadmap-planning` (prioritizes existing backlog).
 compatibility: Claude Code
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 ---

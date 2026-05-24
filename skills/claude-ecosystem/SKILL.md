@@ -1,12 +1,12 @@
 ---
 name: claude-ecosystem
-description: Anthropic Claude platform knowledge -- Claude API features, Anthropic SDK
-  usage patterns, model selection guidance, extended thinking, batch processing, prompt
-  caching, structured outputs, token counting, Files API, and ecosystem navigation.
-  Use when building applications with the Claude Messages API, choosing between Claude
-  models (which model to use), integrating Anthropic client SDKs (Python or TypeScript),
-  SDK selection, choosing between Agent SDK and Messages API, Claude API integration,
-  or navigating Anthropic documentation.
+description: >
+  Anthropic Claude platform: API features, SDK usage (Python/TypeScript),
+  model selection, extended thinking, batch processing, prompt caching,
+  structured outputs, token counting, Files API, ecosystem navigation. Triggers:
+  building with the Claude Messages API, choosing Claude models, integrating
+  Anthropic SDKs, choosing between Agent SDK and Messages API, Claude API
+  integration, navigating Anthropic documentation.
 allowed-tools: [Read, Glob, Grep]
 compatibility: Claude Code
 staleness_sensitive_sections:

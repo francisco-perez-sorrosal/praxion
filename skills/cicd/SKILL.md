@@ -1,12 +1,13 @@
 ---
 name: cicd
-description: CI/CD pipeline design and GitHub Actions workflow authoring. Covers pipeline
-  architecture, testing stages, deployment strategies, caching, secrets management,
-  security hardening, and performance optimization. Use when creating CI/CD pipelines,
-  writing GitHub Actions workflows, configuring automated testing, setting up deployment
-  automation, debugging workflow failures, optimizing pipeline performance, reviewing
-  CI/CD configuration for security and correctness, designing a deployment pipeline,
-  setting up a CI pipeline, or implementing build automation.
+description: >
+  CI/CD pipeline design and GitHub Actions workflow authoring: pipeline
+  architecture, testing stages, deployment strategies, caching, secrets
+  management, security hardening, performance optimization. Triggers: creating
+  CI/CD pipelines, writing GitHub Actions workflows, configuring automated
+  testing, setting up deployment automation, debugging workflow failures,
+  optimizing pipeline performance, reviewing CI/CD config, designing deployment
+  pipelines, implementing build automation.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

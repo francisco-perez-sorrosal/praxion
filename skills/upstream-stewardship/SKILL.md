@@ -1,14 +1,12 @@
 ---
 name: upstream-stewardship
 description: >
-  Methodology for responsibly reporting bugs and contributing fixes to
-  upstream open-source projects. Covers issue deduplication, sensitive
-  information sanitization, template compliance, contribution etiquette,
-  and responsible disclosure. Use when filing an upstream issue, reviewing
-  a bug report draft for an external project, discovering a potential
-  upstream bug during development, or contributing a fix to an open-source
-  dependency. Also activates for filing issues on dependencies, reporting
-  third-party bugs, and OSS contribution workflow.
+  Responsible upstream OSS contribution: issue deduplication, sensitive information
+  sanitization, template compliance, contribution etiquette, responsible disclosure.
+  Triggers: filing an upstream issue, reviewing a bug report draft for an external
+  project, discovering an upstream bug during development, contributing a fix to an
+  open-source dependency; filing issues on dependencies, reporting third-party bugs,
+  OSS contribution workflow.
 allowed-tools: [Read, Grep, Glob]
 compatibility: Claude Code
 ---

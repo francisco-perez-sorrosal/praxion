@@ -1,15 +1,13 @@
 ---
 name: deployment
 description: >
-  Application deployment: local Docker Compose, PaaS, cloud containers,
-  Kubernetes, AI-native GPU platforms. Covers deployment primitives, Docker
-  Compose patterns (watch mode, profiles, GPU passthrough, health checks),
-  dev-to-production spectrum, reverse proxy, secrets, AI/ML model serving.
-  Use when deploying an app, writing compose.yaml or Dockerfile, setting up
-  a production server, choosing a hosting platform, configuring Caddy or
-  nginx, deploying AI models with Ollama or vLLM, GPU passthrough, managing
-  secrets, choosing PaaS (Render, Railway, Fly.io, Vercel), deploying to
-  Cloud Run, ECS, Modal, CoreWeave, or writing systemd units for Compose.
+  Application deployment: Docker Compose (watch mode, profiles, GPU passthrough,
+  health checks), PaaS, cloud containers, Kubernetes, AI-native GPU platforms,
+  reverse proxy, secrets management, AI/ML model serving. Triggers: deploying an
+  app, writing compose.yaml or Dockerfile, choosing a hosting platform, configuring
+  Caddy/nginx, deploying Ollama/vLLM, GPU passthrough, choosing Render/Railway/Fly.io/
+  Vercel, deploying to Cloud Run/ECS/Modal/CoreWeave, writing systemd units for
+  Compose. Siblings: cicd-engineer (pipeline automation), observability (monitoring).
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

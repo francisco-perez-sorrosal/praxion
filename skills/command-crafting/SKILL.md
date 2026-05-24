@@ -1,6 +1,11 @@
 ---
 name: command-crafting
-description: Creating and managing slash commands (also called Claude Code commands or /commands) -- reusable user-invoked prompts with arguments, tool permissions, and dynamic context. Use when creating custom slash commands, debugging command behavior, fixing argument substitution, converting prompts to reusable commands, or organizing commands with namespacing.
+description: >
+  Creating and managing slash commands (/commands, Claude Code commands): reusable
+  user-invoked prompts with arguments, tool permissions, dynamic context (!, @,
+  argument-hint). Triggers: creating custom slash commands, debugging command
+  behavior, fixing argument substitution, converting prompts to commands,
+  organizing commands with namespacing.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

@@ -1,6 +1,10 @@
 ---
 name: adapt-claude-to-agents
-description: Generate or refresh a project-local `AGENTS.md.tmpl` for Praxion Codex onboarding from a project's root `CLAUDE.md`. Use when `install.sh codex <project>` needs a Codex source template, when removing Claude-only operational details while preserving portable project guidance, or when refreshing a previously generated Codex project template.
+description: >
+  Generate or refresh a project-local AGENTS.md.tmpl for Praxion Codex onboarding
+  from a project's root CLAUDE.md: removes Claude-only operational details, preserves
+  portable project guidance. Triggers: install.sh codex needs a Codex
+  source template, refreshing a previously generated Codex project template.
 compatibility: Codex, Claude Code, Cursor, and installer-driven CLI workflows.
 ---
 

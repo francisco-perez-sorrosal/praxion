@@ -1,11 +1,11 @@
 ---
 name: likec4-querying
 description: >
-  Decision rubric and recipes for querying LikeC4 architecture models — when
-  agents should use the `likec4` MCP tools versus reading `.c4` files directly.
-  Path-scoped to architecture-authoring surfaces. Use when authoring or
-  modifying ARCHITECTURE.md, .c4 files, diagram sources, or when exploring
-  the system's LikeC4 model for design decisions.
+  Decision rubric and recipes for querying LikeC4 architecture models: `likec4`
+  MCP tools vs. reading `.c4` files directly. Path-scoped to
+  architecture-authoring surfaces. Triggers: authoring/modifying
+  ARCHITECTURE.md, .c4 files, diagram sources, exploring LikeC4 model for
+  design decisions.
 paths: ["**/*.c4", "**/ARCHITECTURE.md", "docs/architecture.md", "docs/diagrams/**"]
 allowed-tools: [Read, Glob, Grep, Bash]
 compatibility: Claude Code

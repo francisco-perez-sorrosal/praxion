@@ -1,12 +1,12 @@
 ---
 name: api-design
-description: API design methodology covering REST, GraphQL, OpenAPI specifications,
-  data contracts, and interface contracts. Covers API-first/design-first development,
-  resource modeling, endpoint naming, HTTP semantics, OpenAPI 3.1 schema patterns,
-  GraphQL schema design, API versioning strategies, schema evolution, contract testing
-  concepts, consumer-driven contracts, and service boundary definition. Use when designing
-  APIs, writing OpenAPI specs, choosing between REST and GraphQL, defining data contracts,
-  planning API versioning, designing interface contracts, or reviewing API surface design.
+description: >
+  API design methodology: API-first/design-first development, resource modeling,
+  endpoint naming, HTTP semantics, OpenAPI 3.1 schema patterns, GraphQL schema
+  design, API versioning strategies, schema evolution, contract testing concepts,
+  consumer-driven contracts, service boundary definition, REST vs GraphQL. Triggers:
+  designing APIs, writing OpenAPI specs, defining data contracts, planning API
+  versioning, designing interface contracts, reviewing API surface design.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

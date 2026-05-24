@@ -1,6 +1,14 @@
 ---
 name: mcp-crafting
-description: Building MCP (Model Context Protocol) servers using official SDKs. Covers protocol concepts (tools, resources, prompts), transports (stdio, streamable HTTP), bundles (.mcpb), testing with MCP Inspector, client integration with Claude Desktop and Claude Code, logging, error handling, and security principles. Language modules available for Python (with FastMCP) and TypeScript (with @modelcontextprotocol/sdk). Use when creating MCP servers, defining MCP tools or MCP resources, configuring transports, packaging bundles, testing MCP servers, or integrating with Claude. Also relevant for MCP tool definition, MCP resource exposure, and FastMCP server patterns.
+description: >
+  Building MCP (Model Context Protocol) servers with official SDKs: protocol
+  concepts (tools, resources, prompts), transports (stdio, streamable HTTP),
+  bundles (.mcpb), MCP Inspector testing, client integration with Claude Desktop
+  and Claude Code, logging, error handling, security. Language modules for
+  Python (FastMCP) and TypeScript (@modelcontextprotocol/sdk). Triggers:
+  creating MCP servers, defining MCP tools/resources, configuring transports,
+  packaging bundles, testing servers, integrating with Claude; MCP tool
+  definition, MCP resource exposure, FastMCP server patterns.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

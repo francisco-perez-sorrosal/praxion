@@ -1,15 +1,14 @@
 ---
 name: tui-design
 description: >
-  CLI/TUI design craft. Covers the clig.dev CLI contract, output discipline
-  (data→stdout, messages→stderr, NO_COLOR, --json), help-text levels, three-part error
-  messages (what/why/fix), TTY detection, exit codes, TUI frameworks (Python
-  textual+rich, Node Ink, Go Charm/Bubble Tea+Lip Gloss), TUI render discipline
-  (diff-before-render, DECSET 2026 synchronized output, stream-as-it-arrives), and
-  terminal accessibility. Use when designing or reviewing CLI tools, agent/tool
-  terminal output, TUIs, help text, error messages, exit codes, or choosing a TUI
-  framework. Do NOT use for web UI (web-ui-design) or API/agent-tool design
-  (api-design-craft, agentic-interface-design).
+  CLI/TUI design craft: clig.dev contract, output discipline (data→stdout,
+  messages→stderr, NO_COLOR, --json), help-text levels, three-part error messages
+  (what/why/fix), TTY detection, exit codes, TUI frameworks (Python textual+rich,
+  Node Ink, Go Charm/Bubble Tea+Lip Gloss), render discipline (diff-before-render,
+  DECSET 2026, stream-as-it-arrives), terminal accessibility. Triggers: designing/
+  reviewing CLI tools, agent terminal output, TUIs, help text, error messages, exit
+  codes, choosing a TUI framework. Not for web UI (web-ui-design) or agent-tool
+  design (api-design-craft, agentic-interface-design).
 staleness_sensitive_sections:
   - "Framework Selection Decision"
   - "The clig.dev Principles (Full Distillation)"

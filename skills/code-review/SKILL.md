@@ -1,11 +1,10 @@
 ---
 name: code-review
 description: >
-  Structured code review methodology with finding classification (PASS/FAIL/WARN),
-  language adaptation, and report templates. Use when reviewing code for convention
-  compliance, conducting post-implementation verification, reviewing pull requests,
-  or performing ad-hoc code quality assessments. Also activates for PR review,
-  code audit, and code quality checks.
+  Structured code review methodology: finding classification (PASS/FAIL/WARN),
+  language adaptation, report templates. Triggers: reviewing code for convention
+  compliance, post-implementation verification, pull request review, PR review,
+  code audit, code quality checks.
 allowed-tools: [Read, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

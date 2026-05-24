@@ -2,12 +2,12 @@
 name: testing-strategy
 description: >
   Language-independent testing knowledge: test strategy selection, test pyramid,
-  mocking philosophy, fixture and test data patterns, test isolation, coverage
-  approach, property-based testing, and naming conventions. Use when deciding
-  test strategy, choosing between unit and integration and e2e tests, designing
-  mocking boundaries, architecting fixtures, evaluating test coverage philosophy,
-  or assessing property-based testing applicability. Also activates for test
-  architecture, testing methodology, test pyramid, and test isolation questions.
+  mocking philosophy, fixture/test-data patterns, test isolation, coverage
+  approach, property-based testing, naming conventions. Triggers: deciding test
+  strategy, choosing unit/integration/e2e tests, designing mocking boundaries,
+  architecting fixtures, evaluating coverage philosophy, assessing
+  property-based testing; test architecture, testing methodology, test
+  isolation.
 allowed-tools: [Read, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

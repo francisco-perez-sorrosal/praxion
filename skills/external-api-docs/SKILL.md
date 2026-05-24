@@ -1,13 +1,13 @@
 ---
 name: external-api-docs
-description: Retrieving current, curated API documentation for external libraries and
-  SDKs during development. Covers search strategies, token-aware fetching, annotation
-  persistence, and provider fallback hierarchy. Use when writing code against an external
-  API (Stripe, OpenAI, Anthropic Claude API, AWS, FastAPI, Supabase, etc.), debugging
-  an integration issue, evaluating an SDK's capabilities, looking up current endpoint
-  signatures or parameters, or when the agent may hallucinate API details due to training
-  data staleness. Also activates for external API reference, SDK documentation, library
-  docs lookup, current API signatures, and integration reference.
+description: >
+  Retrieving current API documentation for external libraries and SDKs: search
+  strategies, token-aware fetching (chub_search, chub_get, chub_annotate,
+  chub_feedback), annotation persistence, provider fallback. Triggers: writing
+  code against Stripe/OpenAI/Anthropic/AWS/FastAPI/Supabase or any external API,
+  debugging an integration, evaluating SDK capabilities, looking up endpoint
+  signatures/parameters, guarding against training-data staleness; external API
+  reference, SDK docs lookup, current API signatures, integration reference.
 allowed-tools: [Read, Bash, Glob, Grep]
 compatibility: Claude Code, Cursor
 metadata:

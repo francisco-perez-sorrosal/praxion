@@ -1,6 +1,10 @@
 ---
 name: agent-crafting
-description: Creating and configuring agents (subagents) with effective prompts, tool permissions, and lifecycle hooks. Use when building custom agents, designing agent workflows, spawning subagents, delegating tasks via the Task tool, defining subagent_type, or using the /agents command.
+description: >
+  Creating and configuring agents (subagents): system prompts, tool permissions,
+  lifecycle hooks, model selection. Triggers: building custom agents, designing
+  agent workflows, spawning subagents, delegating via Task tool, defining
+  subagent_type, /agents command.
 compatibility: Claude Code
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 ---

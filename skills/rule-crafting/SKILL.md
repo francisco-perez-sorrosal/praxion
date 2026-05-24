@@ -1,12 +1,12 @@
 ---
 name: rule-crafting
-description: Creating and managing rules -- contextual domain knowledge
-  files loaded automatically based on relevance. Covers rule structure, path-specific
-  rules, naming for relevance matching, content guidelines, and the rules-vs-skills-vs-CLAUDE.md
-  decision model. Use when creating new rules, updating existing rules, debugging
-  rule loading, organizing rule files, or deciding whether something belongs in a
-  rule vs skill vs CLAUDE.md. Also covers Claude Code rule authoring, auto-loaded
-  rule mechanics, and rule debugging techniques.
+description: >
+  Creating and managing contextual domain knowledge rules (auto-loaded by
+  relevance): rule structure, path-specific rules (paths: frontmatter), naming
+  for relevance matching, content guidelines, rules-vs-skills-vs-CLAUDE.md
+  decision model, Claude Code rule mechanics, rule debugging. Triggers: creating/
+  updating rules, debugging rule loading, organizing rule files, deciding rule vs
+  skill vs CLAUDE.md placement.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

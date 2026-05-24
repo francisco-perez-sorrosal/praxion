@@ -1,6 +1,11 @@
 ---
 name: memory
-description: Persistent memory system for tracking user preferences, assistant learnings, project conventions, and relationship dynamics across sessions. Use when remembering user preferences, storing project decisions, recalling past interactions, managing assistant self-knowledge, or when starting a new session to load context about the user. Provides persistent context and cross-session memory so knowledge survives between conversations.
+description: >
+  MCP-backed persistent memory across sessions: user preferences, assistant
+  learnings, project conventions, relationship dynamics. Triggers: remembering
+  user preferences, storing project decisions, recalling past interactions,
+  managing assistant self-knowledge, loading context at session start;
+  cross-session memory, persistent context.
 compatibility: Claude Code
 ---
 

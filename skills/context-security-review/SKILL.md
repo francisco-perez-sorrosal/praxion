@@ -1,12 +1,11 @@
 ---
 name: context-security-review
 description: >
-  Security review methodology for Claude Code plugin ecosystems. Covers
-  context artifact injection, hook compromise, dependency supply chain,
-  script injection, secrets exposure, and GitHub Actions security. Use
-  when reviewing PRs for security issues, conducting security audits,
-  verifying agent permissions, reviewing hook scripts, checking for
-  secrets in code, or performing security assessment of context artifacts
+  Security review methodology for Claude Code plugin ecosystems: context
+  artifact injection, hook compromise, dependency supply chain, script
+  injection, secrets exposure, GitHub Actions security. Triggers: reviewing
+  PRs for security, conducting security audits, verifying agent permissions,
+  reviewing hook scripts, checking for secrets, assessing context artifacts
   (CLAUDE.md, skills, agents, rules, commands, hooks).
 allowed-tools: [Read, Glob, Grep, Bash]
 compatibility: Claude Code

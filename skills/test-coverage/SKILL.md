@@ -1,15 +1,12 @@
 ---
 name: test-coverage
 description: >
-  Locating, invoking, and rendering a project's test coverage consistently
-  across terminals, Markdown reports, and verifier fragments. Dispatches to
-  the project's own coverage tooling (pytest-cov, vitest, etc.) via a
-  convention-based probe order — never installs tooling, never mutates project
-  config. Activates when reporting coverage percentages, running a project's
-  canonical coverage target, rendering coverage tables, comparing coverage
-  against a prior run, or wiring coverage into commands, agents, or metrics
-  pipelines. Language references ship per language; Python and TypeScript are
-  available.
+  Dispatcher/renderer for test coverage: locate, invoke, and render coverage
+  via the project's own tooling (pytest-cov, vitest, etc.) — never installs
+  tooling or mutates config. Triggers: reporting coverage percentages, running
+  canonical coverage targets, rendering coverage tables, comparing against a
+  prior run, wiring coverage into commands/agents/metrics pipelines.
+  Per-language references for Python and TypeScript.
 allowed-tools: [Read, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

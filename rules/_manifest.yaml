@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-05-24T01:47:33Z'
+generated_at: '2026-05-24T01:50:58Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
@@ -52,7 +52,7 @@ rules:
   load: always_on
   core: false
   install: hook-deliver
-  chars: 3575
+  chars: 2688
 - id: ml/eval-driven-verification
   path: rules/ml/eval-driven-verification.md
   load: path_scoped
@@ -69,6 +69,19 @@ rules:
   - .ai-work/**/SYSTEMS_PLAN.md
   - .ai-work/**/WIP.md
   - .ai-work/**/VERIFICATION_REPORT.md
+- id: ml/experiment-commit-conventions
+  path: rules/ml/experiment-commit-conventions.md
+  load: path_scoped
+  core: false
+  install: symlink
+  chars: 1526
+  paths:
+  - program.md
+  - train.py
+  - prepare.py
+  - runs/**
+  - experiments/**
+  - TRAINING_RESULTS.md
 - id: ml/experiment-tracking-conventions
   path: rules/ml/experiment-tracking-conventions.md
   load: path_scoped

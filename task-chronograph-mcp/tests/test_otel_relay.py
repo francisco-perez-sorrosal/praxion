@@ -803,7 +803,7 @@ class TestContextReaper:
     """Verify the background reaper cleans up stale agent contexts."""
 
     def test_stale_agent_context_reaped(self, harness: OTelRelayTestHarness):
-        import task_chronograph_mcp.otel_relay as relay_mod
+        import task_chronograph_mcp.relay_helpers as relay_mod
 
         orig_timeout = relay_mod.AGENT_SPAN_TIMEOUT_S
         relay_mod.AGENT_SPAN_TIMEOUT_S = 0.1  # 100ms for testing
@@ -829,7 +829,7 @@ class TestContextReaper:
             relay_mod.AGENT_SPAN_TIMEOUT_S = orig_timeout
 
     def test_active_agent_not_reaped(self, harness: OTelRelayTestHarness):
-        import task_chronograph_mcp.otel_relay as relay_mod
+        import task_chronograph_mcp.relay_helpers as relay_mod
 
         orig_timeout = relay_mod.AGENT_SPAN_TIMEOUT_S
         relay_mod.AGENT_SPAN_TIMEOUT_S = 10  # long timeout
@@ -1651,7 +1651,7 @@ class TestUserIdAttribute:
     def test_session_span_includes_user_id_when_git_identity_available(
         self, harness: OTelRelayTestHarness, monkeypatch
     ):
-        from task_chronograph_mcp import otel_relay
+        from task_chronograph_mcp import relay_helpers as otel_relay
 
         monkeypatch.setattr(otel_relay, "_git_user_id", lambda _p: "test@example.com")
         harness.relay.start_session(SESSION_ID, harness.project_dir)
@@ -1661,7 +1661,7 @@ class TestUserIdAttribute:
     def test_session_span_omits_user_id_when_git_identity_missing(
         self, harness: OTelRelayTestHarness, monkeypatch
     ):
-        from task_chronograph_mcp import otel_relay
+        from task_chronograph_mcp import relay_helpers as otel_relay
 
         monkeypatch.setattr(otel_relay, "_git_user_id", lambda _p: "")
         harness.relay.start_session(SESSION_ID, harness.project_dir)
@@ -1671,7 +1671,7 @@ class TestUserIdAttribute:
     def test_agent_span_propagates_user_id_from_session(
         self, harness: OTelRelayTestHarness, monkeypatch
     ):
-        from task_chronograph_mcp import otel_relay
+        from task_chronograph_mcp import relay_helpers as otel_relay
 
         monkeypatch.setattr(otel_relay, "_git_user_id", lambda _p: "dev@example.com")
         harness.relay.start_session(SESSION_ID, harness.project_dir)
@@ -1932,7 +1932,7 @@ class TestForkGroupClustering:
     def test_agents_outside_window_get_new_fork_group(
         self, harness: OTelRelayTestHarness, monkeypatch
     ):
-        from task_chronograph_mcp import otel_relay
+        from task_chronograph_mcp import relay_helpers as otel_relay
 
         # Shrink the window to 0 so two consecutive starts are always "outside"
         monkeypatch.setattr(otel_relay, "FORK_CLUSTER_WINDOW_S", 0.0)
@@ -1956,7 +1956,7 @@ class TestSessionLevelPhase4Attrs:
     def test_session_span_includes_git_sha_when_available(
         self, harness: OTelRelayTestHarness, monkeypatch
     ):
-        from task_chronograph_mcp import otel_relay
+        from task_chronograph_mcp import relay_helpers as otel_relay
 
         monkeypatch.setattr(otel_relay, "_git_head_sha", lambda _p: "abc1234")
         harness.relay.start_session(SESSION_ID, harness.project_dir)
@@ -1966,7 +1966,7 @@ class TestSessionLevelPhase4Attrs:
     def test_session_span_includes_pipeline_tier_when_available(
         self, harness: OTelRelayTestHarness, monkeypatch
     ):
-        from task_chronograph_mcp import otel_relay
+        from task_chronograph_mcp import relay_helpers as otel_relay
 
         monkeypatch.setattr(otel_relay, "_read_pipeline_tier", lambda _p: "Standard")
         harness.relay.start_session(SESSION_ID, harness.project_dir)
@@ -1974,7 +1974,7 @@ class TestSessionLevelPhase4Attrs:
         assert harness.session_span().attributes["praxion.pipeline_tier"] == "Standard"
 
     def test_agent_span_inherits_git_sha_and_tier(self, harness: OTelRelayTestHarness, monkeypatch):
-        from task_chronograph_mcp import otel_relay
+        from task_chronograph_mcp import relay_helpers as otel_relay
 
         monkeypatch.setattr(otel_relay, "_git_head_sha", lambda _p: "deadbee")
         monkeypatch.setattr(otel_relay, "_read_pipeline_tier", lambda _p: "Full")

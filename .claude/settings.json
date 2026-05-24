@@ -12,6 +12,9 @@
     "PRAXION_DISABLE_OBSERVABILITY": "0"
   },
   "permissions": {
+    "allow": [
+      "Write(.ai-work/**)"
+    ],
     "deny": [
       "Bash(obsidian delete --permanent*)",
       "Bash(obsidian eval*)",

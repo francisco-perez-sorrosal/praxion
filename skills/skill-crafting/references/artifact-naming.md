@@ -10,6 +10,7 @@ All artifact identifiers (directory names, filenames, `name` fields):
 - No consecutive hyphens (`--`), no leading or trailing hyphens
 - Kebab-case for multi-word names
 - No generic names (`helper`, `utils`, `tools`, `stuff`, `misc`, `common`)
+- Skill `name`s additionally cannot contain the reserved words `anthropic` or `claude`, and are capped at 64 characters
 
 ### Skills — Directory Names
 

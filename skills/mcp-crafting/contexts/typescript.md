@@ -31,6 +31,7 @@ the generic [MCP Server Development](../SKILL.md) skill.
 - [Resources](#resources-1)
 
 ## SDK Landscape
+<!-- last-verified: 2026-05-25 -->
 
 Two options for building MCP servers in TypeScript:
 
@@ -55,7 +56,7 @@ The SDK requires **Node 18+**. Target **Node 22 LTS** for new projects (see [nod
 
 | SDK | Version | Status |
 |-----|---------|--------|
-| `@modelcontextprotocol/sdk` | v1.x | **Production recommended** |
+| `@modelcontextprotocol/sdk` | v1.x | **Production recommended** (latest 1.29.x) |
 | `@modelcontextprotocol/sdk` | v2.x alpha | Alpha (sub-package split) — see [SDK v2 Alpha Note](#sdk-v2-alpha-note) |
 | `fastmcp` | v2.x | Stable community alternative |
 
@@ -462,9 +463,11 @@ for the canonical `pnpm overrides` fix.
 ---
 
 ## SDK v2 Alpha Note
+<!-- last-verified: 2026-05-25 -->
 
-**v2 is alpha (sub-package split)**. As of April 2026, `@modelcontextprotocol/sdk`
-v2.0.0-alpha ships as separate packages:
+**v2 is still pre-stable (sub-package split).** As of 2026-05 the npm `latest`
+tag is `@modelcontextprotocol/sdk` **1.29.x** — v2 has not gone stable. The v2
+alpha line ships as separate packages:
 
 - `@modelcontextprotocol/server` — core server
 - `@modelcontextprotocol/node` — Node.js transport adapters

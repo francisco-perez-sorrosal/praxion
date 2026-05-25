@@ -17,6 +17,8 @@ staleness_sensitive_sections:
   - "Bundles (.mcpb) -- Packaging for Distribution"
   - "Code Execution with MCP (Emerging)"
   - "Resources"
+  - "SDK Landscape"
+  - "SDK v2 Alpha Note"
 staleness_threshold_days: 60
 ---
 

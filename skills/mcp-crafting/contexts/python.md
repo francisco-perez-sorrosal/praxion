@@ -33,6 +33,7 @@ the generic [MCP Server Development](../SKILL.md) skill.
 - [Resources](#resources-1)
 
 ## SDK Landscape
+<!-- last-verified: 2026-05-25 -->
 
 Two options for building MCP servers in Python:
 
@@ -43,11 +44,11 @@ Two options for building MCP servers in Python:
 
 **Version pinning** (production):
 ```toml
-# Official SDK v1.x (recommended for production)
+# Official SDK v1.x (current; latest 1.27.x — recommended for production)
 dependencies = ["mcp[cli]>=1.25,<2"]
 
-# FastMCP standalone v2 (stable)
-dependencies = ["fastmcp<3"]
+# FastMCP standalone v3 (current stable line; latest 3.3.x)
+dependencies = ["fastmcp>=3,<4"]
 ```
 
 The SDK requires **Python 3.10+**. Target **3.13+** for new projects.
@@ -56,12 +57,12 @@ The SDK requires **Python 3.10+**. Target **3.13+** for new projects.
 
 | SDK | Version | Status |
 |-----|---------|--------|
-| `mcp` | v1.x | **Production recommended**. Pin `>=1.25,<2` |
-| `mcp` | v2 | In development on `main` branch |
-| `fastmcp` | v2.x | Stable standalone. Pin `<3` |
-| `fastmcp` | v3.0 | Beta. New primitives (providers, transforms) |
+| `mcp` | v1.x | **Production recommended** (latest 1.27.x). Pin `>=1.25,<2` |
+| `mcp` | v2 | In development; not yet released on PyPI |
+| `fastmcp` | v3.x | **Current stable** (latest 3.3.x). Pin `>=3,<4` |
+| `fastmcp` | v2.x | Legacy/maintenance — prior stable line |
 
-v1.x will receive bug fixes and security updates for 6+ months after v2 ships.
+The official `mcp` v1.x will receive bug fixes and security updates for 6+ months after v2 ships.
 
 **v1 vs v2 key differences:**
 
@@ -75,8 +76,8 @@ v1.x will receive bug fixes and security updates for 6+ months after v2 ships.
 **FastMCP standalone history:**
 
 - **FastMCP 1.0** -- incorporated into the official SDK in 2024 (as `mcp.server.fastmcp`)
-- **FastMCP 2.x** -- stable standalone release, extends beyond the SDK
-- **FastMCP 3.0** -- beta, adds providers, transforms, hot reload, background tasks
+- **FastMCP 2.x** -- prior stable standalone line, extended beyond the SDK
+- **FastMCP 3.x** -- current stable (latest 3.3.x); adds providers, transforms, hot reload, background tasks
 
 Migration from SDK-bundled to standalone is often just changing the import:
 ```python

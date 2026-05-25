@@ -1,6 +1,7 @@
 ---
 description: Reconfigure or recover a marketplace-installed Praxion setup — symlink rules, CLI scripts, and optional context-hub MCP. Optional (auto-completes on first session).
 allowed-tools: [Bash]
+disable-model-invocation: true
 ---
 
 Most users will not need this command — Praxion auto-completes the setup on your first Claude Code session. Use this command only if auto-install was disabled (`PRAXION_DISABLE_AUTO_COMPLETE=1`), to reconfigure personal settings, or to recover from a corrupted install state.

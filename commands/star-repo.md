@@ -1,6 +1,7 @@
 ---
 description: Star the Praxion repo on GitHub
 allowed-tools: [Bash(gh:*), AskUserQuestion]
+disable-model-invocation: true
 ---
 
 Interactive prompt to star the [Praxion](https://github.com/francisco-perez-sorrosal/Praxion) repository on GitHub.

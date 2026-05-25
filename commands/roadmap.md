@@ -2,6 +2,7 @@
 description: Produce a project-audited ROADMAP.md via a project-derived evaluation lens set — strengths, weaknesses, deprecations, phased improvements — through the roadmap-cartographer agent
 argument-hint: "[fresh|diff|<focus-area>]"
 allowed-tools: [Read, Glob, Grep, Bash(git:*), Bash(wc:*), Task]
+disable-model-invocation: true
 ---
 
 Produce a project-level `ROADMAP.md` via the [roadmap-cartographer](../agents/roadmap-cartographer.md) agent. The cartographer derives a **project-specific evaluation lens set** (4–8 lenses drawn from the project's own values + domain constraints + exemplar sets: SPIRIT, DORA, SPACE, FAIR, CNCF Platform Maturity, or Custom), orchestrates one researcher per lens in parallel, synthesizes findings, and emits a user-gated roadmap matching the 10-section exemplar structure (Executive Summary, What's Working, Weaknesses, **Opportunities / Forward Lines**, Improvement Phases, Deprecation, Quality Metrics, Guiding Principles, Methodology Footer, Decision Log).

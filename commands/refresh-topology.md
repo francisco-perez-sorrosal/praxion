@@ -9,6 +9,7 @@ description: >
   readiness. Activation terms: topology, test groups, segregation, refresh, init.
 argument-hint: [--init]
 allowed-tools: [Read, Glob, Grep, Task, AskUserQuestion]
+disable-model-invocation: true
 ---
 
 Create or refresh the project's test-group topology. Determine the mode from `$ARGUMENTS`:

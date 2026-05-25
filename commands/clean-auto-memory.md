@@ -2,6 +2,7 @@
 description: List orphan Claude Code auto-memory directories for worktrees and prompt for cleanup
 argument-hint: [--dry-run]
 allowed-tools: [Bash(ls:*), Bash(du:*), Bash(rm:*), Bash(git:*), Bash(basename:*), Read, AskUserQuestion]
+disable-model-invocation: true
 ---
 
 Enumerate orphan Claude Code auto-memory directories under `~/.claude/projects/` whose corresponding git worktree has been removed, and help the user delete them. **Opt-in only** — the command never deletes without explicit confirmation, and never touches auto-memory directories that do not match the `-worktrees-*` pattern.

@@ -1,6 +1,7 @@
 ---
 description: Onboard an existing project to the Praxion ecosystem (gitignore, .ai-state/, hooks, settings, CLAUDE.md)
 allowed-tools: [Bash(git:*), Bash(grep:*), Bash(find:*), Bash(test:*), Bash(ln:*), Bash(mkdir:*), Bash(command:*), Bash(jq:*), Bash(cat:*), Read, Write, Edit, Glob, Grep, AskUserQuestion, Task]
+disable-model-invocation: true
 ---
 
 Onboard the **current existing** project to work cleanly with the Praxion plugin (`i-am`). This is the existing-project counterpart to `/new-project` (greenfield). The command runs phased, with `AskUserQuestion` gates between phases — each gate explains what's about to happen so you learn the shape, not just observe it. A one-way **Run all rest** option on every gate skips the remaining gates for users who have onboarded a project before.

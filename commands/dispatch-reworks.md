@@ -2,6 +2,7 @@
 description: "Fan out /resume-rework into all rework worktrees from REWORK_MANIFEST.md. Default mode is background (--bg); pass --terminals for visible windows."
 allowed-tools: [Bash(scripts/dispatch-reworks:*)]
 argument-hint: "[--bg | --terminals] [--dry-run]"
+disable-model-invocation: true
 ---
 
 ## Help

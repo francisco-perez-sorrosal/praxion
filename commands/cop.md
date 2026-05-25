@@ -2,6 +2,7 @@
 description: Create a commit and push to remote
 argument-hint: [message]
 allowed-tools: [Bash(git:*), Read, Grep]
+disable-model-invocation: true
 ---
 
 Create a commit for the current staged changes (or all changes if nothing is staged), then push to the remote. If changes clearly mix more than one target (e.g. fix + feature, docs + refactor), perform multiple local commits—one per logical task—and push only once after all commits are done.

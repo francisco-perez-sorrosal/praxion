@@ -2,6 +2,7 @@
 description: Run out-of-band quality evals (Tier 1 behavioral + regression). Opt-in, never hook-driven.
 argument-hint: [list | behavioral --task-slug <slug> | regression --baseline <path> | capture-baseline --task-slug <slug> | judge --provider openai|anthropic]
 allowed-tools: [Bash(uv run --project eval praxion-evals:*)]
+disable-model-invocation: true
 ---
 
 User-invoked entrypoint for the `eval/` package. This command is opt-in; eval code never runs from hooks, never during a pipeline — the invocation contract is out-of-band by design so eval bugs cannot break agent work. Load the [`agent-evals`](../skills/agent-evals/SKILL.md) skill for eval design guidance.

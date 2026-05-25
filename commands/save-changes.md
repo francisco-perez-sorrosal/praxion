@@ -2,6 +2,7 @@
 description: Save current working changes to project memory with secret filtering
 argument-hint: [description]
 allowed-tools: [Bash(git:*), Read, Grep, Glob, mcp__memory__remember, mcp__memory__search, AskUserQuestion]
+disable-model-invocation: true
 ---
 
 Capture the current uncommitted changes (staged + unstaged + untracked) and persist a sanitized snapshot to the project's memory system. Useful for preserving work-in-progress context across sessions.

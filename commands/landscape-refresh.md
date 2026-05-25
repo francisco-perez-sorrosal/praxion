@@ -1,6 +1,7 @@
 ---
 description: Bootstrap or refresh the project's landscape watchlist — flag stale entries (>90 days) and optionally re-validate URLs
 allowed-tools: [Read, Write, Edit, Bash, WebFetch, AskUserQuestion, Glob]
+disable-model-invocation: true
 ---
 
 Maintain `.ai-state/LANDSCAPE_WATCHLIST.md` — the curated index of external sources that ideation agents (`promethean`, `roadmap-cartographer`) consult to ground proposals in adjacent-project traction and ecosystem evolution. The watchlist follows the [llms.txt convention](https://llmstxt.org) inbound: an index of *external sources for our agents*, not docs we expose to others.

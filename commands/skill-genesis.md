@@ -2,6 +2,7 @@
 description: Run skill-genesis as an on-demand autonomous learning harvest. Writes a timestamped report to .ai-state/skill_genesis_reports/. Disposition later via /skill-genesis-review.
 argument-hint: "[--since <commit>] [--scope <area>] [--dry-run]"
 allowed-tools: [Read, Glob, Grep, Bash(git:*), Task]
+disable-model-invocation: true
 ---
 
 Spawn the `skill-genesis` agent in the background to harvest learnings from the current project state. The agent runs autonomously, writes a timestamped report to `.ai-state/skill_genesis_reports/`, and appends a row to the sibling `SKILL_GENESIS_LOG.md`. Once the agent completes, run `/skill-genesis-review` to disposition the pending proposals.

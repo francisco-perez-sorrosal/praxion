@@ -2,6 +2,7 @@
 description: Disposition pending proposals from a skill-genesis report — batch multi-select; records approve/reject/refine/defer per proposal; executes approved memory proposals; surfaces delegation handoffs.
 argument-hint: "[--report <path>] [--show-completed]"
 allowed-tools: [Read, Glob, Grep, Bash, Edit, AskUserQuestion]
+disable-model-invocation: true
 ---
 
 Work through pending proposals from the most recent (or specified) skill-genesis report.

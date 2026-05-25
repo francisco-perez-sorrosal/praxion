@@ -2,6 +2,7 @@
 description: File a well-formed bug report on an upstream open-source project
 argument-hint: <owner/repo> [description or context]
 allowed-tools: [Bash(gh:*), Bash(curl:*), Read, Grep, Glob, AskUserQuestion]
+disable-model-invocation: true
 ---
 
 File a bug report on an upstream open-source repository using the [upstream-stewardship](../skills/upstream-stewardship/SKILL.md) skill. Guides the user through deduplication, sanitization, template compliance, and filing — with a human approval gate before every filing.

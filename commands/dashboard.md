@@ -2,6 +2,7 @@
 description: Launch the Praxion pipeline dashboard for the current project. Opens the dashboard in your browser on macOS; prints the URL to open manually on other platforms. Shows architecture, documentation, in-flight workshops, ADRs, sentinel reports, roadmap, and metrics. Requires the dashboard to be installed (part of the Praxion plugin). Delegates to praxion-dashboard for process management.
 argument-hint: [project-root]
 allowed-tools: Bash
+disable-model-invocation: true
 ---
 
 Launch the Praxion pipeline dashboard for the current project. The dashboard is a read-only local web application over `.ai-state/` and `.ai-work/` artifacts — it never invokes an LLM.

@@ -1,6 +1,7 @@
 ---
 description: Reverse /praxion-complete-install — remove rule/script symlinks and optional context-hub MCP. Plugin body is preserved.
 allowed-tools: [Bash]
+disable-model-invocation: true
 ---
 
 Remove the system-level symlinks and MCP entry that `/praxion-complete-install` created. The plugin body stays installed — run `claude plugin uninstall i-am` separately if you want to remove it too.

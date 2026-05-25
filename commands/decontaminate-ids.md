@@ -1,6 +1,7 @@
 ---
 description: Detect and remediate REQ/AC/step citations in the current project's source code
 allowed-tools: [Bash, Read, Edit, Write, Grep, Glob]
+disable-model-invocation: true
 ---
 
 Run the `check_id_citation_discipline.py` detector on the current project and remediate any findings following the methodology in the [`id-decontamination`](../skills/id-decontamination/SKILL.md) skill.

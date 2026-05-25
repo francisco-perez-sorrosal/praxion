@@ -2,6 +2,7 @@
 description: Merge a worktree branch back into current branch
 argument-hint: [branch-name]
 allowed-tools: [Bash(git:*), Bash(python*), Bash(test:*), Read, Grep]
+disable-model-invocation: true
 ---
 
 Merge the $ARGUMENTS worktree into the current branch. Primary worktree home is `.claude/worktrees/$ARGUMENTS`; `.trees/$ARGUMENTS` is supported as a transitional fallback during the deprecation window.

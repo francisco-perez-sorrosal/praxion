@@ -14,6 +14,7 @@ description: >
   re-dispatching a failed run, or initiating an autonomous experiment loop (autoresearch is one such loop pattern).
 argument-hint: [--descriptor <path>] [--task-slug <slug>]
 allowed-tools: [Read, Write, Edit, Bash, Glob, AskUserQuestion]
+disable-model-invocation: true
 ---
 
 Dispatch a training experiment, validate the compute budget, stream metrics, and write

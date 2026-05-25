@@ -2,6 +2,7 @@
 description: Create a commit for staged (or all) changes
 argument-hint: [message]
 allowed-tools: [Bash(git:*), Read, Grep]
+disable-model-invocation: true
 ---
 
 Create a commit for the current staged changes (or all changes if nothing is staged). If changes clearly mix more than one target (e.g. fix + feature, docs + refactor), perform multiple commits—one per logical task—instead of a single mixed commit.

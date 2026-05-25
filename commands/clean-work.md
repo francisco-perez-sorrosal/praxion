@@ -1,6 +1,7 @@
 ---
 description: Clean the .ai-work/ directory after pipeline completion
 allowed-tools: [Bash(rm:*), Bash(ls:*), Bash(cat:*), Read, AskUserQuestion]
+disable-model-invocation: true
 ---
 
 Remove task-scoped subdirectories from `.ai-work/` containing ephemeral pipeline intermediates.

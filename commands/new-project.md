@@ -1,6 +1,7 @@
 ---
 description: Scaffold a greenfield Claude-ready Python project and onboard it to Praxion.
 allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion, Task, mcp__chub__*]
+disable-model-invocation: true
 ---
 
 Onboard the current (freshly scaffolded) directory. Ask one question first, show the user *how* Praxion is driven (orchestrator + subagents), frame the build as a pipeline task so they watch the orchestrator in action, then — once the codebase exists — run `/init`, append the five Praxion blocks (Agent Pipeline + Compaction Guidance + Behavioral Contract + Praxion Process + Working in this project) idempotently, generate a per-run trail map, and hand off to `/onboard-project` (which applies the remaining surfaces — git hooks, merge drivers, `.ai-state/` skeleton, `.claude/settings.json` toggles) before the user runs `/co` to commit. **Greenfield and existing-project paths converge on the same end state**: this command is the existing-project counterpart of `/onboard-project`'s Phase 6 ("CLAUDE.md blocks"); both produce byte-identical CLAUDE.md sections.

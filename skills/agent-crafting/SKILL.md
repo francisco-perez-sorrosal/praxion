@@ -3,18 +3,22 @@ name: agent-crafting
 description: >
   Creating and configuring agents (subagents): system prompts, tool permissions,
   lifecycle hooks, model selection. Triggers: building custom agents, designing
-  agent workflows, spawning subagents, delegating via Task tool, defining
-  subagent_type, /agents command.
+  agent workflows, spawning subagents, delegating via the Agent (formerly Task)
+  tool, defining subagent_type, /agents command.
 compatibility: Claude Code
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
+staleness_sensitive_sections:
+  - "Configuration Fields Summary"
+  - "Constraints and Runtime Behavior"
 ---
 
 # Agent Creator
 
-Guide for building agents -- specialized subprocesses with separate context windows, independent tool permissions, and focused system prompts. The term "subagent" is used interchangeably with "agent" throughout Claude Code documentation.
+Guide for building agents -- specialized subprocesses with separate context windows, independent tool permissions, and focused system prompts. The term "subagent" is used interchangeably with "agent" throughout Claude Code documentation. The tool that spawns them was renamed **`Agent`** (Claude Code v2.1.63); the old name **`Task`** still works as an alias.
 
 **Satellite files** (loaded on-demand):
 
+- [../skill-crafting/references/context-engineering-foundations.md](../skill-crafting/references/context-engineering-foundations.md) -- the shared "why" (an agent is progressive disclosure for a whole task: clean context in, distilled **pointer-not-payload** summary out)
 - [references/configuration.md](references/configuration.md) -- detailed field docs, prompt writing guide, prompt template, CLI agents, troubleshooting
 - [references/examples.md](references/examples.md) -- complete agent definitions showing distinct patterns (read-only, edit-capable, hooks, memory)
 - [../skill-crafting/references/artifact-naming.md](../skill-crafting/references/artifact-naming.md) -- naming conventions for all artifact types
@@ -33,8 +37,8 @@ name: agent-name
 description: When this agent should be invoked
 tools: tool1, tool2, tool3  # Optional: omit to inherit all
 disallowedTools: tool4      # Optional: denylist
-model: sonnet               # Optional: sonnet/opus/haiku/inherit (default: inherit)
-permissionMode: default     # Optional: default/acceptEdits/dontAsk/bypassPermissions/plan
+model: sonnet               # Optional: sonnet/opus/haiku/inherit or a full model ID (default: inherit)
+permissionMode: default     # Optional: default/acceptEdits/auto/dontAsk/bypassPermissions/plan
 color: blue                 # Optional: UI background color
 skills: skill1, skill2      # Optional: inject skill content at startup
 hooks:                       # Optional: lifecycle hooks scoped to this agent
@@ -59,8 +63,14 @@ Define role, expertise, instructions, constraints, and output format.
 | `skills` | No | Skills injected into context (not inherited from parent) |
 | `hooks` | No | `PreToolUse`, `PostToolUse`, `Stop` events |
 | `memory` | No | `user` (personal prefs), `project` (project-specific), `local` (gitignored). Default to `user` for most agents |
+| `mcpServers` | No | MCP servers scoped to this agent (keeps their tool descriptions out of the parent context) |
+| `maxTurns` | No | Cap on agentic turns before the agent stops |
+| `effort` | No | `low`/`medium`/`high`/`xhigh`/`max` — overrides session effort |
+| `background` | No | `true` = always run as a background task (default `false`) |
+| `isolation` | No | `worktree` = run in a temp git worktree (branched from the **default branch**, not parent HEAD) |
+| `initialPrompt` | No | Auto-submitted first turn when run as a main-session agent (`--agent`) |
 
-For detailed field documentation, prompt writing guide, and the full prompt template, see [references/configuration.md](references/configuration.md).
+Only `name` + `description` are required. **Plugin-distributed agents ignore `hooks`, `mcpServers`, and `permissionMode`** (a security boundary) — Praxion's agents are plugin agents, so don't rely on those fields for them; enforce per-agent constraints via project-level `settings.json` hooks instead. For detailed field documentation, prompt writing guide, and the full prompt template, see [references/configuration.md](references/configuration.md).
 
 ## Agent Example
 
@@ -121,9 +131,19 @@ Higher priority wins when names collide:
 
 **Best practice**: Use project-level agents (`.claude/agents/`) for team collaboration. For CLI-defined ephemeral agents, see [references/configuration.md](references/configuration.md).
 
-## Constraints and Runtime Behavior
+## Subagents vs Agent Teams
 
-- **Agents cannot spawn agents.** Do not include `Task` in tools. Chain agents from the main conversation instead.
+A 2026 decision axis — the communication topology of the work picks the abstraction:
+
+- **Subagents** — independent fan-out. Workers don't talk to each other; each returns a distilled summary to the orchestrator. Use for parallel research, isolated analysis, anything where intermediate work shouldn't pollute the parent context. This is Praxion's pipeline model.
+- **Agent Teams** — collaborative. Teammates share discoveries mid-task and coordinate on cross-cutting changes. Use when specialists must exchange detailed information *during* the work, not just hand back a result.
+
+Do **not** reach for a subagent for a quick targeted edit (spawn latency dwarfs the work) or when the guidance belongs inline (use a skill). Subagents cannot spawn subagents — the orchestrator owns all fan-out.
+
+## Constraints and Runtime Behavior
+<!-- last-verified: 2026-05-25 -->
+
+- **Agents cannot spawn agents.** Do not include `Agent` (or its `Task` alias) in tools. Chain agents from the main conversation instead.
 - **System prompt isolation.** Agents receive only their markdown body + basic env details, not the full Claude Code system prompt. They do **not** inherit:
   - Skills from the parent context (must be listed in the `skills` field)
   - Rules (`~/.claude/rules/` content is not injected into sub-agents)
@@ -132,8 +152,10 @@ Higher priority wins when names collide:
   - Parent's conversation history or context
 - **Session loading.** Agents load at session start. Manually added files need a restart or `/agents`.
 - **Foreground**: Blocks main conversation; permission prompts pass through.
-- **Background**: Runs concurrently; permissions pre-approved; press **Ctrl+B** to background a running agent.
-- **Disabling agents**: `claude --disallowedTools "Task(my-agent)"` or add to `deny` array in settings.
+- **Background**: Runs concurrently; permissions pre-approved; press **Ctrl+B** to background a running agent (or set `background: true`).
+- **Worktree isolation**: `isolation: worktree` runs the agent in a temporary git worktree branched from the default branch — for parallel pipelines that must not collide.
+- **Forked subagents**: `/fork` (or `CLAUDE_CODE_FORK_SUBAGENT=1`) spawns an agent that inherits the full conversation and shares the prompt cache — cheaper than a fresh subagent when it needs the parent's context.
+- **Disabling agents**: `claude --disallowedTools "Agent(my-agent)"` or add to the `deny` array in settings.
 - **Transcripts** persist at `~/.claude/projects/{project}/{sessionId}/subagents/agent-{agentId}.jsonl`.
 
 ## Anti-Patterns
@@ -174,8 +196,8 @@ tools: Read, Glob, Grep
 
 ### Agents + Hooks
 
-- Define hooks in agent frontmatter for scoped lifecycle control (`PreToolUse`, `PostToolUse`, `Stop`)
-- Configure project-level hooks via `SubagentStart`/`SubagentStop` events in `settings.json`
+- Define hooks in agent frontmatter for scoped lifecycle control (`PreToolUse`, `PostToolUse`, `Stop` — a subagent's `Stop` auto-converts to `SubagentStop`)
+- **Plugin-distributed agents ignore the frontmatter `hooks` field** (security) — for Praxion's plugin agents, configure lifecycle hooks via `SubagentStart`/`SubagentStop` events in project `settings.json` instead
 
 ## Development Workflow
 

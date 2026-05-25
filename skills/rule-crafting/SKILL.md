@@ -9,6 +9,9 @@ description: >
   skill vs CLAUDE.md placement.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
+staleness_sensitive_sections:
+  - "Context Hierarchy — What Loads, When, and Who Wins"
+  - "Path-Scoped Rules: Read-Only Loading Trigger"
 ---
 
 # Rules
@@ -16,6 +19,7 @@ compatibility: Claude Code
 Guide for creating effective, contextual rules.
 
 **Satellite files** (loaded on-demand):
+- [../skill-crafting/references/context-engineering-foundations.md](../skill-crafting/references/context-engineering-foundations.md) -- the shared "why" (the always-loaded budget *is* the attention budget; context rot is why concise rules win)
 - [REFERENCE.md](REFERENCE.md) -- complete rule examples, path-specific patterns, migration strategies
 - [../skill-crafting/references/artifact-naming.md](../skill-crafting/references/artifact-naming.md) -- naming conventions for all artifact types
 
@@ -165,6 +169,7 @@ Path-scoped rules (`paths:` frontmatter, in project or user `rules/`) sit alongs
 
 - **`claudeMdExcludes`** — real setting (array; set in `.claude/settings.local.json` etc.; merges across layers): skip specific `CLAUDE.md` / rules files by absolute-path glob. Useful for monorepos with irrelevant ancestor files. Managed-policy `CLAUDE.md` can't be excluded.
 - **`InstructionsLoaded` hook** — the docs recommend it to log exactly which instruction files load, when, and why; it's the tool for debugging path-scoped rules and lazy-loaded subdirectory files. (`--add-dir` does *not* load `CLAUDE.md` from extra dirs unless `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`.)
+- **`@path` imports** — a `CLAUDE.md` line like `@docs/architecture.md` or `@~/.claude/shared.md` pulls that file's content in at load time, so shared context lives in one place instead of being copy-pasted across files. Prefer an import over duplicating a config block — it cuts drift across multi-file setups.
 - Inspect what actually loaded in a live session with `/memory`.
 
 Rules override user memory but yield to project memory and managed policy. Full coverage: `~/.claude/CLAUDE.md` and `rules/CLAUDE.md`.
@@ -177,6 +182,8 @@ Rules override user memory but yield to project memory and managed policy. Full 
 - **For a hard guarantee, use a hook.** A rule line is advisory and probabilistic; a hook (`PreToolUse`, `PostToolUse`, `SessionStart`, …) is deterministic and lifecycle-executed. If a behavior must happen 100% of the time, it isn't a rule — see the [`hook-crafting`](../hook-crafting/SKILL.md) skill's "When a Hook (vs a Rule)" criterion.
 
 The ecosystem-wide budget for *all* always-loaded content (every `CLAUDE.md` plus every rule without `paths:` frontmatter) is **25,000 tokens** — a failure-mode guardrail, not a target. The operating principle: every always-loaded token must earn its attention share — applied in >30% of sessions, or unconditionally relevant. Anything below that bar belongs in a `paths:`-scoped rule or a skill. (Practitioner write-ups circulate specific per-session token breakdowns and "instruction-count ceilings"; those *numbers* aren't documented by Anthropic — treat the discipline as load-bearing and the figures as folklore.)
+
+This budget *is* the attention budget: the always-loaded surface competes with everything else for the model's finite, degrading attention. See [context-engineering foundations](../skill-crafting/references/context-engineering-foundations.md) for the empirical grounding (context rot) — why a tight rule outperforms an exhaustive one.
 
 ## Rule File Structure
 
@@ -295,6 +302,7 @@ State what should be true, not steps to follow. Procedural content belongs in a 
 
 ### Content Guidelines
 
+- **Apply the deletion test** — for each line, ask "would removing this cause Claude to make a mistake?" If not, cut it. A rule that is ignored repeatedly is noise diluting the rest — sharpen it, or move the guarantee to a hook.
 - **Be specific** — "Use `snake_case` for column names" not "Use good naming"
 - **Group by domain** — one file per coherent domain area
 - **Include examples** — show correct and incorrect patterns when clarity demands it
@@ -370,6 +378,6 @@ Ask: **"Is this something Claude should _know_, or something Claude should _do_?
 
 ## Resources
 
-- [Official Documentation](https://docs.anthropic.com/en/docs/claude-code/memory#rules) -- rules section of Claude Code memory docs
+- [Official Documentation](https://code.claude.com/docs/en/memory#rules) -- rules section of Claude Code memory docs
 - [rules/README.md](../../rules/README.md) -- user-facing documentation for rules in this repository
 - Extended examples: See [REFERENCE.md](REFERENCE.md) for complete rule patterns and migration strategies

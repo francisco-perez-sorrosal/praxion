@@ -1,6 +1,6 @@
 # Hook Event Reference
 
-All 24 Claude Code hook events with input schemas and blocking semantics.
+Claude Code hook events with input schemas and blocking semantics. The event surface keeps growing — cross-check the live [hooks reference](https://code.claude.com/docs/en/hooks) for additions.
 
 ## Common Input Fields
 
@@ -26,6 +26,7 @@ Every event receives these fields on stdin:
 |-------|-----------|-------------|---------|
 | **PreToolUse** | Yes (exit 2) | `tool_name`, `tool_input` | Security gates, quality gates, input modification |
 | **PermissionRequest** | Yes | `tool_name`, `tool_input` | Auto-approve/deny permissions, custom permission logic |
+| **PermissionDenied** | No | `tool_name`, denied permission | React to an auto-mode permission denial (logging, hints) |
 
 **PreToolUse matchers**: Match by tool name — `Bash`, `Write`, `Edit`, `Read`, `Glob`, `Grep`, `WebSearch`, `WebFetch`, `Agent`, `Task`, `NotebookEdit`, `mcp__<server>__<tool>`.
 
@@ -55,6 +56,7 @@ Every event receives these fields on stdin:
 |-------|-----------|-------------|---------|
 | **PostToolUse** | No | `tool_name`, `tool_input`, `tool_response` | Auto-formatting, logging, context injection |
 | **PostToolUseFailure** | No | `tool_name`, `tool_input`, `error` | Error tracking, retry logic hints |
+| **PostToolBatch** | Yes (exit 2) | resolved parallel tool-call batch | Validate/gate a parallel tool batch as a unit |
 
 **PostToolUse `tool_response`** includes `exit_code` for Bash, `content` for Write, etc.
 
@@ -69,7 +71,9 @@ Every event receives these fields on stdin:
 
 | Event | Can Block | Extra Input | Use For |
 |-------|-----------|-------------|---------|
+| **Setup** | Yes | `source`: init/maintenance | First-run / maintenance setup steps |
 | **SessionStart** | No | `source`: startup/resume/clear/compact | Environment setup, context injection |
+| **SessionEnd** | No | `reason`: clear/resume/logout/… | Cleanup, logging on session end |
 | **Stop** | Yes (exit 2) | `reason`, `stop_hook_active` | Completion enforcement, checklist gates |
 | **StopFailure** | No | `reason` | Cleanup after failed stop |
 | **PreCompact** | No | — | State snapshot before context compression |
@@ -96,6 +100,7 @@ Every event receives these fields on stdin:
 | Event | Can Block | Extra Input | Use For |
 |-------|-----------|-------------|---------|
 | **UserPromptSubmit** | Yes (exit 2) | `prompt` | Input validation, prompt augmentation |
+| **UserPromptExpansion** | Yes (exit 2) | expanded slash-command/skill text | Inspect or gate slash-command expansion |
 | **Notification** | No | Notification type in matcher | Desktop alerts, sound notifications |
 | **Elicitation** | Yes | Elicitation details | Custom approval flows |
 | **ElicitationResult** | Yes | User response | Response validation |
@@ -139,11 +144,20 @@ Every event receives these fields on stdin:
 | **2** | Block | No — JSON ignored | Fed to Claude as error context |
 | **Other** | Non-blocking error | No | Shown in verbose mode only |
 
-## Known Bugs
+> **Exit 0 with no output means "no decision, proceed normally" — NOT "approve."** To actually block you must `exit 2` (or emit JSON `decision: "block"` / `permissionDecision: "deny"`). A hook that silently `exit 0`s is a no-op, not an approval gate. CLI tools default error text to **stdout**; redirect to stderr (`>&2`) on a block, since only stderr is fed back to Claude.
 
-| Issue | Behavior | Workaround |
-|-------|----------|------------|
-| #24327 | PreToolUse exit 2 causes Claude to stop instead of acting on feedback | May be version-dependent; test with current version |
-| #26923 | PreToolUse exit 2 does not block Task tool calls | Agent launches despite block |
+## Exec Form vs Shell Form
+
+A handler with an `args` array runs **exec form** — no shell, no string interpolation, so no injection risk. Prefer it with `${...}` path placeholders. Omitting `args` (a bare `command` string) runs **shell form** — full shell features, but you own the quoting/escaping. Use exec form for anything touching untrusted input.
+
+## Known Bugs
+<!-- last-verified: 2026-05-25 -->
+
+Re-verify before relying on these — hook bugs get fixed (and regress) across Claude Code releases.
+
+| Issue | Behavior | Status / Workaround |
+|-------|----------|---------------------|
+| #24327 | PreToolUse exit 2 makes Claude go idle instead of acting on the stderr feedback | **Still open (2026-05)** — intermittent, correlated with v2.1.32+/Opus 4.6. Verify the block worked; phrase stderr as actionable feedback |
+| #26923 | PreToolUse exit 2 does not block Agent/Task tool calls | Verify; agent may launch despite block |
 | #13744 | PreToolUse exit 2 doesn't block Write/Edit | Historical; verify with current version |
-| #37210 | `permissionDecision: "deny"` ignored for Edit | Permission bypass on Edit tool |
+| #37210 | `permissionDecision: "deny"` ignored for Edit | Verify; possible permission bypass on Edit |

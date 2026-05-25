@@ -8,6 +8,12 @@ description: >
   fixing hook registration, choosing hook types, why a hook is not firing.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
+staleness_sensitive_sections:
+  - "Quick Reference: Events"
+  - "Hook Types"
+  - "Gotchas"
+  - "Known Bugs"
+staleness_threshold_days: 60
 ---
 
 # Hook Crafting
@@ -16,12 +22,13 @@ Hooks are shell commands, prompts, or agents that Claude Code executes in respon
 
 **Satellite files** (loaded on-demand):
 
-- [references/event-reference.md](references/event-reference.md) -- All 24 hook events with input schemas and blocking semantics
+- [../skill-crafting/references/context-engineering-foundations.md](../skill-crafting/references/context-engineering-foundations.md) -- the shared "why" (`additionalContext` is injected tokens — keep hook output minimal and high-signal)
+- [references/event-reference.md](references/event-reference.md) -- the hook events with input schemas and blocking semantics
 - [references/output-patterns.md](references/output-patterns.md) -- JSON output formats: additionalContext, decision, permissionDecision, updatedInput
 - [references/registration-guide.md](references/registration-guide.md) -- Where hooks live, how they get loaded
 - [references/testing-guide.md](references/testing-guide.md) -- Manual testing, debugging, environment setup
 
-**Relationship to built-in skill**: Use `plugin-dev:hook-development` for writing hook scripts (prompt vs command types, security best practices, matcher patterns, bash validation examples). Use this skill for everything around the scripts: registration lifecycle, why hooks don't fire, output patterns (`additionalContext`, `updatedInput`, `decision`), the `if` conditional field, the 15 events the built-in skill doesn't document, known bugs, and installer integration. The built-in skill tells you how to write a hook; this skill tells you how to ship one.
+**Relationship to built-in skill**: Use `plugin-dev:hook-development` for writing hook scripts (prompt vs command types, security best practices, matcher patterns, bash validation examples). Use this skill for everything around the scripts: registration lifecycle, why hooks don't fire, output patterns (`additionalContext`, `updatedInput`, `decision`), the `if` conditional field, the many lifecycle events the built-in skill doesn't document, known bugs, and installer integration. The built-in skill tells you how to write a hook; this skill tells you how to ship one.
 
 ## When a Hook (vs a Rule)
 
@@ -35,9 +42,12 @@ The dividing line is **guarantee strength**, not topic:
 For the rules-vs-`CLAUDE.md`-vs-skills decision, see the [`rule-crafting`](../rule-crafting/SKILL.md) skill; for writing the hook script itself, `plugin-dev:hook-development`.
 
 ## Gotchas
+<!-- last-verified: 2026-05-25 -->
 
 Hard-won lessons from production use. Read these before writing or debugging hooks.
 
+- **Exit 0 with no output is NOT approval.** It means "no decision, proceed normally." To actually block, `exit 2` or emit JSON `decision: "block"` / `permissionDecision: "deny"`. A gate that just `exit 0`s when it should block is a silent no-op. Exit-2 feedback is read from **stderr** — redirect there (`>&2`); error text sent to stdout on a block is dropped.
+- **Exec form avoids injection.** A handler with an `args` array runs without a shell (no interpolation) — prefer it with `${...}` path placeholders for anything touching untrusted input. A bare `command` string runs in a shell; you own the quoting.
 - **Plugin hooks auto-discover from the repo root.** Hooks placed at `<repo-root>/hooks/hooks.json` are auto-discovered by Claude Code when the plugin is installed. The `hooks.json` file at the plugin root is the single source of truth — do NOT also register hooks in `~/.claude/settings.json`, as that causes double-firing.
 
 - **Async hooks cannot deliver feedback.** A hook with `"async": true` runs in the background — its stdout JSON (including `additionalContext`) may not reach Claude before it moves on. Use sync for any hook that needs to provide feedback, inject context, or block a tool call.
@@ -50,7 +60,7 @@ Hard-won lessons from production use. Read these before writing or debugging hoo
 
 - **`stop_hook_active` prevents infinite loops.** A Stop hook that returns `decision: "block"` creates a self-correcting loop: Claude responds → Stop fires → blocks → Claude continues → Stop fires again. Check `stop_hook_active` in the input JSON — when true, this is the second attempt, and you must exit 0 to let Claude stop.
 
-- **Exit code 2 has known bugs.** PreToolUse exit code 2 (block) can intermittently cause Claude to stop instead of acting on the error (#24327). It may also fail to block Task tool calls (#26923) and Write/Edit operations (#13744). For critical gates, verify the block actually worked.
+- **Exit code 2 has known bugs** (re-verify per release). PreToolUse exit 2 can intermittently make Claude go idle instead of acting on the error (#24327 — still open as of 2026-05, correlated with v2.1.32+/Opus 4.6). It may also fail to block Agent/Task calls (#26923) and Write/Edit (#13744). For critical gates, verify the block actually worked and phrase stderr as actionable feedback. See [references/event-reference.md](references/event-reference.md#known-bugs).
 
 - **Single registration authority.** All hooks are registered in `hooks/hooks.json` at the repo root, using `${CLAUDE_PLUGIN_ROOT}` for portable paths. Claude Code auto-discovers this file. Do NOT duplicate hooks into `~/.claude/settings.json` — that causes double-firing and path portability issues.
 
@@ -70,15 +80,17 @@ Hooks can be defined in 6 locations. They are additive (merged, not overridden):
 **For Praxion hooks**: All hooks live in `hooks/hooks.json` at the repo root and are auto-discovered by Claude Code. Do NOT also register in `~/.claude/settings.json`. See [references/registration-guide.md](references/registration-guide.md) for the hook structure.
 
 ## Hook Types
+<!-- last-verified: 2026-05-25 -->
 
 | Type | Async? | Feedback? | Use When |
 |------|--------|-----------|----------|
 | `command` | Yes/No | Yes (sync only) | Running scripts, formatters, linters |
 | `prompt` | No | Yes | LLM-based validation (style checks, safety) |
-| `agent` | No | Yes | Complex multi-step verification (up to 50 tool turns) |
-| `http` | Yes/No | Yes (sync only) | Forwarding events to external services |
+| `agent` | No | Yes | Complex multi-step verification (reads files, runs commands) |
+| `http` | Yes/No | Yes (sync only) | Forwarding events to an external endpoint (must return 2xx + `decision:block` in the body to block) |
+| `mcp_tool` | Yes/No | Yes (sync only) | Invoking an MCP tool as the hook handler |
 
-Prefer `command` for deterministic checks (formatting, linting). Use `prompt` when the check requires LLM judgment. Use `agent` when verification needs to read files or run commands.
+Prefer `command` for deterministic checks (formatting, linting). Use `prompt` when the check requires LLM judgment. Use `agent` when verification needs to read files or run commands. Default timeouts: 600s (command/http/mcp), 30s (prompt), 60s (agent).
 
 ## Design Patterns
 
@@ -143,15 +155,16 @@ if not conditions_met:
 ```
 
 ## Quick Reference: Events
+<!-- last-verified: 2026-05-25 -->
 
-24 events, grouped by phase. See [references/event-reference.md](references/event-reference.md) for full schemas.
+~29 events grouped by phase — the surface keeps growing, so cross-check the live [hooks reference](https://code.claude.com/docs/en/hooks). See [references/event-reference.md](references/event-reference.md) for full schemas.
 
-**Before tool execution** (can block): PreToolUse, PermissionRequest
-**After tool execution** (cannot block): PostToolUse, PostToolUseFailure
-**Session lifecycle**: SessionStart, Stop, StopFailure, PreCompact, PostCompact
+**Before tool execution**: PreToolUse, PermissionRequest (can block); PermissionDenied (no block)
+**After tool execution**: PostToolUse, PostToolUseFailure (no block); PostToolBatch (can block)
+**Session lifecycle**: Setup (can block), SessionStart, SessionEnd, Stop, StopFailure, PreCompact, PostCompact
 **Subagent lifecycle**: SubagentStart, SubagentStop
 **Task lifecycle** (can block): TaskCreated, TaskCompleted
-**User interaction**: UserPromptSubmit, Notification, Elicitation, ElicitationResult
+**User interaction**: UserPromptSubmit, UserPromptExpansion (can block), Notification, Elicitation, ElicitationResult
 **Environment**: ConfigChange, CwdChanged, FileChanged, InstructionsLoaded
 **Worktree**: WorktreeCreate, WorktreeRemove
 **Team**: TeammateIdle

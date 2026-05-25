@@ -169,9 +169,37 @@ Pre-approved tools the skill may use. When specified, Claude can use these tools
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 ```
 
-Tool names are host-specific. Claude Code tools include: `Read`, `Write`, `Edit`, `Glob`, `Grep`, `Bash`, `Task`, `WebFetch`, `WebSearch`.
+Tool names are host-specific. Claude Code tools include: `Read`, `Write`, `Edit`, `Glob`, `Grep`, `Bash`, `Agent` (formerly `Task`), `WebFetch`, `WebSearch`.
 
-**Note:** This field is experimental and its behavior may vary across host tools. Not all hosts respect `allowed-tools`.
+In Claude Code `allowed-tools` **pre-approves** the listed tools (no permission prompt while the skill is active) — it does **not** restrict; every other tool stays callable, governed by your permission settings. Behavior still varies across non-Claude hosts, so treat it as a Claude Code field for portable skills.
+
+## Claude Code Frontmatter Superset
+
+The fields above are the portable Agent Skills core. Claude Code reads them **plus** the fields below. Since custom commands [merged into skills](https://code.claude.com/docs/en/skills), these apply equally to `commands/*.md` files — see the `command-crafting` skill for the command-authoring angle.
+
+| Field | Type | Purpose / constraint |
+|-------|------|----------------------|
+| `when_to_use` | String | Extra trigger phrases / example requests, appended to `description` in the listing. **Combined `description` + `when_to_use` is truncated at 1,536 chars** (`maxSkillDescriptionChars` setting); put the key use case first. |
+| `disable-model-invocation` | Boolean | `true` = only the user can invoke (`/name`); the description leaves model context, and the skill cannot be preloaded into subagents. Default `false`. Use for side-effecting actions. |
+| `user-invocable` | Boolean | `false` = hidden from the `/` menu; Claude can still auto-load it. Default `true`. For background knowledge that isn't a user action. |
+| `paths` | String / list | Glob patterns scoping auto-activation to matching files (same format as path-specific rules). |
+| `context` | String | `fork` runs the skill body as the prompt for a forked subagent. |
+| `agent` | String | Subagent type used when `context: fork` (e.g. `Explore`, `Plan`, `general-purpose`, or a custom agent). Default `general-purpose`. |
+| `model` | String | Model while the skill is active (`inherit` keeps the session model). Override lasts the current turn only. |
+| `effort` | String | `low`/`medium`/`high`/`xhigh`/`max` while active; overrides session effort. |
+| `argument-hint` | String | Autocomplete hint, e.g. `[issue-number]` or `[filename] [format]`. |
+| `arguments` | String / list | Named positional args for `$name` substitution; names map to positions in order. |
+| `hooks` | Object | Hooks scoped to the skill's lifecycle (all events; for subagents `Stop` auto-converts to `SubagentStop`). |
+| `shell` | String | `bash` (default) or `powershell` for `` !`cmd` `` and ` ```! ` blocks. |
+
+**Praxion staleness fields** (validated by `validate.py`, per `rules/swe/staleness-policy.md`):
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `staleness_sensitive_sections` | List | Bare h2/h3 heading texts (in `SKILL.md` or any `references/`/`contexts/` file) the sentinel tracks for drift via `<!-- last-verified: YYYY-MM-DD -->` markers. |
+| `staleness_threshold_days` | Number | Per-skill staleness threshold override (global default 120; use 60 for fast-moving API surfaces). |
+
+**Argument substitution & dynamic context** (skill body, Claude Code): `$ARGUMENTS`, `$ARGUMENTS[N]` / `$N`, `$name`; `${CLAUDE_SESSION_ID}`, `${CLAUDE_EFFORT}`, `${CLAUDE_SKILL_DIR}`; and `` !`command` `` dynamic injection (runs once, before Claude sees the body) with a fenced ` ```! ` block for multi-line. Full reference: [Claude Code skills docs](https://code.claude.com/docs/en/skills).
 
 ## Validation Rules
 

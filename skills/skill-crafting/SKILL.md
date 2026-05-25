@@ -8,14 +8,21 @@ description: >
   activation, skill architecture and best practices.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
+staleness_sensitive_sections:
+  - "Skill Content Lifecycle"
+  - "Cross-Agent Portability"
+  - "Context-Engineering Sources"
 ---
 
 # Skill Creator
 
 Guide for creating effective Agent Skills. Official specification at [agentskills.io](https://agentskills.io). Authoring guidance at [Anthropic's best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices).
 
+**Start here:** [references/context-engineering-foundations.md](references/context-engineering-foundations.md) -- the shared "why" behind every `*-crafting` skill (context rot, the attention budget, progressive disclosure, eval-first). Read once; it is cited, not restated, throughout the six skills.
+
 **Satellite files** (loaded on-demand):
 
+- [references/context-engineering-foundations.md](references/context-engineering-foundations.md) -- context-engineering foundations (shared spine for all six crafting skills)
 - [references/cross-agent-portability.md](references/cross-agent-portability.md) -- discovery paths per tool, portability guidance
 - [references/artifact-naming.md](references/artifact-naming.md) -- naming conventions for all artifact types
 - [references/content-and-development.md](references/content-and-development.md) -- content type selection, feedback loops, evaluation-driven development
@@ -29,6 +36,8 @@ Guide for creating effective Agent Skills. Official specification at [agentskill
 Skills are modular, self-contained packages that extend agent capabilities with specialized workflows, tool integrations, domain expertise, and bundled resources. Each skill is a directory containing a `SKILL.md` file with instructions and optional scripts, references, and assets. Skills activate on-demand when the agent determines they are relevant, keeping the base context lean.
 
 ## Core Principles
+
+These principles are the skill-authoring face of [context engineering](references/context-engineering-foundations.md) -- consult that reference for the empirical grounding (context rot, the attention budget, the four failure modes).
 
 **The context window is a public good.** A skill shares the context window with system prompts, conversation history, other skills' metadata, and the user's request. Every token must earn its place.
 
@@ -69,6 +78,8 @@ Write the body in imperative/infinitive form ("Extract text", "Run the script", 
 
 #### Frontmatter Fields
 
+Only `name` + `description` are required, and they are the **portable core** — the entire Agent Skills standard (the form Cursor, Codex, and other tools read) is just these two. Everything below is optional; the Claude Code superset (next subsection) adds more.
+
 | Field           | Required | Constraints                                                              |
 | --------------- | -------- | ------------------------------------------------------------------------ |
 | `name`          | Yes      | 1-64 chars. Lowercase alphanumeric + hyphens. Must match directory name. No consecutive hyphens, no leading/trailing hyphens. |
@@ -77,6 +88,24 @@ Write the body in imperative/infinitive form ("Extract text", "Run the script", 
 | `compatibility` | No       | Max 500 chars. Environment requirements.                                 |
 | `metadata`      | No       | Arbitrary key-value pairs for additional info.                           |
 | `allowed-tools` | No       | Pre-approved tools the skill may use. (Experimental)                     |
+
+##### Claude Code Frontmatter Superset
+
+Claude Code reads the portable core **plus** these optional fields. Because custom commands merged into skills, the same fields apply to `commands/*.md` files too (see the `command-crafting` skill):
+
+| Field | Purpose |
+| --- | --- |
+| `when_to_use` | Extra trigger phrases, appended to `description`. **Combined `description` + `when_to_use` is truncated at 1,536 chars in the skill listing** — put the key use case first. |
+| `disable-model-invocation` | `true` = only the user can invoke (`/name`); the description leaves model context. Use for side-effecting actions (`/deploy`, `/commit`). |
+| `user-invocable` | `false` = hide from the `/` menu (background knowledge Claude loads but users don't call). |
+| `allowed-tools` | Tools pre-approved (no prompt) while active. Does NOT restrict — every tool stays callable. |
+| `paths` | Glob patterns that scope auto-activation to matching files (same syntax as path-specific rules). |
+| `context: fork` + `agent` | Run the skill body as the prompt for a forked subagent (`agent:` picks the type, e.g. `Explore`). Only meaningful for skills with an explicit task, not pure guidelines. |
+| `model`, `effort` | Override model / effort while the skill is active (current turn only). |
+| `argument-hint`, `arguments` | Autocomplete hint + named positional args for `$name` substitution. |
+| `hooks`, `shell` | Lifecycle hooks scoped to the skill; `bash` (default) or `powershell` for `` !`cmd` `` blocks. |
+
+These are Claude-Code extensions, **not** part of the portable standard — keep them out of skills meant to run cross-tool, or isolate them behind clear headings. Full field reference + interactions: [references/schema.md](references/schema.md).
 
 #### Directory Name Constraints
 
@@ -87,6 +116,7 @@ The directory name is the skill's identity (Claude Code infers the name from it)
 - If `name` field is present, it must match the directory name
 - Prefer gerund form (`processing-pdfs`) or noun phrases (`pdf-processing`)
 - Avoid vague names: `helper`, `utils`, `tools`
+- Reserved words `anthropic` and `claude` are not allowed anywhere in the name
 
 --> See [references/artifact-naming.md](references/artifact-naming.md) for naming conventions across all artifact types.
 
@@ -131,6 +161,15 @@ Three tiers of context loading:
 1. **Metadata** (~100 tokens): `name` + `description` loaded at startup for all skills
 2. **Instructions** (<5000 tokens recommended): Full SKILL.md body loaded on activation
 3. **Resources** (as needed): Referenced files loaded only when required
+
+### Skill Content Lifecycle
+<!-- last-verified: 2026-05-25 -->
+
+Two facts about Claude Code's runtime change how you write a skill body:
+
+- **An invoked skill stays in context for the rest of the session.** Claude Code injects the rendered `SKILL.md` once and does not re-read it on later turns. Write **standing instructions** that hold across a task, not one-time steps that read as already-done after the first turn.
+- **The skill *listing* (every skill's `name` + `description`) is always-loaded**, budgeted at ~1% of the model's context window. On overflow, the least-used descriptions drop first (`/doctor` shows this). This is why the description must be high-signal and why `description` + `when_to_use` is capped at 1,536 chars.
+- **Auto-compaction re-attaches the most recent invocation of each skill**, keeping the first ~5,000 tokens of each within a combined ~25,000-token budget (newest first); older skills may drop entirely. Keep load-bearing instructions near the top of the body.
 
 ### Design Patterns
 
@@ -200,6 +239,8 @@ Creating a skill involves these steps:
 6. Iterate based on real usage
 
 Follow these steps in order, skipping only with clear reason.
+
+**Evaluation comes first, not last.** Before writing extensive prose, establish *where the agent fails without the skill* and capture ≥3 realistic scenarios — including **negative** cases that must not trigger it — see [evaluation-first authoring](references/context-engineering-foundations.md#evaluation-first-authoring). Steps 1–2 feed those scenarios; Step 6 iterates against them.
 
 ### Step 1: Understand the Skill with Concrete Examples
 
@@ -287,8 +328,9 @@ Skills cluster into recurring archetypes. When creating a skill, consider which 
 --> See [references/skill-categories.md](references/skill-categories.md) for the nine categories with descriptions and structural guidance for each.
 
 ## Cross-Agent Portability
+<!-- last-verified: 2026-05-25 -->
 
-The [Agent Skills standard](https://agentskills.io) is adopted by 25+ tools including Claude Code, Cursor, VS Code/Copilot, OpenAI Codex, Gemini CLI, Roo Code, Goose, Amp, and others.
+The [Agent Skills standard](https://agentskills.io) is adopted across the ecosystem — Claude Code, Cursor, VS Code/Copilot, OpenAI (ChatGPT + Codex CLI), Gemini CLI, Roo Code, Goose, Amp, and others — making `SKILL.md` a genuinely cross-tool format, not a Claude-only one. This is why the portable core (`name` + `description`) is worth preserving even when authoring for Claude Code.
 
 **What's portable**: SKILL.md format, directory structure, progressive disclosure model.
 
@@ -300,15 +342,11 @@ Keep SKILL.md body in standard markdown. Isolate tool-specific instructions behi
 
 ## Resources
 
-- [Agent Skills Specification](https://agentskills.io/specification)
-- [Authoring Best Practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)
+- [Agent Skills Specification](https://agentskills.io/specification) -- the portable open standard
+- [Authoring Best Practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices) -- Anthropic-official
+- [Claude Code Skills reference](https://code.claude.com/docs/en/skills) -- the Claude Code superset (merged commands, invocation control, dynamic context injection)
 - [Example Skills](https://github.com/anthropics/skills) -- Anthropic's official reference implementations
-- [Validation Library (skills-ref)](https://github.com/agentskills/agentskills/tree/main/skills-ref)
-- [Lessons from Building Claude Code: How We Use Skills](https://www.techtwitter.com/articles/lessons-from-building-claude-code-how-we-use-skills) -- Anthropic's internal skill practices (Thariq Shihipar)
-- [Awesome Agent Skills](https://github.com/VoltAgent/awesome-agent-skills) -- Curated collection of 200+ skills
-- [Vercel Labs Skills](https://github.com/vercel-labs/agent-skills) -- Reference implementations from Vercel
-- [Claude Skills Deep Dive](https://leehanchung.github.io/blogs/2025/10/26/claude-skills-deep-dive/) -- Architectural analysis
-- [Agent Skills Course](https://www.deeplearning.ai/short-courses/agent-skills-with-anthropic/) -- DeepLearning.AI hands-on course
+- Context-engineering sources (context rot, attention budget, eval-first): see [references/context-engineering-foundations.md](references/context-engineering-foundations.md#context-engineering-sources)
 
 ## Checklist
 

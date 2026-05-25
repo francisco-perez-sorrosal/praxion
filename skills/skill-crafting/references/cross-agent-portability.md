@@ -13,9 +13,10 @@ See [agentskills.io](https://agentskills.io/home) for the current list.
 Each tool scans its own directories for `SKILL.md` files. The standard does not mandate a single path — it defines the format, and tools choose where to look.
 
 | Tool | Discovery Path(s) |
-|------|-------------------|
+| --- | --- |
 | Claude Code | `~/.claude/skills/<name>/SKILL.md` (personal), `.claude/skills/<name>/SKILL.md` (project), nested `.claude/skills/` in subdirectories (monorepo) |
-| Cursor | `.cursor/rules/` (`.mdc` files, not SKILL.md — Cursor reads SKILL.md via the Agent Skills standard in `.claude/skills/`) |
+| Cursor | `.cursor/rules/` (`.mdc` files) plus Agent Skills `SKILL.md` via `.claude/skills/`. Reads `name`, `description`, `paths`, `disable-model-invocation`, `metadata` natively. |
+| Codex CLI | `.agents/skills/` (walks parent dirs to repo root), `~/.agents/skills/`, `/etc/codex/skills/`. Reads only `name` + `description` from SKILL.md; invocation policy, tool deps, and UI metadata live in a sibling `agents/openai.yaml`. |
 | VS Code / Copilot | `.github/copilot-instructions.md` (project instructions), plus Agent Skills via `.claude/skills/` |
 | Gemini CLI | `GEMINI.md` (project instructions), plus Agent Skills via `.claude/skills/` |
 
@@ -35,7 +36,7 @@ Each tool scans its own directories for `SKILL.md` files. The standard does not 
 - **`allowed-tools`**: Tool names differ across agents (Claude Code uses `Read`, `Bash`, `Edit`; other tools may use different names). The field is experimental per the spec.
 - **`compatibility`**: Use this to indicate when a skill targets a specific tool: `compatibility: Designed for Claude Code (or similar products)`
 - **MCP tool names** (`ServerName:tool_name`): Only relevant to tools with MCP support
-- **Claude Code extensions**: `disable-model-invocation`, `user-invocable`, `context: fork`, `agent`, `hooks`, string substitutions (`$ARGUMENTS`, `$0`, `${CLAUDE_SESSION_ID}`) — these are Claude Code features, not part of the open standard
+- **Claude-Code-only extensions**: `when_to_use`, `user-invocable`, `context: fork`, `agent`, `model`, `effort`, `argument-hint`, `arguments`, `hooks`, string substitutions (`$ARGUMENTS`, `$0`, `${CLAUDE_SESSION_ID}`) — Claude Code features, not part of the open standard. (`paths` and `disable-model-invocation` are *not* Claude-only — Cursor reads them natively; see the discovery table above.)
 
 ### Writing for Maximum Portability
 
@@ -50,7 +51,7 @@ Each tool scans its own directories for `SKILL.md` files. The standard does not 
 Skills (SKILL.md) and project instruction files (CLAUDE.md, AGENTS.md, GEMINI.md, .cursorrules) serve different purposes:
 
 | Aspect | Skills (SKILL.md) | Project Instructions (CLAUDE.md, etc.) |
-|--------|-------------------|----------------------------------------|
+| --- | --- | --- |
 | **Scope** | Modular, task-specific capability | Project-wide context and conventions |
 | **Loading** | On-demand when relevant to the task | Always loaded at session start |
 | **Portability** | Cross-agent via the open standard | Tool-specific format |

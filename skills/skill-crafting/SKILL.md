@@ -78,34 +78,30 @@ Write the body in imperative/infinitive form ("Extract text", "Run the script", 
 
 #### Frontmatter Fields
 
-Only `name` + `description` are required, and they are the **portable core** — the entire Agent Skills standard (the form Cursor, Codex, and other tools read) is just these two. Everything below is optional; the Claude Code superset (next subsection) adds more.
+`name` + `description` are the required **portable nucleus** every tool reads; everything else is optional, with cross-tool support that varies field by field. Read the compat columns before relying on a field outside Claude Code.
 
-| Field           | Required | Constraints                                                              |
-| --------------- | -------- | ------------------------------------------------------------------------ |
-| `name`          | Yes      | 1-64 chars. Lowercase alphanumeric + hyphens. Must match directory name. No consecutive hyphens, no leading/trailing hyphens. |
-| `description`   | Yes      | 1-1024 chars. What it does + when to use it + trigger terms.             |
-| `license`       | No       | License name or reference to bundled file.                               |
-| `compatibility` | No       | Max 500 chars. Environment requirements.                                 |
-| `metadata`      | No       | Arbitrary key-value pairs for additional info.                           |
-| `allowed-tools` | No       | Pre-approved tools the skill may use. (Experimental)                     |
+**Req** `✓` required, blank optional. Support — **CC** Claude Code · **Cur** Cursor · **Cdx** Codex CLI: `✓` read natively · `✗` not read (inert YAML, still travels harmlessly) · `↗` supported via Codex's `openai.yaml` sidecar, not this frontmatter field.
 
-##### Claude Code Frontmatter Superset
+| Field | Req | CC | Cur | Cdx | Semantics / constraints |
+| --- | --- | --- | --- | --- | --- |
+| **Open-standard core** | | | | | |
+| `name` | ✓ | ✓ | ✓ | ✓ | 1-64 chars; lowercase alphanumeric + hyphens; must match directory name; no consecutive, leading, or trailing hyphens. |
+| `description` | ✓ | ✓ | ✓ | ✓ | 1-1024 chars; what it does + when to use it + trigger terms. |
+| `license` | | ✓ | ✗ | ✗ | License name or reference to a bundled file. |
+| `compatibility` | | ✓ | ✗ | ✗ | Max 500 chars; environment requirements. |
+| `metadata` | | ✓ | ✓ | ↗ | Arbitrary key-value pairs for additional info. |
+| `allowed-tools` | | ✓ | ✗ | ↗ | Pre-approves the listed tools (no permission prompt while active); does NOT restrict — every tool stays callable. Experimental in the standard. |
+| **Claude Code extensions** | | | | | |
+| `when_to_use` | | ✓ | ✗ | ✗ | Extra trigger phrases appended to `description`. Combined `description` + `when_to_use` is truncated at 1,536 chars in the listing — put the key use case first. |
+| `disable-model-invocation` | | ✓ | ✓ | ↗ | `true` = only the user can invoke (`/name`); the description leaves model context. Use for side-effecting actions (`/deploy`, `/commit`). |
+| `user-invocable` | | ✓ | ✗ | ✗ | `false` = hide from the `/` menu (background knowledge the agent loads but users don't call). |
+| `paths` | | ✓ | ✓ | ✗ | Glob patterns scoping auto-activation to matching files (same syntax as path-specific rules). |
+| `context: fork` + `agent` | | ✓ | ✗ | ✗ | Run the skill body as the prompt for a forked subagent; `agent:` picks the type (e.g. `Explore`). Only meaningful for skills with an explicit task, not pure guidelines. |
+| `model`, `effort` | | ✓ | ✗ | ✗ | Override model / effort while the skill is active (current turn only). |
+| `argument-hint`, `arguments` | | ✓ | ✗ | ✗ | Autocomplete hint + named positional args for `$name` substitution. |
+| `hooks`, `shell` | | ✓ | ✗ | ✗ | Lifecycle hooks scoped to the skill; `bash` (default) or `powershell` for `` !`cmd` `` blocks. |
 
-Claude Code reads the portable core **plus** these optional fields. Because custom commands merged into skills, the same fields apply to `commands/*.md` files too (see the `command-crafting` skill):
-
-| Field | Purpose |
-| --- | --- |
-| `when_to_use` | Extra trigger phrases, appended to `description`. **Combined `description` + `when_to_use` is truncated at 1,536 chars in the skill listing** — put the key use case first. |
-| `disable-model-invocation` | `true` = only the user can invoke (`/name`); the description leaves model context. Use for side-effecting actions (`/deploy`, `/commit`). |
-| `user-invocable` | `false` = hide from the `/` menu (background knowledge Claude loads but users don't call). |
-| `allowed-tools` | Tools pre-approved (no prompt) while active. Does NOT restrict — every tool stays callable. |
-| `paths` | Glob patterns that scope auto-activation to matching files (same syntax as path-specific rules). |
-| `context: fork` + `agent` | Run the skill body as the prompt for a forked subagent (`agent:` picks the type, e.g. `Explore`). Only meaningful for skills with an explicit task, not pure guidelines. |
-| `model`, `effort` | Override model / effort while the skill is active (current turn only). |
-| `argument-hint`, `arguments` | Autocomplete hint + named positional args for `$name` substitution. |
-| `hooks`, `shell` | Lifecycle hooks scoped to the skill; `bash` (default) or `powershell` for `` !`cmd` `` blocks. |
-
-These are Claude-Code extensions, **not** part of the portable standard — keep them out of skills meant to run cross-tool, or isolate them behind clear headings. Full field reference + interactions: [references/schema.md](references/schema.md).
+Because commands [merged into skills](https://code.claude.com/docs/en/skills), every field applies to `commands/*.md` too (see the `command-crafting` skill). For portable skills, rely only on fields your target tools mark `✓`, and isolate Claude-only fields (those Cursor and Codex both mark `✗`) behind a clear heading. Complete field reference + interactions: [references/schema.md](references/schema.md).
 
 #### Directory Name Constraints
 
@@ -334,7 +330,7 @@ The [Agent Skills standard](https://agentskills.io) is adopted across the ecosys
 
 **What's portable**: SKILL.md format, directory structure, progressive disclosure model.
 
-**What's tool-specific**: `allowed-tools` names, MCP tool references, `compatibility` values, Claude Code extensions (`context: fork`, `disable-model-invocation`).
+**What's tool-specific**: `allowed-tools` names, MCP tool references, `compatibility` values, and the Claude-Code-only extensions (`context: fork`, `when_to_use`, `user-invocable`, `hooks`). Note `paths` and `disable-model-invocation` are *not* Claude-only — Cursor reads them too.
 
 Keep SKILL.md body in standard markdown. Isolate tool-specific instructions behind clear headings.
 

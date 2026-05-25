@@ -28,7 +28,7 @@ Compatible with **Claude Code** (primary), **Claude Desktop**, **Cursor**, and A
 
 - **49 skills** — Python, API design, CI/CD, deployment, observability, refactoring, spec-driven development, security review, testing, ML/AI training, web/TUI/API interface design, and more. Loaded automatically when the task matches.
 - **15 specialized agents** — research, architecture, interface design, planning, implementation, testing, verification, structural validation, roadmap cartography. They collaborate on complex features through a shared-document pipeline.
-- **38 slash commands** — commits, worktrees, memory management, project scaffolding, testing, releases, code review, roadmap generation, metrics, ML experiment dispatch.
+- **39 slash commands** — commits, worktrees, memory management, project scaffolding, testing, releases, code review, roadmap generation, metrics, ML experiment dispatch.
 - **20 rules** — coding style, git conventions, documentation standards, agent coordination. Auto-loaded by context.
 - **MCP servers** — persistent cross-session memory and agent-lifecycle observability.
 - **Architecture-as-Code + Documentation-as-Code stack** — fence convention, fitness functions, golden-rule pre-commit gate, `architect-validator` agent, architecture CI workflow, REQ↔architecture traceability, periodic `sentinel` audit, Diátaxis-aligned doc taxonomy. See [docs/aac-dac.md](docs/aac-dac.md) for how the mechanisms compose.
@@ -116,7 +116,7 @@ Reusable knowledge modules loaded automatically based on context. See [skills/RE
 
 ### Commands
 
-38 slash commands invoked with `/<name>` (`/i-am:<name>` in Claude Code plugin mode). Frequently used:
+39 slash commands invoked with `/<name>` (`/i-am:<name>` in Claude Code plugin mode). Frequently used:
 
 - `/co`, `/cop` — create a commit (and push)
 - `/create-worktree`, `/merge-worktree` — git worktree lifecycle
@@ -126,6 +126,9 @@ Reusable knowledge modules loaded automatically based on context. See [skills/RE
 - `/run-experiment`, `/check-experiment` — ML training experiment dispatch
 
 See [commands/README.md](commands/README.md) for the complete list with descriptions.
+
+> [!NOTE]
+> **Commands are skills now (in Claude Code).** Claude Code [merged custom slash commands into skills](https://code.claude.com/docs/en/skills) — a `commands/<name>.md` file and a `skills/<name>/SKILL.md` directory both produce `/<name>`, and Claude Code already surfaces Praxion's commands through the skill system. Praxion keeps its slash commands as single-file `commands/*.md` because that directory is the **assistant-agnostic source** `install.sh` exports to Cursor and Codex (which don't share the merge). Rule of thumb: author a `commands/*.md` file for a portable single-file workflow; reach for a `skills/<name>/` directory when it needs bundled scripts/references or should auto-load. See the [`command-crafting`](skills/command-crafting/SKILL.md) skill for the decision.
 
 ### Agents
 

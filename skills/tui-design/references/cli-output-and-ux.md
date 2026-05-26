@@ -1,6 +1,6 @@
 # CLI Output and UX
 
-Full clig.dev distillation, exemplar CLI tools with their lessons, output design rules in depth, composability, and the conversation-as-interface pattern.
+Full clig.dev distillation, exemplar CLI tools with their lessons, output design rules in depth, composability, and the conversation-as-interface pattern. Back to [SKILL.md](../SKILL.md).
 
 ---
 

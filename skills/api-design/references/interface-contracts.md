@@ -1,6 +1,6 @@
 # Interface Contracts
 
-Patterns for defining service boundaries, establishing behavioral guarantees between services, and verifying compliance through contract testing.
+Patterns for defining service boundaries, establishing behavioral guarantees between services, and verifying compliance through contract testing. Back to [SKILL.md](../SKILL.md).
 
 ## What is an Interface Contract
 

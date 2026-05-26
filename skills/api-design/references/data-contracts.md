@@ -1,6 +1,6 @@
 # Data Contracts
 
-Patterns for defining, evolving, and enforcing data schemas across service boundaries. Data contracts formalize the agreement between data producers and consumers on structure, semantics, and evolution rules.
+Patterns for defining, evolving, and enforcing data schemas across service boundaries. Data contracts formalize the agreement between data producers and consumers on structure, semantics, and evolution rules. Back to [SKILL.md](../SKILL.md).
 
 ## What is a Data Contract
 

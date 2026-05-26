@@ -1,6 +1,6 @@
 # Motion and Perceived Performance
 
-Animation timing depth, the RAIL model, skeleton vs spinner implementation, optimistic UI patterns, debounce/throttle, and animation-to-mask-latency. <!-- last-verified: 2026-05-12 -->
+Animation timing depth, the RAIL model, skeleton vs spinner implementation, optimistic UI patterns, debounce/throttle, and animation-to-mask-latency. Back to [SKILL.md](../SKILL.md). <!-- last-verified: 2026-05-12 -->
 
 The perception thresholds (< 100ms instant / 100ms–1s progression / 1s–10s drift / > 10s abandonment) and the 50ms input budget live in [`design-fundamentals.md`](design-fundamentals.md). This file covers implementation and web-specific application.
 

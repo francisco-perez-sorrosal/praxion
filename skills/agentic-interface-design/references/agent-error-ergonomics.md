@@ -1,6 +1,6 @@
 # Agent Error Ergonomics
 
-Error design for agentic interfaces is a distinct discipline from error design for human-facing APIs. The consumer is different; the recovery path is different; the constraints are different.
+Error design for agentic interfaces is a distinct discipline from error design for human-facing APIs. The consumer is different; the recovery path is different; the constraints are different. Back to [SKILL.md](../SKILL.md).
 
 ## The Fundamental Constraint
 

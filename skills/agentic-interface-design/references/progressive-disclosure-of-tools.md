@@ -1,6 +1,6 @@
 # Progressive Disclosure of Tools
 
-When a tool surface grows, the token cost of serving all schemas upfront becomes a hard constraint — not a preference, but a physics problem. This reference covers the problem in numbers and the patterns that solve it.
+When a tool surface grows, the token cost of serving all schemas upfront becomes a hard constraint — not a preference, but a physics problem. This reference covers the problem in numbers and the patterns that solve it. Back to [SKILL.md](../SKILL.md).
 
 ## The Token Economy Problem
 <!-- last-verified: 2026-05-12 -->

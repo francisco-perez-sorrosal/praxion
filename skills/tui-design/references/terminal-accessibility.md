@@ -1,6 +1,6 @@
 # Terminal Accessibility
 
-NO_COLOR, color depth, ANSI escapes in non-TTY, screen readers, and TUI render performance (including DECSET 2026 synchronized output). <!-- last-verified: 2026-05-12 -->
+NO_COLOR, color depth, ANSI escapes in non-TTY, screen readers, and TUI render performance (including DECSET 2026 synchronized output). Back to [SKILL.md](../SKILL.md). <!-- last-verified: 2026-05-12 -->
 
 ---
 

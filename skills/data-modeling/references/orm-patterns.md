@@ -1,6 +1,6 @@
 # ORM Patterns
 
-Patterns for using Object-Relational Mappers effectively, avoiding common pitfalls, and knowing when to bypass the ORM. Language-agnostic -- examples use pseudocode.
+Patterns for using Object-Relational Mappers effectively, avoiding common pitfalls, and knowing when to bypass the ORM. Language-agnostic -- examples use pseudocode. Back to [SKILL.md](../SKILL.md).
 
 ## Repository Pattern
 

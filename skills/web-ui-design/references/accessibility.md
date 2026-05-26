@@ -1,6 +1,6 @@
 # Accessibility (Web UI)
 
-Full WCAG 2.2 audit guidance, ARIA patterns, keyboard navigation, focus management, accessible primitives, and screen reader considerations. <!-- last-verified: 2026-05-12 -->
+Full WCAG 2.2 audit guidance, ARIA patterns, keyboard navigation, focus management, accessible primitives, and screen reader considerations. Back to [SKILL.md](../SKILL.md). <!-- last-verified: 2026-05-12 -->
 
 Accessibility is not a feature to add after launch — it is what correct interactive behavior looks like. An inaccessible button is a broken button. An inaccessible modal is a broken modal.
 

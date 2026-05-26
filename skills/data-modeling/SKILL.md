@@ -158,11 +158,11 @@ ORMs reduce boilerplate for standard CRUD operations. Use them as a starting poi
 
 --> See [references/orm-patterns.md](references/orm-patterns.md) for the repository pattern, N+1 prevention, and query optimization strategies.
 
-## Integration with Other Skills
+## Related Skills
 
-- **[API Design](../api-design/SKILL.md)** -- data models inform API resource surfaces; schema evolution rules complement API versioning
-- **[Python Development](../python-development/SKILL.md)** -- SQLAlchemy and Pydantic model patterns when working in Python
-- **[CI/CD](../cicd/SKILL.md)** -- running migration checks and schema validation in CI pipelines
+- **[`api-design`](../api-design/SKILL.md)** -- data models inform API resource surfaces; schema evolution rules complement API versioning
+- **[`python-development`](../python-development/SKILL.md)** -- SQLAlchemy and Pydantic model patterns when working in Python
+- **[`cicd`](../cicd/SKILL.md)** -- running migration checks and schema validation in CI pipelines
 
 ## Resources
 

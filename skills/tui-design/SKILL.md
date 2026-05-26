@@ -9,6 +9,8 @@ description: >
   reviewing CLI tools, agent terminal output, TUIs, help text, error messages, exit
   codes, choosing a TUI framework. Not for web UI (web-ui-design) or agent-tool
   design (api-design-craft, agentic-interface-design).
+allowed-tools: [Read, Glob, Grep, Bash]
+compatibility: Claude Code
 staleness_sensitive_sections:
   - "Framework Selection Decision"
   - "The clig.dev Principles (Full Distillation)"
@@ -23,6 +25,15 @@ The durable cross-cutting fundamentals (Rams, Norman, Nielsen, Tufte, Bloch, per
 **Separation of contexts**: this skill covers terminal/CLI/TUI only. For web UI design, use the `web-ui-design` skill. For API and agent-tool design, use `api-design-craft` or `agentic-interface-design`.
 
 **Boundary note**: when a tool or agent *outputs to a terminal* that a human reads, that is a TUI concern (this skill). When the tool itself is invoked by a model (its name, description, schema), that is an agentic-interface concern — see `agentic-interface-design`. Both may apply to the same tool; load both when that is the case.
+
+**Satellite files** (loaded on-demand):
+
+- [references/design-fundamentals.md](references/design-fundamentals.md) -- durable design canon (Rams, Norman, Nielsen, Tufte, Bloch, Zhuo), perception thresholds, full canon with one lesson each
+- [references/cli-output-and-ux.md](references/cli-output-and-ux.md) -- full clig.dev distillation, exemplar CLIs, composability, stdout/stderr depth, JSON mode, tables, progress
+- [references/cli-ux-patterns.md](references/cli-ux-patterns.md) -- help text design, three-part error message in full, interactive vs non-interactive, exit code table
+- [references/tui-frameworks.md](references/tui-frameworks.md) -- framework selection, Model-Update-View architecture, Python textual/rich, Node Ink, Go Charm ecosystem
+- [references/terminal-accessibility.md](references/terminal-accessibility.md) -- NO_COLOR, color depth, ANSI in non-TTY, screen readers, render performance (DECSET 2026)
+- [references/design-review-checklist.md](references/design-review-checklist.md) -- CLI/TUI quality audit checklist (PASS/FAIL/WARN)
 
 ---
 
@@ -160,7 +171,7 @@ OPTIONS
 
 ---
 
-## Cross-References
+## Related Skills
 
-- **`web-ui-design`** — sibling hat for web UI design; when a product has both a web UI and a CLI.
-- **`agentic-interface-design`** — when the CLI is invoked by a model (tool name, description, schema); the tool's agentic interface is a separate design concern from its human-facing terminal output.
+- **[`web-ui-design`](../web-ui-design/SKILL.md)** — sibling hat for web UI design; when a product has both a web UI and a CLI.
+- **[`agentic-interface-design`](../agentic-interface-design/SKILL.md)** — when the CLI is invoked by a model (tool name, description, schema); the tool's agentic interface is a separate design concern from its human-facing terminal output.

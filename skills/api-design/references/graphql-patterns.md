@@ -1,6 +1,6 @@
 # GraphQL Schema Design Patterns
 
-Patterns for designing maintainable GraphQL schemas. Covers type system conventions, query/mutation design, error handling, and federation basics for microservices.
+Patterns for designing maintainable GraphQL schemas. Covers type system conventions, query/mutation design, error handling, and federation basics for microservices. Back to [SKILL.md](../SKILL.md).
 
 ## Schema Structure
 

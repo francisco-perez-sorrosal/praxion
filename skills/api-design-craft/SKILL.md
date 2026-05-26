@@ -10,6 +10,8 @@ description: >
   choosing a paradigm, designing error contracts/pagination/webhooks, evaluating
   latency ergonomics. Methodology in api-design; agentic tool design in
   agentic-interface-design.
+allowed-tools: [Read, Glob, Grep, Bash]
+compatibility: Claude Code
 staleness_sensitive_sections:
   - "The Standards Canon"
   - "Rate Limiting"
@@ -24,14 +26,15 @@ The difference matters for context loading: use `api-design` when building an AP
 
 Start with the shared canon in `references/design-fundamentals.md` — Bloch's principles are the foundation of this skill's entire review framework.
 
-## When This Skill Activates
+**Satellite files** (loaded on-demand):
 
-- "Review this API for quality" / "Is this a good API design?"
-- "Which paradigm should I use — REST, GraphQL, or gRPC?"
-- "How should I design the error format / pagination / webhook / versioning?"
-- "Evaluate the latency ergonomics of this interface"
-- "Explain the Stripe API's design decisions"
-- Any reference to API canon, taste, quality, RFC 9457, or the Bloch principles applied to APIs
+- [references/design-fundamentals.md](references/design-fundamentals.md) -- durable design canon (Rams, Norman, Nielsen, Bloch) — the first-principles foundation
+- [references/api-canon.md](references/api-canon.md) -- canonical APIs (Stripe, GitHub, S3, Twilio, Linear, Resend) and standards (RFC 9457, OpenAPI 3.1, Relay, Google AIP)
+- [references/rest-patterns.md](references/rest-patterns.md) -- REST quality patterns: URL design, status codes, PATCH semantics, webhooks, long-running ops, versioning
+- [references/graphql-patterns.md](references/graphql-patterns.md) -- GraphQL quality patterns: when to use, schema design, Relay, error unions, DataLoader
+- [references/grpc-patterns.md](references/grpc-patterns.md) -- gRPC quality patterns: Protobuf design, FieldMask, streaming modes, Google AIP
+- [references/low-latency-ergonomics.md](references/low-latency-ergonomics.md) -- N+1 elimination, caching (ETag, Cache-Control), streaming decisions, round-trip cost
+- [references/design-review-checklist.md](references/design-review-checklist.md) -- audit checklist for REST/GraphQL/gRPC APIs
 
 ## The Canon Summary
 
@@ -126,14 +129,10 @@ Apply Joshua Bloch's 8 principles as the primary review checklist for any API:
 | Reviewing an API design | `design-review-checklist.md` |
 | Shared design principles (Rams, Norman, Nielsen, Bloch) | `design-fundamentals.md` |
 
-## Cross-References
+## Related Skills
 
-**Methodology layer (how to build):** → `api-design` — the API-first process: resource modeling, OpenAPI spec patterns, versioning strategies, interface contracts. This skill (`api-design-craft`) is the quality lens; `api-design` is the methodology. `api-design` carries a reciprocal cross-reference added in the surgical-edit step.
-
-**Sibling hat:** → `agentic-interface-design` — the same quality/taste lens applied to MCP tools, function-calling schemas, and A2A contracts (the model as consumer).
-
-**Current external API details:** → `external-api-docs` — for verifying current API specifications, SDK versions, or library capabilities before committing to a paradigm decision. Always verify external facts before stating them.
-
-**Data layer:** → `data-modeling` — backend schema design informs resource modeling. When the resource model feels wrong, often the data model is the root cause.
-
-**Backend performance:** → `performance-architecture` — infrastructure-level performance (query optimization, connection pooling, caching layers). This skill covers *interface*-level latency ergonomics (payload shape, N+1 patterns, caching headers); `performance-architecture` covers what happens behind the API surface.
+- **[`api-design`](../api-design/SKILL.md)** — the methodology layer: API-first process, resource modeling, OpenAPI spec patterns, versioning strategies, interface contracts. This skill is the quality lens; `api-design` is the how-to.
+- **[`agentic-interface-design`](../agentic-interface-design/SKILL.md)** — the same quality/taste lens applied to MCP tools, function-calling schemas, and A2A contracts (the model as consumer).
+- **[`external-api-docs`](../external-api-docs/SKILL.md)** — for verifying current API specifications, SDK versions, or library capabilities before committing to a paradigm decision.
+- **[`data-modeling`](../data-modeling/SKILL.md)** — backend schema design informs resource modeling; when the resource model feels wrong, often the data model is the root cause.
+- **[`performance-architecture`](../performance-architecture/SKILL.md)** — infrastructure-level performance behind the API surface; this skill covers interface-level latency ergonomics.

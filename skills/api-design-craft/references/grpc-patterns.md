@@ -1,6 +1,6 @@
 # gRPC Patterns
 
-gRPC quality guidance — when to use it and what a well-designed gRPC API looks like. This is one of the least-documented areas in Praxion's skill set.
+gRPC quality guidance — when to use it and what a well-designed gRPC API looks like. This is one of the least-documented areas in Praxion's skill set. Back to [SKILL.md](../SKILL.md).
 
 ## When gRPC Is the Right Choice
 

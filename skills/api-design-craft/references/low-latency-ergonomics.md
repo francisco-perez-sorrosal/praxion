@@ -1,6 +1,6 @@
 # Low-Latency Interface Ergonomics
 
-The latency-conscious API designer models specific costs and minimizes them. This file covers the concrete toolkit: payload design, N+1 elimination, caching, connection reuse, streaming decisions, and round-trip cost modeling.
+The latency-conscious API designer models specific costs and minimizes them. This file covers the concrete toolkit: payload design, N+1 elimination, caching, connection reuse, streaming decisions, and round-trip cost modeling. Back to [SKILL.md](../SKILL.md).
 
 ## Payload Shape and Size
 

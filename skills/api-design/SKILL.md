@@ -203,12 +203,12 @@ Apply these security patterns to every API:
 | God endpoint | `/api/do?action=X` dispatching everything | One resource per entity, one method per operation |
 | Ignoring idempotency | Retries create duplicates | Implement idempotency keys for non-idempotent operations |
 
-## Integration with Other Skills
+## Related Skills
 
-- **[Spec-Driven Development](../spec-driven-development/SKILL.md)** -- behavioral specifications (When/and/the system/so that) define what the API should do; API design defines how the surface exposes that behavior
-- **[Data Modeling](../data-modeling/SKILL.md)** -- data models inform API resource design; schema evolution rules complement API versioning strategy
-- **[Doc Management](../doc-management/SKILL.md)** -- API documentation generation and maintenance
-- **[api-design-craft](../api-design-craft/SKILL.md)** -- the quality/taste/review lens above this methodology: the API canon, Bloch principles as a review checklist, RFC 9457 error design, low-latency ergonomics. Consult when reviewing an API design or applying a taste lens.
+- **[`spec-driven-development`](../spec-driven-development/SKILL.md)** -- behavioral specifications define what the API should do; API design defines how the surface exposes that behavior
+- **[`data-modeling`](../data-modeling/SKILL.md)** -- data models inform API resource design; schema evolution rules complement API versioning strategy
+- **[`doc-management`](../doc-management/SKILL.md)** -- API documentation generation and maintenance
+- **[`api-design-craft`](../api-design-craft/SKILL.md)** -- the quality/taste/review lens above this methodology: the API canon, Bloch principles as a review checklist, RFC 9457 error design, low-latency ergonomics
 
 ## Pre-Design Checklist
 

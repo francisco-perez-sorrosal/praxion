@@ -1,6 +1,6 @@
 # TUI Frameworks
 
-Framework selection, architecture patterns, and the Model-Update-View pattern that underlies all quality TUI work.
+Framework selection, architecture patterns, and the Model-Update-View pattern that underlies all quality TUI work. Back to [SKILL.md](../SKILL.md).
 
 **Praxion's working tools**: Python `textual` and `rich` (Python stack), Node `Ink` (Node.js stack). Go's Charm ecosystem (Bubble Tea, Lip Gloss, Gum) is the **quality exemplar** — study it for architecture even when building in Python or Node.
 

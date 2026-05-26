@@ -1,6 +1,6 @@
 # Database Migration Strategies
 
-Patterns for evolving database schemas safely in production, with emphasis on zero-downtime deployments and rollback capability.
+Patterns for evolving database schemas safely in production, with emphasis on zero-downtime deployments and rollback capability. Back to [SKILL.md](../SKILL.md).
 
 ## Expand-Contract Pattern
 

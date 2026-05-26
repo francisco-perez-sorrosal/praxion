@@ -1,6 +1,6 @@
 # Relational Schema Design
 
-Patterns and conventions for designing relational database schemas. Language- and database-agnostic unless noted.
+Patterns and conventions for designing relational database schemas. Language- and database-agnostic unless noted. Back to [SKILL.md](../SKILL.md).
 
 ## Naming Conventions
 

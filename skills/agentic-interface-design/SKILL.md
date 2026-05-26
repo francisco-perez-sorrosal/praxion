@@ -8,6 +8,8 @@ description: >
   Triggers: designing/reviewing MCP tools, tool descriptions, function-calling schemas,
   agent error ergonomics, A2A contracts. Not for web/CLI (web-ui-design, tui-design)
   or REST/GraphQL quality (api-design-craft).
+allowed-tools: [Read, Glob, Grep, Bash]
+compatibility: Claude Code
 staleness_sensitive_sections:
   - "The Token Economy Problem"
   - "A2A Contract Design"
@@ -18,6 +20,16 @@ staleness_sensitive_sections:
 Interface design craft for one specific consumer: the language model. When the consumer is a model rather than a human, the ergonomics of the interface change fundamentally — and most API design instincts don't transfer.
 
 Start with the shared canon in `references/design-fundamentals.md` — the Bloch principles apply directly here (minimal surface area, names matter, hard-to-misuse, fail-fast). Then apply the agentic-specific lens this skill provides.
+
+**Satellite files** (loaded on-demand):
+
+- [references/design-fundamentals.md](references/design-fundamentals.md) -- durable design canon (Rams, Norman, Nielsen, Bloch) — the first-principles foundation
+- [references/tool-design-for-models.md](references/tool-design-for-models.md) -- tool naming, description writing, parameter naming, granularity decisions
+- [references/mcp-primitives-as-design-surfaces.md](references/mcp-primitives-as-design-surfaces.md) -- when to use tool vs resource vs prompt; the do-not-mix rule
+- [references/agent-error-ergonomics.md](references/agent-error-ergonomics.md) -- error grammar, idempotency patterns, Stripe-style request_id
+- [references/progressive-disclosure-of-tools.md](references/progressive-disclosure-of-tools.md) -- token economy problem, meta-tool pattern, domain bundles, 85–100× reduction
+- [references/agent-contracts.md](references/agent-contracts.md) -- JSON-schema design, response structure, pagination, A2A contracts
+- [references/design-review-checklist.md](references/design-review-checklist.md) -- audit checklist for MCP servers, tool surfaces, A2A contracts
 
 ## The Central Principle: Names and Descriptions ARE the Interface
 
@@ -91,14 +103,10 @@ Paginate every list tool result. The model's context window is a shared resource
 | Reviewing an existing tool surface or MCP server | `design-review-checklist.md` |
 | Shared design principles (Bloch, Rams, Nielsen) | `design-fundamentals.md` |
 
-## Cross-References
+## Related Skills
 
-**Sibling hat:** → `api-design-craft` — the same taste/quality lens applied to REST/GraphQL/gRPC APIs rather than agent tools. When an interface serves both human API consumers and model consumers, both skills apply.
-
-**Implementation (how to build):** → `mcp-crafting` — MCP server construction: FastMCP patterns, transport configuration, testing with MCP Inspector, bundle packaging. This skill (`agentic-interface-design`) covers *how good* the design is; `mcp-crafting` covers *how to build it*. `mcp-crafting` carries a reciprocal cross-reference pointing here.
-
-**SDK loop mechanics:** → `agentic-sdks` — how to wire tools to the agent loop, framework selection (OpenAI Agents SDK vs Claude Agent SDK), multi-agent orchestration patterns. This skill owns design craft; `agentic-sdks` owns SDK mechanics. `agentic-sdks` carries a reciprocal cross-reference pointing here.
-
-**A2A protocol mechanics:** → `communicating-agents` — Agent Card structure, A2A task lifecycle, interaction patterns. This skill covers the design of those contracts; `communicating-agents` covers the protocol mechanics.
-
-**Prompt body inside tool descriptions:** → `llm-prompt-engineering` — when a tool description is long enough to be a mini-prompt (few-shot examples, chain-of-thought cues), the prompt engineering craft applies directly.
+- **[`api-design-craft`](../api-design-craft/SKILL.md)** — the same taste/quality lens applied to REST/GraphQL/gRPC APIs; when an interface serves both human and model consumers, both skills apply.
+- **[`mcp-crafting`](../mcp-crafting/SKILL.md)** — MCP server construction (FastMCP, transport config, Inspector testing); this skill covers design quality, `mcp-crafting` covers how to build it.
+- **[`agentic-sdks`](../agentic-sdks/SKILL.md)** — wiring tools to the agent loop, framework selection, multi-agent orchestration; this skill covers design craft, `agentic-sdks` covers SDK mechanics.
+- **[`communicating-agents`](../communicating-agents/SKILL.md)** — Agent Card structure, A2A task lifecycle, interaction patterns; this skill covers contract design, `communicating-agents` covers protocol mechanics.
+- **[`llm-prompt-engineering`](../llm-prompt-engineering/SKILL.md)** — when a tool description is long enough to be a mini-prompt (few-shot examples, chain-of-thought cues).

@@ -1,6 +1,6 @@
 # API Canon
 
-The exemplary APIs and specifications worth studying. Each entry is an existence proof of a principle — not a tutorial but a reference for "this works; here's why."
+The exemplary APIs and specifications worth studying. Each entry is an existence proof of a principle — not a tutorial but a reference for "this works; here's why." Back to [SKILL.md](../SKILL.md).
 
 ## The Canonical APIs
 

@@ -1,6 +1,6 @@
 # REST Patterns
 
-REST quality patterns — the taste layer above `api-design`'s methodology. This file covers the opinionated guidance for making REST APIs excellent, not just functional.
+REST quality patterns — the taste layer above `api-design`'s methodology. This file covers the opinionated guidance for making REST APIs excellent, not just functional. Back to [SKILL.md](../SKILL.md).
 
 ## URL Design and Resource Naming
 

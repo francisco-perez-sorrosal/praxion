@@ -1,6 +1,6 @@
 # MCP Primitives as Design Surfaces
 
-The three MCP primitives — tools, resources, and prompts — are design choices, not implementation choices. Picking the right primitive shapes how the model understands and uses the interface.
+The three MCP primitives — tools, resources, and prompts — are design choices, not implementation choices. Picking the right primitive shapes how the model understands and uses the interface. Back to [SKILL.md](../SKILL.md).
 
 ## The Three Primitives
 

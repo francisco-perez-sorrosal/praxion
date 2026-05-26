@@ -1,6 +1,6 @@
 # CLI/TUI Design Review Checklist
 
-The quality audit checklist for terminal/CLI/TUI surfaces. Run this when reviewing a CLI tool, agent output formatting, TUI implementation, or preparing a PASS/FAIL/WARN Interface Design Review. Reference the in-scope skill reference files for depth on any item.
+The quality audit checklist for terminal/CLI/TUI surfaces. Run this when reviewing a CLI tool, agent output formatting, TUI implementation, or preparing a PASS/FAIL/WARN Interface Design Review. Reference the in-scope skill reference files for depth on any item. Back to [SKILL.md](../SKILL.md).
 
 ---
 

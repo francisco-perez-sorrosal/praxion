@@ -1,6 +1,6 @@
 # GraphQL Patterns
 
-GraphQL quality guidance — the taste layer above `api-design`'s methodology. This file covers when GraphQL is the right choice and what a well-designed GraphQL API looks like.
+GraphQL quality guidance — the taste layer above `api-design`'s methodology. This file covers when GraphQL is the right choice and what a well-designed GraphQL API looks like. Back to [SKILL.md](../SKILL.md).
 
 ## When GraphQL Is the Right Choice
 

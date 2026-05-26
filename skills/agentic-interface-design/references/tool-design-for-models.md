@@ -1,6 +1,6 @@
 # Tool Design for Models
 
-The core craft of agentic interface design: writing tool names, descriptions, and parameter schemas that enable a language model to use a tool correctly on every call.
+The core craft of agentic interface design: writing tool names, descriptions, and parameter schemas that enable a language model to use a tool correctly on every call. Back to [SKILL.md](../SKILL.md).
 
 ## The Description Is the Interface
 

@@ -1,6 +1,6 @@
 # NoSQL Data Modeling Patterns
 
-Patterns for designing data models in document, key-value, column-family, and graph databases. Focus on access-pattern-driven design rather than normalization.
+Patterns for designing data models in document, key-value, column-family, and graph databases. Focus on access-pattern-driven design rather than normalization. Back to [SKILL.md](../SKILL.md).
 
 ## Document Modeling
 

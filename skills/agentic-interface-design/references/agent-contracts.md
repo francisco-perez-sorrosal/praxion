@@ -1,6 +1,6 @@
 # Agent Contracts
 
-JSON-schema design for tool definitions, structured response design, pagination, and A2A contract design — the contracts that make agentic interfaces predictable and reliable.
+JSON-schema design for tool definitions, structured response design, pagination, and A2A contract design — the contracts that make agentic interfaces predictable and reliable. Back to [SKILL.md](../SKILL.md).
 
 ## JSON Schema Design for Tool Parameters
 

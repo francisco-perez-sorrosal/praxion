@@ -1,6 +1,6 @@
 # Agentic Interface Design Review Checklist
 
-Use this checklist to audit an MCP server, function-calling tool surface, or A2A contract. Apply it when reviewing a design before implementation, auditing an existing server, or running `/review-interface` against an agentic tool surface.
+Use this checklist to audit an MCP server, function-calling tool surface, or A2A contract. Apply it when reviewing a design before implementation, auditing an existing server, or running `/review-interface` against an agentic tool surface. Back to [SKILL.md](../SKILL.md).
 
 ## Tool Naming and Descriptions
 

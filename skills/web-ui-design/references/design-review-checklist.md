@@ -1,6 +1,6 @@
 # Web UI Design Review Checklist
 
-The quality audit checklist for web UI surfaces. Run this when reviewing a web UI implementation, preparing a PASS/FAIL/WARN Interface Design Review, or running `verifier` quality checks. Reference the in-scope skill reference files for depth on any item.
+The quality audit checklist for web UI surfaces. Run this when reviewing a web UI implementation, preparing a PASS/FAIL/WARN Interface Design Review, or running `verifier` quality checks. Reference the in-scope skill reference files for depth on any item. Back to [SKILL.md](../SKILL.md).
 
 ---
 

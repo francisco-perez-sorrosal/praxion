@@ -1,6 +1,6 @@
 # API Design Review Checklist
 
-Use this checklist to audit a REST, GraphQL, or gRPC API design. Apply it when reviewing a design before implementation, auditing an existing API, or running `/review-interface` against an API surface.
+Use this checklist to audit a REST, GraphQL, or gRPC API design. Apply it when reviewing a design before implementation, auditing an existing API, or running `/review-interface` against an API surface. Back to [SKILL.md](../SKILL.md).
 
 ## Errors and RFC 9457
 

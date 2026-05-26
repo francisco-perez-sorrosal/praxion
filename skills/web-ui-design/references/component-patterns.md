@@ -1,6 +1,6 @@
 # Component Patterns (Web UI)
 
-Depth on modal/drawer/inline patterns, table/card/list patterns, form patterns, empty states, the five UI states, and keyboard-first interaction patterns. For the decision tables at a glance, see the `SKILL.md` body.
+Depth on modal/drawer/inline patterns, table/card/list patterns, form patterns, empty states, the five UI states, and keyboard-first interaction patterns. For the decision tables at a glance, see the `SKILL.md` body. Back to [SKILL.md](../SKILL.md).
 
 ---
 

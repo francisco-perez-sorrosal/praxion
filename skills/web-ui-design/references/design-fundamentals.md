@@ -2,7 +2,7 @@
 
 *The durable cross-cutting canon for all interface surfaces — web UI, terminal/CLI, APIs, and agent tools. An interface is the boundary where a system meets its consumer — human through a UI, machine through an API or a tool; design that boundary as a contract.*
 
-This file is byte-identical across all four interface-design skills (`web-ui-design`, `tui-design`, `agentic-interface-design`, `api-design-craft`). The duplication is intentional: each skill loads only its own context, so the fundamentals must travel with the skill that needs them. The `sentinel` will flag this as redundancy — this is expected and correct. Do not "fix" it by consolidating or cross-referencing.
+This file is byte-identical across all four interface-design skills (`web-ui-design`, `tui-design`, `agentic-interface-design`, `api-design-craft`). The duplication is intentional: each skill loads only its own context, so the fundamentals must travel with the skill that needs them. The `sentinel` will flag this as redundancy — this is expected and correct. Do not "fix" it by consolidating or cross-referencing. Back to [SKILL.md](../SKILL.md).
 
 ---
 

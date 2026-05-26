@@ -10,6 +10,8 @@ description: >
   tokens, component ergonomics, UI framework selection, auditing React/Next.js
   quality and accessibility. Not for CLI/terminal (tui-design) or API/tools
   (api-design-craft, agentic-interface-design).
+allowed-tools: [Read, Glob, Grep, Bash]
+compatibility: Claude Code
 staleness_sensitive_sections:
   - "WCAG 2.2 AA — The Numbers"
   - "RAIL Model"
@@ -22,6 +24,15 @@ Web UI design is the craft of the boundary between a system and its human consum
 The durable cross-cutting fundamentals (Rams, Norman, Nielsen, Tufte, Bloch, Zhuo, perception thresholds, the full canon with one lesson each) live in [`references/design-fundamentals.md`](references/design-fundamentals.md). Load it when you need the canon depth. This SKILL.md body carries the web-specific application.
 
 **Separation of contexts**: this skill covers web UI only. For terminal/CLI output design, use the `tui-design` skill. For API and agent-tool design, use `api-design-craft` or `agentic-interface-design`.
+
+**Satellite files** (loaded on-demand):
+
+- [references/design-fundamentals.md](references/design-fundamentals.md) -- durable design canon (Rams, Norman, Nielsen, Tufte, Bloch, Zhuo), perception thresholds, full canon with one lesson each
+- [references/visual-design-fundamentals.md](references/visual-design-fundamentals.md) -- visual hierarchy, typography, color systems (5-shade palette, grayscale-first, dark mode), layout
+- [references/component-patterns.md](references/component-patterns.md) -- modal/drawer/inline, table/card/list, form patterns, the five UI states, Linear keyboard-first patterns
+- [references/accessibility.md](references/accessibility.md) -- WCAG 2.2 AA audit, ARIA patterns, focus management, accessible primitives, screen readers
+- [references/motion-and-perceived-performance.md](references/motion-and-perceived-performance.md) -- animation timing, RAIL model, skeleton vs spinner, optimistic UI, debounce/throttle
+- [references/design-review-checklist.md](references/design-review-checklist.md) -- web UI quality audit checklist (PASS/FAIL/WARN)
 
 ---
 
@@ -224,9 +235,9 @@ Never fire heavy operations on every keystroke.
 
 ---
 
-## Cross-References
+## Related Skills
 
-- **`tui-design`** — sibling hat for terminal/CLI output design; when a surface has both web UI and CLI components, use both skills.
-- **`api-design-craft`** — sibling hat for the API quality and taste lens; the web UI and the API it consumes are both interface surfaces.
-- **`agentic-interface-design`** — when the web UI exposes a tool surface or is consumed by an agent rather than a human.
-- **HTML output conventions rule** (`rules/writing/html-output-conventions.md`) — Praxion's dashboard runtime conventions (Markdown-as-source-of-truth, server-only filesystem access, renderer registry, narrow live refresh, empty-state degradation); auto-loads when working on `dashboard_app/`.
+- **[`tui-design`](../tui-design/SKILL.md)** — sibling hat for terminal/CLI output design; when a surface has both web UI and CLI components, use both skills.
+- **[`api-design-craft`](../api-design-craft/SKILL.md)** — sibling hat for the API quality and taste lens; the web UI and the API it consumes are both interface surfaces.
+- **[`agentic-interface-design`](../agentic-interface-design/SKILL.md)** — when the web UI exposes a tool surface or is consumed by an agent rather than a human.
+- **HTML output conventions rule** (`rules/writing/html-output-conventions.md`) — Praxion's dashboard runtime conventions; auto-loads when working on `dashboard_app/`.

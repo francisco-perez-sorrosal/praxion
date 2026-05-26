@@ -1,6 +1,6 @@
 # Visual Design Fundamentals (Web)
 
-Web-specific deepening of visual hierarchy, typography, color, and layout. The cross-cutting design canon (Rams, Norman, Nielsen, Tufte, Bloch) lives in [`design-fundamentals.md`](design-fundamentals.md). This file covers web-specific application.
+Web-specific deepening of visual hierarchy, typography, color, and layout. The cross-cutting design canon (Rams, Norman, Nielsen, Tufte, Bloch) lives in [`design-fundamentals.md`](design-fundamentals.md). This file covers web-specific application. Back to [SKILL.md](../SKILL.md).
 
 ---
 

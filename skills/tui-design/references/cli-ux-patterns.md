@@ -1,6 +1,6 @@
 # CLI UX Patterns
 
-Help-text design depth, the three-part error message in full, interactive-vs-non-interactive handling, and exit codes. See `cli-output-and-ux.md` for output design rules and exemplar tools.
+Help-text design depth, the three-part error message in full, interactive-vs-non-interactive handling, and exit codes. See `cli-output-and-ux.md` for output design rules and exemplar tools. Back to [SKILL.md](../SKILL.md).
 
 ---
 

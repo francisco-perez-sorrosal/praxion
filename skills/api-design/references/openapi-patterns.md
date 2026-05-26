@@ -1,6 +1,6 @@
 # OpenAPI 3.1 Specification Patterns
 
-Patterns and conventions for writing effective OpenAPI 3.1 specifications. OpenAPI 3.1 aligns fully with JSON Schema Draft 2020-12, enabling richer schema composition and validation.
+Patterns and conventions for writing effective OpenAPI 3.1 specifications. OpenAPI 3.1 aligns fully with JSON Schema Draft 2020-12, enabling richer schema composition and validation. Back to [SKILL.md](../SKILL.md).
 
 ## Document Structure
 

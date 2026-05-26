@@ -2,8 +2,17 @@
 
 Integration recipe for the `skypilot` backend of the neo-cloud abstraction.
 This is the **default remote backend** for operational mode C.
+Back to [SKILL.md](../SKILL.md).
 
-Back to: [neo-cloud-abstraction SKILL.md](../SKILL.md)
+## Contents
+
+- [Configuration](#configuration)
+- [Descriptor → SkyPilot YAML Translation](#descriptor--skypilot-yaml-translation)
+- [Lifecycle Operations — SkyPilot CLI mapping](#lifecycle-operations--skypilot-cli-mapping)
+- [Spot Recovery and Multi-Cloud Failover](#spot-recovery-and-multi-cloud-failover)
+- [Version Drift Note](#version-drift-note)
+- [Provider Coverage (as of SkyPilot 0.12.1)](#provider-coverage-as-of-skypilot-0121)
+- [When to Move from SkyPilot to RunPod Direct](#when-to-move-from-skypilot-to-runpod-direct)
 
 ---
 

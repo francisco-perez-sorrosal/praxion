@@ -1,8 +1,15 @@
 # Local Backend
 
 Integration recipe for the `local` backend of the neo-cloud abstraction.
+Back to [SKILL.md](../SKILL.md).
 
-Back to: [neo-cloud-abstraction SKILL.md](../SKILL.md)
+## Contents
+
+- [Configuration](#configuration)
+- [Lifecycle Operations — local backend implementation](#lifecycle-operations--local-backend-implementation)
+- [wall_clock_seconds_max enforcement](#wall_clock_seconds_max-enforcement)
+- [env_vars merging](#env_vars-merging)
+- [Mode A vs Mode B — what is different for the user](#mode-a-vs-mode-b--what-is-different-for-the-user)
 
 ---
 

@@ -2,7 +2,15 @@
 
 Three modes share one `training_job_descriptor` schema. Mode is a **project-level
 configuration** — changing mode requires only updating `neo_cloud_backend.yaml`, not
-touching the descriptor or any project code.
+touching the descriptor or any project code. Back to [SKILL.md](../SKILL.md).
+
+## Contents
+
+- [Mode A — Co-located Owned GPU](#mode-a--co-located-owned-gpu)
+- [Mode B — Co-located Rented GPU](#mode-b--co-located-rented-gpu)
+- [Mode C — Separated Cloud](#mode-c--separated-cloud-skypilot-or-direct-adapter)
+- [When to Transition Between Modes](#when-to-transition-between-modes)
+- [Project Config Convention](#project-config-convention)
 
 ---
 

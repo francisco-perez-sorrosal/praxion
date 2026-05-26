@@ -1,9 +1,20 @@
 # TRAINING_RESULTS.md — Canonical Schema
 
 Schema reference for `TRAINING_RESULTS.md`. Owned by the `llm-training-eval` skill.
-Back-link: [../SKILL.md](../SKILL.md)
+Back to [SKILL.md](../SKILL.md).
 
 <!-- last-verified: 2026-05-03 -->
+
+## Contents
+
+- [Schema Overview](#schema-overview)
+- [Canonical YAML Front-Matter](#canonical-yaml-front-matter)
+- [Field Constraints](#field-constraints)
+- [Markdown Body](#markdown-body)
+- [Dual Lifecycle](#dual-lifecycle)
+- [Verifier Consumption (Phase 3a)](#verifier-consumption-phase-3a)
+- [Schema Versioning](#schema-versioning)
+- [Minimal Valid Example](#minimal-valid-example)
 
 ---
 

@@ -1,12 +1,23 @@
 # W&B (Weights & Biases) Integration
 
 Integration recipe for connecting a training loop to Weights & Biases experiment tracking.
-Back-link: [../SKILL.md](../SKILL.md)
+Back to [SKILL.md](../SKILL.md).
 
 Curated chub reference: `wandb/package` (maintainer, Python, `0.25.1`). Fetch for
 current endpoint signatures: `chub get wandb/package --lang python`.
 
 <!-- last-verified: 2026-05-03 -->
+
+## Contents
+
+- [Version Note](#version-note)
+- [Install](#install)
+- [Authentication](#authentication)
+- [Project and Entity Convention](#project-and-entity-convention)
+- [Core Training Loop Pattern](#core-training-loop-pattern)
+- [Mapping run.id to TRAINING_RESULTS.md](#mapping-runid-to-training_resultsmd)
+- [Offline / Air-Gapped Use](#offline--air-gapped-use)
+- [Reproducibility Fields to Log](#reproducibility-fields-to-log)
 
 ## Version Note
 

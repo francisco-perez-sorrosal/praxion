@@ -1,12 +1,22 @@
 # MLflow Integration
 
 Integration recipe for connecting a training loop to MLflow experiment tracking.
-Back-link: [../SKILL.md](../SKILL.md)
+Back to [SKILL.md](../SKILL.md).
 
 Curated chub reference: `mlflow/package` (maintainer, Python, `3.10.1`). Fetch for
 current endpoint signatures: `chub get mlflow/package --lang python`.
 
 <!-- last-verified: 2026-05-03 -->
+
+## Contents
+
+- [Version Note](#version-note)
+- [Install](#install)
+- [Tracking URI Convention](#tracking-uri-convention)
+- [Core Training Loop Pattern](#core-training-loop-pattern)
+- [Mapping run_id to TRAINING_RESULTS.md](#mapping-run_id-to-training_resultsmd)
+- [Self-Hosted Tracking Server (Team Use)](#self-hosted-tracking-server-team-use)
+- [Reproducibility Fields to Log](#reproducibility-fields-to-log)
 
 ## Version Note
 

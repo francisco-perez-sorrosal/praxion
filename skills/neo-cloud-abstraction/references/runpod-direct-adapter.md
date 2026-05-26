@@ -2,8 +2,18 @@
 
 Integration recipe for the `runpod-direct` backend of the neo-cloud abstraction.
 This is an **opt-in specialization** for mode C users who have committed to RunPod.
+Back to [SKILL.md](../SKILL.md).
 
-Back to: [neo-cloud-abstraction SKILL.md](../SKILL.md)
+## Contents
+
+- [Important: Praxion does not ship a custom MCP server](#important-praxion-does-not-ship-a-custom-mcp-server)
+- [Configuration](#configuration)
+- [Lifecycle Operations — RunPod MCP tool mapping](#lifecycle-operations--runpod-mcp-tool-mapping)
+- [Descriptor → RunPod pod_create mapping](#descriptor--runpod-pod_create-mapping)
+- [artifact_fetch via Network Volume](#artifact_fetch-via-network-volume)
+- [Community Cloud vs Secure Cloud](#community-cloud-vs-secure-cloud)
+- [Security notes](#security-notes)
+- [v2 Direct Adapters — same pattern](#v2-direct-adapters--same-pattern)
 
 ---
 

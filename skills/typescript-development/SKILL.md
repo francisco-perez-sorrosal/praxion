@@ -8,6 +8,10 @@ description: >
   projects. Layered contexts: TypeScript baseline, React, Vue.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
+staleness_sensitive_sections:
+  - "Framework Contexts"
+  - "Test Discipline"
+  - "Gotchas"
 ---
 
 # TypeScript Development
@@ -29,6 +33,7 @@ contexts loaded on demand.
 | Node.js + TypeScript baseline | [contexts/typescript.md](contexts/typescript.md) | All TS work — type system, linting, testing, type checking |
 
 ## Framework Contexts
+<!-- last-verified: 2026-05-25 -->
 
 | Framework | Context File | When to load alongside `contexts/typescript.md` |
 |-----------|--------------|-------------------------------------------------|
@@ -82,6 +87,7 @@ Run all three before committing. Each check catches a different failure class; s
 For project-setup toolchain details (pnpm, volta, workspace config), see the `node-prj-mgmt` skill.
 
 ## Test Discipline
+<!-- last-verified: 2026-05-25 -->
 
 Vitest 4 is the default test runner for TypeScript projects. It shares the Vite config
 surface, runs in parallel by default, and supports browser-mode testing for frontend
@@ -97,6 +103,7 @@ For coverage configuration, thresholds, and CI integration, see the `test-covera
 TypeScript reference once available. For project-level test setup, see `contexts/typescript.md`.
 
 ## Gotchas
+<!-- last-verified: 2026-05-25 -->
 
 - **`tsc --noEmit` is mandatory, not optional**: many projects run only ESLint or only Biome and skip the type checker. ESLint `@typescript-eslint` does not replicate TypeScript's full type-inference — `tsc --noEmit` is the only check that catches generic constraint violations, overload mismatches, and mapped-type narrowing failures.
 - **Biome and ESLint cannot coexist as formatters**: running both produces conflicting edits. Choose one formatter per project. For framework projects that need ESLint plugins (React hooks, Vue), use Prettier as the formatter and ESLint for linting. For greenfield/library projects, Biome handles both. See `contexts/typescript.md` for the full decision rule.

@@ -1,6 +1,6 @@
 # pixi for Python Projects
 
-pixi is a fast, cross-platform package manager built on conda that supports multiple languages. For Python projects, pixi uses `pyproject.toml` as the primary configuration file, providing a Python-native development experience.
+Fast, cross-platform package manager built on conda. Complete pixi reference for Python projects. Back to [SKILL.md](../SKILL.md).
 
 ## Table of Contents
 

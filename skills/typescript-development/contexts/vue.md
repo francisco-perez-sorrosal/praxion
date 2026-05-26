@@ -1,16 +1,17 @@
 # Vue 3 Context
 
-Vue 3 Composition API + Nuxt 3 patterns layered on top of the TypeScript baseline.
+Vue 3 Composition API + Nuxt 3 patterns layered on top of the TypeScript baseline. Back to [SKILL.md](../SKILL.md).
 
-For baseline TypeScript conventions, see [`contexts/typescript.md`](typescript.md). This file
-layers Vue-specific patterns on top — it does **not** restate pnpm/volta setup, tsconfig
-configuration, or Vitest baseline.
+Load [`contexts/typescript.md`](typescript.md) first — this file layers Vue-specific patterns on top and does not restate pnpm/volta setup, tsconfig configuration, or Vitest baseline.
 
-**Related skills**:
-- [TypeScript Development](../SKILL.md) — skill body with context routing decision tree
-- [Node Project Management](../../node-prj-mgmt/SKILL.md) — pnpm, volta, workspace setup
+## Contents
 
----
+- [Scaffolding](#scaffolding)
+- [Code quality toolchain — ESLint path](#code-quality-toolchain--eslint-path)
+- [Type checking — vue-tsc](#type-checking--vue-tsc)
+- [Composition API with script setup](#composition-api-with-script-setup)
+- [Testing with @vue/test-utils + Vitest](#testing-with-vuetest-utils--vitest)
+- [Nuxt 3 setup conventions](#nuxt-3-setup-conventions)
 
 ## Scaffolding
 

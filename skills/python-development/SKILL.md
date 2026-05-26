@@ -9,6 +9,8 @@ description: >
   pytest configuration.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
+staleness_sensitive_sections:
+  - "Python Version Guidelines"
 ---
 
 # Modern Python Development
@@ -44,6 +46,7 @@ Non-obvious pitfalls that cause silent failures or confusing errors:
 **Project Management**: Commands in this skill use `<tool>` as a placeholder for your project management tool (pixi or uv). See the [Python Project Management](../python-prj-mgmt/SKILL.md) skill for environment setup, dependency management, and choosing between pixi (default) and uv.
 
 ## Python Version Guidelines
+<!-- last-verified: 2026-05-25 -->
 
 **Target Python 3.13+** for new projects:
 - Better error messages
@@ -193,3 +196,8 @@ When invoked from a pipeline agent (`implementer`, `test-engineer`, or any subag
 ```
 
 **Cost-of-verbosity reference**: a 50-test suite with `pytest -v` emits roughly 3–5k tokens; the same suite with `--tb=short -q` emits roughly 300–800 tokens for the same outcome. The savings compound on every subsequent agent turn that carries the test-run history. `ruff check --output-format concise` typically halves lint output relative to the default `full` format on codebases with many findings.
+
+## Related Skills
+
+- [`python-prj-mgmt`](../python-prj-mgmt/SKILL.md) — pixi and uv: project initialization, dependency management, environment setup
+- [`testing-strategy`](../testing-strategy/SKILL.md) — advanced pytest patterns: conftest architecture, hypothesis, fixture composition, coverage philosophy

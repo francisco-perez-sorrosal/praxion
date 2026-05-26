@@ -1,15 +1,18 @@
 # TypeScript Baseline Context
 
-Node.js + TypeScript language mechanics for all TS work. Loaded first before any
-framework context (`contexts/react.md`, `contexts/vue.md`).
+Node.js + TypeScript language mechanics for all TS work — load first before any framework context. Back to [SKILL.md](../SKILL.md).
 
 For pnpm/volta/workspace setup, see [`node-prj-mgmt/contexts/typescript.md`](../../node-prj-mgmt/contexts/typescript.md).
 
-**Related skills**:
-- [TypeScript Development](../SKILL.md) — skill body with context routing decision tree
-- [Node Project Management](../../node-prj-mgmt/SKILL.md) — pnpm, volta, workspace, Zod coexistence
+## Contents
 
----
+- [Code quality toolchain](#code-quality-toolchain)
+- [Node.js and TypeScript version baseline](#nodejs-and-typescript-version-baseline)
+- [tsconfig strict configuration](#tsconfig-strict-configuration)
+- [Type-system discipline](#type-system-discipline)
+- [Type checking gate — tsc --noEmit](#type-checking-gate--tsc---noemit)
+- [Vitest 4](#vitest-4)
+- [Framework pointers](#framework-pointers)
 
 ## Code quality toolchain
 

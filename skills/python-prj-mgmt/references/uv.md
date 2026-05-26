@@ -1,6 +1,6 @@
 # uv Package Manager
 
-uv is an extremely fast Python package installer and resolver written in Rust. Use when explicitly requested by the user or when pixi is not suitable for the project needs.
+Extremely fast Python package installer and resolver written in Rust. Complete uv reference for Python projects. Back to [SKILL.md](../SKILL.md).
 
 ## Table of Contents
 

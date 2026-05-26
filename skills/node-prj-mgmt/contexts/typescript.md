@@ -1,11 +1,17 @@
 # Node.js Project Management — TypeScript Context
 
-TypeScript-specific setup for Node.js project management. Assumes the
-`node-prj-mgmt` SKILL.md body is loaded for conceptual grounding.
+TypeScript-specific setup for Node.js project management: Node 22 LTS + pnpm v10 + volta + @tsconfig/node22. Back to [SKILL.md](../SKILL.md).
 
-Baseline: **Node 22 LTS** + **pnpm v10** + **volta** + **@tsconfig/node22**.
+## Contents
 
----
+- [Node Version Pinning with volta](#node-version-pinning-with-volta)
+- [pnpm as Default Package Manager](#pnpm-as-default-package-manager)
+- [TypeScript Configuration Baseline](#typescript-configuration-baseline)
+- [Testing: Vitest 4 + @vitest/coverage-v8](#testing-vitest-4--vitestcoverage-v8)
+- [Code Quality: Biome v2 (default) / ESLint v9 (framework path)](#code-quality-biome-v2-default--eslint-v9-framework-path)
+- [pnpm Workspace Pattern (Monorepos)](#pnpm-workspace-pattern-monorepos)
+- [Zod v3/v4 Coexistence Gotcha](#zod-v3v4-coexistence-gotcha)
+- [MCP TypeScript SDK Version Baseline](#mcp-typescript-sdk-version-baseline)
 
 ## Node Version Pinning with volta
 

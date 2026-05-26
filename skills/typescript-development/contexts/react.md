@@ -1,17 +1,18 @@
 # React Context — TypeScript Development
 
-React 19 + Vite + Next.js 15 patterns layered on top of the TypeScript baseline.
+React 19 + Vite + Next.js 15 patterns layered on top of the TypeScript baseline. Back to [SKILL.md](../SKILL.md).
 
-For baseline TypeScript conventions (tsconfig strict mode, Biome/ESLint decision rule,
-Vitest setup, `tsc --noEmit` gate, pnpm/volta, `node-prj-mgmt`), see
-[`contexts/typescript.md`](typescript.md). Load that file first — this file layers
-React-specific patterns on top and does not restate the baseline.
+Load [`contexts/typescript.md`](typescript.md) first — this file layers React-specific patterns on top and does not restate tsconfig, Biome/ESLint, Vitest, or pnpm/volta baseline.
 
-**Related skills**:
-- [TypeScript Development](../SKILL.md) — skill body with context routing decision tree
-- [Node Project Management](../../node-prj-mgmt/SKILL.md) — pnpm, volta, workspace config
+## Contents
 
----
+- [Code quality toolchain — React override](#code-quality-toolchain--react-override)
+- [React 19 — Hooks and patterns](#react-19--hooks-and-patterns)
+- [Vite scaffolding](#vite-scaffolding)
+- [Next.js 15 — App Router](#nextjs-15--app-router)
+- [Testing — React Testing Library + Vitest](#testing--react-testing-library--vitest)
+- [End-to-end testing — Playwright](#end-to-end-testing--playwright)
+- [Package.json scripts](#packagejson-scripts)
 
 ## Code quality toolchain — React override
 

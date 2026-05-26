@@ -202,3 +202,8 @@ For complete command references, see [pixi.md](references/pixi.md) and [uv.md](r
 
 - [pixi Reference](references/pixi.md) — Complete pixi guide: environments, tasks, ML workflows, troubleshooting
 - [uv Reference](references/uv.md) — Complete uv guide: workspaces, build/publish, Python version management
+
+## Related Skills
+
+- [`python-development`](../python-development/SKILL.md) — type hints, testing with pytest, code quality tools, language patterns
+- [`cicd`](../cicd/SKILL.md) — GitHub Actions CI/CD pipeline design beyond the quick-start snippets above

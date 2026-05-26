@@ -1,31 +1,30 @@
-# Python Skill
+# Python Development
 
-Conventions and preferences for modern Python development — type hints, testing, code quality tools, and project structure.
+Conventions for modern Python development: type hints, testing with pytest, code quality tools (ruff, mypy, pyright), data modeling (dataclasses, Pydantic), async patterns, and project structure.
 
 ## When to Use
 
 - Writing Python code in any project
 - Setting up testing with pytest
-- Configuring code quality tools (ruff, mypy)
+- Configuring code quality tools (ruff, mypy, pyright)
 - Choosing between dataclasses and Pydantic
 - Structuring a Python package with `src` layout
+- Debugging pytest fixture scope or asyncio mode issues
 
 ## Activation
 
-The skill activates automatically when the agent detects Python development tasks: writing code, implementing tests, discussing language features, or configuring tooling.
+Auto-triggers on Python development tasks: writing code, implementing tests, configuring linting/formatting, discussing language features.
 
-Trigger explicitly by mentioning "python skill" or referencing it by name.
+Trigger explicitly by mentioning "python skill", "pytest", "ruff", "mypy", "pyright", "dataclasses", or "Pydantic".
 
 ## Skill Contents
 
-| File | Purpose |
-|------|---------|
-| `SKILL.md` | Core reference: project structure, type hints, code style, data modeling, testing, tool configs, gotchas |
-| `references/patterns-and-examples.md` | Dataclasses vs Pydantic, async patterns, structural pattern matching, error handling examples |
-| `references/testing-and-tooling.md` | Ruff/mypy/pyright configuration, pytest fixtures, parametrize patterns |
-| `README.md` | This file — overview and usage guide |
+- `SKILL.md` — core conventions: project structure, type hints, code style, async, error handling, gotchas, quick commands
+- `references/patterns-and-examples.md` — dataclasses vs Pydantic decision guide, protocols, context managers, structural pattern matching, async, error handling examples
+- `references/testing-and-tooling.md` — pytest fixtures, parametrize, ruff/mypy/pyright configuration, pre-commit setup
 
 ## Related Skills
 
-- [`python-prj-mgmt`](../python-prj-mgmt/) — pixi/uv setup, dependency management, environment configuration
-- [`refactoring`](../refactoring/) — restructuring code, improving design, reducing coupling
+- [`python-prj-mgmt`](../python-prj-mgmt/SKILL.md) — pixi/uv setup, dependency management, environment configuration
+- [`testing-strategy`](../testing-strategy/SKILL.md) — advanced pytest: conftest architecture, hypothesis, fixture composition, coverage philosophy
+- [`refactoring`](../refactoring/SKILL.md) — restructuring code, improving design, reducing coupling

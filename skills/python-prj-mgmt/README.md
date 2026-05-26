@@ -1,4 +1,4 @@
-# Python Project Management Skill
+# Python Project Management
 
 Managing Python projects with modern package managers. Defaults to **pixi** unless uv is explicitly requested.
 
@@ -13,19 +13,17 @@ Managing Python projects with modern package managers. Defaults to **pixi** unle
 
 ## Activation
 
-The skill activates automatically when the agent detects project management tasks: initializing projects, managing dependencies, configuring environments, or choosing package managers.
+Auto-triggers on project management tasks: initializing Python projects, managing dependencies, choosing package managers.
 
-Trigger explicitly by mentioning "python project management," "pixi," "uv," "pyproject.toml," or "dependency management."
+Trigger explicitly by mentioning "pixi", "uv", "pyproject.toml", "dependency management", or "python project management".
 
 ## Skill Contents
 
-| File | Purpose |
-|------|---------|
-| `SKILL.md` | Core reference: tool selection, project init, dependency management, CI/CD, pyproject.toml shared config, best practices |
-| `pixi.md` | Complete pixi reference: conda+PyPI ecosystem, environments, tasks, ML workflows, troubleshooting |
-| `uv.md` | Complete uv reference: fast installs, Python version management, workspaces, build/publish |
-| `README.md` | This file — overview and usage guide |
+- `SKILL.md` — tool selection decision table, project init, dependency management, CI/CD snippets, pyproject.toml shared config, best practices
+- `references/pixi.md` — complete pixi reference: conda+PyPI ecosystem, environments, tasks, ML workflows, troubleshooting
+- `references/uv.md` — complete uv reference: fast installs, Python version management, workspaces, build/publish
 
 ## Related Skills
 
-- [`python-development`](../python-development/) — type hints, testing, code quality, language patterns
+- [`python-development`](../python-development/SKILL.md) — type hints, testing with pytest, code quality tools, language patterns
+- [`cicd`](../cicd/SKILL.md) — GitHub Actions CI/CD pipeline design beyond the quick-start snippets

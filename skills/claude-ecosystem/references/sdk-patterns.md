@@ -2,6 +2,14 @@
 
 Practical SDK idioms for the [claude-ecosystem](../SKILL.md) skill. Covers Python SDK, TypeScript SDK, Agent SDK (both), version compatibility, and common gotchas. Load on demand.
 
+## Contents
+
+- [Python SDK](#python-sdk)
+- [TypeScript SDK](#typescript-sdk)
+- [Agent SDK](#agent-sdk)
+- [Version Compatibility](#version-compatibility)
+- [Common Gotchas](#common-gotchas)
+
 ## Python SDK
 
 Package: `anthropic`. Python 3.9+. Install: `pip install anthropic`.

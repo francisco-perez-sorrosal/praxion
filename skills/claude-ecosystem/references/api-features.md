@@ -4,6 +4,15 @@ Detailed coverage of Claude API features -- parameters, usage patterns, and avai
 
 **Boundary:** This file covers features available through the Messages API. It does not cover MCP server development (see [mcp-crafting](../../mcp-crafting/SKILL.md)) or Claude Code hooks/plugins (see `claude-code-guide` subagent).
 
+## Contents
+
+- [Model Capabilities](#model-capabilities)
+- [Server-Side Tools](#server-side-tools)
+- [Client-Side Tools](#client-side-tools)
+- [Tool Infrastructure](#tool-infrastructure)
+- [Context Management](#context-management)
+- [Files](#files)
+
 ## Model Capabilities
 
 ### Extended Thinking

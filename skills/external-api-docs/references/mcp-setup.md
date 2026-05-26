@@ -1,6 +1,6 @@
 # MCP Server Setup
 
-context-hub's MCP server is the **preferred integration path**. It gives agents native access to `chub_search`, `chub_get`, and other tools without shelling out to the CLI. The Praxion installer configures this automatically.
+context-hub's MCP server is the preferred integration path for the [external-api-docs](../SKILL.md) skill. It gives agents native access to `chub_search`, `chub_get`, and other tools without shelling out to the CLI. The Praxion installer configures this automatically.
 
 **After running `./install.sh`:** The MCP server is already configured. No manual setup needed.
 

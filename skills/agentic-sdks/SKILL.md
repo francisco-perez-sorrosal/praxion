@@ -5,7 +5,7 @@ description: >
   architecture, tool integration, multi-agent orchestration, safety guardrails,
   tracing, context management, streaming, MCP integration. Triggers: building
   autonomous agents, multi-agent workflows, choosing agent frameworks, integrating
-  MCP servers, agent safety patterns. Language modules: Python, TypeScript.
+  MCP servers, agent safety patterns. Language modules available for Python and TypeScript.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:
@@ -29,6 +29,17 @@ Build production AI agents using the OpenAI Agents SDK or Claude Agent SDK. Both
 - [contexts/openai-agents-typescript.md](contexts/openai-agents-typescript.md) -- OpenAI Agents SDK for TypeScript
 - [contexts/claude-agent-python.md](contexts/claude-agent-python.md) -- Claude Agent SDK for Python
 - [contexts/claude-agent-typescript.md](contexts/claude-agent-typescript.md) -- Claude Agent SDK for TypeScript
+
+## Language Contexts
+
+| Language   | Context File | Tooling |
+|------------|-------------|---------|
+| Python     | [contexts/openai-agents-python.md](contexts/openai-agents-python.md) | OpenAI Agents SDK (`openai-agents`) |
+| TypeScript | [contexts/openai-agents-typescript.md](contexts/openai-agents-typescript.md) | OpenAI Agents SDK (`@openai/agents`) |
+| Python     | [contexts/claude-agent-python.md](contexts/claude-agent-python.md) | Claude Agent SDK (`claude-agent-sdk`) |
+| TypeScript | [contexts/claude-agent-typescript.md](contexts/claude-agent-typescript.md) | Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`) |
+
+Load the context file matching your target framework and language. The SKILL.md body is framework-agnostic; version pins and setup instructions live in the context files.
 
 **Related skills:**
 

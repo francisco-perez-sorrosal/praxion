@@ -8,9 +8,10 @@ description: >
   issues, migrating across model versions, picking a prompt-management platform,
   establishing prompt regression tests. Defers to claude-ecosystem for Claude-specific
   features, agentic-sdks for agent-loop plumbing, agent-evals for eval design,
-  external-api-docs for current SDK signatures.
-compatibility: Claude Code
+  external-api-docs for current SDK signatures. Language modules available for
+  Python and TypeScript.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
+compatibility: Claude Code
 staleness_sensitive_sections:
   - "Model Family Matrix"
   - "Platform Comparison"
@@ -43,23 +44,14 @@ Systematic prompt design for production LLM calls. Covers few-shot patterns, cha
 - [assets/promptfoo-prompt-suite.yaml](assets/promptfoo-prompt-suite.yaml) -- starter Promptfoo suite with contains/not-contains/llm-rubric assertions
 - [assets/envelope-manifest.yaml](assets/envelope-manifest.yaml) -- full-envelope pinning template (model, temp, top_p, max_tokens, schema hash, rollout)
 
-## When to Use This Skill
+## Language Contexts
 
-| Use for | Defer to |
-|---------|----------|
-| Designing a new production prompt (system + user) | — |
-| Picking few-shot count, ordering, dynamic retrieval | — |
-| Deciding whether to add chain-of-thought or use reasoning-effort | — |
-| Structuring a Pydantic/Zod model as the output contract | — |
-| Picking a prompt-management platform, pinning the call envelope | — |
-| Writing single-prompt regression assertions | — |
-| Migrating a prompt across model families or versions | — |
-| Claude model IDs, API features, prompt-caching block sizes | `claude-ecosystem` |
-| Agent-loop plumbing, tool registration, MCP protocol | `agentic-sdks`, `mcp-crafting` |
-| Trajectory evals, LLM-as-judge rubric engineering, eval CI architecture | `agent-evals` |
-| Current SDK method signatures, endpoint parameters | `external-api-docs` |
-| Runtime prompt-injection detection in shipped apps | `context-security-review` |
-| Claude Code subagent configuration (agent files, system prompts) | `agent-crafting` |
+| Language   | Context File | Tooling |
+|------------|-------------|---------|
+| Python     | [contexts/python.md](contexts/python.md) | `instructor` + Pydantic, Anthropic/OpenAI SDK, pytest + DeepEval |
+| TypeScript | [contexts/typescript.md](contexts/typescript.md) | Zod + `instructor-js`, native SDK `strict: true`, Promptfoo, Node test-runner |
+
+Load the context matching your project language for call shapes, retry-loop implementations, and test integration patterns.
 
 ## Gotchas
 <!-- last-verified: 2026-05-01 -->

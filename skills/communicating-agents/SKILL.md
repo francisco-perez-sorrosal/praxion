@@ -7,7 +7,7 @@ description: >
   ADK, LangGraph, CrewAI, Pydantic AI. Triggers: building multi-agent systems across
   frameworks or organizations, exposing agents via A2A endpoints, implementing agent
   discovery; A2A, agent-to-agent, Agent Card, multi-agent communication, agent
-  interoperability, cross-agent protocol.
+  interoperability, cross-agent protocol. Language modules available for Python and TypeScript.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:
@@ -27,12 +27,21 @@ staleness_threshold_days: 60
 
 Protocols for agent-to-agent communication -- enabling agents built with different frameworks, languages, or organizations to discover each other and collaborate on tasks.
 
-**Satellite files** (loaded on-demand): `contexts/` is a project convention for language-specific implementation guides — functionally equivalent to `references/` but semantically distinct (task-oriented vs. lookup).
+**Satellite files** (loaded on-demand):
 
 - [contexts/a2a-python.md](contexts/a2a-python.md) -- A2A Python SDK implementation guide (`a2a-sdk`)
 - [contexts/a2a-typescript.md](contexts/a2a-typescript.md) -- A2A TypeScript SDK implementation guide (`@a2a-js/sdk`)
 - [references/a2a-protocol.md](references/a2a-protocol.md) -- Full A2A protocol reference (spec, data model, operations, auth, lifecycle)
 - [references/a2a-framework-integrations.md](references/a2a-framework-integrations.md) -- Framework integration patterns (ADK, LangGraph, CrewAI, Pydantic AI, etc.)
+
+## Language Contexts
+
+| Language   | Context File | Tooling |
+|------------|-------------|---------|
+| Python     | [contexts/a2a-python.md](contexts/a2a-python.md) | `a2a-sdk`, Starlette/Uvicorn |
+| TypeScript | [contexts/a2a-typescript.md](contexts/a2a-typescript.md) | `@a2a-js/sdk`, Express |
+
+Load the context matching your language for setup, server/client implementation, streaming, and testing patterns.
 
 ## Gotchas
 <!-- last-verified: 2026-05-01 -->

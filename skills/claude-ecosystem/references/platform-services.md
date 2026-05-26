@@ -4,6 +4,15 @@ Operational patterns, cost optimization, and platform-level services for the Cla
 
 **Boundary:** This file covers how to run workloads efficiently -- batching, caching, file management, rate limits, and cost strategies. For API feature parameters and usage patterns, see [api-features.md](api-features.md). For SDK code examples, see [sdk-patterns.md](sdk-patterns.md).
 
+## Contents
+
+- [Batch Processing](#batch-processing)
+- [Prompt Caching](#prompt-caching)
+- [Files API](#files-api)
+- [Data Residency](#data-residency)
+- [Rate Limits and Usage](#rate-limits-and-usage)
+- [Cost Optimization Patterns](#cost-optimization-patterns)
+
 ## Batch Processing
 
 Process large volumes of requests asynchronously at 50% cost reduction. Batches complete within 24 hours (typically much faster) and do not count against real-time rate limits.

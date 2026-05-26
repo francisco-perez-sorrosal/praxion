@@ -22,6 +22,7 @@ Triggers on: agent evaluation, eval framework selection, golden dataset creation
 | --- | --- | --- |
 | `SKILL.md` | Core eval guidance: types, framework selection, getting started, gotchas | ~250 |
 | `references/framework-patterns.md` | Code examples for Inspect AI, DeepEval, Promptfoo; comparison matrix | ~410 |
+| `references/typescript.md` | TypeScript eval tooling: Vitest async patterns, Promptfoo YAML schema, TypeScript provider config | ~120 |
 | `references/eval-design-patterns.md` | Golden datasets, LLM-as-judge, grader design, scoring, non-determinism | ~370 |
 | `references/cicd-integration.md` | GitHub Actions workflows, deployment gates, cost management | ~325 |
 

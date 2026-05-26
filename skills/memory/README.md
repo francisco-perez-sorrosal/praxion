@@ -13,6 +13,14 @@ Complements built-in memory (e.g. Claude Code's `MEMORY.md`) with explicit categ
 - Consolidating overlapping entries via `consolidate()`
 - Reviewing memory health via `reflect()`
 
+## Activation
+
+Auto-triggered by phrases like "remember", "recall", "cross-session memory", "persistent
+context", or "session start". Also activates when managing user preferences, project
+conventions, or assistant self-knowledge. Requires the `memory` MCP server to be present
+in the session; in Praxion, this is conditionally enabled (disabled when
+`PRAXION_DISABLE_MEMORY_MCP=1`).
+
 ## Enforcement and Capture
 
 Memory is automatically integrated into agent workflows:

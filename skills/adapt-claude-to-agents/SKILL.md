@@ -5,6 +5,7 @@ description: >
   from a project's root CLAUDE.md: removes Claude-only operational details, preserves
   portable project guidance. Triggers: install.sh codex needs a Codex
   source template, refreshing a previously generated Codex project template.
+allowed-tools: [Read, Write, Edit, Bash]
 compatibility: Codex, Claude Code, Cursor, and installer-driven CLI workflows.
 ---
 
@@ -38,3 +39,7 @@ follows this skill's workflow and contract.
   template.
 - Favor conservative removal over speculative rewriting when Claude-only
   details are ambiguous.
+
+## Related Skills
+
+- [`rule-crafting`](../rule-crafting/SKILL.md) — when authoring new rules that need Codex portability annotations.

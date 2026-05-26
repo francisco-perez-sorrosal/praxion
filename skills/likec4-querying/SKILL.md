@@ -6,10 +6,11 @@ description: >
   architecture-authoring surfaces. Triggers: authoring/modifying
   ARCHITECTURE.md, .c4 files, diagram sources, exploring LikeC4 model for
   design decisions.
-paths: ["**/*.c4", "**/ARCHITECTURE.md", "docs/architecture.md", "docs/diagrams/**"]
 allowed-tools: [Read, Glob, Grep, Bash]
 compatibility: Claude Code
+paths: ["**/*.c4", "**/ARCHITECTURE.md", "docs/architecture.md", "docs/diagrams/**"]
 staleness_sensitive_sections: ["## Decision Rubric", "## MCP Tool Quick Reference"]
+staleness_threshold_days: 60
 ---
 
 # LikeC4 Querying
@@ -88,9 +89,9 @@ quick reference for all 13 MCP tools, so agents choose the right path on the fir
 Full input shapes and worked examples for all 13 tools:
 [`references/mcp-tool-recipes.md`](references/mcp-tool-recipes.md)
 
-## Last verified
-
-Last verified: 2026-04-30
-
 Re-verify when the LikeC4 MCP tool surface changes (run `list-projects` or inspect the MCP
 server's tool list in the session reminder to detect additions or removals).
+
+## Related Skills
+
+- [`software-planning`](../software-planning/SKILL.md) — when architectural analysis of LikeC4 query results feeds into system design decisions.

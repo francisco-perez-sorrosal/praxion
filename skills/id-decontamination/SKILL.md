@@ -6,8 +6,8 @@ description: >
   Praxion project, check_id_citation_discipline.py reports violations, user asks
   to "clean up REQ citations"/"decontaminate id references"/"remove pipeline
   residues from code", /decontaminate-ids invoked.
-compatibility: Claude Code
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
+compatibility: Claude Code
 ---
 
 # ID Decontamination
@@ -20,7 +20,7 @@ Detection and remediation methodology for removing ephemeral identifier citation
 - `scripts/check_id_citation_discipline.py` — the detector (installed by Praxion; runs in any project)
 - [`shipped-artifact-isolation.md`](../../rules/swe/shipped-artifact-isolation.md) — the outbound counterpart rule
 
-## When to Apply This Skill
+## Activation Scope
 
 **Activate when:**
 
@@ -166,3 +166,7 @@ After decontamination, produce a short summary:
 - Regression-prevention layer chosen (hook-only / +CI / +git-pre-commit)
 
 This summary is the handoff to the user confirming the project's source code is clean and staying clean.
+
+## Related Skills
+
+- [`software-planning`](../software-planning/SKILL.md) — for Standard-tier pipeline delegation when decontamination spans many files.

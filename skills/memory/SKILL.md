@@ -6,6 +6,7 @@ description: >
   user preferences, storing project decisions, recalling past interactions,
   managing assistant self-knowledge, loading context at session start;
   cross-session memory, persistent context.
+allowed-tools: [Read, Glob, Grep, Bash]
 compatibility: Claude Code
 ---
 
@@ -136,3 +137,7 @@ Do NOT store:
 - Validate category names -- reject unknown categories
 - Confidence values: 0.0 to 1.0, or null
 - Importance values: clamped to 1-10
+
+## Related Skills
+
+- [`software-planning`](../software-planning/SKILL.md) — LEARNINGS.md bridge and pipeline memory promotion patterns.

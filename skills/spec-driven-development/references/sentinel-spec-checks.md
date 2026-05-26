@@ -1,6 +1,6 @@
 # Spec Health (SH) -- Sentinel Check Catalog
 
-Defines the Spec Health dimension for the sentinel's check catalog. These checks apply only to persistent specs archived in `.ai-state/specs/`.
+Defines the Spec Health dimension for the sentinel's check catalog. These checks apply only to persistent specs archived in `.ai-state/specs/`. Back to [SKILL.md](../SKILL.md).
 
 ## Scope
 

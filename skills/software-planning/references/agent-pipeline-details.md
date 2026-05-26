@@ -1,6 +1,6 @@
 # Agent Pipeline Details
 
-Detailed tables and specifications for the SWE agent coordination pipeline. This reference supplements the always-loaded [coordination protocol rule](../../../rules/swe/swe-agent-coordination-protocol.md) with information agents load on demand.
+Detailed tables and specifications for the SWE agent coordination pipeline. This reference supplements the always-loaded [coordination protocol rule](../../../rules/swe/swe-agent-coordination-protocol.md) with information agents load on demand. Back to [SKILL.md](../SKILL.md).
 
 ## Boundary Discipline
 

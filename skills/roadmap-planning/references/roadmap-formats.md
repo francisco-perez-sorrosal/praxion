@@ -1,6 +1,6 @@
 # Roadmap Formats
 
-Templates and guidance for different roadmap representations. Load this reference when choosing a format or when building a roadmap from the templates.
+Templates and guidance for different roadmap representations. Load this reference when choosing a format or when building a roadmap from the templates. Back to [SKILL.md](../SKILL.md).
 
 ## Format Selection
 

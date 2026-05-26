@@ -5,9 +5,10 @@ description: >
   WIP.md, LEARNINGS.md) in small, known-good increments. Triggers: starting
   significant development, breaking down complex features, architecture planning,
   multi-session projects, feature breakdown, work planning, task tracking, WIP
-  management, incremental development.
-compatibility: Claude Code
+  management, incremental development. Language modules available for Python,
+  TypeScript.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
+compatibility: Claude Code
 ---
 
 # Software Planning in Small Increments
@@ -63,6 +64,7 @@ When planning work in a specific language or tech stack, load the relevant **con
 | Context | File | Related Skills |
 |---------|------|----------------|
 | Python | [contexts/python.md](contexts/python.md) | [Python](../python-development/SKILL.md), [Python Project Management](../python-prj-mgmt/SKILL.md) |
+| TypeScript | [contexts/typescript.md](contexts/typescript.md) | — |
 
 **How contexts integrate**:
 
@@ -308,29 +310,6 @@ Critical gotchas (most common planning failures):
 
 --> See [references/decomposition-guide.md](references/decomposition-guide.md#anti-patterns) for the full list of planning anti-patterns to avoid.
 
-## When to Use This Skill
-
-Three-document planning maps to the **Standard** and **Full** tiers in the [process calibration](../../rules/swe/swe-agent-coordination-protocol.md#process-calibration). Direct and Lightweight tiers use simpler tracking or none.
-
-**Use three-document planning for:**
-
-- Features taking multiple sessions
-- Complex features with many moving parts
-- Work with architectural implications
-- Projects where requirements may evolve
-- Collaborative work needing clear status
-- Anything where you need to track progress over time
-
-**Skip for simple tasks:**
-
-- Bug fixes (unless complex)
-- Simple feature additions (1-2 files)
-- Refactoring within single module
-- Documentation updates
-- Configuration changes
-
-For simple multi-step tasks, use the agent's built-in task tracking instead.
-
 ## Claude Code Usage
 
 The `implementation-planner` agent uses this skill directly for step decomposition, document creation, and execution supervision. For manual planning without agents, use `Write` and `Edit` tools directly. For simple single-session tasks, use `TaskCreate`/`TaskUpdate`/`TaskList`.
@@ -362,3 +341,10 @@ The `implementation-planner` agent uses this skill directly for step decompositi
 - [ ] WIP.md reflects current state
 - [ ] Learnings captured if any
 - [ ] Can describe change in one sentence
+
+## Related Skills
+
+- [spec-driven-development](../spec-driven-development/SKILL.md) -- behavioral specification format and REQ traceability; load together for medium/large features
+- [refactoring](../refactoring/SKILL.md) -- refactoring phase methodology delegated from plan steps
+- [python-development](../python-development/SKILL.md) -- Python language context (quality gates, tooling)
+- [roadmap-planning](../roadmap-planning/SKILL.md) -- upstream: roadmap items flow into this skill's step decomposition

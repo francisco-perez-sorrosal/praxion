@@ -7,8 +7,8 @@ description: >
   the pipeline, decision documentation, spec archival. Triggers: behavioral
   specifications, requirement traceability, SDD methodology, spec format, REQ IDs,
   spec-driven development, complexity triage, spec archival.
-compatibility: Claude Code
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
+compatibility: Claude Code
 ---
 
 # Spec-Driven Development
@@ -315,3 +315,8 @@ For brownfield features — when `.ai-state/specs/` contains prior `SPEC_*.md` f
 | Spec delta (brownfield) | `.ai-work/<task-slug>/SPEC_DELTA.md` (ephemeral, produced by architect) |
 | Calibration log | `.ai-state/calibration_log.md` (persistent, append-only) |
 | Decision documentation | `LEARNINGS.md` `### Decisions Made` section |
+
+## Related Skills
+
+- [software-planning](../software-planning/SKILL.md) -- three-document planning model; compose together for medium/large features
+- [roadmap-planning](../roadmap-planning/SKILL.md) -- upstream: roadmap items become behavioral specs via this skill

@@ -12,6 +12,7 @@ allowed-tools: [Read, Glob, Grep, Bash(git:*), Bash(wc:*), Bash(find:*)]
 compatibility: Claude Code
 ---
 
+
 # Project Exploration
 
 Methodology for understanding any software project you encounter -- from a tiny CLI tool to a massive monorepo. The `/explore-project` command drives the exploration workflow; this skill provides the analysis methodology that any agent or command can reference.
@@ -237,3 +238,8 @@ Reorder Phase 2 analysis emphasis based on type:
 - **Rich/Adequate**: Cross-reference docs against code. Summarize what exists. Focus exploration on gaps and undocumented patterns. Flag any doc-code drift.
 - **Sparse/Absent**: The exploration output IS the documentation. Be more thorough in Phase 1-3. Note the documentation gap in the executive summary.
 - **Misleading**: This is the highest-value scenario. For every finding, explicitly state whether it's from docs or from code. Flag discrepancies prominently: "README says X, but code shows Y -- trust the code."
+
+## Related Skills
+
+- [roadmap-synthesis](../roadmap-synthesis/SKILL.md) -- run after exploration to produce a lens-based roadmap from a now-familiar codebase
+- [software-planning](../software-planning/SKILL.md) -- once the project is understood, plan implementation work in small known-good increments

@@ -8,8 +8,8 @@ description: >
   Triggers: prioritizing features, building a product roadmap, sequencing
   releases, release planning, backlog grooming, mapping feature dependencies,
   deciding what to build next.
-compatibility: Claude Code
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
+compatibility: Claude Code
 ---
 
 # Roadmap Planning
@@ -253,7 +253,8 @@ Resist the urge to estimate in hours or days. Relative sizing communicates uncer
 | IDEA_LEDGER_*.md | `.ai-state/idea_ledgers/` | Permanent; promethean-maintained |
 | IDEA_PROPOSAL.md | `.ai-work/<task-slug>/` | Ephemeral; consumed during Gather Input |
 
-**Related skills**:
+## Related Skills
 
-- [software-planning](../software-planning/SKILL.md) -- three-document planning model for implementation
-- [spec-driven-development](../spec-driven-development/SKILL.md) -- behavioral specifications with REQ traceability
+- [software-planning](../software-planning/SKILL.md) -- three-document planning model for implementation (downstream)
+- [spec-driven-development](../spec-driven-development/SKILL.md) -- behavioral specifications with REQ traceability (downstream)
+- [roadmap-synthesis](../roadmap-synthesis/SKILL.md) -- audit-to-roadmap synthesis; delegates Phase 6 prioritization to this skill

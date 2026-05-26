@@ -32,7 +32,7 @@ Load explicitly with `spec-driven-development` or reference behavioral specifica
 2. **Write specs** (medium/large): use the `When/and/the system/so that` format with REQ IDs
 3. **Diff specs** (brownfield): the architect produces `SPEC_DELTA.md` showing added/modified/removed requirements vs prior archived specs
 4. **Thread IDs**: the implementation-planner threads REQ IDs into test steps
-5. **Name tests**: prefix test names with `req{NN}_` for traceability
+5. **Name tests**: use behavioral names (e.g., `test_expired_token_returns_401`) — never `test_req{NN}_...`; REQ-to-test mapping lives in `traceability.yml`
 6. **Verify**: the verifier produces a traceability matrix linking requirements to tests
 7. **Archive**: the planner archives the spec to `.ai-state/specs/` at end-of-feature
 

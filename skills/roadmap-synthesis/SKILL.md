@@ -9,8 +9,8 @@ description: >
   state of the union, lens-based audit, strengths/weaknesses/deprecations
   roadmap, agentic-era project evaluation, AGENTS.md-aware audit, SDLC health
   audit. Contrast with `roadmap-planning` (prioritizes existing backlog).
-compatibility: Claude Code
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
+compatibility: Claude Code
 ---
 
 # Roadmap Synthesis
@@ -158,3 +158,8 @@ Distilled from pre-design research and validated by context-engineer review. Eac
 | Paired skill | [`roadmap-planning`](../roadmap-planning/SKILL.md) — activated at Phase 6 |
 | Output location | `ROADMAP.md` at project root |
 | Common pitfall | Skipping paradigm detection or lens derivation → R4/R15 false findings (e.g., cargo-culting SPIRIT to a Python library) |
+
+## Related Skills
+
+- [roadmap-planning](../roadmap-planning/SKILL.md) -- prioritization and sequencing; activated at Phase 6 of this skill's workflow
+- [project-exploration](../project-exploration/SKILL.md) -- codebase orientation; useful before audit fan-out when the target project is unfamiliar

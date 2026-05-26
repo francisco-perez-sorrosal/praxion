@@ -1,6 +1,6 @@
 # Dependency Mapping
 
-Identify, visualize, and sequence dependencies between roadmap items. Load this reference when building a dependency graph or when the dependency mapping step in the core workflow needs more depth.
+Identify, visualize, and sequence dependencies between roadmap items. Load this reference when building a dependency graph or when the dependency mapping step in the core workflow needs more depth. Back to [SKILL.md](../SKILL.md).
 
 ## Dependency Types
 

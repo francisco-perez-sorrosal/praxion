@@ -1,6 +1,6 @@
 # Cross-Agent Skill Conventions
 
-Conventions that apply across multiple pipeline agents independent of their phase. Loaded by `software-planning` (and consulted by every agent whose work touches an external API, SDK, or library) so the rules surface once at the layer that most cleanly enforces them.
+Conventions that apply across multiple pipeline agents independent of their phase. Loaded by `software-planning` (and consulted by every agent whose work touches an external API, SDK, or library) so the rules surface once at the layer that most cleanly enforces them. Back to [SKILL.md](../SKILL.md).
 
 ## External API docs are non-optional
 

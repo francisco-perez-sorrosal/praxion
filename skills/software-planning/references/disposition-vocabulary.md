@@ -1,9 +1,6 @@
 # Disposition Vocabulary
 
-Shared vocabulary for recording the outcome of a Continuous Improvement Signal (CIS)
-or a rework-loop finding. Both surfaces use the same three terms so the ecosystem
-speaks with one voice across forward-feeding (researcher → architect) and
-backward-feeding (verifier → architect/planner) flows.
+Shared vocabulary for recording the outcome of a Continuous Improvement Signal (CIS) or a rework-loop finding. Both surfaces use the same three terms so the ecosystem speaks with one voice across forward-feeding (researcher → architect) and backward-feeding (verifier → architect/planner) flows. Back to [SKILL.md](../SKILL.md).
 
 ---
 

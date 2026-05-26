@@ -64,6 +64,7 @@ skill-name/
 ├── SKILL.md              # Required: instructions + metadata
 ├── scripts/              # Optional: executable utilities
 ├── references/           # Optional: detailed docs loaded on-demand
+├── contexts/             # Optional: runnable language/runtime variants (mutually exclusive per session)
 └── assets/               # Optional: templates, schemas, data files
 ```
 
@@ -129,7 +130,8 @@ Avoid vague descriptions ("Helps with documents"). Include terms that challenge 
 ### Bundled Resources
 
 - **`scripts/`** -- Executable code, run via Bash (not loaded into context)
-- **`references/`** -- Documentation loaded on-demand (one level deep, TOC for 100+ lines)
+- **`references/`** -- Documentation loaded on-demand (one level deep, TOC for 100+ lines). Use for conceptual depth on a topic; multiple references may load per session.
+- **`contexts/`** -- Runnable language/runtime variants (e.g., `contexts/python.md`, `contexts/typescript.md`). Mutually exclusive within a session: the agent loads exactly one based on the active language/runtime/SDK. Use for content that compiles, runs, or installs; reserve `references/` for content whose claims are language-agnostic. See [Pattern 2c](#pattern-2c-polyglot-skill-mutually-exclusive-contexts) below. The Agent Skills specification permits "any additional directories"; `contexts/` is Praxion's spec-permitted extension for polyglot skills.
 - **`assets/`** -- Files used in output (templates, images, boilerplate), not loaded into context
 
 Run `scripts/init_skill.py` to scaffold a new skill with detailed guidance and examples for each resource type.
@@ -207,6 +209,45 @@ testing-strategy/
 ```
 
 The SKILL.md lists all available references as satellite files. New language support is added by creating a reference file — no changes to the core SKILL.md. Use illustrative examples from specific languages (e.g., `tmp_path` in pytest) but frame them as instances of a general principle, not as the only valid approach.
+
+#### Pattern 2c: Polyglot skill (mutually-exclusive contexts)
+
+When a skill covers multiple languages/runtimes/SDKs and each user is in exactly one at a time, place runnable mechanics under `contexts/` — distinct from Pattern 2b's references/-only approach for language-tinged conceptual depth.
+
+```text
+mcp-crafting/
+├── SKILL.md               # Language-agnostic protocol + decisions
+├── references/            # Cross-language conceptual depth (transports, primitives)
+└── contexts/
+    ├── python.md          # FastMCP commands, runnable Python examples
+    └── typescript.md      # @modelcontextprotocol/sdk commands, runnable TS examples
+```
+
+The SKILL.md body stays language-agnostic, carries a Language Contexts table (columns: Language | Context File | Tooling), and redirects at every divergence point ("see `contexts/<language>.md` for X"). Activation is local: the agent loads `contexts/typescript.md` without loading `contexts/python.md`. The frontmatter `description` ends with "Language modules available for `<list>`."
+
+**Decision rule** when authoring a file:
+
+- Does the content compile / run / install? → `contexts/`
+- Does the content explain a cross-language concept? → `references/`
+- Multi-language comparison? → SKILL.md body or `references/`
+
+A reference may *use* one language for illustrative examples, but its *claims* must be language-agnostic; otherwise the file is a context regardless of current directory.
+
+**File-naming convention:**
+
+- `contexts/<language>.md` — one-per-language (e.g., `contexts/python.md`)
+- `contexts/<framework>-<language>.md` — matrix cases (e.g., `contexts/openai-agents-typescript.md`)
+- `contexts/<framework>.md` — when the parent skill is language-rooted and frameworks layer above the baseline language context (e.g., `typescript-development/contexts/react.md`)
+
+**Body discipline:** Language-agnostic prose; no language-specific code blocks in SKILL.md except (a) one-line pseudocode showing *shape*, (b) "Python: X / TypeScript: Y" inline pairs for direct comparison. No version pins in the body — versions live in contexts.
+
+**Extension protocol** — to add a new language to an existing polyglot skill:
+
+1. Create `contexts/<language>.md`
+2. Add a row to the Language Contexts table
+3. Update the frontmatter `description` to include the new language
+4. Add language-specific gotchas only if any exist
+5. The body is NOT modified
 
 #### Pattern 3: Conditional details
 

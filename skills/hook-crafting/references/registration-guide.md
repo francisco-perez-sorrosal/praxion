@@ -1,6 +1,17 @@
 # Hook Registration Guide
 
-How hooks get from source files to active execution.
+How hooks get from source files to active execution. Back to [SKILL.md](../SKILL.md).
+
+## Contents
+
+- [Auto-Discovery Model](#auto-discovery-model)
+- [Configuration Format](#configuration-format)
+- [Single Registration Authority](#single-registration-authority)
+- [Plugin Cache Mechanics](#plugin-cache-mechanics)
+- [Hook Configuration Fields](#hook-configuration-fields)
+- [Merging Behavior](#merging-behavior)
+- [Verifying Registration](#verifying-registration)
+- [Checklist: Adding a New Hook](#checklist-adding-a-new-hook)
 
 ## Auto-Discovery Model
 

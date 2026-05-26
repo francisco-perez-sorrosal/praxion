@@ -1,6 +1,6 @@
 # Hook Testing Guide
 
-How to test hooks during development, debug registration issues, and verify hooks are firing.
+How to test hooks during development, debug registration issues, and verify hooks are firing. Back to [SKILL.md](../SKILL.md).
 
 ## Manual Pipe Testing
 

@@ -4,11 +4,11 @@ description: >
   Building MCP (Model Context Protocol) servers with official SDKs: protocol
   concepts (tools, resources, prompts), transports (stdio, streamable HTTP),
   bundles (.mcpb), MCP Inspector testing, client integration with Claude Desktop
-  and Claude Code, logging, error handling, security. Language modules for
-  Python (FastMCP) and TypeScript (@modelcontextprotocol/sdk). Triggers:
-  creating MCP servers, defining MCP tools/resources, configuring transports,
-  packaging bundles, testing servers, integrating with Claude; MCP tool
-  definition, MCP resource exposure, FastMCP server patterns.
+  and Claude Code, logging, error handling, security. Triggers: creating MCP
+  servers, defining MCP tools/resources, configuring transports, packaging
+  bundles, testing servers, integrating with Claude; MCP tool definition, MCP
+  resource exposure, FastMCP server patterns. Language modules available for
+  Python (FastMCP) and TypeScript (@modelcontextprotocol/sdk).
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

@@ -1,6 +1,16 @@
 # Hook Output Patterns
 
-JSON output formats for hook scripts. Output goes to stdout (exit 0) or stderr (exit 2).
+JSON output formats for hook scripts. Output goes to stdout (exit 0) or stderr (exit 2). Back to [SKILL.md](../SKILL.md).
+
+## Contents
+
+- [additionalContext](#additionalcontext)
+- [decision: "block"](#decision-block)
+- [updatedInput](#updatedinput)
+- [permissionDecision](#permissiondecision)
+- [Combining Output Fields](#combining-output-fields)
+- [Error Output (exit 2)](#error-output-exit-2)
+- [Python Template](#python-template)
 
 ## additionalContext
 

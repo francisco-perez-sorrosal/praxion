@@ -1,7 +1,7 @@
 # TypeScript MCP Development
 
 TypeScript-specific implementation guide for MCP servers. Load alongside
-the generic [MCP Server Development](../SKILL.md) skill.
+the generic [MCP Server Development](../SKILL.md) skill. Back to [SKILL.md](../SKILL.md).
 
 **Related skills:**
 - [TypeScript Development](../../typescript-development/SKILL.md) -- tsconfig, toolchain, testing patterns

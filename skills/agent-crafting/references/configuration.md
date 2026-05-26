@@ -1,6 +1,6 @@
 # Agent Configuration Reference
 
-Detailed documentation for all frontmatter fields, prompt writing, and troubleshooting.
+Detailed documentation for all frontmatter fields, prompt writing, and troubleshooting. Back to [SKILL.md](../SKILL.md).
 
 ## Contents
 

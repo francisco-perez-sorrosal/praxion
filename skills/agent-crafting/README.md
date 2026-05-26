@@ -47,11 +47,6 @@ Agents live in `agents/` (this repo) or `.claude/agents/` (consumer projects). I
 | `skill-genesis` | Post-pipeline learning harvest and artifact proposal |
 | `cicd-engineer` | CI/CD pipeline design, GitHub Actions, deployment automation |
 
-## Related Skills
-
-- [`skill-crafting`](../skill-crafting/) — the spec for creating skills that agents can consume via the `skills` field
-- [`command-crafting`](../command-crafting/) — understanding the distinction between slash commands and agents
-
 ## Testing
 
 ### In Claude Code (CLI)
@@ -108,3 +103,9 @@ After creating or modifying agents, verify:
 - [ ] System prompt includes: role, steps, checklist, output format, constraints
 - [ ] Agent activates when expected (test with matching prompts)
 - [ ] Agent does NOT activate for unrelated tasks
+
+
+## Related Skills
+
+- [`skill-crafting`](../skill-crafting/SKILL.md) — the spec for creating skills that agents can consume via the `skills` field
+- [`command-crafting`](../command-crafting/SKILL.md) — understanding the distinction between slash commands and agents

@@ -5,8 +5,8 @@ description: >
   lifecycle hooks, model selection. Triggers: building custom agents, designing
   agent workflows, spawning subagents, delegating via the Agent (formerly Task)
   tool, defining subagent_type, /agents command.
-compatibility: Claude Code
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
+compatibility: Claude Code
 staleness_sensitive_sections:
   - "Configuration Fields Summary"
   - "Constraints and Runtime Behavior"
@@ -50,6 +50,7 @@ Define role, expertise, instructions, constraints, and output format.
 ```
 
 ### Configuration Fields Summary
+<!-- last-verified: 2026-05-25 -->
 
 | Field | Required | Description |
 |-------|----------|-------------|

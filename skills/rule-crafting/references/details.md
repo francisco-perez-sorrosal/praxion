@@ -2,6 +2,14 @@
 
 Detailed guidance for writing, debugging, and maintaining rules. Back to [SKILL.md](../SKILL.md).
 
+## Contents
+
+- [Rule Loading Mechanics](#rule-loading-mechanics)
+- [Writing Effective Rules](#writing-effective-rules)
+- [Debugging Rule Loading](#debugging-rule-loading)
+- [Rule Lifecycle](#rule-lifecycle)
+- [Naming Best Practices](#naming-best-practices)
+
 ## Rule Loading Mechanics
 
 ### How Claude Discovers Rules

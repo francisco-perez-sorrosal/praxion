@@ -50,11 +50,6 @@ Trigger explicitly by asking about "agent skills," "creating a skill," or refere
 6. **Validate**: run `scripts/validate.py` and the deployment checklist
 7. **Iterate**: test with real tasks using the author-tester workflow
 
-## Related Skills
-
-- [`agent-crafting`](../agent-crafting/) — building custom agents that consume skills via the `skills` frontmatter field
-- [`command-crafting`](../command-crafting/) — creating slash commands; understanding the distinction between commands and skills
-
 ## Testing
 
 **Test skill creation guidance:**
@@ -82,3 +77,8 @@ python skills/skill-crafting/scripts/validate.py ./my-skill
 
 # Or manually check against the checklist in SKILL.md
 ```
+
+## Related Skills
+
+- [`agent-crafting`](../agent-crafting/SKILL.md) — building custom agents that consume skills via the `skills` frontmatter field
+- [`command-crafting`](../command-crafting/SKILL.md) — creating slash commands; understanding the distinction between commands and skills

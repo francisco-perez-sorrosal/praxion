@@ -1,6 +1,14 @@
 # Hook Event Reference
 
-Claude Code hook events with input schemas and blocking semantics. The event surface keeps growing — cross-check the live [hooks reference](https://code.claude.com/docs/en/hooks) for additions.
+Claude Code hook events with input schemas and blocking semantics. The event surface keeps growing — cross-check the live [hooks reference](https://code.claude.com/docs/en/hooks) for additions. Back to [SKILL.md](../SKILL.md).
+
+## Contents
+
+- [Common Input Fields](#common-input-fields)
+- [Events by Category](#events-by-category)
+- [Exit Code Semantics](#exit-code-semantics)
+- [Exec Form vs Shell Form](#exec-form-vs-shell-form)
+- [Known Bugs](#known-bugs)
 
 ## Common Input Fields
 

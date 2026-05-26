@@ -1,6 +1,6 @@
 # Agent Examples
 
-Complete agent definitions demonstrating distinct structural patterns. Use as starting points, then customize for your domain.
+Complete agent definitions demonstrating distinct structural patterns. Use as starting points, then customize for your domain. Back to [SKILL.md](../SKILL.md).
 
 ## Contents
 

@@ -1,7 +1,7 @@
 # Python MCP Development
 
 Python-specific implementation guide for MCP servers. Load alongside
-the generic [MCP Server Development](../SKILL.md) skill.
+the generic [MCP Server Development](../SKILL.md) skill. Back to [SKILL.md](../SKILL.md).
 
 **Related skills:**
 - [Python Development](../../python-development/SKILL.md) -- type hints, testing, code quality, async patterns

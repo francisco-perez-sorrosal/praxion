@@ -5,7 +5,7 @@ description: >
   tooling and assertion-based tests, decision rubric (graph-rule vs assertion),
   citation contract (ADR/CLAUDE.md), waiver pattern. Triggers: authoring fitness
   rules, deciding between graph-rule and assertion-based invariants, authoring a
-  fitness waiver. Language modules: Python, TypeScript.
+  fitness waiver. Language modules available for Python, TypeScript.
 allowed-tools: [Read, Grep, Bash, Write, Edit]
 compatibility: Claude Code
 ---
@@ -17,16 +17,11 @@ runnable check that fails loudly when a structural constraint is violated.
 
 **Satellite files** (loaded on-demand):
 
-- See [Language Contexts](#language-contexts) — each context file lists its language-specific references
+- [contexts/python.md](contexts/python.md) -- import-linter quickstart, pytest fitness tests, meta-citation rule, authoring workflow for Python
+- [contexts/typescript.md](contexts/typescript.md) -- dependency-cruiser quickstart, ESLint no-restricted-imports, ArchUnitTS alternative, authoring workflow for TypeScript
+- [references/import-linter-recipes.md](references/import-linter-recipes.md) -- common import-linter contract recipes with INI stanzas and citation examples
 
-## 1. When to Use This Skill
-
-- Authoring a new architectural invariant (import boundary, layer rule, or convention check)
-- Choosing between a graph-rule tool and an assertion-based test for a given invariant
-- Debugging the meta-citation rule (`fitness/tests/test_meta_citation.py`)
-- Authoring or reviewing a fitness waiver
-
-## 2. Decision Rubric
+## Decision Rubric
 
 ```
 Is the invariant about which module imports which?
@@ -48,7 +43,7 @@ Common cases:
 
 See the language context for your project's toolchain for the specific tool invocations.
 
-## 3. Citation Contract
+## Citation Contract
 
 Every fitness rule — whether a graph-rule contract or an assertion-based test — **must**
 cite its architectural justification. This makes each rule self-documenting and
@@ -75,7 +70,7 @@ rule causes the suite to FAIL.
 Write the citation **before** the rule logic — it forces upfront justification and
 prevents the meta-citation rule from catching you by surprise.
 
-## 4. Waiver Pattern
+## Waiver Pattern
 
 When an invariant must be temporarily violated (e.g., during a migration), annotate
 the offending line with a waiver comment:
@@ -100,3 +95,9 @@ the code it waives, and waivers surface immediately in code review diffs.
 |----------|--------------|---------|
 | Python | [contexts/python.md](contexts/python.md) | graph-rule tool + pytest |
 | TypeScript | [contexts/typescript.md](contexts/typescript.md) | dependency-cruiser + ESLint |
+
+## Related Skills
+
+- **[testing-strategy](../testing-strategy/SKILL.md)** -- test strategy and isolation principles that fitness tests follow
+- **[code-review](../code-review/SKILL.md)** -- structured review methodology; fitness violations surface as FAIL findings in review reports
+- **[refactoring](../refactoring/SKILL.md)** -- remediation path when fitness violations indicate structural issues

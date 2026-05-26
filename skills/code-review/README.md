@@ -24,7 +24,7 @@ Trigger explicitly by mentioning "code-review skill" or referencing it by name.
 | `references/report-template.md` | Canonical VERIFICATION_REPORT.md template (pipeline and standalone modes) |
 | `README.md` | This file -- overview and usage guide |
 
-## Related Artifacts
+## Related Skills
 
 - [`coding-style` rule](../../rules/swe/coding-style.md) -- Convention definitions (WHAT to check)
 - [`refactoring` skill](../refactoring/) -- Structural improvement patterns (complementary, not overlapping)

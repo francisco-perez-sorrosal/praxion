@@ -1,7 +1,6 @@
 # Report Template
 
-Canonical structure for code review reports. Used by the verifier agent (pipeline
-mode) and the code-review skill (standalone mode).
+Canonical structure for code review reports. Used by the verifier agent (pipeline mode) and the code-review skill (standalone mode). Back to [SKILL.md](../SKILL.md).
 
 ## Full Template (Pipeline Mode)
 

@@ -17,7 +17,9 @@
 
 # Test Topology — Language-Agnostic Trunk Schema
 
-This file is the **language-agnostic source of truth** for the test-topology protocol. It defines the group schema, tier vocabulary, identifier registries, and document conventions that apply regardless of which programming language, test framework, or parallel runner a project uses. Architects and tooling (planners, sentinel checks) read this file directly. Implementers read this file for the schema contract and their language's leaf reference file for concrete framework wiring. The protocol lives in the existing `testing-strategy` skill so it composes naturally with the skill's existing tier-selection and isolation guidance — see [`../SKILL.md`](../SKILL.md).
+Language-agnostic source of truth for the test-topology protocol: group schema, tier vocabulary, identifier registries, and document conventions. Back to [SKILL.md](../SKILL.md).
+
+This file defines the schema and conventions that apply regardless of which programming language, test framework, or parallel runner a project uses. Architects and tooling (planners, sentinel checks) read this file directly. Implementers read this file for the schema contract and their language's leaf reference file for concrete framework wiring.
 
 ---
 

@@ -23,9 +23,13 @@ Trigger explicitly by mentioning "testing-strategy skill" or referencing it by n
 |------|---------|
 | `SKILL.md` | Core reference: strategy selection, isolation, mocking, fixtures, coverage, property-based testing, naming |
 | `references/python-testing.md` | Advanced pytest patterns: conftest architecture, hypothesis, fixture composition, markers, coverage |
+| `references/typescript-testing.md` | TypeScript testing patterns with Vitest and Jest, type-safe mocking, integration testing |
+| `references/rust-testing.md` | Rust testing with the built-in test framework, proptest, and integration patterns |
+| `references/test-topology.md` | Language-agnostic test topology schema: group schema, tier vocabulary, identifier registries |
+| `references/gate-canaries.md` | How to author canary tests that prove a CODE gate bites (negative-case contract) |
 | `README.md` | This file -- overview and usage guide |
 
-## Related Artifacts
+## Related Skills
 
 - [`testing-conventions` rule](../../rules/swe/testing-conventions.md) -- Declarative constraints for test code (what must be true)
 - [`test-engineer` agent](../../agents/test-engineer.md) -- Pipeline agent for test execution workflow

@@ -1,6 +1,6 @@
 # Refactoring Patterns & Scenarios
 
-Detailed patterns and common refactoring scenarios with full examples.
+Detailed patterns and common refactoring scenarios with full examples. Back to [SKILL.md](../SKILL.md).
 
 ## Table of Contents
 

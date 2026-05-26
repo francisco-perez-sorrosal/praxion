@@ -1,8 +1,8 @@
-<!-- last-verified: 2026-05-03 -->
 # GPU Compute Budgeting
+<!-- last-verified: 2026-05-03 -->
 
 Discipline for declaring, estimating, and enforcing GPU compute budgets in Praxion ML projects.
-Back to [deployment SKILL.md](../SKILL.md).
+Back to [SKILL.md](../SKILL.md).
 
 GPU compute has **three distinct cost regimes** depending on operational mode. Budget discipline
 differs across them; do not conflate Modes A/B with Mode C.

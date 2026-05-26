@@ -1,6 +1,6 @@
 # GitHub Actions Reference
 
-Deep reference for GitHub Actions workflow syntax, runners, action types, secrets management, security hardening, and debugging.
+Deep reference for GitHub Actions workflow syntax, runners, action types, secrets management, security hardening, and debugging. Back to [SKILL.md](../SKILL.md).
 
 ## Workflow Syntax
 

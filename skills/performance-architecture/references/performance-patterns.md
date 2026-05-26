@@ -1,6 +1,6 @@
 # Performance Patterns
 
-Detailed patterns for caching, connection pooling, async I/O, batching, and pagination. Load on-demand when implementing specific performance optimizations.
+Detailed patterns for caching, connection pooling, async I/O, batching, and pagination. Back to [SKILL.md](../SKILL.md).
 
 ## Caching Strategies
 

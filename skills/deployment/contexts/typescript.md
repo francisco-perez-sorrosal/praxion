@@ -1,7 +1,7 @@
 # Deployment — TypeScript/Node.js Context
 
 Node.js production deployment patterns. Assumes the `deployment` SKILL.md body is
-loaded for the platform decision framework and Compose primitives.
+loaded for the platform decision framework and Compose primitives. Back to [SKILL.md](../SKILL.md).
 
 For **package manager setup** (pnpm, volta, workspace config), see
 [`node-prj-mgmt/contexts/typescript.md`](../../node-prj-mgmt/contexts/typescript.md).

@@ -28,8 +28,7 @@ Application observability strategy for instrumentation decisions: what to observ
 - [references/metrics-design.md](references/metrics-design.md) -- metric types, Prometheus naming, cardinality, RED/USE implementation
 - [references/distributed-tracing.md](references/distributed-tracing.md) -- OTel SDK patterns (Python + TypeScript), span design, context propagation, Collector architecture
 - [references/alerting-patterns.md](references/alerting-patterns.md) -- SLO-based alerting, burn rates, error budgets, runbook templates
-
-Future language references (e.g., `references/typescript-observability.md`) added here without changes to this file's body.
+- [references/typescript-observability.md](references/typescript-observability.md) -- OTel instrumentation, structured logging, and metrics patterns for TypeScript/Node.js
 
 ## Gotchas
 

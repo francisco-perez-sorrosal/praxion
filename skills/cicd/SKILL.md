@@ -10,6 +10,11 @@ description: >
   pipelines, implementing build automation.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
+staleness_sensitive_sections:
+  - "Essential Marketplace Actions"
+  - "Security Hardening"
+  - "Supply Chain Security"
+staleness_threshold_days: 60
 ---
 
 # CI/CD Pipeline Development
@@ -178,6 +183,7 @@ Cache limit: 10 GB per repository. Artifacts default retention: 90 days (configu
 3. **Organization secrets** (lowest) -- shared across repos with policy-based access
 
 ### Security Hardening
+<!-- last-verified: 2026-05-25 -->
 
 | Practice | Implementation |
 | --- | --- |
@@ -189,6 +195,7 @@ Cache limit: 10 GB per repository. Artifacts default retention: 90 days (configu
 | **Disable persist-credentials** | `persist-credentials: false` in `actions/checkout` unless needed |
 
 ### Supply Chain Security
+<!-- last-verified: 2026-05-25 -->
 
 - **SLSA framework**: Build provenance via `actions/attest-build-provenance`
 - **Artifact attestations**: Cryptographically link artifacts to build metadata (Sigstore)
@@ -244,8 +251,11 @@ GitHub Actions provides built-in usage and performance metrics on all plans (sin
 - **[Python Development](../python-development/SKILL.md)** -- pytest patterns, ruff/mypy configuration for CI steps
 - **[Python Project Management](../python-prj-mgmt/SKILL.md)** -- pixi/uv commands for dependency installation in CI workflows
 - **[Observability](../observability/SKILL.md)** -- application metrics and SLIs that complement DORA pipeline metrics
+- **[Deployment](../deployment/SKILL.md)** -- deployment targets and strategies that CI/CD pipelines automate
+- **[Performance Architecture](../performance-architecture/SKILL.md)** -- performance regression detection patterns to incorporate in CI pipelines
 
 ## Essential Marketplace Actions
+<!-- last-verified: 2026-05-25 -->
 
 | Category | Action | Purpose |
 | --- | --- | --- |

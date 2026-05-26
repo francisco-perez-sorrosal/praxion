@@ -12,6 +12,7 @@ allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:
   - "Platform Quick Reference"
+  - "GPU Compute Budgeting"
 ---
 
 # Deployment
@@ -36,6 +37,13 @@ Opinionated guidance for deploying applications -- from local Docker Compose thr
 - [references/kubernetes-patterns.md](references/kubernetes-patterns.md) -- when K8s is warranted, basic patterns, managed K8s comparison
 - [references/ai-native-platforms.md](references/ai-native-platforms.md) -- Modal, CoreWeave, RunPod, Nebius, GPU marketplace
 - [references/gpu-compute-budgeting.md](references/gpu-compute-budgeting.md) -- GPU compute budget enforcement patterns for ML training (budget declaration, gate pattern, cost estimation)
+- [references/deployment-documentation.md](references/deployment-documentation.md) -- living document lifecycle for `SYSTEM_DEPLOYMENT.md`, section ownership model, staleness mitigation
+
+**Language contexts** (runtime/toolchain-specific patterns):
+
+| Language | Context File | Tooling |
+|----------|-------------|---------|
+| TypeScript/Node.js | [contexts/typescript.md](contexts/typescript.md) | Multi-stage Dockerfile, pnpm, Node 22 LTS, health-check patterns |
 
 **Starter templates** (in `assets/`):
 

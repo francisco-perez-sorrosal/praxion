@@ -1,6 +1,6 @@
 # CI/CD Patterns and Examples
 
-Complete workflow examples for common scenarios. All examples follow security best practices: SHA-pinned actions, least-privilege permissions, caching, timeouts, and concurrency control.
+Complete workflow examples for common scenarios. All examples follow security best practices: SHA-pinned actions, least-privilege permissions, caching, timeouts, and concurrency control. Back to [SKILL.md](../SKILL.md).
 
 > **Note**: Replace `<full-sha>` placeholders with actual commit SHAs from each action's repository. Use Dependabot to keep pinned SHAs current.
 

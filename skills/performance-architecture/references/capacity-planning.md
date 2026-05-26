@@ -1,6 +1,6 @@
 # Capacity Planning
 
-Back-of-envelope estimation, Little's law, scaling decisions, and cost-performance optimization. Load on-demand when sizing systems or planning for growth.
+Back-of-envelope estimation, Little's law, scaling decisions, and cost-performance optimization. Back to [SKILL.md](../SKILL.md).
 
 ## Back-of-Envelope Estimation
 

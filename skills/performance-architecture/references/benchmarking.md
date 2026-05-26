@@ -1,6 +1,6 @@
 # Benchmarking and Profiling
 
-Methodology for microbenchmarks, load testing, profiling, and performance regression detection. Load on-demand when setting up benchmarks or investigating performance.
+Methodology for microbenchmarks, load testing, profiling, and performance regression detection. Back to [SKILL.md](../SKILL.md).
 
 ## Microbenchmark Methodology
 

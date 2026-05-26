@@ -26,7 +26,7 @@ Activates automatically when the task context matches communication patterns (st
 
 ## Related Skills
 
-- **[spec-driven-development](../spec-driven-development/)** -- behavioral specifications that translate RFC decisions into implementable requirements
-- **[doc-management](../doc-management/)** -- documentation artifacts (READMEs, changelogs, API docs) that complement stakeholder communications
-- **[software-planning](../software-planning/)** -- planning documents that feed status updates with concrete progress data
-- **[code-review](../code-review/)** -- structured review methodology supporting approval workflows
+- **[spec-driven-development](../spec-driven-development/SKILL.md)** -- behavioral specifications that translate RFC decisions into implementable requirements
+- **[doc-management](../doc-management/SKILL.md)** -- documentation artifacts (READMEs, changelogs, API docs) that complement stakeholder communications
+- **[software-planning](../software-planning/SKILL.md)** -- planning documents that feed status updates with concrete progress data
+- **[code-review](../code-review/SKILL.md)** -- structured review methodology supporting approval workflows

@@ -1,6 +1,6 @@
 # Advanced Markdown Patterns
 
-Progressive disclosure and semantic enhancement for human-facing GitHub-rendered documentation. These patterns reduce cognitive load in long documents without hiding essential content.
+Progressive disclosure and semantic enhancement for human-facing GitHub-rendered documentation. These patterns reduce cognitive load in long documents without hiding essential content. Back to [SKILL.md](../SKILL.md).
 
 **Back to**: [../SKILL.md](../SKILL.md)
 

@@ -1,6 +1,6 @@
 # Issue Templates
 
-Methodology for parsing upstream YAML form templates and constructing template-compliant issue bodies via CLI. Includes a built-in bug report structure for repos without templates.
+Methodology for parsing upstream YAML form templates and constructing template-compliant issue bodies via CLI. Includes a built-in bug report structure for repos without templates. Back to [SKILL.md](../SKILL.md).
 
 Back-link: [Upstream Stewardship Skill](../SKILL.md)
 

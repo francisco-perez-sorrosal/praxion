@@ -1,6 +1,6 @@
 # Contribution Workflow
 
-Fork-and-PR workflow for contributing fixes to upstream open-source projects. Covers the full lifecycle from forking to PR creation, with conventions for branch naming, commit messages, and maintainer communication.
+Fork-and-PR workflow for contributing fixes to upstream open-source projects. Covers the full lifecycle from forking to PR creation, with conventions for branch naming, commit messages, and maintainer communication. Back to [SKILL.md](../SKILL.md).
 
 Back-link: [Upstream Stewardship Skill](../SKILL.md)
 

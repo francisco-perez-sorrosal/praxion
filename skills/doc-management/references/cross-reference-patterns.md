@@ -1,6 +1,6 @@
 # Cross-Reference Patterns
 
-Detailed procedures for validating cross-references in project documentation. Covers filesystem path validation, catalog synchronization, and common drift scenarios.
+Detailed procedures for validating cross-references in project documentation. Covers filesystem path validation, catalog synchronization, and common drift scenarios. Back to [SKILL.md](../SKILL.md).
 
 ## Table of Contents
 

@@ -1,6 +1,6 @@
 # Sanitization Patterns
 
-Extended pattern catalog for detecting internal information in upstream issue drafts. Credential patterns are maintained in the `context-security-review` skill's [secret-patterns.md](../../context-security-review/references/secret-patterns.md) — this file covers upstream-specific categories.
+Extended pattern catalog for detecting internal information in upstream issue drafts. Credential patterns are maintained in the `context-security-review` skill's `secret-patterns.md` reference — this file covers upstream-specific categories. Back to [SKILL.md](../SKILL.md).
 
 Back-link: [Upstream Stewardship Skill](../SKILL.md)
 

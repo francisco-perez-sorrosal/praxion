@@ -1,6 +1,6 @@
 # Documentation Types
 
-Per-type guidelines for project documentation. Each type has distinct conventions, required sections, and maintenance triggers.
+Per-type guidelines for project documentation. Each type has distinct conventions, required sections, and maintenance triggers. Back to [SKILL.md](../SKILL.md).
 
 ## Table of Contents
 

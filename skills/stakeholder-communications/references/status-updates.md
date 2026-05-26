@@ -1,6 +1,6 @@
 # Status Updates
 
-Detailed templates and patterns for technical status reports, blocker escalations, and milestone announcements.
+Detailed templates and patterns for technical status reports, blocker escalations, and milestone announcements. Back to [SKILL.md](../SKILL.md).
 
 ## Status Update Types
 

@@ -1,8 +1,6 @@
 # Secret Pattern Catalog
 
-Regex patterns for detecting common secret types in code and configuration. These patterns are used by `send_event.py` for runtime redaction and by this skill for static review.
-
-Back-link: [Context Security Review Skill](../SKILL.md)
+Regex patterns for detecting common secret types in code and configuration. These patterns are used by `send_event.py` for runtime redaction and by this skill for static review. Back to [SKILL.md](../SKILL.md).
 
 ## Pattern Table
 

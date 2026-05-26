@@ -6,8 +6,8 @@ description: >
   maintenance, freshness checks, structural integrity. Triggers: creating/reviewing/
   fixing documentation, maintaining catalog READMEs, verifying filesystem state
   match, documentation audit, checking doc freshness, authoring diagrams.
-compatibility: Claude Code
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
+compatibility: Claude Code
 ---
 
 # Documentation Management
@@ -19,6 +19,8 @@ Procedural expertise for writing, maintaining, and validating project-facing doc
 - [references/documentation-types.md](references/documentation-types.md) -- per-type guidelines for README, architecture, changelog, contributing, API docs
 - [references/diagram-conventions.md](references/diagram-conventions.md) -- Mermaid diagram creation, decomposition methodology, type recipes, styling guide
 - [references/advanced-markdown-patterns.md](references/advanced-markdown-patterns.md) -- `<details>`/`<summary>`, GitHub Alerts, footnotes, anchor links: decision rules, syntax, and scope constraints for human-facing GitHub-rendered docs
+- [references/diataxis-modes.md](references/diataxis-modes.md) -- Diátaxis mode rationale, common pitfalls, and worked examples per mode
+- [references/doc-manifest-schema.md](references/doc-manifest-schema.md) -- `doc_manifest.yaml` schema for the dashboard's documentation discovery spine
 - [assets/ARCHITECTURE_GUIDE_TEMPLATE.md](assets/ARCHITECTURE_GUIDE_TEMPLATE.md) -- 8-section template for developer-facing `docs/architecture.md` navigation guide
 
 ## Diátaxis Modes

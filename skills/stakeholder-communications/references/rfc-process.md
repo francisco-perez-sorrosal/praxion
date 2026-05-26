@@ -1,6 +1,6 @@
 # RFC Process
 
-Patterns for authoring RFCs (Requests for Comments), managing review workflows, and recording technical decisions at the right level of formality.
+Patterns for authoring RFCs (Requests for Comments), managing review workflows, and recording technical decisions at the right level of formality. Back to [SKILL.md](../SKILL.md).
 
 ## RFC Template
 

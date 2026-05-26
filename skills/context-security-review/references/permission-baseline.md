@@ -1,8 +1,6 @@
 # Agent Permission Baseline
 
-Expected tool permissions, permission modes, and access levels for all Praxion pipeline agents. Use this baseline to detect permission escalation in PRs that modify agent definitions.
-
-Back-link: [Context Security Review Skill](../SKILL.md)
+Expected tool permissions, permission modes, and access levels for all Praxion pipeline agents. Use this baseline to detect permission escalation in PRs that modify agent definitions. Back to [SKILL.md](../SKILL.md).
 
 ## Baseline Table
 

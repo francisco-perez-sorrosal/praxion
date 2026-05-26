@@ -1,6 +1,6 @@
 # Release Communications
 
-Templates and patterns for release announcements, breaking change notifications, and migration guides for downstream consumers.
+Templates and patterns for release announcements, breaking change notifications, and migration guides for downstream consumers. Back to [SKILL.md](../SKILL.md).
 
 ## Release Announcement Template
 

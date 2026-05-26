@@ -1,8 +1,6 @@
 # Hook Safety Contract
 
-Behavioral contract for each hook in the Praxion plugin ecosystem. Documents what each hook reads, writes, contacts externally, and guarantees NOT to do. Use this contract to verify hook behavior during security reviews.
-
-Back-link: [Context Security Review Skill](../SKILL.md)
+Behavioral contract for each hook in the Praxion plugin ecosystem. Documents what each hook reads, writes, contacts externally, and guarantees NOT to do. Use this contract to verify hook behavior during security reviews. Back to [SKILL.md](../SKILL.md).
 
 ## Contract Summary
 

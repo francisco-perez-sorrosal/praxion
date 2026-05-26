@@ -99,7 +99,7 @@ Write the body in imperative/infinitive form ("Extract text", "Run the script", 
 | `context: fork` + `agent` | | ✓ | ✗ | ✗ | Run the skill body as the prompt for a forked subagent; `agent:` picks the type (e.g. `Explore`). Only meaningful for skills with an explicit task, not pure guidelines. |
 | `model`, `effort` | | ✓ | ✗ | ✗ | Override model / effort while the skill is active (current turn only). |
 | `argument-hint`, `arguments` | | ✓ | ✗ | ✗ | Autocomplete hint + named positional args for `$name` substitution. |
-| `hooks`, `shell` | | ✓ | ✗ | ✗ | Lifecycle hooks scoped to the skill; `bash` (default) or `powershell` for `` !`cmd` `` blocks. |
+| `hooks`, `shell` | | ✓ | ✗ | ✗ | Lifecycle hooks scoped to the skill; `bash` (default) or `powershell` for bang-prefixed command-injection blocks. |
 
 Because commands [merged into skills](https://code.claude.com/docs/en/skills), every field applies to `commands/*.md` too (see the `command-crafting` skill). For portable skills, rely only on fields your target tools mark `✓`, and isolate Claude-only fields (those Cursor and Codex both mark `✗`) behind a clear heading. Complete field reference + interactions: [references/schema.md](references/schema.md).
 

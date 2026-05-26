@@ -190,7 +190,7 @@ The fields above are the portable Agent Skills core. Claude Code reads them **pl
 | `argument-hint` | String | Autocomplete hint, e.g. `[issue-number]` or `[filename] [format]`. |
 | `arguments` | String / list | Named positional args for `$name` substitution; names map to positions in order. |
 | `hooks` | Object | Hooks scoped to the skill's lifecycle (all events; for subagents `Stop` auto-converts to `SubagentStop`). |
-| `shell` | String | `bash` (default) or `powershell` for `` !`cmd` `` and ` ```! ` blocks. |
+| `shell` | String | `bash` (default) or `powershell` for bang-prefixed inline injection and fenced ` ```! ` blocks. |
 
 **Praxion staleness fields** (validated by `validate.py`, per `rules/swe/staleness-policy.md`):
 
@@ -199,7 +199,7 @@ The fields above are the portable Agent Skills core. Claude Code reads them **pl
 | `staleness_sensitive_sections` | List | Bare h2/h3 heading texts (in `SKILL.md` or any `references/`/`contexts/` file) the sentinel tracks for drift via `<!-- last-verified: YYYY-MM-DD -->` markers. |
 | `staleness_threshold_days` | Number | Per-skill staleness threshold override (global default 120; use 60 for fast-moving API surfaces). |
 
-**Argument substitution & dynamic context** (skill body, Claude Code): `$ARGUMENTS`, `$ARGUMENTS[N]` / `$N`, `$name`; `${CLAUDE_SESSION_ID}`, `${CLAUDE_EFFORT}`, `${CLAUDE_SKILL_DIR}`; and `` !`command` `` dynamic injection (runs once, before Claude sees the body) with a fenced ` ```! ` block for multi-line. Full reference: [Claude Code skills docs](https://code.claude.com/docs/en/skills).
+**Argument substitution & dynamic context** (skill body, Claude Code): `$ARGUMENTS`, `$ARGUMENTS[N]` / `$N`, `$name`; `${CLAUDE_SESSION_ID}`, `${CLAUDE_EFFORT}`, `${CLAUDE_SKILL_DIR}`; and bang-prefixed backtick-quoted dynamic injection (runs once, before Claude sees the body) with a fenced ` ```! ` block for multi-line. Full reference: [Claude Code skills docs](https://code.claude.com/docs/en/skills).
 
 ## Validation Rules
 

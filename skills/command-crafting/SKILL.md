@@ -163,7 +163,7 @@ Review the above changes and create a commit message.
 
 ### File References
 
-Use `@` prefix to include file contents (a command-file feature carried over from the legacy form; the merged skills docs emphasize `` !`cmd` `` injection and `${CLAUDE_SKILL_DIR}` instead — prefer `!` for new work):
+Use `@` prefix to include file contents (a command-file feature carried over from the legacy form; the merged skills docs emphasize bang-prefixed command injection and `${CLAUDE_SKILL_DIR}` instead — prefer the bang form for new work):
 
 ```markdown
 ---

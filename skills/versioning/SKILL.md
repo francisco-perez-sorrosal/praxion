@@ -92,7 +92,7 @@ When a change spans multiple categories, use the highest applicable level. When 
 
 - **Commitizen `version_files` uses substring matching.** The `:version` suffix in a `version_files` entry means "find the substring `version` on a line and replace the version string on that line." This works for both TOML (`version = "1.0.0"`) and JSON (`"version": "1.0.0"`). However, if a file has multiple lines containing the word `version` with version-like strings, Commitizen may update the wrong one. Ensure each target file has an unambiguous `version` field.
 
-- **`major_version_zero = true` changes bump semantics.** When enabled, `feat` commits produce MINOR bumps instead of MAJOR, and `feat!` / `BREAKING CHANGE` commits produce MINOR instead of MAJOR. This keeps the project in the `0.x` range during early development. Disable it (or remove the setting) when ready to release `1.0.0`.
+- **`major_version_zero = true` changes bump semantics.** When enabled, `feat` commits produce MINOR bumps instead of MAJOR, and breaking-change commits (a `feat` with a trailing bang, or a `BREAKING CHANGE` footer) produce MINOR instead of MAJOR. This keeps the project in the `0.x` range during early development. Disable it (or remove the setting) when ready to release `1.0.0`.
 
 - **Commitizen requires a baseline tag.** The first `cz bump` fails if no tag matching `tag_format` exists in git history. Bootstrap with a manual tag (`git tag -a v0.0.1 -m "Bootstrap"`) before running any bump commands.
 

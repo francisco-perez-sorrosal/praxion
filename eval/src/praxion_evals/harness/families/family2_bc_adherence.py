@@ -204,17 +204,26 @@ class Family2BehavioralContractAdherence(Family):
     name = "Family 2 — Behavioral-contract adherence"
     corpus_paths = (".ai-work/",)
 
-    def run(self, corpus: Corpus, judge: JudgeClient) -> list[CheckResult]:
+    def run(
+        self,
+        corpus: Corpus,
+        judge: JudgeClient,
+        *,
+        mechanical_only: bool = False,
+    ) -> list[CheckResult]:
         """Execute all Family 2 checks against the corpus.
 
         For each VERIFICATION_REPORT.md in the corpus:
         1. Detect BC Findings section presence — SKIP all checks if absent
         2. Run 6 mechanical tag-scan checks
-        3. Run 4 LLM-judged rubric checks (one per behavioral-contract behavior)
+        3. Run 4 LLM-judged rubric checks (one per behavioral-contract behavior),
+           skipped when ``mechanical_only`` is True
 
         Args:
             corpus: Resolved, immutable snapshot of the target's artifacts.
             judge: JudgeClient for LLM-judged checks.
+            mechanical_only: When True, skip the 4 LLM-judged rubric checks
+                and emit only the mechanical tag-scan rows.
 
         Returns:
             Ordered list of CheckResult objects.
@@ -236,10 +245,19 @@ class Family2BehavioralContractAdherence(Family):
 
         results: list[CheckResult] = []
         for path, content in corpus.verification_reports:
-            results.extend(self._check_report(path, content, judge))
+            results.extend(
+                self._check_report(path, content, judge, mechanical_only=mechanical_only)
+            )
         return results
 
-    def _check_report(self, path: str, content: str, judge: JudgeClient) -> list[CheckResult]:
+    def _check_report(
+        self,
+        path: str,
+        content: str,
+        judge: JudgeClient,
+        *,
+        mechanical_only: bool = False,
+    ) -> list[CheckResult]:
         """Run all checks for one VERIFICATION_REPORT.md."""
         results: list[CheckResult] = []
 
@@ -266,7 +284,8 @@ class Family2BehavioralContractAdherence(Family):
         results.extend(self._check_bc_tags(path, content))
 
         # LLM: 4 rubric checks
-        results.extend(self._check_bc_rubrics(path, content, judge))
+        if not mechanical_only:
+            results.extend(self._check_bc_rubrics(path, content, judge))
 
         return results
 

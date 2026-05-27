@@ -28,7 +28,7 @@ Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.m
 
 - **Craft or modify a component** (skill / rule / agent / command / hook) — load the matching `*-crafting` skill first, then run that skill's validator.
 - **Update content shipped into managed projects** — edit `claude/canonical-blocks/<slug>.md`, run `python3 scripts/sync_canonical_blocks.py --write`, mirror the change in `commands/onboard-project.md` + `commands/new-project.md` (the sync-check is in *Build / test / lint* above).
-- **Run an audit or roadmap pass** — `/sentinel` (coherence), `/project-metrics` (health), `/eval-praxion` (semantic quality gate: ADR reasoning, BC adherence — run after a multi-ADR pipeline or for periodic quality review), `/roadmap` (audit→roadmap; per `dec-092` Praxion does not carry a living `ROADMAP.md` instance — the cartographer regenerates on demand).
+- **Run an audit or roadmap pass** — `/sentinel` (coherence), `/project-metrics` (health), `/eval-praxion` (single eval entrypoint: mechanical + LLM-as-judge quality checks; pass `--task-slug <slug>` to add the in-flight artifact-manifest scan; `--mechanical-only` for the free, auth-less structural surface), `/roadmap` (audit→roadmap; per `dec-092` Praxion does not carry a living `ROADMAP.md` instance — the cartographer regenerates on demand).
 - **Work on the dashboard** — `dashboard_app/` (Next.js runtime over `.ai-state/`); its test + build commands are in *Build / test / lint* above.
 - **Add or refine docs** — long-form Diátaxis-shaped docs under `docs/` (index: `docs/README.md`); component catalogs in `agents/README.md` / `skills/README.md` / `commands/README.md` / `rules/README.md`.
 

@@ -28,7 +28,11 @@ from praxion_evals.harness.families.family1_pipeline_fidelity import (
 from praxion_evals.harness.families.family2_bc_adherence import (
     Family2BehavioralContractAdherence,
 )
-from praxion_evals.harness.judge_client import JudgeClient, select_judge_client
+from praxion_evals.harness.judge_client import (
+    JudgeClient,
+    NullJudgeClient,
+    select_judge_client,
+)
 from praxion_evals.harness.orchestrator import Orchestrator
 from praxion_evals.harness.report_writer import ReportWriter
 from praxion_evals.harness.schemas import (
@@ -37,21 +41,24 @@ from praxion_evals.harness.schemas import (
     JudgeVerdict,
     Report,
 )
+from praxion_evals.harness.task_manifest import PipelineTier
 
 __all__ = [
+    "CheckResult",
+    "Corpus",
+    "CorpusReader",
     "Family",
     "Family1PipelineOutcomeFidelity",
     "Family2BehavioralContractAdherence",
     "JudgeClient",
-    "CorpusReader",
-    "Orchestrator",
-    "ReportWriter",
-    "select_judge_client",
-    "CheckResult",
-    "Corpus",
     "JudgeVerdict",
+    "NullJudgeClient",
+    "Orchestrator",
+    "PipelineTier",
     "Report",
+    "ReportWriter",
     "run_eval",
+    "select_judge_client",
 ]
 
 # Default report output directory (relative to repo root / cwd).
@@ -62,13 +69,17 @@ def run_eval(
     target: str = "main",
     output_dir: Path | str | None = None,
     repo_root: Path | str | None = None,
+    *,
+    task_slug: str | None = None,
+    pipeline_tier: PipelineTier | None = None,
+    mechanical_only: bool = False,
 ) -> Report:
     """Run both eval families against a target and return the written Report.
 
     Composition:
-        CorpusReader(repo_root).resolve(target)
-        → select_judge_client()
-        → Orchestrator([Family1, Family2], output_dir).run(corpus, judge)
+        CorpusReader(repo_root).resolve(target, task_slug=…, pipeline_tier=…)
+        → select_judge_client()  (or NullJudgeClient when mechanical_only)
+        → Orchestrator([Family1, Family2], output_dir).run(corpus, judge, …)
         → Report
 
     Args:
@@ -77,6 +88,15 @@ def run_eval(
                     ``.ai-state/praxion_eval_reports/`` relative to *repo_root*.
         repo_root: Repository root for corpus resolution and worktree expansion.
                    Defaults to ``Path.cwd()``.
+        task_slug: When supplied, also verdict the in-flight ``.ai-work/<slug>/``
+                   artifact manifest under the resolved target.
+        pipeline_tier: Tier governing the expected manifest. Defaults to
+                       STANDARD when ``task_slug`` is supplied without an
+                       explicit tier.
+        mechanical_only: When True, skip every LLM-judged check across all
+                         families. No auth env vars are required in this mode
+                         — a ``NullJudgeClient`` is wired in to surface any
+                         family that accidentally calls ``judge.judge()``.
 
     Returns:
         A populated Report with a non-empty ``report_path``.
@@ -84,12 +104,12 @@ def run_eval(
     root = Path(repo_root) if repo_root is not None else Path.cwd()
     out_dir = Path(output_dir) if output_dir is not None else root / _DEFAULT_OUTPUT_DIR
 
-    corpus = CorpusReader(root).resolve(target)
-    judge = select_judge_client()
+    corpus = CorpusReader(root).resolve(target, task_slug=task_slug, pipeline_tier=pipeline_tier)
+    judge: JudgeClient = NullJudgeClient() if mechanical_only else select_judge_client()
 
     families: list[Family] = [
         Family1PipelineOutcomeFidelity(),
         Family2BehavioralContractAdherence(),
     ]
     orchestrator = Orchestrator(families=families, output_dir=out_dir)
-    return orchestrator.run(corpus, judge)
+    return orchestrator.run(corpus, judge, mechanical_only=mechanical_only)

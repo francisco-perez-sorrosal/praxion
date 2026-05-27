@@ -35,7 +35,13 @@ class Orchestrator:
         self._families = list(families)
         self._output_dir = Path(output_dir)
 
-    def run(self, corpus: Corpus, judge: JudgeClient) -> Report:
+    def run(
+        self,
+        corpus: Corpus,
+        judge: JudgeClient,
+        *,
+        mechanical_only: bool = False,
+    ) -> Report:
         """Run all families, aggregate results, write the report, and return it.
 
         Each family's run() is called in registration order.  If a family raises
@@ -45,6 +51,7 @@ class Orchestrator:
         Args:
             corpus: Resolved corpus to run checks against.
             judge: JudgeClient for LLM-backed checks.
+            mechanical_only: When True, families skip every LLM-judged check.
 
         Returns:
             Report with all check results and a non-empty report_path.
@@ -56,7 +63,7 @@ class Orchestrator:
             family_id = getattr(family, "id", family.__class__.__name__)
             print(f"[{family_id}] start — corpus={total_items} items", flush=True)
             try:
-                family_results = family.run(corpus, judge)
+                family_results = family.run(corpus, judge, mechanical_only=mechanical_only)
                 all_results.extend(family_results)
                 pass_count = sum(1 for r in family_results if r.verdict == "PASS")
                 warn_count = sum(1 for r in family_results if r.verdict == "WARN")

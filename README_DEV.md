@@ -182,7 +182,7 @@ memory-mcp/                          # Persistent memory MCP server
 └── ...
 eval/                                # Out-of-band quality evals (praxion-evals CLI)
 ├── pyproject.toml                   # Standalone uv project — not installed with plugin
-├── src/praxion_evals/               # behavioral, harness, judges, tiers
+├── src/praxion_evals/               # harness (cli, families, corpus, judge), stubs
 └── tests/
 .ai-state/                           # Persistent project intelligence (committed to git)
 ├── decisions/                       # Architecture Decision Records (ADR files)
@@ -589,38 +589,42 @@ Always run `/praxion-complete-uninstall` **before** `claude plugin uninstall i-a
 
 Quality measurement for agent pipelines that runs **separately from pipeline execution**, not as part of it. No hook triggers evals automatically; no agent ever calls them while a pipeline is in flight (binding constraint: [`dec-040`](.ai-state/decisions/040-eval-framework-out-of-band.md)). The framework lives in `eval/` as a standalone `uv` project and is **not** bundled with the plugin.
 
-### Tiers
+### Modes
 
-| Command | Tier | Purpose |
-|---------|------|---------|
-| `/eval` | 1 | Filesystem-only artifact manifest check — confirms every expected deliverable for the pipeline's tier was produced under `.ai-work/<task-slug>/`. Pure filesystem read; no LLM call. |
-| `/eval-praxion` | 2 | LLM-as-judge semantic quality gate over completed `.ai-state/` artifacts. Family 1: pipeline-outcome fidelity (ADR structure, supersession reciprocity, traceability). Family 2: behavioral-contract adherence (BC-tag coverage in `VERIFICATION_REPORT.md`). Reports land in `.ai-state/praxion_eval_reports/`. |
+`/eval-praxion` is the single entrypoint. The retired `/eval` Tier 1 surface has been folded into Family 1's mechanical artifact-manifest check, activated by `--task-slug <slug>`.
 
-The `regression` sub-package was retired in the praxion-self-eval-v1 pipeline. Baselines were keyed by `task_slug`, but Praxion slugs are one-shot — each feature generates a unique slug with no second run to compare against. The entire broken-by-design surface (448 LOC) was removed. The broader regression-mode redesign (tier/shape-keyed envelope baselines over a Phoenix corpus) remains deferred; see `eval/EVAL_PLAN.md`.
+| Invocation | What runs | Cost |
+|------------|-----------|------|
+| `/eval-praxion` (no args) | Both families against `main` HEAD; LLM judging on | API credits |
+| `/eval-praxion <ref-or-worktree>` | Both families against the resolved target | API credits |
+| `/eval-praxion --task-slug <slug>` | Adds the in-flight `.ai-work/<slug>/` manifest scan to Family 1 | API credits |
+| `/eval-praxion --mechanical-only` | Skip every LLM-judged check across families; no auth env needed | Free |
+
+The `regression` sub-package was retired in the praxion-self-eval-v1 pipeline. Baselines were keyed by `task_slug`, but Praxion slugs are one-shot — each feature generates a unique slug with no second run to compare against. The entire broken-by-design surface (448 LOC) was removed. The broader regression-mode redesign (tier/shape-keyed envelope baselines over a Phoenix corpus) remains deferred; see `eval/EVAL_PLAN.md`. The standalone `behavioral/` package and top-level `cli.py` were collapsed into the harness post-v1.
 
 ### When to run
 
-- **`/eval`** — after any pipeline run to confirm the agent produced the full artifact set for its tier.
-- **`/eval-praxion`** — after a multi-ADR pipeline or for periodic quality review; requires `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`.
+- **`/eval-praxion --task-slug <slug> --mechanical-only`** — after any pipeline run to confirm the agent produced the full artifact set for its tier. Free.
+- **`/eval-praxion`** — after a multi-ADR pipeline or for periodic quality review; requires `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` (omitted with `--mechanical-only`).
 
 ### Examples
 
 ```sh
-/i-am:eval                                                           # list tier status
-/i-am:eval behavioral --task-slug architecture-doc                   # verify deliverables
-/i-am:eval behavioral --task-slug architecture-doc --tier full       # include ARCHITECTURE.md + docs/architecture.md recency
-/i-am:eval-praxion                                                   # LLM-as-judge over main HEAD
+/i-am:eval-praxion                                                           # LLM-as-judge over main HEAD
+/i-am:eval-praxion --task-slug architecture-doc --mechanical-only            # verify deliverables, free
+/i-am:eval-praxion --task-slug architecture-doc --tier full                  # include ARCHITECTURE.md + docs/architecture.md recency
+/i-am:eval-praxion my-worktree-name                                          # eval a specific worktree by name
 ```
 
 ### Benefits
 
-- **Catches silent pipeline skips.** When a subagent reports "complete" but didn't actually write the deliverable, `/eval behavioral` flags the missing file. The verifier alone has false-positive failure modes; behavioral is an independent cross-check.
-- **Semantic quality gate.** `/eval-praxion` surfaces ADR reasoning gaps and behavioral-contract omissions that mechanical checks cannot detect.
+- **Catches silent pipeline skips.** When a subagent reports "complete" but didn't actually write the deliverable, the `--task-slug` manifest scan flags the missing file. The verifier alone has false-positive failure modes; the manifest check is an independent cross-check.
+- **Semantic quality gate.** Family 1's option-depth check and Family 2's BC rubrics surface ADR reasoning gaps and behavioral-contract omissions that mechanical checks cannot detect.
 - **Zero pipeline overhead.** Binding constraint in `dec-040`: eval code never runs inside a pipeline, so bugs in the eval framework cannot break agent work.
 
 ### Scope
 
-Currently Praxion-internal: `/i-am:eval` and `/i-am:eval-praxion` resolve `Bash(uv run ...)` in their `allowed-tools` frontmatter, which requires the `eval/` project on disk. When the plugin is installed in another project, the commands are exposed but invocation fails — there is no `eval/` directory and no `praxion-evals` binary on the path.
+Currently Praxion-internal: `/i-am:eval-praxion` resolves `Bash(uv run ...)` in its `allowed-tools` frontmatter, which requires the `eval/` project on disk. When the plugin is installed in another project, the command is exposed but invocation fails — there is no `eval/` directory and no `praxion-evals` binary on the path.
 
 Making the tooling portable would require bundling `eval/` inside the plugin or publishing `praxion-evals` to PyPI. Not in scope today — open an issue if you need to consume it downstream.
 

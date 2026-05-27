@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "praxion-evals"
-version = "0.2.0"
-description = "Out-of-band quality measurement framework for Praxion agent pipelines (Tier 1: behavioral; Tier 2: LLM-as-judge harness via /eval-praxion)."
+version = "0.3.0"
+description = "Out-of-band quality measurement framework for Praxion agent pipelines — single entrypoint /eval-praxion with mechanical + LLM-judged check families over completed and in-flight artifacts."
 requires-python = ">=3.13"
 dependencies = [
     "anthropic",
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-praxion-evals = "praxion_evals.cli:main"
+praxion-evals = "praxion_evals.harness.cli:main"
 
 [dependency-groups]
 dev = [

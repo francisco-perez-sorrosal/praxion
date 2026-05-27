@@ -122,7 +122,7 @@ Reusable knowledge modules loaded automatically based on context. See [skills/RE
 - `/create-worktree`, `/merge-worktree` — git worktree lifecycle
 - `/onboard-project`, `/new-project` — bring a project into the ecosystem
 - `/roadmap` — produce a lens-audited `ROADMAP.md`
-- `/project-metrics`, `/eval` — health metrics and out-of-band quality evals
+- `/project-metrics`, `/eval-praxion` — health metrics and out-of-band quality evals
 - `/run-experiment`, `/check-experiment` — ML training experiment dispatch
 
 See [commands/README.md](commands/README.md) for the complete list with descriptions.

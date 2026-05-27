@@ -11,14 +11,21 @@ Auth route is resolved via select_judge_client() (env-detect):
     ANTHROPIC_API_KEY set       → messages-api route
     Neither                     → RuntimeError naming both vars
 
+When ``--task-slug`` is supplied, the corpus reader also walks the resolved
+target's ``.ai-work/<slug>/`` and records per-tier artifact-manifest
+verdicts. ``--tier`` selects the manifest (lightweight / standard / full);
+defaults to ``standard``. ``.ai-work/`` is gitignored, so for git-ref
+targets the manifest scan falls back to the working tree.
+
+When ``--mechanical-only`` is supplied, every LLM-judged check is skipped
+and no auth env var is required — the cheap mechanical surface (artifact
+manifest, ADR structure, supersession reciprocity, BC tag scans) runs alone.
+
 A `.env` file at (or above) the invocation cwd is loaded at the top of main()
 via python-dotenv. Real environment variables take precedence over `.env`
 values (load_dotenv default: override=False), so an explicit `export` always
 wins. This lets operators set CLAUDE_CODE_OAUTH_TOKEN once in `.env` instead
 of re-exporting it in every shell that invokes /eval-praxion.
-
-The slash-command registration (entry point script, commands/eval-praxion.md)
-is Step 8 scope — this module is the Python-level CLI only.
 """
 
 from __future__ import annotations
@@ -36,6 +43,7 @@ from dotenv import find_dotenv, load_dotenv
 # harness/__init__.py; CLI consumers use it as cli.run_eval)
 # ---------------------------------------------------------------------------
 from praxion_evals.harness import run_eval  # noqa: F401
+from praxion_evals.harness.task_manifest import PipelineTier
 
 # ---------------------------------------------------------------------------
 # Arg resolver: 4-case resolution
@@ -116,13 +124,17 @@ def _resolve_git_ref(ref: str, cwd: Path) -> str:
 # ---------------------------------------------------------------------------
 
 
-def main(argv: list[str] | None = None) -> None:
+def main(argv: list[str] | None = None) -> int:
     """Argparse-backed CLI entry point for eval-praxion.
 
     Usage:
-        python -m praxion_evals.harness.cli [TARGET] [--output-dir DIR]
+        python -m praxion_evals.harness.cli [TARGET]
+            [--output-dir DIR]
+            [--task-slug SLUG] [--tier lightweight|standard|full]
+            [--mechanical-only]
 
     TARGET is resolved via the 4-case resolver (resolve_target).
+    Returns the process exit code (0 on success, non-zero on error).
     """
     load_dotenv(find_dotenv(usecwd=True))
 
@@ -148,6 +160,33 @@ def main(argv: list[str] | None = None) -> None:
             "(default: <repo-root>/.ai-state/praxion_eval_reports/)."
         ),
     )
+    parser.add_argument(
+        "--task-slug",
+        default=None,
+        help=(
+            "In-flight pipeline slug. When set, Family 1 also verdicts the "
+            "per-tier artifact manifest under .ai-work/<slug>/."
+        ),
+    )
+    parser.add_argument(
+        "--tier",
+        default=PipelineTier.STANDARD.value,
+        choices=[t.value for t in PipelineTier],
+        help=(
+            "Pipeline tier governing the expected artifact manifest "
+            "(only consulted when --task-slug is set). Default: standard."
+        ),
+    )
+    parser.add_argument(
+        "--mechanical-only",
+        action="store_true",
+        help=(
+            "Skip every LLM-judged check across all families. No auth env "
+            "var is required in this mode — useful for the cheap, fast "
+            "structural surface (artifact manifest, ADR frontmatter, "
+            "supersession reciprocity, BC tag scans)."
+        ),
+    )
 
     args = parser.parse_args(argv)
 
@@ -155,17 +194,26 @@ def main(argv: list[str] | None = None) -> None:
         resolved = resolve_target(args.target)
     except (ValueError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
-        sys.exit(2)
+        return 2
+
+    try:
+        tier = PipelineTier(args.tier) if args.task_slug else None
+    except ValueError:
+        print(f"error: unknown tier {args.tier!r}", file=sys.stderr)
+        return 2
 
     # Run eval — fully wired composition: CorpusReader → JudgeClient → families → Report.
     try:
         report = run_eval(
             target=str(resolved),
             output_dir=args.output_dir,
+            task_slug=args.task_slug,
+            pipeline_tier=tier,
+            mechanical_only=args.mechanical_only,
         )
     except (RuntimeError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
-        sys.exit(1)
+        return 1
 
     print(
         f"Eval complete: {report.pass_count} PASS / "
@@ -174,7 +222,8 @@ def main(argv: list[str] | None = None) -> None:
     )
     if report.report_path:
         print(f"Report: {report.report_path}")
+    return 0 if report.fail_count == 0 else 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

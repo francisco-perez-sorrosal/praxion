@@ -64,7 +64,7 @@ class _FamilyProducingOnePass:
     name = "Fake Family (pass)"
     corpus_paths: tuple[str, ...] = ()
 
-    def run(self, corpus: Any, judge: Any) -> list[Any]:
+    def run(self, corpus: Any, judge: Any, *, mechanical_only: bool = False) -> list[Any]:
         from praxion_evals.harness.schemas import CheckResult
 
         return [
@@ -86,7 +86,7 @@ class _FamilyProducingOneWarn:
     name = "Fake Family (warn)"
     corpus_paths: tuple[str, ...] = ()
 
-    def run(self, corpus: Any, judge: Any) -> list[Any]:
+    def run(self, corpus: Any, judge: Any, *, mechanical_only: bool = False) -> list[Any]:
         from praxion_evals.harness.schemas import CheckResult
 
         return [
@@ -108,7 +108,7 @@ class _FamilyThatRaises:
     name = "Fake Family (raises)"
     corpus_paths: tuple[str, ...] = ()
 
-    def run(self, corpus: Any, judge: Any) -> list[Any]:
+    def run(self, corpus: Any, judge: Any, *, mechanical_only: bool = False) -> list[Any]:
         raise RuntimeError("Simulated family failure")
 
 
@@ -317,7 +317,7 @@ def test_orchestrator_passes_corpus_to_each_family(tmp_path: Path):
         name = "Capturing Family"
         corpus_paths: tuple[str, ...] = ()
 
-        def run(self, corpus: Any, judge: Any) -> list[Any]:
+        def run(self, corpus: Any, judge: Any, *, mechanical_only: bool = False) -> list[Any]:
             received_corpora.append(corpus)
             return []
 

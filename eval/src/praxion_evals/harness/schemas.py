@@ -61,6 +61,38 @@ class CheckResult:
 
 
 # ---------------------------------------------------------------------------
+# In-flight task artifact verdict
+# ---------------------------------------------------------------------------
+
+
+ArtifactVerdict = Literal["present", "missing", "stale"]
+
+
+@dataclass(frozen=True)
+class TaskArtifactVerdict:
+    """One artifact-manifest verdict for an in-flight pipeline.
+
+    Populated by the corpus reader when a task_slug is supplied. Family 1
+    translates each verdict into a CheckResult.
+
+    Fields:
+        path: Path (relative to corpus root) of the expected artifact.
+        verdict: ``present`` if the file exists, ``missing`` if not,
+            ``stale`` if recency was checked and the mtime predates the
+            pipeline-start timestamp.
+        required: When True, ``missing`` flips the overall check to FAIL.
+        description: Human-readable explanation of the artifact's purpose.
+        detail: Optional extra context (e.g., the mtime that caused stale).
+    """
+
+    path: str
+    verdict: ArtifactVerdict
+    required: bool
+    description: str = ""
+    detail: str = ""
+
+
+# ---------------------------------------------------------------------------
 # CorpusReader output
 # ---------------------------------------------------------------------------
 
@@ -77,6 +109,14 @@ class Corpus:
         specs: Pairs of (relative_path, file_content) for archived SPEC files.
         verification_reports: Pairs of (relative_path, file_content) for
             VERIFICATION_REPORT.md files found in .ai-work/ directories.
+        task_slug: When the run is scoped to an in-flight pipeline, the
+            ``.ai-work/<task_slug>/`` directory whose artifact manifest was
+            checked. ``None`` for post-merge runs.
+        pipeline_tier: Pipeline tier that determined the expected manifest —
+            ``lightweight`` / ``standard`` / ``full``. ``None`` when
+            ``task_slug`` is also ``None``.
+        task_artifacts: Per-artifact verdicts from the manifest scan. Empty
+            tuple when ``task_slug`` is ``None``.
     """
 
     target_kind: Literal["path", "worktree", "ref"]
@@ -84,6 +124,9 @@ class Corpus:
     decisions: tuple[tuple[str, str], ...]
     specs: tuple[tuple[str, str], ...]
     verification_reports: tuple[tuple[str, str], ...]
+    task_slug: str | None = None
+    pipeline_tier: str | None = None
+    task_artifacts: tuple[TaskArtifactVerdict, ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -138,20 +181,13 @@ EMPTY_CORPUS = Corpus(
 )
 
 
-# Re-export field for external consumers that only want the field sentinel
-_CORPUS_FIELDS: tuple[str, ...] = (
-    "target_kind",
-    "target_label",
-    "decisions",
-    "specs",
-    "verification_reports",
-)
-# noqa: F401 — exported for downstream type checks
 __all__ = [
-    "JudgeVerdict",
+    "ArtifactVerdict",
     "CheckKind",
     "CheckResult",
     "Corpus",
-    "Report",
     "EMPTY_CORPUS",
+    "JudgeVerdict",
+    "Report",
+    "TaskArtifactVerdict",
 ]

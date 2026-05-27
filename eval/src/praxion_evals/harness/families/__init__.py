@@ -32,7 +32,13 @@ class Family(ABC):
     corpus_paths: tuple[str, ...]
 
     @abstractmethod
-    def run(self, corpus: Corpus, judge: JudgeClient) -> list[CheckResult]:
+    def run(
+        self,
+        corpus: Corpus,
+        judge: JudgeClient,
+        *,
+        mechanical_only: bool = False,
+    ) -> list[CheckResult]:
         """Execute all checks in this family. Read-only over the corpus.
 
         Mechanical checks call no method on *judge*.
@@ -45,6 +51,9 @@ class Family(ABC):
         Args:
             corpus: Resolved, immutable snapshot of the target's artifacts.
             judge: JudgeClient to use for LLM-backed checks.
+            mechanical_only: When True, skip every check that would call the
+                judge. Families that are entirely LLM-judged should return an
+                empty list. Lets operators run cheap mechanical checks alone.
 
         Returns:
             Ordered list of CheckResult objects, one per check executed.

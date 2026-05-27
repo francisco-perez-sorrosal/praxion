@@ -9,6 +9,12 @@ Resolver order (first match wins):
 For filesystem targets (cases 1 and 2), files are read directly from disk.
 For git-ref targets (case 3), files are read via ``git show <ref>:<path>``.
 
+When ``task_slug`` is supplied, the reader also walks the per-tier artifact
+manifest under the resolved root's ``.ai-work/<slug>/`` and records verdicts
+on the Corpus. ``.ai-work/`` is gitignored by Praxion convention, so for git-
+ref targets the manifest scan falls back to the working tree (mirroring the
+existing VERIFICATION_REPORT.md handling).
+
 Each subprocess call uses check=False and wraps failures in actionable messages.
 """
 
@@ -17,7 +23,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from praxion_evals.harness.schemas import Corpus
+from praxion_evals.harness.schemas import Corpus, TaskArtifactVerdict
+from praxion_evals.harness.task_manifest import PipelineTier, scan_task_manifest
 
 # ---------------------------------------------------------------------------
 # Paths within a corpus root that contain eval-relevant artifacts
@@ -52,13 +59,29 @@ class CorpusReader:
     # Public API
     # ------------------------------------------------------------------
 
-    def resolve(self, target: str) -> Corpus:
+    def resolve(
+        self,
+        target: str,
+        task_slug: str | None = None,
+        pipeline_tier: PipelineTier | None = None,
+    ) -> Corpus:
         """Resolve *target* to an immutable Corpus.
 
         Resolution order: filesystem path → worktree name → git ref → error.
 
+        When ``task_slug`` is supplied, the Corpus additionally carries the
+        per-tier artifact-manifest verdicts for ``.ai-work/<task_slug>/`` at
+        the resolved root. For git-ref targets the manifest scan falls back
+        to the working tree (``.ai-work/`` is gitignored).
+
         Args:
             target: A filesystem path, worktree name, git ref, or 'main'/'HEAD'.
+            task_slug: Optional in-flight pipeline slug. When set, also
+                triggers the artifact-manifest scan.
+            pipeline_tier: Tier governing the expected manifest. Required
+                when ``task_slug`` is set; ignored otherwise. Defaults to
+                ``PipelineTier.STANDARD`` when ``task_slug`` is set without
+                an explicit tier.
 
         Returns:
             A populated Corpus.
@@ -72,20 +95,24 @@ class CorpusReader:
         if not candidate_path.is_absolute():
             candidate_path = self._root / target
         if candidate_path.exists():
-            return self._read_from_filesystem(candidate_path, target_label=str(candidate_path))
+            corpus = self._read_from_filesystem(candidate_path, target_label=str(candidate_path))
+            return self._attach_task_manifest(corpus, candidate_path, task_slug, pipeline_tier)
 
         # Case 2: known worktree name
         worktree_path = self._root / ".claude" / "worktrees" / target
         if worktree_path.exists():
-            return self._read_from_filesystem(
+            corpus = self._read_from_filesystem(
                 worktree_path,
                 target_label=f"worktree:{target}",
                 target_kind="worktree",
             )
+            return self._attach_task_manifest(corpus, worktree_path, task_slug, pipeline_tier)
 
         # Case 3: valid git ref
         if self._is_valid_git_ref(target):
-            return self._read_from_git_ref(target)
+            corpus = self._read_from_git_ref(target)
+            # .ai-work/ is gitignored — fall back to working tree for manifest.
+            return self._attach_task_manifest(corpus, self._root, task_slug, pipeline_tier)
 
         # Case 4: unresolvable — three-part error
         raise ValueError(
@@ -95,6 +122,41 @@ class CorpusReader:
             f"git ref '{target}' (git rev-parse returned non-zero). "
             f"To fix: pass an existing path, a worktree name under "
             f".claude/worktrees/, or a valid git ref (SHA, branch, tag)."
+        )
+
+    # ------------------------------------------------------------------
+    # In-flight artifact-manifest attachment
+    # ------------------------------------------------------------------
+
+    def _attach_task_manifest(
+        self,
+        corpus: Corpus,
+        scan_root: Path,
+        task_slug: str | None,
+        pipeline_tier: PipelineTier | None,
+    ) -> Corpus:
+        """Return *corpus* with task_slug + manifest verdicts attached.
+
+        No-op when *task_slug* is None.
+        """
+        if task_slug is None:
+            return corpus
+
+        tier = pipeline_tier if pipeline_tier is not None else PipelineTier.STANDARD
+        verdicts: tuple[TaskArtifactVerdict, ...] = scan_task_manifest(
+            repo_root=scan_root,
+            task_slug=task_slug,
+            tier=tier,
+        )
+        return Corpus(
+            target_kind=corpus.target_kind,
+            target_label=corpus.target_label,
+            decisions=corpus.decisions,
+            specs=corpus.specs,
+            verification_reports=corpus.verification_reports,
+            task_slug=task_slug,
+            pipeline_tier=str(tier),
+            task_artifacts=verdicts,
         )
 
     def read_file_at_ref(self, ref: str, relative_path: str) -> str:

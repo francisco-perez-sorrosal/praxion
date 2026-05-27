@@ -190,6 +190,27 @@ class MessagesApiJudgeClient(JudgeClient):
 
 
 # ---------------------------------------------------------------------------
+# Mechanical-only sentinel
+# ---------------------------------------------------------------------------
+
+
+class NullJudgeClient(JudgeClient):
+    """Sentinel client for ``--mechanical-only`` runs.
+
+    Families that respect ``mechanical_only=True`` must not call ``judge()``;
+    if one does anyway, this client raises so the bug surfaces immediately
+    instead of silently returning a fake verdict.
+    """
+
+    def judge(self, rubric: str, artifact: str, schema: dict) -> JudgeVerdict:  # type: ignore[type-arg]
+        raise RuntimeError(
+            "NullJudgeClient.judge() was called in mechanical-only mode. "
+            "A family attempted an LLM-judged check despite mechanical_only=True; "
+            "the family's run() must skip every judge.judge() call when this flag is set."
+        )
+
+
+# ---------------------------------------------------------------------------
 # Factory
 # ---------------------------------------------------------------------------
 

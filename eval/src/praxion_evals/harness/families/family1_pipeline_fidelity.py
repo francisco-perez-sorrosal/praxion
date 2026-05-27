@@ -1,6 +1,7 @@
 """Family 1 — Pipeline-outcome fidelity checks.
 
-Mechanical checks verify structural correctness of ADRs and SPECs:
+Mechanical checks verify structural correctness of ADRs, SPECs, and (when an
+in-flight pipeline is in scope) the per-tier artifact manifest:
 - ADR frontmatter completeness (required fields present)
 - ADR body section presence (Context / Decision / Considered Options / Consequences)
 - Supersession reciprocity (supersedes ↔ superseded_by symmetry)
@@ -8,6 +9,8 @@ Mechanical checks verify structural correctness of ADRs and SPECs:
 - SPEC traceability matrix presence
 - affected_reqs resolvability (WARN on unresolvable — 20% population rate is expected)
 - DECISIONS_INDEX row count consistency (WARN on mismatch)
+- In-flight pipeline artifact-manifest completeness (activates when the corpus
+  carries a task_slug; emits one CheckResult per expected deliverable)
 
 LLM-judged checks evaluate substantive quality:
 - Option-depth substantiveness (Considered Options section depth)
@@ -177,7 +180,13 @@ class Family1PipelineOutcomeFidelity(Family):
         ".ai-state/specs/",
     )
 
-    def run(self, corpus: Corpus, judge: JudgeClient) -> list[CheckResult]:
+    def run(
+        self,
+        corpus: Corpus,
+        judge: JudgeClient,
+        *,
+        mechanical_only: bool = False,
+    ) -> list[CheckResult]:
         """Execute all Family 1 checks against the corpus.
 
         Mechanical checks run first; LLM checks run last (cost-sensitive).
@@ -185,6 +194,10 @@ class Family1PipelineOutcomeFidelity(Family):
         Args:
             corpus: Resolved, immutable snapshot of the target's artifacts.
             judge: JudgeClient for LLM-judged checks.
+            mechanical_only: When True, skip every LLM-judged check. Lets
+                operators run the cheap, free mechanical checks (artifact
+                manifest, ADR structure, supersession reciprocity) without
+                paying for judge calls.
 
         Returns:
             Ordered list of CheckResult objects.
@@ -204,6 +217,7 @@ class Family1PipelineOutcomeFidelity(Family):
         ]
 
         # --- Mechanical checks ---
+        results.extend(self._check_task_manifest(corpus))
         results.extend(self._check_frontmatter(adr_entries))
         results.extend(self._check_body_sections(adr_entries))
         results.extend(self._check_supersession_reciprocity(adr_entries))
@@ -213,8 +227,64 @@ class Family1PipelineOutcomeFidelity(Family):
         results.extend(self._check_decisions_index(adr_entries, index_entries))
 
         # --- LLM-judged checks ---
-        results.extend(self._check_option_depth(adr_entries, judge))
+        if not mechanical_only:
+            results.extend(self._check_option_depth(adr_entries, judge))
 
+        return results
+
+    # ------------------------------------------------------------------
+    # Mechanical: in-flight pipeline artifact-manifest completeness
+    # ------------------------------------------------------------------
+
+    def _check_task_manifest(self, corpus: Corpus) -> list[CheckResult]:
+        """Translate per-tier artifact verdicts on the corpus into CheckResults.
+
+        Activates only when ``corpus.task_slug`` is populated (i.e. the
+        operator passed ``--task-slug`` to the harness CLI). Emits one
+        CheckResult per expected artifact in manifest order: PASS when
+        present, FAIL when required-and-missing, WARN when optional-and-
+        missing or stale.
+        """
+        if corpus.task_slug is None or not corpus.task_artifacts:
+            return []
+
+        results: list[CheckResult] = []
+        for verdict in corpus.task_artifacts:
+            if verdict.verdict == "present":
+                results.append(
+                    CheckResult(
+                        check_name="task_artifact_manifest",
+                        check_kind="mechanical",
+                        verdict="PASS",
+                        artifact_path=verdict.path,
+                        findings=(f"Expected artifact present: {verdict.description}",),
+                        score=-1,
+                    )
+                )
+            elif verdict.verdict == "missing":
+                outcome = "FAIL" if verdict.required else "WARN"
+                tag = "required" if verdict.required else "optional"
+                results.append(
+                    CheckResult(
+                        check_name="task_artifact_manifest",
+                        check_kind="mechanical",
+                        verdict=outcome,
+                        artifact_path=verdict.path,
+                        findings=(f"Expected {tag} artifact missing: {verdict.description}",),
+                        score=-1,
+                    )
+                )
+            else:  # stale
+                results.append(
+                    CheckResult(
+                        check_name="task_artifact_manifest",
+                        check_kind="mechanical",
+                        verdict="WARN",
+                        artifact_path=verdict.path,
+                        findings=(f"Artifact stale relative to pipeline start. {verdict.detail}",),
+                        score=-1,
+                    )
+                )
         return results
 
     # ------------------------------------------------------------------

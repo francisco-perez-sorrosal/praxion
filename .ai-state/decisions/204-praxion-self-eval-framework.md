@@ -1,7 +1,7 @@
 ---
-id: dec-draft-e1f01781
+id: dec-204
 title: Praxion self-eval v1 — `/eval-praxion` adds LLM-as-judge over completed artifacts (narrow supersession of dec-040 clause 3)
-status: proposed
+status: accepted
 category: architectural
 date: 2026-05-26
 summary: v1 self-eval reads completed `.ai-state/` artifacts and runs LLM-as-judge calls out-of-band via `/eval-praxion`; narrowly supersedes dec-040 clause 3's implicit filesystem-only reading model; re-affirms clauses 1, 2, 4.
@@ -53,7 +53,7 @@ Add a new slash command `/eval-praxion` to the Praxion repo that:
 
 Auth is **hybrid (Path C)**: env-var detection picks Agent SDK (`CLAUDE_CODE_OAUTH_TOKEN`) or direct Messages API (`ANTHROPIC_API_KEY`) at runtime. A single `JudgeClient` adapter encapsulates the seam; eval families never branch on auth mode.
 
-**Narrow supersession scope.** The new behavior narrows **only clause 3** of dec-040, and only its implicit "evals = filesystem-only reading" assumption. Clauses 1, 2, and 4 are re-affirmed verbatim. dec-040 stays `accepted` (not flipped to `superseded`) but carries a `superseded_by: dec-draft-e1f01781` field pointing at this ADR's clause-3 narrowing; the prose `## Prior Decision` section below names exactly what is narrowed vs. re-affirmed.
+**Narrow supersession scope.** The new behavior narrows **only clause 3** of dec-040, and only its implicit "evals = filesystem-only reading" assumption. Clauses 1, 2, and 4 are re-affirmed verbatim. dec-040 stays `accepted` (not flipped to `superseded`) but carries a `superseded_by: dec-204` field pointing at this ADR's clause-3 narrowing; the prose `## Prior Decision` section below names exactly what is narrowed vs. re-affirmed.
 
 **Scope re-affirmation in detail:**
 
@@ -62,7 +62,7 @@ Auth is **hybrid (Path C)**: env-var detection picks Agent SDK (`CLAUDE_CODE_OAU
 - **Clause 3 — "evals read completed artifacts":** narrowed. The original framing implied filesystem-only reads (`Phoenix traces` is named, but Phoenix is itself a completed-trace store). The narrowed model: completed artifacts may be *passed to an LLM-as-judge call* over the network for semantic judgment. The artifact content is the only input; no live pipeline state is read, no agents are spawned, no pipeline is interrupted. The LLM call is a *reading transformation*, not a mutation. Cost and rate-limit budgets are owned by the user's auth choice (subscription quota or API key billing).
 - **Clause 4 — preserve out-of-band pattern for future work:** re-affirmed. Any Phase 5+ eval addition still inherits the slash-command-or-CI invocation contract.
 
-**Out of scope of this ADR** — the full td-005 regression-mode redesign (tier/shape-keyed envelope baselines + Phoenix corpus question). This ADR resolves only the LLM-as-judge deferral; td-005's broader full redesign remains deferred. v1's contribution to td-005 is retiring the broken `regression/` package (448 LOC clean removal) and migrating the td-005 row to `TECH_DEBT_RESOLVED.md` with `resolved-by: dec-NNN` (the finalize step rewrites `dec-draft-e1f01781` to `dec-NNN`).
+**Out of scope of this ADR** — the full td-005 regression-mode redesign (tier/shape-keyed envelope baselines + Phoenix corpus question). This ADR resolves only the LLM-as-judge deferral; td-005's broader full redesign remains deferred. v1's contribution to td-005 is retiring the broken `regression/` package (448 LOC clean removal) and migrating the td-005 row to `TECH_DEBT_RESOLVED.md` with `resolved-by: dec-NNN` (the finalize step rewrites `dec-204` to `dec-NNN`).
 
 ## Considered Options
 
@@ -82,7 +82,7 @@ Replace dec-040 entirely. Re-state the full out-of-band model with explicit LLM-
 
 ### Option 3 — Narrow supersession of dec-040's clause 3 only (chosen)
 
-Author this ADR. Set `supersedes: dec-040` in frontmatter, flag `superseded_by: dec-draft-e1f01781` on dec-040, leave dec-040's `status: accepted` (the partial-supersession pattern from `~/.claude/agent-memory/i-am-systems-architect/partial_supersession_clause_pattern.md`). Use a `## Prior Decision` section to scope exactly which clause is narrowed vs. re-affirmed. Per the partial-supersession pattern, dec-040 can carry BOTH `superseded_by: dec-draft-e1f01781` (for clause 3) AND `re_affirmed_by: [dec-draft-e1f01781]` (for clauses 1, 2, 4) — the new ADR's body discriminates the scope of each link.
+Author this ADR. Set `supersedes: dec-040` in frontmatter, flag `superseded_by: dec-204` on dec-040, leave dec-040's `status: accepted` (the partial-supersession pattern from `~/.claude/agent-memory/i-am-systems-architect/partial_supersession_clause_pattern.md`). Use a `## Prior Decision` section to scope exactly which clause is narrowed vs. re-affirmed. Per the partial-supersession pattern, dec-040 can carry BOTH `superseded_by: dec-204` (for clause 3) AND `re_affirmed_by: [dec-204]` (for clauses 1, 2, 4) — the new ADR's body discriminates the scope of each link.
 
 - Pros: surgical; preserves the load-bearing parts of dec-040; mirrors the project's existing partial-supersession idiom (e.g., dec-125 and dec-130 superseding fragments of earlier dashboard ADRs); makes the eval-framework history readable in three months.
 - Cons: introduces a `## Prior Decision` section that future readers must read carefully to discern the narrowing scope. Mitigation: explicit "re-affirms clauses X" / "narrows clause Y" prose in this section.
@@ -94,7 +94,7 @@ Author this ADR. Set `supersedes: dec-040` in frontmatter, flag `superseded_by: 
 - Closes the `judges/anthropic.py` stub's `dec-040` citation with a documented ADR transition.
 - Unblocks Praxion's self-eval roadmap for v1 without re-litigating settled out-of-band invocation discipline.
 - Sets a precedent for narrowing one clause of a still-load-bearing ADR — a documented pattern future architects can mirror when dec-040-class ADRs evolve.
-- Migrates `td-005`'s row from `TECH_DEBT_LEDGER.md` to `TECH_DEBT_RESOLVED.md` with `resolved-by: dec-NNN` (the finalize protocol rewrites `dec-draft-e1f01781` to `dec-NNN`). td-005's *broader* full redesign (tier/shape-keyed envelopes + Phoenix corpus) remains deferred; the LLM-as-judge piece is resolved.
+- Migrates `td-005`'s row from `TECH_DEBT_LEDGER.md` to `TECH_DEBT_RESOLVED.md` with `resolved-by: dec-NNN` (the finalize protocol rewrites `dec-204` to `dec-NNN`). td-005's *broader* full redesign (tier/shape-keyed envelopes + Phoenix corpus) remains deferred; the LLM-as-judge piece is resolved.
 - Hybrid auth (Path C) means the framework runs cleanly across the user's machines regardless of which auth env var is exported, with one adapter encapsulating the seam.
 
 **Negative:**
@@ -114,4 +114,4 @@ This ADR **narrows only clause 3** of dec-040 and **re-affirms clauses 1, 2, and
 - **Clause 3** (evals read completed artifacts): **narrowed**. The original wording — *"Evals read completed artifacts ... they never mutate live pipeline state, never start agents, never run during a pipeline"* — is preserved on its mutation/agent/pipeline-interruption guarantees. The narrowing is on the reading model only: *completed artifact content may be passed to an LLM-as-judge call over the network*. This makes the family-#2 BC-adherence judge legal (it reads `VERIFICATION_REPORT.md` content and asks Claude to apply the rubric) and makes the family-#1 ADR-option-depth LLM check legal (it reads ADR `## Considered Options` prose and asks Claude to score depth). No other clause-3 semantics change.
 - **Clause 4** (preserve out-of-band for future work): re-affirmed. Any Phase 5+ eval tier (including v2's adversarial-fixture LLM judge for family #2, the eventual full td-005 envelope-baseline redesign, and any future cost or decision-quality tier) still inherits the slash-command-or-CI contract.
 
-dec-040 retains `status: accepted`. The two cross-references it carries — `superseded_by: dec-draft-e1f01781` and `re_affirmed_by: [dec-draft-e1f01781]` — are scoped by THIS body, not by the link alone, per the partial-supersession-clause pattern.
+dec-040 retains `status: accepted`. The two cross-references it carries — `superseded_by: dec-204` and `re_affirmed_by: [dec-204]` — are scoped by THIS body, not by the link alone, per the partial-supersession-clause pattern.

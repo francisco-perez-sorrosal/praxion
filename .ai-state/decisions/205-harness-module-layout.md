@@ -1,7 +1,7 @@
 ---
-id: dec-draft-6039d490
+id: dec-205
 title: praxion-self-eval-v1 harness — flat 2-level module layout at v1; deep checks/ sub-package deferred
-status: proposed
+status: accepted
 category: implementation
 date: 2026-05-26
 summary: harness/ uses flat families/ with no checks/mechanical/ or checks/llm/ sub-directories at v1; the 4-level directory sketch in SYSTEMS_PLAN.md is a future-state guide, not a v1 constraint.
@@ -13,7 +13,7 @@ pipeline_tier: standard
 affected_files:
   - eval/src/praxion_evals/harness/families/
   - eval/src/praxion_evals/harness/checks/
-re_affirms: dec-draft-e1f01781
+re_affirms: dec-204
 ---
 
 ## Context

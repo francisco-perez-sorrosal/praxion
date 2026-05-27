@@ -19,9 +19,9 @@ affected_reqs:
   - REQ-EV-02
   - REQ-EV-04
   - REQ-EV-05
-superseded_by: dec-draft-e1f01781
+superseded_by: dec-204
 re_affirmed_by:
-  - dec-draft-e1f01781
+  - dec-204
 ---
 
 ## Context

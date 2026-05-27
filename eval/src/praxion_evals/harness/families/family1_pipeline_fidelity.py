@@ -689,11 +689,27 @@ class Family1PipelineOutcomeFidelity(Family):
         family_id = getattr(self, "id", self.__class__.__name__)
         for path, content in adr_entries:
             print(f"[{family_id}] llm-check option-depth — {path}", flush=True)
-            verdict_obj = judge.judge(
-                rubric=_OPTION_DEPTH_RUBRIC,
-                artifact=content,
-                schema=_OPTION_DEPTH_SCHEMA,
-            )
+            try:
+                verdict_obj = judge.judge(
+                    rubric=_OPTION_DEPTH_RUBRIC,
+                    artifact=content,
+                    schema=_OPTION_DEPTH_SCHEMA,
+                )
+            except Exception as exc:
+                # Per-ADR fail-soft: a single judge failure (rate limit, SDK
+                # error, malformed response) becomes one FAIL row, not a
+                # family-wide wipe of the mechanical results.
+                results.append(
+                    CheckResult(
+                        check_name="adr_option_depth",
+                        check_kind="llm",
+                        verdict="FAIL",
+                        artifact_path=path,
+                        findings=(f"Judge call failed: {type(exc).__name__}: {exc}",),
+                        score=-1,
+                    )
+                )
+                continue
             results.append(
                 CheckResult(
                     check_name="adr_option_depth",

@@ -201,7 +201,11 @@ class CorpusReader:
 
         decisions = self._scan_git_ref_dir(ref, _DECISIONS_DIR, _ADR_GLOB)
         specs = self._scan_git_ref_dir(ref, _SPECS_DIR, _SPEC_GLOB)
-        verification_reports = self._scan_verification_reports_git_ref(ref)
+        # .ai-work/ is gitignored by Praxion convention (always), so no git ref
+        # ever contains VERIFICATION_REPORT.md files. Fall back to the repo's
+        # working-tree .ai-work/ scan — that is the only place verification
+        # reports physically exist.
+        verification_reports = self._scan_verification_reports_filesystem(self._root)
 
         return Corpus(
             target_kind="ref",
@@ -259,32 +263,4 @@ class CorpusReader:
             )
             if content_result.returncode == 0:
                 results.append((relative_path, content_result.stdout))
-        return results
-
-    def _scan_verification_reports_git_ref(self, ref: str) -> list[tuple[str, str]]:
-        """Find VERIFICATION_REPORT.md files in .ai-work/ at a git ref."""
-        ls_result = subprocess.run(
-            ["git", "ls-tree", "-r", "--name-only", ref, f"{_AI_WORK_DIR}/"],
-            cwd=str(self._root),
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if ls_result.returncode != 0:
-            return []
-
-        results = []
-        for filepath in sorted(ls_result.stdout.splitlines()):
-            filepath = filepath.strip()
-            if not filepath.endswith(_VERIFICATION_REPORT_NAME):
-                continue
-            content_result = subprocess.run(
-                ["git", "show", f"{ref}:{filepath}"],
-                cwd=str(self._root),
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            if content_result.returncode == 0:
-                results.append((filepath, content_result.stdout))
         return results

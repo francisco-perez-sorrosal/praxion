@@ -19,6 +19,7 @@ claude_agent_sdk or anthropic directly.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from typing import Any
 
 import yaml
@@ -493,7 +494,9 @@ class Family1PipelineOutcomeFidelity(Family):
     # Mechanical: SPEC traceability matrix presence
     # ------------------------------------------------------------------
 
-    def _check_spec_traceability(self, spec_entries: list[tuple[str, str]]) -> list[CheckResult]:
+    def _check_spec_traceability(
+        self, spec_entries: Sequence[tuple[str, str]]
+    ) -> list[CheckResult]:
         """Verify each SPEC contains a Traceability Matrix section."""
         results: list[CheckResult] = []
 
@@ -548,7 +551,7 @@ class Family1PipelineOutcomeFidelity(Family):
     def _check_affected_reqs(
         self,
         adr_entries: list[tuple[str, str]],
-        spec_entries: list[tuple[str, str]],
+        spec_entries: Sequence[tuple[str, str]],
     ) -> list[CheckResult]:
         """Check that affected_reqs entries can be found in at least one SPEC.
 
@@ -683,7 +686,9 @@ class Family1PipelineOutcomeFidelity(Family):
         if not adr_entries:
             return results
 
+        family_id = getattr(self, "id", self.__class__.__name__)
         for path, content in adr_entries:
+            print(f"[{family_id}] llm-check option-depth — {path}", flush=True)
             verdict_obj = judge.judge(
                 rubric=_OPTION_DEPTH_RUBRIC,
                 artifact=content,

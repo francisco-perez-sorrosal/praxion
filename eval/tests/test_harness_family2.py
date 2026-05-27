@@ -608,28 +608,31 @@ def test_family2_module_source_contains_no_direct_sdk_imports():
 
 
 # ---------------------------------------------------------------------------
-# Corpus-shape integration test: real VERIFICATION_REPORT.md
+# Corpus-shape integration test: sampled VERIFICATION_REPORT.md fixture
 # ---------------------------------------------------------------------------
 
-# Resolve the real VERIFICATION_REPORT.md from the canonical checkout's .ai-work/
+# Resolve the fixture from the tracked tests/fixtures/ directory.
 # This follows the same discipline as test_harness_family1_corpus_integration.py:
-# use real artifacts, not synthetic ones, to catch parser failures.
-_CANONICAL_REPO = Path(__file__).parent.parent.parent
-_REAL_REPORT_PATH = (
-    _CANONICAL_REPO / ".ai-work" / "head-milestone-verify" / "VERIFICATION_REPORT.md"
-)
+# use a real-artifact-derived corpus sample, not a synthetic string, to catch
+# parser failures against the actual section-heading grammar.
+#
+# The fixture was sampled from a real VERIFICATION_REPORT.md produced by the
+# eval-praxion-hardening pipeline and committed to tests/fixtures/ so it is
+# available in every checkout. See the fixture file's header for provenance.
+_FIXTURE_DIR = Path(__file__).parent / "fixtures"
+_REAL_REPORT_PATH = _FIXTURE_DIR / "verification_report_pass_case.md"
 
 
 def test_real_verification_report_bc_section_detected():
-    """The real VERIFICATION_REPORT.md from head-milestone-verify has a BC section
-    that Family 2 detects correctly (no SKIP emitted)."""
-    # Register objection trigger: if this file doesn't exist, the corpus contract
-    # is broken (no real PASS-case fixture) and the test must fail with a clear message.
+    """The sampled VERIFICATION_REPORT.md fixture has a BC section that Family 2 detects
+    correctly (no SKIP emitted)."""
+    # Register objection trigger: if this fixture file doesn't exist, the corpus
+    # contract is broken and the test must fail with a clear message.
     assert _REAL_REPORT_PATH.exists(), (
-        f"Real VERIFICATION_REPORT.md not found at {_REAL_REPORT_PATH}. "
-        "This is a corpus-contract violation: Family 2 integration tests require a real "
-        "VERIFICATION_REPORT.md, not a synthetic fixture. "
-        "Locate the report or document why none is reachable."
+        f"Fixture VERIFICATION_REPORT not found at {_REAL_REPORT_PATH}. "
+        "This is a corpus-contract violation: Family 2 integration tests require a "
+        "real-artifact-derived fixture at tests/fixtures/verification_report_pass_case.md. "
+        "Restore the fixture or document why none is reachable."
     )
 
     from praxion_evals.harness.families.family2_bc_adherence import (
@@ -639,25 +642,27 @@ def test_real_verification_report_bc_section_detected():
     report_content = _REAL_REPORT_PATH.read_text(encoding="utf-8")
     family = Family2BehavioralContractAdherence()
     corpus = _make_corpus(
-        verification_reports=[(str(_REAL_REPORT_PATH.relative_to(_CANONICAL_REPO)), report_content)]
+        verification_reports=[
+            (str(_REAL_REPORT_PATH.relative_to(_FIXTURE_DIR.parent)), report_content)
+        ]
     )
     fake_judge = FakeJudgeClient()
 
     results = family.run(corpus, fake_judge)
 
-    assert len(results) > 0, "Family 2 must produce at least one result against the real report"
+    assert len(results) > 0, "Family 2 must produce at least one result against the fixture report"
     skip_results = [r for r in results if r.verdict == "SKIP"]
     assert len(skip_results) == 0, (
-        "The real head-milestone-verify VERIFICATION_REPORT.md has a '### Behavioral Contract "
-        "Findings' section — no SKIP should be emitted. "
+        "The fixture VERIFICATION_REPORT.md has a '### Behavioral Contract Findings' "
+        "section — no SKIP should be emitted. "
         f"Got {len(skip_results)} SKIP: {[r.findings for r in skip_results]!r}"
     )
 
 
 def test_real_verification_report_all_tags_clean():
-    """The real VERIFICATION_REPORT.md contains no BC violation tags (PASS-only corpus)."""
+    """The fixture VERIFICATION_REPORT.md contains no BC violation tags (PASS-only corpus)."""
     assert _REAL_REPORT_PATH.exists(), (
-        f"Real VERIFICATION_REPORT.md not found at {_REAL_REPORT_PATH}."
+        f"Fixture VERIFICATION_REPORT not found at {_REAL_REPORT_PATH}."
     )
 
     from praxion_evals.harness.families.family2_bc_adherence import (
@@ -667,7 +672,9 @@ def test_real_verification_report_all_tags_clean():
     report_content = _REAL_REPORT_PATH.read_text(encoding="utf-8")
     family = Family2BehavioralContractAdherence()
     corpus = _make_corpus(
-        verification_reports=[(str(_REAL_REPORT_PATH.relative_to(_CANONICAL_REPO)), report_content)]
+        verification_reports=[
+            (str(_REAL_REPORT_PATH.relative_to(_FIXTURE_DIR.parent)), report_content)
+        ]
     )
     fake_judge = FakeJudgeClient()
 
@@ -676,16 +683,16 @@ def test_real_verification_report_all_tags_clean():
     mechanical_results = [r for r in results if r.check_kind == "mechanical"]
     warn_or_fail = [r for r in mechanical_results if r.verdict in ("WARN", "FAIL")]
     assert len(warn_or_fail) == 0, (
-        "The real PASS-case VERIFICATION_REPORT.md must produce no WARN/FAIL on tag scans; "
+        "The fixture PASS-case VERIFICATION_REPORT.md must produce no WARN/FAIL on tag scans; "
         f"violations: {[(r.check_name, r.verdict, r.findings) for r in warn_or_fail]!r}"
     )
 
 
 def test_real_verification_report_produces_four_llm_slots():
-    """The real VERIFICATION_REPORT.md causes Family 2 to queue 4 LLM judgment slots
+    """The fixture VERIFICATION_REPORT.md causes Family 2 to queue 4 LLM judgment slots
     (FakeJudgeClient intercepts; no real API calls)."""
     assert _REAL_REPORT_PATH.exists(), (
-        f"Real VERIFICATION_REPORT.md not found at {_REAL_REPORT_PATH}."
+        f"Fixture VERIFICATION_REPORT not found at {_REAL_REPORT_PATH}."
     )
 
     from praxion_evals.harness.families.family2_bc_adherence import (
@@ -695,7 +702,9 @@ def test_real_verification_report_produces_four_llm_slots():
     report_content = _REAL_REPORT_PATH.read_text(encoding="utf-8")
     family = Family2BehavioralContractAdherence()
     corpus = _make_corpus(
-        verification_reports=[(str(_REAL_REPORT_PATH.relative_to(_CANONICAL_REPO)), report_content)]
+        verification_reports=[
+            (str(_REAL_REPORT_PATH.relative_to(_FIXTURE_DIR.parent)), report_content)
+        ]
     )
     fake_judge = FakeJudgeClient(verdict="PASS", findings=("no violations",), score=98)
 
@@ -703,12 +712,12 @@ def test_real_verification_report_produces_four_llm_slots():
 
     llm_results = [r for r in results if r.check_kind == "llm"]
     assert len(llm_results) == 4, (
-        f"Family 2 must produce exactly 4 LLM checks for the real report; "
+        f"Family 2 must produce exactly 4 LLM checks for the fixture report; "
         f"got {len(llm_results)}: {[r.check_name for r in llm_results]!r}"
     )
-    # The real report is a PASS-case; all 4 LLM checks should return PASS
+    # The fixture report is a PASS-case; all 4 LLM checks should return PASS
     for r in llm_results:
         assert r.verdict == "PASS", (
-            f"LLM check {r.check_name!r} must be PASS for the real PASS-case report; "
+            f"LLM check {r.check_name!r} must be PASS for the fixture PASS-case report; "
             f"got {r.verdict!r}"
         )

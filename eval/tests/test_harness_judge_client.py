@@ -30,6 +30,7 @@ def test_oauth_token_selects_agent_sdk_client(monkeypatch):
     """When CLAUDE_CODE_OAUTH_TOKEN is set, factory returns AgentSdkJudgeClient."""
     monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok_test")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("CLAUDECODE", raising=False)
 
     from praxion_evals.harness.judge_client import AgentSdkJudgeClient, select_judge_client
 
@@ -52,6 +53,7 @@ def test_oauth_wins_when_both_env_vars_set(monkeypatch):
     """When both env vars are set, CLAUDE_CODE_OAUTH_TOKEN takes precedence."""
     monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok_test")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk_test")
+    monkeypatch.delenv("CLAUDECODE", raising=False)
 
     from praxion_evals.harness.judge_client import AgentSdkJudgeClient, select_judge_client
 
@@ -67,6 +69,7 @@ def test_neither_env_var_raises_runtime_error_naming_both(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
     import pytest
+
     from praxion_evals.harness.judge_client import select_judge_client
 
     with pytest.raises(RuntimeError) as exc_info:
@@ -86,6 +89,7 @@ def test_agent_sdk_client_returns_valid_judge_verdict(monkeypatch):
     """AgentSdkJudgeClient.judge() with a mocked query returns a JudgeVerdict."""
     monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok_test")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("CLAUDECODE", raising=False)
 
     # Stub out the claude_agent_sdk dependency so the test runs without the real SDK.
     import types
@@ -128,6 +132,7 @@ def test_agent_sdk_client_raises_on_missing_verdict_field(monkeypatch):
     """AgentSdkJudgeClient.judge() raises ValueError when 'verdict' is absent from output."""
     monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok_test")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("CLAUDECODE", raising=False)
 
     import sys
     import types
@@ -165,22 +170,28 @@ def test_messages_api_client_returns_valid_judge_verdict(monkeypatch):
     import sys
     import types
 
-    # Minimal stub for anthropic.Anthropic().messages.create()
+    class _FakeToolUseBlock:
+        def __init__(self, name: str, input_: dict) -> None:
+            self.type = "tool_use"
+            self.name = name
+            self.input = input_
+
     tool_call_input = {"verdict": "WARN", "findings": ["minor issue"], "score": 65}
-    fake_tool_use = types.SimpleNamespace(
-        type="tool_use",
-        name="verdict",
-        input=tool_call_input,
-    )
+    fake_tool_use = _FakeToolUseBlock(name="verdict", input_=tool_call_input)
     fake_response = types.SimpleNamespace(content=[fake_tool_use])
 
     fake_messages = types.SimpleNamespace(create=lambda **_kw: fake_response)
     fake_anthropic_instance = types.SimpleNamespace(messages=fake_messages)
 
+    fake_types_mod = types.ModuleType("anthropic.types")
+    fake_types_mod.ToolUseBlock = _FakeToolUseBlock  # type: ignore[attr-defined]
+
     fake_anthropic_mod = types.ModuleType("anthropic")
     fake_anthropic_mod.Anthropic = lambda **_kw: fake_anthropic_instance  # type: ignore[attr-defined]
+    fake_anthropic_mod.types = fake_types_mod  # type: ignore[attr-defined]
 
     sys.modules["anthropic"] = fake_anthropic_mod
+    sys.modules["anthropic.types"] = fake_types_mod
 
     from praxion_evals.harness.judge_client import MessagesApiJudgeClient
     from praxion_evals.harness.schemas import JudgeVerdict
@@ -246,3 +257,204 @@ def test_constructing_agent_sdk_client_without_sdk_raises_import_error(monkeypat
             sys.modules.pop("claude_agent_sdk", None)
         else:
             sys.modules["claude_agent_sdk"] = original
+
+
+# ---------------------------------------------------------------------------
+# AgentSdkJudgeClient: nested-invocation guard
+# ---------------------------------------------------------------------------
+
+
+def test_agent_sdk_client_raises_when_nested_session_detected(monkeypatch):
+    """AgentSdkJudgeClient() raises RuntimeError when CLAUDECODE=1 is in the environment."""
+    import sys
+    import types
+
+    import pytest
+
+    monkeypatch.setenv("CLAUDECODE", "1")
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok_test")
+
+    fake_sdk = types.ModuleType("claude_agent_sdk")
+    fake_sdk.ClaudeAgentOptions = lambda **kw: types.SimpleNamespace(**kw)  # type: ignore[attr-defined]
+    sys.modules["claude_agent_sdk"] = fake_sdk
+
+    from praxion_evals.harness.judge_client import AgentSdkJudgeClient
+
+    with pytest.raises(RuntimeError) as exc_info:
+        AgentSdkJudgeClient()
+
+    msg = str(exc_info.value)
+    assert "CLAUDECODE" in msg
+    assert "deadlock" in msg
+    assert "ANTHROPIC_API_KEY" in msg or "plain shell" in msg
+
+
+def test_agent_sdk_client_succeeds_when_claudecode_unset(monkeypatch):
+    """AgentSdkJudgeClient() constructs without error when CLAUDECODE is not set."""
+    import sys
+    import types
+
+    monkeypatch.delenv("CLAUDECODE", raising=False)
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok_test")
+
+    fake_sdk = types.ModuleType("claude_agent_sdk")
+    fake_sdk.ClaudeAgentOptions = lambda **kw: types.SimpleNamespace(**kw)  # type: ignore[attr-defined]
+    sys.modules["claude_agent_sdk"] = fake_sdk
+
+    from praxion_evals.harness.judge_client import AgentSdkJudgeClient
+
+    # Must not raise
+    client = AgentSdkJudgeClient()
+    assert client is not None
+
+
+def test_messages_api_client_unaffected_by_claudecode_set(monkeypatch):
+    """MessagesApiJudgeClient() constructs without error even when CLAUDECODE=1."""
+    import sys
+    import types
+
+    monkeypatch.setenv("CLAUDECODE", "1")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk_test")
+    monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+
+    fake_anthropic_mod = types.ModuleType("anthropic")
+    sys.modules["anthropic"] = fake_anthropic_mod
+
+    from praxion_evals.harness.judge_client import MessagesApiJudgeClient
+
+    # Guard applies only to AgentSdkJudgeClient; must not raise here
+    client = MessagesApiJudgeClient()
+    assert client is not None
+
+
+def test_select_judge_client_propagates_nested_guard_error(monkeypatch):
+    """select_judge_client() propagates RuntimeError when CLAUDECODE=1 and OAuth token is set."""
+    import sys
+    import types
+
+    import pytest
+
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok_test")
+    monkeypatch.setenv("CLAUDECODE", "1")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    fake_sdk = types.ModuleType("claude_agent_sdk")
+    fake_sdk.ClaudeAgentOptions = lambda **kw: types.SimpleNamespace(**kw)  # type: ignore[attr-defined]
+    sys.modules["claude_agent_sdk"] = fake_sdk
+
+    from praxion_evals.harness.judge_client import select_judge_client
+
+    with pytest.raises(RuntimeError) as exc_info:
+        select_judge_client()
+
+    assert "CLAUDECODE" in str(exc_info.value)
+
+
+# ---------------------------------------------------------------------------
+# AgentSdkJudgeClient: asyncio.wait_for timeout enforcement
+# ---------------------------------------------------------------------------
+
+
+def test_judge_times_out_when_query_never_yields(monkeypatch):
+    """AgentSdkJudgeClient.judge() raises TimeoutError when the query never completes."""
+    import asyncio
+    import sys
+    import types
+
+    import pytest
+
+    import praxion_evals.harness.judge_client as jc
+
+    monkeypatch.delenv("CLAUDECODE", raising=False)
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok_test")
+    # Use a 1-second timeout so the test completes well under 5 s
+    monkeypatch.setattr(jc, "_JUDGE_TIMEOUT_SECONDS", 1)
+
+    fake_sdk = types.ModuleType("claude_agent_sdk")
+
+    async def _fake_query(*_args, **_kwargs):
+        await asyncio.sleep(999)
+        yield  # pragma: no cover
+
+    fake_sdk.query = _fake_query  # type: ignore[attr-defined]
+    fake_sdk.ClaudeAgentOptions = lambda **kw: types.SimpleNamespace(**kw)  # type: ignore[attr-defined]
+    sys.modules["claude_agent_sdk"] = fake_sdk
+
+    from praxion_evals.harness.judge_client import AgentSdkJudgeClient
+
+    client = AgentSdkJudgeClient()
+    with pytest.raises(TimeoutError) as exc_info:
+        client.judge(rubric="?", artifact="x", schema=_VERDICT_SCHEMA)
+
+    msg = str(exc_info.value)
+    assert "exceeded" in msg
+    assert "_JUDGE_TIMEOUT_SECONDS" in msg
+
+
+def test_judge_succeeds_within_timeout(monkeypatch):
+    """AgentSdkJudgeClient.judge() returns a JudgeVerdict when the query yields before timeout."""
+    import sys
+    import types
+
+    monkeypatch.delenv("CLAUDECODE", raising=False)
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok_test")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    fake_sdk = types.ModuleType("claude_agent_sdk")
+    fake_result = types.SimpleNamespace(
+        structured_output={"verdict": "PASS", "findings": ["ok"], "score": 95}
+    )
+
+    async def _fake_query(*_args, **_kwargs):
+        yield fake_result
+
+    fake_sdk.query = _fake_query  # type: ignore[attr-defined]
+    fake_sdk.ClaudeAgentOptions = lambda **kw: types.SimpleNamespace(**kw)  # type: ignore[attr-defined]
+    sys.modules["claude_agent_sdk"] = fake_sdk
+
+    from praxion_evals.harness.judge_client import AgentSdkJudgeClient
+    from praxion_evals.harness.schemas import JudgeVerdict
+
+    client = AgentSdkJudgeClient()
+    verdict = client.judge(rubric="Rate this.", artifact="Some content.", schema=_VERDICT_SCHEMA)
+
+    assert isinstance(verdict, JudgeVerdict)
+    assert verdict.verdict == "PASS"
+
+
+def test_api_timeout_ms_set_in_options_env(monkeypatch):
+    """AgentSdkJudgeClient.judge() passes API_TIMEOUT_MS in the ClaudeAgentOptions env."""
+    import sys
+    import types
+
+    import praxion_evals.harness.judge_client as jc
+
+    monkeypatch.delenv("CLAUDECODE", raising=False)
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok_test")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    captured: dict = {}  # type: ignore[type-arg]
+
+    fake_sdk = types.ModuleType("claude_agent_sdk")
+    fake_result = types.SimpleNamespace(
+        structured_output={"verdict": "PASS", "findings": ["ok"], "score": 80}
+    )
+
+    async def _fake_query(*_args, **_kwargs):
+        yield fake_result
+
+    def _recording_options(**kw):
+        captured.update(kw)
+        return types.SimpleNamespace(**kw)
+
+    fake_sdk.query = _fake_query  # type: ignore[attr-defined]
+    fake_sdk.ClaudeAgentOptions = _recording_options  # type: ignore[attr-defined]
+    sys.modules["claude_agent_sdk"] = fake_sdk
+
+    from praxion_evals.harness.judge_client import AgentSdkJudgeClient
+
+    client = AgentSdkJudgeClient()
+    client.judge(rubric="?", artifact="x", schema=_VERDICT_SCHEMA)
+
+    expected = str(jc._JUDGE_TIMEOUT_SECONDS * 1000 + jc._API_TIMEOUT_MS_MARGIN_MS)
+    assert captured["env"]["API_TIMEOUT_MS"] == expected

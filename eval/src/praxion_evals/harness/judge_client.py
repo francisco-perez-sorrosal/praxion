@@ -28,6 +28,9 @@ _ENV_API_KEY = "ANTHROPIC_API_KEY"
 
 _DEFAULT_MODEL = "claude-haiku-4-5"
 _JUDGE_MAX_TOKENS = 1024
+_JUDGE_TIMEOUT_SECONDS = 120
+_NESTED_ENV = "CLAUDECODE"
+_API_TIMEOUT_MS_MARGIN_MS = 5_000
 
 
 # ---------------------------------------------------------------------------
@@ -88,6 +91,17 @@ class AgentSdkJudgeClient(JudgeClient):
                 "Install it with: pip install claude-agent-sdk"
             )
 
+        if os.environ.get(_NESTED_ENV) == "1":
+            raise RuntimeError(
+                "Cannot use Agent SDK route from inside an active Claude Code session.\n"
+                f"Detected: {_NESTED_ENV}=1 in the environment. The bundled `claude` CLI "
+                "subprocess spawned by claude-agent-sdk attempts a stdin handshake that "
+                "deadlocks when the parent's stdio is already managed by an outer Claude Code "
+                "session (see https://github.com/anthropics/claude-agent-sdk-python/issues/573).\n"
+                f"To fix: run /eval-praxion from a plain shell (no active Claude Code session), "
+                "or set ANTHROPIC_API_KEY to take the direct Messages API route."
+            )
+
     def judge(self, rubric: str, artifact: str, schema: dict) -> JudgeVerdict:  # type: ignore[type-arg]
         """Call the Agent SDK with output_format=json_schema and parse the result."""
         try:
@@ -103,6 +117,7 @@ class AgentSdkJudgeClient(JudgeClient):
         options = sdk.ClaudeAgentOptions(
             allowed_tools=[],
             output_format={"type": "json_schema", "schema": schema},
+            env={"API_TIMEOUT_MS": str(_JUDGE_TIMEOUT_SECONDS * 1000 + _API_TIMEOUT_MS_MARGIN_MS)},
         )
 
         raw: dict = {}  # type: ignore[type-arg]
@@ -114,7 +129,21 @@ class AgentSdkJudgeClient(JudgeClient):
                 if structured is not None:
                     raw = dict(structured)
 
-        asyncio.run(_run())
+        async def _run_with_timeout() -> None:
+            await asyncio.wait_for(_run(), timeout=_JUDGE_TIMEOUT_SECONDS)
+
+        try:
+            asyncio.run(_run_with_timeout())
+        except TimeoutError as exc:
+            raise TimeoutError(
+                f"Agent SDK judge call exceeded {_JUDGE_TIMEOUT_SECONDS} s.\n"
+                f"Tried: claude_agent_sdk.query(model={_DEFAULT_MODEL!r}, "
+                f"max_tokens={_JUDGE_MAX_TOKENS}) for {len(artifact)} chars.\n"
+                "No structured_output yielded within the budget.\n"
+                "To fix: inspect rate-limit / network state; if the SDK is healthy, "
+                "increase _JUDGE_TIMEOUT_SECONDS in "
+                "praxion_evals.harness.judge_client."
+            ) from exc
         return _parse_verdict(raw)
 
 
@@ -153,10 +182,7 @@ class MessagesApiJudgeClient(JudgeClient):
 
         raw: dict = {}  # type: ignore[type-arg]
         for block in response.content:
-            if (
-                getattr(block, "type", None) == "tool_use"
-                and getattr(block, "name", None) == "verdict"
-            ):
+            if isinstance(block, anthropic.types.ToolUseBlock) and block.name == "verdict":
                 raw = dict(block.input)
                 break
 

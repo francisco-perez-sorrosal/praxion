@@ -18,6 +18,8 @@ affected_files:
   - commands/eval-praxion.md
   - .ai-state/praxion_eval_reports/
 supersedes: dec-040
+re_affirmed_by:
+  - dec-draft-f4083c48
 ---
 
 ## Context

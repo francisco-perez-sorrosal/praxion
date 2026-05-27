@@ -3,10 +3,10 @@
 Tests cover the Python-level CLI module only: arg parsing, the 4-case arg
 resolver wiring, auth-mode detection, and the invalid-target error path.
 
-The actual slash-command registration (entry point script, commands/eval-praxion.md)
-is Step 8 scope — do NOT test it here. Test the Python-level module only.
+The slash-command registration (entry point script, commands/eval-praxion.md)
+is a separate surface and is not exercised here.
 
-All production imports are deferred inside each test body (RED-state handshake).
+All production imports are deferred inside each test body.
 """
 
 from __future__ import annotations
@@ -217,6 +217,7 @@ def test_oauth_token_env_selects_agent_sdk_route(monkeypatch: Any):
     """When CLAUDE_CODE_OAUTH_TOKEN is set, the CLI uses the agent-sdk auth route."""
     monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-oauth-token")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("CLAUDECODE", raising=False)
 
     from praxion_evals.harness.judge_client import select_judge_client
 
@@ -342,7 +343,6 @@ def test_cli_run_records_auth_route_in_report(tmp_path: Path, monkeypatch: Any):
     )
 
     with patch("praxion_evals.harness.cli.run_eval", return_value=fake_report):
-
         # The CLI's run_and_write function (or equivalent) should record the auth route.
         # If the CLI exposes a get_auth_route() or similar helper, test that.
         # Otherwise verify that the resolved judge_client type matches the env.

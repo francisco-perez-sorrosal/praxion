@@ -174,12 +174,14 @@ def test_valid_git_ref_corpus_label_contains_sha(tmp_path: Path):
 def test_invalid_target_raises_with_three_part_error(tmp_path: Path):
     """An unresolvable target raises an error naming what was tried, what failed, what to try."""
     import pytest
+
     from praxion_evals.harness.corpus_reader import CorpusReader
 
     reader = CorpusReader(repo_root=tmp_path)
 
-    # AC-2 specifies a three-part error: what was tried / what failed / what to try.
-    # The resolver raises ValueError with an actionable message.
+    # The acceptance contract for this case is a three-part error:
+    # what was tried / what failed / what to try. The resolver raises
+    # ValueError with an actionable message.
     with pytest.raises(ValueError, match=r"(?i)(tried|attempt|path|worktree|ref)") as exc_info:
         reader.resolve("xyzzy-not-a-ref-or-path-or-worktree-12345")
 
@@ -191,6 +193,7 @@ def test_invalid_target_raises_with_three_part_error(tmp_path: Path):
 def test_invalid_target_error_message_names_the_target(tmp_path: Path):
     """The error message must name the failed target so the user can diagnose it."""
     import pytest
+
     from praxion_evals.harness.corpus_reader import CorpusReader
 
     bad_target = "completely-bogus-target-xyz"

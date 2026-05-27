@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: [memory-mcp, task-chronograph-mcp]
+        project: [memory-mcp, task-chronograph-mcp, eval]
 
     concurrency:
       group: test-${{ github.ref }}-${{ matrix.project }}

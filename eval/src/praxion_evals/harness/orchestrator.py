@@ -50,13 +50,20 @@ class Orchestrator:
             Report with all check results and a non-empty report_path.
         """
         all_results: list[CheckResult] = []
+        total_items = len(corpus.decisions) + len(corpus.specs) + len(corpus.verification_reports)
 
         for family in self._families:
+            family_id = getattr(family, "id", family.__class__.__name__)
+            print(f"[{family_id}] start — corpus={total_items} items", flush=True)
             try:
                 family_results = family.run(corpus, judge)
                 all_results.extend(family_results)
+                pass_count = sum(1 for r in family_results if r.verdict == "PASS")
+                warn_count = sum(1 for r in family_results if r.verdict == "WARN")
+                fail_count = sum(1 for r in family_results if r.verdict == "FAIL")
+                summary = f"{pass_count} PASS, {warn_count} WARN, {fail_count} FAIL"
+                print(f"[{family_id}] done — {len(family_results)} checks, {summary}", flush=True)
             except Exception as exc:
-                family_id = getattr(family, "id", repr(family))
                 all_results.append(
                     CheckResult(
                         check_name=f"family_error_{family_id}",

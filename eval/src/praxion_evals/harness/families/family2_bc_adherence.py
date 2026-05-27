@@ -315,8 +315,10 @@ class Family2BehavioralContractAdherence(Family):
 
     def _check_bc_rubrics(self, path: str, content: str, judge: JudgeClient) -> list[CheckResult]:
         """Run one LLM rubric check per behavioral-contract behavior."""
+        family_id = getattr(self, "id", self.__class__.__name__)
         results: list[CheckResult] = []
         for check_slug, behavior_name in _BC_BEHAVIORS:
+            print(f"[{family_id}] llm-check {check_slug} — {path}", flush=True)
             rubric = _build_bc_rubric(behavior_name)
             verdict_obj = judge.judge(
                 rubric=rubric,

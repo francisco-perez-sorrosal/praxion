@@ -56,7 +56,7 @@ Aliases only (`opus`/`sonnet`/`haiku`); pin full IDs at spawn time only when ver
 
 **Implementer step-level override.** Planner annotates `WIP.md` with `tier: H` (cross-cutting refactor) or `tier: L` (typo/mechanical); no hint = `sonnet`.
 
-**Direct-invocation entry points.** Slash commands and user-driven spawns (e.g. `/sentinel`, `/roadmap`, `/eval`, ad-hoc `Agent` calls) bypass the orchestrator, so the entry point applies this rule: read the agent's row and pass its alias as the `model:` parameter. `sentinel` and `skill-genesis` are most often invoked this way; both default to `sonnet` unless overridden up.
+**Direct-invocation entry points.** Slash commands and user-driven spawns (e.g. `/sentinel`, `/roadmap`, `/eval`, `/eval-praxion`, ad-hoc `Agent` calls) bypass the orchestrator, so the entry point applies this rule: read the agent's row and pass its alias as the `model:` parameter. `sentinel` and `skill-genesis` are most often invoked this way; both default to `sonnet` unless overridden up.
 
 ### Operator Kill Switch — `CLAUDE_CODE_SUBAGENT_MODEL`
 

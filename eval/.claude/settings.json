@@ -1,0 +1,5 @@
+{
+  "claudeMdExcludes": [
+    "**/.claude/rules/swe/memory-protocol.md"
+  ]
+}

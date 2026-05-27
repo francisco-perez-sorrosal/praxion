@@ -13,7 +13,8 @@ Reusable slash commands for AI coding assistants. Each `.md` file becomes a `/co
 | `/cop` | Create a commit and push to remote |
 | `/create-simple-python-prj` | Create a basic Python project with pixi or uv |
 | `/create-worktree` | Create a new git worktree in `.claude/worktrees/` |
-| `/eval` | Run out-of-band quality evals (Tier 1 behavioral + regression). Opt-in, never hook-driven |
+| `/eval` | Run out-of-band quality evals (Tier 1 behavioral). Opt-in, never hook-driven |
+| `/eval-praxion` | Semantic quality gate: LLM-as-judge over completed `.ai-state/` artifacts (ADR reasoning, behavioral-contract adherence). Reports land in `.ai-state/praxion_eval_reports/`. Opt-in, out-of-band |
 | `/explore-project` | Explore and understand an unfamiliar project's architecture, patterns, and workflow |
 | `/full-security-scan` | Run a full-project security audit against all security-critical paths |
 | `/landscape-refresh` | Bootstrap or refresh the project's landscape watchlist — flag stale entries (>90 days) and optionally re-validate URLs |

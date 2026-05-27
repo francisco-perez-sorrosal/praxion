@@ -1,0 +1,115 @@
+# Praxion Per-Project Rules Configuration
+#
+# Disables Praxion rules for this project. The SessionStart hook reads
+# this file and applies the disable list through two mechanisms — together
+# they give the YAML uniform reach across every Praxion rule:
+#
+#   - `install: hook-deliver` rules → filtered out of the SessionStart
+#     `additionalContext` payload (rule body not delivered to the session).
+#   - `install: symlink` rules → reconciled into `claudeMdExcludes` in
+#     `.claude/settings.json` as portable globs of shape
+#     `**/.claude/rules/<id>.md`. Claude Code's runtime then skips those
+#     rule files even when a matching `Read` would otherwise trigger them.
+#
+# Defense-in-depth: the `claudeMdExcludes` mechanism also covers
+# `install: hook-deliver` rules in the disable set, so a stale symlink
+# left in `~/.claude/rules/` by a prior install (e.g., when a rule's
+# install type flipped from `symlink` to `hook-deliver`) cannot bypass
+# the blacklist. The structural prune happens in the installer's
+# `sweep_stale_rule_symlinks` step; this is the runtime safety net.
+#
+# Core rules (`core: true`) are non-disableable; attempting to disable
+# one emits a SessionStart warning and the rule remains loaded.
+# Organization-managed-policy rules deployed at platform locations are
+# also immune to this mechanism (a Claude Code platform constraint).
+#
+# The hook is idempotent. It recomputes the derived `claudeMdExcludes`
+# entries on every SessionStart, replacing only Praxion-managed entries
+# (those whose pattern starts with `**/.claude/rules/`) and preserving any
+# other entries you added to `.claude/settings.json` by hand. Removing an
+# entry from this YAML triggers a clean removal of the corresponding
+# `claudeMdExcludes` entry on the next SessionStart.
+#
+# === Token-savings ceiling ===
+# The maximum baseline token reduction is the sum of the *hook-deliver*
+# rule sizes — currently ~5,100 tokens across three rules (memory-protocol,
+# agent-model-routing, vcs/git-conventions). Path-scoped rules cost zero
+# tokens at SessionStart; disabling them yields a *policy guarantee* but
+# no baseline savings. Core rules are non-disableable. To shrink the
+# always-loaded surface further, the lever is the `core: true/false`
+# classification in `rules/_manifest.yaml`, not the YAML disable list.
+#
+# === Behavior contract ===
+# Fail-open everywhere — the hook never blocks SessionStart:
+#   - File missing → all rules load (backward-compatible default).
+#   - Malformed YAML → stderr warning + all rules load.
+#   - Schema `version: > 1` → stderr warning + all rules load.
+#   - `disable:` provided as a scalar (e.g. `disable: ml/*` without `- `)
+#     → stderr warning + treated as empty.
+#   - A pattern in `disable:` matching zero rules → stderr warning per
+#     pattern (typo guard).
+#   - Duplicate entries in `disable:` are harmless (fnmatch results are
+#     deduplicated via a set internally).
+#
+# === Kill switch ===
+# Set `PRAXION_DISABLE_RULE_INJECTION=1` to disable injection entirely
+# for one session — useful for debugging rule interactions without
+# uninstalling. Hook-deliver bodies are suppressed; previously-written
+# `claudeMdExcludes` entries remain in effect via Claude Code's runtime.
+#
+# Full enumeration of disableable rules — what `disable:` can actually target.
+# Canonical source: `rules/_manifest.yaml`. Full token accounting and rationale:
+# `docs/rules-taxonomy.md`. Five core rules are NON-disableable (CLAUDE,
+# swe/adr-conventions, swe/agent-behavioral-contract,
+# swe/agent-intermediate-documents, swe/swe-agent-coordination-protocol) —
+# attempting to list them emits a SessionStart warning and they stay loaded.
+#
+#   Hook-deliver, always-loaded (3 rules — disabling reclaims SessionStart tokens):
+#     - swe/memory-protocol            — Memory MCP protocol (~1.2k tokens)
+#     - swe/agent-model-routing        — Per-agent Claude model tier policy (~1.6k tokens)
+#     - swe/vcs/git-conventions        — Commit/staging/secrets conventions (~1.0k tokens)
+#
+#   Path-scoped (13 rules — zero baseline cost; disabling is a declarative
+#   guarantee that the rule never applies here, even if a trigger file appears):
+#
+#     SWE (6 rules):
+#       - swe/coding-style                — Language coding conventions (.py/.ts/.go/.rs/etc.)
+#       - swe/id-citation-discipline      — REQ/AC citation discipline in source code
+#       - swe/shipped-artifact-isolation  — Artifact-portability constraint (rules/skills/etc.)
+#       - swe/staleness-policy            — Skill freshness conventions (skills/**/SKILL.md)
+#       - swe/testing-conventions         — Test code patterns and discipline
+#       - swe/vcs/pr-conventions          — PR workflow and merge policy
+#
+#     ML/AI (3 rules):
+#       - ml/eval-driven-verification        — Training plan acceptance criteria
+#       - ml/experiment-tracking-conventions — Experiment tracking tool conventions
+#       - ml/gpu-budget-conventions          — GPU compute budget enforcement
+#
+#     Writing (4 rules):
+#       - writing/aac-dac-conventions     — Architecture-as-Code fence conventions
+#       - writing/diagram-conventions     — Diagram toolchain (Mermaid, LikeC4, D2)
+#       - writing/html-output-conventions — HTML dashboard output rules
+#       - writing/readme-style            — README writing style
+#
+#   Glob shortcuts (fnmatch; `*` crosses `/`):
+#     - ml/*       → all 3 ML rules
+#     - writing/*  → all 4 writing rules
+#     - swe/vcs/*  → swe/vcs/git-conventions + swe/vcs/pr-conventions
+#     - swe/*      → 9 SWE rules (3 hook-deliver + 6 path-scoped); core rules
+#                    emit a warning and stay loaded
+
+# List of rules to disable for this project, by ID (directory-prefixed
+# path without the `.md` extension). fnmatch glob syntax is supported.
+disable:
+  # Project sets PRAXION_DISABLE_MEMORY_MCP=1 or has no memory MCP server
+  # - swe/memory-protocol
+
+  # Not an ML project — never load ML training conventions, even if a file
+  # like `prepare.py` or `runs/` appears in the tree for unrelated reasons
+  # - ml/*
+
+  # Project uses default model routing only (no multi-tier pipeline)
+  # - swe/agent-model-routing
+
+# Schema version. Currently 1. Bumped on breaking config changes.
+version: 1

@@ -182,7 +182,7 @@ memory-mcp/                          # Persistent memory MCP server
 └── ...
 eval/                                # Out-of-band quality evals (praxion-evals CLI)
 ├── pyproject.toml                   # Standalone uv project — not installed with plugin
-├── src/praxion_evals/               # behavioral, regression, judges, tiers
+├── src/praxion_evals/               # behavioral, harness, judges, tiers
 └── tests/
 .ai-state/                           # Persistent project intelligence (committed to git)
 ├── decisions/                       # Architecture Decision Records (ADR files)
@@ -587,24 +587,21 @@ Always run `/praxion-complete-uninstall` **before** `claude plugin uninstall i-a
 
 ## Quality Evals
 
-Quality measurement for agent pipelines that runs **separately from pipeline execution**, not as part of it. The developer invokes `/i-am:eval` by hand after a pipeline has finished; no hook triggers it automatically, and no agent ever calls it while a pipeline is in flight (binding constraint: [`dec-040`](.ai-state/decisions/040-eval-framework-out-of-band.md)). The framework lives in `eval/` as a standalone `uv` project and is **not** bundled with the plugin.
+Quality measurement for agent pipelines that runs **separately from pipeline execution**, not as part of it. No hook triggers evals automatically; no agent ever calls them while a pipeline is in flight (binding constraint: [`dec-040`](.ai-state/decisions/040-eval-framework-out-of-band.md)). The framework lives in `eval/` as a standalone `uv` project and is **not** bundled with the plugin.
 
-> ⚠️ **Current status: regression mode is effectively useless.** The shipped implementation keys baselines by `task_slug`, but Praxion slugs are one-shot (each feature generates a unique slug, runs once, gets cleaned up). There is no "next run" on that slug to compare against any captured baseline, so drift detection has no sample to work with. Behavioral and OpenAI-judge modes work as advertised; treat `/eval regression` and `/eval capture-baseline` as proofs-of-concept only. Replacement design (tier/shape-keyed envelope baselines sampled from many past pipelines) is tracked as `td-005` in [`.ai-state/TECH_DEBT_LEDGER.md`](.ai-state/TECH_DEBT_LEDGER.md). A second bug compounds this: `eval/pyproject.toml` is missing the `arize-phoenix` dependency, so `phoenix.Client()` never works and live capture silently returns empty results.
+### Tiers
 
-### Purpose
+| Command | Tier | Purpose |
+|---------|------|---------|
+| `/eval` | 1 | Filesystem-only artifact manifest check — confirms every expected deliverable for the pipeline's tier was produced under `.ai-work/<task-slug>/`. Pure filesystem read; no LLM call. |
+| `/eval-praxion` | 2 | LLM-as-judge semantic quality gate over completed `.ai-state/` artifacts. Family 1: pipeline-outcome fidelity (ADR structure, supersession reciprocity, traceability). Family 2: behavioral-contract adherence (BC-tag coverage in `VERIFICATION_REPORT.md`). Reports land in `.ai-state/praxion_eval_reports/`. |
 
-Two Tier 1 checks verify distinct quality dimensions after a pipeline completes:
-
-- **Behavioral** — confirms every expected deliverable for the pipeline's tier (lightweight, standard, full) was produced under `.ai-work/<task-slug>/`. Pure filesystem read; no LLM call, no network, no Phoenix. **This mode is fully working.**
-- **Regression** — compares a current Phoenix trace summary (span count, tool-call count, agent count, p95 duration) plus on-disk deliverables against a committed baseline JSON at `.ai-state/evals/baselines/<slug>.json`. **Blocked by the slug-ephemerality problem above** — works mechanically against hand-crafted baselines, but has no real use case until the tier/shape-keyed redesign tracked as `td-005` in [`.ai-state/TECH_DEBT_LEDGER.md`](.ai-state/TECH_DEBT_LEDGER.md) lands.
-
-A supporting mode, `capture-baseline`, snapshots current Phoenix traces + `.ai-work/<slug>/*.md` deliverables into a fresh baseline JSON — but inherits the slug-ephemerality problem and is further blocked by the missing `arize-phoenix` dependency. Two Tier 2 tiers (LLM-as-judge for decision quality, cost analysis) are stubs and raise `NotImplementedError`.
+The `regression` sub-package was retired in the praxion-self-eval-v1 pipeline. Baselines were keyed by `task_slug`, but Praxion slugs are one-shot — each feature generates a unique slug with no second run to compare against. The entire broken-by-design surface (448 LOC) was removed. The broader regression-mode redesign (tier/shape-keyed envelope baselines over a Phoenix corpus) remains deferred; see `eval/EVAL_PLAN.md`.
 
 ### When to run
 
-- After a significant pipeline run to confirm the agent produced the full artifact set
-- Before cutting a release to catch silent pipeline regressions (doubled tool-call counts, missing verifier reports, dropped agents)
-- On demand during development when investigating whether a pipeline misbehaved
+- **`/eval`** — after any pipeline run to confirm the agent produced the full artifact set for its tier.
+- **`/eval-praxion`** — after a multi-ADR pipeline or for periodic quality review; requires `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`.
 
 ### Examples
 
@@ -612,24 +609,20 @@ A supporting mode, `capture-baseline`, snapshots current Phoenix traces + `.ai-w
 /i-am:eval                                                           # list tier status
 /i-am:eval behavioral --task-slug architecture-doc                   # verify deliverables
 /i-am:eval behavioral --task-slug architecture-doc --tier full       # include ARCHITECTURE.md + docs/architecture.md recency
-/i-am:eval capture-baseline --task-slug my-feature                   # snapshot a baseline from live Phoenix + .ai-work/
-/i-am:eval regression --baseline .ai-state/evals/baselines/my-feature.json
+/i-am:eval-praxion                                                   # LLM-as-judge over main HEAD
 ```
-
-Running `uv run --project eval praxion-evals capture-baseline` from the repo root requires `--repo-root .` because `uv` sets CWD to `eval/`, and the deliverable scanner resolves `.ai-work/<slug>/` relative to CWD.
 
 ### Benefits
 
-- **Catches silent pipeline skips.** When a subagent reports "complete" but didn't actually write the deliverable (a recurring Praxion gotcha), behavioral flags the missing file. The verifier alone has false-positive failure modes; behavioral is an independent cross-check.
-- **Structural drift detection.** Regression surfaces when a pipeline starts making 2× the tool calls for the same task, drops an agent, or regresses p95 duration.
-- **Zero pipeline overhead.** Binding constraint in `dec-040`: eval code never runs inside a pipeline, so bugs in the eval framework cannot break agent work. Phoenix imports stay lazy (500 ms–2 s cold-import cost is paid only when regression or `capture-baseline` runs).
-- **Cheap to run.** Behavioral is a filesystem walk (milliseconds). Regression pulls one Phoenix DataFrame.
+- **Catches silent pipeline skips.** When a subagent reports "complete" but didn't actually write the deliverable, `/eval behavioral` flags the missing file. The verifier alone has false-positive failure modes; behavioral is an independent cross-check.
+- **Semantic quality gate.** `/eval-praxion` surfaces ADR reasoning gaps and behavioral-contract omissions that mechanical checks cannot detect.
+- **Zero pipeline overhead.** Binding constraint in `dec-040`: eval code never runs inside a pipeline, so bugs in the eval framework cannot break agent work.
 
 ### Scope
 
-Currently Praxion-internal: `/i-am:eval` resolves `Bash(uv run --project eval praxion-evals:*)` in its `allowed-tools` frontmatter, which requires the `eval/` project on disk. When the plugin is installed in another project, the command is exposed but invocation fails — there is no `eval/` directory and no `praxion-evals` binary on the path.
+Currently Praxion-internal: `/i-am:eval` and `/i-am:eval-praxion` resolve `Bash(uv run ...)` in their `allowed-tools` frontmatter, which requires the `eval/` project on disk. When the plugin is installed in another project, the commands are exposed but invocation fails — there is no `eval/` directory and no `praxion-evals` binary on the path.
 
-The underlying concepts (artifact manifest, trace-summary regression) apply to any project that runs Praxion pipelines. Making the tooling portable would require bundling `eval/` inside the plugin via `${CLAUDE_PLUGIN_ROOT}/eval` (matching the MCP server pattern) or publishing `praxion-evals` to PyPI. Not in scope today — open an issue if you need to consume it downstream.
+Making the tooling portable would require bundling `eval/` inside the plugin or publishing `praxion-evals` to PyPI. Not in scope today — open an issue if you need to consume it downstream.
 
 ## Releases
 

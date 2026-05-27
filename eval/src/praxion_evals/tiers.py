@@ -1,8 +1,11 @@
 """Tier registry — declarative status table for `praxion-evals list`.
 
-Tier 1 ("ready") entries have runnable implementations in the behavioral and
-regression sub-packages. Tier 2 ("stub") entries raise NotImplementedError until
-a future phase implements them — see dec-040 for the out-of-band constraint.
+Tier 1 ("ready") entries have runnable implementations. Tier 2 ("stub") entries raise
+NotImplementedError until a future phase implements them.
+
+The `regression`, `judge-openai`, and `judge-anthropic` tiers were retired in v1
+(regression package and judges/ stubs deleted; the `eval-praxion` tier provides the
+LLM-as-judge surface via the harness, invoked via /eval-praxion).
 """
 
 from __future__ import annotations
@@ -26,19 +29,12 @@ TIERS: tuple[Tier, ...] = (
         description="Artifact manifest check: expected pipeline deliverables exist per tier.",
     ),
     Tier(
-        name="regression",
+        name="eval-praxion",
         status="ready",
-        description="Phoenix trace diff against a baseline summary (span count, tool calls, duration).",
-    ),
-    Tier(
-        name="judge-openai",
-        status="ready",
-        description="OpenAI GPT judge over TOOL spans (preserved shim; see trajectory_eval.py).",
-    ),
-    Tier(
-        name="judge-anthropic",
-        status="stub",
-        description="Claude-as-judge — Tier 2, deferred (dec-040).",
+        description=(
+            "LLM-as-judge over completed artifacts: Family 1 (pipeline-outcome fidelity) + "
+            "Family 2 (behavioral-contract adherence). Invoke via /eval-praxion."
+        ),
     ),
     Tier(
         name="cost",

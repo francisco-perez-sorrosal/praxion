@@ -56,7 +56,7 @@ def test_runner_missing_task_dir_sets_error(tmp_path: Path):
 
 def test_runner_stale_mtime_for_full_tier(tmp_path: Path):
     _seed_complete_pipeline(tmp_path, "sample")
-    arch_path = tmp_path / ".ai-state" / "ARCHITECTURE.md"
+    arch_path = tmp_path / ".ai-state" / "DESIGN.md"
     arch_path.parent.mkdir(parents=True, exist_ok=True)
     arch_path.write_text("# arch\n", encoding="utf-8")
     docs_path = tmp_path / "docs" / "architecture.md"
@@ -76,4 +76,4 @@ def test_runner_stale_mtime_for_full_tier(tmp_path: Path):
         pipeline_start=pipeline_start,
     )
     stale = [v for v in report.verdicts if v.verdict == "stale"]
-    assert any(v.path.endswith("ARCHITECTURE.md") for v in stale)
+    assert any(v.path.endswith("DESIGN.md") for v in stale)

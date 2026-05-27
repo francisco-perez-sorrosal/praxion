@@ -1,6 +1,6 @@
 # Praxion Evals
 
-Out-of-band quality measurement for Praxion agent pipelines. Invoked via the `/eval` and `/eval-praxion` slash commands — never from a Claude Code hook. See [`dec-040`](../.ai-state/decisions/040-eval-framework-out-of-band.md) for the out-of-band invocation contract; `dec-draft-e1f01781` (finalized at merge-to-main) narrows clause 3 to allow LLM-as-judge calls over completed artifacts.
+Out-of-band quality measurement for Praxion agent pipelines. Invoked via the `/eval` and `/eval-praxion` slash commands — never from a Claude Code hook. See [`dec-040`](../.ai-state/decisions/040-eval-framework-out-of-band.md) for the out-of-band invocation contract; `dec-204` (finalized at merge-to-main) narrows clause 3 to allow LLM-as-judge calls over completed artifacts.
 
 ## Tiers
 

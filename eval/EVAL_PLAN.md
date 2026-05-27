@@ -11,7 +11,7 @@ The `eval/` framework predates v1. Before v1, it shipped two modes:
 
 `td-005` in `.ai-state/TECH_DEBT_LEDGER.md` tracked this as a scheduled full effort. The trigger for v1 was `dec-040`'s deferred LLM-as-judge clause: the now-retired `judges/anthropic.py` stub explicitly cited dec-040 as the deferral reason, and the proper resolution required a new ADR (partial supersession of clause 3) plus a real harness. The `judges/` package was retired in v1 alongside `regression/` — the `harness/judge_client.py` adapter is the sole judge surface.
 
-`dec-draft-e1f01781` narrows dec-040 clause 3 to allow LLM-as-judge calls over **completed artifacts** out-of-band, while re-affirming clauses 1, 2, and 4. v1 implements that resolution. `td-005` migrates to `TECH_DEBT_RESOLVED.md` with `resolved-by: dec-draft-e1f01781` (rewritten to `dec-NNN` at merge-to-main via `scripts/finalize_adrs.py`).
+`dec-204` narrows dec-040 clause 3 to allow LLM-as-judge calls over **completed artifacts** out-of-band, while re-affirming clauses 1, 2, and 4. v1 implements that resolution. `td-005` migrates to `TECH_DEBT_RESOLVED.md` with `resolved-by: dec-204` (rewritten to `dec-NNN` at merge-to-main via `scripts/finalize_adrs.py`).
 
 ## Why separate from sentinel
 

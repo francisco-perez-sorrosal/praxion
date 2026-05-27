@@ -1,7 +1,7 @@
 ---
-id: dec-draft-f4083c48
+id: dec-206
 title: AgentSdkJudgeClient refuses to run from inside a nested Claude Code session — no graceful degradation, no retry
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-05-26
 summary: When CLAUDECODE=1 is set, AgentSdkJudgeClient raises RuntimeError at __init__ time with a three-part remediation message; the harness never silently falls back to MessagesApiJudgeClient and never retries the SDK call. Re-affirms dec-204's hybrid-auth seam and dec-205's flat module layout.

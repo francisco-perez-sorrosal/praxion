@@ -426,6 +426,7 @@ source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "claude-agent-sdk" },
+    { name = "python-dotenv" },
     { name = "pyyaml" },
 ]
 
@@ -441,6 +442,7 @@ dev = [
 requires-dist = [
     { name = "anthropic" },
     { name = "claude-agent-sdk", specifier = ">=0.2.87" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
 ]
 

@@ -31,6 +31,8 @@ Auth route is implicit — no flag needed:
 | `ANTHROPIC_API_KEY` | Direct Messages API route (`anthropic` SDK) |
 | Neither | Non-zero exit with a one-line message naming both env vars |
 
+The CLI calls `dotenv.load_dotenv(find_dotenv(usecwd=True))` before reading these vars, so the token may live in a `.env` at the project root (or any ancestor of the invocation cwd) instead of being re-exported per shell. Real environment variables take precedence over `.env` values — `export` always wins.
+
 ## Families
 
 | Family | Checks |
@@ -62,7 +64,7 @@ Verify the CLI is invocable and shows the target argument.
 cd /path/to/repo && uv run --project eval python -m praxion_evals.harness.cli [TARGET] [--output-dir DIR]
 ```
 
-Set `--output-dir` to the repo root (or leave unset) so the report lands under `.ai-state/praxion_eval_reports/`.
+Omit `--output-dir` to land the report under `<repo-root>/.ai-state/praxion_eval_reports/` (the resolved default — `<repo-root>` is the invocation cwd). Pass `--output-dir` only to override that destination.
 
 ### 3. Surface the report
 

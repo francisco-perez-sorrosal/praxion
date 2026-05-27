@@ -11,6 +11,12 @@ Auth route is resolved via select_judge_client() (env-detect):
     ANTHROPIC_API_KEY set       → messages-api route
     Neither                     → RuntimeError naming both vars
 
+A `.env` file at (or above) the invocation cwd is loaded at the top of main()
+via python-dotenv. Real environment variables take precedence over `.env`
+values (load_dotenv default: override=False), so an explicit `export` always
+wins. This lets operators set CLAUDE_CODE_OAUTH_TOKEN once in `.env` instead
+of re-exporting it in every shell that invokes /eval-praxion.
+
 The slash-command registration (entry point script, commands/eval-praxion.md)
 is Step 8 scope — this module is the Python-level CLI only.
 """
@@ -22,6 +28,8 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+
+from dotenv import find_dotenv, load_dotenv
 
 # ---------------------------------------------------------------------------
 # Public re-export: run_eval (the orchestrator-backed implementation lives in
@@ -116,6 +124,8 @@ def main(argv: list[str] | None = None) -> None:
 
     TARGET is resolved via the 4-case resolver (resolve_target).
     """
+    load_dotenv(find_dotenv(usecwd=True))
+
     parser = argparse.ArgumentParser(
         prog="eval-praxion",
         description=(
@@ -132,8 +142,11 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument(
         "--output-dir",
-        default=".",
-        help="Directory for the eval report and log file (default: current directory).",
+        default=None,
+        help=(
+            "Directory for the eval report and log file "
+            "(default: <repo-root>/.ai-state/praxion_eval_reports/)."
+        ),
     )
 
     args = parser.parse_args(argv)

@@ -1,7 +1,7 @@
 ---
-id: dec-draft-de1be9c5
+id: dec-207
 title: Architect Phase 2.5 Pre-Refactor Sub-Pipeline — bundled architecture decision
-status: proposed
+status: accepted
 category: architectural
 date: 2026-05-27
 summary: Adds a Phase 2.5 (Pre-Refactor Assessment) to the architect, an artifact-driven in-worktree mini sub-pipeline, a new post-refactor-adaptation re-entry mode, and a verifier scope-switch — all reusing existing primitives (artifact-presence trigger, prompt-directive mode signaling, Conversation Checkpoint, in-place td-NNN status flips) without expanding the four-writer ledger policy.

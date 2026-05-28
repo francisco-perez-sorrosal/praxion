@@ -42,6 +42,7 @@ Work through these phases in order. Complete each phase before moving to the nex
 Determine what you have to work with. The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all reads and writes.
 
 1. **Check for SYSTEMS_PLAN.md** — read the architectural sections (Goal, Acceptance Criteria, Architecture, Risk Assessment). If `VERIFIER_FINDINGS.md` is present in `.ai-work/<task-slug>/` and no `RESEARCH_FINDINGS.md` exists, read it as the primary task-intake document — its `## Problem`, `## Scope`, and `## Success Criteria` sections fill the same role.
+1a. **Check for `PRE_REFACTOR_PLAN.md`** — when present in `.ai-work/<task-slug>/`, the orchestrator has dispatched a pre-refactor mini-pipeline and this artifact is your primary intake (alongside any feature-scope `SYSTEMS_PLAN.md`). See the **Pre-Refactor Mode** subsection at the end of this phase.
 2. **Check for SPEC_DELTA.md** — if present, read the spec delta for brownfield context. Modified requirements indicate targeted refactoring-then-implementation steps. Removed requirements indicate explicit cleanup steps with dead code/test removal. Added requirements follow normal step decomposition. Note any staleness warnings for verification substeps.
 3. **Check for RESEARCH_FINDINGS.md** — read for codebase context and technical details
 4. **Check for CONTEXT_REVIEW.md** — if present, read the accumulated context engineering review (research-stage and architecture-stage sections) for artifact dependency ordering, placement recommendations, and spec compliance notes
@@ -59,6 +60,19 @@ Determine what you have to work with. The **task slug** (provided in your prompt
 10. **Library version and capability detection** — in the same scan, identify any *new* dependency the plan will introduce (a library not already pinned) and any step that assumes a specific library feature. For each, the plan must schedule verification of the library's current version and capabilities before the implementation step fires — delegating the concrete check to the language's package-management skill (e.g., `python-prj-mgmt` for `pixi search` / `uv pip index versions`). If the architect recorded a version or capability that you cannot confirm, raise it to the architect rather than carrying the assumption into decomposition. See [Cross-Agent Skill Conventions — Library version and capability checks](../rules/swe/swe-agent-coordination-protocol.md#cross-agent-skill-conventions) for the binding rule.
 
 If `SYSTEMS_PLAN.md` does not exist or lacks architecture sections, recommend invoking the systems-architect agent first. If `RESEARCH_FINDINGS.md` is missing and the task is complex, recommend invoking the researcher agent first.
+
+#### Pre-Refactor Mode
+
+When `.ai-work/<task-slug>/PRE_REFACTOR_PLAN.md` is present, the orchestrator has dispatched a pre-refactor mini-pipeline (the architect's Phase 2.5 emitted the artifact, the orchestrator detected it by file presence, and the mini-pipeline runs in the same worktree — no new `EnterWorktree` call). Treat `PRE_REFACTOR_PLAN.md` as the primary intake document for the mini-pipeline's `IMPLEMENTATION_PLAN.md`; if a feature-scope `SYSTEMS_PLAN.md` also exists, it is out-of-scope for this mini-pipeline (it drives the post-refactor feature plan, not the refactor itself).
+
+Decomposition contract:
+
+- **Steps source**: derive steps from `PRE_REFACTOR_PLAN.md § Steps`; the architect's `## Behavior Preservation Contract` defines the safety net the test-engineer locks down first
+- **Tag reuse**: tag every refactor step with the existing `[Phase: Refactoring]` marker — do not invent a new tag. The refactoring skill's verification checklist (incremental, behavior-preserving, post-restructuring re-wiring) flows in unchanged
+- **Characterization-tests-first invariant (hard contract)**: the first non-trivial implementation step MUST be a `test-engineer`-assigned characterization-test step whose seeds are the behaviors enumerated in `PRE_REFACTOR_PLAN.md § Behavior Preservation Contract`. This is not a preference — it is the safety net that lets every subsequent restructuring step be reverted cleanly if it regresses behavior. Skipping it means structural change without a regression detector
+- **Acceptance criteria source**: use `PRE_REFACTOR_PLAN.md § Acceptance Criteria` for the `IMPLEMENTATION_PLAN.md § Acceptance Criteria` block. The verifier (when invoked) reads from the same source — see verifier Phase 1 mode detection
+
+The mini-pipeline ends with the orchestrator's mechanical evaluation of `## Verifier Bypass Criteria` and `## Loop-Back Conditions` (parseable YAML blocks the orchestrator routes on), surfacing one of `run-verifier` / `bypass-verifier` / `loop-back-to-architect` to the user via the existing Conversation Checkpoint — none of which is the planner's concern; you decompose, the orchestrator routes.
 
 ### Phase 2 — Codebase Verification
 

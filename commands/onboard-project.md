@@ -467,6 +467,7 @@ Delegate to `systems-architect` via the `Task` tool. The delegation prompt MUST 
    - One ADR draft under `.ai-state/decisions/drafts/` if the baseline reading surfaces a load-bearing architectural invariant worth preserving (e.g., a one-way module dependency, a layer boundary, a data-flow constraint). The ADR is *only* warranted when the invariant is non-obvious from the code; do not write a ceremonial "architecture is now baselined" ADR.
 5. **Anti-instructions.**
    - Do NOT produce `SYSTEMS_PLAN.md` — there is no feature in scope for a baseline audit, and a SYSTEMS_PLAN without a feature is anti-pattern.
+   - Do NOT produce `PRE_REFACTOR_PLAN.md` — Phase 2.5 is skipped in baseline-audit mode (no feature scope means no pre-refactor scope).
    - Do NOT invent components that don't exist on disk. Every component table row and SVG reference must be code-verified.
    - Do NOT exceed L1 detail in C4 diagrams (≤10 nodes per `rules/writing/diagram-conventions.md`). Use LikeC4 DSL for C4-architectural views; Mermaid for sequence/state/ER/flowchart. L2 internals are deferred to feature-pipeline updates.
    - Do NOT modify any source code, tests, or non-architecture documentation.
@@ -978,6 +979,8 @@ Follow the **Understand, Plan, Verify** methodology. For multi-step work (Standa
 3. **implementation-planner** → `.ai-work/<slug>/IMPLEMENTATION_PLAN.md` + `WIP.md` — step decomposition
 4. **implementer** + **test-engineer** (concurrent, on disjoint file sets) → code + tests — execute steps from the plan
 5. **verifier** → `.ai-work/<slug>/VERIFICATION_REPORT.md` — post-implementation review
+
+**Recognized pipeline branches.** The pipeline is not strictly linear. The architect's pre-refactor assessment may emit `.ai-work/<slug>/PRE_REFACTOR_PLAN.md`, which triggers a same-worktree mini-pipeline (characterization-tests-first → implementer → orchestrator-mediated verifier-vs-loopback decision) before the parent feature plan resumes. Re-entry is bounded at one pass via the architect's `post-refactor-adaptation` mode. The mini-pipeline reuses the existing `[Phase: Refactoring]` tag — no new tag is invented.
 
 **Independent audits.** The `sentinel` agent runs outside the pipeline and writes timestamped `.ai-state/sentinel_reports/SENTINEL_REPORT_<timestamp>.md` plus an append-only `.ai-state/sentinel_reports/SENTINEL_LOG.md`. Trigger it for ecosystem health baselines (before first ideation, after major refactors).
 

@@ -1,0 +1,5 @@
+# Canary: a YAML body whose flow-mapping has an unbalanced brace.
+# The parser must reject this with PreRefactorYamlError(error_id="malformed-yaml").
+- id: blast-radius-exceeded
+  description: {key: value
+  check: "git diff --name-only is not a subset of in-scope-paths"

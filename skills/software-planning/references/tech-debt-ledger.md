@@ -17,6 +17,14 @@ Back-link: [`../SKILL.md`](../SKILL.md) · Index entry in [`../../../rules/swe/a
 
 Consumer agents (systems-architect, implementation-planner, implementer, test-engineer, doc-engineer) read the ledger, filter by their `owner-role`, and update `status` / `resolved-by` / `last-seen` on existing rows when they address an item. No agent outside the four writers above creates new ledger rows.
 
+### Architect Phase 2.5 — consumer-only flip protocol (no writer-set expansion)
+
+The systems-architect's Phase 2.5 (Pre-Refactor Assessment) operates as a **consumer**, not a writer — the four-writer policy is preserved. When Phase 2.5 emits `PRE_REFACTOR_PLAN.md`, the architect systematically flips matching existing rows from `open → in-flight` at plan-write time and records the affected `td-NNN` IDs under `## Affected td-NNN rows` in the plan. Row-selection eligibility is mechanical: each claimed row must be `status: open` AND its `location` must overlap the documented refactor scope AND its `owner-role` must be in `{systems-architect, implementation-planner}`. No new rows are created during Phase 2.5; the architect cannot fabricate debt.
+
+At mini-pipeline completion (verifier PASS, or user accepts a verifier-bypass per `## Verifier Bypass Criteria`), the orchestrator — or the re-entered architect in `post-refactor-adaptation` mode — flips the same rows `in-flight → resolved`, populating `resolved-by` with the pipeline/PR reference. The standard `scripts/finalize_tech_debt_ledger.py` migration at post-merge moves resolved rows to `TECH_DEBT_RESOLVED.md` per the lifecycle conventions below; no Phase 2.5-specific finalize logic is needed.
+
+This is a *clarification* of the existing consumer contract — not a schema change, not a writer-set expansion, and not a new field. The same in-place `status` update mechanism documented above is the one Phase 2.5 uses; the architect merely applies it systematically across a scoped row set rather than ad-hoc per finding.
+
 ## Lifecycle conventions
 
 - **Append-only at write** — producers append new rows to the **active LEDGER** (never to RESOLVED.md directly)

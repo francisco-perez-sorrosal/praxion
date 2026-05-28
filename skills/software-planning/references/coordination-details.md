@@ -17,6 +17,7 @@ This is the **authoritative source of truth** for per-agent delegation deliverab
 - "Create or update `.ai-state/DESIGN.md` (architect-facing design target)"
 - "Create or update `docs/architecture.md` (developer-facing navigation guide, Built components only)"
 - If deployment is in scope: "Create or update `.ai-state/SYSTEM_DEPLOYMENT.md`"
+- If pre-refactor sub-pipeline outcome (Phase 2.5 emits `emit-PRE_REFACTOR_PLAN`): "Create or update `.ai-work/<task-slug>/PRE_REFACTOR_PLAN.md`"
 
 **implementation-planner** — always include in prompt:
 - "Produce `IMPLEMENTATION_PLAN.md`, `WIP.md`, and `LEARNINGS.md` at `.ai-work/<task-slug>/`"
@@ -207,6 +208,58 @@ Information flows **forward only between concurrent agents**: the architect read
 
 `INTERFACE_DESIGN.md` is single-writer (interface-designer only) and cumulative per pipeline run. It is ephemeral — deleted with `.ai-work/<task-slug>/` after the pipeline completes. It is not subject to fragment file patterns.
 
+<a id="pre-refactor-sub-pipeline--the-verifier-vs-loopback-decision"></a>
+## Pre-Refactor Sub-Pipeline & the Verifier-vs-Loopback Decision
+
+When the systems-architect's Phase 2.5 (Pre-Refactor Assessment) emits the outcome `emit-PRE_REFACTOR_PLAN`, it writes `.ai-work/<task-slug>/PRE_REFACTOR_PLAN.md` and the orchestrator routes the work through a **mini-pipeline** before resuming the parent feature plan. This loop is structurally a third feedback mechanism alongside the verifier rework loop and the interface-designer challenge loop — same artifact-presence trigger pattern, same Conversation-Checkpoint surface, same one-pass recursion bound.
+
+### Activation
+
+Triggered when `.ai-work/<task-slug>/PRE_REFACTOR_PLAN.md` exists at the architect's turn-end. The orchestrator detects it the same way it detects `REWORK_MANIFEST.md` (rework loop) and `INTERFACE_DESIGN.md § Architecture Challenges` (interface-designer challenge): a single file-presence + structured-content check. No additional plumbing.
+
+### Same-Worktree Topology
+
+The mini-pipeline runs **inside the parent task's worktree** — no `EnterWorktree` call, no fresh branch. Rationale: the refactor is *for* the parent feature; isolating it across worktrees would duplicate `.ai-state/` reconciliation work for no benefit. The boundary the mini-pipeline preserves is *behavioral*, enforced by characterization tests, not *spatial*, enforced by git tree separation. The verifier rework loop differs (it does spawn a worktree per row) because its work is post-merge cleanup, not in-flight refactor.
+
+### Orchestrator's Mechanical Evaluation
+
+When `PRE_REFACTOR_PLAN.md` is present, the orchestrator reads two structured YAML blocks from the plan:
+
+- `## Verifier Bypass Criteria` — conditions under which the user may accept the refactor without a formal verifier pass (e.g., "all characterization tests pass" + "no new public APIs introduced" + "blast radius ≤ N files"). Each criterion is mechanically evaluable.
+- `## Loop-Back Conditions` — conditions under which the orchestrator must route back to the architect rather than forward to the verifier (e.g., "characterization tests revealed a behavior the SYSTEMS_PLAN doesn't account for" + "refactor scope grew beyond Phase 2.5 magnitude estimate"). Each condition is mechanically evaluable.
+
+The parser at `scripts/parse_pre_refactor_yaml.py` (which raises `PreRefactorYamlError` on malformed input — see its accompanying pytest module for the canary contract) handles the mechanical evaluation; the orchestrator surfaces one of three recommendations at the pre-verification Conversation Checkpoint:
+
+1. **`proceed-to-verifier`** — neither bypass nor loop-back triggered; pipeline continues normally.
+2. **`bypass-verifier-with-user-ack`** — all bypass criteria met; recommend bypass but require explicit user acknowledgement.
+3. **`loop-back-to-architect`** — at least one loop-back condition met; recommend re-entry into the architect in `post-refactor-adaptation` mode.
+
+The recommendation is *advisory* — the user retains final say in every case.
+
+### Recursion Bound
+
+The architect's re-entry runs in `post-refactor-adaptation` mode, which is **forbidden from re-running Phase 2.5**. This single contractual restriction (documented in the architect agent's Phase 1 mode-detection and Phase 2.5 mode-gate) bounds the loop at one pass. There is no machinery for arbitrary recursion; the bound is structural.
+
+### Mini-Pipeline Step Conventions
+
+When the orchestrator dispatches the mini-pipeline:
+
+- Steps reuse the existing `[Phase: Refactoring]` tag — **no new tag invented**. The planner-driven `[Phase: Refactoring]` and architect-driven `emit-PRE_REFACTOR_PLAN` are two entry points to the same tag and the same `skills/refactoring/SKILL.md` workflow.
+- The first non-trivial step is a `test-engineer`-assigned characterization-tests-first step, sourced from `PRE_REFACTOR_PLAN.md § Behavior Preservation Contract`. Characterization-first is a hard contract — refactoring without first capturing the pre-refactor behavior is forbidden.
+- Subsequent steps follow the standard paired BDD/TDD execution pattern.
+
+### Tech-Debt Ledger Lifecycle
+
+The architect's Phase 2.5 flips matching `td-NNN` rows from `open → in-flight` *at plan-write time* (consumer-only privilege — the four-writer policy is preserved; no writer-set expansion). Upon mini-pipeline completion (verifier PASS, or user accepts a verifier-bypass), the orchestrator (or the re-entered architect in `post-refactor-adaptation` mode) flips the same rows `in-flight → resolved`, populating `resolved-by`. The `scripts/finalize_tech_debt_ledger.py` migration at post-merge moves them to `TECH_DEBT_RESOLVED.md` per the standard lifecycle.
+
+### Conversation Checkpoint Surface
+
+The orchestrator's `verifier-vs-loopback recommendation` is a **named variant** of the pre-verification Conversation Checkpoint (see [Conversation Checkpoints](#conversation-checkpoints) below). The digest carries the mechanical evaluation result plus the criteria that triggered it — the user can override the recommendation in either direction.
+
+### Forward-Only Information Flow
+
+Like the interface-designer challenge loop, this is a single orchestrator-mediated loop-back, not a concurrent-agent messaging primitive. The pre-refactor artifact flows forward (architect → orchestrator → mini-pipeline → verifier-or-loopback); the one loop-back goes through the orchestrator at a checkpoint. The verifier rework loop, the interface-designer challenge loop, and the pre-refactor sub-pipeline loop are the **three structural loop-back patterns** in the otherwise forward-only model — same shape, three contexts.
+
 <a id="conversation-checkpoints"></a>
 ## Conversation Checkpoints
 
@@ -340,11 +393,16 @@ This is the canonical ASCII depiction of the Praxion agent coordination pipeline
 
 ```text
 promethean --> researcher ---------> systems-architect --> implementation-planner --+--> implementer    --+--> verifier
-              + context-engineer     + context-engineer                             |                     |
-                (shadow)               (shadow)                                    +--> test-engineer  --+
-                                                                                   |
-                                                                                   +--> doc-engineer   --+
-                                                                                        (when assigned)
+              + context-engineer     + context-engineer    |                        |                     |
+                (shadow)               (shadow)            |                       +--> test-engineer  --+
+                                                           |                        |
+                                                           |                       +--> doc-engineer   --+
+                                                           |                            (when assigned)
+                                                           |
+                                                           +--> [Phase 2.5 emits PRE_REFACTOR_PLAN.md]
+                                                                |  same-worktree mini-pipeline:
+                                                                +--> test-engineer (characterization-first) --> implementer --> orchestrator-mediated verifier-vs-loopback
+                                                                                                                                 (one-pass; re-entry via post-refactor-adaptation mode)
                                                                      sentinel (independent audit)
 ```
 
@@ -354,3 +412,4 @@ promethean --> researcher ---------> systems-architect --> implementation-planne
 - `+ context-engineer (shadow)` indicates the context-engineer runs in parallel with that stage, appending to `CONTEXT_REVIEW.md`
 - `sentinel (independent audit)` is not part of the pipeline chain — it is a standalone read-only auditor invokable at any time
 - The parallel-implementer / test-engineer / doc-engineer group operates on disjoint file sets per BDD/TDD execution rules
+- The pre-refactor sub-pipeline branch (rooted at the architect's Phase 2.5) runs in the same worktree and rejoins the main flow at the verifier-or-loopback decision; deep-dive in [Pre-Refactor Sub-Pipeline & the Verifier-vs-Loopback Decision](#pre-refactor-sub-pipeline--the-verifier-vs-loopback-decision)

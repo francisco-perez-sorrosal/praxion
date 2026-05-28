@@ -22,6 +22,7 @@ Agent documents live in two locations based on their lifecycle:
       CONTEXT_REVIEW.md
       INTERFACE_DESIGN.md
       SYSTEMS_PLAN.md
+      PRE_REFACTOR_PLAN.md
       SPEC_DELTA.md
       IMPLEMENTATION_PLAN.md
       WIP.md
@@ -117,6 +118,7 @@ Full schema (14 fields + `dedup_key`), owner-role heuristic, lifecycle conventio
 |------|----------|-----------|----------|
 | Ephemeral | `.ai-work/<task-slug>/` | `IDEA_PROPOSAL.md`, `RESEARCH_FINDINGS.md`, `CONTEXT_REVIEW.md`, `INTERFACE_DESIGN.md`, `SYSTEMS_PLAN.md`, `SPEC_DELTA.md`, `VERIFICATION_REPORT.md`, `REWORK_MANIFEST.md`, `PROGRESS.md` | Single pipeline run — delete after downstream consumption (merge `VERIFICATION_REPORT.md` patterns into `LEARNINGS.md` first). `INTERFACE_DESIGN.md` (interface-designer pipeline output: interface architecture, framework/paradigm decisions, UI/API sketches, trade-offs, `## Architecture Challenges`) is consumed by planner, implementer, and verifier. `REWORK_MANIFEST.md` — writer: verifier (Phase 12.5); reader: main agent; cleanup gated on rework completion. |
 | Ephemeral | `.ai-work/<rework-slug>/` | `VERIFIER_FINDINGS.md` — writer: main agent; reader: `/resume-rework` + spawned session | Worktree-local ephemeral. |
+| Ephemeral | `.ai-work/<task-slug>/` | `PRE_REFACTOR_PLAN.md` — writer: systems-architect (Phase 2.5 outcome `emit-PRE_REFACTOR_PLAN`); readers: orchestrator (parses `## Verifier Bypass Criteria` + `## Loop-Back Conditions`), implementation-planner (steps tagged `[Phase: Refactoring]`), test-engineer (sources characterization-tests from `## Behavior Preservation Contract`), verifier (sources acceptance criteria from `## Acceptance Criteria` in pre-refactor mode) | Single pipeline run — receives a `[CONSUMED]` marker at architect's `post-refactor-adaptation` re-entry; deleted with `.ai-work/` at cleanup |
 | Ephemeral | `.ai-work/<task-slug>/` | `TEST_BASELINE.md` — implementation-planner's pre-pipeline failing-test snapshot (failing node IDs + base commit SHA), captured before any code change; verifier Phase 10 reads it to separate regressions from pre-existing failures | Single pipeline run — delete with `.ai-work/` |
 | Ephemeral | `.ai-work/<task-slug>/` | `TEST_RESULTS.md` — implementer (or test-engineer) test-run handoff artifact (canonical schema in `skills/software-planning/references/agent-pipeline-details.md`) | Single pipeline run — merge into `VERIFICATION_REPORT.md`, then delete |
 | Ephemeral | `.ai-work/<task-slug>/` | `traceability.yml` — REQ-to-test/implementation mapping (canonical source of truth during the pipeline; rendered into the archived SPEC's matrix at feature end per [`id-citation-discipline.md`](id-citation-discipline.md)) | Single pipeline run — rendered into archived SPEC matrix, then deleted with `.ai-work/` |

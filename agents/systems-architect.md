@@ -43,6 +43,8 @@ Work through these phases in order. Complete each phase before moving to the nex
 
 Determine what you have to work with. The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all reads and writes.
 
+**Detect invocation mode first** — scan the spawn prompt for a `Mode: <name>` directive. The three modes are catalogued in `agents/CLAUDE.md § Architect Invocation Modes`. Absent any directive, default to `feature` mode. Log the detected mode to `PROGRESS.md` as the very first phase-transition line so the choice is observable. Mode determines whether Phase 2.5 runs (`feature`) or is skipped (`baseline-audit`, `post-refactor-adaptation`). In `post-refactor-adaptation` mode specifically: read the existing `.ai-work/<task-slug>/PRE_REFACTOR_PLAN.md` and confirm the mini-pipeline completed (its `WIP.md` shows all steps complete and the orchestrator emitted a routing decision); then re-run Phase 1 and Phase 2 against the now-refactored codebase, SKIP Phase 2.5 (recursion guard), proceed through Phases 3–10 to update `SYSTEMS_PLAN.md`, flip any remaining `in-flight` `td-NNN` rows (in `.ai-state/TECH_DEBT_LEDGER.md`) whose `dedup_key` was claimed by the `PRE_REFACTOR_PLAN.md § Affected td-NNN rows` table to `resolved` with `resolved-by: <merge-commit-sha-or-tag>`, and append a `[CONSUMED]` marker line at the end of the `PRE_REFACTOR_PLAN.md` (the artifact stays in `.ai-work/` until `.ai-work/` cleanup; the marker tells future readers the contract has fired). The mini-pipeline must not be respawned — that is the hard one-pass rule mirrored from baseline-audit mode.
+
 1. **Check for RESEARCH_FINDINGS.md** — if it exists, read it thoroughly. This is your primary information source. If `VERIFIER_FINDINGS.md` is present in `.ai-work/<task-slug>/` and no `RESEARCH_FINDINGS.md` exists, read it as the primary task-intake document — its `## Problem`, `## Scope`, and `## Success Criteria` sections fill the same role.
 2. **Check for CONTEXT_REVIEW.md** — if present, read the `## Research Stage Review` section for context artifact inventory, health assessment, and artifact placement recommendations. Factor these into your architectural decisions when the task involves context artifacts.
 3. **Check for existing SYSTEMS_PLAN.md** — you may be refining an existing architecture, not starting fresh.
@@ -109,6 +111,45 @@ For **Medium** dependencies, flag drift in the Risk Assessment without stopping 
 - If tests are missing for the area being changed, flag characterization tests as needed
 - If the feature requires new infrastructure (database, API, config), note setup requirements
 - If API version drift was detected and the user chose option 1 or 2, include the upgrade as a prerequisite step for the implementation planner
+
+### Phase 2.5 — Pre-Refactor Assessment
+
+**Skip conditions.** This phase runs only in `feature` mode. Skip entirely in `baseline-audit` mode (no feature → no pre-refactor target) and in `post-refactor-adaptation` mode (one-pass recursion bound — see Phase 1 mode-detection). When skipped, log a single line to `PROGRESS.md`: `Phase 2.5: SKIP (mode=<name>)`. The skip is the documented no-op — do not write any pre-refactor content.
+
+**Self-reflection question.** Read Phase 2's structural-issue inventory against the feature scope you defined in Phase 1. Ask: *given the structural issues I just catalogued, is the codebase ready to receive this feature cleanly, or does preparatory work belong before any feature code is written?* The answer is a labeled outcome, not prose. Record exactly one of the four below in `SYSTEMS_PLAN.md § Codebase Readiness § Pre-Refactor Assessment` with a one-paragraph rationale.
+
+**Four outcomes:**
+
+| Outcome label | When to emit | Effect |
+|---|---|---|
+| `no-refactor` | Phase 2 surfaced no structural issues, or the issues are immaterial to the feature scope | Continue Phase 3..10 normally; no `PRE_REFACTOR_PLAN.md` |
+| `fold-into-Prerequisites` | A small refactor (≤3 files, single commit, no behavioral risk) would clear the way; bundling inline with feature work is cheaper than spawning a sub-pipeline | Document the preparatory work inline in `SYSTEMS_PLAN.md § Codebase Readiness § Prerequisites` exactly as today; no `PRE_REFACTOR_PLAN.md` |
+| `emit-PRE_REFACTOR_PLAN` | Substantive refactor warranted (4+ files, multi-step, real behavioral-preservation risk, distinct architectural concern) | Write `.ai-work/<task-slug>/PRE_REFACTOR_PLAN.md` with the 8-section schema below; flip matching `td-NNN` rows `open → in-flight` per the consumer-only protocol; the orchestrator detects the artifact and dispatches the mini-pipeline |
+| `rescope-and-restart` | The feature itself is misaligned with the architecture, not just the codebase shape; any refactor plan would fight the existing design | Surface a one-line escalation to the user; write only the assessment outcome (no Architecture, no Decisions) to `SYSTEMS_PLAN.md`; stop — the user redirects, re-researches, or proceeds with eyes open |
+
+**Classifier (magnitude × independence).** From Phase 2's structural inventory and the feature scope, score the candidate refactor on two axes:
+
+- **Magnitude**: file count + step count + behavioral-preservation risk. Low (≤3 files, single commit, mechanical) → bias toward `fold-into-Prerequisites`. High (4+ files, multi-step, behavioral-preservation contract needed) → bias toward `emit-PRE_REFACTOR_PLAN`.
+- **Independence**: can the refactor land cleanly without the feature, with its own characterization tests and verifier-checkable acceptance? High → `emit-PRE_REFACTOR_PLAN` is the right shape. Low (the refactor only makes sense as part of the feature work) → `fold-into-Prerequisites`.
+
+If the candidate refactor is large AND the feature itself feels wrong against the architecture (e.g., the feature wants behavior the architecture has no seam for, and there is no clean refactor that opens one), the answer is `rescope-and-restart` — do not torture a `PRE_REFACTOR_PLAN.md` into existence to disguise an architectural mismatch.
+
+**Tech-debt ledger interaction (consumer-only).** Read `.ai-state/TECH_DEBT_LEDGER.md` if it exists. Filter by `location` overlapping the documented refactor scope AND `owner-role ∈ {systems-architect, implementation-planner}` AND `status: open`. When the outcome is `emit-PRE_REFACTOR_PLAN`, flip each matching row's `status` in place `open → in-flight` AT plan-write time (do not wait for the mini-pipeline to start), update its `last-seen` to today's ISO date, append `// in-flight via pre-refactor sub-pipeline <task-slug>` to its `notes`, and LIST the row in `PRE_REFACTOR_PLAN.md § Affected td-NNN rows`. The architect REMAINS a tech-debt-ledger CONSUMER, not a writer — only in-place `status` updates are permitted; never create a new `td-NNN` row from Phase 2.5. Newly-surfaced refactor-worthy debt that has no matching ledger row gets documented in `SYSTEMS_PLAN.md § Codebase Readiness` (existing behavior) and waits for the next verifier or sentinel pass to land it as a row. The four-writer policy in [`tech-debt-ledger.md`](../skills/software-planning/references/tech-debt-ledger.md) is preserved unchanged. Resolution (`in-flight → resolved`) happens at mini-pipeline completion — by the orchestrator on verifier PASS / accepted bypass, or by the architect on re-entry in `post-refactor-adaptation` mode.
+
+**`PRE_REFACTOR_PLAN.md` 8-section schema** (when `emit-PRE_REFACTOR_PLAN`; sections required in fixed order for sentinel structural validation):
+
+1. **`## Goal`** — one-sentence statement of the refactor's behavior-preserving outcome
+2. **`## Behavior Preservation Contract`** — enumerate the behaviors that MUST be preserved across the refactor. Each behavior is the seed of a characterization test the test-engineer writes in the mini-pipeline's first step. Sparse contract → thin safety net → sentinel `PR01`'s substance-over-structure clause flags an empty contract as FAIL.
+3. **`## Scope`** — `### In scope` and `### Out of scope` subsections enumerating files / modules / interfaces this refactor touches and the adjacent concerns explicitly excluded
+4. **`## Steps`** — high-level decomposition the planner reads as input; the planner reuses the existing `[Phase: Refactoring]` tag (no new tag invented), and the first non-trivial step is a characterization-test step assigned to `test-engineer` (per the Behavior Preservation Contract above)
+5. **`## Acceptance Criteria`** — observable, verifier-checkable conditions for the refactor's completion. The verifier sources these instead of `SYSTEMS_PLAN.md § Acceptance Criteria` when invoked in pre-refactor mode.
+6. **`## Verifier Bypass Criteria`** — a fenced ` ```yaml ... ``` ` block; entries are objects with `id`, `description`, `check` (human-auditable string). Logical AND: all criteria must hold for the orchestrator to recommend bypass. Empty list means "no bypass — always run verifier".
+7. **`## Loop-Back Conditions`** — a fenced ` ```yaml ... ``` ` block; entries are objects with `id`, `description`, `check`. Logical OR: any condition true triggers loop-back-to-architect. Empty list means "no loop-back path; verifier always runs".
+8. **`## Resolved Tech Debt`** — populated at mini-pipeline completion by the orchestrator (or by the architect on re-entry); restates which `td-NNN` rows transitioned from `in-flight → resolved` with commit refs; becomes input to `scripts/finalize_tech_debt_ledger.py` at merge
+
+Sections 1–7 are populated when the architect writes the artifact; section 8 is populated later. Section 4 (`Affected td-NNN rows`) is implied as a table inside section 3 (Scope) or as its own subsection per the project's existing markdown taste — the sentinel PR01 check looks for the canonical anchor `## Affected td-NNN rows` to validate ledger cross-references.
+
+**Cross-reference (HOW vs WHEN/WHAT).** This phase decides WHEN a pre-refactor sub-pipeline fires and WHAT scope it covers; the HOW of refactoring (incremental, behavior-preserving, characterization-tests-first, post-restructuring re-wiring verification) lives in [`skills/refactoring/SKILL.md`](../skills/refactoring/SKILL.md). The planner reads `PRE_REFACTOR_PLAN.md § Steps` as input and tags steps with `[Phase: Refactoring]` so the refactoring skill's verification checklist flows in unchanged.
 
 ### Phase 3 — Architecture Design
 
@@ -181,7 +222,7 @@ Skip this phase entirely when no prior spec was identified in Phase 1 (greenfiel
 
 For every significant design decision, make the trade-offs explicit:
 
-**Tech-debt ledger awareness (permission, not obligation).** Read `.ai-state/TECH_DEBT_LEDGER.md`, filter by `owner-role = systems-architect` and `location` overlapping the design scope you are analyzing, and address items where natural to the current task by updating `status` (to `resolved` with `resolved-by`, or `in-flight`); leave out-of-scope items at `status = open` — do not delete. Non-action is a valid outcome. Schema and field constraints live in [rules/swe/agent-intermediate-documents.md](../rules/swe/agent-intermediate-documents.md) under `TECH_DEBT_LEDGER.md`.
+**Tech-debt ledger awareness (permission, not obligation).** Read `.ai-state/TECH_DEBT_LEDGER.md`, filter by `owner-role = systems-architect` and `location` overlapping the design scope you are analyzing, and address items where natural to the current task by updating `status` (to `resolved` with `resolved-by`, or `in-flight`); leave out-of-scope items at `status = open` — do not delete. Non-action is a valid outcome. Schema and field constraints live in [rules/swe/agent-intermediate-documents.md](../rules/swe/agent-intermediate-documents.md) under `TECH_DEBT_LEDGER.md`. **Coordination with Phase 2.5.** If you emitted `emit-PRE_REFACTOR_PLAN` in Phase 2.5, rows that overlap the refactor scope were already flipped `open → in-flight` at plan-write time per Phase 2.5's consumer-only protocol; in Phase 7 you do not re-flip them. Resolution (`in-flight → resolved`) lands later — by the orchestrator on verifier PASS / accepted bypass, or by the architect on re-entry in `post-refactor-adaptation` mode (mode-detection lives in Phase 1).
 
 **Continuous Improvement Signals (obligation when present).** When `RESEARCH_FINDINGS.md` includes a `## Continuous Improvement Signals` section, you **must** resolve every signal it carries. For each one, record an explicit disposition in `SYSTEMS_PLAN.md` (and, when load-bearing, in an ADR fragment under `.ai-state/decisions/drafts/`):
 
@@ -267,7 +308,18 @@ When approved:
 
 ### Phase 10 — Document Creation
 
-**Incremental writing:** Write the `SYSTEMS_PLAN.md` document structure (all section headers with `[pending]` markers for incomplete sections) at the start of Phase 1. Fill in Acceptance Criteria during Phase 1, Codebase Readiness during Phase 2, Architecture during Phase 3, Decisions during Phase 7, Risk Assessment during Phase 8, Stakeholder Review during Phase 9, and finalize in Phase 10. This ensures partial progress is visible even if the agent fails mid-execution, and allows the main agent to check partial results of a background agent.
+**Incremental writing:** Write the `SYSTEMS_PLAN.md` document structure (all section headers with `[pending]` markers for incomplete sections) at the start of Phase 1. Fill in Acceptance Criteria during Phase 1, Codebase Readiness during Phase 2, the Pre-Refactor Assessment outcome during Phase 2.5 (also writing `.ai-work/<task-slug>/PRE_REFACTOR_PLAN.md` when the outcome is `emit-PRE_REFACTOR_PLAN`), Architecture during Phase 3, Decisions during Phase 7, Risk Assessment during Phase 8, Stakeholder Review during Phase 9, and finalize in Phase 10. This ensures partial progress is visible even if the agent fails mid-execution, and allows the main agent to check partial results of a background agent.
+
+**Conditional outputs by phase outcome:**
+
+| Outcome | `SYSTEMS_PLAN.md` content | `PRE_REFACTOR_PLAN.md` |
+|---|---|---|
+| Phase 2.5 = `no-refactor` | Full document (all sections) | Not written |
+| Phase 2.5 = `fold-into-Prerequisites` | Full document; preparatory work in § Codebase Readiness § Prerequisites | Not written |
+| Phase 2.5 = `emit-PRE_REFACTOR_PLAN` | Full document; § Codebase Readiness § Pre-Refactor Assessment records outcome + rationale + `td-NNN` rows flipped | Written to `.ai-work/<task-slug>/PRE_REFACTOR_PLAN.md` with all 8 sections per the schema in Phase 2.5 |
+| Phase 2.5 = `rescope-and-restart` | Assessment outcome only (no Architecture, no Decisions, no Risk Assessment); one-line user-facing escalation | Not written |
+| Mode = `baseline-audit` | Not written (architect produces `.ai-state/DESIGN.md` + `docs/architecture.md` only) | Not written |
+| Mode = `post-refactor-adaptation` | Updated against refactored codebase (Components / Data Flow / Interfaces re-read); no new `## Pre-Refactor Assessment` (Phase 2.5 skipped) | Existing artifact receives `[CONSUMED]` marker line; not re-written |
 
 Write `SYSTEMS_PLAN.md`:
 

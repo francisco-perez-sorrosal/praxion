@@ -22,6 +22,18 @@ Load the `agent-crafting` skill before creating or modifying agent definitions. 
 
 Agents communicate through shared documents in `.ai-work/` (ephemeral) and `.ai-state/` (persistent). See the `swe-agent-coordination-protocol` rule for pipeline ordering and boundary discipline.
 
-## Onboarding Hook
+## Architect Invocation Modes
 
-The `systems-architect` agent runs in **baseline-audit mode** for `/onboard-project` Phase 8 — produces `.ai-state/DESIGN.md` + `docs/architecture.md` from a structural read of the existing codebase with no feature scope. Anti-instructions for that mode: no `SYSTEMS_PLAN.md`, no invented components (every Mermaid node + table row code-verified), no L2 detail, no source edits. The greenfield `/new-project` invokes the same agent with full feature scope (gate 4b of the seed pipeline) — baseline-audit is the existing-project counterpart that omits SYSTEMS_PLAN. When updating `agents/systems-architect.md`, preserve compatibility with both invocation modes.
+The `systems-architect` agent supports three invocation modes, signaled by an explicit `Mode: <name>` directive in the spawn prompt (no frontmatter, no marker file). Phase 1 (Input Assessment) detects the directive on intake and logs the mode to `PROGRESS.md`. When updating `agents/systems-architect.md`, preserve compatibility with all three modes.
+
+| Mode | Trigger | Phase 2.5 behavior | Output |
+|---|---|---|---|
+| `feature` (default — no directive needed) | Standard/Full pipeline with feature scope | Always runs | `SYSTEMS_PLAN.md` + optional `PRE_REFACTOR_PLAN.md` |
+| `baseline-audit` | `/onboard-project` Phase 8; `/new-project` greenfield invokes the same agent with full feature scope at gate 4b of the seed pipeline (baseline-audit is the existing-project counterpart) | SKIP (no feature → no pre-refactor) | `.ai-state/DESIGN.md` + `docs/architecture.md`; NO `SYSTEMS_PLAN.md`, NO `PRE_REFACTOR_PLAN.md` |
+| `post-refactor-adaptation` | Orchestrator re-invocation after a pre-refactor mini-pipeline completes AND a `PRE_REFACTOR_PLAN.md` exists under the task slug's `.ai-work/<task-slug>/` | SKIP (recursion guard — prevents a second mini-pipeline) | Updated `SYSTEMS_PLAN.md` (re-read Components / Data Flow / Interfaces against the refactored code); `[CONSUMED]` marker appended to the existing `PRE_REFACTOR_PLAN.md` |
+
+### Anti-instructions per mode
+
+**`baseline-audit`**: no `SYSTEMS_PLAN.md`, no `PRE_REFACTOR_PLAN.md`, no Phase 2.5, no invented components (every diagram node + table row must be code-verified), no L2 detail, no source edits.
+
+**`post-refactor-adaptation`**: no Phase 2.5 (one-pass recursion bound — same hard rule as baseline-audit mode), no second `PRE_REFACTOR_PLAN.md` for the same task slug, no spawning another mini-pipeline. The architect re-reads research findings + refactored codebase, re-runs Phase 1 + Phase 2, then proceeds through Phases 3–10 against the refactored shape; on completion, the orchestrator (or the architect) flips remaining `in-flight` tech-debt rows to `resolved` and emits the `[CONSUMED]` marker on the `PRE_REFACTOR_PLAN.md`.

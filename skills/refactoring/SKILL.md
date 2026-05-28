@@ -98,6 +98,15 @@ project/
 
 ## Refactoring Workflow
 
+### Entry Points
+
+Refactoring work reaches this skill via two complementary entry points; both produce the same `[Phase: Refactoring]`-tagged steps and follow the workflow below.
+
+- **Planner-driven** (the default). The implementation-planner tags individual plan steps `[Phase: Refactoring]` when a feature implementation requires restructuring as part of its delivery. The step's scope is the feature; the refactoring is opportunistic.
+- **Architect-driven** (`PRE_REFACTOR_PLAN.md` mini-pipeline). The systems-architect's Phase 2.5 (Pre-Refactor Assessment) may emit `.ai-work/<task-slug>/PRE_REFACTOR_PLAN.md` when the codebase needs targeted preparatory restructuring before a feature can land cleanly. The plan's `## Behavior Preservation Contract` is the canonical input for the test-engineer's characterization-tests-first step; the same `[Phase: Refactoring]` tag applies to subsequent implementation steps (no new tag is invented). See `agents/systems-architect.md` Phase 2.5 for the WHEN/WHAT.
+
+Either entry point delegates the HOW — the workflow, patterns, and verification checklist below — to this skill. The architect-driven path adds two contracts on top: (1) characterization tests come first, sourced from the architect's `## Behavior Preservation Contract`; (2) the mini-pipeline rejoins the parent flow through an orchestrator-mediated verifier-or-loopback decision, one-pass-bounded by the architect's `post-refactor-adaptation` mode.
+
 ### 1. Understand Current State
 
 - Read and understand the code

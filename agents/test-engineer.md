@@ -226,6 +226,18 @@ When the step involves refactoring existing tests (not writing new ones), apply 
 4. **After restructuring** — verify all consumers are reconnected: test runners, CI configs, import paths, fixture references. Search for old names and paths — anything still pointing to pre-refactoring locations is a bug.
 5. **Delete dead test code** — orphaned fixtures, unused helpers, stale conftest entries, compatibility shims
 
+## Pre-Refactor Mode
+
+**Trigger.** When `.ai-work/<task-slug>/PRE_REFACTOR_PLAN.md` is present in your task's work directory, the orchestrator has dispatched a pre-refactor mini-pipeline (the architect's Phase 2.5 emitted the artifact). Your assigned step in this mini-pipeline is the first non-trivial step of the planner's decomposition — a **characterization-tests-first** step that runs BEFORE any production code changes. The implementation-planner is contractually bound to sequence your step ahead of the implementer's first refactor step (no exceptions; this is the safety net for behavior preservation).
+
+**Input contract.** Read `PRE_REFACTOR_PLAN.md § Behavior Preservation Contract` — this is the architect-declared enumeration of behaviors that MUST be preserved across the refactor. Each behavior is the seed of at least one characterization test you write. Derive **≥1 test per declared behavior** before any structural changes land. The architect's contract is the source of truth — do not infer behaviors from the production code (it is about to be restructured), and do not skip behaviors that "seem obvious" (the planner reads your `traceability.yml`-equivalent coverage at the integration checkpoint; missing seeds will surface there).
+
+**File-disjointness contract preserved.** You write test files only, never production code. The implementer's restructuring steps that follow yours work on disjoint file sets per the standard parallel-step contract. If a characterization test you intend to write would require touching production code (e.g., introducing a test seam), report `[BLOCKED]` and surface the seam need — the implementer or architect resolves it before you continue. Do not add the seam yourself.
+
+**Characterization-test discipline** (per `skills/refactoring/SKILL.md` — "write characterization tests first" before restructuring untested code): tests pin observable behavior through the public API, not internal structure; assertions must catch real regressions, not coincidental shape preservation; if you cannot characterize a behavior because the surface is genuinely undefined, surface it in `LEARNINGS.md ### Testability Feedback` so the architect or implementer can refine the public contract before the refactor proceeds. Tests written here become the regression detector that every subsequent restructuring step in the mini-pipeline must pass.
+
+**Subsequent steps.** After your characterization-tests-first step, you pair with the implementer on each refactor step per the standard BDD/TDD execution rule (concurrent on disjoint file sets, integration checkpoint at the end). The acceptance criteria you validate are `PRE_REFACTOR_PLAN.md § Acceptance Criteria` (the verifier reads the same source when invoked in pre-refactor mode), not `SYSTEMS_PLAN.md § Acceptance Criteria`.
+
 ## Testability Feedback
 
 When you encounter production code that is difficult to test, document why in LEARNINGS.md:

@@ -49,7 +49,13 @@ Determine what you have to work with:
 2. **Check for `IMPLEMENTATION_PLAN.md` and `WIP.md`** -- extract the planned scope and completion status.
 3. **Check for `LEARNINGS.md`** -- note any implementation context or decisions made during development.
 4. **Determine mode** -- if pipeline documents exist, operate in pipeline mode (full report). If not, operate in standalone mode (convention compliance and test coverage only).
-5. **Determine scope** -- identify the files changed, commits in range, and components affected.
+5. **Detect pre-refactor sub-pipeline run.** The verifier operates in **pre-refactor mode** when:
+   - `.ai-work/<task-slug>/PRE_REFACTOR_PLAN.md` exists, AND
+   - `.ai-work/<task-slug>/SYSTEMS_PLAN.md` either does not exist OR carries a `[CONSUMED]` marker OR has no `## Acceptance Criteria` section sized for a feature (the architect has not yet re-entered in `post-refactor-adaptation` mode to update it against the refactored code)
+
+   **Dual-artifact disambiguation (load-bearing).** When BOTH `PRE_REFACTOR_PLAN.md` AND a feature-scope `SYSTEMS_PLAN.md` with `## Acceptance Criteria` are present, the architect has already re-entered and updated `SYSTEMS_PLAN.md` against the refactored code — **prefer the feature-scope `SYSTEMS_PLAN.md`**. In this state the verifier is reviewing the feature on top of the completed refactor; the refactor's own acceptance was verified earlier (or bypassed via the orchestrator's mechanical Bypass evaluation). Pre-refactor mode applies only while the refactor itself is the unit under review.
+
+6. **Determine scope** -- identify the files changed, commits in range, and components affected.
 
 If pipeline documents are missing, note that only convention compliance and test coverage can be assessed. For standalone reviews, users typically invoke the `code-review` skill directly rather than this agent.
 
@@ -64,7 +70,9 @@ If pipeline documents are missing, note that only convention compliance and test
 
 ### Phase 3 -- Acceptance Criteria Validation (pipeline mode only)
 
-For each acceptance criterion from `SYSTEMS_PLAN.md`:
+**Source of acceptance criteria depends on mode (see Phase 1 step 5).** In standard feature pipelines, source from `SYSTEMS_PLAN.md § Acceptance Criteria`. **In pre-refactor mode**, source from `PRE_REFACTOR_PLAN.md § Acceptance Criteria` — the refactor's own criteria, not the feature's. The remainder of Phase 3 proceeds identically regardless of source. Note: there is **no rework loop in pre-refactor mode** — when criteria fail, the loop-back is mediated by the orchestrator through the existing Conversation Checkpoint (per the `## Loop-Back Conditions` YAML the architect declared in `PRE_REFACTOR_PLAN.md`), not via `REWORK_MANIFEST.md`. Skip Phase 12.5 entirely when operating in pre-refactor mode regardless of FAIL/WARN count; the orchestrator's mechanical Bypass/Loop-Back evaluation is the routing primitive for this mode.
+
+For each acceptance criterion from the chosen source:
 
 1. Assess whether the criterion is met based on the implemented code
 2. Provide evidence: file paths, code references, test results

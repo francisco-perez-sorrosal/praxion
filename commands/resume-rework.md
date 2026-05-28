@@ -91,6 +91,8 @@ file for use in the dispatch step.
 
 ## Dispatch
 
+> **Scope.** Pre-refactor sub-pipelines (triggered when the architect's Phase 2.5 emits `PRE_REFACTOR_PLAN.md`) are NOT rework worktrees and do not flow through `/resume-rework`. They run in the same worktree as the parent task — the orchestrator dispatches them directly via the Conversation Checkpoint, not via a `VERIFIER_FINDINGS.md` artifact.
+
 The architect-always-first routing invariant applies to all rework worktrees:
 `systems-architect` is always the first agent dispatched, regardless of the
 findings file's `class` field (`architecture` or `implementation`).

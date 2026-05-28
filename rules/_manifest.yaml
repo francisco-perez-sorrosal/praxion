@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-05-27T00:49:42Z'
+generated_at: '2026-05-28T05:56:15Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
@@ -28,13 +28,13 @@ rules:
   load: always_on
   core: true
   install: symlink
-  chars: 11940
+  chars: 12580
 - id: swe/swe-agent-coordination-protocol
   path: rules/swe/swe-agent-coordination-protocol.md
   load: always_on
   core: true
   install: symlink
-  chars: 17978
+  chars: 19566
 - id: swe/memory-protocol
   path: rules/swe/memory-protocol.md
   load: always_on

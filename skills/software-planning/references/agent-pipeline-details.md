@@ -119,7 +119,7 @@ When running multiple Claude Code sessions concurrently on the same repository:
 - Worktree names are unique (derived from task slugs), so sessions never collide
 - `.ai-work/` is gitignored — each worktree has its own independent copy, no cross-session bleed
 - `.ai-state/` is committed per-branch — git merge reconciles at merge time (see [.ai-state/ Reconciliation](#ai-state-reconciliation-for-worktree-merges) below)
-- The `ccwt` script (`scripts/ccwt`) can launch tmux sessions with one pane per worktree for monitoring
+- The `praxion-parallel` script (`scripts/praxion-parallel`) can launch N parallel Claude Code sessions in Warp or iTerm2 — one tab per worktree — with per-tab color for visual separation. Use `--worktrees existing` to attach to the current worktree set without creating new ones.
 
 ### When Not to Isolate
 

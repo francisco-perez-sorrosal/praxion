@@ -170,7 +170,7 @@ done
 ACTUAL_LINKED="$(printf '%s' "$ACTUAL_LINKED" | tr ' ' '\n' | sort | grep -v '^$' | tr '\n' ' ' | sed 's/ $//')"
 
 # Positive contract: these MUST be present (canonical, stable user tools).
-EXPECTED_PRESENT="ccwt chronograph-ctl phoenix-ctl"
+EXPECTED_PRESENT="praxion-parallel chronograph-ctl phoenix-ctl"
 missing_present=""
 for tool in $EXPECTED_PRESENT; do
     case " $ACTUAL_LINKED " in

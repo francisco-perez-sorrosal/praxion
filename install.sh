@@ -345,7 +345,7 @@ EOF
     • Rules            (auto-loaded by Claude)
     • i-am plugin      (skills, commands, agents)
     • Chronograph hooks (agent lifecycle observability)
-    • CLI scripts       (ccwt — multi-worktree Claude sessions)
+    • CLI scripts       (praxion-parallel — multi-session terminal launcher)
     • context-hub MCP   (chub-mcp — native agent tool access)
 EOF
             ;;

@@ -1,0 +1,182 @@
+[
+  {
+    "name": "solo-work",
+    "description": "One session, fresh worktree — quickest path to a clean Claude instance on a side task.",
+    "terminal": "warp",
+    "worktrees": "new",
+    "yolo": false,
+    "no_color": false,
+    "base_ref": "head",
+    "layout": "tabs",
+    "sessions": [
+      {
+        "name": "solo",
+        "agent": "",
+        "task": "",
+        "system_prompt": "",
+        "claude_color": "blue"
+      }
+    ]
+  },
+  {
+    "name": "implement-and-test",
+    "description": "Two Praxion-pipeline sessions: @implementer + @test-engineer, sharing the same task slug via .ai-work/.",
+    "praxion_aware": true,
+    "terminal": "warp",
+    "worktrees": "new",
+    "yolo": false,
+    "no_color": false,
+    "base_ref": "head",
+    "layout": "tabs",
+    "sessions": [
+      {
+        "name": "implementer",
+        "agent": "implementer",
+        "task": "Read .ai-work/<slug>/WIP.md and execute the assigned step. Run tests after.",
+        "system_prompt": "",
+        "claude_color": "blue"
+      },
+      {
+        "name": "test-engineer",
+        "agent": "test-engineer",
+        "task": "Read .ai-work/<slug>/WIP.md and the implementer's planned scope. Author matching tests. Run after.",
+        "system_prompt": "",
+        "claude_color": "green"
+      }
+    ]
+  },
+  {
+    "name": "team-lead",
+    "description": "Praxion mini-pipeline fan-out: @researcher / @implementation-planner / @implementer / @verifier on one task slug.",
+    "praxion_aware": true,
+    "terminal": "warp",
+    "worktrees": "new",
+    "yolo": false,
+    "no_color": false,
+    "base_ref": "head",
+    "layout": "tabs",
+    "sessions": [
+      {
+        "name": "researcher",
+        "agent": "researcher",
+        "task": "Explore the codebase area named in CLAUDE.md / WIP.md; emit findings to .ai-work/<slug>/RESEARCH_FINDINGS.md.",
+        "system_prompt": "",
+        "claude_color": "cyan"
+      },
+      {
+        "name": "implementation-planner",
+        "agent": "implementation-planner",
+        "task": "After researcher commits findings, decompose into steps in .ai-work/<slug>/IMPLEMENTATION_PLAN.md.",
+        "system_prompt": "",
+        "claude_color": "magenta"
+      },
+      {
+        "name": "implementer",
+        "agent": "implementer",
+        "task": "Execute one step at a time from WIP.md. Tests must pass before advancing.",
+        "system_prompt": "",
+        "claude_color": "blue"
+      },
+      {
+        "name": "verifier",
+        "agent": "verifier",
+        "task": "After implementer reports done, run convention-compliance review + acceptance check; emit VERIFICATION_REPORT.md.",
+        "system_prompt": "",
+        "claude_color": "yellow"
+      }
+    ]
+  },
+  {
+    "name": "compare-implementations",
+    "description": "Three sessions, same task, different worktrees — explore alternative approaches in parallel.",
+    "terminal": "warp",
+    "worktrees": "new",
+    "yolo": false,
+    "no_color": false,
+    "base_ref": "head",
+    "layout": "tabs",
+    "sessions": [
+      {
+        "name": "approach-a",
+        "agent": "",
+        "task": "Implement the change using approach A (e.g., refactor + small surface).",
+        "system_prompt": "You are approach A. Bias toward minimal-surface refactor. Justify each line in the diff.",
+        "claude_color": "blue"
+      },
+      {
+        "name": "approach-b",
+        "agent": "",
+        "task": "Implement the change using approach B (e.g., new abstraction).",
+        "system_prompt": "You are approach B. Bias toward a clean new abstraction. Justify each new module.",
+        "claude_color": "magenta"
+      },
+      {
+        "name": "approach-c",
+        "agent": "",
+        "task": "Implement the change using approach C (e.g., extend existing without refactor).",
+        "system_prompt": "You are approach C. Bias toward minimum change to existing code. Justify each insertion site.",
+        "claude_color": "yellow"
+      }
+    ]
+  },
+  {
+    "name": "feature-fan-out",
+    "description": "Three parallel feature streams on distinct worktrees. Each session owns one named branch.",
+    "terminal": "warp",
+    "worktrees": "new",
+    "yolo": false,
+    "no_color": false,
+    "base_ref": "head",
+    "layout": "tabs",
+    "sessions": [
+      {
+        "name": "auth",
+        "agent": "",
+        "task": "Pick up the auth feature: read SYSTEMS_PLAN.md + WIP.md, execute the next step.",
+        "system_prompt": "",
+        "claude_color": "red"
+      },
+      {
+        "name": "billing",
+        "agent": "",
+        "task": "Pick up the billing feature: read SYSTEMS_PLAN.md + WIP.md, execute the next step.",
+        "system_prompt": "",
+        "claude_color": "green"
+      },
+      {
+        "name": "docs",
+        "agent": "",
+        "task": "Pick up the docs pass: read the README + CHANGELOG, surface what's stale.",
+        "system_prompt": "",
+        "claude_color": "cyan"
+      }
+    ]
+  },
+  {
+    "name": "overnight-autonomous",
+    "description": "@implementer primary + @sentinel watcher under auto-approve. Use only on isolated worktrees with no shared resources.",
+    "praxion_aware": true,
+    "terminal": "warp",
+    "worktrees": "new",
+    "yolo": true,
+    "no_color": false,
+    "base_ref": "head",
+    "layout": "tabs",
+    "sessions": [
+      {
+        "name": "implementer",
+        "agent": "implementer",
+        "task": "Pick up the long-running task from .ai-work/<slug>/WIP.md. Iterate until verifier passes. Stop and surface if uncertain.",
+        "system_prompt": "",
+        "claude_color": "magenta"
+      },
+      {
+        "name": "sentinel",
+        "agent": "sentinel",
+        "task": "Periodic ecosystem audit while the implementer runs. Read-only; surface drift to .ai-work/<slug>/LEARNINGS.md.",
+        "system_prompt": "",
+        "claude_color": "yellow"
+      }
+    ]
+  }
+]

@@ -1,0 +1,586 @@
+#!/usr/bin/env python3
+# praxion-parallel-ui — ephemeral localhost launcher for praxion-parallel
+#
+# Spawns a single-page web app on 127.0.0.1:<random-port>, opens the user's
+# browser at it, lets them compose a multi-session launch (project, terminal,
+# sessions, per-session task + system-prompt + claude /color), then exec's the
+# `praxion-parallel` bash script with the composed arguments.
+#
+# Server contract:
+#   - 127.0.0.1 bind only (never 0.0.0.0)
+#   - random ephemeral port (kernel-chosen)
+#   - 32-byte URL-safe token; every API request must echo it
+#   - server exits after first successful launch OR 10 min idle OR Ctrl-C
+#
+# Invoked by:
+#   praxion-parallel --ui [PROJECT]
+#
+# Standalone invocation also supported:
+#   praxion-parallel-ui [PROJECT]
+
+import argparse
+import json
+import os
+import secrets
+import subprocess
+import sys
+import threading
+import time
+import webbrowser
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any
+from urllib.parse import parse_qs, urlparse
+
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+
+SELF = Path(os.path.realpath(__file__))
+ASSETS_DIR = SELF.parent / "praxion_parallel_ui_assets"
+INDEX_HTML = ASSETS_DIR / "index.html"
+BUILTIN_RECIPES = ASSETS_DIR / "recipes-builtin.json"
+
+CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "praxion-parallel"
+USER_RECIPES = CONFIG_DIR / "recipes.json"
+
+PRAXION_PARALLEL = SELF.parent / "praxion-parallel"
+
+DEFAULT_DEV_DIR = Path(os.environ.get("PRAXION_DEV_DIR", Path.home() / "dev"))
+
+IDLE_TIMEOUT_SECONDS = 600  # 10 minutes
+
+# Fallback Praxion agent roster — used when filesystem discovery finds nothing.
+# Mirrors the agent set listed in agents/README.md; safe defaults for any
+# Praxion-managed project.
+PRAXION_AGENTS_FALLBACK = [
+    "researcher",
+    "systems-architect",
+    "implementation-planner",
+    "implementer",
+    "test-engineer",
+    "verifier",
+    "doc-engineer",
+    "sentinel",
+    "context-engineer",
+    "interface-designer",
+    "architect-validator",
+    "skill-genesis",
+    "roadmap-cartographer",
+    "cicd-engineer",
+    "promethean",
+]
+
+# Locations where Praxion agent definitions may live, in priority order.
+def praxion_agent_search_paths(project: str) -> list[Path]:
+    return [
+        Path(project) / "agents",                                 # working on Praxion itself
+        Path.home() / ".claude" / "plugins" / "cache" / "i-am" / "agents",  # marketplace install
+        Path.home() / "dev" / "praxion" / "agents",               # dev install
+    ]
+
+# ---------------------------------------------------------------------------
+# Recipe management
+# ---------------------------------------------------------------------------
+
+def load_recipes(project: str = "") -> list[dict[str, Any]]:
+    """Return merged recipe list. Override order: builtin < user < project.
+
+    `project` is an absolute project path. When provided, `<project>/.praxion/recipes.json`
+    is layered on top, letting a team commit project-specific role descriptions
+    (e.g. a "team-lead" recipe with company-specific tasks) into the repo.
+    """
+    out: dict[str, dict[str, Any]] = {}
+    if BUILTIN_RECIPES.exists():
+        for r in json.loads(BUILTIN_RECIPES.read_text()):
+            out[r["name"]] = {**r, "_origin": "builtin"}
+    if USER_RECIPES.exists():
+        for r in json.loads(USER_RECIPES.read_text()):
+            out[r["name"]] = {**r, "_origin": "user"}
+    if project:
+        proj_recipes = Path(project) / ".praxion" / "recipes.json"
+        if proj_recipes.exists():
+            try:
+                for r in json.loads(proj_recipes.read_text()):
+                    out[r["name"]] = {**r, "_origin": "project"}
+            except (json.JSONDecodeError, OSError):
+                # Malformed project recipes — silently skip; never block launch.
+                pass
+    return list(out.values())
+
+
+def save_user_recipe(recipe: dict[str, Any]) -> None:
+    """Persist a recipe to the user store. Replaces any existing same-named recipe."""
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    existing: list[dict[str, Any]] = []
+    if USER_RECIPES.exists():
+        existing = json.loads(USER_RECIPES.read_text())
+    existing = [r for r in existing if r.get("name") != recipe["name"]]
+    # Strip transient fields and ensure required keys
+    clean = {k: v for k, v in recipe.items() if not k.startswith("_")}
+    existing.append(clean)
+    USER_RECIPES.write_text(json.dumps(existing, indent=2))
+
+
+def delete_user_recipe(name: str) -> bool:
+    if not USER_RECIPES.exists():
+        return False
+    existing = json.loads(USER_RECIPES.read_text())
+    new = [r for r in existing if r.get("name") != name]
+    if len(new) == len(existing):
+        return False
+    USER_RECIPES.write_text(json.dumps(new, indent=2))
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Project + worktree discovery
+# ---------------------------------------------------------------------------
+
+def discover_projects() -> list[str]:
+    """List candidate project paths from $PRAXION_DEV_DIR (depth 1, must be git repos)."""
+    if not DEFAULT_DEV_DIR.is_dir():
+        return []
+    out: list[str] = []
+    for child in sorted(DEFAULT_DEV_DIR.iterdir()):
+        if not child.is_dir():
+            continue
+        if (child / ".git").exists():
+            out.append(str(child))
+    return out
+
+
+def is_praxion_project(project: str) -> bool:
+    """A project is Praxion-managed when it has a committed `.ai-state/` directory.
+
+    `.ai-state/` is the canonical signal: the directory is created by
+    `/onboard-project` or `/new-project` and tracked in git. Its presence
+    means the agent pipeline, behavioral contract, and ADR conventions are
+    all in force for that project.
+    """
+    if not project:
+        return False
+    return (Path(project) / ".ai-state").is_dir()
+
+
+def discover_praxion_agents(project: str) -> list[str]:
+    """Return the list of available Praxion agent names for a project.
+
+    Scans candidate filesystem locations (project-local, marketplace cache,
+    dev install) for `agents/*.md` and returns names without extension. Falls
+    back to the hardcoded list when nothing is found, so the dropdown always
+    has something useful even on a fresh checkout.
+    """
+    found: set[str] = set()
+    for path in praxion_agent_search_paths(project):
+        if not path.is_dir():
+            continue
+        for md in path.glob("*.md"):
+            stem = md.stem
+            if stem in {"README", "CLAUDE"}:
+                continue
+            found.add(stem)
+        if found:
+            break  # first hit wins (project > marketplace > dev)
+    return sorted(found) if found else list(PRAXION_AGENTS_FALLBACK)
+
+
+def derive_system_prompt_from_agent(agent: str) -> str:
+    """Template a per-session system prompt from a Praxion agent identity.
+
+    Kept short and stable: the heavy lifting is the agent's own definition,
+    which Claude Code already has loaded via the plugin. This prompt just
+    signals which agent role the session should play.
+    """
+    return (
+        f"Operate as the Praxion @{agent} agent for this session. "
+        f"Honor the agent's contract from agents/{agent}.md, including its "
+        f"tool-permission scope, output format, and pipeline boundaries. "
+        f"Apply the four behavioral-contract behaviors throughout."
+    )
+
+
+def list_worktrees(project: str) -> list[dict[str, str]]:
+    """Return a list of {path, branch} dicts for git worktrees in `project`."""
+    if not (Path(project) / ".git").exists():
+        return []
+    try:
+        raw = subprocess.check_output(
+            ["git", "-C", project, "worktree", "list", "--porcelain"],
+            text=True,
+            timeout=5,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return []
+    wts: list[dict[str, str]] = []
+    cur: dict[str, str] = {}
+    for line in raw.splitlines():
+        if line.startswith("worktree "):
+            if cur:
+                wts.append(cur)
+            cur = {"path": line[len("worktree "):]}
+        elif line.startswith("branch "):
+            cur["branch"] = line[len("branch refs/heads/"):]
+    if cur:
+        wts.append(cur)
+    return wts
+
+
+# ---------------------------------------------------------------------------
+# Arg composition: dict -> praxion-parallel CLI args
+# ---------------------------------------------------------------------------
+
+def compose_args(state: dict[str, Any]) -> list[str]:
+    """Compose a praxion-parallel argv list from a launcher state dict."""
+    args: list[str] = [str(PRAXION_PARALLEL)]
+    project = state.get("project", "").strip()
+    if project:
+        args.append(project)
+    args += ["--terminal", state.get("terminal", "warp")]
+    args += ["--worktrees", state.get("worktrees", "new")]
+    args += ["--layout", state.get("layout", "tabs")]
+
+    if state.get("yolo"):
+        args.append("--yolo")
+    if state.get("no_color"):
+        args.append("--no-color")
+    if state.get("base_ref"):
+        args += ["--base-ref", state["base_ref"]]
+
+    sessions = state.get("sessions") or []
+    if sessions:
+        # Auto-derive a worktree name from the agent if the user didn't set one.
+        # This is the ergonomic backbone of Praxion-aware mode: pick "implementer"
+        # from the agent dropdown, and `--worktree implementer` is composed for free.
+        for s in sessions:
+            if not s.get("name", "").strip() and s.get("agent", "").strip():
+                s["name"] = s["agent"].strip()
+
+        names = [s.get("name", "").strip() for s in sessions if s.get("name", "").strip()]
+        tasks = [s.get("task", "") for s in sessions]
+        if names:
+            args += ["--names", ",".join(names)]
+        # Only emit --tasks if at least one task is non-empty
+        if any(t for t in tasks):
+            args += ["--tasks", "|".join(tasks)]
+
+        # System prompt resolution per session:
+        #   1. Explicit system_prompt wins (advanced override).
+        #   2. Otherwise derive from the agent identity if present.
+        #   3. Otherwise empty.
+        prompts: list[str] = []
+        for s in sessions:
+            explicit = s.get("system_prompt", "").strip()
+            if explicit:
+                prompts.append(explicit)
+            elif s.get("agent", "").strip():
+                prompts.append(derive_system_prompt_from_agent(s["agent"].strip()))
+            else:
+                prompts.append("")
+        if any(p for p in prompts):
+            args += ["--append-system-prompts", "|".join(prompts)]
+    else:
+        n = int(state.get("count", 2))
+        args += ["--count", str(max(1, min(6, n)))]
+
+    return args
+
+
+# ---------------------------------------------------------------------------
+# Subprocess execution
+# ---------------------------------------------------------------------------
+
+def run_subprocess(args: list[str], timeout: int = 30) -> tuple[int, str, str]:
+    try:
+        proc = subprocess.run(
+            args, capture_output=True, text=True, timeout=timeout
+        )
+        return proc.returncode, proc.stdout, proc.stderr
+    except subprocess.TimeoutExpired as e:
+        return 124, e.stdout or "", (e.stderr or "") + f"\n[timeout after {timeout}s]"
+
+
+# ---------------------------------------------------------------------------
+# HTTP handler
+# ---------------------------------------------------------------------------
+
+class LauncherServer(ThreadingHTTPServer):
+    def __init__(self, addr, handler, token: str, initial_project: str):
+        super().__init__(addr, handler)
+        self.token = token
+        self.initial_project = initial_project
+        self.last_activity = time.time()
+        self.should_exit = False
+
+
+class LauncherHandler(BaseHTTPRequestHandler):
+    server: LauncherServer  # type: ignore[assignment]
+
+    # Suppress default access log spam — we have our own log lines elsewhere.
+    def log_message(self, fmt: str, *args: Any) -> None:
+        return
+
+    # ---- helpers ----
+
+    def _bump_activity(self) -> None:
+        self.server.last_activity = time.time()
+
+    def _check_token(self) -> bool:
+        url = urlparse(self.path)
+        query = parse_qs(url.query)
+        token = query.get("t", [None])[0]
+        if token != self.server.token:
+            return False
+        return True
+
+    def _send_json(self, status: int, payload: dict[str, Any]) -> None:
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        # No caching of any API result.
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_text(self, status: int, body: str, content_type: str) -> None:
+        data = body.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", content_type + "; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _read_json_body(self) -> dict[str, Any]:
+        length = int(self.headers.get("Content-Length", "0"))
+        raw = self.rfile.read(length) if length > 0 else b"{}"
+        return json.loads(raw.decode("utf-8") or "{}")
+
+    # ---- routes ----
+
+    def do_GET(self) -> None:  # noqa: N802 (BaseHTTPRequestHandler API)
+        self._bump_activity()
+        url = urlparse(self.path)
+
+        # Static index (token check via query — friendly UX, not security-critical
+        # since loopback-only + ephemeral)
+        if url.path in ("/", "/index.html"):
+            if not self._check_token():
+                self._send_text(HTTPStatus.UNAUTHORIZED, "invalid token", "text/plain")
+                return
+            if not INDEX_HTML.exists():
+                self._send_text(
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                    f"index.html missing at {INDEX_HTML}",
+                    "text/plain",
+                )
+                return
+            self._send_text(HTTPStatus.OK, INDEX_HTML.read_text(), "text/html")
+            return
+
+        # All /api routes require the token.
+        if url.path.startswith("/api/"):
+            if not self._check_token():
+                self._send_json(HTTPStatus.UNAUTHORIZED, {"error": "invalid token"})
+                return
+
+            if url.path == "/api/state":
+                proj = self.server.initial_project
+                self._send_json(
+                    HTTPStatus.OK,
+                    {
+                        "project": proj,
+                        "projects": discover_projects(),
+                        "recipes": load_recipes(proj),
+                        "praxion_aware": is_praxion_project(proj),
+                        "agents": discover_praxion_agents(proj),
+                    },
+                )
+                return
+
+            if url.path == "/api/worktrees":
+                qs = parse_qs(url.query)
+                project = qs.get("project", [self.server.initial_project])[0]
+                self._send_json(HTTPStatus.OK, {"worktrees": list_worktrees(project)})
+                return
+
+            if url.path == "/api/recipes":
+                # Re-load recipes for an arbitrary project so the UI can refresh
+                # when the user picks a different project mid-session. Also
+                # returns the praxion-aware flag and agents list for that
+                # project, since switching projects can flip the mode.
+                qs = parse_qs(url.query)
+                project = qs.get("project", [self.server.initial_project])[0]
+                self._send_json(
+                    HTTPStatus.OK,
+                    {
+                        "recipes": load_recipes(project),
+                        "praxion_aware": is_praxion_project(project),
+                        "agents": discover_praxion_agents(project),
+                    },
+                )
+                return
+
+        self._send_text(HTTPStatus.NOT_FOUND, "not found", "text/plain")
+
+    def do_POST(self) -> None:  # noqa: N802
+        self._bump_activity()
+        url = urlparse(self.path)
+
+        if not self._check_token():
+            self._send_json(HTTPStatus.UNAUTHORIZED, {"error": "invalid token"})
+            return
+
+        try:
+            body = self._read_json_body()
+        except json.JSONDecodeError:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "invalid JSON"})
+            return
+
+        if url.path == "/api/dry-run":
+            args = compose_args(body) + ["--dry-run"]
+            code, out, err = run_subprocess(args, timeout=15)
+            self._send_json(
+                HTTPStatus.OK,
+                {"exit_code": code, "stdout": out, "stderr": err, "argv": args},
+            )
+            return
+
+        if url.path == "/api/launch":
+            args = compose_args(body)
+            code, out, err = run_subprocess(args, timeout=30)
+            self._send_json(
+                HTTPStatus.OK,
+                {"exit_code": code, "stdout": out, "stderr": err, "argv": args},
+            )
+            # Schedule a graceful shutdown so subsequent launches require a fresh UI.
+            if code == 0:
+                threading.Thread(
+                    target=self._delayed_shutdown, daemon=True
+                ).start()
+            return
+
+        if url.path == "/api/recipes":
+            recipe = body.get("recipe") or {}
+            if not recipe.get("name"):
+                self._send_json(
+                    HTTPStatus.BAD_REQUEST, {"error": "recipe.name required"}
+                )
+                return
+            save_user_recipe(recipe)
+            self._send_json(
+                HTTPStatus.OK,
+                {
+                    "saved": recipe["name"],
+                    "recipes": load_recipes(self.server.initial_project),
+                },
+            )
+            return
+
+        if url.path == "/api/recipes/delete":
+            name = body.get("name", "")
+            if not name:
+                self._send_json(HTTPStatus.BAD_REQUEST, {"error": "name required"})
+                return
+            ok = delete_user_recipe(name)
+            self._send_json(
+                HTTPStatus.OK,
+                {
+                    "deleted": ok,
+                    "name": name,
+                    "recipes": load_recipes(self.server.initial_project),
+                },
+            )
+            return
+
+        self._send_text(HTTPStatus.NOT_FOUND, "not found", "text/plain")
+
+    def _delayed_shutdown(self) -> None:
+        time.sleep(1.5)
+        self.server.should_exit = True
+        self.server.shutdown()
+
+
+# ---------------------------------------------------------------------------
+# Entry
+# ---------------------------------------------------------------------------
+
+def idle_watchdog(server: LauncherServer) -> None:
+    while not server.should_exit:
+        time.sleep(15)
+        if time.time() - server.last_activity > IDLE_TIMEOUT_SECONDS:
+            print(
+                f"praxion-parallel-ui: idle for {IDLE_TIMEOUT_SECONDS}s, shutting down",
+                file=sys.stderr,
+            )
+            server.should_exit = True
+            server.shutdown()
+            return
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="praxion-parallel-ui",
+        description="Ephemeral localhost launcher for praxion-parallel.",
+    )
+    parser.add_argument(
+        "project",
+        nargs="?",
+        default=os.getcwd(),
+        help="Initial project directory (default: cwd).",
+    )
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Skip auto-open of the system browser.",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=0,
+        help="Bind port (default: kernel-chosen ephemeral).",
+    )
+    args = parser.parse_args(argv)
+
+    if not ASSETS_DIR.is_dir():
+        print(
+            f"praxion-parallel-ui: assets dir missing at {ASSETS_DIR}",
+            file=sys.stderr,
+        )
+        return 2
+
+    token = secrets.token_urlsafe(32)
+    server = LauncherServer(
+        ("127.0.0.1", args.port),
+        LauncherHandler,
+        token=token,
+        initial_project=os.path.abspath(args.project),
+    )
+    host, port = server.server_address
+    url = f"http://{host}:{port}/?t={token}"
+
+    print(f"praxion-parallel-ui: serving on {host}:{port}", flush=True)
+    print(f"praxion-parallel-ui: {url}", flush=True)
+    print(
+        f"praxion-parallel-ui: idle timeout {IDLE_TIMEOUT_SECONDS}s; ^C to stop",
+        flush=True,
+    )
+
+    threading.Thread(target=idle_watchdog, args=(server,), daemon=True).start()
+
+    if not args.no_browser:
+        webbrowser.open(url)
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\npraxion-parallel-ui: stopped", file=sys.stderr)
+    finally:
+        server.server_close()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

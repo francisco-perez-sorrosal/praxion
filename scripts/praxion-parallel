@@ -1,0 +1,653 @@
+#!/usr/bin/env bash
+# praxion-parallel — launch N parallel Claude Code sessions across worktrees
+#
+# Opens N labeled, colored, isolated Claude Code sessions in either Warp
+# (native Launch Configuration) or iTerm2 (AppleScript). Each session runs
+# `claude --worktree <name>`, so Claude Code itself owns worktree creation
+# and cleanup. This script does not call `git worktree add`.
+#
+# Usage:
+#   praxion-parallel [PROJECT] [OPTIONS]
+#   praxion-parallel --help
+#
+# Why exists:
+#   - `scripts/ccwt` (deprecated, removed) was tmux-only and limited to
+#     existing worktrees. Multi-session work on a modern macOS dev box
+#     wants the native terminal (Warp tabs / iTerm2 tabs), per-tab color
+#     for cognitive separation, and on-demand worktree creation.
+#   - `scripts/dispatch-reworks` is the *verifier-loop* dispatcher. It
+#     parses REWORK_MANIFEST.md and is wired into hooks/notifications.
+#     This script is its generic peer for non-rework parallel work.
+
+set -eo pipefail
+
+# ----------------------------------------------------------------------------
+# Constants
+# ----------------------------------------------------------------------------
+
+readonly SELF_NAME="praxion-parallel"
+readonly MAX_SESSIONS=6
+readonly DEFAULT_SESSIONS=2
+readonly DEV_DIR="${PRAXION_DEV_DIR:-$HOME/dev}"
+readonly WARP_LC_DIR="${HOME}/.warp/launch_configurations"
+
+# Warp supports these ANSI tab colors (verified against docs.warp.dev).
+readonly WARP_COLORS=(red green yellow blue magenta cyan)
+
+# iTerm2 OSC 6 tab color uses RGB; values chosen to roughly match the
+# Warp palette for cross-backend visual parity.
+readonly ITERM_RGB=(
+    "200;30;30"     # red
+    "30;180;60"     # green
+    "210;180;30"    # yellow
+    "40;100;220"    # blue
+    "180;60;200"    # magenta
+    "30;180;200"    # cyan
+)
+
+# Exit codes
+readonly EXIT_OK=0
+readonly EXIT_USAGE=2
+readonly EXIT_PROJECT=3
+readonly EXIT_TERMINAL=4
+readonly EXIT_SPAWN=5
+
+# ----------------------------------------------------------------------------
+# Output helpers
+# ----------------------------------------------------------------------------
+
+if [ -t 1 ]; then
+    B=$'\033[1m'; D=$'\033[2m'; Y=$'\033[33m'; R=$'\033[0m'
+else
+    B=''; D=''; Y=''; R=''
+fi
+
+die() { printf "%s: %s\n" "$SELF_NAME" "$*" >&2; exit "${EXIT_CODE:-1}"; }
+info() { printf "  %s\n" "$*"; }
+warn() { printf "  ${Y}⚠ %s${R}\n" "$*" >&2; }
+step() { printf "    %s\n" "$*"; }
+
+show_usage() {
+    cat <<EOF
+${B}Usage:${R} $SELF_NAME [PROJECT] [OPTIONS]
+       $SELF_NAME --help
+
+Launch N parallel Claude Code sessions in Warp or iTerm2, each in its own
+git worktree (via \`claude --worktree\`), each visually distinguished by
+tab color and title.
+
+${B}ARGUMENT${R}
+  PROJECT                  Project directory. One of:
+                             - absolute path (/path/to/proj)
+                             - relative-with-slash (./proj)
+                             - bare name (proj) → \$PRAXION_DEV_DIR/proj
+                                                  (default \$HOME/dev/proj)
+                           Default: current working directory.
+
+${B}OPTIONS${R}
+  -n, --count N            Number of sessions to launch.
+                           Default ${DEFAULT_SESSIONS}, max ${MAX_SESSIONS}.
+  -t, --terminal T         warp (default) | iterm2
+  -y, --yolo               Pass --dangerously-skip-permissions to each
+                           session. Loud warning printed.
+  -w, --worktrees MODE     new (default) | existing | none
+                             - new: \`claude --worktree s1\` ... \`sN\` (or
+                                    names from --names); Claude Code creates
+                                    each worktree under .claude/worktrees/
+                             - existing: discover via git worktree list,
+                                    one session per existing worktree
+                             - none: all sessions in project root (no
+                                    isolation; warning printed)
+      --names a,b,c        Explicit worktree names (overrides --count).
+      --base-ref REF       fresh (default) | head — applied via the worktree
+                           settings overlay (see docs/worktree-baseref-default).
+      --tasks "T1|T2|..."  Per-session initial prompts; pipe-separated; one
+                           pre-typed in each session (user presses Enter).
+      --append-system-prompts "P1|P2|..."
+                           Per-session --append-system-prompt; pipe-separated.
+                           Pair with --tasks for recipe-style role assignments.
+      --ui [PROJECT]       Launch the ephemeral web launcher instead of
+                           spawning directly. Submits compose into this script.
+      --layout LAYOUT      tabs (default) | windows
+      --no-color           Skip per-tab color theming.
+      --dry-run            Print the spawn plan; do not launch.
+      --list               List existing worktrees in PROJECT and exit.
+  -h, --help               Show this help.
+
+${B}EXAMPLES${R}
+  # 3 sessions in 3 fresh worktrees in the current project, Warp, auto-approve
+  $SELF_NAME -n 3 -y
+
+  # iTerm2, named worktrees, per-session task instructions
+  $SELF_NAME -t iterm2 \\
+      --names auth,billing,docs \\
+      --tasks "implement OAuth|fix billing race|update README"
+
+  # Attach to all existing worktrees of \$HOME/dev/foo
+  $SELF_NAME foo --worktrees existing
+
+  # Preview before launching
+  $SELF_NAME -n 4 --dry-run
+
+${B}NOTES${R}
+  - Each session uses \`claude --worktree <name>\`. Claude Code creates and
+    cleans up the worktree. .worktreeinclude in the project root copies
+    .env-style files into each worktree automatically.
+  - 2-3 sessions is the practical ceiling for most people; --count caps at
+    ${MAX_SESSIONS}.
+  - Warp launch configs are written to ${WARP_LC_DIR/$HOME/~}/
+    and removed after launch unless an error prevents it.
+
+EOF
+    exit "$EXIT_OK"
+}
+
+# ----------------------------------------------------------------------------
+# Argument parsing
+# ----------------------------------------------------------------------------
+
+PROJECT_ARG=""
+COUNT=""
+TERMINAL="warp"
+YOLO=false
+WORKTREES="new"
+NAMES_CSV=""
+BASE_REF=""
+TASKS_PIPED=""
+SYSPROMPTS_PIPED=""
+LAYOUT="tabs"
+USE_UI=false
+NO_COLOR=false
+DRY_RUN=false
+LIST_ONLY=false
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help) show_usage ;;
+        -n|--count)
+            [ -z "${2:-}" ] && { EXIT_CODE=$EXIT_USAGE die "--count needs a value"; }
+            COUNT="$2"; shift ;;
+        --count=*) COUNT="${1#--count=}" ;;
+        -t|--terminal)
+            [ -z "${2:-}" ] && { EXIT_CODE=$EXIT_USAGE die "--terminal needs a value"; }
+            TERMINAL="$2"; shift ;;
+        --terminal=*) TERMINAL="${1#--terminal=}" ;;
+        -y|--yolo) YOLO=true ;;
+        -w|--worktrees)
+            [ -z "${2:-}" ] && { EXIT_CODE=$EXIT_USAGE die "--worktrees needs a value"; }
+            WORKTREES="$2"; shift ;;
+        --worktrees=*) WORKTREES="${1#--worktrees=}" ;;
+        --names)
+            [ -z "${2:-}" ] && { EXIT_CODE=$EXIT_USAGE die "--names needs a value"; }
+            NAMES_CSV="$2"; shift ;;
+        --names=*) NAMES_CSV="${1#--names=}" ;;
+        --base-ref)
+            [ -z "${2:-}" ] && { EXIT_CODE=$EXIT_USAGE die "--base-ref needs a value"; }
+            BASE_REF="$2"; shift ;;
+        --base-ref=*) BASE_REF="${1#--base-ref=}" ;;
+        --tasks)
+            [ -z "${2:-}" ] && { EXIT_CODE=$EXIT_USAGE die "--tasks needs a value"; }
+            TASKS_PIPED="$2"; shift ;;
+        --tasks=*) TASKS_PIPED="${1#--tasks=}" ;;
+        --append-system-prompts)
+            [ -z "${2:-}" ] && { EXIT_CODE=$EXIT_USAGE die "--append-system-prompts needs a value"; }
+            SYSPROMPTS_PIPED="$2"; shift ;;
+        --append-system-prompts=*) SYSPROMPTS_PIPED="${1#--append-system-prompts=}" ;;
+        --ui) USE_UI=true ;;
+        --layout)
+            [ -z "${2:-}" ] && { EXIT_CODE=$EXIT_USAGE die "--layout needs a value"; }
+            LAYOUT="$2"; shift ;;
+        --layout=*) LAYOUT="${1#--layout=}" ;;
+        --no-color) NO_COLOR=true ;;
+        --dry-run) DRY_RUN=true ;;
+        --list) LIST_ONLY=true ;;
+        --) shift; break ;;
+        -*) EXIT_CODE=$EXIT_USAGE die "unknown option: $1 (try --help)" ;;
+        *)
+            [ -n "$PROJECT_ARG" ] && { EXIT_CODE=$EXIT_USAGE die "extra arg: $1"; }
+            PROJECT_ARG="$1" ;;
+    esac
+    shift
+done
+
+# Validate enum-shaped options
+case "$TERMINAL" in
+    warp|iterm2) ;;
+    *) EXIT_CODE=$EXIT_USAGE die "--terminal must be warp or iterm2 (got: $TERMINAL)" ;;
+esac
+case "$WORKTREES" in
+    new|existing|none) ;;
+    *) EXIT_CODE=$EXIT_USAGE die "--worktrees must be new|existing|none (got: $WORKTREES)" ;;
+esac
+case "$LAYOUT" in
+    tabs|windows) ;;
+    *) EXIT_CODE=$EXIT_USAGE die "--layout must be tabs or windows (got: $LAYOUT)" ;;
+esac
+if [ -n "$BASE_REF" ]; then
+    case "$BASE_REF" in
+        fresh|head) ;;
+        *) EXIT_CODE=$EXIT_USAGE die "--base-ref must be fresh or head (got: $BASE_REF)" ;;
+    esac
+fi
+
+# ----------------------------------------------------------------------------
+# --ui mode: hand off to the web launcher and exit
+# ----------------------------------------------------------------------------
+
+if "$USE_UI"; then
+    SELF_REAL="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$0")"
+    UI_LAUNCHER="$(dirname "$SELF_REAL")/praxion-parallel-ui"
+    [ -x "$UI_LAUNCHER" ] || { EXIT_CODE=$EXIT_USAGE die "ui launcher missing or not executable at $UI_LAUNCHER"; }
+    if [ -n "$PROJECT_ARG" ]; then
+        exec "$UI_LAUNCHER" "$PROJECT_ARG"
+    else
+        exec "$UI_LAUNCHER"
+    fi
+fi
+
+# ----------------------------------------------------------------------------
+# Resolve the project directory
+# ----------------------------------------------------------------------------
+
+resolve_project() {
+    local raw="${1:-$PWD}"
+    local resolved
+    if [[ "$raw" = /* ]]; then
+        resolved="$raw"
+    elif [[ "$raw" == *"/"* ]]; then
+        resolved="$(cd "$raw" 2>/dev/null && pwd -P)" || resolved=""
+    else
+        # Bare name → $PRAXION_DEV_DIR/<name>, with $PWD fallback
+        if [ -d "${DEV_DIR}/${raw}" ]; then
+            resolved="${DEV_DIR}/${raw}"
+        else
+            resolved="$(cd "$raw" 2>/dev/null && pwd -P)" || resolved=""
+        fi
+    fi
+    [ -z "$resolved" ] && { EXIT_CODE=$EXIT_PROJECT die "cannot resolve project: $raw"; }
+    [ -d "$resolved" ] || { EXIT_CODE=$EXIT_PROJECT die "not a directory: $resolved"; }
+    if ! git -C "$resolved" rev-parse --show-toplevel &>/dev/null; then
+        EXIT_CODE=$EXIT_PROJECT die "not a git repository: $resolved"
+    fi
+    git -C "$resolved" rev-parse --show-toplevel
+}
+
+PROJECT_DIR="$(resolve_project "$PROJECT_ARG")"
+PROJECT_NAME="$(basename "$PROJECT_DIR")"
+
+# ----------------------------------------------------------------------------
+# --list mode
+# ----------------------------------------------------------------------------
+
+if "$LIST_ONLY"; then
+    printf "${B}%s${R} worktrees:\n" "$PROJECT_NAME"
+    git -C "$PROJECT_DIR" worktree list | sed 's/^/  /'
+    exit "$EXIT_OK"
+fi
+
+# ----------------------------------------------------------------------------
+# Build the session list (name + cwd + initial-prompt per session)
+# ----------------------------------------------------------------------------
+
+# Names: explicit --names wins; else synthetic s1..sN; else discovery for `existing`.
+NAMES=()
+if [ -n "$NAMES_CSV" ]; then
+    IFS=',' read -r -a NAMES <<< "$NAMES_CSV"
+    # Sanitize: kebab-case, [a-z0-9-] only
+    for i in "${!NAMES[@]}"; do
+        clean="$(printf "%s" "${NAMES[$i]}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g; s/--*/-/g; s/^-//; s/-$//')"
+        [ -z "$clean" ] && { EXIT_CODE=$EXIT_USAGE die "empty name after sanitize at index $i"; }
+        NAMES[$i]="$clean"
+    done
+    COUNT="${#NAMES[@]}"
+fi
+
+# Default COUNT
+COUNT="${COUNT:-$DEFAULT_SESSIONS}"
+if ! [[ "$COUNT" =~ ^[0-9]+$ ]] || [ "$COUNT" -lt 1 ] || [ "$COUNT" -gt "$MAX_SESSIONS" ]; then
+    EXIT_CODE=$EXIT_USAGE die "--count must be 1..${MAX_SESSIONS} (got: $COUNT)"
+fi
+
+# Build NAMES + CWDS arrays based on worktree mode
+CWDS=()
+case "$WORKTREES" in
+    new)
+        # Synthetic names if --names not provided
+        if [ ${#NAMES[@]} -eq 0 ]; then
+            for ((i = 1; i <= COUNT; i++)); do
+                NAMES+=("s${i}")
+            done
+        fi
+        # In `new` mode, each session's cwd is the project root; claude --worktree
+        # handles the cd into the freshly-created worktree.
+        for ((i = 0; i < COUNT; i++)); do
+            CWDS+=("$PROJECT_DIR")
+        done
+        ;;
+    existing)
+        # Discover via porcelain; first entry is the main worktree (skip).
+        mapfile -t ALL_WT < <(git -C "$PROJECT_DIR" worktree list --porcelain | awk '/^worktree / {print $2}')
+        # Drop the main worktree (which equals $PROJECT_DIR)
+        AVAILABLE=()
+        for wt in "${ALL_WT[@]}"; do
+            [ "$wt" = "$PROJECT_DIR" ] && continue
+            AVAILABLE+=("$wt")
+        done
+        if [ ${#AVAILABLE[@]} -eq 0 ]; then
+            EXIT_CODE=$EXIT_PROJECT die "no non-main worktrees in $PROJECT_NAME (try --worktrees new)"
+        fi
+        # Cap COUNT at available
+        if [ "$COUNT" -gt "${#AVAILABLE[@]}" ]; then
+            warn "only ${#AVAILABLE[@]} existing worktrees; reducing --count from $COUNT to ${#AVAILABLE[@]}"
+            COUNT="${#AVAILABLE[@]}"
+        fi
+        NAMES=()
+        for ((i = 0; i < COUNT; i++)); do
+            NAMES+=("$(basename "${AVAILABLE[$i]}")")
+            CWDS+=("${AVAILABLE[$i]}")
+        done
+        ;;
+    none)
+        warn "--worktrees none: ${COUNT} sessions in the SAME working tree — edit conflicts likely"
+        if [ ${#NAMES[@]} -eq 0 ]; then
+            for ((i = 1; i <= COUNT; i++)); do NAMES+=("n${i}"); done
+        fi
+        for ((i = 0; i < COUNT; i++)); do CWDS+=("$PROJECT_DIR"); done
+        ;;
+esac
+
+# Per-session initial prompts (split on |)
+TASKS=()
+if [ -n "$TASKS_PIPED" ]; then
+    IFS='|' read -r -a TASKS <<< "$TASKS_PIPED"
+fi
+
+# Per-session --append-system-prompt strings (split on |)
+SYSPROMPTS=()
+if [ -n "$SYSPROMPTS_PIPED" ]; then
+    IFS='|' read -r -a SYSPROMPTS <<< "$SYSPROMPTS_PIPED"
+fi
+
+# ----------------------------------------------------------------------------
+# Build the per-session claude invocation
+# ----------------------------------------------------------------------------
+
+# Returns the shell command string to run in each spawned terminal tab.
+claude_cmd_for() {
+    local idx="$1" name="$2" cwd="$3"
+    local parts=("claude")
+
+    case "$WORKTREES" in
+        new) parts+=("--worktree" "$name") ;;
+        existing|none) ;; # cwd handles it
+    esac
+
+    "$YOLO" && parts+=("--dangerously-skip-permissions")
+
+    parts+=("--name" "$(printf "%s/%s" "$PROJECT_NAME" "$name")")
+
+    # Per-session --append-system-prompt (applies before any user input)
+    if [ "${#SYSPROMPTS[@]}" -gt "$idx" ] && [ -n "${SYSPROMPTS[$idx]}" ]; then
+        parts+=("--append-system-prompt" "${SYSPROMPTS[$idx]}")
+    fi
+
+    # Pre-typed task prompt: positional argument to claude
+    if [ "${#TASKS[@]}" -gt "$idx" ] && [ -n "${TASKS[$idx]}" ]; then
+        parts+=("${TASKS[$idx]}")
+    fi
+
+    # Compose with shell quoting that survives YAML embedding and AppleScript
+    local q=""
+    for p in "${parts[@]}"; do
+        q+="$(printf "%q " "$p")"
+    done
+    printf "cd %q && %s" "$cwd" "$q"
+}
+
+color_for() {
+    local idx="$1" backend="$2"
+    "$NO_COLOR" && { printf ""; return; }
+    local mod=$((idx % 6))
+    case "$backend" in
+        warp) printf "%s" "${WARP_COLORS[$mod]}" ;;
+        iterm|iterm2) printf "%s" "${ITERM_RGB[$mod]}" ;;
+    esac
+}
+
+# ----------------------------------------------------------------------------
+# Dry-run output
+# ----------------------------------------------------------------------------
+
+print_plan() {
+    printf "${B}Plan:${R} %d session(s) in %s · backend=%s · layout=%s · yolo=%s\n" \
+        "$COUNT" "$PROJECT_NAME" "$TERMINAL" "$LAYOUT" "$YOLO"
+    "$YOLO" && warn "AUTO-APPROVE: every session will run with --dangerously-skip-permissions"
+    if [ -n "$BASE_REF" ] && [ "$WORKTREES" = "new" ]; then
+        info "  worktree base-ref: $BASE_REF (writes settings overlay)"
+    fi
+    printf "\n"
+    for ((i = 0; i < COUNT; i++)); do
+        printf "  ${B}#%d${R}  name=%-10s  color=%-7s  cwd=%s\n" \
+            "$((i+1))" "${NAMES[$i]}" \
+            "$(color_for "$i" "$TERMINAL")" \
+            "${CWDS[$i]/$HOME/~}"
+        printf "         %s\n" "$(claude_cmd_for "$i" "${NAMES[$i]}" "${CWDS[$i]}")"
+    done
+}
+
+if "$DRY_RUN"; then
+    print_plan
+    exit "$EXIT_OK"
+fi
+
+# ----------------------------------------------------------------------------
+# Apply --base-ref via Claude Code settings overlay
+# ----------------------------------------------------------------------------
+
+# Claude Code reads worktree.baseRef from ~/.claude/settings.json. We only set
+# this when the user passes --base-ref. A non-zero risk: this is process-global,
+# so a concurrent unrelated `claude --worktree` will also pick it up until the
+# spawn finishes. The window is small (seconds), and the value is restored.
+
+settings_overlay_apply() {
+    [ -z "$BASE_REF" ] && return 0
+    [ "$WORKTREES" != "new" ] && return 0
+    local settings="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
+    [ -f "$settings" ] || { warn "no settings.json at $settings; --base-ref ignored"; return 0; }
+    python3 - "$settings" "$BASE_REF" <<'PY'
+import json, os, sys
+path, value = sys.argv[1], sys.argv[2]
+with open(path) as f: data = json.load(f)
+data.setdefault("worktree", {})["baseRef"] = value
+tmp = path + ".praxion-parallel.bak"
+os.rename(path, tmp)
+try:
+    with open(path, "w") as f: json.dump(data, f, indent=2)
+except Exception:
+    os.rename(tmp, path); raise
+PY
+}
+
+settings_overlay_restore() {
+    [ -z "$BASE_REF" ] && return 0
+    [ "$WORKTREES" != "new" ] && return 0
+    local settings="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
+    local bak="${settings}.praxion-parallel.bak"
+    [ -f "$bak" ] && mv "$bak" "$settings" 2>/dev/null || true
+}
+
+trap 'settings_overlay_restore' EXIT
+
+# ----------------------------------------------------------------------------
+# Warp backend — generate a Launch Configuration and `open warp://launch/<id>`
+# ----------------------------------------------------------------------------
+
+spawn_warp() {
+    command -v open &>/dev/null || { EXIT_CODE=$EXIT_TERMINAL die "no 'open' command (macOS only)"; }
+    mkdir -p "$WARP_LC_DIR" || { EXIT_CODE=$EXIT_TERMINAL die "cannot create $WARP_LC_DIR"; }
+
+    local stamp lc_name lc_path
+    stamp="$(date +%Y%m%d-%H%M%S)"
+    lc_name="praxion-parallel-${PROJECT_NAME}-${stamp}"
+    lc_path="${WARP_LC_DIR}/${lc_name}.yaml"
+
+    {
+        printf -- "---\n"
+        printf "name: %s\n" "$lc_name"
+        printf "windows:\n"
+
+        # tabs layout: one window, N tabs. windows layout: N windows, one tab each.
+        # YAML indent shape:
+        #   windows:
+        #     - tabs:                  (dash col 2, key col 4)
+        #         - title: ...         (dash col 6, key col 8)
+        #           cwd: ...           (col 8, sibling of title)
+        #           commands:          (col 8)
+        #             - exec: ...      (col 10)
+        if [ "$LAYOUT" = "tabs" ]; then
+            printf "  - tabs:\n"
+            for ((i = 0; i < COUNT; i++)); do
+                _emit_warp_tab "$i" "          " "        - "
+            done
+        else
+            for ((i = 0; i < COUNT; i++)); do
+                printf "  - tabs:\n"
+                _emit_warp_tab "$i" "          " "        - "
+            done
+        fi
+    } > "$lc_path" || { EXIT_CODE=$EXIT_SPAWN die "failed to write $lc_path"; }
+
+    info "Warp launch config: ${lc_path/$HOME/~}"
+
+    settings_overlay_apply
+
+    if ! open "warp://launch/${lc_name}" 2>/dev/null; then
+        EXIT_CODE=$EXIT_SPAWN die "open warp://launch/${lc_name} failed (is Warp installed?)"
+    fi
+
+    # Give Warp a beat to read the file before we delete it, then remove the
+    # ephemeral config so ~/.warp/launch_configurations doesn't accumulate.
+    ( sleep 5 && rm -f "$lc_path" ) &
+    disown
+
+    info "Launched ${COUNT} session(s) in Warp."
+}
+
+# Emit one tab block to stdout. Prefix style:
+#   - first line:  "<list_prefix>title: ..."
+#   - body lines:  "<indent>color: ..." etc.
+_emit_warp_tab() {
+    local i="$1" indent="$2" list_prefix="$3"
+    local title="${NAMES[$i]} · ${PROJECT_NAME}"
+    local color cwd cmd
+    color="$(color_for "$i" "warp")"
+    cwd="${CWDS[$i]}"
+    cmd="$(claude_cmd_for "$i" "${NAMES[$i]}" "$cwd")"
+
+    printf "%stitle: %s\n" "$list_prefix" "$(_yaml_escape "$title")"
+    [ -n "$color" ] && printf "%scolor: %s\n" "$indent" "$color"
+    printf "%scwd: %s\n" "$indent" "$(_yaml_escape "$cwd")"
+    printf "%scommands:\n" "$indent"
+    printf "%s  - exec: %s\n" "$indent" "$(_yaml_escape "$cmd")"
+}
+
+# Single-quoted YAML scalar — safe for arbitrary strings (escape single quotes
+# by doubling them, per YAML 1.2).
+_yaml_escape() {
+    python3 -c "import sys; s=sys.argv[1]; print(\"'\" + s.replace(\"'\", \"''\") + \"'\")" "$1"
+}
+
+# ----------------------------------------------------------------------------
+# iTerm2 backend — AppleScript via osascript
+# ----------------------------------------------------------------------------
+
+spawn_iterm2() {
+    command -v osascript &>/dev/null || { EXIT_CODE=$EXIT_TERMINAL die "no osascript (macOS only)"; }
+    osascript -e 'tell application "System Events" to (name of processes) contains "iTerm2"' >/dev/null 2>&1 || true
+
+    settings_overlay_apply
+
+    local script
+    script="$(_build_iterm_script)"
+    if ! osascript -e "$script" >/dev/null; then
+        EXIT_CODE=$EXIT_SPAWN die "osascript failed (is iTerm2 installed?)"
+    fi
+
+    info "Launched ${COUNT} session(s) in iTerm2."
+}
+
+# iTerm2 escape sequence to set the tab color of the current session.
+# Format: ESC ] 6 ; 1 ; bg ; red ; brightness ; <r> BEL  (one per channel).
+# Reference: https://iterm2.com/documentation-escape-codes.html (Set Color)
+_iterm_color_seq() {
+    local rgb="$1"
+    [ -z "$rgb" ] && return
+    local r g b
+    IFS=';' read -r r g b <<< "$rgb"
+    printf '\\033]6;1;bg;red;brightness;%s\\a\\033]6;1;bg;green;brightness;%s\\a\\033]6;1;bg;blue;brightness;%s\\a' \
+        "$r" "$g" "$b"
+}
+
+# AppleScript escape: double-quote-safe via backslash escaping.
+_as_escape() {
+    python3 -c 'import sys; s=sys.argv[1]; print(s.replace("\\","\\\\").replace("\"","\\\""))' "$1"
+}
+
+_build_iterm_script() {
+    local lines=()
+    lines+=('tell application "iTerm"')
+    lines+=('  activate')
+    lines+=('  set newWindow to (create window with default profile)')
+
+    local i
+    for ((i = 0; i < COUNT; i++)); do
+        local title cmd rgb color_seq full_cmd
+        title="${NAMES[$i]} · ${PROJECT_NAME}"
+        cmd="$(claude_cmd_for "$i" "${NAMES[$i]}" "${CWDS[$i]}")"
+        rgb="$(color_for "$i" "iterm")"
+        color_seq="$(_iterm_color_seq "$rgb")"
+
+        # The shell command sent into each tab:
+        #   1. Set tab title via OSC 0
+        #   2. Set tab color via OSC 6 (iTerm2-proprietary)
+        #   3. Run the claude command
+        full_cmd=$(printf 'printf %s; printf %s; %s' \
+            "'\\033]0;$(_as_escape "$title")\\a'" \
+            "'${color_seq}'" \
+            "$cmd")
+
+        if [ "$i" -eq 0 ]; then
+            # First tab — the window's initial session.
+            lines+=("  tell current session of newWindow")
+            lines+=("    write text \"$(_as_escape "$full_cmd")\"")
+            lines+=("  end tell")
+        else
+            lines+=("  tell newWindow")
+            lines+=("    create tab with default profile")
+            lines+=("  end tell")
+            lines+=("  tell current session of newWindow")
+            lines+=("    write text \"$(_as_escape "$full_cmd")\"")
+            lines+=("  end tell")
+        fi
+    done
+
+    lines+=('end tell')
+    printf "%s\n" "${lines[@]}"
+}
+
+# ----------------------------------------------------------------------------
+# Dispatch
+# ----------------------------------------------------------------------------
+
+print_plan
+printf "\n"
+"$YOLO" && warn "AUTO-APPROVE active — sessions will run unsupervised. You asked for this."
+printf "\n"
+
+case "$TERMINAL" in
+    warp)   spawn_warp ;;
+    iterm2) spawn_iterm2 ;;
+esac
+
+settings_overlay_restore
+exit "$EXIT_OK"

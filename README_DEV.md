@@ -150,7 +150,7 @@ cursor/config/                       # Cursor installer config
 └── README.md
 scripts/                             # Utility scripts
 ├── CLAUDE.md                        # Script conventions (lazy loaded)
-├── ccwt                             # Multi-worktree Claude session launcher
+├── praxion-parallel                 # Multi-session launcher (Warp/iTerm2, per-tab color, --worktree-aware)
 ├── check_squash_safety.py           # Post-merge diagnostic: warn on .ai-state/ erasure from squash
 ├── chronograph-ctl                  # Task Chronograph dev helper (start/stop/status)
 ├── finalize_adrs.py                 # Promote draft ADRs to NNN at merge-to-main

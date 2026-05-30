@@ -31,6 +31,7 @@ Compatible with **Claude Code** (primary), **Claude Desktop**, **Cursor**, and A
 - **39 slash commands** — commits, worktrees, memory management, project scaffolding, testing, releases, code review, roadmap generation, metrics, ML experiment dispatch.
 - **20 rules** — coding style, git conventions, documentation standards, agent coordination. Auto-loaded by context.
 - **MCP servers** — persistent cross-session memory and agent-lifecycle observability.
+- **Multi-session launcher** — `praxion-parallel` spawns N Claude Code sessions in native Warp or iTerm2 tabs, each isolated in its own git worktree, each visually distinguished by per-tab color and role-pinned via `--append-system-prompt`. Comes with an ephemeral web launcher (`praxion-parallel --ui`) and six built-in recipes for common parallel patterns. See [Multi-Session Workflows](docs/multi-session.md).
 - **Architecture-as-Code + Documentation-as-Code stack** — fence convention, fitness functions, golden-rule pre-commit gate, `architect-validator` agent, architecture CI workflow, REQ↔architecture traceability, periodic `sentinel` audit, Diátaxis-aligned doc taxonomy. See [docs/aac-dac.md](docs/aac-dac.md) for how the mechanisms compose.
 
 ## Quick Start
@@ -168,6 +169,26 @@ Memory activates automatically per project — the first `remember()` call or to
 
 See [Memory Architecture](docs/memory-architecture.md) for the dual-layer design, data model, enforcement hooks, and concurrency model.
 
+### Multi-Session Workflows
+
+`praxion-parallel` launches N Claude Code sessions in native Warp tabs (default) or iTerm2 tabs — each isolated in its own git worktree via `claude --worktree`, each visually distinguished by per-tab color, optionally with per-session role assignment via `--append-system-prompt`. Two surfaces: a bash CLI and an ephemeral localhost web launcher (`praxion-parallel --ui`).
+
+```bash
+praxion-parallel -n 3 -y                      # 3 sessions, fresh worktrees, auto-approve
+praxion-parallel --ui                         # open the web launcher with recipe gallery
+praxion-parallel --worktrees existing         # attach to existing worktrees
+```
+
+Six built-in recipes ship for common parallel patterns: `solo-work`, `implement-and-test`, `team-lead`, `compare-implementations`, `feature-fan-out`, `overnight-autonomous`. Recipes layer at three precedence levels — `builtin < user (~/.config/) < project (<repo>/.praxion/)` — so teams can commit company-specific role descriptions to the repo.
+
+> [!TIP]
+> **Praxion-aware mode** activates automatically when the target project has `.ai-state/`. Recipes can name a Praxion **agent identity** per session (`@implementer`, `@test-engineer`, `@verifier`, ...) instead of re-typing system prompts — Praxion's agent contracts are already loaded.
+> After launch, type `/color <name>` in each Claude session to set the agent-identifier color — a second visual layer on top of the tab color. Tab switching: `⌘1` / `⌘2` / … in both Warp and iTerm2.
+
+The launcher is distinct from [`scripts/dispatch-reworks`](docs/rework-dispatch.md) — that one is purpose-built for the verifier-loop rework manifest and is wired into Stop hooks and macOS notifications. Use `praxion-parallel` for generic parallel work; use `dispatch-reworks` when the verifier has emitted a `REWORK_MANIFEST.md`.
+
+See [Multi-Session Workflows](docs/multi-session.md) for the full reference: web launcher security model, recipe schema, all CLI flags, worktree modes, after-launch ergonomics, examples, troubleshooting, and design rationale.
+
 ## Installation
 
 The main entry point is `install.sh`, which routes to `install_claude.sh` (Claude Code/Desktop), `install_cursor.sh` (Cursor), or `install_codex.sh` (Codex / AGENTS.md-aware agents). The interactive installer defaults to the recommended option at each step.
@@ -193,7 +214,7 @@ The main entry point is `install.sh`, which routes to `install_claude.sh` (Claud
 | 2    | Rules to `~/.claude/rules/` (auto-loaded when relevant)                                                                   | No — always installed  |
 | 3    | i-am plugin via [bit-agora](https://github.com/francisco-perez-sorrosal/bit-agora) marketplace (scope: user or project)   | Yes — recommended      |
 | 4    | Task Chronograph hooks (agent lifecycle observability)                                                                    | Yes — recommended      |
-| 5    | CLI scripts (`ccwt` — multi-worktree Claude sessions) to `~/.local/bin/`                                                  | No — always installed  |
+| 5    | CLI scripts (`praxion-parallel` — multi-session terminal launcher) to `~/.local/bin/`                                      | No — always installed  |
 | 6    | External API docs ([context-hub](https://github.com/andrewyng/context-hub) MCP — curated docs for 600+ libraries)         | Yes — recommended      |
 | 7    | Phoenix observability daemon (persistent trace backend at `http://localhost:6006`)                                        | Yes — recommended      |
 
@@ -259,6 +280,7 @@ Installer resources live in tool-specific config directories: [claude/config/](c
 
 - **[Core Concepts](docs/concepts.md)** — the building blocks, the layered architecture, and the agent pipeline.
 - **[Memory Architecture](docs/memory-architecture.md)** — dual-layer memory: curated JSON + observation JSONL, enforcement hooks, concurrency model, scaling strategy.
+- **[Multi-Session Workflows](docs/multi-session.md)** — `praxion-parallel` CLI + web launcher, recipe layering, worktree modes, after-launch ergonomics, examples.
 - **[External API Docs](docs/external-api-docs.md)** — retrieve current API documentation for external libraries during development.
 - **[Spec-Driven Development](docs/spec-driven-development.md)** — behavioral specifications with requirement IDs for medium/large features.
 - **[Decision Tracking](docs/decision-tracking.md)** — Architecture Decision Records in `.ai-state/decisions/` capturing decisions from AI-assisted sessions.

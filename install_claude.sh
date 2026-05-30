@@ -513,7 +513,7 @@ complete_install_from_plugin() {
     printf "  the plugin body (skills, commands, agents, hooks, MCP servers). This\n"
     printf "  command adds the surfaces the plugin mechanism does not cover natively:\n"
     printf "    • Rules (auto-loaded by Claude Code — shape agent behavior globally)\n"
-    printf "    • CLI scripts on \$PATH (detector, ccwt, chronograph-ctl, etc.)\n"
+    printf "    • CLI scripts on \$PATH (detector, praxion-parallel, chronograph-ctl, etc.)\n"
     printf "    • context-hub MCP (curated docs for 600+ libraries)\n\n"
     printf "  You will be prompted before each system-level change. Re-run anytime;\n"
     printf "  the operations are idempotent.\n\n"
@@ -534,7 +534,7 @@ complete_install_from_plugin() {
 
     # ---- CLI scripts ----
     printf "\n  ${B}[1] Symlink CLI scripts to ~/.local/bin/?${R}\n"
-    printf "      ${D}check_id_citation_discipline.py, ccwt (multi-worktree sessions),\n"
+    printf "      ${D}check_id_citation_discipline.py, praxion-parallel (multi-session launcher),\n"
     printf "      chronograph-ctl, phoenix-ctl, new-project — runnable from any\n"
     printf "      shell. Filters internal helpers (merge drivers, git hooks).${R}\n"
     printf "  ${B}[2] Skip scripts${R}\n"

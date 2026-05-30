@@ -6,7 +6,8 @@ Utility and operational scripts for the Praxion ecosystem.
 
 - `praxion-hackathon` — Launch Claude Code in hackathon mode with launch-time context trimming: passes `--disable-slash-commands` (~5–8K skill tokens trimmed), `--effort low`, `--append-system-prompt` (from `.claude/hackathon-directive.md`), and `--settings` (`.claude/hackathon-settings.json`). Mode activation (env var, CLAUDE.md block, rules preset) is project-scoped and works on any launch; this wrapper adds the skill-surface trim layer that `settings.json` cannot. Use `scripts/praxion-hackathon --resume` to re-attach. Set `PRAXION_HACKATHON_NO_PS1=1` to suppress the `[hackathon]` PS1 prefix. Dogfooding copy — template source at `claude/aac-templates/praxion-hackathon.sh.tmpl`
 - `praxion-claude-dev` — Launch Claude Code with the Praxion working tree as the plugin source (wraps `claude --plugin-dir`). Passes `--dangerously-skip-permissions` by default; set `PRAXION_DEV_SAFE=1` to keep prompts. See [Session-scoped local testing](../README_DEV.md#session-scoped-local-testing)
-- `ccwt` — Claude Code Worktrees: opens a tmux session with one pane per git worktree, each running Claude Code
+- `praxion-parallel` — Launch N parallel Claude Code sessions in Warp (default) or iTerm2, each visually distinguished by per-tab color and title, each in its own git worktree via `claude --worktree`. Supports `--worktrees new|existing|none`, per-session `--names`, `--tasks`, and `--append-system-prompts` (pipe-separated, for recipe-style role assignment); `-y/--yolo` for `--dangerously-skip-permissions`. Warp backend writes an ephemeral Launch Configuration under `~/.warp/launch_configurations/` and invokes `open warp://launch/<name>`; iTerm2 backend drives `osascript` and sends OSC-6 escape sequences for per-tab color. `--dry-run` prints the spawn plan. `--ui [PROJECT]` hands off to `praxion-parallel-ui` (the ephemeral web launcher). Replaces the legacy tmux-based `ccwt`
+- `praxion-parallel-ui` — Ephemeral localhost launcher for `praxion-parallel`. Stdlib-only Python (`http.server`), binds `127.0.0.1` on a kernel-chosen port, prints a single-use 32-byte URL token, opens the user's default browser. The single-page UI composes a multi-session launch — project, terminal, worktree mode, per-session name/task/system-prompt/`/color` — submits to the bash engine via `POST /api/launch`, and the server self-terminates after the first successful launch (or 10 min idle). User recipes persist at `~/.config/praxion-parallel/recipes.json`; project-local recipes at `<project>/.praxion/recipes.json` (precedence `builtin < user < project`); six built-in templates (`solo-work`, `implement-and-test`, `team-lead`, `compare-implementations`, `feature-fan-out`, `overnight-autonomous`) ship under `scripts/praxion_parallel_ui_assets/`. **Praxion-aware mode** activates automatically on projects with `.ai-state/`: the per-session `agent` field replaces explicit `system_prompt` (auto-derives "Operate as the Praxion @<agent>..." at submit time), worktree name auto-fills from the agent, and the agents dropdown is populated from `<project>/agents/`, the marketplace cache, or a hardcoded fallback. Inspired by named-preset patterns in community tools (Codeman, Nimbalyst)
 - `chronograph-ctl` — Development helper for the Task Chronograph MCP server (start/stop/restart/status/logs from source)
 - `phoenix-ctl` — Manage the Phoenix observability daemon (install/start/stop/restart/status/uninstall via launchd)
 - `reconcile_ai_state.py` — Post-merge reconciliation for `.ai-state/` artifacts: semantic memory.json merge, observations.jsonl dedup, ADR renumbering, index regeneration. Called by `/merge-worktree`
@@ -24,13 +25,16 @@ Utility and operational scripts for the Praxion ecosystem.
 
 ## Conventions
 
-- Shell scripts (bash), `set -euo pipefail` (except `ccwt` which uses `set -eo pipefail`)
+- Shell scripts (bash), `set -euo pipefail` (except `praxion-parallel` which uses `set -eo pipefail` because it intentionally tolerates unset optional vars)
+- Python scripts: stdlib-only when possible. `praxion-parallel-ui` follows this — `http.server`, `secrets`, `subprocess`, `webbrowser`, no third-party deps.
 - Each script is self-contained with usage documentation in header comments
 - `chronograph-ctl` and `phoenix-ctl` are development/operations tools — in production, MCP servers run via plugin.json
 
 ## Installer Filter
 
 `install_claude.sh` links scripts under `~/.local/bin/` only when they are `-f && -x` AND do not match `merge_driver_*` or `git-*-hook.sh`. User-facing tools must be executable (`chmod +x`); merge drivers and git hooks are invoked by git, not by PATH, so they are intentionally skipped. Orphaned symlinks (from renamed/removed scripts) are cleaned on upgrade by `clean_stale_symlinks`. See dec-042.
+
+Asset directories (`scripts/praxion_parallel_ui_assets/`) are not executable files and are not linked into `~/.local/bin/`. The `praxion-parallel-ui` script resolves its assets via `realpath(__file__)` so the symlinked launcher finds the original asset directory through the symlink chain — same pattern as `praxion-claude-dev` and `praxion-hackathon`.
 
 ## Wired into Onboarding
 

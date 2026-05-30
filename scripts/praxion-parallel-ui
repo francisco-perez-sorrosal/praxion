@@ -291,14 +291,32 @@ def compose_args(state: dict[str, Any]) -> list[str]:
 # Subprocess execution
 # ---------------------------------------------------------------------------
 
+def _ensure_str(value: Any) -> str:
+    """Coerce subprocess stdout/stderr to str even when it arrives as bytes.
+
+    `subprocess.run(..., text=True)` returns str on normal completion, but the
+    `subprocess.TimeoutExpired` exception's `.stdout`/`.stderr` properties can
+    still arrive as bytes on some Python versions. JSON-encoding the response
+    payload then fails with `TypeError: Object of type bytes is not JSON
+    serializable`. Belt-and-braces at the boundary.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, (bytes, bytearray)):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
 def run_subprocess(args: list[str], timeout: int = 30) -> tuple[int, str, str]:
     try:
         proc = subprocess.run(
             args, capture_output=True, text=True, timeout=timeout
         )
-        return proc.returncode, proc.stdout, proc.stderr
+        return proc.returncode, _ensure_str(proc.stdout), _ensure_str(proc.stderr)
     except subprocess.TimeoutExpired as e:
-        return 124, e.stdout or "", (e.stderr or "") + f"\n[timeout after {timeout}s]"
+        out = _ensure_str(e.stdout)
+        err = _ensure_str(e.stderr) + f"\n[timeout after {timeout}s]"
+        return 124, out, err
 
 
 # ---------------------------------------------------------------------------

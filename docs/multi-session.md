@@ -341,6 +341,33 @@ Two distinct failure modes, both rooted in Warp's URL-launch behavior:
 </details>
 
 <details>
+<summary><strong>"project '<name>' has no commits — <code>claude --worktree</code> cannot create a worktree"</strong></summary>
+
+The pre-flight check caught a fresh `git init` with no commits yet. Claude Code's `--worktree` flag needs at least one commit in the project so it has a base ref to branch from; an unborn HEAD produces the cryptic upstream error "Failed to resolve base branch 'HEAD': git rev-parse failed".
+
+Fix in the target project:
+
+```bash
+cd <project-root>
+git commit --allow-empty -m 'init'
+```
+
+Then retry the launch. Alternatively, use `--worktrees=existing` (after creating worktrees by hand) or `--worktrees=none` (all sessions share the project root — no isolation).
+
+</details>
+
+<details>
+<summary><strong>The web launcher returns <code>TypeError: Object of type bytes is not JSON serializable</code> (historical, fixed)</strong></summary>
+
+Surfaced once during real-world testing; fixed in the same commit that added the pre-flight check. Root cause: the bash script's background cleanup subshell (the 30-second sleep that deletes the ephemeral Warp launch config) inherited the parent's stdout/stderr pipes, blocking the Python launcher's `subprocess.run` from seeing the script actually finish. That hit the launcher's 30-second `timeout=30`, raising `TimeoutExpired` whose `.stdout`/`.stderr` came back as bytes → `json.dumps` blew up.
+
+Fix on the bash side: redirect every background subshell to `/dev/null` (`( sleep 30 && rm -f "$lc_path" ) >/dev/null 2>&1 &`) so the pipes close immediately when the script exits. Defensive fix on the Python side: `_ensure_str()` coerces bytes to str at the boundary so the JSON encoder is unconditionally safe.
+
+If you see this error on a later version, capture the request body and file an issue.
+
+</details>
+
+<details>
 <summary><strong>iTerm2 backend: "AppleScript syntax error"</strong></summary>
 
 The launcher generates AppleScript via heredoc and feeds it to `osascript -e`. If you see a syntax error, dump the generated script by replacing `osascript` with a wrapper:

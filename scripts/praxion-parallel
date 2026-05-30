@@ -299,6 +299,27 @@ resolve_project() {
 PROJECT_DIR="$(resolve_project "$PROJECT_ARG")"
 PROJECT_NAME="$(basename "$PROJECT_DIR")"
 
+# Pre-flight: `claude --worktree <name>` needs at least one commit in the
+# project so it can resolve a base ref to branch from. A bare `git init`
+# with no commits produces an unborn HEAD, and the resulting Claude Code
+# error is cryptic ("Failed to resolve base branch 'HEAD': git rev-parse
+# failed"). Catch it here with a clear fix recipe.
+if [ "$WORKTREES" = "new" ] && ! "$LIST_ONLY"; then
+    if ! git -C "$PROJECT_DIR" rev-parse HEAD &>/dev/null; then
+        EXIT_CODE=$EXIT_PROJECT die "$(cat <<EOF
+project '$PROJECT_NAME' has no commits — \`claude --worktree\` cannot create a worktree
+without a base ref to branch from.
+
+Fix (in $PROJECT_DIR):
+  git commit --allow-empty -m 'init'
+
+Or run with --worktrees=existing (after creating worktrees by hand) or
+--worktrees=none (all sessions share the project root — no isolation).
+EOF
+)"
+    fi
+fi
+
 # ----------------------------------------------------------------------------
 # --list mode
 # ----------------------------------------------------------------------------
@@ -505,7 +526,26 @@ settings_overlay_restore() {
     [ -f "$bak" ] && mv "$bak" "$settings" 2>/dev/null || true
 }
 
-trap 'settings_overlay_restore' EXIT
+# Schedule a DELAYED restore so the overlay survives until the spawned terminals
+# actually start `claude --worktree`. Without the delay, the trap fires when the
+# bash script exits — milliseconds later — and the spawned claude processes read
+# the already-restored settings.
+#
+# CRITICAL: redirect the subshell's stdout/stderr to /dev/null. Otherwise the
+# parent's pipes stay open for the duration of the sleep, blocking any caller
+# (e.g., the Python launcher's subprocess.run) from seeing the bash script
+# actually finish. This is the root cause of the "TypeError: Object of type
+# bytes is not JSON serializable" error users hit: subprocess.run waits for
+# the pipe to close, hits its own timeout, and TimeoutExpired.{stdout,stderr}
+# come back as bytes.
+schedule_delayed_overlay_restore() {
+    [ -z "$BASE_REF" ] && return 0
+    [ "$WORKTREES" != "new" ] && return 0
+    # 15 seconds: enough for Warp's launch-config to materialize tabs and for
+    # claude --worktree to read settings.json before the restore fires.
+    ( sleep 15 && settings_overlay_restore ) >/dev/null 2>&1 &
+    disown
+}
 
 # ----------------------------------------------------------------------------
 # Warp backend — generate a Launch Configuration and `open warp://launch/<id>`
@@ -578,10 +618,15 @@ spawn_warp_launch_config() {
         EXIT_CODE=$EXIT_SPAWN die "open warp://launch/${lc_name} failed (is Warp installed?)"
     fi
 
+    schedule_delayed_overlay_restore
+
     # Cleanup at 30s (was 5s). Warp can be slow to scan after a cold-start /
     # post-update activation; 30s is the empirical safety margin.
+    # Redirect to /dev/null so the disowned subshell doesn't inherit (and hold
+    # open) stdout/stderr — otherwise callers that pipe the script (like the
+    # Python launcher's subprocess.run) hang waiting for the pipe to close.
     if ! "$KEEP_CONFIG"; then
-        ( sleep 30 && rm -f "$lc_path" ) &
+        ( sleep 30 && rm -f "$lc_path" ) >/dev/null 2>&1 &
         disown
     fi
 
@@ -735,6 +780,8 @@ spawn_iterm2() {
     if ! osascript -e "$script" >/dev/null; then
         EXIT_CODE=$EXIT_SPAWN die "osascript failed (is iTerm2 installed?)"
     fi
+
+    schedule_delayed_overlay_restore
 
     info "Launched ${COUNT} session(s) in iTerm2."
 }

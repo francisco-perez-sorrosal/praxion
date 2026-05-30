@@ -233,6 +233,30 @@ OPTIONS
 | `existing` | Discovers via `git worktree list`. One session per existing worktree. Caps `--count` at the actual number found. |
 | `none` | All sessions in the project root. **Edit conflicts likely** — loud warning printed. Useful only for read-only or unrelated workloads. |
 
+### Layouts
+
+| `--layout` | Meaning |
+|---|---|
+| `tabs` (default) | One window, N tabs. Both backends. |
+| `windows` | N separate windows, one session each. Both backends. |
+| `panes` | One window, one tab, N rectangular split panes. **N=1..4 only** (denser panes become unreadable). Both backends. |
+
+**Panes tilings:**
+- N=2: side-by-side (vertical split)
+- N=3: one tall left pane + two stacked panes on the right
+- N=4: 2×2 grid
+
+### Warp modes (`--warp-mode`)
+
+The Warp backend has two paths because of upstream Warp bug [#9007](https://github.com/warpdotdev/warp/issues/9007) — `commands:` / `exec:` blocks are silently dropped when a Launch Configuration is invoked via `warp://launch/<name>` from the command line. Tabs/panes open at the right `cwd`, but the `claude --worktree …` command never runs.
+
+| `--warp-mode` | What happens | Trade-off |
+|---|---|---|
+| `launch-config` (default) | Writes a YAML to `~/.warp/launch_configurations/`, opens `warp://launch/<name>`. Autonomous when it works. | Subject to #9007 (commands may silently fail). A fallback block is always printed with the exact manual command, the YAML path, and a workaround pointer. The YAML is preserved 30s by default; pass `--keep-config` to keep it indefinitely for debugging. |
+| `tabs` | Opens `warp://action/new_tab?path=<cwd>` per tab. Reliably opens N tabs at the right cwds; prints the `claude --worktree …` command for each so you can paste-and-Enter. | Not fully autonomous — one paste per tab. But it always works. Does not support `--layout=panes`; falls back to flat tabs. |
+
+If `launch-config` mode opens tabs but nothing runs in them, **switch to `--warp-mode=tabs`**. The iTerm2 backend is unaffected by #9007 — it uses AppleScript directly.
+
 ### What gets passed to each session
 
 ```bash
@@ -299,12 +323,20 @@ Discovers via `git worktree list`, spawns one session per existing worktree. Use
 ## Troubleshooting
 
 <details>
-<summary><strong>The Warp launch config wasn't picked up — Warp opened a blank window</strong></summary>
+<summary><strong>Warp: "Launched N sessions" printed but nothing visible / tabs opened with no claude running</strong></summary>
 
-The launcher writes a temporary YAML at `~/.warp/launch_configurations/praxion-parallel-<timestamp>.yaml` and invokes `open warp://launch/<name>`. Warp may need a moment to read the file before the cleanup sweep deletes it. If you see a blank window, either:
+Two distinct failure modes, both rooted in Warp's URL-launch behavior:
 
-1. Increase the cleanup delay in `scripts/praxion-parallel` (currently 5s) — find `( sleep 5 && rm -f "$lc_path" ) &` and bump.
-2. Run with `--dry-run` and verify the YAML at `~/.warp/launch_configurations/` parses with `python3 -c "import yaml; print(yaml.safe_load(open('<path>')))"`.
+**Failure mode A — nothing opens at all** (the "cold-start race"). `open` returns exit 0 the moment macOS hands the URL to LaunchServices; it does not wait for Warp to actually process it. If Warp was mid-startup, mid-update, or otherwise busy, the URL is dropped silently and the script's success message is misleading. The launcher already activates Warp via `open -a Warp` + a 400ms pause before sending the launch URL to minimize this, but a slow start can still miss.
+
+**Failure mode B — tabs open at the right cwd but the `claude` command never runs**. This is upstream Warp bug [#9007](https://github.com/warpdotdev/warp/issues/9007): the `commands:` / `exec:` block inside a Launch Configuration YAML is silently dropped when the config is invoked via `warp://launch/<name>` from `open`. Manually invoking the same Launch Configuration from Warp's Command Palette works fine.
+
+**Recovery, in order:**
+
+1. **Manual relaunch**: the script always prints `open "warp://launch/<name>"` ready to copy. Run it again — Warp is now warm, so the URL usually lands.
+2. **Open from Warp's UI**: ⌘P → "Launch Configuration" → pick the `praxion-parallel-…` entry. This path bypasses the URL handler and #9007 doesn't apply, so commands run.
+3. **Switch modes**: `praxion-parallel --warp-mode=tabs …` — opens one tab per session via `warp://action/new_tab?path=…` (which doesn't have #9007) and prints the `claude --worktree …` command for you to paste-and-Enter. Reliable. Doesn't support `--layout=panes` (panes need the launch-config YAML path).
+4. **Inspect the YAML**: use `--keep-config` to preserve the YAML indefinitely, then `python3 -c "import yaml; print(yaml.safe_load(open('<path>')))"` to verify it parses cleanly.
 
 </details>
 

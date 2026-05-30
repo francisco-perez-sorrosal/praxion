@@ -108,8 +108,21 @@ ${B}OPTIONS${R}
                            Pair with --tasks for recipe-style role assignments.
       --ui [PROJECT]       Launch the ephemeral web launcher instead of
                            spawning directly. Submits compose into this script.
-      --layout LAYOUT      tabs (default) | windows
-      --no-color           Skip per-tab color theming.
+      --layout LAYOUT      tabs (default) | windows | panes
+                             - tabs:    one window, N tabs
+                             - windows: N separate windows, one session each
+                             - panes:   one window, one tab, N rectangular
+                                        split panes. Capped at N=4 (max useful
+                                        density without overlap).
+      --warp-mode MODE     launch-config (default) | tabs
+                             - launch-config: write YAML + open warp://launch/.
+                               Autonomous BUT subject to upstream Warp bug
+                               #9007 (commands silently dropped via URL launch).
+                             - tabs: open one warp://action/new_tab?path= per
+                               tab. Reliably opens N tabs at the right cwd;
+                               the claude command is printed for you to paste.
+      --keep-config        Preserve the generated Warp Launch Config YAML
+                           (default: deleted 30s after launch).
       --dry-run            Print the spawn plan; do not launch.
       --list               List existing worktrees in PROJECT and exit.
   -h, --help               Show this help.
@@ -157,6 +170,8 @@ TASKS_PIPED=""
 SYSPROMPTS_PIPED=""
 LAYOUT="tabs"
 USE_UI=false
+WARP_MODE="launch-config"
+KEEP_CONFIG=false
 NO_COLOR=false
 DRY_RUN=false
 LIST_ONLY=false
@@ -198,6 +213,11 @@ while [ $# -gt 0 ]; do
             [ -z "${2:-}" ] && { EXIT_CODE=$EXIT_USAGE die "--layout needs a value"; }
             LAYOUT="$2"; shift ;;
         --layout=*) LAYOUT="${1#--layout=}" ;;
+        --warp-mode)
+            [ -z "${2:-}" ] && { EXIT_CODE=$EXIT_USAGE die "--warp-mode needs a value"; }
+            WARP_MODE="$2"; shift ;;
+        --warp-mode=*) WARP_MODE="${1#--warp-mode=}" ;;
+        --keep-config) KEEP_CONFIG=true ;;
         --no-color) NO_COLOR=true ;;
         --dry-run) DRY_RUN=true ;;
         --list) LIST_ONLY=true ;;
@@ -220,8 +240,12 @@ case "$WORKTREES" in
     *) EXIT_CODE=$EXIT_USAGE die "--worktrees must be new|existing|none (got: $WORKTREES)" ;;
 esac
 case "$LAYOUT" in
-    tabs|windows) ;;
-    *) EXIT_CODE=$EXIT_USAGE die "--layout must be tabs or windows (got: $LAYOUT)" ;;
+    tabs|windows|panes) ;;
+    *) EXIT_CODE=$EXIT_USAGE die "--layout must be tabs|windows|panes (got: $LAYOUT)" ;;
+esac
+case "$WARP_MODE" in
+    launch-config|tabs) ;;
+    *) EXIT_CODE=$EXIT_USAGE die "--warp-mode must be launch-config or tabs (got: $WARP_MODE)" ;;
 esac
 if [ -n "$BASE_REF" ]; then
     case "$BASE_REF" in
@@ -306,6 +330,11 @@ fi
 COUNT="${COUNT:-$DEFAULT_SESSIONS}"
 if ! [[ "$COUNT" =~ ^[0-9]+$ ]] || [ "$COUNT" -lt 1 ] || [ "$COUNT" -gt "$MAX_SESSIONS" ]; then
     EXIT_CODE=$EXIT_USAGE die "--count must be 1..${MAX_SESSIONS} (got: $COUNT)"
+fi
+
+# Panes layout has a tighter cap — even 4 panes on a 13" laptop is dense.
+if [ "$LAYOUT" = "panes" ] && [ "$COUNT" -gt 4 ]; then
+    EXIT_CODE=$EXIT_USAGE die "--layout=panes supports N=1..4 (got: $COUNT). Use --layout=tabs for N>4."
 fi
 
 # Build NAMES + CWDS arrays based on worktree mode
@@ -484,6 +513,26 @@ trap 'settings_overlay_restore' EXIT
 
 spawn_warp() {
     command -v open &>/dev/null || { EXIT_CODE=$EXIT_TERMINAL die "no 'open' command (macOS only)"; }
+    settings_overlay_apply
+
+    # Activate Warp before sending any URL so cold-start races are minimized.
+    # `open -a Warp` returns immediately; the small sleep gives Warp's URL
+    # handler a moment to be ready when Warp wasn't already running.
+    open -a Warp 2>/dev/null || true
+    sleep 0.4
+
+    if [ "$WARP_MODE" = "tabs" ]; then
+        spawn_warp_tabs
+    else
+        spawn_warp_launch_config
+    fi
+}
+
+# Mode A — Launch Configuration (default).
+# Autonomous: writes a YAML, opens warp://launch/<name>. Subject to upstream
+# Warp bug #9007 (commands silently dropped on URL launch); a manual-fallback
+# block is always printed so the user can recover if nothing visibly happens.
+spawn_warp_launch_config() {
     mkdir -p "$WARP_LC_DIR" || { EXIT_CODE=$EXIT_TERMINAL die "cannot create $WARP_LC_DIR"; }
 
     local stamp lc_name lc_path
@@ -495,8 +544,6 @@ spawn_warp() {
         printf -- "---\n"
         printf "name: %s\n" "$lc_name"
         printf "windows:\n"
-
-        # tabs layout: one window, N tabs. windows layout: N windows, one tab each.
         # YAML indent shape:
         #   windows:
         #     - tabs:                  (dash col 2, key col 4)
@@ -504,33 +551,87 @@ spawn_warp() {
         #           cwd: ...           (col 8, sibling of title)
         #           commands:          (col 8)
         #             - exec: ...      (col 10)
-        if [ "$LAYOUT" = "tabs" ]; then
-            printf "  - tabs:\n"
-            for ((i = 0; i < COUNT; i++)); do
-                _emit_warp_tab "$i" "          " "        - "
-            done
-        else
-            for ((i = 0; i < COUNT; i++)); do
+        case "$LAYOUT" in
+            tabs)
                 printf "  - tabs:\n"
-                _emit_warp_tab "$i" "          " "        - "
-            done
-        fi
+                for ((i = 0; i < COUNT; i++)); do
+                    _emit_warp_tab "$i" "          " "        - "
+                done ;;
+            windows)
+                for ((i = 0; i < COUNT; i++)); do
+                    printf "  - tabs:\n"
+                    _emit_warp_tab "$i" "          " "        - "
+                done ;;
+            panes)
+                # One window, one tab, N panes inside the tab's `layout:` block.
+                printf "  - tabs:\n"
+                printf "        - title: %s\n" "$(_yaml_escape "${NAMES[0]} · ${PROJECT_NAME} (${COUNT} panes)")"
+                printf "          layout:\n"
+                _emit_warp_panes_layout "$COUNT" "            " ;;
+        esac
     } > "$lc_path" || { EXIT_CODE=$EXIT_SPAWN die "failed to write $lc_path"; }
 
     info "Warp launch config: ${lc_path/$HOME/~}"
-
-    settings_overlay_apply
+    info "Sending: open \"warp://launch/${lc_name}\""
 
     if ! open "warp://launch/${lc_name}" 2>/dev/null; then
         EXIT_CODE=$EXIT_SPAWN die "open warp://launch/${lc_name} failed (is Warp installed?)"
     fi
 
-    # Give Warp a beat to read the file before we delete it, then remove the
-    # ephemeral config so ~/.warp/launch_configurations doesn't accumulate.
-    ( sleep 5 && rm -f "$lc_path" ) &
-    disown
+    # Cleanup at 30s (was 5s). Warp can be slow to scan after a cold-start /
+    # post-update activation; 30s is the empirical safety margin.
+    if ! "$KEEP_CONFIG"; then
+        ( sleep 30 && rm -f "$lc_path" ) &
+        disown
+    fi
 
-    info "Launched ${COUNT} session(s) in Warp."
+    printf "\n"
+    printf "${Y}If nothing opened in Warp:${R}\n"
+    printf "  · Re-run manually:  ${B}open \"warp://launch/%s\"${R}\n" "$lc_name"
+    printf "  · Or open from Warp's Command Palette (⌘P) → \"Launch Configuration\" → \"%s\"\n" "$lc_name"
+    printf "  · YAML stays at ${B}%s${R}%s\n" "${lc_path/$HOME/~}" "$($KEEP_CONFIG && printf "" || printf " for 30s")"
+    printf "  · Known Warp upstream bug #9007: commands may not run via URL launch.\n"
+    printf "    Workaround: switch to ${B}--warp-mode=tabs${R} (opens tabs at the right\n"
+    printf "    cwd, prints the claude command for you to paste-and-Enter).\n\n"
+    info "Sent launch URL for ${COUNT} session(s) to Warp."
+}
+
+# Mode B — per-tab URLs (reliable but not fully autonomous).
+# Opens N tabs at the right cwds via warp://action/new_tab?path=, then prints
+# the claude command for each tab. The user pastes-and-Enters in each tab.
+spawn_warp_tabs() {
+    info "Opening ${COUNT} Warp tab(s) at target cwds (Warp bug #9007 workaround)."
+    printf "\n"
+    for ((i = 0; i < COUNT; i++)); do
+        local cwd="${CWDS[$i]}"
+        local cmd
+        cmd="$(claude_cmd_for "$i" "${NAMES[$i]}" "$cwd")"
+        local enc_cwd
+        enc_cwd="$(_url_encode "$cwd")"
+
+        local url
+        if [ "$i" -eq 0 ] || [ "$LAYOUT" = "windows" ]; then
+            url="warp://action/new_window?path=${enc_cwd}"
+        else
+            url="warp://action/new_tab?path=${enc_cwd}"
+        fi
+
+        if ! open "$url" 2>/dev/null; then
+            warn "open '$url' failed for tab $((i+1)); skipping."
+            continue
+        fi
+        # Small pacing so tabs open in order; Warp's URL handler ignores
+        # rapid-fire URLs occasionally.
+        sleep 0.3
+
+        printf "  ${B}#%d${R}  %s\n    paste-and-Enter:  ${B}%s${R}\n\n" \
+            "$((i+1))" "${NAMES[$i]}" "$cmd"
+    done
+    info "Opened ${COUNT} tab(s). Paste the matching command into each."
+}
+
+_url_encode() {
+    python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$1"
 }
 
 # Emit one tab block to stdout. Prefix style:
@@ -547,6 +648,68 @@ _emit_warp_tab() {
     printf "%stitle: %s\n" "$list_prefix" "$(_yaml_escape "$title")"
     [ -n "$color" ] && printf "%scolor: %s\n" "$indent" "$color"
     printf "%scwd: %s\n" "$indent" "$(_yaml_escape "$cwd")"
+    printf "%scommands:\n" "$indent"
+    printf "%s  - exec: %s\n" "$indent" "$(_yaml_escape "$cmd")"
+}
+
+# Emit a leaf pane block (cwd + commands) at the given indent.
+_emit_warp_pane_leaf() {
+    local i="$1" indent="$2"
+    local cwd="${CWDS[$i]}"
+    local cmd
+    cmd="$(claude_cmd_for "$i" "${NAMES[$i]}" "$cwd")"
+    printf "%scwd: %s\n" "$indent" "$(_yaml_escape "$cwd")"
+    printf "%scommands:\n" "$indent"
+    printf "%s  - exec: %s\n" "$indent" "$(_yaml_escape "$cmd")"
+}
+
+# Emit a nested `split_direction` + `panes` block. Tilings:
+#   N=2: vertical (left/right) — 1 split
+#   N=3: vertical, then horizontal of right half — 1 left, 2 stacked right
+#   N=4: vertical, then horizontal of both halves — 2x2 grid
+_emit_warp_panes_layout() {
+    local n="$1" indent="$2"
+    local sub="${indent}      "  # leaf indent inside `- ` list item
+
+    case "$n" in
+        1)
+            # Single pane: degenerate to a tab without split. Promote pane#0 to leaf fields.
+            _emit_warp_pane_leaf 0 "$indent" ;;
+        2)
+            printf "%ssplit_direction: vertical\n" "$indent"
+            printf "%spanes:\n" "$indent"
+            printf "%s- " "${indent}  "; _emit_warp_pane_leaf_inline 0 "${indent}    "
+            printf "%s- " "${indent}  "; _emit_warp_pane_leaf_inline 1 "${indent}    " ;;
+        3)
+            printf "%ssplit_direction: vertical\n" "$indent"
+            printf "%spanes:\n" "$indent"
+            printf "%s- " "${indent}  "; _emit_warp_pane_leaf_inline 0 "${indent}    "
+            printf "%s- split_direction: horizontal\n" "${indent}  "
+            printf "%s  panes:\n" "${indent}  "
+            printf "%s  - " "${indent}    "; _emit_warp_pane_leaf_inline 1 "${indent}        "
+            printf "%s  - " "${indent}    "; _emit_warp_pane_leaf_inline 2 "${indent}        " ;;
+        4)
+            printf "%ssplit_direction: vertical\n" "$indent"
+            printf "%spanes:\n" "$indent"
+            printf "%s- split_direction: horizontal\n" "${indent}  "
+            printf "%s  panes:\n" "${indent}  "
+            printf "%s  - " "${indent}    "; _emit_warp_pane_leaf_inline 0 "${indent}        "
+            printf "%s  - " "${indent}    "; _emit_warp_pane_leaf_inline 1 "${indent}        "
+            printf "%s- split_direction: horizontal\n" "${indent}  "
+            printf "%s  panes:\n" "${indent}  "
+            printf "%s  - " "${indent}    "; _emit_warp_pane_leaf_inline 2 "${indent}        "
+            printf "%s  - " "${indent}    "; _emit_warp_pane_leaf_inline 3 "${indent}        " ;;
+    esac
+}
+
+# Emit a leaf pane inline starting from the cwd: line (the dash + space prefix
+# is already printed by the caller; this just emits cwd: and following keys).
+_emit_warp_pane_leaf_inline() {
+    local i="$1" indent="$2"
+    local cwd="${CWDS[$i]}"
+    local cmd
+    cmd="$(claude_cmd_for "$i" "${NAMES[$i]}" "$cwd")"
+    printf "cwd: %s\n" "$(_yaml_escape "$cwd")"
     printf "%scommands:\n" "$indent"
     printf "%s  - exec: %s\n" "$indent" "$(_yaml_escape "$cmd")"
 }
@@ -593,7 +756,31 @@ _as_escape() {
     python3 -c 'import sys; s=sys.argv[1]; print(s.replace("\\","\\\\").replace("\"","\\\""))' "$1"
 }
 
+# Generate the shell command for session #i, including the OSC title and
+# OSC-6 tab color prelude. Used by both tabs and panes layouts.
+_iterm_full_cmd() {
+    local i="$1"
+    local title cmd rgb color_seq
+    title="${NAMES[$i]} · ${PROJECT_NAME}"
+    cmd="$(claude_cmd_for "$i" "${NAMES[$i]}" "${CWDS[$i]}")"
+    rgb="$(color_for "$i" "iterm")"
+    color_seq="$(_iterm_color_seq "$rgb")"
+    printf 'printf %s; printf %s; %s' \
+        "'\\033]0;$(_as_escape "$title")\\a'" \
+        "'${color_seq}'" \
+        "$cmd"
+}
+
 _build_iterm_script() {
+    case "$LAYOUT" in
+        tabs)    _build_iterm_tabs ;;
+        windows) _build_iterm_windows ;;
+        panes)   _build_iterm_panes ;;
+    esac
+}
+
+# Layout=tabs: one window, N tabs.
+_build_iterm_tabs() {
     local lines=()
     lines+=('tell application "iTerm"')
     lines+=('  activate')
@@ -601,23 +788,10 @@ _build_iterm_script() {
 
     local i
     for ((i = 0; i < COUNT; i++)); do
-        local title cmd rgb color_seq full_cmd
-        title="${NAMES[$i]} · ${PROJECT_NAME}"
-        cmd="$(claude_cmd_for "$i" "${NAMES[$i]}" "${CWDS[$i]}")"
-        rgb="$(color_for "$i" "iterm")"
-        color_seq="$(_iterm_color_seq "$rgb")"
-
-        # The shell command sent into each tab:
-        #   1. Set tab title via OSC 0
-        #   2. Set tab color via OSC 6 (iTerm2-proprietary)
-        #   3. Run the claude command
-        full_cmd=$(printf 'printf %s; printf %s; %s' \
-            "'\\033]0;$(_as_escape "$title")\\a'" \
-            "'${color_seq}'" \
-            "$cmd")
+        local full_cmd
+        full_cmd="$(_iterm_full_cmd "$i")"
 
         if [ "$i" -eq 0 ]; then
-            # First tab — the window's initial session.
             lines+=("  tell current session of newWindow")
             lines+=("    write text \"$(_as_escape "$full_cmd")\"")
             lines+=("  end tell")
@@ -633,6 +807,86 @@ _build_iterm_script() {
 
     lines+=('end tell')
     printf "%s\n" "${lines[@]}"
+}
+
+# Layout=windows: N separate windows.
+_build_iterm_windows() {
+    local lines=()
+    lines+=('tell application "iTerm"')
+    lines+=('  activate')
+    local i
+    for ((i = 0; i < COUNT; i++)); do
+        local full_cmd
+        full_cmd="$(_iterm_full_cmd "$i")"
+        lines+=("  set w${i} to (create window with default profile)")
+        lines+=("  tell current session of w${i}")
+        lines+=("    write text \"$(_as_escape "$full_cmd")\"")
+        lines+=("  end tell")
+    done
+    lines+=('end tell')
+    printf "%s\n" "${lines[@]}"
+}
+
+# Layout=panes: one window, one tab, N rectangular split panes (N=1..4).
+# Split convention: "vertically" = vertical divider line (left|right),
+# "horizontally" = horizontal divider line (top/bottom).
+#
+# Tilings (s1 is the initial session, splits return new sessions):
+#   N=2:  s1 | s2                                    (vertical split of s1)
+#   N=3:  s1 | s2/s3                                 (vert(s1)=s2; horiz(s2)=s3)
+#   N=4:  s1/s3 | s2/s4   (2x2)                      (vert(s1)=s2; horiz(s1)=s3; horiz(s2)=s4)
+#
+# Implementation note: AppleScript's inline form
+#   `set s2 to (tell s1 to split vertically with default profile command "...")`
+# is rejected by the AppleScript compiler (the `command` token after `to`
+# confuses the grammar). The block form
+#   `tell s1 \n  set s2 to (split vertically with default profile command "...") \n end tell`
+# is the only shape that parses cleanly.
+_build_iterm_panes() {
+    local lines=()
+    lines+=('tell application "iTerm"')
+    lines+=('  activate')
+    lines+=('  set w to (create window with default profile)')
+    lines+=('  set s1 to current session of w')
+
+    # First session's command runs in s1 via write text (s1 was created with
+    # no command parameter).
+    lines+=("  tell s1")
+    lines+=("    write text \"$(_as_escape "$(_iterm_full_cmd 0)")\"")
+    lines+=("  end tell")
+
+    # Emit the script body to date, then append the splits and the closing tell.
+    # Done in two phases to stay bash-3.2 compatible (no nameref/mapfile).
+    printf "%s\n" "${lines[@]}"
+
+    case "$COUNT" in
+        1) ;;
+        2)
+            _iterm_split_block 1 s1 s2 vertically ;;
+        3)
+            _iterm_split_block 1 s1 s2 vertically
+            _iterm_split_block 2 s2 s3 horizontally ;;
+        4)
+            _iterm_split_block 1 s1 s2 vertically
+            _iterm_split_block 2 s1 s3 horizontally
+            _iterm_split_block 3 s2 s4 horizontally ;;
+    esac
+
+    printf "end tell\n"
+}
+
+# Emit a `tell <parent> ... split ... command "..." ... end tell` block to stdout
+# as three lines (one per array entry the caller will use). Bash-3.2 compatible
+# (no `local -n` nameref, no `mapfile`).
+# Args: command-index parent-session new-session direction
+_iterm_split_block() {
+    local cmd_idx="$1" parent="$2" newvar="$3" direction="$4"
+    local cmd
+    cmd="$(_iterm_full_cmd "$cmd_idx")"
+    printf "  tell %s\n" "$parent"
+    printf "    set %s to (split %s with default profile command \"%s\")\n" \
+        "$newvar" "$direction" "$(_as_escape "$cmd")"
+    printf "  end tell\n"
 }
 
 # ----------------------------------------------------------------------------

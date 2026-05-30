@@ -292,7 +292,9 @@
         <div class="seg" id="layout-seg">
           <button data-v="tabs" class="on">Tabs</button>
           <button data-v="windows">Windows</button>
+          <button data-v="panes">Panes</button>
         </div>
+        <span class="hint" id="layout-hint"></span>
       </div>
     </div>
 
@@ -546,6 +548,12 @@ function syncForm() {
     none: `WARNING: all sessions share the same checkout — edit conflicts likely`,
   }[state.worktrees] || "";
   document.getElementById("worktrees-hint").textContent = hint;
+  const layoutHint = {
+    tabs: "N tabs in one window",
+    windows: "N separate windows",
+    panes: "N rectangular split panes in one window (N=1..4)",
+  }[state.layout] || "";
+  document.getElementById("layout-hint").textContent = layoutHint;
   renderSessions();
 }
 

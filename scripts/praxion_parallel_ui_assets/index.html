@@ -505,6 +505,14 @@ function renderSessions() {
          </select>`
       : "";
 
+    // When both color and task are set, /color is NOT auto-injected (multi-line
+    // slash-command parsing in Claude Code is unverified). Surface a hint so
+    // the user knows to type /color manually after claude starts.
+    const bothSet = !!(s.claude_color && (s.task || "").trim());
+    const colorHint = bothSet
+      ? `<div class="hint" style="grid-column: 1 / -1; color: var(--warn);">color + task both set — task wins; type <code>/color ${s.claude_color}</code> yourself after claude starts.</div>`
+      : "";
+
     const namePlaceholder = praxionAware && s.agent
       ? `worktree name (auto: ${s.agent})`
       : "worktree name";
@@ -528,6 +536,7 @@ function renderSessions() {
         </select>
         <textarea data-k="task" placeholder="Initial prompt (pre-typed; user presses Enter to submit). Empty = no prompt.">${escapeAttr(s.task || "")}</textarea>
         ${sysPromptBlock}
+        ${colorHint}
       </div>
       <div class="controls">
         <span class="badge">#${i + 1}</span>
@@ -553,6 +562,25 @@ function renderSessions() {
             swatch.style.background = state.no_color
               ? "transparent"
               : (PALETTE_HEX[el.value] || PALETTE_HEX[PALETTE[i % 6]]);
+          }
+        }
+        // When color or task changes, re-evaluate the "both set" hint without
+        // re-rendering the whole row.
+        if (el.dataset.k === "claude_color" || el.dataset.k === "task") {
+          const sess = state.sessions[i];
+          const both = !!(sess.claude_color && (sess.task || "").trim());
+          let hintEl = row.querySelector(".hint[style*=\"warn\"]");
+          if (both && !hintEl) {
+            const fields = row.querySelector(".fields");
+            const div = document.createElement("div");
+            div.className = "hint";
+            div.style.cssText = "grid-column: 1 / -1; color: var(--warn);";
+            div.innerHTML = `color + task both set — task wins; type <code>/color ${sess.claude_color}</code> yourself after claude starts.`;
+            fields.appendChild(div);
+          } else if (!both && hintEl) {
+            hintEl.remove();
+          } else if (both && hintEl) {
+            hintEl.innerHTML = `color + task both set — task wins; type <code>/color ${sess.claude_color}</code> yourself after claude starts.`;
           }
         }
       });

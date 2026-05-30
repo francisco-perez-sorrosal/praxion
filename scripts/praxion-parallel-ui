@@ -258,10 +258,23 @@ def compose_args(state: dict[str, Any]) -> list[str]:
                 s["name"] = s["agent"].strip()
 
         names = [s.get("name", "").strip() for s in sessions if s.get("name", "").strip()]
-        tasks = [s.get("task", "") for s in sessions]
+
+        # Compose the per-session task with an optional `/color <name>` prefix.
+        # When `claude_color` is set on a session, Claude Code's `/color <name>`
+        # slash command runs as the first user message — setting the agent-
+        # identifier color inside the session. Multi-line is fine: the slash
+        # command parses the first line, and the rest is the actual task prompt.
+        tasks: list[str] = []
+        for s in sessions:
+            task = s.get("task", "") or ""
+            color = (s.get("claude_color") or "").strip()
+            if color:
+                task = f"/color {color}\n{task}" if task else f"/color {color}"
+            tasks.append(task)
+
         if names:
             args += ["--names", ",".join(names)]
-        # Only emit --tasks if at least one task is non-empty
+        # Only emit --tasks if at least one task is non-empty after color injection
         if any(t for t in tasks):
             args += ["--tasks", "|".join(tasks)]
 

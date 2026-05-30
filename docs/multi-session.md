@@ -274,7 +274,7 @@ The `--name` flag tags the session in `claude agents` so you can find it later i
 Once the tabs are open:
 
 - **Tab switching** — Warp: `⌘1` / `⌘2` / …; iTerm2: `⌘1` / `⌘2` / … per tab, `⌘⇧[` / `⌘⇧]` to walk.
-- **Second visual layer** — once Claude starts in each tab, type `/color <name>` (e.g., `/color blue`) to set the agent-identifier color (the colored marker next to subagent names). Per [Claude Code v2.1.75+](https://github.com/anthropics/claude-code/issues/34702). Combined with the tab color, gives two cognitive layers of separation.
+- **Second visual layer (auto-injected)** — each session's `claude_color` is auto-injected as the first user message via Claude Code's `/color <name>` slash command (Claude Code v2.1.75+). When a session has both a color and a task, the launcher composes the prompt as `/color <name>\n<task>` so the color is set, then the task prompt runs. Pick the color in the per-session `/color` dropdown in the web launcher; the swatch dot tracks the dropdown live.
 - **Auto-cleanup** — when you exit a session with no uncommitted changes, no untracked files, and no new commits, Claude Code removes the worktree and its branch automatically. Sessions with changes prompt you to keep or discard.
 - **`.env` copying** — add `.worktreeinclude` (gitignore syntax) to your project root to have Claude Code copy gitignored config files (`.env`, `.env.local`, etc.) into each new worktree automatically.
 

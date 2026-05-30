@@ -255,6 +255,23 @@
     width: 100%;
     font-size: 12px;
   }
+  .project-item {
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg);
+  }
+  .project-item:hover {
+    background: var(--bg-input);
+  }
+  .project-item.current {
+    color: var(--accent);
+  }
+  .project-item .dim {
+    color: var(--fg-dim);
+  }
 </style>
 </head>
 <body>
@@ -271,8 +288,15 @@
 
     <div class="row">
       <label class="k">Project</label>
-      <div class="v">
+      <div class="v" style="position: relative;">
+        <button class="btn" id="project-picker-btn" title="Browse projects" style="padding: 7px 10px;">📁</button>
         <input id="project" class="full" type="text" placeholder="/absolute/path">
+
+        <div id="project-picker-popover" style="display: none; position: absolute; top: 38px; left: 0; right: 0; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 6px; padding: 10px; z-index: 50; max-height: 320px; overflow: hidden; display: none; flex-direction: column; gap: 8px; box-shadow: 0 6px 24px rgba(0,0,0,0.3);">
+          <input id="project-picker-filter" type="text" placeholder="filter…" autocomplete="off">
+          <div id="project-picker-list" style="overflow-y: auto; max-height: 240px; display: flex; flex-direction: column; gap: 2px;"></div>
+          <div class="hint" id="project-picker-meta"></div>
+        </div>
       </div>
     </div>
 
@@ -466,7 +490,11 @@ function renderSessions() {
   state.sessions.forEach((s, i) => {
     const row = document.createElement("div");
     row.className = "session-row";
-    const swatchColor = state.no_color ? "transparent" : PALETTE_HEX[PALETTE[i % 6]];
+    // Swatch follows the user's claude_color choice (palette-indexed default
+    // when unset). Previously keyed only by `i % 6`, which is why changing
+    // the dropdown didn't update the dot.
+    const colorName = s.claude_color || PALETTE[i % 6];
+    const swatchColor = state.no_color ? "transparent" : (PALETTE_HEX[colorName] || PALETTE_HEX[PALETTE[i % 6]]);
 
     // Praxion-aware mode: show the agent dropdown as the primary identity control.
     // Worktree name auto-derives from the agent unless the user types one.
@@ -515,6 +543,16 @@ function renderSessions() {
           if (nameInput && !nameInput.value.trim() && el.value) {
             nameInput.value = el.value;
             state.sessions[i].name = el.value;
+          }
+        }
+        // When the user picks a different /color, update the swatch in place
+        // (no full re-render — keeps focus + textarea selections intact).
+        if (el.dataset.k === "claude_color") {
+          const swatch = row.querySelector(".swatch");
+          if (swatch) {
+            swatch.style.background = state.no_color
+              ? "transparent"
+              : (PALETTE_HEX[el.value] || PALETTE_HEX[PALETTE[i % 6]]);
           }
         }
       });
@@ -728,6 +766,60 @@ async function runEndpoint(path, label) {
 }
 
 // --- Wire up ---
+function wireProjectPicker() {
+  const btn = document.getElementById("project-picker-btn");
+  const pop = document.getElementById("project-picker-popover");
+  const filter = document.getElementById("project-picker-filter");
+  const list = document.getElementById("project-picker-list");
+  const meta = document.getElementById("project-picker-meta");
+  const input = document.getElementById("project");
+
+  function render(query = "") {
+    const q = query.trim().toLowerCase();
+    const home = "/Users/" + (initialProject.split("/")[2] || "");
+    const matches = availableProjects.filter(p =>
+      !q || p.toLowerCase().includes(q)
+    );
+    list.innerHTML = matches.length
+      ? matches.map(p => {
+          const isCurrent = p === input.value.trim();
+          const shown = p.startsWith(home) ? "~" + p.slice(home.length) : p;
+          return `<div class="project-item${isCurrent ? " current" : ""}" data-path="${escapeAttr(p)}">${escapeAttr(shown)}</div>`;
+        }).join("")
+      : `<div class="hint" style="padding: 8px 10px;">No projects match "${escapeAttr(q)}".</div>`;
+    meta.textContent = `${matches.length} of ${availableProjects.length} from $PRAXION_DEV_DIR (default ~/dev). Use the input above for arbitrary paths.`;
+    list.querySelectorAll(".project-item").forEach(el => {
+      el.addEventListener("click", () => {
+        const path = el.dataset.path;
+        input.value = path;
+        state.project = path;
+        // Fire `input` event so the existing debounced reloader picks up the
+        // new project: project-local recipes + praxion-aware mode refresh.
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        pop.style.display = "none";
+      });
+    });
+  }
+
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    const open = pop.style.display === "flex";
+    if (open) { pop.style.display = "none"; return; }
+    pop.style.display = "flex";
+    filter.value = "";
+    render("");
+    setTimeout(() => filter.focus(), 50);
+  });
+  filter.addEventListener("input", e => render(e.target.value));
+  // Close popover on outside click or Escape.
+  document.addEventListener("click", e => {
+    if (!pop.contains(e.target) && e.target !== btn) pop.style.display = "none";
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") pop.style.display = "none";
+  });
+}
+
 function wireSegs() {
   document.querySelectorAll("#terminal-seg button").forEach(b => {
     b.addEventListener("click", () => { state.terminal = b.dataset.v; syncForm(); });
@@ -849,6 +941,7 @@ wireSegs();
 wireSessionButtons();
 wireRecipes();
 wireActions();
+wireProjectPicker();
 bootstrap().catch(e => {
   document.getElementById("info").textContent = `bootstrap failed: ${e}`;
 });

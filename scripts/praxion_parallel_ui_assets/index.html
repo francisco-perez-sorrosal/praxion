@@ -453,14 +453,17 @@ const token = new URLSearchParams(location.search).get("t") || "";
 const state = {
   project: "",
   terminal: "warp",
-  layout: "tabs",
-  worktrees: "new",
+  // UI defaults: panes layout + no worktree isolation. Lightest entry point —
+  // a single window with N rectangular panes, all sharing the project root.
+  // Pick `New` worktrees in the segmented control when you want isolation.
+  layout: "panes",
+  worktrees: "none",
   base_ref: "",
   yolo: false,
   no_color: false,
   sessions: [
-    { name: "s1", task: "", system_prompt: "", claude_color: "red", agent: "" },
-    { name: "s2", task: "", system_prompt: "", claude_color: "green", agent: "" },
+    { name: "s1", task: "", system_prompt: "", claude_color: "red", agent: "", yolo: false },
+    { name: "s2", task: "", system_prompt: "", claude_color: "green", agent: "", yolo: false },
   ],
 };
 let recipes = [];
@@ -540,11 +543,18 @@ function renderSessions() {
       </div>
       <div class="controls">
         <span class="badge">#${i + 1}</span>
+        <label class="session-yolo" title="Auto-approve this session (--dangerously-skip-permissions). Overrides the global toggle for this row." style="display:flex; align-items:center; gap:4px; margin-top:6px; font-size:11px; color: ${s.yolo ? 'var(--warn)' : 'var(--fg-dim)'}; cursor:pointer; user-select:none;">
+          <input type="checkbox" data-k="yolo" ${s.yolo ? "checked" : ""} style="margin:0;">
+          <span>⚡yolo</span>
+        </label>
       </div>
     `;
     row.querySelectorAll("input,textarea,select").forEach(el => {
-      el.addEventListener("input", () => {
-        state.sessions[i][el.dataset.k] = el.value;
+      // Use `change` for checkboxes (more reliable than `input` on some browsers).
+      const event = el.type === "checkbox" ? "change" : "input";
+      el.addEventListener(event, () => {
+        // Checkboxes write boolean; everything else writes value.
+        state.sessions[i][el.dataset.k] = el.type === "checkbox" ? el.checked : el.value;
         // When the user picks an agent and the worktree name is still empty,
         // mirror the agent name into the worktree-name input on the fly.
         if (el.dataset.k === "agent" && praxionAware) {
@@ -639,6 +649,9 @@ function selectRecipe(name) {
     system_prompt: s.system_prompt || "",
     claude_color: s.claude_color || PALETTE[0],
     agent: s.agent || "",
+    // Recipe-level yolo is the default for each session unless the recipe
+    // explicitly defines per-session yolo.
+    yolo: s.yolo !== undefined ? !!s.yolo : !!r.yolo,
   }));
   document.getElementById("recipe-name").value = r.name;
   document.getElementById("recipe-desc").value = r.description || "";
@@ -862,7 +875,12 @@ function wireSegs() {
     b.addEventListener("click", () => { state.base_ref = b.dataset.v; syncForm(); });
   });
   document.getElementById("yolo").addEventListener("change", e => {
-    state.yolo = e.target.checked; syncForm();
+    state.yolo = e.target.checked;
+    // Mass-apply the new global value to every session row. Per-session
+    // overrides are still possible by clicking the row's yolo toggle
+    // after this — but flipping global resets the baseline.
+    state.sessions.forEach(s => { s.yolo = e.target.checked; });
+    syncForm();
   });
   document.getElementById("color").addEventListener("change", e => {
     state.no_color = !e.target.checked; syncForm();
@@ -899,6 +917,7 @@ function wireSessionButtons() {
       system_prompt: "",
       claude_color: PALETTE[i % 6],
       agent: "",
+      yolo: state.yolo,
     });
     syncForm();
   });
@@ -920,8 +939,8 @@ function wireSessionButtons() {
   });
   document.getElementById("reset-sessions").addEventListener("click", () => {
     state.sessions = [
-      { name: "s1", task: "", system_prompt: "", claude_color: "red", agent: "" },
-      { name: "s2", task: "", system_prompt: "", claude_color: "green", agent: "" },
+      { name: "s1", task: "", system_prompt: "", claude_color: "red", agent: "", yolo: state.yolo },
+      { name: "s2", task: "", system_prompt: "", claude_color: "green", agent: "", yolo: state.yolo },
     ];
     document.getElementById("recipe-meta").textContent = "Reset to defaults.";
     syncForm();

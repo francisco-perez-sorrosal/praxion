@@ -106,6 +106,9 @@ ${B}OPTIONS${R}
       --append-system-prompts "P1|P2|..."
                            Per-session --append-system-prompt; pipe-separated.
                            Pair with --tasks for recipe-style role assignments.
+      --yolos "t,f,t,..."  Per-session --dangerously-skip-permissions overrides
+                           (comma-separated booleans: t/true/1 or f/false/0).
+                           Overrides --yolo when set per-session.
       --ui [PROJECT]       Launch the ephemeral web launcher instead of
                            spawning directly. Submits compose into this script.
       --layout LAYOUT      tabs (default) | windows | panes
@@ -168,6 +171,7 @@ NAMES_CSV=""
 BASE_REF=""
 TASKS_PIPED=""
 SYSPROMPTS_PIPED=""
+YOLOS_CSV=""
 LAYOUT="tabs"
 USE_UI=false
 WARP_MODE="launch-config"
@@ -208,6 +212,10 @@ while [ $# -gt 0 ]; do
             [ -z "${2:-}" ] && { EXIT_CODE=$EXIT_USAGE die "--append-system-prompts needs a value"; }
             SYSPROMPTS_PIPED="$2"; shift ;;
         --append-system-prompts=*) SYSPROMPTS_PIPED="${1#--append-system-prompts=}" ;;
+        --yolos)
+            [ -z "${2:-}" ] && { EXIT_CODE=$EXIT_USAGE die "--yolos needs a value"; }
+            YOLOS_CSV="$2"; shift ;;
+        --yolos=*) YOLOS_CSV="${1#--yolos=}" ;;
         --ui) USE_UI=true ;;
         --layout)
             [ -z "${2:-}" ] && { EXIT_CODE=$EXIT_USAGE die "--layout needs a value"; }
@@ -418,6 +426,20 @@ if [ -n "$SYSPROMPTS_PIPED" ]; then
     IFS='|' read -r -a SYSPROMPTS <<< "$SYSPROMPTS_PIPED"
 fi
 
+# Per-session yolo overrides (split on ,). Each element is t/true/1 → true,
+# anything else → false. Empty array means "no per-session override; use
+# the global --yolo flag value".
+YOLOS=()
+if [ -n "$YOLOS_CSV" ]; then
+    IFS=',' read -r -a YOLOS_RAW <<< "$YOLOS_CSV"
+    for v in "${YOLOS_RAW[@]}"; do
+        case "$v" in
+            t|true|1|TRUE|True) YOLOS+=(true) ;;
+            *) YOLOS+=(false) ;;
+        esac
+    done
+fi
+
 # ----------------------------------------------------------------------------
 # Build the per-session claude invocation
 # ----------------------------------------------------------------------------
@@ -432,7 +454,12 @@ claude_cmd_for() {
         existing|none) ;; # cwd handles it
     esac
 
-    "$YOLO" && parts+=("--dangerously-skip-permissions")
+    # Per-session yolo: --yolos overrides --yolo when set for this index.
+    local yolo_for_session="$YOLO"
+    if [ "${#YOLOS[@]}" -gt "$idx" ]; then
+        yolo_for_session="${YOLOS[$idx]}"
+    fi
+    "$yolo_for_session" && parts+=("--dangerously-skip-permissions")
 
     parts+=("--name" "$(printf "%s/%s" "$PROJECT_NAME" "$name")")
 

@@ -241,12 +241,22 @@ def compose_args(state: dict[str, Any]) -> list[str]:
     args += ["--worktrees", state.get("worktrees", "new")]
     args += ["--layout", state.get("layout", "tabs")]
 
-    if state.get("yolo"):
-        args.append("--yolo")
     if state.get("no_color"):
         args.append("--no-color")
     if state.get("base_ref"):
         args += ["--base-ref", state["base_ref"]]
+
+    # Resolve per-session yolo. Each session's `yolo` field overrides the
+    # global state.yolo. Emit --yolos (per-session) when any session has an
+    # explicit yolo value; fall back to --yolo (global) only when no session
+    # carries a per-session field (legacy callers).
+    sessions_pre = state.get("sessions") or []
+    has_per_session_yolo = any("yolo" in s for s in sessions_pre)
+    if has_per_session_yolo and sessions_pre:
+        yolos = ["t" if s.get("yolo") else "f" for s in sessions_pre]
+        args += ["--yolos", ",".join(yolos)]
+    elif state.get("yolo"):
+        args.append("--yolo")
 
     sessions = state.get("sessions") or []
     if sessions:

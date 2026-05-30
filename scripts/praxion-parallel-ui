@@ -262,11 +262,17 @@ def compose_args(state: dict[str, Any]) -> list[str]:
         # Compose the per-session task with an optional `/color <name>` prefix.
         #
         # Claude Code's `/color <name>` slash command sets the agent-identifier
-        # color inside the session. The slash command parser's behavior on a
-        # multi-line initial-prompt arg (e.g. "/color blue\nImplement step 7.3")
-        # is UNVERIFIED — it might run the slash command and send the rest as
-        # a follow-up, or it might treat the whole thing as a single text
-        # message with the slash command never firing. To stay deterministic:
+        # color inside the session. EMPIRICALLY CONFIRMED via real-world test
+        # (Claude Code 2.1.158): `/color`'s argument capture is greedy —
+        # `$ARGUMENTS` swallows everything after the command name including
+        # newlines, then validates the whole blob as a color name. So a
+        # multi-line "/color blue\nImplement step 7.3" sets color to the
+        # literal string "blue\nImplement step 7.3" and is rejected as
+        # invalid. The only way to send both is two separate keystroke events
+        # into the TUI, which Warp's launch-config path cannot do (single
+        # command per pane) and which would be timing-brittle in iTerm2.
+        #
+        # Therefore the deterministic split:
         #
         #   - color set, task empty:     send "/color <color>"  (clean slash run)
         #   - color set, task set:       send "<task>" only     (user types /color manually)

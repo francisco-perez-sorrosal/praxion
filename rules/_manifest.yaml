@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-05-28T05:56:15Z'
+generated_at: '2026-06-02T20:29:51Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
@@ -28,7 +28,7 @@ rules:
   load: always_on
   core: true
   install: symlink
-  chars: 12580
+  chars: 12865
 - id: swe/swe-agent-coordination-protocol
   path: rules/swe/swe-agent-coordination-protocol.md
   load: always_on
@@ -46,7 +46,7 @@ rules:
   load: always_on
   core: false
   install: hook-deliver
-  chars: 5522
+  chars: 5746
 - id: swe/vcs/git-conventions
   path: rules/swe/vcs/git-conventions.md
   load: always_on

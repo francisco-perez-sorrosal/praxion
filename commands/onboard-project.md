@@ -433,6 +433,8 @@ See [`docs/rules-taxonomy.md`](../docs/rules-taxonomy.md) for the complete refer
 
 Do not recommend tools the user already has, and do not recommend `uv` if no Python signal was detected in §Pre-flight.
 
+**Agentic transactions (opt-in):** If your managed project will implement agentic payments or trading, the `agentic-transactions-architect` agent and the `agentic-transactions` skill are available as Praxion-internal pipeline capabilities — activate them by including `transaction`, `payment`, or `trading` context in your task description.
+
 ## §Phase 8 — Architecture Baseline (opt-in, default-yes)
 
 **Templates.** The architect doc uses `skills/software-planning/assets/ARCHITECTURE_TEMPLATE.md` (architect-facing design target — full section ownership tags). The developer doc uses `skills/doc-management/assets/ARCHITECTURE_GUIDE_TEMPLATE.md` (filtered to Built components only — every name and path code-verified). The agent's full standing contract is in `agents/systems-architect.md`; this phase invokes a *baseline-audit subset* of that contract, with the directives below as the diff.

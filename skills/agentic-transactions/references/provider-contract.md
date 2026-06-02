@@ -108,6 +108,14 @@ ErrorCode (closed enum):
   human-in-the-loop before retrying.
 - `retriable: False` → do not retry; log and surface to the orchestrator.
 
+**`provider_unavailable` and MCP connection failures:** this code maps to MCP transport
+failures — connection timeout, auto-reconnect exhaustion (5 attempts × exponential backoff
+≈ 30 seconds), or circuit-open state. For `retriable: True` on the MCP client side,
+apply a **bounded exponential backoff** (e.g. base 1s, factor 2×, max 5 attempts, jitter)
+before declaring the provider unavailable. Do not retry indefinitely — set an outer timeout
+budget proportional to your strategy's latency tolerance. On exhaustion, surface
+`provider_unavailable` with `retriable: False` to the orchestrator.
+
 ---
 
 ## Declared Optional Capabilities
@@ -120,7 +128,7 @@ CapabilityDescriptor {
     supports_sandbox      : bool    # paper-trading / testnet / dry-run mode available
     supports_market_data  : bool    # get_market_data() is implemented
     supports_positions    : bool    # list_positions() is implemented
-    approval_mode         : "autonomous" | "human_gate" | "hybrid"
+    approval_mode         : "autonomous" | "human_gate" | "hybrid"   # provider CAPABILITY: which modes it supports ("hybrid" = supports per-call choice). NOT a per-call value — each Approval.mode is only "autonomous" or "human_gate".
     transport_kind        : "mcp-client" | "http-sdk-client"
 }
 

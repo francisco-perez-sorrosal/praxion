@@ -59,7 +59,7 @@ Answer these three questions before loading any reference file.
 - Adding a new provider → copy `references/_provider-template.md` → fill all bracketed fields
 - Formal pseudotype spec, Python binding → `references/provider-contract.md`
 
-**Key composition note:** Robinhood (Space B — trades equities) and Nevermined/x402 (Space A — pays for services) are orthogonal layers. A "pay-for-the-service, then trade" flow *composes* the two; neither replaces the other.
+**Key composition note:** Robinhood (Space B — trades equities) and Nevermined/x402 (Space A — pays for services) are orthogonal layers. A "pay-for-the-service, then trade" flow *composes* the two; neither replaces the other. Note: Robinhood also ships a separate **Banking MCP server (Agentic Credit Card — Space A, payments)**, orthogonal to the Trading MCP (Space B). The Banking MCP endpoint URL is not yet publicly documented; when documented it becomes a second Robinhood provider on the payments side.
 
 ---
 

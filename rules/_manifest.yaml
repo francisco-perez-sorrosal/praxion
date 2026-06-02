@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-06-02T20:29:51Z'
+generated_at: '2026-06-02T21:14:09Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
@@ -34,7 +34,7 @@ rules:
   load: always_on
   core: true
   install: symlink
-  chars: 19566
+  chars: 20680
 - id: swe/memory-protocol
   path: rules/swe/memory-protocol.md
   load: always_on

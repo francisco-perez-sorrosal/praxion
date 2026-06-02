@@ -1,7 +1,7 @@
 ---
-id: dec-draft-26b721f3
+id: dec-210
 title: v1 scope is trading-only PoC with a payments-ready contract
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-02
 summary: v1 implements only the trading path (Space B) behind the Provider contract; the contract is designed to span payments (Space A) too, but payment providers and the pay-for-service composition are designed-for, not built. Honors a locked user decision.
@@ -18,11 +18,11 @@ re_affirms: ""
 
 ## Context
 
-The user locked the scope decision: v1 is a **trading-only PoC** with a **payments-ready contract**. Research confirms the two spaces are distinct (Nevermined cannot place an equity order; Robinhood is a brokerage, not a payment rail) and that a full "agent buys stock and pays for the service" flow would *compose* a payment provider (Space A) with a brokerage (Space B). The contract (`dec-draft-7a508928`) is built to span both, but the question is what v1 *implements*.
+The user locked the scope decision: v1 is a **trading-only PoC** with a **payments-ready contract**. Research confirms the two spaces are distinct (Nevermined cannot place an equity order; Robinhood is a brokerage, not a payment rail) and that a full "agent buys stock and pays for the service" flow would *compose* a payment provider (Space A) with a brokerage (Space B). The contract (`dec-208`) is built to span both, but the question is what v1 *implements*.
 
 ## Decision
 
-v1 **implements only the trading path** with a single brokerage provider (Robinhood — see `dec-draft-f2bfc5c1`). The `Provider` contract is designed to span both spaces, but payment providers (x402 / Nevermined / Stripe) and the pay-for-service composition are **designed-for, not built**. The skill and contract make the payment path a future drop-in (a new plugin behind the same core + a `references/<provider>.md`).
+v1 **implements only the trading path** with a single brokerage provider (Robinhood — see `dec-209`). The `Provider` contract is designed to span both spaces, but payment providers (x402 / Nevermined / Stripe) and the pay-for-service composition are **designed-for, not built**. The skill and contract make the payment path a future drop-in (a new plugin behind the same core + a `references/<provider>.md`).
 
 ## Considered Options
 

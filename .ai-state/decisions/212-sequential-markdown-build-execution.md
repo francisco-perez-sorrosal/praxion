@@ -1,7 +1,7 @@
 ---
-id: dec-draft-01896314
+id: dec-212
 title: Sequential execution for Markdown artifact family build (agentic-transactions)
-status: proposed
+status: accepted
 category: implementation
 date: 2026-06-02
 summary: Steps 1-4 of the agentic-transactions plan execute sequentially rather than in parallel groups because cross-reference consistency in the agent/skill/reference family requires name contracts to be established before dependent artifacts are authored.
@@ -17,7 +17,7 @@ affected_files:
   - skills/agentic-transactions/references/robinhood.md
   - skills/agentic-transactions/references/_provider-template.md
 affected_reqs: []
-re_affirms: dec-draft-b7686136
+re_affirms: dec-211
 ---
 
 ## Context

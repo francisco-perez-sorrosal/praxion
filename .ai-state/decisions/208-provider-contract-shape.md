@@ -1,7 +1,7 @@
 ---
-id: dec-draft-7a508928
+id: dec-208
 title: Provider contract = thin required core + declared optional capabilities + pluggable transport + typed rail_detail/venue_detail extension
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-02
 summary: One language-independent Provider contract spans agentic payments and trading via a six-verb required core, declared optional capabilities, a pluggable transport strategy, and a typed extension that localizes all rail/venue divergence.

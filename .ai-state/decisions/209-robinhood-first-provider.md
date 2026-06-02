@@ -1,7 +1,7 @@
 ---
-id: dec-draft-f2bfc5c1
+id: dec-209
 title: Robinhood (MCP transport) is the first Provider plugin; supports_sandbox=false is first-class with HITL + capital-segregated budget as real-money guardrails
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-02
 summary: The v1 provider plugin is Robinhood Agentic Trading over MCP transport. Because Robinhood has no documented sandbox and undocumented auth/order-types/rate-limits, supports_sandbox=false is a first-class capability flag, the HITL approval interceptor and the capital-segregated agentic-account budget mandate are the real-money guardrails, and all volatile specifics are re-fetched via external-api-docs at use time.
@@ -46,4 +46,4 @@ The v1 `Provider` plugin is **Robinhood, transport = MCP-client**, implementing 
 
 ## Prior Decision
 
-None superseded. `supports_sandbox: false` and the HITL interceptor are realizations of capability flags and the optional-per-operation approval seam defined in `dec-draft-7a508928` (Provider contract shape).
+None superseded. `supports_sandbox: false` and the HITL interceptor are realizations of capability flags and the optional-per-operation approval seam defined in `dec-208` (Provider contract shape).

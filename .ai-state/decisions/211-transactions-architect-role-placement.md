@@ -1,7 +1,7 @@
 ---
-id: dec-draft-b7686136
+id: dec-211
 title: New agentic-transactions-architect is a shadow + on-demand sub-architect (interface-designer-shaped), emitting TRANSACTIONS_DESIGN.md with a challenge loop
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-02
 summary: The new domain-expert agent is a peer sub-architect modeled on interface-designer — it shadows researcher+systems-architect when transactions are in scope, owns mandate/finality/ToS/HITL domain expertise, emits a forward-only TRANSACTIONS_DESIGN.md, and registers objections via an orchestrator-mediated Architecture Challenges loop. One skill (agentic-transactions), not a multi-skill family.

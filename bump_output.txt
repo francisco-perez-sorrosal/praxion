@@ -1,8 +1,4 @@
-bump: version 0.0.1.dev0 → 0.1.0
-tag to create: v0.1.0
+bump: version 0.2.0 → 0.3.0
+tag to create: v0.3.0
 increment detected: MINOR
 
-[main f1d87fe] bump: version 0.0.1.dev0 → 0.1.0
- 5 files changed, 4 insertions(+), 8 deletions(-)
-
-Done!

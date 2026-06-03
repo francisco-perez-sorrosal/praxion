@@ -1,12 +1,263 @@
-## Unreleased
+## v0.3.0 (2026-06-03)
+
+### BREAKING CHANGE
+
+- The `/eval` slash command and the `praxion-evals list` /
+`praxion-evals behavioral` subcommands are removed with no shim. To reproduce
+the old behavioral verdict, invoke:
 
 ### Feat
 
-- **aac-dac**: Ship Idea 8 onboarding-aware tier — `/onboard-project` Phase 8b (existing OFF) + `/new-project` greenfield ON; `claude/aac-templates/` (7 files); plugin-path-resolved scripts (dec-113)
-- **aac-dac**: Ship Bundle X — bidirectional REQ↔architectural-element traceability + sentinel AC dimension extension (AC10 fence integrity, AC11 model↔markdown agreement, AC12 traceability orphans) (dec-111, dec-112)
-- **aac-dac**: Ship v1.1 — golden-rule enforcement hook (Block D + sentinel EC07), architecture CI workflow (3 parallel jobs), likec4-querying skill (8-task rubric + 13-tool recipes), Diátaxis-aligned doc-management companion (4-mode taxonomy) (dec-106..110)
-- **aac-dac**: Wire architect-validator into agent ecosystem boundaries; AaC+DaC ecosystem integration Phase 4 of W2 (dec-105)
-- **aac-dac**: Ship v1 foundation — cornerstone clauses in `~/.claude/CLAUDE.md`, fence convention + validator, fitness functions infrastructure, architect-validator agent (dec-097, dec-098, dec-100, dec-101, dec-102, dec-103, dec-104)
+- **agents**: harden agentic-transactions capability
+- **agents**: add agentic-transactions capability
+- **parallel**: ui defaults panes+none, per-session yolo override
+- **parallel**: add praxion-parallel + web launcher
+- **systems-architect**: add Phase 2.5 pre-refactor assessment + mini-pipeline contract
+- **eval-praxion**: harden v1 against nested-Claude-Code deadlock
+- add /eval-praxion v1 (Praxion self-eval framework)
+- **verifier**: de-dup Phase 3a + extend T03 exception to verifier
+- **sentinel**: recalibrate T03 for the irreducible Check Catalog
+- add gate-canary coverage meta-test + retrofit canaries (L2)
+- add sentinel Gate Liveness family + GL02 detector (L3)
+- add gate-liveness principle and canary recipe (L1)
+- register Python topology selector identifiers
+- capture load-bearing assumptions in LEARNINGS
+- gate planner on architecture completeness
+- auto-suppress memory-protocol when memory MCP is off
+- add agent return contract to the pipeline
+- add decisions.base ADR browser + usage docs
+- harden Obsidian Shape B link safety
+- switch obsidian-skills install to claude plugin marketplace
+- add Obsidian integration onboarding
+- activate test-topology protocol (M2)
+- **dashboard**: improve four surface pages
+- **ci**: add autofix workflow for CI failures
+- thread Conversation into philosophy + blocks
+- add Conversation Checkpoints to the pipeline
+- sharpen Surface Assumptions discipline
+- add --hackathon flag to new_project.sh
+- **hackathon**: add opt-in hackathon mode
+- add test-baseline disposition contract
+- invert skill-genesis to pull-driven mode
+- **rework**: hybrid rework dispatch script + osascript notification hook
+- Add verifier rework loop (Phase 12.5 + /resume-rework)
+- **rules**: warn on blacklist YAML misuse + ceiling docs
+- **rules**: defense-in-depth against stale rule symlinks
+- **rules**: extend YAML blacklist to symlinked rules
+- **rules**: auto-place blacklist template in target projects via SessionStart hook
+- **rules**: add per-project rules blacklist mechanism
+- **researcher**: add continuous-improvement loop
+- **hooks**: worktree-orientation SessionStart banner (roadmap P5)
+- **onboarding**: project-essentials CLAUDE.md block + thin-tier template (roadmap P2)
+- **dashboard**: professional console UI overhaul
+- add interface-designer agent + 4 skills
+- redesign dashboard with interactive visualizations
+- add TypeScript/Node polyglot skill support
+- **codex**: mirror Claude shared config surfaces
+- update codex bridge
+- translate agent routing
+- **codex**: complete canonical hook bridge
+- **codex**: bridge memory and observability hooks
+- **codex**: register canonical MCP servers
+- **codex**: Route via AGENTS.md
+- Export Codex pipeline adapter
+- **codex**: export Praxion slash commands as Codex skill wrappers
+- add Codex rules bridge
+- export codex skill wrappers
+- add native Codex project onboarding
+- Add Codex AGENTS adapter
+- **versioning**: drop PEP 440 dev pre-releases for SemVer-only flow
+- **streamlit**: metrics_view renderer — aggregate snapshot + redirect cue
+- **streamlit**: architecture_explorer renderer — three-pane tabbed view
+- **streamlit**: idea_grid renderer — proposal cards + ledger status tabs
+- **streamlit**: verification_report renderer — color-coded findings
+- **streamlit**: how_to_shell renderer — sections TOC + quick links
+- **streamlit**: explanation_shell renderer — reading-mode wrapper
+- **streamlit**: reference_shell renderer — anchored TOC + sortable large tables
+- **streamlit**: adr_card renderer — frontmatter chips + supersede graph + body collapse
+- **streamlit**: Documentation page — manifest-driven dispatch (HTML-D)
+- **streamlit**: doc-surface component library + manifest generator (HTML-B + HTML-C generator)
+- **dashboard**: rework Streamlit metrics page with semantic KPIs + dark theme
+- **hooks**: add SessionStart context-surface measurement for data-driven audits
+- add Praxion pipeline dashboard
+- integrate sentrux into metrics viewer + ship to onboarded projects
+- add opt-in sentrux structural quality sensor integration
+- **agents**: add token-discipline guidance
+- **hooks**: state-driven finalize chain via post-{merge,commit,checkout}
+- add ML/AI training project archetype
+- tech-debt ledger pair (active + resolved)
+- **docs**: User-facing AaC+DaC explanation essay + README/concepts/CHANGELOG
+- **aac-dac**: Idea 8 — onboarding-aware AaC tier (greenfield ON, existing OFF)
+- **aac-dac**: Bundle X — bidirectional REQ↔arch traceability + sentinel AC extension
+- **aac-dac**: Ship v1.1 — enforcement layer + likec4 skill + Diátaxis companion
+- **aac-dac**: Wire architect-validator into agent ecosystem (Phase 4)
+- **aac-dac**: implement v1 foundation (Phases 0-3)
+- **aac-dac**: record v1 design as ADR drafts
+- **rules**: allow orchestrator as ledger writer
+- Add per-project landscape watchlist
+- Encode dual-toolchain convention in skill + agent prompts
+- Migrate .ai-state/ARCHITECTURE.md L0 and L1 diagrams
+- Migrate live docs/architecture.md L1 to LikeC4 + D2
+- Migrate architecture templates to LikeC4
+- Wire LikeC4 MCP server and AI tooling references
+- Add diagram regeneration hook and test harness
+- Adopt dual-toolchain diagram conventions
+- Default merge policy to fast-forward only
+- Establish test-topology protocol (trunk-only)
+- **commands**: Extract canonical CLAUDE.md blocks to single source of truth
+- **onboarding**: Self-host guard for plugin source repos
+- Praxion-first-class enforcement + install completeness
+- **onboarding**: Rebuild commands, rename, self-awareness pass
+- **model-routing**: Apply post-review cleanup pack (items 6-11)
+- **model-routing**: Apply post-review fix-pack (items 1-5)
+- **model-routing**: Add per-agent model routing policy
+- **tech-debt**: Add ledger contract to doc-engineer
+- **tech-debt**: Add ledger contract to implementer
+- **tech-debt**: Add ledger contract to planner
+- **tech-debt**: Add ledger contract to test-engineer
+- **tech-debt**: Add ledger contract to architect
+- **tech-debt**: Migrate verifier to ledger writes
+- **tech-debt**: Add sentinel TD dimension
+- **tech-debt**: Add ledger dedupe script (GREEN)
+- **tech-debt**: Create ledger and mark Built
+- **tech-debt**: Register ledger schema in rule
+- **tech-debt**: Draft ledger and integration ADRs
+- **project-metrics**: Surface Top-N languages by SLOC in scc subsection
+- **project-metrics**: Document --refresh-coverage opt-in flag
+- **project-metrics**: Slim MD to executive summary; filter ecosystem dirs
+- **test-coverage**: Default pythonpath="." in skill's Python reference config
+- **installer**: Offer optional Python tooling install (uv + dev group)
+- **verifier**: Add test-coverage discretion guidance
+- **pyproject**: Adopt test-coverage skill default config
+- **project-metrics**: Add --refresh-coverage opt-in flag + tests
+- **commands**: Add /project-coverage thin-wrapper command
+- **test-coverage**: Add skill scaffold (dispatcher+renderer, Python v1)
+- **installer**: Offer optional scc install for /project-metrics
+- **project-metrics**: Add /project-metrics command with trend UI
+- **dev**: Add claude-dev launcher for live-edit plugin development
+- **installer**: Add /praxion-complete-install for marketplace-only users
+- **installer**: Add --from-local flag for uniform dev-mode install
+
+### Fix
+
+- **parallel**: switch /color injection to safe-mode (task wins)
+- **parallel**: swatch tracks /color dropdown + auto-inject /color + project picker
+- **parallel**: pre-flight HEAD check + subshell stdout leak + bytes JSON
+- **parallel**: warp diagnostics + panes layout + iterm2 splits
+- **eval-praxion**: scan .ai-work in working tree, fail-soft judge loop
+- **eval-praxion**: load .env, default to .ai-state
+- **testing-strategy**: drop vaporware go-testing.md mention
+- **skills**: defuse bang-injection in skill bodies
+- decouple tech-debt ledger finalize from the ADR-draft gate
+- **tech-debt**: resolve td-041 — reference-clock-aware git-log window
+- **tech-debt**: resolve td-035 — subagent .ai-work/ Write verified
+- allow subagent Write to .ai-work via settings
+- symlink Praxion pre-commit hook in install_claude.sh
+- clear sentinel doc/spec/ledger findings
+- capture last affected_files entry in validate_adr_references
+- gate paired test model to Standard/Full tier
+- repair SDD traceability quality gates
+- count hook-deliver rules in context-surface measurement
+- trim behavioral-contract block under token budget
+- repoint eval banner off retired roadmap
+- repair cross-reference validation
+- resolve praxion-dashboard symlink path
+- **ci**: add log sanitization and path tripwire
+- **ci**: harden ci-autofix per security review
+- **ci**: pin d2 and realign committed renders
+- **ci**: repair Architecture workflow failures
+- resolve sentinel findings I2 and S1
+- **staleness**: track sections in reference files
+- **web-ui-design**: repair staleness frontmatter
+- **sentinel**: scope SH01 to live references
+- regenerate AGENTS.md.tmpl from CLAUDE.md
+- **detector**: scan extensionless bash via shebang detection (td-038)
+- **tests**: fixture target_agent should be systems-architect
+- **codex**: regenerate AGENTS.md.tmpl from CLAUDE.md to clear test_claude_to_agents drift
+- **dashboard**: SVG sanitizer was silently stripping viewBox
+- dashboard diagram rendering — markdown raw-HTML/comments, foreignObject sanitization, DiagramViewer CSS + fit-to-viewport
+- praxion-dashboard start — run next start from $APP_DIR
+- dashboard /adrs and /sentinel 500s — resilient ADR frontmatter parsing + sparkline client boundary
+- silence sanitize-html <style> warning in dashboard SVG sanitizer
+- praxion-dashboard install — survive pnpm's sharp ignored-build error
+- resolve dangling ADR refs in archived SPEC
+- compile codex AGENTS from project template
+- normalize Codex hook context output
+- Reduce Codex rule hook noise
+- harden Codex adapter exports
+- **coverage**: include streamlit_app in pytest testpaths
+- **scripts**: route IDEA_LEDGER_*.md to idea_grid + skip HTML-comment summaries
+- **install**: sentinel-wrap pre-commit hook for idempotent re-install (td-020)
+- **finalize_adrs**: record branch in fragment frontmatter for unambiguous parsing (td-017)
+- **finalize_adrs**: use reflog HEAD@{1} for FF-merge draft detection (td-011)
+- **dashboard**: drop python3 dep + propagate PYTHONPATH
+- **aac-fence-validator**: Skip code-block contents and track nested fence depth
+- **skill-crafting**: Accept path-scoped skill frontmatter
+- **test**: Stub merge-state dependency in TestReconcileADRNumbers
+- **spec**: Rewrite dec-draft references in SPEC_diagrams to dec-NNN
+- Address verifier findings — T4 contract + ADR re_affirms cleanup
+- Pass workspace dir to likec4 gen; adjust T4 for lenient parse
+- **docs**: Correct LikeC4 npm package name
+- **ci**: Resolve test, type-check, and link-validation failures
+- **metrics-ui**: Point web app at the new metrics_reports/ subdir
+- **plugin**: Stop marketplace shadow-load and dev-cycle leak
+- **tech-debt**: Avoid pipe collision in notes-merge separator
+- **project-metrics**: Repair complexipy/pydeps + hot-spots + trends columns
+- **project-metrics**: Isolate complexipy cwd to prevent stray artifact
+- **finalize_adrs**: Parse multi-hyphen branches via sibling prefix
+
+### Refactor
+
+- **eval-praxion**: collapse /eval surface into single /eval-praxion entrypoint
+- **skills**: G10 meta/individuals conformance pass
+- **skills**: G9 comms/docs/security conformance pass
+- **skills**: G8 ops/infra conformance pass
+- **skills**: G7 language/prj-mgmt conformance pass
+- **skills**: G6 quality conformance pass
+- **skills**: G5 planning conformance pass
+- **skills**: G4 ML/AI-training conformance pass
+- **skills**: G3 AI/agent-building conformance pass
+- **skills**: G2 interface/API/data conformance pass
+- **skills**: G1 crafting-family conformance pass
+- **skills**: dedup artifact-naming reference
+- split otel_relay into layered modules
+- compact skill description frontmatter
+- compact agent frontmatter descriptions
+- path-scope experiment-commit rule
+- condense SDD format-rationale to essence
+- trim always-on surface via progressive disclosure
+- trim Praxion's always-on Obsidian block to a pointer
+- **plugin**: consolidate likec4 MCP into plugin.json
+- **skills**: trim observability description to fit listing budget
+- **skills**: trim llm-training-eval description to fit listing budget
+- **skills**: trim ml-training description to fit listing budget
+- **skills**: trim neo-cloud-abstraction description to fit listing budget
+- **skills**: trim tui-design description to fit listing budget
+- **skills**: trim web-ui-design description to fit listing budget
+- **skills**: trim roadmap-synthesis description to fit listing budget
+- **skills**: trim api-design-craft description to fit listing budget
+- **skills**: trim agentic-interface-design description to fit listing budget
+- **skills**: trim experiment-tracking description to fit listing budget
+- **rules**: relocate blacklist template to claude/config/
+- **rules**: consolidate ts and dashboard rules
+- **dashboard**: split globals.css into 6 cascade layers (td-030)
+- **dashboard**: drop dead metricTone/ToneResult and activeWorkshopCount alias (td-031, td-032)
+- remove legacy streamlit_app dashboard
+- **rules**: P6 relocate-don't-delete pass — trim always-loaded surface
+- **streamlit**: extract _render_helpers — single source for anchored body + H2 sidebar TOC
+- extract send_event hook handlers (td-014)
+- extract /co + /cop shared workflow to canonical block (td-006)
+- token-budget pass on always-loaded rules (td-007..td-010)
+- Retire ROADMAP.md; route content to TECH_DEBT_LEDGER and idea_ledgers
+- **.ai-state**: Group timestamped reports into subdirs
+- **tech-debt**: Drop Tech Debt section from LEARNINGS
+- **dev**: Rename claude-dev → praxion-claude-dev, default to --dangerously-skip-permissions
+
+### Perf
+
+- bound ADR index reads (recency + grep scope)
+- make verifier test-coverage load conditional
+- bound implementer and planner agent returns
 
 ## v0.2.0 (2026-04-22)
 
@@ -145,7 +396,7 @@
 - Add path-scoped testing-conventions rule for test files
 - Add testing-strategy skill with language-agnostic test methodology
 - Add /full-security-scan command for project-wide security audit
-- Add security review Phase 6 to verifier agent
+- Add security review Phase 4.5 to verifier agent
 - Add GitHub Actions PR security review workflow
 - Add context-security-review skill with diff/full-scan modes
 - Add secret pattern redaction to hook event logging

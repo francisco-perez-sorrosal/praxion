@@ -63,10 +63,17 @@ jobs:
       # Render Markdown report visible on workflow run page
       - name: Generate report summary
         if: always()
+        env:
+          # Pass via env, not raw ${{ }} interpolation: review output may contain
+          # quotes/newlines that would break a single-quoted shell assignment.
+          STRUCTURED_OUTPUT: ${{ steps.review.outputs.structured_output }}
         run: |
-          OUTPUT='${{ steps.review.outputs.structured_output }}'
-          echo "$OUTPUT" > security-report.json
-          echo "$OUTPUT" | jq -r '
+          printf '%s' "$STRUCTURED_OUTPUT" > security-report.json
+          if [ -z "$STRUCTURED_OUTPUT" ]; then
+            echo "_No structured output produced (review step failed or was skipped)._" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          jq -r '
             "# Security Review Report\n\n",
             "**Risk Level:** \(.risk_level) | **Pass:** \(.pass)\n\n",
             "## Summary\n\n\(.summary)\n\n",
@@ -79,7 +86,7 @@ jobs:
               if .recommendation then "**Recommendation:** \(.recommendation)\n" else "" end,
               "\n")
             end
-          ' >> "$GITHUB_STEP_SUMMARY"
+          ' security-report.json >> "$GITHUB_STEP_SUMMARY"
 
       # Upload structured JSON for agent consumption
       - name: Upload report artifact
@@ -102,10 +109,26 @@ jobs:
       # Post concise PR comment with link to full report
       - name: Comment on PR
         if: always()
+        env:
+          # Read from env inside the script (process.env) instead of interpolating
+          # ${{ }} into the JS source: review output containing a quote or newline
+          # would otherwise break the string literal and JSON.parse (injection-safe).
+          STRUCTURED_OUTPUT: ${{ steps.review.outputs.structured_output }}
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b  # v7.1.0
         with:
           script: |
-            const output = JSON.parse('${{ steps.review.outputs.structured_output }}');
+            const raw = process.env.STRUCTURED_OUTPUT || '';
+            if (!raw.trim()) {
+              core.info('No structured output to comment on; skipping.');
+              return;
+            }
+            let output;
+            try {
+              output = JSON.parse(raw);
+            } catch (err) {
+              core.warning(`Could not parse structured_output as JSON: ${err.message}`);
+              return;
+            }
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const emoji = output.pass ? ':white_check_mark:' : ':x:';
             const count = output.findings.length;

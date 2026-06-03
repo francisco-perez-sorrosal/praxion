@@ -88,3 +88,23 @@ jobs:
 
       - name: Shipped-artifact isolation check
         run: python3 scripts/check_shipped_artifact_isolation.py
+
+  release-staleness:
+    # Advisory (never blocks): after a merge lands on main, report agents /
+    # skills / commands added since the last v* release tag -- they are
+    # invisible to marketplace installs until a release is cut. The frozen
+    # 0.2.0 cache (interface-designer not registering) is the failure this
+    # surfaces. Push-only: noisy on PRs, meaningful post-merge on main.
+    name: Release staleness (advisory)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0  # full history + tags so `git describe` resolves the last release
+
+      - name: Report unreleased artifacts
+        run: python3 scripts/check_release_staleness.py

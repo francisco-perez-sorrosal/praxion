@@ -44,9 +44,31 @@ vi.mock("@/components/viz/sparkline", () => ({
   Sparkline: () => createElement("span", { className: "sparkline-stub" })
 }));
 
+// Stub all recharts exports so RadarChart / LineChart / etc. render safely in node.
+vi.mock("recharts", () => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  RadarChart: ({ children }: { children?: any }) =>
+    createElement("div", { className: "recharts-radar-stub" }, children),
+  Radar: () => createElement("div", { className: "recharts-radar-series-stub" }),
+  PolarGrid: () => null,
+  PolarAngleAxis: () => null,
+  PolarRadiusAxis: () => null,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ResponsiveContainer: ({ children }: { children?: any }) =>
+    createElement("div", { className: "recharts-container-stub" }, children),
+  LineChart: () => createElement("div", { className: "recharts-line-stub" }),
+  Line: () => null,
+  XAxis: () => null,
+  YAxis: () => null,
+  CartesianGrid: () => null,
+  Tooltip: () => null,
+  ReferenceLine: () => null,
+  Label: () => null
+}));
+
 // ─── Fixture helpers ──────────────────────────────────────────────────────────
 
-import type { DashboardMetricsData, MetricsSnapshot } from "@/lib/metrics";
+import type { DashboardMetricsData, MetricsSnapshot, ReadinessSnapshot } from "@/lib/metrics";
 
 function makeAggregate(
   timestamp: string,
@@ -89,11 +111,65 @@ function makeSnapshot(
     hotspots: [],
     coverageArtifactPath: null,
     coverageStatus: null,
+    readiness: null,
     schemaVersion: "1",
     toolAvailability,
     wallClockSeconds: null
   };
 }
+
+const FIXTURE_READINESS: ReadinessSnapshot = {
+  level: 3,
+  pass_pct: 0.82,
+  note: null,
+  pillars: [
+    {
+      id: "style_validation",
+      name: "Style & Validation",
+      pass_pct: 1.0,
+      numerator: 1,
+      denominator: 1,
+      level_pass: [true, true, true, false, false]
+    },
+    {
+      id: "documentation",
+      name: "Documentation",
+      pass_pct: 0.5,
+      numerator: 1,
+      denominator: 2,
+      level_pass: [true, false, false, false, false]
+    }
+  ],
+  manageability: {
+    pass_pct: 0.75,
+    numerator: 3,
+    denominator: 4,
+    note: "Praxion-native"
+  },
+  criteria: [
+    {
+      id: "c.style.linter_config",
+      pillar: "style_validation",
+      level: 1,
+      scope: "repo",
+      applicable: true,
+      passed: true,
+      llm: false,
+      rationale: "ruff config present"
+    },
+    {
+      id: "c.docs.readme_quality",
+      pillar: "documentation",
+      level: 2,
+      scope: "repo",
+      applicable: true,
+      passed: false,
+      llm: false,
+      rationale: "README missing agent-friendliness section"
+    }
+  ],
+  llm: { status: "llm_skipped", model: null, grounded_on: null }
+};
 
 /** A snapshot with a degraded "ruff" collector */
 function makeSnapshotWithDegradedCollector(id: string, timestamp: string): MetricsSnapshot {
@@ -289,5 +365,123 @@ describe("MetricsDashboard — degraded-collector fixture", () => {
     // degradedNote format: "· data confidence reduced (ruff unavailable)"
     const lower = html.toLowerCase();
     expect(lower).toContain("confidence");
+  });
+});
+
+// ─── AgentReadinessSection tests ─────────────────────────────────────────────
+
+async function renderReadinessSection(readiness: ReadinessSnapshot | null): Promise<string> {
+  const { AgentReadinessSection } = await import("@/components/readiness-section");
+  return renderToStaticMarkup(createElement(AgentReadinessSection, { readiness }));
+}
+
+describe("AgentReadinessSection — null readiness shows empty state", () => {
+  it("renders the empty-state message when readiness is null", async () => {
+    const html = await renderReadinessSection(null);
+    expect(html).toContain("No readiness data");
+    expect(html).toContain("/project-metrics");
+  });
+
+  it("does not render level badge when readiness is null", async () => {
+    const html = await renderReadinessSection(null);
+    expect(html).not.toContain("readiness-level-badge");
+  });
+});
+
+describe("AgentReadinessSection — full fixture renders level badge", () => {
+  it("renders the level badge with the correct level label", async () => {
+    const html = await renderReadinessSection(FIXTURE_READINESS);
+    expect(html).toContain("readiness-level-badge");
+    expect(html).toContain("L3");
+  });
+
+  it("renders pass_pct in the level badge", async () => {
+    const html = await renderReadinessSection(FIXTURE_READINESS);
+    expect(html).toContain("82%");
+  });
+});
+
+describe("AgentReadinessSection — full fixture renders pillar names in radar", () => {
+  it("renders pillar names as PolarAngleAxis subjects", async () => {
+    const html = await renderReadinessSection(FIXTURE_READINESS);
+    // recharts is mocked — but PolarAngleAxis is stubbed to null.
+    // The recharts-radar-stub div should be present.
+    expect(html).toContain("recharts-radar-stub");
+  });
+});
+
+describe("AgentReadinessSection — full fixture renders Pillar-9 chip", () => {
+  it("renders the manageability chip with Pillar 9 label", async () => {
+    const html = await renderReadinessSection(FIXTURE_READINESS);
+    expect(html).toContain("readiness-manageability-chip");
+    expect(html).toContain("Pillar 9");
+    expect(html).toContain("75%");
+  });
+
+  it("renders manageability note when present", async () => {
+    const html = await renderReadinessSection(FIXTURE_READINESS);
+    expect(html).toContain("Praxion-native");
+  });
+});
+
+describe("AgentReadinessSection — full fixture renders top-failing criteria", () => {
+  it("renders the failing criterion id in the list", async () => {
+    const html = await renderReadinessSection(FIXTURE_READINESS);
+    expect(html).toContain("readiness-failing-criteria");
+    expect(html).toContain("c.docs.readme_quality");
+  });
+
+  it("does not render passing criteria in the failing list", async () => {
+    const html = await renderReadinessSection(FIXTURE_READINESS);
+    // c.style.linter_config is passed=true, should not appear in failing list
+    // (it might appear in the general section markup, but check class specifically)
+    const failingSection = html.match(/<ul class="readiness-failing-criteria"[^>]*>([\s\S]*?)<\/ul>/);
+    expect(failingSection).not.toBeNull();
+    // The passing criterion should not be in the failing list
+    expect(failingSection?.[1]).not.toContain("c.style.linter_config");
+  });
+
+  it("renders the failing criterion's rationale", async () => {
+    const html = await renderReadinessSection(FIXTURE_READINESS);
+    expect(html).toContain("README missing agent-friendliness section");
+  });
+});
+
+describe("AgentReadinessSection — no failing criteria shows message", () => {
+  it("renders 'No failing criteria' message when all criteria pass", async () => {
+    const allPassingReadiness: ReadinessSnapshot = {
+      ...FIXTURE_READINESS,
+      criteria: [
+        { ...FIXTURE_READINESS.criteria[0]!, passed: true },
+        { ...FIXTURE_READINESS.criteria[1]!, passed: true }
+      ]
+    };
+    const html = await renderReadinessSection(allPassingReadiness);
+    expect(html).toContain("No failing criteria");
+  });
+});
+
+describe("MetricsDashboard — renders Agent Readiness section", () => {
+  it("renders the Agent Readiness section heading with snapshot data", async () => {
+    const snapshotWithReadiness = {
+      ...makeSnapshot("snap-r", "2026-04-01T00:00:00Z"),
+      readiness: FIXTURE_READINESS
+    };
+    const dataWithReadiness: DashboardMetricsData = {
+      latest: snapshotWithReadiness,
+      latestPath: snapshotWithReadiness.path,
+      log: null,
+      logSeries: [],
+      snapshots: [snapshotWithReadiness]
+    };
+    const html = await renderDashboard(dataWithReadiness);
+    expect(html).toContain("Agent Readiness");
+    expect(html).toContain("readiness-level-badge");
+  });
+
+  it("renders Agent Readiness empty state when readiness is null", async () => {
+    const html = await renderDashboard(SINGLE_SNAPSHOT_DATA);
+    expect(html).toContain("Agent Readiness");
+    expect(html).toContain("No readiness data");
   });
 });

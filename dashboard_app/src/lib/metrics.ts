@@ -73,6 +73,53 @@ export type MetricsHotspot = {
   score: number | null;
 };
 
+// ─── Agent Readiness types ────────────────────────────────────────────────────
+
+export type ReadinessCriterion = {
+  applicable: boolean;
+  id: string;
+  level: number;
+  llm: boolean;
+  passed: boolean | null;
+  pillar: string;
+  rationale: string | null;
+  scope: string;
+};
+
+export type ReadinessPillar = {
+  denominator: number;
+  id: string;
+  level_pass: boolean[];
+  name: string;
+  numerator: number;
+  pass_pct: number;
+};
+
+export type ReadinessManageability = {
+  denominator: number;
+  note: string | null;
+  numerator: number;
+  pass_pct: number;
+};
+
+export type ReadinessLlm = {
+  grounded_on: string | null;
+  model: string | null;
+  status: "scored" | "llm_skipped" | "llm_error" | "pending";
+};
+
+export type ReadinessSnapshot = {
+  criteria: ReadinessCriterion[];
+  level: number;
+  llm: ReadinessLlm;
+  manageability: ReadinessManageability;
+  note: string | null;
+  pass_pct: number;
+  pillars: ReadinessPillar[];
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export type MetricsSnapshot = {
   aggregate: MetricsAggregate;
   coverageArtifactPath: string | null;
@@ -82,6 +129,7 @@ export type MetricsSnapshot = {
   id: string;
   path: string;
   hotspots: MetricsHotspot[];
+  readiness: ReadinessSnapshot | null;
   schemaVersion: string | null;
   toolAvailability: Record<string, ToolAvailability>;
   wallClockSeconds: number | null;

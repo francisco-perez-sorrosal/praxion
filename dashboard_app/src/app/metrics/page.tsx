@@ -18,6 +18,8 @@ export default async function MetricsPage() {
       <dd><code>.ai-state/metrics_reports/METRICS_LOG.md</code></dd>
       <dt>Snapshots found</dt>
       <dd>{metrics.snapshots.length}</dd>
+      <dt>Readiness</dt>
+      <dd>Embedded in each <code>METRICS_REPORT_*.json</code> as the <code>readiness</code> block</dd>
     </dl>
   );
 

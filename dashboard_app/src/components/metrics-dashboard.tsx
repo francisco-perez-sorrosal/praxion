@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { MarkdownSurface } from "@/components/markdown-surface";
 import { MetricsSummaryCards } from "@/components/metrics-summary-cards";
+import { AgentReadinessSection } from "@/components/readiness-section";
 import type { SparklineSeriesMap } from "@/components/metrics-summary-cards";
 import { MetricsTrends } from "@/components/metrics-trends";
 import type { TrendSeries } from "@/components/viz/trend-chart";
@@ -420,6 +421,16 @@ export function MetricsDashboard({ data }: { data: DashboardMetricsData }) {
           <CollectorChips collectors={collectorEntries} />
         </section>
       )}
+
+      {/* Agent Readiness */}
+      <section className="artifact-card">
+        <h3>Agent Readiness</h3>
+        <p className="muted">
+          Factory-pillar readiness score for this snapshot. Run{" "}
+          <code>/project-metrics</code> to update.
+        </p>
+        <AgentReadinessSection readiness={activeSnapshot.readiness} />
+      </section>
 
       {/* Consolidated raw data — ONE disclosure */}
       <details className="metrics-raw">

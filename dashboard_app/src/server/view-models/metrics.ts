@@ -10,6 +10,11 @@ import type {
   MetricsHotspot,
   MetricsLogPoint,
   MetricsSnapshot,
+  ReadinessCriterion,
+  ReadinessLlm,
+  ReadinessManageability,
+  ReadinessPillar,
+  ReadinessSnapshot,
   ToolAvailability
 } from "@/lib/metrics";
 import { METRIC_KEYS } from "@/lib/metrics";
@@ -29,6 +34,7 @@ type RawMetricsReport = {
   hotspots?: {
     top_n?: unknown;
   };
+  readiness?: Record<string, unknown>;
   run_metadata?: Record<string, unknown>;
   schema_version?: unknown;
   tool_availability?: Record<string, Record<string, unknown>>;
@@ -174,6 +180,113 @@ function buildToolAvailability(raw: Record<string, Record<string, unknown>> | un
   }, {});
 }
 
+function toBoolean(value: unknown): boolean | null {
+  if (value === true || value === false) return value;
+  return null;
+}
+
+function buildReadinessCriteria(raw: unknown): ReadinessCriterion[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const c = item as Record<string, unknown>;
+      const id = toStringValue(c.id);
+      const pillar = toStringValue(c.pillar);
+      const scope = toStringValue(c.scope);
+      if (!id || !pillar || !scope) return null;
+      return {
+        applicable: c.applicable === true,
+        id,
+        level: typeof c.level === "number" ? c.level : 1,
+        llm: c.llm === true,
+        passed: toBoolean(c.passed),
+        pillar,
+        rationale: toStringValue(c.rationale),
+        scope
+      } satisfies ReadinessCriterion;
+    })
+    .filter((item): item is ReadinessCriterion => item !== null);
+}
+
+function buildReadinessPillars(raw: unknown): ReadinessPillar[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const p = item as Record<string, unknown>;
+      const id = toStringValue(p.id);
+      const name = toStringValue(p.name);
+      if (!id || !name) return null;
+      const levelPass = Array.isArray(p.level_pass)
+        ? (p.level_pass as unknown[]).map((v) => v === true)
+        : [];
+      return {
+        denominator: typeof p.denominator === "number" ? p.denominator : 0,
+        id,
+        level_pass: levelPass,
+        name,
+        numerator: typeof p.numerator === "number" ? p.numerator : 0,
+        pass_pct: typeof p.pass_pct === "number" ? p.pass_pct : 0
+      } satisfies ReadinessPillar;
+    })
+    .filter((item): item is ReadinessPillar => item !== null);
+}
+
+function buildReadinessManageability(raw: unknown): ReadinessManageability | null {
+  if (!raw || typeof raw !== "object") return null;
+  const m = raw as Record<string, unknown>;
+  return {
+    denominator: typeof m.denominator === "number" ? m.denominator : 0,
+    note: toStringValue(m.note),
+    numerator: typeof m.numerator === "number" ? m.numerator : 0,
+    pass_pct: typeof m.pass_pct === "number" ? m.pass_pct : 0
+  };
+}
+
+function buildReadinessLlm(raw: unknown): ReadinessLlm {
+  const VALID_STATUSES = new Set(["scored", "llm_skipped", "llm_error", "pending"]);
+  if (!raw || typeof raw !== "object") {
+    return { grounded_on: null, model: null, status: "llm_skipped" };
+  }
+  const l = raw as Record<string, unknown>;
+  const status =
+    typeof l.status === "string" && VALID_STATUSES.has(l.status)
+      ? (l.status as ReadinessLlm["status"])
+      : "llm_skipped";
+  return {
+    grounded_on: toStringValue(l.grounded_on),
+    model: toStringValue(l.model),
+    status
+  };
+}
+
+/**
+ * Parses the `readiness` block from a raw metrics report into a typed
+ * `ReadinessSnapshot`. Returns null when the block is absent or structurally
+ * invalid (missing required numeric fields).
+ */
+export function buildReadiness(raw: Record<string, unknown> | undefined): ReadinessSnapshot | null {
+  if (!raw) return null;
+  const data = raw.data;
+  if (!data || typeof data !== "object") return null;
+  const d = data as Record<string, unknown>;
+  const level = typeof d.level === "number" ? d.level : null;
+  const pass_pct = typeof d.pass_pct === "number" ? d.pass_pct : null;
+  if (level === null || pass_pct === null) return null;
+  const manageability = buildReadinessManageability(d.manageability);
+  if (!manageability) return null;
+  return {
+    criteria: buildReadinessCriteria(d.criteria),
+    level,
+    llm: buildReadinessLlm(d.llm),
+    manageability,
+    note: toStringValue(d.note),
+    pass_pct,
+    pillars: buildReadinessPillars(d.pillars)
+  };
+}
+
 function buildMetricsSnapshot(reportPath: string, report: RawMetricsReport): MetricsSnapshot | null {
   const aggregate = buildAggregate(report.aggregate);
   if (aggregate.timestamp === null && aggregate.sloc_total === null && aggregate.file_count === null) {
@@ -189,6 +302,7 @@ function buildMetricsSnapshot(reportPath: string, report: RawMetricsReport): Met
     hotspots: buildHotspots(report.hotspots?.top_n),
     id: path.basename(reportPath),
     path: reportPath,
+    readiness: buildReadiness(report.readiness),
     schemaVersion: toStringValue(report.schema_version) ?? aggregate.schemaVersion,
     toolAvailability: buildToolAvailability(report.tool_availability),
     wallClockSeconds: toFiniteNumber(report.run_metadata?.wall_clock_seconds)

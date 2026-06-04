@@ -1,21 +1,27 @@
 ---
-description: Bump version, update changelog, and create a release tag
+description: Cut a stable release by dispatching the Release CI workflow (bump + changelog + tag + GitHub release)
 argument-hint: [patch|minor|major]
-allowed-tools: [Bash(cz:*), Bash(git:*), Bash(gh:*), Bash(pip:*), Read, Grep, Glob]
+allowed-tools: [Bash(gh:*), Bash(git:*), Read, Grep, Glob]
 disable-model-invocation: true
 ---
 
-Bump the project version, generate a changelog entry, and create a release tag using the **versioning** skill. The command detects the active versioning tool automatically -- it does not hardcode tool-specific commands.
+Cut a stable release. Praxion's release is a **manual CI workflow** (`.github/workflows/release.yml`, `workflow_dispatch`) that runs Commitizen on a clean runner. This command **dispatches that workflow** -- it does NOT bump locally -- so the workflow stays the single mechanism that changes version strings (no local/CI double-bump). The workflow, in one tagged commit, updates the version files and regenerates `CHANGELOG.md` (`update_changelog_on_bump = true`), tags it, pushes, and publishes the GitHub release.
 
 ## Process
 
-1. **Detect versioning tool**: Check project config files for a configured versioning tool -- `pyproject.toml` for `[tool.commitizen]`, `[tool.semantic_release]`, `[tool.bumpversion]`; `.release-please-manifest.json`; `knope.toml`; `package.json` for `semantic-release` dependency. If no tool is found, report and stop
-2. **Load the versioning skill**: Activate the `versioning` skill and load the appropriate tool reference file for flag mappings and configuration details
-3. **Map argument to intent**:
-   - No argument -- auto-detect bump type from conventional commit history
-   - `patch` -- patch increment
-   - `minor` -- minor increment
-   - `major` -- major increment
-4. **Execute bump**: Run the tool-appropriate bump command with changelog generation, using the flag mapping from the versioning skill
-5. **Report results**: Show the new version, files updated, and tag created
-6. **Push reminder**: If the tool did not push automatically, remind the user to run `git push --follow-tags`
+1. **Preconditions**:
+   - Confirm the current branch is `main` (`git rev-parse --abbrev-ref HEAD`). If not, stop and report -- releases cut from `main`.
+   - Confirm `origin/main` contains everything to be released: `git fetch origin` then `git rev-list --left-right --count main...origin/main`. The CI workflow checks out `origin/main`, so any local commits not yet pushed will be **excluded** from the release. If local `main` is ahead, push it first (`git push origin main`) before dispatching; surface this to the user.
+2. **Map the argument to the `increment` input**:
+   - No argument -- `increment=auto` (Commitizen detects the bump type from conventional commits since the last tag)
+   - `patch` / `minor` / `major` -- force that bump type
+3. **Dispatch the workflow**: `gh workflow run release.yml --ref main -f increment=<auto|patch|minor|major>`
+4. **Watch to completion**: find the run (`gh run list --workflow=release.yml --limit 1`) and `gh run watch <run-id> --exit-status`. If it fails, report the failing step and stop.
+5. **Report results**: the new version + tag, and the GitHub release URL (`gh release view "v<version>" --json url,tagName,name`). Confirm the tag includes its own `CHANGELOG.md` entry.
+6. **Marketplace note**: if consumers install via the marketplace, remind the user the marketplace entry / cache may need refreshing (`claude plugin marketplace update`, then `claude plugin update i-am`) to serve the new version.
+
+## Notes
+
+- **Do not run `cz bump` locally.** The workflow is authoritative; a local bump would create a divergent tag/version and defeat the "single mechanism" guarantee.
+- A preview of the computed bump (without changing anything) is available via `cz bump --dry-run` if Commitizen is installed locally -- read-only, optional.
+- The workflow is idempotent on the GitHub-release step (it skips if the tag's release already exists).

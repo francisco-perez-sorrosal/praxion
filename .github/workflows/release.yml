@@ -1,14 +1,29 @@
 # Release workflow -- manual-only stable releases via workflow_dispatch.
 #
-# Commitizen computes the proper semver bump from conventional commits since
-# the last stable tag, generates CHANGELOG.md, creates a git tag, and publishes
-# a GitHub release. Between releases, every version file equals the last
-# released stable; cz bump is the only mechanism that changes version strings.
+# Commitizen computes the proper semver bump from conventional commits since the
+# last stable tag and, in a SINGLE bump commit, updates the version files AND
+# regenerates CHANGELOG.md (update_changelog_on_bump = true in pyproject.toml),
+# then tags that commit -- so the release tag points at a tree that already
+# documents its own version. The workflow then pushes and publishes the GitHub
+# release. cz bump is the only mechanism that changes version strings; this
+# workflow_dispatch is the only sanctioned way to invoke it (the /release command
+# dispatches this workflow rather than bumping locally).
 
 name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      increment:
+        description: "Bump type (auto = detect from conventional commits)"
+        required: false
+        type: choice
+        default: auto
+        options:
+          - auto
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: write
@@ -37,17 +52,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Bump version and tag
+      - name: Bump version, changelog, and tag
         id: cz
         run: |
-          cz bump --yes 2>&1 | tee bump_output.txt
+          # update_changelog_on_bump = true folds CHANGELOG.md into this single
+          # bump commit, which is then tagged -- so the tag includes its changelog.
+          if [ "${{ inputs.increment }}" = "auto" ] || [ -z "${{ inputs.increment }}" ]; then
+            cz bump --yes 2>&1 | tee bump_output.txt
+          else
+            cz bump --yes --increment "$(echo '${{ inputs.increment }}' | tr '[:lower:]' '[:upper:]')" 2>&1 | tee bump_output.txt
+          fi
           echo "version=$(cz version --project)" >> $GITHUB_OUTPUT
-
-      - name: Generate changelog
-        run: |
-          cz changelog
-          git add CHANGELOG.md
-          git commit -m "docs: Update CHANGELOG.md for v${{ steps.cz.outputs.version }}"
 
       - name: Push with tags
         run: git push --follow-tags

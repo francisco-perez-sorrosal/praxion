@@ -28,7 +28,10 @@ version_files = [
 tag_format = "v$version"
 changelog_start_rev = "v0.0.0"
 annotated_tag = true
-update_changelog_on_bump = false
+# true so `cz bump` regenerates CHANGELOG.md and folds it INTO the bump commit,
+# so the release tag points at a tree that already documents its own version
+# (avoids the tag-precedes-changelog split). The release workflow relies on this.
+update_changelog_on_bump = true
 major_version_zero = true
 
 # PEP 735 dependency groups — dev tooling for the repo root (scripts/

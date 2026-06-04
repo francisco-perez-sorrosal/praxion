@@ -13,6 +13,8 @@ pipeline_tier: standard
 affected_files:
   - eval/src/praxion_evals/harness/judge_client.py
 re_affirms: dec-204
+re_affirmed_by:
+  - dec-draft-d6eef385
 ---
 
 ## Context

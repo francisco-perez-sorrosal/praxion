@@ -279,6 +279,11 @@ check_python_tooling() {
     else
         warn "Praxion .venv missing or pytest-cov not installed — run install.sh"
     fi
+    if ( cd "${SCRIPT_DIR}" && python3 -c "import scripts.project_metrics.collectors.readiness" ) 2>/dev/null; then
+        info "Agent Readiness engine importable (scripts.project_metrics.collectors.readiness)"
+    else
+        warn "Agent Readiness engine not importable — ensure scripts/project_metrics/collectors/readiness/ exists"
+    fi
 }
 
 uninstall_python_tooling() {

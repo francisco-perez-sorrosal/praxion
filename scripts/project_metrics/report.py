@@ -158,6 +158,11 @@ _DEEP_DIVE_LAYOUT: dict[str, tuple[tuple[str, str, Any], ...]] = {
         ("artifact_format", "Artifact format", _fmt_float_raw),
         ("artifact_path", "Artifact path", _fmt_float_raw),
     ),
+    "readiness": (
+        ("level", "Agent-readiness level (1-5)", _fmt_int),
+        ("pass_pct", "Overall pass %", _fmt_float_2),
+        ("note", "Scoring note", _fmt_float_raw),
+    ),
 }
 
 

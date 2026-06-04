@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import json
 import os
 import re
 import shutil
@@ -42,6 +43,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from scripts.project_metrics.aggregate import compose_aggregate
+from scripts.project_metrics.collectors.readiness import judge, score
 from scripts.project_metrics.hotspot import compose_hotspots
 from scripts.project_metrics.logappend import append_log
 from scripts.project_metrics.report import render_json, render_markdown
@@ -49,7 +51,7 @@ from scripts.project_metrics.runner import Runner, default_registry
 from scripts.project_metrics.schema import Report, RunMetadata
 from scripts.project_metrics.trends import compute_trends
 
-__all__ = ["main"]
+__all__ = ["enrich_readiness", "main"]
 
 
 # ---------------------------------------------------------------------------
@@ -131,6 +133,27 @@ def _build_parser() -> argparse.ArgumentParser:
             "skill's probe order) to refresh coverage.xml. A refresh failure "
             "degrades to a stderr warning and the pipeline still runs. "
             "Default: off (pipeline remains read-only)."
+        ),
+    )
+    parser.add_argument(
+        "--require-readiness-ai",
+        action="store_true",
+        default=False,
+        help=(
+            "Hard-fail (non-zero exit, no report written) when the agent-"
+            "readiness LLM tier cannot run — no auth credential or a judge "
+            "network error. Use in CI to enforce full-fidelity scoring. "
+            "Default: off (the run degrades to a mechanical-only score)."
+        ),
+    )
+    parser.add_argument(
+        "--mechanical-only",
+        action="store_true",
+        default=False,
+        help=(
+            "Skip the agent-readiness LLM enrichment entirely and score with "
+            "the mechanical criteria only — a fast, free, auth-less run. "
+            "Default: off (the LLM tier runs when a credential is present)."
         ),
     )
     return parser
@@ -525,6 +548,189 @@ def _run_pipeline(
     return dataclasses.replace(report, trends=trend_block, run_metadata=run_metadata)
 
 
+# ---------------------------------------------------------------------------
+# Agent-readiness LLM enrichment — the non-deterministic out-of-collect step.
+# Runs after the collect pass and before the report write, mutating the
+# in-memory ``readiness`` block to fill the LLM-judged criteria and re-score.
+# Gated on auth detection + the two CLI flags; degrades gracefully unless
+# ``--require-readiness-ai`` is set.
+# ---------------------------------------------------------------------------
+
+_READINESS_COLLECTOR_NAME = "readiness"
+_LLM_STATUS_SCORED = "scored"
+_LLM_STATUS_SKIPPED = "llm_skipped"
+_READINESS_AI_MISSING_AUTH = (
+    "--require-readiness-ai set but no ANTHROPIC_API_KEY / CLAUDE_CODE_OAUTH_TOKEN"
+)
+
+
+def _mark_llm_skipped(data: dict, reason: str) -> None:
+    """Mark the readiness block's LLM tier as skipped and re-score mechanically.
+
+    The LLM-judged criteria stay ``passed: None`` (excluded from every
+    denominator), the ``llm`` sub-block records the skip status + reason, and
+    ``data["note"]`` is set to ``"mechanical-only"`` so consumers know the level
+    reflects mechanical criteria only.
+    """
+
+    data["llm"] = {
+        "status": _LLM_STATUS_SKIPPED,
+        "model": None,
+        "grounded_on": None,
+        "reason": reason,
+    }
+    data["note"] = "mechanical-only"
+    score.recompute(data)
+
+
+def _mark_llm_scored(data: dict, grounded_on: str | None) -> None:
+    """Record a successful LLM tier and re-score over mechanical ∪ LLM criteria.
+
+    Mirror of :func:`_mark_llm_skipped`: clears the mechanical-only note, stamps
+    the ``llm`` sub-block with the model and the prior report it grounded on, and
+    recomputes the level now that the LLM-judged criteria carry verdicts.
+    """
+
+    data["note"] = None
+    data["llm"] = {
+        "status": _LLM_STATUS_SCORED,
+        "model": judge.DEFAULT_MODEL,
+        "grounded_on": grounded_on,
+    }
+    score.recompute(data)
+
+
+def _load_prior_readiness(repo_root: Path) -> tuple[dict | None, str | None]:
+    """Return the most-recent prior report's readiness data + its filename.
+
+    Scans ``<repo_root>/.ai-state/metrics_reports/`` for ``METRICS_REPORT_*.json``
+    files, picks the lexically-newest (timestamp-prefixed filenames sort
+    chronologically), and extracts its ``readiness.data`` block. Returns
+    ``(None, None)`` when no readable prior with a readiness block exists — the
+    first-run case grounds on nothing.
+    """
+
+    reports_dir = repo_root / _AI_STATE_DIRNAME / _REPORTS_SUBDIR_NAME
+    if not reports_dir.is_dir():
+        return None, None
+    candidates = sorted(reports_dir.glob(f"{_REPORT_BASENAME_PREFIX}*.json"))
+    for path in reversed(candidates):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        block = payload.get(_READINESS_COLLECTOR_NAME)
+        if isinstance(block, dict) and isinstance(block.get("data"), dict):
+            return block["data"], path.name
+    return None, None
+
+
+def _prior_verdict(prior: dict | None, criterion_id: str) -> dict | None:
+    """Find the prior verdict dict for ``criterion_id``, or ``None``.
+
+    The judge grounds on this so a re-run only flips a verdict on clear
+    evidence — keeping run-to-run variance low.
+    """
+
+    if prior is None:
+        return None
+    for crit in prior.get("criteria", []):
+        if isinstance(crit, dict) and crit.get("id") == criterion_id:
+            return crit
+    return None
+
+
+def _artifact_for(criterion: dict, repo_root: Path) -> str:
+    """Return the project text the judge evaluates for ``criterion``.
+
+    Documentation criteria read the README; the remaining LLM criteria read a
+    compact, deterministic listing of the repository's top-level entries so the
+    model has stable, reproducible context. Missing files degrade to an empty
+    string rather than raising — the judge then evaluates against whatever
+    signal is available.
+    """
+
+    crit_id = criterion.get("id", "")
+    if crit_id.startswith("c.docs."):
+        return _read_readme(repo_root)
+    return _repo_listing(repo_root)
+
+
+def _read_readme(repo_root: Path) -> str:
+    """Read the project README, trying common casings; empty string if absent."""
+
+    for name in ("README.md", "README.rst", "README.txt", "README"):
+        candidate = repo_root / name
+        if candidate.is_file():
+            try:
+                return candidate.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                return ""
+    return ""
+
+
+def _repo_listing(repo_root: Path) -> str:
+    """Return a sorted, newline-joined listing of top-level repo entries.
+
+    Deterministic (sorted) so the judge prompt is reproducible across runs.
+    """
+
+    try:
+        entries = sorted(p.name for p in repo_root.iterdir())
+    except OSError:
+        return ""
+    return "\n".join(entries)
+
+
+def enrich_readiness(report: Report, repo_root: Path, args: object) -> None:
+    """Fill the LLM-judged readiness criteria in place, then re-score.
+
+    Runs between the collect pass and the report write. The behavior is gated:
+
+    * No readiness block, or ``--mechanical-only`` → mark skipped, re-score.
+    * No auth credential → mark skipped (``no_auth``); ``--require-readiness-ai``
+      turns this into a :class:`SystemExit` BEFORE any report is written.
+    * Auth present → judge each applicable LLM criterion (grounded on the prior
+      report), merge the verdicts, set ``llm.status = "scored"``, and re-score.
+    * A :class:`judge.JudgeUnavailable` mid-flight degrades to ``llm_error``
+      unless ``--require-readiness-ai`` is set, in which case it re-raises.
+    """
+
+    block = report.collectors.get(_READINESS_COLLECTOR_NAME)
+    if block is None:
+        return
+    data = block.data
+    if getattr(args, "mechanical_only", False):
+        _mark_llm_skipped(data, reason="mechanical_only")
+        return
+
+    auth = judge.detect_auth()
+    if auth is None:
+        if getattr(args, "require_readiness_ai", False):
+            raise SystemExit(_READINESS_AI_MISSING_AUTH)
+        _mark_llm_skipped(data, reason="no_auth")
+        return
+
+    prior, prior_file = _load_prior_readiness(repo_root)
+    llm_criteria = [c for c in data["criteria"] if c["llm"] and c["applicable"]]
+    try:
+        for crit in llm_criteria:
+            verdict = judge.judge_criterion(
+                crit,
+                _artifact_for(crit, repo_root),
+                _prior_verdict(prior, crit["id"]),
+            )
+            crit["passed"] = verdict["passed"]
+            crit["rationale"] = verdict["rationale"]
+    except judge.JudgeUnavailable:
+        if getattr(args, "require_readiness_ai", False):
+            raise
+        _mark_llm_skipped(data, reason="llm_error")
+        return
+
+    _mark_llm_scored(data, prior_file)
+
+
 def _write_report(report: Report, ai_state_dir: Path) -> None:
     """Render the report triple, atomically write it, log it, print the paths."""
 
@@ -575,6 +781,7 @@ def main(argv: list[str]) -> int:
 
     _maybe_refresh_coverage(args, repo_root)
     report = _run_pipeline(args, repo_root, ai_state_dir)
+    enrich_readiness(report, repo_root, args)
     _write_report(report, ai_state_dir)
 
     return 0

@@ -1254,16 +1254,25 @@ _ = threading
 
 
 class TestDefaultRegistry:
-    """Validates the registry wire-up: six concrete collectors in declaration order."""
+    """Validates the registry wire-up: the concrete collectors in declaration
+    order, with the always-available readiness collector registered last."""
 
-    def test_default_registry_contains_all_six_collectors_in_declaration_order(
+    def test_default_registry_contains_all_collectors_in_declaration_order(
         self, tmp_path
     ):
         from scripts.project_metrics.runner import default_registry
 
         registry = default_registry(repo_root=tmp_path)
         names = [c.name for c in registry.collectors]
-        assert names == ["git", "scc", "lizard", "complexipy", "pydeps", "coverage"]
+        assert names == [
+            "git",
+            "scc",
+            "lizard",
+            "complexipy",
+            "pydeps",
+            "coverage",
+            "readiness",
+        ]
 
     def test_default_registry_returns_fresh_list_on_each_call(self, tmp_path):
         from scripts.project_metrics.runner import default_registry

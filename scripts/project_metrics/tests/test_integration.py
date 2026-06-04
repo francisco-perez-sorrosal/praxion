@@ -57,6 +57,29 @@ from scripts.project_metrics.schema import AGGREGATE_COLUMNS
 _FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
+# Frozen golden contracts (mirror the storage-schema ADR). The readiness
+# feature bumped SCHEMA_VERSION to 1.1.0 but MUST NOT touch the aggregate
+# column set nor the METRICS_LOG.md header — these guards fail loudly on drift.
+_GOLDEN_AGGREGATE_COLUMNS: tuple[str, ...] = (
+    "schema_version",
+    "timestamp",
+    "commit_sha",
+    "window_days",
+    "sloc_total",
+    "file_count",
+    "language_count",
+    "ccn_p95",
+    "cognitive_p95",
+    "cyclic_deps",
+    "churn_total_90d",
+    "change_entropy_90d",
+    "truck_factor",
+    "hotspot_top_score",
+    "hotspot_gini",
+    "coverage_line_pct",
+)
+_GOLDEN_LOG_HEADER_CELLS: tuple[str, ...] = _GOLDEN_AGGREGATE_COLUMNS + ("report_file",)
+
 
 # ---------------------------------------------------------------------------
 # Helpers.
@@ -416,6 +439,98 @@ def test_schema_mismatch_surfaced_when_prior_report_has_older_schema(
     assert trends.get("current_schema", "").startswith("1."), (
         f"trends.current_schema must surface the current version; "
         f"got {trends.get('current_schema')!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Scenario 6 — agent-readiness block embedded at the JSON root (no auth).
+# ---------------------------------------------------------------------------
+
+
+def test_full_pipeline_embeds_readiness_block_with_llm_skipped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A full run with no auth credential embeds a well-formed ``readiness``
+    block at the JSON root: schema bumped to 1.1.0, the LLM tier skipped
+    offline, and an integer level in the 1-5 band."""
+
+    repo_copy = _copy_fixture("minimal_repo", tmp_path)
+    monkeypatch.chdir(repo_copy)
+    # Guarantee the offline path regardless of the developer's shell env.
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+
+    exit_code = main(["--window-days", "30", "--top-n", "5"])
+    assert exit_code == 0, f"Offline run must exit 0; got {exit_code}"
+
+    ai_state = repo_copy / ".ai-state"
+    payload = _read_report_json(ai_state)
+
+    assert payload.get("schema_version") == "1.1.0", (
+        "The readiness feature bumps schema_version to 1.1.0; "
+        f"got {payload.get('schema_version')!r}"
+    )
+
+    assert "readiness" in payload, (
+        "The readiness collector block must land at the JSON root next to the "
+        "other collector namespaces"
+    )
+    readiness = payload["readiness"]
+    assert readiness.get("status") == "ok"
+    data = readiness.get("data", {})
+
+    assert data.get("llm", {}).get("status") == "llm_skipped", (
+        "With no auth credential the LLM tier must be skipped offline; "
+        f"got {data.get('llm')!r}"
+    )
+
+    level = data.get("level")
+    assert isinstance(level, int), f"readiness level must be an int; got {level!r}"
+    assert 1 <= level <= 5, f"readiness level must be in 1-5; got {level}"
+
+
+def test_readiness_feature_leaves_aggregate_columns_frozen(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The 16-column aggregate set is byte-unchanged by the readiness feature
+    and a full run still emits exactly those keys in the aggregate block."""
+
+    assert AGGREGATE_COLUMNS == _GOLDEN_AGGREGATE_COLUMNS, (
+        "AGGREGATE_COLUMNS drifted from the frozen golden order — the "
+        "readiness feature must not touch the aggregate column contract."
+    )
+
+    repo_copy = _copy_fixture("minimal_repo", tmp_path)
+    monkeypatch.chdir(repo_copy)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+
+    assert main(["--window-days", "30", "--top-n", "5"]) == 0
+
+    payload = _read_report_json(repo_copy / ".ai-state")
+    assert set(payload["aggregate"].keys()) == set(AGGREGATE_COLUMNS)
+
+
+def test_readiness_feature_leaves_log_header_frozen(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The METRICS_LOG.md 17-column header (16 aggregate + report_file) is
+    byte-identical to the golden after a full run — the readiness feature
+    must not widen the log."""
+
+    repo_copy = _copy_fixture("minimal_repo", tmp_path)
+    monkeypatch.chdir(repo_copy)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+
+    assert main(["--window-days", "30", "--top-n", "5"]) == 0
+
+    log_file = repo_copy / ".ai-state" / "metrics_reports" / "METRICS_LOG.md"
+    header_line = log_file.read_text(encoding="utf-8").strip().splitlines()[0]
+    cells = tuple(c.strip() for c in header_line.strip("|").split("|"))
+
+    assert cells == _GOLDEN_LOG_HEADER_CELLS, (
+        f"METRICS_LOG.md header drifted from the frozen 17-column golden; got {cells!r}"
     )
 
 

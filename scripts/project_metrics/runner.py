@@ -451,11 +451,15 @@ def _build_partial_aggregate(
 
 
 def default_registry(repo_root: Path | str) -> CollectorRegistry:
-    """Return a fresh registry containing all six collectors in declaration order.
+    """Return a fresh registry containing all collectors in declaration order.
 
     Declaration order is the execution contract — the runner never reorders:
 
-        Git (required hard floor) -> Scc -> Lizard -> Complexipy -> Pydeps -> Coverage
+        Git (required hard floor) -> Scc -> Lizard -> Complexipy -> Pydeps
+        -> Coverage -> Readiness
+
+    Readiness is registered last (after Coverage): it is a Tier-0, always-
+    available collector whose mechanical scan reads only the filesystem.
 
     Fresh instances are built on every call so callers can instantiate
     multiple runners in the same process without sharing collector state.
@@ -472,6 +476,9 @@ def default_registry(repo_root: Path | str) -> CollectorRegistry:
     from scripts.project_metrics.collectors.git_collector import GitCollector
     from scripts.project_metrics.collectors.lizard_collector import LizardCollector
     from scripts.project_metrics.collectors.pydeps_collector import PydepsCollector
+    from scripts.project_metrics.collectors.readiness_collector import (
+        ReadinessCollector,
+    )
     from scripts.project_metrics.collectors.scc_collector import SccCollector
 
     return CollectorRegistry(
@@ -482,5 +489,6 @@ def default_registry(repo_root: Path | str) -> CollectorRegistry:
             ComplexipyCollector(repo_root=repo_root),
             PydepsCollector(repo_root=repo_root),
             CoverageCollector(repo_root=repo_root),
+            ReadinessCollector(repo_root=repo_root),
         ]
     )

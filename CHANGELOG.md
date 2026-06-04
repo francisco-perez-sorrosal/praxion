@@ -1,3 +1,16 @@
+## v0.4.0 (2026-06-04)
+
+### Feat
+
+- add agent-readiness skill, docs, and ADRs
+- render agent-readiness section on the metrics dashboard
+- add agent-readiness scoring engine to project-metrics
+- add release-staleness advisory check
+
+### Fix
+
+- **ci**: repair claude-review auth and context-security-review JSON parse
+
 ## v0.3.0 (2026-06-03)
 
 ### BREAKING CHANGE

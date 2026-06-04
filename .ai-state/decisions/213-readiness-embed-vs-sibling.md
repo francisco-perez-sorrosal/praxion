@@ -1,7 +1,7 @@
 ---
-id: dec-draft-1f4628c3
+id: dec-213
 title: Agent-readiness output embeds as a `readiness` block in the metrics JSON, not a sibling readiness_reports/ artifact
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-04
 summary: Readiness is produced by the same /project-metrics run as the other collectors, so its output is a `readiness` collector namespace flattened to the metrics JSON root (schema_version 1.0.0→1.1.0, additive) rather than a separate .ai-state/readiness_reports/ directory; this inherits path security, latest-report selection, and the dashboard type chain at a ~5-file dashboard cost vs ~7 for a sibling.

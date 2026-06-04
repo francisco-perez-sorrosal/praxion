@@ -1,7 +1,7 @@
 ---
-id: dec-draft-d8d079af
+id: dec-215
 title: The agent-readiness LLM enrichment runs outside the metrics collect pass — a conditional network dependency entering a previously pure-offline package
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-04
 summary: Default-on LLM-judged readiness criteria introduce a conditional network+auth dependency into the previously pure-offline scripts/project_metrics package. To preserve the collector determinism contract, the non-deterministic LLM call runs in a cli.py enrich_readiness step AFTER the runner's deterministic collect pass, not inside ReadinessCollector.collect(); CollectionContext is NOT widened.
@@ -30,7 +30,7 @@ A default-on LLM judge is inherently **non-deterministic** (model output varies 
 **The LLM enrichment runs outside the runner's collect pass.**
 
 - `ReadinessCollector.collect(ctx)` computes only the **deterministic mechanical criteria** and scoring, and sets a placeholder `readiness.data.llm = {"status": "pending"}`. It remains byte-identical given the same `CollectionContext`, honoring the contract unchanged.
-- A new `enrich_readiness(report, repo_root, args)` step in `cli.py` runs **after** `Runner.run()` (step 4) and **before** `_write_report()` (step 5). It performs the non-deterministic, network-dependent work: auth detection, grounding on the prior report, the `urllib` judge calls (`dec-draft-d6eef385`), merging verdicts into the `readiness` block, and recomputing the level over (mechanical ∪ scored-LLM) criteria.
+- A new `enrich_readiness(report, repo_root, args)` step in `cli.py` runs **after** `Runner.run()` (step 4) and **before** `_write_report()` (step 5). It performs the non-deterministic, network-dependent work: auth detection, grounding on the prior report, the `urllib` judge calls (`dec-214`), merging verdicts into the `readiness` block, and recomputing the level over (mechanical ∪ scored-LLM) criteria.
 - **`CollectionContext` is NOT widened.** No `llm_enabled`/auth axis is added — that would expand the variance surface for *every* collector and break the field-set drift guard. The flag/auth state is threaded through `cli.py`'s `args`, never through the collector context.
 
 **The contract shift is acknowledged and bounded:** the metrics package now has a *conditional* network+auth dependency, exercised only when (a) the readiness collector is registered, (b) `--mechanical-only` is not set, and (c) auth is present. Graceful degradation preserves keyless/offline/CI runs — they still produce a mechanical readiness score and exit 0. `--require-readiness-ai` is the sole path that hard-fails when the LLM tier is unavailable.
@@ -66,4 +66,4 @@ A default-on LLM judge is inherently **non-deterministic** (model output varies 
 
 ## Prior Decision
 
-This draft revises the metrics-researcher's proposed single opt-in `--score-readiness` flag (off by default), recorded in `RESEARCH_METRICS_PIPELINE.md §(c)`. It is a sibling of `dec-draft-d6eef385` (judge transport), not a supersession — the two together define the LLM tier. The user overrode "opt-in, off by default" with "default-on, gracefully degrading." This ADR records the reconciliation: default-on LLM + the determinism-preserving execution boundary + graceful degradation, rather than an opt-in flag gating an in-collector call.
+This draft revises the metrics-researcher's proposed single opt-in `--score-readiness` flag (off by default), recorded in `RESEARCH_METRICS_PIPELINE.md §(c)`. It is a sibling of `dec-214` (judge transport), not a supersession — the two together define the LLM tier. The user overrode "opt-in, off by default" with "default-on, gracefully degrading." This ADR records the reconciliation: default-on LLM + the determinism-preserving execution boundary + graceful degradation, rather than an opt-in flag gating an in-collector call.

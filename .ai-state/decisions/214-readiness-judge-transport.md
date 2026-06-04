@@ -1,7 +1,7 @@
 ---
-id: dec-draft-d6eef385
+id: dec-214
 title: Agent-readiness LLM judge uses a stdlib-urllib direct Messages API call, not the anthropic SDK nor a shell-out to eval
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-04
 summary: The default-on agent-readiness LLM tier calls the Anthropic Messages API via a ~40-line stdlib urllib judge in scripts/project_metrics/collectors/readiness/judge.py, preserving the metrics package's zero-third-party-dependency contract; it never imports the anthropic SDK and never spawns the claude CLI (avoiding the dec-206 CLAUDECODE deadlock).
@@ -38,7 +38,7 @@ The LLM judge is a **stdlib-`urllib` direct call to the Anthropic Messages API**
 - Uses `claude-haiku-4-5` (eval's `_DEFAULT_MODEL`) for cost/latency, with a per-criterion timeout.
 - Reads auth tokens at call time only; never logs or persists them. The emitted `readiness.llm` block records `model` and `grounded_on`, never credentials.
 
-This is invoked from a `cli.py` `enrich_readiness` step that runs **outside** the runner's deterministic collect pass (see the sibling contract-shift ADR, `dec-draft-d8d079af`).
+This is invoked from a `cli.py` `enrich_readiness` step that runs **outside** the runner's deterministic collect pass (see the sibling contract-shift ADR, `dec-215`).
 
 ## Considered Options
 

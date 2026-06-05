@@ -122,10 +122,10 @@ class TestSchemaVersionConstant:
     """The SCHEMA_VERSION constant is the pinned release identifier consumed
     by METRICS_LOG.md rows and the schema-mismatch delta policy."""
 
-    def test_schema_version_constant_is_1_1_0(self) -> None:
+    def test_schema_version_constant_is_1_2_0(self) -> None:
         from scripts.project_metrics.schema import SCHEMA_VERSION
 
-        assert SCHEMA_VERSION == "1.1.0"
+        assert SCHEMA_VERSION == "1.2.0"
 
     def test_schema_version_is_string(self) -> None:
         from scripts.project_metrics.schema import SCHEMA_VERSION

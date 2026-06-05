@@ -82,16 +82,25 @@ def _report_with_readiness(repo_root: Path) -> Report:
     )
 
 
-def _verdict_response(passed: bool, rationale: str) -> bytes:
-    """A Messages-API-shaped response body carrying a verdict tool call."""
+def _verdict_response(
+    passed: bool, rationale: str, recommendation: str | None = None
+) -> bytes:
+    """A Messages-API-shaped response body carrying a verdict tool call.
 
+    When ``recommendation`` is supplied it is included in the tool input,
+    mirroring the judge returning a project-specific next step on a failure.
+    """
+
+    verdict_input: dict[str, Any] = {"passed": passed, "rationale": rationale}
+    if recommendation is not None:
+        verdict_input["recommendation"] = recommendation
     document = {
         "id": "msg_test",
         "content": [
             {
                 "type": "tool_use",
                 "name": "verdict",
-                "input": {"passed": passed, "rationale": rationale},
+                "input": verdict_input,
             }
         ],
     }
@@ -393,3 +402,72 @@ class TestJudgeErrorDegrades:
                 enrich_readiness(
                     report, populated_repo, _args(require_readiness_ai=True)
                 )
+
+
+# ---------------------------------------------------------------------------
+# Recommendation layering — LLM recommendation overrides static remediation
+# for failing criteria; static fallback survives when none is returned.
+# ---------------------------------------------------------------------------
+
+
+class TestRecommendationLayering:
+    """Failing LLM criteria get the project-specific recommendation; the static
+    deterministic remediation remains the fallback otherwise."""
+
+    def test_failing_llm_criterion_uses_llm_recommendation(
+        self, populated_repo: Path, with_api_key: None
+    ) -> None:
+        report = _report_with_readiness(populated_repo)
+
+        def _fake_urlopen(request: Any, timeout: int = 0) -> _FakeResponse:
+            return _FakeResponse(
+                _verdict_response(False, "thin", recommendation="Add an arch section")
+            )
+
+        with patch("urllib.request.urlopen", _fake_urlopen):
+            enrich_readiness(report, populated_repo, _args())
+
+        data = report.collectors["readiness"].data
+        failing_llm = [
+            c for c in _llm_criteria(data) if c["applicable"] and c["passed"] is False
+        ]
+        assert failing_llm, "expected at least one failing LLM criterion"
+        for crit in failing_llm:
+            assert crit["remediation"] == "Add an arch section"
+            assert crit["remediation_source"] == "llm"
+
+    def test_passing_llm_criterion_keeps_static_remediation_source(
+        self, populated_repo: Path, with_api_key: None
+    ) -> None:
+        report = _report_with_readiness(populated_repo)
+
+        def _fake_urlopen(request: Any, timeout: int = 0) -> _FakeResponse:
+            return _FakeResponse(_verdict_response(True, "great", recommendation=""))
+
+        with patch("urllib.request.urlopen", _fake_urlopen):
+            enrich_readiness(report, populated_repo, _args())
+
+        data = report.collectors["readiness"].data
+        for crit in _llm_criteria(data):
+            if crit["passed"] is True:
+                assert crit["remediation_source"] == "static"
+
+    def test_mechanical_criteria_retain_static_remediation(
+        self, populated_repo: Path, with_api_key: None
+    ) -> None:
+        report = _report_with_readiness(populated_repo)
+
+        def _fake_urlopen(request: Any, timeout: int = 0) -> _FakeResponse:
+            return _FakeResponse(
+                _verdict_response(False, "thin", recommendation="LLM advice")
+            )
+
+        with patch("urllib.request.urlopen", _fake_urlopen):
+            enrich_readiness(report, populated_repo, _args())
+
+        data = report.collectors["readiness"].data
+        # The LLM recommendation must never leak onto a mechanical criterion.
+        for crit in data["criteria"]:
+            if not crit["llm"]:
+                assert crit["remediation_source"] == "static"
+                assert crit["remediation"] != "LLM advice"

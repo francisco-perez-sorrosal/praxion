@@ -461,6 +461,132 @@ describe("AgentReadinessSection — no failing criteria shows message", () => {
   });
 });
 
+describe("AgentReadinessSection — recommendations + educational hovers", () => {
+  const READINESS_WITH_RECS: ReadinessSnapshot = {
+    ...FIXTURE_READINESS,
+    criteria: [
+      {
+        ...FIXTURE_READINESS.criteria[0]!,
+        passed: true,
+        explanation: "Checks for a linter config.",
+        remediation: "Add a ruff config.",
+        remediationSource: "static"
+      },
+      {
+        ...FIXTURE_READINESS.criteria[1]!,
+        passed: false,
+        explanation: "An LLM judges README quality.",
+        remediation: "Add a concrete architecture section to the README.",
+        remediationSource: "llm"
+      }
+    ]
+  };
+
+  it("renders the remediation text for a failing criterion", async () => {
+    const html = await renderReadinessSection(READINESS_WITH_RECS);
+    expect(html).toContain("Add a concrete architecture section to the README.");
+  });
+
+  it("renders an AI-tailored badge for an LLM-sourced recommendation", async () => {
+    const html = await renderReadinessSection(READINESS_WITH_RECS);
+    expect(html).toContain("readiness-failing-criteria__badge");
+  });
+
+  it("does not show remediation for passing criteria in the failing list", async () => {
+    const html = await renderReadinessSection(READINESS_WITH_RECS);
+    const failingSection = html.match(
+      /<ul class="readiness-failing-criteria"[^>]*>([\s\S]*?)<\/ul>/
+    );
+    expect(failingSection).not.toBeNull();
+    // The passing criterion's remediation must not appear in the failing list.
+    expect(failingSection?.[1]).not.toContain("Add a ruff config.");
+  });
+
+  it("renders educational popovers carrying instrument-level docs", async () => {
+    const html = await renderReadinessSection(READINESS_WITH_RECS);
+    expect(html).toContain("educational-popover");
+    // Instrument-concept doc titles travel in the (hidden) popover panels.
+    expect(html).toContain("Readiness level");
+    expect(html).toContain("Recommendations");
+  });
+
+  it("degrades cleanly when criteria carry no new 1.2.0 fields", async () => {
+    // FIXTURE_READINESS omits explanation/remediation entirely (a 1.1.0 report).
+    const html = await renderReadinessSection(FIXTURE_READINESS);
+    expect(html).toContain("readiness-level-badge");
+    // No criterion carries an LLM source → no AI-tailored badge is rendered.
+    expect(html).not.toContain("readiness-failing-criteria__badge");
+  });
+});
+
+describe("AgentReadinessSection — pillar weighting + level docs", () => {
+  const WEIGHTED: ReadinessSnapshot = {
+    ...FIXTURE_READINESS,
+    pass_pct: 0.5,
+    level: 1,
+    adjustedPassPct: 0.9,
+    adjustedLevel: 3,
+    weightingActive: true,
+    pillarWeights: { documentation: 1, style_validation: 0 },
+    pillars: [
+      { ...FIXTURE_READINESS.pillars[0]!, weight: 0, excluded: true },
+      { ...FIXTURE_READINESS.pillars[1]!, weight: 1, excluded: false }
+    ]
+  };
+
+  it("shows the adjusted headline and keeps the canonical Factory score visible", async () => {
+    const html = await renderReadinessSection(WEIGHTED);
+    expect(html).toContain("Adjusted");
+    // adjusted ring shows 90%; canonical line shows the unweighted 50% · L1.
+    expect(html).toContain("90%");
+    expect(html).toContain("Factory (unweighted): 50%");
+  });
+
+  it("marks an excluded pillar", async () => {
+    const html = await renderReadinessSection(WEIGHTED);
+    expect(html).toContain("readiness-pillar-weight");
+    expect(html).toContain("excluded");
+  });
+
+  it("shows only the canonical score when weighting is inactive", async () => {
+    const html = await renderReadinessSection(FIXTURE_READINESS);
+    expect(html).not.toContain("Factory (unweighted)");
+  });
+
+  it("renders L1–L5 meaning popovers on the heatmap headers", async () => {
+    const html = await renderReadinessSection(FIXTURE_READINESS);
+    expect(html).toContain("L1 — Foundational");
+    expect(html).toContain("L5 — Exemplary");
+  });
+
+  it("renders '–' (not a vacuous ✓) for a level with no criteria in a pillar", async () => {
+    // documentation has only a level-1 and level-2 criterion in the fixture,
+    // yet its level_pass[2] (L3) is false and level_pass[0] (L1) true. A level
+    // with no criteria (e.g. L4/L5) must render – not ✓ even if level_pass is true.
+    const fixture: ReadinessSnapshot = {
+      ...FIXTURE_READINESS,
+      pillars: [
+        {
+          ...FIXTURE_READINESS.pillars[1]!, // documentation
+          // L4/L5 marked "passed" in the gate (vacuous) but have no criteria.
+          level_pass: [true, false, false, true, true]
+        }
+      ],
+      criteria: [
+        {
+          ...FIXTURE_READINESS.criteria[1]!, // c.docs.readme_quality, level 2
+          pillar: "documentation"
+        }
+      ]
+    };
+    const html = await renderReadinessSection(fixture);
+    // The L4 cell for documentation has no criteria → must be the "na" state.
+    expect(html).toContain('aria-label="Documentation L4: no criteria at this level"');
+    // And it must NOT claim a pass for L4.
+    expect(html).not.toContain('aria-label="Documentation L4: pass"');
+  });
+});
+
 describe("MetricsDashboard — renders Agent Readiness section", () => {
   it("renders the Agent Readiness section heading with snapshot data", async () => {
     const snapshotWithReadiness = {

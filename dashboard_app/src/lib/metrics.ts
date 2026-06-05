@@ -84,6 +84,10 @@ export type ReadinessCriterion = {
   pillar: string;
   rationale: string | null;
   scope: string;
+  // Additive in schema 1.2.0 — optional so 1.1.0 reports still parse.
+  explanation?: string | null;
+  remediation?: string | null;
+  remediationSource?: "static" | "llm" | null;
 };
 
 export type ReadinessPillar = {
@@ -93,6 +97,11 @@ export type ReadinessPillar = {
   name: string;
   numerator: number;
   pass_pct: number;
+  // Additive in schema 1.2.0 — optional so 1.1.0 reports still parse.
+  explanation?: string | null;
+  // Pillar weighting — optional so reports without a config still parse.
+  weight?: number | null;
+  excluded?: boolean;
 };
 
 export type ReadinessManageability = {
@@ -100,6 +109,8 @@ export type ReadinessManageability = {
   note: string | null;
   numerator: number;
   pass_pct: number;
+  // Additive in schema 1.2.0 — optional so 1.1.0 reports still parse.
+  explanation?: string | null;
 };
 
 export type ReadinessLlm = {
@@ -116,6 +127,12 @@ export type ReadinessSnapshot = {
   note: string | null;
   pass_pct: number;
   pillars: ReadinessPillar[];
+  // Pillar-weighting — additive; the canonical level/pass_pct above stay the
+  // unweighted, cross-tool-comparable values. These carry the adjusted view.
+  adjustedLevel?: number | null;
+  adjustedPassPct?: number | null;
+  pillarWeights?: Record<string, number> | null;
+  weightingActive?: boolean;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

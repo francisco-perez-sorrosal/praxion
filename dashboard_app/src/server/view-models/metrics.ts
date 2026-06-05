@@ -188,13 +188,17 @@ function toBoolean(value: unknown): boolean | null {
 function buildReadinessCriteria(raw: unknown): ReadinessCriterion[] {
   if (!Array.isArray(raw)) return [];
   return raw
-    .map((item) => {
+    .map((item): ReadinessCriterion | null => {
       if (!item || typeof item !== "object") return null;
       const c = item as Record<string, unknown>;
       const id = toStringValue(c.id);
       const pillar = toStringValue(c.pillar);
       const scope = toStringValue(c.scope);
       if (!id || !pillar || !scope) return null;
+      const remediationSource =
+        c.remediation_source === "llm" || c.remediation_source === "static"
+          ? c.remediation_source
+          : null;
       return {
         applicable: c.applicable === true,
         id,
@@ -203,7 +207,10 @@ function buildReadinessCriteria(raw: unknown): ReadinessCriterion[] {
         passed: toBoolean(c.passed),
         pillar,
         rationale: toStringValue(c.rationale),
-        scope
+        scope,
+        explanation: toStringValue(c.explanation),
+        remediation: toStringValue(c.remediation),
+        remediationSource
       } satisfies ReadinessCriterion;
     })
     .filter((item): item is ReadinessCriterion => item !== null);
@@ -212,7 +219,7 @@ function buildReadinessCriteria(raw: unknown): ReadinessCriterion[] {
 function buildReadinessPillars(raw: unknown): ReadinessPillar[] {
   if (!Array.isArray(raw)) return [];
   return raw
-    .map((item) => {
+    .map((item): ReadinessPillar | null => {
       if (!item || typeof item !== "object") return null;
       const p = item as Record<string, unknown>;
       const id = toStringValue(p.id);
@@ -227,7 +234,10 @@ function buildReadinessPillars(raw: unknown): ReadinessPillar[] {
         level_pass: levelPass,
         name,
         numerator: typeof p.numerator === "number" ? p.numerator : 0,
-        pass_pct: typeof p.pass_pct === "number" ? p.pass_pct : 0
+        pass_pct: typeof p.pass_pct === "number" ? p.pass_pct : 0,
+        explanation: toStringValue(p.explanation),
+        weight: typeof p.weight === "number" ? p.weight : null,
+        excluded: p.excluded === true
       } satisfies ReadinessPillar;
     })
     .filter((item): item is ReadinessPillar => item !== null);
@@ -240,7 +250,8 @@ function buildReadinessManageability(raw: unknown): ReadinessManageability | nul
     denominator: typeof m.denominator === "number" ? m.denominator : 0,
     note: toStringValue(m.note),
     numerator: typeof m.numerator === "number" ? m.numerator : 0,
-    pass_pct: typeof m.pass_pct === "number" ? m.pass_pct : 0
+    pass_pct: typeof m.pass_pct === "number" ? m.pass_pct : 0,
+    explanation: toStringValue(m.explanation)
   };
 }
 
@@ -276,6 +287,13 @@ export function buildReadiness(raw: Record<string, unknown> | undefined): Readin
   if (level === null || pass_pct === null) return null;
   const manageability = buildReadinessManageability(d.manageability);
   if (!manageability) return null;
+  let pillarWeights: Record<string, number> | null = null;
+  if (d.pillar_weights && typeof d.pillar_weights === "object") {
+    pillarWeights = {};
+    for (const [pillar, value] of Object.entries(d.pillar_weights as Record<string, unknown>)) {
+      if (typeof value === "number") pillarWeights[pillar] = value;
+    }
+  }
   return {
     criteria: buildReadinessCriteria(d.criteria),
     level,
@@ -283,7 +301,11 @@ export function buildReadiness(raw: Record<string, unknown> | undefined): Readin
     manageability,
     note: toStringValue(d.note),
     pass_pct,
-    pillars: buildReadinessPillars(d.pillars)
+    pillars: buildReadinessPillars(d.pillars),
+    adjustedLevel: typeof d.adjusted_level === "number" ? d.adjusted_level : null,
+    adjustedPassPct: typeof d.adjusted_pass_pct === "number" ? d.adjusted_pass_pct : null,
+    pillarWeights,
+    weightingActive: d.weighting_active === true
   };
 }
 

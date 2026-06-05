@@ -722,6 +722,13 @@ def enrich_readiness(report: Report, repo_root: Path, args: object) -> None:
             )
             crit["passed"] = verdict["passed"]
             crit["rationale"] = verdict["rationale"]
+            # Layer the project-specific LLM recommendation over the static
+            # remediation for failing criteria; keep the static fallback when
+            # the model returns no recommendation or the criterion passed.
+            recommendation = verdict.get("recommendation", "").strip()
+            if verdict["passed"] is False and recommendation:
+                crit["remediation"] = recommendation
+                crit["remediation_source"] = "llm"
     except judge.JudgeUnavailable:
         if getattr(args, "require_readiness_ai", False):
             raise

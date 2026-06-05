@@ -131,7 +131,11 @@ def test_judge_criterion_posts_to_messages_endpoint_with_api_key_header(
     assert header_keys.get("anthropic-version")
     assert captured["body"]["tool_choice"] == {"type": "tool", "name": "verdict"}
     assert captured["body"]["model"] == judge.DEFAULT_MODEL
-    assert result == {"passed": True, "rationale": "looks good"}
+    assert result == {
+        "passed": True,
+        "rationale": "looks good",
+        "recommendation": "",
+    }
 
 
 def test_judge_criterion_uses_bearer_header_for_oauth(

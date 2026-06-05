@@ -7,6 +7,20 @@ Seeded from the kodus 39-check MIT list, mapped to the 8 Factory pillars.
 The 4 LLM criteria mirror the kodus `--ai` flag split. The implementation is
 `scripts/project_metrics/collectors/readiness/criteria.py`.
 
+## Maturity Levels (L1–L5)
+
+Levels are additive maturity tiers, not pillars. Each criterion is gated at one level:
+
+| Level | Name | Meaning |
+|-------|------|---------|
+| L1 | Foundational | The essentials exist (linter, build manifest, tests, README, .gitignore, LICENSE, CLAUDE.md). |
+| L2 | Consistent | Consistency & reproducibility (formatter, editorconfig, lockfile, env example, secrets policy, README quality). |
+| L3 | Automated | Automation & enforcement (pre-commit, CI + CI-runs-tests, contributing, containerization, logging, dependency scanning, type-checking, git hooks). |
+| L4 | Robust | Depth & quality (test quality, agent-friendly docs, health checks, complexity/coverage gate). |
+| L5 | Exemplary | Best-in-class. **No mechanical criteria gate L5 yet** — reserved for future checks, so L4 is effectively the ceiling today. |
+
+**Not every pillar has a criterion at every level** — this is expected, not a gap. A pillar's heatmap cell at a level with no criteria renders `–` ("no criteria at this level"), never a vacuous ✓. (The scorer treats an empty level as vacuously met for progression, but the dashboard distinguishes "passed" from "nothing to check" by counting applicable criteria per pillar-level.)
+
 ## The 80%-per-Level Gate
 
 A project achieves **level N** when at least 80% of applicable criteria at
@@ -117,6 +131,66 @@ constraint). The judge uses forced `tool_choice` to get a structured verdict.
 
 Auth precedence: `ANTHROPIC_API_KEY` (header `x-api-key`) → `CLAUDE_CODE_OAUTH_TOKEN`
 (header `Authorization: Bearer`). Neither set → `llm_skipped`.
+
+## Educational Content & Recommendations
+
+Each `Criterion` (in `criteria.py`) carries two authored fields beyond `rationale`,
+embedded in every report so consumers need not reach into the plugin:
+
+- `explanation` — "what this measures and why it matters". Surfaced in dashboard
+  hovers (per-criterion pip tooltips; per-pillar from `PILLAR_DOCS`) and in the
+  JSON report. Instrument-level concepts (level, the 80%-gate, pass %, the
+  radar/heatmap, Pillar 9) live in the dashboard's `readiness-docs.ts` and render
+  through the shared `EducationalPopover`.
+- `remediation` — "how to fix it", shown for **failing** criteria. The 25
+  mechanical criteria carry deterministic, reproducible guidance. For the 4
+  LLM-judged criteria, the enrichment step layers a **project-specific
+  recommendation** from the same judge call (no extra API request) over the
+  static text and flips the per-criterion `remediation_source` from `"static"`
+  to `"llm"`. Offline (mechanical-only) runs fall back to the static guidance.
+
+The judge `verdict` tool gained an optional `recommendation` field, requested
+only when `passed` is false. The Markdown report renders the failing-criteria
+recommendations under the readiness section; the dashboard renders them in the
+"Recommendations" panel with an "AI-tailored" badge on LLM-sourced items.
+
+This content (and `remediation_source`) is additive in schema **1.2.0**; reports
+written under 1.1.0 simply omit the fields and degrade cleanly.
+
+## Pillar Weighting (per-project relevance)
+
+Not every pillar matters equally for every project — a research harness, a docs
+site, or philosophy-as-infrastructure (like Praxion itself) may not need a
+runtime service's observability or containerization. Equal-weighting then drags
+the headline score down unfairly.
+
+An optional committed config re-weights pillars:
+
+```
+.ai-state/readiness_config.json
+{
+  "pillar_weights": {
+    "observability": 0,        // 0 excludes the pillar from the adjusted score
+    "dev_environment": 0.5     // < 1 counts it less
+  }
+}
+```
+
+Rules: weights are floats `>= 0`; unlisted pillars default to `1.0`; only the
+eight Factory pillars are weightable (Pillar 9 is always separate). Malformed
+config degrades to a warning and is ignored — the run still succeeds. Stdlib
+`json` only (loader: `collectors/readiness/config.py`).
+
+**Two scores, both reported** (so comparability is never lost):
+
+- **Canonical** (`level` / `pass_pct`) — always unweighted; the cross-tool-comparable Factory number.
+- **Adjusted** (`adjusted_level` / `adjusted_pass_pct`) — the weight-aware project headline. Equal to canonical when no config is present (`weighting_active: false`).
+
+Weighting is implemented as a per-criterion multiplier in the shared `_pass_pct`
+primitive, so it threads uniformly through both the overall pass% and the level
+gate, and reduces *exactly* to the canonical number when weights are uniform.
+Each pillar record carries its `weight` and an `excluded` flag. Additive in
+schema 1.2.0.
 
 ## Kodus Attribution
 

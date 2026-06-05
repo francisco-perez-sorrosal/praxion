@@ -1,0 +1,7 @@
+{
+  "notes": "Praxion is plugin/philosophy infrastructure (skills, agents, rules, commands, hooks) plus Python harnesses — not a deployed service. These weights down-rank pillars whose criteria assume a runtime service (health checks, containerization) so the adjusted score reflects what matters for this repo. The canonical unweighted Factory score is still computed and shown for cross-tool comparison. Tune freely: weight 0 excludes a pillar entirely. See skills/agent-readiness.",
+  "pillar_weights": {
+    "observability": 0.5,
+    "dev_environment": 0.5
+  }
+}

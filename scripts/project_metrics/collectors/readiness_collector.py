@@ -32,7 +32,7 @@ from scripts.project_metrics.collectors.base import (
     ResolutionEnv,
     ResolutionResult,
 )
-from scripts.project_metrics.collectors.readiness import checks, score
+from scripts.project_metrics.collectors.readiness import checks, config, score
 from scripts.project_metrics.collectors.readiness.criteria import CRITERIA, Criterion
 
 __all__ = ["ReadinessCollector"]
@@ -79,11 +79,16 @@ class ReadinessCollector(Collector):
 
         repo_root = self._resolve_repo_root(ctx)
         facts = checks.derive_project_facts(repo_root)
+        weights = config.load_pillar_weights(repo_root)
         criteria_verdicts = [_evaluate_criterion(crit, ctx, facts) for crit in CRITERIA]
-        scored = score.score_from_criteria(criteria_verdicts)
+        scored = score.score_with_weights(criteria_verdicts, weights)
         data: dict[str, Any] = {
             "level": scored["level"],
             "pass_pct": scored["pass_pct"],
+            "adjusted_level": scored["adjusted_level"],
+            "adjusted_pass_pct": scored["adjusted_pass_pct"],
+            "pillar_weights": scored["pillar_weights"],
+            "weighting_active": scored["weighting_active"],
             "note": None,
             "pillars": scored["pillars"],
             "manageability": scored["manageability"],
@@ -132,4 +137,12 @@ def _evaluate_criterion(
         "passed": passed,
         "llm": criterion.llm,
         "rationale": rationale,
+        # Educational + how-to-fix content travels in the report so every
+        # consumer (dashboard hover, MD report, agent) gets it without
+        # reaching into the plugin. `remediation_source` starts "static"; the
+        # enrichment step flips it to "llm" when a project-specific LLM
+        # recommendation overrides the deterministic guidance.
+        "explanation": criterion.explanation,
+        "remediation": criterion.remediation,
+        "remediation_source": "static",
     }

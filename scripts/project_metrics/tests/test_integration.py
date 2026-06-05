@@ -58,7 +58,7 @@ _FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
 # Frozen golden contracts (mirror the storage-schema ADR). The readiness
-# feature bumped SCHEMA_VERSION to 1.1.0 but MUST NOT touch the aggregate
+# feature bumped SCHEMA_VERSION (now 1.2.0) but MUST NOT touch the aggregate
 # column set nor the METRICS_LOG.md header — these guards fail loudly on drift.
 _GOLDEN_AGGREGATE_COLUMNS: tuple[str, ...] = (
     "schema_version",
@@ -451,7 +451,7 @@ def test_full_pipeline_embeds_readiness_block_with_llm_skipped(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A full run with no auth credential embeds a well-formed ``readiness``
-    block at the JSON root: schema bumped to 1.1.0, the LLM tier skipped
+    block at the JSON root: schema bumped to 1.2.0, the LLM tier skipped
     offline, and an integer level in the 1-5 band."""
 
     repo_copy = _copy_fixture("minimal_repo", tmp_path)
@@ -466,8 +466,8 @@ def test_full_pipeline_embeds_readiness_block_with_llm_skipped(
     ai_state = repo_copy / ".ai-state"
     payload = _read_report_json(ai_state)
 
-    assert payload.get("schema_version") == "1.1.0", (
-        "The readiness feature bumps schema_version to 1.1.0; "
+    assert payload.get("schema_version") == "1.2.0", (
+        "The readiness recommendations feature bumps schema_version to 1.2.0; "
         f"got {payload.get('schema_version')!r}"
     )
 

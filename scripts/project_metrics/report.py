@@ -378,12 +378,72 @@ def _summarize_scc(data: dict[str, Any]) -> list[str]:
     return lines
 
 
+def _summarize_readiness(data: dict[str, Any]) -> list[str]:
+    """Highlights for agent-readiness: LLM scoring status + recommendations.
+
+    Renders the LLM tier status and a bounded list of failing criteria with
+    their remediation guidance — the human-readable face of the recommendations
+    the evaluation embeds per-criterion. Full per-criterion detail (explanation,
+    pass/fail, scope) lives in the JSON sibling artifact.
+    """
+
+    lines: list[str] = []
+
+    if data.get("weighting_active"):
+        adj_pct = data.get("adjusted_pass_pct")
+        adj_level = data.get("adjusted_level")
+        canon_pct = data.get("pass_pct")
+        canon_level = data.get("level")
+        if isinstance(adj_pct, (int, float)) and isinstance(canon_pct, (int, float)):
+            lines.append(
+                f"- Adjusted (your weights): {adj_pct * 100:.0f}% · L{adj_level} "
+                f"(canonical Factory: {canon_pct * 100:.0f}% · L{canon_level})"
+            )
+        weights = data.get("pillar_weights")
+        if isinstance(weights, dict):
+            tuned = [f"{p} ×{w:g}" for p, w in sorted(weights.items()) if w != 1.0]
+            if tuned:
+                lines.append(f"- Pillar weights: {', '.join(tuned)} (others ×1)")
+
+    llm = data.get("llm")
+    if isinstance(llm, dict):
+        status = llm.get("status")
+        model = llm.get("model")
+        if status == "scored" and model:
+            lines.append(f"- LLM scoring: scored via `{model}`")
+        elif status:
+            lines.append(f"- LLM scoring: {status}")
+
+    criteria = data.get("criteria")
+    if not isinstance(criteria, list):
+        return lines
+    failing = [
+        c
+        for c in criteria
+        if isinstance(c, dict) and c.get("passed") is False and c.get("remediation")
+    ]
+    if not failing:
+        return lines
+    failing.sort(key=lambda c: (int(c.get("level", 1)), str(c.get("id", ""))))
+    shown = failing[:10]
+    lines.append(f"- Recommendations for {len(failing)} unmet criteria:")
+    for crit in shown:
+        tag = " (AI-tailored)" if crit.get("remediation_source") == "llm" else ""
+        lines.append(
+            f"    - L{crit.get('level')} `{crit.get('id')}`{tag}: {crit.get('remediation')}"
+        )
+    if len(failing) > len(shown):
+        lines.append(f"    - …and {len(failing) - len(shown)} more (see JSON sibling)")
+    return lines
+
+
 _DEEP_DIVE_SUMMARIZERS: dict[str, Any] = {
     "git": _summarize_git,
     "scc": _summarize_scc,
     "lizard": _summarize_lizard,
     "complexipy": _summarize_complexipy,
     "pydeps": _summarize_pydeps,
+    "readiness": _summarize_readiness,
 }
 
 

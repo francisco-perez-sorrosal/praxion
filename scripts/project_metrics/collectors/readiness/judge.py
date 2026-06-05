@@ -69,6 +69,14 @@ _VERDICT_SCHEMA: dict[str, Any] = {
             "type": "string",
             "description": "One- or two-sentence justification for the verdict.",
         },
+        "recommendation": {
+            "type": "string",
+            "description": (
+                "When 'passed' is false, one concrete, project-specific next step "
+                "the maintainer can take to satisfy the criterion, grounded in the "
+                "artifact under evaluation. Empty string when 'passed' is true."
+            ),
+        },
     },
     "required": ["passed", "rationale"],
 }
@@ -160,6 +168,9 @@ def _build_prompt(
         [
             "",
             "Call the 'verdict' tool with a boolean 'passed' and a short 'rationale'.",
+            "If 'passed' is false, also set 'recommendation' to one concrete, "
+            "actionable next step tailored to this artifact (not generic advice); "
+            "leave it empty when 'passed' is true.",
         ]
     )
     return "\n".join(lines)
@@ -260,6 +271,7 @@ def _parse_verdict(raw: bytes) -> dict[str, Any]:
             return {
                 "passed": bool(verdict["passed"]),
                 "rationale": str(verdict.get("rationale", "")),
+                "recommendation": str(verdict.get("recommendation", "")),
             }
 
     raise JudgeUnavailable("judge response contained no 'verdict' tool call")

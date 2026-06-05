@@ -39,7 +39,7 @@ __all__ = [
 ]
 
 
-SCHEMA_VERSION = "1.1.0"
+SCHEMA_VERSION = "1.2.0"
 
 
 # Frozen aggregate-block column order — matches the schema ADR row-by-row.

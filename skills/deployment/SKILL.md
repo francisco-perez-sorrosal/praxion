@@ -58,6 +58,7 @@ Opinionated guidance for deploying applications -- from local Docker Compose thr
 - **Compose `version:` field is obsolete** -- modern `compose.yaml` files start with `services:` directly. Drop the `version:` key and rename `docker-compose.yml` to `compose.yaml`
 - **TGI is in maintenance mode (Dec 2025)** -- HuggingFace recommends vLLM or SGLang. Do not recommend TGI for new deployments
 - **Missing health checks cause cascading startup failures** -- `depends_on` without `condition: service_healthy` only waits for container start, not readiness. Always pair with health checks
+- **Agent-readiness detects the `Dockerfile` `HEALTHCHECK` instruction, not the compose `healthcheck:` block** -- a service with only a `compose.yaml` `healthcheck:` will still fail the `c.observability.healthcheck` criterion. Add a `HEALTHCHECK` line to the `Dockerfile` (or expose `/healthz` in `package.json`) for the criterion to pass; the `observability` skill's Service Observability Baseline section has the detector details
 - **GPU memory underestimation** -- an 8B parameter model at FP16 needs ~16GB VRAM; add KV cache overhead (~4.5GB at 32K context). Consumer GPUs (RTX 4090, 24GB) max out at ~13B FP16
 - **Secrets in environment variables committed to git** -- `.env` files must be gitignored. Use `.env.example` with empty values as the committed template
 - **Docker Desktop licensing** -- Docker Desktop is commercial ($5/user/month for businesses 250+ employees). Consider OrbStack (macOS) or Colima (open-source) as alternatives

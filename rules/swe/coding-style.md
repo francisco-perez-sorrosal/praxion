@@ -51,13 +51,18 @@ Language-specific tool choices and configuration belong in each language's skill
 
 ### Baseline Configuration
 
-The "must pass the linters/formatters" mandate above is vacuous if no linter, formatter, or editor config exists. Every Praxion-managed project therefore **must** carry, at the repository root:
+The "must pass the linters/formatters/type-checks" mandate above is vacuous if no config exists. Every Praxion-managed project therefore **must** carry, at the repository root:
 
 - a **linter config** (`[tool.ruff]` for Python; `biome.json` or `eslint.config.*` for JS/TS; the language's equivalent otherwise),
 - a **formatter config** (`[tool.ruff.format]`/black; Biome or Prettier; the language's equivalent),
-- a universal **`.editorconfig`** (charset, end-of-line, indentation) — stack-agnostic.
+- a universal **`.editorconfig`** (charset, end-of-line, indentation) — stack-agnostic,
+- a **type-check config** (`[tool.mypy]`/`[tool.pyright]` for Python; strict `tsconfig.json` for TS),
+- a **`.pre-commit-config.yaml`** wiring linter + formatter + a secret scanner (run `pre-commit install` once to activate),
+- a **`CONTRIBUTING.md`** documenting branch/commit conventions, the local-check commands, and the PR flow.
 
-These are not authored per-project from scratch. The **canonical baselines are single-sourced** in the language skills and installed idempotently by `/onboard-project` Phase 8e (and `/new-project`): `skills/python-development/assets/ruff-baseline.toml`, `skills/typescript-development/assets/{biome.json, eslint.config.mjs, prettierrc.json}`, and `claude/project-baseline/editorconfig`. When you find a managed project missing any of these, install from the canonical asset rather than hand-rolling — onboarding never overwrites an existing config. Edit the asset, not the per-project copy, to evolve the baseline.
+Runtime-service signals — a structured-logging dependency, a health check — are **not** in this universal set; they are service-conditional and owned by the `observability` skill (a library or research harness should not be forced to carry them).
+
+These are not authored per-project from scratch. The **canonical baselines are single-sourced** in the language skills and `claude/project-baseline/`, installed idempotently by `/onboard-project` Phase 8e (and `/new-project`): `skills/python-development/assets/{ruff-baseline.toml, mypy-baseline.toml}`, `skills/typescript-development/assets/{biome.json, eslint.config.mjs, prettierrc.json, tsconfig.json}`, and `claude/project-baseline/{editorconfig, pre-commit-config.yaml, CONTRIBUTING.md.tmpl}`. When you find a managed project missing any of these, install from the canonical asset rather than hand-rolling — onboarding never overwrites an existing config. Edit the asset, not the per-project copy, to evolve the baseline.
 
 ### Language-Specific Style
 

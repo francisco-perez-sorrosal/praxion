@@ -155,6 +155,15 @@ Use `async/await` with `httpx` for HTTP, `asynccontextmanager` for resource life
 
 Configure mypy (strict mode), pytest, and coverage in `pyproject.toml`. Use pre-commit hooks with ruff and mypy for automated quality gates.
 
+The **canonical mypy baseline** is shipped as a single source of truth at
+[`assets/mypy-baseline.toml`](assets/mypy-baseline.toml) and appended to a
+project's `pyproject.toml` by `/onboard-project` Phase 8e (and `/new-project`)
+when no `[tool.mypy]`/`[tool.pyright]` section exists — so the type-check mandate
+in [`coding-style.md`](../../rules/swe/coding-style.md) § Baseline Configuration is
+never vacuous, and the agent-readiness type-check criterion passes. The same phase
+installs the canonical `.pre-commit-config.yaml` (file hygiene + ruff hooks + a
+secret scanner). Edit those assets, not per-project copies, to evolve the baseline.
+
 --> See [references/testing-and-tooling.md](references/testing-and-tooling.md#code-quality-tools) for full `pyproject.toml` configuration and pre-commit setup.
 
 ## Error Handling

@@ -201,12 +201,31 @@ When a project is at level N and you want to reach level N+1:
    focus there before spreading effort.
 
 4. **Handoff to the pipeline:**
-   - For infrastructure / config gaps (missing lockfile, CI, pre-commit):
+   - **For the universal code-quality baselines** (`c.style.precommit_config`,
+     `c.codequality.typecheck_config`, `c.docs.contributing`, plus the L1–L2
+     linter/formatter/editorconfig criteria): the fastest remediation is
+     `/onboard-project` **Phase 8e**, which installs all of them idempotently
+     from Praxion's canonical baseline assets (never overwriting an existing
+     config). Re-run it; only escalate to a feature pipeline for project-specific
+     tuning of the installed configs.
+   - For other infrastructure / config gaps (missing lockfile, CI):
      hand off to `implementation-planner` with the failing criterion as a
      concrete acceptance criterion.
-   - For quality improvements (naming conventions, test quality, README):
+   - **For `c.testing.test_quality`** (LLM-judged — behavior-focused tests that
+     meaningfully cover the code, not just line %): hand off to `test-engineer`
+     to add/strengthen behavior-focused tests (describe behavior, not IDs), and
+     publish coverage via `/project-coverage` (the `test-coverage` skill) so the
+     quality is visible. Line coverage alone does not move this criterion — the
+     judge weighs whether tests assert meaningful behavior.
+   - For other quality improvements (naming conventions, README):
      hand off to `researcher` first to gather current state, then `systems-architect`
      to design the improvement.
+   - **For `c.observability.logging_config` / `c.observability.healthcheck`**:
+     these are *service-conditional*. If the project is a runtime service, follow
+     the `observability` skill's Service Observability Baseline (declare a logging
+     dependency + wire a health surface). If it is a library / CLI / harness, do
+     **not** add a vanity dependency — weight the Observability pillar down in
+     `.ai-state/readiness_config.json` instead (see rubric § Pillar Weighting).
    - For Praxion manageability gaps: use `/onboard-project` (idempotent) to
      install missing surfaces (`CLAUDE.md` block, git hooks, `.ai-state/`).
 
@@ -241,12 +260,22 @@ When a project is at level N and you want to reach level N+1:
 
 - **`/project-metrics`** — the command that runs the readiness engine. All
   readiness flags are arguments to this command.
+- **`/onboard-project` Phase 8e** — installs the universal code-quality baselines
+  (linter/formatter/editorconfig, pre-commit, type-check config, `CONTRIBUTING.md`)
+  from canonical assets; the fastest path to the L1–L3 Style/Code-Quality/Docs
+  mechanical criteria (`c.style.*`, `c.codequality.typecheck_config`, `c.docs.contributing`).
+- **`python-development` / `typescript-development`** — own the canonical
+  linter/formatter/type-check baseline assets Phase 8e installs.
 - **`doc-management`** — improves README quality and contributing guide
   presence (affects `c.docs.readme`, `c.docs.contributing`, `c.docs.readme_quality`).
-- **`observability`** — improves logging config and health-check presence
+- **`observability`** — improves logging config and health-check presence, and
+  carries the Service Observability Baseline + the service-vs-library decision
   (affects `c.observability.logging_config`, `c.observability.healthcheck`).
-- **`cicd`** — improves CI pipeline and test execution (affects
-  `c.build.ci_pipeline`, `c.testing.ci_runs_tests`).
+- **`test-engineer` / `testing-strategy` / `test-coverage`** — improve
+  behavior-focused test quality and make coverage visible (affects
+  `c.testing.test_quality`).
+- **`cicd`** — improves CI pipeline and test execution, and wires type-checking
+  into CI (affects `c.build.ci_pipeline`, `c.testing.ci_runs_tests`).
 - **`architectural-fitness-functions`** — improves type-checker and complexity
   gate presence (affects `c.codequality.typecheck_config`,
   `c.codequality.complexity_gate`).

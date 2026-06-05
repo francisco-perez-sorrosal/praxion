@@ -1,0 +1,20 @@
+{
+  "//": "Canonical Praxion TypeScript baseline: strict type-checking. /onboard-project Phase 8e installs this as tsconfig.json for TS projects when none exists — never overwriting an existing config. Satisfies the agent-readiness code-quality criterion: a static type-checker configuration is present (tsconfig.json with strict). Run type-checking in CI with `tsc --noEmit`. Adjust `include`/`outDir`/`module`/`target` to the project's bundler and runtime; the compiler-strictness flags are the load-bearing baseline.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "noEmit": true
+  },
+  "include": ["src", "tests"]
+}

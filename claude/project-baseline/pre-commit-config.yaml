@@ -1,0 +1,46 @@
+# Canonical Praxion baseline .pre-commit-config.yaml — universal + stack-conditional.
+#
+# Single source of truth for the pre-commit baseline. /onboard-project Phase 8e
+# (and /new-project) install this as `.pre-commit-config.yaml` at the repo root
+# when none exists — never overwriting an existing one. Satisfies the
+# agent-readiness style criterion: a pre-commit configuration is present.
+#
+# Wires the three things the rubric's remediation calls for: a linter, a
+# formatter, and a secret scanner. The UNIVERSAL block (file hygiene + gitleaks)
+# is always kept. Phase 8e KEEPS the PYTHON block only when Python is detected
+# and the JS/TS block only when package.json is present; it strips the
+# non-applicable language block before writing. After install, the user runs
+# `pre-commit install` once to activate the git hook. Bump `rev:` pins to the
+# latest stable tags periodically — these are a safe modern floor.
+
+repos:
+  # --- UNIVERSAL (always kept) -------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks  # secret scanner — blocks committed credentials/tokens
+
+  # --- PYTHON (keep iff Python detected) --------------------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
+    hooks:
+      - id: ruff         # linter (reads [tool.ruff] from pyproject.toml)
+        args: [--fix]
+      - id: ruff-format  # formatter
+
+  # --- JS/TS (keep iff package.json present) ----------------------------------
+  - repo: https://github.com/biomejs/pre-commit
+    rev: v0.6.1
+    hooks:
+      - id: biome-check  # lint + format in one tool (reads biome.json)
+        additional_dependencies: ["@biomejs/biome@1.9.4"]

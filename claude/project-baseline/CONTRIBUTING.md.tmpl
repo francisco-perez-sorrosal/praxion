@@ -1,0 +1,59 @@
+<!--
+Canonical Praxion baseline CONTRIBUTING.md template — universal, stack-agnostic.
+
+Single source of truth for the project contributing guide. /onboard-project
+Phase 8e (and /new-project) install this as `CONTRIBUTING.md` at the repo root
+when none exists — never overwriting an existing one. Satisfies the
+agent-readiness documentation criterion: a contributing guide is present.
+
+Phase 8e fills the <placeholders> from the detected stack (the same tokens Phase 6
+substitutes into the Project Essentials block): <lint command>, <typecheck command>,
+<test command>, <build command>. Leave a `# TODO:` for any command the project
+does not have rather than inventing one, and delete this comment after filling.
+-->
+
+# Contributing
+
+Thanks for contributing! This guide covers the branch/commit conventions, how to
+run the checks locally, and the review flow.
+
+## Branch and commit conventions
+
+- Branch off the default branch; use a short descriptive branch name
+  (`feat/<topic>`, `fix/<topic>`, `docs/<topic>`).
+- One logical change per commit. Keep refactors separate from behavior changes.
+- Commit message format:
+
+  ```
+  <type>: <imperative subject under 50 chars>
+
+  <body — what and why, wrapped at 72 chars, when context is needed>
+  ```
+
+  `type` is one of `feat`, `fix`, `refactor`, `docs`, `test`, `chore`.
+- Never commit secrets, credentials, or generated build artifacts.
+
+## Running checks locally
+
+Run these before every commit and before opening a PR — they must all pass:
+
+```bash
+<lint command>        # format + lint (fix mode)
+<typecheck command>   # static type check
+<test command>        # test suite
+```
+
+A `.pre-commit-config.yaml` wires the linter, formatter, and a secret scanner.
+Activate it once after cloning:
+
+```bash
+pre-commit install
+```
+
+## Pull request / review flow
+
+1. Push your branch and open a PR against the default branch.
+2. Ensure CI is green — linting, type-checking, and tests must pass.
+3. Keep the PR focused; describe *what* changed and *why*.
+4. Address review feedback in follow-up commits; squash on merge if the project
+   prefers a linear history.

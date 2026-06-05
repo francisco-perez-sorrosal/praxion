@@ -30,6 +30,52 @@ Application observability strategy for instrumentation decisions: what to observ
 - [references/alerting-patterns.md](references/alerting-patterns.md) -- SLO-based alerting, burn rates, error budgets, runbook templates
 - [references/typescript-observability.md](references/typescript-observability.md) -- OTel instrumentation, structured logging, and metrics patterns for TypeScript/Node.js
 
+## Service Observability Baseline (when to install, and what passes agent-readiness)
+
+Logging and health-check observability are **service-conditional**, not universal
+code-quality baselines. They belong to a project the moment it becomes a runtime
+service (a web/API server, a worker, a long-running daemon) — and they are
+*wrong* to force onto a pure library, a CLI one-shot, or a research harness. So
+this is a **pipeline-time decision**, not an onboarding install: when the
+`systems-architect`/`implementer` build a service, wire the baseline below; when
+the `deployment` skill produces a `Dockerfile`, add the health check.
+
+**What the agent-readiness detector actually checks** (so you wire the thing that
+flips the criterion, not a lookalike):
+
+- `c.observability.logging_config` matches a **declared dependency** in
+  `pyproject.toml`/`package.json` — one of `structlog`, `loguru`,
+  `opentelemetry`, `sentry`, `prometheus` (Python) or `winston`, `pino`,
+  `opentelemetry` (Node). A stdlib `logging.basicConfig(...)` does **not** satisfy
+  it — the rubric treats "took an explicit observability dependency" as the signal
+  of intent. Declare the dependency *and* configure it.
+- `c.observability.healthcheck` matches a `HEALTHCHECK` instruction in a
+  `Dockerfile`, or `/health`/`healthz` in `package.json`. The portable satisfier
+  for any containerized service is a `Dockerfile HEALTHCHECK` line; web frameworks
+  should *also* expose a `/healthz` route returning 200 when ready.
+
+**Make-it-pass recipe (runtime services only):**
+
+| Stack | Logging dependency + config | Health surface |
+|-------|----------------------------|----------------|
+| Python service | Add `structlog` (or `loguru`); configure a JSON renderer + level at startup | `/healthz` route (FastAPI/Flask) **and** a `Dockerfile` `HEALTHCHECK` probing it |
+| Node service | Add `pino` (or `winston`); structured JSON transport | `/healthz` route **and** a `Dockerfile` `HEALTHCHECK` |
+| OTel-instrumented | `opentelemetry` SDK already satisfies the logging signal | health route + container `HEALTHCHECK` |
+
+`Dockerfile` example: `HEALTHCHECK --interval=30s --timeout=3s CMD curl -fsS http://localhost:8080/healthz || exit 1`.
+
+See [references/structured-logging.md](references/structured-logging.md) for the
+library comparison and config patterns; [`../deployment/SKILL.md`](../deployment/SKILL.md)
+owns the `Dockerfile`/`HEALTHCHECK` wiring.
+
+**Non-service projects** (library, CLI, harness, philosophy-as-infrastructure):
+these criteria do not apply. Rather than carry a vanity dependency, weight the
+Observability pillar down in `.ai-state/readiness_config.json` (`{"pillar_weights":
+{"observability": 0}}`) so the adjusted readiness score is not dragged by criteria
+the project should never meet — see the `agent-readiness` skill's rubric on
+per-project pillar weighting. The canonical (unweighted) score still reports the
+gap honestly; the adjusted score reflects the project's real shape.
+
 ## Gotchas
 
 - **Cardinality explosion**: Unbounded label values in metrics (user IDs, email addresses, request paths) create millions of time series that overwhelm storage and query performance. Use route templates (`/api/users/{id}`), not actual paths. Put high-cardinality data in trace attributes or logs instead.

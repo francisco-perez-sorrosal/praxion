@@ -1,0 +1,27 @@
+# Canonical Praxion mypy baseline — static type-checking for Python projects.
+#
+# Single source of truth for the Python type-check baseline. /onboard-project
+# Phase 8e (and /new-project) append this [tool.mypy] block to a project's
+# pyproject.toml when no [tool.mypy] (and no [tool.pyright]) section exists yet —
+# never overwriting an existing config. Satisfies the agent-readiness code-quality
+# criterion: a static type-checker configuration is present.
+#
+# strict = true is the modern default; the per-module override block is the
+# sanctioned escape hatch for untyped third-party packages (see SKILL.md §Gotchas:
+# "mypy strict mode false positives with third-party libraries") — prefer a
+# scoped override to a blanket `# type: ignore`. python_version is a safe modern
+# floor; bump it to the project's actual minimum. Adjust `files` to the project's
+# source/test layout.
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+show_error_codes = true
+files = ["src", "tests"]
+
+# Scoped escape hatch for an untyped dependency — uncomment and name the module.
+# [[tool.mypy.overrides]]
+# module = ["some_untyped_package.*"]
+# ignore_missing_imports = true

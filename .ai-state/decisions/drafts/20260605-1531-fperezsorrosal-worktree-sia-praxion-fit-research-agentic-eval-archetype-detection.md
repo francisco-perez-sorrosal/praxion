@@ -4,7 +4,7 @@ title: Broaden paradigm-detection for the agentic-eval archetype; cite-as-canoni
 status: proposed
 category: architectural
 date: 2026-06-05
-summary: Extend the single-source paradigm-detection.md with custom-evaluate.py + LLM-SDK-dep eval signals; onboarding cites it as canonical rather than forking. Provisional until validated against more repos.
+summary: Extend the single-source paradigm-detection.md with custom-evaluate.py + LLM-SDK-dep eval signals (core-deps-only + two-tier strength, refined by R5 validation against 4 repos); onboarding cites it as canonical rather than forking. Provisional until R1+R2 are implemented.
 tags: [archetype, detection, paradigm, onboarding, agentic-eval, provisional, sia-fit]
 made_by: agent
 agent_type: systems-architect
@@ -31,19 +31,32 @@ vs cite-as-canonical from onboarding.
 **Extend the existing single-source `paradigm-detection.md`** with a broadened agentic/eval signal
 set, and have onboarding **cite it as canonical** (cross-reference) rather than fork or move it.
 
-Broadened eval signal set (added to the detection table):
-- LLM-SDK deps: `claude-agent-sdk`, `openhands`, `anthropic`, `openai`, MCP SDKs.
+Broadened eval signal set (added to the detection table), **refined by R5 validation (2026-06-05)**:
+- **Strong LLM-SDK deps (fire alone):** `claude-agent-sdk`, `openhands`/`openhands-ai`, `anthropic`,
+  `openai`, MCP SDKs (`@modelcontextprotocol/*`, `mcp`).
+- **Weak/general LLM deps (require a corroborant):** `litellm`, `google-generativeai` fire only with
+  ≥1 structural corroborant — agentic keywords, an `agents/` dir, or the custom-eval-harness layout.
+  *(R5-R2: prevents single-weak-signal misfire on general ML libraries.)*
 - **Custom-eval-harness signal:** a `evaluate.py` plus a `tasks/` / `benchmarks/` / `data/private`
   layout — closing the homegrown-harness blind spot that named-framework detection misses.
+- **Core-deps-only scope (R5-R1):** dependency signals match `[project.dependencies]` only, **never**
+  `[project.optional-dependencies]`/extras. *(Without this, `lm-evaluation-harness` false-positives on
+  its optional `litellm`.)*
 
 Onboarding's Phase 8f describes its *own* signal subset inline (the agentic/eval heuristics it
 acts on) with a cross-reference to `paradigm-detection.md` for the full taxonomy — no duplication,
 single source of truth preserved.
 
-**Provisional marker required (CONTEXT_REVIEW R5):** the broadened signal set must be validated
-against 2–3 more agentic/eval repos before locking, to avoid SIA-overfit. Ship behind a
-`<!-- provisional: validate against N repos -->` marker. This pass designs the detection only;
-it does not lock it.
+**Provisional marker — validation status (CONTEXT_REVIEW R5):** the signal set was validated
+2026-06-05 against four repos (`.ai-work/sia-praxion-fit/RESEARCH_FINDINGS_detection-validation.md`):
+SWE-agent (true positive ✓), Inspect AI (true positive ✓), `lm-evaluation-harness` (boundary —
+non-agentic eval; clean non-fire **only** under R1), and `httpx` (negative control — clean ✗-fire).
+The two refinements above (R5-R1 core-deps-only, R5-R2 two-tier strength) were **folded in as a
+result of that validation** and eliminate the false-positive and single-weak-signal misfire vectors.
+The `<!-- provisional: validate against N repos -->` marker on the `paradigm-detection.md` edit
+**may be removed once R1+R2 are implemented as written**; until the code reflects them, it stays
+provisional. Three lower-priority refinements (model-benchmarking archetype, provider-module dep
+scan, benchmark-dir root-depth constraint) are deferred — see the validation report.
 
 ## Considered Options
 

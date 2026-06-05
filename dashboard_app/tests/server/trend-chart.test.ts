@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { shapeChartData, type TrendSeries } from "@/components/viz/trend-chart";
+import { assignSeriesAxes, shapeChartData, type TrendSeries } from "@/components/viz/trend-chart";
+
+function pts(...ys: number[]): TrendSeries["points"] {
+  return ys.map((y, i) => ({ x: `2026-01-0${i + 1}`, y }));
+}
 
 // ---------------------------------------------------------------------------
 // shapeChartData — pure data-shaping helper
@@ -194,5 +198,54 @@ describe("shapeChartData", () => {
     // The Map<x, y> has the last value for the duplicate key: 20
     expect(rows[0]?.["A"]).toBe(20);
     expect(rows[1]).toEqual({ x: "run-2", A: 30 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// assignSeriesAxes — magnitude-based dual-axis assignment
+// ---------------------------------------------------------------------------
+
+describe("assignSeriesAxes", () => {
+  it("keeps a single series on the left axis", () => {
+    const axes = assignSeriesAxes([{ label: "A", color: "#000", points: pts(10, 20, 30) }]);
+    expect(axes.get("A")).toBe("left");
+  });
+
+  it("keeps same-scale series together on the left axis", () => {
+    const axes = assignSeriesAxes([
+      { label: "CCN", color: "#000", points: pts(8, 9, 11) },
+      { label: "Cognitive", color: "#111", points: pts(12, 14, 15) }
+    ]);
+    expect(axes.get("CCN")).toBe("left");
+    expect(axes.get("Cognitive")).toBe("left");
+  });
+
+  it("splits a small-magnitude series onto the right axis", () => {
+    const axes = assignSeriesAxes([
+      { label: "Churn", color: "#000", points: pts(3000, 4200, 3800) },
+      { label: "Entropy", color: "#111", points: pts(2.1, 3.4, 2.9) },
+      { label: "Truck", color: "#222", points: pts(2, 3, 3) }
+    ]);
+    expect(axes.get("Churn")).toBe("left");
+    expect(axes.get("Entropy")).toBe("right");
+    expect(axes.get("Truck")).toBe("right");
+  });
+
+  it("honors an explicit per-series axis override", () => {
+    const axes = assignSeriesAxes([
+      { label: "A", color: "#000", points: pts(10), axis: "right" },
+      { label: "B", color: "#111", points: pts(12) }
+    ]);
+    expect(axes.get("A")).toBe("right");
+    expect(axes.get("B")).toBe("left");
+  });
+
+  it("defaults a series with no measurable magnitude to the left axis", () => {
+    const axes = assignSeriesAxes([
+      { label: "Big", color: "#000", points: pts(1000, 2000) },
+      { label: "Tiny", color: "#111", points: pts(1, 2) },
+      { label: "Empty", color: "#222", points: [] }
+    ]);
+    expect(axes.get("Empty")).toBe("left");
   });
 });

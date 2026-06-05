@@ -411,6 +411,18 @@ export function formatChartAxisValue(value: number): string {
   return value.toFixed(2);
 }
 
+/**
+ * Per-metric axis/legend formatter. Percentages render as `NN%`; everything
+ * else uses the compact numeric formatter. Used so dual-axis charts can label
+ * each axis (and each legend chip) in the metric's own unit.
+ */
+export function chartAxisFormatterFor(metricKey: MetricKey): (value: number) => string {
+  if (METRIC_DEFINITIONS[metricKey].format === "pct") {
+    return (value: number) => `${(value * 100).toFixed(0)}%`;
+  }
+  return formatChartAxisValue;
+}
+
 export function formatSnapshotLabel(timestamp: string | null): string {
   if (!timestamp) {
     return "Unknown";

@@ -9,6 +9,7 @@ import type {
   MetricsSnapshot
 } from "@/lib/metrics";
 import {
+  chartAxisFormatterFor,
   formatChartAxisValue,
   formatSnapshotLabel,
   METRIC_CHART_SECTIONS,
@@ -37,7 +38,12 @@ function seriesFromLog(
       : row.report_file ?? "?";
     return [{ x, y }];
   });
-  return { color: definition.chartColor, label: definition.shortLabel, points };
+  return {
+    color: definition.chartColor,
+    label: definition.shortLabel,
+    points,
+    yFormatter: chartAxisFormatterFor(metricKey)
+  };
 }
 
 /**
@@ -54,7 +60,12 @@ function seriesFromSnapshots(
     if (y === null) return [];
     return [{ x: formatSnapshotLabel(snapshot.aggregate.timestamp), y }];
   });
-  return { color: definition.chartColor, label: definition.shortLabel, points };
+  return {
+    color: definition.chartColor,
+    label: definition.shortLabel,
+    points,
+    yFormatter: chartAxisFormatterFor(metricKey)
+  };
 }
 
 function buildSectionSeries(

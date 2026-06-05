@@ -140,7 +140,17 @@
 }
 
 .trend-chart__tooltip-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   margin: 0;
+}
+
+.trend-chart__tooltip-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: 0 0 auto;
 }
 
 .trend-chart__tooltip-name {
@@ -149,6 +159,81 @@
 
 .trend-chart__tooltip-value {
   font-family: var(--font-mono), monospace;
+  margin-left: auto;
+}
+
+/* ─── Interactive trend-chart legend (toggle / progressive disclosure) ──────── */
+
+.trend-chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.trend-chart__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill, 999px);
+  background: var(--color-surface-1);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  cursor: pointer;
+  transition: opacity 120ms ease-out, border-color 120ms ease-out, background 120ms ease-out;
+}
+
+.trend-chart__chip:hover {
+  border-color: var(--color-border-strong);
+}
+
+.trend-chart__chip:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.trend-chart__chip.is-hidden {
+  opacity: 0.45;
+  background: var(--color-surface-2);
+}
+
+.trend-chart__chip.is-hidden .trend-chart__chip-swatch {
+  /* drained swatch signals "muted" without relying on color alone */
+  box-shadow: inset 0 0 0 1px var(--color-border-strong);
+  background: transparent !important;
+}
+
+.trend-chart__chip.is-hidden .trend-chart__chip-label {
+  text-decoration: line-through;
+}
+
+.trend-chart__chip-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: 0 0 auto;
+}
+
+.trend-chart__chip-label {
+  font-weight: 500;
+}
+
+.trend-chart__chip-value {
+  font-family: var(--font-mono), monospace;
+  color: var(--color-text-muted);
+}
+
+.trend-chart__chip-axis {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  padding: 0 3px;
+  margin-left: 1px;
 }
 
 .sparkline-wrapper {

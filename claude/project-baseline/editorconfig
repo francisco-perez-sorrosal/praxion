@@ -1,0 +1,34 @@
+# Canonical Praxion baseline .editorconfig — universal, stack-agnostic.
+#
+# Single source of truth for the project editor baseline. /onboard-project
+# Phase 8e (and /new-project) install this as `.editorconfig` at the repo root
+# for every managed project when none exists — never overwriting an existing
+# one. Satisfies the agent-readiness style criterion: .editorconfig present.
+#
+# Encodes whitespace, charset, and newline rules every editor honors, so humans
+# and agents emit byte-consistent files regardless of local settings.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# Web/config ecosystems conventionally use 2-space indentation.
+[*.{js,jsx,ts,tsx,mjs,cjs,json,jsonc,yml,yaml,css,scss,less,html,vue,svelte}]
+indent_size = 2
+
+# Markdown: trailing whitespace can be a hard line break — do not trim.
+[*.md]
+trim_trailing_whitespace = false
+
+# Makefiles require literal tabs.
+[Makefile]
+indent_style = tab
+
+[*.go]
+indent_style = tab

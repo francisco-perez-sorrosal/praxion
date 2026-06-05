@@ -1,0 +1,23 @@
+# Canonical Praxion ruff baseline — lint + format for Python projects.
+#
+# Single source of truth for the Python code-quality baseline. /onboard-project
+# Phase 8e (and /new-project) append these blocks to a project's pyproject.toml
+# when no [tool.ruff] section exists yet — never overwriting an existing config.
+# Satisfies the agent-readiness style criteria: [tool.ruff] = linter config,
+# [tool.ruff.format] = formatter config.
+#
+# line-length lives only under [tool.ruff] and lint ignores E501 so the formatter
+# owns wrapping — avoids the format-vs-lint cycle documented in SKILL.md.
+# target-version is a safe modern floor; bump it to the project's actual minimum.
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "PT"]
+ignore = ["E501"]  # line length is owned by the formatter
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

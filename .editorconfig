@@ -1,0 +1,28 @@
+# Praxion baseline .editorconfig — universal, stack-agnostic.
+# Source of truth: claude/project-baseline/editorconfig (installed by
+# /onboard-project Phase 8e). Praxion dogfoods its own onboarding output.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# Web/config ecosystems conventionally use 2-space indentation.
+[*.{js,jsx,ts,tsx,mjs,cjs,json,jsonc,yml,yaml,css,scss,less,html,vue,svelte}]
+indent_size = 2
+
+# Markdown: trailing whitespace can be a hard line break — do not trim.
+[*.md]
+trim_trailing_whitespace = false
+
+# Makefiles require literal tabs.
+[Makefile]
+indent_style = tab
+
+[*.go]
+indent_style = tab

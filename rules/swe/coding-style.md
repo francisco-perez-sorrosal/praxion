@@ -47,7 +47,17 @@ Every code change must pass the project's formatters and linters before commit. 
 
 **When to run:** At minimum before every commit and before each test run. When working interactively outside the agent pipeline (Direct or Spike tiers), run after completing a logical change — not necessarily after every individual edit.
 
-Language-specific tool choices and configuration belong in each language's skill (e.g., `ruff` for Python, `prettier`/`eslint` for JS/TS). This rule defines the principle; skills define the tools.
+Language-specific tool choices and configuration belong in each language's skill (e.g., `ruff` for Python, Biome or `eslint`/`prettier` for JS/TS). This rule defines the principle; skills define the tools.
+
+### Baseline Configuration
+
+The "must pass the linters/formatters" mandate above is vacuous if no linter, formatter, or editor config exists. Every Praxion-managed project therefore **must** carry, at the repository root:
+
+- a **linter config** (`[tool.ruff]` for Python; `biome.json` or `eslint.config.*` for JS/TS; the language's equivalent otherwise),
+- a **formatter config** (`[tool.ruff.format]`/black; Biome or Prettier; the language's equivalent),
+- a universal **`.editorconfig`** (charset, end-of-line, indentation) — stack-agnostic.
+
+These are not authored per-project from scratch. The **canonical baselines are single-sourced** in the language skills and installed idempotently by `/onboard-project` Phase 8e (and `/new-project`): `skills/python-development/assets/ruff-baseline.toml`, `skills/typescript-development/assets/{biome.json, eslint.config.mjs, prettierrc.json}`, and `claude/project-baseline/editorconfig`. When you find a managed project missing any of these, install from the canonical asset rather than hand-rolling — onboarding never overwrites an existing config. Edit the asset, not the per-project copy, to evolve the baseline.
 
 ### Language-Specific Style
 

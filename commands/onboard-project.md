@@ -23,15 +23,16 @@ Onboard the **current existing** project to work cleanly with the Praxion plugin
 13. §Phase 8b — AaC Tier Install (opt-in, default-skip — fence seed, fitness scaffold, hook block, workflow, diagrams)
 14. §Phase 8c — ML/AI Training Scaffold (opt-in, default-skip; default-yes when ML signals detected)
 15. §Phase 8d — Obsidian integration (opt-in, default-yes)
-16. §Phase 9 — Verification + handoff
-17. §Agent Pipeline Block — canonical source of truth
-18. §Compaction Guidance Block
-19. §Behavioral Contract Block
-20. §Praxion Process Block
-21. §Hackathon Mode Block — installed only when Phase 5b enables hackathon mode
-22. §Project Essentials Block
-23. §Obsidian Integration Block — installed only when Phase 8d runs
-24. §Idempotency Predicates — per-phase contracts
+16. §Phase 8e — Code-quality baseline (opt-in, default-yes — `.editorconfig` + per-stack linter/formatter config from canonical assets)
+17. §Phase 9 — Verification + handoff
+18. §Agent Pipeline Block — canonical source of truth
+19. §Compaction Guidance Block
+20. §Behavioral Contract Block
+21. §Praxion Process Block
+22. §Hackathon Mode Block — installed only when Phase 5b enables hackathon mode
+23. §Project Essentials Block
+24. §Obsidian Integration Block — installed only when Phase 8d runs
+25. §Idempotency Predicates — per-phase contracts
 
 ## §Pre-flight
 
@@ -94,6 +95,7 @@ Execute these phases in order. Each phase honors §Idempotency Predicates — re
 | 8b | AaC tier install — fence seed, `fitness/` scaffold, golden-rule Block D, `architecture.yml` workflow, `docs/diagrams/` scaffold | User picks "Skip AaC" (default) at Gate 8b; or per-sub-step predicates (see §Phase 8b) |
 | 8c | ML/AI training scaffold — experiment tracking config, checkpoint `.gitignore` block, GPU budget declaration, `program.md` template, mode callout | No ML signals detected (skip) OR user picks "Skip" at Gate 8c; per-sub-step predicates (see §Phase 8c) |
 | 8d | Obsidian integration — `.gitignore` Obsidian block, verify `obsidian@obsidian-skills` plugin install, `CLAUDE.md` Obsidian Integration block, `settings.json` deny entries | User picks "Skip" at Gate 8d; per-sub-step predicates (see §Phase 8d) |
+| 8e | Code-quality baseline — universal `.editorconfig` + per-detected-stack linter/formatter config installed from canonical assets (never overwriting existing config) | User picks "Skip" at Gate 8e; per-sub-step predicates (see §Phase 8e) |
 | 9 | Print summary + stage modified files (no commit) | None — terminal phase |
 
 ## §Phase Gates
@@ -117,6 +119,7 @@ The default §Flow runs end-to-end without pause. To let users *learn* the model
   - Three-option `Skip AaC` (default) / `Install AaC tier` / `Run all rest` — Gate 8b (see §Phase 8b)
   - Three-option `Skip ML scaffold` (default for non-ML) / `Run ML scaffold` / `Run all rest` — Gate 8c (see §Phase 8c); default is `Run ML scaffold` when ML signals detected
   - Three-option `Install Obsidian integration (default)` / `Skip` / `Run all rest` — Gate 8d (see §Phase 8d)
+  - Three-option `Install code-quality baseline (default)` / `Skip` / `Run all rest` — Gate 8e (see §Phase 8e)
 
 **Gate map.** Gate 1 doubles as the entry gate — its headline carries both the high-level orientation and the Phase 1 specifics, so the user is not double-prompted before the first phase. Gates 2–8 fire one-per-phase as expected. Gate 5b fires between Phase 5 and Phase 6.
 
@@ -134,6 +137,7 @@ The default §Flow runs end-to-end without pause. To let users *learn* the model
 | 8b | 8b | (Three-option pick — see §Phase 8b for the exact AskUserQuestion form. Default is `Skip AaC`. Headline: `Phase 8b: AaC tier install. I can install the Architecture-as-Code surfaces for this project: fence-region examples in your architecture docs, fitness/ scaffold for architectural fitness tests, a golden-rule pre-commit block, a .github/workflows/architecture.yml CI workflow, and a docs/diagrams/ directory stub. All five installs are idempotent — re-running is safe. The AaC convention requires the i-am plugin to be installed for enforcement to fire. Sentinel-only surfaces (traceability convention, sentinel AC dimension) need no per-project install. Pick:`) |
 | 8c | 8c | (Three-option pick — see §Phase 8c for the exact AskUserQuestion form. Default is `Skip ML scaffold` for non-ML projects; default is `Run ML scaffold` when ML signals are detected. Headline: `Phase 8c: ML/AI training scaffold. I detected signals that this is an ML/AI training project. I can scaffold: experiment tracking config (.ai-state/experiments/), checkpoint directory entries in .gitignore, compute-budget declaration (.ai-state/gpu_budget.yaml), and a program.md template at repo root. All scaffolding is idempotent. Pick:`) |
 | 8d | 8d | (Three-option pick — see §Phase 8d for the exact AskUserQuestion form. Default is `Install Obsidian integration`. Headline: `Phase 8d: Obsidian integration. I can wire this project for Obsidian vault-as-repo: a .gitignore Obsidian block, a check that the obsidian@obsidian-skills marketplace plugin is installed at user scope, an ## Obsidian Integration block in CLAUDE.md, and permissions.deny entries in .claude/settings.json blocking the dangerous obsidian CLI subcommands. All installs are idempotent. Pick:`) |
+| 8e | 8e | (Three-option pick — see §Phase 8e for the exact AskUserQuestion form. Default is `Install code-quality baseline`. Headline: `Phase 8e: Code-quality baseline. Using the stack I detected, I install the conventions that keep code consistent and that agent-readiness checks for: a universal .editorconfig, and your language's linter + formatter config (Python → [tool.ruff] blocks in pyproject.toml; JS/TS → biome.json, or eslint.config.mjs + prettierrc.json for framework projects). All sourced from Praxion's canonical baseline assets and idempotent — I never overwrite an existing config. Pick:`) |
 
 ## §Phase 1 — `.gitignore` hygiene
 
@@ -929,6 +933,44 @@ full allowlist rationale.
 ```
 
 **Verification handoff.** After all sub-steps complete, the summary above serves as the handoff. Phase 9 verification handoff lists every staged file across all phases — Phase 8d's surfaces are included in that enumeration.
+
+## §Phase 8e — Code-quality baseline (opt-in, default-yes)
+
+**Why this phase exists.** Praxion's onboarding establishes universal infrastructure and domain scaffolds, but historically left a gap: it never established the **code-quality baseline** (linter, formatter, `.editorconfig`) every project needs. The `coding-style.md` mandate "every change must pass the linters/formatters" is vacuous when no config exists, and the agent-readiness rubric flags the absence as Style deficits (`c.style.linter_config`, `c.style.formatter_config`, `c.style.editorconfig`). This phase closes the gap from first principles: it installs the **canonical, single-sourced baselines** so the mandate is real and the rubric passes. The configs are owned by the language skills and `claude/project-baseline/`, never hand-rolled here — see [`coding-style.md`](../rules/swe/coding-style.md) § Baseline Configuration.
+
+**Stack reuse.** This phase consumes the **Stack detection** captured in §Pre-flight (step 4) — Python, JavaScript/TypeScript, etc. It performs no new detection beyond reading `package.json` dependencies to distinguish framework (React/Vue/Next) from non-framework JS/TS.
+
+**Asset resolution.** Canonical assets live in the i-am plugin install (the `installPath` captured in §Pre-flight): `skills/python-development/assets/ruff-baseline.toml`, `skills/typescript-development/assets/{biome.json, eslint.config.mjs, prettierrc.json}`, and `claude/project-baseline/editorconfig`. Read the asset from there; write the materialized file into the project. Edit the asset (never the per-project copy) to evolve the baseline.
+
+**Gate 8e — three-option AskUserQuestion.** Use `AskUserQuestion` with `header: "Next?"`, `multiSelect: false`, the Gate 8e headline from the gate map, and these three options:
+
+| Option | Effect |
+|--------|--------|
+| `Install code-quality baseline` | **Default.** Run sub-steps 8e.1–8e.3; each is independently idempotent and skips when its config already exists. |
+| `Skip` | Skip Phase 8e entirely. Re-run `/onboard-project` later — all sub-steps are idempotent. |
+| `Run all rest` | Skip remaining gates, default this choice to `Install code-quality baseline`, run autonomously through Phase 9. |
+
+**Action when "Install code-quality baseline" is chosen.** Run sub-steps 8e.1 through 8e.3 in order. Each prints one line on completion or skip. None overwrites an existing config — the baseline is additive only.
+
+### Sub-step 8e.1 — Universal `.editorconfig`
+
+**Predicate.** `.editorconfig` exists at the repo root → skip with `8e.1: skipped (.editorconfig already present)`.
+
+**Action.** Copy `claude/project-baseline/editorconfig` (from the plugin install) to `<repo-root>/.editorconfig`, stripping the leading template-doc comment lines. Print: `8e.1: .editorconfig installed (universal baseline)`.
+
+### Sub-step 8e.2 — Python linter + formatter (ruff)
+
+**Predicate.** No Python signal in the detected stack → skip with `8e.2: skipped (no Python detected)`. OR `pyproject.toml` already contains a `[tool.ruff]` section → skip with `8e.2: skipped ([tool.ruff] already configured)`.
+
+**Action.** If `pyproject.toml` exists, append the `[tool.ruff]`, `[tool.ruff.lint]`, and `[tool.ruff.format]` blocks from `skills/python-development/assets/ruff-baseline.toml` (this single asset satisfies both the linter and formatter criteria). If no `pyproject.toml` exists, emit `8e.2: deferred (no pyproject.toml — add a build manifest first, then re-run)` rather than creating one (manifest creation is the project-management skill's concern). Print: `8e.2: ruff lint+format config appended to pyproject.toml`.
+
+### Sub-step 8e.3 — JS/TS linter + formatter (Biome, or ESLint+Prettier for frameworks)
+
+**Predicate.** No JavaScript/TypeScript signal (`package.json` absent) → skip with `8e.3: skipped (no JS/TS detected)`. OR any of `biome.json` / `biome.jsonc` / `eslint.config.*` / `.eslintrc.*` already exists → skip with `8e.3: skipped (JS/TS linter already configured)`.
+
+**Action.** Read `package.json` dependencies. If a framework is present (`react`, `vue`, or `next`), install `eslint.config.mjs` + `prettierrc.json` (→ `.prettierrc.json`) from the typescript-development assets — framework ESLint plugins have no Biome equivalent (see the skill's Biome-vs-ESLint decision rule). Otherwise install `biome.json` (one tool, lint + format). Do **not** install npm dev-dependencies; print the one-line install command instead (`npm i -D @biomejs/biome`, or `npm i -D eslint @eslint/js typescript-eslint prettier` for the framework path). Print: `8e.3: <biome.json | eslint.config.mjs + .prettierrc.json> installed (run the printed npm install to enable)`.
+
+**Verification handoff.** Phase 9 lists every file staged here. The agent-readiness Style criteria flip to pass on the next `/project-metrics --refresh` run.
 
 ## §Phase 9 — Verification + handoff
 

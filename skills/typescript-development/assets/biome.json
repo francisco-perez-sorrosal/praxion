@@ -1,0 +1,15 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "//": "Canonical Praxion JS/TS baseline (default): Biome handles lint + format in one tool. /onboard-project Phase 8e installs this as biome.json for non-framework JS/TS projects. Framework projects (React/Vue/Next) get eslint.config.mjs + prettierrc.json instead — see the typescript-development skill's Biome-vs-ESLint decision rule. Required dev dep (onboarding prints, does not install): npm i -D @biomejs/biome",
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "linter": {
+    "enabled": true,
+    "rules": { "recommended": true }
+  },
+  "organizeImports": { "enabled": true }
+}

@@ -105,12 +105,17 @@ class Processor(Protocol):
 
 ## Code Style
 
-**Formatter**: Use ruff for formatting and linting:
+**Formatter + linter**: Use ruff for both. The **canonical baseline** is shipped
+as a single source of truth at [`assets/ruff-baseline.toml`](assets/ruff-baseline.toml)
+and installed into a project's `pyproject.toml` by `/onboard-project` Phase 8e
+(and `/new-project`) — every Python project gets it, idempotently, so the
+linter/formatter mandate in [`coding-style.md`](../../rules/swe/coding-style.md)
+is never vacuous. The baseline is:
 
 ```toml
 [tool.ruff]
 line-length = 100
-target-version = "py313"
+target-version = "py311"   # safe modern floor — bump to the project's minimum
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "PT"]
@@ -120,6 +125,11 @@ ignore = ["E501"]  # Line length handled by formatter
 quote-style = "double"
 indent-style = "space"
 ```
+
+Edit the asset, not this excerpt, when changing the baseline — they must agree.
+Every project also gets a universal `.editorconfig` (charset, newline, indent)
+from the same onboarding phase; see [`coding-style.md`](../../rules/swe/coding-style.md)
+§ Baseline Configuration.
 
 ## Testing with pytest
 

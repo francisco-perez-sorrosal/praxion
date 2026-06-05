@@ -100,3 +100,22 @@ exclude_lines = [
 # Canonical artifact path. Changing this breaks downstream discovery.
 output = "coverage.xml"
 # --- end test-coverage skill defaults ---------------------------------------
+
+# --- code-quality baseline (Praxion dogfoods its own onboarding Phase 8e) ----
+# Single source of truth: skills/python-development/assets/ruff-baseline.toml.
+# Installed here by the same mechanism /onboard-project applies to managed
+# projects. Edit the asset, not this copy, to evolve the baseline. Satisfies the
+# agent-readiness Style criteria (linter = [tool.ruff], formatter =
+# [tool.ruff.format]).
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "PT"]
+ignore = ["E501"]  # line length is owned by the formatter
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+# --- end code-quality baseline ----------------------------------------------

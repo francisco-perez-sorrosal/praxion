@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-06-05T19:51:43Z'
+generated_at: '2026-06-05T23:28:11Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
@@ -28,7 +28,7 @@ rules:
   load: always_on
   core: true
   install: symlink
-  chars: 12865
+  chars: 13458
 - id: swe/swe-agent-coordination-protocol
   path: rules/swe/swe-agent-coordination-protocol.md
   load: always_on
@@ -53,6 +53,17 @@ rules:
   core: false
   install: hook-deliver
   chars: 2688
+- id: eval/eval-data-governance
+  path: rules/eval/eval-data-governance.md
+  load: path_scoped
+  core: false
+  install: symlink
+  chars: 965
+  paths:
+  - evaluate.py
+  - data/private/**
+  - tasks/**
+  - '**/MANIFEST.json'
 - id: ml/eval-driven-verification
   path: rules/ml/eval-driven-verification.md
   load: path_scoped

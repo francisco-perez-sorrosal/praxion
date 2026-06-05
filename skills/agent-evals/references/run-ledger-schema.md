@@ -14,6 +14,7 @@ Owned by the `agent-evals` skill. Back to [SKILL.md](../SKILL.md).
 - [Markdown Body](#markdown-body)
 - [Dual Lifecycle](#dual-lifecycle)
 - [Verifier Consumption](#verifier-consumption)
+- [Run-Store Backend Abstraction](#run-store-backend-abstraction)
 - [Schema Versioning](#schema-versioning)
 - [Minimal Valid Example](#minimal-valid-example)
 
@@ -303,6 +304,84 @@ for this step.
 ```
 
 See `rules/ml/eval-driven-verification.md` for the canonical tolerance-band protocol.
+
+---
+
+## Run-Store Backend Abstraction
+
+The `run_store_descriptor` is **backend-invariant**: only `store_uri` varies across backends.
+This section documents the four supported backends, their `store_uri` derivation rules, the
+five standard operations, and the `local-home` reference-implementation proof that verifies the
+abstraction is correctly designed — mirroring the `neo-cloud-abstraction`
+`pricing_query()→0.0` canonical pattern.
+
+### Backend Table
+
+| Backend | Resolved `store_uri` | Use |
+|---|---|---|
+| `local-home` | `$HOME/.<project-name>/runs/<run_id>/` | zero-config default; no credentials required |
+| `local-custom` | `<run_store_root>/runs/<run_id>/` | custom local mount or network filesystem |
+| `s3` | `s3://<bucket>/<prefix>/runs/<run_id>/` | remote object store (AWS S3 or compatible) |
+| `tracker` | MLflow / W&B run URI | reuse external tracker; delegates to `experiment-tracking` |
+
+`run_store_root` and `run_store_backend` are recorded in `project_profile.yaml` — never in the
+descriptor. The descriptor carries only the resolved `store_uri`.
+
+### Backend Operations
+
+Five operations define the backend contract. Every backend implements all five:
+
+| Operation | Signature | Description |
+|---|---|---|
+| `resolve_uri` | `resolve_uri(descriptor) → store_uri` | Derive the full `store_uri` from `run_id` + `project_name` + backend config |
+| `put` | `put(run_id, path, bytes) → None` | Write artifact bytes to `store_uri/<path>` |
+| `get` | `get(run_id, path) → bytes` | Read artifact bytes from `store_uri/<path>` |
+| `list` | `list(run_id) → paths` | List all artifact paths present under `store_uri` |
+| `prune` | `prune(policy) → count` | Delete runs matching the retention policy; return count removed |
+
+### `local-home` Reference-Implementation Proof
+
+The `local-home` backend is the **reference implementation** that proves the abstraction
+is correctly designed. It mirrors the `neo-cloud-abstraction` `pricing_query()→0.0`
+canonical proof pattern:
+
+- `resolve_uri` for `local-home` returns a plain filesystem path:
+  `$HOME/.<project-name>/runs/<run_id>/`
+- No network call. No credentials. No environment variables beyond `$HOME`.
+- `put`, `get`, `list`, and `prune` operate on the local filesystem — stdlib I/O only.
+
+**Why this proves the abstraction:** if the abstraction were leaking, then `resolve_uri`
+would need a backend-conditional branch (e.g., `if backend == "s3": return s3_url(...)`),
+or the descriptor itself would need a `backend:` field so callers could branch on it. The
+`local-home` path through all five operations using only `store_uri` — without any
+`if backend == ...` check — is the proof that no backend-conditional logic reaches downstream.
+
+A test that verifies `local-home` URI derivation without any import of network or
+credentials libraries is the zero-credential testability proof for the full abstraction.
+
+### Invariance Self-Test
+
+> Trace the descriptor through all four backends. Does any field besides `store_uri`
+> require `if backend == s3` logic downstream? If yes, the schema is wrong.
+
+This self-test (verbatim from the ADR) is the AC-4 acceptance criterion. Apply it whenever
+extending the descriptor schema or adding a new backend. If the answer is "yes," the
+addition belongs in backend-specific config (`project_profile.yaml`), not the descriptor.
+
+### Security Note
+
+Credentials (`s3` bucket credentials, tracker API keys) travel **outside** the descriptor —
+never inside it. Same rule as `neo-cloud-abstraction`. The `env_vars` field (if present in
+project config) carries metadata, not secrets. Secrets are injected via environment variables
+or a secrets manager at backend-initialization time, before the descriptor is constructed.
+
+### `tracker` Backend Delegation
+
+The `tracker` backend delegates run-URI construction and artifact management to
+`skills/experiment-tracking/SKILL.md` (MLflow / W&B). No new library is introduced at the
+Praxion convention layer — the `tracker` backend is an adapter that translates the five
+operations above into the experiment-tracking skill's native calls. `resolve_uri` for
+`tracker` returns the MLflow or W&B run URI as the `store_uri`.
 
 ---
 

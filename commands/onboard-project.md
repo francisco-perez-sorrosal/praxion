@@ -58,6 +58,7 @@ Before any phase runs, gather facts. Pre-flight writes nothing — it produces a
    - `command -v likec4 >/dev/null 2>&1` → record `likec4` present/absent; if present, capture `likec4 --version`
    - `command -v d2 >/dev/null 2>&1` → record `d2` present/absent; if present, capture `d2 --version`
    If either is missing AND the project contains `**/diagrams/*.c4` files (or the user opts into Phase 8 architecture baseline), emit in the pre-flight report: "Install LikeC4 + D2 for architectural diagram regeneration — see `docs/architecture-diagrams.md`."
+4d. **`CLAUDE.md` presence.** `test -e CLAUDE.md` → record present/absent. When absent, §Phase 0.5 bootstraps a `CLAUDE.md` before Phase 1 so the block-append phases (5b, 6, 8d) always have a target. Record in the pre-flight report.
 5. **Prior-onboarding signals.** Check for any of:
    - `## Agent Pipeline` heading in `CLAUDE.md` (re-onboard scenario — Phase 6 will skip the append)
    - `.ai-state/` directory exists with non-empty contents (re-onboard or pipeline-active)
@@ -72,10 +73,11 @@ Before any phase runs, gather facts. Pre-flight writes nothing — it produces a
      plugin install path: <path or n/a>
      stacks detected:     [python, javascript, ...] | none
      ml signals:          detected (train.py|torch/jax/tensorflow|program.md) | none
+     CLAUDE.md:           present | absent (will bootstrap before Phase 1 — see §Phase 0.5)
      prior onboarding:    yes (CLAUDE.md heading found) | no | partial (<list>)
    ```
 
-After printing, proceed to §Flow. The first phase gate (Gate 1) is the entry gate — it carries both the orientation overview and the Phase 1 specifics, so the user is not double-prompted before the first write.
+After printing: **if `CLAUDE.md` is absent, run §Phase 0.5 (CLAUDE.md bootstrap) before §Flow** — it guarantees a `CLAUDE.md` exists so the block-append phases (5b, 6, 8d) never silently skip the Praxion payload. When `CLAUDE.md` is present, §Phase 0.5 is a complete no-op. Then proceed to §Flow. The first phase gate (Gate 1) is the entry gate — it carries both the orientation overview and the Phase 1 specifics, so the user is not double-prompted before the first write.
 
 ## §Flow
 
@@ -83,6 +85,7 @@ Execute these phases in order. Each phase honors §Idempotency Predicates — re
 
 | Phase | Action | Predicate (skip if already done) |
 |-------|--------|----------------------------------|
+| 0.5 | **(conditional — only when `CLAUDE.md` is absent)** Bootstrap a `CLAUDE.md` so the block-append phases have a target: prefer `/init`, else generate an init-equivalent `CLAUDE.md` inline from the codebase | `test -e CLAUDE.md` (present → skip the entire phase, no gate, no write) |
 | 1 | Append AI-assistants block to `.gitignore` | Block detected by `# AI assistants` header line |
 | 2 | Create `.ai-state/` skeleton (4 files) | Each file's existence checked individually |
 | 3 | Append `.gitattributes` entries + register merge drivers via `git config` | Entries detected by exact-line match; drivers detected via `git config --get` |
@@ -112,6 +115,7 @@ The default §Flow runs end-to-end without pause. To let users *learn* the model
 - `question` — the headline from the table below (verbatim, forward-looking)
 - `multiSelect` — `false` for all gates (Gate 5 is a special multi-select on `PRAXION_DISABLE_*` toggles; Gate 8 is a special three-option pick — see below)
 - `options`:
+  - Two-option `Generate from codebase` / `Minimal stub` (default: `Generate from codebase`) — Gate 0.5 (conditional; fires before Gate 1 only when `CLAUDE.md` is absent)
   - Two-option `Continue` / `Run all rest` — gates 1, 2, 3, 4, 6, 7
   - Multi-select toggles — Gate 5 (see §Phase 5)
   - Two-option `Enable hackathon mode` / `Skip — keep full ceremony` (default: Skip) — Gate 5b (see §Phase 5b); gate is suppressed (auto-default Skip) when `no-more-gates` flag is set; auto-default Enable when `--hackathon` was passed
@@ -121,10 +125,11 @@ The default §Flow runs end-to-end without pause. To let users *learn* the model
   - Three-option `Install Obsidian integration (default)` / `Skip` / `Run all rest` — Gate 8d (see §Phase 8d)
   - Three-option `Install code-quality baseline (default)` / `Skip` / `Run all rest` — Gate 8e (see §Phase 8e)
 
-**Gate map.** Gate 1 doubles as the entry gate — its headline carries both the high-level orientation and the Phase 1 specifics, so the user is not double-prompted before the first phase. Gates 2–8 fire one-per-phase as expected. Gate 5b fires between Phase 5 and Phase 6.
+**Gate map.** Gate 0.5 (conditional) fires before Gate 1 **only when `CLAUDE.md` is absent** — it confirms how the bootstrap creates the missing `CLAUDE.md`; when `CLAUDE.md` is present it does not fire at all (zero added friction on the common path). Gate 1 doubles as the entry gate — its headline carries both the high-level orientation and the Phase 1 specifics, so the user is not double-prompted before the first phase. Gates 2–8 fire one-per-phase as expected. Gate 5b fires between Phase 5 and Phase 6.
 
 | Gate | Fires before phase | Headline |
 |------|-------------------|----------|
+| 0.5 | before 1 (only when `CLAUDE.md` is absent) | `No CLAUDE.md found. The Praxion blocks (Phase 6) need a CLAUDE.md to live in. I'll create one — "Generate from codebase" runs /init (or generates an init-equivalent CLAUDE.md inline if /init cannot be invoked here) so it describes your actual code; "Minimal stub" writes just a header you fill in later. Pick:` |
 | 1 | 1 (entry + phase 1) | `I'll walk you through 9 phases that turn this project into a Praxion-aware repo: gitignore hygiene, .ai-state/ skeleton, merge drivers, git hooks, .claude/settings.json toggles, CLAUDE.md blocks, optional CLI tools, an opt-in architecture baseline, and a verification handoff. First up — Phase 1 of 9: I append a Praxion AI-assistants block to your .gitignore. Without these entries, advisory locks, memory backups, per-machine settings, and worktrees can leak into commits. Idempotent — re-runs are no-ops. Continue?` |
 | 2 | 2 | `Phase 2 of 9: I create the .ai-state/ skeleton — decisions/drafts/, DECISIONS_INDEX.md, TECH_DEBT_LEDGER.md, calibration_log.md, plus a static redirect stub at .ai-state/metrics_reports/index.html that points to praxion-dashboard for interactive charts (the METRICS_REPORT_*.md files in the same directory are available for offline reading). Each is created only if missing; existing files are never overwritten. Continue?` |
 | 3 | 3 | `Phase 3 of 9: I add merge-driver entries to .gitattributes and run 'git config' to register Python-based semantic merge drivers for .ai-state/memory.json and .ai-state/observations.jsonl. Without these, concurrent edits get corrupted by line-based merge. Continue?` |
@@ -138,6 +143,37 @@ The default §Flow runs end-to-end without pause. To let users *learn* the model
 | 8c | 8c | (Three-option pick — see §Phase 8c for the exact AskUserQuestion form. Default is `Skip ML scaffold` for non-ML projects; default is `Run ML scaffold` when ML signals are detected. Headline: `Phase 8c: ML/AI training scaffold. I detected signals that this is an ML/AI training project. I can scaffold: experiment tracking config (.ai-state/experiments/), checkpoint directory entries in .gitignore, compute-budget declaration (.ai-state/gpu_budget.yaml), and a program.md template at repo root. All scaffolding is idempotent. Pick:`) |
 | 8d | 8d | (Three-option pick — see §Phase 8d for the exact AskUserQuestion form. Default is `Install Obsidian integration`. Headline: `Phase 8d: Obsidian integration. I can wire this project for Obsidian vault-as-repo: a .gitignore Obsidian block, a check that the obsidian@obsidian-skills marketplace plugin is installed at user scope, an ## Obsidian Integration block in CLAUDE.md, and permissions.deny entries in .claude/settings.json blocking the dangerous obsidian CLI subcommands. All installs are idempotent. Pick:`) |
 | 8e | 8e | (Three-option pick — see §Phase 8e for the exact AskUserQuestion form. Default is `Install code-quality baseline`. Headline: `Phase 8e: Code-quality baseline. Using the stack I detected, I install the conventions that keep code consistent and that agent-readiness checks for: a universal .editorconfig; your language's linter + formatter config (Python → [tool.ruff] in pyproject.toml; JS/TS → biome.json, or eslint.config.mjs + prettierrc.json for frameworks); a static type-check config ([tool.mypy] or strict tsconfig.json); a .pre-commit-config.yaml wiring linter + formatter + a secret scanner; and a CONTRIBUTING.md filled from your project's commands. All sourced from Praxion's canonical baseline assets and idempotent — I never overwrite an existing config. Pick:`) |
+
+## §Phase 0.5 — `CLAUDE.md` bootstrap (conditional)
+
+**Runs only when `CLAUDE.md` is absent** (detected at §Pre-flight step 4d). When `CLAUDE.md` already exists, skip this phase entirely — no gate, no write — and proceed to §Flow. The common path is unchanged.
+
+**Why this phase exists.** Phases 5b, 6, and 8d append Praxion blocks to `CLAUDE.md`. Without a `CLAUDE.md` to append to, those phases would skip and the user would silently lose the core onboarding payload (the Agent Pipeline, Behavioral Contract, Praxion Process, and Working-in-this-project guidance). This phase guarantees a `CLAUDE.md` exists before any block-append phase runs.
+
+**Predicate.** `test -e CLAUDE.md` is true → skip the entire phase (Phase 6 will append to the existing file).
+
+**Gate 0.5.** When `CLAUDE.md` is absent AND the `no-more-gates` flag is not set, fire `AskUserQuestion` with `header: "CLAUDE.md"`, `multiSelect: false`, and the Gate 0.5 headline from the gate map (two options: `Generate from codebase` (default) / `Minimal stub`). When `no-more-gates` is set, apply the default (`Generate from codebase`).
+
+**Action (only when `CLAUDE.md` is absent).**
+
+1. **Prefer `/init`** (when the user chose `Generate from codebase`). Invoke the official Claude `/init` command — it analyzes the codebase and writes a `CLAUDE.md` describing what actually exists. This mirrors `/new-project`'s greenfield step 9.
+
+2. **Verify, then fall back — never leave the project without a `CLAUDE.md`.** After the `/init` attempt, check `test -e CLAUDE.md`:
+   - If `/init` produced a `CLAUDE.md`, continue to §Flow.
+   - **If `CLAUDE.md` is still absent** (`/init` could not be invoked in this execution context — it is a built-in command and may not be programmatically callable mid-command), generate it **inline**: analyze the codebase — project purpose (README / package metadata), primary stack (from §Pre-flight stack detection), entry points, and the build/test/lint/type-check commands (`pyproject.toml` / `package.json` / Makefile / the project's test gate) — and Write a concise `CLAUDE.md` at the project root with a one-paragraph description, a short structure note, and a `## Commands` section listing the *verified* commands. Keep it factual; do not invent. Leave a `# TODO:` for anything undeterminable. (This init-equivalent content is later enriched by Phase 6's §Project Essentials Block.)
+
+3. **Minimal stub** (when the user chose `Minimal stub`). Write only:
+   ```markdown
+   # <project name>
+
+   <!-- TODO: Describe this project — purpose, structure, and build/test/lint commands.
+        Run /init for a codebase-aware version, or fill this in by hand. -->
+   ```
+   Derive `<project name>` from the directory name or package metadata. The Praxion blocks (Phase 6) still append cleanly onto the stub.
+
+**Idempotency.** Guarded by `test -e CLAUDE.md` — a re-run after `CLAUDE.md` exists is a complete no-op. Phase 6's per-heading `grep` predicates independently prevent block duplication.
+
+**§Phase 9 summary line.** `Phase 0.5: CLAUDE.md bootstrapped (/init | inline-generated | minimal stub)` or `skipped (CLAUDE.md already present)`.
 
 ## §Phase 1 — `.gitignore` hygiene
 
@@ -370,7 +406,7 @@ See [`docs/rules-taxonomy.md`](../docs/rules-taxonomy.md) for the complete refer
 
 1. **`.claude/settings.json` env key** — add `"PRAXION_HACKATHON_MODE": "1"` to the `env` block (merge non-destructively; never overwrite other keys). **Predicate:** `PRAXION_HACKATHON_MODE` key present in `.claude/settings.json` env block.
 
-2. **`## Hackathon Mode` CLAUDE.md block** — append the §Hackathon Mode Block verbatim to `CLAUDE.md`. **Predicate:** `grep -q '^## Hackathon Mode$' CLAUDE.md`. When `CLAUDE.md` does not exist, print: `No CLAUDE.md found — run /init to generate one, then re-run /onboard-project.` and skip this artifact.
+2. **`## Hackathon Mode` CLAUDE.md block** — append the §Hackathon Mode Block verbatim to `CLAUDE.md`. **Predicate:** `grep -q '^## Hackathon Mode$' CLAUDE.md`. (`CLAUDE.md` is guaranteed present — §Phase 0.5 bootstraps it before Phase 1.)
 
 3. **`.claude/praxion-rules.yaml` hackathon preset** — merge the three hackathon rule IDs into `.claude/praxion-rules.yaml`. **Predicate:** `grep -q 'hackathon' .claude/praxion-rules.yaml 2>/dev/null` (skip if already present; idempotent re-run never duplicates entries).
    - **If the file does not exist**, create it with:
@@ -406,9 +442,7 @@ See [`docs/rules-taxonomy.md`](../docs/rules-taxonomy.md) for the complete refer
 
 **Action.**
 
-1. **If `CLAUDE.md` does NOT exist**, do not create it directly. Print: `No CLAUDE.md found at the project root. Run /init to generate one from the codebase, then re-run /onboard-project to append the Praxion blocks.` Skip the rest of Phase 6.
-
-2. **If `CLAUDE.md` exists**, append (in this order, each guarded by its predicate):
+`CLAUDE.md` is guaranteed to exist — §Phase 0.5 bootstrapped it before Phase 1 (via `/init`, an inline codebase-aware generation, or a minimal stub). In the rare event it is still absent (e.g. §Phase 0.5 ran in a degraded, gate-less mode and its inline fallback did not fire), create it via §Phase 0.5's inline fallback now rather than skipping. Then append (in this order, each guarded by its predicate):
    - The §Agent Pipeline Block verbatim
    - The §Compaction Guidance Block verbatim
    - The §Behavioral Contract Block verbatim
@@ -845,7 +879,7 @@ Print: `8d.4: .obsidian/app.json link-safety keys pinned (useMarkdownLinks=true,
 
 **Predicate.** `grep -q '^## Obsidian Integration$' CLAUDE.md`. If present: skip with notice `8d.5: skipped (## Obsidian Integration block already in CLAUDE.md)`.
 
-**Action.** If `CLAUDE.md` does not exist, print: `No CLAUDE.md found — run /init first, then re-run /onboard-project.` and skip. Otherwise, append the §Obsidian Integration Block verbatim from this command's body. Append at the end of the file with one blank line separating from preceding content.
+**Action.** `CLAUDE.md` is guaranteed present (bootstrapped at §Phase 0.5). Append the §Obsidian Integration Block verbatim from this command's body at the end of the file with one blank line separating from preceding content.
 
 Print: `8d.5: ## Obsidian Integration block appended to CLAUDE.md`.
 
@@ -999,6 +1033,7 @@ full allowlist rationale.
 1. **Print the change summary** — group by phase, list every file modified and every `git config` setting written. Use this format:
    ```
    Onboarding complete. Changes:
+     Phase 0.5: CLAUDE.md bootstrapped (/init | inline-generated | minimal stub) — or omitted when CLAUDE.md was already present
      Phase 1: .gitignore (appended 10 lines, AI-assistants block)
      Phase 2: .ai-state/ skeleton (4 new entries)
      Phase 3: .gitattributes (appended 2 lines), git config (2 merge drivers registered)

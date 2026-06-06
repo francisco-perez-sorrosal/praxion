@@ -1,3 +1,9 @@
+## v0.6.0 (2026-06-06)
+
+### Feat
+
+- integrate Nebius as a managed neocloud provider
+
 ## v0.5.0 (2026-06-06)
 
 ### Feat

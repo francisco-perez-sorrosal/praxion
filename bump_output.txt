@@ -1,4 +1,4 @@
-bump: version 0.4.1 → 0.5.0
-tag to create: v0.5.0
+bump: version 0.5.0 → 0.6.0
+tag to create: v0.6.0
 increment detected: MINOR
 

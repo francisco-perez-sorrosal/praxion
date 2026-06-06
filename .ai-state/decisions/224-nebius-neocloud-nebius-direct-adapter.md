@@ -1,7 +1,7 @@
 ---
-id: dec-draft-7461de95
+id: dec-224
 title: Nebius integrated as the first v2 direct dispatch adapter plus a managed/self-hosted inference target
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-06
 summary: Add Nebius AI Cloud to Praxion's neocloud surface as a dedicated `nebius-direct` dispatch backend (mirroring `runpod-direct`, the first of dec-118's anticipated v2 direct adapters) and as an actionable inference target in the deployment skill — managed Token Factory API plus self-hosted vLLM on MK8s / GPU VM. SkyPilot `cloud: nebius` is retained as the documented low-friction fallback.

@@ -14,6 +14,7 @@ type NavKey =
   | "sentinel"
   | "roadmap"
   | "metrics"
+  | "evals"
   | "documentation";
 
 type NavItem = {
@@ -29,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/sentinel", key: "sentinel", label: "Sentinel" },
   { href: "/roadmap", key: "roadmap", label: "Roadmap" },
   { href: "/metrics", key: "metrics", label: "Metrics" },
+  { href: "/evals", key: "evals", label: "Evals" },
   { href: "/documentation", key: "documentation", label: "Documentation" }
 ];
 
@@ -76,6 +78,13 @@ const ICONS: Record<NavKey, ReactNode> = {
   metrics: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="2,12 5,7.5 8,9 11,4.5 14,6" />
+    </svg>
+  ),
+  evals: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1.5" y="1.5" width="13" height="13" rx="1" />
+      <line x1="4.5" y1="8" x2="11.5" y2="8" />
+      <line x1="8" y1="4.5" x2="8" y2="11.5" />
     </svg>
   ),
   documentation: (

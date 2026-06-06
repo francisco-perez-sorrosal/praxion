@@ -325,3 +325,141 @@ For significant agent changes, validate user outcomes:
 - Measure user-facing metrics (task completion, satisfaction, escalation rate)
 - Run for statistically significant sample size
 - Use eval suite results as supporting evidence alongside user metrics
+
+## Eval Fixture Smoke Test
+
+A lightweight pre-eval gate that validates fixture integrity before committing to a full (expensive) eval run. The smoke test runs on every commit that touches evaluation data or scoring code and completes in under 60 seconds. It is a gate **before** the eval loop starts — `EVAL_RESULTS.md` is written **after** a successful eval loop run.
+
+This smoke test is the implementation of the **eval determinism contract** referenced in `rules/eval/eval-data-governance.md` Rule 4 and the dataset provenance requirement in Rule 3.
+
+### What the Smoke Test Checks
+
+**1. MANIFEST.json presence**
+
+Every directory under `tasks/**` or `data/private/**` that contains scored examples must have a `MANIFEST.json` sibling. Missing MANIFEST files are caught here before they silently corrupt `dataset_sha` linkage in `EVAL_RESULTS.md`.
+
+**2. MANIFEST.json schema validity**
+
+Each `MANIFEST.json` must be valid JSON containing the four required fields (`sha256`, `version`, `source`, `split`). An invalid or incomplete manifest blocks the eval loop — better to fail fast than to record a run with broken provenance.
+
+```python
+REQUIRED_MANIFEST_FIELDS = {"sha256", "version", "source", "split"}
+
+def validate_manifest(manifest_path: Path) -> list[str]:
+    """Return list of validation errors, or empty list if valid."""
+    errors = []
+    try:
+        manifest = json.loads(manifest_path.read_text())
+    except json.JSONDecodeError as exc:
+        return [f"{manifest_path}: invalid JSON — {exc}"]
+
+    missing = REQUIRED_MANIFEST_FIELDS - set(manifest.keys())
+    if missing:
+        errors.append(f"{manifest_path}: missing required fields: {sorted(missing)}")
+    return errors
+```
+
+**3. SHA-256 integrity check**
+
+Compute the SHA-256 of the dataset files and compare against `MANIFEST.json sha256`. A mismatch means the dataset changed without a manifest update — which would corrupt the `dataset_sha` linkage in `EVAL_RESULTS.md`.
+
+```python
+import hashlib
+from pathlib import Path
+
+def compute_dataset_sha(data_dir: Path) -> str:
+    """SHA-256 over all scored example files in a directory (sorted for determinism)."""
+    h = hashlib.sha256()
+    for path in sorted(data_dir.rglob("*.jsonl")) + sorted(data_dir.rglob("*.json")):
+        if path.name == "MANIFEST.json":
+            continue
+        h.update(path.read_bytes())
+    return h.hexdigest()
+```
+
+**4. evaluate.py importability**
+
+Verify `evaluate.py` is importable before dispatching a full eval run. A broken import at CI time surfaces immediately rather than after minutes of setup.
+
+```bash
+python3 -c "import evaluate; print('evaluate.py importable: OK')"
+```
+
+### Determinism Contract
+
+When `MANIFEST.json` contains `"deterministic": false`, the smoke test changes behavior:
+
+| Condition | Threshold gate | Behavior |
+| --- | --- | --- |
+| `deterministic: true` (or field absent) | Enforced | Run fails if scored metric misses threshold |
+| `deterministic: false` | Skipped | WARN emitted; eval proceeds; no threshold FAIL |
+
+This contract is the mechanism referenced in `rules/eval/eval-data-governance.md` Rule 4. Non-deterministic evals produce meaningful results but must not gate on exact numbers. The WARN signals human attention without blocking the pipeline.
+
+```python
+def check_determinism_gate(manifest: dict, metric: float, threshold: float) -> str:
+    """Return PASS, WARN, or FAIL per determinism contract."""
+    if not manifest.get("deterministic", True):
+        return f"WARN: deterministic=false — threshold gate skipped (metric={metric})"
+    if metric >= threshold:
+        return f"PASS: metric={metric} >= threshold={threshold}"
+    return f"FAIL: metric={metric} < threshold={threshold}"
+```
+
+### CI Job Pattern
+
+Trigger the smoke test on every commit touching evaluation inputs:
+
+```yaml
+name: Eval Fixture Smoke Test
+
+on:
+  push:
+    paths:
+      - "tasks/**"
+      - "data/**"
+      - "evaluate.py"
+  pull_request:
+    paths:
+      - "tasks/**"
+      - "data/**"
+      - "evaluate.py"
+
+jobs:
+  eval-fixture-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install -e ".[eval]"
+
+      - name: Run eval fixture smoke test
+        run: python3 scripts/check_eval_fixtures.py
+
+      - name: Verify evaluate.py is importable
+        run: python3 -c "import evaluate; print('evaluate.py importable: OK')"
+```
+
+`check_eval_fixtures.py` is a managed-project artifact — each project implements it to scan its own `tasks/` and `data/private/` layout. The script performs checks 1–3 above and exits non-zero on any FAIL finding, non-zero-but-with-warn on WARN-only findings. The CI job pattern above is the template; adapt paths to match the project structure.
+
+### Integration with EVAL_RESULTS.md
+
+The smoke test controls whether the eval loop starts. The sequence is:
+
+```
+commit → smoke test → [PASS] → eval loop → EVAL_RESULTS.md written → EVAL_LOG.md row appended
+                     → [FAIL] → eval loop blocked; EVAL_RESULTS.md not written
+                     → [WARN] → eval loop proceeds; EVAL_RESULTS.md written; WARN noted
+```
+
+`EVAL_RESULTS.md` is written only after the eval loop completes. The `dataset_sha` field in `EVAL_RESULTS.md` must match the `sha256` in `MANIFEST.json` — the smoke test's integrity check ensures they are in sync before the run starts.
+
+See `skills/agent-evals/references/run-ledger-schema.md` for the full `EVAL_RESULTS.md` schema (including `dataset_sha`) and `EVAL_LOG.md` column definitions. See `rules/eval/eval-data-governance.md` for the governance rules that this smoke test enforces. See `skills/agent-evals/references/data-governance.md` for the MANIFEST.json schema and held-out split design guidance.

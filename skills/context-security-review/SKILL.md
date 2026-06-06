@@ -20,6 +20,7 @@ Security review methodology for Claude Code plugin ecosystems. Provides a securi
 - [references/permission-baseline.md](references/permission-baseline.md) -- agent permission baseline with deviation detection guidance
 - [references/hook-safety-contract.md](references/hook-safety-contract.md) -- hook safety contracts documenting what each hook reads, writes, and contacts
 - [references/secret-patterns.md](references/secret-patterns.md) -- secret pattern catalog with regex patterns, known prefixes, and redaction rules
+- [references/benchmark-leakage.md](references/benchmark-leakage.md) -- detection patterns for answer-key-in-package / ground-truth-leakage in eval projects (checks BL-01/02/03)
 
 ## Gotchas
 

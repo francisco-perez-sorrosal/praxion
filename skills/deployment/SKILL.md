@@ -36,6 +36,7 @@ Opinionated guidance for deploying applications -- from local Docker Compose thr
 - [references/cloud-containers.md](references/cloud-containers.md) -- Cloud Run, ECS/Fargate, Azure Container Apps
 - [references/kubernetes-patterns.md](references/kubernetes-patterns.md) -- when K8s is warranted, basic patterns, managed K8s comparison
 - [references/ai-native-platforms.md](references/ai-native-platforms.md) -- Modal, CoreWeave, RunPod, Nebius, GPU marketplace
+- [references/nebius-token-factory.md](references/nebius-token-factory.md) -- Nebius Token Factory pro management: model catalog, dedicated-endpoint control plane, fine-tuning, keys/RBAC, cost
 - [references/gpu-compute-budgeting.md](references/gpu-compute-budgeting.md) -- GPU compute budget enforcement patterns for ML training (budget declaration, gate pattern, cost estimation)
 - [references/deployment-documentation.md](references/deployment-documentation.md) -- living document lifecycle for `SYSTEM_DEPLOYMENT.md`, section ownership model, staleness mitigation
 

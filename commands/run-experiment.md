@@ -1,14 +1,14 @@
 ---
 description: >
   Dispatch an ML training experiment using the project's configured backend (local
-  subprocess, SkyPilot, or RunPod direct). Reads the training_job_descriptor from
+  subprocess, SkyPilot, RunPod direct, or Nebius direct). Reads the training_job_descriptor from
   the active WIP.md step, validates the compute budget is declared before dispatch,
   invokes the matching backend lifecycle operations, streams metrics to the configured
   experiment tracker (from program.md's tracker: declaration, or MLflow by default),
   writes TRAINING_RESULTS.md at .ai-work/<task-slug>/ on completion, and offers
   opt-in archival to .ai-state/training_runs/<run-tag>.md when the run is kept.
   Supports operational modes A (co-located owned GPU), B (co-located rented GPU box),
-  and C (separated cloud via SkyPilot or RunPod direct). The same
+  and C (separated cloud via SkyPilot, RunPod direct, or Nebius direct). The same
   training_job_descriptor dispatches without modification in all three modes —
   only the backend configuration varies. Use when starting a training run,
   re-dispatching a failed run, or initiating an autonomous experiment loop (autoresearch is one such loop pattern).
@@ -104,12 +104,12 @@ Read the project's backend configuration:
 .ai-state/neo_cloud_backend.yaml
 ```
 
-Parse the `backend:` key. Expected values: `local`, `skypilot`, `runpod-direct`.
+Parse the `backend:` key. Expected values: `local`, `skypilot`, `runpod-direct`, `nebius-direct`.
 If the file is absent, default to `local` and note:
 
 ```text
 neo_cloud_backend.yaml not found — defaulting to backend: local (Mode A/B).
-To use SkyPilot or RunPod direct, create .ai-state/neo_cloud_backend.yaml.
+To use SkyPilot, RunPod direct, or Nebius direct, create .ai-state/neo_cloud_backend.yaml.
 See skills/neo-cloud-abstraction/SKILL.md §Tiered Backend Strategy.
 ```
 
@@ -120,6 +120,7 @@ Load the matching backend reference for the operation details:
 | `local` | `skills/neo-cloud-abstraction/references/local-backend.md` |
 | `skypilot` | `skills/neo-cloud-abstraction/references/skypilot-backend.md` |
 | `runpod-direct` | `skills/neo-cloud-abstraction/references/runpod-direct-adapter.md` |
+| `nebius-direct` | `skills/neo-cloud-abstraction/references/nebius-direct-adapter.md` |
 
 The backend reference describes how to invoke each lifecycle operation for that backend.
 Record `started_at` as the current UTC timestamp.
@@ -184,7 +185,7 @@ Populate the front-matter from the run's observed values:
 - `run_id`: a UUID or content-addressed slug (generate if the backend did not assign one)
 - `run_tag`: from the descriptor's `run_tag` field
 - `git_commit`: the 40-char SHA recorded in Step 1
-- `backend`: the detected backend value (`local | skypilot | runpod-direct`)
+- `backend`: the detected backend value (`local | skypilot | runpod-direct | nebius-direct`)
 - `descriptor`: path to the descriptor YAML if `--descriptor` was provided; omit otherwise
 - `started_at` / `completed_at`: UTC ISO 8601 timestamps
 - `status`: the terminal status from `status()`
@@ -249,6 +250,7 @@ and committed with the experiment-mode git convention
 | `skills/neo-cloud-abstraction/references/local-backend.md` | Dispatch + streaming for Mode A/B |
 | `skills/neo-cloud-abstraction/references/skypilot-backend.md` | Dispatch + streaming for Mode C (SkyPilot) |
 | `skills/neo-cloud-abstraction/references/runpod-direct-adapter.md` | Dispatch + streaming for Mode C (RunPod) |
+| `skills/neo-cloud-abstraction/references/nebius-direct-adapter.md` | Dispatch + streaming for Mode C (Nebius) |
 | `skills/llm-training-eval/references/training-results-schema.md` | Writer-side contract for TRAINING_RESULTS.md |
 | `skills/experiment-tracking/references/mlflow-integration.md` | MLflow metric streaming patterns |
 | `skills/experiment-tracking/references/wandb-integration.md` | W&B metric streaming patterns |

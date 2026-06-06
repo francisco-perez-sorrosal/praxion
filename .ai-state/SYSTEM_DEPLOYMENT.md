@@ -46,6 +46,7 @@ This subsection documents the **compute backend story Praxion teaches** projects
 | Default — local | `subprocess.run` semantics | Modes A (co-located on owned GPU) and B (co-located on rented GPU) | Yes — ~0 LOC | `skills/neo-cloud-abstraction/references/local-backend.md` (designed) |
 | Default — remote | SkyPilot 0.12.1 (PyPI) | Mode C (Praxion separated) — covers 20+ providers | Yes — one adapter | `skills/neo-cloud-abstraction/references/skypilot-backend.md` (designed) |
 | Specialization | RunPod direct via `@runpod/mcp-server` 1.1.0 (npm) | Mode C committed to RunPod | Yes — v1 reference recipe | `skills/neo-cloud-abstraction/references/runpod-direct-adapter.md` (designed) |
+| Specialization (v2) | Nebius direct via `nebius` CLI | Mode C committed to Nebius | Yes — first v2 direct adapter | `skills/neo-cloud-abstraction/references/nebius-direct-adapter.md` (designed) |
 | Specialization (v2) | Lambda direct (REST), Crusoe direct (REST), CoreWeave direct (K8s) | Mode C committed to those providers | No — deferred | (v2 references) |
 
 The contract — `training_job_descriptor` schema and 8 lifecycle operations — is invariant across modes. See `dec-118` for the full rationale and `.ai-state/DESIGN.md` Components/Interfaces sections for the schema.
@@ -87,11 +88,12 @@ Praxion has two long-lived service classes: (1) MCP processes (memory-mcp, task-
 | Variable | Required | Default | Description | Sensitive |
 |---|---|---|---|---|
 | `RUNPOD_API_KEY` | Yes (when using RunPod direct) | -- | RunPod API key for `@runpod/mcp-server` | Yes |
+| `NEBIUS_IAM_TOKEN` / `~/.nebius/credentials.json` | Yes (when using Nebius direct) | -- | Nebius service-account key / IAM token for the `nebius` CLI (+ `~/.nebius/NEBIUS_TENANT_ID.txt`) | Yes |
 | SkyPilot config | Yes (when using SkyPilot) | -- | Provider-specific via `~/.aws/`, `~/.gcp/`, etc. (per SkyPilot conventions) | Yes |
 
 ### Secrets Management
 
-Secrets are project-scoped, not Praxion-scoped. Praxion does not store credentials; it teaches projects to use `.env` patterns from the `deployment` skill's `references/secrets-management.md`. For ML training compute backends, secrets are passed through `subprocess.Popen` env (local), SkyPilot's per-cloud auth (default-remote), or the RunPod MCP server's `RUNPOD_API_KEY` (RunPod direct).
+Secrets are project-scoped, not Praxion-scoped. Praxion does not store credentials; it teaches projects to use `.env` patterns from the `deployment` skill's `references/secrets-management.md`. For ML training compute backends, secrets are passed through `subprocess.Popen` env (local), SkyPilot's per-cloud auth (default-remote), the RunPod MCP server's `RUNPOD_API_KEY` (RunPod direct), or the Nebius CLI's `~/.nebius/` credentials / `NEBIUS_IAM_TOKEN` (Nebius direct).
 
 ### Environment Differences
 

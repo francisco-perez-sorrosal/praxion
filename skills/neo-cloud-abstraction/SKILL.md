@@ -2,12 +2,13 @@
 name: neo-cloud-abstraction
 description: >
   ML training job dispatch abstraction for Praxion ML/AI projects: mode-invariant
-  training_job_descriptor schema, three backends (local subprocess, SkyPilot 20+
-  providers, RunPod direct adapter). Triggers: configuring a compute backend,
+  training_job_descriptor schema, four backends (local subprocess, SkyPilot 20+
+  providers, RunPod and Nebius direct adapters). Triggers: configuring a compute backend,
   dispatching via /run-experiment, reading/writing training_job_descriptor YAML or
   neo_cloud_backend.yaml, debugging backend dispatch errors, choosing local vs
-  SkyPilot vs RunPod, subprocess training, GPU cloud dispatch. Activate alongside
-  ml-training and llm-training-eval for full pipeline work.
+  SkyPilot vs RunPod vs Nebius, subprocess training, GPU cloud dispatch, Nebius,
+  backend: nebius-direct. Activate alongside ml-training and llm-training-eval for
+  full pipeline work.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:
@@ -26,6 +27,7 @@ the descriptor does not.
 - [references/local-backend.md](references/local-backend.md) -- subprocess semantics; serves modes A and B; pricing_query → 0.0; wall_clock enforcement
 - [references/skypilot-backend.md](references/skypilot-backend.md) -- SkyPilot ~=0.12 integration; mode C default; YAML translation; 20+ provider coverage
 - [references/runpod-direct-adapter.md](references/runpod-direct-adapter.md) -- @runpod/mcp-server ~1.1; mode C opt-in; integration recipe; Praxion does not ship custom MCP
+- [references/nebius-direct-adapter.md](references/nebius-direct-adapter.md) -- Nebius CLI; mode C opt-in; first v2 direct adapter; provision-VM + SSH lifecycle; InfiniBand gpu-cluster
 
 ## training_job_descriptor — the invariant contract
 
@@ -38,7 +40,7 @@ requires knowing which mode is active, the abstraction is leaking; revise the sc
 # training_job_descriptor — NO mode: field. NO backend: field.
 job_id: <string>                          # assigned by backend on create(); uuid or slug
 run_tag: <string>                         # human-readable tag (e.g., "run-003-lr3e4")
-gpu_type: H100 | A100_80GB | RTX4090 | RTX3090 | M2_Ultra | auto
+gpu_type: H100 | H200 | B200 | A100_80GB | RTX4090 | RTX3090 | M2_Ultra | auto
 gpu_count: <int>                          # 1, 2, 4, 8
 container_image: <docker-uri>             # used by SkyPilot and RunPod; ignored by local backend
 env_vars:
@@ -56,14 +58,14 @@ entry_command: "python train.py"         # entrypoint; ignored by local backend 
 
 **Validation rules:**
 
-- `gpu_hours_budget` is REQUIRED for remote backends (SkyPilot, RunPod direct). The local
-  backend accepts `0.0` to signal "owned hardware, no $ cap".
+- `gpu_hours_budget` is REQUIRED for remote backends (SkyPilot, RunPod direct, Nebius direct).
+  The local backend accepts `0.0` to signal "owned hardware, no $ cap".
 - `container_image` is REQUIRED for SkyPilot and RunPod direct. Local backend ignores it.
 - `entry_command` is REQUIRED for SkyPilot and RunPod direct. Local backend uses `Popen`
   with the command from WIP.md step context.
 - `job_id` is assigned by `create()`, not set by the caller.
 
-**Mode-invariance self-test (AC6):** trace the descriptor through all three backends.
+**Mode-invariance self-test (AC6):** trace the descriptor through every backend.
 Does any field require `if mode == C` logic? If yes, the schema is wrong.
 
 ## Lifecycle Operations
@@ -84,6 +86,10 @@ The local backend's implementations prove the abstraction's correctness (see not
 
 **Status enum:** `pending | running | completed | failed | stopped | budget_exhausted`
 
+The `runpod-direct` and `nebius-direct` opt-in adapters implement these same eight operations; their
+reference files carry the per-operation tool/CLI mapping (the table above shows the canonical
+local/SkyPilot/RunPod implementations).
+
 **The `pricing_query() → 0.0` pattern (local backend):** Returning `0.0` for local hardware
 proves the abstraction is correctly designed. If the abstraction leaked — if the caller had
 to handle "not applicable for local mode" as a special case — then the descriptor would need
@@ -101,15 +107,16 @@ Three tiers. Choose based on where the project is in the exploration → commitm
 | **Local** (default) | `backend: local` | A, B | Owned GPU; rented GPU box with Praxion installed; prototyping; cost-free runs |
 | **SkyPilot** (default-remote) | `backend: skypilot` | C | Exploring cloud providers; multi-cloud; spot recovery; first remote run |
 | **RunPod direct** (opt-in) | `backend: runpod-direct` | C | Committed to RunPod; want native MCP integration; avoiding SkyPilot indirection |
+| **Nebius direct** (opt-in) | `backend: nebius-direct` | C | Committed to Nebius; native VM/cluster control; multi-node InfiniBand training |
 
-Start local. Move to SkyPilot when you need remote resources. Move to RunPod direct only
-after validating on SkyPilot and deciding to commit.
+Start local. Move to SkyPilot when you need remote resources. Move to a direct adapter
+(RunPod or Nebius) only after validating on SkyPilot and deciding to commit to that provider.
 
 **Project config file:**
 
 ```yaml
 # .ai-state/neo_cloud_backend.yaml
-backend: local          # local | skypilot | runpod-direct
+backend: local          # local | skypilot | runpod-direct | nebius-direct
 ```
 
 `/run-experiment` reads this file to determine which backend reference to load.
@@ -123,12 +130,14 @@ backend: local          # local | skypilot | runpod-direct
 | Local | stdlib `subprocess` | Python 3.10+ | stdlib | No install required |
 | SkyPilot | `skypilot` (PyPI) | `~=0.12` (0.12.1 verified) | PyPI | Pin `~=0.12`; flag for refresh at 0.13+ |
 | RunPod direct | `@runpod/mcp-server` (npm) | `~1.1` (1.1.0 verified) | npm | Vendor-maintained; verify before using |
+| Nebius direct | `nebius` CLI (+ `nebius` pysdk, PyPI) | CLI + pysdk latest (verified 2026-06-06) | Nebius install script / PyPI | Vendor-maintained; CLI is the dispatch path — see [nebius-direct-adapter.md](references/nebius-direct-adapter.md) |
 
 ## Security
 
 - **Never put secrets in the descriptor.** Cloud credentials travel outside the descriptor:
   - SkyPilot: `~/.aws/`, `~/.gcp/`, `~/.azure/` credential files or env vars
   - RunPod: `RUNPOD_API_KEY` environment variable
+  - Nebius direct: `~/.nebius/credentials.json` + `~/.nebius/NEBIUS_TENANT_ID.txt`, or `NEBIUS_IAM_TOKEN`
   - Local: no cloud credentials needed
 - The descriptor's `env_vars` block is for training hyperparameters and runtime config,
   not for credentials.

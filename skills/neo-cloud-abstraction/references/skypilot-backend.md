@@ -165,3 +165,38 @@ backend: runpod-direct
 ```
 
 See [references/runpod-direct-adapter.md](runpod-direct-adapter.md) for the migration recipe.
+
+## Nebius via SkyPilot (`cloud: nebius`)
+
+<!-- last-verified: 2026-06-06 -->
+
+Nebius is a first-class SkyPilot cloud. Pin SkyPilot to Nebius by adding `cloud: nebius` to the
+generated task YAML's `resources:` block — without the pin, SkyPilot may auto-select a different
+provider you do not have credits for:
+
+```yaml
+resources:
+  cloud: nebius
+  accelerators: H100:8    # H200:8 / B200:8 also available
+  use_spot: true          # spot supported on Nebius since SkyPilot 0.10.1
+```
+
+One-time setup (shares the `~/.nebius/` credentials with the direct adapter): install the Nebius CLI,
+create a service account, generate `~/.nebius/credentials.json` + `~/.nebius/NEBIUS_TENANT_ID.txt`,
+then `sky check nebius` → expect `Nebius: enabled`. Install the extras group:
+`pip install "skypilot[nebius]"`. Spot, B200, and InfiniBand (`H100:8` / `H200:8` only) are all
+supported on SkyPilot ≥ 0.10.1.
+
+This is the **lower-friction first step** before committing to the `nebius-direct` adapter.
+
+## When to Move from SkyPilot to Nebius Direct
+
+After validating on SkyPilot + Nebius and deciding to commit to Nebius, switch to the direct adapter
+for native VM/cluster control (and multi-node InfiniBand orchestration):
+
+```yaml
+# .ai-state/neo_cloud_backend.yaml
+backend: nebius-direct
+```
+
+See [references/nebius-direct-adapter.md](nebius-direct-adapter.md) for the lifecycle recipe.

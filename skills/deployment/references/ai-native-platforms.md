@@ -204,30 +204,131 @@ Deploy with a Docker image containing the handler.
 - Want to run custom Docker images without framework changes
 - Training workloads that need persistent GPU access
 
-## Nebius -- AI Training Infrastructure
+## Nebius -- AI Training + Inference
 
-**Best for:** Large-scale distributed training, organizations needing reserved GPU capacity.
+<!-- last-verified: 2026-06-06 -->
+
+**Best for:** Large-scale distributed training, reserved GPU capacity, **and** production inference —
+served either as a managed model API (no GPU management) or self-hosted on Nebius GPUs.
+
+Nebius spans two serving postures that are easy to conflate — pick deliberately:
+
+- **Managed model API (Token Factory)** -- call a hosted, OpenAI-compatible endpoint; never touch a
+  GPU. Billed per token.
+- **Bring-your-own-GPU serving** -- run your own server (vLLM) on Nebius GPUs via Managed Kubernetes
+  or a direct GPU VM. Billed per GPU-hour.
 
 ### Service Tiers
 
 | Tier | Model | Best For |
 |------|-------|----------|
-| **Managed Kubernetes** | Standard K8s + topology-aware GPU scheduling | Teams with K8s experience |
+| **Token Factory** | Managed OpenAI-compatible inference API ($/token) | Serving open models / your fine-tunes with zero infra |
+| **Managed Kubernetes** | Standard K8s + topology-aware GPU scheduling | Self-hosted serving/training; K8s teams |
 | **Managed Slurm** | HPC-style job scheduling | Research teams, training-heavy |
-| **Direct compute** | GPU VMs with pre-installed NVIDIA drivers | Maximum control |
+| **Direct compute** | GPU VMs with pre-installed NVIDIA drivers | Maximum control (see neo-cloud-abstraction `nebius-direct`) |
 
 ### Key Differentiators
 
 - **Purpose-built for multi-node training** -- InfiniBand networking standard
 - **Topology-aware scheduling** -- places related jobs on physically proximate GPUs
 - **Capacity Blocks** -- reserved GPU capacity with guaranteed availability
-- **Latest hardware** -- GB300, HGX B300, HGX H200 available
+- **Latest hardware** -- GB300, HGX B300, HGX H200, HGX B200 available
+- **Fine-tune → auto-host** -- LoRA / full fine-tuning on 30+ open models, then instant hosted endpoints
+
+### Recipe 1 — Token Factory (managed serverless inference) ★
+
+The fastest path to serving: no GPU, no container, no YAML. Token Factory (the evolution of
+"Nebius AI Studio") is a hosted, **OpenAI-compatible** API. Set `NEBIUS_API_KEY` and point the
+OpenAI SDK at the Nebius base URL:
+
+```python
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://api.tokenfactory.nebius.com/v1/",
+    api_key=os.environ["NEBIUS_API_KEY"],
+)
+
+resp = client.chat.completions.create(
+    model="deepseek-ai/DeepSeek-R1-0528",   # 60+ open models: Llama, Qwen, DeepSeek, GPT-OSS, Mistral
+    messages=[{"role": "user", "content": "hello"}],
+)
+print(resp.choices[0].message.content)
+```
+
+Two endpoint tiers:
+
+| Tier | What | Pricing | When |
+|------|------|---------|------|
+| **Shared access** | Serverless, multi-tenant, 60+ models | $/token, free credits to start | Experiments, bursty traffic, hackathons |
+| **Dedicated endpoint** | Reserved isolated capacity, 99.9% SLA, autoscaling, EU/US region pin | Reserved | Production; predictable latency; high volume |
+
+**Fine-tune → auto-host:** upload a LoRA or fully fine-tuned model via the dashboard or API and serve
+it from the same OpenAI-compatible surface (key models like Llama-3.1-8B / Qwen2.5-72B / Llama-3.3-70B
+support instant auto-hosting). Post-training adds structure-aware decoding so outputs follow your JSON
+schema. This **closes the loop with the training side** — train on Nebius GPUs
+(`neo-cloud-abstraction` → `nebius-direct`), then serve on Token Factory.
+
+**Manage it like a pro** — model catalog (`GET /v1/models`), dedicated-endpoint control-plane
+lifecycle (create/scale/enable/disable/delete + autoscaling + routing keys), fine-tuning jobs,
+API-key/RBAC/projects, and cost/usage: see [nebius-token-factory.md](nebius-token-factory.md).
+
+### Recipe 2 — Managed Kubernetes + vLLM (self-hosted serving)
+
+When you need your own model server on Nebius GPUs (custom model, full control, OpenAI-compatible vLLM
+endpoint), deploy vLLM to a Managed Kubernetes cluster — same shape as the CoreWeave example above:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-llama
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: vllm-llama }
+  template:
+    metadata:
+      labels: { app: vllm-llama }
+    spec:
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:latest
+          args: ["--model=meta-llama/Llama-3.1-8B-Instruct"]
+          resources:
+            limits: { nvidia.com/gpu: 1 }
+          ports:
+            - containerPort: 8000
+```
+
+Provision the GPU node pool per [Nebius MK8s GPU setup](https://docs.nebius.com/kubernetes/gpu/set-up);
+expose the Deployment with a `Service` (+ `Ingress` for external traffic). Walkthrough:
+[Serving LLMs with vLLM on Nebius](https://nebius.com/blog/posts/serving-llms-with-vllm-practical-guide).
+
+### Recipe 3 — GPU VM + vLLM (simplest self-hosted)
+
+For a single-box inference server, provision a GPU VM (the same `nebius compute instance create` path
+the `nebius-direct` dispatch adapter uses) and run vLLM directly:
+
+```bash
+# on the GPU VM (CUDA image)
+pip install vllm
+python -m vllm.entrypoints.openai.api_server \
+  --model meta-llama/Llama-3.1-8B-Instruct --port 8000
+# OpenAI-compatible endpoint now on http://<vm-ip>:8000/v1
+```
+
+See [neo-cloud-abstraction/references/nebius-direct-adapter.md](../../neo-cloud-abstraction/references/nebius-direct-adapter.md)
+for VM provisioning (boot disk, platform/preset), **SSH access** (allocate a public IP at create + inject
+your key via cloud-init), and teardown. Open the vLLM port (8000) to your client in the VM's firewall /
+security group; for anything beyond a demo, front it with a reverse proxy + TLS rather than exposing it raw.
 
 ### When Nebius
 
-- Distributed training across 100+ GPUs
-- Need guaranteed capacity (no spot interruptions)
-- InfiniBand networking for training throughput
+- Serve open models or your fine-tunes with **zero infra** → Token Factory (managed API)
+- Self-hosted serving with full control → MK8s + vLLM, or GPU VM + vLLM
+- Distributed training across 100+ GPUs; guaranteed capacity; InfiniBand throughput
 
 ## GPU Marketplace Comparison
 
@@ -236,7 +337,7 @@ Deploy with a Docker image containing the handler.
 | **Modal** | Serverless | ~$2.78 | Yes | No | No | Simplest dev experience |
 | **RunPod** | Pods + Serverless | ~$1.64 (community) | Serverless only | No | Yes | Cost-sensitive |
 | **CoreWeave** | K8s | ~$2.06 | Via HPA | Yes | Via pod | K8s teams |
-| **Nebius** | IaaS + K8s + Slurm | Custom | No | Yes | Yes | Large-scale training |
+| **Nebius** | Token Factory API + IaaS + K8s + Slurm | Custom ($/token or $/GPU-hr) | Token Factory only | Yes | Yes | Training + managed/self-hosted inference |
 | **Lambda Labs** | Dedicated VMs | ~$1.29 | No | Yes | Yes | Dedicated hardware |
 | **Vast.ai** | P2P marketplace | ~$0.80 (auction) | No | No | Yes | Cheapest, experimental |
 
@@ -244,9 +345,10 @@ Deploy with a Docker image containing the handler.
 
 ```
 Need GPU in the cloud?
+├── Serve a model via hosted API (no GPU mgmt) --> Nebius Token Factory (or Modal)
 ├── Simplest experience (no K8s, no YAML) --> Modal
 ├── Budget is primary concern --> RunPod (or Vast.ai for experimental)
-├── Team knows Kubernetes --> CoreWeave
+├── Team knows Kubernetes --> CoreWeave or Nebius MK8s
 ├── Large-scale training (100+ GPUs) --> Nebius or CoreWeave
 ├── Want dedicated hardware --> Lambda Labs
 └── Just need one-off GPU access --> RunPod Pods or Lambda on-demand

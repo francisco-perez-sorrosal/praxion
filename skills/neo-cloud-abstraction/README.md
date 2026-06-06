@@ -3,24 +3,25 @@
 Backend abstraction for ML training job dispatch in Praxion. Provides a single
 `training_job_descriptor` schema that works unchanged across all three operational modes
 (owned GPU, rented GPU box, cloud dispatch). The backend implementation changes; the
-descriptor does not. Supports three backends: `local` (subprocess, modes A and B),
-`skypilot` (20+ cloud providers, mode C default), and `runpod-direct` (native MCP
-integration, mode C opt-in).
+descriptor does not. Supports four backends: `local` (subprocess, modes A and B),
+`skypilot` (20+ cloud providers, mode C default), `runpod-direct` (native MCP
+integration, mode C opt-in), and `nebius-direct` (Nebius CLI lifecycle, mode C opt-in).
 
 ## When to Use
 
 - Configuring a compute backend (`neo_cloud_backend.yaml`)
 - Dispatching a training run via `/run-experiment`
 - Reading or writing a `training_job_descriptor` YAML
-- Debugging backend dispatch errors (subprocess, SkyPilot, RunPod)
-- Choosing between local, SkyPilot, or RunPod backends
+- Debugging backend dispatch errors (subprocess, SkyPilot, RunPod, Nebius)
+- Choosing between local, SkyPilot, RunPod, or Nebius backends
 - Understanding the 8-operation lifecycle protocol (`create`, `status`, `cancel`, etc.)
 
 ## Activation
 
 Auto-triggers on: `training_job_descriptor`, `neo_cloud_backend.yaml`, `backend: skypilot`,
-`backend: runpod-direct`, `gpu_type`, `gpu_hours_budget`, `wall_clock_seconds_max`,
-`sky launch`, `pod_create`, `SkyPilot`, `RunPod`, `/run-experiment` dispatch.
+`backend: runpod-direct`, `backend: nebius-direct`, `gpu_type`, `gpu_hours_budget`,
+`wall_clock_seconds_max`, `sky launch`, `pod_create`, `SkyPilot`, `RunPod`, `Nebius`,
+`/run-experiment` dispatch.
 
 ## Skill Contents
 
@@ -29,8 +30,8 @@ Auto-triggers on: `training_job_descriptor`, `neo_cloud_backend.yaml`, `backend:
   mode-invariance self-test (AC6)
 - Lifecycle Operations — 8-operation protocol table; local/SkyPilot/RunPod mappings;
   `pricing_query() → 0.0` pattern explanation
-- Tiered Backend Strategy — local → SkyPilot → RunPod progression; config file format
-- Backend Version Reference — library versions (`skypilot`, `@runpod/mcp-server`)
+- Tiered Backend Strategy — local → SkyPilot → RunPod/Nebius direct progression; config file format
+- Backend Version Reference — library versions (`skypilot`, `@runpod/mcp-server`, `nebius` CLI)
 - Security — credential handling; `env_vars` vs secrets separation
 - Performance — `wall_clock_seconds_max` enforcement; remote budget caps
 - Related Skills
@@ -42,6 +43,8 @@ Auto-triggers on: `training_job_descriptor`, `neo_cloud_backend.yaml`, `backend:
   spot recovery; provider coverage; when to move to RunPod direct
 - `references/runpod-direct-adapter.md` — `@runpod/mcp-server ~1.1`; MCP tool mapping;
   network volumes; Community vs Secure Cloud; v2 adapter pattern
+- `references/nebius-direct-adapter.md` — `nebius` CLI lifecycle; provision-VM + SSH;
+  GPU platform/preset map; InfiniBand `gpu-cluster`; Object Storage artifact fetch
 
 ## Related Skills
 

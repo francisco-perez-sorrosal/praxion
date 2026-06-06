@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-06-06T00:19:06Z'
+generated_at: '2026-06-06T00:25:43Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
@@ -69,7 +69,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 1696
+  chars: 3451
   paths:
   - program.md
   - runs/**
@@ -77,9 +77,11 @@ rules:
   - train.py
   - prepare.py
   - TRAINING_RESULTS.md
+  - EVAL_RESULTS.md
   - .ai-work/**/SYSTEMS_PLAN.md
   - .ai-work/**/WIP.md
   - .ai-work/**/VERIFICATION_REPORT.md
+  - .ai-work/**/EVAL_RESULTS.md
 - id: ml/experiment-commit-conventions
   path: rules/ml/experiment-commit-conventions.md
   load: path_scoped

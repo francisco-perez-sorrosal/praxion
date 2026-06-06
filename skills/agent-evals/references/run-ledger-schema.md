@@ -96,10 +96,10 @@ primary_metric: <float>    # Required. The scored result (accuracy, F1, pass@k, 
 held_out_delta: <float>    # Required. Held-out vs public delta (contamination signal).
 model_id: <string>         # Required. Model identifier (e.g., "claude-sonnet-4-5").
 
-# Binding fields (P4 / P3 downstream waves)
-prompt_hash: <string>      # P4 binding — which prompt template produced this run.
-                           # (Field is stable and required from Wave 0; the P4
-                           # prompt-versioning wave formalizes the hashing convention.)
+# Binding fields
+prompt_hash: <string>      # SHA of the prompt template that produced this run.
+                           # Hashing convention: skills/llm-prompt-engineering/
+                           # references/versioning.md § Managed Prompt Versioning.
 dataset_sha: <string>      # P3 provenance — dataset MANIFEST sha256.
                            # (Field is stable and required from Wave 0; the P3
                            # data-governance wave populates the validation rule.)
@@ -152,7 +152,7 @@ per-descriptor.
 | `primary_metric` | Yes | float | Accuracy, F1, pass@k — depends on task |
 | `held_out_delta` | Yes | float | Held-out score minus public score; negative = contamination signal |
 | `model_id` | Yes | string | Model identifier used for the run |
-| `prompt_hash` | Yes | string | SHA of the prompt template (P4 binding; see note below) |
+| `prompt_hash` | Yes | string | SHA of the prompt template; hashing convention: `versioning.md` (see note below) |
 | `dataset_sha` | Yes | string | SHA256 of the dataset MANIFEST (P3 binding; see note below) |
 | `token_usage.input` | Yes | int | Input tokens consumed |
 | `token_usage.output` | Yes | int | Output tokens consumed |
@@ -163,10 +163,13 @@ per-descriptor.
 | `verdict.tolerance_band_applied` | Yes | bool | True if any AC declared `± <value>` |
 | `verdict.notes` | No | string | One paragraph; omit if empty |
 
-**`prompt_hash` field note (P4 binding):**
-This field binds to the P4 prompt-versioning wave. In Wave 0, populate with the SHA of
-the prompt template string or file. The P4 wave will promote `skills/llm-prompt-engineering/
-references/versioning.md` to a managed convention and formalize the hashing contract.
+**`prompt_hash` field note:**
+SHA of the prompt template file (or canonicalized prompt string) at eval dispatch time.
+The authoritative hashing convention — how to compute the hash, what constitutes a
+load-bearing prompt change, and when to write a `category: behavioral` ADR — is defined
+in `skills/llm-prompt-engineering/references/versioning.md`
+§ "Managed Prompt Versioning for Agentic/Eval Projects". That section points back here
+as the binding target, completing the bidirectional cross-reference.
 
 **`dataset_sha` field note (P3 binding):**
 This field binds to the P3 data-governance wave. Populate with the SHA256 of the dataset

@@ -261,6 +261,68 @@ Common migration shapes:
 - **Schema change**: `schema_hash` changes → new version. If the schema change is additive (new optional fields), old clients still work; if breaking, coordinate with consumers.
 - **Few-shot set change**: new version. Exemplar set is part of the envelope for reproducibility.
 
+## Managed Prompt Versioning for Agentic/Eval Projects
+
+Projects that run agentic benchmarks or eval loops — where a prompt change can shift
+primary metric by several points — need **managed** versioning, not advisory versioning.
+The discipline shifts from "good practice" to "required by the eval ledger."
+
+### Convention
+
+1. **Templates are files, not inline strings.** Every prompt template that drives a
+   scored eval run lives in a versioned file (e.g., `prompts/issue-classifier/v3.md`),
+   not as a Python string literal or an f-string in the eval loop. The manifest
+   (`envelope-manifest.yaml`) names the active version.
+
+2. **Content hash is the stable identifier.** The `prompt_hash` recorded in
+   `EVAL_RESULTS.md` and `EVAL_LOG.md` is the SHA of the prompt template file (or the
+   canonicalized prompt string) at the time the eval run was dispatched. Concretely:
+   `sha256(prompt_template_bytes)` → truncated to 32 hex chars for the frontmatter
+   field, or stored in full. The hash is the version's fingerprint — it ties a score
+   to the exact prompt bytes that produced it.
+
+   ```python
+   import hashlib, pathlib
+   prompt_hash = hashlib.sha256(
+       pathlib.Path("prompts/issue-classifier/v3.md").read_bytes()
+   ).hexdigest()
+   ```
+
+3. **`prompt_hash` ↔ eval ledger binding.** The `prompt_hash` field in
+   `EVAL_RESULTS.md` and `EVAL_LOG.md` is the authoritative cross-reference back to
+   the prompt version that produced a given run. The schema is defined in
+   `skills/agent-evals/references/run-ledger-schema.md` — the `prompt_hash` field
+   note there points here as the authoritative hashing convention (bidirectional
+   binding). When diagnosing a metric regression, match `prompt_hash` in the log to
+   a file in `prompts/` to reconstruct exactly what the model saw.
+
+4. **Load-bearing prompt changes warrant a behavioral ADR.** A change is
+   *load-bearing* when it materially shifts eval outcomes — a different instruction
+   strategy, a new few-shot block, or a revised chain-of-thought cue that moves
+   primary metric by more than the declared tolerance band. For these changes:
+   - Cut a new prompt version (new file, new `manifest.yaml` entry).
+   - Gate promotion via the eval suite (`evaluation_id` in the manifest).
+   - Record the decision in `.ai-state/decisions/` as a `category: behavioral` ADR —
+     no new record type, just the existing ADR flow applied to a behavioral change.
+     Document: what changed, why, what eval outcome gated promotion, and the
+     `rollback_version`.
+
+### What does NOT require a behavioral ADR
+
+- Typo fixes that do not alter model behavior (verify via eval before and after).
+- Formatting changes that leave token content identical.
+- A model upgrade that uses an unchanged prompt body — this is a *separate* ADR
+  (`category: configuration`) recording the model-swap decision.
+
+### Integration with the envelope manifest
+
+The `evaluation_id` field in `envelope-manifest.yaml` completes the traceability loop:
+envelope manifest → `evaluation_id` → eval log row → `prompt_hash` → prompt file.
+A prompt promoted to `prod` without an `evaluation_id` is unauditable and should be
+flagged by the sentinel.
+
+---
+
 ## Cross-References
 
 - `../SKILL.md` — overview of envelope pinning and platform matrix.
@@ -271,7 +333,7 @@ Common migration shapes:
 - `../assets/envelope-manifest.yaml` — canonical starter manifest.
 - Sibling skill: `claude-ecosystem` — prompt-caching thresholds (Opus/Sonnet 1024, Haiku 2048) that constrain cache-friendly layout.
 - Sibling skill: `external-api-docs` — verify current SDK parameter shapes before pinning envelope fields.
-- Sibling skill: `agent-evals` — eval CI architecture beyond single-prompt testing.
+- Sibling skill: `agent-evals` — eval CI architecture beyond single-prompt testing; `references/run-ledger-schema.md` defines the `prompt_hash` field bound to this hashing convention.
 
 ## External Sources
 

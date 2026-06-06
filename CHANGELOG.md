@@ -1,3 +1,27 @@
+## v0.5.0 (2026-06-06)
+
+### Feat
+
+- bootstrap CLAUDE.md during onboarding instead of punting
+- promote prompt versioning to managed convention
+- add eval leaderboard dashboard panel
+- add benchmark-leakage detection + eval CI smoke-test
+- wire verifier tolerance bands to EVAL_RESULTS.md
+- populate eval-data-governance rule + add data-governance skill ref
+- add /scores eval leaderboard command
+- scaffold rules/eval namespace + register eval-ledger inventory
+- add run-store backend abstraction + convention tests
+- add run-ledger schema for agentic-eval storage spine
+- load .env in project-metrics CLI
+- dual-axis metric trend charts in dashboard
+- add code-quality baselines to Phase 8e
+- code-quality baseline for managed projects
+- recommendations + weighting for readiness
+
+### Fix
+
+- align data-governance dataset_sha mismatch severity to FAIL
+
 ## v0.4.1 (2026-06-04)
 
 ## v0.4.0 (2026-06-04)

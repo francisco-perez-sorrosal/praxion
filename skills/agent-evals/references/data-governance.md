@@ -98,9 +98,9 @@ EVAL_RESULTS.md  dataset_sha  ──→  MANIFEST.json  sha256
 ```
 
 If `dataset_sha` in a result does not match the `sha256` in the corresponding `MANIFEST.json`,
-either the dataset was changed after scoring or the wrong manifest was referenced. The governance
-sentinel check (see `rules/eval/eval-data-governance.md §Sentinel Checks`) emits a WARN for
-this mismatch.
+either the dataset was changed after scoring or the wrong manifest was referenced — the run's
+provenance is broken. The governance sentinel check (see
+`rules/eval/eval-data-governance.md §Sentinel Checks`) emits a **FAIL** for this mismatch.
 
 ### Example
 

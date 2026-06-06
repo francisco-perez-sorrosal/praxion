@@ -1,7 +1,7 @@
 ---
-id: dec-draft-9c30645e
+id: dec-221
 title: Unified out-of-tree run-storage model for experiment/eval-bearing projects
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-05
 summary: Operational run artifacts default out of the repo tree at $HOME/.<project-name>/; commit only the curated tier-2 summary + config.
@@ -16,7 +16,7 @@ affected_files:
   - commands/onboard-project.md
 re_affirms:
 supersedes:
-related: [dec-draft-52949236, dec-draft-ccb70b10, dec-draft-11bc9d23, dec-draft-7df1a638, dec-draft-7aac9824]
+related: [dec-220, dec-217, dec-218, dec-219, dec-216]
 ---
 
 ## Context
@@ -70,10 +70,10 @@ gitignored `.claude/settings.local.json` or env vars — never committed.
 ## Consequences
 
 - **Positive:** a single, clean storage invariant for the archetype; the curated commit is tiny;
-  the operational store is pluggable (see `dec-draft-52949236`). Improves on the ML convention.
+  the operational store is pluggable (see `dec-220`). Improves on the ML convention.
 - **Negative:** reproducibility depends on the store being reachable — mitigated by committing
   `store_uri` + the curated summary. Introduces `project_profile.yaml` config indirection
-  (see `dec-draft-7df1a638`).
+  (see `dec-219`).
 - **Cross-cutting:** this model is *recommended* to also absorb the ML branch
-  (`dec-draft-11bc9d23`); if that reconciliation is declined, this ADR's scope must be narrowed
+  (`dec-218`); if that reconciliation is declined, this ADR's scope must be narrowed
   to agentic-eval projects and explicitly carve out ML.

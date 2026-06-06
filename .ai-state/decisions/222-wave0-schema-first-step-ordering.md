@@ -1,7 +1,7 @@
 ---
-id: dec-draft-60bfafec
+id: dec-222
 title: Wave 0 step ordering — schema first, backend section as parallel extension
-status: proposed
+status: accepted
 category: implementation
 date: 2026-06-05
 summary: Decompose Wave 0 as schema definition → examples (foldable) → backend abstraction section (parallel-group with test) → namespace + inventory rows; schema step anchors all downstream waves.

@@ -1,5 +1,5 @@
 ---
-id: dec-draft-11bc9d23
+id: dec-218
 title: Reconcile the ML experiment-storage convention onto the unified out-of-tree model
 status: accepted
 category: architectural
@@ -15,12 +15,12 @@ affected_files:
   - rules/ml/experiment-commit-conventions.md
   - commands/onboard-project.md
   - skills/experiment-tracking/SKILL.md
-related: [dec-draft-9c30645e]
+related: [dec-221]
 ---
 
 ## Context
 
-The unified out-of-tree storage model (`dec-draft-9c30645e`) defaults operational artifacts out
+The unified out-of-tree storage model (`dec-221`) defaults operational artifacts out
 of the repo tree. The existing ML scaffold diverges on two layers (verified against current
 conventions):
 
@@ -70,12 +70,12 @@ sub-pipeline (characterization tests first), not bundled into the additive progr
 
 ## Consequences
 
-- **If A (migrate):** the storage-model ADR (`dec-draft-9c30645e`) supersedes the in-tree
+- **If A (migrate):** the storage-model ADR (`dec-221`) supersedes the in-tree
   committed-trace convention; `experiment-commit-conventions.md` and Phase 8c.1/8c.2 are rewritten;
   a one-time migration note ships for existing managed ML projects.
-- **If B (diverge):** `dec-draft-9c30645e` is scoped to agentic-eval only and explicitly carves
+- **If B (diverge):** `dec-221` is scoped to agentic-eval only and explicitly carves
   out ML; this ADR records the divergence rationale.
-- **RESOLVED — user approved migrate (2026-06-05).** `dec-draft-9c30645e` (unified storage model)
+- **RESOLVED — user approved migrate (2026-06-05).** `dec-221` (unified storage model)
   therefore **supersedes** the in-tree committed-trace convention (it should be tightened from
   conditional "if A/if B" scoping to the migrate outcome when the program enters implementation).
   The ML migration is gated on a `PRE_REFACTOR_PLAN.md` and runs as its own pre-refactor

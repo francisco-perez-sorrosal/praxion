@@ -1,7 +1,7 @@
 ---
-id: dec-draft-7aac9824
+id: dec-216
 title: Broaden paradigm-detection for the agentic-eval archetype; cite-as-canonical from onboarding
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-05
 summary: Extend the single-source paradigm-detection.md with custom-evaluate.py + LLM-SDK-dep eval signals (core-deps-only + two-tier strength, refined by R5 validation against 4 repos); onboarding cites it as canonical rather than forking. Provisional until R1+R2 are implemented.
@@ -13,7 +13,7 @@ pipeline_tier: standard
 affected_files:
   - skills/roadmap-synthesis/references/paradigm-detection.md
   - commands/onboard-project.md
-related: [dec-draft-7df1a638, dec-draft-9c30645e]
+related: [dec-219, dec-221]
 ---
 
 ## Context
@@ -79,4 +79,4 @@ scan, benchmark-dir root-depth constraint) are deferred — see the validation r
   escalate-to-user-on-low-confidence path).
 - **Delivery dependency:** P1's Phase 8f scaffold installs references to the P2/P3 artifacts, so
   the scaffold wiring lands AFTER those artifacts exist (the detection design can be authored in
-  parallel). Feeds `project_profile.yaml` (`dec-draft-7df1a638`).
+  parallel). Feeds `project_profile.yaml` (`dec-219`).

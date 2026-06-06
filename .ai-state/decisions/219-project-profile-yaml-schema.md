@@ -1,7 +1,7 @@
 ---
-id: dec-draft-7df1a638
+id: dec-219
 title: .ai-state/project_profile.yaml as the machine-consumable archetype + run-store record
-status: proposed
+status: accepted
 category: configuration
 date: 2026-06-05
 summary: Record archetype/paradigm, run_store_root, run_store_backend, and eval_framework in .ai-state/project_profile.yaml as a Phase 8f output (not a prerequisite); CLAUDE.md gets only a one-line pointer.
@@ -14,13 +14,13 @@ affected_files:
   - .ai-state/project_profile.yaml
   - rules/swe/agent-intermediate-documents.md
   - commands/onboard-project.md
-related: [dec-draft-9c30645e, dec-draft-52949236, dec-draft-7aac9824]
+related: [dec-221, dec-220, dec-216]
 ---
 
 ## Context
 
 P1's archetype detection produces a classification (`agentic-eval` / `ml-training` /
-`deterministic` / `hybrid`) and the storage model (`dec-draft-9c30645e`) needs a committed home
+`deterministic` / `hybrid`) and the storage model (`dec-221`) needs a committed home
 for the portable `run_store_root` default. CONTEXT_REVIEW Decision C adjudicated where this record
 lives: a CLAUDE.md block field (always-loaded in every managed project) vs a machine-consumable
 YAML file.

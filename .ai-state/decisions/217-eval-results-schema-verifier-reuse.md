@@ -1,7 +1,7 @@
 ---
-id: dec-draft-ccb70b10
+id: dec-217
 title: EVAL_RESULTS.md schema as sibling to TRAINING_RESULTS.md with verifier tolerance-band reuse
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-05
 summary: EVAL_RESULTS.md + eval_ledger/EVAL_LOG.md live in agent-evals as a sibling schema; the verifier reuses eval-driven-verification tolerance bands by feeding the eval metric instead of val_bpb.
@@ -15,7 +15,7 @@ affected_files:
   - rules/ml/eval-driven-verification.md
   - rules/swe/agent-intermediate-documents.md
   - commands/scores.md
-related: [dec-draft-9c30645e, dec-draft-52949236]
+related: [dec-221, dec-220]
 ---
 
 ## Context

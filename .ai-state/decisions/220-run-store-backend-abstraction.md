@@ -1,7 +1,7 @@
 ---
-id: dec-draft-52949236
+id: dec-220
 title: Pluggable run-store backend abstraction (storage analog of neo-cloud-abstraction)
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-05
 summary: A backend-invariant run_store_descriptor selecting local-home / local-custom / s3 / tracker; store_uri is the only field that varies downstream.
@@ -13,12 +13,12 @@ pipeline_tier: standard
 affected_files:
   - skills/agent-evals/references/run-ledger-schema.md
   - .ai-state/project_profile.yaml
-related: [dec-draft-9c30645e, dec-draft-ccb70b10, dec-draft-7df1a638]
+related: [dec-221, dec-217, dec-219]
 ---
 
 ## Context
 
-The two-tier storage model (`dec-draft-9c30645e`) defaults the operational run store to
+The two-tier storage model (`dec-221`) defaults the operational run store to
 `$HOME/.<project-name>/` but must also serve projects that want a custom local path, remote S3,
 or an external tracker (MLflow / W&B). Praxion already solved the *dispatch* version of this
 problem with `neo-cloud-abstraction`: one `training_job_descriptor` schema, invariant across

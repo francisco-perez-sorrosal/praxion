@@ -8,7 +8,6 @@ import json
 import re
 from pathlib import Path
 
-
 FRONTMATTER_BOUNDARY = "---"
 SKIP_RULE_FILES = {"CLAUDE.md", "README.md"}
 HOOK_COMMAND_TEMPLATE = '/usr/bin/python3 "{hook_path}"'
@@ -66,7 +65,6 @@ CLAUDE_ONLY_PATTERNS = [
     r"\bSubagentStop\b",
     r"\bPreCompact\b",
     r"\bPostCompact\b",
-    r"\b/memory\b",
     r"claude-ecosystem",
 ]
 
@@ -241,7 +239,6 @@ def build_keywords(relpath: str, title: str, globs: list[str]) -> set[str]:
         "citation": {"citation", "traceability"},
         "gpu": {"gpu", "training", "experiments", "runs"},
         "eval": {"eval", "evaluation", "training", "metrics"},
-        "memory": {"memory", "remember", "recall"},
         "git": {"git", "commit", "branch"},
         "pr": {"pr", "pull", "review"},
     }
@@ -272,9 +269,7 @@ def resolve_codex_portability(
     )
 
 
-def resolve_codex_load(
-    scope: str, portability: str, codex_metadata: dict[str, object]
-) -> str:
+def resolve_codex_load(scope: str, portability: str, codex_metadata: dict[str, object]) -> str:
     value = str(codex_metadata.get("load", "auto")).strip().lower()
     if value in {"", "auto"}:
         if portability != "portable":
@@ -445,10 +440,6 @@ from pathlib import Path
 REPO_ROOT = Path("""
         + repr(repo_root_str)
         + """)
-CODEX_MEMORY_ENV = {
-    "PRAXION_MEMORY_TOOL_PREFIXES": "mcp__memory__,mcp__plugin_i-am_memory__",
-    "PRAXION_MEMORY_REMEMBER_TOOL": "mcp__memory__remember",
-}
 PROJECT_SETTINGS_PATH = Path(".codex") / "praxion" / "settings.json"
 _LEGACY_ADDITIONAL_CONTEXT_EVENTS = frozenset(
     {"SessionStart", "PostToolUse", "UserPromptSubmit"}
@@ -723,7 +714,7 @@ if __name__ == "__main__":
     raise SystemExit(main())
 """
         )
-    if kind == "memory-session-start":
+    if kind == "decisions-session-start":
         return """#!/usr/bin/env python3
 from __future__ import annotations
 
@@ -733,35 +724,14 @@ from pathlib import Path
 HELPER_DIR = Path(__file__).resolve().parents[1] / "praxion"
 sys.path.insert(0, str(HELPER_DIR))
 
-from hook_runtime import CODEX_MEMORY_ENV, payload_has_ai_state, run_canonical_hook
+from hook_runtime import payload_has_ai_state, run_canonical_hook
 
 
 def main() -> int:
     raw = sys.stdin.read()
     if not payload_has_ai_state(raw):
         return 0
-    return run_canonical_hook("hooks/inject_memory.py", raw, CODEX_MEMORY_ENV)
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
-"""
-    elif kind == "memory-stop":
-        return """#!/usr/bin/env python3
-from __future__ import annotations
-
-import sys
-from pathlib import Path
-
-HELPER_DIR = Path(__file__).resolve().parents[1] / "praxion"
-sys.path.insert(0, str(HELPER_DIR))
-
-from hook_runtime import CODEX_MEMORY_ENV, run_canonical_hook
-
-
-def main() -> int:
-    raw = sys.stdin.read()
-    return run_canonical_hook("hooks/memory_gate.py", raw, CODEX_MEMORY_ENV)
+    return run_canonical_hook("hooks/inject_decisions.py", raw)
 
 
 if __name__ == "__main__":
@@ -996,31 +966,6 @@ def main() -> int:
 if __name__ == "__main__":
     raise SystemExit(main())
 """
-    elif kind == "commit-memory-pre-tool-use":
-        return """#!/usr/bin/env python3
-from __future__ import annotations
-
-import sys
-from pathlib import Path
-
-HELPER_DIR = Path(__file__).resolve().parents[1] / "praxion"
-sys.path.insert(0, str(HELPER_DIR))
-
-from hook_runtime import CODEX_MEMORY_ENV, run_canonical_command
-
-
-def main() -> int:
-    raw = sys.stdin.read()
-    return run_canonical_command(
-        ["hooks/commit_gate.sh", "hooks/remind_memory.py"],
-        raw,
-        CODEX_MEMORY_ENV,
-    )
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
-"""
     elif kind == "commit-id-citation-pre-tool-use":
         return """#!/usr/bin/env python3
 from __future__ import annotations
@@ -1110,27 +1055,6 @@ def main() -> int:
 if __name__ == "__main__":
     raise SystemExit(main())
 """
-    elif kind == "memory-subagent-stop":
-        return """#!/usr/bin/env python3
-from __future__ import annotations
-
-import sys
-from pathlib import Path
-
-HELPER_DIR = Path(__file__).resolve().parents[1] / "praxion"
-sys.path.insert(0, str(HELPER_DIR))
-
-from hook_runtime import CODEX_MEMORY_ENV, run_canonical_hook
-
-
-def main() -> int:
-    raw = sys.stdin.read()
-    return run_canonical_hook("hooks/validate_memory.py", raw, CODEX_MEMORY_ENV)
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
-"""
     elif kind == "observability-subagent-stop":
         return """#!/usr/bin/env python3
 from __future__ import annotations
@@ -1193,9 +1117,7 @@ def render_hook_registrations() -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": command(
-                                "praxion-session-start.py", project_root
-                            ),
+                            "command": command("praxion-session-start.py", project_root),
                             "timeout": 30,
                             "statusMessage": "Praxion: loading always-on rules",
                         }
@@ -1206,11 +1128,9 @@ def render_hook_registrations() -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": command(
-                                "praxion-memory-session-start.py", project_root
-                            ),
+                            "command": command("praxion-decisions-session-start.py", project_root),
                             "timeout": 30,
-                            "statusMessage": "Praxion: injecting memory context",
+                            "statusMessage": "Praxion: injecting decision context",
                         }
                     ],
                 },
@@ -1233,19 +1153,7 @@ def render_hook_registrations() -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": command("praxion-memory-stop.py", project_root),
-                            "timeout": 15,
-                            "statusMessage": "Praxion: enforcing memory gate",
-                        }
-                    ],
-                },
-                {
-                    "hooks": [
-                        {
-                            "type": "command",
-                            "command": command(
-                                "praxion-observability-stop.py", project_root
-                            ),
+                            "command": command("praxion-observability-stop.py", project_root),
                             "timeout": 15,
                             "statusMessage": "Praxion: capturing session stop",
                         }
@@ -1257,9 +1165,7 @@ def render_hook_registrations() -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": command(
-                                "praxion-user-prompt-submit.py", project_root
-                            ),
+                            "command": command("praxion-user-prompt-submit.py", project_root),
                             "timeout": 30,
                             "statusMessage": "Praxion: routing prompt-scoped rules",
                         }
@@ -1285,9 +1191,7 @@ def render_hook_registrations() -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": command(
-                                "praxion-subagent-pre-tool-use.py", project_root
-                            ),
+                            "command": command("praxion-subagent-pre-tool-use.py", project_root),
                             "timeout": 15,
                             "statusMessage": "Praxion: injecting subagent contract",
                         }
@@ -1306,9 +1210,7 @@ def render_hook_registrations() -> dict[str, object]:
                         },
                         {
                             "type": "command",
-                            "command": command(
-                                "praxion-commit-adr-pre-tool-use.py", project_root
-                            ),
+                            "command": command("praxion-commit-adr-pre-tool-use.py", project_root),
                             "timeout": 30,
                             "statusMessage": "Praxion: checking ADR reminder",
                         },
@@ -1320,14 +1222,6 @@ def render_hook_registrations() -> dict[str, object]:
                             ),
                             "timeout": 15,
                             "statusMessage": "Praxion: checking learnings cleanup",
-                        },
-                        {
-                            "type": "command",
-                            "command": command(
-                                "praxion-commit-memory-pre-tool-use.py", project_root
-                            ),
-                            "timeout": 15,
-                            "statusMessage": "Praxion: checking commit memory",
                         },
                         {
                             "type": "command",
@@ -1433,18 +1327,6 @@ def render_hook_registrations() -> dict[str, object]:
                         {
                             "type": "command",
                             "command": command(
-                                "praxion-memory-subagent-stop.py", project_root
-                            ),
-                            "timeout": 15,
-                            "statusMessage": "Praxion: enforcing subagent memory",
-                        }
-                    ],
-                },
-                {
-                    "hooks": [
-                        {
-                            "type": "command",
-                            "command": command(
                                 "praxion-observability-subagent-stop.py", project_root
                             ),
                             "timeout": 15,
@@ -1458,9 +1340,7 @@ def render_hook_registrations() -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": command(
-                                "praxion-precompact-state.py", project_root
-                            ),
+                            "command": command("praxion-precompact-state.py", project_root),
                             "timeout": 15,
                             "statusMessage": "Praxion: snapshotting pipeline state",
                         }
@@ -1497,9 +1377,8 @@ def export_rules_bridge(repo_root: Path, out_dir: Path) -> list[Path]:
 
     for hook_name, kind in [
         ("praxion-session-start.py", "session-start"),
-        ("praxion-memory-session-start.py", "memory-session-start"),
+        ("praxion-decisions-session-start.py", "decisions-session-start"),
         ("praxion-observability-session-start.py", "observability-session-start"),
-        ("praxion-memory-stop.py", "memory-stop"),
         ("praxion-observability-stop.py", "observability-stop"),
         ("praxion-user-prompt-submit.py", "user-prompt-submit"),
         (
@@ -1510,7 +1389,6 @@ def export_rules_bridge(repo_root: Path, out_dir: Path) -> list[Path]:
         ("praxion-commit-quality-pre-tool-use.py", "commit-quality-pre-tool-use"),
         ("praxion-commit-adr-pre-tool-use.py", "commit-adr-pre-tool-use"),
         ("praxion-cleanup-learnings-pre-tool-use.py", "cleanup-learnings-pre-tool-use"),
-        ("praxion-commit-memory-pre-tool-use.py", "commit-memory-pre-tool-use"),
         (
             "praxion-commit-id-citation-pre-tool-use.py",
             "commit-id-citation-pre-tool-use",
@@ -1525,7 +1403,6 @@ def export_rules_bridge(repo_root: Path, out_dir: Path) -> list[Path]:
             "detect-duplication-post-tool-use",
         ),
         ("praxion-observability-subagent-start.py", "observability-subagent-start"),
-        ("praxion-memory-subagent-stop.py", "memory-subagent-stop"),
         ("praxion-observability-subagent-stop.py", "observability-subagent-stop"),
         ("praxion-precompact-state.py", "precompact-state"),
     ]:

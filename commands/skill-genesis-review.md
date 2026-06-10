@@ -1,5 +1,5 @@
 ---
-description: Disposition pending proposals from a skill-genesis report — batch multi-select; records approve/reject/refine/defer per proposal; executes approved memory proposals; surfaces delegation handoffs.
+description: Disposition pending proposals from a skill-genesis report — batch multi-select; records approve/reject/refine/defer per proposal; surfaces delegation handoffs.
 argument-hint: "[--report <path>] [--show-completed]"
 allowed-tools: [Read, Glob, Grep, Bash, Edit, AskUserQuestion]
 disable-model-invocation: true
@@ -7,9 +7,9 @@ disable-model-invocation: true
 
 Work through pending proposals from the most recent (or specified) skill-genesis report.
 Presents every pending proposal in a single batch `AskUserQuestion` multi-select, records
-each disposition in the report's `## Disposition Log` section, executes approved `memory`
-proposals via the `remember` MCP tool, and surfaces delegation handoffs for skill/rule/claude.md
-proposals. Re-running this command on a fully-reviewed report is a no-op.
+each disposition in the report's `## Disposition Log` section, and surfaces delegation
+handoffs for skill/rule/claude.md proposals. Re-running this command on a fully-reviewed
+report is a no-op.
 
 ## Flags
 
@@ -107,18 +107,7 @@ Use `Edit` to update the report file's frontmatter fields in place:
 Also update the `Review Status` column for this report's row in
 `.ai-state/skill_genesis_reports/SKILL_GENESIS_LOG.md` using `Edit`.
 
-### 7. Execute approved memory proposals
-
-For each proposal with type `memory` that the user approved, call the `remember` MCP tool
-with the proposal's description and source citations as the memory content.
-
-Before calling `remember`, check for `PRAXION_DISABLE_MEMORY_MCP=1` and whether the
-`remember` tool is available. If memory MCP is disabled or unavailable, skip silently
-and note in the disposition log row: `memory MCP disabled — stored in report only`.
-
-Record the resulting memory key in the disposition log row's Notes column.
-
-### 8. Surface delegation handoffs
+### 7. Surface delegation handoffs
 
 For each approved proposal whose type is `skill (new)`, `skill (update)`, `rule (new)`,
 `rule (update)`, or `claude.md`:
@@ -146,7 +135,7 @@ Options: **spawn now** / **defer**.
 If the user selects **spawn now**, invoke each delegation via `Task`. If **defer**,
 print a summary of the deferred delegations for the user to action later.
 
-### 9. Final summary
+### 8. Final summary
 
 Print a final summary:
 
@@ -171,7 +160,6 @@ Review status: <pending | partial | complete>
 | `skill (update)` | `context-engineer` | Load skill-crafting; pass proposal description + existing path |
 | `rule (new)` | `context-engineer` | Load rule-crafting; pass proposal description + artifact path |
 | `rule (update)` | `context-engineer` | Load rule-crafting; pass proposal description + existing path |
-| `memory` | Direct `remember` call | Executed in step 7; no further delegation |
 | `claude.md` | User action or `implementer` | CLAUDE.md edits may require context-specific judgment; surface for user decision |
 
 ## Idempotency contract

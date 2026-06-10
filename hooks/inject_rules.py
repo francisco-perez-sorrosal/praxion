@@ -69,12 +69,6 @@ from _hook_utils import is_disabled
 # -- Constants -----------------------------------------------------------------
 
 DISABLE_FLAG = "PRAXION_DISABLE_RULE_INJECTION"
-# When the memory MCP is disabled, the memory-protocol rule is inert (its body
-# says "skip all memory operations"). Suppress its delivery structurally so
-# opted-out projects do not pay its always-loaded token cost — the env var alone
-# is sufficient, no per-project blacklist entry required.
-MEMORY_MCP_DISABLE_FLAG = "PRAXION_DISABLE_MEMORY_MCP"
-MEMORY_PROTOCOL_RULE_ID = "swe/memory-protocol"
 SUPPORTED_SCHEMA_VERSION = 1
 
 _INJECT_HEADER = "## Praxion Rules (auto-injected)\n\n"
@@ -134,16 +128,14 @@ def _load_manifest(plugin_root: Path) -> list[dict] | None:
         data = _load_yaml(manifest_path.read_text(encoding="utf-8"))
     except Exception as exc:
         print(
-            f"[inject_rules] WARNING: could not parse manifest: {exc}; "
-            "skipping rule injection",
+            f"[inject_rules] WARNING: could not parse manifest: {exc}; skipping rule injection",
             file=sys.stderr,
         )
         return None
     rules = data.get("rules", [])
     if not isinstance(rules, list):
         print(
-            "[inject_rules] WARNING: manifest 'rules' is not a list; "
-            "skipping rule injection",
+            "[inject_rules] WARNING: manifest 'rules' is not a list; skipping rule injection",
             file=sys.stderr,
         )
         return None
@@ -207,8 +199,7 @@ def _filter_core_rules(disable_set: set[str], rules: list[dict]) -> set[str]:
     attempted_core = disable_set & core_ids
     for rule_id in sorted(attempted_core):
         print(
-            f"[inject_rules] WARNING: cannot disable core rule"
-            f" '{rule_id}' — kept loaded",
+            f"[inject_rules] WARNING: cannot disable core rule '{rule_id}' — kept loaded",
             file=sys.stderr,
         )
     return disable_set - core_ids
@@ -292,9 +283,7 @@ def _apply_symlink_exclusions(cwd: Path, exclusions: list[str]) -> None:
         preserved = [
             entry
             for entry in current
-            if not (
-                isinstance(entry, str) and entry.startswith(_PRAXION_EXCLUSION_PREFIX)
-            )
+            if not (isinstance(entry, str) and entry.startswith(_PRAXION_EXCLUSION_PREFIX))
         ]
         reconciled = preserved + exclusions
 
@@ -492,9 +481,7 @@ def main() -> None:
 
     # Resolve glob patterns (e.g., ml/*) to concrete rule IDs. Warn for any
     # pattern that matched zero rules — catches typos like `disable: [my/tpyo]`.
-    disable_set, unmatched_patterns = _resolve_disable_globs(
-        disable_patterns, all_rule_ids
-    )
+    disable_set, unmatched_patterns = _resolve_disable_globs(disable_patterns, all_rule_ids)
     for pattern in unmatched_patterns:
         print(
             f"[inject_rules] WARNING: disable pattern {pattern!r} matched no"
@@ -502,13 +489,6 @@ def main() -> None:
             " scripts/regenerate_rules_manifest.py` to see valid IDs.",
             file=sys.stderr,
         )
-
-    # Memory MCP opt-out (env-driven, blacklist-independent): when the memory MCP
-    # is disabled, memory-protocol is a no-op rule — suppress it so the project
-    # does not pay its always-loaded cost. Non-core, so it survives the core
-    # filter below and flows through the normal suppression path.
-    if is_disabled(MEMORY_MCP_DISABLE_FLAG) and MEMORY_PROTOCOL_RULE_ID in all_rule_ids:
-        disable_set.add(MEMORY_PROTOCOL_RULE_ID)
 
     # Remove core rules from disable set; warn for each attempted suppression.
     disable_set = _filter_core_rules(disable_set, rules)
@@ -522,14 +502,10 @@ def main() -> None:
 
     # Build inject set: hook-deliver rules that are not suppressed.
     inject_rules = [
-        r
-        for r in rules
-        if r.get("install") == "hook-deliver" and r.get("id") not in disable_set
+        r for r in rules if r.get("install") == "hook-deliver" and r.get("id") not in disable_set
     ]
     hook_deliver_rules = [r for r in rules if r.get("install") == "hook-deliver"]
-    suppressed_hd_ids = [
-        r["id"] for r in hook_deliver_rules if r.get("id") in disable_set
-    ]
+    suppressed_hd_ids = [r["id"] for r in hook_deliver_rules if r.get("id") in disable_set]
     # claudeMdExcludes now covers every non-core disabled rule regardless of
     # install type (defense-in-depth — see _compute_symlink_exclusions).
     exclusion_ids = sorted(disable_set)
@@ -546,9 +522,7 @@ def main() -> None:
     # Emit observability summary to stderr.
     injected_count = len(inject_rules)
     total_hook_deliver = len(hook_deliver_rules)
-    hd_suppressed_str = (
-        ", ".join(sorted(suppressed_hd_ids)) if suppressed_hd_ids else "none"
-    )
+    hd_suppressed_str = ", ".join(sorted(suppressed_hd_ids)) if suppressed_hd_ids else "none"
     exclusion_str = ", ".join(exclusion_ids) if exclusion_ids else "none"
     print(
         f"[inject_rules] Loaded {core_count} core rules;"

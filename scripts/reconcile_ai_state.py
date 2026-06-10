@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Reconcile .ai-state/ artifacts after merging a worktree branch.
 
-Handles three reconciliation tasks:
-1. memory.json — semantic JSON merge (union of entries, updated_at wins)
-2. observations.jsonl — concat, dedup, sort by timestamp
-3. decisions/ — renumber duplicate ADR sequence numbers, regenerate index
+Handles two reconciliation tasks:
+1. observations.jsonl — concat, dedup, sort by timestamp
+2. decisions/ — renumber duplicate ADR sequence numbers, regenerate index
 
 Designed to run AFTER `git merge` to resolve conflicts or validate
 auto-merged results. Can also run standalone to reconcile two copies.
@@ -30,7 +29,6 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 AI_STATE = REPO_ROOT / ".ai-state"
 DECISIONS_DIR = AI_STATE / "decisions"
-MEMORY_PATH = AI_STATE / "memory.json"
 OBSERVATIONS_PATH = AI_STATE / "observations.jsonl"
 
 ADR_FILENAME_PATTERN = re.compile(r"^(\d{3})-.+\.md$")
@@ -79,81 +77,6 @@ def extract_ours_theirs_from_git(rel_path: str) -> tuple[str | None, str | None]
     ours = ours_result.stdout if ours_result.returncode == 0 else None
     theirs = theirs_result.stdout if theirs_result.returncode == 0 else None
     return ours, theirs
-
-
-# -- memory.json reconciliation -----------------------------------------------
-
-
-def reconcile_memory(ours_text: str, theirs_text: str) -> dict:
-    """Merge two memory.json files semantically.
-
-    Strategy:
-    - schema_version: keep the higher version
-    - session_count: sum both (each session is unique)
-    - memories: union of all entries per category; for duplicate keys,
-      the entry with the later updated_at timestamp wins
-    """
-    ours = json.loads(ours_text)
-    theirs = json.loads(theirs_text)
-
-    # Schema version: keep higher
-    ours_ver = ours.get("schema_version", "1.0")
-    theirs_ver = theirs.get("schema_version", "1.0")
-    merged_ver = max(ours_ver, theirs_ver)
-
-    # Session count: sum (each worktree runs independent sessions)
-    merged_sessions = ours.get("session_count", 0) + theirs.get("session_count", 0)
-
-    # Memories: union per category, updated_at wins for duplicates
-    ours_mem = ours.get("memories", {})
-    theirs_mem = theirs.get("memories", {})
-    all_categories = set(ours_mem.keys()) | set(theirs_mem.keys())
-
-    merged_memories: dict[str, dict] = {}
-    stats = {"kept_ours": 0, "kept_theirs": 0, "unique_ours": 0, "unique_theirs": 0}
-
-    for category in sorted(all_categories):
-        ours_entries = ours_mem.get(category, {})
-        theirs_entries = theirs_mem.get(category, {})
-        merged_entries: dict[str, dict] = {}
-
-        all_keys = set(ours_entries.keys()) | set(theirs_entries.keys())
-        for key in sorted(all_keys):
-            in_ours = key in ours_entries
-            in_theirs = key in theirs_entries
-
-            if in_ours and not in_theirs:
-                merged_entries[key] = ours_entries[key]
-                stats["unique_ours"] += 1
-            elif in_theirs and not in_ours:
-                merged_entries[key] = theirs_entries[key]
-                stats["unique_theirs"] += 1
-            else:
-                # Both have it — updated_at wins
-                ours_updated = ours_entries[key].get("updated_at", "")
-                theirs_updated = theirs_entries[key].get("updated_at", "")
-                if theirs_updated > ours_updated:
-                    merged_entries[key] = theirs_entries[key]
-                    stats["kept_theirs"] += 1
-                else:
-                    merged_entries[key] = ours_entries[key]
-                    stats["kept_ours"] += 1
-
-        if merged_entries:
-            merged_memories[category] = merged_entries
-
-    total = sum(len(entries) for entries in merged_memories.values())
-    info(
-        f"memory.json: {total} entries merged "
-        f"(ours: {stats['unique_ours']} unique + {stats['kept_ours']} wins, "
-        f"theirs: {stats['unique_theirs']} unique + {stats['kept_theirs']} wins)"
-    )
-
-    return {
-        "schema_version": merged_ver,
-        "session_count": merged_sessions,
-        "memories": merged_memories,
-    }
 
 
 # -- observations.jsonl reconciliation ----------------------------------------
@@ -372,7 +295,7 @@ def _reconcile_adr_and_index() -> bool:
 
 def _check_merge_drivers() -> None:
     """Warn if custom merge drivers are not registered in git config."""
-    for driver in ["memory-json", "observations-jsonl"]:
+    for driver in ["observations-jsonl"]:
         result = git("config", f"merge.{driver}.driver")
         if result.returncode != 0:
             warn(
@@ -382,7 +305,7 @@ def _check_merge_drivers() -> None:
 
 
 def main() -> None:
-    # --post-merge: only ADR renumbering + index regen (memory/observations
+    # --post-merge: only ADR renumbering + index regen (observations
     # already handled by git merge drivers during the merge itself)
     post_merge_only = "--post-merge" in sys.argv
 
@@ -393,19 +316,7 @@ def main() -> None:
     any_changes = False
 
     if not post_merge_only:
-        # 1. memory.json
-        if MEMORY_PATH.exists():
-            changed = reconcile_file(
-                MEMORY_PATH,
-                ".ai-state/memory.json",
-                reconcile_memory,
-            )
-            if changed:
-                any_changes = True
-            elif not is_conflicted(MEMORY_PATH):
-                info("memory.json: no conflicts")
-
-        # 2. observations.jsonl
+        # 1. observations.jsonl
         if OBSERVATIONS_PATH.exists():
             changed = reconcile_file(
                 OBSERVATIONS_PATH,
@@ -418,7 +329,7 @@ def main() -> None:
             elif not is_conflicted(OBSERVATIONS_PATH):
                 info("observations.jsonl: no conflicts")
 
-    # 3+4. ADR renumbering + index regeneration (always runs)
+    # 2+3. ADR renumbering + index regeneration (always runs)
     if _reconcile_adr_and_index():
         any_changes = True
 

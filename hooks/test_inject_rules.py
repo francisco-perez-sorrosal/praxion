@@ -3,7 +3,7 @@
 Verifies the eleven behavioral contracts:
 
   1. No project config → all 3 blacklistable rules in additionalContext output
-  2. disable: [swe/memory-protocol] → 2 rules in output, memory-protocol absent
+  2. disable: [swe/_fixture-rule] → 2 rules in output, _fixture-rule absent
   3. disable: [ml/*] → glob resolves without crash; hook-deliver set unaffected
   4. disable: [swe/agent-behavioral-contract] → stderr warning; rule kept (core protection)
   5. disable: [swe/*] → warnings for core rules; non-core swe/* rules suppressed
@@ -12,7 +12,7 @@ Verifies the eleven behavioral contracts:
   8. Missing manifest → stderr log + exit 0 (non-fatal)
   9. PRAXION_DISABLE_RULE_INJECTION=1 → exit 0, no additionalContext output
   10. Stderr summary line format validated
-  11. Injection order: rules appear in manifest order (memory-protocol → agent-model-routing
+  11. Injection order: rules appear in manifest order (_fixture-rule → agent-model-routing
       → vcs/git-conventions)
 
 Each test invokes the hook via ``subprocess.run``, setting:
@@ -40,10 +40,8 @@ HOOK_SCRIPT = Path(__file__).resolve().parent / "inject_rules.py"
 # rules/_manifest.yaml.  Per the spec: manifest order is the injection order.
 # ---------------------------------------------------------------------------
 
-_MEMORY_PROTOCOL_BODY = "## Memory Protocol\n\nThis is the memory protocol rule body.\n"
-_AGENT_MODEL_ROUTING_BODY = (
-    "## Agent Model Routing\n\nThis is the model routing rule body.\n"
-)
+_FIXTURE_RULE_BODY = "## Fixture Rule\n\nThis is the test fixture rule body.\n"
+_AGENT_MODEL_ROUTING_BODY = "## Agent Model Routing\n\nThis is the model routing rule body.\n"
 _GIT_CONVENTIONS_BODY = "## Git Conventions\n\nThis is the git conventions rule body.\n"
 
 # Core rule IDs the hook must refuse to suppress.
@@ -57,7 +55,7 @@ _CORE_IDS = [
 
 # Hook-deliver rule IDs (the three blacklistable always-loaded rules).
 _HOOK_DELIVER_IDS = [
-    "swe/memory-protocol",
+    "swe/_fixture-rule",
     "swe/agent-model-routing",
     "swe/vcs/git-conventions",
 ]
@@ -79,9 +77,7 @@ def _make_manifest(plugin_root: Path) -> None:
     # Write the 3 hook-deliver rule body files so the hook can read them.
     (rules_dir / "swe").mkdir(parents=True, exist_ok=True)
     (rules_dir / "swe" / "vcs").mkdir(parents=True, exist_ok=True)
-    (rules_dir / "swe" / "memory-protocol.md").write_text(
-        _MEMORY_PROTOCOL_BODY, encoding="utf-8"
-    )
+    (rules_dir / "swe" / "_fixture-rule.md").write_text(_FIXTURE_RULE_BODY, encoding="utf-8")
     (rules_dir / "swe" / "agent-model-routing.md").write_text(
         _AGENT_MODEL_ROUTING_BODY, encoding="utf-8"
     )
@@ -135,7 +131,7 @@ def _make_manifest(plugin_root: Path) -> None:
 
     # Hook-deliver rules (in the spec's stable injection order).
     hook_deliver_specs = [
-        ("swe/memory-protocol", "rules/swe/memory-protocol.md"),
+        ("swe/_fixture-rule", "rules/swe/_fixture-rule.md"),
         ("swe/agent-model-routing", "rules/swe/agent-model-routing.md"),
         ("swe/vcs/git-conventions", "rules/swe/vcs/git-conventions.md"),
     ]
@@ -178,9 +174,7 @@ def _make_manifest(plugin_root: Path) -> None:
         "  - swe/vcs/pr-conventions",
     ]
 
-    (rules_dir / "_manifest.yaml").write_text(
-        "\n".join(manifest_lines) + "\n", encoding="utf-8"
-    )
+    (rules_dir / "_manifest.yaml").write_text("\n".join(manifest_lines) + "\n", encoding="utf-8")
 
 
 def _run_hook(
@@ -200,10 +194,6 @@ def _run_hook(
         **os.environ,
         "CLAUDE_PLUGIN_ROOT": str(plugin_root),
     }
-    # Neutralize the ambient memory-MCP opt-out (set in this repo's
-    # .claude/settings.json) so tests are deterministic regardless of the
-    # session env. Tests that exercise it pass it explicitly via extra_env.
-    env.pop("PRAXION_DISABLE_MEMORY_MCP", None)
     env.update(extra_env or {})
     return subprocess.run(
         [sys.executable, str(HOOK_SCRIPT)],
@@ -234,14 +224,14 @@ def _additional_context(result: subprocess.CompletedProcess) -> str:
     return hook_out.get("additionalContext", "")
 
 
-@pytest.fixture()
+@pytest.fixture
 def plugin_root(tmp_path: Path) -> Path:
     """A synthetic CLAUDE_PLUGIN_ROOT with a populated rules/_manifest.yaml."""
     _make_manifest(tmp_path)
     return tmp_path
 
 
-@pytest.fixture()
+@pytest.fixture
 def project_dir(tmp_path: Path) -> Path:
     """An empty project directory (no .claude/praxion-rules.yaml)."""
     project = tmp_path / "project"
@@ -278,11 +268,10 @@ def test_no_project_config_injects_all_blacklistable_rules(
     )
     context = _additional_context(result)
     assert context, (
-        "Hook must emit additionalContext when no project config exists. "
-        "Got empty output."
+        "Hook must emit additionalContext when no project config exists. Got empty output."
     )
-    assert _MEMORY_PROTOCOL_BODY.strip() in context, (
-        "memory-protocol body must appear in output when no blacklist is configured. "
+    assert _FIXTURE_RULE_BODY.strip() in context, (
+        "_fixture-rule body must appear in output when no blacklist is configured. "
         f"Context: {context!r}"
     )
     assert _AGENT_MODEL_ROUTING_BODY.strip() in context, (
@@ -296,66 +285,31 @@ def test_no_project_config_injects_all_blacklistable_rules(
 
 
 # ===========================================================================
-# Test 2: disable: [swe/memory-protocol] → 2 rules in output, memory-protocol absent
+# Test 2: disable: [swe/_fixture-rule] → 2 rules in output, _fixture-rule absent
 # ===========================================================================
 
 
-def test_disabling_one_rule_removes_it_from_injection(
-    plugin_root: Path, project_dir: Path
-) -> None:
-    """Disabling swe/memory-protocol suppresses it; the other two rules are still injected."""
+def test_disabling_one_rule_removes_it_from_injection(plugin_root: Path, project_dir: Path) -> None:
+    """Disabling swe/_fixture-rule suppresses it; the other two rules are still injected."""
     _write_project_config(
         project_dir,
-        "version: 1\ndisable:\n  - swe/memory-protocol\n",
+        "version: 1\ndisable:\n  - swe/_fixture-rule\n",
     )
     result = _run_hook(plugin_root, project_dir)
     assert result.returncode == 0, (
         f"Hook must exit 0 when a valid blacklist exists. stderr: {result.stderr!r}"
     )
     context = _additional_context(result)
-    assert _MEMORY_PROTOCOL_BODY.strip() not in context, (
-        "memory-protocol body must NOT appear when disable: [swe/memory-protocol] is set. "
+    assert _FIXTURE_RULE_BODY.strip() not in context, (
+        "_fixture-rule body must NOT appear when disable: [swe/_fixture-rule] is set. "
         f"Context snippet: {context[:200]!r}"
     )
     assert _AGENT_MODEL_ROUTING_BODY.strip() in context, (
-        "agent-model-routing body must still appear when only memory-protocol is disabled. "
+        "agent-model-routing body must still appear when only _fixture-rule is disabled. "
         f"Context snippet: {context[:200]!r}"
     )
     assert _GIT_CONVENTIONS_BODY.strip() in context, (
-        "vcs/git-conventions body must still appear when only memory-protocol is disabled. "
-        f"Context snippet: {context[:200]!r}"
-    )
-
-
-# ===========================================================================
-# Test 2b: PRAXION_DISABLE_MEMORY_MCP=1 (no blacklist) → memory-protocol absent
-# ===========================================================================
-
-
-def test_memory_mcp_disabled_env_suppresses_memory_protocol(
-    plugin_root: Path, project_dir: Path
-) -> None:
-    """PRAXION_DISABLE_MEMORY_MCP=1 structurally suppresses memory-protocol even
-    with no project blacklist; the other two hook-deliver rules still inject."""
-    result = _run_hook(
-        plugin_root,
-        project_dir,
-        extra_env={"PRAXION_DISABLE_MEMORY_MCP": "1"},
-    )
-    assert result.returncode == 0, (
-        f"Hook must exit 0 when memory MCP is disabled via env. stderr: {result.stderr!r}"
-    )
-    context = _additional_context(result)
-    assert _MEMORY_PROTOCOL_BODY.strip() not in context, (
-        "memory-protocol body must NOT appear when PRAXION_DISABLE_MEMORY_MCP=1. "
-        f"Context snippet: {context[:200]!r}"
-    )
-    assert _AGENT_MODEL_ROUTING_BODY.strip() in context, (
-        "agent-model-routing must still appear when only memory MCP is disabled. "
-        f"Context snippet: {context[:200]!r}"
-    )
-    assert _GIT_CONVENTIONS_BODY.strip() in context, (
-        "vcs/git-conventions must still appear when only memory MCP is disabled. "
+        "vcs/git-conventions body must still appear when only _fixture-rule is disabled. "
         f"Context snippet: {context[:200]!r}"
     )
 
@@ -387,9 +341,8 @@ def test_ml_glob_resolves_without_crash_and_hook_deliver_set_unaffected(
         "(ML rules are not in hook-deliver set). Got empty output."
     )
     # All three hook-deliver rules must still be injected (ml/* doesn't match them).
-    assert _MEMORY_PROTOCOL_BODY.strip() in context, (
-        "memory-protocol body must appear — it is not an ML rule. "
-        f"Context snippet: {context[:200]!r}"
+    assert _FIXTURE_RULE_BODY.strip() in context, (
+        f"_fixture-rule body must appear — it is not an ML rule. Context snippet: {context[:200]!r}"
     )
     assert _AGENT_MODEL_ROUTING_BODY.strip() in context, (
         "agent-model-routing body must appear — it is not an ML rule. "
@@ -449,20 +402,17 @@ def test_swe_glob_warns_for_core_rules_and_suppresses_non_core(
         "version: 1\ndisable:\n  - swe/*\n",
     )
     result = _run_hook(plugin_root, project_dir)
-    assert result.returncode == 0, (
-        f"Hook must exit 0 with swe/* glob. stderr: {result.stderr!r}"
-    )
+    assert result.returncode == 0, f"Hook must exit 0 with swe/* glob. stderr: {result.stderr!r}"
     # At least one core rule must be mentioned in stderr (warning fired).
     has_core_warning = any(core_id in result.stderr for core_id in _CORE_IDS)
     assert has_core_warning, (
-        "Hook must emit warnings for core rules swept by swe/* glob. "
-        f"stderr: {result.stderr!r}"
+        f"Hook must emit warnings for core rules swept by swe/* glob. stderr: {result.stderr!r}"
     )
-    # swe/memory-protocol and swe/agent-model-routing (non-core, hook-deliver, swe/*)
+    # swe/_fixture-rule and swe/agent-model-routing (non-core, hook-deliver, swe/*)
     # should be suppressed.
     context = _additional_context(result)
-    assert _MEMORY_PROTOCOL_BODY.strip() not in context, (
-        "memory-protocol (non-core, swe/*) must be suppressed by the swe/* glob. "
+    assert _FIXTURE_RULE_BODY.strip() not in context, (
+        "_fixture-rule (non-core, swe/*) must be suppressed by the swe/* glob. "
         f"Context snippet: {context[:200]!r}"
     )
     assert _AGENT_MODEL_ROUTING_BODY.strip() not in context, (
@@ -489,7 +439,7 @@ def test_malformed_project_config_fails_open_with_all_rules_injected(
     """Malformed .claude/praxion-rules.yaml causes a stderr log and fail-open injection."""
     _write_project_config(
         project_dir,
-        "version: 1\ndisable: [not closed\n  - swe/memory-protocol\n:::bad: yaml:::\n",
+        "version: 1\ndisable: [not closed\n  - swe/_fixture-rule\n:::bad: yaml:::\n",
     )
     result = _run_hook(plugin_root, project_dir)
     assert result.returncode == 0, (
@@ -498,8 +448,8 @@ def test_malformed_project_config_fails_open_with_all_rules_injected(
     assert result.stderr, "Hook must log to stderr when project config is malformed."
     # Fail open: all 3 hook-deliver rules must be injected.
     context = _additional_context(result)
-    assert _MEMORY_PROTOCOL_BODY.strip() in context, (
-        "memory-protocol must be injected when project config is malformed (fail open). "
+    assert _FIXTURE_RULE_BODY.strip() in context, (
+        "_fixture-rule must be injected when project config is malformed (fail open). "
         f"Context snippet: {context[:200]!r}"
     )
     assert _AGENT_MODEL_ROUTING_BODY.strip() in context, (
@@ -523,7 +473,7 @@ def test_unsupported_schema_version_fails_open_with_friendly_error(
     """version: 2 in project config emits a friendly error on stderr and falls back to full injection."""
     _write_project_config(
         project_dir,
-        "version: 2\ndisable:\n  - swe/memory-protocol\n",
+        "version: 2\ndisable:\n  - swe/_fixture-rule\n",
     )
     result = _run_hook(plugin_root, project_dir)
     assert result.returncode == 0, (
@@ -532,16 +482,15 @@ def test_unsupported_schema_version_fails_open_with_friendly_error(
     # Must emit an error mentioning the unsupported version.
     stderr_lower = result.stderr.lower()
     has_version_error = any(
-        kw in stderr_lower
-        for kw in ("version", "schema", "not supported", "unsupported")
+        kw in stderr_lower for kw in ("version", "schema", "not supported", "unsupported")
     )
     assert has_version_error, (
         f"stderr must mention the unsupported schema version. stderr: {result.stderr!r}"
     )
     # Fail open: all rules injected (disable list is ignored when schema is unknown).
     context = _additional_context(result)
-    assert _MEMORY_PROTOCOL_BODY.strip() in context, (
-        "memory-protocol must be injected on schema-version mismatch (fail open). "
+    assert _FIXTURE_RULE_BODY.strip() in context, (
+        "_fixture-rule must be injected on schema-version mismatch (fail open). "
         f"Context snippet: {context[:200]!r}"
     )
     assert _AGENT_MODEL_ROUTING_BODY.strip() in context, (
@@ -559,9 +508,7 @@ def test_unsupported_schema_version_fails_open_with_friendly_error(
 # ===========================================================================
 
 
-def test_missing_manifest_exits_zero_with_stderr_log(
-    tmp_path: Path, project_dir: Path
-) -> None:
+def test_missing_manifest_exits_zero_with_stderr_log(tmp_path: Path, project_dir: Path) -> None:
     """When CLAUDE_PLUGIN_ROOT has no rules/_manifest.yaml, hook logs to stderr and exits 0."""
     empty_plugin_root = tmp_path / "empty_plugin"
     empty_plugin_root.mkdir()
@@ -580,9 +527,7 @@ def test_missing_manifest_exits_zero_with_stderr_log(
 # ===========================================================================
 
 
-def test_disable_env_var_suppresses_all_injection(
-    plugin_root: Path, project_dir: Path
-) -> None:
+def test_disable_env_var_suppresses_all_injection(plugin_root: Path, project_dir: Path) -> None:
     """PRAXION_DISABLE_RULE_INJECTION=1 causes the hook to exit 0 with no output."""
     result = _run_hook(
         plugin_root,
@@ -598,9 +543,7 @@ def test_disable_env_var_suppresses_all_injection(
         f"Got: {context!r}"
     )
     # The hook must log to stderr that injection is disabled.
-    assert result.stderr, (
-        "Hook must emit a stderr log line when PRAXION_DISABLE_RULE_INJECTION=1."
-    )
+    assert result.stderr, "Hook must emit a stderr log line when PRAXION_DISABLE_RULE_INJECTION=1."
 
 
 # ===========================================================================
@@ -608,9 +551,7 @@ def test_disable_env_var_suppresses_all_injection(
 # ===========================================================================
 
 
-def test_stderr_summary_line_matches_expected_format(
-    plugin_root: Path, project_dir: Path
-) -> None:
+def test_stderr_summary_line_matches_expected_format(plugin_root: Path, project_dir: Path) -> None:
     """The hook emits a stderr summary line: [inject_rules] Loaded N core rules; injected M/T ..."""
     import re
 
@@ -630,13 +571,11 @@ def test_stderr_summary_line_matches_expected_format(
 
 
 # ===========================================================================
-# Test 11: Injection order matches manifest order (memory-protocol → agent-model-routing → git-conventions)
+# Test 11: Injection order matches manifest order (_fixture-rule → agent-model-routing → git-conventions)
 # ===========================================================================
 
 
-def test_injection_order_follows_manifest_order(
-    plugin_root: Path, project_dir: Path
-) -> None:
+def test_injection_order_follows_manifest_order(plugin_root: Path, project_dir: Path) -> None:
     """Without blacklist, the 3 rules appear in manifest order in additionalContext."""
     result = _run_hook(plugin_root, project_dir)
     assert result.returncode == 0, f"Hook failed. stderr: {result.stderr!r}"
@@ -644,13 +583,12 @@ def test_injection_order_follows_manifest_order(
     assert context, "Hook must emit additionalContext when no blacklist is configured."
 
     # Find positions of each rule's unique content marker.
-    memory_pos = context.find(_MEMORY_PROTOCOL_BODY.strip()[:20])
+    fixture_pos = context.find(_FIXTURE_RULE_BODY.strip()[:20])
     routing_pos = context.find(_AGENT_MODEL_ROUTING_BODY.strip()[:20])
     git_pos = context.find(_GIT_CONVENTIONS_BODY.strip()[:20])
 
-    assert memory_pos != -1, (
-        "memory-protocol content not found in additionalContext. "
-        f"Context snippet: {context[:300]!r}"
+    assert fixture_pos != -1, (
+        f"_fixture-rule content not found in additionalContext. Context snippet: {context[:300]!r}"
     )
     assert routing_pos != -1, (
         "agent-model-routing content not found in additionalContext. "
@@ -661,9 +599,9 @@ def test_injection_order_follows_manifest_order(
         f"Context snippet: {context[:300]!r}"
     )
 
-    assert memory_pos < routing_pos, (
-        "memory-protocol must appear before agent-model-routing in manifest order. "
-        f"Positions: memory={memory_pos}, routing={routing_pos}"
+    assert fixture_pos < routing_pos, (
+        "_fixture-rule must appear before agent-model-routing in manifest order. "
+        f"Positions: fixture={fixture_pos}, routing={routing_pos}"
     )
     assert routing_pos < git_pos, (
         "agent-model-routing must appear before vcs/git-conventions in manifest order. "
@@ -711,9 +649,7 @@ def test_disabling_symlink_rules_writes_claudemd_excludes(
 # ===========================================================================
 
 
-def test_user_managed_claudemd_excludes_preserved(
-    plugin_root: Path, project_dir: Path
-) -> None:
+def test_user_managed_claudemd_excludes_preserved(plugin_root: Path, project_dir: Path) -> None:
     """Entries not starting with **/.claude/rules/ must survive reconciliation."""
     dot_claude = project_dir / ".claude"
     dot_claude.mkdir(exist_ok=True)
@@ -791,7 +727,7 @@ def test_disabling_hook_deliver_rules_also_writes_claudemd_excludes(
     _write_project_config(
         project_dir,
         "version: 1\ndisable:\n"
-        "  - swe/memory-protocol\n"
+        "  - swe/_fixture-rule\n"
         "  - swe/agent-model-routing\n"
         "  - swe/vcs/git-conventions\n",
     )
@@ -811,7 +747,7 @@ def test_disabling_hook_deliver_rules_also_writes_claudemd_excludes(
     excludes = settings.get("claudeMdExcludes", [])
     expected = sorted(
         [
-            "**/.claude/rules/swe/memory-protocol.md",
+            "**/.claude/rules/swe/_fixture-rule.md",
             "**/.claude/rules/swe/agent-model-routing.md",
             "**/.claude/rules/swe/vcs/git-conventions.md",
         ]
@@ -842,14 +778,16 @@ def test_disable_as_scalar_emits_warning_and_treats_as_empty(
         f"Hook must exit 0 even with malformed disable: scalar. stderr: {result.stderr!r}"
     )
     stderr_lower = result.stderr.lower()
-    assert "disable" in stderr_lower and "list" in stderr_lower, (
+    assert "disable" in stderr_lower, (
+        f"stderr must warn that 'disable:' should be a list. stderr: {result.stderr!r}"
+    )
+    assert "list" in stderr_lower, (
         f"stderr must warn that 'disable:' should be a list. stderr: {result.stderr!r}"
     )
     # Fail-open: all 3 rules still injected.
     context = _additional_context(result)
-    assert _MEMORY_PROTOCOL_BODY.strip() in context, (
-        "Scalar disable: must fail-open with all rules injected."
-        f" Context: {context[:200]!r}"
+    assert _FIXTURE_RULE_BODY.strip() in context, (
+        f"Scalar disable: must fail-open with all rules injected. Context: {context[:200]!r}"
     )
 
 
@@ -858,9 +796,7 @@ def test_disable_as_scalar_emits_warning_and_treats_as_empty(
 # ===========================================================================
 
 
-def test_unmatched_disable_pattern_emits_typo_warning(
-    plugin_root: Path, project_dir: Path
-) -> None:
+def test_unmatched_disable_pattern_emits_typo_warning(plugin_root: Path, project_dir: Path) -> None:
     """A disable: entry that matches no manifest rule is almost always a typo."""
     _write_project_config(
         project_dir,
@@ -884,9 +820,7 @@ def test_unmatched_disable_pattern_emits_typo_warning(
 # ===========================================================================
 
 
-def test_non_int_version_emits_warning_and_coerces(
-    plugin_root: Path, project_dir: Path
-) -> None:
+def test_non_int_version_emits_warning_and_coerces(plugin_root: Path, project_dir: Path) -> None:
     """`version: "1"` (string) is silently coerced to int 1 — but the hook
     surfaces the wrong shape with a stderr warning so the user sees it."""
     _write_project_config(project_dir, 'version: "1"\ndisable: []\n')
@@ -898,8 +832,7 @@ def test_non_int_version_emits_warning_and_coerces(
     )
     # Coerced to 1, so disable list still processed → no unsupported-version warning
     assert "not supported" not in stderr_lower, (
-        f"Coercion to 1 must not trigger the unsupported-version path."
-        f" stderr: {result.stderr!r}"
+        f"Coercion to 1 must not trigger the unsupported-version path. stderr: {result.stderr!r}"
     )
 
 
@@ -908,17 +841,13 @@ def test_non_int_version_emits_warning_and_coerces(
 # ===========================================================================
 
 
-def test_malformed_settings_json_emits_loud_warning(
-    plugin_root: Path, project_dir: Path
-) -> None:
+def test_malformed_settings_json_emits_loud_warning(plugin_root: Path, project_dir: Path) -> None:
     """When .claude/settings.json is invalid JSON, the disable list is silently
     dropped (Claude Code can't read excludes). The hook must surface this
     failure with a warning that names the consequence."""
     dot_claude = project_dir / ".claude"
     dot_claude.mkdir()
-    (dot_claude / "settings.json").write_text(
-        "{ this is not valid json", encoding="utf-8"
-    )
+    (dot_claude / "settings.json").write_text("{ this is not valid json", encoding="utf-8")
 
     _write_project_config(project_dir, "version: 1\ndisable:\n  - ml/*\n")
     result = _run_hook(plugin_root, project_dir)
@@ -929,11 +858,8 @@ def test_malformed_settings_json_emits_loud_warning(
     assert "could not parse" in result.stderr.lower(), (
         f"stderr must report the JSON parse failure. stderr: {result.stderr!r}"
     )
-    assert (
-        "not be applied" in result.stderr.lower() or "skipped" in result.stderr.lower()
-    ), (
-        "stderr must surface the consequence (disable list not applied)."
-        f" stderr: {result.stderr!r}"
+    assert "not be applied" in result.stderr.lower() or "skipped" in result.stderr.lower(), (
+        f"stderr must surface the consequence (disable list not applied). stderr: {result.stderr!r}"
     )
 
 
@@ -976,9 +902,7 @@ def test_existing_settings_json_key_ordering_preserved(
     )
 
 
-def test_no_yaml_leaves_existing_settings_untouched(
-    plugin_root: Path, project_dir: Path
-) -> None:
+def test_no_yaml_leaves_existing_settings_untouched(plugin_root: Path, project_dir: Path) -> None:
     """Without praxion-rules.yaml, the hook must not create or modify settings.json."""
     dot_claude = project_dir / ".claude"
     dot_claude.mkdir()

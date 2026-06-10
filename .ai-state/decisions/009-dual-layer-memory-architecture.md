@@ -1,7 +1,8 @@
 ---
 id: dec-009
 title: Dual-layer memory architecture (curated + observations)
-status: accepted
+status: superseded
+superseded_by: dec-225
 category: architectural
 date: 2026-04-03
 summary: Memory v2.0 uses two complementary stores -- curated JSON for institutional knowledge and append-only JSONL for automatic tool observations

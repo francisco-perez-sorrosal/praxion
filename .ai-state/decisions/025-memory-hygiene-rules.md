@@ -1,7 +1,8 @@
 ---
 id: dec-025
 title: Memory hygiene disposition rules (R1–R7)
-status: accepted
+status: superseded
+superseded_by: dec-225
 category: behavioral
 date: 2026-04-12
 summary: Seven deterministic rules (condense oversized, preserve no-authority, consolidate overlap, preserve distinct angles, supersede stale initiatives, fix doc-drift, skip user-profile invention) govern memory hygiene sprints

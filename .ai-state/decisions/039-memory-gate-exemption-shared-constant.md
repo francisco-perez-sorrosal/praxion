@@ -1,7 +1,8 @@
 ---
 id: dec-039
 title: Share memory-gate EXEMPT_AGENTS via _hook_utils single source of truth
-status: accepted
+status: superseded
+superseded_by: dec-225
 category: implementation
 date: 2026-04-12
 summary: Move EXEMPT_AGENTS frozenset to hooks/_hook_utils.py and import from both validate_memory.py and remind_memory.py; avoids duplication drift

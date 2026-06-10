@@ -6,7 +6,6 @@ import subprocess
 import tomllib
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MANAGER = REPO_ROOT / "codex" / "config" / "manage-codex-mcp.py"
 
@@ -48,19 +47,10 @@ def test_manage_codex_mcp_install_and_check_round_trip(tmp_path: Path):
 
     config_path = project_dir / ".codex" / "config.toml"
     parsed = tomllib.loads(config_path.read_text(encoding="utf-8"))
-    memory_config = parsed["mcp_servers"]["memory"]
     chronograph_config = parsed["mcp_servers"]["task-chronograph"]
 
-    assert memory_config["command"] == "uv"
-    assert memory_config["args"] == [
-        "run",
-        "--project",
-        str((REPO_ROOT / "memory-mcp").resolve()),
-        "python",
-        "-m",
-        "memory_mcp",
-    ]
-    assert memory_config["env"]["MEMORY_FILE"] == ".ai-state/memory.json"
+    # Praxion no longer ships a memory MCP server.
+    assert "memory" not in parsed["mcp_servers"]
     assert chronograph_config["args"] == [
         "run",
         "--project",
@@ -123,7 +113,10 @@ def test_manage_codex_mcp_uninstall_restores_project_config(tmp_path: Path):
     installed = tomllib.loads((codex_dir / "config.toml").read_text(encoding="utf-8"))
     assert installed["project_doc_fallback_filenames"] == ["TEAM_GUIDE.md"]
     assert installed["profiles"]["default"]["model"] == "gpt-5"
-    assert installed["mcp_servers"]["memory"]["command"] == "uv"
+    # Praxion no longer ships a memory server, so the user's own [mcp_servers.memory]
+    # is left untouched; Praxion's task-chronograph is added alongside it.
+    assert installed["mcp_servers"]["memory"]["command"] == "python3"
+    assert installed["mcp_servers"]["task-chronograph"]["command"] == "uv"
 
     uninstall = run_manager(
         "--repo-root",
@@ -179,7 +172,5 @@ def test_manage_codex_mcp_does_not_touch_home_config(tmp_path: Path):
     )
     assert uninstall.returncode == 0, uninstall.stderr or uninstall.stdout
 
-    shared_after_uninstall = (
-        shared_codex_dir / "config.toml"
-    ).read_text(encoding="utf-8")
+    shared_after_uninstall = (shared_codex_dir / "config.toml").read_text(encoding="utf-8")
     assert shared_after_uninstall == original_shared

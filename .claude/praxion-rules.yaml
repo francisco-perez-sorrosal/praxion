@@ -37,8 +37,7 @@
 # swe/agent-intermediate-documents, swe/swe-agent-coordination-protocol) —
 # attempting to list them emits a SessionStart warning and they stay loaded.
 #
-#   Hook-deliver, always-loaded (3 rules — disabling reclaims SessionStart tokens):
-#     - swe/memory-protocol            — Memory MCP protocol (~1.2k tokens)
+#   Hook-deliver, always-loaded (2 rules — disabling reclaims SessionStart tokens):
 #     - swe/agent-model-routing        — Per-agent Claude model tier policy (~1.6k tokens)
 #     - swe/vcs/git-conventions        — Commit/staging/secrets conventions (~1.0k tokens)
 #
@@ -68,7 +67,7 @@
 #     - ml/*       → all 3 ML rules
 #     - writing/*  → all 4 writing rules
 #     - swe/vcs/*  → swe/vcs/git-conventions + swe/vcs/pr-conventions
-#     - swe/*      → 9 SWE rules (3 hook-deliver + 6 path-scoped); core rules
+#     - swe/*      → 8 SWE rules (2 hook-deliver + 6 path-scoped); core rules
 #                    emit a warning and stay loaded
 
 # List of rules to disable for this project, by ID (directory-prefixed
@@ -76,16 +75,10 @@
 #
 # Praxion (this project) is the META-project that defines training conventions
 # for downstream user projects — it doesn't train models itself. The disable
-# list reflects that: suppress memory-protocol (PRAXION_DISABLE_MEMORY_MCP=1
-# makes it irrelevant here) and declare ML rules out of scope. Other rules
+# list reflects that: declare ML rules out of scope. Other rules
 # (agent-model-routing, git-conventions, writing/*) are kept loaded because
 # Praxion's own pipeline and docs use them.
 disable:
-  # Token-saving suppression — recoups ~1.2k always-loaded tokens.
-  # PRAXION_DISABLE_MEMORY_MCP=1 is set in .claude/settings.json, so the
-  # Memory MCP protocol rule has nothing to apply to in this project.
-  - swe/memory-protocol
-
   # Declarative guarantee — zero token savings (ML rules are path-scoped),
   # but adds claudeMdExcludes entries so they never fire even if a file
   # like `prepare.py` appears in the tree for unrelated reasons.

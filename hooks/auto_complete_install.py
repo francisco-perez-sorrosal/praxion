@@ -50,9 +50,7 @@ _MARKER_FILENAME = ".praxion-complete-installed"
 _DECLINE_MARKER_FILENAME = ".praxion-install-declined"
 
 _PLUGIN_CACHE_SUBPATH = Path(".claude") / "plugins" / "cache" / "bit-agora" / "i-am"
-_RULES_SENTINEL_SUBPATH = (
-    Path(".claude") / "rules" / "swe" / "agent-behavioral-contract.md"
-)
+_RULES_SENTINEL_SUBPATH = Path(".claude") / "rules" / "swe" / "agent-behavioral-contract.md"
 _CLAUDE_MD_SUBPATH = Path(".claude") / "CLAUDE.md"
 
 # Template is inside the plugin cache directory
@@ -184,7 +182,7 @@ def _load_hook_deliver_set(rules_src: Path) -> frozenset[Path] | None:
         for entry in data["rules"]:
             if isinstance(entry, dict) and entry.get("install") == "hook-deliver":
                 rule_path = entry.get("path", "")
-                # path field is relative to repo root (e.g. "rules/swe/memory-protocol.md")
+                # path field is relative to repo root (e.g. "rules/swe/agent-model-routing.md")
                 # Strip the leading "rules/" prefix to get path relative to rules_src
                 if rule_path.startswith("rules/"):
                     hook_deliver.add(Path(rule_path[len("rules/") :]))

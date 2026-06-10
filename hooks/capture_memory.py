@@ -176,13 +176,12 @@ def main() -> None:
     session_id = payload.get("session_id", "")
     agent_id = payload.get("agent_id", "") or session_id  # main agent uses session_id
 
-    # Correlation: memory-mcp tool handlers surface extracted W3C trace-context
-    # IDs via ``tool_response["additionalContext"]`` (see dec-048 §Phase B).
-    # Missing/malformed additionalContext degrades silently to empty strings.
+    # Correlation: W3C trace-context IDs may be surfaced by a tool handler via
+    # ``tool_response["additionalContext"]``. Missing/malformed additionalContext
+    # degrades silently to empty strings (the common case — no in-tree tool
+    # currently populates these fields).
     additional_context = (
-        tool_response.get("additionalContext", {})
-        if isinstance(tool_response, dict)
-        else {}
+        tool_response.get("additionalContext", {}) if isinstance(tool_response, dict) else {}
     )
     if not isinstance(additional_context, dict):
         additional_context = {}

@@ -101,9 +101,9 @@ def _collect_always_loaded(
     Rules are collected from the union of `rules_dir` (the symlink-installed
     rules under ~/.claude/rules/) and `plugin_rules_dir` (the plugin's own
     rules/ tree). The plugin tree additionally holds `install: hook-deliver`
-    rules (memory-protocol, agent-model-routing, git-conventions) that are NOT
+    rules (agent-model-routing, git-conventions) that are NOT
     symlinked into ~/.claude/rules/ — without scanning it those always-loaded
-    rules were silently undercounted (~3.6K tokens). Entries are deduplicated
+    rules were silently undercounted. Entries are deduplicated
     by resolved path so a symlink and its target count once. The result is an
     upper bound on the *installable* surface; per-project suppression (memory
     MCP disabled, or the project rules blacklist) may inject fewer at runtime.

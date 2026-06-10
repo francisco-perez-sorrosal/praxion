@@ -70,9 +70,7 @@ def _pending_proposals_from_report(report_text: str) -> list[str]:
     """
     pending: list[str] = []
     # Split into proposal sections (each starts with "### Proposal N:")
-    proposal_sections = re.split(
-        r"(?=^### Proposal \d+:)", report_text, flags=re.MULTILINE
-    )
+    proposal_sections = re.split(r"(?=^### Proposal \d+:)", report_text, flags=re.MULTILINE)
     for section in proposal_sections:
         if not re.match(r"^### Proposal \d+:", section):
             continue
@@ -223,9 +221,7 @@ def test_review_body_states_disposition_log_append_contract() -> None:
         "the section the command appends rows to after each disposition pass."
     )
     # The body must state the append-only / never-rewrite constraint
-    has_append = any(
-        kw in body.lower() for kw in ("append", "never rewrite", "never rewrites")
-    )
+    has_append = any(kw in body.lower() for kw in ("append", "never rewrite", "never rewrites"))
     assert has_append, (
         "commands/skill-genesis-review.md body must state the append-only contract for "
         "the ## Disposition Log (e.g., 'append rows', 'never rewrite existing rows'). "
@@ -325,30 +321,12 @@ def test_review_body_describes_delegation_handoff() -> None:
     text = REVIEW_COMMAND.read_text(encoding="utf-8")
     body = _command_body(text)
     has_delegation = any(
-        kw in body.lower()
-        for kw in ("delegation", "context-engineer", "handoff", "delegate")
+        kw in body.lower() for kw in ("delegation", "context-engineer", "handoff", "delegate")
     )
     assert has_delegation, (
         "commands/skill-genesis-review.md body must describe surfacing delegation handoffs "
         "for approved proposals (context-engineer for skills/rules, remember for memory). "
         "Searched for 'delegation', 'context-engineer', 'handoff', 'delegate' — none found."
-    )
-
-
-def test_review_body_describes_memory_proposal_execution() -> None:
-    """The review command body must describe executing approved memory proposals via remember.
-
-    The review command (not the agent) is the single call-site for remember
-    after the inversion. The body must state that approved memory proposals
-    trigger a remember() call in the review command.
-    """
-    text = REVIEW_COMMAND.read_text(encoding="utf-8")
-    body = _command_body(text)
-    has_remember = "remember" in body.lower()
-    assert has_remember, (
-        "commands/skill-genesis-review.md body must describe executing approved memory "
-        "proposals via 'remember'. After the inversion, remember() is called only from "
-        "the review command, never from the skill-genesis agent."
     )
 
 
@@ -441,9 +419,7 @@ def test_genesis_body_references_skill_genesis_agent() -> None:
     """
     text = GENESIS_COMMAND.read_text(encoding="utf-8")
     body = _command_body(text)
-    has_agent_ref = "skill-genesis" in body and (
-        "Task" in body or "background" in body.lower()
-    )
+    has_agent_ref = "skill-genesis" in body and ("Task" in body or "background" in body.lower())
     assert has_agent_ref, (
         "commands/skill-genesis.md body must reference the skill-genesis agent (via Task) "
         "and spawn it in background mode. "
@@ -571,9 +547,7 @@ def test_refined_proposal_still_appears_as_pending() -> None:
         r"(### Proposal 1:.*?)(- \*\*Disposition\*\*:\s*)pending(?! refinement)",
         re.DOTALL,
     )
-    refined_text = first_proposal_pattern.sub(
-        r"\1\2pending refinement", original_text, count=1
-    )
+    refined_text = first_proposal_pattern.sub(r"\1\2pending refinement", original_text, count=1)
     pending = _pending_proposals_from_report(refined_text)
     assert len(pending) >= 1, (
         "A proposal with 'Disposition: pending refinement' must be returned by the "
@@ -613,22 +587,6 @@ def test_review_body_references_rule_proposal_type() -> None:
     assert "rule" in body.lower(), (
         "commands/skill-genesis-review.md body must reference 'rule' proposals. "
         "Rule proposals are delegated to context-engineer alongside skill proposals."
-    )
-
-
-def test_review_body_references_memory_proposal_type() -> None:
-    """The review command body must reference the 'memory' proposal type.
-
-    Memory proposals are unique: approved ones are executed directly via
-    remember() inside the review command. The body must name this type so
-    the execution path is distinguishable from skill/rule proposals.
-    """
-    text = REVIEW_COMMAND.read_text(encoding="utf-8")
-    body = _command_body(text)
-    assert "memory" in body.lower(), (
-        "commands/skill-genesis-review.md body must reference 'memory' proposals. "
-        "Memory proposals have a distinct execution path: approved ones trigger a "
-        "remember() call directly from the review command, not a delegation."
     )
 
 

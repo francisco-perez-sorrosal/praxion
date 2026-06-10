@@ -30,7 +30,7 @@ Compatible with **Claude Code** (primary), **Claude Desktop**, **Cursor**, and A
 - **15 specialized agents** — research, architecture, interface design, planning, implementation, testing, verification, structural validation, roadmap cartography. They collaborate on complex features through a shared-document pipeline.
 - **39 slash commands** — commits, worktrees, memory management, project scaffolding, testing, releases, code review, roadmap generation, metrics, ML experiment dispatch.
 - **20 rules** — coding style, git conventions, documentation standards, agent coordination. Auto-loaded by context.
-- **MCP servers** — persistent cross-session memory and agent-lifecycle observability.
+- **MCP servers** — agent-lifecycle observability via the Task Chronograph server.
 - **Multi-session launcher** — `praxion-parallel` spawns N Claude Code sessions in native Warp or iTerm2 tabs, each isolated in its own git worktree, each visually distinguished by per-tab color and role-pinned via `--append-system-prompt`. Comes with an ephemeral web launcher (`praxion-parallel --ui`) and six built-in recipes for common parallel patterns. See [Multi-Session Workflows](docs/multi-session.md).
 - **Architecture-as-Code + Documentation-as-Code stack** — fence convention, fitness functions, golden-rule pre-commit gate, `architect-validator` agent, architecture CI workflow, REQ↔architecture traceability, periodic `sentinel` audit, Diátaxis-aligned doc taxonomy. See [docs/aac-dac.md](docs/aac-dac.md) for how the mechanisms compose.
 
@@ -62,7 +62,7 @@ The ecosystem has five building blocks that layer from always-on background know
 
 - **Rules** — domain knowledge loaded automatically by relevance. Declarative constraints (coding style, git conventions) the assistant applies without explicit invocation.
 - **Skills** — reusable knowledge modules loaded on demand. Deeper than rules: workflows, procedures, and reference material for specific domains.
-- **Commands** — slash commands for frequent workflows. User-invoked quick actions (`/co` for commits, `/create-worktree` for git worktrees, `/cajalogic` for cross-session memory).
+- **Commands** — slash commands for frequent workflows. User-invoked quick actions (`/co` for commits, `/create-worktree` for git worktrees, `/onboard-project` for project setup).
 - **Agents** — autonomous subprocesses for complex multi-step tasks. Each runs in its own context with a specialty and communicates through shared documents, forming a pipeline.
 - **MCP servers** — external tool servers for capabilities like persistent memory and task observability.
 
@@ -113,7 +113,7 @@ Reusable knowledge modules loaded automatically based on context. See [skills/RE
 | Software Development     | python-development, python-prj-mgmt, project-exploration, refactoring, code-review, software-planning, spec-driven-development, agent-evals, cicd, testing-strategy, test-coverage, versioning |
 | Security                 | context-security-review                                                                                                                                                                       |
 | OSS Contribution         | upstream-stewardship                                                                                                                                                                          |
-| Project                  | memory, id-decontamination                                                                                                                                                                    |
+| Project                  | agent-readiness, id-decontamination                                                                                                                                                           |
 
 ### Commands
 
@@ -160,14 +160,6 @@ open http://localhost:6006  # Trace UI
 ```
 
 See [Observability](docs/observability.md) for architecture, multi-project workflow, configuration, and troubleshooting.
-
-### Memory
-
-Dual-layer persistent memory gives every agent cross-session knowledge about the project. Curated memories (facts, decisions, gotchas) live in `memory.json`; automatic observations (tool events, session lifecycle) accumulate in `observations.jsonl`. Both live in each project's `.ai-state/` directory and are committed to git.
-
-Memory activates automatically per project — the first `remember()` call or tool event creates the files. At agent spawn, a hook injects a Markdown summary of curated entries into the agent's context; during work, agents call `remember()` for cross-task discoveries; tool events are captured automatically.
-
-See [Memory Architecture](docs/memory-architecture.md) for the dual-layer design, data model, enforcement hooks, and concurrency model.
 
 ### Multi-Session Workflows
 
@@ -247,7 +239,7 @@ To reconfigure personal settings or recover from corruption, `/praxion-complete-
 
 ### Cursor
 
-`./install.sh cursor` installs skills, rules, commands, and MCP into Cursor's discovery paths — either the user profile (`~/.cursor/`, default) or per-project (`./install.sh cursor /path/to/repo` → `/path/to/repo/.cursor/`). Skills and rules are symlinked to this repo; commands are exported as plain Markdown; `mcp.json` registers task-chronograph, memory, and [sub-agents-mcp](https://github.com/shinpr/sub-agents-mcp).
+`./install.sh cursor` installs skills, rules, commands, and MCP into Cursor's discovery paths — either the user profile (`~/.cursor/`, default) or per-project (`./install.sh cursor /path/to/repo` → `/path/to/repo/.cursor/`). Skills and rules are symlinked to this repo; commands are exported as plain Markdown; `mcp.json` registers task-chronograph and [sub-agents-mcp](https://github.com/shinpr/sub-agents-mcp).
 
 > [!NOTE]
 > Agents in Cursor use `cursor-agent` as the sub-agents-mcp backend — run `cursor-agent login` before using them.
@@ -279,7 +271,6 @@ Installer resources live in tool-specific config directories: [claude/config/](c
 ## Documentation
 
 - **[Core Concepts](docs/concepts.md)** — the building blocks, the layered architecture, and the agent pipeline.
-- **[Memory Architecture](docs/memory-architecture.md)** — dual-layer memory: curated JSON + observation JSONL, enforcement hooks, concurrency model, scaling strategy.
 - **[Multi-Session Workflows](docs/multi-session.md)** — `praxion-parallel` CLI + web launcher, recipe layering, worktree modes, after-launch ergonomics, examples.
 - **[External API Docs](docs/external-api-docs.md)** — retrieve current API documentation for external libraries during development.
 - **[Spec-Driven Development](docs/spec-driven-development.md)** — behavioral specifications with requirement IDs for medium/large features.

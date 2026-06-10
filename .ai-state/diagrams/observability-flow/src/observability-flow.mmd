@@ -1,10 +1,8 @@
 graph LR
     subgraph Session
         Hook[Lifecycle Hooks]
-        Agent[Agent Work]
     end
-    subgraph Memory["Memory MCP"]
-        Curated[(memory.json Curated)]
+    subgraph Observability["Observability"]
         Obs[(observations.jsonl session.id + trace_id + span_id)]
     end
     subgraph Chronograph["Chronograph MCP"]
@@ -13,11 +11,8 @@ graph LR
     end
     Phoenix[(Arize Phoenix SQLite)]
 
-    Hook -->|inject_memory| Agent
-    Agent -->|remember| Curated
     Hook -->|capture_session| Obs
     Hook -->|capture_memory + trace context| Obs
     Hook -.->|send_event HTTP| ES
     ES --> OTel
     OTel -.->|OTLP| Phoenix
-    Agent -->|recall/search| Curated

@@ -5,7 +5,7 @@ Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.m
 ## Agent reading order
 
 1. **CLAUDE.md** (this file) — Praxion-specific agent baseline
-2. **`rules/**/*.md` without `paths:` frontmatter** — always-on conventions (coordination protocol, behavioral contract, ADR conventions, agent intermediate documents, model routing, memory protocol, git conventions)
+2. **`rules/**/*.md` without `paths:` frontmatter** — always-on conventions (coordination protocol, behavioral contract, ADR conventions, agent intermediate documents, model routing, git conventions)
 3. **`rules/**/*.md` with `paths:` frontmatter** — load when matching files are touched (diagram conventions, coding style, dashboard conventions, PR conventions, etc.)
 4. **`skills/<name>/SKILL.md`** — load when description matches the task
 5. **`skills/<name>/references/*.md`** — on demand from the skill body
@@ -50,7 +50,6 @@ Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.m
 | `tests/` | Test suites |
 | `scripts/` | Operational scripts (install, sync, finalize) — see `scripts/CLAUDE.md` when working there |
 | `eval/` | Out-of-band quality eval framework |
-| `memory-mcp/` | Memory MCP server (when enabled) |
 
 ## Critical conventions
 
@@ -61,7 +60,7 @@ Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.m
 - **Praxion-specific principles** (extend `~/.claude/CLAUDE.md`): token budget first-class, measure before optimize, standards convergence as opportunity, curiosity over dogma. Full rationale in `README.md#guiding-principles`.
 - **Assistant-agnostic shared assets** at repo root (`skills/`, `commands/`, `agents/`); assistant-specific config in subdirectories (`claude/config/`, `codex/config/`, `cursor/config/`).
 - **Progressive disclosure** in skills (metadata at startup, body on activation, references on demand) is a load-bearing pattern — preserve it when crafting new skills.
-- **Memory MCP disabled for Praxion** (`PRAXION_DISABLE_MEMORY_MCP=1`): skip `remember`, `recall`, `search`, `browse_index` calls. The protocol in `rules/swe/memory-protocol.md` applies when memory is available; here it is not.
+- **No cross-session memory backend** (per dec-225): the in-house memory subsystem was removed; `sandbook` is the planned replacement but is not yet integrated. Do not call `remember`/`recall`/`search` — no memory tools exist. Observability (`observations.jsonl`) and ADR injection are unaffected.
 
 ## When NOT to use the full pipeline
 

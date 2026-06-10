@@ -51,9 +51,6 @@ Praxion: {
   Persistence: {
     label: "Persistence Layer"
 
-    Memory: {
-      label: "Memory MCP"
-    }
     Chronograph: {
       label: "Chronograph MCP"
     }
@@ -94,11 +91,9 @@ Praxion.Knowledge.Agents -> Praxion.Orchestration.Pipeline: "spawns"
 Praxion.Orchestration.Hooks -> Praxion.Orchestration.Pipeline: "enforces"
 Praxion.Orchestration.Pipeline -> Praxion.Orchestration.Aiwork: "reads/writes documents"
 Praxion.Orchestration.Orchestrator -> Praxion.Orchestration.Pipeline: "[...]"
-Praxion.Orchestration.Hooks -> Praxion.Persistence.Memory: "injects context"
 Praxion.Orchestration.Hooks -> Praxion.Persistence.Chronograph: "emits events (HTTP)"
 Praxion.Persistence.Chronograph -> Arize_phoenix: "streams via OTLP"
 Praxion.Orchestration.Pipeline -> Praxion.Persistence.Aistate: "persists artifacts"
-Praxion.Persistence.Memory -> Praxion.Persistence.Aistate: "reads/writes"
 Praxion.Orchestration.Pipeline -> Praxion.Persistence.Adrs: "writes ADR fragments"
 Praxion.Persistence.Adrs -> Praxion.Persistence.Aistate: "finalized at merge-to-main"
 Praxion.Orchestration.Pipeline -> Praxion.Persistence.Tdl: "[...]"

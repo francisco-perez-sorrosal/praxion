@@ -27,7 +27,6 @@ skills/                              # Shared skill modules (assistant-agnostic)
 ├── id-decontamination/
 ├── llm-prompt-engineering/
 ├── mcp-crafting/
-├── memory/
 ├── observability/
 ├── performance-architecture/
 ├── project-exploration/
@@ -58,7 +57,6 @@ commands/                            # Shared slash commands
 ├── explore-project.md
 ├── full-security-scan.md
 ├── manage-readme.md
-├── cajalogic.md
 ├── merge-worktree.md
 ├── onboard-project.md
 ├── refresh-skill.md
@@ -66,7 +64,6 @@ commands/                            # Shared slash commands
 ├── report-upstream.md
 ├── review-pr.md
 ├── roadmap.md
-├── save-changes.md
 ├── sdd-coverage.md
 ├── star-repo.md
 └── test.md
@@ -93,7 +90,6 @@ rules/                               # Rules (installed to ~/.claude/rules/ or .
 │   ├── adr-conventions.md
 │   ├── agent-intermediate-documents.md
 │   ├── coding-style.md
-│   ├── memory-protocol.md
 │   ├── swe-agent-coordination-protocol.md
 │   ├── testing-conventions.md
 │   └── vcs/
@@ -112,18 +108,15 @@ hooks/                               # Hook scripts (auto-discovered by Claude C
 ├── commit_gate.sh
 ├── detect_duplication.py
 ├── format_python.py
-├── inject_memory.py
-├── memory_gate.py
+├── inject_decisions.py
 ├── precompact_state.py
 ├── promote_learnings.py
 ├── remind_adr.py
-├── remind_memory.py
 ├── send_event.py
 ├── test_cleanup_gate.py
 ├── test_hook_utils.py
 ├── test_send_event.py
 ├── test_worktree_guard.py
-├── validate_memory.py
 └── worktree_guard.py
 .claude-plugin/                      # Claude Code plugin manifest
 ├── CLAUDE.md                        # Plugin config conventions (lazy loaded)
@@ -156,7 +149,6 @@ scripts/                             # Utility scripts
 ├── finalize_adrs.py                 # Promote draft ADRs to NNN at merge-to-main
 ├── git-finalize-hook.sh             # Multiplexed lifecycle dispatcher (post-merge/post-commit/post-checkout); post-merge runs reconcile -> finalize -> squash-safety
 ├── finalize_chain.sh                # Shared library sourced by git-finalize-hook.sh — path resolution, state-driven gates, three entry points
-├── merge_driver_memory.py           # Custom merge driver for memory.json
 ├── merge_driver_observations.py     # Custom merge driver for observations.jsonl
 ├── migrate_worktree_home.sh         # Print migration commands for legacy .trees/ worktrees
 ├── phoenix-ctl                      # Phoenix observability daemon manager
@@ -171,13 +163,9 @@ docs/                                # Cross-cutting documentation
 ├── decision-tracking.md              # Content updated to describe ADR system
 ├── external-api-docs.md
 ├── getting-started.md
-├── memory-architecture.md
 ├── observability.md
 └── spec-driven-development.md
 task-chronograph-mcp/                # Pipeline observability MCP server
-├── CLAUDE.md                        # MCP server dev conventions (lazy loaded)
-└── ...
-memory-mcp/                          # Persistent memory MCP server
 ├── CLAUDE.md                        # MCP server dev conventions (lazy loaded)
 └── ...
 eval/                                # Out-of-band quality evals (praxion-evals CLI)
@@ -207,30 +195,19 @@ Makefile                             # Development targets
 
 ## Per-Project Hook Opt-Outs
 
-Seven env-var flags let a downstream project disable Praxion hooks that cost tokens or block behavior. Absence of the flag preserves default behavior — set to `1`, `true`, or `yes` in the target project's `.claude/settings.json` `env` block for Claude or `.codex/praxion/settings.json` `env` block for Codex.
+Four env-var flags let a downstream project disable Praxion hooks that cost tokens or block behavior. Absence of the flag preserves default behavior — set to `1`, `true`, or `yes` in the target project's `.claude/settings.json` `env` block for Claude or `.codex/praxion/settings.json` `env` block for Codex.
 
 | Flag | What it disables | When to use |
 |------|------------------|-------------|
-| `PRAXION_DISABLE_MEMORY_INJECTION` | `inject_memory.py` at SessionStart and SubagentStart | The only hook with meaningful prompt-token cost (~2k tokens per agent spawn). Set when the project has no curated memory worth injecting. |
-| `PRAXION_DISABLE_MEMORY_GATE` | `memory_gate.py` (Stop) and `validate_memory.py` (SubagentStop) | Silences the "you must call remember()" blocker. No prompt-token impact — disables enforcement, not injection. |
 | `PRAXION_DISABLE_OBSERVABILITY` | `send_event.py`, `capture_session.py`, `capture_memory.py` | Disables chronograph telemetry and `observations.jsonl` writes. Zero prompt-token impact; saves process-spawn time and local I/O. |
-| `PRAXION_DISABLE_MEMORY_MCP` | Unified kill switch: implies `DISABLE_MEMORY_INJECTION` + `DISABLE_MEMORY_GATE`, and additionally injects a small "memory MCP disabled" notice so the assistant stops voluntary `remember()`/`recall()` calls driven by the `memory-protocol` rule. | Set when the project wants the memory MCP server's tools to remain nominally callable but behaviorally inert — e.g., during experiments, when memory.json has drifted schema, or when you simply do not want memory persistence for this project. |
 | `PRAXION_DISABLE_PROCESS_INJECT` | `inject_process_framing.py` (UserPromptSubmit) | Disables the compact process-framing reminder that reinforces the tier selector and behavioral contract. No prompt-token impact; use when you want Codex or Claude to stay silent on that reminder. |
 | `PRAXION_DISABLE_WORKTREE_GUARD` | `worktree_guard.py` (PreToolUse on `Write\|Edit\|NotebookEdit`) | Disables the cross-worktree write guard that blocks absolute paths resolving outside the session worktree into a sibling git tree. No prompt-token impact. Set when a workflow legitimately needs to edit the main repo or a sibling worktree from inside a linked worktree (rare; fail-open semantics mean the guard never wedges work — this flag silences the explicit block). |
-| `PRAXION_DISABLE_RULE_INJECTION` | `inject_rules.py` (SessionStart) | Escape hatch for the per-project rules disable mechanism. Skips the hook entirely, so the 3 hook-deliver rules (`memory-protocol`, `agent-model-routing`, `vcs/git-conventions`) are absent from `additionalContext` AND no `claudeMdExcludes` reconciliation runs — existing entries from prior sessions remain in effect via Claude Code's native runtime, so previously-disabled symlinked rules stay disabled. Use when debugging the hook, or when a project wants hook-deliver rules out of all sessions without authoring a per-project disable list. See `docs/rules-taxonomy.md`. |
+| `PRAXION_DISABLE_RULE_INJECTION` | `inject_rules.py` (SessionStart) | Escape hatch for the per-project rules disable mechanism. Skips the hook entirely, so the 2 hook-deliver rules (`agent-model-routing`, `vcs/git-conventions`) are absent from `additionalContext` AND no `claudeMdExcludes` reconciliation runs — existing entries from prior sessions remain in effect via Claude Code's native runtime, so previously-disabled symlinked rules stay disabled. Use when debugging the hook, or when a project wants hook-deliver rules out of all sessions without authoring a per-project disable list. See `docs/rules-taxonomy.md`. |
 
-**Why a fourth flag?** The first three disable hook *side-effects* but cannot stop the assistant from voluntarily calling `remember()` because the always-loaded `rules/swe/memory-protocol.md` rule instructs it to. The MCP flag adds the missing piece: an assistant-observable signal injected at SessionStart/SubagentStart that triggers the rule's skip-all-operations exit clause. Without the notice, the rule's exit clause never fires.
-
-Example `.claude/settings.json` for a project that wants Praxion skills/agents but **no memory** at all:
+Example `.claude/settings.json` for a project that wants Praxion skills/agents but **no observability telemetry**:
 
 ```json
-{ "env": { "PRAXION_DISABLE_MEMORY_MCP": "1" } }
-```
-
-Example for finer-grained control — keep the gate blocker silent but continue injecting memory context:
-
-```json
-{ "env": { "PRAXION_DISABLE_MEMORY_GATE": "1" } }
+{ "env": { "PRAXION_DISABLE_OBSERVABILITY": "1" } }
 ```
 
 Codex uses the same `env` shape in `.codex/praxion/settings.json`, so the same flags work there without touching `.claude/settings.json`.
@@ -548,7 +525,7 @@ The plugin manifest lives in `.claude-plugin/plugin.json`. Key constraints:
 
 ### Plugin cache contains the full repo
 
-When `claude plugin install i-am@bit-agora` runs, Claude Code clones the entire Praxion repo at the marketplace-pinned tag into `~/.claude/plugins/cache/bit-agora/i-am/<version>/`. The plugin mechanism only **loads** what `plugin.json` declares (skills, commands, agents, hooks, MCP servers) — but the rest of the repo (rules, CLI scripts, `install.sh`, `lib/`, `memory-mcp/`, `task-chronograph-mcp/`, `eval/`, etc.) sits on disk unused by the loader.
+When `claude plugin install i-am@bit-agora` runs, Claude Code clones the entire Praxion repo at the marketplace-pinned tag into `~/.claude/plugins/cache/bit-agora/i-am/<version>/`. The plugin mechanism only **loads** what `plugin.json` declares (skills, commands, agents, hooks, MCP servers) — but the rest of the repo (rules, CLI scripts, `install.sh`, `lib/`, `task-chronograph-mcp/`, `eval/`, etc.) sits on disk unused by the loader.
 
 `/praxion-complete-install` relies on this. It resolves `${CLAUDE_PLUGIN_ROOT}` (set by Claude Code) and invokes the cached `install.sh` with `--complete-install`, which symlinks `${CLAUDE_PLUGIN_ROOT}/rules/` → `~/.claude/rules/` and `${CLAUDE_PLUGIN_ROOT}/scripts/` → `~/.local/bin/`. Source and destination are both local; no network, no extra clone.
 
@@ -630,7 +607,7 @@ Making the tooling portable would require bundling `eval/` inside the plugin or 
 
 ## Releases
 
-Versioning is managed by [Commitizen](https://commitizen-tools.github.io/commitizen/) with conventional commits. The version lives in `pyproject.toml` `[tool.commitizen].version` and is synced to `memory-mcp/pyproject.toml`, `task-chronograph-mcp/pyproject.toml`, `eval/pyproject.toml`, and `.claude-plugin/plugin.json` via `version_files`.
+Versioning is managed by [Commitizen](https://commitizen-tools.github.io/commitizen/) with conventional commits. The version lives in `pyproject.toml` `[tool.commitizen].version` and is synced to `task-chronograph-mcp/pyproject.toml`, `eval/pyproject.toml`, and `.claude-plugin/plugin.json` via `version_files`.
 
 ### Day-to-day development
 

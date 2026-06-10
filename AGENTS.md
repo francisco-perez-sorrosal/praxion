@@ -75,7 +75,7 @@ The contract is operationalized by the `agent-behavioral-contract` rule (always 
 - **Recall** - at session start, load previous context. Before tackling a problem, search for relevant past insights. Past you may have already solved it.
 - **Apply** - let recalled learnings shape your approach. Act on patterns and pitfalls surfaced by memory. Feed the next cycle: "What do I wish I'd known at the start?"
 
-Two complementary systems serve this loop: ephemeral pipeline documents (`LEARNINGS.md`) for in-flight knowledge, and persistent memory (Memory MCP) for cross-session intelligence. The mechanics of each belong in their respective rules and agent definitions, not here.
+Two complementary systems serve this loop: ephemeral pipeline documents (`LEARNINGS.md`) for in-flight knowledge, and persistent observations (`observations.jsonl`) for cross-session event capture. The mechanics of each belong in their respective rules and agent definitions, not here.
 
 ## The Ecosystem as Philosophy's Implementation
 
@@ -86,7 +86,7 @@ This agent operates within the Praxion Codex ecosystem. The toolbox exists to op
 | **Context engineering** | Skills - right domain knowledge loaded on demand via progressive disclosure |
 | **Understand, Plan, Verify** | Agent pipeline - ideation through verification, each agent owning one phase |
 | **Conventions and consistency** | Rules - coding style, git hygiene, coordination protocols enforced automatically |
-| **Learning loop** | Memory MCP + LEARNINGS.md - persistent knowledge across sessions, ephemeral within pipelines |
+| **Learning loop** | LEARNINGS.md + observations.jsonl — in-flight knowledge within pipelines, automatic event capture across sessions |
 | **Frequent workflows** | Commands - commits, worktrees, scaffolding, memory management as repeatable actions |
 | **Structural beauty** | All of the above - the ecosystem's own structure should exemplify its principles |
 
@@ -136,7 +136,7 @@ Delegate to the coding-style rule and language-specific toolchains. The philosop
 
 ### Platform Limits
 
-- Memory MCP is disabled for Praxion (`PRAXION_DISABLE_MEMORY_MCP=1`): skip memory tools here and use `.ai-state/` plus `LEARNINGS.md` instead
+- Praxion does not use a curated-memory MCP server; use `.ai-state/` artifacts and `LEARNINGS.md` for cross-session knowledge
 - Codex-native wrappers represent Claude-only semantics through adapters rather than trying to duplicate Claude's runtime features verbatim
 - Keep Codex-specific configuration thin: add native surfaces only when they remove friction or preserve semantics
 
@@ -255,7 +255,7 @@ The operational infrastructure for this project's shared development philosophy.
 | `tests/` | Test suites |
 | `scripts/` | Operational scripts (install, sync, finalize) — see `scripts/CLAUDE.md` when working there |
 | `eval/` | Out-of-band quality eval framework |
-| `memory-mcp/` | Memory MCP server (when enabled) |
+| `task-chronograph-mcp/` | Pipeline observability MCP server |
 
 ## Critical conventions
 
@@ -265,7 +265,7 @@ The operational infrastructure for this project's shared development philosophy.
 - **Praxion-specific principles** (extend the shared Praxion baseline philosophy): token budget first-class, measure before optimize, standards convergence as opportunity, curiosity over dogma. Full rationale in `README.md#guiding-principles`.
 - **Assistant-agnostic shared assets** at repo root (`skills/`, `commands/`, `agents/`); assistant-specific config in subdirectories (`claude/config/`, `codex/config/`, `cursor/config/`).
 - **Progressive disclosure** in skills (metadata at startup, body on activation, references on demand) is a load-bearing pattern — preserve it when crafting new skills.
-- **Memory MCP disabled for Praxion** (`PRAXION_DISABLE_MEMORY_MCP=1`): skip `remember`, `recall`, `search`, `browse_index` calls. The protocol in `rules/swe/memory-protocol.md` applies when memory is available; here it is not.
+- **No curated-memory MCP for Praxion**: cross-session knowledge lives in `.ai-state/` artifacts (`DESIGN.md`, `decisions/`, `TECH_DEBT_LEDGER.md`) and `LEARNINGS.md`; the observability layer captures automatic tool events to `observations.jsonl`.
 
 ## When NOT to use the full pipeline
 

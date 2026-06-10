@@ -89,8 +89,7 @@ The command never auto-commits. After Phase 9, `git status` shows every file mod
 |-------|------------------|
 | `.ai-work/` | Ephemeral pipeline scratch (per-task slug); deleted at pipeline end |
 | `.ai-state/*.lock`, `.ai-state/**/*.lock` | Advisory file locks taken by `finalize_adrs.py`, merge drivers — runtime-only |
-| `.ai-state/*.backup.json` | Snapshots taken before destructive memory ops; local recovery only |
-| `.ai-state/*.pre-forget.json` | Pre-`forget()` memory snapshots |
+| `.ai-state/*.backup.json` | Snapshots taken before destructive `.ai-state/` ops; local recovery only |
 | `.claude/settings.local.json` | Per-machine Claude settings — never committed |
 | `.claude/worktrees/` | Worktree home for `EnterWorktree`; each branch's own checkout |
 | `.env`, `.env.*`, `.env.local` | Secrets — never commit |
@@ -110,22 +109,20 @@ Four new entries, each created only if missing:
 
 ### Phase 3 — `.gitattributes` + merge driver registration
 
-Two new lines appended to `.gitattributes`:
+One new line appended to `.gitattributes`:
 
 ```gitattributes
-# Praxion semantic merge drivers
-.ai-state/memory.json merge=memory-json
+# Praxion semantic merge driver
 .ai-state/observations.jsonl merge=observations-jsonl
 ```
 
-And two `git config` entries registered for this repo:
+And a `git config` entry registered for this repo:
 
 ```
-merge.memory-json.driver = python3 <plugin-install-path>/scripts/merge_driver_memory.py %O %A %B
 merge.observations-jsonl.driver = python3 <plugin-install-path>/scripts/merge_driver_observations.py %O %A %B
 ```
 
-Without these, the first concurrent edit to `.ai-state/memory.json` corrupts it via line-based merge. The drivers parse the JSON / JSONL structurally and reconcile concurrent additions cleanly. **Local merges only** — GitHub PR squash-merges bypass `.gitattributes` (the `check_squash_safety.py` post-merge script warns if squash erased `.ai-state/`).
+Without this, the first concurrent edit to `.ai-state/observations.jsonl` corrupts it via line-based merge. The driver parses the JSONL structurally and reconciles concurrent additions cleanly. **Local merges only** — GitHub PR squash-merges bypass `.gitattributes` (the `check_squash_safety.py` post-merge script warns if squash erased `.ai-state/`).
 
 ### Phase 4 — Git hooks
 
@@ -143,21 +140,15 @@ Multi-select via `AskUserQuestion`. The command writes (or merges into) `.claude
 ```json
 {
   "env": {
-    "PRAXION_DISABLE_MEMORY_INJECTION": "0",
-    "PRAXION_DISABLE_MEMORY_GATE": "0",
-    "PRAXION_DISABLE_MEMORY_MCP": "0",
     "PRAXION_DISABLE_OBSERVABILITY": "0"
   }
 }
 ```
 
-Negative semantics: `"1"` disables, `"0"` enables. Each unchecked option becomes `"1"`; each checked becomes `"0"`. The four toggles:
+Negative semantics: `"1"` disables, `"0"` enables. An unchecked option becomes `"1"`; a checked one becomes `"0"`. The toggle:
 
 | Toggle | What you gain | Cost |
 |--------|---------------|------|
-| Memory MCP injection (SessionStart) | Auto-loaded project context every session | ~3–5k tokens at session start |
-| Memory gate (Stop hook) | Forces `remember()` calls when substantive work happens | Can feel intrusive on quick fixes |
-| Memory MCP server itself | Persistent cross-session memory under `.ai-state/memory.json` | Hooks fire on every event; some session overhead |
 | Observability events | Trace inspection via localhost Phoenix | Phoenix must be running, else events drop silently |
 
 If `.claude/settings.json` already has other top-level keys (`permissions`, `model`, etc.), they're preserved — only the `env.PRAXION_DISABLE_*` keys are touched.
@@ -199,7 +190,7 @@ Prints a per-phase summary listing every file touched and every `git config` ent
 <details>
 <summary>Why this phase exists, and when to skip it</summary>
 
-`.ai-state/DESIGN.md` and `docs/architecture.md` are first-class artifacts in the Praxion ecosystem — sentinel's coherence audit reads them, future feature pipelines update them, Memory MCP context recall benefits from them. **Without them, every future agent runs context-poor on the codebase shape.** The greenfield path (`/new-project`) gets these for free via the seed pipeline; existing-project onboarding needs the same treatment, which is the whole point of Phase 8.
+`.ai-state/DESIGN.md` and `docs/architecture.md` are first-class artifacts in the Praxion ecosystem — sentinel's coherence audit reads them, future feature pipelines update them. **Without them, every future agent runs context-poor on the codebase shape.** The greenfield path (`/new-project`) gets these for free via the seed pipeline; existing-project onboarding needs the same treatment, which is the whole point of Phase 8.
 
 **Skipping is acceptable when:**
 
@@ -210,7 +201,6 @@ Prints a per-phase summary listing every file touched and every `git config` ent
 **Skipping is the wrong call when:**
 
 - You want `/sentinel` to give a clean baseline today.
-- You want Memory MCP recall to know about the codebase structure from session 1.
 - The project is non-trivial (>10 source files) — the architectural snapshot pays off across many future feature pipelines.
 
 </details>
@@ -294,7 +284,7 @@ Every write phase has a predicate that makes re-runs no-ops. Reference: `command
 |-------|--------------------------|
 | 1 | `grep -q '^# AI assistants$' .gitignore` |
 | 2 | Per-file `test -e .ai-state/<file>` (skip files individually) |
-| 3 | `.gitattributes` line present AND `git config --get merge.memory-json.driver` returns a value containing `i-am` |
+| 3 | `.gitattributes` line present AND `git config --get merge.observations-jsonl.driver` returns a value containing `i-am` |
 | 4 | `readlink .git/hooks/post-merge` resolves to a Praxion path AND pre-commit content contains `check_id_citation_discipline` |
 | 5 | All four `PRAXION_DISABLE_*` keys present in `.claude/settings.json` |
 | 6 | `## Agent Pipeline` heading present in `CLAUDE.md` (per-block check) |
@@ -311,7 +301,7 @@ Every write phase has a predicate that makes re-runs no-ops. Reference: `command
 | Command aborts: "This command must be run inside a git repository." | Current directory is not a git repo | Run `git init` first |
 | Command aborts: "This directory looks like a freshly-scaffolded greenfield project..." | Pre-flight detected greenfield signature (no source code, AI-assistants `.gitignore` present, empty `.claude/`) | Run `/new-project` instead — it does the full greenfield scaffold then chains to `/onboard-project` |
 | Phase 4 skipped with "install the plugin and re-run" | Plugin not detected in `~/.claude/plugins/installed_plugins.json` | Install the plugin: `claude plugin install i-am@bit-agora` (or `./install.sh code` from a Praxion checkout), then re-run `/onboard-project` |
-| Phase 3 emits "merge.memory-json.driver is already set..." | A non-Praxion driver is registered for that file pattern | Remove the existing driver: `git config --unset merge.memory-json.driver`, then re-run Phase 3 (or accept the existing driver and skip — Praxion's reconciliation will degrade) |
+| Phase 3 emits "merge.observations-jsonl.driver is already set..." | A non-Praxion driver is registered for that file pattern | Remove the existing driver: `git config --unset merge.observations-jsonl.driver`, then re-run Phase 3 (or accept the existing driver and skip — Praxion's reconciliation will degrade) |
 | Phase 4 backs up `pre-commit.pre-praxion` | A non-Praxion pre-commit hook was already in place | Decide: merge the two hook bodies manually, or restore the original (`mv .git/hooks/pre-commit.pre-praxion .git/hooks/pre-commit`) and skip Praxion's pre-commit |
 | Pre-commit hook fails with "command not found: jq" | `jq` not on PATH; the hook uses it to resolve plugin install path | Install `jq` (`brew install jq` on macOS, `apt install jq` on Debian/Ubuntu) — the hook degrades to an no-op exit 0 if `jq` is unavailable but the id-citation check is then skipped |
 | Phase 6 prints "No CLAUDE.md found..." | The project has no project-level `CLAUDE.md` yet | Run `/init` to generate one from the codebase, then re-run `/onboard-project` |

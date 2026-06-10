@@ -18,7 +18,6 @@ Reusable slash commands for AI coding assistants. Each `.md` file becomes a `/co
 | `/full-security-scan` | Run a full-project security audit against all security-critical paths |
 | `/landscape-refresh` | Bootstrap or refresh the project's landscape watchlist — flag stale entries (>90 days) and optionally re-validate URLs |
 | `/manage-readme` | Create or refine README.md files |
-| `/cajalogic` | Manage persistent memory (user prefs, assistant learnings, project conventions, observations) |
 | `/check-experiment` | Poll an in-flight or report a completed ML training experiment |
 | `/dashboard` | Launch the Praxion pipeline dashboard for the current project |
 | `/decontaminate-ids` | Detect and remediate REQ/AC/step citations in the current project's source code |
@@ -39,10 +38,9 @@ Reusable slash commands for AI coding assistants. Each `.md` file becomes a `/co
 | `/resume-rework` | Dispatch the appropriate agent for a rework worktree; cwd-driven auto-discovery of `VERIFIER_FINDINGS.md` (cite `commands/resume-rework.md`) |
 | `/roadmap` | Produce a project-audited `ROADMAP.md` via a project-derived evaluation lens set (SPIRIT, DORA, SPACE, FAIR, CNCF Platform Maturity, or Custom) through the roadmap-cartographer agent; covers strengths, weaknesses, **opportunities (forward lines of work)**, phased improvements, and deprecations |
 | `/run-experiment` | Dispatch an ML training experiment, validate compute budget, stream metrics, write `TRAINING_RESULTS.md` |
-| `/save-changes` | Save current working changes to project memory with secret filtering |
 | `/sdd-coverage` | Report spec-to-test and spec-to-code coverage for REQ IDs |
-| `/skill-genesis` | Run the skill-genesis agent to autonomously harvest patterns from accumulated learnings (LEARNINGS.md, verification reports, memory entries, sentinel findings, ADRs); write a timestamped report to `.ai-state/skill_genesis_reports/` for later disposition via `/skill-genesis-review` |
-| `/skill-genesis-review` | Disposition pending proposals from a skill-genesis report — batch multi-select presentation, append-only disposition log, execute approved memory entries, surface delegation handoffs |
+| `/skill-genesis` | Run the skill-genesis agent to autonomously harvest patterns from accumulated learnings (LEARNINGS.md, verification reports, sentinel findings, ADRs); write a timestamped report to `.ai-state/skill_genesis_reports/` for later disposition via `/skill-genesis-review` |
+| `/skill-genesis-review` | Disposition pending proposals from a skill-genesis report — batch multi-select presentation, append-only disposition log, surface delegation handoffs |
 | `/star-repo` | Star the Praxion repo on GitHub |
 | `/test` | Auto-detect test framework and run tests |
 

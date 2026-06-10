@@ -63,7 +63,6 @@ Praxion has no servers in the traditional deployment sense. Two stdio MCP server
 
 | Service | Image/Build | Ports (host:container) | Health Check | Restart Policy |
 |---|---|---|---|---|
-| memory-mcp | local Python via `uv run` | none (stdio only) | n/a (per-session lifecycle) | n/a |
 | task-chronograph-mcp | local Python via `uv run` | `8765:8765` (HTTP daemon) | HTTP `GET /health` (informational) | n/a (per-session lifecycle) |
 | pipeline-dashboard | Next.js App Router (`dashboard_app/`, TypeScript) — `next start` from a per-user install at `~/.praxion-dashboard/app/`; `pnpm install --frozen-lockfile` + `next build` performed once by `praxion-dashboard install`; pnpm store at `~/.praxion-dashboard/store/` | `8501–9500` (per-project sha256-derived: `8501 + sha256(project_abs_path) % 1000`); override `PRAXION_DASHBOARD_PORT`; binds `127.0.0.1` only | HTTP `GET /` returns 200 when up | macOS launchd `KeepAlive=true` (v1); `praxion-dashboard restart [path]` for manual cycle |
 
@@ -77,7 +76,6 @@ Praxion has two long-lived service classes: (1) MCP processes (memory-mcp, task-
 
 | Variable | Required | Default | Description | Sensitive |
 |---|---|---|---|---|
-| `PRAXION_DISABLE_MEMORY_MCP` | No | unset | Skip memory persistence in this project | No |
 | `PRAXION_DISABLE_CHRONOGRAPH_MCP` | No | unset | Skip span emission in this project | No |
 | `PRAXION_INJECT_NATIVE_SUBAGENTS` | No | `0` | Inject Praxion-process preamble into Praxion-native subagents (default off) | No |
 | `CHUB_TELEMETRY` | No | `0` | context-hub telemetry off by default | No |
@@ -122,7 +120,6 @@ GitHub Actions for Praxion's own repo handle skill linting, hook tests, MCP serv
 
 | Component | Risk | Likelihood | Impact / Mitigation | Outage Level |
 |---|---|---|---|---|
-| memory-mcp | MCP server crash | Low | Memory persistence breaks for current session; Claude Code surfaces error; restart MCP server. Hook gates protect against partial writes. | Degraded |
 | task-chronograph-mcp HTTP daemon | Port 8765 conflict | Low | Hooks cannot post events; spans silently lost. Daemon restart resolves. | Degraded (observability only) |
 | Hook script failure | Pre-commit hook bug | Low | Commit blocked; user fixes hook input or bypasses with `--no-verify` (discouraged) | Local only |
 | ML compute backend (taught) — local | Wall-clock budget exceeded; runaway training process | Medium | `wall_clock_seconds_max` enforced via `signal.alarm` or equivalent in `/run-experiment` local backend | Per-experiment |
@@ -160,7 +157,6 @@ Praxion has no traditional health-check endpoints. The Chronograph MCP HTTP daem
 
 | Service | Log Driver | Access |
 |---|---|---|
-| memory-mcp | stderr | Claude Code error log; per-session |
 | task-chronograph-mcp | stderr | Claude Code error log; per-session |
 | Hooks | stderr | Claude Code displays on hook block (exit 2) |
 

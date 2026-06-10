@@ -12,7 +12,7 @@
  * Layer structure (R1):
  *   Knowledge Layer      — Skills, Rules, Commands, Agents (authored definitions)
  *   Orchestration Layer  — Agent Pipeline (runtime, with per-agent elements), Hooks, .ai-work/
- *   Persistence Layer    — Memory MCP, Chronograph MCP, .ai-state/
+ *   Persistence Layer    — Chronograph MCP, .ai-state/
  *   Tooling              — Installers, Scripts, Versioning
  *
  * Rendering: the six views above regenerate to ../rendered/*.{d2,svg} via
@@ -128,7 +128,6 @@ model {
 
     // Persistence Layer: durable intelligence and observability
     persistence = component "Persistence Layer" {
-      memory      = component "Memory MCP"      { description "Curated + observations" }
       chronograph = component "Chronograph MCP" { description "OTel relay" }
       aistate     = component ".ai-state/"      { description "ADRs, specs, sentinel reports, tech-debt ledger" }
       adrs        = component "ADR Fragments"   { description ".ai-state/decisions/drafts/ — finalized at merge-to-main" }
@@ -224,11 +223,9 @@ model {
     // Orchestration internal — hooks + handoff substrate
     orchestration.hooks    -> orchestration.pipeline      "enforces"
     orchestration.hooks    -> persistence.chronograph     "emits events (HTTP)"
-    orchestration.hooks    -> persistence.memory          "injects context"
     orchestration.pipeline -> orchestration.aiwork        "reads/writes documents"
     orchestration.pipeline -> persistence.aistate         "persists artifacts"
     orchestration.pipeline -> persistence.adrs            "writes ADR fragments"
-    persistence.memory     -> persistence.aistate         "reads/writes"
     persistence.adrs       -> persistence.aistate         "finalized at merge-to-main"
 
     // Tooling: installers deploy the authored knowledge surface (definitions on disk),
@@ -272,7 +269,7 @@ views {
       praxion.knowledge, praxion.orchestration, praxion.persistence, praxion.tooling,
       praxion.knowledge.skills, praxion.knowledge.rules, praxion.knowledge.commands, praxion.knowledge.agents,
       praxion.orchestration.pipeline, praxion.orchestration.hooks, praxion.orchestration.aiwork, praxion.orchestration.orchestrator,
-      praxion.persistence.memory, praxion.persistence.chronograph, praxion.persistence.aistate,
+      praxion.persistence.chronograph, praxion.persistence.aistate,
       praxion.persistence.adrs, praxion.persistence.tdl,
       praxion.tooling.installers, praxion.tooling.scripts, praxion.tooling.versioning
   }

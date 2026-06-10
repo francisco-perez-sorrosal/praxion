@@ -15,7 +15,6 @@ name = "cz_conventional_commits"
 version = "0.6.0"
 version_files = [
     ".claude-plugin/plugin.json:version",
-    "memory-mcp/pyproject.toml:version",
     "task-chronograph-mcp/pyproject.toml:version",
     "eval/pyproject.toml:version",
     # Root [project].version mirrors [tool.commitizen].version. The

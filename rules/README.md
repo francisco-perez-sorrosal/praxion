@@ -18,7 +18,6 @@ rules/
 │   ├── coding-style.md
 │   ├── gate-liveness.md
 │   ├── id-citation-discipline.md
-│   ├── memory-protocol.md
 │   ├── shipped-artifact-isolation.md
 │   ├── staleness-policy.md
 │   ├── swe-agent-coordination-protocol.md
@@ -47,7 +46,6 @@ rules/
 | `swe/adr-conventions.md` | ADR file format (YAML frontmatter + MADR body), naming convention, supersession protocol, agent authoring guidance |
 | `swe/swe-agent-coordination-protocol.md` | Agent selection, coordination pipeline, parallel execution — detailed tables in `software-planning` skill reference |
 | `swe/vcs/git-conventions.md` | Commit scope, staging discipline, secrets, exclusions, message format |
-| `swe/memory-protocol.md` | When and how to use the memory MCP — `remember()` triggers, tag vocabulary, conflict resolution between memory systems |
 
 ### Path-Scoped Rules
 

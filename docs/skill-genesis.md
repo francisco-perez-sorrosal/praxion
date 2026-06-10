@@ -227,7 +227,7 @@ Example workflow:
 
 ## Memory-disabled projects
 
-Memory MCP is disabled in Praxion itself (`PRAXION_DISABLE_MEMORY_MCP=1`). When you harvest learnings in Praxion, skill-genesis skips memory-category triage — no `memory` proposals will appear. The rest of the report (skills, rules, CLAUDE.md suggestions) proceeds normally. This is by design; memory is a user-project feature, not relevant to Praxion's internal curation.
+skill-genesis proposes skills, rules, and CLAUDE.md additions; it does not propose cross-session memory entries — the in-house memory subsystem was removed (dec-225). The harvest sources are `LEARNINGS.md`, verification reports, sentinel findings, and ADR patterns.
 
 ## Troubleshooting
 

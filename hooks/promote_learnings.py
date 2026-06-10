@@ -29,9 +29,7 @@ def _is_cleanup_command(command: str) -> bool:
 
 def _count_entries(content: str) -> int:
     """Count tagged entries (lines starting with '- **[') in LEARNINGS.md."""
-    return sum(
-        1 for line in content.splitlines() if line.strip().startswith(ENTRY_PREFIX)
-    )
+    return sum(1 for line in content.splitlines() if line.strip().startswith(ENTRY_PREFIX))
 
 
 def _find_learnings(cwd: str) -> list[tuple[str, int]]:
@@ -80,8 +78,9 @@ def main() -> None:
             "additionalContext": (
                 f"LEARNINGS.md files found with unpromoted content:\n"
                 f"{files_list}\n\n"
-                f"Consider running `/cajalogic dream` or calling `remember()` "
-                f"for cross-session insights before cleanup."
+                f"Consider promoting these insights to a permanent home "
+                f"(an ADR, a doc, or a rule) before cleanup — they are about "
+                f"to be deleted with .ai-work/."
             ),
         }
     }

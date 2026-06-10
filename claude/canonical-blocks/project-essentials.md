@@ -1,6 +1,6 @@
 ## Working in this project
 
-This `CLAUDE.md` is the **index**; `docs/` and the skills it points to are the **library** — read the index, follow the links the task needs. When I correct you, propose a durable rule for review (a memory entry, a `CLAUDE.md` or rule edit, or a skill note) so the correction outlasts this session.
+This `CLAUDE.md` is the **index**; `docs/` and the skills it points to are the **library** — read the index, follow the links the task needs. When I correct you, propose a durable rule for review (a `CLAUDE.md` or rule edit, or a skill note) so the correction outlasts this session.
 
 ### Verification
 

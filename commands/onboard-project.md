@@ -130,9 +130,9 @@ The default §Flow runs end-to-end without pause. To let users *learn* the model
 | Gate | Fires before phase | Headline |
 |------|-------------------|----------|
 | 0.5 | before 1 (only when `CLAUDE.md` is absent) | `No CLAUDE.md found. The Praxion blocks (Phase 6) need a CLAUDE.md to live in. I'll create one — "Generate from codebase" runs /init (or generates an init-equivalent CLAUDE.md inline if /init cannot be invoked here) so it describes your actual code; "Minimal stub" writes just a header you fill in later. Pick:` |
-| 1 | 1 (entry + phase 1) | `I'll walk you through 9 phases that turn this project into a Praxion-aware repo: gitignore hygiene, .ai-state/ skeleton, merge drivers, git hooks, .claude/settings.json toggles, CLAUDE.md blocks, optional CLI tools, an opt-in architecture baseline, and a verification handoff. First up — Phase 1 of 9: I append a Praxion AI-assistants block to your .gitignore. Without these entries, advisory locks, memory backups, per-machine settings, and worktrees can leak into commits. Idempotent — re-runs are no-ops. Continue?` |
+| 1 | 1 (entry + phase 1) | `I'll walk you through 9 phases that turn this project into a Praxion-aware repo: gitignore hygiene, .ai-state/ skeleton, merge drivers, git hooks, .claude/settings.json toggles, CLAUDE.md blocks, optional CLI tools, an opt-in architecture baseline, and a verification handoff. First up — Phase 1 of 9: I append a Praxion AI-assistants block to your .gitignore. Without these entries, advisory locks, temporary snapshots, per-machine settings, and worktrees can leak into commits. Idempotent — re-runs are no-ops. Continue?` |
 | 2 | 2 | `Phase 2 of 9: I create the .ai-state/ skeleton — decisions/drafts/, DECISIONS_INDEX.md, TECH_DEBT_LEDGER.md, calibration_log.md, plus a static redirect stub at .ai-state/metrics_reports/index.html that points to praxion-dashboard for interactive charts (the METRICS_REPORT_*.md files in the same directory are available for offline reading). Each is created only if missing; existing files are never overwritten. Continue?` |
-| 3 | 3 | `Phase 3 of 9: I add merge-driver entries to .gitattributes and run 'git config' to register Python-based semantic merge drivers for .ai-state/memory.json and .ai-state/observations.jsonl. Without these, concurrent edits get corrupted by line-based merge. Continue?` |
+| 3 | 3 | `Phase 3 of 9: I add a merge-driver entry to .gitattributes and run 'git config' to register a Python-based semantic merge driver for .ai-state/observations.jsonl. Without this, concurrent edits get corrupted by line-based merge. Continue?` |
 | 4 | 4 | `Phase 4 of 9: I install four git hooks — pre-commit (id-citation discipline) and three finalize hooks (post-merge, post-commit, post-checkout) all sharing one multiplexed dispatcher. The trio guarantees that draft ADRs landing on main via any path — ff merge, direct commit, rebase, fresh clone, branch reset — eventually promote to stable dec-NNN. Symlinks resolve to the plugin scripts so updates flow automatically. Continue?` |
 | 5 | 5 | (Multi-select on PRAXION_DISABLE_* toggles — see §Phase 5 for option text) |
 | 5b | 5b | (Two-option pick — `Enable hackathon mode` / `Skip — keep full ceremony` (default: Skip). Headline: `Phase 5b: Hackathon mode. I can install the six hackathon mode artifacts: set PRAXION_HACKATHON_MODE=1 in .claude/settings.json, append the ## Hackathon Mode block to CLAUDE.md, add the hackathon preset to .claude/praxion-rules.yaml, and create scripts/praxion-hackathon, .claude/hackathon-directive.md, and .claude/hackathon-settings.json. Hackathon mode replaces the 5-tier selector with a flexible-entry Hackathon Spine and relaxes test/SDD/ADR ceremony. All six installs are idempotent. Skip if you want the full Praxion ceremony. Pick:`) |
@@ -187,7 +187,6 @@ The default §Flow runs end-to-end without pause. To let users *learn* the model
 .ai-state/*.lock
 .ai-state/**/*.lock
 .ai-state/*.backup.json
-.ai-state/*.pre-forget.json
 .claude/settings.local.json
 .claude/worktrees/
 .env
@@ -201,8 +200,7 @@ The default §Flow runs end-to-end without pause. To let users *learn* the model
 |-------|------------------|-----|
 | `.ai-work/` | Ephemeral pipeline scratch (per-task slug) | Deleted at pipeline end; never useful in history |
 | `.ai-state/*.lock`, `.ai-state/**/*.lock` | Advisory file locks taken by `finalize_adrs.py`, merge drivers | Runtime-only — committing them masks real lock behavior |
-| `.ai-state/*.backup.json` | Snapshots taken before destructive memory ops | Local recovery only |
-| `.ai-state/*.pre-forget.json` | Pre-`forget()` memory snapshots | Local recovery only |
+| `.ai-state/*.backup.json` | Temporary local snapshots | Local recovery only |
 | `.claude/settings.local.json` | Per-machine Claude settings | Machine-specific |
 | `.claude/worktrees/` | Worktree home for `EnterWorktree` | Each branch's own checkout |
 | `.env`, `.env.*`, `.env.local` | Secrets | Never commit secrets |
@@ -257,31 +255,29 @@ If the user agrees, remove that line. If they decline, proceed without changing 
 
   **Note:** The interactive metrics viewer lives in the dashboard. Launch it with `praxion-dashboard start <project-path>` or `/dashboard` in Claude Code, then open the Metrics tab. Offline reading is available via the `METRICS_REPORT_*.md` files in the same directory.
 
-Do NOT create `.ai-state/memory.json` or `.ai-state/observations.jsonl` — those are written on first use by the memory MCP and the observability hook respectively. Pre-creating them confuses semantic merge drivers.
+Do NOT create `.ai-state/observations.jsonl` — that is written on first use by the observability hook. Pre-creating it confuses the semantic merge driver.
 
 ## §Phase 3 — `.gitattributes` + merge driver registration
 
-**Why this phase exists.** Line-based merge corrupts structured data. `.ai-state/memory.json` (curated knowledge) and `.ai-state/observations.jsonl` (event log) are merge-conflict targets when concurrent edits land — the semantic merge drivers reconcile them at the JSON / JSONL level instead. The full `.ai-state/` safety contract at PR time, including merge policy and the squash-merge ban for `.ai-state/`-touching branches, lives in `rules/swe/vcs/pr-conventions.md`.
+**Why this phase exists.** Line-based merge corrupts structured data. `.ai-state/observations.jsonl` (event log) is a merge-conflict target when concurrent edits land — the semantic merge driver reconciles it at the JSONL level instead. The full `.ai-state/` safety contract at PR time, including merge policy and the squash-merge ban for `.ai-state/`-touching branches, lives in `rules/swe/vcs/pr-conventions.md`.
 
-**Predicate.** Detect entries via exact-line `grep -qF '.ai-state/memory.json merge=memory-json' .gitattributes` and the analogous line for observations. Detect driver registration via `git config --get merge.memory-json.driver` and `git config --get merge.observations-jsonl.driver`.
+**Predicate.** Detect entries via exact-line `grep -qF '.ai-state/observations.jsonl merge=observations-jsonl' .gitattributes`. Detect driver registration via `git config --get merge.observations-jsonl.driver`.
 
 **Action.**
 
 1. **Append to `.gitattributes`** (create the file if missing):
    ```gitattributes
    # Praxion semantic merge drivers — see rules/swe/agent-intermediate-documents.md
-   .ai-state/memory.json merge=memory-json
    .ai-state/observations.jsonl merge=observations-jsonl
    ```
 
-2. **Register the drivers in this repo's `git config`**:
+2. **Register the driver in this repo's `git config`**:
    ```bash
-   git config merge.memory-json.driver "python3 ${PLUGIN_INSTALL_PATH}/scripts/merge_driver_memory.py %O %A %B"
    git config merge.observations-jsonl.driver "python3 ${PLUGIN_INSTALL_PATH}/scripts/merge_driver_observations.py %O %A %B"
    ```
-   `${PLUGIN_INSTALL_PATH}` is the value captured in §Pre-flight. If the plugin was not detected (skip-phase-4 flag is set), still write `.gitattributes` but emit a warning: `Merge drivers not registered — run 'git config merge.memory-json.driver "..."' manually after installing the plugin. Without this, .ai-state/memory.json will be corrupted by line-based merge on first concurrent edit.`
+   `${PLUGIN_INSTALL_PATH}` is the value captured in §Pre-flight. If the plugin was not detected (skip-phase-4 flag is set), still write `.gitattributes` but emit a warning: `Merge driver not registered — run 'git config merge.observations-jsonl.driver "..."' manually after installing the plugin. Without this, .ai-state/observations.jsonl will be corrupted by line-based merge on first concurrent edit.`
 
-3. **Conflict check.** If `git config --get merge.memory-json.driver` already returns a value that does NOT contain `i-am` and is NOT empty, refuse to overwrite. Print: `merge.memory-json.driver is already set to '<value>' — refusing to overwrite. Remove the existing driver manually if you want Praxion's, or leave as-is.` Same logic for observations.
+3. **Conflict check.** If `git config --get merge.observations-jsonl.driver` already returns a value that does NOT contain `i-am` and is NOT empty, refuse to overwrite. Print: `merge.observations-jsonl.driver is already set to '<value>' — refusing to overwrite. Remove the existing driver manually if you want Praxion's, or leave as-is.`
 
 ## §Phase 4 — Git hooks
 
@@ -334,38 +330,29 @@ Composition per trigger: `post-merge` runs `reconcile_ai_state.py` (when `.ai-st
 
 ## §Phase 5 — `.claude/settings.json` toggles
 
-The Praxion plugin auto-fires hooks on `SessionStart`, `Stop`, `SubagentStart`, `SubagentStop`, `PreToolUse`, `PostToolUse`, `PreCompact`. Some are heavyweight: memory MCP injection ships project context to the model, observability ships events to a localhost Phoenix instance, the memory gate blocks `Stop` if no `remember()` calls fired during a substantive session. Users opt out via four `PRAXION_DISABLE_*` env vars in `.claude/settings.json`.
+The Praxion plugin auto-fires hooks on `SessionStart`, `Stop`, `SubagentStart`, `SubagentStop`, `PreToolUse`, `PostToolUse`, `PreCompact`. Some are heavyweight: observability ships events to a localhost Phoenix instance. Users opt out via a `PRAXION_DISABLE_*` env var in `.claude/settings.json`.
 
-**Predicate.** Read `.claude/settings.json` if it exists. If the four keys are all already set (any value), skip the phase but report current values in Phase 8. If the file exists but is missing some keys, merge in the missing ones using the user's choices below; never overwrite a key the user has already set.
+**Predicate.** Read `.claude/settings.json` if it exists. If `PRAXION_DISABLE_OBSERVABILITY` is already set (any value), skip the phase but report current value in Phase 8. If the file exists but the key is missing, merge it in using the user's choice below; never overwrite a key the user has already set.
 
-**Gate 5 — multi-select toggle picker.** Use `AskUserQuestion` with `multiSelect: true`, header `"Praxion features"`, question `"Which features should be ENABLED in this project? Each adds runtime overhead — leave a feature unchecked to disable it. Defaults below match Praxion's own dogfooding choice (everything off for safety; opt in deliberately)."`, and these four options:
+**Gate 5 — toggle picker.** Use `AskUserQuestion` with `multiSelect: true`, header `"Praxion features"`, question `"Should the observability hook be ENABLED in this project? It ships Claude Code events to a localhost Phoenix instance — useful for trace inspection but requires Phoenix to be running. Leave unchecked to disable."`, and this option:
 
 | Option label | Description |
 |--------------|-------------|
-| `Memory MCP injection (SessionStart)` | Auto-load project context into every session via `inject_memory.py`. Enables cross-session memory but the injected context costs ~3–5k tokens at session start. |
-| `Memory gate (Stop hook)` | Block session completion if substantive work happened with zero `remember()` calls. Forces learning capture; can feel intrusive on quick fixes. |
-| `Memory MCP server itself` | The actual `mcp__plugin_i-am_memory__*` tool surface. Disable to skip persistent memory entirely (no `.ai-state/memory.json` writes). |
 | `Observability events` | Ship Claude Code events to a localhost Phoenix instance via `send_event.py`. Useful for trace inspection; requires Phoenix to be running otherwise events are silently dropped. |
 
-**Mapping** unchecked options to env vars (Praxion uses negative `DISABLE` semantics — `"1"` disables, `"0"` enables):
+**Mapping** unchecked option to env var (Praxion uses negative `DISABLE` semantics — `"1"` disables, `"0"` enables):
 
 | Unchecked option | Env var written | Value |
 |------------------|-----------------|-------|
-| Memory MCP injection | `PRAXION_DISABLE_MEMORY_INJECTION` | `"1"` |
-| Memory gate | `PRAXION_DISABLE_MEMORY_GATE` | `"1"` |
-| Memory MCP server | `PRAXION_DISABLE_MEMORY_MCP` | `"1"` |
 | Observability | `PRAXION_DISABLE_OBSERVABILITY` | `"1"` |
 
-Checked options write the corresponding `PRAXION_DISABLE_*` to `"0"`.
+Checked option writes `PRAXION_DISABLE_OBSERVABILITY` to `"0"`.
 
 **Action.** Write `.claude/settings.json` (creating `.claude/` if needed):
 
 ```json
 {
   "env": {
-    "PRAXION_DISABLE_MEMORY_INJECTION": "<value>",
-    "PRAXION_DISABLE_MEMORY_GATE": "<value>",
-    "PRAXION_DISABLE_MEMORY_MCP": "<value>",
     "PRAXION_DISABLE_OBSERVABILITY": "<value>"
   }
 }
@@ -380,8 +367,8 @@ Praxion rules are categorized into core (always-loaded, non-disableable) and dis
 ```yaml
 version: 1
 disable:
-  - swe/memory-protocol    # Example: disable if your team uses different memory strategy
-  - ml/*                   # Example: disable entire category
+  - swe/agent-model-routing    # Example: disable if your team has a different model routing strategy
+  - ml/*                       # Example: disable entire category
 ```
 
 **Action (idempotent).** If the project does not already have `.claude/praxion-rules.yaml.example`, copy Praxion's template into the project so the user has a starting point to edit:
@@ -414,10 +401,9 @@ See [`docs/rules-taxonomy.md`](../docs/rules-taxonomy.md) for the complete refer
      # Hackathon mode preset — saves ~3,500 tokens (ambient, every session)
      disable:
        - swe/agent-model-routing
-       - swe/memory-protocol
        - swe/vcs/git-conventions
      ```
-   - **If the file already exists**, read it and append the three rule IDs as new list items under the existing `disable:` key (do not emit a second `disable:` block and do not emit `version:`). If no `disable:` key is present yet, add one. Never overwrite or remove existing entries — only add the three missing IDs (skip any that are already listed).
+   - **If the file already exists**, read it and append the two rule IDs as new list items under the existing `disable:` key (do not emit a second `disable:` block and do not emit `version:`). If no `disable:` key is present yet, add one. Never overwrite or remove existing entries — only add the two missing IDs (skip any that are already listed).
 
 4. **`scripts/praxion-hackathon` wrapper** — copy `claude/aac-templates/praxion-hackathon.sh.tmpl` from the plugin install path to `scripts/praxion-hackathon` and `chmod +x`. Adjust the `PRAXION_DIR` path for the project's `.claude/` directory. **Predicate:** `test -f scripts/praxion-hackathon`.
 
@@ -484,7 +470,7 @@ Do not recommend tools the user already has, and do not recommend `uv` if no Pyt
 
 When skipped via predicate, emit: `Phase 8: skipped (architecture docs already exist — produced by the seed pipeline or a prior /onboard-project run)`. Skipping is idempotent and does not block Phase 9.
 
-**Why this phase exists.** Praxion's `sentinel` coherence audits, future feature pipelines (`systems-architect` updates these docs incrementally), and Memory MCP context recall all benefit from an architectural baseline. Without it, the existing-project onboarding is half-complete from the agent ecosystem's perspective — every future agent runs context-poor on the codebase shape. Greenfield (`/new-project`) gets this for free via the seed pipeline; existing-project needs the same treatment, which is what this phase delivers.
+**Why this phase exists.** Praxion's `sentinel` coherence audits and future feature pipelines (`systems-architect` updates these docs incrementally) both benefit from an architectural baseline. Without it, the existing-project onboarding is half-complete from the agent ecosystem's perspective — every future agent runs context-poor on the codebase shape. Greenfield (`/new-project`) gets this for free via the seed pipeline; existing-project needs the same treatment, which is what this phase delivers.
 
 **Gate 8 — three-option AskUserQuestion.** Use `AskUserQuestion` with `header: "Next?"`, `multiSelect: false`, the headline from the gate map, and these three options:
 
@@ -1036,9 +1022,9 @@ full allowlist rationale.
      Phase 0.5: CLAUDE.md bootstrapped (/init | inline-generated | minimal stub) — or omitted when CLAUDE.md was already present
      Phase 1: .gitignore (appended 10 lines, AI-assistants block)
      Phase 2: .ai-state/ skeleton (4 new entries)
-     Phase 3: .gitattributes (appended 2 lines), git config (2 merge drivers registered)
+     Phase 3: .gitattributes (appended 1 line), git config (1 merge driver registered)
      Phase 4: .git/hooks/pre-commit (new), .git/hooks/{post-merge,post-commit,post-checkout} (symlinks)
-     Phase 5: .claude/settings.json (4 PRAXION_DISABLE_* env vars)
+     Phase 5: .claude/settings.json (PRAXION_DISABLE_OBSERVABILITY env var)
      Phase 6: CLAUDE.md (appended Agent Pipeline + Compaction + Behavioral Contract + Praxion Process + Working-in-this-project blocks)
      Phase 7: companion CLIs — chub missing (install: ...), scc missing (install: ...)
      Phase 8: architecture baseline produced — .ai-state/DESIGN.md + docs/architecture.md (+ N ADR draft(s))
@@ -1081,7 +1067,7 @@ Follow the **Understand, Plan, Verify** methodology. For multi-step work (Standa
 
 **Independent audits.** The `sentinel` agent runs outside the pipeline and writes timestamped `.ai-state/sentinel_reports/SENTINEL_REPORT_<timestamp>.md` plus an append-only `.ai-state/sentinel_reports/SENTINEL_LOG.md`. Trigger it for ecosystem health baselines (before first ideation, after major refactors).
 
-**From PoC to production.** The feature pipeline is one milestone of many. The full journey: baseline audit (`/sentinel`) → CI/CD setup (`cicd-engineer` agent) → deployment (`deployment` skill) → first release (`/release`) → ongoing decisions captured as ADRs in `.ai-state/decisions/` → cross-session memory in `.ai-state/memory.json` (when memory MCP is enabled).
+**From PoC to production.** The feature pipeline is one milestone of many. The full journey: baseline audit (`/sentinel`) → CI/CD setup (`cicd-engineer` agent) → deployment (`deployment` skill) → first release (`/release`) → ongoing decisions captured as ADRs in `.ai-state/decisions/`.
 
 Always include expected deliverables when delegating to an agent. The agent coordination protocol rule has full delegation checklists.
 ```
@@ -1301,7 +1287,7 @@ This block is installed into the user project's `CLAUDE.md` by Phase 5b **only w
 ```markdown
 ## Working in this project
 
-This `CLAUDE.md` is the **index**; `docs/` and the skills it points to are the **library** — read the index, follow the links the task needs. When I correct you, propose a durable rule for review (a memory entry, a `CLAUDE.md` or rule edit, or a skill note) so the correction outlasts this session.
+This `CLAUDE.md` is the **index**; `docs/` and the skills it points to are the **library** — read the index, follow the links the task needs. When I correct you, propose a durable rule for review (a `CLAUDE.md` or rule edit, or a skill note) so the correction outlasts this session.
 
 ### Verification
 
@@ -1374,9 +1360,9 @@ This block is installed into the user project's `CLAUDE.md` by Phase 8d sub-step
 |-------|--------------------------|
 | 1 | `grep -q '^# AI assistants$' .gitignore` |
 | 2 | Per-file: `test -e .ai-state/<file>` for each of the four targets — skip files individually |
-| 3 | `grep -qF '.ai-state/memory.json merge=memory-json' .gitattributes` AND `git config --get merge.memory-json.driver` returns a value containing `i-am` AND same for `observations-jsonl` |
+| 3 | `grep -qF '.ai-state/observations.jsonl merge=observations-jsonl' .gitattributes` AND `git config --get merge.observations-jsonl.driver` returns a value containing `i-am` |
 | 4 | `readlink .git/hooks/pre-commit` resolves to a Praxion-shipped file (or the file is a script containing `check_id_citation_discipline`) AND each of `readlink .git/hooks/{post-merge,post-commit,post-checkout}` resolves to a path containing `/i-am/` (target ending in `git-finalize-hook.sh`, or the legacy `git-post-merge-hook.sh` for the post-merge slot only) |
-| 5 | All four `PRAXION_DISABLE_*` keys present under `.env` in `.claude/settings.json` (any value) |
+| 5 | `PRAXION_DISABLE_OBSERVABILITY` key present under `.env` in `.claude/settings.json` (any value) |
 | 5b | Entire phase: `PRAXION_HACKATHON_MODE=1` present under `.env` in `.claude/settings.json`; or user picks `Skip — keep full ceremony` at Gate 5b. Per-artifact: 5b.1 — `PRAXION_HACKATHON_MODE` key present in `.claude/settings.json` env; 5b.2 — `grep -q '^## Hackathon Mode$' CLAUDE.md`; 5b.3 — `grep -q 'hackathon' .claude/praxion-rules.yaml 2>/dev/null`; 5b.4 — `test -f scripts/praxion-hackathon`; 5b.5 — `test -f .claude/hackathon-directive.md`; 5b.6 — `test -f .claude/hackathon-settings.json` |
 | 6 | `grep -q '^## <heading>$' CLAUDE.md` per block — checked individually for each of the five: `## Agent Pipeline`, `## Compaction Guidance`, `## Behavioral Contract`, `## Praxion Process`, `## Working in this project` (plus `## Hackathon Mode` if Phase 5b was enabled) |
 | 7 | None — phase 7 is advisory and always runs |

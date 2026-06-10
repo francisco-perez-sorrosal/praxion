@@ -12,7 +12,7 @@
           },
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_memory.py",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_decisions.py",
             "timeout": 5,
             "async": false
           },

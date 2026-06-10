@@ -11,20 +11,6 @@
         "task_chronograph_mcp"
       ]
     },
-    "memory": {
-      "command": "uv",
-      "args": [
-        "run",
-        "--project",
-        "{{MCP_ROOT}}/memory-mcp",
-        "python",
-        "-m",
-        "memory_mcp"
-      ],
-      "env": {
-        "MEMORY_FILE": "{{MEMORY_FILE}}"
-      }
-    },
     "sub-agents": {
       "command": "npx",
       "args": ["-y", "sub-agents-mcp"],

@@ -35,20 +35,6 @@
         "OTEL_ENABLED": "true"
       }
     },
-    "memory": {
-      "command": "uv",
-      "args": [
-        "run",
-        "--project",
-        "${CLAUDE_PLUGIN_ROOT}/memory-mcp",
-        "python",
-        "-m",
-        "memory_mcp"
-      ],
-      "env": {
-        "MEMORY_FILE": ".ai-state/memory.json"
-      }
-    },
     "likec4": {
       "command": "npx",
       "args": [

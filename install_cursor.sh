@@ -9,7 +9,7 @@
 #   ./install_cursor.sh [path] --uninstall # Message only (remove .cursor/ manually)
 #   --dry-run and --status are equivalent (dry-run is canonical).
 #
-# MCP servers in mcp.json always point at this repo (task-chronograph, memory, agents).
+# MCP servers in mcp.json always point at this repo (task-chronograph, agents).
 
 set -eo pipefail
 
@@ -168,7 +168,7 @@ sys.exit(0 if sys.argv[2] in servers else 1)
                 fi
             done < "$expected_servers"
             if [ -z "$missing" ]; then
-                info "mcp.json present (task-chronograph, memory, sub-agents, chub)"
+                info "mcp.json present (task-chronograph, sub-agents, chub)"
             else
                 warn "mcp.json missing expected server(s):$missing"
                 healthy=false
@@ -226,7 +226,6 @@ info "Commands exported"
 step "Writing mcp.json..."
 MCP_ROOT="$(cd "$REPO_ROOT_FOR_MCP" && pwd)"
 AGENTS_DIR_ABS="$MCP_ROOT/agents"
-MEMORY_FILE="${CURSOR_MEMORY_FILE:-.ai-state/memory.json}"
 template="$CURSOR_CONFIG_DIR/mcp.json.template"
 if [ ! -f "$template" ]; then
     echo "Error: cursor config template not found: $template" >&2
@@ -235,7 +234,6 @@ fi
 mkdir -p "$CURSOR_DIR"
 sed -e "s|{{MCP_ROOT}}|$MCP_ROOT|g" \
     -e "s|{{AGENTS_DIR_ABS}}|$AGENTS_DIR_ABS|g" \
-    -e "s|{{MEMORY_FILE}}|$MEMORY_FILE|g" \
     "$template" > "$CURSOR_DIR/mcp.json"
 info "MCP config written to $CURSOR_DIR/mcp.json (servers use repo: $MCP_ROOT)"
 info "sub-agents points at $AGENTS_DIR_ABS (requires Node/npx)"
@@ -244,4 +242,4 @@ info "chub (context-hub) configured for external API docs (requires Node/npx)"
 printf "\n"
 info "Cursor install complete."
 step "Target: $CURSOR_DIR"
-step "MCP: task-chronograph and memory require \`uv\`; sub-agents and chub require Node/npx."
+step "MCP: task-chronograph requires \`uv\`; sub-agents and chub require Node/npx."

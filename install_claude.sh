@@ -353,13 +353,10 @@ install_git_merge_infra() {
     fi
 
     # Register merge drivers (references scripts/ in the repo)
-    git -C "$repo_root" config merge.memory-json.name "Semantic memory.json merge"
-    git -C "$repo_root" config merge.memory-json.driver "python3 scripts/merge_driver_memory.py %O %A %B"
-
     git -C "$repo_root" config merge.observations-jsonl.name "Observations JSONL merge"
     git -C "$repo_root" config merge.observations-jsonl.driver "python3 scripts/merge_driver_observations.py %O %A %B"
 
-    info "Merge drivers: memory-json, observations-jsonl"
+    info "Merge driver: observations-jsonl"
 
     # Install three git hooks (post-merge, post-commit, post-checkout) as
     # symlinks pointing at the multiplexed dispatcher scripts/git-finalize-hook.sh.

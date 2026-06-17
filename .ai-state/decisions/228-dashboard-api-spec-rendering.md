@@ -1,7 +1,7 @@
 ---
-id: dec-draft-54f5185a
+id: dec-228
 title: Dashboard surfaces project API specs as rendered API reference (Scalar standalone)
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-16
 summary: The doc manifest builder discovers API spec files and the dashboard renders them as API reference docs via a Scalar standalone bundle over the raw spec, served through the existing server-only data layer.
@@ -16,7 +16,7 @@ affected_files:
   - dashboard_app/src/components/registry.ts
   - dashboard_app/src/server/view-models/documentation.ts
   - dashboard_app/src/app/documentation/page.tsx
-re_affirms: dec-draft-dfff9ea4
+re_affirms: dec-226
 ---
 
 ## Context
@@ -110,6 +110,6 @@ component) and `docs/architecture.md`; the skill/command portion remains additiv
 
 ## Prior Decision
 
-Re-affirms `dec-draft-dfff9ea4` (reference tiering) only in spirit — the renderer recommendation
+Re-affirms `dec-226` (reference tiering) only in spirit — the renderer recommendation
 (Scalar) made there for managed projects is the same choice adopted here for the dashboard itself,
 keeping skill guidance and dashboard behavior consistent. No supersession.

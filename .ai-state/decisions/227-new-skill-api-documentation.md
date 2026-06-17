@@ -1,7 +1,7 @@
 ---
-id: dec-draft-7f656105
+id: dec-227
 title: New api-documentation skill (peer to doc-management) rather than extending doc-management
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-16
 summary: Document a project's OWN API surface (REST/Python/TS/MCP/GraphQL, human + agent) via a new deep-specialist skill, not an expansion of doc-management's shallow API section.
@@ -14,7 +14,7 @@ affected_files:
   - skills/api-documentation/SKILL.md
   - skills/doc-management/references/documentation-types.md
   - commands/document-api.md
-re_affirms: dec-draft-dfff9ea4
+re_affirms: dec-226
 ---
 
 ## Context

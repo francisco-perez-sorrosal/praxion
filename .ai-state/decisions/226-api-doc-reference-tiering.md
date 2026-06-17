@@ -1,7 +1,7 @@
 ---
-id: dec-draft-dfff9ea4
+id: dec-226
 title: api-documentation reference tiering — universal core in SKILL.md, per-surface references, one extension seam
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-16
 summary: Lean SKILL.md carries only cross-validated universal core; deep tiers split per-surface (rest-openapi, agent-consumable, python, typescript, graphql, mcp-docs); extended set is one extending.md seam + seeded stubs.
@@ -13,7 +13,7 @@ pipeline_tier: standard
 affected_files:
   - skills/api-documentation/SKILL.md
   - skills/api-documentation/references/
-re_affirms: dec-draft-7f656105
+re_affirms: dec-227
 ---
 
 ## Context
@@ -55,4 +55,4 @@ Cons: four near-empty files add navigation noise; a single `extending.md` with a
 - Positive: SKILL.md stays token-lean (universal core + routing only); contested/fast-moving evidence (llms.txt, renderer wars) is loaded only when the user pursues that path.
 - Positive: the extension seam is a *documented pattern*, so adding gRPC/Go/Rust/AsyncAPI depth later is a known move, not a redesign.
 - Negative: multi-surface projects load 2+ references — mitigated by the SKILL.md routing table making the combination explicit.
-- This ADR refines (re-affirms, does not supersede) the structure left open by dec-draft-7f656105 (the new-skill decision); the two are complementary sibling decisions.
+- This ADR refines (re-affirms, does not supersede) the structure left open by dec-227 (the new-skill decision); the two are complementary sibling decisions.

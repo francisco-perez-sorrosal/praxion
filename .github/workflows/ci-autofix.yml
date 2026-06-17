@@ -18,7 +18,7 @@
 #   - the dedup step skips when an autofix PR is already open.
 #
 # Prerequisites:
-#   ANTHROPIC_API_KEY — repository secret (already powers claude.yml,
+#   CLAUDE_CODE_OAUTH_TOKEN — repository secret (already powers claude.yml,
 #   claude-code-review.yml, architecture.yml).
 #   The Claude GitHub app (github.com/apps/claude) must be installed so the
 #   agent authenticates as the app — PRs it opens then trigger CI and
@@ -111,7 +111,7 @@ jobs:
         # already applied to checkout and setup-uv above. Bump deliberately.
         uses: anthropics/claude-code-action@51ea8ea73a139f2a74ff649e3092c25a904aed7e  # v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             A CI workflow failed on the `main` branch of
             ${{ github.repository }}. Diagnose the root cause and open a pull

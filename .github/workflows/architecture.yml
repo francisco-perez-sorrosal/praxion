@@ -10,7 +10,7 @@
 #                             claude-code-action (structural reasoning).
 #
 # Prerequisites:
-#   ANTHROPIC_API_KEY — repository secret required by the dsl-validate job.
+#   CLAUDE_CODE_OAUTH_TOKEN — repository secret required by the dsl-validate job.
 #   The same secret already powers claude-code-review.yml and claude.yml.
 #
 # Path filtering: this workflow runs ONLY on PRs (and pushes to main) that
@@ -205,7 +205,7 @@ jobs:
       - name: Architect-validator pre-merge sweep
         uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             Load the i-am:architect-validator agent. Run in --mode=pre-merge
             for PR #${{ github.event.pull_request.number }} on ${{ github.repository }}.

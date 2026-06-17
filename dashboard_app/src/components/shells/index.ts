@@ -1,3 +1,4 @@
+export { ApiReferenceShell } from "./api-reference";
 export { DefaultShell } from "./default";
 export { ExplanationShell } from "./explanation";
 export { ReferenceShell } from "./reference";

@@ -260,6 +260,8 @@ This skill provides **current factual reference** (what the API looks like right
 
 **When both activate:** If working with the Claude API, `claude-ecosystem` tells you which model and SDK to use; `external-api-docs` fetches the current endpoint details so you write correct code. Neither replaces the other.
 
+**Name-collision boundary:** [`api-documentation`](../api-documentation/SKILL.md) documents your OWN API surface; this skill fetches *others'* API docs. The names are near-identical — if the task is authoring docs for an API you own, that is the `api-documentation` skill, not this one.
+
 ## Token Management
 
 External API docs are the largest single-fetch content an agent encounters. Follow these constraints:

@@ -28,7 +28,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -185,6 +185,8 @@ def _file_type(path: Path) -> str:
         ".yaml": "yaml",
         ".yml": "yaml",
         ".json": "json",
+        ".graphql": "graphql",
+        ".graphqls": "graphql",
         ".svg": "svg",
         ".html": "html",
         ".ipynb": "jupyter",
@@ -242,9 +244,7 @@ def _build_surface(root: Path, rel_path: Path) -> dict[str, Any] | None:
                 continue
             # Resolve relative to the surface's directory
             try:
-                resolved = (
-                    (rel_path.parent / link).resolve().relative_to(root.resolve())
-                )
+                resolved = (rel_path.parent / link).resolve().relative_to(root.resolve())
             except (ValueError, OSError):
                 continue
             referenced_paths.append(str(resolved))
@@ -256,9 +256,7 @@ def _build_surface(root: Path, rel_path: Path) -> dict[str, Any] | None:
             link = match.group(1).split(" ", 1)[0].strip()
             if "/diagrams/" in link and "/rendered/" in link:
                 try:
-                    resolved = (
-                        (rel_path.parent / link).resolve().relative_to(root.resolve())
-                    )
+                    resolved = (rel_path.parent / link).resolve().relative_to(root.resolve())
                 except (ValueError, OSError):
                     continue
                 diagrams.append(str(resolved))
@@ -268,9 +266,7 @@ def _build_surface(root: Path, rel_path: Path) -> dict[str, Any] | None:
         "path": str(rel_path),
         "type": file_type,
         "title": str(title),
-        "last_modified": datetime.fromtimestamp(abs_path.stat().st_mtime)
-        .date()
-        .isoformat(),
+        "last_modified": datetime.fromtimestamp(abs_path.stat().st_mtime).date().isoformat(),
     }
     if diataxis:
         descriptor["diataxis"] = str(diataxis)
@@ -308,6 +304,93 @@ def _walk_for_md(root: Path, subdir: str) -> list[Path]:
     return paths
 
 
+# Bounded locations searched for API-spec surfaces (relative to root).
+_API_SPEC_DIRS = ["", "docs", "openapi", "api", "spec", "specs"]
+
+# Exact filenames (OpenAPI / AsyncAPI) recognized as spec surfaces.
+_API_SPEC_FILENAMES = {
+    "openapi.yaml",
+    "openapi.yml",
+    "openapi.json",
+    "asyncapi.yaml",
+    "asyncapi.yml",
+    "asyncapi.json",
+}
+
+# Extensions (GraphQL SDL) recognized as spec surfaces.
+_API_SPEC_SUFFIXES = {".graphql", ".graphqls"}
+
+
+def _walk_for_api_specs(root: Path) -> list[Path]:
+    """List API-spec surfaces in a bounded set of locations.
+
+    Searches the project root and `docs/` / `openapi/` / `api/` / `spec/` /
+    `specs/` (when present) for `openapi.{yaml,json}`, `asyncapi.{yaml,json}`,
+    and `*.graphql[s]` SDL files. The search is shallow per directory (no
+    recursion) to keep the surface bounded and predictable. Excluded dirs are
+    skipped. Returns root-relative paths, de-duplicated and sorted.
+    """
+    found: set[Path] = set()
+    for subdir in _API_SPEC_DIRS:
+        base = root / subdir if subdir else root
+        if not base.is_dir():
+            continue
+        if any(part in _EXCLUDED_DIRS for part in base.relative_to(root).parts):
+            continue
+        for path in base.iterdir():
+            if not path.is_file():
+                continue
+            name = path.name.lower()
+            if name in _API_SPEC_FILENAMES or path.suffix.lower() in _API_SPEC_SUFFIXES:
+                found.add(path.relative_to(root))
+    return sorted(found)
+
+
+def _spec_title(abs_path: Path, file_type: str, rel_path: Path) -> str:
+    """Derive a spec title from `info.title` (+ `info.version`) for OpenAPI /
+    AsyncAPI specs; fall back to the filename for GraphQL SDL or unparseable
+    specs."""
+    fallback = rel_path.name
+    if file_type == "graphql":
+        return fallback
+    text = _read_text(abs_path)
+    if not text.strip():
+        return fallback
+    try:
+        # YAML safe_load parses JSON too, so a single path covers both.
+        data = yaml.safe_load(text)
+    except yaml.YAMLError:
+        return fallback
+    if not isinstance(data, dict):
+        return fallback
+    info = data.get("info")
+    if not isinstance(info, dict):
+        return fallback
+    title = info.get("title")
+    if not title:
+        return fallback
+    version = info.get("version")
+    return f"{title} {version}" if version else str(title)
+
+
+def _build_api_spec_surface(root: Path, rel_path: Path) -> dict[str, Any] | None:
+    """Build a manifest entry for one API-spec surface. Spec surfaces always
+    get `diataxis: reference` and `renderer: api_reference`."""
+    abs_path = root / rel_path
+    if not abs_path.is_file():
+        return None
+    file_type = _file_type(abs_path)
+    return {
+        "id": _surface_id(rel_path),
+        "path": str(rel_path),
+        "type": file_type,
+        "title": _spec_title(abs_path, file_type, rel_path),
+        "diataxis": "reference",
+        "renderer": "api_reference",
+        "last_modified": datetime.fromtimestamp(abs_path.stat().st_mtime).date().isoformat(),
+    }
+
+
 def _resolve_referenced_paths_to_ids(
     surfaces: list[dict[str, Any]],
 ) -> None:
@@ -333,10 +416,13 @@ def _build_groups(surfaces: list[dict[str, Any]]) -> list[dict[str, Any]]:
         "concepts": [],
     }
     transient: list[str] = []
+    api_reference: list[str] = []
     other: list[str] = []
     for s in surfaces:
         if s["path"].startswith(".ai-work/"):
             transient.append(s["id"])
+        elif s.get("renderer") == "api_reference":
+            api_reference.append(s["id"])
         elif s.get("diataxis") in by_quadrant:
             by_quadrant[s["diataxis"]].append(s["id"])
         else:
@@ -352,9 +438,15 @@ def _build_groups(surfaces: list[dict[str, Any]]) -> list[dict[str, Any]]:
     }
     for quadrant, ids in by_quadrant.items():
         if ids:
-            groups.append(
-                {"id": quadrant, "label": labels[quadrant], "surface_ids": sorted(ids)}
-            )
+            groups.append({"id": quadrant, "label": labels[quadrant], "surface_ids": sorted(ids)})
+    if api_reference:
+        groups.append(
+            {
+                "id": "api-reference",
+                "label": "API Reference",
+                "surface_ids": sorted(api_reference),
+            }
+        )
     if other:
         groups.append({"id": "other", "label": "Other", "surface_ids": sorted(other)})
     if transient:
@@ -443,6 +535,16 @@ def build_manifest(root: Path) -> dict[str, Any]:
                     if entry:
                         surfaces.append(entry)
 
+    # API-spec surfaces (OpenAPI / AsyncAPI / GraphQL SDL) in bounded locations
+    existing_paths = {s["path"] for s in surfaces}
+    for rel in _walk_for_api_specs(root):
+        if str(rel) in existing_paths:
+            continue
+        entry = _build_api_spec_surface(root, rel)
+        if entry:
+            surfaces.append(entry)
+            existing_paths.add(entry["path"])
+
     # Resolve internal cross-references
     _resolve_referenced_paths_to_ids(surfaces)
 
@@ -451,7 +553,7 @@ def build_manifest(root: Path) -> dict[str, Any]:
     manifest = {
         "schema_version": SCHEMA_VERSION,
         "generator_version": GENERATOR_VERSION,
-        "generated_at": datetime.now(timezone.utc)
+        "generated_at": datetime.now(UTC)
         .isoformat(timespec="seconds")
         .replace("+00:00", "Z"),
         "project_name": project_name,
@@ -496,12 +598,8 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         # Compare excluding the `generated_at` timestamp (which always drifts)
         old_text = output.read_text()
-        old_no_ts = re.sub(
-            r"^generated_at:.*$", "generated_at:", old_text, flags=re.MULTILINE
-        )
-        new_no_ts = re.sub(
-            r"^generated_at:.*$", "generated_at:", new_yaml, flags=re.MULTILINE
-        )
+        old_no_ts = re.sub(r"^generated_at:.*$", "generated_at:", old_text, flags=re.MULTILINE)
+        new_no_ts = re.sub(r"^generated_at:.*$", "generated_at:", new_yaml, flags=re.MULTILINE)
         if old_no_ts != new_no_ts:
             print(
                 f"FAIL: {output} is out of sync (run scripts/build_doc_manifest.py)",

@@ -110,3 +110,4 @@ Paginate every list tool result. The model's context window is a shared resource
 - **[`agentic-sdks`](../agentic-sdks/SKILL.md)** — wiring tools to the agent loop, framework selection, multi-agent orchestration; this skill covers design craft, `agentic-sdks` covers SDK mechanics.
 - **[`communicating-agents`](../communicating-agents/SKILL.md)** — Agent Card structure, A2A task lifecycle, interaction patterns; this skill covers contract design, `communicating-agents` covers protocol mechanics.
 - **[`llm-prompt-engineering`](../llm-prompt-engineering/SKILL.md)** — when a tool description is long enough to be a mini-prompt (few-shot examples, chain-of-thought cues).
+- **[`api-documentation`](../api-documentation/SKILL.md)** — documenting an *existing* MCP server (render the tool catalog from live `tools/list`, surface schemas + annotations + error modes); this skill owns tool *design*, that one owns the doc artifact.

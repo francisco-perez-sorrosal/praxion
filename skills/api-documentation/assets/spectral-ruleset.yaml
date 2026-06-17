@@ -1,0 +1,113 @@
+# Baseline Spectral ruleset for API documentation coverage.
+#
+# Enforces the agent-metadata discipline from the api-documentation skill's
+# universal core: every operation carries a stable operationId, a one-line
+# summary, a precondition-stating description, at least one example, an error
+# response, and tags. These are the fields an LLM reasons over on every call.
+#
+# Provider-neutral: works with Spectral (Stoplight) AND Vacuum (daveshanley)
+# unchanged — Vacuum is 100% Spectral-ruleset-compatible. Pick whichever your
+# CI prefers (Vacuum for speed/scale; Spectral for ecosystem familiarity).
+#
+# Usage:
+#   spectral lint openapi.yaml --ruleset spectral-ruleset.yaml
+#   vacuum lint openapi.yaml -r spectral-ruleset.yaml
+#
+# This extends spectral:oas (the built-in OpenAPI ruleset) so the structural
+# checks (valid $refs, no duplicate operationIds, schema validity) come for
+# free; the rules below add the documentation-coverage layer on top.
+
+extends: ["spectral:oas"]
+
+rules:
+  # --- Operation-level agent-metadata discipline ---
+
+  operation-operationId:
+    description: Every operation must declare a stable operationId (the agent's handle).
+    message: "{{path}} is missing an operationId"
+    severity: error
+    given: "$.paths[*][get,put,post,delete,patch,head,options,trace]"
+    then:
+      field: operationId
+      function: truthy
+
+  operation-summary:
+    description: Every operation needs a one-line summary.
+    message: "{{path}} is missing a summary"
+    severity: error
+    given: "$.paths[*][get,put,post,delete,patch,head,options,trace]"
+    then:
+      field: summary
+      function: truthy
+
+  operation-description:
+    description: Every operation needs a description stating preconditions and what the return means.
+    message: "{{path}} is missing a description"
+    severity: error
+    given: "$.paths[*][get,put,post,delete,patch,head,options,trace]"
+    then:
+      field: description
+      function: truthy
+
+  operation-tags:
+    description: Every operation must be tagged (groups the reference and the agent surface).
+    message: "{{path}} has no tags"
+    severity: error
+    given: "$.paths[*][get,put,post,delete,patch,head,options,trace]"
+    then:
+      field: tags
+      function: truthy
+
+  # --- Examples (lint-enforced; the renderer surfaces them automatically) ---
+
+  operation-2xx-response-example:
+    description: Successful responses must carry at least one example.
+    message: "{{path}} success response has no example"
+    severity: warn
+    given: "$.paths[*][get,put,post,delete,patch].responses[?(@property >= '200' && @property < '300')].content[*]"
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          anyOf:
+            - required: ["example"]
+            - required: ["examples"]
+
+  # --- Error catalog: RFC 9457 problem+json (core item 4) ---
+
+  operation-has-error-response:
+    description: Every operation must document at least one error response.
+    message: "{{path}} documents no 4xx/5xx error response"
+    severity: error
+    given: "$.paths[*][get,put,post,delete,patch,head,options,trace].responses"
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: object
+          patternProperties:
+            "^(4|5)[0-9][0-9]$": {}
+          minProperties: 1
+        # Note: minProperties on patternProperties is advisory; tighten per-project
+        # if your team wants a hard "at least one 4xx/5xx" gate. Kept as error to
+        # surface undocumented failure modes early.
+
+  error-response-uses-problem-json:
+    description: Error responses should use application/problem+json (RFC 9457).
+    message: "{{path}} error response should offer application/problem+json"
+    severity: warn
+    given: "$.paths[*][*].responses[?(@property >= '400')].content"
+    then:
+      field: "application/problem+json"
+      function: truthy
+
+  # --- Tag hygiene: every declared tag carries a description ---
+
+  tag-description:
+    description: Every tag in the top-level tags list needs a description.
+    message: "Tag '{{value}}' has no description"
+    severity: warn
+    given: "$.tags[*]"
+    then:
+      field: description
+      function: truthy

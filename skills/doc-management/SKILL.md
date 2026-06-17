@@ -16,7 +16,7 @@ Procedural expertise for writing, maintaining, and validating project-facing doc
 
 **Satellite files** (loaded on-demand):
 - [references/cross-reference-patterns.md](references/cross-reference-patterns.md) -- cross-reference validation procedures, catalog sync, drift scenarios
-- [references/documentation-types.md](references/documentation-types.md) -- per-type guidelines for README, architecture, changelog, contributing, API docs
+- [references/documentation-types.md](references/documentation-types.md) -- per-type guidelines for README, architecture, changelog, contributing, API docs (deep API-doc production lives in the `api-documentation` skill)
 - [references/diagram-conventions.md](references/diagram-conventions.md) -- Mermaid diagram creation, decomposition methodology, type recipes, styling guide
 - [references/advanced-markdown-patterns.md](references/advanced-markdown-patterns.md) -- `<details>`/`<summary>`, GitHub Alerts, footnotes, anchor links: decision rules, syntax, and scope constraints for human-facing GitHub-rendered docs
 - [references/diataxis-modes.md](references/diataxis-modes.md) -- Diátaxis mode rationale, common pitfalls, and worked examples per mode

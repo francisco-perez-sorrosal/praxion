@@ -3,6 +3,7 @@ import type { ComponentType } from "react";
 import type { ManifestSurface } from "@/server/types";
 
 import {
+  ApiReferenceShell,
   ConceptsShell,
   DefaultShell,
   ExplanationShell,
@@ -32,7 +33,8 @@ export const RENDERER_REGISTRY: Map<string, RendererComponent> = new Map([
   ["reference", ReferenceShell],
   ["explanation", ExplanationShell],
   ["concepts", ConceptsShell],
-  ["markdown", DefaultShell]
+  ["markdown", DefaultShell],
+  ["api_reference", ApiReferenceShell]
 ]);
 
 // ─── Resolver ────────────────────────────────────────────────────────────────

@@ -61,7 +61,7 @@ So, in order:
 2. **If you do build MCP, install few servers and scope narrowly.** Three focused servers beat thirteen; fewer, sharper tools choose better.
 3. **At large tool counts, prefer code-execution mode** (see [Code Execution with MCP](#code-execution-with-mcp-emerging)).
 
-Tool-*design* quality (naming, fat-vs-thin, error grammar) is its own discipline — see [`agentic-interface-design`](../agentic-interface-design/SKILL.md) and Anthropic's [Writing effective tools for AI agents](https://www.anthropic.com/engineering/writing-tools-for-agents).
+Tool-*design* quality (naming, fat-vs-thin, error grammar) is its own discipline — see [`agentic-interface-design`](../agentic-interface-design/SKILL.md) and Anthropic's [Writing effective tools for AI agents](https://www.anthropic.com/engineering/writing-tools-for-agents). To *document* an existing MCP server's tool catalog (render schemas + annotations + error modes from live `tools/list`), see [`api-documentation`](../api-documentation/SKILL.md) (`mcp-docs.md`).
 
 ## Language Contexts
 

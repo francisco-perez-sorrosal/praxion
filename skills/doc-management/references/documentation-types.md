@@ -204,6 +204,8 @@ Do NOT create a contributing guide for internal-only or single-maintainer projec
 
 Interface contracts for libraries, services, and tools.
 
+For deep, multi-surface API-doc *production* (OpenAPI pipeline, agent-consumable docs, per-language toolchains, MCP/GraphQL), load the `api-documentation` skill. This section is the shallow generalist entry point; that skill owns the deep production guidance.
+
 ### When to Maintain
 
 - The project exposes a public API (library, REST endpoint, CLI, plugin interface)

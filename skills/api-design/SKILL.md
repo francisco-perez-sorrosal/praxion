@@ -208,6 +208,7 @@ Apply these security patterns to every API:
 - **[`spec-driven-development`](../spec-driven-development/SKILL.md)** -- behavioral specifications define what the API should do; API design defines how the surface exposes that behavior
 - **[`data-modeling`](../data-modeling/SKILL.md)** -- data models inform API resource design; schema evolution rules complement API versioning strategy
 - **[`doc-management`](../doc-management/SKILL.md)** -- API documentation generation and maintenance
+- **[`api-documentation`](../api-documentation/SKILL.md)** -- producing the published doc deliverable from the spec (render, agent-consumable surface, CI freshness gate); the *deep* sibling to doc-management, picking up where "OpenAPI spec written" ends
 - **[`api-design-craft`](../api-design-craft/SKILL.md)** -- the quality/taste/review lens above this methodology: the API canon, Bloch principles as a review checklist, RFC 9457 error design, low-latency ergonomics
 
 ## Pre-Design Checklist

@@ -500,6 +500,8 @@ Delegate to `systems-architect` via the `Task` tool. The delegation prompt MUST 
 
 The architect operates in a fresh context window (`Task` tool spawn) and reports completion when both docs are written. The main agent reads the produced docs at completion to confirm shape, then proceeds to Phase 9.
 
+**API-surface pointer (informational, not a gate).** If this project exposes an API surface (REST/OpenAPI, Python/TypeScript library, MCP server, GraphQL schema), tell the user: "Run `/document-api` to scaffold its documentation." This is a one-line pointer only — do NOT auto-invoke `/document-api` and do NOT add a gate.
+
 **If the architect fails or times out**, emit a clear warning: `Phase 8 skipped — systems-architect did not complete the baseline audit. Architecture docs were not produced. Re-run /onboard-project to retry, or run a feature pipeline whose first stage will produce them.` Proceed to Phase 8b.
 
 ## §Phase 8b — AaC Tier Install (opt-in, default-skip)

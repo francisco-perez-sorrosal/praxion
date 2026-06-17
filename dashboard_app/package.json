@@ -13,6 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@scalar/api-reference-react": "^0.9.46",
     "github-slugger": "^2.0.0",
     "gray-matter": "^4.0.3",
     "next": "^16.2.6",

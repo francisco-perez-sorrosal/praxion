@@ -1,0 +1,89 @@
+# Provider-neutral CI gate for API documentation: lint -> breaking-change diff -> contract-test.
+#
+# This is the minimal gate from the api-documentation skill's universal core
+# (item 5): documentation freshness is a pipeline byproduct, not a manual chore.
+# It keeps a committed OpenAPI/AsyncAPI spec honest whether the spec is authored
+# spec-first or generated code-first.
+#
+# ----------------------------------------------------------------------------
+# ADAPT THIS to your CI provider. The steps below are written as GitHub Actions
+# job steps, but the three gates are provider-agnostic — each is a CLI call:
+#
+#   GitHub Actions : drop into a job's `steps:` (shown below, ready to use).
+#   GitLab CI      : each `run:` becomes a `script:` line in a job stage
+#                    (lint -> diff -> contract-test as three stages).
+#   CircleCI       : each `run:` becomes a `- run:` step in a job.
+#   Jenkins        : each `run:` becomes a `sh '...'` step in a stage.
+#
+# Pin tool versions at adoption time — the versions/flags below are defaults,
+# not hard pins (verify current releases for Spectral/Vacuum, oasdiff,
+# Schemathesis). Replace SPEC_PATH and BASE_SPEC_PATH for your repo layout.
+# ----------------------------------------------------------------------------
+
+name: api-docs-gate
+
+on:
+  pull_request:
+    paths:
+      # Trigger only when the spec or its docs change.
+      - "openapi.yaml"
+      - "openapi.json"
+      - "asyncapi.yaml"
+      - "docs/**"
+
+env:
+  SPEC_PATH: openapi.yaml
+  BASE_SPEC_PATH: base-spec/openapi.yaml   # the prior committed spec, fetched below
+
+jobs:
+  api-docs-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # === Gate 1: LINT =======================================================
+      # Validate the spec against the baseline ruleset (operationId, summary,
+      # description, examples, error responses, tags). Fails the build on errors.
+      #
+      # Spectral (Node, ecosystem default):
+      - name: Lint spec (Spectral)
+        run: npx @stoplight/spectral-cli lint "$SPEC_PATH" --ruleset spectral-ruleset.yaml
+      #
+      # OR Vacuum (Go, ~3x faster, Spectral-ruleset-compatible — swap for scale):
+      #   run: vacuum lint "$SPEC_PATH" -r spectral-ruleset.yaml
+
+      # === Gate 2: BREAKING-CHANGE DIFF =======================================
+      # Diff the PR's spec against the prior committed spec; flag breaking changes
+      # before merge. oasdiff distinguishes ERR (breaking) from WARN tiers.
+      - name: Fetch base spec
+        run: |
+          mkdir -p base-spec
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          git show "origin/${{ github.base_ref }}:$SPEC_PATH" > "$BASE_SPEC_PATH" || true
+      - name: Breaking-change diff (oasdiff)
+        run: |
+          # `breaking` exits non-zero on ERR-tier breaking changes, failing the gate.
+          oasdiff breaking "$BASE_SPEC_PATH" "$SPEC_PATH" --fail-on ERR
+
+      # === Gate 3: CONTRACT TEST ==============================================
+      # Property-based contract test so the live API and the spec cannot silently
+      # diverge. Schemathesis generates cases directly from the spec.
+      # Requires the API to be reachable (start it, or point at a mock/staging URL).
+      - name: Contract test (Schemathesis)
+        run: |
+          # Replace the URL with your running service or a spec-derived mock.
+          schemathesis run "$SPEC_PATH" --base-url "http://localhost:8000" --checks all
+        # If there is no running service in CI, gate on spec-only checks instead:
+        #   schemathesis run "$SPEC_PATH" --dry-run
+
+# ----------------------------------------------------------------------------
+# Notes:
+# - GraphQL surfaces swap oasdiff for `graphql-inspector diff old.graphql new.graphql`.
+# - gRPC/protobuf surfaces swap Gate 1+2 for `buf lint` + `buf breaking`.
+# - For code-first specs (FastAPI, tsoa, zod-to-openapi): add a step that
+#   regenerates the spec from code and `git diff --exit-code` against the
+#   committed spec, so a stale committed spec fails the build. This is the
+#   single most important gate for code-first projects.
+# - Rust surfaces get a fourth implicit gate for free: `cargo test --doc`
+#   (doctests are examples that fail CI if they go stale).
+# ----------------------------------------------------------------------------

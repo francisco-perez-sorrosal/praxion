@@ -7,6 +7,7 @@ import {
   assertContainedProjectPath,
   validateProjectRoot
 } from "@/server/artifacts/project-root";
+import { readText } from "@/server/artifacts/files";
 import { readJson, readMarkdown, readYaml } from "@/server/parsers/content";
 import type { ManifestGroup, ManifestSurface } from "@/server/types";
 
@@ -14,7 +15,7 @@ export type DocumentationSurfaceData = {
   body: string | null;
   errorMessage: string | null;
   path: string;
-  renderMode: "code" | "error" | "markdown" | "unsupported";
+  renderMode: "api" | "code" | "error" | "markdown" | "unsupported";
   surface: ManifestSurface;
 };
 
@@ -51,6 +52,21 @@ export async function getDocumentationSurfaceData(
       validatedRoot,
       path.join(validatedRoot, surface.path)
     );
+
+    // API-reference surfaces route through the registry regardless of `type`
+    // (yaml/json/graphql): the raw spec text is read server-side and handed to
+    // the Scalar-backed shell. This is the one renderer reached on a
+    // non-markdown surface.
+    if (surface.renderer === "api_reference") {
+      const text = await readText(absolutePath);
+      return {
+        body: text,
+        errorMessage: text === null ? "Unreadable file." : null,
+        path: absolutePath,
+        renderMode: "api",
+        surface
+      };
+    }
 
     if (surface.type === "markdown") {
       const file = await readMarkdown(absolutePath);

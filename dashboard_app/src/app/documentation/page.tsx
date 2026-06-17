@@ -66,6 +66,14 @@ export default async function DocumentationPage({
       ) : (
         <Renderer body={selectedSurfaceData.body} surface={selectedSurface ?? undefined} />
       );
+  } else if (selectedSurfaceData?.renderMode === "api") {
+    const Renderer = resolveRenderer(undefined, "api_reference");
+    renderedBody =
+      selectedSurfaceData.body === null ? (
+        <p className="muted">{selectedSurfaceData.errorMessage ?? "Unreadable file."}</p>
+      ) : (
+        <Renderer body={selectedSurfaceData.body} surface={selectedSurface ?? undefined} />
+      );
   } else if (selectedSurfaceData?.renderMode === "code") {
     renderedBody =
       selectedSurfaceData.body === null ? (

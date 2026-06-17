@@ -26,7 +26,7 @@ project_slug: praxion                      # kebab-case
 surfaces:
   - id: docs-getting-started               # stable; kebab-case; <doc-tree>-<basename>
     path: docs/getting-started.md
-    type: markdown                         # markdown | yaml | json | svg | html | jupyter
+    type: markdown                         # markdown | yaml | json | graphql | svg | html | jupyter
     diataxis: tutorial                     # tutorial | how-to | reference | explanation | concepts | (omit when n/a)
     audience: developer                    # developer | contributor | end-user | architect | agent
     renderer: tutorial_shell               # component name resolved by the dashboard's renderer registry (dashboard_app/src/components/registry.ts) — a Diátaxis-shell key (reference/explanation/default, with tutorial/how-to/concepts aliasing their respective shells) or a content-type key
@@ -72,7 +72,7 @@ groups:                                    # optional: sidebar grouping for the 
 |---|---|---|---|
 | `id` | string | yes | Stable kebab-case identifier; `<doc-tree>-<basename>` (e.g., `docs-architecture`, `ai-state-design`, `ai-work-implementation-plan`). Surfaces referenced cross-surface use this id. |
 | `path` | string | yes | Project-relative path. Used by the dashboard to read the source. |
-| `type` | enum | yes | `markdown` \| `yaml` \| `json` \| `svg` \| `html` \| `jupyter`. Drives the default renderer if `renderer` is omitted. |
+| `type` | enum | yes | `markdown` \| `yaml` \| `json` \| `graphql` \| `svg` \| `html` \| `jupyter`. Drives the default renderer if `renderer` is omitted. `graphql` is reserved for GraphQL SDL spec surfaces. |
 | `diataxis` | enum | when applicable | `tutorial` \| `how-to` \| `reference` \| `explanation` \| `concepts`. Read from frontmatter; drives the Diátaxis-typed shell selection. |
 | `audience` | enum | recommended | `developer` \| `contributor` \| `end-user` \| `architect` \| `agent`. Read from frontmatter. Drives audience-specific groupings or filters. |
 | `renderer` | string | recommended | Component name resolved by the dashboard's renderer registry (`dashboard_app/src/components/registry.ts`) — a Diátaxis-shell key (`reference`/`explanation`/`default`, with `tutorial`/`how-to`/`concepts` aliasing their respective shells) or a content-type key. If omitted, generator picks a default per `type` + `diataxis`. |
@@ -96,6 +96,7 @@ Initial set, matching the shell registry in `dashboard_app/src/components/regist
 | `explanation` | `diataxis: explanation` | Wide-text + illustration-heavy wrapper (`ExplanationShell`) |
 | `concepts` | `diataxis: concepts` | Glossary + conceptual map wrapper (`ConceptsShell`) |
 | `markdown` | fallback for any `type: markdown` with no `diataxis:` | Plain markdown render (`DefaultShell`) |
+| `api_reference` | API-spec surfaces (`diataxis: reference`, `type ∈ {yaml, json, graphql}` carrying an `openapi`/`asyncapi`/SDL spec body) | Renders the raw spec via `ApiReferenceShell` (Scalar standalone embed). **The one renderer reached on a non-markdown surface** — the documented exception to the markdown-only page dispatch (the page routes `renderer === "api_reference"` through the registry regardless of `type`). |
 
 Custom renderers can be added by dropping a new shell component under `dashboard_app/src/components/shells/<name>.tsx` (export it), and registering it in `dashboard_app/src/components/registry.ts`'s `RENDERER_REGISTRY` map (and the `shells/index.ts` barrel if used).
 
@@ -107,6 +108,8 @@ Custom renderers can be added by dropping a new shell component under `dashboard
 2. **`docs/**`** — every `.md` file is a surface. The generator reads frontmatter for `diataxis:` and `audience:`. Inferred `id` from path (e.g., `docs/architecture.md` → `docs-architecture`).
 3. **`.ai-state/`** — `DESIGN.md`, `SYSTEM_DEPLOYMENT.md`, `TECH_DEBT_LEDGER.md`, `TECH_DEBT_RESOLVED.md`, `decisions/<NNN>-*.md`, `decisions/DECISIONS_INDEX.md`, `idea_ledgers/IDEA_LEDGER_*.md`, `sentinel_reports/SENTINEL_REPORT_*.md`, `metrics_reports/METRICS_REPORT_*.{md,json}`. Each gets a surface entry.
 4. **`.ai-work/<active-slug>/`** — when present, all canonical pipeline documents (`IDEA_PROPOSAL.md`, `RESEARCH_FINDINGS.md`, `SYSTEMS_PLAN.md`, `IMPLEMENTATION_PLAN.md`, `WIP.md`, `LEARNINGS.md`, `VERIFICATION_REPORT.md`, `traceability.yml`, `TEST_RESULTS.md`). Marked with `transient: true` at the group level.
+
+5. **API-spec surfaces** — a bounded spec-discovery walk over the project root and `docs/`, `openapi/`, `api/`, `spec/`, `specs/` (each searched shallowly when present, honoring `_EXCLUDED_DIRS`). Recognized files: `openapi.{yaml,yml,json}`, `asyncapi.{yaml,yml,json}`, and `*.graphql` / `*.graphqls` SDL. Each spec surface is emitted with `diataxis: reference`, `renderer: api_reference`, an `id` from the path-slug helper, and a `title` derived from `info.title` (+ `info.version` when present) for OpenAPI/AsyncAPI specs — falling back to the filename for GraphQL SDL or unparseable specs. All spec surfaces are grouped under a single **"API Reference"** group (`id: api-reference`), placed before the catch-all `other` group. This is wholesale-regenerated like every other surface — no hand entries; `--check` gates freshness for sentinel EC07 + CI.
 
 The generator skips:
 

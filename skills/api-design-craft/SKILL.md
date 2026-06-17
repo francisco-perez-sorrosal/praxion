@@ -136,3 +136,4 @@ Apply Joshua Bloch's 8 principles as the primary review checklist for any API:
 - **[`external-api-docs`](../external-api-docs/SKILL.md)** — for verifying current API specifications, SDK versions, or library capabilities before committing to a paradigm decision.
 - **[`data-modeling`](../data-modeling/SKILL.md)** — backend schema design informs resource modeling; when the resource model feels wrong, often the data model is the root cause.
 - **[`performance-architecture`](../performance-architecture/SKILL.md)** — infrastructure-level performance behind the API surface; this skill covers interface-level latency ergonomics.
+- **[`api-documentation`](../api-documentation/SKILL.md)** — turning the reviewed API into best-in-class human + agent docs (the doc-production deliverable downstream of the design critique).

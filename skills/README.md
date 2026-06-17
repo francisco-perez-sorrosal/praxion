@@ -34,6 +34,7 @@ Reusable skill modules for AI coding assistants. Each skill is a self-contained 
 
 | Skill | Description | When to Use |
 | --- | --- | --- |
+| **[api-documentation](api-documentation/)** | Documenting a project's OWN API surface for humans + agents — REST/OpenAPI, Python, TypeScript, MCP, GraphQL (deep), gRPC/Go/Rust/AsyncAPI (seeded). | Producing API reference docs, OpenAPI/llms.txt/agent-consumable docs, documenting an MCP server or GraphQL schema. |
 | **[doc-management](doc-management/)** | Writing and maintaining project documentation (README.md, catalogs, architecture docs, changelogs). Covers cross-reference validation, catalog maintenance, and structural integrity. | Creating or reviewing project documentation, maintaining catalog READMEs, validating cross-references, ensuring documentation freshness. |
 
 ### ML/AI Training

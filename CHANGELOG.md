@@ -1,3 +1,9 @@
+## v0.7.1 (2026-06-17)
+
+### Fix
+
+- migrate Claude workflows to CLAUDE_CODE_OAUTH_TOKEN auth
+
 ## v0.7.0 (2026-06-17)
 
 ### Feat

@@ -47,12 +47,9 @@ def _load_module():
     script_path = HOOKS_DIR / "inject_subagent_context.py"
     if not script_path.exists():
         raise ImportError(
-            "hooks/inject_subagent_context.py not found. "
-            "The production module does not yet exist."
+            "hooks/inject_subagent_context.py not found. The production module does not yet exist."
         )
-    spec = importlib.util.spec_from_file_location(
-        "inject_subagent_context", script_path
-    )
+    spec = importlib.util.spec_from_file_location("inject_subagent_context", script_path)
     if spec is None or spec.loader is None:
         raise ImportError("Could not load spec for inject_subagent_context.py")
     module = importlib.util.module_from_spec(spec)
@@ -162,15 +159,11 @@ def test_host_native_subagent_receives_preamble_in_praxion_project(
     assert result.returncode == 0, f"Hook exited non-zero: {result.stderr}"
     assert result.stdout, "Expected updatedInput JSON on stdout"
     output = json.loads(result.stdout)
-    updated_prompt = output["hookSpecificOutput"]["updatedInput"]["tool_input"][
-        "prompt"
-    ]
+    updated_prompt = output["hookSpecificOutput"]["updatedInput"]["tool_input"]["prompt"]
     assert updated_prompt.startswith(PREAMBLE_MARKER), (
         f"Preamble not prepended for {subagent_type!r}: {updated_prompt[:80]!r}"
     )
-    assert _ORIGINAL_PROMPT in updated_prompt, (
-        "Original prompt must be preserved after preamble"
-    )
+    assert _ORIGINAL_PROMPT in updated_prompt, "Original prompt must be preserved after preamble"
 
 
 def test_preamble_contains_behavioral_contract_keywords(
@@ -223,10 +216,39 @@ def test_output_preserves_subagent_type_unchanged(praxion_project: Path) -> None
     result = _run_hook(payload)
     assert result.returncode == 0
     output = json.loads(result.stdout)
-    returned_type = output["hookSpecificOutput"]["updatedInput"]["tool_input"][
-        "subagent_type"
-    ]
+    returned_type = output["hookSpecificOutput"]["updatedInput"]["tool_input"]["subagent_type"]
     assert returned_type == "Plan"
+
+
+def test_output_preserves_description_and_other_tool_input_fields(
+    praxion_project: Path,
+) -> None:
+    """The hook must preserve every original tool_input field, not just
+    subagent_type and prompt.
+
+    Canary for the host-native spawn breakage: the Agent tool requires a
+    `description` field. An earlier version reconstructed tool_input from
+    scratch with only subagent_type + prompt, dropping `description` (and
+    `model`, `run_in_background`, …), so Explore/Plan/general-purpose spawns
+    failed schema validation. This test feeds a payload carrying those extra
+    fields and asserts they survive the injection.
+    """
+    payload = _pretooluse_payload(subagent_type="Explore", cwd=str(praxion_project))
+    payload["tool_input"]["description"] = "probe task"
+    payload["tool_input"]["model"] = "sonnet"
+    payload["tool_input"]["run_in_background"] = True
+
+    result = _run_hook(payload)
+    assert result.returncode == 0, f"Hook exited non-zero: {result.stderr}"
+    output = json.loads(result.stdout)
+    returned = output["hookSpecificOutput"]["updatedInput"]["tool_input"]
+    assert returned.get("description") == "probe task", (
+        "description field dropped — host-native Agent spawns will fail schema validation"
+    )
+    assert returned.get("model") == "sonnet", "model field dropped"
+    assert returned.get("run_in_background") is True, "run_in_background field dropped"
+    # And the prompt is still injected
+    assert returned["prompt"].startswith(PREAMBLE_MARKER)
 
 
 def test_output_hook_event_name_is_pretooluse(praxion_project: Path) -> None:
@@ -301,9 +323,7 @@ def test_praxion_native_injection_opt_in_does_not_affect_host_native(
     assert result_default.stdout, "Explore must be injected by default"
 
     # With opt-in (should also inject)
-    result_optin = _run_hook(
-        payload, env_extra={"PRAXION_INJECT_NATIVE_SUBAGENTS": "1"}
-    )
+    result_optin = _run_hook(payload, env_extra={"PRAXION_INJECT_NATIVE_SUBAGENTS": "1"})
     assert result_optin.returncode == 0
     assert result_optin.stdout, "Explore must still be injected with opt-in"
 
@@ -314,19 +334,13 @@ def test_praxion_native_injection_opt_in_does_not_affect_host_native(
 
 
 @pytest.mark.parametrize("subagent_type", ["Explore", "Plan", "i-am:researcher"])
-def test_no_injection_when_ai_state_absent(
-    subagent_type: str, non_praxion_project: Path
-) -> None:
+def test_no_injection_when_ai_state_absent(subagent_type: str, non_praxion_project: Path) -> None:
     """No injection occurs for any subagent type when .ai-state/ is absent."""
-    payload = _pretooluse_payload(
-        subagent_type=subagent_type, cwd=str(non_praxion_project)
-    )
+    payload = _pretooluse_payload(subagent_type=subagent_type, cwd=str(non_praxion_project))
     result = _run_hook(payload)
 
     assert result.returncode == 0
-    assert result.stdout == "", (
-        f"No injection expected without .ai-state/; got: {result.stdout!r}"
-    )
+    assert result.stdout == "", f"No injection expected without .ai-state/; got: {result.stdout!r}"
 
 
 def test_no_injection_when_cwd_has_no_ai_state_subdirectory(tmp_path: Path) -> None:
@@ -346,24 +360,18 @@ def test_no_injection_when_cwd_has_no_ai_state_subdirectory(tmp_path: Path) -> N
 
 
 @pytest.mark.parametrize("subagent_type", ["Explore", "Plan", "general-purpose"])
-def test_injection_disabled_when_opt_out_env_set(
-    subagent_type: str, praxion_project: Path
-) -> None:
+def test_injection_disabled_when_opt_out_env_set(subagent_type: str, praxion_project: Path) -> None:
     """PRAXION_DISABLE_SUBAGENT_INJECT=1 suppresses injection even in Praxion projects."""
     payload = _pretooluse_payload(subagent_type=subagent_type, cwd=str(praxion_project))
     result = _run_hook(payload, env_extra={"PRAXION_DISABLE_SUBAGENT_INJECT": "1"})
 
     assert result.returncode == 0
-    assert result.stdout == "", (
-        f"Expected no injection with opt-out flag, got: {result.stdout!r}"
-    )
+    assert result.stdout == "", f"Expected no injection with opt-out flag, got: {result.stdout!r}"
 
 
 def test_opt_out_also_suppresses_native_opt_in(praxion_project: Path) -> None:
     """PRAXION_DISABLE_SUBAGENT_INJECT takes precedence over PRAXION_INJECT_NATIVE_SUBAGENTS."""
-    payload = _pretooluse_payload(
-        subagent_type="i-am:researcher", cwd=str(praxion_project)
-    )
+    payload = _pretooluse_payload(subagent_type="i-am:researcher", cwd=str(praxion_project))
     result = _run_hook(
         payload,
         env_extra={
@@ -390,9 +398,7 @@ def test_empty_stdin_exits_zero_without_crash() -> None:
         env={k: v for k, v in os.environ.items() if not k.startswith("PRAXION_")},
         timeout=10,
     )
-    assert result.returncode == 0, (
-        f"Expected exit 0, got {result.returncode}: {result.stderr}"
-    )
+    assert result.returncode == 0, f"Expected exit 0, got {result.returncode}: {result.stderr}"
 
 
 def test_malformed_json_stdin_exits_zero_without_crash() -> None:
@@ -405,9 +411,7 @@ def test_malformed_json_stdin_exits_zero_without_crash() -> None:
         env={k: v for k, v in os.environ.items() if not k.startswith("PRAXION_")},
         timeout=10,
     )
-    assert result.returncode == 0, (
-        f"Expected exit 0, got {result.returncode}: {result.stderr}"
-    )
+    assert result.returncode == 0, f"Expected exit 0, got {result.returncode}: {result.stderr}"
 
 
 def test_missing_tool_input_field_exits_zero() -> None:

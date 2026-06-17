@@ -72,18 +72,22 @@ def _is_praxion_native(subagent_type: str) -> bool:
     return subagent_type.startswith("i-am:")
 
 
-def _emit_updated_input(subagent_type: str, prompt: str) -> None:
-    """Emit the updatedInput JSON response to stdout."""
+def _emit_updated_input(tool_input: dict, prompt: str) -> None:
+    """Emit the updatedInput JSON response to stdout.
+
+    Preserves every field of the original tool_input (subagent_type,
+    description, model, run_in_background, isolation, …) and overrides only
+    the prompt. Reconstructing tool_input from scratch would drop the Agent
+    tool's required `description` field, causing host-native spawns
+    (Explore/Plan/general-purpose) to fail schema validation.
+    """
+    updated = dict(tool_input)
+    updated["prompt"] = f"{_PREAMBLE}\n\n{prompt}"
     output = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "allow",
-            "updatedInput": {
-                "tool_input": {
-                    "subagent_type": subagent_type,
-                    "prompt": f"{_PREAMBLE}\n\n{prompt}",
-                }
-            },
+            "updatedInput": {"tool_input": updated},
         }
     }
     print(json.dumps(output))
@@ -137,7 +141,7 @@ def _process(payload: dict) -> None:
         if inject_native.lower() not in ("1", "true", "yes"):
             return
 
-    _emit_updated_input(subagent_type, prompt)
+    _emit_updated_input(tool_input, prompt)
 
 
 if __name__ == "__main__":

@@ -1,3 +1,23 @@
+## v0.7.0 (2026-06-17)
+
+### Feat
+
+- embed SOLID for the AI era as the Balanced Coupling principle
+- add api-documentation skill, /document-api command, dashboard API rendering
+- delete the in-house curated-memory subsystem
+- extract ADR injection into standalone inject_decisions hook
+
+### Fix
+
+- preserve full tool_input in inject_subagent_context hook (td-021)
+- regenerate AGENTS.md.tmpl after CLAUDE.md memory removal
+
+### Refactor
+
+- stop shipping memory machinery in onboarding
+- remove memory as a source and proposal type from skill-genesis
+- drop memory.json from reconcile and inject_rules seams
+
 ## v0.6.0 (2026-06-06)
 
 ### Feat

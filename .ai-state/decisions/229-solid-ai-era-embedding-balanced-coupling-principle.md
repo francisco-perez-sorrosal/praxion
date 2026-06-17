@@ -1,7 +1,7 @@
 ---
-id: dec-draft-ba1cc0a9
+id: dec-229
 title: Embed SOLID for the AI era as the "Balanced Coupling" principle + software-design-principles skill
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-16
 summary: Add a dedicated "Balanced Coupling" philosophy principle and a canonical software-design-principles skill that reframes SOLID as knowledge-flow heuristics for the AI era, composed by software-planning and refactoring and enforced via fitness functions.

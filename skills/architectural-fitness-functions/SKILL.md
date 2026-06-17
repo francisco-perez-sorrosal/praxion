@@ -52,7 +52,7 @@ enables the meta-citation rule to enforce coverage automatically.
 **Accepted citation forms:**
 
 - An ADR id matching the pattern `dec-\d{3,}` (preferred when the invariant has a specific decision record)
-- A CLAUDE.md principle matching `CLAUDE\.md§[A-Z][A-Za-z ]+` (preferred when the invariant follows from a foundational principle rather than a specific decision)
+- A CLAUDE.md principle matching `CLAUDE\.md§[A-Z][A-Za-z ]+` (preferred when the invariant follows from a foundational principle rather than a specific decision). SOLID-derived invariants (e.g. "the domain layer must not import infrastructure" — DIP; "modules A and B must not import each other" — cohesion/independence) cite `CLAUDE.md§Balanced Coupling`; see the `software-design-principles` skill for the heuristic each rule encodes.
 
 **Where the citation lives:**
 

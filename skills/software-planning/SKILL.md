@@ -31,6 +31,12 @@ Create and maintain planning documents (IMPLEMENTATION_PLAN.md, WIP.md, LEARNING
 - [references/behavioral-contract.md](references/behavioral-contract.md) -- four-behavior contract deep dive: definitions, per-agent application, objection templates, DRY relationship
 - [references/design-synthesis.md](references/design-synthesis.md) -- activation-gated pre-implementation synthesis: lens catalog, activation formula, convergence signals; composed from existing skills (security / performance / simplicity / testability)
 
+For the **up-front** design discipline behind boundary and interface choices —
+SOLID as balanced-coupling heuristics, the strength/distance/volatility model, and
+the agent-as-consumer lens — compose with the `software-design-principles` skill.
+Planning is where boundaries are chosen *before* code exists; that skill is the
+canon, this one decomposes the chosen design into safe steps.
+
 ## Three-Document Model
 
 For significant work, maintain three documents:

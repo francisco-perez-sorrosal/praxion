@@ -30,6 +30,12 @@ Systematic approach to refactoring that prioritizes modularity, low coupling, hi
 
 ## The Four Pillars
 
+These four are the **reactive** application of the `software-design-principles`
+canon — the same balanced-coupling discipline (managing knowledge flow:
+integration strength vs distance vs volatility) restored in code that already
+drifted. Consult that skill for the SOLID heuristics and the up-front design
+rationale; this skill covers how to *restore* the pillars safely.
+
 ### 1. Modularity
 
 Break systems into self-contained units with clear responsibilities. Each module should have a single, well-defined purpose and be understandable in isolation.

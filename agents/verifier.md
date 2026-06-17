@@ -133,6 +133,7 @@ Convention checks (derived from `coding-style` rule):
 - Immutability (prefer immutable patterns)
 - Naming (descriptive, intention-revealing)
 - Code organization (modular, no catch-all utils)
+- Balanced coupling (cohesion: related logic grouped by reason-to-change; coupling: no policy depending on volatile detail, no leaking abstractions). Flag SOLID violations as `architecture`-bucket findings against `CLAUDE.md§Balanced Coupling` — but only where the coupling actually hurts; do not flag the absence of speculative abstraction (Incremental Evolution governs)
 - Code duplication (no repeated logic within files; for changed files, read sibling files in the same module — capped at 5 — and use LLM judgment to assess cross-module semantic similarity; report duplicated patterns with file paths and line ranges)
 
 #### Interface Design Review (conditional)

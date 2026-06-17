@@ -167,6 +167,7 @@ Design the architecture by working through these questions:
 - Minimize the blast radius — prefer localized changes over sweeping modifications
 - Design for the current requirements, not hypothetical future ones
 - Favor composition over inheritance, interfaces over concrete coupling
+- Balance coupling — keep integration strength (shared knowledge) and distance in balance; gather what changes together, separate different reasons to change, point dependencies toward stability. Apply SOLID as heuristics, not commandments (consult the `software-design-principles` skill; cite `CLAUDE.md§Balanced Coupling`)
 - Make the architecture testable — if it can't be tested, redesign it
 
 ### Phase 4 — Deployment Documentation

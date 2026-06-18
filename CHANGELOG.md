@@ -1,3 +1,10 @@
+## v0.8.0 (2026-06-18)
+
+### Feat
+
+- engrave multi-perspective deliberation primitives into pipeline
+- add multi-perspective-analysis skill (composition layer)
+
 ## v0.7.1 (2026-06-17)
 
 ### Fix

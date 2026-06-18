@@ -1,7 +1,7 @@
 ---
-id: dec-draft-c8d8d7f2
+id: dec-233
 title: Extend the Context Engineering principle rather than create a new principle for multi-perspective deliberation
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-18
 summary: Add one clause about structurally-independent vantage points to the existing Context Engineering principle (cross-ref Balanced Coupling); do not create an "Epistemic Diversity" principle.

@@ -1,7 +1,7 @@
 ---
-id: dec-draft-dd0da49a
+id: dec-234
 title: multi-perspective-analysis skill — GO as a composition layer (Step-1 kill-switch verdict)
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-18
 summary: Create skills/multi-perspective-analysis as a thin composition layer (pointers + shared schema definitions, mirroring design-synthesis.md), HARD-gated to high-stakes stages; not a knowledge layer, not embedded-per-agent.

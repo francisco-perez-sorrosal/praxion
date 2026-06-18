@@ -1,7 +1,7 @@
 ---
-id: dec-draft-34589a96
+id: dec-230
 title: Calibrated-confidence schema uses verbal tiers anchored to numeric ranges plus GRADE downgrade factors
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-06-18
 summary: Confidence is expressed as high (>80%) / med (40-80%) / low (<40%) with GRADE-style downgrade basis, defined once in the multi-perspective-analysis skill and applied to verifier findings and per-claim researcher annotations.

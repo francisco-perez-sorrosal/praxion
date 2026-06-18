@@ -1,7 +1,7 @@
 ---
-id: dec-draft-60a83db4
+id: dec-232
 title: Dialectical Inquiry + two-tier Disconfirmation replaces an ACH matrix for ADR deliberation
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-18
 summary: ADR deliberation uses a gated Dialectical-Inquiry sub-step + an always-on Tier-A Disconfirmation block + a gated Tier-B cross-model challenge; the full ACH matrix is not adopted.
@@ -16,7 +16,7 @@ affected_files:
   - skills/software-planning/references/adr-authoring-protocols.md
   - skills/software-planning/references/design-synthesis.md
 affected_reqs: [REQ-03, REQ-04, REQ-05]
-supersedes: dec-draft-9d87021a
+supersedes: dec-231
 dissent: "A reader who wants exhaustive option enumeration may argue DI (one genuine rival) is narrower than an ACH matrix (all plausible hypotheses scored by disconfirmation). Held minority view: revisit if decisions with >2 genuinely-live options recur and DI's single-rival framing demonstrably loses coverage."
 ---
 
@@ -49,7 +49,7 @@ Replace ACH with a three-part scheme:
 
 ## Prior Decision
 
-Supersedes the deferral ADR (dec-draft-9d87021a) only on the ACH-matrix clause: that ADR defers the full ACH matrix; this ADR explains *why* the replacement (DI + Disconfirmation) is the chosen mechanism. The two are consistent — the matrix is deferred because this scheme covers the need.
+Supersedes the deferral ADR (dec-231) only on the ACH-matrix clause: that ADR defers the full ACH matrix; this ADR explains *why* the replacement (DI + Disconfirmation) is the chosen mechanism. The two are consistent — the matrix is deferred because this scheme covers the need.
 
 ## Disconfirmation (Tier A)
 

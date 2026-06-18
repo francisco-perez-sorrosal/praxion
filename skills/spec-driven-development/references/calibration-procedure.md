@@ -36,6 +36,19 @@ Before computing the numeric score, check for spike indicators in the request:
 
 When spike indicators are present, recommend **Spike** regardless of the numeric score. A spike can have any scope — the uncertainty is about outcome, not size.
 
+### Goal-Clarity Read (feeds the Intake Clarity Gate, NOT the size score)
+
+Intent clarity is **orthogonal** to task size — a one-file change can be deeply ambiguous, a large refactor crystal-clear. Read it separately; do **not** add it to the numeric score (that would conflate two independent axes). This read feeds the orchestrator's **Intake Clarity Gate** (see `swe-agent-coordination-protocol.md` § Conversation Checkpoints); the full procedure is the `goal-disambiguation` skill.
+
+Produce two verdicts from the request text:
+
+| Read | How to assess | Verdict |
+|------|--------------|---------|
+| **Goal clarity** | Run the smell scan (optionality markers, vague qualities, missing actor, vague referent, superlatives) + the XY test (does it prescribe a mechanism but never state the outcome it serves?). | `clear` (no load-bearing smells; success is observable) or `ambiguous` (smells survive that change what gets built) |
+| **Reversibility** | Would guessing wrong on the ambiguity be hard to reverse? (schema/data, public contracts, deletions, auth/security, money, architecture = hard; naming, formatting, internal/additive-behind-flag = reversible) | `reversible` or `hard-to-reverse` |
+
+The Gate's action follows the 2×2: ambiguous + hard-to-reverse → ask (≤3 questions); ambiguous + reversible → proceed with assumptions stated univocally; clear → proceed (capture Key Signals when hard-to-reverse). Direct tier skips the Gate.
+
 ## Calibration Matrix
 
 Sum the signal scores to produce a composite score, then map to a tier:
@@ -70,9 +83,12 @@ Present the assessment as a structured block so the user can inspect per-signal 
 
 **Recommended tier**: Standard (score 8, range 7-10)
 **Rationale**: Multiple files with distinct behaviors and a new interface. Brownfield area with existing specs.
+**Goal-clarity read**: ambiguous (success metric unstated) · hard-to-reverse (new auth interface) → Intake Clarity Gate will ask ≤3 questions before committing.
 
 Override? [user confirms or specifies different tier]
 ```
+
+The goal-clarity read is reported alongside the tier but is a separate axis — it drives the Intake Clarity Gate, not the tier number.
 
 After the user confirms or overrides, log the decision and proceed with the selected tier.
 

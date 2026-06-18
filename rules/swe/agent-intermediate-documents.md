@@ -18,6 +18,7 @@ Agent documents live in two locations based on their lifecycle:
   .ai-work/
     <task-slug>/
       IDEA_PROPOSAL.md
+      TASK_BRIEF.md
       RESEARCH_FINDINGS.md
       CONTEXT_REVIEW.md
       INTERFACE_DESIGN.md
@@ -122,6 +123,7 @@ Full schema (14 fields + `dedup_key`), owner-role heuristic, lifecycle conventio
 
 | Tier | Location | Documents | Lifetime |
 |------|----------|-----------|----------|
+| Ephemeral | `.ai-work/<task-slug>/` | `TASK_BRIEF.md` — writer: orchestrator at the Intake Clarity Gate (before any agent spawn); readers: researcher + systems-architect (first input — authoritative Intent / Key Signals), implementation-planner (Key Signals → step acceptance tests; Uncertainty Flags → spikes), test-engineer (signals → test nodes), verifier (Key Signals = primary rubric, Health Guards = regression checklist). Captured at Lightweight+ when success is non-obvious; skipped at Direct. Shape + template: `goal-disambiguation` skill | Single pipeline run — Key Signals merged into the archived SPEC / `VERIFICATION_REPORT.md`, then deleted with `.ai-work/` |
 | Ephemeral | `.ai-work/<task-slug>/` | `IDEA_PROPOSAL.md`, `RESEARCH_FINDINGS.md`, `CONTEXT_REVIEW.md`, `INTERFACE_DESIGN.md`, `TRANSACTIONS_DESIGN.md`, `SYSTEMS_PLAN.md`, `SPEC_DELTA.md`, `VERIFICATION_REPORT.md`, `REWORK_MANIFEST.md`, `PROGRESS.md` | Single pipeline run — delete after downstream consumption (merge `VERIFICATION_REPORT.md` patterns into `LEARNINGS.md` first). `INTERFACE_DESIGN.md` (interface-designer pipeline output: interface architecture, framework/paradigm decisions, UI/API sketches, trade-offs, `## Architecture Challenges`) is consumed by planner, implementer, and verifier. `TRANSACTIONS_DESIGN.md` (agentic-transactions-architect pipeline output: provider-contract analysis, mandate/settlement/HITL decisions, trade-offs, `## Architecture Challenges`) is consumed by planner, implementer, and verifier. `REWORK_MANIFEST.md` — writer: verifier (Phase 12.5); reader: main agent; cleanup gated on rework completion. |
 | Ephemeral | `.ai-work/<rework-slug>/` | `VERIFIER_FINDINGS.md` — writer: main agent; reader: `/resume-rework` + spawned session | Worktree-local ephemeral. |
 | Ephemeral | `.ai-work/<task-slug>/` | `PRE_REFACTOR_PLAN.md` — writer: systems-architect (Phase 2.5 outcome `emit-PRE_REFACTOR_PLAN`); readers: orchestrator (parses `## Verifier Bypass Criteria` + `## Loop-Back Conditions`), implementation-planner (steps tagged `[Phase: Refactoring]`), test-engineer (sources characterization-tests from `## Behavior Preservation Contract`), verifier (sources acceptance criteria from `## Acceptance Criteria` in pre-refactor mode) | Single pipeline run — receives a `[CONSUMED]` marker at architect's `post-refactor-adaptation` re-entry; deleted with `.ai-work/` at cleanup |

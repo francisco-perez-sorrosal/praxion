@@ -1,7 +1,7 @@
 ---
-id: dec-draft-7c4e9af2
+id: dec-235
 title: Intake Clarity Gate + goal-disambiguation skill for task-intent disambiguation
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-18
 summary: Add a clarity-axis intake gate (orthogonal to size-based tiering) that disambiguates user intent and captures measurable Key Signals into TASK_BRIEF.md before the pipeline commits.

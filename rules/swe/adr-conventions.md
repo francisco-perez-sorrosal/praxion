@@ -61,6 +61,7 @@ The frontmatter schema is shared between draft and finalized ADRs. Only the `id`
 | `superseded_by` | string | No | id of replacing decision |
 | `re_affirms` | string | No | id of prior decision this ADR re-affirms without superseding |
 | `re_affirmed_by` | list | No | ids of later ADRs that re-affirmed this decision |
+| `dissent:` | string | No | Machine-queryable companion to the `## Disconfirmation` body block; one-line strongest objection to the chosen option. Required when `category: architectural`. |
 
 **Body sections** (after frontmatter):
 
@@ -68,7 +69,8 @@ The frontmatter schema is shared between draft and finalized ADRs. Only the `id`
 2. **Decision** -- what was decided (clear, direct statement)
 3. **Considered Options** -- alternatives with pros/cons (subsections per option)
 4. **Consequences** -- positive and negative outcomes
-5. **Prior Decision** -- only when superseding; summarizes what changed and why
+5. **Disconfirmation** -- **always-on for `category: architectural`**; three sub-items: (a) **Falsifier** — what evidence would make this decision wrong; (b) **Steelmanned runner-up** — the strongest case for the next-best option; (c) **Reversal trigger** — the future signal that should prompt revisiting. See `adr-authoring-protocols.md` for the creation-protocol step.
+6. **Prior Decision** -- only when superseding; summarizes what changed and why
 
 ### Supersession Protocol
 

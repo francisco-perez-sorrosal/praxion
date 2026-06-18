@@ -360,7 +360,7 @@ Write the manifest as follows:
   "headline": "<one-sentence description of the cluster>",
   "finding_refs": ["#fail-1", "#fail-2"],
   "td_refs": ["td-NNN"],
-  "confidence": "high | medium | low",
+  "confidence": "high (>80%) | medium (40–80%) | low (<40%)",
   "dedup_against": [],
   "notes": ""
 }
@@ -368,7 +368,7 @@ Write the manifest as follows:
 
 `target_agent` is always `systems-architect` — routing through the architect first is invariant (all reworks route through systems-architect regardless of class).
 
-The `confidence` field is the verifier's in-band Register-Objection signal: `low` means the verifier's finding evidence is weak and the user should scrutinise before spawning a rework worktree.
+The `confidence` field is the verifier's in-band Register-Objection signal: `low` means the verifier's finding evidence is weak and the user should scrutinise before spawning a rework worktree. The three-tier vocabulary (`high (>80%) | medium (40–80%) | low (<40%)`) is defined in [`skills/multi-perspective-analysis/references/calibrated-confidence.md`](../skills/multi-perspective-analysis/references/calibrated-confidence.md) — apply GRADE downgrade factors when evidence quality is limited.
 
 #### VERIFIER_FINDINGS.md template
 

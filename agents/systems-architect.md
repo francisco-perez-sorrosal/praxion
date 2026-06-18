@@ -233,6 +233,10 @@ Silent dismissal is a behavioral-contract violation (Register Objection): if you
 
 > When the activation gate fires (see [design-synthesis.md — When to Activate](../skills/software-planning/references/design-synthesis.md#when-to-activate)), run the lens sweep and the convergence check in that reference before writing the Decision block below. Record an **Activation:** line in the ADR body (either the fired outcome or `no — <reason>`) per the [ADR obligation](../skills/software-planning/references/design-synthesis.md#adr-obligation).
 
+**Dialectical Inquiry (DI) sub-step** — fires when honest-uncertainty gate fires AND `category: architectural`. Before writing the `### Decision` block, argue the steelmanned runner-up design as if it were your actual recommendation. This is DI, not devil's advocacy: the argument must reflect genuine epistemic uncertainty, not assigned opposition. Cross-link [`skills/multi-perspective-analysis/references/disconfirmation-tiers.md`](../skills/multi-perspective-analysis/references/disconfirmation-tiers.md) for the DI vs. DA distinction and Tier-A body-section requirements (`Falsifier`, `Steelmanned runner-up`, `Reversal trigger`).
+
+**Tier-B cross-model challenge** (gated: honest-uncertainty fires AND stakes ∈ {security, one-way-door, user-visible-breaking}) — invoke a different-model agent as an external oracle on the rival design. See [`disconfirmation-tiers.md § Tier-B`](../skills/multi-perspective-analysis/references/disconfirmation-tiers.md#tier-b-cross-model-adversarial-challenge-gated) for the full protocol. Tier-B fires on fewer than 20% of architectural ADRs; do not invoke it as a default.
+
 ```markdown
 ### Decision: [What was decided]
 
@@ -461,3 +465,5 @@ Write the line immediately upon entering each new phase. Include optional hashta
 - **Make trade-offs explicit.** Every significant decision should show what was considered and why.
 - **Design for incrementality.** The architecture must be implementable in small, safe steps — if it requires a big-bang change, redesign it.
 - **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.
+
+**High-stakes deliberation.** For decisions where the honest-uncertainty gate fires and stakes are elevated, load [`skills/multi-perspective-analysis`](../skills/multi-perspective-analysis/SKILL.md) for the activation gate, DI sub-step protocol, disconfirmation tiers, and heterogeneous model assignment guidance.

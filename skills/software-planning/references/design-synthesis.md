@@ -99,7 +99,7 @@ Each subsection names the activation gate, lens set, and convergence outcome for
 - **Lens set (Phase 7)**: Security + Performance + Simplicity + Testability — applied to each option under consideration.
 - **Lens set (Phase 9)**: Dev + Test + Ops (baseline) + Security + Performance + Simplicity + Testability (extended), each citing an existing Praxion artifact (the owning skill or rule) rather than restating methodology.
 - **Convergence outcome**: REQ-ID stability + risk-budget satisfaction + blast-radius bound + user acceptance (see [Convergence Signals](#convergence-signals)).
-- **What the sweep produces**: ≥2 fleshed-out options under the Decision block (strawmen violate the honest-uncertainty gate) and an ADR body `Activation:` line per the [ADR obligation](#adr-obligation).
+- **What the sweep produces**: ≥2 fleshed-out options under the Decision block (strawmen violate the honest-uncertainty gate) and an ADR body `Activation:` line per the [ADR obligation](#adr-obligation). The DI sub-step (see `agents/systems-architect.md` Phase 7 DI sub-step, grounded in [`disconfirmation-tiers.md`](../../multi-perspective-analysis/references/disconfirmation-tiers.md)) completes the lens sweep by arguing the runner-up genuinely before committing to the `### Decision` block.
 
 ### S5 Refactoring
 

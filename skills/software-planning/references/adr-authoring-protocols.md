@@ -14,7 +14,8 @@ When a decision-making agent (systems-architect, implementation-planner) records
 4. **Create the fragment** at `.ai-state/decisions/drafts/<fragment-filename>.md` using the Write tool, with frontmatter `id: dec-draft-<hash>`, `status: proposed`, and `branch: <branch_slug>` (the sanitized authoring branch from step 1) plus the full schema fields (see the [Frontmatter table](../../../rules/swe/adr-conventions.md#frontmatter) in the rule for the canonical schema). Recording `branch:` lets `finalize_adrs.py` parse hyphenated branches unambiguously even when only one fragment remains in `drafts/`.
 5. **Cross-references between drafts** use `dec-draft-<hash>` values for `supersedes` / `superseded_by` / `re_affirms` / `re_affirmed_by`. Finalize rewrites these to `dec-NNN` at merge-to-main.
 6. **Record the decision** in `LEARNINGS.md ### Decisions Made` citing `(dec-draft-<hash>)`. Finalize rewrites this reference too.
-7. **Do not** manually invoke any index-regeneration script — `DECISIONS_INDEX.md` regenerates automatically at finalize.
+7. **Write the `## Disconfirmation` body block** when `category: architectural`. Three sub-items are required: (a) **Falsifier** — what evidence would make this decision wrong; (b) **Steelmanned runner-up** — the strongest case for the next-best option; (c) **Reversal trigger** — the future signal that should prompt revisiting. Set `dissent:` in frontmatter to a one-line summary of the strongest objection. This block attacks the chosen option and is always-on for architectural decisions; it is not optional.
+8. **Do not** manually invoke any index-regeneration script — `DECISIONS_INDEX.md` regenerates automatically at finalize.
 
 ## Identity Derivation and Filename Construction
 

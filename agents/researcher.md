@@ -133,9 +133,15 @@ When evaluating alternatives (libraries, approaches, architectures):
 
 Do not recommend — that is the systems-architect's job. Present the options with enough context for an informed decision.
 
+**Per-claim certainty annotation** — for any claim entering `## Comparative Analysis` or `## Divergence Map` that relies on limited, indirect, or conflicting evidence, append an inline annotation immediately after the claim: `[certainty: high/med/low — <one-line basis>]`. The basis clause is mandatory; a naked label is a schema violation. The three-tier vocabulary and GRADE downgrade factors are defined in [`skills/multi-perspective-analysis/references/calibrated-confidence.md`](../skills/multi-perspective-analysis/references/calibrated-confidence.md). Annotation is not required for claims with unanimous, direct, high-tier-source support (those are implicitly high-confidence); annotate where the source chain introduces doubt.
+
+### Phase 4.5 — Cross-Source Divergence Pass
+
+Before finalizing findings, run a terminal divergence pass across all sources gathered in Phases 2–4. For each claim where two or more sources (or a codebase finding and an external source) give incompatible answers, record the disagreement as a named divergence: which sources conflict, what each says, and which source tier (1–4) each represents. Write these as a `## Divergence Map` sub-section in `RESEARCH_FINDINGS.md`. If no divergences exist, write a brief `## Divergence Map` note stating so. The systems-architect must receive this map alongside the comparative analysis — silently averaging contradictory evidence transfers the disagreement downstream without naming it. Apply per-claim certainty annotations to divergent claims in this map: conflicting sources are by definition medium-or-low confidence.
+
 ### Phase 5 — Synthesis
 
-**Incremental writing:** Write the `RESEARCH_FINDINGS.md` document structure (all section headers with `[pending]` markers for incomplete sections) at the start of Phase 1. Fill in Codebase Findings during Phase 2, External Findings during Phase 3, Comparative Analysis during Phase 4, and finalize in Phase 5. This ensures partial progress is visible even if the agent fails mid-execution, and allows the main agent to check partial results of a background agent.
+**Incremental writing:** Write the `RESEARCH_FINDINGS.md` document structure (all section headers with `[pending]` markers for incomplete sections) at the start of Phase 1. Fill in Codebase Findings during Phase 2, External Findings during Phase 3, Comparative Analysis during Phase 4, the Divergence Map during Phase 4.5, and finalize in Phase 5. This ensures partial progress is visible even if the agent fails mid-execution, and allows the main agent to check partial results of a background agent.
 
 Distill all findings into `RESEARCH_FINDINGS.md`:
 
@@ -217,6 +223,10 @@ For each signal, use this shape:
 - **Source(s)**: [Links to the primary evidence — release notes, official docs, benchmarks, ADRs in the candidate's own repo]
 
 Be conservative. A Continuous Improvement Signal should clear a high bar: a candidate that is marginally newer or stylistically preferred does not qualify. The bar is **strict improvement on multiple criteria the project demonstrably cares about, with the trade-offs honestly stated**.
+
+## Divergence Map
+
+*(Populated during Phase 4.5. Name each cross-source conflict: which sources disagree, what each claims, and the source tier of each. Write "No divergences found" when sources agree.)*
 
 ## Open Questions
 
@@ -304,3 +314,5 @@ Write the line immediately upon entering each new phase. Include optional hashta
 - **Do not commit.** The document is a draft for user and downstream agent review.
 - **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.
 - **Turn budget awareness.** You have a hard turn limit (`maxTurns` in frontmatter). Track your tool call count — reserve the last 5 turns for writing `RESEARCH_FINDINGS.md`. At 80% budget consumed, wrap up and write output with what you have.
+
+**High-stakes deliberation.** For research tasks where the evidence is genuinely contested or the decision is high-stakes, load [`skills/multi-perspective-analysis`](../skills/multi-perspective-analysis/SKILL.md) for activation criteria, per-claim confidence annotation, and lens-independence discipline when running parallel analysis.

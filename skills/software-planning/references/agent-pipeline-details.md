@@ -137,6 +137,10 @@ Instead, all agents share the pipeline worktree created by `EnterWorktree`. Para
 
 For high-risk decisions, use parallel agents with distinct lenses: **correctness** (requirements satisfied?), **security** (vulnerabilities introduced?), **performance** (bottlenecks?), **maintainability** (evolvable?). Reserve for decisions with significant blast radius; most tasks need only the standard pipeline.
 
+**Lens independence is mandatory.** Parallel lens agents MUST NOT reference sibling lens outputs during the collection pass — reconciliation happens only at the aggregator layer. Sharing intermediate findings during collection collapses output diversity (correlation-collapse: up to 17.2× reduction in effective variance). The fragment-file pattern is the mechanical enforcement surface: each lens agent writes to `<artifact>_<lens>.md`; the aggregator reads all fragments and writes the consolidated artifact. See [`../../multi-perspective-analysis/references/lens-independence.md`](../../multi-perspective-analysis/references/lens-independence.md) for the full isolate/reconcile/gate rationale.
+
+For high-stakes activations requiring heterogeneous model assignment (Haiku-proposer / Opus-aggregator recipe) or cross-model adversarial challenge (Tier-B), load the [`multi-perspective-analysis` skill](../../multi-perspective-analysis/SKILL.md) for activation criteria and cost guidance.
+
 ## Context-Engineer Pipeline Engagement
 
 | Stage | Role | Trigger |

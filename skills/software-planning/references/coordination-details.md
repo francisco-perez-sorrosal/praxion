@@ -308,6 +308,22 @@ The user then either:
 
 Two rollback paths bracket the verifier by design: the pre-verification checkpoint (user-driven, before verification) and the verifier rework loop (verifier-driven, after — the automated backstop for whatever the user did not catch). The pre-verification checkpoint catches what the verifier structurally cannot: the verifier checks the build against the plan's acceptance criteria, so a plan that drifted from intent passes verification; only a human intent-level inspect catches plan-level drift.
 
+### The pre-mortem gate (planning → implementation boundary)
+
+The **pre-mortem gate** is a named Conversation Checkpoint variant that fires at the `planning → implementation` boundary, always-on for Standard and Full tiers. It is the failure-imagination complement to the pre-verification checkpoint's residue-acknowledgement.
+
+**Prompt template** (the orchestrator poses this to the user after the plan is reviewed and before spawning the first implementer step):
+
+> *Assume this shipped and caused an incident — why?*
+
+The user's responses are failure modes. They are not bugs in the plan; they are plausible failure futures the plan does not yet guard against. Recording them forces the implementation phase to carry those risks explicitly.
+
+**Recording location**: `WIP.md` under a `## Pre-Mortem` section (add it after the `## Blockers` section). Each failure mode is one bullet: `- [failure-mode description] — mitigation: [what the plan does or should do]`. If a failure mode has no current mitigation, flag it as an open risk for the implementer.
+
+**Gate pass condition**: the orchestrator may proceed to implementation when either (a) the user confirms no failure modes surfaced, or (b) all surfaced failure modes have been recorded in `WIP.md` and either mitigated in the plan or explicitly accepted as known risks.
+
+**Relationship to pre-verification checkpoint**: the pre-mortem gate runs before implementation (looking forward at risk); the pre-verification checkpoint runs before verification (looking backward at residue). They are complementary checkpoints at opposite seams of the implementation phase. See the parent rule `rules/swe/swe-agent-coordination-protocol.md § Conversation Checkpoints` for the named-variant definition.
+
 ### Tier scaling
 
 Direct and Lightweight tiers have no phases. The discipline collapses to the intake `Surface Assumptions` ritual plus a **pre-commit digest** — the existing commit-approval gate, enriched with the assumptions and constraints taken so the user is aware before approving the commit.

@@ -88,6 +88,7 @@ Mode is passed from the command as a single token:
 - **`ROADMAP.md`** at the **project root** — living document. In `diff` mode, the Decision Log is never rewritten; append a new entry.
 - **`.ai-work/<task-slug>/ROADMAP_DRAFT.md`** — intermediate draft before Gate 3.
 - **`.ai-work/<task-slug>/AUDIT_<lens>.md`** — one fragment per Phase 3 researcher.
+- **`.ai-work/<task-slug>/CONTRADICTION_MAP.md`** — cross-lens conflict list produced by Phase 3.5; ephemeral.
 - **`.ai-work/<task-slug>/PROGRESS.md`** — append-only phase-transition log.
 
 Use [`skills/roadmap-synthesis/assets/ROADMAP_TEMPLATE.md`](../skills/roadmap-synthesis/assets/ROADMAP_TEMPLATE.md) as the scaffold.
@@ -119,6 +120,10 @@ Spawn one researcher per lens from the derived set (from Phase 1b). N = lens_cou
 **Concurrency cap — wave-of-3**: Praxion's parallel-agent guidance caps concurrent Bg-Safe subagents at 3. When N > 3, fan out in waves of ≤3 researchers; wait for each wave's completion before launching the next. For N ≤ 3, spawn all in a single-wave fan-out. Fragment reconciliation is wave-order-insensitive. See [`audit-methodology.md §Lens count discipline`](../skills/roadmap-synthesis/references/audit-methodology.md#lens-count-discipline) for full detail.
 
 Pass each researcher the lens name, its sub-questions (paradigm-matched), the task slug, the path to [`audit-fragment-template.md`](../skills/roadmap-synthesis/assets/audit-fragment-template.md), **and the relevant landscape entries from the *Landscape* stub in `ROADMAP_DRAFT.md` (if Phase 2 populated it)** — Evolution-class and Pragmatism-class lenses use these to anchor adjacent-project-traction claims and external-research citations; other lenses may ignore or use opportunistically. Researchers may `WebFetch` watchlist URLs for fresh signal but must report fetched-date in the fragment. Each researcher writes `AUDIT_<lens-slug>.md` to `.ai-work/<task-slug>/`. Wait for all fragments; re-invoke any researcher whose fragment is missing required sections. The cartographer delegates audit work to parallel researchers rather than introducing a dedicated auditor agent — researchers already own the evidence-gathering shape and scale cleanly across lenses.
+
+### Phase 3.5 — Contradiction Map
+
+Before synthesis, collect all cross-lens conflicts surfaced by the Phase 3 researchers. For each pair of lens fragments that make incompatible claims about the same project area, record: (a) the two lenses in conflict, (b) the conflicting claims verbatim, (c) the strength of evidence behind each. Write conflicts to `.ai-work/<task-slug>/CONTRADICTION_MAP.md` (ephemeral). If no conflicts exist, write a brief `## No Conflicts Found` note. Phase 4 synthesis must address each named conflict — silently averaging contradictory evidence is not acceptable.
 
 ### Phase 4 — Lens Synthesis
 
@@ -215,3 +220,5 @@ If you hit an error or your turn budget is exhausted, write what you have to `.a
 - **Three user gates are mandatory in interactive mode.** Scope, deprecations, ordering.
 - **No commits.** Your output is a draft for user and coordinator review.
 - **Turn budget awareness.** Reserve the last 5 turns for writing `ROADMAP.md` and the memory-candidates section. At 80% budget consumed, wrap up the current phase and emit partial output.
+
+**High-stakes deliberation.** For roadmap tasks where cross-lens contradictions are substantial or the evidence for prioritization is contested, load [`skills/multi-perspective-analysis`](../skills/multi-perspective-analysis/SKILL.md) for lens-independence discipline, per-claim confidence annotation, and disconfirmation tiers.

@@ -6,9 +6,11 @@ flowchart TD
     subgraph SHADOW["Shadow Advisors — run parallel to researcher + systems-architect; forward-only between concurrent agents"]
         CE["context-engineer (shadow) → CONTEXT_REVIEW.md"]
         ID["interface-designer (shadow) → INTERFACE_DESIGN.md"]
+        TA["agentic-transactions-architect (shadow) → TRANSACTIONS_DESIGN.md"]
     end
-    SHADOW -.->|"CONTEXT_REVIEW.md + INTERFACE_DESIGN.md → planner"| IP
+    SHADOW -.->|"CONTEXT_REVIEW.md + INTERFACE_DESIGN.md + TRANSACTIONS_DESIGN.md → planner"| IP
     ID -.->|"## Architecture Challenges → orchestrator routes back → re-evaluate"| SA
+    TA -.->|"## Architecture Challenges → orchestrator routes back → re-evaluate"| SA
 
     SA["systems-architect"] -->|"SYSTEMS_PLAN.md"| IP
 

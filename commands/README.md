@@ -39,6 +39,7 @@ Reusable slash commands for AI coding assistants. Each `.md` file becomes a `/co
 | `/resume-rework` | Dispatch the appropriate agent for a rework worktree; cwd-driven auto-discovery of `VERIFIER_FINDINGS.md` (cite `commands/resume-rework.md`) |
 | `/roadmap` | Produce a project-audited `ROADMAP.md` via a project-derived evaluation lens set (SPIRIT, DORA, SPACE, FAIR, CNCF Platform Maturity, or Custom) through the roadmap-cartographer agent; covers strengths, weaknesses, **opportunities (forward lines of work)**, phased improvements, and deprecations |
 | `/run-experiment` | Dispatch an ML training experiment, validate compute budget, stream metrics, write `TRAINING_RESULTS.md` |
+| `/scores` | Render a ranked leaderboard of eval runs from `.ai-state/eval_ledger/EVAL_LOG.md` (read-only); supports `--task`, `--sort`, and `--top` filters |
 | `/sdd-coverage` | Report spec-to-test and spec-to-code coverage for REQ IDs |
 | `/skill-genesis` | Run the skill-genesis agent to autonomously harvest patterns from accumulated learnings (LEARNINGS.md, verification reports, sentinel findings, ADRs); write a timestamped report to `.ai-state/skill_genesis_reports/` for later disposition via `/skill-genesis-review` |
 | `/skill-genesis-review` | Disposition pending proposals from a skill-genesis report — batch multi-select presentation, append-only disposition log, surface delegation handoffs |

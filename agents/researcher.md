@@ -266,6 +266,12 @@ When research reveals a potential bug in an upstream dependency, document the ev
 - When the task involves context artifacts, the context-engineer may shadow this stage — running in parallel and producing the research-stage section of `CONTEXT_REVIEW.md`. No coordination needed: both agents work independently on their respective outputs
 - Scope boundary: you gather and present information; the context-engineer assesses what it means for context architecture
 
+### With the Agentic Transactions Architect
+
+- When the task involves agentic payments or trading (mandate, settlement finality, broker ToS, HITL spend-gating, x402/AP2/Nevermined rails), the agentic-transactions-architect shadows this stage — running in parallel and consuming your `RESEARCH_FINDINGS.md` as input to `TRANSACTIONS_DESIGN.md`. No coordination needed: both agents work independently on their respective outputs
+- Surface provider/SDK capabilities, regulatory constraints, and integration risks in your findings; the agentic-transactions-architect decides what they mean for transaction-layer architecture
+- Scope boundary: you gather and present transaction-domain information; the agentic-transactions-architect makes the provider-contract and spend-gating decisions
+
 ## Output
 
 After creating `RESEARCH_FINDINGS.md`, return a concise summary:

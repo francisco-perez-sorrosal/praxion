@@ -58,6 +58,7 @@ Work through these phases in order. Complete each phase before moving to the nex
 
 Before gathering information, clarify what needs to be researched. The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all reads and writes.
 
+0. **Read `TASK_BRIEF.md` first if it exists** — `.ai-work/<task-slug>/TASK_BRIEF.md` carries the user's authoritative Task Intent and Key Signals (captured at the Intake Clarity Gate). Scope your research to serve those signals; treat them as the goal, not as something to re-derive or second-guess.
 1. **Restate the research goal** in one sentence
 2. **Identify research questions** — concrete questions the findings must answer
 3. **Define scope boundaries** — what is in scope vs. out of scope

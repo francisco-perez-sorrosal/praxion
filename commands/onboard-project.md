@@ -41,8 +41,8 @@ Before any phase runs, gather facts. Pre-flight writes nothing — it produces a
 1. **Git repo check.** `git rev-parse --git-dir`. If it fails, abort with: `This command must be run inside a git repository. Run 'git init' first if this is a new project.` Exit without writing.
 2. **Project root.** `git rev-parse --show-toplevel`. All paths in subsequent phases are relative to this root.
 3. **Plugin install scope.** Read `~/.claude/plugins/installed_plugins.json` (use `jq -r '.plugins["i-am@bit-agora"]'`). Three outcomes:
-   - **User scope** — entry exists with `scope: "user"`. Capture `installPath` (used for hook resolution in §Phase 4).
-   - **Project scope** — entry exists with `scope: "project"` and `projectPath` matching the current project root. Capture `installPath`.
+   - **User scope** — entry exists with `scope: "user"`. Capture `installPath` (used for hook resolution in §Phase 4) and `version` (the live plugin version, used for drift detection in §Phase 3, §Phase 4, and the §Phase 9 onboard manifest). Capture `version` from the entry's `version` field, or fall back to the version segment of `installPath` (`.../i-am/<version>`).
+   - **Project scope** — entry exists with `scope: "project"` and `projectPath` matching the current project root. Capture `installPath` and `version` as above.
    - **Not installed** — emit a warning: `The i-am plugin is not installed. Install it via 'claude plugin install i-am@bit-agora' or './install.sh code' from a Praxion checkout. The onboarding can still run, but git hooks (Phase 4) will be skipped because they need the plugin's scripts/.` Set a flag to skip Phase 4.
 4. **Stack detection.** Probe for stack signals in the project root and capture which apply (used in §Phase 7 to recommend tooling):
    - Python: `pyproject.toml` OR `setup.py` OR `setup.cfg` OR `requirements.txt`
@@ -62,7 +62,7 @@ Before any phase runs, gather facts. Pre-flight writes nothing — it produces a
 5. **Prior-onboarding signals.** Check for any of:
    - `## Agent Pipeline` heading in `CLAUDE.md` (re-onboard scenario — Phase 6 will skip the append)
    - `.ai-state/` directory exists with non-empty contents (re-onboard or pipeline-active)
-   - `.git/hooks/post-merge`, `.git/hooks/post-commit`, and `.git/hooks/post-checkout` symlinks all pointing at `*/i-am/*/scripts/git-finalize-hook.sh` (Phase 4 already done)
+   - `.git/hooks/post-merge`, `.git/hooks/post-commit`, and `.git/hooks/post-checkout` symlinks all pointing at the **live** `${PLUGIN_INSTALL_PATH}/scripts/git-finalize-hook.sh` (Phase 4 already done). A symlink pointing at a *different* `/i-am/<version>/` path is a stale pin from a prior plugin version — Phase 4 will re-point it, so record it as "needs upgrade", not "already done".
 6. **Plugin-source-repo guard.** Detect whether the user has invoked `/onboard-project` on a Claude Code plugin source repo (Praxion itself, or any plugin in development that ships skills/agents/rules/commands). The signal is the existence of `.claude-plugin/plugin.json` at the project root. Plugin source repos curate their own `CLAUDE.md`, `.ai-state/` skeleton, and onboarding artifacts as the **canonical** sources of those patterns; running `/onboard-project` against them would either duplicate content under conflicting headings (the repo's bespoke sections plus newly-injected blocks like `## Agent Pipeline` / `## Praxion Process`) or skew bespoke sections from their downstream-injected counterparts as edits land in only one of the two locations. If `test -e .claude-plugin/plugin.json` succeeds AND the environment variable `PRAXION_ALLOW_SELF_ONBOARD` is not set to `1`, abort with: `This project root contains .claude-plugin/plugin.json — it looks like a Claude Code plugin source repo, not a consumer project. Plugin source repos curate their own CLAUDE.md and .ai-state/ as canonical sources of the onboarding patterns; running /onboard-project would either duplicate content under conflicting headings or skew bespoke sections from their downstream-injected counterparts. If you genuinely want to onboard this repo (rare — only useful for divergent forks), set PRAXION_ALLOW_SELF_ONBOARD=1 in the environment and re-run.` Exit without writing. **Override:** if `PRAXION_ALLOW_SELF_ONBOARD=1` is set, print a single-line warning to chat (`Self-onboard override active — proceeding on plugin source repo at <project-root>.`) and continue.
 7. **Greenfield-shape check.** Detect whether the user has accidentally invoked `/onboard-project` on a freshly-scaffolded greenfield project that should run `/new-project` instead. The greenfield signature: `.git/` exists, `.gitignore` contains the AI-assistants header, `.claude/` is empty, AND there is no `src/`, `pyproject.toml`, `package.json`, `Cargo.toml`, or `go.mod` (no source code yet). If all conditions hold, abort with: `This directory looks like a freshly-scaffolded greenfield project (.git/ + AI-assistants .gitignore + empty .claude/ + no source tree). Run /new-project instead — it scaffolds the codebase via the agent pipeline AND applies the existing-project onboarding surfaces at end. /onboard-project is for projects that already have code.` Exit without writing.
 8. **Print the pre-flight report** to chat. Format:
@@ -88,8 +88,8 @@ Execute these phases in order. Each phase honors §Idempotency Predicates — re
 | 0.5 | **(conditional — only when `CLAUDE.md` is absent)** Bootstrap a `CLAUDE.md` so the block-append phases have a target: prefer `/init`, else generate an init-equivalent `CLAUDE.md` inline from the codebase | `test -e CLAUDE.md` (present → skip the entire phase, no gate, no write) |
 | 1 | Append AI-assistants block to `.gitignore` | Block detected by `# AI assistants` header line |
 | 2 | Create `.ai-state/` skeleton (4 files) | Each file's existence checked individually |
-| 3 | Append `.gitattributes` entries + register merge drivers via `git config` | Entries detected by exact-line match; drivers detected via `git config --get` |
-| 4 | Symlink pre-commit + the three finalize hooks (post-merge, post-commit, post-checkout) (skip if `skip-phase-4` flag) | Symlinks detected via `readlink` resolving to the plugin path |
+| 3 | Append `.gitattributes` entries + register merge drivers via `git config`; clean up retired drivers | Entries detected by exact-line match; drivers detected via `git config --get`; **version-aware** — a `/i-am/` driver pinned to a non-live path is re-registered, not skipped |
+| 4 | Symlink pre-commit + the three finalize hooks (post-merge, post-commit, post-checkout) (skip if `skip-phase-4` flag) | Symlinks detected via `readlink`; **version-aware** — a finalize-hook target pinned to a non-live `/i-am/<version>/` path is re-pointed, not skipped (pre-commit is runtime-resolving, never stale) |
 | 5 | Write `.claude/settings.json` with chosen `PRAXION_DISABLE_*` flags | Existing keys preserved unless user explicitly chooses to override |
 | 5b | Hackathon mode gate: write six artifacts when enabled | `PRAXION_HACKATHON_MODE=1` present in `.claude/settings.json` env (skip if already set); or user picks `Skip — keep full ceremony` (default) at Gate 5b |
 | 6 | Append Agent Pipeline + Compaction Guidance + Behavioral Contract + Praxion Process blocks to `CLAUDE.md` (+ `## Hackathon Mode` when Phase 5b enabled it) | `## Agent Pipeline` heading detection per block |
@@ -261,7 +261,9 @@ Do NOT create `.ai-state/observations.jsonl` — that is written on first use by
 
 **Why this phase exists.** Line-based merge corrupts structured data. `.ai-state/observations.jsonl` (event log) is a merge-conflict target when concurrent edits land — the semantic merge driver reconciles it at the JSONL level instead. The full `.ai-state/` safety contract at PR time, including merge policy and the squash-merge ban for `.ai-state/`-touching branches, lives in `rules/swe/vcs/pr-conventions.md`.
 
-**Predicate.** Detect entries via exact-line `grep -qF '.ai-state/observations.jsonl merge=observations-jsonl' .gitattributes`. Detect driver registration via `git config --get merge.observations-jsonl.driver`.
+**Predicate (version-aware).** Detect the `.gitattributes` entry via exact-line `grep -qF '.ai-state/observations.jsonl merge=observations-jsonl' .gitattributes`. Detect driver registration via `git config --get merge.observations-jsonl.driver`. The registration is **stale** (and must be re-registered, not skipped) when the registered command contains `/i-am/` but its path is NOT the live `${PLUGIN_INSTALL_PATH}` captured at pre-flight — i.e. a plugin upgrade moved the install path and left git config pinned to the old version. A version-agnostic "already contains `/i-am/`" check is the bug that stranded upgraded consumers (drift was undetectable); compare the full path, and re-register on mismatch.
+
+**Cross-version cleanup.** Read the prior onboard manifest `.ai-state/.praxion-onboard.json` if present (written by §Phase 9 of an earlier run). For every merge driver named in its `artifacts.merge_drivers` that is NOT in the current expected set (`observations-jsonl` only), the feature was retired between versions: `git config --unset merge.<name>.driver` (ignore failure if already absent) and delete its `.gitattributes` line. Example: a project onboarded by an older version carries `.ai-state/memory.json merge=memory-json`; the `memory-json` driver was dropped, so onboarding must remove both the git-config entry and the `.gitattributes` line rather than leaving a `.gitattributes` mapping to a driver that no longer exists. Only touch Praxion-managed entries (driver value contains `/i-am/` or `merge_driver_`); never remove a user's own driver.
 
 **Action.**
 
@@ -271,7 +273,7 @@ Do NOT create `.ai-state/observations.jsonl` — that is written on first use by
    .ai-state/observations.jsonl merge=observations-jsonl
    ```
 
-2. **Register the driver in this repo's `git config`**:
+2. **Register (or re-register) the driver in this repo's `git config`**. Run this whenever the driver is absent OR the predicate flagged a stale `/i-am/` path — `git config` overwrites in place, upgrading a stale-version pin to the live install path:
    ```bash
    git config merge.observations-jsonl.driver "python3 ${PLUGIN_INSTALL_PATH}/scripts/merge_driver_observations.py %O %A %B"
    ```
@@ -289,7 +291,7 @@ Composition per trigger: `post-merge` runs `reconcile_ai_state.py` (when `.ai-st
 
 **Skip condition.** If §Pre-flight set the `skip-phase-4` flag (plugin not installed), skip this phase entirely and emit: `Skipping Phase 4 — install the plugin and re-run /onboard-project to install hooks.`
 
-**Predicate.** Detect existing symlinks via `readlink .git/hooks/<name>` and check whether the target contains `/i-am/`. The pre-commit hook target ends in `git-pre-commit-hook.sh`; the three finalize hooks (`post-merge`, `post-commit`, `post-checkout`) all share `git-finalize-hook.sh` as their target. Each individual hook that is already a correct Praxion symlink is skipped; the others install. Legacy targets (`git-post-merge-hook.sh` from older versions) count as Praxion-managed and are upgraded to the new symlink target without prompting.
+**Predicate (version-aware).** Detect existing symlinks via `readlink .git/hooks/<name>` and check whether the target contains `/i-am/`. The pre-commit hook target ends in `git-pre-commit-hook.sh` (but see the note below — the pre-commit hook is written inline and resolves the plugin path at run time, so it is version-independent and never goes stale); the three finalize hooks (`post-merge`, `post-commit`, `post-checkout`) all share `git-finalize-hook.sh` as their target. A finalize-hook symlink is **stale** (must be re-pointed, not skipped) when its target contains `/i-am/` but is NOT `${PLUGIN_INSTALL_PATH}/scripts/git-finalize-hook.sh` — a plugin upgrade moved the install path and left the symlink pinned to a now-garbage-collected old-version cache path. A version-agnostic "target contains `/i-am/`" check treats a stale pin as "already done" — the bug that left upgraded consumers running hooks against a path that no longer exists. Compare the full target path; re-point on mismatch. Each hook that already points at the live target is skipped; absent, stale, or legacy (`git-post-merge-hook.sh` from older versions) hooks are (re-)installed without prompting.
 
 **Action.**
 
@@ -1033,7 +1035,9 @@ full allowlist rationale.
      Phase 8b: AaC tier — fence seed, fitness/, Block D, architecture.yml, docs/diagrams/ (or skipped per sub-step)
      Phase 8c: ML scaffold — .ai-state/experiments/, .gitignore block, gpu_budget.yaml, program.md (or skipped per sub-step)
      Phase 8d: Obsidian integration — .gitignore Obsidian block, obsidian@obsidian-skills plugin verified, CLAUDE.md ## Obsidian Integration block, .claude/settings.json deny entries (or skipped per sub-step)
+     Phase 9: .ai-state/.praxion-onboard.json (onboard manifest — version <version>, artifact inventory)
    ```
+   Also report any cross-version cleanup performed in Phase 3 (e.g. `removed retired merge driver 'memory-json' + its .gitattributes line`) and any stale-pin upgrades in Phase 3/4 (e.g. `re-pointed finalize hooks from i-am/0.6.0 to i-am/0.8.0`).
    For each skipped phase (idempotency hit OR user opt-out), print `Phase N: skipped (<reason>)` instead.
 
 2. **Print verification next-steps** verbatim:
@@ -1048,7 +1052,23 @@ full allowlist rationale.
      - rules/swe/swe-agent-coordination-protocol.md (how the agent pipeline works)
    ```
 
-3. **Stage modified files**: run `git add` with the explicit list of files this command touched (built up through phases 1–6). Do NOT run `git add -A`. Do NOT commit. The user reviews staging and decides.
+3. **Write the onboard manifest** `.ai-state/.praxion-onboard.json` (overwrite each run — it is the single record of what version onboarded this project and what artifacts it installed, consumed by §Phase 3 / §Phase 4 drift detection and cross-version cleanup on the next run). Record only **shareable** fields — never the machine-specific `installPath` (it is resolved live from `installed_plugins.json` at every hook/driver run, so it must not be committed):
+   ```json
+   {
+     "plugin": "i-am@bit-agora",
+     "onboarded_with_version": "<version captured at pre-flight>",
+     "onboarded_at": "<ISO 8601 UTC timestamp>",
+     "scope": "user | project",
+     "artifacts": {
+       "hooks": ["pre-commit", "post-merge", "post-commit", "post-checkout"],
+       "merge_drivers": ["observations-jsonl"],
+       "gitattributes": [".ai-state/observations.jsonl merge=observations-jsonl"]
+     }
+   }
+   ```
+   List only artifacts actually installed this run (omit hooks if Phase 4 was skipped). If the plugin version could not be captured at pre-flight (skip-phase-4 flag), write `"onboarded_with_version": "unknown"` and emit a one-line note. Add `.ai-state/.praxion-onboard.json` to the staged set.
+
+4. **Stage modified files**: run `git add` with the explicit list of files this command touched (built up through phases 1–6, plus `.ai-state/.praxion-onboard.json`). Do NOT run `git add -A`. Do NOT commit. The user reviews staging and decides.
 
 ## §Agent Pipeline Block
 

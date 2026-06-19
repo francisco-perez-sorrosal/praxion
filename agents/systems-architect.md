@@ -265,7 +265,7 @@ Small decisions don't need this format. Reserve it for choices that affect:
 
 2. **ADR fragment file** — for each significant decision, create a draft ADR fragment under `.ai-state/decisions/drafts/`:
    - Derive a fragment filename `<YYYYMMDD-HHMM>-<user>-<branch>-<slug>.md`. `<user>` is the username prefix of `git config user.email` (the part before `@`), falling back to `git config user.name`, then `anon`; sanitize to `[a-z0-9-]` and cap at 40 chars. `<branch>` is `git rev-parse --abbrev-ref HEAD`, same sanitization. `<slug>` is a short kebab-case label derived from the decision title.
-   - Compute `id: dec-draft-<sha1(filename)[:8]>`.
+   - Compute `id: dec-draft-<sha1(filename)[:8]>`. The hash MUST be the literal 8-char hex digest prefix and always matches `dec-draft-[0-9a-f]{8}`. Never hand-author a mnemonic id (e.g. `dec-draft-w068a1c2` — `w` is not hex): a non-hex id is skipped-with-warning by finalize and flagged by sentinel DL02, so the decision silently fails to promote. Self-check the id against `[0-9a-f]{8}` before writing.
    - Create `.ai-state/decisions/drafts/<fragment-filename>.md` using the Write tool with frontmatter `id: dec-draft-<hash>` and `status: proposed`, plus the remaining fields and MADR body sections (Context, Decision, Considered Options, Consequences) defined in the ADR conventions rule.
    - Cross-reference sibling drafts authored during this pipeline via `supersedes: dec-draft-<hash>` or `re_affirms: dec-draft-<hash>`. The finalize step at merge-to-main rewrites these to stable `dec-NNN`.
    - Do **not** invoke `scripts/regenerate_adr_index.py` — `DECISIONS_INDEX.md` regenerates automatically at finalize.

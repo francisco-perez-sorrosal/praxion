@@ -1,3 +1,21 @@
+## v0.9.0 (2026-06-19)
+
+### Feat
+
+- version-aware onboarding — drift detection, manifest, cleanup
+- wire pipeline agents to consume TASK_BRIEF.md
+- add goal-disambiguation intake mechanism
+
+### Fix
+
+- harden ADR draft-id authoring; reconcile Phase 8f producer claim
+- guard finalize against plugin-cache writes; widen cross-ref scope
+- resolve consumer repo root in finalize-chain scripts
+
+### Refactor
+
+- share repo-root resolver; drop scripts/ from cross-ref sweep
+
 ## v0.8.0 (2026-06-18)
 
 ### Feat

@@ -521,6 +521,9 @@ class TestMain:
         monkeypatch.setattr(reconcile, "DECISIONS_DIR", tmp_path / "decisions")
         monkeypatch.setattr(reconcile, "has_drafts_directory_changed_in_merge", lambda: False)
         monkeypatch.setattr(reconcile, "git", lambda *args: _make_completed_process(0))
+        # Disable repo-root resolution so the injected path constants survive;
+        # the resolver itself is covered by the consumer-layout regression tests.
+        monkeypatch.setattr(reconcile, "apply_repo_root", lambda *_a, **_k: None)
 
         monkeypatch.setattr(sys, "argv", ["reconcile_ai_state.py"])
         reconcile.main()
@@ -730,6 +733,9 @@ class TestMainObservationsAndAdrChanges:
         monkeypatch.setattr(reconcile, "DECISIONS_DIR", tmp_path / "decisions")
         monkeypatch.setattr(reconcile, "has_drafts_directory_changed_in_merge", lambda: False)
         monkeypatch.setattr(reconcile, "git", fake_git)
+        # Disable repo-root resolution so the injected path constants survive;
+        # the resolver itself is covered by the consumer-layout regression tests.
+        monkeypatch.setattr(reconcile, "apply_repo_root", lambda *_a, **_k: None)
         monkeypatch.setattr(sys, "argv", ["reconcile_ai_state.py"])
         reconcile.main()
 

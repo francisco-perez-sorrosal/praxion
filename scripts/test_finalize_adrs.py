@@ -162,9 +162,7 @@ def repo_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
             if attr == "REPO_ROOT":
                 monkeypatch.setattr(finalize, attr, tmp_path)
             elif attr == "DECISIONS_DIR":
-                monkeypatch.setattr(
-                    finalize, attr, tmp_path / ".ai-state" / "decisions"
-                )
+                monkeypatch.setattr(finalize, attr, tmp_path / ".ai-state" / "decisions")
             elif attr == "DRAFTS_DIR":
                 monkeypatch.setattr(
                     finalize,
@@ -324,9 +322,7 @@ class TestParseFragmentBranchFromFrontmatter:
                         stdout="alice@example.com\n",
                         stderr="",
                     )
-            return subprocess.CompletedProcess(
-                args=args, returncode=0, stdout="", stderr=""
-            )
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
 
         monkeypatch.setattr(finalize.subprocess, "run", _fake_run)
 
@@ -361,9 +357,7 @@ class TestParseFragmentBranchFromFrontmatter:
                         stdout="alice@example.com\n",
                         stderr="",
                     )
-            return subprocess.CompletedProcess(
-                args=args, returncode=0, stdout="", stderr=""
-            )
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
 
         monkeypatch.setattr(finalize.subprocess, "run", _fake_run)
 
@@ -401,9 +395,7 @@ class TestParseFragmentBranchFromFrontmatter:
                         stdout="alice@example.com\n",
                         stderr="",
                     )
-            return subprocess.CompletedProcess(
-                args=args, returncode=0, stdout="", stderr=""
-            )
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
 
         monkeypatch.setattr(finalize.subprocess, "run", _fake_run)
 
@@ -434,9 +426,7 @@ class TestParseFragmentBranchFromFrontmatter:
                         stdout="alice@example.com\n",
                         stderr="",
                     )
-            return subprocess.CompletedProcess(
-                args=args, returncode=0, stdout="", stderr=""
-            )
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
 
         monkeypatch.setattr(finalize.subprocess, "run", _fake_run)
 
@@ -467,9 +457,7 @@ class TestFinalizeSingleDraft:
         """One draft becomes <NNN+1>-<slug>.md with rewritten id."""
         # Pre-existing finalized ADR at 042
         make_finalized(repo_root, 42, "prior-decision")
-        draft_path = make_draft(
-            repo_root, "20260419-1810", "alice", "main", "new-decision"
-        )
+        draft_path = make_draft(repo_root, "20260419-1810", "alice", "main", "new-decision")
         draft_filename = draft_path.name
         expected_draft_id = f"dec-draft-{_draft_hash(draft_filename)}"
 
@@ -520,15 +508,9 @@ class TestFinalizeMultipleDrafts:
         assert (decisions_dir / "053-charlie.md").exists()
 
         # Each renamed file has its id rewritten
-        assert "id: dec-051" in (decisions_dir / "051-alpha.md").read_text(
-            encoding="utf-8"
-        )
-        assert "id: dec-052" in (decisions_dir / "052-bravo.md").read_text(
-            encoding="utf-8"
-        )
-        assert "id: dec-053" in (decisions_dir / "053-charlie.md").read_text(
-            encoding="utf-8"
-        )
+        assert "id: dec-051" in (decisions_dir / "051-alpha.md").read_text(encoding="utf-8")
+        assert "id: dec-052" in (decisions_dir / "052-bravo.md").read_text(encoding="utf-8")
+        assert "id: dec-053" in (decisions_dir / "053-charlie.md").read_text(encoding="utf-8")
 
     def test_next_adr_number_on_empty_decisions_dir(self, repo_root: Path) -> None:
         """Empty decisions dir -> next NNN is 1."""
@@ -703,9 +685,7 @@ class TestFinalizeCrossReferences:
 
     def test_scripts_refs_rewritten(self, repo_root: Path) -> None:
         """Expanded scope: scripts/*.py and scripts/*.sh docstring refs rewrite."""
-        draft = make_draft(
-            repo_root, "20260419-1810", "alice", "main", "script-decision"
-        )
+        draft = make_draft(repo_root, "20260419-1810", "alice", "main", "script-decision")
         draft_id = f"dec-draft-{_draft_hash(draft.name)}"
 
         scripts_dir = repo_root / "scripts"
@@ -736,18 +716,14 @@ class TestFinalizeCrossReferences:
 class TestFinalizeIdempotent:
     """Finalize is idempotent -- running twice is a no-op."""
 
-    def test_second_run_is_no_op(
-        self, repo_root: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_second_run_is_no_op(self, repo_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Second invocation on the same batch exits 0 and changes nothing."""
         make_draft(repo_root, "20260419-1810", "alice", "main", "idempotent")
 
         # Stub subprocess.run so the embedded call to regenerate_adr_index and
         # any git detection cannot touch the real filesystem / repo.
         def _fake_run(*_args: Any, **_kwargs: Any) -> subprocess.CompletedProcess[str]:
-            return subprocess.CompletedProcess(
-                args=[], returncode=0, stdout="", stderr=""
-            )
+            return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
 
         monkeypatch.setattr(finalize.subprocess, "run", _fake_run)
 
@@ -757,9 +733,7 @@ class TestFinalizeIdempotent:
         decisions_dir = repo_root / ".ai-state" / "decisions"
         first_run_files = sorted(p.name for p in decisions_dir.iterdir() if p.is_file())
         first_run_content = {
-            p.name: p.read_text(encoding="utf-8")
-            for p in decisions_dir.iterdir()
-            if p.is_file()
+            p.name: p.read_text(encoding="utf-8") for p in decisions_dir.iterdir() if p.is_file()
         }
 
         # Second run -- must be a no-op
@@ -770,13 +744,9 @@ class TestFinalizeIdempotent:
         assert exit_code_second == 0
 
         # Filesystem unchanged after the second run
-        second_run_files = sorted(
-            p.name for p in decisions_dir.iterdir() if p.is_file()
-        )
+        second_run_files = sorted(p.name for p in decisions_dir.iterdir() if p.is_file())
         second_run_content = {
-            p.name: p.read_text(encoding="utf-8")
-            for p in decisions_dir.iterdir()
-            if p.is_file()
+            p.name: p.read_text(encoding="utf-8") for p in decisions_dir.iterdir() if p.is_file()
         }
         assert first_run_files == second_run_files
         assert first_run_content == second_run_content
@@ -831,34 +801,29 @@ class TestFinalizeIndex:
         """
         # Load regenerate_adr_index as a module
         regen_path = Path(__file__).resolve().parent / "regenerate_adr_index.py"
-        regen_spec = importlib.util.spec_from_file_location(
-            "regenerate_adr_index", regen_path
-        )
+        regen_spec = importlib.util.spec_from_file_location("regenerate_adr_index", regen_path)
         assert regen_spec is not None and regen_spec.loader is not None
         regen_mod = importlib.util.module_from_spec(regen_spec)
         regen_spec.loader.exec_module(regen_mod)
 
         # Point regen at our tmp-path decisions dir
-        monkeypatch.setattr(
-            regen_mod, "DECISIONS_DIR", repo_root / ".ai-state" / "decisions"
-        )
+        monkeypatch.setattr(regen_mod, "DECISIONS_DIR", repo_root / ".ai-state" / "decisions")
         monkeypatch.setattr(
             regen_mod,
             "INDEX_PATH",
             repo_root / ".ai-state" / "decisions" / "DECISIONS_INDEX.md",
         )
+        # Disable regen's repo-root resolution so the injected constants above
+        # survive; the resolver is covered by the consumer-layout regression tests.
+        monkeypatch.setattr(regen_mod, "apply_repo_root", lambda *_a, **_k: None)
 
         # Stub subprocess.run inside finalize -- on the regen call, invoke regen
         # in-process. Other calls (e.g., git log) are no-ops.
-        def _fake_run(
-            args: Any, *_a: Any, **_k: Any
-        ) -> subprocess.CompletedProcess[str]:
+        def _fake_run(args: Any, *_a: Any, **_k: Any) -> subprocess.CompletedProcess[str]:
             args_list = list(args) if not isinstance(args, str) else args.split()
             if any("regenerate_adr_index" in str(a) for a in args_list):
                 regen_mod.main()
-            return subprocess.CompletedProcess(
-                args=args_list, returncode=0, stdout="", stderr=""
-            )
+            return subprocess.CompletedProcess(args=args_list, returncode=0, stdout="", stderr="")
 
         monkeypatch.setattr(finalize.subprocess, "run", _fake_run)
 
@@ -899,9 +864,7 @@ class TestFinalizeDryRun:
 
         # Stub subprocess.run so git detection is inert
         def _fake_run(*_a: Any, **_k: Any) -> subprocess.CompletedProcess[str]:
-            return subprocess.CompletedProcess(
-                args=[], returncode=0, stdout="", stderr=""
-            )
+            return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
 
         monkeypatch.setattr(finalize.subprocess, "run", _fake_run)
 
@@ -943,9 +906,7 @@ class TestFinalizeEmptyDirectory:
         import logging
 
         def _fake_run(*_a: Any, **_k: Any) -> subprocess.CompletedProcess[str]:
-            return subprocess.CompletedProcess(
-                args=[], returncode=0, stdout="", stderr=""
-            )
+            return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
 
         monkeypatch.setattr(finalize.subprocess, "run", _fake_run)
 
@@ -986,25 +947,19 @@ class TestDraftsAddedDetection:
         """
         calls: list[tuple[str, ...]] = []
 
-        def _fake_run(
-            args: list[str], **_kwargs: Any
-        ) -> subprocess.CompletedProcess[str]:
+        def _fake_run(args: list[str], **_kwargs: Any) -> subprocess.CompletedProcess[str]:
             assert args[0] == "git"
             key = tuple(args[1:])
             calls.append(key)
             if key not in responses:
                 # Default: success with empty output keeps tests deterministic.
-                return subprocess.CompletedProcess(
-                    args=args, returncode=0, stdout="", stderr=""
-                )
+                return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
             stdout = responses[key]
             if stdout is None:
                 return subprocess.CompletedProcess(
                     args=args, returncode=128, stdout="", stderr="fatal"
                 )
-            return subprocess.CompletedProcess(
-                args=args, returncode=0, stdout=stdout, stderr=""
-            )
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout=stdout, stderr="")
 
         monkeypatch.setattr(finalize.subprocess, "run", _fake_run)
         return calls
@@ -1082,9 +1037,7 @@ class TestDraftsAddedDetection:
         assert ("rev-parse", "HEAD@{1}") in calls
         assert ("rev-list", "--parents", "-n", "1", "HEAD") in calls
 
-    def test_returns_empty_set_for_root_commit(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_returns_empty_set_for_root_commit(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Root commit (no parents) yields empty set, not None.
 
         A None return signals "git unavailable / lookup failed" and triggers
@@ -1130,3 +1083,182 @@ class TestFinalizeLock:
         with open(lock_path, "a") as f:
             fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+
+
+# -- Repo-root resolution + consumer-layout regression ------------------------
+#
+# These pin the fix for the symlinked-plugin-cache divergence: finalize must
+# act on the *consumer's* repo (resolved from --repo-root or the git worktree),
+# never on the plugin location that `Path(__file__).resolve()` follows the
+# symlink to. Self-hosting masks this bug because Praxion's own scripts/ is a
+# real checkout; only a consumer running from the plugin cache exposes it.
+
+
+class TestRepoRootResolution:
+    """resolve_repo_root + _apply_repo_root precedence and rebinding."""
+
+    def test_explicit_repo_root_wins(self, tmp_path: Path) -> None:
+        resolved = finalize.resolve_repo_root(str(tmp_path))
+        assert resolved == tmp_path.resolve()
+
+    def test_falls_back_to_git_toplevel_when_no_explicit_root(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(finalize, "_git_toplevel_from_cwd", lambda: tmp_path)
+        assert finalize.resolve_repo_root(None) == tmp_path.resolve()
+
+    def test_script_relative_is_last_resort_when_git_unavailable(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(finalize, "_git_toplevel_from_cwd", lambda: None)
+        assert finalize.resolve_repo_root(None) == finalize.SCRIPT_DIR.parent
+
+    def test_apply_repo_root_rebinds_all_path_constants(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Use monkeypatch.setattr so the global rebind is reverted post-test.
+        for attr in ("REPO_ROOT", "DECISIONS_DIR", "DRAFTS_DIR", "LOCK_PATH"):
+            monkeypatch.setattr(finalize, attr, getattr(finalize, attr))
+        finalize._apply_repo_root(tmp_path)
+        assert finalize.REPO_ROOT == tmp_path
+        assert finalize.DECISIONS_DIR == tmp_path / ".ai-state" / "decisions"
+        assert finalize.DRAFTS_DIR == tmp_path / ".ai-state" / "decisions" / "drafts"
+        assert finalize.LOCK_PATH == finalize.DRAFTS_DIR / ".finalize.lock"
+
+
+def _init_consumer_repo(root: Path) -> None:
+    """Create a git repo at root on `main` with one committed draft fragment."""
+    import subprocess as sp
+
+    (root / ".ai-state" / "decisions" / "drafts").mkdir(parents=True)
+
+    def run(*args: str) -> None:
+        sp.run(
+            ["git", "-C", str(root), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+    run("init")
+    run("config", "user.email", "tester@example.com")
+    run("config", "user.name", "Tester")
+    make_draft(
+        root,
+        "20260101-1200",
+        "tester",
+        "main",
+        "sample-decision",
+        frontmatter_extra={"branch": "main"},
+    )
+    run("add", "-A")
+    run("commit", "-m", "add draft")
+    run("branch", "-M", "main")
+
+
+def _make_fake_plugin(plugin_dir: Path) -> Path:
+    """Copy finalize + regen scripts into a plugin-like dir with its OWN empty
+    drafts/, mimicking the symlinked-cache layout. Returns the finalize script.
+
+    The empty drafts/ is the trap: a buggy __file__-relative root scans here
+    and reports `nothing to do` instead of touching the consumer's drafts.
+    """
+    import shutil
+
+    plugin_scripts = plugin_dir / "scripts"
+    plugin_scripts.mkdir(parents=True)
+    src_dir = Path(__file__).resolve().parent
+    for name in ("finalize_adrs.py", "regenerate_adr_index.py"):
+        shutil.copy2(src_dir / name, plugin_scripts / name)
+    (plugin_dir / ".ai-state" / "decisions" / "drafts").mkdir(parents=True)
+    return plugin_scripts / "finalize_adrs.py"
+
+
+class TestConsumerLayoutEndToEnd:
+    """Run the real script from a copied plugin location against a git fixture.
+
+    Exercises the __file__-vs-git-root divergence end to end -- the bug only
+    manifests when the script is invoked from outside the target repo.
+    """
+
+    def test_explicit_repo_root_finalizes_consumer_not_plugin(self, tmp_path: Path) -> None:
+        consumer = tmp_path / "consumer"
+        plugin = tmp_path / "plugin"
+        _init_consumer_repo(consumer)
+        script = _make_fake_plugin(plugin)
+
+        result = subprocess.run(
+            [sys.executable, str(script), "--all", "--repo-root", str(consumer)],
+            capture_output=True,
+            text=True,
+            cwd=str(tmp_path),
+        )
+
+        assert result.returncode == 0, result.stderr
+        decisions = consumer / ".ai-state" / "decisions"
+        assert (decisions / "001-sample-decision.md").exists()
+        assert (decisions / "DECISIONS_INDEX.md").exists()
+        # The plugin's own (empty) decisions dir must be untouched.
+        assert not list((plugin / ".ai-state" / "decisions").glob("[0-9]*.md"))
+
+    def test_git_root_fallback_finalizes_consumer_when_cwd_is_repo(self, tmp_path: Path) -> None:
+        """No --repo-root: resolution falls back to `git rev-parse` in cwd.
+
+        This is the exact failure the report hit -- without the fix the script
+        resolves its root from __file__ (the plugin) and no-ops, stranding the
+        consumer's drafts.
+        """
+        consumer = tmp_path / "consumer"
+        plugin = tmp_path / "plugin"
+        _init_consumer_repo(consumer)
+        script = _make_fake_plugin(plugin)
+
+        result = subprocess.run(
+            [sys.executable, str(script), "--all"],
+            capture_output=True,
+            text=True,
+            cwd=str(consumer),
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert (consumer / ".ai-state" / "decisions" / "001-sample-decision.md").exists()
+        assert not list((plugin / ".ai-state" / "decisions").glob("[0-9]*.md"))
+
+
+class TestMalformedDraftResilience:
+    """A single malformed fragment is skipped, not allowed to abort the batch."""
+
+    def test_malformed_id_skipped_valid_drafts_still_planned(self, repo_root: Path, caplog) -> None:
+        import logging
+        import re as _re
+
+        good = make_draft(
+            repo_root,
+            "20260101-1200",
+            "alice",
+            "main",
+            "good-one",
+            frontmatter_extra={"branch": "main"},
+        )
+        bad = make_draft(
+            repo_root,
+            "20260101-1300",
+            "alice",
+            "main",
+            "bad-one",
+            frontmatter_extra={"branch": "main"},
+        )
+        # Corrupt the bad draft's id to a non-hex hash (the report's case:
+        # dec-draft-w068a1c2). The id regex requires [0-9a-f]{8}, so this draft
+        # fails per-draft validation.
+        bad.write_text(
+            _re.sub(r"dec-draft-[0-9a-f]{8}", "dec-draft-w068a1c2", bad.read_text()),
+            encoding="utf-8",
+        )
+
+        with caplog.at_level(logging.WARNING, logger="finalize_adrs"):
+            plans = finalize.build_promotion_plan([good, bad])
+
+        assert {p.slug for p in plans} == {"good-one"}
+        assert plans[0].new_id == "dec-001"
+        assert "skipping malformed draft" in caplog.text

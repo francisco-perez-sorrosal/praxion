@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import logging
+import subprocess
 import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -51,6 +52,60 @@ REPO_ROOT = SCRIPT_DIR.parent
 LEDGER_PATH = REPO_ROOT / ".ai-state" / "TECH_DEBT_LEDGER.md"
 RESOLVED_PATH = REPO_ROOT / ".ai-state" / "TECH_DEBT_RESOLVED.md"
 LOCK_PATH = REPO_ROOT / ".ai-state" / ".tech_debt_ledger_finalize.lock"
+
+
+def _git_toplevel_from_cwd() -> Path | None:
+    """Resolve the repo root from the process CWD via git.
+
+    Git invokes the finalize hooks with the working directory at the consumer's
+    worktree root, so a bare `git rev-parse --show-toplevel` (no `cwd` override)
+    returns the consumer's repo -- even when this script executes from a
+    symlinked plugin cache, where `Path(__file__).resolve()` would follow the
+    symlink to the plugin instead.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        return None
+    if result.returncode != 0:
+        return None
+    out = result.stdout.strip()
+    return Path(out) if out else None
+
+
+def resolve_repo_root(cli_repo_root: str | None) -> Path:
+    """Resolve the repo root: explicit `--repo-root` > git-root > script-relative.
+
+    The script-relative fallback is correct only for a real checkout (Praxion
+    self-hosting); for symlinked plugin hooks it resolves to the plugin, so it
+    is the logged last resort.
+    """
+    if cli_repo_root:
+        return Path(cli_repo_root).resolve()
+    git_root = _git_toplevel_from_cwd()
+    if git_root is not None:
+        return git_root.resolve()
+    logger.warning(
+        "finalize_tech_debt_ledger: could not resolve repo root from "
+        "--repo-root or git; falling back to script-relative %s",
+        SCRIPT_DIR.parent,
+    )
+    return SCRIPT_DIR.parent
+
+
+def _apply_repo_root(root: Path) -> None:
+    """Rebind the module-level path constants to a resolved repo root."""
+    global REPO_ROOT, LEDGER_PATH, RESOLVED_PATH, LOCK_PATH
+    REPO_ROOT = root
+    LEDGER_PATH = root / ".ai-state" / "TECH_DEBT_LEDGER.md"
+    RESOLVED_PATH = root / ".ai-state" / "TECH_DEBT_RESOLVED.md"
+    LOCK_PATH = root / ".ai-state" / ".tech_debt_ledger_finalize.lock"
+
 
 # Schema-defined column order. See rules/swe/agent-intermediate-documents.md
 # § TECH_DEBT_LEDGER.md for the authoritative field definitions.
@@ -283,9 +338,7 @@ def reconcile_pair(
     their source file keep their position; rows that move (re-open or first-
     time migration) append to the destination file.
     """
-    tagged = [(row, "active") for row in active_rows] + [
-        (row, "resolved") for row in resolved_rows
-    ]
+    tagged = [(row, "active") for row in active_rows] + [(row, "resolved") for row in resolved_rows]
 
     groups: dict[str, list[tuple[LedgerRow, str]]] = {}
     key_order: list[str] = []
@@ -348,23 +401,15 @@ def _reopen_collapse(group: list[tuple[LedgerRow, str]]) -> LedgerRow:
     resolved_rows = [row for row, tag in group if tag == "resolved"]
     active_rows = [row for row, tag in group if tag == "active"]
 
-    historical = (
-        _pick_survivor(resolved_rows) if len(resolved_rows) > 1 else resolved_rows[0]
-    )
-    active_survivor = (
-        _pick_survivor(active_rows) if len(active_rows) > 1 else active_rows[0]
-    )
+    historical = _pick_survivor(resolved_rows) if len(resolved_rows) > 1 else resolved_rows[0]
+    active_survivor = _pick_survivor(active_rows) if len(active_rows) > 1 else active_rows[0]
 
     recurrence_date = active_survivor.get("last-seen") or _latest_last_seen(active_rows)
     all_rows = resolved_rows + active_rows
-    merged_notes = _merge_notes(
-        historical, [r for r in all_rows if r is not historical]
-    )
+    merged_notes = _merge_notes(historical, [r for r in all_rows if r is not historical])
     recurrence_marker = f"{RECURRENCE_NOTE_PREFIX}{recurrence_date}"
     final_notes = (
-        f"{merged_notes}{NOTES_SEPARATOR}{recurrence_marker}"
-        if merged_notes
-        else recurrence_marker
+        f"{merged_notes}{NOTES_SEPARATOR}{recurrence_marker}" if merged_notes else recurrence_marker
     )
 
     return historical.with_updates(
@@ -444,9 +489,7 @@ def finalize_pair(
         if ledger_header
         else _render_with_default_ledger_header(new_active, ledger_path)
     )
-    new_resolved_text = render_ledger(
-        resolved_header or DEFAULT_RESOLVED_HEADER, new_resolved
-    )
+    new_resolved_text = render_ledger(resolved_header or DEFAULT_RESOLVED_HEADER, new_resolved)
 
     ledger_changed = _bytes_changed(ledger_path, new_ledger_text)
     resolved_changed = _resolved_changed(resolved_path, new_resolved, new_resolved_text)
@@ -519,9 +562,7 @@ def _resolved_changed(path: Path, new_rows: list[LedgerRow], new_text: str) -> b
 # Backwards-compatible alias retained for any caller that imported the old name.
 def finalize_ledger(ledger_path: Path = LEDGER_PATH, dry_run: bool = False) -> int:
     """Compatibility shim for the pre-pair API. Routes to finalize_pair."""
-    return finalize_pair(
-        ledger_path=ledger_path, resolved_path=RESOLVED_PATH, dry_run=dry_run
-    )
+    return finalize_pair(ledger_path=ledger_path, resolved_path=RESOLVED_PATH, dry_run=dry_run)
 
 
 # -- CLI ----------------------------------------------------------------------
@@ -557,6 +598,15 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Run reconciliation unconditionally (same behavior as --merged today).",
     )
     parser.add_argument(
+        "--repo-root",
+        metavar="PATH",
+        help=(
+            "Repo root whose .ai-state/ ledger pair to reconcile. When omitted, "
+            "resolved from `git rev-parse --show-toplevel` in the current "
+            "directory. Required when the script runs from a symlinked plugin cache."
+        ),
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Report what would change without writing the pair.",
@@ -573,6 +623,7 @@ def main(argv: list[str] | None = None) -> None:
     """CLI entry point. Never raises; logs errors and exits with a code."""
     args = _parse_args(argv)
     _configure_logging(args.verbose)
+    _apply_repo_root(resolve_repo_root(args.repo_root))
 
     try:
         with acquire_lock(LOCK_PATH):

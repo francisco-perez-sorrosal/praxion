@@ -10,11 +10,52 @@ Usage: python scripts/regenerate_adr_index.py
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
-DECISIONS_DIR = Path(__file__).resolve().parent.parent / ".ai-state" / "decisions"
+SCRIPT_DIR = Path(__file__).resolve().parent
+DECISIONS_DIR = SCRIPT_DIR.parent / ".ai-state" / "decisions"
 INDEX_PATH = DECISIONS_DIR / "DECISIONS_INDEX.md"
+
+
+def _git_toplevel_from_cwd() -> Path | None:
+    """Resolve the repo root from the process CWD via git.
+
+    A bare `git rev-parse --show-toplevel` (no `cwd` override) returns the
+    consumer's repo even when this script runs from a symlinked plugin cache,
+    where `Path(__file__).resolve()` would follow the symlink to the plugin.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return None
+    if result.returncode != 0:
+        return None
+    out = result.stdout.strip()
+    return Path(out) if out else None
+
+
+def resolve_repo_root(cli_repo_root: str | None) -> Path:
+    """Resolve the repo root: explicit `--repo-root` > git-root > script-relative."""
+    if cli_repo_root:
+        return Path(cli_repo_root).resolve()
+    git_root = _git_toplevel_from_cwd()
+    if git_root is not None:
+        return git_root.resolve()
+    return SCRIPT_DIR.parent
+
+
+def apply_repo_root(root: Path) -> None:
+    """Rebind the module-level path constants to a resolved repo root."""
+    global DECISIONS_DIR, INDEX_PATH
+    DECISIONS_DIR = root / ".ai-state" / "decisions"
+    INDEX_PATH = DECISIONS_DIR / "DECISIONS_INDEX.md"
+
 
 # Match files like 001-slug.md, 012-another-slug.md
 ADR_FILENAME_PATTERN = re.compile(r"^\d{3}-.+\.md$")
@@ -59,9 +100,7 @@ def parse_frontmatter(content: str) -> dict[str, str]:
     def flush_block() -> None:
         nonlocal block_key, block_items
         if block_key is not None and block_items:
-            result[block_key] = (
-                "[" + ", ".join(f'"{item}"' for item in block_items) + "]"
-            )
+            result[block_key] = "[" + ", ".join(f'"{item}"' for item in block_items) + "]"
         block_key = None
         block_items = []
 
@@ -153,8 +192,18 @@ def generate_index(adrs: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
+def _parse_repo_root_arg() -> str | None:
+    """Extract `--repo-root <path>` from argv, if present."""
+    if "--repo-root" in sys.argv:
+        idx = sys.argv.index("--repo-root")
+        if idx + 1 < len(sys.argv):
+            return sys.argv[idx + 1]
+    return None
+
+
 def main() -> None:
     """Entry point: collect ADRs, generate index, write to file."""
+    apply_repo_root(resolve_repo_root(_parse_repo_root_arg()))
     adrs = collect_adrs()
     index_content = generate_index(adrs)
     INDEX_PATH.write_text(index_content, encoding="utf-8")

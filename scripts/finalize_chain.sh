@@ -116,12 +116,17 @@ _finalize_chain_run_script() {
 #     resolutions committed without a concurrent ADR draft.
 _finalize_chain_run_on_main() {
     local repo_root="$1"
+    # Pass --repo-root explicitly: the python scripts may be executing from a
+    # symlinked plugin cache, where their own file location resolves to the
+    # plugin rather than this consumer repo. repo_root is the git worktree root
+    # resolved above; handing it down is what makes finalize act on the
+    # consumer's .ai-state/ instead of the plugin's (empty) one.
     if _finalize_chain_drafts_present "$repo_root"; then
         _finalize_chain_run_script "finalize_adrs" \
-            "${FINALIZE_CHAIN_DIR}/finalize_adrs.py" --all
+            "${FINALIZE_CHAIN_DIR}/finalize_adrs.py" --all --repo-root "$repo_root"
     fi
     _finalize_chain_run_script "finalize_tech_debt_ledger" \
-        "${FINALIZE_CHAIN_DIR}/finalize_tech_debt_ledger.py" --all
+        "${FINALIZE_CHAIN_DIR}/finalize_tech_debt_ledger.py" --all --repo-root "$repo_root"
 }
 
 # -- Public entry points ------------------------------------------------------
@@ -154,7 +159,8 @@ finalize_chain_post_merge() {
 
     if _finalize_chain_state_was_touched "$repo_root"; then
         _finalize_chain_run_script "post-merge: reconcile_ai_state" \
-            "${FINALIZE_CHAIN_DIR}/reconcile_ai_state.py" --post-merge
+            "${FINALIZE_CHAIN_DIR}/reconcile_ai_state.py" --post-merge \
+            --repo-root "$repo_root"
     fi
 
     if _finalize_chain_on_main; then
@@ -162,7 +168,7 @@ finalize_chain_post_merge() {
     fi
 
     _finalize_chain_run_script "post-merge: check_squash_safety" \
-        "${FINALIZE_CHAIN_DIR}/check_squash_safety.py"
+        "${FINALIZE_CHAIN_DIR}/check_squash_safety.py" --repo-root "$repo_root"
 }
 
 # Post-commit entry point. Catches paths that create commits on main without

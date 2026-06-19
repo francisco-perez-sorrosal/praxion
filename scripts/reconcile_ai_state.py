@@ -34,6 +34,57 @@ OBSERVATIONS_PATH = AI_STATE / "observations.jsonl"
 ADR_FILENAME_PATTERN = re.compile(r"^(\d{3})-.+\.md$")
 
 
+def git_toplevel_from_cwd() -> Path | None:
+    """Resolve the repo root from the process CWD via git.
+
+    Git invokes the finalize hooks with the working directory at the consumer's
+    worktree root, so a bare `git rev-parse --show-toplevel` (no `cwd` override)
+    returns the consumer's repo -- even when this script executes from a
+    symlinked plugin cache, where `Path(__file__).resolve()` would follow the
+    symlink to the plugin instead.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return None
+    if result.returncode != 0:
+        return None
+    out = result.stdout.strip()
+    return Path(out) if out else None
+
+
+def resolve_repo_root(cli_repo_root: str | None) -> Path:
+    """Resolve the repo root: explicit `--repo-root` > git-root > script-relative.
+
+    The script-relative fallback is correct only for a real checkout (Praxion
+    self-hosting); for symlinked plugin hooks it resolves to the plugin, so it
+    is the warned last resort.
+    """
+    if cli_repo_root:
+        return Path(cli_repo_root).resolve()
+    git_root = git_toplevel_from_cwd()
+    if git_root is not None:
+        return git_root.resolve()
+    warn(
+        "reconcile_ai_state: could not resolve repo root from --repo-root or "
+        f"git; falling back to script-relative {SCRIPT_DIR.parent}"
+    )
+    return SCRIPT_DIR.parent
+
+
+def apply_repo_root(root: Path) -> None:
+    """Rebind the module-level path constants to a resolved repo root."""
+    global REPO_ROOT, AI_STATE, DECISIONS_DIR, OBSERVATIONS_PATH
+    REPO_ROOT = root
+    AI_STATE = root / ".ai-state"
+    DECISIONS_DIR = AI_STATE / "decisions"
+    OBSERVATIONS_PATH = AI_STATE / "observations.jsonl"
+
+
 # -- Helpers ------------------------------------------------------------------
 
 
@@ -278,7 +329,7 @@ def _reconcile_adr_and_index() -> bool:
         regen_script = SCRIPT_DIR / "regenerate_adr_index.py"
         if regen_script.exists():
             result = subprocess.run(
-                [sys.executable, str(regen_script)],
+                [sys.executable, str(regen_script), "--repo-root", str(REPO_ROOT)],
                 capture_output=True,
                 text=True,
                 cwd=REPO_ROOT,
@@ -308,6 +359,16 @@ def main() -> None:
     # --post-merge: only ADR renumbering + index regen (observations
     # already handled by git merge drivers during the merge itself)
     post_merge_only = "--post-merge" in sys.argv
+
+    # --repo-root <path>: resolve the consumer repo explicitly. Falls back to
+    # git-root (cwd) when absent, so symlinked plugin hooks act on the consumer
+    # rather than the plugin cache.
+    repo_root_arg: str | None = None
+    if "--repo-root" in sys.argv:
+        idx = sys.argv.index("--repo-root")
+        if idx + 1 < len(sys.argv):
+            repo_root_arg = sys.argv[idx + 1]
+    apply_repo_root(resolve_repo_root(repo_root_arg))
 
     print("\n  .ai-state/ reconciliation\n")
 

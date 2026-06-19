@@ -44,20 +44,14 @@ REGEN_SCRIPT = SCRIPT_DIR / "regenerate_adr_index.py"
 
 FINALIZED_ADR_PATTERN = re.compile(r"^(\d{3})-.+\.md$")
 FRAGMENT_ADR_PATTERN = re.compile(r"^(?P<ts>\d{8}-\d{4})-(?P<rest>[a-z0-9-]+)\.md$")
-FRONTMATTER_ID_PATTERN = re.compile(
-    r"^(id:\s*)(dec-draft-[0-9a-f]{8})\s*$", re.MULTILINE
-)
-FRONTMATTER_STATUS_PROPOSED_PATTERN = re.compile(
-    r"^(status:\s*)proposed\s*$", re.MULTILINE
-)
+FRONTMATTER_ID_PATTERN = re.compile(r"^(id:\s*)(dec-draft-[0-9a-f]{8})\s*$", re.MULTILINE)
+FRONTMATTER_STATUS_PROPOSED_PATTERN = re.compile(r"^(status:\s*)proposed\s*$", re.MULTILINE)
 # Optional `branch:` field in fragment frontmatter — when present, the value
 # is the authoritative branch name written by the creating agent, immune to
 # the single-fragment hyphenated-branch ambiguity the filename heuristic
 # stumbles on (td-017). The value matches the same `[a-z0-9-]+` sanitize
 # alphabet used to build the filename's branch slug.
-FRONTMATTER_BRANCH_PATTERN = re.compile(
-    r"""^branch:\s*["']?([a-z0-9-]+)["']?\s*$""", re.MULTILINE
-)
+FRONTMATTER_BRANCH_PATTERN = re.compile(r"""^branch:\s*["']?([a-z0-9-]+)["']?\s*$""", re.MULTILINE)
 TIMESTAMP_FORMAT = "%Y%m%d-%H%M"
 
 logger = logging.getLogger("finalize_adrs")
@@ -119,9 +113,7 @@ def parse_fragment_filename(path: Path) -> tuple[datetime, str, str, str]:
     rest = match.group("rest")
     tokens = rest.split("-")
     if len(tokens) < 3:
-        raise ValueError(
-            f"fragment filename too short (need user-branch-slug): {path.name}"
-        )
+        raise ValueError(f"fragment filename too short (need user-branch-slug): {path.name}")
 
     # Tier 1: authoritative branch from frontmatter, if present. Takes
     # precedence over the current-git-branch hint because it is the value
@@ -184,9 +176,7 @@ def _split_user_branch_slug(
 
         # User hint matched but branch hint did not. Try sibling-prefix
         # discovery before falling back to the first-token heuristic.
-        discovered = _discover_branch_from_siblings(
-            rest, user_hint, siblings_dir, self_name
-        )
+        discovered = _discover_branch_from_siblings(rest, user_hint, siblings_dir, self_name)
         if discovered is not None:
             branch, slug = discovered
             return user_hint, branch, slug
@@ -281,9 +271,7 @@ def _parse_via_siblings(
     return user, branch, slug
 
 
-def _collect_peer_tails(
-    siblings_dir: Path, user_hint: str, self_name: str | None
-) -> list[str]:
+def _collect_peer_tails(siblings_dir: Path, user_hint: str, self_name: str | None) -> list[str]:
     """Return the `<branch>-<slug>` tails of peer fragments sharing user_hint."""
     tails: list[str] = []
     prefix = user_hint + "-"
@@ -386,6 +374,67 @@ def _git(*args: str) -> str | None:
 
 def _is_git_worktree() -> bool:
     return _git("rev-parse", "--is-inside-work-tree") == "true"
+
+
+# -- Repo-root resolution -----------------------------------------------------
+
+
+def _git_toplevel_from_cwd() -> Path | None:
+    """Resolve the repo root from the process CWD via git.
+
+    Git invokes the post-merge/post-commit/post-checkout hooks with the working
+    directory at the consumer's worktree root, so a bare
+    `git rev-parse --show-toplevel` (no `cwd` override) returns the consumer's
+    repo -- even when this script executes from a symlinked plugin cache, where
+    `Path(__file__).resolve()` would follow the symlink to the plugin instead.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        return None
+    if result.returncode != 0:
+        return None
+    out = result.stdout.strip()
+    return Path(out) if out else None
+
+
+def resolve_repo_root(cli_repo_root: str | None) -> Path:
+    """Resolve the repo root: explicit `--repo-root` > git-root > script-relative.
+
+    The script-relative fallback (`SCRIPT_DIR.parent`) is correct only when the
+    script runs from a real checkout (e.g. Praxion self-hosting). For symlinked
+    plugin hooks it resolves to the *plugin*, not the consumer -- the divergence
+    that silently stranded draft ADRs -- so it is the last resort and is logged.
+    """
+    if cli_repo_root:
+        return Path(cli_repo_root).resolve()
+    git_root = _git_toplevel_from_cwd()
+    if git_root is not None:
+        return git_root.resolve()
+    logger.warning(
+        "finalize_adrs: could not resolve repo root from --repo-root or git; "
+        "falling back to script-relative %s",
+        SCRIPT_DIR.parent,
+    )
+    return SCRIPT_DIR.parent
+
+
+def _apply_repo_root(root: Path) -> None:
+    """Rebind the module-level path constants to a resolved repo root.
+
+    `REGEN_SCRIPT` deliberately stays `SCRIPT_DIR`-relative: it is a plugin
+    sibling, not a per-repo artifact.
+    """
+    global REPO_ROOT, DECISIONS_DIR, DRAFTS_DIR, LOCK_PATH
+    REPO_ROOT = root
+    DECISIONS_DIR = root / ".ai-state" / "decisions"
+    DRAFTS_DIR = DECISIONS_DIR / "drafts"
+    LOCK_PATH = DRAFTS_DIR / ".finalize.lock"
 
 
 # -- Draft detection ----------------------------------------------------------
@@ -540,13 +589,22 @@ def build_promotion_plan(draft_paths: list[Path]) -> list[DraftPlan]:
     start = next_adr_number(DECISIONS_DIR)
 
     plans: list[DraftPlan] = []
-    for offset, draft_path in enumerate(sorted_drafts):
-        _, _, _, slug = parse_fragment_filename(draft_path)
-        if not slug:
-            raise ValueError(
-                f"fragment {draft_path.name} produced empty slug after parse"
-            )
-        old_id = _read_draft_id(draft_path)
+    offset = 0
+    for draft_path in sorted_drafts:
+        # Validate each draft independently: a single malformed fragment (bad
+        # filename, empty slug, or non-conforming `id:`) is skipped with a
+        # warning rather than aborting the batch. Otherwise one bad ADR would
+        # strand an entire release's worth of valid decision history. The
+        # offset only advances for drafts that enter the plan, so skipped
+        # fragments leave no gap in the assigned NNN sequence.
+        try:
+            _, _, _, slug = parse_fragment_filename(draft_path)
+            if not slug:
+                raise ValueError(f"fragment {draft_path.name} produced empty slug after parse")
+            old_id = _read_draft_id(draft_path)
+        except ValueError as exc:
+            logger.warning("finalize_adrs: skipping malformed draft: %s", exc)
+            continue
         nnn = start + offset
         new_name = f"{nnn:03d}-{slug}.md"
         new_path = DECISIONS_DIR / new_name
@@ -561,6 +619,7 @@ def build_promotion_plan(draft_paths: list[Path]) -> list[DraftPlan]:
                 new_id=new_id,
             )
         )
+        offset += 1
     return plans
 
 
@@ -572,9 +631,7 @@ def _read_draft_id(draft_path: Path) -> str:
     content = draft_path.read_text(encoding="utf-8")
     match = FRONTMATTER_ID_PATTERN.search(content)
     if match is None:
-        raise ValueError(
-            f"draft {draft_path.name} has no `id: dec-draft-<hash>` in frontmatter"
-        )
+        raise ValueError(f"draft {draft_path.name} has no `id: dec-draft-<hash>` in frontmatter")
     return match.group(2)
 
 
@@ -593,9 +650,7 @@ def promote_draft(draft_path: Path, nnn: int, repo_root: Path) -> tuple[Path, st
     new_id = f"dec-{nnn:03d}"
 
     if new_path.exists():
-        raise FileExistsError(
-            f"target exists: {new_path}; manual intervention required"
-        )
+        raise FileExistsError(f"target exists: {new_path}; manual intervention required")
 
     old_id = _read_draft_id(draft_path)
 
@@ -605,9 +660,7 @@ def promote_draft(draft_path: Path, nnn: int, repo_root: Path) -> tuple[Path, st
     # stay flagged as proposals indefinitely.
     content = draft_path.read_text(encoding="utf-8")
     rewritten = FRONTMATTER_ID_PATTERN.sub(rf"\g<1>{new_id}", content, count=1)
-    rewritten = FRONTMATTER_STATUS_PROPOSED_PATTERN.sub(
-        r"\g<1>accepted", rewritten, count=1
-    )
+    rewritten = FRONTMATTER_STATUS_PROPOSED_PATTERN.sub(r"\g<1>accepted", rewritten, count=1)
     draft_path.write_text(rewritten, encoding="utf-8")
 
     _rename(draft_path, new_path, repo_root)
@@ -786,6 +839,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--repo-root",
+        metavar="PATH",
+        help=(
+            "Repo root whose .ai-state/decisions/ to finalize. When omitted, "
+            "resolved from `git rev-parse --show-toplevel` in the current "
+            "directory. Required when the script runs from a symlinked plugin "
+            "cache, where the script location does not identify the consumer repo."
+        ),
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Print the promotion plan without writing any files.",
@@ -814,7 +877,7 @@ def _run_regenerate_index() -> bool:
         return False
     try:
         result = subprocess.run(
-            [sys.executable, str(REGEN_SCRIPT)],
+            [sys.executable, str(REGEN_SCRIPT), "--repo-root", str(REPO_ROOT)],
             capture_output=True,
             text=True,
             cwd=REPO_ROOT,
@@ -839,8 +902,7 @@ def _describe_plan(plans: list[DraftPlan]) -> str:
     lines = [f"finalize_adrs: {len(plans)} draft(s) to promote"]
     for plan in plans:
         lines.append(
-            f"  {plan.draft_filename} -> {plan.new_path.name} "
-            f"({plan.old_id} -> {plan.new_id})"
+            f"  {plan.draft_filename} -> {plan.new_path.name} ({plan.old_id} -> {plan.new_id})"
         )
     return "\n".join(lines)
 
@@ -910,6 +972,7 @@ def main(argv: list[str] | None = None) -> None:
     args = _parse_args(argv)
     _configure_logging(args.verbose)
     mode, branch = _resolve_mode(args)
+    _apply_repo_root(resolve_repo_root(args.repo_root))
 
     try:
         with acquire_lock(LOCK_PATH):

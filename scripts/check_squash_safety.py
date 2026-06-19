@@ -47,6 +47,44 @@ MAX_LISTED_FILES = 20
 logger = logging.getLogger("check_squash_safety")
 
 
+def _git_toplevel_from_cwd() -> Path | None:
+    """Resolve the repo root from the process CWD via git.
+
+    A bare `git rev-parse --show-toplevel` (no `cwd` override) returns the
+    consumer's repo even when this script runs from a symlinked plugin cache,
+    where `Path(__file__).resolve()` would follow the symlink to the plugin.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        return None
+    if result.returncode != 0:
+        return None
+    out = result.stdout.strip()
+    return Path(out) if out else None
+
+
+def resolve_repo_root(cli_repo_root: str | None) -> Path:
+    """Resolve the repo root: explicit `--repo-root` > git-root > script-relative."""
+    if cli_repo_root:
+        return Path(cli_repo_root).resolve()
+    git_root = _git_toplevel_from_cwd()
+    if git_root is not None:
+        return git_root.resolve()
+    return SCRIPT_DIR.parent
+
+
+def apply_repo_root(root: Path) -> None:
+    """Rebind the module-level REPO_ROOT (git `cwd`) to a resolved repo root."""
+    global REPO_ROOT
+    REPO_ROOT = root
+
+
 # -- Git helpers --------------------------------------------------------------
 
 
@@ -220,6 +258,15 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--repo-root",
+        metavar="PATH",
+        help=(
+            "Repo root to diagnose. When omitted, resolved from "
+            "`git rev-parse --show-toplevel` in the current directory. Required "
+            "when the script runs from a symlinked plugin cache."
+        ),
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help=(
@@ -264,6 +311,7 @@ def main(argv: list[str] | None = None) -> None:
     """CLI entry point. Never raises; logs errors and exits 0."""
     args = _parse_args(argv)
     _configure_logging(args.verbose)
+    apply_repo_root(resolve_repo_root(args.repo_root))
     try:
         code = _run(args.since)
     except OSError as exc:

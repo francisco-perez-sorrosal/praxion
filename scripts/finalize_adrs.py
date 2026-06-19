@@ -33,6 +33,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from _repo_root import is_plugin_cache_path
+from _repo_root import resolve_repo_root as _resolve_repo_root
+
 # -- Constants ----------------------------------------------------------------
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -379,62 +382,17 @@ def _is_git_worktree() -> bool:
 # -- Repo-root resolution -----------------------------------------------------
 
 
-def _git_toplevel_from_cwd() -> Path | None:
-    """Resolve the repo root from the process CWD via git.
-
-    Git invokes the post-merge/post-commit/post-checkout hooks with the working
-    directory at the consumer's worktree root, so a bare
-    `git rev-parse --show-toplevel` (no `cwd` override) returns the consumer's
-    repo -- even when this script executes from a symlinked plugin cache, where
-    `Path(__file__).resolve()` would follow the symlink to the plugin instead.
-    """
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except FileNotFoundError:
-        return None
-    if result.returncode != 0:
-        return None
-    out = result.stdout.strip()
-    return Path(out) if out else None
-
-
 def resolve_repo_root(cli_repo_root: str | None) -> Path:
-    """Resolve the repo root: explicit `--repo-root` > git-root > script-relative.
+    """Resolve the repo root via the shared resolver, logging the fallback."""
 
-    The script-relative fallback (`SCRIPT_DIR.parent`) is correct only when the
-    script runs from a real checkout (e.g. Praxion self-hosting). For symlinked
-    plugin hooks it resolves to the *plugin*, not the consumer -- the divergence
-    that silently stranded draft ADRs -- so it is the last resort and is logged.
-    """
-    if cli_repo_root:
-        return Path(cli_repo_root).resolve()
-    git_root = _git_toplevel_from_cwd()
-    if git_root is not None:
-        return git_root.resolve()
-    logger.warning(
-        "finalize_adrs: could not resolve repo root from --repo-root or git; "
-        "falling back to script-relative %s",
-        SCRIPT_DIR.parent,
-    )
-    return SCRIPT_DIR.parent
+    def _log_fallback(fallback: Path) -> None:
+        logger.warning(
+            "finalize_adrs: could not resolve repo root from --repo-root or git; "
+            "falling back to script-relative %s",
+            fallback,
+        )
 
-
-def is_plugin_cache_path(root: Path) -> bool:
-    """True if `root` looks like an installed-plugin cache location.
-
-    Claude Code installs plugins under `.../plugins/cache/<owner>/<plugin>/<ver>`.
-    Finalize must never write there -- it would corrupt shared plugin state for
-    every onboarded project (and hard-fail on a read-only cache). Resolving
-    correctly (explicit --repo-root or git-root) never lands here; only the
-    buggy script-relative fallback could, so this is a hard backstop.
-    """
-    posix = root.as_posix()
-    return "/plugins/cache/" in posix or posix.endswith("/plugins/cache")
+    return _resolve_repo_root(cli_repo_root, script_dir=SCRIPT_DIR, on_fallback=_log_fallback)
 
 
 def _apply_repo_root(root: Path) -> None:
@@ -714,9 +672,11 @@ def rewrite_cross_references(repo_root: Path, old_id: str, new_id: str) -> int:
       design notes and integration docs cite ADR ids outside `.ai-state/`.
     - All `.ai-work/*/LEARNINGS.md`.
     - All `.ai-work/*/SYSTEMS_PLAN.md` and `.ai-work/*/IMPLEMENTATION_PLAN.md`.
-    - All `scripts/*.py` and `scripts/*.sh` (pipeline-authored test files and
-      migration scripts can carry draft-id references in docstrings/comments).
     - `.ai-state/specs/SPEC_*.md` files matching any active pipeline task slug.
+
+    `scripts/` is deliberately excluded: id-citation-discipline forbids
+    `dec-draft-<hash>` in committed code, so the only scripts carrying a
+    concrete draft id are test fixtures that must not be rewritten.
 
     The scope is still an explicit allowlist of named files and bounded
     subtrees -- never an arbitrary whole-repo sweep.
@@ -774,12 +734,13 @@ def _cross_reference_targets(repo_root: Path) -> Iterator[Path]:
                 if candidate.is_file():
                     yield candidate
 
-    scripts_dir = repo_root / "scripts"
-    if scripts_dir.is_dir():
-        for pattern in ("*.py", "*.sh"):
-            for entry in scripts_dir.glob(pattern):
-                if entry.is_file():
-                    yield entry
+    # NOTE: scripts/ is intentionally NOT swept. id-citation-discipline forbids
+    # `dec-draft-<hash>` in committed code, so no production script legitimately
+    # carries a draft id to rewrite; the only `scripts/` files that contain a
+    # concrete draft id are test fixtures that use it as data (and must be left
+    # untouched). Sweeping scripts/ was all-risk (corrupting a fixture on a hash
+    # collision), no-benefit, and contradicted the documented bounded scope,
+    # which never listed scripts/.
 
     specs = repo_root / ".ai-state" / "specs"
     task_slugs = _active_task_slugs(repo_root)

@@ -38,12 +38,14 @@ from __future__ import annotations
 import argparse
 import fcntl
 import logging
-import subprocess
 import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+
+from _repo_root import is_plugin_cache_path
+from _repo_root import resolve_repo_root as _resolve_repo_root
 
 # -- Constants ----------------------------------------------------------------
 
@@ -54,59 +56,17 @@ RESOLVED_PATH = REPO_ROOT / ".ai-state" / "TECH_DEBT_RESOLVED.md"
 LOCK_PATH = REPO_ROOT / ".ai-state" / ".tech_debt_ledger_finalize.lock"
 
 
-def _git_toplevel_from_cwd() -> Path | None:
-    """Resolve the repo root from the process CWD via git.
-
-    Git invokes the finalize hooks with the working directory at the consumer's
-    worktree root, so a bare `git rev-parse --show-toplevel` (no `cwd` override)
-    returns the consumer's repo -- even when this script executes from a
-    symlinked plugin cache, where `Path(__file__).resolve()` would follow the
-    symlink to the plugin instead.
-    """
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except FileNotFoundError:
-        return None
-    if result.returncode != 0:
-        return None
-    out = result.stdout.strip()
-    return Path(out) if out else None
-
-
 def resolve_repo_root(cli_repo_root: str | None) -> Path:
-    """Resolve the repo root: explicit `--repo-root` > git-root > script-relative.
+    """Resolve the repo root via the shared resolver, logging the fallback."""
 
-    The script-relative fallback is correct only for a real checkout (Praxion
-    self-hosting); for symlinked plugin hooks it resolves to the plugin, so it
-    is the logged last resort.
-    """
-    if cli_repo_root:
-        return Path(cli_repo_root).resolve()
-    git_root = _git_toplevel_from_cwd()
-    if git_root is not None:
-        return git_root.resolve()
-    logger.warning(
-        "finalize_tech_debt_ledger: could not resolve repo root from "
-        "--repo-root or git; falling back to script-relative %s",
-        SCRIPT_DIR.parent,
-    )
-    return SCRIPT_DIR.parent
+    def _log_fallback(fallback: Path) -> None:
+        logger.warning(
+            "finalize_tech_debt_ledger: could not resolve repo root from "
+            "--repo-root or git; falling back to script-relative %s",
+            fallback,
+        )
 
-
-def is_plugin_cache_path(root: Path) -> bool:
-    """True if `root` looks like an installed-plugin cache location.
-
-    Claude Code installs plugins under `.../plugins/cache/<owner>/<plugin>/<ver>`.
-    The ledger reconciler must never write there -- it would corrupt shared
-    plugin state for every onboarded project.
-    """
-    posix = root.as_posix()
-    return "/plugins/cache/" in posix or posix.endswith("/plugins/cache")
+    return _resolve_repo_root(cli_repo_root, script_dir=SCRIPT_DIR, on_fallback=_log_fallback)
 
 
 def _apply_repo_root(root: Path) -> None:

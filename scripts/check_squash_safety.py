@@ -37,6 +37,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from _repo_root import resolve_repo_root as _resolve_repo_root
+
 # -- Constants ----------------------------------------------------------------
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -47,36 +49,9 @@ MAX_LISTED_FILES = 20
 logger = logging.getLogger("check_squash_safety")
 
 
-def _git_toplevel_from_cwd() -> Path | None:
-    """Resolve the repo root from the process CWD via git.
-
-    A bare `git rev-parse --show-toplevel` (no `cwd` override) returns the
-    consumer's repo even when this script runs from a symlinked plugin cache,
-    where `Path(__file__).resolve()` would follow the symlink to the plugin.
-    """
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except FileNotFoundError:
-        return None
-    if result.returncode != 0:
-        return None
-    out = result.stdout.strip()
-    return Path(out) if out else None
-
-
 def resolve_repo_root(cli_repo_root: str | None) -> Path:
-    """Resolve the repo root: explicit `--repo-root` > git-root > script-relative."""
-    if cli_repo_root:
-        return Path(cli_repo_root).resolve()
-    git_root = _git_toplevel_from_cwd()
-    if git_root is not None:
-        return git_root.resolve()
-    return SCRIPT_DIR.parent
+    """Resolve the repo root via the shared resolver."""
+    return _resolve_repo_root(cli_repo_root, script_dir=SCRIPT_DIR)
 
 
 def apply_repo_root(root: Path) -> None:

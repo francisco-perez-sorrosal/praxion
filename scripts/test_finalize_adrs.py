@@ -683,31 +683,26 @@ class TestFinalizeCrossReferences:
         assert draft_id not in developer_doc.read_text(encoding="utf-8")
         assert "dec-077" in developer_doc.read_text(encoding="utf-8")
 
-    def test_scripts_refs_rewritten(self, repo_root: Path) -> None:
-        """Expanded scope: scripts/*.py and scripts/*.sh docstring refs rewrite."""
+    def test_scripts_dir_not_swept(self, repo_root: Path) -> None:
+        """scripts/ is excluded: a draft-id literal in a script (e.g. a test
+        fixture) must NOT be rewritten. id-citation-discipline forbids
+        dec-draft ids in committed code, so the only scripts carrying one are
+        fixtures using it as data — rewriting them on a hash collision would
+        corrupt the fixture (the W-02 false-positive class)."""
         draft = make_draft(repo_root, "20260419-1810", "alice", "main", "script-decision")
         draft_id = f"dec-draft-{_draft_hash(draft.name)}"
 
         scripts_dir = repo_root / "scripts"
         scripts_dir.mkdir()
-        py_file = scripts_dir / "helper.py"
-        py_file.write_text(
-            f'"""Helper script.\n\nDerived from {draft_id}."""\n',
-            encoding="utf-8",
-        )
-        sh_file = scripts_dir / "migrate.sh"
-        sh_file.write_text(
-            f"#!/usr/bin/env bash\n# per {draft_id} / SYSTEMS_PLAN\n",
-            encoding="utf-8",
-        )
+        fixture = scripts_dir / "test_helper.py"
+        original = f'old = "{draft_id}"  # fixture literal, must survive finalize\n'
+        fixture.write_text(original, encoding="utf-8")
 
         finalize.promote_draft(draft, 88, repo_root)
         finalize.rewrite_cross_references(repo_root, draft_id, "dec-088")
 
-        assert "dec-088" in py_file.read_text(encoding="utf-8")
-        assert draft_id not in py_file.read_text(encoding="utf-8")
-        assert "dec-088" in sh_file.read_text(encoding="utf-8")
-        assert draft_id not in sh_file.read_text(encoding="utf-8")
+        # Untouched: the draft id literal still present, no dec-088 injected.
+        assert fixture.read_text(encoding="utf-8") == original
 
 
 # -- Idempotence --------------------------------------------------------------
@@ -1104,13 +1099,19 @@ class TestRepoRootResolution:
     def test_falls_back_to_git_toplevel_when_no_explicit_root(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr(finalize, "_git_toplevel_from_cwd", lambda: tmp_path)
+        # finalize.resolve_repo_root delegates to the shared resolver, which
+        # calls _repo_root.git_toplevel_from_cwd -- patch at that seam.
+        import _repo_root
+
+        monkeypatch.setattr(_repo_root, "git_toplevel_from_cwd", lambda: tmp_path)
         assert finalize.resolve_repo_root(None) == tmp_path.resolve()
 
     def test_script_relative_is_last_resort_when_git_unavailable(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr(finalize, "_git_toplevel_from_cwd", lambda: None)
+        import _repo_root
+
+        monkeypatch.setattr(_repo_root, "git_toplevel_from_cwd", lambda: None)
         assert finalize.resolve_repo_root(None) == finalize.SCRIPT_DIR.parent
 
     def test_apply_repo_root_rebinds_all_path_constants(
@@ -1168,7 +1169,10 @@ def _make_fake_plugin(plugin_dir: Path) -> Path:
     plugin_scripts = plugin_dir / "scripts"
     plugin_scripts.mkdir(parents=True)
     src_dir = Path(__file__).resolve().parent
-    for name in ("finalize_adrs.py", "regenerate_adr_index.py"):
+    # _repo_root.py is the shared resolver imported by both scripts; it must
+    # ship alongside them (it lives in scripts/ in the plugin), so the fake
+    # plugin layout mirrors that.
+    for name in ("finalize_adrs.py", "regenerate_adr_index.py", "_repo_root.py"):
         shutil.copy2(src_dir / name, plugin_scripts / name)
     (plugin_dir / ".ai-state" / "decisions" / "drafts").mkdir(parents=True)
     return plugin_scripts / "finalize_adrs.py"

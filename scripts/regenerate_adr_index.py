@@ -10,54 +10,20 @@ Usage: python scripts/regenerate_adr_index.py
 from __future__ import annotations
 
 import re
-import subprocess
 import sys
 from pathlib import Path
+
+from _repo_root import is_plugin_cache_path
+from _repo_root import resolve_repo_root as _resolve_repo_root
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DECISIONS_DIR = SCRIPT_DIR.parent / ".ai-state" / "decisions"
 INDEX_PATH = DECISIONS_DIR / "DECISIONS_INDEX.md"
 
 
-def _git_toplevel_from_cwd() -> Path | None:
-    """Resolve the repo root from the process CWD via git.
-
-    A bare `git rev-parse --show-toplevel` (no `cwd` override) returns the
-    consumer's repo even when this script runs from a symlinked plugin cache,
-    where `Path(__file__).resolve()` would follow the symlink to the plugin.
-    """
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError:
-        return None
-    if result.returncode != 0:
-        return None
-    out = result.stdout.strip()
-    return Path(out) if out else None
-
-
 def resolve_repo_root(cli_repo_root: str | None) -> Path:
-    """Resolve the repo root: explicit `--repo-root` > git-root > script-relative."""
-    if cli_repo_root:
-        return Path(cli_repo_root).resolve()
-    git_root = _git_toplevel_from_cwd()
-    if git_root is not None:
-        return git_root.resolve()
-    return SCRIPT_DIR.parent
-
-
-def is_plugin_cache_path(root: Path) -> bool:
-    """True if `root` looks like an installed-plugin cache location.
-
-    Index regeneration must never write there -- it would overwrite the
-    plugin's own index and corrupt shared state for every onboarded project.
-    """
-    posix = root.as_posix()
-    return "/plugins/cache/" in posix or posix.endswith("/plugins/cache")
+    """Resolve the repo root via the shared resolver."""
+    return _resolve_repo_root(cli_repo_root, script_dir=SCRIPT_DIR)
 
 
 def apply_repo_root(root: Path) -> None:

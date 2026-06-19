@@ -25,6 +25,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+from _repo_root import is_plugin_cache_path
+from _repo_root import resolve_repo_root as _resolve_repo_root
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 AI_STATE = REPO_ROOT / ".ai-state"
@@ -34,57 +37,16 @@ OBSERVATIONS_PATH = AI_STATE / "observations.jsonl"
 ADR_FILENAME_PATTERN = re.compile(r"^(\d{3})-.+\.md$")
 
 
-def git_toplevel_from_cwd() -> Path | None:
-    """Resolve the repo root from the process CWD via git.
-
-    Git invokes the finalize hooks with the working directory at the consumer's
-    worktree root, so a bare `git rev-parse --show-toplevel` (no `cwd` override)
-    returns the consumer's repo -- even when this script executes from a
-    symlinked plugin cache, where `Path(__file__).resolve()` would follow the
-    symlink to the plugin instead.
-    """
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError:
-        return None
-    if result.returncode != 0:
-        return None
-    out = result.stdout.strip()
-    return Path(out) if out else None
-
-
 def resolve_repo_root(cli_repo_root: str | None) -> Path:
-    """Resolve the repo root: explicit `--repo-root` > git-root > script-relative.
+    """Resolve the repo root via the shared resolver, warning on fallback."""
 
-    The script-relative fallback is correct only for a real checkout (Praxion
-    self-hosting); for symlinked plugin hooks it resolves to the plugin, so it
-    is the warned last resort.
-    """
-    if cli_repo_root:
-        return Path(cli_repo_root).resolve()
-    git_root = git_toplevel_from_cwd()
-    if git_root is not None:
-        return git_root.resolve()
-    warn(
-        "reconcile_ai_state: could not resolve repo root from --repo-root or "
-        f"git; falling back to script-relative {SCRIPT_DIR.parent}"
-    )
-    return SCRIPT_DIR.parent
+    def _warn_fallback(fallback: Path) -> None:
+        warn(
+            "reconcile_ai_state: could not resolve repo root from --repo-root "
+            f"or git; falling back to script-relative {fallback}"
+        )
 
-
-def is_plugin_cache_path(root: Path) -> bool:
-    """True if `root` looks like an installed-plugin cache location.
-
-    Reconciliation writes (renumbered ADRs, regenerated index, merged
-    observations) must never target there -- it would corrupt shared plugin
-    state for every onboarded project.
-    """
-    posix = root.as_posix()
-    return "/plugins/cache/" in posix or posix.endswith("/plugins/cache")
+    return _resolve_repo_root(cli_repo_root, script_dir=SCRIPT_DIR, on_fallback=_warn_fallback)
 
 
 def apply_repo_root(root: Path) -> None:

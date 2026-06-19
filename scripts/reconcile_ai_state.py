@@ -76,6 +76,17 @@ def resolve_repo_root(cli_repo_root: str | None) -> Path:
     return SCRIPT_DIR.parent
 
 
+def is_plugin_cache_path(root: Path) -> bool:
+    """True if `root` looks like an installed-plugin cache location.
+
+    Reconciliation writes (renumbered ADRs, regenerated index, merged
+    observations) must never target there -- it would corrupt shared plugin
+    state for every onboarded project.
+    """
+    posix = root.as_posix()
+    return "/plugins/cache/" in posix or posix.endswith("/plugins/cache")
+
+
 def apply_repo_root(root: Path) -> None:
     """Rebind the module-level path constants to a resolved repo root."""
     global REPO_ROOT, AI_STATE, DECISIONS_DIR, OBSERVATIONS_PATH
@@ -368,7 +379,14 @@ def main() -> None:
         idx = sys.argv.index("--repo-root")
         if idx + 1 < len(sys.argv):
             repo_root_arg = sys.argv[idx + 1]
-    apply_repo_root(resolve_repo_root(repo_root_arg))
+    root = resolve_repo_root(repo_root_arg)
+    if is_plugin_cache_path(root):
+        fail(
+            f"refusing to reconcile against a plugin-cache path: {root}; "
+            "pass --repo-root or run from the consumer worktree"
+        )
+        sys.exit(1)
+    apply_repo_root(root)
 
     print("\n  .ai-state/ reconciliation\n")
 

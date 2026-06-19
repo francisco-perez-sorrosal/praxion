@@ -424,6 +424,19 @@ def resolve_repo_root(cli_repo_root: str | None) -> Path:
     return SCRIPT_DIR.parent
 
 
+def is_plugin_cache_path(root: Path) -> bool:
+    """True if `root` looks like an installed-plugin cache location.
+
+    Claude Code installs plugins under `.../plugins/cache/<owner>/<plugin>/<ver>`.
+    Finalize must never write there -- it would corrupt shared plugin state for
+    every onboarded project (and hard-fail on a read-only cache). Resolving
+    correctly (explicit --repo-root or git-root) never lands here; only the
+    buggy script-relative fallback could, so this is a hard backstop.
+    """
+    posix = root.as_posix()
+    return "/plugins/cache/" in posix or posix.endswith("/plugins/cache")
+
+
 def _apply_repo_root(root: Path) -> None:
     """Rebind the module-level path constants to a resolved repo root.
 
@@ -694,13 +707,19 @@ def rewrite_cross_references(repo_root: Path, old_id: str, new_id: str) -> int:
 
     Bounded scope:
     - All files under `.ai-state/decisions/` (both drafts/ and finalized).
-    - `.ai-state/DESIGN.md` and `docs/architecture.md` (Section 8 ADR
-      references land here during pipelines).
+    - `.ai-state/DESIGN.md`, `.ai-state/TECH_DEBT_LEDGER.md`,
+      `.ai-state/TECH_DEBT_RESOLVED.md`, and a project-root `ROADMAP.md` --
+      named persistent files that cite the ADR a decision/debt row resolved.
+    - Every markdown file under `docs/` (subsumes `docs/architecture.md`):
+      design notes and integration docs cite ADR ids outside `.ai-state/`.
     - All `.ai-work/*/LEARNINGS.md`.
     - All `.ai-work/*/SYSTEMS_PLAN.md` and `.ai-work/*/IMPLEMENTATION_PLAN.md`.
     - All `scripts/*.py` and `scripts/*.sh` (pipeline-authored test files and
       migration scripts can carry draft-id references in docstrings/comments).
     - `.ai-state/specs/SPEC_*.md` files matching any active pipeline task slug.
+
+    The scope is still an explicit allowlist of named files and bounded
+    subtrees -- never an arbitrary whole-repo sweep.
 
     Returns the number of files modified.
     """
@@ -719,12 +738,27 @@ def _cross_reference_targets(repo_root: Path) -> Iterator[Path]:
             if entry.is_file():
                 yield entry
 
-    for architecture_doc in (
+    # Named persistent files that legitimately cite ADR ids: the design target
+    # and both tech-debt ledgers (rows reference the ADR that resolved them),
+    # plus a project-root ROADMAP.md when present.
+    for persistent_doc in (
         repo_root / ".ai-state" / "DESIGN.md",
-        repo_root / "docs" / "architecture.md",
+        repo_root / ".ai-state" / "TECH_DEBT_LEDGER.md",
+        repo_root / ".ai-state" / "TECH_DEBT_RESOLVED.md",
+        repo_root / "ROADMAP.md",
     ):
-        if architecture_doc.is_file():
-            yield architecture_doc
+        if persistent_doc.is_file():
+            yield persistent_doc
+
+    # Bounded docs/ sweep: every markdown file under docs/ (subsumes the
+    # developer architecture guide). Consumer projects cite ADR ids from
+    # design notes and integration docs that live outside .ai-state/; without
+    # this sweep those references dangle the moment finalize runs.
+    docs_dir = repo_root / "docs"
+    if docs_dir.is_dir():
+        for entry in docs_dir.rglob("*.md"):
+            if entry.is_file():
+                yield entry
 
     ai_work = repo_root / ".ai-work"
     if ai_work.is_dir():
@@ -972,7 +1006,15 @@ def main(argv: list[str] | None = None) -> None:
     args = _parse_args(argv)
     _configure_logging(args.verbose)
     mode, branch = _resolve_mode(args)
-    _apply_repo_root(resolve_repo_root(args.repo_root))
+    root = resolve_repo_root(args.repo_root)
+    if is_plugin_cache_path(root):
+        logger.error(
+            "finalize_adrs: refusing to run against a plugin-cache path (%s); "
+            "pass --repo-root or run from the consumer worktree",
+            root,
+        )
+        sys.exit(1)
+    _apply_repo_root(root)
 
     try:
         with acquire_lock(LOCK_PATH):

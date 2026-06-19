@@ -50,6 +50,16 @@ def resolve_repo_root(cli_repo_root: str | None) -> Path:
     return SCRIPT_DIR.parent
 
 
+def is_plugin_cache_path(root: Path) -> bool:
+    """True if `root` looks like an installed-plugin cache location.
+
+    Index regeneration must never write there -- it would overwrite the
+    plugin's own index and corrupt shared state for every onboarded project.
+    """
+    posix = root.as_posix()
+    return "/plugins/cache/" in posix or posix.endswith("/plugins/cache")
+
+
 def apply_repo_root(root: Path) -> None:
     """Rebind the module-level path constants to a resolved repo root."""
     global DECISIONS_DIR, INDEX_PATH
@@ -203,7 +213,14 @@ def _parse_repo_root_arg() -> str | None:
 
 def main() -> None:
     """Entry point: collect ADRs, generate index, write to file."""
-    apply_repo_root(resolve_repo_root(_parse_repo_root_arg()))
+    root = resolve_repo_root(_parse_repo_root_arg())
+    if is_plugin_cache_path(root):
+        print(
+            f"refusing to regenerate index against a plugin-cache path: {root}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    apply_repo_root(root)
     adrs = collect_adrs()
     index_content = generate_index(adrs)
     INDEX_PATH.write_text(index_content, encoding="utf-8")

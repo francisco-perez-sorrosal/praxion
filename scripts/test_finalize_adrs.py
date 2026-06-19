@@ -1262,3 +1262,64 @@ class TestMalformedDraftResilience:
         assert {p.slug for p in plans} == {"good-one"}
         assert plans[0].new_id == "dec-001"
         assert "skipping malformed draft" in caplog.text
+
+
+# -- Plugin-cache write guard -------------------------------------------------
+
+
+class TestPluginCacheGuard:
+    """finalize must refuse to mutate a plugin-cache path (P0 safety backstop)."""
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/Users/x/.claude/plugins/cache/bit-agora/i-am/0.8.0",
+            "/home/u/.config/plugins/cache",
+        ],
+    )
+    def test_detects_plugin_cache_paths(self, path: str) -> None:
+        assert finalize.is_plugin_cache_path(Path(path)) is True
+
+    @pytest.mark.parametrize(
+        "path",
+        ["/Users/x/dev/sandbook", "/tmp/consumer", "/srv/repos/myproj"],
+    )
+    def test_allows_normal_repo_paths(self, path: str) -> None:
+        assert finalize.is_plugin_cache_path(Path(path)) is False
+
+    def test_main_refuses_when_resolved_root_is_cache(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        cache = Path("/Users/x/.claude/plugins/cache/bit-agora/i-am/0.8.0")
+        monkeypatch.setattr(finalize, "resolve_repo_root", lambda _arg: cache)
+        # If the guard fails, _apply_repo_root would point at the cache; assert
+        # we exit non-zero before any mutation instead.
+        with pytest.raises(SystemExit) as exc:
+            finalize.main(["--all"])
+        assert exc.value.code == 1
+
+
+# -- Widened cross-reference rewrite scope ------------------------------------
+
+
+class TestWidenedCrossReferenceScope:
+    """dec-draft ids in persistent non-ADR files are rewritten at finalize."""
+
+    def test_rewrites_ledger_roadmap_and_docs(self, repo_root: Path) -> None:
+        old, new = "dec-draft-abcd1234", "dec-042"
+        targets = {
+            repo_root / ".ai-state" / "TECH_DEBT_LEDGER.md": f"resolved by {old}\n",
+            repo_root / ".ai-state" / "TECH_DEBT_RESOLVED.md": f"see {old}\n",
+            repo_root / "ROADMAP.md": f"tracked under {old}\n",
+            repo_root / "docs" / "design" / "notes.md": f"per {old}\n",
+        }
+        for path, content in targets.items():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+
+        modified = finalize.rewrite_cross_references(repo_root, old, new)
+
+        assert modified == len(targets)
+        for path in targets:
+            text = path.read_text(encoding="utf-8")
+            assert new in text and old not in text

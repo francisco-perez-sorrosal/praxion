@@ -98,6 +98,17 @@ def resolve_repo_root(cli_repo_root: str | None) -> Path:
     return SCRIPT_DIR.parent
 
 
+def is_plugin_cache_path(root: Path) -> bool:
+    """True if `root` looks like an installed-plugin cache location.
+
+    Claude Code installs plugins under `.../plugins/cache/<owner>/<plugin>/<ver>`.
+    The ledger reconciler must never write there -- it would corrupt shared
+    plugin state for every onboarded project.
+    """
+    posix = root.as_posix()
+    return "/plugins/cache/" in posix or posix.endswith("/plugins/cache")
+
+
 def _apply_repo_root(root: Path) -> None:
     """Rebind the module-level path constants to a resolved repo root."""
     global REPO_ROOT, LEDGER_PATH, RESOLVED_PATH, LOCK_PATH
@@ -623,7 +634,15 @@ def main(argv: list[str] | None = None) -> None:
     """CLI entry point. Never raises; logs errors and exits with a code."""
     args = _parse_args(argv)
     _configure_logging(args.verbose)
-    _apply_repo_root(resolve_repo_root(args.repo_root))
+    root = resolve_repo_root(args.repo_root)
+    if is_plugin_cache_path(root):
+        logger.error(
+            "finalize_tech_debt_ledger: refusing to run against a plugin-cache "
+            "path (%s); pass --repo-root or run from the consumer worktree",
+            root,
+        )
+        sys.exit(1)
+    _apply_repo_root(root)
 
     try:
         with acquire_lock(LOCK_PATH):

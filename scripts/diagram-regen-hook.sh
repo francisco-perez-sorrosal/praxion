@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # diagram-regen-hook.sh — Pre-commit regeneration of LikeC4 → D2 → SVG artifacts.
 #
-# Called from scripts/git-pre-commit-hook.sh when that script detects that this
-# file is executable and present in the same scripts/ directory.
+# Invoked by the `diagram-regen` hook in .pre-commit-config.yaml when a staged
+# path matches `\.c4$`. Self-discovers staged *.c4 sources; skips gracefully when
+# likec4/d2 binaries are absent.
 #
 # Behavior:
 #   1. Detects staged *.c4 files under any diagrams/ subdirectory.

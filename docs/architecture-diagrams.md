@@ -72,8 +72,8 @@ per risk mitigation R2 in `SYSTEMS_PLAN.md`).
 
 ## Hook Behavior
 
-A pre-commit hook (`scripts/diagram-regen-hook.sh`, called by
-`scripts/git-pre-commit-hook.sh`) regenerates derived artifacts whenever `**/diagrams/*.c4`
+A pre-commit hook (`scripts/diagram-regen-hook.sh`, run by the `diagram-regen`
+hook in `.pre-commit-config.yaml`) regenerates derived artifacts whenever `**/diagrams/*.c4`
 files are staged for commit.
 
 **Happy path** (both binaries installed, valid DSL):

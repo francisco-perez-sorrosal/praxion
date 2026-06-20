@@ -372,47 +372,62 @@ install_git_merge_infra() {
         install_finalize_hook "$repo_root" "$finalize_hook_target" post-checkout
     fi
 
-    # Install the Praxion pre-commit hook (shipped-artifact isolation +
-    # canonical-block sync + diagram regen + AaC golden-rule gate) as a symlink
-    # to scripts/git-pre-commit-hook.sh, mirroring the finalize hooks above.
-    # This is Praxion's own author repo — there is no user-authored pre-commit
-    # content to preserve (user projects get a tailored inline hook from
-    # /onboard-project Phase 4, not this script). The symlink keeps the installed
-    # hook byte-identical to source (sentinel F10's diff-clean contract) and
-    # self-syncing. Rationale: rules/swe/shipped-artifact-isolation.md.
+    # Activate Praxion's commit gate via the pre-commit framework. The five
+    # author gates (shipped-artifact isolation, canonical-block sync, diagram
+    # regen, AaC golden-rule, rules-manifest drift) plus ruff + gitleaks live in
+    # .pre-commit-config.yaml (repo:local + standard hooks); `pre-commit install`
+    # writes the framework dispatcher into .git/hooks/pre-commit. This is
+    # Praxion's own author repo — user projects get a tailored inline hook from
+    # /onboard-project Phase 4 instead. Rationale: rules/swe/coding-style.md
+    # (Baseline Configuration) + rules/swe/shipped-artifact-isolation.md.
     install_praxion_pre_commit "$repo_root"
 }
 
 install_praxion_pre_commit() {
     local repo_root="$1"
-    local precommit_src="${SCRIPT_DIR}/scripts/git-pre-commit-hook.sh"
+    local config="${repo_root}/.pre-commit-config.yaml"
     local precommit_dst="${repo_root}/.git/hooks/pre-commit"
 
-    [ -f "$precommit_src" ] || return 0
+    [ -f "$config" ] || return 0
 
-    # Symlink to the source script, mirroring install_finalize_hook. A symlink
-    # is inherently idempotent (re-linking is a no-op — this supersedes the
-    # former sentinel-wrapped-copy idempotency scheme) and stays diff-clean
-    # against source (sentinel F10's contract). A pre-existing Praxion-managed
-    # copy (legacy cp or sentinel-wrapped, recognizable by its isolation-check
-    # body) is replaced silently; a genuinely foreign hook is backed up to
-    # pre-commit.pre-praxion.
-    if [ -L "$precommit_dst" ] && [ "$(readlink "$precommit_dst")" = "$precommit_src" ]; then
-        info "Pre-commit hook: already linked"
+    if $CHECK || $DRY_RUN; then
+        if [ -f "$precommit_dst" ] && grep -q "pre-commit" "$precommit_dst" 2>/dev/null; then
+            info "Pre-commit hook: pre-commit framework dispatcher present"
+        else
+            info "Pre-commit hook: would run 'pre-commit install' to activate the commit gate"
+        fi
         return 0
     fi
 
-    if [ -e "$precommit_dst" ] && [ ! -L "$precommit_dst" ]; then
-        if grep -qE "check_shipped_artifact_isolation|Praxion shipped-artifact isolation" "$precommit_dst" 2>/dev/null; then
-            : # Legacy Praxion-managed copy — safe to replace.
-        else
-            warn "Existing pre-commit hook is non-Praxion — backing up to pre-commit.pre-praxion"
-            mv "$precommit_dst" "${precommit_dst}.pre-praxion"
-        fi
+    # Resolve the pre-commit CLI — direct, else via the repo's uv dev env.
+    local pc=""
+    if command -v pre-commit >/dev/null 2>&1; then
+        pc="pre-commit"
+    elif command -v uv >/dev/null 2>&1; then
+        pc="uv run pre-commit"
+    fi
+    if [ -z "$pc" ]; then
+        warn "pre-commit not available — activate the commit gate manually:"
+        warn "    uv sync --group dev && uv run pre-commit install"
+        return 0
     fi
 
-    ln -sf "$precommit_src" "$precommit_dst"
-    info "Pre-commit hook → scripts/git-pre-commit-hook.sh"
+    # Back up a genuinely foreign existing hook (neither a pre-commit dispatcher
+    # nor a legacy Praxion symlink/copy).
+    if [ -e "$precommit_dst" ] && [ ! -L "$precommit_dst" ] \
+        && ! grep -qE "pre-commit|check_shipped_artifact_isolation" "$precommit_dst" 2>/dev/null; then
+        warn "Existing pre-commit hook is non-Praxion — backing up to pre-commit.pre-praxion"
+        mv "$precommit_dst" "${precommit_dst}.pre-praxion"
+    fi
+    # Remove a dangling/legacy symlink (e.g., to the retired git-pre-commit-hook.sh)
+    # so the framework installs cleanly.
+    [ -L "$precommit_dst" ] && rm -f "$precommit_dst"
+
+    if ( cd "$repo_root" && $pc install >/dev/null 2>&1 ); then
+        info "Pre-commit hook installed via the pre-commit framework"
+    else
+        warn "pre-commit install failed — run 'uv run pre-commit install' from the repo root"
+    fi
 }
 
 # =============================================================================

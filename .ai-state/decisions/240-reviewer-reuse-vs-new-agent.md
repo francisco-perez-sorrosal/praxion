@@ -1,7 +1,7 @@
 ---
-id: dec-draft-9f84f144
+id: dec-240
 title: Intra-step pair-review reuses the verifier in a scoped light-review mode rather than a new agent
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-19
 summary: The intra-step risky-step reviewer is the existing verifier invoked in a scoped light-review mode (sonnet), not a 17th agent — independence comes from the spawn, not the agent type.

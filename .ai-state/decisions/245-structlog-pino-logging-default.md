@@ -1,7 +1,7 @@
 ---
-id: dec-draft-47d763a7
+id: dec-245
 title: Sharpen the observability logging default to structlog (Python) and pino (TypeScript)
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-20
 summary: Adopt structlog as the #1 Python service-logging default (loguru relegated to CLI/prototyping) and pino as the #1 TypeScript default (winston migration-only), superseding the prior parity framing.

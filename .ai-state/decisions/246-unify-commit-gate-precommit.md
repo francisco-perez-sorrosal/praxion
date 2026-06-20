@@ -1,7 +1,7 @@
 ---
-id: dec-draft-498ed8d6
+id: dec-246
 title: Unify the bespoke commit gate into the pre-commit framework
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-20
 summary: Replace Praxion's bespoke git-pre-commit-hook.sh with .pre-commit-config.yaml; five author blocks become repo:local hooks alongside ruff + gitleaks.

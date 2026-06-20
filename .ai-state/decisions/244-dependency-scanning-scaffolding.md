@@ -1,7 +1,7 @@
 ---
-id: dec-draft-bba71102
+id: dec-244
 title: Add dependency-scanning scaffolding (dependabot) to the onboarding baseline
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-20
 summary: New canonical dependabot.yml.tmpl in claude/project-baseline/ plus a /onboard-project Phase 8e.7 sub-step that installs an ecosystem-tailored .github/dependabot.yml.

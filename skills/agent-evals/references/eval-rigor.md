@@ -2,7 +2,7 @@
 
 Operationalizes two **dev-time, in-pipeline-gateable** disciplines that turn eval *metrics* into eval *gates*. Reference material for the [Agent Evals](../SKILL.md) skill.
 
-Both disciplines run on the **project's own eval corpus** — no deployed production surface required. (Contrast the production/online grounding loop in `online-evals.md`, which needs a running deployment Praxion does not operate and so stays advisory.) That is what makes the two disciplines here enforceable *inside* the pipeline:
+Both disciplines run on the **project's own eval corpus** — no deployed production surface required. (Contrast the production/online grounding loop in [online-evals.md](online-evals.md), which needs a running deployment Praxion does not operate and so stays advisory.) That is what makes the two disciplines here enforceable *inside* the pipeline:
 
 1. A **judge-calibration protocol** — a repeatable loop that earns the right to trust an LLM-as-judge score before it gates anything.
 2. A **regression-vs-capability dataset split** — the regression suite is a frozen gate; the capability suite is a free-growing progress tracker.

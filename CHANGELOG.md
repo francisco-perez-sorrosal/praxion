@@ -1,3 +1,9 @@
+## v0.9.1 (2026-06-20)
+
+### Feat
+
+- add /upgrade-project to re-point version-pinned project surfaces
+
 ## v0.9.0 (2026-06-19)
 
 ### Feat

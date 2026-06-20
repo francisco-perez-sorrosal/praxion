@@ -1,7 +1,7 @@
 ---
-id: dec-draft-6e600ec9
+id: dec-241
 title: Per-project principles artifact — standalone `.ai-state/principles.yaml`, Shape B, per-principle gate severity
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-20
 summary: >

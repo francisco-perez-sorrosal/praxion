@@ -1,7 +1,7 @@
 ---
-id: dec-draft-b6b91e14
+id: dec-242
 title: Introduce `scripts/principles_loader.py` pure-function helper for principles YAML parsing
-status: proposed
+status: accepted
 category: implementation
 date: 2026-06-20
 summary: >
@@ -17,7 +17,7 @@ affected_files:
   - scripts/principles_loader.py
   - tests/test_principles_loader.py
   - tests/fixtures/principles/
-re_affirms: dec-draft-6e600ec9
+re_affirms: dec-241
 ---
 
 ## Context
@@ -58,4 +58,4 @@ Developed TDD: failing tests first (RED, ImportError), then implementation (GREE
 
 ## Prior Decision
 
-Re-affirms `dec-draft-6e600ec9` (standalone Shape B artifact design). The loader is an implementation detail of that design — it does not change the artifact's schema, placement, or gate semantics.
+Re-affirms `dec-241` (standalone Shape B artifact design). The loader is an implementation detail of that design — it does not change the artifact's schema, placement, or gate semantics.

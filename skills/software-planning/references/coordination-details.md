@@ -295,7 +295,34 @@ Digest shape:
 
 ### To revisit (pre-verification only)
 - <load-bearing assumptions offered for multi-select acknowledgement>
+
+### Spec Drift
+<!-- Omit this subsection entirely when detect_drift returns no findings — no noise on clean pipelines. -->
+- [<severity>] <req>: <rationale> — pointer: <pointer>
 ```
+
+**Spec Drift rendering protocol (pre-verification only):**
+
+At the pre-verification checkpoint the orchestrator calls:
+
+```python
+from scripts.spec_drift import detect_drift
+findings = detect_drift(
+    scope="in-flight:<task-slug>",
+    repo_root=<repo_root>,
+    base_sha=<sha_from_TEST_BASELINE_md>,   # falls back to HEAD~1 when absent
+)
+```
+
+If `findings` is non-empty, render a `### Spec Drift` subsection in the digest with one bullet per finding:
+
+```
+[<severity>] <req>: <rationale> — pointer: <pointer>
+```
+
+If `findings` is empty, **omit the `### Spec Drift` subsection entirely** — no entry, no heading, no placeholder. Absence of the subsection is the signal for a clean pipeline. This conditional rendering is load-bearing: adding a blank or always-present subsection defeats the noise-reduction goal.
+
+The subsection is **advisory only and never blocks**. The user proceeds to verification or rolls back; the orchestrator does not gate on drift findings.
 
 ### The pre-verification checkpoint
 

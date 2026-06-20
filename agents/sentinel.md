@@ -220,6 +220,7 @@ Requires `.ai-state/specs/` directory with spec files. Skip with a note when no 
 | SH04 | L | Traceability matrix has no UNTESTED entries | All requirements have at least one test |
 | SH05 | L | Key Decisions section is substantive | Decisions include what, why, alternatives |
 | SH06 | L | Spec delta claims match actual spec evolution | Added/modified/removed requirements in delta consistent with differences between prior and current archived specs |
+| SH07 | A | Spec↔artifact drift detected against current HEAD | Auto tier. Conditional on `.ai-state/specs/` present. Imports `detect_drift` from `scripts/spec_drift`; maps findings to Important/Suggested; defers `orphaned-edge` to SH01/SH04; never Critical. Unique value: `stale-dependent` + `untracked-req` kinds. See `sentinel-spec-checks.md § SH07`. |
 
 ### Calibration Accuracy (CA)
 

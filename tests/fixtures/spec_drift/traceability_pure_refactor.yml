@@ -1,0 +1,10 @@
+# Fixture: stale-dependent — pure refactor
+# REQ-02 maps to test + impl; only the impl changed (refactor), REQ clause unchanged.
+# Expected finding: kind=stale-dependent, severity=suggested (or suppressed)
+
+requirements:
+  REQ-02:
+    tests:
+      - tests/test_widget.py::test_widget_renders_title
+    implementation:
+      - src/widget_render.py

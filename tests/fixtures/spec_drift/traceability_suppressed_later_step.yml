@@ -1,0 +1,11 @@
+# Fixture: suppressed-later-step (false-positive guard / AC-7)
+# REQ-05 maps to tests NOT YET TOUCHED; those tests are scheduled in a WIP step
+# that is still [ ] (incomplete). Detector must suppress Important findings.
+# Expected: zero Important findings returned.
+
+requirements:
+  REQ-05:
+    tests:
+      - tests/test_future_feature.py::test_future_behavior
+    implementation:
+      - src/future_feature.py

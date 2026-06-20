@@ -1,6 +1,11 @@
 # SPEC: Per-Agent Model Routing Policy
 
-Archived: 2026-04-25. Source: `.ai-work/agent-model-routing/SYSTEMS_PLAN.md` (since cleaned).
+**Task slug**: `agent-model-routing`
+**Tier**: Standard
+**Archived**: 2026-04-25
+**Status**: Shipped
+**ADRs**: `dec-076` (routing dimensionality — 1D now, defer 2D), `dec-077` (frontmatter `model:` is a capability floor), `dec-078` (hybrid central-table routing), `dec-079` (policy in a new always-loaded rule), `dec-080` (defer routing telemetry).
+**Source**: `.ai-work/agent-model-routing/SYSTEMS_PLAN.md` (since cleaned). Header reconstructed to the canonical bold-key format; `Tier` derived from archive evidence (behavioral SPEC + 5 ADRs + 9 ACs, single-rule core scope) — the original header did not record it.
 
 ## Feature Summary
 

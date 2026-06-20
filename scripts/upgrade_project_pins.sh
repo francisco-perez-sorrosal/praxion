@@ -1,0 +1,303 @@
+#!/usr/bin/env bash
+# scripts/upgrade_project_pins.sh — re-point a managed project's version-pinned
+# Praxion surfaces to the live plugin install after a plugin upgrade.
+#
+# Why this exists
+# ---------------
+# /onboard-project installs git hooks and a merge driver that reference the
+# plugin's scripts/ by absolute path (the versioned plugin-cache install path,
+# e.g. ~/.claude/plugins/cache/i-am/<version>/scripts/git-finalize-hook.sh).
+# When the i-am plugin is upgraded, the cache moves to a new <version>/ path and
+# the old one is garbage-collected, leaving the per-project pins dangling. The
+# onboard predicates that re-point them are themselves shipped by the plugin, so
+# a project onboarded by an *older* Praxion cannot self-heal until the *newer*
+# logic runs once. This script IS that newer logic, factored out of the 10-phase
+# onboard flow into a deterministic, gate-free, LLM-free reconciler.
+#
+# It touches exactly the four version-pinned (drift-prone) surfaces — nothing
+# else from onboarding is path-pinned:
+#   1. The three finalize-hook symlinks (post-merge, post-commit, post-checkout)
+#   2. The merge.observations-jsonl.driver git config
+#   3. Retired merge drivers + their .gitattributes lines (cross-version cleanup)
+#   4. The .ai-state/.praxion-onboard.json manifest version stamp
+# The pre-commit hook is written inline and resolves the plugin path at run time,
+# so it is version-independent and never goes stale — this script leaves it be.
+#
+# Usage
+# -----
+#   scripts/upgrade_project_pins.sh [options]
+#
+#   --repo-root <path>    Project root (default: git rev-parse --show-toplevel)
+#   --plugin-path <path>  Override the live plugin install path (for tests)
+#   --check               Report drift and exit 1 if any is found; mutate nothing
+#   --dry-run             Print what would change; mutate nothing
+#   --no-stage            Skip `git add` of touched tracked files
+#   -h, --help            Show this help
+#
+# Exit codes: 0 = reconciled (or no drift); 1 = drift found under --check, or a
+# fatal precondition failure (not a git repo, plugin not installed, etc.).
+#
+# Idempotent: a second run on an already-current project produces no changes.
+
+set -euo pipefail
+
+PLUGIN_KEY="i-am@bit-agora"
+EXPECTED_DRIVERS=("observations-jsonl")
+FINALIZE_HOOKS=("post-merge" "post-commit" "post-checkout")
+LEGACY_HOOK_BASENAME="git-post-merge-hook.sh"
+
+REPO_ROOT=""
+PLUGIN_PATH_OVERRIDE=""
+MODE="apply"   # apply | check | dry-run
+STAGE=1
+
+err()  { printf 'upgrade-pins: %s\n' "$*" >&2; }
+info() { printf '  %s\n' "$*"; }
+
+usage() { sed -n '2,/^set -euo/p' "$0" | sed 's/^# \{0,1\}//; s/^#$//' | sed '$d'; }
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --repo-root)   REPO_ROOT="$2"; shift 2 ;;
+        --plugin-path) PLUGIN_PATH_OVERRIDE="$2"; shift 2 ;;
+        --check)       MODE="check"; shift ;;
+        --dry-run)     MODE="dry-run"; shift ;;
+        --no-stage)    STAGE=0; shift ;;
+        -h|--help)     usage; exit 0 ;;
+        *) err "unknown option: $1"; exit 1 ;;
+    esac
+done
+
+# ---- preconditions ---------------------------------------------------------
+
+if [ -z "$REPO_ROOT" ]; then
+    REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+        err "not inside a git repository (pass --repo-root to override)"; exit 1; }
+fi
+[ -d "$REPO_ROOT/.git" ] || [ -f "$REPO_ROOT/.git" ] || {
+    err "no .git at $REPO_ROOT"; exit 1; }
+
+if ! [ -d "$REPO_ROOT/.ai-state" ] && ! [ -f "$REPO_ROOT/.ai-state/.praxion-onboard.json" ]; then
+    err "$REPO_ROOT has no .ai-state/ — not a Praxion-onboarded project. Run /onboard-project first."
+    exit 1
+fi
+
+MANIFEST="$REPO_ROOT/.ai-state/.praxion-onboard.json"
+GITATTR="$REPO_ROOT/.gitattributes"
+HOOKS_DIR="$REPO_ROOT/.git/hooks"
+
+# ---- resolve the live plugin install path ----------------------------------
+
+resolve_plugin() {
+    if [ -n "$PLUGIN_PATH_OVERRIDE" ]; then
+        PLUGIN_INSTALL_PATH="$PLUGIN_PATH_OVERRIDE"
+        PLUGIN_VERSION="$(basename "$PLUGIN_INSTALL_PATH")"
+        return 0
+    fi
+    local reg="$HOME/.claude/plugins/installed_plugins.json"
+    [ -f "$reg" ] || { err "plugin registry not found: $reg"; return 1; }
+    command -v jq >/dev/null 2>&1 || { err "jq is required"; return 1; }
+
+    # Prefer a project-scoped entry matching this repo, else first user-scoped,
+    # else the first entry. Mirrors /onboard-project pre-flight resolution.
+    PLUGIN_INSTALL_PATH="$(jq -r --arg root "$REPO_ROOT" '
+        (.plugins["'"$PLUGIN_KEY"'"] // [])
+        | (map(select(.scope=="project" and .projectPath==$root)) + map(select(.scope=="user")) + .)
+        | (.[0].installPath // empty)' "$reg")"
+    PLUGIN_VERSION="$(jq -r --arg root "$REPO_ROOT" '
+        (.plugins["'"$PLUGIN_KEY"'"] // [])
+        | (map(select(.scope=="project" and .projectPath==$root)) + map(select(.scope=="user")) + .)
+        | (.[0].version // empty)' "$reg")"
+
+    [ -n "$PLUGIN_INSTALL_PATH" ] || {
+        err "$PLUGIN_KEY is not installed. Run 'claude plugin install $PLUGIN_KEY' or ./install.sh code from a Praxion checkout."
+        return 1; }
+    [ -n "$PLUGIN_VERSION" ] && [ "$PLUGIN_VERSION" != "null" ] || PLUGIN_VERSION="$(basename "$PLUGIN_INSTALL_PATH")"
+    return 0
+}
+
+resolve_plugin || exit 1
+LIVE_HOOK="$PLUGIN_INSTALL_PATH/scripts/git-finalize-hook.sh"
+LIVE_DRIVER="python3 $PLUGIN_INSTALL_PATH/scripts/merge_driver_observations.py %O %A %B"
+
+CHANGES=0          # count of surfaces that needed (or, in check/dry-run, would need) change
+declare -a STAGED_FILES=()
+
+note_change() { CHANGES=$((CHANGES + 1)); }
+mutating()    { [ "$MODE" = "apply" ]; }
+
+echo "Plugin: $PLUGIN_KEY @ $PLUGIN_VERSION"
+echo "Live install path: $PLUGIN_INSTALL_PATH"
+echo "Mode: $MODE"
+echo
+
+# ---- 1. finalize-hook symlinks ---------------------------------------------
+
+echo "[1/4] Finalize hooks"
+for h in "${FINALIZE_HOOKS[@]}"; do
+    hp="$HOOKS_DIR/$h"
+    target=""
+    [ -L "$hp" ] && target="$(readlink "$hp")"
+
+    action=""
+    if [ "$target" = "$LIVE_HOOK" ]; then
+        info "$h: ok"
+        continue
+    elif [ ! -e "$hp" ] && [ ! -L "$hp" ]; then
+        action="install"            # absent
+    elif [ -L "$hp" ] && [ ! -e "$hp" ]; then
+        action="repoint"            # dangling symlink (stale cache GC'd)
+    elif [ -n "$target" ] && [ "$(basename "$target")" = "$LEGACY_HOOK_BASENAME" ]; then
+        action="repoint"            # legacy single-trigger hook name
+    elif [ -n "$target" ] && case "$target" in */i-am/*) true;; *) false;; esac; then
+        action="repoint"            # version-pinned to a non-live cache path
+    elif [ -L "$hp" ] && [ "$(basename "$target")" = "git-finalize-hook.sh" ]; then
+        # Resolves to a real finalize hook outside the /i-am/ cache — a dev /
+        # self-host install (Praxion's own tree). Not stale; leave it.
+        info "$h: skip (dev/self-host symlink → $target)"
+        continue
+    else
+        action="backup-install"     # a non-Praxion hook occupies the slot
+    fi
+
+    note_change
+    case "$action" in
+        install)        info "$h: absent → install" ;;
+        repoint)        info "$h: stale ($target) → re-point" ;;
+        backup-install) info "$h: non-Praxion hook present → back up + install" ;;
+    esac
+    if mutating; then
+        mkdir -p "$HOOKS_DIR"
+        if [ "$action" = "backup-install" ]; then
+            mv "$hp" "$hp.pre-praxion"
+            info "  backed up to $h.pre-praxion"
+        fi
+        ln -sf "$LIVE_HOOK" "$hp"
+    fi
+done
+echo
+
+# ---- 2. merge driver registration ------------------------------------------
+
+echo "[2/4] Merge driver (observations-jsonl)"
+cur_driver="$(git -C "$REPO_ROOT" config --get merge.observations-jsonl.driver 2>/dev/null || true)"
+attr_present=0
+[ -f "$GITATTR" ] && grep -qF '.ai-state/observations.jsonl merge=observations-jsonl' "$GITATTR" && attr_present=1
+
+if [ "$cur_driver" = "$LIVE_DRIVER" ]; then
+    info "ok"
+elif [ -z "$cur_driver" ]; then
+    if [ "$attr_present" -eq 1 ]; then
+        note_change; info "absent but .gitattributes maps it → register"
+        mutating && git -C "$REPO_ROOT" config merge.observations-jsonl.driver "$LIVE_DRIVER"
+    else
+        info "not registered and no .gitattributes mapping → nothing to do"
+    fi
+elif case "$cur_driver" in */i-am/*) true;; *) false;; esac; then
+    note_change; info "stale ($cur_driver) → re-register"
+    mutating && git -C "$REPO_ROOT" config merge.observations-jsonl.driver "$LIVE_DRIVER"
+else
+    info "set to a non-Praxion value ('$cur_driver') → refusing to overwrite (leave as-is)"
+fi
+echo
+
+# ---- 3. retired merge-driver cleanup (manifest-driven) ---------------------
+
+echo "[3/4] Retired merge drivers"
+if [ -f "$MANIFEST" ] && command -v jq >/dev/null 2>&1; then
+    prior_drivers="$(jq -r '(.artifacts.merge_drivers // [])[]' "$MANIFEST" 2>/dev/null || true)"
+    retired_any=0
+    while IFS= read -r d; do
+        [ -n "$d" ] || continue
+        keep=0
+        for e in "${EXPECTED_DRIVERS[@]}"; do [ "$d" = "$e" ] && keep=1; done
+        [ "$keep" -eq 1 ] && continue
+        # Only remove Praxion-managed drivers: value contains /i-am/ or merge_driver_.
+        dval="$(git -C "$REPO_ROOT" config --get "merge.$d.driver" 2>/dev/null || true)"
+        case "$dval" in
+            */i-am/*|*merge_driver_*) ;;
+            "") ;;  # already unset; the .gitattributes line may still need removal
+            *) info "$d: driver value not Praxion-managed ('$dval') → skip"; continue ;;
+        esac
+        line_present=0
+        [ -f "$GITATTR" ] && grep -q "merge=$d\$" "$GITATTR" && line_present=1
+        # Idempotency guard: a no-op (driver already unset AND line already gone)
+        # is not a change — it only lingers in the manifest's artifact list.
+        if [ -z "$dval" ] && [ "$line_present" -eq 0 ]; then
+            continue
+        fi
+        retired_any=1; note_change
+        info "$d: retired → unset driver + drop .gitattributes line"
+        if mutating; then
+            git -C "$REPO_ROOT" config --unset "merge.$d.driver" 2>/dev/null || true
+            if [ "$line_present" -eq 1 ]; then
+                grep -v "merge=$d\$" "$GITATTR" > "$GITATTR.tmp" && mv "$GITATTR.tmp" "$GITATTR"
+                STAGED_FILES+=("$GITATTR")
+            fi
+        fi
+    done <<< "$prior_drivers"
+    [ "$retired_any" -eq 0 ] && info "none"
+else
+    info "no manifest → nothing to clean"
+fi
+echo
+
+# ---- 4. manifest version stamp ---------------------------------------------
+
+echo "[4/4] Onboard manifest"
+now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+if [ -f "$MANIFEST" ] && command -v jq >/dev/null 2>&1; then
+    recorded="$(jq -r '.onboarded_with_version // "unknown"' "$MANIFEST")"
+    # Canonical artifact inventory after reconciliation: the expected driver set
+    # and its sole .gitattributes mapping. Retired entries are dropped here so a
+    # future run does not reprocess them (the step-3 guard is the safety net).
+    expected_artifacts='{"hooks":["pre-commit","post-merge","post-commit","post-checkout"],"merge_drivers":["observations-jsonl"],"gitattributes":[".ai-state/observations.jsonl merge=observations-jsonl"]}'
+    cur_artifacts="$(jq -cS '.artifacts // {}' "$MANIFEST")"
+    want_artifacts="$(jq -cS '.' <<<"$expected_artifacts")"
+
+    if [ "$recorded" = "$PLUGIN_VERSION" ] && [ "$cur_artifacts" = "$want_artifacts" ]; then
+        info "version already $PLUGIN_VERSION; artifacts current"
+    else
+        note_change
+        [ "$recorded" = "$PLUGIN_VERSION" ] && info "artifacts inventory refreshed" \
+            || info "version $recorded → $PLUGIN_VERSION"
+        if mutating; then
+            jq --arg v "$PLUGIN_VERSION" --arg t "$now" --argjson a "$expected_artifacts" \
+               '.onboarded_with_version=$v | .onboarded_at=$t | .artifacts=$a' \
+               "$MANIFEST" > "$MANIFEST.tmp" && mv "$MANIFEST.tmp" "$MANIFEST"
+            STAGED_FILES+=("$MANIFEST")
+        fi
+    fi
+else
+    info "manifest absent — run /onboard-project to create it (skipping stamp)"
+fi
+echo
+
+# ---- staging + summary -----------------------------------------------------
+
+if [ "$MODE" = "check" ]; then
+    if [ "$CHANGES" -gt 0 ]; then
+        err "drift detected ($CHANGES surface(s) need re-pointing) — run without --check to fix"
+        exit 1
+    fi
+    echo "No drift: all pins current for $PLUGIN_VERSION."
+    exit 0
+fi
+
+if [ "$MODE" = "dry-run" ]; then
+    echo "Dry run: $CHANGES surface(s) would change. Nothing was modified."
+    exit 0
+fi
+
+if [ "$STAGE" -eq 1 ] && [ "${#STAGED_FILES[@]}" -gt 0 ]; then
+    # de-dup
+    printf '%s\n' "${STAGED_FILES[@]}" | sort -u | while IFS= read -r f; do
+        git -C "$REPO_ROOT" add "$f" 2>/dev/null && echo "staged: ${f#$REPO_ROOT/}"
+    done
+fi
+
+if [ "$CHANGES" -eq 0 ]; then
+    echo "Already current — no changes."
+else
+    echo "Reconciled $CHANGES surface(s) to $PLUGIN_VERSION. Review staged changes and commit."
+fi

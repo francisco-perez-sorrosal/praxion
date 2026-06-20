@@ -98,7 +98,7 @@ Execute these phases in order. Each phase honors §Idempotency Predicates — re
 | 8b | AaC tier install — fence seed, `fitness/` scaffold, golden-rule Block D, `architecture.yml` workflow, `docs/diagrams/` scaffold | User picks "Skip AaC" (default) at Gate 8b; or per-sub-step predicates (see §Phase 8b) |
 | 8c | ML/AI training scaffold — experiment tracking config, checkpoint `.gitignore` block, GPU budget declaration, `program.md` template, mode callout | No ML signals detected (skip) OR user picks "Skip" at Gate 8c; per-sub-step predicates (see §Phase 8c) |
 | 8d | Obsidian integration — `.gitignore` Obsidian block, verify `obsidian@obsidian-skills` plugin install, `CLAUDE.md` Obsidian Integration block, `settings.json` deny entries | User picks "Skip" at Gate 8d; per-sub-step predicates (see §Phase 8d) |
-| 8e | Code-quality baseline — universal `.editorconfig` + pre-commit config + `CONTRIBUTING.md` + per-detected-stack linter/formatter/type-check config installed from canonical assets (never overwriting existing config) | User picks "Skip" at Gate 8e; per-sub-step predicates (see §Phase 8e) |
+| 8e | Code-quality baseline — universal `.editorconfig` + pre-commit config + `CONTRIBUTING.md` + per-detected-stack linter/formatter/type-check config + dependency-scanning config installed from canonical assets (never overwriting existing config) | User picks "Skip" at Gate 8e; per-sub-step predicates (see §Phase 8e) |
 | 9 | Print summary + stage modified files (no commit) | None — terminal phase |
 
 ## §Phase Gates
@@ -960,21 +960,21 @@ full allowlist rationale.
 
 ## §Phase 8e — Code-quality baseline (opt-in, default-yes)
 
-**Why this phase exists.** Praxion's onboarding establishes universal infrastructure and domain scaffolds, but historically left a gap: it never established the **code-quality baseline** every project needs. The `coding-style.md` mandate "every change must pass the linters/formatters/type-checks" is vacuous when no config exists, and the agent-readiness rubric flags the absences across three pillars: Style (`c.style.linter_config`, `c.style.formatter_config`, `c.style.editorconfig` at L1–L2; `c.style.precommit_config` at L3), Code Quality (`c.codequality.typecheck_config` at L3), and Documentation (`c.docs.contributing` at L3). This phase closes the gap from first principles: it installs the **canonical, single-sourced baselines** so the mandate is real and the rubric passes. The configs are owned by the language skills and `claude/project-baseline/`, never hand-rolled here — see [`coding-style.md`](../rules/swe/coding-style.md) § Baseline Configuration. Runtime-service signals (a logging dependency, a health check) are deliberately *not* installed here — they are service-conditional, not universal: the `observability` skill owns them and a feature pipeline wires them when a service is actually built (forcing them onto a library or research harness would be wrong).
+**Why this phase exists.** Praxion's onboarding establishes universal infrastructure and domain scaffolds, but historically left a gap: it never established the **code-quality baseline** every project needs. The `coding-style.md` mandate "every change must pass the linters/formatters/type-checks" is vacuous when no config exists, and the agent-readiness rubric flags the absences across four pillars: Style (`c.style.linter_config`, `c.style.formatter_config`, `c.style.editorconfig` at L1–L2; `c.style.precommit_config` at L3), Code Quality (`c.codequality.typecheck_config` at L3), Documentation (`c.docs.contributing` at L3), and Security (`c.security.dependency_scanning` at L3). This phase closes the gap from first principles: it installs the **canonical, single-sourced baselines** so the mandate is real and the rubric passes. The configs are owned by the language skills and `claude/project-baseline/`, never hand-rolled here — see [`coding-style.md`](../rules/swe/coding-style.md) § Baseline Configuration. Runtime-service signals (a logging dependency, a health check) are deliberately *not* installed here — they are service-conditional, not universal: the `observability` skill owns them and a feature pipeline wires them when a service is actually built (forcing them onto a library or research harness would be wrong).
 
 **Stack reuse.** This phase consumes the **Stack detection** captured in §Pre-flight (step 4) — Python, JavaScript/TypeScript, etc. It performs no new detection beyond reading `package.json` dependencies to distinguish framework (React/Vue/Next) from non-framework JS/TS.
 
-**Asset resolution.** Canonical assets live in the i-am plugin install (the `installPath` captured in §Pre-flight): `skills/python-development/assets/{ruff-baseline.toml, mypy-baseline.toml}`, `skills/typescript-development/assets/{biome.json, eslint.config.mjs, prettierrc.json, tsconfig.json}`, and `claude/project-baseline/{editorconfig, pre-commit-config.yaml, CONTRIBUTING.md.tmpl}`. Read the asset from there; write the materialized file into the project. Edit the asset (never the per-project copy) to evolve the baseline.
+**Asset resolution.** Canonical assets live in the i-am plugin install (the `installPath` captured in §Pre-flight): `skills/python-development/assets/{ruff-baseline.toml, mypy-baseline.toml}`, `skills/typescript-development/assets/{biome.json, eslint.config.mjs, prettierrc.json, tsconfig.json}`, and `claude/project-baseline/{editorconfig, pre-commit-config.yaml, CONTRIBUTING.md.tmpl, dependabot.yml.tmpl}`. Read the asset from there; write the materialized file into the project. Edit the asset (never the per-project copy) to evolve the baseline.
 
 **Gate 8e — three-option AskUserQuestion.** Use `AskUserQuestion` with `header: "Next?"`, `multiSelect: false`, the Gate 8e headline from the gate map, and these three options:
 
 | Option | Effect |
 |--------|--------|
-| `Install code-quality baseline` | **Default.** Run sub-steps 8e.1–8e.6; each is independently idempotent and skips when its config already exists. |
+| `Install code-quality baseline` | **Default.** Run sub-steps 8e.1–8e.7; each is independently idempotent and skips when its config already exists. |
 | `Skip` | Skip Phase 8e entirely. Re-run `/onboard-project` later — all sub-steps are idempotent. |
 | `Run all rest` | Skip remaining gates, default this choice to `Install code-quality baseline`, run autonomously through Phase 9. |
 
-**Action when "Install code-quality baseline" is chosen.** Run sub-steps 8e.1 through 8e.6 in order. Each prints one line on completion or skip. None overwrites an existing config — the baseline is additive only.
+**Action when "Install code-quality baseline" is chosen.** Run sub-steps 8e.1 through 8e.7 in order. Each prints one line on completion or skip. None overwrites an existing config — the baseline is additive only.
 
 ### Sub-step 8e.1 — Universal `.editorconfig`
 
@@ -1012,7 +1012,13 @@ full allowlist rationale.
 
 **Action.** Read `claude/project-baseline/CONTRIBUTING.md.tmpl` (from the plugin install). Strip the leading HTML template-doc comment, then fill the `<lint command>` / `<typecheck command>` / `<test command>` / `<build command>` placeholders from the detected stack — reuse the exact values resolved for Phase 6's Project Essentials block (e.g. `uv run ruff …`, `uv run mypy src/`, `uv run pytest`). Leave a `# TODO:` for any command the project does not have rather than inventing one. Write the result to `<repo-root>/CONTRIBUTING.md`. Print: `8e.6: CONTRIBUTING.md installed (filled from detected stack commands)`.
 
-**Verification handoff.** Phase 9 lists every file staged here. The agent-readiness Style, Code Quality, and Documentation criteria covered by this phase (linter/formatter/editorconfig/pre-commit, type-check, contributing) flip to pass on the next `/project-metrics --refresh` run.
+### Sub-step 8e.7 — Dependency-scanning config
+
+**Predicate.** Any of `.github/dependabot.yml` / `.github/dependabot.yaml` / `renovate.json` / `.renovaterc` / `.renovaterc.json` / `.snyk` exists → skip with `8e.7: skipped (dependency-scanning config already present)`.
+
+**Action.** Read `claude/project-baseline/dependabot.yml.tmpl` (from the plugin install). Strip the leading template-doc comment lines. Emit `updates:` blocks only for detected ecosystems: a Python manifest present anywhere in the repo → include the `pip` block with `directory:` set to the discovered manifest directory; a `package.json` present anywhere in the repo → include the `npm` block with `directory:` set to the discovered `package.json` directory; a `.github/workflows/` directory present → include the `github-actions` block. Multiple Python or npm manifests at different directories each get their own `updates:` entry. Strip blocks for undetected ecosystems. Write the result to `<repo-root>/.github/dependabot.yml` (creating `.github/` if absent). Print: `8e.7: .github/dependabot.yml installed (dependency scanning enabled for detected ecosystems)`.
+
+**Verification handoff.** Phase 9 lists every file staged here. The agent-readiness Style, Code Quality, Documentation, and Security criteria covered by this phase (linter/formatter/editorconfig/pre-commit, type-check, contributing, dependency-scanning) flip to pass on the next `/project-metrics --refresh` run.
 
 ## §Phase 9 — Verification + handoff
 

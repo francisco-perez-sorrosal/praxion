@@ -6,7 +6,9 @@
 **Pipeline branch**: `worktree-multi-language-support`
 **Start date**: 2026-05-11
 **End date**: 2026-05-11
+**Archived**: 2026-05-11
 **Status**: Shipped — verifier PASS-WITH-WARNINGS (step-21); 2 catalog-text WARNs fixed post-verify; ADRs finalized as dec-135..dec-140 at merge-to-main
+**ADRs**: `dec-135` (Angular excluded from first-class TS contexts), `dec-136` (Biome/ESLint coexistence), `dec-137` (framework contexts nest in typescript-development), `dec-138` (MCP TS SDK v2 trigger-based review), `dec-139` (polyglot skill template), `dec-140` (Zod v3/v4 cross-skill split).
 
 ## Feature Summary
 

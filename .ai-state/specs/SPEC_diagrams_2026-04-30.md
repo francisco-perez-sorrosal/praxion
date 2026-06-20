@@ -6,7 +6,9 @@
 **Pipeline branch**: `worktree-structurizr-d2-diagrams`
 **Start date**: 2026-04-29
 **End date**: 2026-04-30
+**Archived**: 2026-04-30
 **Status**: Shipped (PASS WITH FINDINGS — verifier verdict)
+**ADRs**: `dec-093` (LikeC4 + Mermaid coexistence policy), `dec-094` (commit source DSL + rendered SVG), `dec-095` (LikeC4 + D2 toolchain choice), `dec-096` (step ordering — rule before `.c4`/`.d2`).
 
 ## Feature Summary
 

@@ -1,0 +1,10 @@
+# Fixture: orphaned-edge
+# REQ-03 points to a test path that no longer exists (deleted/renamed in the diff).
+# Expected finding: kind=orphaned-edge, severity=important
+
+requirements:
+  REQ-03:
+    tests:
+      - tests/test_deleted_module.py::test_old_behavior
+    implementation:
+      - src/old_module.py

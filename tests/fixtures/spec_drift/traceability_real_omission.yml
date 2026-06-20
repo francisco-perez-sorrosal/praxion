@@ -1,0 +1,10 @@
+# Fixture: stale-dependent — real omission
+# REQ-01 maps to a test and an impl; only the spec clause changed in the diff.
+# Expected finding: kind=stale-dependent, severity=important
+
+requirements:
+  REQ-01:
+    tests:
+      - tests/test_widget.py::test_widget_rejects_empty_name
+    implementation:
+      - src/widget.py

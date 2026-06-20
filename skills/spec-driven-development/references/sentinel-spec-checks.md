@@ -20,6 +20,7 @@ When multiple spec files exist, the sentinel samples a representative subset con
 | SH04 | L | Traceability matrix has no UNTESTED entries | All requirements have at least one test |
 | SH05 | L | Key Decisions section is substantive | Decisions include what, why, alternatives |
 | SH06 | L | Spec delta claims match actual spec evolution | Added/modified/removed requirements in delta consistent with differences between prior and current archived specs |
+| SH07 | A | Spec↔artifact drift detected against current HEAD | Imports `detect_drift` from `scripts/spec_drift`; iterates `SPEC_*.md` in `.ai-state/specs/`; renders findings as sentinel severity rows (Important/Suggested); defers orphaned-edge detection to SH01/SH04; never emits Critical; skips with INFO when `.ai-state/specs/` is absent |
 
 ## Check Evaluation Details
 
@@ -75,6 +76,30 @@ When a current archived spec was produced by a pipeline that included a `SPEC_DE
 If all delta claims are consistent with actual spec evolution, PASS. If a claim contradicts the evidence (e.g., delta says REQ was removed but it still appears in the current spec), FAIL. When behavioral comparison is ambiguous (requirement rephrased but intent unclear), WARN.
 
 **Common failures**: delta produced from stale baseline (prior spec's behavior had already drifted from code), delta claims not updated after plan amendments changed scope, rushed archival that preserved the delta but modified the spec differently.
+
+### SH07 -- Spec Drift (Auto)
+
+**Tier:** Auto (not LLM). **Activation:** Conditional — skip with a single INFO note ("SH07: skipped — `.ai-state/specs/` absent or empty") when the directory does not exist or contains no `SPEC_*.md` files.
+
+**Logic:**
+
+1. Import `detect_drift` from `scripts/spec_drift` (available in any Praxion-managed project that has run Step 6 of the spec-drift pipeline).
+2. For each `SPEC_*.md` found under `.ai-state/specs/`, invoke:
+   ```python
+   findings = detect_drift(scope=f"archived:{spec_filename}", repo_root=repo_root)
+   ```
+3. Map each finding's `severity` field to a sentinel severity row:
+   - `important` → **Important** finding in the SH dimension
+   - `suggested` → **Suggested** finding in the SH dimension
+4. Render each finding using `kind`, `req`, `stale_dependents`, `pointer`, and `rationale` fields from the finding dict.
+
+**Defers to SH01/SH04 (AC-6):** SH07 does not re-detect or re-report orphaned-edge findings (`kind=orphaned-edge`). SH01 already checks whether live file references resolve; SH04 already checks for UNTESTED entries. When `detect_drift` returns a finding with `kind=orphaned-edge`, SH07 silently drops it — that finding is already in scope for SH01/SH04 and would otherwise be duplicated. SH07's unique value is surfacing `stale-dependent` findings (a spec-req clause changed but its dependents were not updated) and `untracked-req` findings (a new REQ has no edge in `traceability.yml`).
+
+**Severity cap:** SH07 never emits Critical. The highest severity it can produce is Important. This preserves the sentinel's invariant that spec-drift findings are actionable improvements, not blocking failures — the detector module enforces this cap at the source (`severity` field is constrained to `important` or `suggested`).
+
+**Unique value** over SH01–SH06:
+- `stale-dependent`: surfaces when a spec-req clause was edited but dependent implementation or test paths were not touched in the same commit range — a signal invisible to static file-resolution checks.
+- `untracked-req`: surfaces a REQ present in the archived spec but absent from `traceability.yml` — a gap the traceability matrix may not catch until the verifier runs.
 
 ## Integration with Sentinel Methodology
 

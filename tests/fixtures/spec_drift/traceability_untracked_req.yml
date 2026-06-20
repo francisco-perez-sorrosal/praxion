@@ -1,0 +1,11 @@
+# Fixture: untracked-req
+# REQ-04 was added by SPEC_DELTA but has NO edge in traceability.yml.
+# Expected finding: kind=untracked-req, severity=important
+
+requirements:
+  REQ-01:
+    tests:
+      - tests/test_existing.py::test_existing_behavior
+    implementation:
+      - src/existing.py
+# NOTE: REQ-04 (added in spec_delta_untracked_req.md) intentionally absent here.

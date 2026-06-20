@@ -20,6 +20,7 @@ Evaluate AI agent behavior systematically. Agent evals differ fundamentally from
 - [references/framework-patterns.md](references/framework-patterns.md) -- framework comparison, Python code examples for Inspect AI, DeepEval, Promptfoo
 - [references/typescript.md](references/typescript.md) -- TypeScript eval tooling: Vitest async patterns for LLM calls, Promptfoo YAML schema, TypeScript provider config, CLI vs SDK usage
 - [references/eval-design-patterns.md](references/eval-design-patterns.md) -- golden datasets, LLM-as-judge, grader design, scoring, non-determinism
+- [references/eval-rigor.md](references/eval-rigor.md) -- dev-time gateable rigor: the judge-calibration protocol (transcript-driven, κ-gated) and the regression-vs-capability split (frozen gate vs free-growing tracker) + living-dataset lifecycle
 - [references/cicd-integration.md](references/cicd-integration.md) -- GitHub Actions workflows, deployment gates, regression tracking, cost management
 - [references/run-ledger-schema.md](references/run-ledger-schema.md) -- run_store_descriptor, EVAL_RESULTS.md schema (13 fields), EVAL_LOG.md aggregate columns (11 cols), verifier reuse
 - [references/data-governance.md](references/data-governance.md) -- held-out split design, MANIFEST.json schema (sha256/version/source/split), answer-key isolation, eval determinism practices, contamination detection

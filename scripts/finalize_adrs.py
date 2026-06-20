@@ -422,7 +422,22 @@ def detect_drafts_to_promote(mode: str, branch: str | None) -> list[Path]:
     if not DRAFTS_DIR.is_dir():
         return []
 
-    existing = {p for p in DRAFTS_DIR.iterdir() if FRAGMENT_ADR_PATTERN.match(p.name)}
+    all_md = {p for p in DRAFTS_DIR.iterdir() if p.is_file() and p.suffix == ".md"}
+    existing = {p for p in all_md if FRAGMENT_ADR_PATTERN.match(p.name)}
+
+    # Defense in depth: a draft whose filename does not match the fragment
+    # schema is filtered out of `existing` and would otherwise be silently
+    # stranded forever (e.g. a dot or colon left in the slug at creation
+    # time). A valid, human-authored decision should never disappear without
+    # a trace -- warn loudly so it can be renamed to a valid slug.
+    for unmatched in sorted(all_md - existing):
+        logger.warning(
+            "finalize_adrs: %s is in drafts/ but does not match the fragment "
+            "schema [a-z0-9-]+; it will NOT be promoted -- rename it to a "
+            "valid slug.",
+            unmatched.name,
+        )
+
     if not existing:
         return []
 

@@ -1268,6 +1268,60 @@ class TestMalformedDraftResilience:
         assert "skipping malformed draft" in caplog.text
 
 
+# -- Malformed-slug visibility (dot in slug strands the draft) ----------------
+
+
+class TestMalformedSlugVisibility:
+    """A draft whose filename violates the fragment schema is warned, not silently dropped."""
+
+    def test_dot_named_draft_skipped_with_warning_not_silently(
+        self, repo_root: Path, caplog
+    ) -> None:
+        import logging
+
+        good = make_draft(
+            repo_root,
+            "20260612-2309",
+            "alice",
+            "main",
+            "core-only-ci-leg",
+            frontmatter_extra={"branch": "main"},
+        )
+        # The report's case: version numbers turned into literal dots in the
+        # slug. The fragment schema is [a-z0-9-]+, so this filename never
+        # matches and would be filtered out of `existing` forever.
+        bad = make_draft(
+            repo_root,
+            "20260612-2310",
+            "alice",
+            "main",
+            "step-ordering-0.3-before-0.2",
+            frontmatter_extra={"branch": "main"},
+        )
+        assert finalize.FRAGMENT_ADR_PATTERN.match(bad.name) is None
+
+        with caplog.at_level(logging.WARNING, logger="finalize_adrs"):
+            promotable = finalize.detect_drafts_to_promote("all", None)
+
+        # The valid draft promotes; the dot-named one is excluded...
+        assert good in promotable
+        assert bad not in promotable
+        # ...but loudly, naming the offending file -- never a silent skip.
+        assert "does not match the fragment schema" in caplog.text
+        assert bad.name in caplog.text
+
+    def test_versioned_title_sanitizes_to_valid_fragment_filename(self) -> None:
+        # Creation-side contract: the slug runs through sanitize(), so a title
+        # full of dots, colons, and version numbers yields a filename that
+        # matches FRAGMENT_ADR_PATTERN (i.e. would never strand at finalize).
+        title = "Phase 0 step ordering: 0.3 must land before 0.2 core-only CI leg"
+        slug = finalize._sanitize(title)
+        filename = f"20260612-2310-alice-main-{slug}.md"
+
+        assert finalize.FRAGMENT_ADR_PATTERN.match(filename) is not None
+        assert "." not in slug and ":" not in slug
+
+
 # -- Plugin-cache write guard -------------------------------------------------
 
 

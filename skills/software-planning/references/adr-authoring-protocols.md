@@ -27,14 +27,16 @@ user_raw    = git_config("user.email") or git_config("user.name") or "anon"
 user_slug   = sanitize(user_raw.split("@")[0])     # username prefix from email, if email set
 branch_raw  = git_rev_parse("--abbrev-ref", "HEAD") or "detached"
 branch_slug = sanitize(branch_raw)
-slug        = kebab_case(decision_title)
+slug        = sanitize(decision_title)              # MUST match [a-z0-9-]+ (see note below)
 filename    = f"{timestamp}-{user_slug}-{branch_slug}-{slug}.md"
 id          = f"dec-draft-{sha1(filename)[:8]}"
 # Persist `branch_slug` into the fragment's frontmatter as `branch: <branch_slug>`
 # so finalize can recover the authoring branch unambiguously, even after merge.
 ```
 
-`sanitize(s)` lowercases and strips to `[a-z0-9-]` (replacing any run of other characters with a single `-`) and caps length at 40 characters. When both `user.email` and `user.name` are unset, use `anon` — never fabricate identity.
+`sanitize(s)` lowercases and strips to `[a-z0-9-]` (replacing any run of other characters with a single `-`, then trimming leading/trailing `-`) and caps length at 40 characters. When both `user.email` and `user.name` are unset, use `anon` — never fabricate identity.
+
+**The slug runs through `sanitize`, not a bare kebab-case.** All three filename components — `user_slug`, `branch_slug`, *and* `slug` — must end up matching `[a-z0-9-]+`, because the finalize step (`finalize_adrs.py`, `FRAGMENT_ADR_PATTERN = ^\d{8}-\d{4}-[a-z0-9-]+\.md$`) only sees fragments whose **whole filename** matches that schema. A title with dots, colons, or version numbers — e.g. `"Phase 0 step ordering: 0.3 must land before 0.2 core-only CI leg"` — must sanitize to `phase-0-step-ordering-0-3-must-land-before-0-2` (a literal `0.3` would strand the draft: finalize silently skips any non-matching filename, so the decision never promotes and no error is raised). Verify the constructed `filename` matches `FRAGMENT_ADR_PATTERN` before writing the fragment.
 
 **PII note**: the fragment filename contains a sanitized email-username prefix. This is acceptable for internal project state but is not a secret — treat fragment filenames the same way as commit-author metadata, not as redacted data. Teams with stricter privacy requirements can substitute a short hash of the email address for the username prefix.
 

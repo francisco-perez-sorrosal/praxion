@@ -71,6 +71,12 @@ Aliases only (`opus`/`sonnet`/`haiku`); pin full IDs at spawn time only when ver
 
 **Opus breaking-change note.** Some Opus versions reject `thinking.budget_tokens` and non-default `temperature`/`top_p`/`top_k` with HTTP 400; never pass these on routed Opus spawns. *Specific to Opus 4.7 as of 2026-04-25 — verify against `claude-ecosystem` skill before relaxing if a later version restores the params.*
 
+### Per-Spawn Overrides
+
+| Scenario | Agent | Override | Rationale |
+|----------|-------|----------|-----------|
+| Intra-step pair-review (`Mode: light-review`) | `verifier` | `sonnet` | Step-scoped diff review only; not a whole-pipeline quality gate. Sanctioned per-spawn override below the `opus` floor. |
+
 ### Quality-Cliff Guards
 
 - **Deep scientific or math reasoning** — do not downgrade below Opus.

@@ -442,6 +442,57 @@ Cannot write REWORK_MANIFEST.md to .ai-work/<task-slug>/.
 [How to fix]: <exact action — e.g., "create .ai-work/<task-slug>/ before invoking the verifier", "inspect the finding anchors in VERIFICATION_REPORT.md for malformed JSON characters">
 ```
 
+## Mode: light-review
+
+**Activation:** The orchestrator spawns with an explicit `Mode: light-review` directive in the prompt. Detect it in Phase 1 and skip all standard phases.
+
+### Inputs (step-scoped only)
+
+| Input | What to read |
+|-------|-------------|
+| Step diff | Provided inline in the spawn prompt or as `git diff HEAD~1..HEAD -- <files>` |
+| Step acceptance criteria | The `Done when` clause for the step under review |
+| Key Signals | `TASK_BRIEF.md § Key Signals` when the file exists |
+
+### Output (bounded verdict)
+
+Return exactly one of:
+
+```
+verdict: accept
+notes: <optional one-liner>
+```
+
+or
+
+```
+verdict: revise
+findings:
+  - id: F1
+    severity: FAIL | WARN
+    location: <file:line>
+    evidence: <observed>
+    criterion: <step AC or convention violated>
+```
+
+Every finding must reference either the step's `Done when` criteria or a convention from the `coding-style` rule or `agent-behavioral-contract.md`. Findings without a traceable anchor are not valid.
+
+### Model
+
+Spawn at `sonnet` — per-spawn override below the `opus` floor. This is a step-scoped diff review, not a whole-pipeline quality gate. See `rules/swe/agent-model-routing.md`.
+
+### Anti-instructions (hard limits for this mode)
+
+- **Do NOT assess the whole pipeline**, traceability matrix, cross-cutting structure, or feature-level acceptance criteria — those are the full verifier's domain.
+- **Do NOT produce a `VERIFICATION_REPORT.md`** — the output is an inline bounded verdict, not a file artifact.
+- **Do NOT check test coverage, deployment docs, or architecture docs** — scope is this step's diff only.
+- **Do NOT run tests** — read the step's `Done when` criteria and assess the diff against them.
+- **Do NOT enter any standard Phase (1–12.5)** — this mode is a separate, abbreviated workflow.
+
+Full procedure (trigger table, iteration bound, escalation, composition with full verifier): [`skills/software-planning/references/intra-step-review.md`](../skills/software-planning/references/intra-step-review.md).
+
+---
+
 ## Collaboration Points
 
 ### With the Implementation Planner (Self-Healing Loop)

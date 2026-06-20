@@ -70,6 +70,48 @@ For exploratory work, add spike steps:
 
 After a spike, update the plan: document findings in LEARNINGS.md, propose plan changes, get approval, then continue.
 
+<a id="step-risk-tagging"></a>
+## Step Risk Tagging
+
+The planner annotates steps with risk signals so the orchestrator can decide at step completion whether to spawn an intra-step pair-review. This annotation is part of step decomposition (Phase 3–4 of the implementation-planner process).
+
+### `tier: H` — High-complexity step
+
+Add `tier: H` to a step when the change is cross-cutting, high-complexity, or architecturally load-bearing:
+
+| Signal | Example |
+|--------|---------|
+| Touches 4+ files across package boundaries | Core abstraction shared by many consumers |
+| Refactors or replaces a central interface | Auth session handler, configuration loader |
+| Architect flagged the step as high-risk in `SYSTEMS_PLAN.md § Risk Assessment` | Migration, permission model change |
+| Implementer was routed to `tier: H` override in `agent-model-routing.md` | Cross-codebase refactor |
+
+```markdown
+### Step N: [Cross-cutting refactor description]
+
+tier: H
+**Implementation**: ...
+**Files**: ...
+**Done when**: ...
+```
+
+The `tier: H` annotation is already used by `agent-model-routing.md` to route the implementer to `opus`. The intra-step pair-review feature additionally reads this tag as a RISKY signal to spawn a reviewer.
+
+### `review: force` and `review: off`
+
+Planner overrides — higher precedence than every auto-signal:
+
+```markdown
+**review**: force   # spawn reviewer regardless of signals
+**review**: off     # suppress reviewer regardless of signals
+```
+
+When to use `force`: the planner judges the step risky independent of signals (e.g., a simple-looking step that changes a critical invariant).
+
+When to use `off`: the planner judges the step safe despite signals (e.g., a `tier: H` step whose diff is mechanical and already verified by a paired test).
+
+Full procedure and composition table: [`intra-step-review.md`](intra-step-review.md).
+
 ## Anti-Patterns
 
 **Don't:** Commit without approval -- always wait for explicit "yes" before committing

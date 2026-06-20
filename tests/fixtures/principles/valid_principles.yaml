@@ -1,0 +1,12 @@
+version: 1
+principles:
+  - id: no-raw-sql
+    statement: Database access goes through the repository layer; no raw SQL in handlers.
+    severity: blocking
+    scope: "src/api/**"
+    rationale: Centralizes query auditing and prevents injection surface.
+  - id: public-fn-docstrings
+    statement: Every exported function carries a docstring with a usage example.
+    severity: advisory
+    # scope omitted → applies project-wide ("*")
+    # rationale omitted → fine

@@ -1,0 +1,10 @@
+version: 1
+principles:
+  - id: blocking-rule
+    statement: All writes must go through the transaction manager.
+    severity: blocking
+    rationale: Ensures atomicity and rollback capability.
+  - id: advisory-rule
+    statement: Prefer named constants over magic strings in configuration.
+    severity: advisory
+    rationale: Improves readability and prevents typo-driven bugs.

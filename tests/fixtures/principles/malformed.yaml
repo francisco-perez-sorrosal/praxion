@@ -1,0 +1,7 @@
+version: 1
+principles:
+  - id: broken
+    statement: This is fine
+    severity: blocking
+  this is not valid yaml: [unclosed bracket
+  another bad line: {key: value with: nested colon: broken

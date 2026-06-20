@@ -1,0 +1,6 @@
+version: 1
+principles:
+  - id: experimental-rule
+    statement: Use the new async pipeline for all data ingestion.
+    severity: experimental
+    rationale: Unrecognized severity must be coerced to advisory, never fail closed.

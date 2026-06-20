@@ -31,6 +31,7 @@ Create and maintain planning documents (IMPLEMENTATION_PLAN.md, WIP.md, LEARNING
 - [references/architecture-documentation.md](references/architecture-documentation.md) -- dual-audience architecture documentation methodology: lifecycle, section ownership, validation models for both architect and developer documents
 - [references/behavioral-contract.md](references/behavioral-contract.md) -- four-behavior contract deep dive: definitions, per-agent application, objection templates, DRY relationship
 - [references/design-synthesis.md](references/design-synthesis.md) -- activation-gated pre-implementation synthesis: lens catalog, activation formula, convergence signals; composed from existing skills (security / performance / simplicity / testability)
+- [references/project-principles.md](references/project-principles.md) -- per-project standards artifact (`.ai-state/principles.yaml`): schema, authoring boundary + decision test, advisory/blocking guidance, absent-behavior contract, migration path to `project_profile.yaml`
 
 For the **up-front** design discipline behind boundary and interface choices —
 SOLID as balanced-coupling heuristics, the strength/distance/volatility model, and

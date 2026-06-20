@@ -112,6 +112,21 @@ When `SPEC_DELTA.md` exists alongside the behavioral specification, add a `## De
 
 Skip this phase when no Behavioral Specification section exists in `SYSTEMS_PLAN.md`.
 
+### Phase 4.5 -- Project Principles (conditional)
+
+**Activation:** Only when `.ai-state/principles.yaml` exists and is non-empty. Absent or empty file → skip silently; no `## Project Principles` section emitted in the report (no-op per AC5).
+
+1. **Load principles** — read `.ai-state/principles.yaml` via the loader contract (`load_principles`/`scope_matches` in `scripts/principles_loader.py`; schema in `skills/software-planning/references/project-principles.md`). If the loader returns a dict with `kind: "malformed-yaml"`, surface it as a single `WARN` finding: `[Principle: malformed-yaml] principles.yaml could not be parsed — treated as absent`, then skip remaining sub-steps. Do NOT silently drop the note — surfacing it preserves the fail-loud benefit while still proceeding.
+
+2. **Scope-match** — for each principle, check whether its `scope` glob matches any file in the changed-files set (from `git diff`). Principles whose scope matches no changed file are out-of-scope; omit them entirely (no PASS noise). If a matched principle carries `_coerced_severity: true`, emit a `WARN`: `[Principle: <id>] severity value unrecognized — treated as advisory`.
+
+3. **Assess** — for each in-scope principle, assess the changed code against the principle's `statement`. Classify:
+   - `blocking` + violated → `FAIL`, tagged `[Principle: <id>]` — gates the report identically to an unmet acceptance criterion; feeds existing rework loop (Phase 12.5)
+   - `advisory` + violated → `WARN`, tagged `[Principle: <id>]`
+   - satisfied → `PASS`, tagged `[Principle: <id>]`
+
+4. **Emit** — add a `## Project Principles` section to `VERIFICATION_REPORT.md`. Each finding includes: `id`, severity, verdict, evidence (file:line), and `rationale` when present in the principle. Reference `skills/software-planning/references/project-principles.md` for schema detail; do NOT inline the schema.
+
 ### Phase 5 -- Convention Compliance
 
 Apply the `code-review` skill's review workflow:
@@ -297,7 +312,7 @@ Skip this phase entirely in standalone mode.
 
 ### Phase 12 -- Report Generation
 
-**Incremental writing:** Write the `VERIFICATION_REPORT.md` document structure (all section headers with `[pending]` markers for incomplete sections) at the start of Phase 1. Fill in Scope during Phase 2, Acceptance Criteria results during Phase 3, Convention Compliance during Phase 5, Test Coverage during Phase 10, Context Artifact Completeness during Phase 11, and finalize the verdict in Phase 12. This ensures partial progress is visible even if the agent fails mid-execution, and allows the main agent to check partial results of a background agent.
+**Incremental writing:** Write the `VERIFICATION_REPORT.md` document structure (all section headers with `[pending]` markers for incomplete sections) at the start of Phase 1. Fill in Scope during Phase 2, Acceptance Criteria results during Phase 3, Project Principles during Phase 4.5 (when active), Convention Compliance during Phase 5, Test Coverage during Phase 10, Context Artifact Completeness during Phase 11, and finalize the verdict in Phase 12. This ensures partial progress is visible even if the agent fails mid-execution, and allows the main agent to check partial results of a background agent.
 
 1. Load the report template from the `code-review` skill's `references/report-template.md`
 2. Determine the overall verdict:

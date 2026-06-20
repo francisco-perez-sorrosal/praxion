@@ -43,6 +43,7 @@ Determine what you have to work with. The **task slug** (provided in your prompt
 
 1. **Check for SYSTEMS_PLAN.md** — read the architectural sections (Goal, Acceptance Criteria, Architecture, Risk Assessment). If `VERIFIER_FINDINGS.md` is present in `.ai-work/<task-slug>/` and no `RESEARCH_FINDINGS.md` exists, read it as the primary task-intake document — its `## Problem`, `## Scope`, and `## Success Criteria` sections fill the same role.
 1a. **Check for `PRE_REFACTOR_PLAN.md`** — when present in `.ai-work/<task-slug>/`, the orchestrator has dispatched a pre-refactor mini-pipeline and this artifact is your primary intake (alongside any feature-scope `SYSTEMS_PLAN.md`). See the **Pre-Refactor Mode** subsection at the end of this phase.
+1b. **Check for `.ai-state/principles.yaml`** — if present and non-empty, load it tolerantly using the contract in `scripts/principles_loader.py` (schema detail: `skills/software-planning/references/project-principles.md`). A `kind: "malformed-yaml"` note from the loader means the file is unparseable — record one note in `LEARNINGS.md` ("principles.yaml could not be parsed — treated as absent") and proceed as if absent. Absent or empty file → skip silently.
 2. **Check for SPEC_DELTA.md** — if present, read the spec delta for brownfield context. Modified requirements indicate targeted refactoring-then-implementation steps. Removed requirements indicate explicit cleanup steps with dead code/test removal. Added requirements follow normal step decomposition. Note any staleness warnings for verification substeps.
 3. **Check for RESEARCH_FINDINGS.md** — read for codebase context and technical details
 4. **Check for CONTEXT_REVIEW.md** — if present, read the accumulated context engineering review (research-stage and architecture-stage sections) for artifact dependency ordering, placement recommendations, and spec compliance notes
@@ -211,6 +212,10 @@ When a parallel group has documentation impact, add a third step:
 - **Step N+2** `[parallel-group: X]`: Doc step (assignee: `doc-engineer`, files: documentation files)
 
 The doc step's `Documentation` field describes which READMEs, catalogs, or architecture docs need updating and why. File sets are disjoint by construction (production code / test code / documentation files).
+
+**Project Principles threading (when `.ai-state/principles.yaml` was loaded in Phase 1b):**
+
+For each step, compare the step's `Files` field against each principle's `scope` glob. Applicable principles — those whose scope matches at least one file — should have their `statement` appended to that step's `Done when` / acceptance criteria and their `id` recorded in `WIP.md` for the step. This makes principle compliance part of the implementer's own self-review checklist, not just the verifier's gate. Out-of-scope principles (no file match) are silently omitted.
 
 **Requirement traceability threading:**
 

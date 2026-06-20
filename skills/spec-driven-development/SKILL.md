@@ -15,6 +15,8 @@ compatibility: Claude Code
 
 Behavioral specifications bridge architecture and implementation by giving each requirement a unique identity that threads through the entire pipeline -- from the architect's design through planning, testing, verification, and archival. SDD composes with the [software-planning](../software-planning/SKILL.md) skill: planning provides the three-document model and step decomposition; SDD provides the specification format and requirement traceability. Load both when working on medium or large features.
 
+**Stance: spec as source of truth, code as its realization.** Treat the behavioral specification as the authoritative artifact — the statement of intended behavior — and the implementation as the realization of that specification, validated back via traceability. Guard-rail: this is a *stance*, not a claim that Praxion mechanically compiles or generates code from specs. Realization is human-and-agent-driven, BDD-grounded, and HITL-interactive — the spec shapes and validates the implementation; it does not produce it automatically.
+
 **Satellite files** (loaded on-demand):
 
 - [references/spec-format-guide.md](references/spec-format-guide.md) -- full spec format with examples, EARS/GWT comparison, traceability matrix template, persistent spec template, spec delta template, edge cases

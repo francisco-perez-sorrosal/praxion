@@ -2,6 +2,8 @@
 
 Behavioral specification methodology with requirement traceability for medium and large features. Provides spec format, complexity triage, REQ ID conventions, traceability threading, decision documentation, and spec archival.
 
+**Stance:** The spec is the authoritative artifact — code is its realization, validated back via traceability. This is a *stance*, not automated codegen: realization is human-and-agent-driven through BDD and interactive HITL, not a compiler step.
+
 ## When to Use
 
 - Medium or large features that need behavioral specifications with requirement IDs

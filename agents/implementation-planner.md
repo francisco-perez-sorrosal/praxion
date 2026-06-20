@@ -224,6 +224,37 @@ After both paired steps complete, add an integration checkpoint:
 - If pre-existing tests broke, the implementer fixes them (boy scout rule)
 - Iterate until all tests pass
 
+### Phase 4b — Step Risk Tagging and Intra-Step Review Annotation
+
+After pairing test steps (Phase 4), scan each step for RISKY signals and annotate accordingly. This is what the orchestrator reads at step completion to decide whether to spawn a light-review pass.
+
+**RISKY signals — tag the step when any applies:**
+
+| Signal | How to detect | Tag action |
+|--------|--------------|-----------|
+| **One-way-door** | Step description includes: schema migration, deletion, permission grant, external API write, irreversible data transform | Note in the step description; orchestrator auto-signals on this pattern |
+| **`tier: H`** (cross-cutting, high complexity) | Step touches 4+ files across package boundaries; or refactors a core abstraction used by many consumers; or is a critical-path change the architect flagged as high-risk | Add `tier: H` annotation to the step block |
+| **Planner override** | Planner judges a step risky independent of signals, or judges it safe despite signals | Add `review: force` or `review: off` to the step block |
+
+**`review:` field** — add to a step block in `IMPLEMENTATION_PLAN.md` when an override is warranted:
+
+```markdown
+### Step N: [description]
+
+**Implementation**: ...
+**Files**: ...
+**review**: force | off
+**Done when**: ...
+```
+
+- `review: force` — pass runs regardless of auto-signals
+- `review: off` — pass suppressed regardless of auto-signals
+- *(omit field)* — auto-signal logic governs
+
+**Important**: The planner annotates `review:`. The implementer does not set it. Non-RISKY steps with no `review:` field incur zero added cost — no reviewer spawn.
+
+Full procedure (trigger predicate, reviewer contract, iteration bound, escalation, composition table): [`skills/software-planning/references/intra-step-review.md`](../skills/software-planning/references/intra-step-review.md).
+
 ### Phase 5 — Phase Detection
 
 Check if any steps should be delegated to specialized methodologies:

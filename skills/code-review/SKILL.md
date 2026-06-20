@@ -100,6 +100,18 @@ When invoked directly by a user (no pipeline documents):
 - Acceptance Criteria and Context Artifact Completeness are omitted (no pipeline context)
 - Used for ad-hoc reviews, PR reviews, non-pipeline work
 
+### Light-Review Mode
+
+When the `verifier` agent is spawned with `Mode: light-review` for an intra-step pair-review:
+
+- **Scope**: changed lines in the step's declared `Files` only — no pipeline-global documents, no full feature assessment
+- **Output**: bounded `accept`/`revise` verdict (inline, no `VERIFICATION_REPORT.md`)
+- **Findings anchor**: each finding must reference the step's `Done when` criteria or a `coding-style` / `agent-behavioral-contract` convention — no other sources
+- **No sections**: Acceptance Criteria, Test Coverage, Context Artifact Completeness, Deployment, Architecture — all out of scope
+- Triggered by: intra-step pair-review spawn (RISKY step boundary, planner `review: force`, or iteration-bound escalation)
+
+Full procedure: [`skills/software-planning/references/intra-step-review.md`](../software-planning/references/intra-step-review.md).
+
 ## Language Adaptation
 
 The coding-style rule is language-independent. Map generic conventions to language-specific idioms when reviewing code.

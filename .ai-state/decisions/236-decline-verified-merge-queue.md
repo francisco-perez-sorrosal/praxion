@@ -1,7 +1,7 @@
 ---
-id: dec-draft-e686202a
+id: dec-236
 title: Decline verified merge queue (Gastown Refinery) at Praxion's target operating point
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-19
 summary: Decline adopting a Bors-style bisecting verified merge queue; it solves an autonomous-20-30-agent-scale problem Praxion deliberately does not have. finalize-at-merge + worktree isolation + verifier rework loop already gate quality for human-in-the-loop, low-concurrency operation.

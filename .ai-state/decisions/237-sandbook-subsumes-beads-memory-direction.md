@@ -1,7 +1,7 @@
 ---
-id: dec-draft-04237662
+id: dec-237
 title: Memory direction — sandbook subsumes beads-class capability; defer-by-dependency, not by-priority
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-19
 summary: Ratify that sandbook (five-tier, vector+graph, consolidation, eval suite) strictly subsumes Gastown beads-class capability; agent memory is Praxion's #1 gap by importance but is deferred only because sandbook is pre-1.0 — land it behind a pinned ref when the API settles.

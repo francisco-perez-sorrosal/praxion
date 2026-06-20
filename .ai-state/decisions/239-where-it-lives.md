@@ -1,7 +1,7 @@
 ---
-id: dec-draft-3ffc5719
+id: dec-239
 title: Spec-drift detection lives in a shared module with two consumers — sentinel check + pipeline checkpoint, NOT a git hook
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-19
 summary: Place proactive spec↔artifact drift detection in one side-effect-free detector module consumed by (A) a new sentinel SH07 check over archived specs and (B) the orchestrator's pre-verification checkpoint over in-flight traceability.yml — rejecting a git/PreToolUse hook because drift is a pipeline-state question that a commit-time gate gets wrong (partial-commit false positives) and that a checkpoint already answers correctly.
@@ -10,7 +10,7 @@ made_by: agent
 agent_type: systems-architect
 branch: feat-spec-drift-detection
 pipeline_tier: standard
-re_affirms: dec-draft-1b2387cf
+re_affirms: dec-238
 affected_files:
   - scripts/spec_drift.py
   - agents/sentinel.md
@@ -22,7 +22,7 @@ dissent: "If in-flight drift is rare and the sentinel's post-hoc SH backstop alr
 
 ## Context
 
-`dec-draft-1b2387cf` ratified that Praxion adds proactive spec↔artifact drift detection, scoped to **detect-and-surface, not regenerate**. It left ONE architectural fork open: *where does detection live* — (1) a new sentinel dimension, (2) a git-commit / PreToolUse hook, or (3) both via a shared module.
+`dec-238` ratified that Praxion adds proactive spec↔artifact drift detection, scoped to **detect-and-surface, not regenerate**. It left ONE architectural fork open: *where does detection live* — (1) a new sentinel dimension, (2) a git-commit / PreToolUse hook, or (3) both via a shared module.
 
 The drift that today's surfaces catch *late* is intra-pipeline: a `SPEC_*`/REQ or design artifact changes while the dependent tests/impl/docs in `.ai-work/<task-slug>/traceability.yml` are not correspondingly touched. The sentinel only ever sees *archived* specs (post-pipeline); the verifier catches it at end-of-pipeline. The genuine gap is **in-flight, before the verifier**. The decision lens is quality / reliability / leanness per unit effort.
 
@@ -50,7 +50,7 @@ One detector module; sentinel and the orchestrator are thin callers. Gets the *e
 
 **Positive.** Closes the in-flight drift gap strictly earlier than the verifier; reuses existing traceability edges + the existing checkpoint + `TEST_BASELINE.md` base SHA; zero new always-loaded surface; one logic site; fully unit-testable (pure module). Moat-aligned: detection at a governed decision point, not autonomous gating.
 
-**Negative / accepted.** Two call sites to maintain instead of one. Residual false-positive risk on pure refactors, mitigated by clause-level diffing, WIP-step sequencing suppression, and advisory-only severity. Detection still requires a human/planner to act on the flag (inherited from `dec-draft-1b2387cf`'s scope).
+**Negative / accepted.** Two call sites to maintain instead of one. Residual false-positive risk on pure refactors, mitigated by clause-level diffing, WIP-step sequencing suppression, and advisory-only severity. Detection still requires a human/planner to act on the flag (inherited from `dec-238`'s scope).
 
 ## Disconfirmation
 

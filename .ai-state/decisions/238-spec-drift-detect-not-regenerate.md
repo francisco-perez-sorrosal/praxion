@@ -1,7 +1,7 @@
 ---
-id: dec-draft-1b2387cf
+id: dec-238
 title: Proactive spec↔artifact drift — detect-and-surface, NOT auto-regenerate
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-19
 summary: Adopt Kiro-style proactive spec-change awareness as Praxion's FIRST competitive improvement, but scoped to detect-and-surface drift (reusing traceability edges + sentinel), explicitly excluding Kiro's automatic downstream regeneration to avoid cascade loops and silently-wrong generated artifacts.

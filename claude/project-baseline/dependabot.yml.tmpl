@@ -1,0 +1,38 @@
+# Canonical Praxion baseline dependabot.yml template — ecosystem-conditional.
+#
+# Single source of truth for the dependency-scanning baseline. /onboard-project
+# Phase 8e.7 installs this as `.github/dependabot.yml` at the repo root when no
+# dependency-scanning config exists — never overwriting an existing one. Satisfies
+# the agent-readiness security criterion: a dependency-scanning config is present.
+#
+# Phase 8e.7 KEEPS per-ecosystem blocks only for detected stacks: a Python
+# manifest at any directory → pip block(s); a package.json at any directory → npm
+# block; a .github/workflows/ directory → github-actions block. It strips
+# non-applicable blocks before writing and sets each `directory:` to the
+# discovered manifest location (e.g., "/" for a root pyproject.toml, "/frontend"
+# for a subdirectory package.json). Multiple manifests for the same ecosystem each
+# get their own `updates:` entry. Delete this comment after tailoring.
+
+version: 2
+
+updates:
+  # --- PYTHON (keep iff Python manifest detected; set directory: per manifest location) ---
+  - package-ecosystem: pip
+    directory: /         # Phase-8e tailoring: replace with the manifest directory
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  # --- NODE/NPM (keep iff package.json detected; set directory: per manifest location) ---
+  - package-ecosystem: npm
+    directory: /         # Phase-8e tailoring: replace with the package.json directory
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  # --- GITHUB ACTIONS (keep iff .github/workflows/ exists) ---
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

@@ -169,6 +169,7 @@ Design the architecture by working through these questions:
 - Favor composition over inheritance, interfaces over concrete coupling
 - Balance coupling — keep integration strength (shared knowledge) and distance in balance; gather what changes together, separate different reasons to change, point dependencies toward stability. Apply SOLID as heuristics, not commandments (consult the `software-design-principles` skill; cite `CLAUDE.md§Balanced Coupling`)
 - Make the architecture testable — if it can't be tested, redesign it
+- When the architecture includes a typed-language runtime service, the design must establish (i) the typecheck baseline (cite per-language assets: `skills/python-development/assets/mypy-baseline.toml` for Python; `skills/typescript-development/assets/tsconfig.json` for TypeScript) and (ii) the logging baseline (cite the `observability` skill § Service Observability Baseline; structlog for Python services, pino for Node services)
 
 ### Phase 4 — Deployment Documentation
 

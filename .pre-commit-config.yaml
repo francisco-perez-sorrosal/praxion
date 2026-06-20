@@ -1,0 +1,87 @@
+# Praxion's own commit gate.
+#
+# Unifies the standard baseline Praxion ships to managed projects
+# (claude/project-baseline/pre-commit-config.yaml — UNIVERSAL file-hygiene +
+# gitleaks + PYTHON ruff) with the five Praxion-author gates that formerly lived
+# in the bespoke scripts/git-pre-commit-hook.sh (now retired). Each author block
+# is re-expressed as a repo:local hook invoking the same checker script with the
+# same staged-file filter — behavior-preserving by construction.
+#
+# Activate once with `pre-commit install` (install_claude.sh runs this). Bump
+# rev: pins in lock-step with the project-baseline asset.
+repos:
+  # --- UNIVERSAL (mirrors the shipped canonical baseline) ----------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks  # secret scanner — blocks committed credentials/tokens
+
+  # --- PYTHON (reads [tool.ruff] from pyproject.toml) --------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # --- PRAXION AUTHOR GATES (retired scripts/git-pre-commit-hook.sh Blocks A–E)-
+  # repo:local hooks reproduce each block's exact (staged-file filter → checker →
+  # pass/fail) tuple. The checker scripts are unchanged; only the dispatcher
+  # changed (pre-commit instead of the shell hook).
+  - repo: local
+    hooks:
+      # Block A — shipped-artifact isolation. The script re-filters to shipped
+      # surfaces and excludes test fixtures; --files receives the matched paths.
+      - id: shipped-artifact-isolation
+        name: Shipped-artifact isolation
+        entry: python3 scripts/check_shipped_artifact_isolation.py --repo-root . --files
+        language: system
+        files: '^(rules|skills|agents|commands|claude/config|claude/canonical-blocks)/.*\.md$'
+        exclude: '/tests/fixtures/'
+        pass_filenames: true
+
+      # Block B — canonical-block sync. Whole-repo --check; fires only when a
+      # canonical block or an onboarding command file is staged.
+      - id: canonical-block-sync
+        name: Canonical-block sync
+        entry: python3 scripts/sync_canonical_blocks.py --check
+        language: system
+        files: '^(claude/canonical-blocks/.*\.md|commands/(onboard-project|new-project)\.md)$'
+        pass_filenames: false
+
+      # Block C — diagram regeneration. Self-discovers staged .c4; skips when
+      # likec4/d2 are absent.
+      - id: diagram-regen
+        name: Diagram regeneration
+        entry: scripts/diagram-regen-hook.sh
+        language: system
+        files: '\.c4$'
+        pass_filenames: false
+
+      # Block D — AaC golden-rule gate. Self-discovers staged architectural
+      # surfaces via --mode=gate.
+      - id: aac-golden-rule
+        name: AaC golden-rule gate
+        entry: python3 scripts/check_aac_golden_rule.py --mode=gate
+        language: system
+        files: '^(docs/diagrams/|.*\.c4$|.*ARCHITECTURE\.md$|docs/architecture\.md$)'
+        pass_filenames: false
+
+      # Block E — rules-manifest drift. --check (no write); fires on staged
+      # rules/ changes.
+      - id: rules-manifest-drift
+        name: Rules-manifest drift
+        entry: python3 scripts/regenerate_rules_manifest.py --check
+        language: system
+        files: '^rules/(_manifest\.yaml|.*\.md)$'
+        pass_filenames: false

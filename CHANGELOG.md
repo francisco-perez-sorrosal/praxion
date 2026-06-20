@@ -1,3 +1,9 @@
+## v0.9.2 (2026-06-20)
+
+### Fix
+
+- sanitize ADR slug and warn on stranded drafts at finalize
+
 ## v0.9.1 (2026-06-20)
 
 ### Feat

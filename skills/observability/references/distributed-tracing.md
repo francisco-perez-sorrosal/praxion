@@ -198,11 +198,49 @@ Key namespaces:
 - `db.*` -- database client operations
 - `messaging.*` -- message queue producers and consumers
 - `rpc.*` -- RPC/gRPC operations
-- `gen_ai.*` -- generative AI / LLM operations (experimental)
+- `gen_ai.*` -- generative AI / LLM **and agent** operations (core attributes stable as of 2026; see [GenAI & Agent Spans](#genai--agent-spans))
 
 Install the conventions package for type-safe attribute access: `opentelemetry-semantic-conventions` (Python) or `@opentelemetry/semantic-conventions` (TypeScript).
 
-**Version note:** Semantic conventions v1.40.0 as of latest release. Some namespaces (notably `gen_ai.*`) are still experimental and may change. Use semconv attributes whenever they match your use case instead of inventing duplicates.
+**Version note:** Semantic conventions evolve per release; check the installed package version before relying on a namespace's stability. The `gen_ai.*` namespace is no longer experimental wholesale — its **core execution attributes are stable** as of 2026, while finer-grained sub-areas (multi-modal content, streaming detail, some granular tool metadata) remain experimental. See [GenAI & Agent Spans](#genai--agent-spans) below for the current state. Use semconv attributes whenever they match your use case instead of inventing duplicates.
+
+## GenAI & Agent Spans
+<!-- last-verified: 2026-06-20 -->
+
+The `gen_ai.*` semantic conventions describe spans for LLM calls **and** for agent and tool execution. As of 2026 the **core execution attributes are stable** — `gen_ai.system` (the provider/system, e.g. `anthropic`, `openai`), `gen_ai.operation.name`, `gen_ai.request.model`, and the base token-usage counts (`gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`). Finer-grained areas — multi-modal content, streaming event detail, and some granular tool metadata — remain experimental and may still change. The convention has moved well past "experimental across the board": treat the core as adoptable, and pin the experimental edges.
+
+### Agent and tool operations
+
+Dedicated agent-span conventions extend the base GenAI span model with three operation names carried on `gen_ai.operation.name`:
+
+| `gen_ai.operation.name` | Span represents | Typical parent |
+|---|---|---|
+| `create_agent` | Construction/configuration of an agent (name, model, tools, system prompt) | application root |
+| `invoke_agent` | One full agent invocation — the unit of an agent "turn" | request / session span |
+| `execute_tool` | A single tool/function call the agent made | the `invoke_agent` span |
+| `chat` (base GenAI) | One model request/response inside an invocation | the `invoke_agent` span |
+
+Key attributes beyond the core set:
+
+- `gen_ai.agent.name` / `gen_ai.agent.id` — identify the agent on `create_agent` / `invoke_agent` spans.
+- `gen_ai.tool.name` / `gen_ai.tool.call.id` — identify the tool and correlate the call on `execute_tool` spans.
+- `gen_ai.request.model` / `gen_ai.response.model` plus the `gen_ai.usage.*` token counts on the model-call (`chat`) spans.
+
+### The trace IS the trajectory
+
+Nesting these spans makes the trace a **replayable agent trajectory**: an `invoke_agent` span parents the `chat` model calls and the `execute_tool` calls in the order the agent made them. Reading the span tree top-to-bottom reconstructs the agent's decision path — which tool it chose, what it passed, how the model responded — without re-running the agent. This is the agent-native analogue of an HTTP request trace, and it is what makes post-hoc debugging and failure classification tractable: a misfired tool call, a runaway loop, or a dropped-context turn each show up as a recognizable shape in the trajectory. (For naming and mitigating those shapes once observed, see the `agent-failure-taxonomy` skill.)
+
+### Migrating during the transition — `OTEL_SEMCONV_STABILITY_OPT_IN`
+
+While the conventions stabilize, instrumentation libraries can emit attributes under both the old and the new schema, selected by the `OTEL_SEMCONV_STABILITY_OPT_IN` environment variable (comma-separated opt-in keys):
+
+- unset — the legacy/old `gen_ai` attribute set only
+- `gen_ai_latest_experimental` — opt in to the current (newer) attribute set
+- during a migration window, emitting both lets a backend ingest the old and new schemas in parallel so dashboards and queries cut over without a flag-day break
+
+Set the opt-in explicitly in any service you instrument so the emitted schema is deterministic across SDK upgrades, rather than silently shifting when an instrumentation library changes its default.
+
+**Sources:** [OTel — GenAI agent & framework spans](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-agent-spans/), [OTel — GenAI client spans](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/).
 
 ## OpenInference
 

@@ -1,7 +1,7 @@
 ---
-id: dec-draft-bfb5a89a
+id: dec-243
 title: Agentic-app-reliability frontier practices land as skills, not a 17th agent
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-20
 summary: Blend the five agentic-app-reliability frontier candidates into Praxion as two new skills plus deepened references in two existing skills and zero new rules, consumed by existing agents — no new shadow sub-architect agent.

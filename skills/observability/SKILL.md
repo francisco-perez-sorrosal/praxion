@@ -31,6 +31,7 @@ Application observability strategy for instrumentation decisions: what to observ
 - [references/typescript-observability.md](references/typescript-observability.md) -- OTel instrumentation, structured logging, and metrics patterns for TypeScript/Node.js
 
 ## Service Observability Baseline (when to install, and what passes agent-readiness)
+<!-- last-verified: 2026-06-20 -->
 
 Logging and health-check observability are **service-conditional**, not universal
 code-quality baselines. They belong to a project the moment it becomes a runtime
@@ -56,11 +57,11 @@ flips the criterion, not a lookalike):
 
 **Make-it-pass recipe (runtime services only):**
 
-| Stack | Logging dependency + config | Health surface |
-|-------|----------------------------|----------------|
-| Python service | Add `structlog` (or `loguru`); configure a JSON renderer + level at startup | `/healthz` route (FastAPI/Flask) **and** a `Dockerfile` `HEALTHCHECK` probing it |
-| Node service | Add `pino` (or `winston`); structured JSON transport | `/healthz` route **and** a `Dockerfile` `HEALTHCHECK` |
-| OTel-instrumented | `opentelemetry` SDK already satisfies the logging signal | health route + container `HEALTHCHECK` |
+| Stack | Logging dependency + config | OTel bridge | Health surface |
+|-------|----------------------------|-------------|----------------|
+| Python service | **structlog** (#1) — configure a JSON renderer + level at startup; wire `structlog.stdlib.LoggerFactory()` so stdlib `logging` handlers (including `opentelemetry.sdk.logs.LoggingHandler`) attach with zero per-call code. (loguru → CLI/prototyping only; feature-frozen at 0.7.3) | `structlog.stdlib.LoggerFactory()` bridge + `opentelemetry.sdk.logs.LoggingHandler` on the root logger | `/healthz` route (FastAPI/Flask) **and** a `Dockerfile` `HEALTHCHECK` probing it |
+| Node service | **pino** (#1) — structured JSON transport out of the box. (winston → migration paths only) | `@opentelemetry/instrumentation-pino` + `pino-opentelemetry-transport` | `/healthz` route **and** a `Dockerfile` `HEALTHCHECK` |
+| OTel-instrumented | `opentelemetry` SDK already satisfies the logging signal | — | health route + container `HEALTHCHECK` |
 
 `Dockerfile` example: `HEALTHCHECK --interval=30s --timeout=3s CMD curl -fsS http://localhost:8080/healthz || exit 1`.
 

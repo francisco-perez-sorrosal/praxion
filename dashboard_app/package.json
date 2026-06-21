@@ -34,6 +34,6 @@
     "@types/react-dom": "^19.1.5",
     "@types/sanitize-html": "^2.16.1",
     "typescript": "^6.0.3",
-    "vitest": "4.1.6"
+    "vitest": "4.1.9"
   }
 }

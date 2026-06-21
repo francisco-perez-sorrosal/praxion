@@ -22,6 +22,10 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-added-large-files
+        # Generated project-intelligence artifacts under .ai-state/ are
+        # intentionally large (metrics + readiness payloads, audit reports) and
+        # committed by convention; the guard targets accidental source blobs.
+        exclude: '^\.ai-state/(metrics_reports|sentinel_reports)/.*\.(json|md)$'
       - id: check-merge-conflict
       - id: detect-private-key
 

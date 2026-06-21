@@ -26,7 +26,7 @@
     "remark-gfm": "^4.0.1",
     "sanitize-html": "^2.17.3",
     "server-only": "^0.0.1",
-    "yaml": "^2.8.1"
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.29",

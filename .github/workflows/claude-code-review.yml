@@ -12,10 +12,12 @@ on:
 
 jobs:
   claude-review:
+    # Skip Dependabot PRs: the claude-code-action rejects bot actors (and a
+    # dependency bump does not warrant an LLM review). To also gate by human
+    # author, AND additional conditions onto this expression.
+    if: ${{ github.actor != 'dependabot[bot]' }}
     # Optional: Filter by PR author
-    # if: |
     #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
     #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
 
     runs-on: ubuntu-latest
@@ -41,4 +43,3 @@ jobs:
           prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
-

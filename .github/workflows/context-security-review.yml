@@ -19,6 +19,11 @@ permissions:
 
 jobs:
   context-security-review:
+    # Skip on Dependabot PRs: they run with a restricted token and no secret
+    # access, so the Claude review step cannot authenticate — and its failure
+    # cascades into the `if: always()` upload steps (empty `path`). Dependency
+    # bumps do not need a context-security review.
+    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 

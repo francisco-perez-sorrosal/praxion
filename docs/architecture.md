@@ -99,7 +99,7 @@ The system-boundary L0 diagram is rendered in [`.ai-state/DESIGN.md` §2](../.ai
 
 The agent-pipeline execution sequence, the memory + observability flow, and the tech-debt ledger flow are diagrammed in [`.ai-state/DESIGN.md` §5](../.ai-state/DESIGN.md#5-data-flow). The architect doc additionally diagrams the ADR finalize flow.
 
-For developers: the entry point for tracing a pipeline run is `EnterWorktree` (main agent) → researcher → systems-architect → implementation-planner → (implementer ∥ test-engineer) → verifier, with all artifacts under `.ai-work/<task-slug>/`. Memory and observation correlation goes through the OpenInference `session.id` attribute and W3C trace-context (`traceparent`) — see [`task-chronograph-mcp/src/task_chronograph_mcp/otel_relay.py`](../task-chronograph-mcp/src/task_chronograph_mcp/otel_relay.py) and [`memory-mcp/src/memory_mcp/correlation.py`](../memory-mcp/src/memory_mcp/correlation.py).
+For developers: the entry point for tracing a pipeline run is `EnterWorktree` (main agent) → researcher → systems-architect → implementation-planner → (implementer ∥ test-engineer) → verifier, with all artifacts under `.ai-work/<task-slug>/`. Observation correlation goes through the OpenInference `session.id` attribute and W3C trace-context (`traceparent`) — see [`task-chronograph-mcp/src/task_chronograph_mcp/otel_relay.py`](../task-chronograph-mcp/src/task_chronograph_mcp/otel_relay.py).
 
 ## 6. Dependencies
 

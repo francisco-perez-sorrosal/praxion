@@ -2,7 +2,7 @@
 
 The differentiator: documenting your API surface for an LLM consumer — the spec *is* the agent doc, the human-vs-agent divergence, agent-metadata discipline, llms.txt (honestly framed), and emerging machine-readable conventions. Back to [SKILL.md](../SKILL.md).
 
-This reference expands core item 3 of the [universal core](../SKILL.md#humans-and-agents-diverge--mind-the-metadata) for the agent consumer. Adoption maturity is tagged per item — fast-moving conventions carry their contested evidence so you don't over-invest.
+This reference expands core item 3 of the [universal core](../SKILL.md#3-humans-and-agents-diverge--mind-the-metadata) for the agent consumer. Adoption maturity is tagged per item — fast-moving conventions carry their contested evidence so you don't over-invest.
 
 ## 1. The Spec IS the Agent Doc Surface
 

@@ -12,6 +12,12 @@
 # discovered manifest location (e.g., "/" for a root pyproject.toml, "/frontend"
 # for a subdirectory package.json). Multiple manifests for the same ecosystem each
 # get their own `updates:` entry. Delete this comment after tailoring.
+#
+# `groups:` collapses each ecosystem's updates into ONE PR per directory rather
+# than one-PR-(and-one-branch)-per-dependency — the default that produces branch
+# sprawl on first run against a repo with accumulated drift. To review breaking
+# changes separately, give the group `update-types: ["minor", "patch"]` so majors
+# get their own PRs.
 
 version: 2
 
@@ -22,6 +28,9 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      pip:
+        patterns: ["*"]
 
   # --- NODE/NPM (keep iff package.json detected; set directory: per manifest location) ---
   - package-ecosystem: npm
@@ -29,6 +38,9 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      npm:
+        patterns: ["*"]
 
   # --- GITHUB ACTIONS (keep iff .github/workflows/ exists) ---
   - package-ecosystem: github-actions
@@ -36,3 +48,6 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns: ["*"]

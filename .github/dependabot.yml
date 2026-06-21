@@ -2,6 +2,12 @@
 # Satisfies the agent-readiness Security criterion (c.security.dependency_scanning).
 # Scaffolding counterpart for managed projects: claude/project-baseline/dependabot.yml.tmpl
 # (installed/tailored by /onboard-project Phase 8e.7).
+#
+# `groups:` collapses each ecosystem's updates into ONE PR per directory rather
+# than one-PR-(and-one-branch)-per-dependency — the default that produces branch
+# sprawl on a repo with accumulated drift. To review breaking changes
+# separately, give the group `update-types: ["minor", "patch"]` (majors then get
+# their own PRs).
 version: 2
 updates:
   # Python (pip ecosystem covers pyproject.toml/uv) — one entry per manifest dir.
@@ -10,18 +16,27 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    groups:
+      pip-root:
+        patterns: ["*"]
 
   - package-ecosystem: "pip"
     directory: "/task-chronograph-mcp"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    groups:
+      pip-chronograph:
+        patterns: ["*"]
 
   - package-ecosystem: "pip"
     directory: "/eval"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    groups:
+      pip-eval:
+        patterns: ["*"]
 
   # Node/TypeScript — the dashboard runtime.
   - package-ecosystem: "npm"
@@ -29,6 +44,9 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    groups:
+      npm-dashboard:
+        patterns: ["*"]
 
   # GitHub Actions workflows.
   - package-ecosystem: "github-actions"
@@ -36,3 +54,6 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns: ["*"]

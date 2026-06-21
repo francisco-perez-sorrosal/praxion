@@ -29,6 +29,7 @@ Application observability strategy for instrumentation decisions: what to observ
 - [references/distributed-tracing.md](references/distributed-tracing.md) -- OTel SDK patterns (Python + TypeScript), span design, context propagation, Collector architecture
 - [references/alerting-patterns.md](references/alerting-patterns.md) -- SLO-based alerting, burn rates, error budgets, runbook templates
 - [references/typescript-observability.md](references/typescript-observability.md) -- OTel instrumentation, structured logging, and metrics patterns for TypeScript/Node.js
+- [references/healthcheck-patterns.md](references/healthcheck-patterns.md) -- per-service-type health surfaces (web / MCP / agent), the liveness-vs-readiness model, and the always-200 anti-pattern
 
 ## Service Observability Baseline (when to install, and what passes agent-readiness)
 <!-- last-verified: 2026-06-20 -->
@@ -51,9 +52,15 @@ flips the criterion, not a lookalike):
   it — the rubric treats "took an explicit observability dependency" as the signal
   of intent. Declare the dependency *and* configure it.
 - `c.observability.healthcheck` matches a `HEALTHCHECK` instruction in a
-  `Dockerfile`, or `/health`/`healthz` in `package.json`. The portable satisfier
-  for any containerized service is a `Dockerfile HEALTHCHECK` line; web frameworks
-  should *also* expose a `/healthz` route returning 200 when ready.
+  `Dockerfile` (root **or a subdirectory service**), `/health`/`healthz` in a
+  `package.json` (root or subdir), or a `route.*` handler inside a
+  `health`/`healthz`/`healthcheck` directory (the app-router pattern) — the
+  detector is monorepo-aware. The portable satisfier for any containerized
+  service is a `Dockerfile HEALTHCHECK` line; a web framework should expose a
+  `/healthz` route. **Never an unconditional 200** — return `503` when a critical
+  dependency is unreachable (the dominant anti-pattern). Per-service-type
+  patterns (web / MCP / agent) and the liveness-vs-readiness model live in
+  [references/healthcheck-patterns.md](references/healthcheck-patterns.md).
 
 **Make-it-pass recipe (runtime services only):**
 
@@ -64,6 +71,8 @@ flips the criterion, not a lookalike):
 | OTel-instrumented | `opentelemetry` SDK already satisfies the logging signal | — | health route + container `HEALTHCHECK` |
 
 `Dockerfile` example: `HEALTHCHECK --interval=30s --timeout=3s CMD curl -fsS http://localhost:8080/healthz || exit 1`.
+
+**Non-web service types** (the table above is HTTP-shaped): an **MCP server** signals health via the protocol-native `ping` (stdio) or a `GET /health` + a `list_tools` readiness probe (streamable-HTTP); a **long-running agent** needs three signals — liveness (heartbeat), *progress* (a `last_progress_at` timestamp), and a `/status` surface — because a heartbeating agent stuck on an LLM call is the always-200 trap. Full per-type guidance: [references/healthcheck-patterns.md](references/healthcheck-patterns.md).
 
 See [references/structured-logging.md](references/structured-logging.md) for the
 library comparison and config patterns; [`../deployment/SKILL.md`](../deployment/SKILL.md)

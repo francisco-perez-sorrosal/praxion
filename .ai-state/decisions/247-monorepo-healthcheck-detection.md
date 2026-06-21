@@ -1,7 +1,7 @@
 ---
-id: dec-draft-c7f3a2e9
+id: dec-247
 title: Make readiness healthcheck detection monorepo-aware (subdir-service + route-handler signals)
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-20
 summary: Extend _detect_healthcheck beyond the root Dockerfile/package.json to a bounded subtree scan that recognizes a subdir Dockerfile HEALTHCHECK, a subdir package.json health signal, or a route.* handler inside a health/healthz/healthcheck directory.

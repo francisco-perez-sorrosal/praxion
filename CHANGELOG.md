@@ -1,3 +1,33 @@
+## v0.10.0 (2026-06-21)
+
+### Feat
+
+- **observability**: per-type healthcheck guidance + agent linkage
+- **dashboard**: add readiness-lean /api/health route
+- **metrics**: make healthcheck detection monorepo-aware
+- sharpen Service Observability Baseline — structlog #1 Python, pino #1 Node
+- add typecheck + logging baseline clauses to implementer and systems-architect
+- add dependabot.yml.tmpl asset and onboard-project Phase 8e.7 sub-step
+- add canonical structlog logging module
+- **agent-evals**: add simulation-testing reference
+- **agent-evals**: add online-evals + budget-gate reference
+- **skills**: add agent-runtime-guardrails discipline skill
+- **skills**: add agent-failure-taxonomy classification skill
+- **agent-evals**: add eval-rigor reference — calibration + split gates
+- add on-demand SPECS_INDEX generator
+- add per-project principles artifact (advisory/blocking gates)
+- add lightweight intra-step pair-review for risky steps
+- add proactive spec-drift detection (detect-and-surface)
+
+### Fix
+
+- **dependabot**: group updates to stop per-dependency branch sprawl
+- **pre-commit**: exclude generated .ai-state reports from large-file guard + record re-measures
+
+### Refactor
+
+- unify commit gate into the pre-commit framework
+
 ## v0.9.2 (2026-06-20)
 
 ### Fix

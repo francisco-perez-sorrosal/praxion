@@ -186,3 +186,45 @@ def test_derive_project_facts_is_deterministic(tmp_path: Path) -> None:
 def test_empty_repo_yields_all_false_facts(tmp_path: Path) -> None:
     facts = checks.derive_project_facts(tmp_path)
     assert all(value is False for value in facts.values())
+
+
+# ---------------------------------------------------------------------------
+# Healthcheck detection — root signals (preserved) and subdir-service signals.
+# ---------------------------------------------------------------------------
+
+
+def test_healthcheck_root_dockerfile_passes(tmp_path: Path) -> None:
+    _write(tmp_path, "Dockerfile", "FROM x\nHEALTHCHECK CMD curl -f localhost/healthz\n")
+    assert checks.has_healthcheck(_ctx(tmp_path), _facts(tmp_path)) is True
+
+
+def test_healthcheck_root_package_json_passes(tmp_path: Path) -> None:
+    _write(tmp_path, "package.json", '{"scripts": {"health": "curl /healthz"}}')
+    assert checks.has_healthcheck(_ctx(tmp_path), _facts(tmp_path)) is True
+
+
+def test_healthcheck_subdir_dockerfile_passes(tmp_path: Path) -> None:
+    _write(tmp_path, "service/Dockerfile", "FROM x\nHEALTHCHECK CMD true\n")
+    assert checks.has_healthcheck(_ctx(tmp_path), _facts(tmp_path)) is True
+
+
+def test_healthcheck_subdir_package_json_passes(tmp_path: Path) -> None:
+    _write(tmp_path, "webapp/package.json", '{"routes": ["/healthz"]}')
+    assert checks.has_healthcheck(_ctx(tmp_path), _facts(tmp_path)) is True
+
+
+def test_healthcheck_route_handler_in_subdir_passes(tmp_path: Path) -> None:
+    # The Next.js app-router pattern: a route handler inside a health directory.
+    _write(tmp_path, "dash/src/app/api/health/route.ts", "export const GET = () => {}")
+    assert checks.has_healthcheck(_ctx(tmp_path), _facts(tmp_path)) is True
+
+
+def test_healthcheck_absent_fails(tmp_path: Path) -> None:
+    _write(tmp_path, "src/main.py", "print('hi')")
+    assert checks.has_healthcheck(_ctx(tmp_path), _facts(tmp_path)) is False
+
+
+def test_healthcheck_in_excluded_dir_ignored(tmp_path: Path) -> None:
+    # A health route inside an excluded dependency tree must NOT count.
+    _write(tmp_path, "node_modules/pkg/app/health/route.js", "export const GET = () => {}")
+    assert checks.has_healthcheck(_ctx(tmp_path), _facts(tmp_path)) is False

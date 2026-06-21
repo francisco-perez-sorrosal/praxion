@@ -15,9 +15,11 @@ fixed ``CollectionContext``.
 
 from __future__ import annotations
 
+import os
 import tomllib
 from pathlib import Path
 
+from scripts.project_metrics._path_filter import DEFAULT_EXCLUDED_DIRS, is_excluded_path
 from scripts.project_metrics.collectors.base import CollectionContext
 
 __all__ = [
@@ -493,13 +495,69 @@ def _detect_logging(pyproject_text: str, package_json_text: str) -> bool:
     return any(token in haystack for token in tokens)
 
 
-def _detect_healthcheck(repo_root: Path, package_json_text: str) -> bool:
-    """Return True for a health-check signal (Docker HEALTHCHECK or a route)."""
+# Directory names whose route-handler file signals an HTTP health endpoint
+# (the app-router / framework-route convention).
+_HEALTH_ROUTE_DIRS: frozenset[str] = frozenset({"health", "healthz", "healthcheck"})
+# Depth cap keeps the subtree scan cheap on large monorepos.
+_HEALTHCHECK_SCAN_MAX_DEPTH: int = 8
 
-    dockerfile = _read_text(repo_root / "Dockerfile")
-    if "HEALTHCHECK" in dockerfile:
+
+def _detect_healthcheck(repo_root: Path, package_json_text: str) -> bool:
+    """Return True for a health-check signal.
+
+    Root signals — a root ``Dockerfile`` ``HEALTHCHECK`` instruction, or
+    ``healthz``/``/health`` in the root ``package.json`` — are the original
+    contract. A monorepo whose deployable service lives in a subdirectory (e.g.
+    a dashboard under its own app tree) is also recognized via a bounded subtree
+    scan: a subdirectory ``Dockerfile`` ``HEALTHCHECK``, a subdirectory
+    ``package.json`` health signal, or a ``route.*`` handler inside a
+    ``health``/``healthz``/``healthcheck`` directory. The scan excludes the
+    standard noise directories (``node_modules``, ``.venv``, ``.git`` …).
+    """
+
+    # Root signals (original behavior, preserved).
+    if "HEALTHCHECK" in _read_text(repo_root / "Dockerfile"):
         return True
-    return "healthz" in package_json_text or "/health" in package_json_text
+    if "healthz" in package_json_text or "/health" in package_json_text:
+        return True
+    # Subdirectory-service signals (monorepo-aware).
+    return _scan_subtree_for_healthcheck(repo_root)
+
+
+def _scan_subtree_for_healthcheck(repo_root: Path) -> bool:
+    """Bounded, deterministic walk for a health signal in a subdirectory.
+
+    Returns True on the first of: a ``Dockerfile`` with ``HEALTHCHECK``; a
+    ``package.json`` mentioning ``healthz``/``/health``; or a ``route.*`` handler
+    inside a health-named directory. Excluded directories are pruned and the walk
+    is sorted for byte-identical determinism.
+    """
+
+    for dirpath, dirnames, filenames in os.walk(repo_root):
+        current = Path(dirpath)
+        depth = len(current.relative_to(repo_root).parts)
+        if depth >= _HEALTHCHECK_SCAN_MAX_DEPTH:
+            dirnames[:] = []
+        else:
+            dirnames[:] = sorted(
+                d
+                for d in dirnames
+                if not is_excluded_path(
+                    str((current / d).relative_to(repo_root)),
+                    excluded=DEFAULT_EXCLUDED_DIRS,
+                )
+            )
+        if current.name in _HEALTH_ROUTE_DIRS and any(f.startswith("route.") for f in filenames):
+            return True
+        for fname in sorted(filenames):
+            path = current / fname
+            if fname == "Dockerfile" and "HEALTHCHECK" in _read_text(path):
+                return True
+            if fname == "package.json":
+                text = _read_text(path)
+                if "healthz" in text or "/health" in text:
+                    return True
+    return False
 
 
 def _detect_typecheck(repo_root: Path, pyproject_data: dict[str, object]) -> bool:
@@ -518,9 +576,9 @@ def _detect_typecheck(repo_root: Path, pyproject_data: dict[str, object]) -> boo
 def _detect_complexity_gate(repo_root: Path, pyproject_data: dict[str, object]) -> bool:
     """Return True when a complexity / coverage quality gate is configured."""
 
-    if _pyproject_has_section(
-        pyproject_data, "tool", "coverage"
-    ) or _pyproject_has_section(pyproject_data, "tool", "radon"):
+    if _pyproject_has_section(pyproject_data, "tool", "coverage") or _pyproject_has_section(
+        pyproject_data, "tool", "radon"
+    ):
         return True
     return _any_exists(repo_root, ("sonar-project.properties", ".coveragerc"))
 
@@ -538,6 +596,5 @@ def _has_installed_git_hooks(repo_root: Path) -> bool:
     if not hooks_dir.is_dir():
         return False
     return any(
-        child.is_file() and not child.name.endswith(".sample")
-        for child in hooks_dir.iterdir()
+        child.is_file() and not child.name.endswith(".sample") for child in hooks_dir.iterdir()
     )

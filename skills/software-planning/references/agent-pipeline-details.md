@@ -198,6 +198,30 @@ A subagent's full output lives in its `.ai-work/<task-slug>/` artifact. Its **re
 
 **Reach.** Praxion-native (`i-am:*`) agents carry a conformant `## Output` block in their definition (concise summary + pointer to the artifact). Host-native agents (`Explore`, `Plan`, `general-purpose`) receive the contract via the `inject_subagent_context.py` spawn preamble, since they have no definition block and do not load the always-on rules.
 
+### Completion handshake (truncation detection)
+
+The contract above tells the orchestrator *how* to read a return; this clause tells it *when to distrust one*. A subagent can be hard-truncated at its context ceiling **mid-work** — code half-written, or written but its `WIP.md` checkbox never flipped — after which the harness returns only the partial text the agent last produced. Because every status signal (`WIP.md`, `PROGRESS.md`, the terminal marker) is authored by the agent itself, "agent died" and "status not written" are perfectly correlated: a return arriving is **not** proof the step finished.
+
+**The gate.** Before advancing the pipeline past any subagent, the orchestrator confirms a *completion handshake*. It applies to step-executing pipeline agents (those whose `## Output` block defines terminal markers and that write a durable step artifact — `implementer`, `test-engineer`, `implementation-planner`, etc.); research/exploration agents without markers are governed by check 2 alone.
+
+1. **Terminal marker present** — the return carries one of the agent's recognized terminal markers (`[COMPLETE]` / `[BLOCKED]` / `[CONFLICT]` / `[PARTIAL]`). A return that ends mid-sentence with no marker is the signature of a hard cut.
+2. **Durable artifact agrees** — for a claimed `[COMPLETE]`, the step's `WIP.md` checkbox is flipped (`- [x]` / `[COMPLETE]`) and, where present, `PROGRESS.md`'s last phase line is the agent's final phase. A marker that contradicts the artifact is as suspect as a missing one.
+
+If **either** check fails, treat the return as a **suspected truncation** — do **not** advance, and do **not** blindly re-spawn the step from scratch (that redoes completed work and can clobber it).
+
+**What to do on a suspected truncation.** Recovery correctness must rest only on signals the dying agent did not author — the codebase + `git diff` + the test suite (ground truth), never the checkboxes:
+
+- Re-derive how far the step actually got from ground truth: were the files in the step's `Files` set written? Do the step's tests pass? Is the diff coherent and self-consistent?
+- If the work is verifiably complete, **complete the bookkeeping the agent never reached** — flip the `WIP.md` checkbox — and advance. This is "mark the broken step complete," but *earned by verification*, not assumed.
+- If the work is partial, re-spawn the step's agent scoped to the **unfinished remainder only**, citing what ground truth shows already done so it does not repeat it.
+- If ground truth is ambiguous, surface the suspected truncation to the user rather than guessing.
+
+The Tier-2 localization hint is the harness write-ahead log `.ai-state/observations.jsonl` — `agent_start` / `tool_use` (with `file_paths`, `outcome`) / `agent_stop` rows that the `capture_session.py` + `capture_memory.py` hooks append durably and independently of the agent's cooperation (so they survive a hard cut that drops `PROGRESS.md`). It tells you *which agent stopped* and *where it last wrote* — an accelerator, never the arbiter. `PROGRESS.md` and the chronograph's `get_pipeline_status` are weaker hints of the same kind. The handshake never depends on any of them: a dropped WAL line costs localization precision, never a verdict.
+
+**Mechanism.** The handshake is operationalized by `scripts/reconcile_pipeline_state.py <slug>` — a side-effect-free reader that classifies every `WIP.md` step against Tier-1 (git + tests) with the WAL as the localization hint, emitting per-step verdicts: `verified-complete` / `mismatch` (a false `[COMPLETE]` claim) / `partial@<point>` / `in-flight` / `unknown` / `pending`. Ground truth — not the checkbox — drives `verified-complete`, so a step whose files are all changed but still shows `- [ ]` is caught as a needs-mark completion (the died-before-checkbox case). When correlation is ambiguous (no declared `Files:`, dropped WAL lines, conflicting workstream claims), it degrades to `unknown` and surfaces to the user — it never guesses a `verified-complete`. The `/resume-pipeline <slug>` command drives the reader and acts on the verdicts (auto-mark verified-complete, auto-resume partial scoped to the unfinished remainder, surface unknown), recording every automatic action in five audit surfaces — `.ai-work/<slug>/RECOVERY_LOG.md`, a `WIP.md` `[AUTO-RECOVERED <ts>]` annotation, a `LEARNINGS.md ### Recovery Events` entry, a real-time user notice, and a synthetic `recovery` event in `observations.jsonl` — so recovery is never silent.
+
+**Golden bad-case (this gate must flag it).** A subagent returns text ending `"…all tests green, now let me update WIP.md"` with **no** terminal marker, while the step's `WIP.md` entry is still `- [ ] … [IN-PROGRESS]`. The orchestrator must classify this as a suspected truncation, re-derive completion from the codebase/tests, and — finding the work done — flip the checkbox itself; it must never advance on the strength of the prose alone.
+
 ## Semantic Document Reconciliation
 
 When concurrent agents write to fragment files (`WIP_<agent>.md`, `LEARNINGS_<agent>.md`, `PROGRESS_<agent>.md`), the supervising agent (implementation-planner) merges fragments into canonical documents after all agents in a batch complete. All fragment files and canonical documents live inside the task-scoped directory (`.ai-work/<task-slug>/`). Each document type has its own schema and merge semantics -- naive concatenation produces structurally invalid documents.

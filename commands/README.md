@@ -37,6 +37,7 @@ Reusable slash commands for AI coding assistants. Each `.md` file becomes a `/co
 | `/dispatch-reworks` | Fan out `/resume-rework` into every rework worktree from `REWORK_MANIFEST.md` — background sessions by default, `--terminals` for visible windows |
 | `/document-api` | Scaffold best-in-class API documentation for a project's own API surface — auto-detects language/protocol, scaffolds skeleton + Spectral ruleset + CI gate, registers in `doc_manifest.yaml`, idempotent |
 | `/resume-rework` | Dispatch the appropriate agent for a rework worktree; cwd-driven auto-discovery of `VERIFIER_FINDINGS.md` (cite `commands/resume-rework.md`) |
+| `/resume-pipeline` | Reconcile a pipeline's `WIP.md` against ground truth (git + tests + the `observations.jsonl` WAL) and recover truncated steps — auto-mark verified-complete work, auto-resume partials scoped to the remainder, surface the ambiguous — with a five-surface audit trail (cite `commands/resume-pipeline.md`) |
 | `/roadmap` | Produce a project-audited `ROADMAP.md` via a project-derived evaluation lens set (SPIRIT, DORA, SPACE, FAIR, CNCF Platform Maturity, or Custom) through the roadmap-cartographer agent; covers strengths, weaknesses, **opportunities (forward lines of work)**, phased improvements, and deprecations |
 | `/run-experiment` | Dispatch an ML training experiment, validate compute budget, stream metrics, write `TRAINING_RESULTS.md` |
 | `/scores` | Render a ranked leaderboard of eval runs from `.ai-state/eval_ledger/EVAL_LOG.md` (read-only); supports `--task`, `--sort`, and `--top` filters |

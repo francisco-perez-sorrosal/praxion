@@ -340,7 +340,7 @@ The Praxion plugin auto-fires hooks on `SessionStart`, `Stop`, `SubagentStart`, 
 
 | Option label | Description |
 |--------------|-------------|
-| `Observability events` | Ship Claude Code events to a localhost Phoenix instance via `send_event.py`. Useful for trace inspection; requires Phoenix to be running otherwise events are silently dropped. |
+| `Observability events` | Ship Claude Code events to a localhost Phoenix instance via `send_event.py` (trace inspection) **and** to the local `.ai-state/observations.jsonl` WAL, which lets `/resume-pipeline` localize a partially-completed step when recovering a context-truncated agent. Truncation recovery works without this (Tier-1 git+tests alone); enabling it adds `partial@<file>` localization precision. Phoenix is needed only for trace *visualization* — events drop silently to Phoenix if it is not running, but the WAL (and recovery) are unaffected. |
 
 **Mapping** unchecked option to env var (Praxion uses negative `DISABLE` semantics — `"1"` disables, `"0"` enables):
 

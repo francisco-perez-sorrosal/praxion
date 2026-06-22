@@ -100,6 +100,12 @@ EXEMPT_EXACT_PATHS = frozenset(
         # forbidden patterns as test inputs — same self-referential exemption
         # logic as the detector scripts above.
         "tests/test_check_id_citation_discipline.py",
+        # The pipeline-recovery reconciler PARSES "Step N" labels out of WIP.md /
+        # IMPLEMENTATION_PLAN.md — the step number is its input grammar, not a
+        # citation to an ephemeral spec — and its tests use "Step 1" as fixture
+        # data. Same self-referential exemption as the detector scripts above.
+        "scripts/reconcile_pipeline_state.py",
+        "scripts/test_reconcile_pipeline_state.py",
     }
 )
 
@@ -177,9 +183,7 @@ PATTERNS: tuple[tuple[str, re.Pattern[str], str], ...] = (
 
 
 _SHEBANG_INTERPRETERS = ("bash", "sh", "zsh", "dash", "ksh")
-_SHEBANG_PATTERNS = tuple(
-    re.compile(rf"\b{shell}\b") for shell in _SHEBANG_INTERPRETERS
-)
+_SHEBANG_PATTERNS = tuple(re.compile(rf"\b{shell}\b") for shell in _SHEBANG_INTERPRETERS)
 
 
 def is_bash_shebang(path: Path) -> bool:
@@ -279,9 +283,7 @@ def scan_file(path: Path) -> list[tuple[int, str, str, str]]:
 def filter_files(explicit_files: list[Path], repo_root: Path) -> list[Path]:
     out: list[Path] = []
     for candidate in explicit_files:
-        abs_path = (
-            candidate if candidate.is_absolute() else (repo_root / candidate).resolve()
-        )
+        abs_path = candidate if candidate.is_absolute() else (repo_root / candidate).resolve()
         if not abs_path.is_file():
             continue
         # Accept recognized code extensions OR extensionless files with a
@@ -324,9 +326,7 @@ def format_findings(files: list[Path], repo_root: Path) -> tuple[int, list[str]]
 
 
 def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(
-        description=__doc__.splitlines()[0] if __doc__ else ""
-    )
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else "")
     parser.add_argument(
         "--repo-root",
         type=Path,

@@ -128,6 +128,8 @@ Fix any violations before reporting. Do not produce a formal report — just fix
 
 You write ONLY to your own step's fields:
 
+**Write-ahead (do this FIRST, before writing any code):** set your step's status to `[IN-PROGRESS]` in `WIP.md`. This is a cheap write-ahead intent marker — if you are hard-truncated at your context ceiling mid-work, it lets the recovery reconciler distinguish "never started" from "started but produced nothing durable yet" (see the completion handshake in `swe-agent-coordination-protocol.md`). The recovery layer verifies against git ground truth regardless, so this marker is an accelerator, not a substitute for completing the work.
+
 **What you update:**
 
 - Your step's checkbox: `- [ ]` → `- [x]`
@@ -225,3 +227,4 @@ Keep the return to ≤5 lines. Do not echo diff content, test output, or `LEARNI
 - **Token discipline.** Verbose tool output (test runs, lint, typecheck) compounds in cumulative agent context — every output token rides along in every subsequent turn, raising the cost of every later round-trip. Default to the loaded language skill's compact-output flags (short tracebacks, suppress per-test verbosity, summary-mode lint). Escalate to verbose output only when investigating a specific failure that compact output doesn't explain, and only for the next single invocation.
 - **Partial output on failure.** If you hit an error or approach your turn budget limit, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Stopped at**: Phase N -- [reason]`, and `**Usable sections**: [list]`. A partial implementation is always better than no output.
 - **Turn budget awareness.** You have a hard turn limit (`maxTurns` in frontmatter). Track your tool call count — reserve the last 5 turns for updating `WIP.md` and reporting status. At 80% budget consumed, finish the current file edit, update WIP.md with progress, and report `[PARTIAL]`.
+- **Token-ceiling awareness.** The turn limit is not the only stop — a long step can hit the model's context ceiling and be cut **mid-turn**, with no chance to write `[PARTIAL]`. Defend against it: keep `WIP.md` continuously close to reality (mark the step `[IN-PROGRESS]` at the start, and prefer flipping `[COMPLETE]` as soon as the work and tests are actually done rather than after a long tail of polish), so the durable record trails your real progress by as little as possible. The recovery reconciler re-derives truth from git regardless, but a small gap means less to reconstruct.

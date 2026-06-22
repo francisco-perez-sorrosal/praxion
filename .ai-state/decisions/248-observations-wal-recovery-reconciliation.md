@@ -1,7 +1,7 @@
 ---
-id: dec-draft-a5c5b9db
+id: dec-248
 title: observations.jsonl as recovery WAL + deterministic reconciliation + auto-resume-with-audit; WIP.md demoted to a verified cache
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-22
 summary: Make pipeline step-completion a verified fact derived from ground truth — reconcile WIP claims against git/tests (Tier 1) localized by the existing observations.jsonl WAL (Tier 2); auto-resume partials with a mandatory five-surface audit trail.

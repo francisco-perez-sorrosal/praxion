@@ -1,3 +1,9 @@
+## v0.11.0 (2026-06-23)
+
+### Feat
+
+- add pipeline truncation recovery
+
 ## v0.10.0 (2026-06-21)
 
 ### Feat

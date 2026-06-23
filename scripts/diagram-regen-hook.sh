@@ -33,6 +33,13 @@ set -eo pipefail
 # Override via LIKEC4_FORMATS env var; default is d2 only.
 LIKEC4_FORMATS="${LIKEC4_FORMATS:-d2}"
 
+# Sibling normalizer that scrubs the volatile d2 version stamp. Resolved relative
+# to this script so it works regardless of the caller's cwd. Mirrors the
+# normalize step in .github/workflows/architecture.yml — both must stay in sync,
+# which is why the rule lives in one shared script rather than inlined twice.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+NORMALIZE_D2_SVG="${SCRIPT_DIR}/normalize_d2_svg.sh"
+
 # ---------------------------------------------------------------------------
 # Detect staged .c4 files
 # ---------------------------------------------------------------------------
@@ -115,6 +122,10 @@ render_d2_views() {
             echo "${render_stderr}" >&2
             return 1
         fi
+
+        # Scrub the build-dependent d2 version stamp so a local (Homebrew) render
+        # matches CI's pinned (standalone) render byte-for-byte.
+        bash "${NORMALIZE_D2_SVG}" "${svg_file}"
     done <<< "${d2_files}"
 }
 

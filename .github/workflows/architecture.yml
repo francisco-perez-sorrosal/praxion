@@ -89,12 +89,17 @@ jobs:
         run: npm install -g likec4@1.56.0
 
       - name: Install d2
-        # Pinned: d2 stamps its own version into every rendered SVG
-        # (data-d2-version=...). An unpinned install drifts that string and
-        # fails the diff step below even when the diagrams are identical.
-        # --method standalone forces the release tarball so the binary — and
-        # the version string it stamps — is identical regardless of a runner's
-        # Homebrew state.
+        # Pinned for GEOMETRY stability: a different d2 version can lay diagrams
+        # out differently, which would legitimately change the rendered SVG.
+        # --method standalone forces the release tarball so the binary is
+        # identical regardless of a runner's Homebrew state.
+        #
+        # The version STAMP (data-d2-version=...) is handled separately: the
+        # render steps below pipe every SVG through scripts/normalize_d2_svg.sh,
+        # which scrubs the stamp to a constant. The stamp varies by build
+        # provenance (Homebrew d2 0.7.1 emits "0.7.1"; this standalone tarball
+        # emits "v0.7.1"), so pinning alone never fully stabilized it — a local
+        # Homebrew regen still drifted the stamp. Normalization closes that gap.
         run: |
           curl -fsSL https://d2lang.com/install.sh \
             | sh -s -- --version v0.7.1 --method standalone
@@ -120,6 +125,12 @@ jobs:
               svg_file="${d2_file%.d2}.svg"
               echo "[ci] Rendering ${d2_file} → ${svg_file}"
               d2 "${d2_file}" "${svg_file}"
+              # Scrub the build-dependent d2 version stamp. Mirrors the local
+              # regen path (scripts/diagram-regen-hook.sh) so a committed render
+              # produced by a contributor's Homebrew d2 matches this standalone
+              # render. Without this, the stamp alone (0.7.1 vs v0.7.1) reddened
+              # the diff below even when the diagram was byte-identical.
+              bash scripts/normalize_d2_svg.sh "${svg_file}"
             done
           done
 

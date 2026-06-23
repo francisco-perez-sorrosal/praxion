@@ -1,3 +1,11 @@
+## v0.11.1 (2026-06-23)
+
+### Fix
+
+- **ci**: graceful auth fallback for security review
+- **ci**: disable empty uv cache in non-uv jobs
+- **ci**: normalize d2 stamp to end diagram drift
+
 ## v0.11.0 (2026-06-23)
 
 ### Feat

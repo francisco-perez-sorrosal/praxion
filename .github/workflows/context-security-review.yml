@@ -1,9 +1,24 @@
-# Security review workflow -- runs Claude Code on every PR to review diff for
-# security issues in context artifacts (CLAUDE.md, agents, skills, rules,
+# Security review workflow -- runs Claude Code on every PR to review the diff
+# for security issues in context artifacts (CLAUDE.md, agents, skills, rules,
 # commands, hooks, plugin.json, workflows, install scripts).
 #
-# Operates in diff mode: reviews ONLY files changed in the PR.
-# Uses the context-security-review skill loaded via --plugin-dir.
+# Diff mode: reviews ONLY files changed in the PR, via the
+# context-security-review skill loaded with --plugin-dir.
+#
+# Auth degradation (never hard-blocks a PR):
+#   1. CLAUDE_CODE_OAUTH_TOKEN subscription -- primary (preferred, no metered cost).
+#   2. Metered ANTHROPIC_API_KEY -- fallback, used only when the subscription
+#      attempt yields no review (e.g. its Sonnet quota is exhausted) AND the key
+#      secret is configured.
+#   3. Advisory -- if neither yields output, post a non-blocking notice and pass.
+#
+# "No review" is detected as an EMPTY structured_output, not a step exit code: a
+# rate-limit can surface as either a non-zero exit or an exit-0 run with empty
+# output. Both review steps are continue-on-error so the chain degrades cleanly.
+#
+# Note: claude-code-action declines to run on a PR that modifies this very
+# workflow file (its workflow-validation guard) -- both attempts skip and the
+# advisory path fires. The review begins working on the next PR once merged.
 
 name: Security Review
 
@@ -15,17 +30,47 @@ permissions:
   contents: read
   pull-requests: write
   actions: read    # needed for artifact URL access
-  id-token: write  # required by claude-code-action for OIDC authentication
+  id-token: write  # claude-code-action OIDC
 
 jobs:
   context-security-review:
-    # Skip on Dependabot PRs: they run with a restricted token and no secret
-    # access, so the Claude review step cannot authenticate — and its failure
-    # cascades into the `if: always()` upload steps (empty `path`). Dependency
-    # bumps do not need a context-security review.
+    # Skip on Dependabot PRs: restricted token, no secret access, and a
+    # dependency bump does not need a context-security review.
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
+    # Single source of truth for the review prompt + CLI args, shared by both
+    # auth attempts. GitHub Actions has no YAML anchors, so a job-level env block
+    # is how the two steps avoid duplicating (and drifting) the prompt and the
+    # --json-schema blob.
+    env:
+      REVIEW_PROMPT: |
+        Load the i-am:context-security-review skill in DIFF MODE. Review ONLY
+        the files modified in this PR -- do not scan the entire project.
+
+        Steps:
+        1. Run `git diff --name-only HEAD~1` to get the list of
+           changed files
+        2. Filter to files matching security-critical paths from
+           the skill
+        3. For each matching file, assess the risk using the
+           vulnerability categories
+        4. Check for permission escalation in agent or command changes
+        5. Check for secret patterns in added/modified lines
+        6. Check for dependency changes that widen version ranges or
+           add new dependencies
+
+        SCOPE: Only the PR diff. Do not review unchanged files.
+        CONFIDENCE: HIGH findings only. Do not report stylistic issues.
+
+        Return structured JSON with your findings.
+      REVIEW_ARGS: |
+        --plugin-dir .
+        --model sonnet
+        --max-turns 10
+        --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
+        --json-schema '{"type":"object","required":["findings","summary","risk_level","pass"],"properties":{"findings":{"type":"array","items":{"type":"object","required":["severity","category","description"],"properties":{"severity":{"type":"string","enum":["critical","high","medium","low","info"]},"category":{"type":"string"},"file":{"type":"string"},"line":{"type":"integer"},"description":{"type":"string"},"recommendation":{"type":"string"}}}},"summary":{"type":"string"},"risk_level":{"type":"string","enum":["critical","high","medium","low","none"]},"pass":{"type":"boolean"}}}'
 
     steps:
       - name: Checkout
@@ -33,51 +78,64 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Security Review
-        id: review
+      # Secrets are not readable in step `if:` conditions, so surface whether the
+      # metered API-key fallback is configured as a plain output.
+      - name: Detect API-key fallback
+        id: auth
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            echo "has_api_key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_api_key=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Primary: subscription (OAuth). continue-on-error so an exhausted quota
+      # falls through to the fallback and, failing that, to advisory mode.
+      - name: Security Review (subscription)
+        id: review_oauth
+        continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: |
-            Load the i-am:context-security-review skill in DIFF MODE. Review ONLY
-            the files modified in this PR -- do not scan the entire project.
+          prompt: ${{ env.REVIEW_PROMPT }}
+          claude_args: ${{ env.REVIEW_ARGS }}
 
-            Steps:
-            1. Run `git diff --name-only HEAD~1` to get the list of
-               changed files
-            2. Filter to files matching security-critical paths from
-               the skill
-            3. For each matching file, assess the risk using the
-               vulnerability categories
-            4. Check for permission escalation in agent or command changes
-            5. Check for secret patterns in added/modified lines
-            6. Check for dependency changes that widen version ranges or
-               add new dependencies
+      # Fallback: metered API key. Runs when the subscription produced no review
+      # (empty output -- robust to both exit-1 and exit-0 rate-limits) and a key
+      # is configured.
+      - name: Security Review (API-key fallback)
+        id: review_apikey
+        if: ${{ always() && steps.auth.outputs.has_api_key == 'true' && steps.review_oauth.outputs.structured_output == '' }}
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: ${{ env.REVIEW_PROMPT }}
+          claude_args: ${{ env.REVIEW_ARGS }}
 
-            SCOPE: Only the PR diff. Do not review unchanged files.
-            CONFIDENCE: HIGH findings only. Do not report stylistic issues.
-
-            Return structured JSON with your findings.
-          claude_args: |
-            --plugin-dir .
-            --model sonnet
-            --max-turns 10
-            --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
-            --json-schema '{"type":"object","required":["findings","summary","risk_level","pass"],"properties":{"findings":{"type":"array","items":{"type":"object","required":["severity","category","description"],"properties":{"severity":{"type":"string","enum":["critical","high","medium","low","info"]},"category":{"type":"string"},"file":{"type":"string"},"line":{"type":"integer"},"description":{"type":"string"},"recommendation":{"type":"string"}}}},"summary":{"type":"string"},"risk_level":{"type":"string","enum":["critical","high","medium","low","none"]},"pass":{"type":"boolean"}}}'
-
-      # Render Markdown report visible on workflow run page
       - name: Generate report summary
         if: always()
         env:
-          # Pass via env, not raw ${{ }} interpolation: review output may contain
-          # quotes/newlines that would break a single-quoted shell assignment.
-          STRUCTURED_OUTPUT: ${{ steps.review.outputs.structured_output }}
+          # Prefer whichever attempt produced output. Empty == no review from
+          # either -> advisory. Passed via env, not raw ${{ }} interpolation, so
+          # quotes or newlines in the review cannot break the shell assignment.
+          STRUCTURED_OUTPUT: ${{ steps.review_oauth.outputs.structured_output || steps.review_apikey.outputs.structured_output }}
         run: |
-          printf '%s' "$STRUCTURED_OUTPUT" > security-report.json
           if [ -z "$STRUCTURED_OUTPUT" ]; then
-            echo "_No structured output produced (review step failed or was skipped)._" >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "## :warning: Security Review skipped (advisory)"
+              echo
+              echo "No review was produced: the subscription Sonnet quota is exhausted"
+              echo "and the \`ANTHROPIC_API_KEY\` fallback is unset or also failed (or"
+              echo "claude-code-action declined to run on a PR that modifies this"
+              echo "workflow -- it runs once merged). Advisory; does not block the PR."
+            } >> "$GITHUB_STEP_SUMMARY"
+            printf '' > security-report.json
             exit 0
           fi
+          printf '%s' "$STRUCTURED_OUTPUT" > security-report.json
           jq -r '
             "# Security Review Report\n\n",
             "**Risk Level:** \(.risk_level) | **Pass:** \(.pass)\n\n",
@@ -91,9 +149,9 @@ jobs:
               if .recommendation then "**Recommendation:** \(.recommendation)\n" else "" end,
               "\n")
             end
-          ' security-report.json >> "$GITHUB_STEP_SUMMARY"
+          ' security-report.json >> "$GITHUB_STEP_SUMMARY" \
+            || echo "_Could not render report (output was not valid JSON)._" >> "$GITHUB_STEP_SUMMARY"
 
-      # Upload structured JSON for agent consumption
       - name: Upload report artifact
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
@@ -101,30 +159,44 @@ jobs:
           name: security-report
           path: security-report.json
           retention-days: 30
+          if-no-files-found: ignore
 
-      # Upload full execution log for debugging
+      # Guard on a non-empty path: a rate-limited/skipped action emits no
+      # execution_file, and upload-artifact rejects an empty path as a missing
+      # required input. Prefer the fallback's log when present.
       - name: Upload execution log
-        if: always()
+        if: ${{ always() && (steps.review_apikey.outputs.execution_file != '' || steps.review_oauth.outputs.execution_file != '') }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: context-security-review-execution
-          path: ${{ steps.review.outputs.execution_file }}
+          path: ${{ steps.review_apikey.outputs.execution_file || steps.review_oauth.outputs.execution_file }}
           retention-days: 14
+          if-no-files-found: ignore
 
-      # Post concise PR comment with link to full report
       - name: Comment on PR
         if: always()
         env:
-          # Read from env inside the script (process.env) instead of interpolating
-          # ${{ }} into the JS source: review output containing a quote or newline
-          # would otherwise break the string literal and JSON.parse (injection-safe).
-          STRUCTURED_OUTPUT: ${{ steps.review.outputs.structured_output }}
+          # Read from env (process.env) rather than interpolating ${{ }} into the
+          # JS source: review output with a quote or newline would otherwise break
+          # the string literal and JSON.parse (injection-safe).
+          STRUCTURED_OUTPUT: ${{ steps.review_oauth.outputs.structured_output || steps.review_apikey.outputs.structured_output }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
         with:
           script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const raw = process.env.STRUCTURED_OUTPUT || '';
             if (!raw.trim()) {
-              core.info('No structured output to comment on; skipping.');
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.issue.number,
+                body: [
+                  '## :warning: Security Review skipped (advisory)',
+                  '',
+                  'No review was produced: the subscription quota is exhausted and the `ANTHROPIC_API_KEY` fallback is unset or also failed (or the action declined to run on a PR that modifies this workflow — it runs once merged). This check is **advisory** and does not block the PR.',
+                  '',
+                  `[View run](${runUrl})`,
+                ].join('\n'),
+              });
               return;
             }
             let output;
@@ -134,7 +206,6 @@ jobs:
               core.warning(`Could not parse structured_output as JSON: ${err.message}`);
               return;
             }
-            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const emoji = output.pass ? ':white_check_mark:' : ':x:';
             const count = output.findings.length;
             const body = [

@@ -79,6 +79,11 @@ jobs:
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
         with:
           python-version: "3.13"
+          # This job installs likec4 (npm) + d2 (curl), never a uv dependency,
+          # so the uv cache stays empty and setup-uv's post-step `cache prune`
+          # fails the job with "Cache path does not exist". Disable caching
+          # where there is nothing to cache.
+          enable-cache: false
 
       - name: Install likec4
         # Pinned to the maintained `likec4` package. The org-scoped
@@ -203,6 +208,11 @@ jobs:
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
         with:
           python-version: "3.13"
+          # This job runs the mechanical AaC validator and the architect-validator
+          # agent, neither of which populates a uv dependency cache, so setup-uv's
+          # post-step `cache prune` fails the job with "Cache path does not exist".
+          # Disable caching where there is nothing to cache.
+          enable-cache: false
 
       - name: Validate AaC fences (mechanical, fast-fail)
         env:

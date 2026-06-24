@@ -56,7 +56,7 @@ If invoked with a sentinel report (latest `SENTINEL_REPORT_*.md` from `.ai-state
 
 **Tech-debt ledger awareness (permission, not obligation).** Read `.ai-state/TECH_DEBT_LEDGER.md`. Filter entries by `owner-role = doc-engineer` and `location` overlapping your current scope. Address items where possible within your current task; update `status` to `resolved` (with `resolved-by`) or `in-flight` as appropriate. Out-of-scope items remain `open` — do not delete. This is permission, not obligation: addressing ledger items is allowed when natural to your current scope, never required.
 
-**Diátaxis-mode awareness for architecture docs.** When the scope includes any `**/ARCHITECTURE.md` or `docs/architecture.md`, consult [`skills/doc-management/references/diataxis-modes.md`](../skills/doc-management/references/diataxis-modes.md) before authoring or restructuring sections. The reference assigns each Diátaxis mode (Tutorial / How-to / Reference / Explanation) a default fence kind (`aac:authored` / `aac:generated`) so generated content stays regenerable and authored rationale stays curated.
+**Diátaxis-mode awareness for architecture docs.** When the scope includes any `**/DESIGN.md` or `docs/architecture.md`, consult [`skills/doc-management/references/diataxis-modes.md`](../skills/doc-management/references/diataxis-modes.md) before authoring or restructuring sections. The reference assigns each Diátaxis mode (Tutorial / How-to / Reference / Explanation) a default fence kind (`aac:authored` / `aac:generated`) so generated content stays regenerable and authored rationale stays curated.
 
 ### Phase 2 -- Documentation Inventory (2/6)
 
@@ -64,7 +64,7 @@ Discover all documentation files in the project:
 
 1. **Project README** -- `Glob README.md` at the project root
 2. **Catalog READMEs** -- `Glob **/README.md` in artifact directories (skills, agents, commands, rules)
-3. **Architecture docs** -- `Glob **/ARCHITECTURE.md` and `Glob docs/architecture.md`. Note: `docs/architecture.md` is a distinct document type -- a developer navigation guide where every component name and file path must be verified against the filesystem. It is derived from `.ai-state/DESIGN.md` but contains only Built components with present-tense framing.
+3. **Architecture docs** -- `Glob **/DESIGN.md` and `Glob docs/architecture.md`. Note: `docs/architecture.md` is a distinct document type -- a developer navigation guide where every component name and file path must be verified against the filesystem. It is derived from `.ai-state/DESIGN.md` but contains only Built components with present-tense framing.
 4. **Changelogs** -- `Glob **/CHANGELOG.md`
 5. **Contributing guides** -- `Glob **/CONTRIBUTING.md`
 6. **Other documentation** -- `Glob **/*.md` filtered to documentation files (exclude context artifacts: CLAUDE.md, SKILL.md, agent definitions, rule files, command files)

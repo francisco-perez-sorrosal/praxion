@@ -93,7 +93,7 @@ For your assigned step:
    - Include actual file paths verified against filesystem
    - No Status column — omit Planned/Designed items
    If `docs/architecture.md` does not exist, skip — the systems-architect creates it.
-   When a step modifies architectural surfaces (DSL files, `ARCHITECTURE.md`, ADRs, or `aac:generated` fence regions), the change is also subject to the `architect-validator` agent's pre-merge structural-drift gate — implementers do not run this check themselves; it runs in the validation pipeline.
+   When a step modifies architectural surfaces (DSL files, `.ai-state/DESIGN.md`, ADRs, or `aac:generated` fence regions), the change is also subject to the `architect-validator` agent's pre-merge structural-drift gate — implementers do not run this check themselves; it runs in the validation pipeline.
 7.8. **Write test results** — if this step ran tests, write `.ai-work/<task-slug>/TEST_RESULTS.md` using the canonical schema (sections per step: command, pass/fail/skip counts, duration, optional coverage, failure blocks, notes). Presence of the file is the handoff signal to the verifier. In parallel mode, write fragment `TEST_RESULTS_implementer.md` — the planner merges fragments by concatenating `## Step N` sections in ascending step order. If a paired test-engineer ran the step's tests, they are the canonical writer and the implementer skips this sub-step.
 7.9. **Write traceability entries** — if this step implements behavior tied to specific REQ IDs from `SYSTEMS_PLAN.md`'s `## Behavioral Specification`, record the REQ-to-implementation mapping in `.ai-work/<task-slug>/traceability.yml` (sequential mode) or `.ai-work/<task-slug>/traceability_implementer.yml` (parallel mode). Schema:
 

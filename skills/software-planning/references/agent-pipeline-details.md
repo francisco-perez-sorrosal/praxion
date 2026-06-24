@@ -346,7 +346,7 @@ These lines are **optional and backward-compatible**. Existing `TEST_RESULTS.md`
 | `idea_ledgers/IDEA_LEDGER_*.md` | Medium — each promethean run carries forward previous entries | If two worktrees both run promethean, the later ledger may miss the earlier's new entries. Create a reconciled ledger with suffix `_reconciled` containing the union of both |
 | `specs/SPEC_*.md` | None — unique feature-name + date filenames | Git merge handles distinct file additions natively |
 | `SYSTEM_DEPLOYMENT.md` | Low — single evolving file, section ownership prevents concurrent edits | Standard git merge. If conflict, later worktree's version wins for architect-owned sections; review implementer/cicd-owned sections manually |
-| `ARCHITECTURE.md` | Low — single evolving file, section ownership prevents concurrent edits | Standard git merge. If conflict, later worktree's version wins for architect-owned sections; review implementer-owned sections manually |
+| `DESIGN.md` | Low — single evolving file, section ownership prevents concurrent edits | Standard git merge. If conflict, later worktree's version wins for architect-owned sections; review implementer-owned sections manually |
 | `TEST_TOPOLOGY.md` | Low — section ownership (architect / test-engineer / planner) prevents concurrent edits | Standard git merge. If conflict, later worktree's version wins per section; section ownership rules apply. Group splits and merges require an ADR; group-level additions are append-only. |
 | `docs/architecture.md` | Low — developer-facing, derived from `.ai-state/DESIGN.md` | Standard git merge. Developer doc is regenerable from architect doc + filesystem verification. If conflict, prefer later version (freshest data) and re-verify paths against disk |
 

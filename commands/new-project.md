@@ -234,7 +234,7 @@ Acceptance:
 Use Praxion's Standard-tier pipeline with the full delegation checklist for architect and planner (skip only SPEC archival and the verifier's written report for this seed). The architect produces SYSTEMS_PLAN.md + .ai-state/DESIGN.md + docs/architecture.md + one ADR draft for the defining trade-off; the planner produces the full three-doc model (IMPLEMENTATION_PLAN.md + WIP.md + LEARNINGS.md).
 ```
 
-The custom branch still runs every step of §Flow (orchestrator preamble, pipeline framing shown and executed, `/init` after code exists, mushi doc last) and produces the same full artifact set (SYSTEMS_PLAN + ARCHITECTURE + docs/architecture + ADR draft + three-doc planner model). The only lesson-ladder difference is that **L1 and L2 are tailored to the user's app** (new tool analog, refactor analog) while **L3–L7 remain generic** — see §Five-to-Seven Lessons. Tailored count is fixed at 2 regardless of final ladder size (5–7 total).
+The custom branch still runs every step of §Flow (orchestrator preamble, pipeline framing shown and executed, `/init` after code exists, mushi doc last) and produces the same full artifact set (SYSTEMS_PLAN + `.ai-state/DESIGN.md` + docs/architecture + ADR draft + three-doc planner model). The only lesson-ladder difference is that **L1 and L2 are tailored to the user's app** (new tool analog, refactor analog) while **L3–L7 remain generic** — see §Five-to-Seven Lessons. Tailored count is fixed at 2 regardless of final ladder size (5–7 total).
 
 If Claude cannot produce a concrete `src/<path>:<line>` anchor for a tailored lesson (e.g., user described a Haskell library with no `src/` tree), fall back to the generic L1/L2 and note the fallback in the mushi doc's troubleshooting line.
 
@@ -358,7 +358,7 @@ Ship all seven by default; L1 / L2 / L7 may be omitted only if anchor generation
 - **What you'll learn:** how a real feature *evolves* Praxion's persistent artifacts — the architecture docs from the seed get updated (not replaced), the next ADR joins the existing fleet, `VERIFICATION_REPORT.md` appears for the first time, and you see the full Plan → Implement → Verify traceability chain end-to-end.
 - **Put this in Claude:**
   > Add a request-size gate to POST `/chat`: reject bodies larger than 4 KB with HTTP 413, and emit the accepted size as the first SSE event. Apply Praxion's Standard-tier pipeline in full — I want the architect to update the existing `.ai-state/DESIGN.md` and `docs/architecture.md` (do not rewrite them from scratch), the planner to produce a fresh `IMPLEMENTATION_PLAN.md`/`WIP.md`/`LEARNINGS.md` triad for this feature, paired implementer/test work, and a VERIFICATION_REPORT.md against explicit acceptance criteria. Leave the `.ai-work/` artifacts in place so I can read them.
-- **What will happen:** full pipeline fires — `researcher` → `systems-architect` (updates `ARCHITECTURE.md` + `docs/architecture.md`, writes a fresh `SYSTEMS_PLAN.md`, adds a new ADR draft if the gate introduces a trade-off) → `implementation-planner` (fresh `IMPLEMENTATION_PLAN.md` + `WIP.md` + `LEARNINGS.md`) → `implementer` + `test-engineer` → `verifier` (NEW: `VERIFICATION_REPORT.md`).
+- **What will happen:** full pipeline fires — `researcher` → `systems-architect` (updates `.ai-state/DESIGN.md` + `docs/architecture.md`, writes a fresh `SYSTEMS_PLAN.md`, adds a new ADR draft if the gate introduces a trade-off) → `implementation-planner` (fresh `IMPLEMENTATION_PLAN.md` + `WIP.md` + `LEARNINGS.md`) → `implementer` + `test-engineer` → `verifier` (NEW: `VERIFICATION_REPORT.md`).
 - **Expected touches:** `src/web/app.py:<line-of-POST-/chat>`, `tests/test_agent.py`, updated `.ai-state/DESIGN.md`, updated `docs/architecture.md`, possibly a new `.ai-state/decisions/drafts/<fragment>.md`, and a fresh `.ai-work/<slug>/` directory with the full four-doc pipeline set + `VERIFICATION_REPORT.md`.
 
 ### L5 — Persist a second decision as an ADR
@@ -451,9 +451,9 @@ Self-test: did I state my assumptions, flag conflicts with reasons, stay in scop
 
 ## §AaC Scaffolding Sub-flow
 
-Greenfield projects ship with Architecture-as-Code enabled by default (sub-step 5f). This sub-flow installs five per-project AaC surfaces immediately after the seed pipeline produces `ARCHITECTURE.md` and `docs/architecture.md`. It is skipped entirely when the bootstrap context contains `# AaC scaffolding: false` (set by `new_project.sh --no-aac` or `PRAXION_NEW_PROJECT_NO_AAC=1`).
+Greenfield projects ship with Architecture-as-Code enabled by default (sub-step 5f). This sub-flow installs five per-project AaC surfaces immediately after the seed pipeline produces `.ai-state/DESIGN.md` and `docs/architecture.md`. It is skipped entirely when the bootstrap context contains `# AaC scaffolding: false` (set by `new_project.sh --no-aac` or `PRAXION_NEW_PROJECT_NO_AAC=1`).
 
-**Opt-out consequence.** When skipped, the project ships without `fitness/`, without `.github/workflows/architecture.yml`, without fence convention seeded into `ARCHITECTURE.md`, and without `docs/diagrams/`. These can be added later via `/onboard-project --with-aac` (Track A's Phase 8b).
+**Opt-out consequence.** When skipped, the project ships without `fitness/`, without `.github/workflows/architecture.yml`, without fence convention seeded into `.ai-state/DESIGN.md`, and without `docs/diagrams/`. These can be added later via `/onboard-project --with-aac` (Track A's Phase 8b).
 
 **Note — sentinel-only set.** The traceability convention (global SDD skill) and the sentinel AC dimension (global sentinel agent) require NO per-project install. They are inherited from the plugin automatically. This sub-flow installs only the surfaces that must physically reside in the user project.
 
@@ -461,14 +461,14 @@ Each sub-step is idempotent — a predicate gates every write. Partial-run resum
 
 ### Sub-step 5f.1 — Fence-region template seed
 
-**What it does.** Appends a commented fence-region example stanza to `ARCHITECTURE.md` and/or `docs/architecture.md` (whichever the pipeline produced) so greenfield projects start with the AaC fence convention visible.
+**What it does.** Appends a commented fence-region example stanza to `.ai-state/DESIGN.md` and/or `docs/architecture.md` (whichever the pipeline produced) so greenfield projects start with the AaC fence convention visible.
 
-**Predicate (skip if true):** `grep -q 'aac:generated\|aac:authored' ARCHITECTURE.md 2>/dev/null` — fence markers already present.
+**Predicate (skip if true):** `grep -q 'aac:generated\|aac:authored' .ai-state/DESIGN.md 2>/dev/null` — fence markers already present.
 
 **Action when predicate fails:**
 
 ```
-# Append to ARCHITECTURE.md (and docs/architecture.md when present):
+# Append to .ai-state/DESIGN.md (and docs/architecture.md when present):
 
 <!-- aac:generated — do not edit this block by hand; regenerate via scripts/diagram-regen-hook.sh -->
 <!-- Fence example — see rules/writing/aac-dac-conventions.md for the full convention -->
@@ -476,7 +476,7 @@ Each sub-step is idempotent — a predicate gates every write. Partial-run resum
 <!-- aac:generated:end -->
 ```
 
-If neither `ARCHITECTURE.md` nor `docs/architecture.md` exists yet, skip with notice: `Fence seed skipped — no ARCHITECTURE.md yet; re-run /onboard-project --with-aac after the architecture baseline lands.`
+If neither `.ai-state/DESIGN.md` nor `docs/architecture.md` exists yet, skip with notice: `Fence seed skipped — no DESIGN.md yet; re-run /onboard-project --with-aac after the architecture baseline lands.`
 
 ### Sub-step 5f.2 — fitness/ scaffold
 
@@ -515,7 +515,7 @@ After copying, print: `fitness/ scaffolded — read fitness/README.md and the ar
 | Placeholder | Value |
 |-------------|-------|
 | `{{PROJECT_PATHS_DIAGRAMS}}` | `docs/diagrams/` |
-| `{{PROJECT_PATHS_ARCHITECTURE_DOCS}}` | `**/ARCHITECTURE.md` |
+| `{{PROJECT_PATHS_ARCHITECTURE_DOCS}}` | `**/DESIGN.md` |
 | `{{PROJECT_PYTHON_VERSION}}` | lower bound from `pyproject.toml` `requires-python`, or `3.13` |
 | `{{PROJECT_PLUGIN_DIR}}` | `.` |
 
@@ -586,7 +586,7 @@ Per-phase predicates that govern §Flow steps. Re-running `/new-project` on a di
 
 | Flow step | Predicate (skip if true) |
 |-----------|--------------------------|
-| 5f.1 (fence seed) | `grep -q 'aac:generated\|aac:authored' ARCHITECTURE.md 2>/dev/null` |
+| 5f.1 (fence seed) | `grep -q 'aac:generated\|aac:authored' .ai-state/DESIGN.md 2>/dev/null` |
 | 5f.2 (fitness/ scaffold — per file) | `test -e fitness/<filename>` for each of the five template destinations |
 | 5f.3 (Block D append) | `grep -q 'check_aac_golden_rule' .git/hooks/pre-commit 2>/dev/null` |
 | 5f.4 (architecture.yml) | `test -e .github/workflows/architecture.yml` |
@@ -612,7 +612,7 @@ Other §Flow steps (1–7, 9, 11–13) are not idempotent in the strict sense be
 
 - **`/onboard-project` Phase 6 (CLAUDE.md blocks)** — all five standard predicates hit (Agent Pipeline, Compaction Guidance, Behavioral Contract, Praxion Process, and Working in this project are present from this command's Flow step 10). When hackathon mode was enabled, the `## Hackathon Mode` block is also present; `/onboard-project --hackathon`'s Phase 5b finds its per-artifact CLAUDE.md-block predicate already satisfied and skips just that artifact while still writing the remaining five (env var, preset, wrapper, directive, settings) — Phase 5b is not skipped wholesale, only its block-append sub-step.
 - **`/onboard-project` Phase 8 (Architecture Baseline)** — the predicate `test -e .ai-state/DESIGN.md` hits because the seed pipeline's `systems-architect` (gate 4b) already produced both `.ai-state/DESIGN.md` and `docs/architecture.md`. Re-running the architect would overwrite a real-content baseline with another real-content baseline; the predicate prevents that.
-- **`/onboard-project` Phase 8b (AaC scaffolding)** — when AaC was not opted out of (the default), all five sub-step predicates hit (`fitness/` exists, Block D is present, `architecture.yml` exists, fence markers are in `ARCHITECTURE.md`, `docs/diagrams/.gitkeep` exists). The `/onboard-project --with-aac` path becomes a clean no-op.
+- **`/onboard-project` Phase 8b (AaC scaffolding)** — when AaC was not opted out of (the default), all five sub-step predicates hit (`fitness/` exists, Block D is present, `architecture.yml` exists, fence markers are in `.ai-state/DESIGN.md`, `docs/diagrams/.gitkeep` exists). The `/onboard-project --with-aac` path becomes a clean no-op.
 - **`/onboard-project` Phase 8d (Obsidian integration)** — when Obsidian was not opted out of (the default), all sub-step predicates hit (`.gitignore` Obsidian block present, `obsidian@obsidian-skills` plugin installed at user scope, `.obsidian/app.json` link-safety keys pinned, `## Obsidian Integration` block in `CLAUDE.md`, `permissions.deny` entries present). `/onboard-project`'s Phase 8d becomes a complete no-op.
 
 The other phases of `/onboard-project` (1, 2, 3, 4, 5, 7, 9) apply the surfaces this command does not — git hooks, merge drivers, `.ai-state/` skeleton (`DECISIONS_INDEX.md`, `TECH_DEBT_LEDGER.md`, `calibration_log.md`), `.gitattributes`, `.claude/settings.json` toggles, companion CLI advisories, and the verification handoff.

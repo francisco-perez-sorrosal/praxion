@@ -526,12 +526,12 @@ When the `no-more-gates` flag is set (user previously picked `Run all rest`), de
 
 ### Sub-step 8b.1 — Fence seed
 
-**Predicate.** At least one of `**/ARCHITECTURE.md` or `docs/architecture.md` exists AND does NOT already contain the string `aac:generated` or `aac:authored`.
+**Predicate.** At least one of `**/DESIGN.md` or `docs/architecture.md` exists AND does NOT already contain the string `aac:generated` or `aac:authored`.
 
 - If no architecture doc exists: skip silently. Phase 8 (if run) will produce one; a future feature pipeline may produce one. Re-running Phase 8b after an architecture doc exists will complete this sub-step.
 - If an architecture doc exists but already contains `aac:generated` or `aac:authored` markers: skip with notice `8b.1: skipped (fence regions already present)`.
 
-**Action.** For each architecture doc found (prefer `docs/architecture.md`; also process `**/ARCHITECTURE.md` if different from the first), append the following commented example stanza at the end of the file using `Edit`:
+**Action.** For each architecture doc found (prefer `.ai-state/DESIGN.md`, then `docs/architecture.md`), append the following commented example stanza at the end of the file using `Edit`:
 
 ```markdown
 <!-- AaC fence example — see rules/writing/aac-dac-conventions.md for the full convention.
@@ -589,7 +589,7 @@ Print: `8b.3: Block D appended to .git/hooks/pre-commit`.
 | Placeholder | Derivation | Default |
 |---|---|---|
 | `{{PROJECT_PATHS_DIAGRAMS}}` | Detected `<doc-dir>/diagrams/` from sub-step 8b.5 or `docs/diagrams/` | `docs/diagrams/` |
-| `{{PROJECT_PATHS_ARCHITECTURE_DOCS}}` | Fixed | `**/ARCHITECTURE.md` |
+| `{{PROJECT_PATHS_ARCHITECTURE_DOCS}}` | Fixed | `**/DESIGN.md` |
 | `{{PROJECT_PYTHON_VERSION}}` | `requires-python` lower bound from `pyproject.toml`, or fallback | `3.13` |
 | `{{PROJECT_PLUGIN_DIR}}` | Plugin install scope; `.` works for user-installed plugins | `.` |
 

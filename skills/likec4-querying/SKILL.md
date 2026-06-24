@@ -4,11 +4,11 @@ description: >
   Decision rubric and recipes for querying LikeC4 architecture models: `likec4`
   MCP tools vs. reading `.c4` files directly. Path-scoped to
   architecture-authoring surfaces. Triggers: authoring/modifying
-  ARCHITECTURE.md, .c4 files, diagram sources, exploring LikeC4 model for
+  DESIGN.md, .c4 files, diagram sources, exploring LikeC4 model for
   design decisions.
 allowed-tools: [Read, Glob, Grep, Bash]
 compatibility: Claude Code
-paths: ["**/*.c4", "**/ARCHITECTURE.md", "docs/architecture.md", "docs/diagrams/**"]
+paths: ["**/*.c4", "**/DESIGN.md", "docs/architecture.md", "docs/diagrams/**"]
 staleness_sensitive_sections: ["## Decision Rubric", "## MCP Tool Quick Reference"]
 staleness_threshold_days: 60
 ---

@@ -6,7 +6,7 @@ description: >
   on any FAIL) and --mode=on-demand (always reports, never blocks). Produces
   ARCHITECTURE_VALIDATION.md covering Model→Code, ADR→Model, and generated-region
   drift, appending a TECH_DEBT_LEDGER row per FAIL. Use when reviewing PRs that
-  touch architectural surfaces (DSL files, ARCHITECTURE.md, ADRs, fitness
+  touch architectural surfaces (DSL files, DESIGN.md, ADRs, fitness
   contracts), or locally before pushing. Distinct from verifier (behavior),
   doc-engineer (markdown quality), sentinel (periodic audit), and cicd-engineer
   (CI harness authoring).
@@ -44,7 +44,8 @@ Triggers on PRs touching any of these paths:
 
 - `docs/diagrams/**`
 - `**/*.c4`
-- `**/ARCHITECTURE.md`
+- `**/DESIGN.md`
+- `docs/architecture.md`
 - `.ai-state/decisions/**`
 - `fitness/**`
 
@@ -91,7 +92,7 @@ Read `.ai-state/decisions/DECISIONS_INDEX.md` for the index. Read individual `.a
 
 ### Markdown fences
 
-For each `**/ARCHITECTURE.md` and `docs/architecture.md` file in scope, run:
+For each architecture markdown file in scope (`**/DESIGN.md` and `docs/architecture.md`), run:
 
 ```
 python scripts/aac_fence_validator.py <file>
@@ -108,7 +109,8 @@ Work through all seven phases in order. Complete each phase before the next.
 **In `--mode=pre-merge`**: run `git diff --name-only $BASE..HEAD` (default: `origin/main..HEAD`). Check whether any changed file matches the trigger paths:
 - `docs/diagrams/**`
 - `**/*.c4`
-- `**/ARCHITECTURE.md`
+- `**/DESIGN.md`
+- `docs/architecture.md`
 - `.ai-state/decisions/**`
 - `fitness/**`
 
@@ -122,7 +124,7 @@ If no file matches: emit `no architectural-touch slice detected; skipping` and e
 2. Run `uv run lint-imports --config fitness/import-linter.cfg --no-cache` to refresh the import graph
 3. Read `.ai-state/decisions/DECISIONS_INDEX.md`
 4. In `--mode=pre-merge`: run `git diff --name-only $BASE..HEAD` filtered to `.ai-state/decisions/` to collect ADRs touched in this PR
-5. Identify `**/ARCHITECTURE.md` and `docs/architecture.md` files in scope
+5. Identify architecture markdown files in scope: `**/DESIGN.md` and `docs/architecture.md`
 
 Surface any missing inputs as WARNs before proceeding (e.g., no `fitness/import-linter.cfg`, no `.ai-state/decisions/`).
 
@@ -157,7 +159,7 @@ Also verify ADR cross-reference chains resolve:
 
 ### Phase 5 — Generated-region drift
 
-For each `**/ARCHITECTURE.md` and `docs/architecture.md` file identified in Phase 2:
+For each architecture markdown file identified in Phase 2 (`**/DESIGN.md` and `docs/architecture.md`):
 
 ```
 python scripts/aac_fence_validator.py <file>
@@ -167,7 +169,7 @@ Map fence-validator findings to architect-validator findings:
 - Fence FAIL findings (`unbalanced-fence`, `missing-required-attribute`, `source-path-not-found`) → architect-validator FAIL with code `fence-<original-code>`
 - Fence WARN findings (`likec4-unavailable`) → architect-validator WARN
 
-If no `ARCHITECTURE.md` files exist: emit one INFO note `no fenced markdown to validate` and continue.
+If no architecture markdown files exist: emit one INFO note `no fenced markdown to validate` and continue.
 
 ### Phase 6 — Verdict aggregation
 
@@ -235,7 +237,7 @@ For each FAIL, append a row to `.ai-state/TECH_DEBT_LEDGER.md` with these fields
 - `direction: code-to-goals` (default; use `goals-to-code` when the ADR or model declares something the code does not implement)
 - `location: <file:line or DSL element id>`
 - `goal-ref-type: architecture` (or `adr` when the violation is anchored to a specific ADR)
-- `goal-ref-value: <ARCHITECTURE.md section path or dec-NNN>`
+- `goal-ref-value: <DESIGN.md section path or dec-NNN>`
 - `source: architect-validator`
 - `severity: critical | important | suggested` (model-edge or ADR-dangling → critical; generated-region → important; suppressed → suggested)
 - `owner-role: systems-architect`
@@ -250,7 +252,7 @@ Before appending, scan for an existing row with the same `dedup_key` (computed a
 - **No `.c4` files in repo**: Phases 3 and 4 each emit one WARN (`no LikeC4 model present`) and continue. This is the bootstrap state for projects that have not yet adopted LikeC4; it is not a FAIL.
 - **`dynamic` metadata tag**: LikeC4 elements or edges with `metadata.dynamic = true` (or `tags: [dynamic]`) suppress Model→Code findings. Plugin-loader and dispatch patterns are intentionally unresolvable via static import analysis; the tag is the explicit opt-out.
 - **No `fitness/import-linter.cfg`**: Phase 3's import-graph source is unavailable; emit one WARN (`import-linter-config-not-found`) and skip edge cross-checks. ADR→Model and Generated-region drift continue unaffected.
-- **No `ARCHITECTURE.md` files**: Phase 5 emits one INFO note (`no fenced markdown to validate`) and continues. Not a FAIL.
+- **No architecture markdown files**: Phase 5 emits one INFO note (`no fenced markdown to validate`) and continues. Not a FAIL.
 - **Missing `$BASE` in pre-merge mode**: default to `origin/main`. Surface the assumption at Phase 1 start.
 
 ## Progress Signals

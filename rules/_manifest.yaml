@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-06-22T20:22:24Z'
+generated_at: '2026-06-24T23:42:24Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
@@ -16,7 +16,7 @@ rules:
   load: always_on
   core: true
   install: symlink
-  chars: 11870
+  chars: 11874
 - id: swe/agent-behavioral-contract
   path: rules/swe/agent-behavioral-contract.md
   load: always_on
@@ -28,7 +28,7 @@ rules:
   load: always_on
   core: true
   install: symlink
-  chars: 14468
+  chars: 14479
 - id: swe/swe-agent-coordination-protocol
   path: rules/swe/swe-agent-coordination-protocol.md
   load: always_on
@@ -240,7 +240,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 6774
+  chars: 6768
   paths:
   - .github/**/*.md
   - commands/*pr*.md
@@ -252,9 +252,9 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 4822
+  chars: 4858
   paths:
-  - '**/ARCHITECTURE.md'
+  - '**/DESIGN.md'
   - docs/architecture.md
   - '**/*.c4'
 - id: writing/diagram-conventions
@@ -262,13 +262,12 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 7167
+  chars: 7144
   paths:
   - docs/**
   - README.md
   - '**/README.md'
   - '**/DESIGN.md'
-  - '**/ARCHITECTURE.md'
   - '**/SYSTEM_DEPLOYMENT.md'
   - .ai-state/**
   - '**/IDEA_PROPOSAL.md'
@@ -291,7 +290,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 6177
+  chars: 6181
   paths:
   - '**/README.md'
   - '**/README_DEV.md'

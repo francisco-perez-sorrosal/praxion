@@ -4,18 +4,18 @@ Decision rubric and tool reference for querying LikeC4 architecture models. Help
 choose between the `likec4` MCP server (parsed model objects, BFS traversal, cross-project
 indexing) and direct `.c4` file reads (raw DSL text, edit-capable) so the right approach
 is used on the first try. Path-scoped: activates when working with `.c4` files or
-`ARCHITECTURE.md`.
+`.ai-state/DESIGN.md`.
 
 ## When to Use
 
-- Authoring or modifying `.c4` files or `ARCHITECTURE.md`
+- Authoring or modifying `.c4` files or `.ai-state/DESIGN.md`
 - Exploring a LikeC4 model for design decisions or dependency analysis
 - Choosing between MCP tools and direct file reads for an architecture query
 - Working under `docs/diagrams/`
 
 ## Activation
 
-Path-scoped to `**/*.c4`, `**/ARCHITECTURE.md`, `docs/architecture.md`, and
+Path-scoped to `**/*.c4`, `**/DESIGN.md`, `docs/architecture.md`, and
 `docs/diagrams/**`. Activates automatically when Claude reads files matching these
 patterns.
 

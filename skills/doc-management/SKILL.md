@@ -219,7 +219,7 @@ Stale documentation is documentation that no longer matches reality. Detecting s
 
 ### Freshness Assessment Workflow
 
-1. **Identify documentation files**: `Glob` for `**/README.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `CHANGELOG.md`
+1. **Identify documentation files**: `Glob` for `**/README.md`, `**/DESIGN.md`, `CONTRIBUTING.md`, `CHANGELOG.md`
 2. **Check modification dates**: compare documentation last-modified against the files it describes
 3. **Validate structural claims**: filesystem paths, counts, names, trees
 4. **Flag stale sections**: mark specific sections that need updating, not just "this file is stale"

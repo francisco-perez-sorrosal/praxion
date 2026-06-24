@@ -163,7 +163,7 @@ ADRs document *why* an architectural decision was made. The canonical, auto-gene
 
 - **Section 8** is a single pointer to `DECISIONS_INDEX.md` — never an inline summary table. Summary tables drift; auto-generated indexes do not.
 - **Inline `dec-NNN` mentions** appear in Sections 3 (Components), 4 (Interfaces), and 7 (Constraints) when an ADR materially shaped that row. These are validated by sentinel AC04.
-- Architecture-related ADRs include `ARCHITECTURE.md` in `affected_files`.
+- Architecture-related ADRs include `.ai-state/DESIGN.md` in `affected_files`.
 - Never duplicate ADR rationale in either architecture document — just cite by `dec-NNN`.
 
 ## Relationship to SYSTEM_DEPLOYMENT.md
@@ -203,7 +203,7 @@ Follow the project's Mermaid diagram conventions (see `rules/writing/diagram-con
 
 For projects that already have code but no architecture docs:
 
-1. The sentinel's AC01 check flags the gap (3+ interacting components, no ARCHITECTURE.md)
+1. The sentinel's AC01 check flags the gap (3+ interacting components, no `.ai-state/DESIGN.md`)
 2. The systems-architect creates both documents when next invoked for a Standard/Full pipeline
 3. Read existing code structure, imports, and config to populate components, interfaces, and dependencies
 4. Section 8 needs no per-bootstrap population — it is a stable pointer to `DECISIONS_INDEX.md`. Inline `dec-NNN` references should be added in Sections 3/4/7 only when an existing ADR materially shaped a row

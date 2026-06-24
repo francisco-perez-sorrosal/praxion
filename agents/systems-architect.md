@@ -431,11 +431,11 @@ Your `SYSTEMS_PLAN.md` is the implementation planner's primary input. Focus on:
 - **Obligation to re-evaluate**: when the agentic-transactions-architect raises an `## Architecture Challenges` entry, read each contested decision and incorporate the proposed alternative unless you can articulate a concrete architectural reason to reject it. The orchestrator mediates if the parties cannot converge in one round
 - **Scope boundary**: you make load-bearing structural decisions; the agentic-transactions-architect refines transaction-safety and provider semantics within those constraints — but a transaction decision that affects correctness or real-money risk is a structural concern and rises to you for resolution
 
-Structural coherence of the architect's outputs (DSL, `ARCHITECTURE.md`, ADR cross-references) is verified downstream by `architect-validator` once the design is committed; the architect does not run this check.
+Structural coherence of the architect's outputs (DSL, `.ai-state/DESIGN.md`, ADR cross-references) is verified downstream by `architect-validator` once the design is committed; the architect does not run this check.
 
 ## Output
 
-After creating `SYSTEMS_PLAN.md` (and `SPEC_DELTA.md` for brownfield features, `ARCHITECTURE.md` + `docs/architecture.md` for Standard/Full pipelines), return a concise summary:
+After creating `SYSTEMS_PLAN.md` (and `SPEC_DELTA.md` for brownfield features, `.ai-state/DESIGN.md` + `docs/architecture.md` for Standard/Full pipelines), return a concise summary:
 
 1. **Goal** — one sentence
 2. **Architecture approach** — brief description of the design

@@ -55,7 +55,7 @@ Depth, the decision framework, and cognitive-load heuristics live in [`skills/do
 
 ### Scaling Long READMEs
 
-Add TL;DR + table of contents at 4-5+ sections. Split into companion documents (`ARCHITECTURE.md`, `CONTRIBUTING.md`) when depth exceeds entry-point scope.
+Add TL;DR + table of contents at 4-5+ sections. Split into companion documents (`.ai-state/DESIGN.md`, `CONTRIBUTING.md`) when depth exceeds entry-point scope.
 
 ### Markdown Enhancement Patterns
 

@@ -60,7 +60,7 @@ Path-scoped rules load only when editing files matching their `paths:` pattern. 
 | `swe/staleness-policy.md` | Marker syntax and threshold protocol for drift-prone skill sections. Paths: `**/SKILL.md` |
 | `swe/testing-conventions.md` | Test file placement, naming, coverage expectations, and test isolation. Paths: `tests/**` |
 | `swe/vcs/pr-conventions.md` | PR workflow, merge policy, and the `.ai-state/` safety contract at PR time. Paths: `.github/**`, PR/merge/release commands, `git-conventions.md` |
-| `writing/aac-dac-conventions.md` | Architecture-as-Code + Documentation-as-Code fence convention (`aac:generated` / `aac:authored`) for `ARCHITECTURE.md` and `.c4` sources. Paths: `**/ARCHITECTURE.md`, `docs/architecture.md`, `**/*.c4` |
+| `writing/aac-dac-conventions.md` | Architecture-as-Code + Documentation-as-Code fence convention (`aac:generated` / `aac:authored`) for `.ai-state/DESIGN.md` and `.c4` sources. Paths: `**/DESIGN.md`, `docs/architecture.md`, `**/*.c4` |
 | `writing/diagram-conventions.md` | Mermaid syntax, layered decomposition (L0/L1/L2), diagram type selection. Paths: documentation-authoring surfaces (`docs/`, architecture docs, `.ai-state/`) |
 | `writing/html-output-conventions.md` | HTML output conventions for the dashboard runtime — Markdown stays source of truth; HTML is a presentation veneer. Paths: `dashboard_app/**`, `**/doc_manifest.yaml` |
 | `writing/readme-style.md` | Precision-first technical writing and structural integrity conventions for README.md files. Paths: `**/README.md`, `**/README_DEV.md` |

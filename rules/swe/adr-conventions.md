@@ -111,7 +111,7 @@ The 7-step procedure agents follow when creating a fragment ADR (identity deriva
 
 ### Linking to ADRs
 
-Persistent files — `docs/`, `ARCHITECTURE.md`, READMEs — link the **finalized** record at `.ai-state/decisions/<NNN>-<slug>.md`, never a `drafts/<…>.md` fragment: a `drafts/` path stops resolving the moment the authoring pipeline merges. While a pipeline is in flight, cite an unfinalized ADR inline by its `dec-draft-<hash>` id (from the draft frontmatter), not by path — the id survives finalize as a rewritten `dec-NNN`; the path does not. (ADR-to-ADR cross-references use the frontmatter `id` form per the Supersession and Re-affirmation protocols above, not file-path links.)
+Persistent files — `docs/`, `.ai-state/DESIGN.md`, READMEs — link the **finalized** record at `.ai-state/decisions/<NNN>-<slug>.md`, never a `drafts/<…>.md` fragment: a `drafts/` path stops resolving the moment the authoring pipeline merges. While a pipeline is in flight, cite an unfinalized ADR inline by its `dec-draft-<hash>` id (from the draft frontmatter), not by path — the id survives finalize as a rewritten `dec-NNN`; the path does not. (ADR-to-ADR cross-references use the frontmatter `id` form per the Supersession and Re-affirmation protocols above, not file-path links.)
 
 ### Consumption
 

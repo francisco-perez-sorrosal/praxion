@@ -94,7 +94,7 @@ Commit both the `.c4` source and the regenerated `.d2`/`.svg` files together.
 **Common pitfalls:**
 - Placing inventory tables inside an Explanation region — if a region labelled "Design Rationale" contains a component count table, the table will not be drift-checked. Move it to a separate `aac:generated` Reference region.
 - Using `aac:generated` for a region labelled "Architecture Decisions" — decision text is not generated from the LikeC4 model; giving it a generated fence causes the validator to seek a non-existent source and fail.
-- Conflating ADR content with inline Explanation — Explanation in `ARCHITECTURE.md` summarises the decision; the ADR file at `.ai-state/decisions/<NNN>-<slug>.md` is the full record. Keep Explanation concise and link to the ADR.
+- Conflating ADR content with inline Explanation — Explanation in `.ai-state/DESIGN.md` summarises the decision; the ADR file at `.ai-state/decisions/<NNN>-<slug>.md` is the full record. Keep Explanation concise and link to the ADR.
 
 **Worked example:**
 

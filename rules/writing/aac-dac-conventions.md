@@ -1,6 +1,6 @@
 ---
 paths:
-- '**/ARCHITECTURE.md'
+- '**/DESIGN.md'
 - docs/architecture.md
 - '**/*.c4'
 core: false
@@ -8,7 +8,7 @@ core: false
 
 ## AaC Fence Convention
 
-`ARCHITECTURE.md` mixes two kinds of content: regenerable structural inventory (component tables, deployment topology, dependency graphs) derived from a LikeC4 DSL model, and authored narrative (rationale, invariants, trade-offs) that the DSL cannot express. Without an explicit boundary, two failure modes coexist: regenerating from the model silently erases authored narrative; treating the file as fully authored lets structural inventory drift silently. The fence convention makes the boundary mechanically detectable so neither half degrades silently.
+The architect-facing design doc (`.ai-state/DESIGN.md`) mixes two kinds of content: regenerable structural inventory (component tables, deployment topology, dependency graphs) derived from a LikeC4 DSL model, and authored narrative (rationale, invariants, trade-offs) that the DSL cannot express. Without an explicit boundary, two failure modes coexist: regenerating from the model silently erases authored narrative; treating the file as fully authored lets structural inventory drift silently. The fence convention makes the boundary mechanically detectable so neither half degrades silently.
 
 ## Fence Schema
 
@@ -52,7 +52,7 @@ The gateway layer was chosen over per-service auth to centralize credential rota
 
 ## Untagged Content Default
 
-Untagged content (no fence) is treated as `aac:authored owner=unspecified`. Legacy `ARCHITECTURE.md` files require zero migration; the contract activates per region as fences are added.
+Untagged content (no fence) is treated as `aac:authored owner=unspecified`. Legacy architecture markdown files require zero migration; the contract activates per region as fences are added.
 
 ## Do Not Strip Fences
 

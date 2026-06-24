@@ -27,7 +27,7 @@ PRs that touch `.ai-state/` carry obligations beyond regular code PRs because th
 
 - Run `python scripts/finalize_adrs.py --dry-run` locally. Confirm any draft ADRs in `.ai-state/decisions/drafts/` promote cleanly — no collisions, no missing cross-references.
 - Run the full project test suite (`pytest scripts/` at minimum).
-- Include in the PR description an explicit note: "Touches `.ai-state/`". List the affected subpaths (e.g., `decisions/drafts/`, `observations.jsonl`, `ARCHITECTURE.md`) so reviewers know semantic merge will apply.
+- Include in the PR description an explicit note: "Touches `.ai-state/`". List the affected subpaths (e.g., `decisions/drafts/`, `observations.jsonl`, `DESIGN.md`) so reviewers know semantic merge will apply.
 
 **When in doubt, rebase on latest `main` before opening the PR.** This narrows the merge-time reconciliation surface.
 

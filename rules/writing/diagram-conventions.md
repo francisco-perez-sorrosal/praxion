@@ -4,7 +4,6 @@ paths:
 - README.md
 - '**/README.md'
 - '**/DESIGN.md'
-- '**/ARCHITECTURE.md'
 - '**/SYSTEM_DEPLOYMENT.md'
 - .ai-state/**
 - '**/IDEA_PROPOSAL.md'

@@ -589,7 +589,7 @@ The `regression` sub-package was retired in the praxion-self-eval-v1 pipeline. B
 ```sh
 /i-am:eval-praxion                                                           # LLM-as-judge over main HEAD
 /i-am:eval-praxion --task-slug architecture-doc --mechanical-only            # verify deliverables, free
-/i-am:eval-praxion --task-slug architecture-doc --tier full                  # include ARCHITECTURE.md + docs/architecture.md recency
+/i-am:eval-praxion --task-slug architecture-doc --tier full                  # include DESIGN.md + docs/architecture.md recency
 /i-am:eval-praxion my-worktree-name                                          # eval a specific worktree by name
 ```
 

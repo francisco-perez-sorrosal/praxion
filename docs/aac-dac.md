@@ -28,7 +28,7 @@ alternatives were considered or why this shape over alternatives. A contributor 
 trace dependencies but not know whether they are incidental or intentional. The same trade-offs get relitigated
 because no one recorded the original reasoning.
 
-**Narrative without a model.** `ARCHITECTURE.md` prose ages from the moment it is written. Components rename,
+**Narrative without a model.** `.ai-state/DESIGN.md` prose ages from the moment it is written. Components rename,
 modules merge, deployment topology shifts — the document stays frozen. Within months it describes a system
 that no longer exists. Reviews treat it as aspirational rather than authoritative.
 
@@ -108,7 +108,7 @@ Block D of the pre-commit hook. It checks two things:
 - **Path-pair detection.** A staged generated-output file (a `.d2`/`.svg` render in `docs/diagrams/`) must
   be accompanied by a staged change to its corresponding `.c4` source, or carry a line-adjacent
   `<!-- aac-override: <reason> -->` comment explaining the hand-edit.
-- **Fence-interior detection.** A staged edit inside an `aac:generated` region in `ARCHITECTURE.md` must
+- **Fence-interior detection.** A staged edit inside an `aac:generated` region in `.ai-state/DESIGN.md` must
   be accompanied by a staged change to the fence's `source=` path, or carry an override comment.
 
 Gate mode exits non-zero on violation; audit mode scans recent commits and produces JSON findings for the
@@ -134,7 +134,7 @@ rather than evaporating with the ephemeral report (dec-100).
 ### 6. The Architecture CI Pipeline (Idea 7)
 
 `.github/workflows/architecture.yml` runs three parallel jobs on every PR that touches an architectural
-path (`docs/diagrams/**`, `**/*.c4`, `**/ARCHITECTURE.md`, `.ai-state/decisions/**`, `fitness/**`,
+path (`docs/diagrams/**`, `**/*.c4`, `**/DESIGN.md`, `.ai-state/decisions/**`, `fitness/**`,
 `scripts/aac_fence_validator.py`, `scripts/check_aac_golden_rule.py`):
 
 1. **`regenerate-and-diff`** — re-runs the diagram regen hook and checks `git diff --exit-code` on
@@ -161,7 +161,7 @@ Element(s). Absent `architectural_elements:` for a REQ is not a FAIL — it sign
 The sentinel's AC dimension audits the substrate periodically:
 
 - **AC10** — fence integrity: `aac:generated`/`aac:authored`/`aac:end` balance and required attributes.
-- **AC11** — model↔markdown agreement: components named in ARCHITECTURE.md correspond to LikeC4 elements.
+- **AC11** — model↔markdown agreement: components named in `.ai-state/DESIGN.md` correspond to LikeC4 elements.
 - **AC12** — traceability orphans: REQs with no element claiming them; elements citing nonexistent REQs.
 
 Each check activates only when its substrate is present, mirroring the TT-dimension's conditional-activation
@@ -179,7 +179,7 @@ the author as tracked work.
 The loop:
 
 1. **Author writes** an ADR (DaC: the "why") and updates the LikeC4 model (AaC: the "what").
-2. **Author seeds** an `aac:generated` fence in `ARCHITECTURE.md` citing `source=` from the model.
+2. **Author seeds** an `aac:generated` fence in `.ai-state/DESIGN.md` citing `source=` from the model.
 3. **At commit**, Block D runs `check_aac_golden_rule.py --mode=gate`. A staged edit to a generated region
    without a corresponding source change fails immediately — the cheapest feedback point.
 4. **At PR time**, three CI jobs cover disjoint failure modes: render drift (`regenerate-and-diff`), invariant
@@ -197,7 +197,7 @@ The loop:
 The Mermaid diagram below represents this loop. It is authored prose today and could become an
 `aac:generated` region once a corresponding LikeC4 view (`docs/diagrams/aac-dac-loop.c4`) is created.
 
-![AaC+DaC feedback loop: author writes ADR + LikeC4 DSL + ARCHITECTURE.md with aac fences; pre-commit golden-rule gate, CI jobs, and architect-validator feed FAILs into the tech-debt ledger; sentinel performs periodic AC-dimension audits; feedback routes back to author for resolution](diagrams/aac-dac-feedback-loop/rendered/aac-dac-feedback-loop.svg)
+![AaC+DaC feedback loop: author writes ADR + LikeC4 DSL + DESIGN.md with aac fences; pre-commit golden-rule gate, CI jobs, and architect-validator feed FAILs into the tech-debt ledger; sentinel performs periodic AC-dimension audits; feedback routes back to author for resolution](diagrams/aac-dac-feedback-loop/rendered/aac-dac-feedback-loop.svg)
 
 ## Adopting It
 
@@ -211,7 +211,7 @@ regions into established documents requires deliberate author review.
 **What lands per project**: `fitness/` scaffold, `.github/workflows/architecture.yml` (rendered from
 `claude/aac-templates/architecture.yml.tmpl`), `docs/diagrams/` directory, Block D fragment in
 `.git/hooks/pre-commit` (invokes `check_aac_golden_rule.py` via `${PLUGIN_ROOT}` — no per-project copy),
-and a commented-out fence example seeded into `ARCHITECTURE.md` when present.
+and a commented-out fence example seeded into `.ai-state/DESIGN.md` when present.
 
 **What is global** (no per-project install): the SDD skill's traceability convention, the fence validator
 and golden-rule scripts (canonical in the plugin path), the sentinel agent's AC10–AC12 audit, and the
@@ -219,7 +219,7 @@ architect-validator agent (dec-113).
 
 > [!NOTE]
 > AC10–AC12 and the architect-validator activate conditionally on substrate presence. A project with no `.c4`
-> files and no fenced `ARCHITECTURE.md` gets INFO notes, not false positives.
+> files and no fenced `.ai-state/DESIGN.md` gets INFO notes, not false positives.
 
 ## See Also
 

@@ -29,7 +29,7 @@ on:
     paths:
       - 'docs/diagrams/**'
       - '**/*.c4'
-      - '**/ARCHITECTURE.md'
+      - '**/DESIGN.md'
       - 'docs/architecture.md'
       - '.ai-state/decisions/**'
       - 'fitness/**'
@@ -40,7 +40,7 @@ on:
     paths:
       - 'docs/diagrams/**'
       - '**/*.c4'
-      - '**/ARCHITECTURE.md'
+      - '**/DESIGN.md'
       - 'docs/architecture.md'
       - '.ai-state/decisions/**'
       - 'fitness/**'
@@ -219,7 +219,7 @@ jobs:
           AAC_FENCE_VALIDATOR_LIKEC4: disabled
         run: |
           find . -path ./.git -prune -o \
-            \( -name 'ARCHITECTURE.md' -o -path './docs/architecture.md' \) \
+            \( -name 'DESIGN.md' -o -path './docs/architecture.md' \) \
             -print 2>/dev/null \
             | xargs -r -I {} python3 scripts/aac_fence_validator.py {}
 
@@ -235,7 +235,7 @@ jobs:
             1. Read agents/architect-validator.md for the full pre-merge protocol
             2. Identify all architectural files changed in this PR:
                run `git diff --name-only origin/${{ github.base_ref }}...HEAD`
-            3. For each changed ARCHITECTURE.md or .c4 file, run the pre-merge
+            3. For each changed DESIGN.md or .c4 file, run the pre-merge
                checks defined in the agent: model↔code drift, ADR↔model drift,
                generated-region drift, fence validity
             4. For changes to .ai-state/decisions/**, verify ADR cross-references

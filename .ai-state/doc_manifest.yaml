@@ -1,6 +1,6 @@
 schema_version: 1
 generator_version: praxion-0.7.0
-generated_at: '2026-06-17T01:44:54Z'
+generated_at: '2026-06-24T23:26:27Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -35,7 +35,7 @@ surfaces:
   path: README_DEV.md
   type: markdown
   title: Developer Guide
-  last_modified: '2026-06-11'
+  last_modified: '2026-06-24'
   renderer: default_markdown
   summary: Contributor and developer documentation for Praxion. For installation and usage, see [`README.md`](README.md).
   surfaces_referenced:
@@ -62,9 +62,9 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-06-05'
+  last_modified: '2026-06-23'
   renderer: default_markdown
-  summary: '- integrate Nebius as a managed neocloud provider'
+  summary: '- **ci**: graceful auth fallback for security review - **ci**: disable empty uv cache in non-uv jobs - **ci**: normalize d2 stamp to end diagram drift'
 - id: docs-readme
   path: docs/README.md
   type: markdown
@@ -105,7 +105,7 @@ surfaces:
   path: docs/aac-dac.md
   type: markdown
   title: Architecture-as-Code + Documentation-as-Code
-  last_modified: '2026-05-12'
+  last_modified: '2026-06-24'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -134,7 +134,7 @@ surfaces:
   path: docs/architecture-diagrams.md
   type: markdown
   title: Architecture Diagrams
-  last_modified: '2026-05-08'
+  last_modified: '2026-06-20'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -147,7 +147,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-06-16'
+  last_modified: '2026-06-22'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -176,7 +176,7 @@ surfaces:
   path: docs/claude-ecosystem-learning-resources.md
   type: markdown
   title: Claude Ecosystem Learning Resources
-  last_modified: '2026-05-19'
+  last_modified: '2026-06-20'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -314,7 +314,7 @@ surfaces:
   path: docs/context-prj-comparison-2026-05-12/sources/01-forrestchang-andrej-karpathy-skills.md
   type: markdown
   title: 'Analysis: forrestchang/andrej-karpathy-skills'
-  last_modified: '2026-05-12'
+  last_modified: '2026-06-20'
   renderer: default_markdown
   summary: '**Type:** Claude Code plugin / CLAUDE.md template / skills pack **Maturity signals:** 126,824 stars, 12,888 forks, 88 open issues, last push 2026-04-20, created 2026-01-27 (less than 4 months
     old at analysis date), 7 contributors (main author: forrestchang / Jiayuan), no explicit...'
@@ -329,7 +329,7 @@ surfaces:
   path: docs/context-prj-comparison-2026-05-12/sources/03-danielrosehill-repo-managers-claudemd.md
   type: markdown
   title: 'Analysis: danielrosehill/Claude-Code-Repo-Managers-ClaudeMD'
-  last_modified: '2026-05-12'
+  last_modified: '2026-06-20'
   renderer: default_markdown
   summary: '**Type:** Template library + deployment tooling **Maturity signals:** 2 stars, 0 forks, 0 open issues, last commit 2025-10-25, 1 contributor (Daniel Rosehill), MIT license **Language:** Shell
     (100%) **Topics:** `claude-code`, `slash-commands`'
@@ -393,7 +393,7 @@ surfaces:
   path: docs/existing-project-onboarding.md
   type: markdown
   title: Existing-Project Onboarding
-  last_modified: '2026-06-11'
+  last_modified: '2026-06-20'
   diataxis: tutorial
   audience: developer
   renderer: tutorial_shell
@@ -422,7 +422,7 @@ surfaces:
   path: docs/getting-started.md
   type: markdown
   title: Getting Started
-  last_modified: '2026-06-11'
+  last_modified: '2026-06-24'
   diataxis: tutorial
   audience: developer
   renderer: tutorial_shell
@@ -458,6 +458,48 @@ surfaces:
   - docs-existing-project-onboarding
   - docs-external-api-docs
   - docs-ml-training-onramp
+- id: docs-independent-analysis-cursor-ci-autofix-research-brief
+  path: docs/independent-analysis/cursor-ci-autofix-research-brief.md
+  type: markdown
+  title: "Research Brief \u2014 Autonomous CI/PR Failure Remediation via the Cursor Agent (installable across Praxion + managed projects)"
+  last_modified: '2026-06-20'
+  renderer: default_markdown
+  summary: "> Paste this whole brief as the task for a fresh Praxion research session. Recommended invocation: `/deep-research` with this brief as the argument, or spawn the `i-am:researcher` agent (escalate\
+    \ to the contested-evidence Opus mode \u2014 this has \u22653 plausible architectures with confl..."
+- id: docs-independent-analysis-linear-integration-analysis
+  path: docs/independent-analysis/linear-integration-analysis.md
+  type: markdown
+  title: "Integrating Linear into Praxion \u2014 Feasibility, Vision, and Approach"
+  last_modified: '2026-06-24'
+  audience: architect / maintainer
+  renderer: default_markdown
+  summary: "> **Scope of this document.** This is an analysis, not an implementation. It answers three > questions in order \u2014 (1) *does it make sense?*, (2) *is it possible?*, (3) *how would we do\
+    \ > it?* \u2014 and then lays out a phased plan. No code, no canonical blocks, no onboarding edits > a..."
+  frontmatter:
+    title: "Integrating Linear into Praxion \u2014 Feasibility, Vision, and Approach"
+    type: independent-analysis
+    audience: architect / maintainer
+    status: analysis (no implementation)
+    date: 2026-06-24
+    author: Francisco Perez-Sorrosal (analysis drafted with Cursor agent)
+    verification: claims tagged VERIFIED / SINGLE-SOURCE / ASSUMPTION / DESIGN
+- id: docs-independent-analysis-praxion-artifact-lifecycle-audit
+  path: docs/independent-analysis/praxion-artifact-lifecycle-audit.md
+  type: markdown
+  title: Praxion Generated Artifact Lifecycle Audit
+  last_modified: '2026-06-24'
+  audience: architect / context-engineer / implementation-planner / maintainer
+  renderer: default_markdown
+  summary: '> **Scope of this document.** This is an analysis, not an implementation. It audits the generated > artifacts Praxion uses to run projects and pipelines: ephemeral `.ai-work/<task-slug>/...`
+    > process documents, persistent `.ai-state/...` traceability/state documents, and adjacen...'
+  frontmatter:
+    title: Praxion Generated Artifact Lifecycle Audit
+    type: independent-analysis
+    audience: architect / context-engineer / implementation-planner / maintainer
+    status: analysis (no implementation)
+    date: 2026-06-24
+    author: Francisco Perez-Sorrosal (analysis drafted with Cursor agent)
+    verification: claims tagged VERIFIED / INFERRED / RISK / RECOMMENDATION
 - id: docs-metrics-readme
   path: docs/metrics/README.md
   type: markdown
@@ -583,7 +625,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-06-16'
+  last_modified: '2026-06-22'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -616,7 +658,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-06-11'
+  last_modified: '2026-06-19'
   renderer: default_markdown
   summary: "**Schema**: 14 row fields + 1 structural `dedup_key`. See [`skills/software-planning/references/tech-debt-ledger.md`](../skills/software-planning/references/tech-debt-ledger.md) \xA7 `TECH_DEBT_LEDGER.md`\
     \ for field definitions, enum values, the owner-role heuristic, and the post-mer..."
@@ -633,7 +675,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-06-04'
+  last_modified: '2026-06-22'
   renderer: default_markdown
   summary: Append-only tier-selection log. Each Standard/Full pipeline (and every tier on completion) appends one row so the sentinel can analyze recommendation-vs-actual match rate (CA01/CA02) over time.
     See `rules/swe/swe-agent-coordination-protocol.md` and `rules/swe/agent-intermediate-d...
@@ -1155,7 +1197,7 @@ surfaces:
   path: .ai-state/decisions/020-architecture-md-living-artifact.md
   type: markdown
   title: Living ARCHITECTURE.md artifact in .ai-state/
-  last_modified: '2026-04-10'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: Persistent architecture document maintained by pipeline agents via section ownership, stored in .ai-state/, following the SYSTEM_DEPLOYMENT.md precedent
   frontmatter:
@@ -1195,7 +1237,7 @@ surfaces:
   path: .ai-state/decisions/021-dual-audience-architecture-docs.md
   type: markdown
   title: Dual-audience architecture documentation
-  last_modified: '2026-04-12'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: Split architecture docs into design-target (.ai-state/ARCHITECTURE.md) and code-verified navigation guide (docs/architecture.md) with distinct validation models
   frontmatter:
@@ -1407,7 +1449,7 @@ surfaces:
   path: .ai-state/decisions/028-diagram-conventions-path-scoping.md
   type: markdown
   title: Narrow `rules/writing/diagram-conventions.md` path-scope from `**/*.md` to doc-authoring surfaces
-  last_modified: '2026-04-12'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: 'Replace `paths: "**/*.md"` with a narrower list (docs/, README, ARCHITECTURE, SYSTEM_DEPLOYMENT, .ai-state/, design docs) to reclaim ~2,584 chars on non-documentation sessions'
   frontmatter:
@@ -1549,7 +1591,7 @@ surfaces:
   path: .ai-state/decisions/034-roadmap-budget-offset-via-prune.md
   type: markdown
   title: Zero-net always-loaded budget impact via prune of redundant ASCII Coordination Pipeline block
-  last_modified: '2026-04-12'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: "Add cartographer Available Agents row + Delegation Checklist + proactive-use bullet (~570 chars); offset by pruning redundant ASCII Coordination Pipeline block (~430 chars) and consolidating\
     \ proactive-use examples (~120 chars). Net \u2264 0"
@@ -1607,7 +1649,7 @@ surfaces:
   path: .ai-state/decisions/036-lens-framework-project-derived.md
   type: markdown
   title: Lens framework is project-derived; SPIRIT is an exemplar, not the canonical default
-  last_modified: '2026-04-12'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: Replace hardcoded six-dimension SPIRIT lens with a 4-step derivation methodology that composes a project-specific 4-8 lens set from project values + domain constraints + exemplar lens sets (SPIRIT,
     DORA, SPACE, FAIR, CNCF, Custom)
@@ -1640,7 +1682,7 @@ surfaces:
   path: .ai-state/decisions/037-opportunities-forward-lines.md
   type: markdown
   title: Opportunities (Forward Lines) as a first-class roadmap section; Motivation field generalization
-  last_modified: '2026-04-12'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: "Add \xA74 Opportunities (forward lines of work \u2014 non-deficit items) to ROADMAP_TEMPLATE.md; generalize Improvement Roadmap item field from `Problem addressed` (Weakness-only) to `Motivation`\
     \ (Weakness | Opportunity | Evolution trend | Strategic bet | User request | Prior item). 9-section scaffold becomes 10-section"
@@ -1829,7 +1871,7 @@ surfaces:
   path: .ai-state/decisions/043-behavioral-contract-layer.md
   type: markdown
   title: Introduce a four-behavior Agent Behavioral Contract as a first-class operational pillar
-  last_modified: '2026-04-13'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: Name Surface Assumptions, Register Objection, Stay Surgical, Simplicity First in an always-loaded rule, cross-reference from CLAUDE.md at both scopes, introduce as README fifth Guiding Principle,
     inject one-line pointer into 10 pipeline agents, and enforce via six named failure-mode tags in verification reports
@@ -2715,7 +2757,7 @@ surfaces:
   path: .ai-state/decisions/071-ledger-living-artifact.md
   type: markdown
   title: Tech-debt ledger as a living artifact in `.ai-state/`
-  last_modified: '2026-05-08'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: "Introduce `.ai-state/TECH_DEBT_LEDGER.md` as a single living, append-only ledger for grounded debt findings \u2014 one artifact, status updates in place, dedup-key for worktree merge \u2014\
     \ following the SYSTEM_DEPLOYMENT/ARCHITECTURE living-document precedent."
@@ -3231,7 +3273,7 @@ surfaces:
   path: .ai-state/decisions/087-pilot-strategy-trunk-only-then-defer-behavioral-pilot.md
   type: markdown
   title: "Pilot strategy \u2014 trunk-only at this pipeline; defer behavioral pilot to first consumer project"
-  last_modified: '2026-05-08'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: Land the test-topology trunk artifacts (schema, sentinel dimension, ledger class, document conventions) without activating any behavioral pilot in Praxion; the first behavioral pilot occurs in
     the first consumer project that adopts the protocol.
@@ -3456,7 +3498,7 @@ surfaces:
   path: .ai-state/decisions/094-render-storage-commit-both.md
   type: markdown
   title: Commit both diagram source DSL and rendered SVG; regenerate via repo hook
-  last_modified: '2026-05-08'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: For C4-architectural diagrams, commit the LikeC4 source `.c4`, the generated `.d2`, and the rendered `.svg` together; a pre-commit hook regenerates derived artifacts when source changes; CI validates
     freshness as a backstop.
@@ -3492,7 +3534,7 @@ surfaces:
   path: .ai-state/decisions/095-toolchain-likec4-d2.md
   type: markdown
   title: LikeC4 + D2 chosen as C4-architectural diagramming toolchain
-  last_modified: '2026-05-08'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: Adopt LikeC4 DSL + native D2 codegen + D2-rendered SVG for C4-architectural diagrams; reject Structurizr CLI (archived) and Structurizr vNext (D2 export bundling unconfirmed) and Mermaid C4 (no
     SSOT/multi-view).
@@ -3529,7 +3571,7 @@ surfaces:
   path: .ai-state/decisions/096-structurizr-d2-diagrams-step-ordering-constraint.md
   type: markdown
   title: "Step ordering constraint \u2014 rule update must commit before any .c4/.d2 file"
-  last_modified: '2026-05-08'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: Rule update (rules/writing/diagram-conventions.md) must land in its own commit before any .c4, .d2, or .svg file is committed; hook script must land before live-file migrations.
   frontmatter:
@@ -3588,7 +3630,7 @@ surfaces:
   path: .ai-state/decisions/098-aac-fence-contract.md
   type: markdown
   title: Hybrid generated/authored markdown contract via fenced HTML-comment regions
-  last_modified: '2026-04-30'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: Standardize <!-- aac:generated source=... view=... --> / <!-- aac:authored owner=... --> / <!-- aac:end --> fences in ARCHITECTURE.md and docs/architecture.md, with a small Python validator detecting
     drift, broken sources, and unbalanced fences. Untagged content is authored-by-default for backward compatibility.
@@ -3653,7 +3695,7 @@ surfaces:
   path: .ai-state/decisions/100-architect-validator-charter.md
   type: markdown
   title: "architect-validator agent \u2014 pre-merge / on-demand structural validator for code\u2194DSL\u2194ADR coherence"
-  last_modified: '2026-04-30'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: "Charter a new gated agent (model tier H/opus) that verifies the code\u2194DSL\u2194ADR triangle on architectural-touch slices, produces ARCHITECTURE_VALIDATION.md plus tech-debt-ledger rows\
     \ on FAIL, runs in two modes (on-demand + pre-merge), and respects strict boundaries against verifier (behavior), doc-engineer (markdown), sentinel (periodic), cicd-engineer (harness)."
@@ -3839,7 +3881,7 @@ surfaces:
   path: .ai-state/decisions/106-aac-architecture-ci-pipeline.md
   type: markdown
   title: "Architecture CI pipeline \u2014 three parallel jobs invoking architect-validator on architectural-touch PRs"
-  last_modified: '2026-05-08'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: Ship .github/workflows/architecture.yml with three parallel jobs (regenerate-and-diff, fitness-functions, dsl-validate); dsl-validate invokes the architect-validator agent via anthropics/claude-code-action;
     path-filter triggers prevent non-architectural PRs from running; mechanical fence check runs first to fail fast and avoid agent API spend.
@@ -3903,7 +3945,7 @@ surfaces:
   path: .ai-state/decisions/108-aac-golden-rule-enforcement-hook.md
   type: markdown
   title: Golden-rule enforcement at commit time via standalone script invoked from pre-commit hook
-  last_modified: '2026-05-08'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: 'Ship scripts/check_aac_golden_rule.py (stdlib, idempotent, side-effect-free) invoked from git-pre-commit-hook.sh Block D to detect generated-output edits without source changes; line-adjacent
     # aac-override: <reason> escape hatch; sentinel EC dimension reuses the same script in audit mode.'
@@ -3938,7 +3980,7 @@ surfaces:
   path: .ai-state/decisions/109-aac-likec4-querying-skill.md
   type: markdown
   title: "likec4-querying skill \u2014 path-scoped progressive-disclosure rubric for MCP-vs-direct-read decisions"
-  last_modified: '2026-05-08'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: "Ship skills/likec4-querying/SKILL.md (\u2264200 lines, path-scoped to .c4 / ARCHITECTURE.md / docs/architecture.md / docs/diagrams) with a one-table decision rubric covering eight common architecture-authoring\
     \ tasks, plus a references/mcp-tool-recipes.md catalog with one worked example per likec4 MCP tool."
@@ -4010,7 +4052,7 @@ surfaces:
   path: .ai-state/decisions/112-aac-dac-traceability-sentinel-ac-traceability-checks.md
   type: markdown
   title: "Sentinel AC-dimension extension \u2014 three conditional-activation checks for fence integrity, model\u2194markdown agreement, and traceability orphans"
-  last_modified: '2026-05-01'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: "Extend the sentinel's existing AC dimension with three conditional-activation checks (AC10 fence integrity, AC11 model\u2194markdown agreement, AC12 traceability orphans) mirroring the TT dimension's\
     \ activation pattern. Reuses scripts/aac_fence_validator.py and the LikeC4 MCP query-by-metadata; introduces no new tooling. AC12 depends on the bidirectional convention defined in dec-111."
@@ -4040,7 +4082,7 @@ surfaces:
   path: .ai-state/decisions/113-aac-dac-onboarding-aac-onboarding-tier.md
   type: markdown
   title: "AaC tier integrates into onboarding via plugin-path-resolved scripts and templated artifacts \u2014 greenfield default-ON, existing-project default-OFF"
-  last_modified: '2026-05-08'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: 'Idea 8 wires the v1+v1.1+W4 AaC stack into /onboard-project Phase 8b (default-OFF, opt-in gate) and /new-project + new_project.sh (default-ON, --no-aac opt-out). Per-project surfaces are minimal:
     fence-region template seed, fitness/ scaffold, golden-rule pre-commit Block D resolved to plugin-installed scripts, architecture.yml workflow with placeholder substitution, and <doc-dir>/diagrams/ directory
@@ -4303,7 +4345,7 @@ surfaces:
   path: .ai-state/decisions/121-pipeline-dashboard-dashboard-claudemd-placement.md
   type: markdown
   title: "Pipeline Dashboard CLAUDE.md placement \u2014 Working Here mention, no philosophical block"
-  last_modified: '2026-05-08'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: Mention streamlit_app/ in Praxion's CLAUDE.md "Working Here" section to satisfy sentinel EC03; the SYSTEMS_PLAN's Goal section is the canonical philosophical statement, not a separate CLAUDE.md
     block.
@@ -4606,7 +4648,7 @@ surfaces:
   path: .ai-state/decisions/132-rename-architecture-to-design.md
   type: markdown
   title: "Rename .ai-state/ARCHITECTURE.md to .ai-state/DESIGN.md for Di\xE1taxis clarity"
-  last_modified: '2026-05-08'
+  last_modified: '2026-06-24'
   renderer: adr_card
   summary: "Rename the architect-facing design-target document from ARCHITECTURE.md to DESIGN.md to make audience and Di\xE1taxis quadrant unambiguous from filename alone"
   frontmatter:
@@ -4627,8 +4669,6 @@ surfaces:
     branch: docs-strategy-p1-foundation
     pipeline_tier: standard
     affected_files:
-    - .ai-state/ARCHITECTURE.md
-    - .ai-state/ARCHITECTURE_CHANGELOG.md
     - .ai-state/DESIGN.md
     - .ai-state/DESIGN_CHANGELOG.md
     - docs/architecture.md
@@ -6204,7 +6244,7 @@ surfaces:
   path: .ai-state/decisions/183-likec4-feedback-loop-modeling.md
   type: markdown
   title: "LikeC4 feedback-loop modeling \u2014 multiple focused views, tagged edges, document-substrate handoffs"
-  last_modified: '2026-05-14'
+  last_modified: '2026-06-20'
   renderer: adr_card
   summary: Model the Praxion agent pipeline's two feedback loops (CIS forward, Rework backward) as tag-classified edges over a per-agent, per-document graph projected through multiple focused LikeC4 views
     rather than a single omnibus diagram; keep agent-to-agent communication routed through .ai-work/ document elements to match the coordination protocol's "agents communicate through shared documents,
@@ -7784,11 +7824,698 @@ surfaces:
     - dashboard_app/src/server/view-models/documentation.ts
     - dashboard_app/src/app/documentation/page.tsx
     re_affirms: dec-226
+- id: ai-state-decisions-229-solid-ai-era-embedding-balanced-coupling-principle
+  path: .ai-state/decisions/229-solid-ai-era-embedding-balanced-coupling-principle.md
+  type: markdown
+  title: Embed SOLID for the AI era as the "Balanced Coupling" principle + software-design-principles skill
+  last_modified: '2026-06-17'
+  renderer: adr_card
+  summary: Add a dedicated "Balanced Coupling" philosophy principle and a canonical software-design-principles skill that reframes SOLID as knowledge-flow heuristics for the AI era, composed by software-planning
+    and refactoring and enforced via fitness functions.
+  frontmatter:
+    id: dec-229
+    title: Embed SOLID for the AI era as the "Balanced Coupling" principle + software-design-principles skill
+    status: accepted
+    category: architectural
+    date: 2026-06-16
+    summary: Add a dedicated "Balanced Coupling" philosophy principle and a canonical software-design-principles skill that reframes SOLID as knowledge-flow heuristics for the AI era, composed by software-planning
+      and refactoring and enforced via fitness functions.
+    tags:
+    - philosophy
+    - principles
+    - solid
+    - coupling
+    - cohesion
+    - design
+    - ai-era
+    - skill
+    - agent-as-consumer
+    made_by: user
+    pipeline_tier: standard
+    branch: worktree-solid-ai-era-embedding
+    affected_files:
+    - claude/config/CLAUDE.md.tmpl
+    - skills/software-design-principles/
+    - skills/software-planning/SKILL.md
+    - skills/refactoring/SKILL.md
+    - skills/architectural-fitness-functions/SKILL.md
+    - agents/systems-architect.md
+    - agents/verifier.md
+- id: ai-state-decisions-230-calibrated-confidence-schema
+  path: .ai-state/decisions/230-calibrated-confidence-schema.md
+  type: markdown
+  title: Calibrated-confidence schema uses verbal tiers anchored to numeric ranges plus GRADE downgrade factors
+  last_modified: '2026-06-18'
+  renderer: adr_card
+  summary: Confidence is expressed as high (>80%) / med (40-80%) / low (<40%) with GRADE-style downgrade basis, defined once in the multi-perspective-analysis skill and applied to verifier findings and
+    per-claim researcher annotations.
+  frontmatter:
+    id: dec-230
+    title: Calibrated-confidence schema uses verbal tiers anchored to numeric ranges plus GRADE downgrade factors
+    status: accepted
+    category: behavioral
+    date: 2026-06-18
+    summary: Confidence is expressed as high (>80%) / med (40-80%) / low (<40%) with GRADE-style downgrade basis, defined once in the multi-perspective-analysis skill and applied to verifier findings and
+      per-claim researcher annotations.
+    tags:
+    - confidence
+    - calibration
+    - grade
+    - sherman-kent
+    - verifier
+    - researcher
+    - storm-integration
+    made_by: agent
+    agent_type: systems-architect
+    branch: worktree-storm-integration
+    pipeline_tier: full
+    affected_files:
+    - skills/multi-perspective-analysis/references/calibrated-confidence.md
+    - agents/verifier.md
+    - agents/researcher.md
+    affected_reqs:
+    - REQ-06
+- id: ai-state-decisions-231-defer-eval-lens-and-ach-matrix
+  path: .ai-state/decisions/231-defer-eval-lens-and-ach-matrix.md
+  type: markdown
+  title: Defer the agentic eval-lens and the full ACH matrix
+  last_modified: '2026-06-18'
+  renderer: adr_card
+  summary: The project_profile.yaml-keyed agentic eval-lens and the full ACH matrix are explicitly out of scope for storm-integration; both are recorded as deferred with the signals that would justify revisiting.
+  frontmatter:
+    id: dec-231
+    title: Defer the agentic eval-lens and the full ACH matrix
+    status: accepted
+    category: architectural
+    date: 2026-06-18
+    summary: The project_profile.yaml-keyed agentic eval-lens and the full ACH matrix are explicitly out of scope for storm-integration; both are recorded as deferred with the signals that would justify
+      revisiting.
+    tags:
+    - deferral
+    - eval-lens
+    - ach-matrix
+    - project-profile
+    - agentic
+    - storm-integration
+    made_by: agent
+    agent_type: systems-architect
+    branch: worktree-storm-integration
+    pipeline_tier: full
+    affected_files: []
+    affected_reqs:
+    - REQ-09
+    superseded_by: dec-232
+    dissent: 'A reader could argue the agentic eval-lens should ship now because the coverage gap (no multi-perspective eval-coverage check before plan approval) is real today for any managed agentic project.
+      Held minority view: revisit when a managed agentic project actually runs the pipeline and the project_profile.yaml infrastructure exists.'
+- id: ai-state-decisions-232-di-disconfirmation-replaces-ach
+  path: .ai-state/decisions/232-di-disconfirmation-replaces-ach.md
+  type: markdown
+  title: Dialectical Inquiry + two-tier Disconfirmation replaces an ACH matrix for ADR deliberation
+  last_modified: '2026-06-18'
+  renderer: adr_card
+  summary: ADR deliberation uses a gated Dialectical-Inquiry sub-step + an always-on Tier-A Disconfirmation block + a gated Tier-B cross-model challenge; the full ACH matrix is not adopted.
+  frontmatter:
+    id: dec-232
+    title: Dialectical Inquiry + two-tier Disconfirmation replaces an ACH matrix for ADR deliberation
+    status: accepted
+    category: architectural
+    date: 2026-06-18
+    summary: ADR deliberation uses a gated Dialectical-Inquiry sub-step + an always-on Tier-A Disconfirmation block + a gated Tier-B cross-model challenge; the full ACH matrix is not adopted.
+    tags:
+    - adr
+    - dialectical-inquiry
+    - disconfirmation
+    - devils-advocacy
+    - cross-model
+    - storm-integration
+    made_by: agent
+    agent_type: systems-architect
+    branch: worktree-storm-integration
+    pipeline_tier: full
+    affected_files:
+    - agents/systems-architect.md
+    - rules/swe/adr-conventions.md
+    - skills/software-planning/references/adr-authoring-protocols.md
+    - skills/software-planning/references/design-synthesis.md
+    affected_reqs:
+    - REQ-03
+    - REQ-04
+    - REQ-05
+    supersedes: dec-231
+    dissent: 'A reader who wants exhaustive option enumeration may argue DI (one genuine rival) is narrower than an ACH matrix (all plausible hypotheses scored by disconfirmation). Held minority view: revisit
+      if decisions with >2 genuinely-live options recur and DI''s single-rival framing demonstrably loses coverage.'
+- id: ai-state-decisions-233-extend-context-engineering-principle
+  path: .ai-state/decisions/233-extend-context-engineering-principle.md
+  type: markdown
+  title: Extend the Context Engineering principle rather than create a new principle for multi-perspective deliberation
+  last_modified: '2026-06-18'
+  renderer: adr_card
+  summary: Add one clause about structurally-independent vantage points to the existing Context Engineering principle (cross-ref Balanced Coupling); do not create an "Epistemic Diversity" principle.
+  frontmatter:
+    id: dec-233
+    title: Extend the Context Engineering principle rather than create a new principle for multi-perspective deliberation
+    status: accepted
+    category: architectural
+    date: 2026-06-18
+    summary: Add one clause about structurally-independent vantage points to the existing Context Engineering principle (cross-ref Balanced Coupling); do not create an "Epistemic Diversity" principle.
+    tags:
+    - philosophy
+    - context-engineering
+    - multi-perspective
+    - storm-integration
+    - always-loaded
+    made_by: agent
+    agent_type: systems-architect
+    branch: worktree-storm-integration
+    pipeline_tier: full
+    affected_files:
+    - claude/config/CLAUDE.md
+    affected_reqs:
+    - REQ-08
+    - REQ-09
+    dissent: 'A reader who values rhetorical salience may argue a one-clause extension under-signals the importance of structural-independence vs. a named heading. Held minority view: revisit if usage telemetry
+      shows the clause is ignored where a heading would not be.'
+- id: ai-state-decisions-234-multi-perspective-analysis-skill
+  path: .ai-state/decisions/234-multi-perspective-analysis-skill.md
+  type: markdown
+  title: "multi-perspective-analysis skill \u2014 GO as a composition layer (Step-1 kill-switch verdict)"
+  last_modified: '2026-06-18'
+  renderer: adr_card
+  summary: Create skills/multi-perspective-analysis as a thin composition layer (pointers + shared schema definitions, mirroring design-synthesis.md), HARD-gated to high-stakes stages; not a knowledge layer,
+    not embedded-per-agent.
+  frontmatter:
+    id: dec-234
+    title: "multi-perspective-analysis skill \u2014 GO as a composition layer (Step-1 kill-switch verdict)"
+    status: accepted
+    category: architectural
+    date: 2026-06-18
+    summary: Create skills/multi-perspective-analysis as a thin composition layer (pointers + shared schema definitions, mirroring design-synthesis.md), HARD-gated to high-stakes stages; not a knowledge
+      layer, not embedded-per-agent.
+    tags:
+    - skill
+    - multi-perspective
+    - composition-layer
+    - heterogeneous-models
+    - storm-integration
+    - gating
+    made_by: agent
+    agent_type: systems-architect
+    branch: worktree-storm-integration
+    pipeline_tier: full
+    affected_files:
+    - skills/multi-perspective-analysis/SKILL.md
+    - skills/multi-perspective-analysis/references/calibrated-confidence.md
+    - skills/multi-perspective-analysis/references/lens-independence.md
+    - skills/multi-perspective-analysis/references/heterogeneous-orchestration.md
+    - skills/multi-perspective-analysis/references/disconfirmation-tiers.md
+    affected_reqs:
+    - REQ-05
+    - REQ-06
+    - REQ-08
+    - REQ-09
+    dissent: 'A reader applying maximal Simplicity-First may argue four agents sharing a structure is too thin to justify a whole skill, and the shared schemas could live in software-planning/references/
+      without a new skill. Held minority view: revisit if the skill''s SKILL.md body never grows past the schema pointers it hosts at v1.'
+- id: ai-state-decisions-235-intake-clarity-gate
+  path: .ai-state/decisions/235-intake-clarity-gate.md
+  type: markdown
+  title: Intake Clarity Gate + goal-disambiguation skill for task-intent disambiguation
+  last_modified: '2026-06-18'
+  renderer: adr_card
+  summary: Add a clarity-axis intake gate (orthogonal to size-based tiering) that disambiguates user intent and captures measurable Key Signals into TASK_BRIEF.md before the pipeline commits.
+  frontmatter:
+    id: dec-235
+    title: Intake Clarity Gate + goal-disambiguation skill for task-intent disambiguation
+    status: accepted
+    category: architectural
+    date: 2026-06-18
+    summary: Add a clarity-axis intake gate (orthogonal to size-based tiering) that disambiguates user intent and captures measurable Key Signals into TASK_BRIEF.md before the pipeline commits.
+    tags:
+    - intake
+    - disambiguation
+    - goal-elicitation
+    - okr
+    - acceptance-criteria
+    - conversation-checkpoints
+    - calibration
+    made_by: agent
+    agent_type: main-orchestrator
+    branch: feat-goal-disambiguation-intake
+    pipeline_tier: standard
+    affected_files:
+    - skills/goal-disambiguation/SKILL.md
+    - skills/goal-disambiguation/references/worked-examples.md
+    - rules/swe/swe-agent-coordination-protocol.md
+    - skills/spec-driven-development/references/calibration-procedure.md
+    - rules/swe/agent-intermediate-documents.md
+    - agents/researcher.md
+    - agents/systems-architect.md
+    - agents/verifier.md
+    dissent: A disciplined orchestrator already practicing Surface Assumptions may treat the gate as redundant ceremony, and a poorly-calibrated gate risks re-introducing the interrogation the behavioral
+      contract explicitly forbids.
+- id: ai-state-decisions-236-decline-verified-merge-queue
+  path: .ai-state/decisions/236-decline-verified-merge-queue.md
+  type: markdown
+  title: Decline verified merge queue (Gastown Refinery) at Praxion's target operating point
+  last_modified: '2026-06-19'
+  renderer: adr_card
+  summary: Decline adopting a Bors-style bisecting verified merge queue; it solves an autonomous-20-30-agent-scale problem Praxion deliberately does not have. finalize-at-merge + worktree isolation + verifier
+    rework loop already gate quality for human-in-the-loop, low-concurrency operation.
+  frontmatter:
+    id: dec-236
+    title: Decline verified merge queue (Gastown Refinery) at Praxion's target operating point
+    status: accepted
+    category: architectural
+    date: 2026-06-19
+    summary: Decline adopting a Bors-style bisecting verified merge queue; it solves an autonomous-20-30-agent-scale problem Praxion deliberately does not have. finalize-at-merge + worktree isolation +
+      verifier rework loop already gate quality for human-in-the-loop, low-concurrency operation.
+    tags:
+    - merge-queue
+    - refinery
+    - gastown
+    - scope
+    - simplicity
+    - competitive
+    made_by: agent
+    agent_type: systems-architect
+    branch: main
+    pipeline_tier: standard
+    affected_files: []
+    dissent: If Praxion ever raises its autonomous-concurrency ceiling well beyond a few human-supervised worktrees, a verified merge queue stops being ceremony and starts paying for itself.
+- id: ai-state-decisions-237-sandbook-subsumes-beads-memory-direction
+  path: .ai-state/decisions/237-sandbook-subsumes-beads-memory-direction.md
+  type: markdown
+  title: "Memory direction \u2014 sandbook subsumes beads-class capability; defer-by-dependency, not by-priority"
+  last_modified: '2026-06-19'
+  renderer: adr_card
+  summary: Ratify that sandbook (five-tier, vector+graph, consolidation, eval suite) strictly subsumes Gastown beads-class capability; agent memory is Praxion's
+  frontmatter:
+    id: dec-237
+    title: "Memory direction \u2014 sandbook subsumes beads-class capability; defer-by-dependency, not by-priority"
+    status: accepted
+    category: architectural
+    date: 2026-06-19
+    summary: Ratify that sandbook (five-tier, vector+graph, consolidation, eval suite) strictly subsumes Gastown beads-class capability; agent memory is Praxion's
+    tags:
+    - memory
+    - sandbook
+    - beads
+    - competitive
+    - deferral
+    - architecture
+    made_by: agent
+    agent_type: systems-architect
+    branch: main
+    pipeline_tier: standard
+    re_affirms: dec-225
+    affected_files:
+    - hooks/inject_decisions.py
+    - .ai-state/observations.jsonl
+    dissent: 'If sandbook stalls at alpha indefinitely, the #1 gap stays open and a lighter interim memory shim (even file-backed) might beat waiting.'
+- id: ai-state-decisions-238-spec-drift-detect-not-regenerate
+  path: .ai-state/decisions/238-spec-drift-detect-not-regenerate.md
+  type: markdown
+  title: "Proactive spec\u2194artifact drift \u2014 detect-and-surface, NOT auto-regenerate"
+  last_modified: '2026-06-19'
+  renderer: adr_card
+  summary: Adopt Kiro-style proactive spec-change awareness as Praxion's FIRST competitive improvement, but scoped to detect-and-surface drift (reusing traceability edges + sentinel), explicitly excluding
+    Kiro's automatic downstream regeneration to avoid cascade loops and silently-wrong generated artifacts.
+  frontmatter:
+    id: dec-238
+    title: "Proactive spec\u2194artifact drift \u2014 detect-and-surface, NOT auto-regenerate"
+    status: accepted
+    category: architectural
+    date: 2026-06-19
+    summary: Adopt Kiro-style proactive spec-change awareness as Praxion's FIRST competitive improvement, but scoped to detect-and-surface drift (reusing traceability edges + sentinel), explicitly excluding
+      Kiro's automatic downstream regeneration to avoid cascade loops and silently-wrong generated artifacts.
+    tags:
+    - drift
+    - spec-driven
+    - sentinel
+    - traceability
+    - hooks
+    - quality
+    - competitive
+    made_by: agent
+    agent_type: systems-architect
+    branch: main
+    pipeline_tier: standard
+    affected_files:
+    - .ai-work/<slug>/traceability.yml
+    - .ai-state/specs/
+    - agents/sentinel.md
+    dissent: If drift is rare in practice and verifier/sentinel already catch it acceptably, even a detection-only check is ceremony for change that won't come.
+- id: ai-state-decisions-239-where-it-lives
+  path: .ai-state/decisions/239-where-it-lives.md
+  type: markdown
+  title: "Spec-drift detection lives in a shared module with two consumers \u2014 sentinel check + pipeline checkpoint, NOT a git hook"
+  last_modified: '2026-06-19'
+  renderer: adr_card
+  summary: "Place proactive spec\u2194artifact drift detection in one side-effect-free detector module consumed by (A) a new sentinel SH07 check over archived specs and (B) the orchestrator's pre-verification\
+    \ checkpoint over in-flight traceability.yml \u2014 rejecting a git/PreToolUse hook because drift is a pipeline-state question that a commit-time gate gets wrong (partial-commit false positives) and\
+    \ that a checkpoint already answers correctly."
+  frontmatter:
+    id: dec-239
+    title: "Spec-drift detection lives in a shared module with two consumers \u2014 sentinel check + pipeline checkpoint, NOT a git hook"
+    status: accepted
+    category: architectural
+    date: 2026-06-19
+    summary: "Place proactive spec\u2194artifact drift detection in one side-effect-free detector module consumed by (A) a new sentinel SH07 check over archived specs and (B) the orchestrator's pre-verification\
+      \ checkpoint over in-flight traceability.yml \u2014 rejecting a git/PreToolUse hook because drift is a pipeline-state question that a commit-time gate gets wrong (partial-commit false positives) and\
+      \ that a checkpoint already answers correctly."
+    tags:
+    - drift
+    - spec-driven
+    - sentinel
+    - traceability
+    - hooks
+    - checkpoint
+    - quality
+    - competitive
+    made_by: agent
+    agent_type: systems-architect
+    branch: feat-spec-drift-detection
+    pipeline_tier: standard
+    re_affirms: dec-238
+    affected_files:
+    - scripts/spec_drift.py
+    - agents/sentinel.md
+    - skills/spec-driven-development/references/sentinel-spec-checks.md
+    - skills/software-planning/references/coordination-details.md
+    affected_reqs: []
+    dissent: "If in-flight drift is rare and the sentinel's post-hoc SH backstop already catches it acceptably, the in-flight checkpoint consumer is ceremony \u2014 a single sentinel dimension would suffice."
+- id: ai-state-decisions-240-reviewer-reuse-vs-new-agent
+  path: .ai-state/decisions/240-reviewer-reuse-vs-new-agent.md
+  type: markdown
+  title: Intra-step pair-review reuses the verifier in a scoped light-review mode rather than a new agent
+  last_modified: '2026-06-19'
+  renderer: adr_card
+  summary: "The intra-step risky-step reviewer is the existing verifier invoked in a scoped light-review mode (sonnet), not a 17th agent \u2014 independence comes from the spawn, not the agent type."
+  frontmatter:
+    id: dec-240
+    title: Intra-step pair-review reuses the verifier in a scoped light-review mode rather than a new agent
+    status: accepted
+    category: architectural
+    date: 2026-06-19
+    summary: "The intra-step risky-step reviewer is the existing verifier invoked in a scoped light-review mode (sonnet), not a 17th agent \u2014 independence comes from the spawn, not the agent type."
+    tags:
+    - pipeline
+    - verifier
+    - code-review
+    - model-routing
+    - reliability-gate
+    - simplicity-first
+    made_by: agent
+    agent_type: systems-architect
+    branch: feat-intra-step-review
+    pipeline_tier: standard
+    affected_files:
+    - agents/verifier.md
+    - skills/code-review/SKILL.md
+    - rules/swe/swe-agent-coordination-protocol.md
+    - rules/swe/agent-model-routing.md
+    - skills/software-planning/references/intra-step-review.md
+    dissent: A dedicated step-reviewer agent would keep the verifier single-responsibility and avoid mode-branching that could blur full-pipeline vs step-scoped assessment.
+- id: ai-state-decisions-241-principles-artifact
+  path: .ai-state/decisions/241-principles-artifact.md
+  type: markdown
+  title: "Per-project principles artifact \u2014 standalone `.ai-state/principles.yaml`, Shape B, per-principle gate severity"
+  last_modified: '2026-06-20'
+  renderer: adr_card
+  summary: 'Fold Kiro steering-files + Spec Kit Constitution + the deferred project_profile.yaml.principles idea into one standalone, optional, on-demand-read .ai-state/principles.yaml; gate per-principle
+    via a configurable advisory|blocking severity routed onto the verifier''s existing FAIL/WARN mechanics. Zero always-loaded cost.
+
+    '
+  frontmatter:
+    id: dec-241
+    title: "Per-project principles artifact \u2014 standalone `.ai-state/principles.yaml`, Shape B, per-principle gate severity"
+    status: accepted
+    category: architectural
+    date: 2026-06-20
+    summary: 'Fold Kiro steering-files + Spec Kit Constitution + the deferred project_profile.yaml.principles idea into one standalone, optional, on-demand-read .ai-state/principles.yaml; gate per-principle
+      via a configurable advisory|blocking severity routed onto the verifier''s existing FAIL/WARN mechanics. Zero always-loaded cost.
+
+      '
+    tags:
+    - governance
+    - principles
+    - verifier
+    - planner
+    - project-profile
+    - gating
+    - token-budget
+    made_by: agent
+    agent_type: systems-architect
+    branch: feat-project-principles
+    pipeline_tier: standard
+    affected_files:
+    - .ai-state/principles.yaml
+    - agents/verifier.md
+    - agents/implementation-planner.md
+    - skills/software-planning/references/project-principles.md
+    - skills/spec-driven-development/SKILL.md
+    dissent: "A standalone file ahead of project_profile.yaml creates a second principles read-site to fold in later; the cleaner one-location design would wait for the profile producer \u2014 at the cost\
+      \ of blocking a real capability gap indefinitely."
+- id: ai-state-decisions-242-principles-loader
+  path: .ai-state/decisions/242-principles-loader.md
+  type: markdown
+  title: Introduce `scripts/principles_loader.py` pure-function helper for principles YAML parsing
+  last_modified: '2026-06-20'
+  renderer: adr_card
+  summary: "Add a stdlib-only, side-effect-free principles_loader module (load_principles + scope_matches) following the spec_drift.py style, fixture-tested via TDD, to encapsulate the toleration contract\
+    \ (absent/empty/malformed \u2192 []) and scope-matching logic for both planner and verifier consumers.\n"
+  frontmatter:
+    id: dec-242
+    title: Introduce `scripts/principles_loader.py` pure-function helper for principles YAML parsing
+    status: accepted
+    category: implementation
+    date: 2026-06-20
+    summary: "Add a stdlib-only, side-effect-free principles_loader module (load_principles + scope_matches) following the spec_drift.py style, fixture-tested via TDD, to encapsulate the toleration contract\
+      \ (absent/empty/malformed \u2192 []) and scope-matching logic for both planner and verifier consumers.\n"
+    tags:
+    - principles
+    - parser
+    - testing
+    - simplicity
+    made_by: agent
+    agent_type: implementation-planner
+    branch: feat-project-principles
+    pipeline_tier: standard
+    affected_files:
+    - scripts/principles_loader.py
+    - tests/test_principles_loader.py
+    - tests/fixtures/principles/
+    re_affirms: dec-241
+- id: ai-state-decisions-243-reliability-skills-not-agent
+  path: .ai-state/decisions/243-reliability-skills-not-agent.md
+  type: markdown
+  title: Agentic-app-reliability frontier practices land as skills, not a 17th agent
+  last_modified: '2026-06-20'
+  renderer: adr_card
+  summary: "Blend the five agentic-app-reliability frontier candidates into Praxion as two new skills plus deepened references in two existing skills and zero new rules, consumed by existing agents \u2014\
+    \ no new shadow sub-architect agent."
+  frontmatter:
+    id: dec-243
+    title: Agentic-app-reliability frontier practices land as skills, not a 17th agent
+    status: accepted
+    category: architectural
+    date: 2026-06-20
+    summary: "Blend the five agentic-app-reliability frontier candidates into Praxion as two new skills plus deepened references in two existing skills and zero new rules, consumed by existing agents \u2014\
+      \ no new shadow sub-architect agent."
+    tags:
+    - agents
+    - skills
+    - agentic-reliability
+    - evals
+    - observability
+    - guardrails
+    - budget
+    - pipeline
+    made_by: agent
+    agent_type: systems-architect
+    pipeline_tier: full
+    branch: main
+    affected_files:
+    - skills/agent-runtime-guardrails/
+    - skills/agent-failure-taxonomy/
+    - skills/agent-evals/references/eval-rigor.md
+    - skills/agent-evals/references/online-evals.md
+    - skills/agent-evals/references/simulation-testing.md
+    - skills/observability/references/distributed-tracing.md
+    dissent: A coherent reliability discipline spanning all five candidates could justify a standing advocate agent with challenge-loop teeth, exactly as agentic-transactions-architect guards real-money
+      safety; under a build-production-multi-agent-apps workload, a skills-only carrier leaves no owner to object to an un-guard-railed architecture.
+- id: ai-state-decisions-244-dependency-scanning-scaffolding
+  path: .ai-state/decisions/244-dependency-scanning-scaffolding.md
+  type: markdown
+  title: Add dependency-scanning scaffolding (dependabot) to the onboarding baseline
+  last_modified: '2026-06-20'
+  renderer: adr_card
+  summary: New canonical dependabot.yml.tmpl in claude/project-baseline/ plus a /onboard-project Phase 8e.7 sub-step that installs an ecosystem-tailored .github/dependabot.yml.
+  frontmatter:
+    id: dec-244
+    title: Add dependency-scanning scaffolding (dependabot) to the onboarding baseline
+    status: accepted
+    category: architectural
+    date: 2026-06-20
+    summary: New canonical dependabot.yml.tmpl in claude/project-baseline/ plus a /onboard-project Phase 8e.7 sub-step that installs an ecosystem-tailored .github/dependabot.yml.
+    tags:
+    - dependency-scanning
+    - dependabot
+    - onboarding
+    - scaffolding
+    - readiness
+    made_by: agent
+    agent_type: systems-architect
+    branch: feat-l3-readiness-config
+    pipeline_tier: full
+    affected_files:
+    - claude/project-baseline/dependabot.yml.tmpl
+    - commands/onboard-project.md
+    - .github/dependabot.yml
+    dissent: Inline-authoring a dependabot.yml per project (no canonical asset) avoids adding template indirection to claude/project-baseline/ for a few lines per ecosystem; the asset-plus-sub-step machinery
+      is arguably overhead for a low-churn config.
+- id: ai-state-decisions-245-structlog-pino-logging-default
+  path: .ai-state/decisions/245-structlog-pino-logging-default.md
+  type: markdown
+  title: Sharpen the observability logging default to structlog (Python) and pino (TypeScript)
+  last_modified: '2026-06-20'
+  renderer: adr_card
+  summary: Adopt structlog as the
+  frontmatter:
+    id: dec-245
+    title: Sharpen the observability logging default to structlog (Python) and pino (TypeScript)
+    status: accepted
+    category: architectural
+    date: 2026-06-20
+    summary: Adopt structlog as the
+    tags:
+    - observability
+    - logging
+    - structlog
+    - pino
+    - defaults
+    made_by: agent
+    agent_type: systems-architect
+    branch: feat-l3-readiness-config
+    pipeline_tier: full
+    affected_files:
+    - skills/observability/SKILL.md
+    - pyproject.toml
+    - scripts/praxion_logging.py
+    dissent: loguru's lower setup friction and the user's prior positive experience make it a defensible Python default for a small-team CLI-heavy codebase; structlog's medium setup cost is a real tax.
+- id: ai-state-decisions-246-unify-commit-gate-precommit
+  path: .ai-state/decisions/246-unify-commit-gate-precommit.md
+  type: markdown
+  title: Unify the bespoke commit gate into the pre-commit framework
+  last_modified: '2026-06-20'
+  renderer: adr_card
+  summary: Replace Praxion's bespoke git-pre-commit-hook.sh with .pre-commit-config.yaml; five author blocks become repo:local hooks alongside ruff + gitleaks.
+  frontmatter:
+    id: dec-246
+    title: Unify the bespoke commit gate into the pre-commit framework
+    status: accepted
+    category: architectural
+    date: 2026-06-20
+    summary: Replace Praxion's bespoke git-pre-commit-hook.sh with .pre-commit-config.yaml; five author blocks become repo:local hooks alongside ruff + gitleaks.
+    tags:
+    - pre-commit
+    - commit-gate
+    - tooling
+    - readiness
+    - dogfooding
+    made_by: agent
+    agent_type: systems-architect
+    branch: feat-l3-readiness-config
+    pipeline_tier: full
+    affected_files:
+    - .pre-commit-config.yaml
+    - scripts/git-pre-commit-hook.sh
+    - install_claude.sh
+    - pyproject.toml
+    dissent: A separate minimal pre-commit config (ruff+gitleaks only) that leaves the proven 5-block shell author gate untouched carries zero regex-transcription risk to author-gate enforcement.
+- id: ai-state-decisions-247-monorepo-healthcheck-detection
+  path: .ai-state/decisions/247-monorepo-healthcheck-detection.md
+  type: markdown
+  title: Make readiness healthcheck detection monorepo-aware (subdir-service + route-handler signals)
+  last_modified: '2026-06-20'
+  renderer: adr_card
+  summary: Extend _detect_healthcheck beyond the root Dockerfile/package.json to a bounded subtree scan that recognizes a subdir Dockerfile HEALTHCHECK, a subdir package.json health signal, or a route.*
+    handler inside a health/healthz/healthcheck directory.
+  frontmatter:
+    id: dec-247
+    title: Make readiness healthcheck detection monorepo-aware (subdir-service + route-handler signals)
+    status: accepted
+    category: architectural
+    date: 2026-06-20
+    summary: Extend _detect_healthcheck beyond the root Dockerfile/package.json to a bounded subtree scan that recognizes a subdir Dockerfile HEALTHCHECK, a subdir package.json health signal, or a route.*
+      handler inside a health/healthz/healthcheck directory.
+    tags:
+    - readiness
+    - healthcheck
+    - observability
+    - monorepo
+    - metrics
+    - detector
+    made_by: agent
+    agent_type: orchestrator
+    branch: feat-healthcheck-baseline
+    pipeline_tier: standard
+    affected_files:
+    - scripts/project_metrics/collectors/readiness/checks.py
+    - scripts/project_metrics/tests/test_readiness_checks.py
+    dissent: A subtree scan adds per-run cost and false-positive surface (any route.* in a health-named dir counts, even a non-deployed example or a fixture); the root-only detector plus the readiness_config
+      pillar-weight escape hatch already handles non-service repos without changing detection semantics for every project.
+- id: ai-state-decisions-248-observations-wal-recovery-reconciliation
+  path: .ai-state/decisions/248-observations-wal-recovery-reconciliation.md
+  type: markdown
+  title: observations.jsonl as recovery WAL + deterministic reconciliation + auto-resume-with-audit; WIP.md demoted to a verified cache
+  last_modified: '2026-06-22'
+  renderer: adr_card
+  summary: "Make pipeline step-completion a verified fact derived from ground truth \u2014 reconcile WIP claims against git/tests (Tier 1) localized by the existing observations.jsonl WAL (Tier 2); auto-resume\
+    \ partials with a mandatory five-surface audit trail."
+  frontmatter:
+    id: dec-248
+    title: observations.jsonl as recovery WAL + deterministic reconciliation + auto-resume-with-audit; WIP.md demoted to a verified cache
+    status: accepted
+    category: architectural
+    date: 2026-06-22
+    summary: "Make pipeline step-completion a verified fact derived from ground truth \u2014 reconcile WIP claims against git/tests (Tier 1) localized by the existing observations.jsonl WAL (Tier 2); auto-resume\
+      \ partials with a mandatory five-surface audit trail."
+    tags:
+    - pipeline
+    - recovery
+    - truncation
+    - reliability
+    - observability
+    - reconciliation
+    - wal
+    made_by: agent
+    agent_type: systems-architect
+    branch: feat-truncation-recovery
+    pipeline_tier: standard
+    affected_files:
+    - scripts/reconcile_pipeline_state.py
+    - scripts/test_reconcile_pipeline_state.py
+    - commands/resume-pipeline.md
+    - skills/software-planning/references/agent-pipeline-details.md
+    - rules/swe/swe-agent-coordination-protocol.md
+    - agents/implementer.md
+    - .ai-state/observations.jsonl
+    affected_reqs:
+    - REQ-01
+    - REQ-02
+    - REQ-03
+    - REQ-04
+    - REQ-05
+    - REQ-06
+    - REQ-07
+    - REQ-08
+    dissent: "A pure-prevention design (restructure the implementer loop so the durable WIP write is atomic and early) would eliminate the truncation gap at its source and need no reconciliation reader\
+      \ at all \u2014 it loses here only because no agent-authored write is trustworthy under a hard mid-turn token cut, so prevention shrinks the gap but cannot close it."
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-06-16'
+  last_modified: '2026-06-24'
   renderer: default_markdown
   summary: 'Auto-generated from ADR frontmatter. Do not edit manually. Regenerate: `python scripts/regenerate_adr_index.py`'
 - id: ai-state-idea-ledgers-idea-ledger-2026-02-08-18-00-00
@@ -8010,7 +8737,7 @@ surfaces:
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-05-08_14-30-00.md
   type: markdown
   title: Sentinel Report
-  last_modified: '2026-05-09'
+  last_modified: '2026-06-20'
   renderer: default_markdown
   summary: "**Generated:** 2026-05-08 14:30:00 **Audit scope:** Full ecosystem sweep \u2014 all dimensions **Commits since last audit:** 18 (since `SENTINEL_REPORT_2026-05-03_10-48-56.md`) **Latest commit:**\
     \ `ad5f920 feat(versioning): drop PEP 440 dev pre-releases for SemVer-only flow`"
@@ -8118,200 +8845,244 @@ surfaces:
   renderer: default_markdown
   summary: '**Branch:** `worktree-sandbook-memory-migration` **Audit context:** Post-memory-removal ecosystem integrity check (dec-225). Focused on memory-subsystem removal coherence, ADR supersession wiring,
     canonical-block sync, and token-budget recovery. Full ten-dimension sweep included.'
+- id: ai-state-sentinel-reports-sentinel-report-2026-06-17-11-21-44
+  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-06-17_11-21-44.md
+  type: markdown
+  title: Sentinel Report
+  last_modified: '2026-06-17'
+  renderer: default_markdown
+  summary: "**Run metadata**: model = **opus** (Sonnet rate-limited until 7am PT; operator-approved quality-boost fallback \u2014 noted per request). Audit type = **fresh-commit** (latest commit `f8095e9`\
+    \ 2026-06-17 18:01 UTC `bump: version 0.7.0 \u2192 0.7.1`; prior sentinel run 2026-06-11). Scope = ..."
+- id: ai-state-sentinel-reports-sentinel-report-2026-06-20-13-34-25
+  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-06-20_13-34-25.md
+  type: markdown
+  title: Sentinel Report
+  last_modified: '2026-06-20'
+  renderer: default_markdown
+  summary: "> Generated: 2026-06-20 13:34:25 > Scope: Full ecosystem audit \u2014 focused on new skills `agent-failure-taxonomy` / `agent-runtime-guardrails`, cross-reference integrity, description collision\
+    \ risk, token efficiency, and coherence regression check vs 2026-06-11 / 2026-06-17 baselin..."
 - id: ai-state-metrics-reports-metrics-report-2026-04-24-23-22-51
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-04-24_23-22-51.json
   type: json
   title: METRICS_REPORT_2026-04-24_23-22-51.json
-  last_modified: '2026-04-24'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":8.0,"change_entropy_90d":319.9285023973139,"churn_total_90d":95101,"cognitive_p95":10.0,"commit_sha":"ee61f06ceb65d40e02d4fc848d1de9ace59dc0e0","coverage_line_pct":0.7986,"cyclic_deps":0,"file_count":510,"hotspot_gini":0.6801750710486587,"hotspot_top_score...'
 - id: ai-state-metrics-reports-metrics-report-2026-04-25-00-04-23
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-04-25_00-04-23.json
   type: json
   title: METRICS_REPORT_2026-04-25_00-04-23.json
-  last_modified: '2026-04-24'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":8.0,"change_entropy_90d":319.9285023973139,"churn_total_90d":95101,"cognitive_p95":10.0,"commit_sha":"ee61f06ceb65d40e02d4fc848d1de9ace59dc0e0","coverage_line_pct":0.8273,"cyclic_deps":0,"file_count":510,"hotspot_gini":0.6801750710486587,"hotspot_top_score...'
 - id: ai-state-metrics-reports-metrics-report-2026-04-26-21-58-29
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-04-26_21-58-29.json
   type: json
   title: METRICS_REPORT_2026-04-26_21-58-29.json
-  last_modified: '2026-04-26'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":8.0,"change_entropy_90d":325.0363242797694,"churn_total_90d":97832,"cognitive_p95":9.0,"commit_sha":"bdf6fde4237a84be2cff9a37e2c1452aa860dc1a","coverage_line_pct":0.8011,"cyclic_deps":0,"file_count":516,"hotspot_gini":0.675356352079827,"hotspot_top_score":...'
 - id: ai-state-metrics-reports-metrics-report-2026-04-27-06-46-29
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-04-27_06-46-29.json
   type: json
   title: METRICS_REPORT_2026-04-27_06-46-29.json
-  last_modified: '2026-04-26'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":8.0,"change_entropy_90d":324.7572084528007,"churn_total_90d":100700,"cognitive_p95":9.0,"commit_sha":"01b59763904bf887e4d8ff4a2fc8468105a7a6f9","coverage_line_pct":0.7993,"cyclic_deps":0,"file_count":525,"hotspot_gini":0.6657493373717267,"hotspot_top_score...'
 - id: ai-state-metrics-reports-metrics-report-2026-04-28-20-34-07
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-04-28_20-34-07.json
   type: json
   title: METRICS_REPORT_2026-04-28_20-34-07.json
-  last_modified: '2026-04-28'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":8.0,"change_entropy_90d":328.23190928559796,"churn_total_90d":102690,"cognitive_p95":9.0,"commit_sha":"3abf54a32ddabbf583a6090e00f7227e020a3cda","coverage_line_pct":0.8007,"cyclic_deps":0,"file_count":531,"hotspot_gini":0.6591623183832436,"hotspot_top_scor...'
 - id: ai-state-metrics-reports-metrics-report-2026-05-01-22-14-59
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-05-01_22-14-59.json
   type: json
   title: METRICS_REPORT_2026-05-01_22-14-59.json
-  last_modified: '2026-05-01'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":8.0,"change_entropy_90d":336.2544108995852,"churn_total_90d":106285,"cognitive_p95":9.0,"commit_sha":"bbcb77317139d8812eedd333c726c1d91e7eca9b","coverage_line_pct":0.8327,"cyclic_deps":0,"file_count":583,"hotspot_gini":0.6389206246781266,"hotspot_top_score...'
 - id: ai-state-metrics-reports-metrics-report-2026-05-03-17-59-20
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-05-03_17-59-20.json
   type: json
   title: METRICS_REPORT_2026-05-03_17-59-20.json
-  last_modified: '2026-05-03'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":8.0,"change_entropy_90d":281.6513813585008,"churn_total_90d":96301,"cognitive_p95":9.0,"commit_sha":"5d1e6c8ab3917d834ccfbd07b7ba937be1a11fee","coverage_line_pct":0.8327,"cyclic_deps":0,"file_count":602,"hotspot_gini":0.6415897379031638,"hotspot_top_score"...'
 - id: ai-state-metrics-reports-metrics-report-2026-05-09-06-08-07
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-05-09_06-08-07.json
   type: json
   title: METRICS_REPORT_2026-05-09_06-08-07.json
-  last_modified: '2026-05-08'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":8.0,"change_entropy_90d":255.81048500873217,"churn_total_90d":98081,"cognitive_p95":9.0,"commit_sha":"912ee1aeda0606760ae1aebb07c718ed21580e46","coverage_line_pct":0.5408,"cyclic_deps":0,"file_count":679,"hotspot_gini":0.6223796593793264,"hotspot_top_score...'
 - id: ai-state-metrics-reports-metrics-report-2026-05-13-02-56-41
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-05-13_02-56-41.json
   type: json
   title: METRICS_REPORT_2026-05-13_02-56-41.json
-  last_modified: '2026-05-12'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":8.0,"change_entropy_90d":311.4169310031596,"churn_total_90d":132585,"cognitive_p95":9.0,"commit_sha":"d260bc00d9c749dd6e15582182dbf9970ef2033f","coverage_line_pct":0.04478,"cyclic_deps":0,"file_count":863,"hotspot_gini":0.6922873258267022,"hotspot_top_scor...'
 - id: ai-state-metrics-reports-metrics-report-2026-05-13-06-10-23
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-05-13_06-10-23.json
   type: json
   title: METRICS_REPORT_2026-05-13_06-10-23.json
-  last_modified: '2026-05-12'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":8.0,"change_entropy_90d":328.48195250299295,"churn_total_90d":149967,"cognitive_p95":9.0,"commit_sha":"cc245be8b36c7fa753557fdbaef8c3f5cddc33ef","coverage_line_pct":0.8398,"cyclic_deps":0,"file_count":816,"hotspot_gini":0.7217474055452627,"hotspot_top_scor...'
 - id: ai-state-metrics-reports-metrics-report-2026-05-15-22-58-55
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-05-15_22-58-55.json
   type: json
   title: METRICS_REPORT_2026-05-15_22-58-55.json
-  last_modified: '2026-05-15'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":8.0,"change_entropy_90d":354.16222225971063,"churn_total_90d":164173,"cognitive_p95":9.0,"commit_sha":"c042f20c3986600d6183abde0463ed3250607e3c","coverage_line_pct":0.8292,"cyclic_deps":0,"file_count":863,"hotspot_gini":0.7163614671371397,"hotspot_top_scor...'
 - id: ai-state-metrics-reports-metrics-report-2026-05-24-06-31-34
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-05-24_06-31-34.json
   type: json
   title: METRICS_REPORT_2026-05-24_06-31-34.json
-  last_modified: '2026-05-23'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":8.0,"change_entropy_90d":350.1217185853423,"churn_total_90d":158234,"cognitive_p95":9.0,"commit_sha":"095bf70ab1396116d1a62aa0355a085bbb450143","coverage_line_pct":0.8238,"cyclic_deps":0,"file_count":902,"hotspot_gini":0.7170383985758558,"hotspot_top_score...'
 - id: ai-state-metrics-reports-metrics-report-2026-05-26-05-49-05
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-05-26_05-49-05.json
   type: json
   title: METRICS_REPORT_2026-05-26_05-49-05.json
-  last_modified: '2026-05-25'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":7.0,"change_entropy_90d":372.6298684934349,"churn_total_90d":136048,"cognitive_p95":9.0,"commit_sha":"ac108252226679b97d08050e52a7c1e22d1f5a89","coverage_line_pct":0.8239,"cyclic_deps":0,"file_count":917,"hotspot_gini":0.7663645823879874,"hotspot_top_score...'
 - id: ai-state-metrics-reports-metrics-report-2026-06-04-23-15-36
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-04_23-15-36.json
   type: json
   title: METRICS_REPORT_2026-06-04_23-15-36.json
-  last_modified: '2026-06-04'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":7.0,"change_entropy_90d":352.0271648034557,"churn_total_90d":132995,"cognitive_p95":8.0,"commit_sha":"3cc879d3fc1228e625e4a403558072385c055be6","coverage_line_pct":0.8365,"cyclic_deps":0,"file_count":946,"hotspot_gini":0.7607445875038155,"hotspot_top_score...'
 - id: ai-state-metrics-reports-metrics-report-2026-06-04-23-22-30
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-04_23-22-30.json
   type: json
   title: METRICS_REPORT_2026-06-04_23-22-30.json
-  last_modified: '2026-06-04'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":7.0,"change_entropy_90d":352.0271648034557,"churn_total_90d":132995,"cognitive_p95":8.0,"commit_sha":"3cc879d3fc1228e625e4a403558072385c055be6","coverage_line_pct":0.837,"cyclic_deps":0,"file_count":946,"hotspot_gini":0.7607445875038155,"hotspot_top_score"...'
 - id: ai-state-metrics-reports-metrics-report-2026-06-05-00-21-27
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-05_00-21-27.json
   type: json
   title: METRICS_REPORT_2026-06-05_00-21-27.json
-  last_modified: '2026-06-04'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":7.0,"change_entropy_90d":352.0271648034557,"churn_total_90d":132995,"cognitive_p95":8.0,"commit_sha":"3cc879d3fc1228e625e4a403558072385c055be6","coverage_line_pct":0.8504,"cyclic_deps":0,"file_count":948,"hotspot_gini":0.7596317224546234,"hotspot_top_score...'
 - id: ai-state-metrics-reports-metrics-report-2026-06-05-02-24-52
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-05_02-24-52.json
   type: json
   title: METRICS_REPORT_2026-06-05_02-24-52.json
-  last_modified: '2026-06-04'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":7.0,"change_entropy_90d":352.0271648034557,"churn_total_90d":132995,"cognitive_p95":8.0,"commit_sha":"3cc879d3fc1228e625e4a403558072385c055be6","coverage_line_pct":0.8497,"cyclic_deps":0,"file_count":950,"hotspot_gini":0.7608280312521466,"hotspot_top_score...'
 - id: ai-state-metrics-reports-metrics-report-2026-06-05-02-30-57
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-05_02-30-57.json
   type: json
   title: METRICS_REPORT_2026-06-05_02-30-57.json
-  last_modified: '2026-06-04'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":7.0,"change_entropy_90d":352.0271648034557,"churn_total_90d":132995,"cognitive_p95":8.0,"commit_sha":"3cc879d3fc1228e625e4a403558072385c055be6","coverage_line_pct":0.8373,"cyclic_deps":0,"file_count":950,"hotspot_gini":0.7608280312521466,"hotspot_top_score...'
 - id: ai-state-metrics-reports-metrics-report-2026-06-05-02-57-09
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-05_02-57-09.json
   type: json
   title: METRICS_REPORT_2026-06-05_02-57-09.json
-  last_modified: '2026-06-04'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":7.0,"change_entropy_90d":352.0271648034557,"churn_total_90d":132995,"cognitive_p95":8.0,"commit_sha":"3cc879d3fc1228e625e4a403558072385c055be6","coverage_line_pct":0.8373,"cyclic_deps":0,"file_count":954,"hotspot_gini":0.7608280312521466,"hotspot_top_score...'
 - id: ai-state-metrics-reports-metrics-report-2026-06-05-03-16-32
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-05_03-16-32.json
   type: json
   title: METRICS_REPORT_2026-06-05_03-16-32.json
-  last_modified: '2026-06-04'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":7.0,"change_entropy_90d":352.0271648034557,"churn_total_90d":132995,"cognitive_p95":8.0,"commit_sha":"3cc879d3fc1228e625e4a403558072385c055be6","coverage_line_pct":0.8373,"cyclic_deps":0,"file_count":954,"hotspot_gini":0.7608280312521466,"hotspot_top_score...'
 - id: ai-state-metrics-reports-metrics-report-2026-06-05-03-24-26
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-05_03-24-26.json
   type: json
   title: METRICS_REPORT_2026-06-05_03-24-26.json
-  last_modified: '2026-06-04'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":7.0,"change_entropy_90d":352.0271648034557,"churn_total_90d":132995,"cognitive_p95":8.0,"commit_sha":"3cc879d3fc1228e625e4a403558072385c055be6","coverage_line_pct":0.8373,"cyclic_deps":0,"file_count":954,"hotspot_gini":0.7608280312521466,"hotspot_top_score...'
 - id: ai-state-metrics-reports-metrics-report-2026-06-05-18-26-42
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-05_18-26-42.json
   type: json
   title: METRICS_REPORT_2026-06-05_18-26-42.json
-  last_modified: '2026-06-05'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":7.0,"change_entropy_90d":358.6103908106602,"churn_total_90d":135876,"cognitive_p95":8.0,"commit_sha":"8743f87c09c9d0268e2db89933a5be3e0eb4a3e8","coverage_line_pct":0.8373,"cyclic_deps":0,"file_count":958,"hotspot_gini":0.7706084180793229,"hotspot_top_score...'
 - id: ai-state-metrics-reports-metrics-report-2026-06-05-19-37-56
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-05_19-37-56.json
   type: json
   title: METRICS_REPORT_2026-06-05_19-37-56.json
-  last_modified: '2026-06-05'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":7.0,"change_entropy_90d":358.6103908106602,"churn_total_90d":135876,"cognitive_p95":8.05,"commit_sha":"8743f87c09c9d0268e2db89933a5be3e0eb4a3e8","coverage_line_pct":0.8381,"cyclic_deps":0,"file_count":960,"hotspot_gini":0.7704366530500241,"hotspot_top_scor...'
 - id: ai-state-metrics-reports-metrics-report-2026-06-05-19-55-03
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-05_19-55-03.json
   type: json
   title: METRICS_REPORT_2026-06-05_19-55-03.json
-  last_modified: '2026-06-05'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":7.0,"change_entropy_90d":364.59660395126457,"churn_total_90d":136866,"cognitive_p95":8.05,"commit_sha":"38651e735c9b233d470d0f0765760d4973b16fe6","coverage_line_pct":0.8381,"cyclic_deps":0,"file_count":960,"hotspot_gini":0.7710196216410385,"hotspot_top_sco...'
 - id: ai-state-metrics-reports-metrics-report-2026-06-06-04-28-10
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-06_04-28-10.json
   type: json
   title: METRICS_REPORT_2026-06-06_04-28-10.json
-  last_modified: '2026-06-05'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":7.0,"change_entropy_90d":374.3684214720094,"churn_total_90d":139222,"cognitive_p95":8.0,"commit_sha":"a183208a91c99fa9a2ffed2e654acab0a0b1b6d1","coverage_line_pct":0.8381,"cyclic_deps":0,"file_count":971,"hotspot_gini":0.7698316464492164,"hotspot_top_score...'
 - id: ai-state-metrics-reports-metrics-report-2026-06-11-08-16-02
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-11_08-16-02.json
   type: json
   title: METRICS_REPORT_2026-06-11_08-16-02.json
-  last_modified: '2026-06-11'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":7.0,"change_entropy_90d":285.91956907110296,"churn_total_90d":100775,"cognitive_p95":8.0,"commit_sha":"235c6305f66359fe02913d7817235f104a8ecbce","coverage_line_pct":0.8381,"cyclic_deps":0,"file_count":973,"hotspot_gini":0.7542479799536441,"hotspot_top_scor...'
 - id: ai-state-metrics-reports-metrics-report-2026-06-11-08-38-15
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-11_08-38-15.json
   type: json
   title: METRICS_REPORT_2026-06-11_08-38-15.json
-  last_modified: '2026-06-11'
+  last_modified: '2026-06-20'
   renderer: metrics_view
   summary: '{"aggregate":{"ccn_p95":8.0,"change_entropy_90d":302.61418798316464,"churn_total_90d":117954,"cognitive_p95":9.0,"commit_sha":"ea770c54768393f1202e5c4133ca2a7a97d56f4f","coverage_line_pct":0.8478,"cyclic_deps":0,"file_count":925,"hotspot_gini":0.7481655583729214,"hotspot_top_scor...'
+- id: ai-state-metrics-reports-metrics-report-2026-06-18-23-41-03
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-18_23-41-03.json
+  type: json
+  title: METRICS_REPORT_2026-06-18_23-41-03.json
+  last_modified: '2026-06-20'
+  renderer: metrics_view
+  summary: '{"aggregate":{"ccn_p95":8.0,"change_entropy_90d":208.47658560806147,"churn_total_90d":66708,"cognitive_p95":9.0,"commit_sha":"3c83b23ccc2e403f6c457e17390f543a78700543","coverage_line_pct":0.8416,"cyclic_deps":0,"file_count":959,"hotspot_gini":0.7169154458853534,"hotspot_top_score...'
+- id: ai-state-metrics-reports-metrics-report-2026-06-20-20-40-35
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-20_20-40-35.json
+  type: json
+  title: METRICS_REPORT_2026-06-20_20-40-35.json
+  last_modified: '2026-06-20'
+  renderer: metrics_view
+  summary: '{"aggregate":{"ccn_p95":8.0,"change_entropy_90d":230.503161787738,"churn_total_90d":70379,"cognitive_p95":9.0,"commit_sha":"f80990f2d0ad7f3186ae6b76766be654588a67e7","coverage_line_pct":0.8414,"cyclic_deps":0,"file_count":997,"hotspot_gini":0.6907060086938364,"hotspot_top_score":...'
+- id: ai-state-metrics-reports-metrics-report-2026-06-20-23-30-00
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-20_23-30-00.json
+  type: json
+  title: METRICS_REPORT_2026-06-20_23-30-00.json
+  last_modified: '2026-06-20'
+  renderer: metrics_view
+  summary: '{"aggregate":{"ccn_p95":8.0,"change_entropy_90d":849.9255542946847,"churn_total_90d":294905,"cognitive_p95":9.0,"commit_sha":"2062cd05adb86586bdfb1e04dcd9a443ab6ea4e0","coverage_line_pct":0.8414,"cyclic_deps":0,"file_count":1000,"hotspot_gini":0.7049612758649909,"hotspot_top_scor...'
+- id: ai-state-metrics-reports-metrics-report-2026-06-21-01-14-35
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-21_01-14-35.json
+  type: json
+  title: METRICS_REPORT_2026-06-21_01-14-35.json
+  last_modified: '2026-06-20'
+  renderer: metrics_view
+  summary: '{"aggregate":{"ccn_p95":8.0,"change_entropy_90d":852.695719059261,"churn_total_90d":295193,"cognitive_p95":9.0,"commit_sha":"61f0c83bd48ad2fc95224d82026eac93674f4425","coverage_line_pct":0.6727,"cyclic_deps":0,"file_count":1003,"hotspot_gini":0.7066608297783433,"hotspot_top_score...'
 - id: ai-state-metrics-reports-metrics-report-2026-04-24-23-22-51
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-04-24_23-22-51.md
   type: markdown
   title: Project Metrics Report
-  last_modified: '2026-04-24'
+  last_modified: '2026-06-20'
   renderer: default_markdown
   summary: Generated at 2026-04-24T23:22:51Z
 - id: ai-state-metrics-reports-metrics-report-2026-04-25-00-04-23
@@ -8496,18 +9267,47 @@ surfaces:
   last_modified: '2026-06-11'
   renderer: default_markdown
   summary: Generated at 2026-06-11T08:38:15Z
+- id: ai-state-metrics-reports-metrics-report-2026-06-18-23-41-03
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-18_23-41-03.md
+  type: markdown
+  title: Project Metrics Report
+  last_modified: '2026-06-18'
+  renderer: default_markdown
+  summary: Generated at 2026-06-18T23:41:03Z
+- id: ai-state-metrics-reports-metrics-report-2026-06-20-20-40-35
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-20_20-40-35.md
+  type: markdown
+  title: Project Metrics Report
+  last_modified: '2026-06-20'
+  renderer: default_markdown
+  summary: Generated at 2026-06-20T20:40:35Z
+- id: ai-state-metrics-reports-metrics-report-2026-06-20-23-30-00
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-20_23-30-00.md
+  type: markdown
+  title: Project Metrics Report
+  last_modified: '2026-06-20'
+  renderer: default_markdown
+  summary: Generated at 2026-06-20T23:30:00Z
+- id: ai-state-metrics-reports-metrics-report-2026-06-21-01-14-35
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-21_01-14-35.md
+  type: markdown
+  title: Project Metrics Report
+  last_modified: '2026-06-20'
+  renderer: default_markdown
+  summary: Generated at 2026-06-21T01:14:35Z
 - id: ai-state-specs-spec-agent-model-routing-2026-04-25
   path: .ai-state/specs/SPEC_agent-model-routing_2026-04-25.md
   type: markdown
   title: 'SPEC: Per-Agent Model Routing Policy'
-  last_modified: '2026-04-25'
+  last_modified: '2026-06-20'
   renderer: default_markdown
-  summary: 'Archived: 2026-04-25. Source: `.ai-work/agent-model-routing/SYSTEMS_PLAN.md` (since cleaned).'
+  summary: "**Task slug**: `agent-model-routing` **Tier**: Standard **Archived**: 2026-04-25 **Status**: Shipped **ADRs**: `dec-076` (routing dimensionality \u2014 1D now, defer 2D), `dec-077` (frontmatter\
+    \ `model:` is a capability floor), `dec-078` (hybrid central-table routing), `dec-079` (polic..."
 - id: ai-state-specs-spec-design-dialectic-2026-04-17
   path: .ai-state/specs/SPEC_design-dialectic_2026-04-17.md
   type: markdown
   title: 'SPEC: Pre-Implementation Design-Synthesis Capability (H1-wide)'
-  last_modified: '2026-04-16'
+  last_modified: '2026-06-24'
   renderer: default_markdown
   summary: '**Task slug**: `design-dialectic` **Tier**: Full **Archived**: 2026-04-17 **Status**: Shipped **Commits**: `845ee31` (dec-050 budget revision) + `e4dc7eb` (dec-051 H1-wide capability) **ADRs**:
     [dec-050](../decisions/050-always-loaded-budget-revision.md), [dec-051](../decisions/0...'
@@ -8518,15 +9318,15 @@ surfaces:
   path: .ai-state/specs/SPEC_diagrams_2026-04-30.md
   type: markdown
   title: 'SPEC: LikeC4 + D2 Dual-Toolchain Diagram Convention'
-  last_modified: '2026-05-23'
+  last_modified: '2026-06-24'
   renderer: default_markdown
   summary: '**Task slug**: `structurizr-d2-diagrams` **Feature**: Introduce LikeC4 + D2 dual-toolchain for C4-architectural diagrams (coexistence with Mermaid) **Tier**: Standard **Pipeline branch**: `worktree-structurizr-d2-diagrams`
-    **Start date**: 2026-04-29 **End date**: 2026-04-30 **Sta...'
+    **Start date**: 2026-04-29 **End date**: 2026-04-30 **Arc...'
 - id: ai-state-specs-spec-multi-language-support-2026-05-11
   path: .ai-state/specs/SPEC_multi-language-support_2026-05-11.md
   type: markdown
   title: "SPEC: Multi-Language Support \u2014 Polyglot Skill Architecture"
-  last_modified: '2026-05-23'
+  last_modified: '2026-06-20'
   renderer: default_markdown
   summary: '**Task slug**: `multi-language-support` **Feature**: Extend Praxion from Python-only to full-stack TypeScript/Node/React/Vue via the polyglot skill pattern **Tier**: Full **Pipeline branch**:
     `worktree-multi-language-support` **Start date**: 2026-05-11 **End date**: 2026-05-11 **...'
@@ -8538,6 +9338,69 @@ surfaces:
   renderer: default_markdown
   summary: "**Task slug**: `project-metrics` **Tier**: Full (escalated from Standard \u2014 decomposition yielded 18 steps, exceeding the ~10-step threshold; file breadth is wide but depth remains shallow)\
     \ **Archived**: 2026-04-23 **Status**: Shipped **ADRs**: `dec-062` (storage schema), `dec-063..."
+- id: ai-work-agent-truncation-recovery-systems-plan
+  path: .ai-work/agent-truncation-recovery/SYSTEMS_PLAN.md
+  type: markdown
+  title: 'Plan: Verifiable Pipeline Step-Completion (truncation-proof artifacts)'
+  last_modified: '2026-06-22'
+  renderer: default_markdown
+  summary: "Make \"did this pipeline step complete\" a **verified fact derived from ground truth** rather than an agent-authored claim, so a subagent hard-truncated mid-work can never leave the pipeline\
+    \ silently wrong \u2014 the worst case becomes \"detected-unverified \u2192 reconciled \u2192 auto-resumed-wi..."
+- id: ai-work-agent-truncation-recovery-learnings
+  path: .ai-work/agent-truncation-recovery/LEARNINGS.md
+  type: markdown
+  title: "LEARNINGS \u2014 agent-truncation-recovery"
+  last_modified: '2026-06-22'
+  renderer: default_markdown
+  summary: "**[systems-architect] observations.jsonl as recovery WAL + deterministic reconciliation + auto-resume-with-audit; WIP.md demoted to verified cache (dec-248)**: Make pipeline step-completion\
+    \ a verified fact from a reliability hierarchy \u2014 Tier 1 (git diff over Files + tests) is the..."
+- id: ai-work-agent-truncation-recovery-verification-report
+  path: .ai-work/agent-truncation-recovery/VERIFICATION_REPORT.md
+  type: markdown
+  title: "Verification Report \u2014 Verifiable Pipeline Step-Completion (truncation-recovery)"
+  last_modified: '2026-06-22'
+  renderer: verification_report
+  summary: "**Verdict:** PASS WITH FINDINGS **Date:** 2026-06-22 **Branch:** `feat/truncation-recovery` **Mode:** Pipeline (Standard tier) **Tests:** 20 passed \xB7 ruff clean \xB7 canonical-blocks in sync\
+    \ \xB7 shipped-artifact isolation 0 violations \xB7 live dry-run read-only with zero false `verified..."
+- id: ai-work-agent-truncation-recovery-progress
+  path: .ai-work/agent-truncation-recovery/PROGRESS.md
+  type: markdown
+  title: PROGRESS.md
+  last_modified: '2026-06-22'
+  renderer: default_markdown
+  summary: '[2026-06-22T19:02:29Z] [systems-architect] Phase 0: mode=feature detected (Mode directive in spawn prompt) #mode=feature [2026-06-22T19:02:29Z] [systems-architect] Phase 1/10: input-assessment
+    -- read PROPOSAL+plan+WAL producers+Layer A contract+reuse candidates; formalizing co-d...'
+- id: ai-work-agentic-reliability-integration-context-review
+  path: .ai-work/agentic-reliability-integration/CONTEXT_REVIEW.md
+  type: markdown
+  title: "Context Review \u2014 Agentic Reliability Integration"
+  last_modified: '2026-06-20'
+  renderer: default_markdown
+  summary: '---'
+- id: ai-work-agentic-reliability-integration-systems-plan
+  path: .ai-work/agentic-reliability-integration/SYSTEMS_PLAN.md
+  type: markdown
+  title: 'Integration Design: Blending Agentic-App-Reliability Frontier Practices into Praxion'
+  last_modified: '2026-06-20'
+  renderer: default_markdown
+  summary: "**Mode:** baseline-audit (advisory INTEGRATION DESIGN STUDY \u2014 analysis + concrete design, no production code, no agent/skill/rule files written; ADR fragment drafts only). **Status:** design\
+    \ for user review before any build. **Date:** 2026-06-20"
+- id: ai-work-agentic-reliability-integration-verification-report
+  path: .ai-work/agentic-reliability-integration/VERIFICATION_REPORT.md
+  type: markdown
+  title: "Verification Report \u2014 agentic-app-reliability skills build"
+  last_modified: '2026-06-20'
+  renderer: verification_report
+  summary: "**Task slug:** agentic-reliability-integration **Branch:** `feat/agentic-reliability` \xB7 commits `55e6ffb..14056a8` (6 feat commits) **Date:** 2026-06-20 **Verifier:** i-am:verifier **Mode:**\
+    \ pipeline (documentation/context-artifact build \u2014 doc-verification + grep + budget re-meas..."
+- id: ai-work-agentic-reliability-integration-progress
+  path: .ai-work/agentic-reliability-integration/PROGRESS.md
+  type: markdown
+  title: PROGRESS.md
+  last_modified: '2026-06-20'
+  renderer: default_markdown
+  summary: '2026-06-20T19:14:07Z [systems-architect] Phase 1/10: input-assessment -- baseline-audit mode (INTEGRATION DESIGN STUDY); Phase 2.5 SKIP per mode 2026-06-20T19:14:53Z [systems-architect] Phase
+    2/10: codebase-assessment -- read precedent agents (interface-designer, agentic-transact...'
 - id: ai-work-api-documentation-progress
   path: .ai-work/api-documentation/PROGRESS.md
   type: markdown
@@ -8546,6 +9409,22 @@ surfaces:
   renderer: default_markdown
   summary: '2026-06-17T00:33:08Z [systems-architect] Phase 1/10: input-assessment -- read 4 research fragments (rest/agent/lang/praxion-fit); feature=api-documentation skill+command; greenfield context
     artifact #feature=api-documentation'
+- id: ai-work-ci-autofix-research-research-findings
+  path: .ai-work/ci-autofix-research/RESEARCH_FINDINGS.md
+  type: markdown
+  title: "RESEARCH_FINDINGS \u2014 Autonomous CI/PR Failure Remediation + Independent Cursor Review Lens"
+  last_modified: '2026-06-21'
+  renderer: default_markdown
+  summary: "> Decision-grade research report. Answers the brief at `tmp/cursor-ci-autofix-research-brief.md`, > **revised** after user clarification (2026-06-21): the Cursor credits are **surplus-to-spend**\
+    \ > (monthly reset, no rollover \u2192 unspent = wasted), and a **non-Claude model as an ind..."
+- id: ai-work-ci-autofix-research-progress
+  path: .ai-work/ci-autofix-research/PROGRESS.md
+  type: markdown
+  title: PROGRESS.md
+  last_modified: '2026-06-20'
+  renderer: default_markdown
+  summary: '[2026-06-20T00:00:00Z] [researcher] Phase 1/5: scoping -- research goal: map Praxion install machinery so CI-autofix workflow can plug in with minimal friction #ci #github-actions #onboarding
+    [2026-06-20T01:00:00Z] [researcher] Phase 2/5: codebase-exploration -- read sync_canonic...'
 - id: ai-work-crafting-skills-refresh-progress
   path: .ai-work/crafting-skills-refresh/PROGRESS.md
   type: markdown
@@ -8562,6 +9441,22 @@ surfaces:
   renderer: default_markdown
   summary: '[2026-06-04T19:41:06Z] [researcher] Phase 1/5: scoping -- reading install.sh and related infrastructure for factory-agent-readiness research #install #skill #cli [2026-06-04T19:42:20Z] [researcher]
     Phase 2/5: codebase-exploration -- read install.sh, install_claude.sh, pyproject.t...'
+- id: ai-work-finalize-consumer-bugs-verification-report
+  path: .ai-work/finalize-consumer-bugs/VERIFICATION_REPORT.md
+  type: markdown
+  title: "Verification Report \u2014 finalize-consumer-bugs"
+  last_modified: '2026-06-19'
+  renderer: verification_report
+  summary: '**Verdict:** PASS WITH FINDINGS **Scope:** commits `5cec434`, `cf4776a`, `f400454`, `b72220d` (range `f789d25..HEAD`), 17 files **Mode:** post-merge verification (no in-flight pipeline docs;
+    AC rubric supplied inline) **Date:** 2026-06-19'
+- id: ai-work-finalize-consumer-bugs-progress
+  path: .ai-work/finalize-consumer-bugs/PROGRESS.md
+  type: markdown
+  title: PROGRESS.md
+  last_modified: '2026-06-19'
+  renderer: default_markdown
+  summary: '2026-06-19T21:31:37Z [verifier] Phase 1/12: inputs -- pipeline docs absent (post-merge verification), AC rubric supplied inline #feature=finalize-consumer-bugs 2026-06-19T21:33:07Z [verifier]
+    Phase 12/12: report -- 9/9 ACs assessed, 122 tests green, verdict PASS WITH FINDINGS #fe...'
 - id: ai-work-hackathon-skill-loop-idea-proposal
   path: .ai-work/hackathon-skill-loop/IDEA_PROPOSAL.md
   type: markdown
@@ -8594,6 +9489,93 @@ surfaces:
   renderer: default_markdown
   summary: '[2026-05-24] [verifier] Phase 1/12: input-assessment -- milestone validation mode, no pipeline; HEAD=5675431 #milestone [2026-05-24] [verifier] Phase 2/12: scope -- recent surfaces: otel_relay
     split, settings.json, sentinel/verifier; failing-test source git_collector + claude_to_...'
+- id: ai-work-healthcheck-baseline-research-findings
+  path: .ai-work/healthcheck-baseline/RESEARCH_FINDINGS.md
+  type: markdown
+  title: 'Research Findings: Healthcheck Patterns for Web / MCP / Agent Services'
+  last_modified: '2026-06-20'
+  renderer: default_markdown
+  summary: Establish principled per-type healthcheck semantics (liveness vs readiness, minimal correct patterns) for web services, MCP servers, and long-running agents, to seed progressive-disclosure guidance
+    in Praxion's `observability` skill.
+- id: ai-work-healthcheck-baseline-verification-report
+  path: .ai-work/healthcheck-baseline/VERIFICATION_REPORT.md
+  type: markdown
+  title: "Verification Report \u2014 healthcheck-baseline"
+  last_modified: '2026-06-20'
+  renderer: verification_report
+  summary: '**Branch:** `feat/healthcheck-baseline` (commits `18be889`, `0e098cf`, `bbfdfcb`, `61f0c83` ADR-draft) **Verifier:** independent post-implementation review **Date:** 2026-06-20 **Verdict:**
+    **PASS** (all 8 ACs PASS; one informational note, no actionable WARN)'
+- id: ai-work-healthcheck-baseline-progress
+  path: .ai-work/healthcheck-baseline/PROGRESS.md
+  type: markdown
+  title: PROGRESS.md
+  last_modified: '2026-06-20'
+  renderer: default_markdown
+  summary: '[2026-06-20T00:00:00Z] [researcher] Phase 1/5: scoping -- task slug: healthcheck-baseline; goal: research liveness/readiness patterns for web/MCP/agent service types to seed observability skill
+    #observability #feature=healthcheck [2026-06-20T00:01:00Z] [researcher] Phase 2/5: cod...'
+- id: ai-work-l3-readiness-config-research-findings
+  path: .ai-work/l3-readiness-config/RESEARCH_FINDINGS.md
+  type: markdown
+  title: 'Research Findings: Structured Logging Library Selection (Python + TypeScript/Node.js)'
+  last_modified: '2026-06-20'
+  renderer: default_markdown
+  summary: Identify and rank the best structured logging library for (A) Python and (B) TypeScript/Node.js, for adoption as Praxion's recommended per-stack default in the `observability` skill's Service
+    Observability Baseline and for Praxion's own use.
+- id: ai-work-l3-readiness-config-systems-plan
+  path: .ai-work/l3-readiness-config/SYSTEMS_PLAN.md
+  type: markdown
+  title: "Plan: L3 Readiness \u2014 Pre-commit Unification, Typecheck, Logging, Dependency-Scanning + Scaffolding"
+  last_modified: '2026-06-20'
+  renderer: default_markdown
+  summary: Bring Praxion itself to readiness L3 on four criteria (`precommit_config`, `dependency_scanning`, `typecheck_config`, `logging_config`) by applying the baselines it already ships (plus a unified
+    pre-commit framework), and close the one genuine scaffolding gap (dependency-scanning...
+- id: ai-work-l3-readiness-config-implementation-plan
+  path: .ai-work/l3-readiness-config/IMPLEMENTATION_PLAN.md
+  type: markdown
+  title: "Plan: L3 Readiness \u2014 Pre-commit Unification, Typecheck, Logging, Dependency-Scanning + Scaffolding"
+  last_modified: '2026-06-20'
+  renderer: plan_view
+  summary: Bring Praxion itself to readiness L3 on four criteria (precommit_config, dependency_scanning, typecheck_config, logging_config), unify the five bespoke author blocks into the pre-commit framework,
+    and fill the dependency-scanning scaffolding gap so managed projects inherit the fi...
+- id: ai-work-l3-readiness-config-wip
+  path: .ai-work/l3-readiness-config/WIP.md
+  type: markdown
+  title: "WIP: L3 Readiness \u2014 Pre-commit Unification, Typecheck, Logging, Dependency-Scanning + Scaffolding"
+  last_modified: '2026-06-20'
+  renderer: default_markdown
+  summary: 'Step 1 of 10: Add `pre-commit` dev dep, `structlog` runtime dep, `[tool.pyright]` to root `pyproject.toml`'
+- id: ai-work-l3-readiness-config-learnings
+  path: .ai-work/l3-readiness-config/LEARNINGS.md
+  type: markdown
+  title: "Learnings \u2014 L3 Readiness Config"
+  last_modified: '2026-06-20'
+  renderer: default_markdown
+  summary: "**[systems-architect] Unify the commit gate into pre-commit framework (dec-246)**: Replace bespoke `git-pre-commit-hook.sh` with `.pre-commit-config.yaml`; 5 author blocks (A\u2013E) become\
+    \ `repo: local` hooks alongside ruff + gitleaks; `install_claude.sh` runs `pre-commit install`. *..."
+- id: ai-work-l3-readiness-config-test-results
+  path: .ai-work/l3-readiness-config/TEST_RESULTS.md
+  type: markdown
+  title: "Test Results \u2014 L3 Readiness Config"
+  last_modified: '2026-06-20'
+  renderer: default_markdown
+  summary: '**Commit under test**: `1f4639c` on branch `feat/l3-readiness-config` **Hook runner**: `uv run pre-commit` (pre-commit 4.6.0) **Method**: `uv run pre-commit run <hook-id> --files <path>` for
+    targeted runs. No real commits made. Disposable test files created under `rules/` and `do...'
+- id: ai-work-l3-readiness-config-verification-report
+  path: .ai-work/l3-readiness-config/VERIFICATION_REPORT.md
+  type: markdown
+  title: "Verification Report \u2014 L3 Readiness Config"
+  last_modified: '2026-06-20'
+  renderer: verification_report
+  summary: "**Branch**: `feat/l3-readiness-config` \xB7 **Commits**: `60b87d2..2062cd0` (7 commits) **Date**: 2026-06-20 \xB7 **Mode**: Pipeline (Standard tier, config/infrastructure build) **Verdict**:\
+    \ **PASS WITH FINDINGS**"
+- id: ai-work-l3-readiness-config-progress
+  path: .ai-work/l3-readiness-config/PROGRESS.md
+  type: markdown
+  title: PROGRESS.md
+  last_modified: '2026-06-20'
+  renderer: default_markdown
+  summary: '[2026-06-20T22:34:19Z] [researcher] Phase 1/5: scoping -- structured-logging library evaluation for Python and TypeScript/Node.js [2026-06-20T22:37:02Z] [researcher] Phase 2/5: codebase-exploration
+    -- found existing structured-logging.md in observability skill, task-chronograph-m...'
 - id: ai-work-nebius-neocloud-research-findings
   path: .ai-work/nebius-neocloud/RESEARCH_FINDINGS.md
   type: markdown
@@ -8610,6 +9592,30 @@ surfaces:
   renderer: default_markdown
   summary: '[2026-06-06T05:27:27Z] [researcher] Phase 1/5: scoping -- Nebius neocloud research for ML dispatch backend; praxion .ai-work writable #feature=nebius-dispatch [2026-06-06T05:27:46Z] [researcher]
     Phase 2/5: codebase -- sia has no existing dispatch backend abstraction (config/orche...'
+- id: ai-work-praxion-competitive-eval-systems-plan
+  path: .ai-work/praxion-competitive-eval/SYSTEMS_PLAN.md
+  type: markdown
+  title: 'Plan: Praxion Competitive-Parity Triage (advisory / baseline-audit)'
+  last_modified: '2026-06-19'
+  renderer: default_markdown
+  summary: "**Mode:** baseline-audit \u2014 this is a *triage + sequencing* pass, not a feature design. No production code, no DESIGN.md/docs mutation. ADR fragments below are **proposals** (`status: proposed`)\
+    \ for the user to ratify."
+- id: ai-work-praxion-competitive-eval-progress
+  path: .ai-work/praxion-competitive-eval/PROGRESS.md
+  type: markdown
+  title: PROGRESS.md
+  last_modified: '2026-06-19'
+  renderer: default_markdown
+  summary: '2026-06-20T04:32:30Z [systems-architect] Phase 1/10: input-assessment -- baseline-audit mode; triaging 3 CIS + 2 softer signals against current state #mode=baseline-audit 2026-06-20T04:33:03Z
+    [systems-architect] Phase 7/10: trade-off+triage -- FIRST=spec-change cascade (Signal B)...'
+- id: ai-work-process-governance-study-progress
+  path: .ai-work/process-governance-study/PROGRESS.md
+  type: markdown
+  title: PROGRESS.md
+  last_modified: '2026-06-19'
+  renderer: default_markdown
+  summary: '[2026-06-19 23:53] [systems-architect] Phase 1/10: input-assessment -- baseline-audit STUDY mode; Phase 2.5 SKIP (mode=baseline-audit). Reading philosophy + existing surfaces. #study #governance
+    [2026-06-19 23:58] [systems-architect] Phase 10/10: study-complete -- fit-ranked 4 it...'
 - id: ai-work-self-improving-skills-progress
   path: .ai-work/self-improving-skills/PROGRESS.md
   type: markdown
@@ -8649,6 +9655,22 @@ surfaces:
   renderer: default_markdown
   summary: '[2026-05-25T00:00:00Z] [context-engineer] Phase 1/5: scope-understanding -- Group 2 (6 skills): web-ui-design, tui-design, api-design-craft, agentic-interface-design, api-design, data-modeling.
     All validate PASS; gap analysis in progress. #skills-conformance #group=G2 [2026-05-26...'
+- id: ai-work-task-intake-disambiguation-research-findings
+  path: .ai-work/task-intake-disambiguation/RESEARCH_FINDINGS.md
+  type: markdown
+  title: "Task Intake & Goal Disambiguation \u2014 Consolidated Findings + Design Proposal"
+  last_modified: '2026-06-18'
+  renderer: default_markdown
+  summary: "**Task slug:** `task-intake-disambiguation` **Deliverable:** Research synthesis + concrete Praxion-embedding proposal (no code this pass) **Lenses reconciled:** internal-audit \xB7 elicitation-literature\
+    \ \xB7 outcome-signal **Fragments:** `RESEARCH_FINDINGS_internal.md`, `RESEARCH_FIND..."
+- id: ai-work-task-intake-disambiguation-progress
+  path: .ai-work/task-intake-disambiguation/PROGRESS.md
+  type: markdown
+  title: PROGRESS.md
+  last_modified: '2026-06-18'
+  renderer: default_markdown
+  summary: '[2026-06-18T23:04:58Z] [researcher] Phase 1/5: scoping -- mapping intake/disambiguation surfaces in Praxion [2026-06-18T23:05:09Z] [researcher/elicitation-lit] Phase 1/5: scoping -- Surveying
+    elicitation/disambiguation best practices for AI coding agent task intake [2026-06-18T23...'
 groups:
 - id: tutorial
   label: Tutorials (learning by doing)
@@ -8922,6 +9944,26 @@ groups:
   - ai-state-decisions-226-api-doc-reference-tiering
   - ai-state-decisions-227-new-skill-api-documentation
   - ai-state-decisions-228-dashboard-api-spec-rendering
+  - ai-state-decisions-229-solid-ai-era-embedding-balanced-coupling-principle
+  - ai-state-decisions-230-calibrated-confidence-schema
+  - ai-state-decisions-231-defer-eval-lens-and-ach-matrix
+  - ai-state-decisions-232-di-disconfirmation-replaces-ach
+  - ai-state-decisions-233-extend-context-engineering-principle
+  - ai-state-decisions-234-multi-perspective-analysis-skill
+  - ai-state-decisions-235-intake-clarity-gate
+  - ai-state-decisions-236-decline-verified-merge-queue
+  - ai-state-decisions-237-sandbook-subsumes-beads-memory-direction
+  - ai-state-decisions-238-spec-drift-detect-not-regenerate
+  - ai-state-decisions-239-where-it-lives
+  - ai-state-decisions-240-reviewer-reuse-vs-new-agent
+  - ai-state-decisions-241-principles-artifact
+  - ai-state-decisions-242-principles-loader
+  - ai-state-decisions-243-reliability-skills-not-agent
+  - ai-state-decisions-244-dependency-scanning-scaffolding
+  - ai-state-decisions-245-structlog-pino-logging-default
+  - ai-state-decisions-246-unify-commit-gate-precommit
+  - ai-state-decisions-247-monorepo-healthcheck-detection
+  - ai-state-decisions-248-observations-wal-recovery-reconciliation
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger-2026-02-08-18-00-00
@@ -8986,6 +10028,14 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-06-11-08-16-02
   - ai-state-metrics-reports-metrics-report-2026-06-11-08-38-15
   - ai-state-metrics-reports-metrics-report-2026-06-11-08-38-15
+  - ai-state-metrics-reports-metrics-report-2026-06-18-23-41-03
+  - ai-state-metrics-reports-metrics-report-2026-06-18-23-41-03
+  - ai-state-metrics-reports-metrics-report-2026-06-20-20-40-35
+  - ai-state-metrics-reports-metrics-report-2026-06-20-20-40-35
+  - ai-state-metrics-reports-metrics-report-2026-06-20-23-30-00
+  - ai-state-metrics-reports-metrics-report-2026-06-20-23-30-00
+  - ai-state-metrics-reports-metrics-report-2026-06-21-01-14-35
+  - ai-state-metrics-reports-metrics-report-2026-06-21-01-14-35
   - ai-state-sentinel-reports-sentinel-report-2026-02-08-14-30-00
   - ai-state-sentinel-reports-sentinel-report-2026-02-23-20-00-00
   - ai-state-sentinel-reports-sentinel-report-2026-02-24-02-15-00
@@ -9022,6 +10072,8 @@ groups:
   - ai-state-sentinel-reports-sentinel-report-2026-06-02-14-04-03
   - ai-state-sentinel-reports-sentinel-report-2026-06-11-01-06-26
   - ai-state-sentinel-reports-sentinel-report-2026-06-11-01-25-30
+  - ai-state-sentinel-reports-sentinel-report-2026-06-17-11-21-44
+  - ai-state-sentinel-reports-sentinel-report-2026-06-20-13-34-25
   - ai-state-specs-spec-agent-model-routing-2026-04-25
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30
@@ -9039,6 +10091,9 @@ groups:
   - docs-context-prj-comparison-2026-05-12-sources-02-abhishekray07-claude-md-templates
   - docs-context-prj-comparison-2026-05-12-sources-03-danielrosehill-repo-managers-claudemd
   - docs-context-prj-comparison-2026-05-12-sources-04-alphasignal-karpathy-inspired-claudemd
+  - docs-independent-analysis-cursor-ci-autofix-research-brief
+  - docs-independent-analysis-linear-integration-analysis
+  - docs-independent-analysis-praxion-artifact-lifecycle-audit
   - docs-multi-session
   - docs-rework-dispatch
   - readme
@@ -9046,18 +10101,46 @@ groups:
 - id: pipeline-state
   label: In-flight pipeline
   surface_ids:
+  - ai-work-agent-truncation-recovery-learnings
+  - ai-work-agent-truncation-recovery-progress
+  - ai-work-agent-truncation-recovery-systems-plan
+  - ai-work-agent-truncation-recovery-verification-report
+  - ai-work-agentic-reliability-integration-context-review
+  - ai-work-agentic-reliability-integration-progress
+  - ai-work-agentic-reliability-integration-systems-plan
+  - ai-work-agentic-reliability-integration-verification-report
   - ai-work-api-documentation-progress
+  - ai-work-ci-autofix-research-progress
+  - ai-work-ci-autofix-research-research-findings
   - ai-work-crafting-skills-refresh-progress
   - ai-work-factory-agent-readiness-progress
+  - ai-work-finalize-consumer-bugs-progress
+  - ai-work-finalize-consumer-bugs-verification-report
   - ai-work-hackathon-skill-loop-idea-proposal
   - ai-work-hackathon-skill-loop-progress
   - ai-work-head-milestone-verify-progress
   - ai-work-head-milestone-verify-verification-report
+  - ai-work-healthcheck-baseline-progress
+  - ai-work-healthcheck-baseline-research-findings
+  - ai-work-healthcheck-baseline-verification-report
+  - ai-work-l3-readiness-config-implementation-plan
+  - ai-work-l3-readiness-config-learnings
+  - ai-work-l3-readiness-config-progress
+  - ai-work-l3-readiness-config-research-findings
+  - ai-work-l3-readiness-config-systems-plan
+  - ai-work-l3-readiness-config-test-results
+  - ai-work-l3-readiness-config-verification-report
+  - ai-work-l3-readiness-config-wip
   - ai-work-nebius-neocloud-progress
   - ai-work-nebius-neocloud-research-findings
+  - ai-work-praxion-competitive-eval-progress
+  - ai-work-praxion-competitive-eval-systems-plan
+  - ai-work-process-governance-study-progress
   - ai-work-self-improving-skills-progress
   - ai-work-sia-praxion-fit-progress
   - ai-work-skills-coherence-pass-learnings
   - ai-work-skills-conformance-learnings
   - ai-work-skills-conformance-progress
+  - ai-work-task-intake-disambiguation-progress
+  - ai-work-task-intake-disambiguation-research-findings
   transient: true

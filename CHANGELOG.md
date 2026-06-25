@@ -1,3 +1,14 @@
+## v0.11.2 (2026-06-25)
+
+### Fix
+
+- remove remember() obligation from PreCompact snapshot hook
+- reconcile SYSTEM_DEPLOYMENT with dec-225 memory removal
+
+### Refactor
+
+- complete dec-132 DESIGN.md path migration in active guidance
+
 ## v0.11.1 (2026-06-23)
 
 ### Fix

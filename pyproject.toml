@@ -6,7 +6,7 @@
 # [tool.commitizen].version_files with a disambiguating regex.
 [project]
 name = "praxion"
-version = "0.11.1"
+version = "0.11.2"
 description = "Operational infrastructure for spec-driven development and context engineering"
 requires-python = ">=3.11"
 # Runtime dependency for the repo-root Python surface (scripts/). structlog is the
@@ -18,7 +18,7 @@ dependencies = [
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.11.1"
+version = "0.11.2"
 version_files = [
     ".claude-plugin/plugin.json:version",
     "task-chronograph-mcp/pyproject.toml:version",

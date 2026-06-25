@@ -68,7 +68,7 @@ When `.ai-work/<task-slug>/PRE_REFACTOR_PLAN.md` is present, the orchestrator ha
 
 Decomposition contract:
 
-- **Steps source**: derive steps from `PRE_REFACTOR_PLAN.md § Steps`; the architect's `## Behavior Preservation Contract` defines the safety net the test-engineer locks down first
+- **Steps source**: derive steps from `PRE_REFACTOR_PLAN.md § Scope` and `§ Behavior Preservation Contract` (eight-section schema — no top-level `## Steps`); the Behavior Preservation Contract defines the safety net the test-engineer locks down first
 - **Tag reuse**: tag every refactor step with the existing `[Phase: Refactoring]` marker — do not invent a new tag. The refactoring skill's verification checklist (incremental, behavior-preserving, post-restructuring re-wiring) flows in unchanged
 - **Characterization-tests-first invariant (hard contract)**: the first non-trivial implementation step MUST be a `test-engineer`-assigned characterization-test step whose seeds are the behaviors enumerated in `PRE_REFACTOR_PLAN.md § Behavior Preservation Contract`. This is not a preference — it is the safety net that lets every subsequent restructuring step be reverted cleanly if it regresses behavior. Skipping it means structural change without a regression detector
 - **Acceptance criteria source**: use `PRE_REFACTOR_PLAN.md § Acceptance Criteria` for the `IMPLEMENTATION_PLAN.md § Acceptance Criteria` block. The verifier (when invoked) reads from the same source — see verifier Phase 1 mode detection

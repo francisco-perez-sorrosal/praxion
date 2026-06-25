@@ -511,6 +511,8 @@ instance).
 
 ### F-14 — Pre-Refactor Plan Schema Has a Section-Ordering Inconsistency
 
+**Status:** Done (2026-06-24)
+
 **Severity:** Important
 **Effort:** S
 **Estimated time/cost:** 2-4 hours
@@ -523,6 +525,13 @@ enforce stricter structure than the writer prompt.
 
 **Recommended fix.** Make `## Affected td-NNN rows` an explicit required top-level section in both
 producer and validator docs, with one canonical order.
+
+**Remediation (2026-06-24).** Aligned `agents/systems-architect.md` Phase 2.5 schema with sentinel
+`PR01` and `tests/fixtures/pre_refactor_plan_wellformed.md`: Goal → Behavior Preservation Contract →
+Acceptance Criteria → Scope → Affected td-NNN rows → Verifier Bypass Criteria → Loop-Back Conditions
+→ Resolved Tech Debt. Removed the erroneous top-level `## Steps` section (optional `### Steps` under
+Scope only). Updated `agents/implementation-planner.md` pre-refactor decomposition source and
+clarified `PR01` producer/validator parity in `agents/sentinel.md`.
 
 ### F-15 — Cleanup / Archival Order for `VERIFICATION_REPORT.md` Is Underspecified
 
@@ -918,7 +927,7 @@ Verification:
 | P10 | Memory subsystem stale active docs | Important | M | doc-engineer | Update current docs; preserve history |
 | P11 | `reconcile_ai_state.py` contract overstated in docs | Important | S-M | implementer | Align script docs and command docs |
 | P12 | Optional `.ai-state` artifacts lack state labels | Suggested | M | context-engineer | Add lifecycle labels |
-| P13 | Pre-refactor schema producer/validator mismatch | Important | S | systems-architect / sentinel | Canonicalize section order |
+| P13 | ~~Pre-refactor schema producer/validator mismatch~~ | Important | S | systems-architect / sentinel | **Done** — F-14 remediation 2026-06-24 |
 | P14 | Verification report archival before cleanup underspecified | Important | S-M | implementation-planner | Add marker/gate |
 | P15 | Interface/transaction challenge artifacts under-discovered | Important | M | interface-designer / dashboard | Add to manifests and compaction |
 | P16 | ML artifacts not clearly separated as extension family | Suggested | M | systems-architect | Add ML extension artifact subsection |

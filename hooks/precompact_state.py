@@ -9,16 +9,27 @@ orientation. Exits 0 unconditionally -- must never block compaction.
 import sys
 from pathlib import Path
 
+# Ordered by pipeline flow so the snapshot reads as a narrative of the run.
+# Each doc is snapshotted only if present (absent ones are skipped), so listing
+# conditional/specialist artifacts here is free for pipelines that never produce them.
+# SKILL_GENESIS_REPORT.md is intentionally absent: dec-186 moved it out of .ai-work/
+# to .ai-state/skill_genesis_reports/, so it is no longer an in-flight pipeline doc.
 PIPELINE_DOCS = [
-    "WIP.md",
-    "IMPLEMENTATION_PLAN.md",
-    "LEARNINGS.md",
-    "PROGRESS.md",
-    "RESEARCH_FINDINGS.md",
-    "SYSTEMS_PLAN.md",
-    "VERIFICATION_REPORT.md",
+    "TASK_BRIEF.md",
     "IDEA_PROPOSAL.md",
-    "SKILL_GENESIS_REPORT.md",
+    "RESEARCH_FINDINGS.md",
+    "INTERFACE_DESIGN.md",
+    "TRANSACTIONS_DESIGN.md",
+    "SYSTEMS_PLAN.md",
+    "PRE_REFACTOR_PLAN.md",
+    "IMPLEMENTATION_PLAN.md",
+    "WIP.md",
+    "PROGRESS.md",
+    "LEARNINGS.md",
+    "TEST_RESULTS.md",
+    "VERIFICATION_REPORT.md",
+    "REWORK_MANIFEST.md",
+    "RECOVERY_LOG.md",
 ]
 
 HEAD_LINES = 30

@@ -746,6 +746,14 @@ have been routed back to the architect before planning.
 
 ### F-17 — ML Training Artifacts Are Adjacent but Not Clearly Partitioned From SWE Pipeline Artifacts
 
+**Status:** Done (2026-06-25) — added an **ML/AI Training Extension Artifacts** subsection to
+`skills/software-planning/references/artifact-inventory.md` (the F-03 reference): a conditional,
+`optional-lazy` family (`TRAINING_RESULTS.md` in `.ai-work/`; `training_runs/*.md`, `gpu_budget.yaml`,
+`neo_cloud_backend.yaml` in `.ai-state/`) with per-artifact producers/consumers, activation conditions
+(training archetype only), owning skills, and an explicit "adjacent, not core — never generalize onto
+non-training projects" note. `TRAINING_RESULTS.md` is also in `scripts/artifact_registry.py` with
+`activation: ml`.
+
 **Severity:** Suggested
 **Effort:** M
 **Estimated time/cost:** 0.5 day
@@ -761,6 +769,15 @@ artifacts into every project.
 inventory with conditional activation rules.
 
 ### F-18 — Historical Specs Can Preserve Broken Paths Without a Repair Policy
+
+**Status:** Done (2026-06-25) — added a **Path-Repair Policy for Historical Specs** to
+`skills/spec-driven-development/references/spec-format-guide.md`: a two-layer rule — requirement prose
+and change-narration are **immutable history** (a path named there is history, never repaired); live
+`## Traceability` matrix / YAML `impl:`/`test:` paths are **maintainable** and may carry an inline
+`<!-- maintenance correction YYYY-MM-DD: was … -->` note. Aligned with the existing sentinel split
+(SH01 resolves only live references and excludes change-narration; SH07/`scripts/spec_drift` detects
+`stale-dependent` paths) — so a stale path in a traceability field is a correction candidate while the
+same path in narration is correct-as-history.
 
 **Severity:** Suggested
 **Effort:** S-M
@@ -779,6 +796,13 @@ persistent baselines used for future deltas.
 - Sentinel SH checks should distinguish historical narration from live traceability fields.
 
 ### F-19 — `doc_manifest.yaml` Is Generated but Its Own Freshness Semantics Are Understated
+
+**Status:** Done (2026-06-25) — added sentinel **F11** (Freshness dimension): conditional on
+`.ai-state/doc_manifest.yaml` present, compare its `generated_at` against the newest commit touching
+`docs/` and `.ai-state/` (`git log -1 --format=%cI`), **WARN (never block)** when the manifest predates
+that commit, pointing to `scripts/build_doc_manifest.py` to regenerate — the dashboard navigation lags
+until it runs. Golden bad-case documented inline per `gate-liveness`. WARN-only because regeneration is
+manual (no hook/CI runs the builder), so stale is a normal, non-failing state.
 
 **Severity:** Suggested
 **Effort:** S
@@ -903,6 +927,13 @@ to list only `task-chronograph-mcp` as the active MCP; documented dec-225 remova
 dec-225 to §9 Decisions; noted L1 diagram may still depict removed memory MCP until regen.
 
 ### F-24 — `capture_memory.py` Is a Misnamed Observability Hook After Memory Removal
+
+**Status:** Done (2026-06-25) — documented as a **legacy filename** (the audit's lower-risk option).
+The hook's docstring now states it is an observability hook (the observations-WAL writer, dec-248), not
+curated memory, and that the `capture_memory` name is retained because it is referenced from
+`hooks/hooks.json`, the plugin manifest, and the Codex bridge generator — a rename would churn ~8
+callers for no behavioral gain, unwarranted for a Suggested cosmetic finding. A `capture_observations.py`
+rename is flagged as the right move *if* a future change touches those registration sites anyway.
 
 **Severity:** Suggested
 **Effort:** M
@@ -1139,15 +1170,15 @@ Verification:
 | P13 | ~~Pre-refactor schema producer/validator mismatch~~ | Important | S | systems-architect / sentinel | **Done** — F-14 remediation 2026-06-24 |
 | P14 | ~~Verification report archival before cleanup underspecified~~ | Important | S-M | implementation-planner | **Done (2026-06-25)** — `unmerged-verification` WARN keys on a `### Verification Patterns Merged` marker (F-06 gate) |
 | P15 | ~~Interface/transaction challenge artifacts under-discovered~~ | Important | M | interface-designer / dashboard | **Done (2026-06-25)** — `INTERFACE_DESIGN.md` + `TRANSACTIONS_DESIGN.md` now in precompact (batch 2) AND the dashboard/doc manifest (F-04 registry); drift-guarded |
-| P16 | ML artifacts not clearly separated as extension family | Suggested | M | systems-architect | Add ML extension artifact subsection |
-| P17 | Spec path-repair policy missing | Suggested | S-M | context-engineer | Define immutable-vs-maintained spec fields |
-| P18 | `doc_manifest.yaml` freshness not surfaced | Suggested | S | doc-engineer | Add sentinel/doc freshness check |
+| P16 | ~~ML artifacts not clearly separated as extension family~~ | Suggested | M | systems-architect | **Done (2026-06-25)** — ML/AI Training Extension Artifacts subsection in `artifact-inventory.md` (conditional, optional-lazy, adjacent-not-core) |
+| P17 | ~~Spec path-repair policy missing~~ | Suggested | S-M | context-engineer | **Done (2026-06-25)** — two-layer policy (immutable prose vs maintainable traceability paths) in `spec-format-guide.md`, aligned with sentinel SH01/SH07 |
+| P18 | ~~`doc_manifest.yaml` freshness not surfaced~~ | Suggested | S | doc-engineer | **Done (2026-06-25)** — sentinel `F11` WARNs when `generated_at` predates recent docs/state commits |
 | P19 | ~~Calibration log append weakly enforced~~ | Important | M | implementation-planner | **Done (2026-06-25)** — sentinel `CA03` coverage check flags under-logging (newest row vs recent pipeline commits); detection over a bypassable command surface |
 | P20 | ~~Tech-debt schema duplicated in prose~~ | Suggested | S | context-engineer | **Done** — F-12 remediation 2026-06-24 |
 | P21 | ~~Stale `.ai-work` slugs accumulated on disk~~ | Important | M | doc-engineer / context-engineer | **Done (2026-06-25)** — `clean_work_safety.py` `age_days` + `stale_safe` advisory (surfaced by `/clean-work`); one-time deletion left to the user (irreversible gitignored `rm -rf`) |
 | P22 | ~~Completed pipeline may be missing spec archival~~ | Important | S-M | implementation-planner | **Done (2026-06-25)** — cleanup-gating (F-06); `l3-readiness-config` investigated — archival **correctly skipped** (config task, no REQ-NN block, rationale in its SYSTEMS_PLAN) |
 | P23 | ~~`SYSTEM_DEPLOYMENT.md` still lists removed memory infrastructure~~ | Important | S | systems-architect / doc-engineer | **Done** — F-23 remediation 2026-06-24 |
-| P24 | `capture_memory.py` name conflicts with observations-only architecture | Suggested | M | implementer | Rename with compatibility or document legacy name |
+| P24 | ~~`capture_memory.py` name conflicts with observations-only architecture~~ | Suggested | M | implementer | **Done (2026-06-25)** — documented as a legacy filename (observations-WAL writer); rename deferred to avoid churning ~8 registration callers for a cosmetic gain |
 | P25 | ~~CI/path-scoped architecture filters may miss `DESIGN.md` changes~~ | Critical | M | cicd-engineer / context-engineer | **Done** — F-02/F-25 remediation 2026-06-24 |
 
 ---

@@ -53,3 +53,16 @@ Optional/adoption-gated persistent artifacts not in the tree above (created only
 | Permanent | `docs/` | `architecture.md` | Project lifetime — committed to git, derived from `.ai-state/DESIGN.md`, maintained by pipeline agents |
 
 The machine-readable counterpart for the `.ai-work/<slug>/` set (consumed by the doc manifest, dashboard, eval manifest, and precompact hook) is [`scripts/artifact_registry.py`](../../../scripts/artifact_registry.py); drift between its consumers is caught by `scripts/test_artifact_registry.py`.
+
+## ML/AI Training Extension Artifacts
+
+A **conditional extension family** — present only on ML/AI **training** projects (those onboarded with the training archetype: `train.py`/`prepare.py`/`program.md` present). All are `optional-lazy`: absent on every non-training project, and absence is never a defect. They are *adjacent* to the core SWE pipeline, not part of it — a SWE-shaped pipeline neither produces nor expects them, and they should not be generalized onto non-training projects.
+
+| Artifact | Location | State | Producer / consumers | Activation |
+|---|---|---|---|---|
+| `TRAINING_RESULTS.md` | `.ai-work/<slug>/` | optional-lazy | `/run-experiment` (writer); `/check-experiment`, verifier Phase 3a, archival (readers) | A training-dispatch step ran. Canonical schema: `skills/llm-training-eval` |
+| `training_runs/*.md` | `.ai-state/` | optional-lazy | ML workflow | Per-run training records on a training project |
+| `gpu_budget.yaml` | `.ai-state/` | optional-lazy | ML workflow / `/check-experiment` | Compute-budget tracking for owned/rented GPU modes |
+| `neo_cloud_backend.yaml` | `.ai-state/` | optional-lazy | ML workflow; read by the `neo-cloud-abstraction` skill | A training-job dispatch backend is configured (local / SkyPilot / RunPod / Nebius) |
+
+Owning skills: `ml-training`, `llm-training-eval`, `neo-cloud-abstraction`, `experiment-tracking`. The verifier reads `TRAINING_RESULTS.md` under Phase 3a only when it is present; its absence on a SWE task is expected, not a missing deliverable.

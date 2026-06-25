@@ -246,3 +246,14 @@ Prior spec requirements with uncertain baselines (SH03 FAIL):
 - **Staleness Warning** is conditional — omit the section entirely when baseline confidence is High
 
 **When the delta is empty**: if comparison reveals no behavioral changes (pure refactoring or implementation-only changes), skip `SPEC_DELTA.md` entirely. The absence of a delta signals "no behavioral change" to the planner and verifier.
+
+## Path-Repair Policy for Historical Specs
+
+Archived specs (`.ai-state/specs/SPEC_<name>_YYYY-MM-DD.md`) are persistent baselines used for future `SPEC_DELTA.md` comparisons. They are **not fully immutable** — a spec has two layers with different repair rules, because a future delta that baselines against a stale implementation path inherits the staleness:
+
+| Layer | Examples | Repair rule |
+|---|---|---|
+| **Historical requirements prose** | `When/and/the system/so that` blocks, Rationale, Key Decisions, change-narration ("the referenced function moved") | **Immutable.** Never rewrite — it records what was specified and decided at the time. A path *named inside requirement prose or narration* is history, not a live reference. |
+| **Live traceability fields** | the `## Traceability` matrix's file/test path cells; YAML `impl:`/`test:` paths | **Maintainable.** May be corrected when a file is renamed or moved post-archive, so the matrix keeps resolving. Annotate the correction inline — e.g. `path/new.py <!-- maintenance correction 2026-06-25: was path/old.py (renamed) -->` — so the edit is auditable and distinguishable from an original entry. |
+
+**Sentinel alignment.** This split already matches the SH checks: **SH01** resolves only live file references (matrix + Requirements) and *excludes change-narration prose*; **SH07** (`scripts/spec_drift`) detects `stale-dependent` paths against current HEAD. So a stale path flagged by SH01/SH07 in a *traceability field* is a maintenance-correction candidate; the same path appearing only in narration prose is correct-as-history and must be left alone. When in doubt, repair the matrix cell (live), never the requirement text (history).

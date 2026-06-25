@@ -1,4 +1,13 @@
-"""PostToolUse hook: capture tool events as memory observations.
+"""PostToolUse hook: capture tool events as append-only observations.
+
+LEGACY FILENAME (retained for hook-registration stability). This is an
+*observability* hook — it appends a JSONL line to `.ai-state/observations.jsonl`,
+not curated memory. The `capture_memory` name predates dec-225's removal of the
+in-house memory subsystem; it is kept because the filename is referenced from
+`hooks/hooks.json`, the plugin manifest, and the Codex bridge generator, and a
+rename would churn all of those for no behavioral gain. If a future change
+touches those registration sites anyway, rename to `capture_observations.py`
+then. Functionally this is the observations-WAL writer (see dec-248).
 
 Extracts structured fields using pattern matching (no LLM calls).
 Appends a single JSONL line to .ai-state/observations.jsonl.
@@ -12,7 +21,7 @@ import fcntl
 import json
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from _hook_utils import DISABLE_OBSERVABILITY, is_disabled
@@ -190,7 +199,7 @@ def main() -> None:
     parent_span_id = str(additional_context.get("parent_span_id") or "")
 
     observation = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "session_id": session_id,
         "agent_type": payload.get("agent_type", "main"),
         "agent_id": agent_id,

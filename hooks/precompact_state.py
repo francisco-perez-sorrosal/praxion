@@ -87,11 +87,11 @@ def main():
         state += "\n".join(sections)
 
         state += (
-            "\n## Memory Obligation\n\n"
-            "Before completing, call `remember()` if you discovered any "
-            "gotcha, pattern, convention, or insight that future agents "
-            "should know. The memory gate will block session completion "
-            "and commits without `remember()` calls.\n"
+            "\n## Durable Learning Reminder\n\n"
+            "Praxion has no curated-memory backend after dec-225 (no `remember()`/`recall()` "
+            "tools). Capture cross-session insights in `.ai-work/<slug>/LEARNINGS.md` during "
+            "the pipeline, or promote durable learnings to `.ai-state/` ADRs, archived specs, "
+            "or project docs before task cleanup.\n"
         )
 
         output_path = ai_work / "PIPELINE_STATE.md"

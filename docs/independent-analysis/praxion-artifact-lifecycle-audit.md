@@ -307,6 +307,8 @@ artifacts for challenge loops, rework, recovery, and ML verification.
 
 ### F-05 — `PIPELINE_STATE.md` Compaction Recovery Is Stale and Incomplete
 
+**Status:** Partial — P4 done (2026-06-24); P3 path mismatch and P5 snapshot coverage remain open
+
 **Severity:** Critical
 **Effort:** M
 **Estimated time/cost:** 0.5-1 day; hook update + tests
@@ -331,6 +333,11 @@ partial document list and includes obsolete `SKILL_GENESIS_REPORT.md`.
   `LEARNINGS.md` -> ADR/spec/docs/skill-genesis/sandbook future seam.
 - Snapshot all active artifacts or use the central registry from F-04.
 - Include a compact "active task slug(s)" index at the top when multiple task directories exist.
+
+**Remediation (2026-06-24, P4).** Replaced the PreCompact "Memory Obligation" block in
+`hooks/precompact_state.py` with a "Durable Learning Reminder" that points at `LEARNINGS.md` and
+`.ai-state/` promotion paths and explicitly states no `remember()`/`recall()` tools exist after
+dec-225.
 
 ### F-06 — `/clean-work` Can Delete Valuable or Gated State Too Easily
 
@@ -363,9 +370,9 @@ pre-refactor state. That undermines Praxion's proof-before-done and accountabili
 **Effort:** M
 **Estimated time/cost:** 0.5-1 day; cross-reference cleanup
 **Evidence:** Dec-225 removed `memory-mcp`, `memory.json`, `remember()`/`recall()` surfaces, and the
-memory gate. Stale references remain in `hooks/precompact_state.py`, `skills/software-planning/references/agent-pipeline-details.md`
+memory gate. Stale references remain in `skills/software-planning/references/agent-pipeline-details.md`
 (`memory.json` reconciliation), `docs/getting-started.md` (curated memory table), historical metrics
-reports, and some older ADRs/reports.
+reports, and some older ADRs/reports. *(PreCompact hook fixed 2026-06-24 — P4.)*
 
 **Clarification.** Historical ADRs and reports should not be rewritten unless they are current
 guidance. Active docs, hooks, rules, and commands should be updated.
@@ -806,7 +813,8 @@ projections or consistency tests.
 Fix:
 
 - ~~`ARCHITECTURE.md` active references in rules/agents/validators/docs.~~ **Done (2026-06-24)**
-- `remember()` active references in compaction hook and current docs.
+- ~~`remember()` active references in compaction hook and current docs.~~ **PreCompact hook done
+  (2026-06-24 — P4);** remaining active-doc cleanup tracked under F-07/P10.
 - `SKILL_GENESIS_REPORT.md` from `.ai-work` lists.
 - `PIPELINE_STATE.md` path mismatch.
 
@@ -894,7 +902,7 @@ Verification:
 | P1 | ~~Active `.ai-state/ARCHITECTURE.md` references after dec-132~~ | Critical | M | context-engineer | **Done** — F-01 remediation 2026-06-24 |
 | P2 | ~~`architect-validator` misses `.ai-state/DESIGN.md`~~ | Critical | M | architect-validator / cicd-engineer | **Done** — F-02 remediation 2026-06-24 |
 | P3 | `PIPELINE_STATE.md` path mismatch | Critical | S | implementer | Choose root vs slug, update hook + canonical block |
-| P4 | `precompact_state.py` tells agents to call removed `remember()` | Critical | XS | implementer | Remove memory obligation text |
+| P4 | ~~`precompact_state.py` tells agents to call removed `remember()`~~ | Critical | XS | implementer | **Done** — P4/F-05 remediation 2026-06-24 |
 | P5 | Precompact snapshot misses many current artifacts | Important | M | implementer | Drive from registry or update list |
 | P6 | `/clean-work` unsafe deletion semantics | Critical | M | implementation-planner | Add dry-run and cleanup gates |
 | P7 | Dashboard/doc manifest stale `.ai-work` list | Important | M | implementer | Update manifests and tests |
@@ -933,7 +941,8 @@ A future cleanup pipeline should not call itself complete until:
   reason.
 - Completed Standard/Full pipelines with REQ IDs or `traceability.yml` have archived specs or a
   recorded exception before cleanup.
-- Active docs no longer describe `remember()` or `memory-mcp` as available Praxion behavior.
+- [x] PreCompact hook no longer instructs agents to call `remember()`. *(Done 2026-06-24 — P4/F-05)*
+- Active docs no longer describe `remember()` or `memory-mcp` as available Praxion behavior. *(Partial — precompact fixed; F-07/P10 remain)*
 - [x] `SYSTEM_DEPLOYMENT.md` reflects the post-dec-225 observations-only state. *(Done 2026-06-24 — F-23)*
 - Sentinel or a dedicated test catches hard-coded artifact-list drift.
 - Historical artifacts are explicitly exempted from migration sweeps.

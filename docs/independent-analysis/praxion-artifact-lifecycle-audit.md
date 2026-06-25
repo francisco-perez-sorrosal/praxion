@@ -559,6 +559,8 @@ workshop.
 
 ### F-11 — Calibration Log Is Required by Philosophy but Weakly Produced
 
+**Status:** Done (2026-06-25).
+
 **Severity:** Important
 **Effort:** M
 **Estimated time/cost:** 0.5-1 day
@@ -575,6 +577,18 @@ cannot assess over/under-processing trends.
 - Add a lightweight `/record-calibration` helper or orchestrator checklist snippet.
 - Consider a best-effort hook that reminds but does not block.
 - Add a sentinel finding when recent completed pipelines have no corresponding calibration row.
+
+**Remediation (2026-06-25).** Added the audit's primary recommendation — a **sentinel `CA03`**
+coverage check (`agents/sentinel.md` § Calibration Accuracy) that compares the calibration log's
+newest `Timestamp` against recent pipeline activity in `git log` and flags **Important** when recent
+Standard/Full pipeline work has no corresponding row (with a golden bad-case per `gate-liveness`). The
+CA dimension's activation was clarified so `CA03` runs whenever the file exists (few rows + much
+activity *is* the under-logging signal), not only at the 5-entry `CA02` threshold. Detection — not a
+new command surface — is the right enforcement: there is no "task-complete" hook event to gate on, and
+the audit itself ranks the sentinel finding as the "add" (the `/record-calibration` helper and the
+reminder hook are its "or"/"consider" options). The append obligation already lives in
+`swe-agent-coordination-protocol.md`; CA03 closes the loop (instruction + detection) without expanding
+the always-loaded budget (the check lives in `agents/sentinel.md`, which is not always-loaded).
 
 ### F-12 — `TECH_DEBT_LEDGER.md` Is Conceptually Strong but Producer/Consumer Boundaries Need a Single Schema Anchor
 
@@ -1104,7 +1118,7 @@ Verification:
 | P16 | ML artifacts not clearly separated as extension family | Suggested | M | systems-architect | Add ML extension artifact subsection |
 | P17 | Spec path-repair policy missing | Suggested | S-M | context-engineer | Define immutable-vs-maintained spec fields |
 | P18 | `doc_manifest.yaml` freshness not surfaced | Suggested | S | doc-engineer | Add sentinel/doc freshness check |
-| P19 | Calibration log append weakly enforced | Important | M | implementation-planner | Add helper/check/reminder |
+| P19 | ~~Calibration log append weakly enforced~~ | Important | M | implementation-planner | **Done (2026-06-25)** — sentinel `CA03` coverage check flags under-logging (newest row vs recent pipeline commits); detection over a bypassable command surface |
 | P20 | ~~Tech-debt schema duplicated in prose~~ | Suggested | S | context-engineer | **Done** — F-12 remediation 2026-06-24 |
 | P21 | Stale `.ai-work` slugs accumulated on disk | Important | M | doc-engineer / context-engineer | Run gated cleanup and add stale-slug advisory |
 | P22 | Completed pipeline may be missing spec archival | Important | S-M | implementation-planner | **Partial (2026-06-25)** — cleanup-gating done (F-06 `unarchived-spec` WARN); `l3-readiness-config` investigation remains |

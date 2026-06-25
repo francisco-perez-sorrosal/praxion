@@ -224,12 +224,13 @@ Requires `.ai-state/specs/` directory with spec files. Skip with a note when no 
 
 ### Calibration Accuracy (CA)
 
-Requires `.ai-state/calibration_log.md`. Skip with a note when no calibration log exists or fewer than 5 entries.
+Requires `.ai-state/calibration_log.md`. CA01 and CA03 run whenever the file exists; CA02 needs 5+ entries (skip it with a note below that threshold). Skip the whole dimension with a note only when no calibration log exists.
 
 | ID | Tp | Rule | Pass |
 |----|----|------|------|
 | CA01 | A | `calibration_log.md` exists with valid table format | File exists in `.ai-state/`, header row matches expected columns, 1+ data rows |
 | CA02 | L | Calibration accuracy analysis (5+ entries required) | Recommendation-vs-actual match rate >60%, no single override pattern >40% of entries |
+| CA03 | L | Calibration coverage — recent pipelines are actually logged | The orchestrator is required to append a row on task completion (per `swe-agent-coordination-protocol.md`), but the append has no hook to enforce it, so it silently lapses. Compare the calibration log's newest `Timestamp` against recent pipeline activity in `git log` (feature/`feat:`/`fix:` merges and Standard/Full-tier commits landed since that timestamp). Flag **Important** when recent Standard/Full pipeline work has no corresponding row — i.e., the newest calibration `Timestamp` lags materially behind several intervening pipeline commits. Golden bad-case: the newest calibration row is dated weeks/months before multiple feature merges that have since landed on the branch. |
 
 ### Decision Log (DL)
 

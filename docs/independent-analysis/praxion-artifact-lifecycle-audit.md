@@ -168,7 +168,7 @@ These live in `.ai-state/` or permanent docs and are committed to git.
 | `.ai-state/DESIGN.md` | ✅ | Current file exists and active agents, sentinel, verifier, and dashboard all consume it. | `systems-architect`, `implementation-planner`, `implementer` | `researcher`, `promethean`, `roadmap-cartographer`, `verifier`, `sentinel`, dashboard | Architect-facing design target, includes planned/designed/built/deprecated components | Strong. Filename aligned with dec-132; active-surface rename completed 2026-06-24 (F-01). |
 | `docs/architecture.md` | ✅ | Active developer-facing pair to `DESIGN.md`, validated by docs/architecture checks and consumed by dashboard/humans. | `systems-architect`, `implementer`, `doc-engineer` | Developers, dashboard, verifier, sentinel | Code-verified developer navigation guide | Strong. The subset-of-DESIGN rule is coherent. |
 | `.ai-state/DESIGN_CHANGELOG.md` | ◐ | Intended as a living companion, but update frequency is lower and less central than `DESIGN.md`. | Architecture-maintenance agents | Maintainers | Verification/change history for design doc | Useful if maintained. Lower priority than main DESIGN.md freshness. |
-| `.ai-state/SYSTEM_DEPLOYMENT.md` | ◐ | Active deployment-state document, but content still references removed memory infrastructure. | `systems-architect`, `implementer`, `cicd-engineer` | `verifier`, `sentinel`, deployment agents | Deployment topology/config/runbook state | Strong conceptually, but content is stale after memory removal. |
+| `.ai-state/SYSTEM_DEPLOYMENT.md` | ✅ | Deployment surface reconciled with dec-225 (2026-06-24); no active `memory-mcp` listing. | `systems-architect`, `implementer`, `cicd-engineer` | `verifier`, `sentinel`, deployment agents | Deployment topology/config/runbook state | Strong. Diagram L1 may still show removed memory MCP — prose is authoritative until regen. |
 | `.ai-state/decisions/drafts/*.md` | ◐ | Active only during pipelines; empty drafts directory is healthy when no draft ADR is in flight. | `systems-architect`, `implementation-planner`, `interface-designer`, transaction architect | `finalize_adrs.py`, sentinel, agents in-flight | Pre-finalize ADR fragments with `dec-draft-<hash>` ids | Strong. It solves concurrent ADR numbering and is active only during pipelines. |
 | `.ai-state/decisions/<NNN>-*.md` | ✅ | Finalized ADRs are the active rationale spine and are consumed by agents, indexes, hooks, and docs. | `finalize_adrs.py`, direct-tier human authors | All planning/research agents, docs, sentinel | Finalized ADRs | Core persistent traceability surface. |
 | `.ai-state/decisions/DECISIONS_INDEX.md` | ✅ | Generated index is actively maintained by ADR finalization/index regeneration and consumed by agents/dashboard. | `regenerate_adr_index.py` via finalize | Research, architecture, dashboard, sentinel | Scannable ADR index | Strong but generated; should never be hand-merged. |
@@ -653,6 +653,8 @@ artifacts and promoted ADRs but no obvious matching `.ai-state/specs/SPEC_*.md` 
 
 ### F-23 — `SYSTEM_DEPLOYMENT.md` Still Describes Removed Memory Infrastructure
 
+**Status:** Done (2026-06-24)
+
 **Severity:** Important
 **Effort:** S
 **Estimated time/cost:** 2-4 hours
@@ -664,6 +666,11 @@ can mislead agents doing install, deployment, MCP, or observability work.
 
 **Recommended fix.** Update `SYSTEM_DEPLOYMENT.md` to reflect observations-only state, ADR injection,
 and "memory backend: none / sandbook future seam".
+
+**Remediation (2026-06-24).** Updated `.ai-state/SYSTEM_DEPLOYMENT.md` Overview and Service Topology
+to list only `task-chronograph-mcp` as the active MCP; documented dec-225 removal of curated memory,
+`observations.jsonl` WAL, standalone `inject_decisions.py`, and the planned `sandbook` seam; added
+dec-225 to §9 Decisions; noted L1 diagram may still depict removed memory MCP until regen.
 
 ### F-24 — `capture_memory.py` Is a Misnamed Observability Hook After Memory Removal
 
@@ -906,7 +913,7 @@ Verification:
 | P20 | Tech-debt schema duplicated in prose | Suggested | S | context-engineer | Reduce to one schema anchor |
 | P21 | Stale `.ai-work` slugs accumulated on disk | Important | M | doc-engineer / context-engineer | Run gated cleanup and add stale-slug advisory |
 | P22 | Completed pipeline may be missing spec archival | Important | S-M | implementation-planner | Investigate `l3-readiness-config`; gate cleanup on spec archive when required |
-| P23 | `SYSTEM_DEPLOYMENT.md` still lists removed memory infrastructure | Important | S | systems-architect / doc-engineer | Update deployment state after dec-225 |
+| P23 | ~~`SYSTEM_DEPLOYMENT.md` still lists removed memory infrastructure~~ | Important | S | systems-architect / doc-engineer | **Done** — F-23 remediation 2026-06-24 |
 | P24 | `capture_memory.py` name conflicts with observations-only architecture | Suggested | M | implementer | Rename with compatibility or document legacy name |
 | P25 | ~~CI/path-scoped architecture filters may miss `DESIGN.md` changes~~ | Critical | M | cicd-engineer / context-engineer | **Done** — F-02/F-25 remediation 2026-06-24 |
 
@@ -927,7 +934,7 @@ A future cleanup pipeline should not call itself complete until:
 - Completed Standard/Full pipelines with REQ IDs or `traceability.yml` have archived specs or a
   recorded exception before cleanup.
 - Active docs no longer describe `remember()` or `memory-mcp` as available Praxion behavior.
-- `SYSTEM_DEPLOYMENT.md` reflects the post-dec-225 observations-only state.
+- [x] `SYSTEM_DEPLOYMENT.md` reflects the post-dec-225 observations-only state. *(Done 2026-06-24 — F-23)*
 - Sentinel or a dedicated test catches hard-coded artifact-list drift.
 - Historical artifacts are explicitly exempted from migration sweeps.
 

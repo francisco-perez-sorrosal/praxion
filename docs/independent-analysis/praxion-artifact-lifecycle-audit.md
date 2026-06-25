@@ -814,6 +814,9 @@ well; the canonical tree still makes them look like expected project-state files
 
 ### F-21 — `.ai-work/` Contains Many Completed, Broken, or Orphaned Task Slugs
 
+**Status:** Done — advisory (2026-06-25). The durable stale-slug advisory is built; the one-time disk
+cleanup is left to the user (irreversible deletion of gitignored state).
+
 **Severity:** Important
 **Effort:** M
 **Estimated time/cost:** 0.5-1 day; doc-engineer/context-engineer plus cleanup gate
@@ -833,13 +836,34 @@ durable state.
 - Delete empty/broken orphan slugs after confirming they do not carry unique learnings.
 - Add a sentinel or dashboard advisory when `.ai-work` has stale slugs older than a threshold.
 
+**Remediation (2026-06-25).** Built the stale-slug advisory into the existing safety scanner
+(`scripts/clean_work_safety.py`, the P6 gate) rather than stretching sentinel's committed-artifact
+scope: each verdict now carries `age_days` (idle days since the newest file) and the summary tallies
+`stale_safe` (SAFE dirs idle ≥14d). `/clean-work` surfaces stale SAFE dirs first as the prime cleanup
+candidates. A live classification of the current 21 slugs: **2 BLOCK** (`l3-readiness-config` active
+WIP; `agent-truncation-recovery` open `REWORK_MANIFEST.md` — its advisory rework correctly gates parent
+cleanup, per the finding), **7 WARN** (unmerged learnings/verification), **12 SAFE** (6 stale ≥14d:
+`hackathon-skill-loop` 61d, `crafting-skills-refresh` 31d, `self-improving-skills` 22d,
+`factory-agent-readiness` 21d, `sia-praxion-fit` 20d, `nebius-neocloud` 19d; plus the empty
+`codex-onboarding-bridge`). The **one-time deletion is left to the user** — `rm -rf` of gitignored
+`.ai-work/` is irreversible, so bulk-deleting on the user's behalf would violate the confirm-before-
+hard-to-reverse discipline; run `/clean-work` to action it (it now merges-learnings-first and flags
+the rework dir to dispose first). Tests: 5 new staleness cases in `scripts/test_clean_work_safety.py`.
+
 ### F-22 — Completed Standard Pipelines May Miss Spec Archival
 
-**Status:** Partial (2026-06-25). The **cleanup-gating half is done** (subsumed by the F-06 safety
-gate): `/clean-work` now WARNs (`unarchived-traceability` / `unarchived-spec`) when a task directory
-has `traceability.yml` or a REQ-bearing `SYSTEMS_PLAN.md`, requiring archived-spec confirmation before
-deletion. The **one-off investigation** of whether `l3-readiness-config` actually missed its archive
-(and any backfill) remains a separate manual task.
+**Status:** Done (2026-06-25). The **cleanup-gating half** was subsumed by the F-06 safety gate:
+`/clean-work` now WARNs (`unarchived-traceability` / `unarchived-spec`) when a task directory has
+`traceability.yml` or a REQ-bearing `SYSTEMS_PLAN.md`, requiring archived-spec confirmation before
+deletion. The **`l3-readiness-config` investigation** is now complete: archival was **correctly
+skipped, not missed**. Its `SYSTEMS_PLAN.md` explicitly documents the rationale — *"a configuration +
+infrastructure task… not behavior-rich in the SDD sense — no new runtime behaviors with input/output
+contracts… No `REQ-NN` block is warranted"* — with a Register-Objection note that forcing SDD
+requirements onto config-file presence checks would be ceremony. There is no `traceability.yml` and no
+`REQ-NN` block (the audit's "rich artifacts" included a `SYSTEMS_PLAN` whose only "REQ" string is that
+objection prose). Nothing to backfill. (Note: the F-06 gate's `unarchived-spec` WARN does fire on this
+slug from the same prose REQ-substring match — an acceptable conservative false-positive the user
+dispositions; tightening the grep to a `REQ-NN:` block anchor is a possible refinement.)
 
 **Severity:** Important
 **Effort:** S-M
@@ -1120,8 +1144,8 @@ Verification:
 | P18 | `doc_manifest.yaml` freshness not surfaced | Suggested | S | doc-engineer | Add sentinel/doc freshness check |
 | P19 | ~~Calibration log append weakly enforced~~ | Important | M | implementation-planner | **Done (2026-06-25)** — sentinel `CA03` coverage check flags under-logging (newest row vs recent pipeline commits); detection over a bypassable command surface |
 | P20 | ~~Tech-debt schema duplicated in prose~~ | Suggested | S | context-engineer | **Done** — F-12 remediation 2026-06-24 |
-| P21 | Stale `.ai-work` slugs accumulated on disk | Important | M | doc-engineer / context-engineer | Run gated cleanup and add stale-slug advisory |
-| P22 | Completed pipeline may be missing spec archival | Important | S-M | implementation-planner | **Partial (2026-06-25)** — cleanup-gating done (F-06 `unarchived-spec` WARN); `l3-readiness-config` investigation remains |
+| P21 | ~~Stale `.ai-work` slugs accumulated on disk~~ | Important | M | doc-engineer / context-engineer | **Done (2026-06-25)** — `clean_work_safety.py` `age_days` + `stale_safe` advisory (surfaced by `/clean-work`); one-time deletion left to the user (irreversible gitignored `rm -rf`) |
+| P22 | ~~Completed pipeline may be missing spec archival~~ | Important | S-M | implementation-planner | **Done (2026-06-25)** — cleanup-gating (F-06); `l3-readiness-config` investigated — archival **correctly skipped** (config task, no REQ-NN block, rationale in its SYSTEMS_PLAN) |
 | P23 | ~~`SYSTEM_DEPLOYMENT.md` still lists removed memory infrastructure~~ | Important | S | systems-architect / doc-engineer | **Done** — F-23 remediation 2026-06-24 |
 | P24 | `capture_memory.py` name conflicts with observations-only architecture | Suggested | M | implementer | Rename with compatibility or document legacy name |
 | P25 | ~~CI/path-scoped architecture filters may miss `DESIGN.md` changes~~ | Critical | M | cicd-engineer / context-engineer | **Done** — F-02/F-25 remediation 2026-06-24 |

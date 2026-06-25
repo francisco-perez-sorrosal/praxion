@@ -21,8 +21,8 @@ Remove task-scoped subdirectories from `.ai-work/` — but never silently delete
    ```
    clean_work_safety.py --repo-root "$(git rev-parse --show-toplevel)" --json [slug ...]
    ```
-   The scanner mutates nothing. Parse the `task_dirs` array: each entry has `slug`, `classification` (`BLOCK` / `WARN` / `SAFE`), and `reasons` (each with `code`, `blocker`, `severity`, `remedy`). If it reports "Nothing to clean", stop.
-2. **Present** the verdicts grouped by classification, listing every `BLOCK` and `WARN` reason with its remedy so the user sees exactly what is at risk.
+   The scanner mutates nothing. Parse the `task_dirs` array: each entry has `slug`, `classification` (`BLOCK` / `WARN` / `SAFE`), `reasons` (each with `code`, `blocker`, `severity`, `remedy`), and `age_days` (idle days since the newest file; the `summary.stale_safe` count tallies SAFE dirs idle ≥14d). If it reports "Nothing to clean", stop.
+2. **Present** the verdicts grouped by classification, listing every `BLOCK` and `WARN` reason with its remedy so the user sees exactly what is at risk. Call out the **stale SAFE** dirs (`age_days ≥ 14`) first — they are the prime cleanup candidates that let `.ai-work/` keep communicating "active work".
 3. **`--dry-run`:** stop here — report what *would* be deleted (SAFE), retained (BLOCK), and warned (WARN). Delete nothing.
 4. **BLOCK directories:** do **not** delete. Tell the user to resolve the blocker (finish or `/resume-pipeline` the pipeline; complete the rework worktrees), or re-invoke with `--force <slug>` to override that specific slug. Only delete a BLOCK slug when it was passed in `--force` **and** the user confirms via `AskUserQuestion`.
 5. **WARN directories:** show the reasons and remedies, then use `AskUserQuestion` to confirm deletion (per slug, or as a batch) — only after the user acknowledges the durable-state handoff. Do not delete a WARN slug without explicit confirmation.

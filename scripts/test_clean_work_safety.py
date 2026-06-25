@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -254,8 +256,56 @@ def test_json_output_shape(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -
     with pytest.raises(SystemExit):
         cws.main(["--ai-work-root", str(ai_work), "--json"])
     payload = json.loads(capsys.readouterr().out)
-    assert payload["summary"] == {"total": 2, "block": 1, "warn": 0, "safe": 1}
+    assert payload["summary"] == {"total": 2, "block": 1, "warn": 0, "safe": 1, "stale_safe": 0}
     by_slug = {d["slug"]: d for d in payload["task_dirs"]}
     assert by_slug["blocked"]["classification"] == "BLOCK"
     assert by_slug["blocked"]["reasons"][0]["code"] == "open-rework"
     assert by_slug["safe"]["classification"] == "SAFE"
+
+
+# -- Staleness signal (P21) ---------------------------------------------------
+
+
+def _age_file(path: Path, days_ago: float) -> None:
+    past = time.time() - days_ago * 86400
+    os.utime(path, (past, past))
+
+
+def test_age_days_reflects_newest_file_mtime(tmp_path: Path) -> None:
+    ai_work = tmp_path / ".ai-work"
+    task = _make_task(ai_work, "old", {"RESEARCH_FINDINGS.md": "x\n"})
+    _age_file(task / "RESEARCH_FINDINGS.md", days_ago=30)
+    assert _classify(ai_work, "old").age_days >= 29
+
+
+def test_empty_dir_age_is_none(tmp_path: Path) -> None:
+    ai_work = tmp_path / ".ai-work"
+    _make_task(ai_work, "empty", {})
+    assert _classify(ai_work, "empty").age_days is None
+
+
+def test_recent_safe_dir_is_not_stale(tmp_path: Path) -> None:
+    ai_work = tmp_path / ".ai-work"
+    _make_task(ai_work, "fresh", {"RESEARCH_FINDINGS.md": "x\n"})  # mtime ~ now
+    verdict = _classify(ai_work, "fresh")
+    assert verdict.classification == "SAFE"
+    assert not cws._is_stale_safe(verdict)
+
+
+def test_old_safe_dir_is_flagged_stale(tmp_path: Path) -> None:
+    ai_work = tmp_path / ".ai-work"
+    task = _make_task(ai_work, "abandoned", {"RESEARCH_FINDINGS.md": "x\n"})
+    _age_file(task / "RESEARCH_FINDINGS.md", days_ago=60)
+    verdict = _classify(ai_work, "abandoned")
+    assert verdict.classification == "SAFE"
+    assert cws._is_stale_safe(verdict)
+
+
+def test_old_blocking_dir_is_not_a_stale_cleanup_candidate(tmp_path: Path) -> None:
+    """An old dir that still BLOCKs (open rework) must never be a stale candidate."""
+    ai_work = tmp_path / ".ai-work"
+    task = _make_task(ai_work, "old-rework", {"REWORK_MANIFEST.md": "x\n"})
+    _age_file(task / "REWORK_MANIFEST.md", days_ago=90)
+    verdict = _classify(ai_work, "old-rework")
+    assert verdict.classification == "BLOCK"
+    assert not cws._is_stale_safe(verdict)

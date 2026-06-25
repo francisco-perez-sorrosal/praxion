@@ -45,6 +45,7 @@ import json
 import logging
 import re
 import sys
+import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -54,6 +55,8 @@ from _repo_root import resolve_repo_root as _resolve_repo_root
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 AI_WORK_DIRNAME = ".ai-work"
+# A SAFE task dir idle longer than this is a prime cleanup candidate (advisory only).
+STALE_DAYS = 14
 
 # An unchecked GitHub-flavoured task box anywhere in WIP.md means the pipeline
 # still has work to do — the strongest "do not delete" signal.
@@ -87,6 +90,7 @@ class TaskVerdict:
     slug: str
     classification: str  # "BLOCK" | "WARN" | "SAFE"
     reasons: list[Reason] = field(default_factory=list)
+    age_days: int | None = None  # days since the newest file's mtime; None if the dir has no files
 
 
 # -- Content probes -----------------------------------------------------------
@@ -209,8 +213,15 @@ def detect_reasons(task_dir: Path) -> list[Reason]:
     return reasons
 
 
-def classify(task_dir: Path) -> TaskVerdict:
-    """Classify one task directory as BLOCK / WARN / SAFE."""
+def _newest_mtime(task_dir: Path) -> float | None:
+    """Most recent file mtime under `task_dir`, or None when it holds no files."""
+    mtimes = [p.stat().st_mtime for p in task_dir.rglob("*") if p.is_file()]
+    return max(mtimes) if mtimes else None
+
+
+def classify(task_dir: Path, now: float | None = None) -> TaskVerdict:
+    """Classify one task directory as BLOCK / WARN / SAFE, with its idle age."""
+    now = time.time() if now is None else now
     reasons = detect_reasons(task_dir)
     if any(r.severity == "block" for r in reasons):
         classification = "BLOCK"
@@ -218,10 +229,19 @@ def classify(task_dir: Path) -> TaskVerdict:
         classification = "WARN"
     else:
         classification = "SAFE"
-    return TaskVerdict(slug=task_dir.name, classification=classification, reasons=reasons)
+    newest = _newest_mtime(task_dir)
+    age_days = int((now - newest) // 86400) if newest is not None else None
+    return TaskVerdict(
+        slug=task_dir.name,
+        classification=classification,
+        reasons=reasons,
+        age_days=age_days,
+    )
 
 
-def scan_task_dirs(ai_work_root: Path, slugs: list[str]) -> list[TaskVerdict]:
+def scan_task_dirs(
+    ai_work_root: Path, slugs: list[str], now: float | None = None
+) -> list[TaskVerdict]:
     """Classify task-scoped subdirectories of `ai_work_root`.
 
     Hidden entries and the root-level `PIPELINE_STATE.md` snapshot file are not
@@ -234,16 +254,23 @@ def scan_task_dirs(ai_work_root: Path, slugs: list[str]) -> list[TaskVerdict]:
     if slugs:
         wanted = set(slugs)
         dirs = [d for d in dirs if d.name in wanted]
-    return [classify(d) for d in dirs]
+    return [classify(d, now) for d in dirs]
 
 
 # -- Rendering ----------------------------------------------------------------
 
 
+def _is_stale_safe(v: TaskVerdict) -> bool:
+    """A SAFE dir idle past the threshold — a prime cleanup candidate."""
+    return v.classification == "SAFE" and v.age_days is not None and v.age_days >= STALE_DAYS
+
+
 def _summary_counts(verdicts: list[TaskVerdict]) -> dict[str, int]:
-    counts = {"total": len(verdicts), "block": 0, "warn": 0, "safe": 0}
+    counts = {"total": len(verdicts), "block": 0, "warn": 0, "safe": 0, "stale_safe": 0}
     for v in verdicts:
         counts[v.classification.lower()] += 1
+        if _is_stale_safe(v):
+            counts["stale_safe"] += 1
     return counts
 
 
@@ -252,13 +279,16 @@ def render_text(verdicts: list[TaskVerdict], ai_work_root: Path) -> str:
         return f"Nothing to clean: no task directories under {ai_work_root}/"
     lines: list[str] = []
     for v in verdicts:
-        lines.append(f"{ai_work_root.name}/{v.slug}    {v.classification}")
+        age = f"idle {v.age_days}d" if v.age_days is not None else "empty"
+        stale = "  ← stale; prime cleanup candidate" if _is_stale_safe(v) else ""
+        lines.append(f"{ai_work_root.name}/{v.slug}    {v.classification}  ({age}){stale}")
         for r in v.reasons:
             lines.append(f"      [{r.severity}] {r.code}: {r.blocker} — {r.remedy}")
     c = _summary_counts(verdicts)
     lines.append("")
     lines.append(
-        f"{c['total']} task dir(s): {c['block']} BLOCK, {c['warn']} WARN, {c['safe']} SAFE"
+        f"{c['total']} task dir(s): {c['block']} BLOCK, {c['warn']} WARN, {c['safe']} SAFE "
+        f"({c['stale_safe']} stale, idle ≥{STALE_DAYS}d)"
     )
     return "\n".join(lines)
 

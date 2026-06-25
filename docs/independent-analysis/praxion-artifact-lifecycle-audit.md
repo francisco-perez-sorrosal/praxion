@@ -255,6 +255,8 @@ structural validation path that is supposed to guard code <-> DSL <-> ADR drift.
 
 ### F-03 — The Canonical Artifact Inventory Mixes Active, Optional, Future, Historical, and Renamed Surfaces
 
+**Status:** Done (2026-06-25) — also closes P12 (lifecycle-state labels).
+
 **Severity:** Important
 **Effort:** L
 **Estimated time/cost:** 1-2 days; context-engineer + doc-engineer + sentinel/eval updates
@@ -278,6 +280,20 @@ not activated, optional, future-designed, or deprecated.
 - Move the full per-artifact table out of the always-loaded rule into a reference file, leaving a
   compact decision table in the rule. Sentinel already reported token budget pressure, so this also
   improves token efficiency.
+
+**Remediation (2026-06-25).** Moved both verbose tables — the per-artifact inventory and the
+`## Document Lifecycle` table (the latter the sentinel's named target) — out of the always-loaded
+`rules/swe/agent-intermediate-documents.md` into a new on-demand reference
+`skills/software-planning/references/artifact-inventory.md` (the `td-018` progressive-disclosure
+pattern). The rule keeps the canonical file trees and now carries a **compact lifecycle-state decision
+table** with the five state labels (`active` / `optional-lazy` / `threshold-lazy` / `future-designed`
+/ `historical-retained`) so "absent" is unambiguous — **this closes P12**. Both sentinel-validated
+anchors (`#task-slug-convention`, `#tech_debt_ledger-summary`) preserved; no inbound anchor links to
+the moved sections. The rule dropped **14,658 → 7,742 chars (~6,900 chars / ~1,900 tokens freed)**,
+moving the always-loaded budget from the sentinel's urgent **0.9% headroom** to ~5.7%. The reference
+cross-links the machine counterpart `scripts/artifact_registry.py` (F-04), closing the human-inventory
+/ machine-inventory loop. `ARCHITECTURE.md` was already removed by F-01. Rules manifest regenerated;
+software-planning skill validates.
 
 ### F-04 — Dashboard and Documentation Manifest Recognize a Stale Partial `.ai-work` Set
 
@@ -1081,7 +1097,7 @@ Verification:
 | P11 | ~~`reconcile_ai_state.py` contract overstated in docs~~ | Important | S-M | implementer | **Done (2026-06-25)** — callers aligned to the script's narrow observations+ADR contract |
 | P26 | ~~Codex memory bridge still ships memory hooks/gates post-dec-225~~ | Important | M | implementer | **Done (2026-06-25)** — verified the generator (`export-codex-rules-bridge.py`) no longer emits memory hooks (stale `.codex/hooks/` files were gitignored leftovers, deleted); purged stale memory descriptions from `codex/config/README.md`, `README_DEV.md`, `AGENTS.md.tmpl`. Codex-native memory etiquette + the observability hook retained |
 | P27 | ~~Roadmap `remember()` persistence cluster is broken~~ | Important | M | context-engineer | **Done (2026-06-25)** — renamed "Memory Candidates" → "Learning Candidates" across `roadmap-cartographer`, `/roadmap`, `roadmap-synthesis` (assets + refs); rerouted persistence to LEARNINGS.md / ADR / idea ledger / surface-to-user; no `remember()` referenced. Inline rationale only (shipped-artifact isolation) |
-| P12 | Optional `.ai-state` artifacts lack state labels | Suggested | M | context-engineer | Add lifecycle labels |
+| P12 | ~~Optional `.ai-state` artifacts lack state labels~~ | Suggested | M | context-engineer | **Done (2026-06-25)** — five-state vocabulary (`active`/`optional-lazy`/`threshold-lazy`/`future-designed`/`historical-retained`) in the rule's compact table + the inventory reference's `State` column (via F-03) |
 | P13 | ~~Pre-refactor schema producer/validator mismatch~~ | Important | S | systems-architect / sentinel | **Done** — F-14 remediation 2026-06-24 |
 | P14 | ~~Verification report archival before cleanup underspecified~~ | Important | S-M | implementation-planner | **Done (2026-06-25)** — `unmerged-verification` WARN keys on a `### Verification Patterns Merged` marker (F-06 gate) |
 | P15 | ~~Interface/transaction challenge artifacts under-discovered~~ | Important | M | interface-designer / dashboard | **Done (2026-06-25)** — `INTERFACE_DESIGN.md` + `TRANSACTIONS_DESIGN.md` now in precompact (batch 2) AND the dashboard/doc manifest (F-04 registry); drift-guarded |

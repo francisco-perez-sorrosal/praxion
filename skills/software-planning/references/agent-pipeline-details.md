@@ -334,7 +334,6 @@ These lines are **optional and backward-compatible**. Existing `TEST_RESULTS.md`
 
 | Artifact | Conflict risk | Reconciliation |
 |----------|--------------|----------------|
-| `memory.json` | **High** — JSON object, git can't merge structurally; concurrent `remember()` calls produce divergent keys | Run `python scripts/reconcile_ai_state.py`. Semantic merge: union of entries per category, `updated_at` timestamp wins for duplicate keys, session counts summed |
 | `observations.jsonl` | Medium — append-only JSONL, git usually auto-merges but can conflict at insertion point | Run `python scripts/reconcile_ai_state.py`. Concat both, dedup by `(timestamp, session_id, event_type, tool_name)`, sort by timestamp |
 | `decisions/<NNN>-<slug>.md` | Low — unique sequence numbers, but two worktrees may pick the same NNN | Run `python scripts/reconcile_ai_state.py`. Auto-detects duplicate NNN prefixes, renumbers the later ADR, updates its `id` field |
 | `decisions/DECISIONS_INDEX.md` | Medium — both worktrees regenerate the full index | Run `python scripts/reconcile_ai_state.py`. Always regenerated from ADR files — never merge textually |

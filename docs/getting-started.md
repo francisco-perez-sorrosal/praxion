@@ -150,7 +150,7 @@ After the feature is complete and verified:
 /clean-work
 ```
 
-This removes `.ai-work/<task-slug>/` after merging learnings into permanent locations. Commit your code with `/co`.
+This removes `.ai-work/<task-slug>/` once its durable content is safe to lose. `/clean-work` first runs a read-only safety scan: it **blocks** deletion of a directory with an active `WIP.md` or an open `REWORK_MANIFEST.md`, and **warns** when `LEARNINGS.md`, an unmerged `VERIFICATION_REPORT.md`, `traceability.yml`, `RECOVERY_LOG.md`, or an unconsumed `PRE_REFACTOR_PLAN.md` still needs a permanent home. Use `/clean-work --dry-run` to preview the verdicts without deleting. Commit your code with `/co`.
 
 ## What Persists vs What Gets Cleaned
 
@@ -166,8 +166,9 @@ After `/clean-work` removes `.ai-work/<task-slug>/`, several categories of artif
 | **Behavioral specs (medium/large features)** | `.ai-state/specs/SPEC_<name>_YYYY-MM-DD.md` | implementation-planner at end-of-feature | Project lifetime |
 | **Idea ledger** | `.ai-state/idea_ledgers/IDEA_LEDGER_*.md` | promethean | Project lifetime |
 | **Tier calibration log** | `.ai-state/calibration_log.md` | main agent on every task | Append-only |
-| **Curated cross-session memory** | `.ai-state/memory.json` | memory MCP via `remember()` | Survives across sessions and worktrees |
 | **Auto-captured tool events** | `.ai-state/observations.jsonl` | hooks (`capture_memory.py`, `capture_session.py`) | Append-only |
+
+> There is no curated cross-session *memory* artifact: dec-225 removed the in-house memory subsystem (`memory.json`, the Memory MCP, `remember()`/`recall()`). Cross-session knowledge now lives in the committed `.ai-state/` artifacts above (ADRs, specs) plus learnings promoted out of `LEARNINGS.md`; `sandbook` is the planned external memory backend.
 
 ### Key lifecycle — ADR fragments → stable IDs
 
@@ -254,7 +255,7 @@ These agents operate alongside the main pipeline:
 | `/cop` | Commit and push |
 | `/create-worktree [branch]` | Work on a feature in an isolated worktree |
 | `/merge-worktree [branch]` | Merge the worktree back |
-| `/clean-work` | Remove `.ai-work/<task-slug>/` after pipeline completion |
+| `/clean-work` | Safely remove `.ai-work/<task-slug>/` — blocks on live/unarchived state; `--dry-run` to preview |
 | `/onboard-project` | Set up a new project for the ecosystem |
 
 ## Further Reading

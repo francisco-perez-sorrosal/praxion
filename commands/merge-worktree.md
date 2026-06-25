@@ -24,6 +24,6 @@ Merge the $ARGUMENTS worktree into the current branch. Primary worktree home is 
    - If no `.ai-state/` paths are touched, squash-merge is permitted.
 5. Merge in the worktree. Default: `git merge --ff-only "$BRANCH"` to preserve a linear history. If `--ff-only` refuses because the branch has diverged from the target, stop and tell the user to rebase the branch on the target first (`git rebase <default-branch>` from inside the worktree) and re-run the merge. Do not silently fall back to a non-fast-forward merge commit. The user's explicit `--squash` or rebase choice (when it passed the check in Step 4) is honored.
 6. Check for merge conflicts using `git status`, `git diff --name-only --diff-filter=U`, or `git ls-files -u`.
-7. Run `.ai-state/` reconciliation: `python scripts/reconcile_ai_state.py` — this resolves memory.json and observations.jsonl conflicts semantically, renumbers duplicate ADR sequence numbers, and regenerates `DECISIONS_INDEX.md`.
+7. Run `.ai-state/` reconciliation: `python scripts/reconcile_ai_state.py` — this resolves `observations.jsonl` conflicts semantically, renumbers duplicate ADR sequence numbers, and regenerates `DECISIONS_INDEX.md`.
 8. Promote any draft ADRs introduced by the merged branch: `python3 scripts/finalize_adrs.py --merged` (command-layer invocation complementing the post-merge git hook — idempotent; no-op when the hook already ran).
 9. Resolve any remaining conflicts based on your knowledge of the changes and continue the merging process.

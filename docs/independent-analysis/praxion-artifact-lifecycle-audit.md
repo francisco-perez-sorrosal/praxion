@@ -365,6 +365,8 @@ file written, exit 0.
 
 ### F-06 — `/clean-work` Can Delete Valuable or Gated State Too Easily
 
+**Status:** Done (2026-06-25) — closed together with F-15/P14 and F-22/P22 (all three converge on `/clean-work`)
+
 **Severity:** Critical
 **Effort:** M
 **Estimated time/cost:** 0.5-1 day; command update + dry-run tests
@@ -388,7 +390,43 @@ pre-refactor state. That undermines Praxion's proof-before-done and accountabili
   - Detect `RECOVERY_LOG.md` and preserve or summarize it.
 - Add `--dry-run` output listing blockers/warnings per task slug.
 
+**Remediation (2026-06-25).** Replaced the single-`LEARNINGS.md` warning with a deterministic,
+testable safety gate (the audit's stated verification — "fixture `.ai-work` directories… tests show
+cleanup refuses"). New read-only classifier `scripts/clean_work_safety.py` scans each task directory
+and returns `BLOCK` (active `WIP.md` with an unchecked step; open `REWORK_MANIFEST.md`), `WARN`
+(`LEARNINGS.md`; `VERIFICATION_REPORT.md` without a `### Verification Patterns Merged` marker in
+`LEARNINGS.md`; `traceability.yml` / REQ-bearing `SYSTEMS_PLAN.md`; `RECOVERY_LOG.md`; unconsumed
+`PRE_REFACTOR_PLAN.md`), or `SAFE`; exit 1 when any directory is BLOCK. The scanner mutates nothing —
+`commands/clean-work.md` (rewritten) drives it, supports `--dry-run` and per-slug `--force` for BLOCK
+override, and confirms WARN deletions via `AskUserQuestion`. Per `gate-liveness`, the gate ships
+canaries proving it bites on known-bad inputs (open rework manifest; unchecked WIP step) in
+`scripts/test_clean_work_safety.py` (22 tests). Installed on `PATH` by `install_claude.sh` so the
+shipped command works in managed projects. **F-15/P14** (verification-report merge marker) and
+**F-22/P22** (spec-archival gate) are subsumed: the `unmerged-verification` and
+`unarchived-traceability`/`unarchived-spec` WARN reasons implement them directly.
+
 ### F-07 — Memory Removal Is Not Fully Reflected in Process Docs
+
+**Status:** Partial (2026-06-25). The audit-named active surfaces are fixed; grounding revealed the
+stale-memory surface is **wider than this finding enumerated** — two new clusters are tracked as
+backlog items **P26** (Codex memory bridge) and **P27** (roadmap `remember()` persistence) in §9, plus
+a list of deliberately-retained vestigial references below.
+
+**Remediation (2026-06-25).** Updated the active surfaces this finding named, plus two more found via
+grounding: removed the curated-memory row from `docs/getting-started.md` (added a one-line note that
+the backend is none / `sandbook` planned); deleted the `memory.json` reconciliation row from
+`skills/software-planning/references/agent-pipeline-details.md`; corrected the stale Phase 5 toggle
+description in `docs/existing-project-onboarding.md` (observability only — `/onboard-project` itself
+was already clean); and removed `.ai-state/memory.json` from the retired-merge-driver references in
+`rules/swe/vcs/pr-conventions.md` (active path-scoped rule) and `commands/merge-worktree.md`. History
+(`.ai-state/decisions/`, idea ledgers, `TECH_DEBT_RESOLVED.md`, metrics reports) left untouched.
+
+**Deliberately retained (vestigial / illustrative / guarded — not active wrong guidance):**
+`skills/tui-design` (`memory-mcp start` as a generic CLI-UX *example*); `skills/versioning/references/commitizen.md`
+(`memory-mcp/pyproject.toml` version-pin example); and the defensive *sanitization/scan* patterns for
+`.ai-state/memory.json` in `skills/upstream-stewardship`, `skills/context-security-review`, and
+`skills/id-decontamination` (guarded by "if present" — harmless on memory-free projects). These teach patterns
+rather than assert Praxion ships memory; revisit only if they cause confusion.
 
 **Severity:** Important
 **Effort:** M
@@ -410,6 +448,17 @@ guidance. Active docs, hooks, rules, and commands should be updated.
   historical/managed-project legacy only.
 
 ### F-08 — `reconcile_ai_state.py` Documentation and Reconciliation Contracts Lag Current State
+
+**Status:** Done (2026-06-25). The script is intentionally narrow and its docstring already says so
+(handles only `observations.jsonl` dedup + ADR renumber/index — verified: zero `memory` references in
+`scripts/reconcile_ai_state.py`). The drift was entirely in the *callers* overstating its contract.
+
+**Remediation (2026-06-25).** Aligned the callers to the script's actual narrow contract:
+`commands/merge-worktree.md` no longer claims it "resolves memory.json" (now: `observations.jsonl` +
+ADR renumber + index regen); the `agent-pipeline-details.md` `.ai-state/` reconciliation table dropped
+its `memory.json` row (the script never handled it post-dec-225). The stale `ARCHITECTURE.md` reference
+in that table was already removed by the F-01 migration. The remaining table rows match what the script
+and git semantics actually do.
 
 **Severity:** Important
 **Effort:** S-M
@@ -609,6 +658,10 @@ clarified `PR01` producer/validator parity in `agents/sentinel.md`.
 
 ### F-15 — Cleanup / Archival Order for `VERIFICATION_REPORT.md` Is Underspecified
 
+**Status:** Done (2026-06-25 — subsumed by the F-06 `/clean-work` safety gate). The `unmerged-verification`
+WARN reason fires when `VERIFICATION_REPORT.md` exists without a `### Verification Patterns Merged`
+marker in `LEARNINGS.md` — the marker-or-prompt option this finding recommended, made deterministic.
+
 **Severity:** Important
 **Effort:** S-M
 **Estimated time/cost:** 2-6 hours
@@ -731,6 +784,12 @@ durable state.
 - Add a sentinel or dashboard advisory when `.ai-work` has stale slugs older than a threshold.
 
 ### F-22 — Completed Standard Pipelines May Miss Spec Archival
+
+**Status:** Partial (2026-06-25). The **cleanup-gating half is done** (subsumed by the F-06 safety
+gate): `/clean-work` now WARNs (`unarchived-traceability` / `unarchived-spec`) when a task directory
+has `traceability.yml` or a REQ-bearing `SYSTEMS_PLAN.md`, requiring archived-spec confirmation before
+deletion. The **one-off investigation** of whether `l3-readiness-config` actually missed its archive
+(and any backfill) remains a separate manual task.
 
 **Severity:** Important
 **Effort:** S-M
@@ -994,15 +1053,17 @@ Verification:
 | P3 | ~~`PIPELINE_STATE.md` path mismatch~~ | Critical | S | implementer | **Done (2026-06-25)** — resolved to root-scoped; canonical block + onboarding pair re-synced |
 | P4 | ~~`precompact_state.py` tells agents to call removed `remember()`~~ | Critical | XS | implementer | **Done** — P4/F-05 remediation 2026-06-24 |
 | P5 | ~~Precompact snapshot misses many current artifacts~~ | Important | M | implementer | **Done (2026-06-25)** — list updated (added brief/interface/transactions/pre-refactor/test-results/rework/recovery); registry (F-04) remains the durable follow-up |
-| P6 | `/clean-work` unsafe deletion semantics | Critical | M | implementation-planner | Add dry-run and cleanup gates |
+| P6 | ~~`/clean-work` unsafe deletion semantics~~ | Critical | M | implementation-planner | **Done (2026-06-25)** — deterministic `clean_work_safety.py` BLOCK/WARN/SAFE gate + `--dry-run` + canary tests |
 | P7 | Dashboard/doc manifest stale `.ai-work` list | Important | M | implementer | Update manifests and tests |
 | P8 | Eval task manifest too small | Important | M | test-engineer / implementer | Conditional artifact manifest |
 | P9 | Skill-genesis old ephemeral path remains in consumers | Important | S | context-engineer | **Partial (2026-06-25)** — removed from `precompact_state.py`; `build_doc_manifest.py` + dashboard `files.ts` still list it (F-04) |
-| P10 | Memory subsystem stale active docs | Important | M | doc-engineer | Update current docs; preserve history |
-| P11 | `reconcile_ai_state.py` contract overstated in docs | Important | S-M | implementer | Align script docs and command docs |
+| P10 | Memory subsystem stale active docs | Important | M | doc-engineer | **Partial (2026-06-25)** — audit-named active surfaces fixed; new clusters split to P26/P27; vestigial refs retained with reasons |
+| P11 | ~~`reconcile_ai_state.py` contract overstated in docs~~ | Important | S-M | implementer | **Done (2026-06-25)** — callers aligned to the script's narrow observations+ADR contract |
+| P26 | Codex memory bridge still ships memory hooks/gates post-dec-225 | Important | M | implementer | **New (2026-06-25, from P10 grounding)** — `README_DEV.md`, `codex/config/README.md`, and the `.codex/hooks/praxion-memory-*.py` bridge reference removed memory; verify `install_codex.sh` and purge |
+| P27 | Roadmap `remember()` persistence cluster is broken | Important | M | context-engineer | **New (2026-06-25, from P10 grounding)** — `roadmap-cartographer`, `/roadmap`, `roadmap-synthesis` tell the coordinator to persist "Memory Candidates" via a `remember()` tool removed by dec-225; reroute to LEARNINGS.md / surface-to-user |
 | P12 | Optional `.ai-state` artifacts lack state labels | Suggested | M | context-engineer | Add lifecycle labels |
 | P13 | ~~Pre-refactor schema producer/validator mismatch~~ | Important | S | systems-architect / sentinel | **Done** — F-14 remediation 2026-06-24 |
-| P14 | Verification report archival before cleanup underspecified | Important | S-M | implementation-planner | Add marker/gate |
+| P14 | ~~Verification report archival before cleanup underspecified~~ | Important | S-M | implementation-planner | **Done (2026-06-25)** — `unmerged-verification` WARN keys on a `### Verification Patterns Merged` marker (F-06 gate) |
 | P15 | Interface/transaction challenge artifacts under-discovered | Important | M | interface-designer / dashboard | **Partial (2026-06-25)** — compaction half done (`INTERFACE_DESIGN.md` + `TRANSACTIONS_DESIGN.md` now in `precompact_state.py`); dashboard/eval manifests remain |
 | P16 | ML artifacts not clearly separated as extension family | Suggested | M | systems-architect | Add ML extension artifact subsection |
 | P17 | Spec path-repair policy missing | Suggested | S-M | context-engineer | Define immutable-vs-maintained spec fields |
@@ -1010,7 +1071,7 @@ Verification:
 | P19 | Calibration log append weakly enforced | Important | M | implementation-planner | Add helper/check/reminder |
 | P20 | ~~Tech-debt schema duplicated in prose~~ | Suggested | S | context-engineer | **Done** — F-12 remediation 2026-06-24 |
 | P21 | Stale `.ai-work` slugs accumulated on disk | Important | M | doc-engineer / context-engineer | Run gated cleanup and add stale-slug advisory |
-| P22 | Completed pipeline may be missing spec archival | Important | S-M | implementation-planner | Investigate `l3-readiness-config`; gate cleanup on spec archive when required |
+| P22 | Completed pipeline may be missing spec archival | Important | S-M | implementation-planner | **Partial (2026-06-25)** — cleanup-gating done (F-06 `unarchived-spec` WARN); `l3-readiness-config` investigation remains |
 | P23 | ~~`SYSTEM_DEPLOYMENT.md` still lists removed memory infrastructure~~ | Important | S | systems-architect / doc-engineer | **Done** — F-23 remediation 2026-06-24 |
 | P24 | `capture_memory.py` name conflicts with observations-only architecture | Suggested | M | implementer | Rename with compatibility or document legacy name |
 | P25 | ~~CI/path-scoped architecture filters may miss `DESIGN.md` changes~~ | Critical | M | cicd-engineer / context-engineer | **Done** — F-02/F-25 remediation 2026-06-24 |
@@ -1028,14 +1089,15 @@ A future cleanup pipeline should not call itself complete until:
   is now correct and complete and its `PIPELINE_STATE.md` path is root-aligned; dashboard `files.ts`,
   `build_doc_manifest.py`, and the eval manifest still diverge — closing this fully is the F-04/Phase-3
   registry work, the single root cause behind P5/P7/P8/P9/P15.)*
-- `/clean-work --dry-run` reports blockers for in-progress WIP, rework manifests, unarchived
-  traceability, verifier reports, and recovery logs.
+- [x] `/clean-work --dry-run` reports blockers for in-progress WIP, rework manifests, unarchived
+  traceability, verifier reports, and recovery logs. *(Done 2026-06-25 — F-06; `clean_work_safety.py`
+  BLOCK/WARN classifier + canary tests)*
 - Existing stale `.ai-work` task slugs are either cleaned, promoted, or explicitly retained with a
   reason.
 - Completed Standard/Full pipelines with REQ IDs or `traceability.yml` have archived specs or a
   recorded exception before cleanup.
 - [x] PreCompact hook no longer instructs agents to call `remember()`. *(Done 2026-06-24 — P4/F-05)*
-- Active docs no longer describe `remember()` or `memory-mcp` as available Praxion behavior. *(Partial — precompact fixed; F-07/P10 remain)*
+- Active docs no longer describe `remember()` or `memory-mcp` as available Praxion behavior. *(Partial 2026-06-25 — precompact (P4), getting-started/onboarding/agent-pipeline-details/merge-worktree/pr-conventions (P10), and the reconcile contract (P11) fixed; the Codex memory bridge (P26) and roadmap `remember()` cluster (P27) remain)*
 - [x] `SYSTEM_DEPLOYMENT.md` reflects the post-dec-225 observations-only state. *(Done 2026-06-24 — F-23)*
 - Sentinel or a dedicated test catches hard-coded artifact-list drift.
 - Historical artifacts are explicitly exempted from migration sweeps.

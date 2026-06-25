@@ -33,7 +33,7 @@ PRs that touch `.ai-state/` carry obligations beyond regular code PRs because th
 
 ### Merge Policy
 
-**Default: fast-forward only (`git merge --ff-only`).** Preserves a linear history on the target branch; post-merge git hooks fire as expected on the moved tip. When the source branch has diverged from the target, rebase the source onto the target first (`git rebase <target>` from inside the worktree) so the next attempt fast-forwards — the rebase exercises the merge drivers on `.ai-state/memory.json` and `.ai-state/observations.jsonl` if any conflicts in those files exist. Do not silently fall back to a non-fast-forward merge commit.
+**Default: fast-forward only (`git merge --ff-only`).** Preserves a linear history on the target branch; post-merge git hooks fire as expected on the moved tip. When the source branch has diverged from the target, rebase the source onto the target first (`git rebase <target>` from inside the worktree) so the next attempt fast-forwards — the rebase exercises the `.ai-state/observations.jsonl` merge driver if any conflicts in that file exist. Do not silently fall back to a non-fast-forward merge commit.
 
 **Do not squash-merge PRs that touch `.ai-state/`.** Squash collapses the source-branch history into a single commit on the target; the resulting tree replaces the target's `.ai-state/` wholesale, erasing any state the target accumulated since the branch diverged. Consequences include:
 
@@ -51,7 +51,7 @@ Enforcement is layered:
 
 - **Reviewers verify ADR drafts have the required frontmatter shape** per `adr-conventions.md` — fragment filename, `id: dec-draft-<hash>`, `status: proposed`. The finalize step at merge rewrites `id` and cross-references; review the draft in its draft form, not against what it will become.
 - **Do not review `DECISIONS_INDEX.md` changes.** The index is regenerated automatically at finalize from the on-disk ADR set; hand-edited index changes on a PR are a signal of drift.
-- **Treat `.ai-state/observations.jsonl` and `.ai-state/memory.json` as mergeable data.** The semantic merge drivers reconcile concurrent writes. Reviewers confirm the delta looks structurally sensible (new keys / appended events), not line-by-line.
+- **Treat `.ai-state/observations.jsonl` as mergeable data.** Its semantic merge driver reconciles concurrent writes. Reviewers confirm the delta looks structurally sensible (appended events), not line-by-line.
 - **Architecture docs (`.ai-state/DESIGN.md` and `docs/architecture.md`) respect section ownership.** Systems architect owns design-target sections; implementer owns as-built sections; doc-engineer validates dev-facing wording. Conflicting edits to the same section are a review concern; edits to different sections are expected to compose.
 
 ### Stacked PRs and Multi-PR Feature Work

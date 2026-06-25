@@ -85,13 +85,19 @@ Mode is passed from the command as a single token:
 
 ## Output Contract
 
-- **`ROADMAP.md`** at the **project root** — living document. In `diff` mode, the Decision Log is never rewritten; append a new entry.
+- **`ROADMAP.md`** at the **project root** — audit output document. In `diff` mode, the Decision Log is never rewritten; append a new entry.
 - **`.ai-work/<task-slug>/ROADMAP_DRAFT.md`** — intermediate draft before Gate 3.
 - **`.ai-work/<task-slug>/AUDIT_<lens>.md`** — one fragment per Phase 3 researcher.
 - **`.ai-work/<task-slug>/CONTRADICTION_MAP.md`** — cross-lens conflict list produced by Phase 3.5; ephemeral.
 - **`.ai-work/<task-slug>/PROGRESS.md`** — append-only phase-transition log.
 
 Use [`skills/roadmap-synthesis/assets/ROADMAP_TEMPLATE.md`](../skills/roadmap-synthesis/assets/ROADMAP_TEMPLATE.md) as the scaffold.
+
+### ROADMAP.md lifecycle (managed project vs Praxion metaproject)
+
+**Managed projects** may keep a standing `ROADMAP.md` at the project root between cartographer runs — a living document with a preserved Decision Log (standard managed-project onboarding contract).
+
+**Praxion itself** (this metaproject) does **not** carry a standing `ROADMAP.md` instance between audits: steady-state planning lives in `.ai-state/TECH_DEBT_LEDGER.md` and `.ai-state/idea_ledgers/`. `/roadmap` still produces a fresh root `ROADMAP.md` on demand from a new audit; absence of the file in the Praxion repo is expected, not a defect. The user may delete or archive the emitted file after extracting actions.
 
 ## Phase Loop
 

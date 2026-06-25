@@ -70,4 +70,12 @@ Surface:
 - The cartographer operates on any project type — **deterministic** (libraries, CLIs, services) or **agentic** (LLM apps, agent frameworks, plugins) or **hybrid**. Paradigm detection happens in Phase 1 and feeds the lens-set derivation (which exemplar fits, which sub-questions fire within each lens). SPIRIT is the exemplar Praxion uses for its own audits; other projects get other exemplars or Custom sets (see [`lens-framework.md`](../skills/roadmap-synthesis/references/lens-framework.md)).
 - The audit involves external research (2026 state-of-the-art); expect several minutes for the parallel researcher fan-out.
 - Every quantitative claim in the output is grounded to a file, command, or cited source per the [grounding-protocol](../skills/roadmap-synthesis/references/grounding-protocol.md). If you see an ungrounded claim, flag it as a bug in the cartographer's Phase 7 self-verify.
-- `ROADMAP.md` is a living document at the project root; its Decision Log is preserved across runs (never rewritten) and per-run archival happens via git history.
+
+## ROADMAP.md lifecycle
+
+| Context | Steady-state expectation |
+|---------|------------------------|
+| **Managed projects** | `ROADMAP.md` at project root may persist between runs as a living document; the Decision Log is preserved across `diff` mode. |
+| **Praxion metaproject** | No standing `ROADMAP.md` between audits; regenerate via `/roadmap` on demand. Ongoing planning lives in `.ai-state/TECH_DEBT_LEDGER.md` and `.ai-state/idea_ledgers/`. |
+
+For managed projects, git history archives prior roadmap states. For Praxion, do not treat a missing root `ROADMAP.md` as incomplete onboarding.

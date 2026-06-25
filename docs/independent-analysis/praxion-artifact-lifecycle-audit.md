@@ -488,6 +488,8 @@ differently.
 
 ### F-13 — `ROADMAP.md` Lifecycle Is Ambiguous Between Managed Projects and Praxion Itself
 
+**Status:** Done (2026-06-24)
+
 **Severity:** Suggested
 **Effort:** S
 **Estimated time/cost:** 2-4 hours
@@ -501,6 +503,11 @@ on demand.
 - Praxion itself intentionally does not carry a standing roadmap instance.
 
 **Recommended fix.** Add that distinction wherever the cartographer output contract is summarized.
+
+**Remediation (2026-06-24).** Added a managed-project vs Praxion-metaproject lifecycle subsection to
+`agents/roadmap-cartographer.md` (Output Contract) and a lifecycle table to `commands/roadmap.md`,
+both citing dec-032 (managed living doc) and dec-092 (Praxion on-demand regeneration, no standing
+instance).
 
 ### F-14 — Pre-Refactor Plan Schema Has a Section-Ordering Inconsistency
 
@@ -725,7 +732,7 @@ be retired from active guidance.
 | `memory.json`, `memory-mcp`, `remember()` as active Praxion behavior | Removed by dec-225; stale active references remain | Remove from active guidance; preserve only historical/migration context |
 | `.ai-work/<slug>/SKILL_GENESIS_REPORT.md` | Moved to `.ai-state/skill_genesis_reports/` by dec-186 | Remove from `.ai-work` manifests and compaction/dashboard lists |
 | Legacy ADR NNN-at-create path for agent-authored ADRs | Deprecated by fragment-name-at-create scheme | Keep only as direct-tier human fallback; ensure agents never suggest it |
-| `ROADMAP.md` as standing Praxion repo artifact | Dec-092 says Praxion regenerates on demand | Clarify managed-project vs Praxion-self behavior |
+| `ROADMAP.md` as standing Praxion repo artifact | Dec-092 says Praxion regenerates on demand | **Done (2026-06-24)** — F-13 clarifies managed-project vs Praxion-self in cartographer + `/roadmap` |
 | `token_budgeting/TOKEN_BUDGETING_*.md` | Historical retained, no active producer | Label historical, not active state |
 
 ---

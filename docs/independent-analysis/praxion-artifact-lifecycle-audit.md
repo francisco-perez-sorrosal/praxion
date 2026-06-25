@@ -335,10 +335,10 @@ and the dashboard's `CANONICAL_WORKSHOP_ARTIFACTS` to the 19-artifact dashboard 
 `SKILL_GENESIS_REPORT.md` dropped — **closes P9**; `TASK_BRIEF`/`INTERFACE_DESIGN`/`TRANSACTIONS_DESIGN`/
 `PRE_REFACTOR_PLAN`/`TEST_BASELINE`/`REWORK_MANIFEST`/`RECOVERY_LOG` added — **closes P7 and P15**);
 `task_manifest._STANDARD_REQUIRED` gained the always-produced `LEARNINGS.md` (**closes P8**). `precompact`
-already matched (batch 2). **Deferred (noted, not done):** wiring consumers to *read* from the registry
-(vs. checked-against); conditional eval specs for tests-/SDD-only artifacts (needs activation conditions
-on `ArtifactSpec`); the roadmap/ML/rework specialty artifacts are registered but not enforced into the
-four core consumers. The always-loaded rule was intentionally **not** expanded (F-03 wants it smaller);
+already matched (batch 2). Conditional eval specs for tests-/SDD-only artifacts were the one remaining
+follow-up and are **now done** (`ArtifactSpec.activation` + registry `eval_conditional`; see F-10).
+**Deferred (noted, not done):** wiring consumers to *read* from the registry (vs. checked-against);
+the roadmap/ML/rework specialty artifacts are registered but not enforced into the four core consumers. The always-loaded rule was intentionally **not** expanded (F-03 wants it smaller);
 enforcement lives in the drift test + in-code pointers, not always-loaded prose.
 
 ### F-05 — `PIPELINE_STATE.md` Compaction Recovery Is Stale and Incomplete
@@ -539,12 +539,16 @@ the persistent report/log pair may be under-discovered.
 
 ### F-10 — Eval Harness Manifest Is Too Small for the Current Pipeline Contract
 
-**Status:** Done (2026-06-25, via P8) for the unconditional core — `LEARNINGS.md` (always produced)
-added to `_STANDARD_REQUIRED`, registry-backed and drift-guarded (`scripts/test_artifact_registry.py`).
-**Deferred (noted):** the *conditionally*-produced artifacts (`TEST_RESULTS.md`, `traceability.yml`,
-`TASK_BRIEF.md`, `TEST_BASELINE.md`, `SPEC_DELTA.md`) need activation conditions on `ArtifactSpec` to
-avoid mis-verdicting lean runs as incomplete — a model extension tracked as the eval follow-up, not a
-flat-required addition.
+**Status:** Done (2026-06-25). Two passes: (1, via P8) `LEARNINGS.md` (always produced) added to
+`_STANDARD_REQUIRED`, registry-backed and drift-guarded; (2, conditional follow-up now closed)
+`ArtifactSpec` gained an `activation` predicate, so **`TEST_RESULTS.md`** (gated by `_tests_ran` —
+`TEST_BASELINE.md` present) and **`traceability.yml`** (gated by `_sdd_active` — a `### REQ-NN` heading
+in `SYSTEMS_PLAN`) are *conditionally required*: flagged missing only when their producing step ran, so
+a lean run is not penalised. Mirrored as `eval_conditional` in `scripts/artifact_registry.py` and
+drift-guarded; a regression test encodes the `l3-readiness-config` lesson (prose "REQ-NN" must **not**
+activate SDD). `TASK_BRIEF.md` / `TEST_BASELINE.md` / `SPEC_DELTA.md` are deliberately left out of the
+required/conditional sets — `TEST_BASELINE` is the *signal* (not a deliverable), and `TASK_BRIEF` /
+`SPEC_DELTA` lack a mechanical activation signal independent of themselves.
 
 **Severity:** Important
 **Effort:** M
@@ -1189,7 +1193,7 @@ Verification:
 | P5 | ~~Precompact snapshot misses many current artifacts~~ | Important | M | implementer | **Done (2026-06-25)** — list updated (added brief/interface/transactions/pre-refactor/test-results/rework/recovery); registry (F-04) remains the durable follow-up |
 | P6 | ~~`/clean-work` unsafe deletion semantics~~ | Critical | M | implementation-planner | **Done (2026-06-25)** — deterministic `clean_work_safety.py` BLOCK/WARN/SAFE gate + `--dry-run` + canary tests |
 | P7 | ~~Dashboard/doc manifest stale `.ai-work` list~~ | Important | M | implementer | **Done (2026-06-25)** — both corrected to the registry's 19-artifact dashboard set; drift-guarded (F-04) |
-| P8 | ~~Eval task manifest too small~~ | Important | M | test-engineer / implementer | **Done (2026-06-25)** — `LEARNINGS.md` added to `_STANDARD_REQUIRED`; conditional eval specs (TEST_RESULTS/traceability) noted as a follow-up (needs ArtifactSpec activation conditions) |
+| P8 | ~~Eval task manifest too small~~ | Important | M | test-engineer / implementer | **Done (2026-06-25)** — `LEARNINGS.md` added to `_STANDARD_REQUIRED`; conditional `TEST_RESULTS`/`traceability` added with `ArtifactSpec.activation` predicates (`_tests_ran`/`_sdd_active`), registry `eval_conditional` + drift-guarded |
 | P9 | ~~Skill-genesis old ephemeral path remains in consumers~~ | Important | S | context-engineer | **Done (2026-06-25)** — `SKILL_GENESIS_REPORT.md` removed from `build_doc_manifest.py` + dashboard `files.ts` (precompact done batch 2); registry drift test prevents re-introduction |
 | P10 | ~~Memory subsystem stale active docs~~ | Important | M | doc-engineer | **Done (2026-06-25)** — audit-named active surfaces fixed; the split-out clusters P26 + P27 are both Done; vestigial/illustrative/guarded refs retained with reasons (F-07) |
 | P11 | ~~`reconcile_ai_state.py` contract overstated in docs~~ | Important | S-M | implementer | **Done (2026-06-25)** — callers aligned to the script's narrow observations+ADR contract |
@@ -1221,8 +1225,8 @@ A future cleanup pipeline should not call itself complete until:
 - [x] `precompact_state.py`, dashboard artifact discovery, doc manifest discovery, and eval task manifest
   agree on the active `.ai-work` artifact registry. *(Done 2026-06-25 — F-04: `scripts/artifact_registry.py`
   is the single source of truth; `scripts/test_artifact_registry.py` fails when any of the four consumers
-  diverges. The root cause behind P5/P7/P8/P9/P15 is closed; only the consumers-read-from-registry and
-  conditional-eval refinements remain as noted follow-ups.)*
+  diverges. The root cause behind P5/P7/P8/P9/P15 is closed; conditional-eval specs are now done (F-10);
+  only the consumers-read-*from*-the-registry refinement remains a noted follow-up.)*
 - [x] `/clean-work --dry-run` reports blockers for in-progress WIP, rework manifests, unarchived
   traceability, verifier reports, and recovery logs. *(Done 2026-06-25 — F-06; `clean_work_safety.py`
   BLOCK/WARN classifier + canary tests)*

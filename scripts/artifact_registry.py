@@ -48,7 +48,8 @@ class Artifact:
     dashboard: bool = False  # build_doc_manifest._AI_WORK_FILES + files.ts
     snapshot: bool = False  # precompact PIPELINE_DOCS
     eval_tier: str | None = None  # standard | full
-    eval_required: bool = False  # required deliverable at eval_tier
+    eval_required: bool = False  # always-required deliverable at eval_tier
+    eval_conditional: bool = False  # required at eval_tier only when its producer ran
     description: str = ""
 
 
@@ -180,23 +181,29 @@ ARTIFACTS: tuple[Artifact, ...] = (
         description="Pre-pipeline failing-test snapshot (verifier regression baseline).",
     ),
     Artifact(
-        # eval: conditionally produced (only when tests run), so NOT marked
-        # eval_required — the flat manifest model can't express "required when
-        # tests ran". Expanding to conditional eval specs is a follow-up.
+        # eval: conditionally required — `eval_conditional` at standard, gated by the
+        # task_manifest activation predicate `_tests_ran` (TEST_BASELINE present), so a
+        # no-test run is not penalised for its absence.
         "TEST_RESULTS.md",
         "ai-work",
         "ephemeral",
         "conditional",
         dashboard=True,
         snapshot=True,
+        eval_tier="standard",
+        eval_conditional=True,
         description="Test-run evidence handoff to the verifier.",
     ),
     Artifact(
+        # eval: conditionally required — gated by `_sdd_active` (a `### REQ-NN` heading
+        # in SYSTEMS_PLAN), so a config/infra pipeline with no REQ block is not penalised.
         "traceability.yml",
         "ai-work",
         "ephemeral",
         "conditional",
         dashboard=True,
+        eval_tier="standard",
+        eval_conditional=True,
         description="In-flight REQ -> tests -> implementation mapping.",
     ),
     Artifact(
@@ -291,8 +298,13 @@ def snapshot_artifacts() -> set[str]:
 
 
 def eval_required(tier: str) -> set[str]:
-    """Filenames the eval task manifest must require for the given tier."""
+    """Filenames the eval task manifest must *always* require for the given tier."""
     return {a.name for a in ARTIFACTS if a.eval_required and a.eval_tier == tier}
+
+
+def eval_conditional(tier: str) -> set[str]:
+    """Filenames the eval task manifest requires *conditionally* (activation-gated) for the tier."""
+    return {a.name for a in ARTIFACTS if a.eval_conditional and a.eval_tier == tier}
 
 
 def all_names() -> set[str]:

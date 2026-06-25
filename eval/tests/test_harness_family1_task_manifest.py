@@ -27,14 +27,16 @@ from praxion_evals.harness.task_manifest import (
 # ---------------------------------------------------------------------------
 
 
-def test_standard_tier_lists_four_required_artifacts():
+def test_standard_tier_lists_required_and_conditional_artifacts():
     specs = expected_artifacts(PipelineTier.STANDARD)
     paths = [s.path for s in specs]
-    assert ".ai-work/{slug}/SYSTEMS_PLAN.md" in paths
-    assert ".ai-work/{slug}/IMPLEMENTATION_PLAN.md" in paths
-    assert ".ai-work/{slug}/WIP.md" in paths
-    assert ".ai-work/{slug}/VERIFICATION_REPORT.md" in paths
-    assert all(s.required for s in specs)
+    for req in ("SYSTEMS_PLAN", "IMPLEMENTATION_PLAN", "WIP", "LEARNINGS", "VERIFICATION_REPORT"):
+        assert f".ai-work/{{slug}}/{req}.md" in paths
+    # Conditional deliverables carry an activation predicate; the always-required ones do not.
+    conditional = {s.path for s in specs if s.activation is not None}
+    assert ".ai-work/{slug}/TEST_RESULTS.md" in conditional
+    assert ".ai-work/{slug}/traceability.yml" in conditional
+    assert all(s.required for s in specs if s.activation is None)
 
 
 def test_full_tier_includes_architecture_docs():
@@ -52,7 +54,8 @@ def test_lightweight_tier_is_minimal():
     assert specs[0].path == ".ai-work/{slug}/WIP.md"
 
 
-def test_scan_returns_present_for_existing_artifacts(tmp_path: Path):
+def test_lean_run_passes_with_required_present_and_conditionals_inactive(tmp_path: Path):
+    """A standard pipeline with no tests and no SDD: required present, conditionals not penalised."""
     slug = "demo"
     task_dir = tmp_path / ".ai-work" / slug
     task_dir.mkdir(parents=True)
@@ -66,17 +69,64 @@ def test_scan_returns_present_for_existing_artifacts(tmp_path: Path):
     for fname in standard_required:
         (task_dir / fname).write_text("x", encoding="utf-8")
 
-    verdicts = scan_task_manifest(tmp_path, slug, PipelineTier.STANDARD)
-    assert len(verdicts) == len(standard_required)
-    assert all(v.verdict == "present" for v in verdicts)
+    by_name = {
+        Path(v.path).name: v for v in scan_task_manifest(tmp_path, slug, PipelineTier.STANDARD)
+    }
+    assert all(by_name[n].verdict == "present" for n in standard_required)
+    # Conditional artifacts are inactive (no TEST_BASELINE, no REQ heading) -> informational, not FAIL.
+    assert by_name["TEST_RESULTS.md"].required is False
+    assert by_name["traceability.yml"].required is False
+    assert not [v for v in by_name.values() if v.verdict == "missing" and v.required]
 
 
-def test_scan_returns_missing_when_artifact_absent(tmp_path: Path):
+def test_empty_dir_flags_required_missing_but_not_inactive_conditionals(tmp_path: Path):
     slug = "demo"
     (tmp_path / ".ai-work" / slug).mkdir(parents=True)
-    verdicts = scan_task_manifest(tmp_path, slug, PipelineTier.STANDARD)
-    assert all(v.verdict == "missing" for v in verdicts)
-    assert all(v.required for v in verdicts)
+    by_name = {
+        Path(v.path).name: v for v in scan_task_manifest(tmp_path, slug, PipelineTier.STANDARD)
+    }
+    assert all(v.verdict == "missing" for v in by_name.values())
+    assert by_name["SYSTEMS_PLAN.md"].required is True
+    assert by_name["TEST_RESULTS.md"].required is False  # no TEST_BASELINE -> inactive
+
+
+def test_test_results_required_when_tests_ran(tmp_path: Path):
+    slug = "demo"
+    task_dir = tmp_path / ".ai-work" / slug
+    task_dir.mkdir(parents=True)
+    (task_dir / "TEST_BASELINE.md").write_text("failing nodes\n", encoding="utf-8")
+    by_name = {
+        Path(v.path).name: v for v in scan_task_manifest(tmp_path, slug, PipelineTier.STANDARD)
+    }
+    assert by_name["TEST_RESULTS.md"].verdict == "missing"
+    assert by_name["TEST_RESULTS.md"].required is True
+
+
+def test_traceability_required_when_sdd_active(tmp_path: Path):
+    slug = "demo"
+    task_dir = tmp_path / ".ai-work" / slug
+    task_dir.mkdir(parents=True)
+    (task_dir / "SYSTEMS_PLAN.md").write_text(
+        "## Requirements\n### REQ-01: Login works\n", encoding="utf-8"
+    )
+    by_name = {
+        Path(v.path).name: v for v in scan_task_manifest(tmp_path, slug, PipelineTier.STANDARD)
+    }
+    assert by_name["traceability.yml"].required is True
+
+
+def test_config_task_prose_req_does_not_activate_sdd(tmp_path: Path):
+    """A plan that only mentions REQ-NN in prose is not SDD-active (the l3-readiness-config case)."""
+    slug = "demo"
+    task_dir = tmp_path / ".ai-work" / slug
+    task_dir.mkdir(parents=True)
+    (task_dir / "SYSTEMS_PLAN.md").write_text(
+        "This is a config task. No `REQ-NN` block is warranted.\n", encoding="utf-8"
+    )
+    by_name = {
+        Path(v.path).name: v for v in scan_task_manifest(tmp_path, slug, PipelineTier.STANDARD)
+    }
+    assert by_name["traceability.yml"].required is False
 
 
 # ---------------------------------------------------------------------------

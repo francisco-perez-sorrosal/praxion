@@ -11,12 +11,18 @@ Family 1 stays stateless.
 
 from __future__ import annotations
 
+import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 
 from praxion_evals.harness.schemas import TaskArtifactVerdict
+
+# A `### REQ-NN` heading (SDD behavioral spec), not the substring "REQ" in prose —
+# so a config/infra plan that merely mentions "no REQ-NN block" does not count as SDD-active.
+_REQ_HEADING_RE = re.compile(r"(?m)^#{1,6}\s*REQ-\d")
 
 
 class PipelineTier(StrEnum):
@@ -42,6 +48,30 @@ class ArtifactSpec:
     required: bool = True
     check_recency: bool = False
     description: str = ""
+    # When set, `required` applies only if the predicate holds for the task dir
+    # (`.ai-work/<slug>/`). A conditionally-produced artifact (e.g. TEST_RESULTS only
+    # when tests ran) is informational — never a missing-FAIL — on runs where its
+    # activation signal is absent. None = unconditionally required.
+    activation: Callable[[Path], bool] | None = None
+
+
+# -- Activation predicates (independent signals, never the artifact itself) ----
+
+
+def _tests_ran(task_dir: Path) -> bool:
+    """A test step was in scope — the planner captured a pre-pipeline baseline."""
+    return (task_dir / "TEST_BASELINE.md").exists()
+
+
+def _sdd_active(task_dir: Path) -> bool:
+    """The pipeline is SDD-tracked — its SYSTEMS_PLAN carries `### REQ-NN` headings."""
+    plan = task_dir / "SYSTEMS_PLAN.md"
+    if not plan.exists():
+        return False
+    try:
+        return _REQ_HEADING_RE.search(plan.read_text(encoding="utf-8")) is not None
+    except OSError:
+        return False
 
 
 _STANDARD_REQUIRED: tuple[ArtifactSpec, ...] = (
@@ -66,12 +96,24 @@ _STANDARD_REQUIRED: tuple[ArtifactSpec, ...] = (
         description="Verifier's post-implementation review.",
     ),
 )
-# NOTE: the required-deliverable set is mirrored by the `eval_required`/`standard`
-# projection in scripts/artifact_registry.py and enforced by
-# scripts/test_artifact_registry.py. Conditionally-produced artifacts
-# (TEST_RESULTS.md, traceability.yml — only when tests/SDD ran) are intentionally
-# NOT required here; expressing them needs activation conditions on ArtifactSpec
-# (a follow-up), so adding them as flat required specs would mis-verdict lean runs.
+# The always-required set above is mirrored by the `eval_required`/`standard`
+# projection in scripts/artifact_registry.py; the conditional set below is mirrored
+# by `eval_conditional`/`standard`. Both are enforced by scripts/test_artifact_registry.py.
+
+# Conditionally-produced deliverables: required only when an *independent* activation
+# signal shows the producing step ran. A lean run (no tests / no SDD) is not penalised.
+_STANDARD_CONDITIONAL: tuple[ArtifactSpec, ...] = (
+    ArtifactSpec(
+        path=".ai-work/{slug}/TEST_RESULTS.md",
+        description="Test-run evidence — required when a test step ran (TEST_BASELINE present).",
+        activation=_tests_ran,
+    ),
+    ArtifactSpec(
+        path=".ai-work/{slug}/traceability.yml",
+        description="REQ→test/impl mapping — required when the pipeline is SDD-tracked.",
+        activation=_sdd_active,
+    ),
+)
 
 
 _FULL_EXTRA: tuple[ArtifactSpec, ...] = (
@@ -101,9 +143,9 @@ def expected_artifacts(tier: PipelineTier = PipelineTier.STANDARD) -> tuple[Arti
             ),
         )
     if tier is PipelineTier.STANDARD:
-        return _STANDARD_REQUIRED
+        return _STANDARD_REQUIRED + _STANDARD_CONDITIONAL
     # FULL extends STANDARD with the architecture-doc recency checks.
-    return _STANDARD_REQUIRED + _FULL_EXTRA
+    return _STANDARD_REQUIRED + _STANDARD_CONDITIONAL + _FULL_EXTRA
 
 
 def scan_task_manifest(
@@ -141,11 +183,15 @@ def _verdict_for(
 ) -> TaskArtifactVerdict:
     relative = spec.path.format(slug=task_slug)
     path = repo_root / relative
+    # A conditional spec is required only when its activation signal holds; on a run
+    # where the producing step did not fire, an absent artifact is informational.
+    task_dir = repo_root / ".ai-work" / task_slug
+    effective_required = spec.required and (spec.activation is None or spec.activation(task_dir))
     if not path.exists():
         return TaskArtifactVerdict(
             path=relative,
             verdict="missing",
-            required=spec.required,
+            required=effective_required,
             description=spec.description,
         )
     if spec.check_recency and pipeline_start is not None:
@@ -154,7 +200,7 @@ def _verdict_for(
             return TaskArtifactVerdict(
                 path=relative,
                 verdict="stale",
-                required=spec.required,
+                required=effective_required,
                 description=spec.description,
                 detail=(
                     f"mtime {mtime.isoformat()} precedes pipeline start "
@@ -164,6 +210,6 @@ def _verdict_for(
     return TaskArtifactVerdict(
         path=relative,
         verdict="present",
-        required=spec.required,
+        required=effective_required,
         description=spec.description,
     )

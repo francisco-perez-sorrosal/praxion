@@ -91,6 +91,12 @@ def _eval_standard_required() -> set[str]:
     return {Path(m.group(1)).name for m in _PATH_RE.finditer(block)}
 
 
+def _eval_standard_conditional() -> set[str]:
+    text = _read("eval/src/praxion_evals/harness/task_manifest.py")
+    block = _bracketed_block(text, "_STANDARD_CONDITIONAL", "(", ")")
+    return {Path(m.group(1)).name for m in _PATH_RE.finditer(block)}
+
+
 # -- Live drift assertions ----------------------------------------------------
 
 
@@ -115,6 +121,10 @@ def test_eval_standard_required_matches_registry() -> None:
     assert _eval_standard_required() == registry.eval_required("standard")
 
 
+def test_eval_standard_conditional_matches_registry() -> None:
+    assert _eval_standard_conditional() == registry.eval_conditional("standard")
+
+
 def test_every_consumer_filename_is_registered() -> None:
     # No consumer may list an artifact the registry does not know — catches the
     # dead SKILL_GENESIS_REPORT.md class of drift in either direction.
@@ -123,7 +133,8 @@ def test_every_consumer_filename_is_registered() -> None:
         ("build_doc_manifest", _build_doc_manifest_ai_work()),
         ("dashboard", _dashboard_workshop()),
         ("precompact", _precompact_pipeline_docs()),
-        ("eval", _eval_standard_required()),
+        ("eval-required", _eval_standard_required()),
+        ("eval-conditional", _eval_standard_conditional()),
     ):
         unknown = names - known
         assert not unknown, f"{label} lists unregistered artifact(s): {sorted(unknown)}"
@@ -168,7 +179,9 @@ def test_registry_names_are_unique() -> None:
     assert len(names) == len(set(names))
 
 
-def test_eval_required_implies_eval_tier() -> None:
+def test_eval_flags_imply_eval_tier() -> None:
     for a in registry.ARTIFACTS:
-        if a.eval_required:
-            assert a.eval_tier is not None, f"{a.name}: eval_required without eval_tier"
+        if a.eval_required or a.eval_conditional:
+            assert a.eval_tier is not None, f"{a.name}: eval flag without eval_tier"
+        # An artifact is required XOR conditional, never both.
+        assert not (a.eval_required and a.eval_conditional), f"{a.name}: required and conditional"

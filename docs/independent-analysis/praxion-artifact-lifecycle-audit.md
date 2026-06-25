@@ -443,10 +443,10 @@ shipped command works in managed projects. **F-15/P14** (verification-report mer
 
 ### F-07 — Memory Removal Is Not Fully Reflected in Process Docs
 
-**Status:** Partial (2026-06-25). The audit-named active surfaces are fixed; grounding revealed the
-stale-memory surface is **wider than this finding enumerated** — two new clusters are tracked as
-backlog items **P26** (Codex memory bridge) and **P27** (roadmap `remember()` persistence) in §9, plus
-a list of deliberately-retained vestigial references below.
+**Status:** Done (2026-06-25). The audit-named active surfaces are fixed; grounding revealed the
+stale-memory surface is **wider than this finding enumerated**, so two new clusters were split out and
+have since been completed — **P26** (Codex memory bridge) and **P27** (roadmap `remember()`
+persistence), both **Done** in §9 — plus a list of deliberately-retained vestigial references below.
 
 **Remediation (2026-06-25).** Updated the active surfaces this finding named, plus two more found via
 grounding: removed the curated-memory row from `docs/getting-started.md` (added a one-line note that
@@ -515,6 +515,11 @@ several manual reconciliation procedures not obviously implemented by the script
 
 ### F-09 — Skill-Genesis's Permanent-Report Migration Is Incompletely Propagated
 
+**Status:** Done (2026-06-25, via P9). `SKILL_GENESIS_REPORT.md` removed from `precompact_state.py`
+(batch 2) and from `build_doc_manifest._AI_WORK_FILES` + the dashboard `CANONICAL_WORKSHOP_ARTIFACTS`
+(F-04); the registry drift test (`scripts/test_artifact_registry.py`) now fails if any consumer
+re-introduces it. The persistent `.ai-state/skill_genesis_reports/` pair is in the inventory tree.
+
 **Severity:** Important
 **Effort:** M
 **Estimated time/cost:** 0.5 day
@@ -533,6 +538,13 @@ the persistent report/log pair may be under-discovered.
 - Keep fixture references only where they test migration or old-surface rejection.
 
 ### F-10 — Eval Harness Manifest Is Too Small for the Current Pipeline Contract
+
+**Status:** Done (2026-06-25, via P8) for the unconditional core — `LEARNINGS.md` (always produced)
+added to `_STANDARD_REQUIRED`, registry-backed and drift-guarded (`scripts/test_artifact_registry.py`).
+**Deferred (noted):** the *conditionally*-produced artifacts (`TEST_RESULTS.md`, `traceability.yml`,
+`TASK_BRIEF.md`, `TEST_BASELINE.md`, `SPEC_DELTA.md`) need activation conditions on `ArtifactSpec` to
+avoid mis-verdicting lean runs as incomplete — a model extension tracked as the eval follow-up, not a
+flat-required addition.
 
 **Severity:** Important
 **Effort:** M
@@ -728,6 +740,16 @@ whether this merge happened.
 
 ### F-16 — Challenge-Loop Artifacts Need Stronger Manifest and Cleanup Semantics
 
+**Status:** Done (2026-06-25). Both halves closed: (1) **manifest + compaction visibility** (via P15) —
+`INTERFACE_DESIGN.md` + `TRANSACTIONS_DESIGN.md` are now in `precompact_state.py` and the dashboard/doc
+manifest (F-04 registry, drift-guarded); (2) **disposition recording** — the loop-back protocol in
+`skills/software-planning/references/coordination-details.md` now requires every non-empty
+`## Architecture Challenges` to record its disposition (`adopted` / `adopted-with-modification` /
+`rejected (reason)` / `escalated`) in the *durable* `SYSTEMS_PLAN.md` (since the design docs are
+ephemeral), with "populated challenges, no recorded disposition" framed as a contract violation — the
+structural check the finding asked for, enforced as a behavioral obligation rather than a sentinel scan
+of ephemeral artifacts.
+
 **Severity:** Important
 **Effort:** M
 **Estimated time/cost:** 0.5 day
@@ -819,6 +841,13 @@ but consumers need to know when it is stale.
 - Warn when stale, but do not block normal work.
 
 ### F-20 — Persistent Optional Artifacts Need "Absent Means OK" Language Everywhere
+
+**Status:** Done (2026-06-25, via F-03/P12). The exact absent-behavior vocabulary this finding
+recommends — `optional-lazy` / `threshold-lazy` / `future-designed` / `historical-retained` — is now
+the lifecycle-state table in `rules/swe/agent-intermediate-documents.md` (with `active` for "a real
+gap") and the per-artifact `State` column in `skills/software-planning/references/artifact-inventory.md`,
+so "absent" is unambiguous for every artifact (`TEST_TOPOLOGY.md`, `principles.yaml`,
+`project_profile.yaml`, `eval_ledger/EVAL_LOG.md`, the ML family, …).
 
 **Severity:** Suggested
 **Effort:** M
@@ -1162,7 +1191,7 @@ Verification:
 | P7 | ~~Dashboard/doc manifest stale `.ai-work` list~~ | Important | M | implementer | **Done (2026-06-25)** — both corrected to the registry's 19-artifact dashboard set; drift-guarded (F-04) |
 | P8 | ~~Eval task manifest too small~~ | Important | M | test-engineer / implementer | **Done (2026-06-25)** — `LEARNINGS.md` added to `_STANDARD_REQUIRED`; conditional eval specs (TEST_RESULTS/traceability) noted as a follow-up (needs ArtifactSpec activation conditions) |
 | P9 | ~~Skill-genesis old ephemeral path remains in consumers~~ | Important | S | context-engineer | **Done (2026-06-25)** — `SKILL_GENESIS_REPORT.md` removed from `build_doc_manifest.py` + dashboard `files.ts` (precompact done batch 2); registry drift test prevents re-introduction |
-| P10 | Memory subsystem stale active docs | Important | M | doc-engineer | **Partial (2026-06-25)** — audit-named active surfaces fixed; new clusters split to P26/P27; vestigial refs retained with reasons |
+| P10 | ~~Memory subsystem stale active docs~~ | Important | M | doc-engineer | **Done (2026-06-25)** — audit-named active surfaces fixed; the split-out clusters P26 + P27 are both Done; vestigial/illustrative/guarded refs retained with reasons (F-07) |
 | P11 | ~~`reconcile_ai_state.py` contract overstated in docs~~ | Important | S-M | implementer | **Done (2026-06-25)** — callers aligned to the script's narrow observations+ADR contract |
 | P26 | ~~Codex memory bridge still ships memory hooks/gates post-dec-225~~ | Important | M | implementer | **Done (2026-06-25)** — verified the generator (`export-codex-rules-bridge.py`) no longer emits memory hooks (stale `.codex/hooks/` files were gitignored leftovers, deleted); purged stale memory descriptions from `codex/config/README.md`, `README_DEV.md`, `AGENTS.md.tmpl`. Codex-native memory etiquette + the observability hook retained |
 | P27 | ~~Roadmap `remember()` persistence cluster is broken~~ | Important | M | context-engineer | **Done (2026-06-25)** — renamed "Memory Candidates" → "Learning Candidates" across `roadmap-cartographer`, `/roadmap`, `roadmap-synthesis` (assets + refs); rerouted persistence to LEARNINGS.md / ADR / idea ledger / surface-to-user; no `remember()` referenced. Inline rationale only (shipped-artifact isolation) |
@@ -1198,14 +1227,23 @@ A future cleanup pipeline should not call itself complete until:
   traceability, verifier reports, and recovery logs. *(Done 2026-06-25 — F-06; `clean_work_safety.py`
   BLOCK/WARN classifier + canary tests)*
 - Existing stale `.ai-work` task slugs are either cleaned, promoted, or explicitly retained with a
-  reason.
-- Completed Standard/Full pipelines with REQ IDs or `traceability.yml` have archived specs or a
-  recorded exception before cleanup.
+  reason. *(Mechanism done 2026-06-25 — P21: `clean_work_safety.py` `age_days`/`stale_safe` advisory
+  classifies all 21 slugs and `/clean-work` surfaces the 6 stale SAFE candidates; the actual deletion
+  is left to the user since `rm -rf` of gitignored state is irreversible. Operational, not a code gap.)*
+- [x] Completed Standard/Full pipelines with REQ IDs or `traceability.yml` have archived specs or a
+  recorded exception before cleanup. *(Done 2026-06-25 — F-06 `/clean-work` WARNs on unarchived
+  spec/traceability; the one flagged pipeline `l3-readiness-config` was investigated (P22) and its
+  archival is a recorded exception in its own `SYSTEMS_PLAN.md`.)*
 - [x] PreCompact hook no longer instructs agents to call `remember()`. *(Done 2026-06-24 — P4/F-05)*
 - [x] Active docs no longer describe `remember()` or `memory-mcp` as available Praxion behavior. *(Done 2026-06-25 across the active surfaces — precompact (P4); getting-started/onboarding/agent-pipeline-details/merge-worktree/pr-conventions (P10); reconcile contract (P11); Codex memory bridge (P26); roadmap `remember()` cluster (P27). Vestigial/illustrative/guarded refs and the global-CLAUDE.md philosophy mirror in `AGENTS.md.tmpl` are deliberately retained.)*
 - [x] `SYSTEM_DEPLOYMENT.md` reflects the post-dec-225 observations-only state. *(Done 2026-06-24 — F-23)*
-- Sentinel or a dedicated test catches hard-coded artifact-list drift.
-- Historical artifacts are explicitly exempted from migration sweeps.
+- [x] Sentinel or a dedicated test catches hard-coded artifact-list drift. *(Done 2026-06-25 — F-04:
+  `scripts/test_artifact_registry.py` fails when any of the four consumers diverges from
+  `scripts/artifact_registry.py`, with gate-liveness canaries.)*
+- [x] Historical artifacts are explicitly exempted from migration sweeps. *(Done — dec-132 ADR retains
+  before/after rename narrative; F-07 retains vestigial/historical memory refs with reasons; the
+  `finalize_adrs.py` cross-reference rewrite runs over a bounded allowlist, never an arbitrary repo
+  sweep; F-12 left pre-dec-132 ADRs + `DESIGN_CHANGELOG` untouched.)*
 
 ---
 

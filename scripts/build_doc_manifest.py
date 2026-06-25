@@ -80,21 +80,30 @@ _AI_STATE_FILES = [
     "UPSTREAM_ISSUES.md",
 ]
 
-# Pipeline artifacts in .ai-work/<slug>/ (when present)
+# Pipeline artifacts in .ai-work/<slug>/ (when present), ordered by pipeline flow.
+# Source of truth: the `dashboard` set in scripts/artifact_registry.py; drift from
+# the registry (or from the dashboard's CANONICAL_WORKSHOP_ARTIFACTS) fails
+# scripts/test_artifact_registry.py.
 _AI_WORK_FILES = [
+    "TASK_BRIEF.md",
     "IDEA_PROPOSAL.md",
     "RESEARCH_FINDINGS.md",
     "CONTEXT_REVIEW.md",
+    "INTERFACE_DESIGN.md",
+    "TRANSACTIONS_DESIGN.md",
     "SYSTEMS_PLAN.md",
+    "PRE_REFACTOR_PLAN.md",
     "SPEC_DELTA.md",
-    "SKILL_GENESIS_REPORT.md",
     "IMPLEMENTATION_PLAN.md",
     "WIP.md",
     "LEARNINGS.md",
+    "TEST_BASELINE.md",
     "TEST_RESULTS.md",
-    "VERIFICATION_REPORT.md",
-    "PROGRESS.md",
     "traceability.yml",
+    "VERIFICATION_REPORT.md",
+    "REWORK_MANIFEST.md",
+    "PROGRESS.md",
+    "RECOVERY_LOG.md",
 ]
 
 # Renderer mapping by Diátaxis quadrant + type
@@ -553,9 +562,7 @@ def build_manifest(root: Path) -> dict[str, Any]:
     manifest = {
         "schema_version": SCHEMA_VERSION,
         "generator_version": GENERATOR_VERSION,
-        "generated_at": datetime.now(UTC)
-        .isoformat(timespec="seconds")
-        .replace("+00:00", "Z"),
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "project_name": project_name,
         "project_slug": re.sub(r"[^a-z0-9-]", "-", project_name.lower()).strip("-"),
         "surfaces": surfaces,

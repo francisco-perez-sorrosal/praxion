@@ -7,20 +7,29 @@ const FINALIZED_ADR = /^\d{3}-[a-z0-9-]+\.md$/;
 const METRICS_REPORT_JSON = /^METRICS_REPORT_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?\.json$/;
 const SENTINEL_REPORT = /^SENTINEL_REPORT_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.md$/;
 
+// Source of truth: the `dashboard` set in scripts/artifact_registry.py; drift
+// from the registry (or from build_doc_manifest._AI_WORK_FILES) fails
+// scripts/test_artifact_registry.py. Ordered by pipeline flow.
 export const CANONICAL_WORKSHOP_ARTIFACTS: string[] = [
+  "TASK_BRIEF.md",
+  "IDEA_PROPOSAL.md",
+  "RESEARCH_FINDINGS.md",
+  "CONTEXT_REVIEW.md",
+  "INTERFACE_DESIGN.md",
+  "TRANSACTIONS_DESIGN.md",
   "SYSTEMS_PLAN.md",
+  "PRE_REFACTOR_PLAN.md",
+  "SPEC_DELTA.md",
   "IMPLEMENTATION_PLAN.md",
   "WIP.md",
   "LEARNINGS.md",
+  "TEST_BASELINE.md",
   "TEST_RESULTS.md",
   "traceability.yml",
   "VERIFICATION_REPORT.md",
+  "REWORK_MANIFEST.md",
   "PROGRESS.md",
-  "RESEARCH_FINDINGS.md",
-  "IDEA_PROPOSAL.md",
-  "CONTEXT_REVIEW.md",
-  "SPEC_DELTA.md",
-  "SKILL_GENESIS_REPORT.md"
+  "RECOVERY_LOG.md"
 ] as const;
 
 export async function pathExists(target: string): Promise<boolean> {

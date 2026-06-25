@@ -58,10 +58,20 @@ _STANDARD_REQUIRED: tuple[ArtifactSpec, ...] = (
         description="Live execution state.",
     ),
     ArtifactSpec(
+        path=".ai-work/{slug}/LEARNINGS.md",
+        description="In-flight learning capture; produced by every pipeline agent.",
+    ),
+    ArtifactSpec(
         path=".ai-work/{slug}/VERIFICATION_REPORT.md",
         description="Verifier's post-implementation review.",
     ),
 )
+# NOTE: the required-deliverable set is mirrored by the `eval_required`/`standard`
+# projection in scripts/artifact_registry.py and enforced by
+# scripts/test_artifact_registry.py. Conditionally-produced artifacts
+# (TEST_RESULTS.md, traceability.yml — only when tests/SDD ran) are intentionally
+# NOT required here; expressing them needs activation conditions on ArtifactSpec
+# (a follow-up), so adding them as flat required specs would mis-verdict lean runs.
 
 
 _FULL_EXTRA: tuple[ArtifactSpec, ...] = (

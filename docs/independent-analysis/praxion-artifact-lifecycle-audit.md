@@ -281,6 +281,8 @@ not activated, optional, future-designed, or deprecated.
 
 ### F-04 — Dashboard and Documentation Manifest Recognize a Stale Partial `.ai-work` Set
 
+**Status:** Done (2026-06-25) — closed together with its dependent cluster P7/P8/P9/P15.
+
 **Severity:** Important
 **Effort:** M
 **Estimated time/cost:** 0.5-1 day; TypeScript + Python manifest updates + tests
@@ -304,6 +306,24 @@ artifacts for challenge loops, rework, recovery, and ML verification.
   - compaction snapshot hook.
 - If a registry is too large for now, at minimum update the four current hard-coded lists together
   and add a test that fails when they diverge.
+
+**Remediation (2026-06-25).** Built the canonical registry (`scripts/artifact_registry.py`) as the
+single source of truth: one `Artifact` per `.ai-work/<slug>/` doc with per-consumer membership flags
+(`dashboard`, `snapshot`, `eval_tier`/`eval_required`) plus projection helpers. The four hard-coded
+lists are now **checked** against the registry by `scripts/test_artifact_registry.py` — which parses
+each consumer from source (no imports; uniform across Python, the hook, the eval package, and the TS
+dashboard module) and asserts agreement, with gate-liveness canaries proving it bites on the
+historical drift (stale `SKILL_GENESIS_REPORT.md`; a dropped required artifact; eval missing
+`LEARNINGS.md`). Corrected all three drifted consumers to the registry: `build_doc_manifest._AI_WORK_FILES`
+and the dashboard's `CANONICAL_WORKSHOP_ARTIFACTS` to the 19-artifact dashboard set (dead
+`SKILL_GENESIS_REPORT.md` dropped — **closes P9**; `TASK_BRIEF`/`INTERFACE_DESIGN`/`TRANSACTIONS_DESIGN`/
+`PRE_REFACTOR_PLAN`/`TEST_BASELINE`/`REWORK_MANIFEST`/`RECOVERY_LOG` added — **closes P7 and P15**);
+`task_manifest._STANDARD_REQUIRED` gained the always-produced `LEARNINGS.md` (**closes P8**). `precompact`
+already matched (batch 2). **Deferred (noted, not done):** wiring consumers to *read* from the registry
+(vs. checked-against); conditional eval specs for tests-/SDD-only artifacts (needs activation conditions
+on `ArtifactSpec`); the roadmap/ML/rework specialty artifacts are registered but not enforced into the
+four core consumers. The always-loaded rule was intentionally **not** expanded (F-03 wants it smaller);
+enforcement lives in the drift test + in-code pointers, not always-loaded prose.
 
 ### F-05 — `PIPELINE_STATE.md` Compaction Recovery Is Stale and Incomplete
 
@@ -1054,9 +1074,9 @@ Verification:
 | P4 | ~~`precompact_state.py` tells agents to call removed `remember()`~~ | Critical | XS | implementer | **Done** — P4/F-05 remediation 2026-06-24 |
 | P5 | ~~Precompact snapshot misses many current artifacts~~ | Important | M | implementer | **Done (2026-06-25)** — list updated (added brief/interface/transactions/pre-refactor/test-results/rework/recovery); registry (F-04) remains the durable follow-up |
 | P6 | ~~`/clean-work` unsafe deletion semantics~~ | Critical | M | implementation-planner | **Done (2026-06-25)** — deterministic `clean_work_safety.py` BLOCK/WARN/SAFE gate + `--dry-run` + canary tests |
-| P7 | Dashboard/doc manifest stale `.ai-work` list | Important | M | implementer | Update manifests and tests |
-| P8 | Eval task manifest too small | Important | M | test-engineer / implementer | Conditional artifact manifest |
-| P9 | Skill-genesis old ephemeral path remains in consumers | Important | S | context-engineer | **Partial (2026-06-25)** — removed from `precompact_state.py`; `build_doc_manifest.py` + dashboard `files.ts` still list it (F-04) |
+| P7 | ~~Dashboard/doc manifest stale `.ai-work` list~~ | Important | M | implementer | **Done (2026-06-25)** — both corrected to the registry's 19-artifact dashboard set; drift-guarded (F-04) |
+| P8 | ~~Eval task manifest too small~~ | Important | M | test-engineer / implementer | **Done (2026-06-25)** — `LEARNINGS.md` added to `_STANDARD_REQUIRED`; conditional eval specs (TEST_RESULTS/traceability) noted as a follow-up (needs ArtifactSpec activation conditions) |
+| P9 | ~~Skill-genesis old ephemeral path remains in consumers~~ | Important | S | context-engineer | **Done (2026-06-25)** — `SKILL_GENESIS_REPORT.md` removed from `build_doc_manifest.py` + dashboard `files.ts` (precompact done batch 2); registry drift test prevents re-introduction |
 | P10 | Memory subsystem stale active docs | Important | M | doc-engineer | **Partial (2026-06-25)** — audit-named active surfaces fixed; new clusters split to P26/P27; vestigial refs retained with reasons |
 | P11 | ~~`reconcile_ai_state.py` contract overstated in docs~~ | Important | S-M | implementer | **Done (2026-06-25)** — callers aligned to the script's narrow observations+ADR contract |
 | P26 | ~~Codex memory bridge still ships memory hooks/gates post-dec-225~~ | Important | M | implementer | **Done (2026-06-25)** — verified the generator (`export-codex-rules-bridge.py`) no longer emits memory hooks (stale `.codex/hooks/` files were gitignored leftovers, deleted); purged stale memory descriptions from `codex/config/README.md`, `README_DEV.md`, `AGENTS.md.tmpl`. Codex-native memory etiquette + the observability hook retained |
@@ -1064,7 +1084,7 @@ Verification:
 | P12 | Optional `.ai-state` artifacts lack state labels | Suggested | M | context-engineer | Add lifecycle labels |
 | P13 | ~~Pre-refactor schema producer/validator mismatch~~ | Important | S | systems-architect / sentinel | **Done** — F-14 remediation 2026-06-24 |
 | P14 | ~~Verification report archival before cleanup underspecified~~ | Important | S-M | implementation-planner | **Done (2026-06-25)** — `unmerged-verification` WARN keys on a `### Verification Patterns Merged` marker (F-06 gate) |
-| P15 | Interface/transaction challenge artifacts under-discovered | Important | M | interface-designer / dashboard | **Partial (2026-06-25)** — compaction half done (`INTERFACE_DESIGN.md` + `TRANSACTIONS_DESIGN.md` now in `precompact_state.py`); dashboard/eval manifests remain |
+| P15 | ~~Interface/transaction challenge artifacts under-discovered~~ | Important | M | interface-designer / dashboard | **Done (2026-06-25)** — `INTERFACE_DESIGN.md` + `TRANSACTIONS_DESIGN.md` now in precompact (batch 2) AND the dashboard/doc manifest (F-04 registry); drift-guarded |
 | P16 | ML artifacts not clearly separated as extension family | Suggested | M | systems-architect | Add ML extension artifact subsection |
 | P17 | Spec path-repair policy missing | Suggested | S-M | context-engineer | Define immutable-vs-maintained spec fields |
 | P18 | `doc_manifest.yaml` freshness not surfaced | Suggested | S | doc-engineer | Add sentinel/doc freshness check |
@@ -1084,11 +1104,11 @@ A future cleanup pipeline should not call itself complete until:
 
 - [x] No active guidance references `.ai-state/ARCHITECTURE.md`. *(Done 2026-06-24 — F-01; dec-132 rename ADR retains historical before/after narrative only)*
 - [x] `architect-validator` and AaC validators inspect `.ai-state/DESIGN.md` where appropriate. *(Done 2026-06-24 — F-02/F-25)*
-- `precompact_state.py`, dashboard artifact discovery, doc manifest discovery, and eval task manifest
-  agree on the active `.ai-work` artifact registry. *(Partial 2026-06-25 — `precompact_state.py` list
-  is now correct and complete and its `PIPELINE_STATE.md` path is root-aligned; dashboard `files.ts`,
-  `build_doc_manifest.py`, and the eval manifest still diverge — closing this fully is the F-04/Phase-3
-  registry work, the single root cause behind P5/P7/P8/P9/P15.)*
+- [x] `precompact_state.py`, dashboard artifact discovery, doc manifest discovery, and eval task manifest
+  agree on the active `.ai-work` artifact registry. *(Done 2026-06-25 — F-04: `scripts/artifact_registry.py`
+  is the single source of truth; `scripts/test_artifact_registry.py` fails when any of the four consumers
+  diverges. The root cause behind P5/P7/P8/P9/P15 is closed; only the consumers-read-from-registry and
+  conditional-eval refinements remain as noted follow-ups.)*
 - [x] `/clean-work --dry-run` reports blockers for in-progress WIP, rework manifests, unarchived
   traceability, verifier reports, and recovery logs. *(Done 2026-06-25 — F-06; `clean_work_safety.py`
   BLOCK/WARN classifier + canary tests)*

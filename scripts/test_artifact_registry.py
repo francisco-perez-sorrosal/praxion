@@ -1,0 +1,174 @@
+"""Drift gate for the canonical artifact registry (scripts/artifact_registry.py).
+
+The four hard-coded `.ai-work/<slug>/` artifact lists must agree with the
+registry's projection for their consumer. This test is that gate.
+
+Gate-liveness contract: a gate must be proven to bite on a known-bad input, not
+merely pass on the current good state. The canaries below feed synthetic drifted
+consumer text (a stale `SKILL_GENESIS_REPORT.md`; a dropped required artifact)
+and assert the comparison the live tests make would FAIL — so a future edit that
+re-introduces drift in any of the four consumers turns this suite red.
+
+Consumers are parsed from source text (no imports) so the gate works uniformly
+across the Python scripts, the hook, the eval package, and the TypeScript
+dashboard module.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import re
+import sys
+from pathlib import Path
+from typing import Any
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_REGISTRY_PATH = Path(__file__).resolve().parent / "artifact_registry.py"
+
+
+def _load_registry() -> Any:
+    spec = importlib.util.spec_from_file_location("artifact_registry", _REGISTRY_PATH)
+    assert spec is not None
+    assert spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+registry = _load_registry()
+
+
+# -- Source extraction --------------------------------------------------------
+
+_FILE_RE = re.compile(r"""["']([A-Za-z0-9_]+\.(?:md|ya?ml))["']""")
+_PATH_RE = re.compile(r'path="([^"]+)"')
+
+
+def _bracketed_block(text: str, marker: str, open_ch: str, close_ch: str) -> str:
+    """Return the balanced `open_ch..close_ch` block that follows `marker`."""
+    marker_idx = text.index(marker)
+    # Search for the opening bracket AFTER the marker ends, so a type annotation
+    # inside the marker (e.g. TS `string[]`) does not get matched as the block.
+    start = text.index(open_ch, marker_idx + len(marker))
+    depth = 0
+    for i in range(start, len(text)):
+        if text[i] == open_ch:
+            depth += 1
+        elif text[i] == close_ch:
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    raise ValueError(f"unbalanced block after {marker!r}")
+
+
+def _filenames(block: str) -> set[str]:
+    return {m.group(1) for m in _FILE_RE.finditer(block)}
+
+
+def _read(rel: str) -> str:
+    return (_REPO_ROOT / rel).read_text(encoding="utf-8")
+
+
+def _build_doc_manifest_ai_work() -> set[str]:
+    text = _read("scripts/build_doc_manifest.py")
+    return _filenames(_bracketed_block(text, "_AI_WORK_FILES", "[", "]"))
+
+
+def _dashboard_workshop() -> set[str]:
+    text = _read("dashboard_app/src/server/artifacts/files.ts")
+    return _filenames(_bracketed_block(text, "CANONICAL_WORKSHOP_ARTIFACTS: string[] =", "[", "]"))
+
+
+def _precompact_pipeline_docs() -> set[str]:
+    text = _read("hooks/precompact_state.py")
+    return _filenames(_bracketed_block(text, "PIPELINE_DOCS", "[", "]"))
+
+
+def _eval_standard_required() -> set[str]:
+    text = _read("eval/src/praxion_evals/harness/task_manifest.py")
+    block = _bracketed_block(text, "_STANDARD_REQUIRED", "(", ")")
+    return {Path(m.group(1)).name for m in _PATH_RE.finditer(block)}
+
+
+# -- Live drift assertions ----------------------------------------------------
+
+
+def test_build_doc_manifest_matches_registry_dashboard_set() -> None:
+    assert _build_doc_manifest_ai_work() == registry.dashboard_artifacts()
+
+
+def test_dashboard_workshop_matches_registry_dashboard_set() -> None:
+    assert _dashboard_workshop() == registry.dashboard_artifacts()
+
+
+def test_doc_manifest_and_dashboard_agree() -> None:
+    # The two render surfaces must list exactly the same discoverable set.
+    assert _build_doc_manifest_ai_work() == _dashboard_workshop()
+
+
+def test_precompact_matches_registry_snapshot_set() -> None:
+    assert _precompact_pipeline_docs() == registry.snapshot_artifacts()
+
+
+def test_eval_standard_required_matches_registry() -> None:
+    assert _eval_standard_required() == registry.eval_required("standard")
+
+
+def test_every_consumer_filename_is_registered() -> None:
+    # No consumer may list an artifact the registry does not know — catches the
+    # dead SKILL_GENESIS_REPORT.md class of drift in either direction.
+    known = registry.all_names()
+    for label, names in (
+        ("build_doc_manifest", _build_doc_manifest_ai_work()),
+        ("dashboard", _dashboard_workshop()),
+        ("precompact", _precompact_pipeline_docs()),
+        ("eval", _eval_standard_required()),
+    ):
+        unknown = names - known
+        assert not unknown, f"{label} lists unregistered artifact(s): {sorted(unknown)}"
+
+
+# -- Canaries (prove the gate bites) ------------------------------------------
+
+
+def test_canary_stale_skill_genesis_report_would_fail() -> None:
+    """The historical drift: a consumer carrying the dead SKILL_GENESIS_REPORT.md."""
+    drifted = '_AI_WORK_FILES = [\n  "WIP.md",\n  "SKILL_GENESIS_REPORT.md",\n]'
+    items = _filenames(_bracketed_block(drifted, "_AI_WORK_FILES", "[", "]"))
+    assert "SKILL_GENESIS_REPORT.md" in items
+    assert "SKILL_GENESIS_REPORT.md" not in registry.dashboard_artifacts()
+    # The live assertion (items == dashboard set) would fail on this input.
+    assert items != registry.dashboard_artifacts()
+
+
+def test_canary_missing_required_artifact_would_fail() -> None:
+    """A consumer that dropped required artifacts must be flagged."""
+    drifted = '_AI_WORK_FILES = [\n  "WIP.md",\n]'
+    items = _filenames(_bracketed_block(drifted, "_AI_WORK_FILES", "[", "]"))
+    missing = registry.dashboard_artifacts() - items
+    assert missing  # non-empty => the gate bites
+    assert items != registry.dashboard_artifacts()
+
+
+def test_canary_eval_drops_learnings_would_fail() -> None:
+    """If the eval manifest drops a required deliverable, the gate bites."""
+    drifted = '_STANDARD_REQUIRED = (\n  ArtifactSpec(path=".ai-work/{slug}/WIP.md"),\n)'
+    block = _bracketed_block(drifted, "_STANDARD_REQUIRED", "(", ")")
+    items = {Path(m.group(1)).name for m in _PATH_RE.finditer(block)}
+    assert registry.eval_required("standard") - items  # LEARNINGS etc. missing
+    assert items != registry.eval_required("standard")
+
+
+# -- Registry self-consistency ------------------------------------------------
+
+
+def test_registry_names_are_unique() -> None:
+    names = [a.name for a in registry.ARTIFACTS]
+    assert len(names) == len(set(names))
+
+
+def test_eval_required_implies_eval_tier() -> None:
+    for a in registry.ARTIFACTS:
+        if a.eval_required:
+            assert a.eval_tier is not None, f"{a.name}: eval_required without eval_tier"

@@ -56,11 +56,18 @@ def test_scan_returns_present_for_existing_artifacts(tmp_path: Path):
     slug = "demo"
     task_dir = tmp_path / ".ai-work" / slug
     task_dir.mkdir(parents=True)
-    for fname in ("SYSTEMS_PLAN.md", "IMPLEMENTATION_PLAN.md", "WIP.md", "VERIFICATION_REPORT.md"):
+    standard_required = (
+        "SYSTEMS_PLAN.md",
+        "IMPLEMENTATION_PLAN.md",
+        "WIP.md",
+        "LEARNINGS.md",
+        "VERIFICATION_REPORT.md",
+    )
+    for fname in standard_required:
         (task_dir / fname).write_text("x", encoding="utf-8")
 
     verdicts = scan_task_manifest(tmp_path, slug, PipelineTier.STANDARD)
-    assert len(verdicts) == 4
+    assert len(verdicts) == len(standard_required)
     assert all(v.verdict == "present" for v in verdicts)
 
 

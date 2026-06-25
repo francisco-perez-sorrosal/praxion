@@ -8,7 +8,7 @@ Reusable slash commands for AI coding assistants. Each `.md` file becomes a `/co
 |---------|-------------|
 | `/add-rules` | Copy rules into the current project for customization |
 | `/clean-auto-memory` | Enumerate orphan Claude Code auto-memory directories for removed worktrees and help the user delete them |
-| `/clean-work` | Clean the `.ai-work/` directory after pipeline completion |
+| `/clean-work` | Safely clean `.ai-work/` after pipeline completion — state-aware (blocks on live/unarchived state), with `--dry-run` |
 | `/co` | Create a commit for staged (or all) changes |
 | `/cop` | Create a commit and push to remote |
 | `/create-simple-python-prj` | Create a basic Python project with pixi or uv |

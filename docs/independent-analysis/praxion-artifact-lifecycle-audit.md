@@ -307,7 +307,7 @@ artifacts for challenge loops, rework, recovery, and ML verification.
 
 ### F-05 — `PIPELINE_STATE.md` Compaction Recovery Is Stale and Incomplete
 
-**Status:** Partial — P4 done (2026-06-24); P3 path mismatch and P5 snapshot coverage remain open
+**Status:** Done (P4 2026-06-24; P3 + P5 2026-06-25). Registry-driven snapshot (F-04/Phase 3) remains the durable follow-up, but the hard-coded list is now correct and complete.
 
 **Severity:** Critical
 **Effort:** M
@@ -338,6 +338,30 @@ partial document list and includes obsolete `SKILL_GENESIS_REPORT.md`.
 `hooks/precompact_state.py` with a "Durable Learning Reminder" that points at `LEARNINGS.md` and
 `.ai-state/` promotion paths and explicitly states no `remember()`/`recall()` tools exist after
 dec-225.
+
+**Remediation (2026-06-25, P3 — path mismatch).** Resolved in favor of the **root-scoped** layout
+the hook actually implements: `hooks/precompact_state.py` scans *all* task-slug subdirectories and
+writes one consolidated `.ai-work/PIPELINE_STATE.md` with a per-slug `## <slug>/<doc>` section per
+active pipeline (a single active slug cannot be inferred when concurrent pipelines exist, so a
+task-scoped path is unsound). The drift was a three-surface fork in the synced canonical block:
+`claude/canonical-blocks/compaction-guidance.md` (source) plus its two consumers
+`commands/onboard-project.md` and `commands/new-project.md` said `.ai-work/<slug>/PIPELINE_STATE.md`,
+while every other surface (Praxion `CLAUDE.md`, `AGENTS.md`, `AGENTS.md.tmpl`,
+`skills/software-planning/SKILL.md`, the hook-safety contract, and `test_export_codex_rules_bridge.py`)
+already used root. Corrected the source block and re-ran `scripts/sync_canonical_blocks.py --write`;
+`--check` reports all 8 blocks in sync. Managed projects onboarded after this fix now teach the path
+the hook actually writes.
+
+**Remediation (2026-06-25, P5 + F-09 — snapshot coverage).** Rewrote the hook's `PIPELINE_DOCS`
+list: removed the dead `SKILL_GENESIS_REPORT.md` (dec-186 moved it to
+`.ai-state/skill_genesis_reports/`; a `.ai-work/<slug>/` copy is never produced — this also closes
+the precompact half of F-09/P9), and added the orientation-critical artifacts that explain *why* a
+pipeline is mid-flight: `TASK_BRIEF.md`, `INTERFACE_DESIGN.md`, `TRANSACTIONS_DESIGN.md` (challenge
+state per F-16), `PRE_REFACTOR_PLAN.md`, `TEST_RESULTS.md`, `REWORK_MANIFEST.md`, `RECOVERY_LOG.md`.
+The list is now ordered by pipeline flow. Absent docs are skipped (`if not doc_path.exists()`), so
+listing specialist artifacts costs nothing for pipelines that never produce them. Smoke-tested with a
+two-slug fixture: one root snapshot, per-slug sections, dead genesis report excluded, no slug-scoped
+file written, exit 0.
 
 ### F-06 — `/clean-work` Can Delete Valuable or Gated State Too Easily
 
@@ -544,8 +568,20 @@ on demand.
 
 **Remediation (2026-06-24).** Added a managed-project vs Praxion-metaproject lifecycle subsection to
 `agents/roadmap-cartographer.md` (Output Contract) and a lifecycle table to `commands/roadmap.md`,
-both citing dec-032 (managed living doc) and dec-092 (Praxion on-demand regeneration, no standing
-instance).
+and softened the cartographer's general output-contract line from "living document" to "audit output
+document" so the managed-vs-Praxion distinction reads cleanly.
+
+**Correction (2026-06-25).** An earlier draft of this note claimed both files "cite dec-032 and
+dec-092." They do **not**, and they **must not**: `agents/` and `commands/` are *shipped* surfaces,
+and `rules/swe/shipped-artifact-isolation.md` forbids embedding specific `dec-NNN` ids in shipped
+artifacts (a `dec-NNN` dangles once the plugin lands in another project; `scripts/check_shipped_artifact_isolation.py`
+enforces this at the commit gate). The committed fix correctly **inlines** the rationale instead of
+pointing at ADR numbers — exactly what the isolation rule prescribes. Verified clean: the isolation
+checker reports 0 violations on both files. For the record (this audit lives under `docs/`, which is
+isolation-exempt): the underlying chain is **dec-032** (established the project-root living-document
+model) **superseded by dec-092** (`status: superseded`/`superseded_by: dec-092`), which retires only
+the *Praxion-instance* living document while preserving the on-demand regeneration capability — so a
+future remediation must not "fix" this by adding the citations to the shipped files.
 
 ### F-14 — Pre-Refactor Plan Schema Has a Section-Ordering Inconsistency
 
@@ -869,8 +905,8 @@ Fix:
 - ~~`ARCHITECTURE.md` active references in rules/agents/validators/docs.~~ **Done (2026-06-24)**
 - ~~`remember()` active references in compaction hook and current docs.~~ **PreCompact hook done
   (2026-06-24 — P4);** remaining active-doc cleanup tracked under F-07/P10.
-- `SKILL_GENESIS_REPORT.md` from `.ai-work` lists.
-- `PIPELINE_STATE.md` path mismatch.
+- ~~`SKILL_GENESIS_REPORT.md` from `.ai-work` lists.~~ **PreCompact hook done (2026-06-25);** `build_doc_manifest.py` + dashboard `files.ts` remain (F-04/P7).
+- ~~`PIPELINE_STATE.md` path mismatch.~~ **Done (2026-06-25 — P3);** resolved to root-scoped, canonical block re-synced.
 
 Verification:
 
@@ -955,19 +991,19 @@ Verification:
 | --- | --- | ---: | ---: | --- | --- |
 | P1 | ~~Active `.ai-state/ARCHITECTURE.md` references after dec-132~~ | Critical | M | context-engineer | **Done** — F-01 remediation 2026-06-24 |
 | P2 | ~~`architect-validator` misses `.ai-state/DESIGN.md`~~ | Critical | M | architect-validator / cicd-engineer | **Done** — F-02 remediation 2026-06-24 |
-| P3 | `PIPELINE_STATE.md` path mismatch | Critical | S | implementer | Choose root vs slug, update hook + canonical block |
+| P3 | ~~`PIPELINE_STATE.md` path mismatch~~ | Critical | S | implementer | **Done (2026-06-25)** — resolved to root-scoped; canonical block + onboarding pair re-synced |
 | P4 | ~~`precompact_state.py` tells agents to call removed `remember()`~~ | Critical | XS | implementer | **Done** — P4/F-05 remediation 2026-06-24 |
-| P5 | Precompact snapshot misses many current artifacts | Important | M | implementer | Drive from registry or update list |
+| P5 | ~~Precompact snapshot misses many current artifacts~~ | Important | M | implementer | **Done (2026-06-25)** — list updated (added brief/interface/transactions/pre-refactor/test-results/rework/recovery); registry (F-04) remains the durable follow-up |
 | P6 | `/clean-work` unsafe deletion semantics | Critical | M | implementation-planner | Add dry-run and cleanup gates |
 | P7 | Dashboard/doc manifest stale `.ai-work` list | Important | M | implementer | Update manifests and tests |
 | P8 | Eval task manifest too small | Important | M | test-engineer / implementer | Conditional artifact manifest |
-| P9 | Skill-genesis old ephemeral path remains in consumers | Important | S | context-engineer | Remove old path from manifests |
+| P9 | Skill-genesis old ephemeral path remains in consumers | Important | S | context-engineer | **Partial (2026-06-25)** — removed from `precompact_state.py`; `build_doc_manifest.py` + dashboard `files.ts` still list it (F-04) |
 | P10 | Memory subsystem stale active docs | Important | M | doc-engineer | Update current docs; preserve history |
 | P11 | `reconcile_ai_state.py` contract overstated in docs | Important | S-M | implementer | Align script docs and command docs |
 | P12 | Optional `.ai-state` artifacts lack state labels | Suggested | M | context-engineer | Add lifecycle labels |
 | P13 | ~~Pre-refactor schema producer/validator mismatch~~ | Important | S | systems-architect / sentinel | **Done** — F-14 remediation 2026-06-24 |
 | P14 | Verification report archival before cleanup underspecified | Important | S-M | implementation-planner | Add marker/gate |
-| P15 | Interface/transaction challenge artifacts under-discovered | Important | M | interface-designer / dashboard | Add to manifests and compaction |
+| P15 | Interface/transaction challenge artifacts under-discovered | Important | M | interface-designer / dashboard | **Partial (2026-06-25)** — compaction half done (`INTERFACE_DESIGN.md` + `TRANSACTIONS_DESIGN.md` now in `precompact_state.py`); dashboard/eval manifests remain |
 | P16 | ML artifacts not clearly separated as extension family | Suggested | M | systems-architect | Add ML extension artifact subsection |
 | P17 | Spec path-repair policy missing | Suggested | S-M | context-engineer | Define immutable-vs-maintained spec fields |
 | P18 | `doc_manifest.yaml` freshness not surfaced | Suggested | S | doc-engineer | Add sentinel/doc freshness check |
@@ -988,7 +1024,10 @@ A future cleanup pipeline should not call itself complete until:
 - [x] No active guidance references `.ai-state/ARCHITECTURE.md`. *(Done 2026-06-24 — F-01; dec-132 rename ADR retains historical before/after narrative only)*
 - [x] `architect-validator` and AaC validators inspect `.ai-state/DESIGN.md` where appropriate. *(Done 2026-06-24 — F-02/F-25)*
 - `precompact_state.py`, dashboard artifact discovery, doc manifest discovery, and eval task manifest
-  agree on the active `.ai-work` artifact registry.
+  agree on the active `.ai-work` artifact registry. *(Partial 2026-06-25 — `precompact_state.py` list
+  is now correct and complete and its `PIPELINE_STATE.md` path is root-aligned; dashboard `files.ts`,
+  `build_doc_manifest.py`, and the eval manifest still diverge — closing this fully is the F-04/Phase-3
+  registry work, the single root cause behind P5/P7/P8/P9/P15.)*
 - `/clean-work --dry-run` reports blockers for in-progress WIP, rework manifests, unarchived
   traceability, verifier reports, and recovery logs.
 - Existing stale `.ai-work` task slugs are either cleaned, promoted, or explicitly retained with a

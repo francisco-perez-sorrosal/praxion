@@ -140,7 +140,7 @@ Delegate to the coding-style rule and language-specific toolchains. The philosop
 
 ### Platform Limits
 
-- Memory MCP is disabled for Praxion (`PRAXION_DISABLE_MEMORY_MCP=1`): skip memory tools here and use `.ai-state/` plus `LEARNINGS.md` instead
+- Praxion has no curated-memory backend (the in-house Memory MCP was removed) and no `remember()`/`recall()` tools: use `.ai-state/` plus `LEARNINGS.md` for cross-session knowledge
 - Codex-native wrappers represent Claude-only semantics through adapters rather than trying to duplicate Claude's runtime features verbatim
 - Keep Codex-specific configuration thin: add native surfaces only when they remove friction or preserve semantics
 

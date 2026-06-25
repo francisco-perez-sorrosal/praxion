@@ -279,7 +279,7 @@ lossy direct export to native `.codex/rules/`:
 - `.codex/hooks/praxion-*.py` route always-on, prompt-scoped, and file-scoped
   rule matches back to canonical `rules/**/*.md`
 - `.codex/hooks/praxion-*.py` also bridge the portable canonical hook families:
-  process framing, subagent contract injection, memory gates, observability,
+  process framing, subagent contract injection, observability,
   Bash commit/cleanup gates, worktree guard, post-write quality checks, and
   precompact state snapshots
 - `.codex/praxion/hook_runtime.py` runs canonical Praxion hook scripts with
@@ -303,14 +303,14 @@ bridge preserves Claude-style semantic rule meaning without repurposing that
 native Codex policy surface.
 
 For MCP, `install_codex.sh` reuses the canonical `.claude-plugin/plugin.json`
-`mcpServers` entries and writes the corresponding `memory` and
-`task-chronograph` registrations into the target project's
+`mcpServers` entries and writes the corresponding `task-chronograph`
+registration into the target project's
 `.codex/config.toml`. A project-local state file at
 `.codex/praxion/mcp_state.json` tracks any original project-owned blocks so
 uninstall can restore them without clobbering unrelated Codex config.
 
 The installer still does not create `.ai-state/`; Claude project onboarding
-owns that lifecycle. Codex memory hooks and file-backed observation capture
+owns that lifecycle. Codex observability hooks and file-backed observation capture
 activate only when the target project already has `.ai-state/`. Current Codex
 adapter status:
 
@@ -329,7 +329,7 @@ instead of extending adapter code.
 | `rules/**/*.md` frontmatter | `install_codex.sh` now generates a hook-backed rules bridge under `.codex/praxion/` plus `.codex/hooks.json`; native `.codex/rules` stays reserved for approval policy |
 | `skills/*/SKILL.md` metadata | `install_codex.sh` generates project `.agents/skills/*` wrappers by default |
 | MCP servers | `install_codex.sh` syncs canonical `.claude-plugin/plugin.json` `mcpServers` into project `.codex/config.toml`, with restore state under `.codex/praxion/mcp_state.json` |
-| hooks | `install_codex.sh` now installs Praxion rule routing plus portable canonical hooks for process framing, subagent contract injection, memory gates, observability, Bash commit/cleanup gates, worktree guard, post-write quality checks, and precompact state snapshots; Claude marketplace auto-completion remains Claude-only |
+| hooks | `install_codex.sh` now installs Praxion rule routing plus portable canonical hooks for process framing, subagent contract injection, observability, Bash commit/cleanup gates, worktree guard, post-write quality checks, and precompact state snapshots; Claude marketplace auto-completion remains Claude-only |
 
 Use this flow to test a pet project from a Praxion checkout:
 

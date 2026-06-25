@@ -48,9 +48,9 @@ Observations that might conflict with findings from other lenses. The cartograph
 
 ---
 
-## Memory Candidates for Main Coordinator
+## Learning Candidates for Main Coordinator
 
-Subagents cannot call `remember()` directly. Structured entries below let the main coordinator persist them on return.
+Subagents surface candidates; the main coordinator records the durable ones (`.ai-work/<slug>/LEARNINGS.md` / an ADR / idea ledger) on return — no `remember()`/`recall()` tool exists.
 
 - **category**: [learnings | project] · **key**: [kebab-case slug] · **type**: [decision | gotcha | pattern | convention | preference | correction | insight] · **importance**: [3-8]
   **summary**: [~100 chars] · **tags**: [2-4 lowercase] · **value**: [what future agents should know]

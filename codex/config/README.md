@@ -124,10 +124,6 @@ Generated surfaces:
   scripts with Codex-specific runtime environment
 - `.codex/hooks/praxion-session-start.py` -- injects always-on Praxion rule
   context at session start
-- `.codex/hooks/praxion-memory-session-start.py` -- injects curated memory
-  context when the target project already has `.ai-state/`
-- `.codex/hooks/praxion-memory-stop.py` -- enforces the memory gate with Codex
-  MCP tool names
 - `.codex/hooks/praxion-observability-session-start.py` -- records session
   lifecycle events and context-surface measurements
 - `.codex/hooks/praxion-observability-stop.py` -- records session stop events
@@ -137,8 +133,7 @@ Generated surfaces:
 - `.codex/hooks/praxion-subagent-pre-tool-use.py` -- injects the Praxion
   behavioral contract into host-native subagent prompts
 - `.codex/hooks/praxion-commit-*-pre-tool-use.py` -- runs canonical Bash
-  commit gates for quality, ADR reminders, memory reminders, and ID citation
-  discipline
+  commit gates for quality, ADR reminders, and ID citation discipline
 - `.codex/hooks/praxion-cleanup-learnings-pre-tool-use.py` -- warns before
   cleanup deletes unpromoted `.ai-work/**/LEARNINGS.md` content
 - `.codex/hooks/praxion-worktree-guard-pre-tool-use.py` -- blocks
@@ -148,15 +143,13 @@ Generated surfaces:
 - `.codex/hooks/praxion-observability-pre-tool-use.py` -- forwards tool-start
   events to Praxion observability
 - `.codex/hooks/praxion-observability-post-tool-use.py` -- forwards tool-result
-  events and captures memory observations
+  events and captures observation events
 - `.codex/hooks/praxion-format-python-post-tool-use.py` -- runs canonical
   Python auto-formatting after file writes/edits
 - `.codex/hooks/praxion-detect-duplication-post-tool-use.py` -- runs canonical
   intra-file duplication detection after file writes/edits
 - `.codex/hooks/praxion-observability-subagent-start.py` -- records subagent
   lifecycle start events when Codex emits them
-- `.codex/hooks/praxion-memory-subagent-stop.py` -- enforces subagent memory
-  validation with Codex MCP tool names when Codex emits the event
 - `.codex/hooks/praxion-observability-subagent-stop.py` -- records subagent
   lifecycle stop events when Codex emits them
 - `.codex/hooks/praxion-precompact-state.py` -- writes `.ai-work/` pipeline
@@ -175,8 +168,8 @@ into `.codex/rules/`. Native Codex `.rules` remain reserved for command
 approval / sandbox policy semantics.
 
 The bridge also does **not** create `.ai-state/`. Claude project onboarding
-owns that lifecycle; generated Codex memory hooks and file-backed observation
-capture activate against an existing `.ai-state/` directory.
+owns that lifecycle; generated Codex observability hooks and file-backed
+observation capture activate against an existing `.ai-state/` directory.
 
 ## Project Settings Overlay
 
@@ -187,10 +180,10 @@ environment entries are merged into the hook subprocess environment.
 
 Use it to flip the same `PRAXION_DISABLE_*` flags documented in
 `README_DEV.md` without touching `.claude/settings.json`. The common case is
-disabling memory or prompt-injection helpers for a Codex-managed project:
+disabling observability or prompt-injection helpers for a Codex-managed project:
 
 ```json
-{ "env": { "PRAXION_DISABLE_MEMORY_MCP": "1", "PRAXION_DISABLE_PROCESS_INJECT": "1" } }
+{ "env": { "PRAXION_DISABLE_OBSERVABILITY": "1", "PRAXION_DISABLE_PROCESS_INJECT": "1" } }
 ```
 
 The Claude marketplace auto-completion hook is intentionally not bridged to
@@ -230,8 +223,8 @@ All Praxion-managed rule-bridge assets are prefixed `praxion-` or live under
 Codex MCP adapter in the target project's Codex config:
 
 - reads the canonical `mcpServers` definitions from `.claude-plugin/plugin.json`
-- writes the corresponding `memory` and `task-chronograph` entries into
-  `<project>/.codex/config.toml` as `mcp_servers.*` tables with concrete
+- writes the corresponding `task-chronograph` entry into
+  `<project>/.codex/config.toml` as an `mcp_servers.*` table with concrete
   repo-root paths
 - preserves unrelated project Codex config sections and non-Praxion MCP entries
 - tracks the original project-owned blocks in

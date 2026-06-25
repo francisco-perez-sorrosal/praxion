@@ -172,14 +172,14 @@ When launched as a background agent or with a turn budget that forecloses dialog
 
 Append a `## Auto-Approved Decisions` summary at the end of the draft `ROADMAP.md` listing every auto-approved decision for user review before commit.
 
-## Memory Candidates for Main Coordinator
+## Learning Candidates for Main Coordinator
 
-You cannot call `remember()` directly. At the end of your output to the main coordinator, include a `## Memory Candidates for Main Coordinator` section with structured entries for any non-obvious insight, gotcha, pattern, or convention you surfaced. The coordinator evaluates and persists.
+You have no `remember()`/`recall()` tool — Praxion carries no curated-memory backend. At the end of your output to the main coordinator, include a `## Learning Candidates for Main Coordinator` section with structured entries for any non-obvious insight, gotcha, pattern, or convention you surfaced. The coordinator records the durable ones in `.ai-work/<task-slug>/LEARNINGS.md` (harvested by skill-genesis), promotes the persistent ones to an ADR or idea ledger, and surfaces them to the user.
 
 ```markdown
-## Memory Candidates for Main Coordinator
+## Learning Candidates for Main Coordinator
 
-<!-- Cartographer cannot call remember() directly. Main coordinator evaluates and persists. -->
+<!-- The cartographer has no remember()/recall() tool. The main coordinator records durable candidates in LEARNINGS.md / an ADR / idea ledger and surfaces them to the user. -->
 
 - **category**: learnings | project
   **key**: <kebab-case-slug>
@@ -215,7 +215,7 @@ If you hit an error or your turn budget is exhausted, write what you have to `.a
 | Write `ROADMAP.md` at the project root | Write or modify files outside `ROADMAP.md` and `.ai-work/<slug>/` |
 | Preserve the Decision Log in `diff` mode | Rewrite or truncate the Decision Log |
 | Gate scope / deprecations / ordering with `AskUserQuestion` | Silently destroy existing content |
-| Surface memory candidates to the main coordinator | Call `remember()` directly |
+| Surface learning candidates to the main coordinator | Invent a `remember()`/`recall()` call — no memory tool exists |
 | Produce the full output structure in `<focus-area>` mode | Produce a partial-only roadmap when a focus is requested |
 
 ## Constraints

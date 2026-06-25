@@ -249,7 +249,7 @@ The worked example of a full exemplar lens set. This is the content originally i
 
 **Example findings**:
 - *Deterministic*: "CI runs `pytest` but skips `ruff`; regressions ship. Evidence: `.github/workflows/test.yml` has no `ruff check` step."
-- *Agentic*: "Memory `remember()` required by hook but subagents lack the tool injection, so gate blocks silently. Evidence: `agents/sentinel.md` + hook config."
+- *Agentic*: "A pre-commit gate runs `check_id_citation_discipline.py` locally, but the CI workflow has no equivalent step, so a contaminated commit landing via the web UI ships unchecked. Evidence: `.pre-commit-config.yaml` vs `.github/workflows/test.yml`."
 
 ### Coordinator Awareness
 
@@ -275,7 +275,7 @@ The worked example of a full exemplar lens set. This is the content originally i
 
 **Example findings**:
 - *Deterministic*: "`README.md` documents a 2023 CLI layout; four commands renamed since. New contributors waste ~1h before finding current syntax."
-- *Agentic*: "`memory-mcp` exposes a `metrics()` tool the coordinator never calls; tool is absent from coordinator's `allowed-tools`. Evidence: `claude/config/CLAUDE.md`, `memory-mcp/src/memory_mcp/server.py`."
+- *Agentic*: "An MCP server exposes a status tool that no agent's `allowed-tools` lists, so the capability is write-only — present but never wielded. Evidence: the server's `tools/list` vs the agents' `allowed-tools` frontmatter."
 
 ### Quality
 

@@ -76,7 +76,7 @@ Each researcher writes a fragment following the schema in [`audit-fragment-templ
 - **Findings** — numbered, each with Evidence
 - **Evidence** — full citation list
 - **Cross-lens Tensions** — conflicts/overlaps with other lenses the cartographer should reconcile
-- **Memory Candidates for Main Coordinator** — structured entries (subagents can't call `remember()` directly)
+- **Learning Candidates for Main Coordinator** — structured entries the coordinator records durably (subagents surface, never persist; no `remember()`/`recall()` tool exists)
 
 Researchers are spawned with prompts that include the template path and the cartographer's task slug. Each researcher's prompt must name its specific lens; the researcher does not choose its lens.
 
@@ -96,7 +96,7 @@ After all fragments land, the cartographer's Phase 4 synthesizes them into draft
 3. **Resolve cross-lens tensions** — when two lenses disagree on the same observation, the cartographer surfaces both views as a "Considered Angles" note under the affected weakness or improvement item. Do not silently pick one side.
 4. **Deduplicate** — findings may surface in multiple lenses (e.g., "no CI test workflow" appears in Quality and Automation). Merge into one weakness, cite both lenses as evidence sources.
 5. **Verify coverage** — every lens in the derived lens set should be touched by at least one weakness or improvement item. Sparse lenses trigger a "Considered Angles" revisit in the synthesis.
-6. **Carry-forward memory candidates** — aggregate structured entries from every fragment's "Memory Candidates" section; the cartographer returns them to the main coordinator for `remember()`.
+6. **Carry-forward learning candidates** — aggregate structured entries from every fragment's "Learning Candidates" section; the cartographer returns them to the main coordinator to record in `.ai-work/<task-slug>/LEARNINGS.md` / an ADR / idea ledger (no `remember()`/`recall()` tool exists).
 
 Conflict surfacing rule: **if a cross-lens tension cannot be resolved from evidence, surface it — do not hide it.** Hidden tensions compound; surfaced tensions get user input.
 
@@ -151,6 +151,6 @@ The audit feeds the `ROADMAP_TEMPLATE.md` structure (see [`../assets/ROADMAP_TEM
 - Cross-lens **strengths** → template **Section 2 (What's Working)**
 - Fragment **Cross-lens Tensions** → template **Section 5 (Improvement Roadmap)** "Considered Angles" notes
 - Fragment **Evidence** → grounding citations preserved verbatim in the final roadmap
-- Fragment **Memory Candidates** → carried out-of-band to the main coordinator
+- Fragment **Learning Candidates** → carried out-of-band to the main coordinator (recorded in LEARNINGS.md / an ADR / idea ledger; no `remember()` tool exists)
 
 The methodology footer (template section 9) records which lenses ran, how many researchers fanned out, and what evidence sources were consulted — making every roadmap auditable. A roadmap that surfaces Weaknesses without any Opportunities is structurally incomplete — the Evolution and Curiosity lenses (or their equivalents in non-SPIRIT lens sets) are expected to produce forward-looking material, and the cartographer must seek it out rather than stopping at deficit repair.

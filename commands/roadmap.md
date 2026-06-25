@@ -63,7 +63,7 @@ Surface:
 - Path to the generated or updated `ROADMAP.md`
 - One-sentence summary per phase (from the cartographer's output)
 - Any open questions the cartographer flagged
-- Any memory candidates the cartographer surfaced for persistence (these are for the main coordinator to evaluate via `remember()`)
+- Any learning candidates the cartographer surfaced — for the coordinator to record in `.ai-work/<slug>/LEARNINGS.md` / an ADR / idea ledger and surface to the user (no `remember()`/`recall()` tool exists)
 
 ## Notes
 

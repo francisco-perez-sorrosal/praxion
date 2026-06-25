@@ -161,28 +161,7 @@ When the task involved an interface surface (web UI, TUI/CLI output, API, MCP to
 
 #### Tech-Debt Ledger Writes
 
-For each per-change debt finding surfaced by Phase 5 or Phase 5.5 (`[DEAD-CODE-UNREMOVED]`, `[BLOAT]`, duplication, function-size or file-size ceiling breaches, nesting-depth violations), append a row to `.ai-state/TECH_DEBT_LEDGER.md` per the canonical schema in `skills/software-planning/references/tech-debt-ledger.md` (`#### TECH_DEBT_LEDGER.md` — 14 row fields + `dedup_key`).
-
-Writing a row means:
-
-- **`id`**: next-available `td-NNN`. Scan the ledger's existing rows and take max + 1 (zero-padded, 3 digits).
-- **`severity`**: sentinel-aligned tier — `critical` (correctness risk or contract violation), `important` (quality ceiling breach or systemic duplication), `suggested` (surviving overrides, low-impact cleanup).
-- **`class`**: one of `duplication`, `complexity`, `dead-code`, `drift`, `stale-todo`, `coverage-gap`, `cyclic-dep`, `other`. Size / nesting-depth breaches map to `complexity`; `[BLOAT]` maps to `complexity` unless the bloat is a dedicated unused symbol (then `dead-code`).
-- **`direction`**: default `code-to-goals` for change-introduced debt; use `goals-to-code` only when the finding is about code not yet meeting a stated goal.
-- **`location`**: file path(s) affected, with optional `:start-end` line ranges; one path per list entry.
-- **`goal-ref-type`**: `code-quality` for universal engineering-principle findings (the common case for verifier). Use `adr` / `spec-req` / `architecture` / `claude-md` only when the violation has a specific Praxion-native goal anchor (e.g., an ADR invariant broken by the change).
-- **`goal-ref-value`**: the referenced anchor when `goal-ref-type` ≠ `code-quality`; empty otherwise.
-- **`source`**: `verifier`.
-- **`first-seen`** / **`last-seen`**: current ISO date (`YYYY-MM-DD`). Both identical on row creation.
-- **`owner-role`**: assigned from the canonical class-to-role mapping in the same rule file (`#### TECH_DEBT_LEDGER.md` → **Owner-role heuristic**). Do not re-derive the mapping — look it up.
-- **`status`**: `open`.
-- **`resolved-by`**: empty.
-- **`notes`**: one short sentence describing the finding. Cite the tag (`[BLOAT]` / `[DEAD-CODE-UNREMOVED]`) or the breached ceiling (e.g., "function 63 lines, ceiling 50") when relevant.
-- **`dedup_key`**: computed per the formula in the rule — `sha1(f"{class}|{normalize(location)}|{direction}|{goal-ref-type}|{goal-ref-value}")[:12]`.
-
-**De-duplication at write time.** Before appending, scan the ledger for an existing row with the same `dedup_key`. If one exists, update its `last-seen` to today rather than appending a new row. Do not change its `status`, `notes`, or `owner-role` — consumers own those fields.
-
-Ledger writes are independent from the `VERIFICATION_REPORT.md` findings: a single finding produces both a report entry (for the current pipeline review) and a ledger row (for persistence beyond the pipeline). Do not write debt findings into `LEARNINGS.md` or into any section of `VERIFICATION_REPORT.md` intended as the persistence surface — the ledger is the single persistence surface for debt.
+For each per-change debt finding surfaced by Phase 5 or Phase 5.5, append a row to `.ai-state/TECH_DEBT_LEDGER.md` per [`skills/software-planning/references/tech-debt-ledger.md`](../skills/software-planning/references/tech-debt-ledger.md) § Schema and § Producer overlays → **verifier**. Populate all fields from the schema table; apply only the verifier overlay for triggers, severity/class mapping, and producer defaults. Do not re-list field definitions here.
 
 #### Phase 5.5 -- Behavioral Contract Compliance
 
@@ -195,7 +174,7 @@ Scan the change set for behavioral-contract violations and emit findings in the 
 | `[NON-SURGICAL]` | Changes touch files, modules, or behavior outside the declared scope without being load-bearing for the stated task (violates Stay Surgical) |
 | `[SCOPE-CREEP]` | Scope expanded mid-execution without being re-surfaced and re-approved (violates Stay Surgical) |
 | `[BLOAT]` | A simpler solution would have achieved the same behavior; unnecessary abstraction, speculative generality, or dead parameters were introduced (violates Simplicity First) |
-| `[DEAD-CODE-UNREMOVED]` | The change supersedes code that should have been deleted but was left in place (violates Simplicity First). When a `[DEAD-CODE-UNREMOVED]` FAIL is overridden by the user or scope-deferred, also promote the finding to a tech-debt ledger row with `severity = suggested`, `status = open`, and a survivor flag in `notes` per the schema in `skills/software-planning/references/tech-debt-ledger.md` — survivors must persist as tracked debt rather than be lost. |
+| `[DEAD-CODE-UNREMOVED]` | The change supersedes code that should have been deleted but was left in place (violates Simplicity First). When a `[DEAD-CODE-UNREMOVED]` FAIL is overridden by the user or scope-deferred, also promote the finding to a tech-debt ledger row per § Producer overlays → **verifier** (Phase 5.5 survivor override) — survivors must persist as tracked debt rather than be lost. |
 
 Tag emission is required whenever a violation is observed; "no violations" is a valid Phase 5.5 result and should be recorded explicitly. The sentinel aggregates tag frequencies across `VERIFICATION_REPORT.md` files.
 
@@ -269,7 +248,7 @@ When tests exist or are expected:
 2. **Read `.ai-work/<task-slug>/TEST_BASELINE.md`** — the failing-test set captured by the implementation-planner at pipeline setup, before any code change. If the file is absent (standalone mode, or capture skipped), treat the baseline as unknown and apply the conservative branch in step 3.
 3. **Disposition every failing test** in `TEST_RESULTS.md`. A failure is never closeable by calling it "pre-existing" — classify each one and act:
    - **Regression** — failing now, not listed in `TEST_BASELINE.md`. This pipeline caused it. Emit `FAIL`; the failure routes to rework via Phase 12.5.
-   - **Pre-existing** — failing now and listed in `TEST_BASELINE.md`. Disposition it: if the fix is trivial and adjacent to the change under review, note it as an in-scope boy-scout fix and confirm it lands; otherwise append a `td-NNN` row to `.ai-state/TECH_DEBT_LEDGER.md` (Phase 5 schema) and emit a `WARN` citing the row id.
+   - **Pre-existing** — failing now and listed in `TEST_BASELINE.md`. Disposition it: if the fix is trivial and adjacent to the change under review, note it as an in-scope boy-scout fix and confirm it lands; otherwise append a `td-NNN` row per [`skills/software-planning/references/tech-debt-ledger.md`](../skills/software-planning/references/tech-debt-ledger.md) § Producer overlays → **verifier**, and emit a `WARN` citing the row id.
    - **Undisposed pre-existing** — a failure labelled pre-existing with neither a fix nor a `td-NNN` row is a report-completeness `FAIL`: "pre-existing" alone is not a disposition.
    - **No baseline** — when `TEST_BASELINE.md` is absent, every current failure is unverified; disposition each as pre-existing (fix or `td-NNN` row) and record one `WARN` that the baseline was missing.
    - **Fixed** — listed in `TEST_BASELINE.md`, passing now: record as a boy-scout win.
@@ -540,7 +519,7 @@ This subsection documents the main-agent-facing protocol for spawning rework wor
 
 **`VERIFICATION_REPORT.md` snapshot**: the parent worktree's `VERIFICATION_REPORT.md` is snapshotted (copied) into each rework worktree at `.ai-work/<rework-slug>/parent-VERIFICATION_REPORT.md`. This gives the rework session read-only access to the full verification context without depending on the parent worktree's lifecycle.
 
-**`td-NNN` status flip**: for each `td-NNN` reference in the manifest row's `td_refs` field, the main agent flips the ledger row from `open` to `in-flight`. The row's `notes` field is updated with the suffix `// in-flight via rework worktree <name>` per the canonical schema in `skills/software-planning/references/tech-debt-ledger.md`.
+**`td-NNN` status flip**: for each `td-NNN` reference in the manifest row's `td_refs` field, the main agent flips the ledger row from `open` to `in-flight`. The row's `notes` field is updated with the suffix `// in-flight via rework worktree <name>` per [`skills/software-planning/references/tech-debt-ledger.md`](../skills/software-planning/references/tech-debt-ledger.md) § Producer overlays → **orchestrator** (consumer-only).
 
 **User-facing one-liner**: after all rework worktrees are created, the main agent surfaces a message to the user: "Created N rework worktrees. To dispatch all reworks at once, run `scripts/dispatch-reworks` from the project root (or `/dispatch-reworks` as a slash command). Default mode (`--bg`) starts headless background sessions — monitor them with `claude agents` from a fresh terminal pane outside the orchestrator session; macOS notifications fire when each session completes. Add `--terminals` to open each rework in its own visible terminal window instead (you'll press Enter in each to start). Use `--dry-run` first to preview the dispatch plan. The full user workflow — monitoring, handling mid-rework prompts, troubleshooting — is documented in `docs/rework-dispatch.md`." This gives the user the next concrete action.
 

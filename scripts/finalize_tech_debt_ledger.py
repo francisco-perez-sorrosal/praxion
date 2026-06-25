@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Reconcile the tech-debt ledger pair (`TECH_DEBT_LEDGER.md` + `TECH_DEBT_RESOLVED.md`).
 
-Reads both files' 15-column Markdown tables, groups rows across the pair by
+Reads both files' Markdown tables (14 row fields + structural `dedup_key` per table row), groups rows across the pair by
 `dedup_key`, picks one survivor per group with status precedence (`resolved >
 in-flight > open > wontfix`) and tie-break by newer `last-seen`, then routes
 each survivor to the correct file: terminal-status (`resolved` / `wontfix`)
@@ -78,8 +78,8 @@ def _apply_repo_root(root: Path) -> None:
     LOCK_PATH = root / ".ai-state" / ".tech_debt_ledger_finalize.lock"
 
 
-# Schema-defined column order. See rules/swe/agent-intermediate-documents.md
-# § TECH_DEBT_LEDGER.md for the authoritative field definitions.
+# Schema-defined column order. Canonical field definitions:
+# skills/software-planning/references/tech-debt-ledger.md § Schema
 FIELD_ORDER: tuple[str, ...] = (
     "id",
     "severity",
@@ -117,12 +117,12 @@ DEFAULT_RESOLVED_HEADER = (
     "<!-- Sibling of TECH_DEBT_LEDGER.md holding rows with terminal status (resolved / wontfix).\n"
     "     Rows arrive via scripts/finalize_tech_debt_ledger.py migration when status transitions\n"
     "     to a terminal value. Schema, lifecycle, and re-open semantics are defined canonically\n"
-    "     in rules/swe/agent-intermediate-documents.md § TECH_DEBT_LEDGER.md. Do not duplicate\n"
-    "     the schema here — the rule is the single source of truth. -->\n"
+    "     in skills/software-planning/references/tech-debt-ledger.md. Do not duplicate\n"
+    "     the schema here — the skill reference is the single source of truth. -->\n"
     "\n"
     "**Schema**: 14 row fields + 1 structural `dedup_key`. See "
-    "[`rules/swe/agent-intermediate-documents.md`](../rules/swe/agent-intermediate-documents.md) "
-    "§ `TECH_DEBT_LEDGER.md` for field definitions.\n"
+    "[`skills/software-planning/references/tech-debt-ledger.md`](../skills/software-planning/references/tech-debt-ledger.md) "
+    "§ Schema for field definitions.\n"
     "\n"
     "**Rows arrive here automatically** when status transitions to `resolved` or `wontfix`. "
     "The pair forms one logical namespace with `TECH_DEBT_LEDGER.md`: `id` and `dedup_key` "

@@ -6,8 +6,8 @@ in-flight > open > wontfix``) picks the survivor, ties break by newer
 ``last-seen``, and non-conflicting fields (notes, locations) merge.
 
 Tests are ordered to match the public-helper contract the implementer
-commits to, with surface discovered by reading ``rules/swe/agent-intermediate-documents.md``
-§ ``TECH_DEBT_LEDGER.md`` and the ``SYSTEMS_PLAN.md`` authoritative schema:
+commits to, with surface discovered by reading
+``skills/software-planning/references/tech-debt-ledger.md`` § Schema:
 
     parse_ledger(path) -> (header_lines, rows)      # table round-trip
     collapse_rows(rows) -> rows                     # pure dedupe + merge
@@ -73,9 +73,7 @@ def _load_module() -> Any:
             f"This is expected during the BDD/TDD RED handshake; once the "
             f"implementer lands the script, tests will resolve."
         )
-    spec = importlib.util.spec_from_file_location(
-        "finalize_tech_debt_ledger", _SCRIPT_PATH
-    )
+    spec = importlib.util.spec_from_file_location("finalize_tech_debt_ledger", _SCRIPT_PATH)
     assert spec is not None
     assert spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
@@ -97,34 +95,32 @@ HEADER = (
     "<!-- Living, append-only ledger of grounded debt findings. -->\n"
     "\n"
     "**Schema**: 14 row fields + 1 structural `dedup_key`. "
-    "See rules/swe/agent-intermediate-documents.md for field definitions.\n"
+    "See skills/software-planning/references/tech-debt-ledger.md § Schema.\n"
     "\n"
     "| id | severity | class | direction | location | goal-ref-type | goal-ref-value | source | first-seen | last-seen | owner-role | status | resolved-by | notes | dedup_key |\n"
     "|----|----------|-------|-----------|----------|---------------|----------------|--------|------------|-----------|-----------|--------|-------------|-------|-----------|\n"
 )
 
-FIELD_ORDER = (
-    "id",
-    "severity",
-    "class",
-    "direction",
-    "location",
-    "goal-ref-type",
-    "goal-ref-value",
-    "source",
-    "first-seen",
-    "last-seen",
-    "owner-role",
-    "status",
-    "resolved-by",
-    "notes",
-    "dedup_key",
+FIELD_ORDER = finalize_td.FIELD_ORDER
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+# Active surfaces that must not use ambiguous "15-field" schema wording.
+_ACTIVE_SCHEMA_SURFACES = (
+    "docs/architecture.md",
+    "rules/swe/agent-intermediate-documents.md",
+    "commands/onboard-project.md",
+    "docs/existing-project-onboarding.md",
+    ".ai-state/DESIGN.md",
+    "agents/sentinel.md",
+    "agents/verifier.md",
+    "agents/architect-validator.md",
 )
 
 
 def make_row(
     *,
-    id: str = "td-001",
+    row_id: str = "td-001",
     severity: str = "important",
     cls: str = "duplication",
     direction: str = "code-to-goals",
@@ -142,7 +138,7 @@ def make_row(
 ) -> str:
     """Build a Markdown-table row line. All fields default to a canonical shape."""
     values = (
-        id,
+        row_id,
         severity,
         cls,
         direction,
@@ -201,7 +197,7 @@ def parse_row(row_line: str) -> dict[str, str]:
         raise AssertionError(
             f"row has {len(parts)} columns, expected {len(FIELD_ORDER)}: {row_line!r}"
         )
-    return dict(zip(FIELD_ORDER, parts))
+    return dict(zip(FIELD_ORDER, parts, strict=False))
 
 
 def write_resolved(path: Path, rows: list[str]) -> None:
@@ -249,15 +245,60 @@ def resolved_path(tmp_path: Path) -> Path:
     return tmp_path / ".ai-state" / "TECH_DEBT_RESOLVED.md"
 
 
+# -- Canonical schema anchor (F-12) -------------------------------------------
+
+
+class TestCanonicalSchemaAnchor:
+    """Guard the single schema anchor and column contract."""
+
+    def test_field_order_is_fourteen_row_fields_plus_dedup_key(self) -> None:
+        assert FIELD_ORDER[-1] == "dedup_key"
+        assert len(FIELD_ORDER) == 15
+
+    def test_skill_reference_declares_canonical_schema_heading(self) -> None:
+        skill_path = REPO_ROOT / "skills/software-planning/references/tech-debt-ledger.md"
+        text = skill_path.read_text(encoding="utf-8")
+        assert "14 row fields + 1 structural `dedup_key` field" in text
+        assert "## Producer overlays" in text
+        assert "### verifier (Phase 5 / 5.5)" in text
+        assert "### architect-validator (Phase 7)" in text
+        assert "### sentinel (TD01–TD04, TT04, EC07)" in text
+        assert "### orchestrator (main agent)" in text
+
+    def test_sentinel_td_checks_reference_producer_overlay(self) -> None:
+        text = (REPO_ROOT / "agents/sentinel.md").read_text(encoding="utf-8")
+        assert "Producer overlays" in text
+        assert "Producer overlays → **sentinel** → TD01" in text
+        assert "`class = complexity`" not in text
+        assert "`owner-role = implementer`" not in text
+
+    def test_verifier_links_to_producer_overlay_without_field_bullets(self) -> None:
+        text = (REPO_ROOT / "agents/verifier.md").read_text(encoding="utf-8")
+        assert "Producer overlays" in text
+        assert "Do not re-list field definitions here" in text
+        assert "- **`severity`**:" not in text
+        assert "- **`dedup_key`**:" not in text
+
+    def test_architect_validator_links_to_producer_overlay(self) -> None:
+        text = (REPO_ROOT / "agents/architect-validator.md").read_text(encoding="utf-8")
+        assert "Producer overlays" in text
+        assert "## TECH_DEBT_LEDGER producer overlay" not in text
+
+    @pytest.mark.parametrize("rel_path", _ACTIVE_SCHEMA_SURFACES)
+    def test_active_surfaces_avoid_ambiguous_15_field_wording(self, rel_path: str) -> None:
+        text = (REPO_ROOT / rel_path).read_text(encoding="utf-8").lower()
+        assert "15-field" not in text
+        assert "15 fields" not in text
+        assert "15 field schema" not in text
+
+
 # -- Empty / trivial inputs ---------------------------------------------------
 
 
 class TestEmptyInputIsNoOp:
     """Empty ledger (header-only, zero rows) is a no-op; exit 0."""
 
-    def test_empty_ledger_exits_zero_without_modifying_file(
-        self, ledger_path: Path
-    ) -> None:
+    def test_empty_ledger_exits_zero_without_modifying_file(self, ledger_path: Path) -> None:
         """Header-only input -> script exits 0, file bytes unchanged."""
         write_ledger(ledger_path, rows=[])
         original_bytes = ledger_path.read_bytes()
@@ -271,11 +312,9 @@ class TestEmptyInputIsNoOp:
 class TestSingleRowIsNoOp:
     """One row cannot be deduped; exit 0, row preserved byte-for-byte."""
 
-    def test_single_row_ledger_exits_zero_without_modifying_file(
-        self, ledger_path: Path
-    ) -> None:
+    def test_single_row_ledger_exits_zero_without_modifying_file(self, ledger_path: Path) -> None:
         """One data row -> no dedup possible -> exit 0, file unchanged."""
-        row = make_row(id="td-001", dedup_key="abc123def456")
+        row = make_row(row_id="td-001", dedup_key="aaaaaaaaaaaa")
         write_ledger(ledger_path, [row])
         original_bytes = ledger_path.read_bytes()
 
@@ -296,9 +335,9 @@ class TestDistinctKeysPreserveAllRows:
     ) -> None:
         """Three rows with distinct dedup_keys survive unchanged in order."""
         rows = [
-            make_row(id="td-001", dedup_key="aaaaaaaaaaaa"),
-            make_row(id="td-002", dedup_key="bbbbbbbbbbbb"),
-            make_row(id="td-003", dedup_key="cccccccccccc"),
+            make_row(row_id="td-001", dedup_key="aaaaaaaaaaaa"),
+            make_row(row_id="td-002", dedup_key="bbbbbbbbbbbb"),
+            make_row(row_id="td-003", dedup_key="cccccccccccc"),
         ]
         write_ledger(ledger_path, rows)
 
@@ -318,14 +357,12 @@ class TestDistinctKeysPreserveAllRows:
 class TestSameDedupKeyCollapsesToOneRow:
     """Two rows with the same dedup_key collapse to one."""
 
-    def test_two_rows_with_same_dedup_key_collapse_to_one(
-        self, ledger_path: Path
-    ) -> None:
+    def test_two_rows_with_same_dedup_key_collapse_to_one(self, ledger_path: Path) -> None:
         """Duplicate key -> exactly one row survives."""
         shared_key = "ddddeeeeffff"
         rows = [
-            make_row(id="td-001", dedup_key=shared_key, notes="first"),
-            make_row(id="td-002", dedup_key=shared_key, notes="second"),
+            make_row(row_id="td-001", dedup_key=shared_key, notes="first"),
+            make_row(row_id="td-002", dedup_key=shared_key, notes="second"),
         ]
         write_ledger(ledger_path, rows)
 
@@ -373,17 +410,15 @@ class TestStatusPrecedenceOnCollapse:
         """
         shared_key = "statuspriorty"
         rows = [
-            make_row(id="td-001", dedup_key=shared_key, status=status_a),
-            make_row(id="td-002", dedup_key=shared_key, status=status_b),
+            make_row(row_id="td-001", dedup_key=shared_key, status=status_a),
+            make_row(row_id="td-002", dedup_key=shared_key, status=status_b),
         ]
         write_ledger(ledger_path, rows)
 
         code = finalize_td.finalize_ledger(ledger_path, dry_run=False)
 
         assert code == 0
-        target_path = (
-            resolved_path if expected_winner in ("resolved", "wontfix") else ledger_path
-        )
+        target_path = resolved_path if expected_winner in ("resolved", "wontfix") else ledger_path
         other_path = ledger_path if target_path is resolved_path else resolved_path
 
         surviving = read_rows(target_path)
@@ -397,9 +432,9 @@ class TestStatusPrecedenceOnCollapse:
         """Three rows with resolved + in-flight + open collapse to resolved (in RESOLVED.md)."""
         shared_key = "threewaychain"
         rows = [
-            make_row(id="td-001", dedup_key=shared_key, status="open"),
-            make_row(id="td-002", dedup_key=shared_key, status="in-flight"),
-            make_row(id="td-003", dedup_key=shared_key, status="resolved"),
+            make_row(row_id="td-001", dedup_key=shared_key, status="open"),
+            make_row(row_id="td-002", dedup_key=shared_key, status="in-flight"),
+            make_row(row_id="td-003", dedup_key=shared_key, status="resolved"),
         ]
         write_ledger(ledger_path, rows)
 
@@ -418,21 +453,19 @@ class TestStatusPrecedenceOnCollapse:
 class TestLastSeenTieBreak:
     """Same status on collapse -> newer ``last-seen`` wins."""
 
-    def test_same_status_collapse_keeps_newer_last_seen(
-        self, ledger_path: Path
-    ) -> None:
+    def test_same_status_collapse_keeps_newer_last_seen(self, ledger_path: Path) -> None:
         """Two open rows with same key -> newer last-seen wins."""
         shared_key = "tiebreakkey01"
         rows = [
             make_row(
-                id="td-001",
+                row_id="td-001",
                 dedup_key=shared_key,
                 status="open",
                 last_seen="2026-04-01",
                 notes="older",
             ),
             make_row(
-                id="td-002",
+                row_id="td-002",
                 dedup_key=shared_key,
                 status="open",
                 last_seen="2026-04-20",
@@ -460,14 +493,14 @@ class TestFirstSeenPreservation:
         shared_key = "firstseenearly"
         rows = [
             make_row(
-                id="td-001",
+                row_id="td-001",
                 dedup_key=shared_key,
                 status="open",
                 first_seen="2026-01-15",
                 last_seen="2026-02-01",
             ),
             make_row(
-                id="td-002",
+                row_id="td-002",
                 dedup_key=shared_key,
                 status="open",
                 first_seen="2026-04-20",
@@ -499,14 +532,14 @@ class TestNotesMerge:
         shared_key = "notesmergekey1"
         rows = [
             make_row(
-                id="td-001",
+                row_id="td-001",
                 dedup_key=shared_key,
                 status="open",
                 last_seen="2026-04-20",
                 notes="kept-note",
             ),
             make_row(
-                id="td-002",
+                row_id="td-002",
                 dedup_key=shared_key,
                 status="open",
                 last_seen="2026-04-01",
@@ -533,9 +566,7 @@ class TestNotesMerge:
 class TestLocationsUnion:
     """On collapse, ``location`` is the sorted-union of both rows' locations."""
 
-    def test_collapse_unions_locations_sorted_and_deduplicated(
-        self, ledger_path: Path
-    ) -> None:
+    def test_collapse_unions_locations_sorted_and_deduplicated(self, ledger_path: Path) -> None:
         """Overlapping but non-identical locations -> sorted dedup union.
 
         Source: ``rules/swe/agent-intermediate-documents.md`` line 157
@@ -544,14 +575,14 @@ class TestLocationsUnion:
         shared_key = "locationunion1"
         rows = [
             make_row(
-                id="td-001",
+                row_id="td-001",
                 dedup_key=shared_key,
                 status="open",
                 last_seen="2026-04-20",
                 location="src/beta.py, src/alpha.py",
             ),
             make_row(
-                id="td-002",
+                row_id="td-002",
                 dedup_key=shared_key,
                 status="open",
                 last_seen="2026-04-01",
@@ -582,9 +613,9 @@ class TestIdempotency:
         """After the first collapse, the second run is a byte-for-byte no-op."""
         shared_key = "idempotencytst"
         rows = [
-            make_row(id="td-001", dedup_key=shared_key, status="open"),
-            make_row(id="td-002", dedup_key=shared_key, status="resolved"),
-            make_row(id="td-003", dedup_key="distinctkey01", status="open"),
+            make_row(row_id="td-001", dedup_key=shared_key, status="open"),
+            make_row(row_id="td-002", dedup_key=shared_key, status="resolved"),
+            make_row(row_id="td-003", dedup_key="distinctkey01", status="open"),
         ]
         write_ledger(ledger_path, rows)
 
@@ -595,9 +626,9 @@ class TestIdempotency:
         second_code = finalize_td.finalize_ledger(ledger_path, dry_run=False)
         assert second_code == 0
 
-        assert ledger_path.read_bytes() == after_first, (
-            "second run must be byte-equivalent -- finalize is not idempotent"
-        )
+        assert (
+            ledger_path.read_bytes() == after_first
+        ), "second run must be byte-equivalent -- finalize is not idempotent"
 
 
 # -- Dry-run ------------------------------------------------------------------
@@ -612,8 +643,8 @@ class TestDryRunDoesNotWrite:
         """Dry-run on a file that would collapse -> bytes unchanged, exit 0."""
         shared_key = "dryrunkey0001"
         rows = [
-            make_row(id="td-001", dedup_key=shared_key, status="open"),
-            make_row(id="td-002", dedup_key=shared_key, status="resolved"),
+            make_row(row_id="td-001", dedup_key=shared_key, status="open"),
+            make_row(row_id="td-002", dedup_key=shared_key, status="resolved"),
         ]
         write_ledger(ledger_path, rows)
         original_bytes = ledger_path.read_bytes()
@@ -621,9 +652,9 @@ class TestDryRunDoesNotWrite:
         code = finalize_td.finalize_ledger(ledger_path, dry_run=True)
 
         assert code == 0
-        assert ledger_path.read_bytes() == original_bytes, (
-            "dry-run must not write -- ledger bytes drifted"
-        )
+        assert (
+            ledger_path.read_bytes() == original_bytes
+        ), "dry-run must not write -- ledger bytes drifted"
 
 
 # -- Malformed-row handling ---------------------------------------------------
@@ -644,7 +675,7 @@ class TestMalformedRowHandling:
         self, ledger_path: Path
     ) -> None:
         """Row missing columns -> exit == ``MALFORMED_EXIT_CODE`` (non-zero)."""
-        good_row = make_row(id="td-001", dedup_key="goodkey000001")
+        good_row = make_row(row_id="td-001", dedup_key="goodkey000001")
         # Intentionally malformed: 5 columns instead of 15.
         bad_row = "| td-002 | important | duplication | open | malformed |\n"
         write_ledger(ledger_path, [good_row, bad_row])
@@ -652,8 +683,7 @@ class TestMalformedRowHandling:
         code = finalize_td.finalize_ledger(ledger_path, dry_run=False)
 
         assert code == MALFORMED_EXIT_CODE, (
-            f"malformed row must trigger non-zero exit for manual intervention, "
-            f"got exit={code}"
+            f"malformed row must trigger non-zero exit for manual intervention, " f"got exit={code}"
         )
 
 
@@ -663,9 +693,7 @@ class TestMalformedRowHandling:
 class TestAdvisoryLock:
     """The script acquires + releases an advisory lock for concurrency safety."""
 
-    def test_acquire_lock_is_exclusive_and_releases_on_context_exit(
-        self, tmp_path: Path
-    ) -> None:
+    def test_acquire_lock_is_exclusive_and_releases_on_context_exit(self, tmp_path: Path) -> None:
         """``acquire_lock`` context manager holds LOCK_EX; re-acquirable on exit.
 
         Mirrors the pattern in ``scripts/test_finalize_adrs.py::TestFinalizeLock``
@@ -741,7 +769,7 @@ class TestPairMigration:
         """A standalone resolved row moves to RESOLVED.md and leaves LEDGER empty."""
         rows = [
             make_row(
-                id="td-001",
+                row_id="td-001",
                 dedup_key="resolveonly1",
                 status="resolved",
                 resolved_by="abc1234",
@@ -764,7 +792,7 @@ class TestPairMigration:
         """`wontfix` is a terminal status — same migration path as resolved."""
         rows = [
             make_row(
-                id="td-002",
+                row_id="td-002",
                 dedup_key="wontfixonly1",
                 status="wontfix",
                 notes="rationale: out-of-scope",
@@ -784,7 +812,7 @@ class TestPairMigration:
         self, ledger_path: Path, resolved_path: Path
     ) -> None:
         """When nothing is terminal, RESOLVED.md is not lazily created."""
-        rows = [make_row(id="td-001", dedup_key="activeonly01", status="open")]
+        rows = [make_row(row_id="td-001", dedup_key="activeonly01", status="open")]
         write_ledger(ledger_path, rows)
 
         code = finalize_td.finalize_ledger(ledger_path, dry_run=False)
@@ -810,7 +838,7 @@ class TestPairReopen:
             resolved_path,
             [
                 make_row(
-                    id="td-001",
+                    row_id="td-001",
                     dedup_key=shared_key,
                     status="resolved",
                     first_seen="2026-01-01",
@@ -825,7 +853,7 @@ class TestPairReopen:
             ledger_path,
             [
                 make_row(
-                    id="td-099",
+                    row_id="td-099",
                     dedup_key=shared_key,
                     status="open",
                     first_seen="2026-04-30",
@@ -869,14 +897,14 @@ class TestWithinResolvedCollapse:
             resolved_path,
             [
                 make_row(
-                    id="td-005",
+                    row_id="td-005",
                     dedup_key=shared_key,
                     status="resolved",
                     last_seen="2026-03-01",
                     notes="first",
                 ),
                 make_row(
-                    id="td-006",
+                    row_id="td-006",
                     dedup_key=shared_key,
                     status="resolved",
                     last_seen="2026-04-01",
@@ -909,13 +937,13 @@ class TestPairIdempotency:
         """Active row in LEDGER + resolved row in RESOLVED -> no rewrites."""
         write_ledger(
             ledger_path,
-            [make_row(id="td-001", dedup_key="settledact01", status="open")],
+            [make_row(row_id="td-001", dedup_key="settledact01", status="open")],
         )
         write_resolved(
             resolved_path,
             [
                 make_row(
-                    id="td-002",
+                    row_id="td-002",
                     dedup_key="settledres01",
                     status="resolved",
                     resolved_by="abc1234",
@@ -935,7 +963,7 @@ class TestPairIdempotency:
         self, ledger_path: Path, resolved_path: Path
     ) -> None:
         """First run migrates; second run on settled state is a no-op."""
-        rows = [make_row(id="td-001", dedup_key="migratethis1", status="resolved")]
+        rows = [make_row(row_id="td-001", dedup_key="migratethis1", status="resolved")]
         write_ledger(ledger_path, rows)
 
         finalize_td.finalize_ledger(ledger_path, dry_run=False)

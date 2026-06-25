@@ -25,8 +25,9 @@ Keep the incumbent for this task; schedule the change for later.
 is wrong, or an ecosystem milestone is needed first.
 
 A deferred signal is the canonical input for a `.ai-state/TECH_DEBT_LEDGER.md`
-row, filed by the verifier, sentinel, or orchestrator from the documented
-rationale. The architect documents the criteria that would justify a future
+row. File per [`tech-debt-ledger.md`](tech-debt-ledger.md) § Producer overlays
+→ **orchestrator** (or defer to verifier/sentinel when their scope fits on a later
+pass). The architect documents the criteria that would justify a future
 switch (a performance threshold, an ecosystem milestone, a maintenance event).
 
 ---

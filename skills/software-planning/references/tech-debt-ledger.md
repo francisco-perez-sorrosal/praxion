@@ -81,3 +81,127 @@ Pipelines in separate worktrees write independently; conflicts reconcile at merg
 ## Consumer-contract framing
 
 The ledger's input contract on its five consumer agents is **permission, not obligation** — non-action is a valid outcome. The contract line does not make every consumer process every open item on every run, which would degrade per-agent phase-budget discipline.
+
+## Producer overlays
+
+Field definitions, enums, and `dedup_key` live in § Schema above. Each writer populates **all** fields from that table, then applies only its overlay below for triggers, finding-to-field mapping, and producer-specific defaults. Do not duplicate the schema table in agent prompts.
+
+**De-duplication at write time (all producers).** Before appending, scan the ledger pair for an existing row with the same `dedup_key`. If one exists, update its `last-seen` to today rather than appending a duplicate. Do not change its `status`, `notes`, or `owner-role` — consumers own those fields.
+
+### verifier (Phase 5 / 5.5)
+
+**When to write.** For each per-change debt finding surfaced during convention compliance (Phase 5) or behavioral-contract compliance (Phase 5.5): `[DEAD-CODE-UNREMOVED]`, `[BLOAT]`, duplication, function-size or file-size ceiling breaches, nesting-depth violations.
+
+**Producer defaults** (all other fields per § Schema):
+
+| Field | Value |
+|-------|-------|
+| `source` | `verifier` |
+| `status` | `open` |
+| `resolved-by` | empty |
+| `direction` | `code-to-goals` (default); `goals-to-code` only when the finding is code not yet meeting a stated goal |
+| `goal-ref-type` | `code-quality` (default); `adr` / `spec-req` / `architecture` / `claude-md` only when anchored to a Praxion-native goal |
+| `goal-ref-value` | empty when `goal-ref-type = code-quality` |
+| `owner-role` | from § Owner-role heuristic — lookup; do not re-derive |
+| `first-seen` / `last-seen` | today (`YYYY-MM-DD`) on creation |
+| `notes` | one sentence; cite the tag (`[BLOAT]` / `[DEAD-CODE-UNREMOVED]`) or the breached ceiling (e.g. "function 63 lines, ceiling 50") |
+
+**Severity** (verifier tiering — maps finding impact, not the schema enum definition):
+
+| Tier | When |
+|------|------|
+| `critical` | correctness risk or contract violation |
+| `important` | quality ceiling breach or systemic duplication |
+| `suggested` | surviving overrides, low-impact cleanup |
+
+**Class** (finding → `class`):
+
+| Finding | `class` |
+|---------|---------|
+| duplication | `duplication` |
+| function/file size or nesting-depth breach | `complexity` |
+| `[BLOAT]` | `complexity`, unless the bloat is a dedicated unused symbol → `dead-code` |
+
+**Phase 5.5 survivor override.** When a `[DEAD-CODE-UNREMOVED]` FAIL is overridden by the user or scope-deferred, file a row with `severity = suggested`, `status = open`, and a survivor flag in `notes` — survivors must persist as tracked debt rather than be lost.
+
+**Report vs ledger.** A single finding produces both a `VERIFICATION_REPORT.md` entry (current pipeline review) and a ledger row (persistence beyond the pipeline). Do not write debt findings into `LEARNINGS.md` or into report sections intended as the persistence surface.
+
+### architect-validator (Phase 7)
+
+**When to write.** For each FAIL finding in `ARCHITECTURE_VALIDATION.md`.
+
+**Producer defaults** (populate all other fields per § Schema):
+
+| Field | Value |
+|-------|-------|
+| `class` | `drift` |
+| `direction` | `code-to-goals` (default); `goals-to-code` when the ADR or model declares something the code does not implement |
+| `location` | file:line or DSL element id |
+| `goal-ref-type` | `architecture` (or `adr` when anchored to a specific ADR) |
+| `goal-ref-value` | DESIGN.md section path or `dec-NNN` |
+| `source` | `architect-validator` |
+| `severity` | `critical` (model-edge or ADR-dangling), `important` (generated-region), `suggested` (suppressed) |
+| `owner-role` | `systems-architect` |
+| `status` | `open` |
+| `notes` | one-line context |
+
+### sentinel (TD01–TD04, TT04, EC07)
+
+**When to write.** Repo-wide audit signals from `.ai-state/metrics_reports/METRICS_REPORT_*.md` and targeted dimension checks — not per-change verification (verifier) or per-PR structural drift (architect-validator):
+
+| Check | Signal source | Overlay key |
+|-------|---------------|-------------|
+| TD01 | `hotspots` (churn × complexity) | TD01 |
+| TD02 | `pydeps.cyclic_sccs` (SCC size > 1) | TD02 |
+| TD03 | `coverage` namespace (module below project floor; default 70%) | TD03 |
+| TD04 | `lizard` / `complexipy` p95 complexity crossings | TD04 |
+| TT04 | per-group P95 > 1.5× declared `expected_runtime_envelope` for ≥ 3 consecutive reports | TT04 |
+| EC07 | `scripts/check_aac_golden_rule.py --mode=audit` important-severity findings | EC07 |
+
+TD05 audits ledger discipline only — **never writes rows**. TT03 reads `topology-drift` counts but does not write.
+
+**Policies (all sentinel writes).**
+
+- **LLM-judgment gating:** a numeric threshold breach is necessary but not sufficient. The Tech-Debt Findings report subsection must explain why each filed row was warranted — mechanical dumps flood the ledger.
+- **Staleness:** when `METRICS_LOG.md` latest row is older than 14 days OR `coverage.status = stale`, emit a TD-dimension WARN and write from available data — never block.
+- **`source`:** `sentinel`; **`status`:** `open`; **`direction`:** `code-to-goals` (default); **`goal-ref-type`:** `code-quality` unless anchored to ADR/architecture; **`owner-role`:** from § Owner-role heuristic unless the table below overrides.
+
+**Finding → field mapping:**
+
+| Overlay key | `class` | `severity` | `owner-role` |
+|-------------|---------|------------|--------------|
+| TD01 | `complexity` | `important` (top-3 hotspot impact), `suggested` otherwise | `implementer`; → `implementation-planner` when restructuring required |
+| TD02 | `cyclic-dep` | `important` | `implementation-planner` |
+| TD03 | `coverage-gap` | per finding impact | `test-engineer` |
+| TD04 | `complexity` | per finding impact | `implementer` |
+| TT04 | `topology-drift` | `important` | `implementation-planner` |
+| EC07 | `drift` | `important` | `implementer` |
+
+Populate `location`, dates, `notes` (one sentence + why-filed), and remaining schema fields per § Schema.
+
+### orchestrator (main agent)
+
+**When to append rows (exception, not routine).** Only when:
+
+1. **Explicit user direction** — the user asks to file a grounded finding as tracked debt.
+2. **`defer-with-rationale` disposition** — the architect recorded defer on a Continuous Improvement Signal per [`disposition-vocabulary.md`](disposition-vocabulary.md); the documented defer criteria become the row's `notes`. Verifier or sentinel remain preferred if the finding fits their scope on a later pass.
+3. **Scope gap** — a grounded finding fits neither verifier's per-change scope (Phase 5/5.5) nor sentinel's periodic-audit scope (TD/TT/EC dimensions). File with honest `source: orchestrator` rather than misattributing to verifier or sentinel.
+
+**When NOT to append.** Per-change findings during verification → § Producer overlays → **verifier**. Metrics/repo-wide audit signals → **sentinel**. Per-PR structural drift → **architect-validator**. Verifier and sentinel may **re-source** orchestrator rows on subsequent runs.
+
+**Producer defaults** (populate all other fields per § Schema):
+
+| Field | Value |
+|-------|-------|
+| `source` | `orchestrator` |
+| `status` | `open` |
+| `resolved-by` | empty |
+| `direction` | `code-to-goals` (default) |
+| `goal-ref-type` | best anchor (`adr`, `architecture`, `code-quality`, …) per finding |
+| `goal-ref-value` | anchor id/path when applicable; empty when `goal-ref-type = code-quality` |
+| `owner-role` | § Owner-role heuristic; `unassigned` + proposed owner in `notes` when unclear |
+| `class` | best-fit enum; `other` when no slot fits — `notes` SHOULD propose a named class |
+| `first-seen` / `last-seen` | today on creation |
+| `notes` | one sentence citing user direction, defer rationale, or scope-gap reason |
+
+**Consumer-only (not new rows).** Rework worktree creation: flip linked `td-NNN` rows `open → in-flight` with `notes` suffix `// in-flight via rework worktree <name>` (notes-field linkage — no schema change). Pre-refactor mini-pipeline completion: flip affected rows `in-flight → resolved`. These are in-place status updates on existing rows, not producer appends.

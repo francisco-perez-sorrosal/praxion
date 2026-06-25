@@ -181,7 +181,7 @@ If no architecture markdown files exist: emit one INFO note `no fenced markdown 
 
 Write `.ai-work/<task-slug>/ARCHITECTURE_VALIDATION.md` (see Output section for structure).
 
-For each FAIL finding, append a row to `.ai-state/TECH_DEBT_LEDGER.md` per the schema below.
+For each FAIL finding, append a row to `.ai-state/TECH_DEBT_LEDGER.md` per [`skills/software-planning/references/tech-debt-ledger.md`](../skills/software-planning/references/tech-debt-ledger.md) § Schema and § Producer overlays → **architect-validator**.
 
 **Exit behavior**:
 - `--mode=pre-merge`: exit 1 if overall verdict is FAIL; exit 0 otherwise
@@ -228,23 +228,6 @@ Each finding entry:
 ```
 
 WARNs use `### [WARN]`; confirmed checks use `### [PASS]` (summarized, not one entry per element).
-
-## TECH_DEBT_LEDGER row schema
-
-For each FAIL, append a row to `.ai-state/TECH_DEBT_LEDGER.md` with these fields:
-
-- `class: drift`
-- `direction: code-to-goals` (default; use `goals-to-code` when the ADR or model declares something the code does not implement)
-- `location: <file:line or DSL element id>`
-- `goal-ref-type: architecture` (or `adr` when the violation is anchored to a specific ADR)
-- `goal-ref-value: <DESIGN.md section path or dec-NNN>`
-- `source: architect-validator`
-- `severity: critical | important | suggested` (model-edge or ADR-dangling → critical; generated-region → important; suppressed → suggested)
-- `owner-role: systems-architect`
-- `status: open`
-- `notes: <one-line context>`
-
-Before appending, scan for an existing row with the same `dedup_key` (computed as `sha1(f"{class}|{normalize(location)}|{direction}|{goal-ref-type}|{goal-ref-value}")[:12]`). If one exists, update `last-seen` rather than appending a duplicate.
 
 ## Edge Cases
 

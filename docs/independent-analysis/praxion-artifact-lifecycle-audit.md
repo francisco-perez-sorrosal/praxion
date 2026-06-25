@@ -469,6 +469,8 @@ cannot assess over/under-processing trends.
 
 ### F-12 — `TECH_DEBT_LEDGER.md` Is Conceptually Strong but Producer/Consumer Boundaries Need a Single Schema Anchor
 
+**Status:** Done (2026-06-24)
+
 **Severity:** Suggested
 **Effort:** S-M
 **Estimated time/cost:** 2-6 hours
@@ -485,6 +487,42 @@ differently.
 - Keep the full schema in `skills/software-planning/references/tech-debt-ledger.md`.
 - Everywhere else should link to it and name only writer/consumer boundaries.
 - Add a tiny schema self-test if one does not already exist.
+
+**Remediation (2026-06-24).** Closed in two passes:
+
+**Pass 1 — single schema anchor + wording.** Canonical schema lives in
+`skills/software-planning/references/tech-debt-ledger.md` § Schema (`14 row fields + 1 structural
+`dedup_key` field`). Active surfaces that previously said `15-field` or mixed `14 fields +
+dedup_key` now use the canonical phrase and link to the skill reference instead of re-explaining
+enums or formulas: `docs/architecture.md`, `docs/existing-project-onboarding.md`,
+`rules/swe/agent-intermediate-documents.md`, `.ai-state/DESIGN.md`, `commands/onboard-project.md`,
+`agents/sentinel.md`, `scripts/finalize_tech_debt_ledger.py` (generated ledger headers). Pre-dec-132
+ADRs and `DESIGN_CHANGELOG.md` left unchanged (historical “15 fields” narrative preserved).
+
+**Pass 2 — producer overlays (strict “link only” in agents).** Operational finding→field mapping
+moved out of agent prompts into the same skill reference § **Producer overlays**:
+- **`verifier (Phase 5 / 5.5)`** — when to write, severity tiers, class mapping from tags/ceilings,
+  Phase 5.5 survivor override, report-vs-ledger split, shared dedup rule.
+- **`architect-validator (Phase 7)`** — drift-specific defaults for FAIL rows.
+
+`agents/verifier.md` and `agents/architect-validator.md` now link to § Schema + § Producer overlays
+only (no per-field bullet lists). `agents/systems-architect.md` consumer pointer updated from the
+rule summary to the skill reference.
+
+**Pass 3 — remaining writers (sentinel + orchestrator).** Completed the overlay set for all four
+ledger writers:
+- **`sentinel (TD01–TD04, TT04, EC07)`** — metrics/TT/EC signals, LLM-judgment gating, staleness
+  policy, finding→class/severity/owner table. `agents/sentinel.md` TD/TT/EC check rows link to
+  overlay keys instead of inline `class`/`owner-role` defaults.
+- **`orchestrator (main agent)`** — explicit user direction, `defer-with-rationale` CIS filing,
+  scope-gap exception; consumer-only rework/pre-refactor status flips documented separately from
+  appends. `disposition-vocabulary.md` and `agents/researcher.md` link here.
+
+**Verification.** `scripts/test_finalize_tech_debt_ledger.py` (`TestCanonicalSchemaAnchor`):
+`FIELD_ORDER` = 14 row fields + `dedup_key`; skill reference declares canonical heading and all four
+Producer overlays; active surfaces must not contain `15-field` wording; verifier/architect-validator
+prompts must not duplicate field bullets; sentinel TD checks must reference overlay keys without
+inline class/owner defaults.
 
 ### F-13 — `ROADMAP.md` Lifecycle Is Ambiguous Between Managed Projects and Praxion Itself
 
@@ -934,7 +972,7 @@ Verification:
 | P17 | Spec path-repair policy missing | Suggested | S-M | context-engineer | Define immutable-vs-maintained spec fields |
 | P18 | `doc_manifest.yaml` freshness not surfaced | Suggested | S | doc-engineer | Add sentinel/doc freshness check |
 | P19 | Calibration log append weakly enforced | Important | M | implementation-planner | Add helper/check/reminder |
-| P20 | Tech-debt schema duplicated in prose | Suggested | S | context-engineer | Reduce to one schema anchor |
+| P20 | ~~Tech-debt schema duplicated in prose~~ | Suggested | S | context-engineer | **Done** — F-12 remediation 2026-06-24 |
 | P21 | Stale `.ai-work` slugs accumulated on disk | Important | M | doc-engineer / context-engineer | Run gated cleanup and add stale-slug advisory |
 | P22 | Completed pipeline may be missing spec archival | Important | S-M | implementation-planner | Investigate `l3-readiness-config`; gate cleanup on spec archive when required |
 | P23 | ~~`SYSTEM_DEPLOYMENT.md` still lists removed memory infrastructure~~ | Important | S | systems-architect / doc-engineer | **Done** — F-23 remediation 2026-06-24 |

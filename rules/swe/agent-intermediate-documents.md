@@ -117,7 +117,7 @@ Artifact inventory is not stored here — it is derivable from the filesystem.
 
 `.ai-state/TECH_DEBT_LEDGER.md` (active: `status ∈ {open, in-flight}`) and `.ai-state/TECH_DEBT_RESOLVED.md` (terminal: `status ∈ {resolved, wontfix}`) form a two-file pair of grounded debt findings sharing one `td-NNN` namespace. **Writers (only four):** verifier, sentinel, orchestrator, architect-validator. **Consumers** (systems-architect, implementation-planner, implementer, test-engineer, doc-engineer) update status in place but never add rows. LEDGER is append-only; terminal rows migrate to RESOLVED via `scripts/finalize_tech_debt_ledger.py` at post-merge.
 
-Full schema (14 fields + `dedup_key`), owner-role heuristic, lifecycle conventions, worktree concurrency, and consumer-contract framing live in [`skills/software-planning/references/tech-debt-ledger.md`](../../skills/software-planning/references/tech-debt-ledger.md). Read it on demand when authoring a producer or consumer.
+Full schema (14 row fields + structural `dedup_key`), owner-role heuristic, lifecycle conventions, worktree concurrency, and consumer-contract framing live in [`skills/software-planning/references/tech-debt-ledger.md`](../../skills/software-planning/references/tech-debt-ledger.md) — the single schema anchor; do not duplicate field definitions elsewhere. Read it on demand when authoring a producer or consumer.
 
 ### Document Lifecycle
 

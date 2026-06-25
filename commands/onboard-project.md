@@ -213,7 +213,7 @@ If the user agrees, remove that line. If they decline, proceed without changing 
 
 ## §Phase 2 — `.ai-state/` skeleton
 
-**Canonical schemas.** The full TECH_DEBT_LEDGER schema (15 fields, producer/consumer contracts, dedup semantics), DECISIONS_INDEX format, and calibration_log format are defined in `rules/swe/agent-intermediate-documents.md`. The skeletons below are header-only seeds — agents populate rows over time per the canonical contracts. ADR fragment naming and lifecycle live in `rules/swe/adr-conventions.md`.
+**Canonical schemas.** TECH_DEBT_LEDGER schema (14 row fields + structural `dedup_key`), producer/consumer contracts, and dedup semantics: [`skills/software-planning/references/tech-debt-ledger.md`](../skills/software-planning/references/tech-debt-ledger.md) (summary + pointer in `rules/swe/agent-intermediate-documents.md` § `TECH_DEBT_LEDGER.md`). DECISIONS_INDEX format and calibration_log format: `rules/swe/agent-intermediate-documents.md`. The skeletons below are header-only seeds — agents populate rows over time per the canonical contracts. ADR fragment naming and lifecycle live in `rules/swe/adr-conventions.md`.
 
 **Predicate.** Each file's existence is checked individually. Existing files are never overwritten.
 
@@ -233,7 +233,7 @@ If the user agrees, remove that line. If they decline, proceed without changing 
   ```markdown
   # Tech Debt Ledger
 
-  Living, append-only ledger of grounded debt findings. Producers (verifier, sentinel) append rows; consumers update `status` in place; rows are never deleted. Schema and producer/consumer contracts live in the agent intermediate documents rule.
+  Living, append-only ledger of grounded debt findings. Producers (verifier, sentinel, orchestrator, architect-validator) append rows; consumers update `status` in place. Schema (14 row fields + structural `dedup_key`): [`skills/software-planning/references/tech-debt-ledger.md`](../skills/software-planning/references/tech-debt-ledger.md).
 
   | id | severity | class | direction | location | goal-ref-type | goal-ref-value | source | first-seen | last-seen | owner-role | status | resolved-by | notes | dedup_key |
   |----|----------|-------|-----------|----------|---------------|----------------|--------|------------|-----------|------------|--------|-------------|-------|-----------|

@@ -76,10 +76,10 @@ Every error must answer three questions:
 
 **Good**:
 ```
-Cannot connect to memory MCP server (localhost:7474).
+Cannot connect to the database (localhost:5432).
 The server is not running (connection refused).
-Start it with: memory-mcp start
-Or set PRAXION_DISABLE_MEMORY_MCP=1 to skip.
+Start it with: docker compose up -d db
+Or set DATABASE_URL to point at a running instance.
 ```
 
 **Grammar rules**:

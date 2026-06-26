@@ -8,13 +8,6 @@
 
 set -e
 
-# Honor the project-level memory opt-out. When PRAXION_DISABLE_MEMORY_MCP=1,
-# the memory-protocol rule forbids agents from calling remember(); blocking
-# their commits for not calling it would leave them with no legal path forward.
-if [ "${PRAXION_DISABLE_MEMORY_MCP:-}" = "1" ]; then
-    exit 0
-fi
-
 input=$(cat)
 
 # Quick text check — the JSON payload contains "git commit" in the command field.

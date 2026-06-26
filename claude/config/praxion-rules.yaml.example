@@ -101,9 +101,6 @@
 # List of rules to disable for this project, by ID (directory-prefixed
 # path without the `.md` extension). fnmatch glob syntax is supported.
 disable:
-  # Project sets PRAXION_DISABLE_MEMORY_MCP=1 or has no memory MCP server
-  # - swe/memory-protocol
-
   # Not an ML project — never load ML training conventions, even if a file
   # like `prepare.py` or `runs/` appears in the tree for unrelated reasons
   # - ml/*

@@ -120,21 +120,21 @@ Every error must answer exactly three questions:
 
 **Minimal well-formed error**:
 ```
-Cannot connect to memory MCP server (localhost:7474).
-The server is not running (connection refused on port 7474).
-Start it with: memory-mcp start
+Cannot connect to the database (localhost:5432).
+The server is not running (connection refused on port 5432).
+Start it with: docker compose up -d db
 ```
 
 **Extended error with alternatives**:
 ```
-Cannot connect to memory MCP server (localhost:7474).
-The server is not running (connection refused on port 7474).
+Cannot connect to the database (localhost:5432).
+The server is not running (connection refused on port 5432).
 
 To fix:
-  Start the server:   memory-mcp start
-  Or skip memory:     set PRAXION_DISABLE_MEMORY_MCP=1
+  Start the server:   docker compose up -d db
+  Or use a remote:    set DATABASE_URL to a running instance
 
-Debug output: praxion --debug will log the full connection attempt.
+Debug output: myapp --debug will log the full connection attempt.
 ```
 
 ### Grammar Rules

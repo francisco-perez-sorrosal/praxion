@@ -48,7 +48,7 @@ The `/onboard-project` command installs several of these scripts as git hooks an
 
 - `git-finalize-hook.sh` + `finalize_chain.sh` — symlinked into `.git/hooks/{post-merge,post-commit,post-checkout}` by `/onboard-project` Phase 4 (state-driven finalize chain — every path landing drafts on main eventually triggers one of the three hooks)
 - Praxion's own commit gate lives in `.pre-commit-config.yaml` (the `pre-commit` framework): the five author gates — shipped-artifact isolation, canonical-block sync, diagram regen, AaC golden-rule, rules-manifest drift — run as `repo: local` hooks alongside ruff + gitleaks, activated by `install_claude.sh` via `pre-commit install`. User projects instead get a *tailored* inline hook written by `/onboard-project` Phase 4 that runs only `check_id_citation_discipline.py` — Praxion's shipped-artifact concern doesn't apply downstream
-- `merge_driver_memory.py`, `merge_driver_observations.py` — registered via `git config merge.<name>.driver` by `/onboard-project` Phase 3 (alongside the `.gitattributes` entries)
+- `merge_driver_observations.py` — registered via `git config merge.observations-jsonl.driver` by `/onboard-project` Phase 3 (alongside the `.gitattributes` entry). The retired `merge_driver_memory.py` (in-house memory subsystem) is gone; onboarding now *removes* any leftover `memory-json` driver — see Phase 3 cross-version cleanup
 - `check_id_citation_discipline.py` — invoked by the user-project pre-commit hook installed in Phase 4
 - `finalize_adrs.py`, `finalize_tech_debt_ledger.py`, `reconcile_ai_state.py`, `check_squash_safety.py` — invoked by the finalize hook chain (composition varies per trigger; see `finalize_chain.sh`)
 

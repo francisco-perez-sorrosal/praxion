@@ -443,10 +443,12 @@ shipped command works in managed projects. **F-15/P14** (verification-report mer
 
 ### F-07 — Memory Removal Is Not Fully Reflected in Process Docs
 
-**Status:** Done (2026-06-25). The audit-named active surfaces are fixed; grounding revealed the
-stale-memory surface is **wider than this finding enumerated**, so two new clusters were split out and
-have since been completed — **P26** (Codex memory bridge) and **P27** (roadmap `remember()`
-persistence), both **Done** in §9 — plus a list of deliberately-retained vestigial references below.
+**Status:** Done (2026-06-25, second pass). The first pass missed four active surfaces, which the
+Second Auditor (§12) correctly rejected; all are now fixed — see **§12.4** for the per-file list.
+Earlier grounding had already split out two wider clusters, both **Done** in §9 — **P26** (Codex
+memory bridge) and **P27** (roadmap `remember()` persistence) — plus the deliberately-retained
+vestigial references below. The widened second-pass scan also surfaced a diagram source and a hook
+coupling the auditor's `.md`/`.py` grep could not reach (the latter is the new **F-26**).
 
 **Remediation (2026-06-25).** Updated the active surfaces this finding named, plus two more found via
 grounding: removed the curated-memory row from `docs/getting-started.md` (added a one-line note that
@@ -485,9 +487,13 @@ guidance. Active docs, hooks, rules, and commands should be updated.
 
 ### F-08 — `reconcile_ai_state.py` Documentation and Reconciliation Contracts Lag Current State
 
-**Status:** Done (2026-06-25). The script is intentionally narrow and its docstring already says so
-(handles only `observations.jsonl` dedup + ADR renumber/index — verified: zero `memory` references in
-`scripts/reconcile_ai_state.py`). The drift was entirely in the *callers* overstating its contract.
+**Status:** Done (2026-06-25, second pass). The script is intentionally narrow and its docstring
+already says so (handles only `observations.jsonl` dedup + ADR renumber/index — verified: zero
+`memory` references in `scripts/reconcile_ai_state.py`). The drift was entirely in the *callers*
+overstating its contract. The first pass fixed the `agent-pipeline-details.md` reconciliation **table**
+but missed the §Automated-reconciliation **prose bullet** (and the `docs/architecture.md` post-merge
+row) — the surfaces the Second Auditor rejected. Both are now aligned to the single `observations-jsonl`
+driver; see **§12.4**.
 
 **Remediation (2026-06-25).** Aligned the callers to the script's actual narrow contract:
 `commands/merge-worktree.md` no longer claims it "resolves memory.json" (now: `observations.jsonl` +
@@ -630,8 +636,7 @@ differently.
 **Remediation (2026-06-24).** Closed in two passes:
 
 **Pass 1 — single schema anchor + wording.** Canonical schema lives in
-`skills/software-planning/references/tech-debt-ledger.md` § Schema (`14 row fields + 1 structural
-`dedup_key` field`). Active surfaces that previously said `15-field` or mixed `14 fields +
+`skills/software-planning/references/tech-debt-ledger.md` § Schema (`14 row fields + 1 structural dedup_key field`). Active surfaces that previously said `15-field` or mixed `14 fields +
 dedup_key` now use the canonical phrase and link to the skill reference instead of re-explaining
 enums or formulas: `docs/architecture.md`, `docs/existing-project-onboarding.md`,
 `rules/swe/agent-intermediate-documents.md`, `.ai-state/DESIGN.md`, `commands/onboard-project.md`,
@@ -640,6 +645,7 @@ ADRs and `DESIGN_CHANGELOG.md` left unchanged (historical “15 fields” narrat
 
 **Pass 2 — producer overlays (strict “link only” in agents).** Operational finding→field mapping
 moved out of agent prompts into the same skill reference § **Producer overlays**:
+
 - **`verifier (Phase 5 / 5.5)`** — when to write, severity tiers, class mapping from tags/ceilings,
   Phase 5.5 survivor override, report-vs-ledger split, shared dedup rule.
 - **`architect-validator (Phase 7)`** — drift-specific defaults for FAIL rows.
@@ -650,6 +656,7 @@ rule summary to the skill reference.
 
 **Pass 3 — remaining writers (sentinel + orchestrator).** Completed the overlay set for all four
 ledger writers:
+
 - **`sentinel (TD01–TD04, TT04, EC07)`** — metrics/TT/EC signals, LLM-judgment gating, staleness
   policy, finding→class/severity/owner table. `agents/sentinel.md` TD/TT/EC check rows link to
   overlay keys instead of inline `class`/`owner-role` defaults.
@@ -998,6 +1005,62 @@ load the relevant path-scoped conventions.
 to include `.ai-state/DESIGN.md`, keeping `**/ARCHITECTURE.md` only as a legacy managed-project
 compatibility path when intentionally needed.
 
+### F-26 — `commit_gate.sh` Memory Opt-Out Now Silently Skips Unrelated Commit Checks
+
+**Status:** Done (2026-06-25, second pass) — Option A (gates always run); the whole dead memory-env-var
+family purged from active surfaces per user direction.
+
+**Severity:** Important (latent correctness — hackathon-scoped)
+**Effort:** S
+**Discovered:** Second-pass grounding (widened the memory scan beyond `.md`/`.py`); independently
+pre-flagged as **I2** in `SENTINEL_REPORT_2026-06-11` (mis-characterized there as a "dead code path").
+**Evidence:** `hooks/commit_gate.sh` short-circuits (`exit 0`) when `PRAXION_DISABLE_MEMORY_MCP=1`.
+That branch was written to skip the memory commit-reminder (`remind_memory.py`), which **dec-225
+deleted**. The wrapper now fronts three live, non-memory checks — `check_code_quality.py`,
+`remind_adr.py`, `check_id_citation_discipline.py` (`hooks/hooks.json:181/187/199`). The env key is
+still set to `"1"` in active settings: `.claude/hackathon-settings.json`,
+`claude/aac-templates/hackathon-settings.json.tmpl`, and `eval/.claude/settings.json`.
+
+**Risk.** In hackathon mode a *memory-named* flag silently disables the id-citation-discipline and
+code-quality commit gates — quality hygiene, not the "ADR/SDD/test ceremony" hackathon mode means to
+relax. `hooks/test_commit_gate.py:139` encodes the current short-circuit, so any behavior change must
+update the test.
+
+**Recommended fix (two options, user-decided).**
+- **A — gates always run:** remove the short-circuit; drop the dead env key from the three settings
+  files; update `test_commit_gate.py`. Hackathon commits then run code-quality + id-citation checks.
+- **B — hackathon intentionally relaxes them:** keep the skip but rename the switch to an honest,
+  memory-independent name (e.g. driven by `PRAXION_HACKATHON_MODE`); migrate the settings + test.
+
+**Remediation (2026-06-25, two steps).** First the misleading comment was rewritten. Then, on the
+user's direction that no dead `PRAXION_DISABLE_MEMORY_*` flag should survive in the project, **Option A
+was taken and the whole dead env-var family was purged** (grounding showed two siblings —
+`PRAXION_DISABLE_MEMORY_INJECTION` and `PRAXION_DISABLE_MEMORY_GATE` — alongside `…_MCP`, all three with
+**zero consumers**; contrast the live `PRAXION_DISABLE_OBSERVABILITY` / `PRAXION_HACKATHON_MODE`, which
+*are* consumed):
+
+- `hooks/commit_gate.sh` — removed the `exit 0` short-circuit; the three wrapped checks (code-quality +
+  id-citation-discipline are *blocking* — `sys.exit(2)` / non-zero — and the ADR reminder, which already
+  self-relaxes via `PRAXION_HACKATHON_MODE` in `remind_adr.py`) now always run.
+- `hooks/test_commit_gate.py` — dropped the kill-switch test + the dead-var `pop`; 7 tests green.
+- `.claude/hackathon-settings.json` + `claude/aac-templates/hackathon-settings.json.tmpl` — removed all
+  three dead keys (kept `PRAXION_HACKATHON_MODE`, `PRAXION_DISABLE_OBSERVABILITY`).
+- `claude/config/praxion-rules.yaml.example` + `eval/.claude/praxion-rules.yaml.example` — removed the
+  retired `swe/memory-protocol` disable example and its `PRAXION_DISABLE_MEMORY_MCP` comment.
+- `skills/tui-design/SKILL.md` + `references/cli-ux-patterns.md` — re-pointed the error-grammar examples
+  from the removed `memory-mcp` server to a neutral database example.
+- `scripts/test_export_codex_rules_bridge.py` — generalized the docstring (the `PRAXION_DISABLE_*` strip
+  logic is unchanged and still correct).
+
+Plus an adjacent memory residue surfaced en route: `scripts/CLAUDE.md` listed the retired
+`merge_driver_memory.py` as a live onboard-Phase-3 driver — corrected to `observations-jsonl`-only with a
+pointer to the cross-version cleanup. **Verified:** zero dead `PRAXION_DISABLE_MEMORY_*` references remain
+in active surfaces (only the dec-225 ADR, `CHANGELOG`, sentinel reports, the WAL, and the dated
+comparison snapshot retain them as history); `test_hackathon_mode` + `commit_gate` + codex-bridge suites
+(38 tests) green; canonical blocks in sync. *(The pre-existing `doc_manifest.yaml` staleness that lists
+`merge_driver_memory.py` is the separate F-19/P18 freshness concern — left for a deliberate regen, not
+folded into this change.)*
+
 ---
 
 ## 5. Deprecated / Cleanup Candidates
@@ -1195,10 +1258,11 @@ Verification:
 | P7 | ~~Dashboard/doc manifest stale `.ai-work` list~~ | Important | M | implementer | **Done (2026-06-25)** — both corrected to the registry's 19-artifact dashboard set; drift-guarded (F-04) |
 | P8 | ~~Eval task manifest too small~~ | Important | M | test-engineer / implementer | **Done (2026-06-25)** — `LEARNINGS.md` added to `_STANDARD_REQUIRED`; conditional `TEST_RESULTS`/`traceability` added with `ArtifactSpec.activation` predicates (`_tests_ran`/`_sdd_active`), registry `eval_conditional` + drift-guarded |
 | P9 | ~~Skill-genesis old ephemeral path remains in consumers~~ | Important | S | context-engineer | **Done (2026-06-25)** — `SKILL_GENESIS_REPORT.md` removed from `build_doc_manifest.py` + dashboard `files.ts` (precompact done batch 2); registry drift test prevents re-introduction |
-| P10 | ~~Memory subsystem stale active docs~~ | Important | M | doc-engineer | **Done (2026-06-25)** — audit-named active surfaces fixed; the split-out clusters P26 + P27 are both Done; vestigial/illustrative/guarded refs retained with reasons (F-07) |
-| P11 | ~~`reconcile_ai_state.py` contract overstated in docs~~ | Important | S-M | implementer | **Done (2026-06-25)** — callers aligned to the script's narrow observations+ADR contract |
+| P10 | ~~Memory subsystem stale active docs~~ | Important | M | doc-engineer | **Done (2026-06-25, second pass)** — the four surfaces the Second Auditor rejected (getting-started row 8, onboarding skeleton, external-api-docs fallback + skill, rules-taxonomy examples) now fixed; split-out clusters P26 + P27 Done; vestigial/illustrative/guarded refs retained with reasons (F-07, §12.4) |
+| P11 | ~~`reconcile_ai_state.py` contract overstated in docs~~ | Important | S-M | implementer | **Done (2026-06-25, second pass)** — first pass fixed the reconciliation table; second pass fixed the §Automated-reconciliation prose bullet + `docs/architecture.md` row (the surfaces the Second Auditor rejected). Aligned to the single `observations-jsonl` driver (F-08, §12.4) |
 | P26 | ~~Codex memory bridge still ships memory hooks/gates post-dec-225~~ | Important | M | implementer | **Done (2026-06-25)** — verified the generator (`export-codex-rules-bridge.py`) no longer emits memory hooks (stale `.codex/hooks/` files were gitignored leftovers, deleted); purged stale memory descriptions from `codex/config/README.md`, `README_DEV.md`, `AGENTS.md.tmpl`. Codex-native memory etiquette + the observability hook retained |
 | P27 | ~~Roadmap `remember()` persistence cluster is broken~~ | Important | M | context-engineer | **Done (2026-06-25)** — renamed "Memory Candidates" → "Learning Candidates" across `roadmap-cartographer`, `/roadmap`, `roadmap-synthesis` (assets + refs); rerouted persistence to LEARNINGS.md / ADR / idea ledger / surface-to-user; no `remember()` referenced. Inline rationale only (shipped-artifact isolation) |
+| P28 | ~~`commit_gate.sh` memory opt-out skips unrelated commit checks~~ | Important | S | implementer | **Done (F-26, 2026-06-25, Option A)** — removed the short-circuit (gates always run) and purged the whole dead `PRAXION_DISABLE_MEMORY_*` family (3 zero-consumer vars) across hooks/settings/skills/tests; fixed the `merge_driver_memory.py` residue in `scripts/CLAUDE.md`. 38 tests green |
 | P12 | ~~Optional `.ai-state` artifacts lack state labels~~ | Suggested | M | context-engineer | **Done (2026-06-25)** — five-state vocabulary (`active`/`optional-lazy`/`threshold-lazy`/`future-designed`/`historical-retained`) in the rule's compact table + the inventory reference's `State` column (via F-03) |
 | P13 | ~~Pre-refactor schema producer/validator mismatch~~ | Important | S | systems-architect / sentinel | **Done** — F-14 remediation 2026-06-24 |
 | P14 | ~~Verification report archival before cleanup underspecified~~ | Important | S-M | implementation-planner | **Done (2026-06-25)** — `unmerged-verification` WARN keys on a `### Verification Patterns Merged` marker (F-06 gate) |
@@ -1239,7 +1303,7 @@ A future cleanup pipeline should not call itself complete until:
   spec/traceability; the one flagged pipeline `l3-readiness-config` was investigated (P22) and its
   archival is a recorded exception in its own `SYSTEMS_PLAN.md`.)*
 - [x] PreCompact hook no longer instructs agents to call `remember()`. *(Done 2026-06-24 — P4/F-05)*
-- [x] Active docs no longer describe `remember()` or `memory-mcp` as available Praxion behavior. *(Done 2026-06-25 across the active surfaces — precompact (P4); getting-started/onboarding/agent-pipeline-details/merge-worktree/pr-conventions (P10); reconcile contract (P11); Codex memory bridge (P26); roadmap `remember()` cluster (P27). Vestigial/illustrative/guarded refs and the global-CLAUDE.md philosophy mirror in `AGENTS.md.tmpl` are deliberately retained.)*
+- [x] Active docs no longer describe `remember()` or `memory-mcp` as available Praxion behavior. *(First pass over-claimed this — the Second Auditor (§12) correctly rejected it. **Genuinely Done 2026-06-25, second pass** — §12.4: getting-started row 8, onboarding skeleton, external-api-docs (doc + skill), id-decontamination, rules-taxonomy, the `agent-pipeline-details` prose bullet, `architecture.md`, and the skill-genesis diagram source all corrected; verified by the §13.4 scan yielding zero wrong-guidance hits. Earlier surfaces also done: precompact (P4); merge-worktree/pr-conventions (P10); Codex memory bridge (P26); roadmap cluster (P27). Vestigial/illustrative/guarded refs and the global-CLAUDE.md philosophy mirror in `AGENTS.md.tmpl` deliberately retained. Open: `commit_gate.sh` coupling — F-26, behavioral decision pending.)*
 - [x] `SYSTEM_DEPLOYMENT.md` reflects the post-dec-225 observations-only state. *(Done 2026-06-24 — F-23)*
 - [x] Sentinel or a dedicated test catches hard-coded artifact-list drift. *(Done 2026-06-25 — F-04:
   `scripts/test_artifact_registry.py` fails when any of the four consumers diverges from
@@ -1263,3 +1327,242 @@ earn their keep.
 The cleanup should instead target **obsolete names, stale producers/consumers, incomplete manifests,
 and unsafe deletion paths**. The most reusable future improvement is a canonical artifact registry
 that makes lifecycle, producer, consumer, activation, and cleanup policy explicit and testable.
+
+---
+
+## 12. Second Auditor Review (2026-06-25)
+
+Reviewer: **Second Auditor** (independent verification pass over current `main`).
+
+Method: validated each claimed remediation against the current repo state (rules, agents, commands,
+hooks, scripts, and tests), then assigned one of:
+
+- **Approved** — claim verified as complete for the stated scope
+- **Partial** — mostly fixed, but at least one meaningful gap remains
+- **Not approved** — claim currently contradicted by active surfaces
+
+### 12.1 Findings (`F-*`) — Second Auditor Verdicts
+
+| ID | Second Auditor verdict | Evidence / rationale | Required follow-up (if not Approved) |
+| --- | --- | --- | --- |
+| F-01 | Approved | Active-surface rename to `DESIGN.md` is in place; historical-only references retained intentionally. | — |
+| F-02 | Approved | Architect-validator/CI/path filters target `DESIGN.md`; no active `ARCHITECTURE.md` trigger dependency found in those surfaces. | — |
+| F-03 | Approved | Always-loaded rule is slimmed; lifecycle-state table + `artifact-inventory.md` split are present. | — |
+| F-04 | Approved | `artifact_registry.py` + drift tests exist; dashboard/doc/eval/precompact sets are aligned and guarded. | — |
+| F-05 | Approved | Path mismatch resolved to root-scoped `.ai-work/PIPELINE_STATE.md`; snapshot list updated; stale `SKILL_GENESIS_REPORT.md` removed from hook. | — |
+| F-06 | Approved | `clean_work_safety.py` gate implemented with BLOCK/WARN/SAFE + `--dry-run` workflow in `/clean-work`. | — |
+| F-07 | **Not approved** | Active docs still describe removed memory surfaces (examples below): `docs/getting-started.md` milestone row still says memory protocol + `remember()`/Memory MCP; `docs/existing-project-onboarding.md` still says `memory.json` is written by memory MCP server; `docs/external-api-docs.md` fallback still includes Memory MCP; `skills/external-api-docs/SKILL.md` still instructs `remember(...)`. | Remove/replace remaining active memory references with observations-only + durable-artifact guidance; keep historical ADR/report mentions only. |
+| F-08 | **Not approved** | `skills/software-planning/references/agent-pipeline-details.md` still states merge drivers handle `memory.json` (automated reconciliation section), contradicting "narrow observations + ADR" claim. | Update reconciliation section to match current `.gitattributes`/script behavior (observations + ADR index/renumber only). |
+| F-09 | Approved | Old `.ai-work/.../SKILL_GENESIS_REPORT.md` removed from active consumers; persistent location reflected and drift-guarded. | — |
+| F-10 | Approved | Eval manifest now includes unconditional `LEARNINGS.md` and conditional activation for `TEST_RESULTS.md`/`traceability.yml`. | — |
+| F-11 | Approved | Sentinel CA03 check exists and is documented as coverage enforcement for calibration logging. | — |
+| F-12 | Approved | Single schema anchor + producer overlays implemented; agent prompts link-only; tests guard against drift. | — |
+| F-13 | Approved | Managed-project vs Praxion `ROADMAP.md` lifecycle distinction is explicit; shipped-artifact ADR-ID caveat handled correctly. | — |
+| F-14 | Approved | Pre-refactor schema order and producer/validator parity are aligned. | — |
+| F-15 | Approved | Verification-merge gating is now enforced via `/clean-work` WARN path (`unmerged-verification`). | — |
+| F-16 | Approved | Challenge-channel visibility + durable disposition requirement are present and documented. | — |
+| F-17 | Approved | ML extension artifact family is explicitly partitioned and activation-scoped in inventory/reference surfaces. | — |
+| F-18 | Approved | Spec path-repair policy (immutable narrative vs maintainable traceability paths) is present and aligned with SH checks. | — |
+| F-19 | Approved | Sentinel freshness check (`F11`) for `doc_manifest.yaml` is present and WARN-only as intended. | — |
+| F-20 | Approved | Absent-means-OK lifecycle labels are now explicit (`active`/`optional-lazy`/`threshold-lazy`/`future-designed`/`historical-retained`). | — |
+| F-21 | Approved | Stale-slug advisory is implemented via safety classifier (`age_days`/`stale_safe`); user-action deletion model is explicit. | — |
+| F-22 | Approved | Cleanup gating for traceability/spec archival exists; investigated exception is documented. | — |
+| F-23 | Approved | `SYSTEM_DEPLOYMENT.md` reflects post-dec-225 observations-only architecture. | — |
+| F-24 | Approved | Legacy filename rationale for `capture_memory.py` is clearly documented with future rename seam. | — |
+| F-25 | Approved | CI/path-scoped architecture filters include `DESIGN.md` surfaces. | — |
+
+### 12.2 Problems (`P*`) — Second Auditor Verdicts
+
+| ID | Second Auditor verdict | Evidence / rationale | Required follow-up (if not Approved) |
+| --- | --- | --- | --- |
+| P1 | Approved | Matches F-01 verification. | — |
+| P2 | Approved | Matches F-02 verification. | — |
+| P3 | Approved | Matches F-05 path decision verification. | — |
+| P4 | Approved | PreCompact `remember()` obligation removed and replaced with durable-learning reminder. | — |
+| P5 | Approved | Snapshot coverage widened and stale artifact removed. | — |
+| P6 | Approved | Deterministic cleanup safety gate shipped with tests and command integration. | — |
+| P7 | Approved | Dashboard/doc manifest list drift resolved and guarded. | — |
+| P8 | Approved | Eval manifest enlargement + conditionality implemented. | — |
+| P9 | Approved | Skill-genesis old ephemeral path removed from active consumers. | — |
+| P10 | **Not approved** | Same outstanding active-memory references as F-07 remain in current docs/skills. | Complete memory-reference purge in active guidance surfaces. |
+| P11 | **Not approved** | Same reconciliation-contract overstatement remains in `agent-pipeline-details.md` (memory merge-driver mention). | Align that section with actual `reconcile_ai_state.py` + `.gitattributes` behavior. |
+| P12 | Approved | Lifecycle-state labels now explicit and consistently framed. | — |
+| P13 | Approved | Pre-refactor schema mismatch resolved. | — |
+| P14 | Approved | Verification-report archival/merge guard now enforced by cleanup safety workflow. | — |
+| P15 | Approved | Interface/transaction artifact discoverability fixed in manifests/snapshot flows. | — |
+| P16 | Approved | ML artifacts explicitly separated as extension family. | — |
+| P17 | Approved | Spec path-repair policy now exists and is actionable. | — |
+| P18 | Approved | `doc_manifest.yaml` freshness surfaced via sentinel check. | — |
+| P19 | Approved | Calibration under-logging now detectably surfaced (CA03). | — |
+| P20 | Approved | Tech-debt schema anchor consolidation is complete and guarded by tests. | — |
+| P21 | Approved | Stale `.ai-work` advisory mechanism exists and is operational. | — |
+| P22 | Approved | Spec-archival cleanup gating + exception recording are present. | — |
+| P23 | Approved | Deployment doc memory removal reflected. | — |
+| P24 | Approved | Legacy-name documentation accepted and implemented. | — |
+| P25 | Approved | `DESIGN.md` architecture filter gap resolved. | — |
+| P26 | Approved | Codex-side memory bridge/hook references are removed from active codex surfaces. | — |
+| P27 | Approved | Roadmap learning-candidate flow no longer depends on `remember()`/`recall()`. | — |
+
+### 12.3 Second Auditor Summary
+
+- **Approved:** 23/25 findings, 25/27 problems
+- **Not approved:** `F-07`, `F-08`, `P10`, `P11`
+- **Blocking residual scope:** memory-removal cleanup in active docs/skills + one reconciliation-contract paragraph
+
+Once those four are corrected, this audit can be considered fully closed from a second-auditor perspective.
+
+### 12.4 Re-review Remediation (2026-06-25, second pass)
+
+All four Not-Approved items were corrected in one pass. The §13.4 active-surface scan now yields zero
+*wrong-guidance* hits — only correct "no `remember()`/`recall()` tool exists" mentions, the
+deliberately-exempt defensive/illustrative/migration/`memory-mcp`-directory surfaces, and one synthetic
+test fixture (`hooks/test_auto_complete_install.py`, exempt under `id-citation-discipline`) remain. The
+Second Auditor's claims were independently re-grounded against the live repo before any edit — every
+cited surface reproduced exactly, and the named contracts (`.gitattributes` = one `observations-jsonl`
+driver; `reconcile_ai_state.py` = zero memory refs; `memory-protocol.md` rule absent) held.
+
+**F-07 / P10 — active memory references purged** (every surface the auditor named, plus two it missed):
+
+| Surface | Change |
+| --- | --- |
+| `docs/getting-started.md` row 8 | Milestone **Cross-session memory → Cross-session learning**; trigger/output rewritten to observability-hook + durable artifacts; now agrees with its own dec-225 callout three rows above |
+| `docs/existing-project-onboarding.md` | `memory.json` / "memory MCP server" line reduced to `observations.jsonl` written by the observability hook |
+| `docs/external-api-docs.md` + `skills/external-api-docs/SKILL.md` | "Memory MCP" fallback step → **durable project artifacts**; `remember({...})` "Where to Record" row → `LEARNINGS.md` / ADR |
+| `skills/id-decontamination/SKILL.md` | "Decontamination of Memory Entries" → "Non-Code Surfaces" (no `memory.json` scan; adds a caveat that archived-spec `REQ-NN` IDs are a legitimate system of record, not contamination) |
+| `docs/rules-taxonomy.md` | Retired `swe/memory-protocol` removed from both disable examples; rationale + token figure (`~5,100 → ~2,400`) corrected — now consistent with the doc's own "1/2 hook-deliver rules" log example and the 2-rule manifest |
+
+**F-08 / P11 — reconciliation contract aligned.** `agent-pipeline-details.md` §Automated-reconciliation
+bullet 1 now names the single semantic driver `observations-jsonl` (was "handle `memory.json` and
+`observations.jsonl`"); `docs/architecture.md` post-merge-hook row corrected from "reconcile handles
+memory/observations" to observations-dedup + ADR-index. Both match `.gitattributes` and
+`reconcile_ai_state.py` on disk.
+
+**Two findings the auditor's `.md`/`.py`-scoped grep could not reach** (found by widening the scan to all
+file types):
+
+- **Diagram source** `docs/diagrams/skill-genesis-harvest/src/skill-genesis-harvest.mmd` depicted the
+  removed `remember(...)` flow (a `remember MCP` participant). Removed the participant + the `remember()`
+  step; the rest of the harvest sequence is current. *(The source is orphaned — no rendered SVG, not
+  embedded in any doc — a separate diagram-hygiene item, noted not fixed here.)*
+- **`hooks/commit_gate.sh` coupling → new finding F-26.** A `PRAXION_DISABLE_MEMORY_MCP` short-circuit
+  written for the removed memory commit-reminder now silently skips three live non-memory checks
+  whenever the env key is set — and it *is* set in hackathon settings. Stale comment corrected this
+  pass; the behavioral A-vs-B decouple is surfaced for a user decision (F-26 is the only item left open
+  by this pass).
+
+**Deliberately retained** (unchanged — same rationale as the F-07 note): the correct "no `remember()`
+tool exists" mentions (roadmap surfaces, `precompact_state.py`); defensive redaction patterns
+(`upstream-stewardship`, `context-security-review`); illustrative CLI-UX (`tui-design`) and version-pin
+(`versioning`) examples; `memory-mcp/`-**directory** path references (the dir still exists on disk);
+onboard cross-version cleanup guidance; the synthetic hook test fixture.
+
+Ready for Second-Auditor re-review: **F-07, F-08, P10, P11** — plus **F-26** (newly found this pass and
+closed via Option A: the dead `PRAXION_DISABLE_MEMORY_*` env-var family fully purged from active surfaces;
+gates always run).
+
+---
+
+## 13. Second Auditor Remediation Checklist
+
+**Owner:** implementer / context-engineer (docs + skill surfaces)
+**Tier:** Lightweight (4 primary edits + verification grep; optional secondary pass)
+**Closes:** `F-07`, `F-08`, `P10`, `P11`
+
+### 13.1 Pre-flight
+
+- [ ] Read `dec-225` (removed subsystem scope) and the F-07 remediation note in §6 — historical ADR/sentinel/metrics mentions are **exempt**; active guidance is not.
+- [ ] Confirm `rules/swe/memory-protocol.md` is gone (it is — do not reintroduce disable examples that reference a non-existent rule without a migration note).
+- [ ] Confirm current contracts:
+  - `.gitattributes` — only `.ai-state/observations.jsonl merge=observations-jsonl`
+  - `scripts/reconcile_ai_state.py` — observations dedup + ADR renumber/index only (no `memory.json` path)
+  - Cross-session knowledge — committed `.ai-state/` artifacts + promoted `LEARNINGS.md`; observability via `observations.jsonl`; `sandbook` planned
+
+### 13.2 Track A — F-07 / P10: purge active memory references
+
+Replace removed-memory behavior with **observations-only + durable-artifact** guidance. Do not instruct agents to call `remember()`/`recall()` or to expect `.ai-state/memory.json`.
+
+| Priority | File | Location | Current problem | Required change |
+| --- | --- | --- | --- | --- |
+| **P0** | `docs/getting-started.md` | Journey table row 8 (~L223) | Milestone still titled "Cross-session memory"; cites `memory-protocol` rule, `remember()`, Memory MCP, and `.ai-state/memory.json` | Rename milestone (e.g. **Cross-session learning**). Trigger: observability hook + durable artifacts (`LEARNINGS.md` promotion, ADRs, `.ai-state/` specs). Output: `.ai-state/observations.jsonl` (auto-captured tool events) + committed durable artifacts — **not** curated `memory.json`. The dec-225 callout at ~L171 is correct; row 8 must match it. |
+| **P0** | `docs/existing-project-onboarding.md` | Phase 2 skeleton (~L108) | Says `memory.json` is written by memory MCP server | Replace with: only `observations.jsonl` is created on first use (observability hook); **do not** pre-create either file; merge driver applies to observations only. |
+| **P0** | `docs/external-api-docs.md` | Fallback Hierarchy (~L168) | Step 3 is "Memory MCP" | Remove step 3 or replace with **durable project artifacts** (prior `LEARNINGS.md` entries, ADRs, local chub annotations). Renumber remaining steps. |
+| **P0** | `skills/external-api-docs/SKILL.md` | Fallback Hierarchy (~L174) + "Where to Record" table (~L230) | Memory MCP in fallback; table row instructs `remember({...})` | Same as companion doc: durable-artifact fallback; table row → `LEARNINGS.md` under `### API Version Drift` (or ADR if architectural). Remove all `remember()` examples. |
+
+**P1 — same pass if time permits (Second Auditor near-misses; not in original four-ID list but will re-fail grep-based acceptance if left):**
+
+| File | Location | Required change |
+| --- | --- | --- |
+| `skills/id-decontamination/SKILL.md` | § Decontamination of Memory Entries (~L148–156) | Remove or rewrite section: no `memory.json` scan, no `memory-protocol` rule reference. ID decontamination applies to code, docs, `.ai-work/` artifacts, and observations — not curated memory. |
+| `docs/architecture.md` | Git post-merge hook chain row (~L94) | Change "reconcile handles memory/observations" → "reconcile handles observations + ADR index/renumber". |
+| `docs/rules-taxonomy.md` | Example disable lists (~L216, L232) + rationale (~L237) | Remove `swe/memory-protocol` from examples (rule retired). Rationale line can say "skips retired memory surfaces" or drop memory mention entirely. |
+
+**Deliberately exempt — do not edit in this pass:**
+
+| Surface | Reason |
+| --- | --- |
+| `commands/onboard-project.md` cross-version cleanup example (`memory-json` driver retirement) | Migration/cleanup guidance for projects onboarded pre-dec-225 — intentional |
+| `skills/tui-design/` `memory-mcp start` CLI examples | Illustrative CLI-UX pattern, not operational guidance |
+| `skills/upstream-stewardship/` + `skills/context-security-review/` sanitization rows for `memory.json` | Defensive redaction patterns for upstream exports; not instructing use |
+| `docs/context-prj-comparison-2026-05-12/**` | Dated comparison snapshot; historical framing |
+| `.ai-state/decisions/**`, sentinel/metrics reports | Historical records |
+
+### 13.3 Track B — F-08 / P11: align reconciliation contract
+
+| Priority | File | Location | Current problem | Required change |
+| --- | --- | --- | --- | --- |
+| **P0** | `skills/software-planning/references/agent-pipeline-details.md` | § Automated reconciliation, bullet 1 (~L353) | "handle `memory.json` and `observations.jsonl`" | Change to: merge driver handles **`observations.jsonl` only** (registered by `install.sh` / onboard Phase 3). Optionally add: retired `memory-json` driver is removed on re-onboard/upgrade — see onboard cross-version cleanup. |
+| **P0** | Same file | Reconciliation table (~L337–339) | Rows already correct for observations + ADR | **No change needed** — table matches `reconcile_ai_state.py`; only the automated-reconciliation bullet is wrong. |
+| **P1** | `docs/architecture.md` | Hook chain row (~L94) | Overstates reconcile scope | Covered in Track A P1 above |
+
+**Canonical wording to converge on (one sentence, reuse everywhere):**
+
+> Post-merge reconciliation (`reconcile_ai_state.py`) deduplicates `.ai-state/observations.jsonl` and renumbers/regenerates ADR files and `DECISIONS_INDEX.md`. The only semantic merge driver is `observations-jsonl`.
+
+### 13.4 Verification (run after edits)
+
+```bash
+# Active-surface scan — expect ZERO hits outside exempt paths
+rg -n 'remember\(|recall\(|memory\.json|Memory MCP|memory-mcp|memory-protocol' \
+  docs/ skills/ commands/ agents/ rules/ hooks/ \
+  --glob '!docs/context-prj-comparison-2026-05-12/**' \
+  --glob '!docs/independent-analysis/**'
+
+# Reconciliation contract — expect observations-only merge driver mention
+rg -n 'memory\.json.*merge|merge.*memory\.json|handle.*memory\.json' \
+  skills/software-planning/references/agent-pipeline-details.md docs/architecture.md
+
+# Confirm script contract unchanged
+python3 -c "import pathlib; t=pathlib.Path('scripts/reconcile_ai_state.py').read_text(); assert 'memory.json' not in t"
+```
+
+**Manual spot-check:**
+
+- [ ] `docs/getting-started.md` row 8 no longer contradicts the dec-225 callout above it
+- [ ] `skills/external-api-docs/SKILL.md` fallback hierarchy has no gap numbering after Memory MCP removal
+- [ ] `agent-pipeline-details.md` three-layer reconciliation list matches `.gitattributes` on disk
+
+### 13.5 Post-remediation doc updates
+
+- [ ] Update F-07, F-08, P10, P11 rows in §12.1/§12.2 to **Approved** (or add a §12.4 "Re-review" subsection with date + verifier)
+- [ ] Correct §10 acceptance criterion "Active docs no longer describe `remember()`…" — currently marked `[x]` but contradicted by §12; uncheck until Track A passes verification grep
+- [ ] Add one-line remediation note to each F-07/F-08 backlog row in §8 (same pattern as F-12/F-14)
+
+### 13.6 Suggested commit message
+
+```
+fix: purge remaining active memory references and reconcile contract drift
+
+Align getting-started, onboarding, and external-api-docs surfaces with
+dec-225 observations-only architecture; fix agent-pipeline-details merge-driver
+wording to match reconcile_ai_state.py and .gitattributes.
+```
+
+### 13.7 Estimated effort
+
+| Track | Files (P0) | Effort |
+| --- | --- | --- |
+| A — memory purge | 4 | ~30 min |
+| A — P1 near-misses | 3 | ~15 min |
+| B — reconciliation | 1 (+ architecture if not done in A) | ~10 min |
+| Verification + audit doc | 1 | ~15 min |
+| **Total** | **5–8 files** | **~1 h** |

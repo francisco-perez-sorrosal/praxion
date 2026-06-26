@@ -15,10 +15,9 @@ def _hermetic_env() -> dict[str, str]:
 
     The codex hook wrappers copy ``os.environ`` before dispatching. Without
     this, an ambient ``PRAXION_DISABLE_*`` flag set in the developer session
-    (Praxion itself sets ``PRAXION_DISABLE_MEMORY_MCP=1`` in
-    ``.claude/settings.json``) leaks into the hook under test and silently
-    flips its behavior. Tests control disable flags via the project settings
-    overlay, never via inherited env -- so the test env must not carry them.
+    leaks into the hook under test and silently flips its behavior. Tests
+    control disable flags via the project settings overlay, never via inherited
+    env -- so the test env must not carry them.
     """
     return {k: v for k, v in os.environ.items() if not k.startswith("PRAXION_")}
 

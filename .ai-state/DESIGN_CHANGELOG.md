@@ -6,6 +6,12 @@ The current "Last verified" pointer in `.ai-state/DESIGN.md` § 1 is a one-liner
 
 ---
 
+## 2026-06-02 — agentic-payment-onboarding (Built)
+
+Agentic-Transactions capability row Designed→Built; `alpaca.md` removed from Key Files (D6-REJECTED); `TRANSACTIONS_DESIGN.md` registered in `rules/swe/agent-intermediate-documents.md`.
+
+---
+
 ## 2026-05-13 — doc-arch-sync Option-C dual-agent representation (structural)
 
 LikeC4 model restructured to dual-represent Agents on the two axes Praxion already operates on. The original layer model put `agents` only in the Orchestration layer, conflating authorship (the `.md` files on disk under `agents/`) with runtime (spawned subprocesses with their own context windows). After observing on the rendered components view that Agents were missing from the Knowledge cluster — where they sit semantically alongside Skills / Rules / Commands as a deployable authoring surface — the model was reshaped per Option C: **dual representation**.

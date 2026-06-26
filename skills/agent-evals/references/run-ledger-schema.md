@@ -48,6 +48,8 @@ The `run_store_descriptor` is **backend-invariant**: no field requires knowing w
 backend is active except the resolved `store_uri`. Backend selection lives in
 `project_profile.yaml` (`run_store_backend` + `run_store_root`), never in the descriptor.
 
+> **Absent-behavior:** `project_profile.yaml` is `future-designed` — there is no onboarding producer yet (see `skills/software-planning/references/artifact-inventory.md`), so it is absent on essentially all projects today. When absent, consumers MUST fall back to live detection (default `local-home`: `$HOME/.<project-name>/runs/`); never assume the file exists.
+
 ```yaml
 # run_store_descriptor — backend-invariant. NO backend-conditional fields.
 # Backend is a project-level config concern (project_profile.yaml), NOT a descriptor field.

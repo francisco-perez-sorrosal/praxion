@@ -72,6 +72,32 @@ scattered across rules and prompts.
 
 ---
 
+## 0.1 Remediation Status
+
+**Single source of truth for what has been fixed.** Updated as each wave lands; per-item detail uses the finding IDs from §4 and the R-IDs from §6.
+
+| Wave | Scope | Items | Status |
+|---|---|---|---|
+| **1 — Honesty sweep** | Stop the design docs asserting capabilities that don't exist | B2, B3, A6, PF-06; partials R17/R19; doc-half of B1 | ✅ **Done** (2026-06-26) |
+| 2 — Criticals | WAL rotation + windowed read; `TASK_BRIEF` floor (mandatory at Standard/Full) | R1, R2 | ▶ **in progress** |
+| 3 — Production-gate cohort | registry declarative spine + the production gates | R3, R4, R5, R9, R13 | planned |
+| 4 — Feedback & hygiene | readiness/eval feedback, idea-ledger, report retention, `doc_manifest`, dead seam, registry import + deferred R17/R19 tails | R7, R8, R11, R12, R15, R18 | planned |
+| 5 — Capstone | integration eval over the criteria→spec path | R10 | planned |
+
+**Wave 1 — landed 2026-06-26:**
+
+- ✅ **B2** — `DESIGN.md` WAL row no longer claims dashboard/metrics consumption; it names the real consumers (`reconcile_pipeline_state.py`, post-merge dedup).
+- ✅ **B3** — Pipeline Recovery Loop flipped `Designed → Built` (reconciler, command, tests, and handshake rules all verified on disk).
+- ✅ **A6** — `DESIGN.md` §1 history (**1,830 → 193 chars**) moved into `DESIGN_CHANGELOG.md`; the intended split restored. *Assigning a standing producer so it cannot re-drift is deferred to Wave 3.*
+- ✅ **PF-06** — `TECH_DEBT_RESOLVED.md` schema pointer corrected to the skill reference.
+- ◑ **B1 (doc-half only)** — the false "auto-rotates above 10 MiB" claim in `DESIGN.md` / `dec-248` corrected to "documented intent, not yet implemented." **The rotation implementation is R1 (Wave 2).**
+- ◑ **R17 (partial)** — dead `evals/baselines/` orphan removed; `token_budgeting/` removal **deferred** — it conflicts with the `historical-retained` state the prior audit sanctioned, so it becomes a Wave-4 policy call.
+- ◑ **R19 (partial)** — `project_profile.yaml` absent-behavior note added; the `program.md` ML-signal tightening is **deferred** to Wave 4 (behavioral, not a doc truth-fix).
+
+Legend: ✅ done · ◑ partial / doc-half · ▶ in progress · (blank) planned.
+
+---
+
 ## 1. Scope, Method, and Relationship to the Prior Audit
 
 **Method.** Praxion's own pipeline drove this analysis. Five lens-independent researchers each took one
@@ -264,6 +290,8 @@ become frequent. *Effort: S (sentinel) / M (script).*
 
 #### A6 — `DESIGN_CHANGELOG.md` has no producer; `DESIGN.md` §1 swelled to absorb it **[High, VERIFIED]**
 
+> **Status (Wave 1, ✅ 2026-06-26):** split restored — §1 history (1,830→193 chars) moved to `DESIGN_CHANGELOG.md`. Assigning a standing producer is deferred to Wave 3. See §0.1.
+
 `grep -rl DESIGN_CHANGELOG agents/ skills/ rules/` → **0**. The file is 44 days stale (last touched
 2026-05-12) while `DESIGN.md` was updated through June. The intended split — `DESIGN.md` holds a one-line
 "Last verified" pointer; `DESIGN_CHANGELOG.md` holds deep history — has **collapsed**: `DESIGN.md` §1 now
@@ -285,6 +313,8 @@ A subtler drift than the prior audit's name-drift: `DESIGN.md` overstates what i
 
 #### B1 — The WAL's "auto-rotation" is documented but does not exist **[Critical, VERIFIED]**
 
+> **Status (Wave 1, ◑ doc-half):** the false claim is corrected in `DESIGN.md` / `dec-248`; the rotation **implementation** is R1 (Wave 2). See §0.1.
+
 `DESIGN.md:64` states the observability log "auto-rotates above 10 MiB (best-effort, never blocks)";
 `dec-248`'s Considered-Options A repeats the WAL is "already hardened (auto-rotation)." Neither
 `capture_memory.py` nor `capture_session.py` contains any size check or rotation logic (grep for
@@ -299,6 +329,8 @@ the claim. Pair with a windowed read (Finding C5). *Effort: M.*
 
 #### B2 — `DESIGN.md` claims dashboard/metrics consume the WAL; no code does **[Important, VERIFIED]**
 
+> **Status (Wave 1, ✅ 2026-06-26):** claim corrected to name the real consumers. See §0.1.
+
 Same `DESIGN.md:64` line: "Consumed by metrics and the dashboard." Exhaustive grep of `dashboard_app/src/`
 finds **no reader** of `observations.jsonl` (the dashboard reads `metrics_reports/*.json`). The WAL's only
 real consumers are `reconcile_pipeline_state.py` (recovery) and `reconcile_ai_state.py` (merge dedup). The
@@ -308,6 +340,8 @@ claim inflates the WAL's apparent utility and would mislead anyone reasoning abo
 consumption as planned-not-built. *Effort: XS.*
 
 #### B3 — The recovery loop is labeled "Designed" while it ships and passes tests **[Suggested, VERIFIED]**
+
+> **Status (Wave 1, ✅ 2026-06-26):** flipped `Designed → Built` in `DESIGN.md`. See §0.1.
 
 `DESIGN.md` §3 and §161 mark the Pipeline Recovery Loop **"Designed,"** even tagging
 `reconcile_pipeline_state.py` as "(new — Designed)" — but the script exists, is executable, and has
@@ -506,6 +540,8 @@ materially better without losing a single load-bearing surface.
 
 Effort: XS≤1h · S≤4h · M≤1d · L≤3d. "Kind" distinguishes a **mechanism** (new gate/producer/script) from
 a **policy** (a documented decision) from **content** (a doc edit).
+
+> **Live status of every R-item is tracked in §0.1 Remediation Status — the single source of truth for what is fixed.**
 
 | ID | Finding | Severity | Effort | Kind | Suggested owner |
 |---|---|---|---|---|---|

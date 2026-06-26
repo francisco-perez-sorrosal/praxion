@@ -18,7 +18,10 @@ The convention is codified in [`../../rules/writing/diagram-conventions.md`](../
 | `concepts-agent-pipeline/` | `src/concepts-agent-pipeline.mmd` | `rendered/concepts-agent-pipeline.svg` | [`../concepts.md`](../concepts.md) |
 | `concepts-component-layers/` | `src/concepts-component-layers.mmd` | `rendered/concepts-component-layers.svg` | [`../concepts.md`](../concepts.md) |
 | `getting-started-pipeline/` | `src/getting-started-pipeline.mmd` | `rendered/getting-started-pipeline.svg` | [`../getting-started.md`](../getting-started.md) |
+| `hackathon-spine/` | `src/hackathon-spine.mmd` | `rendered/hackathon-spine.svg` | [`../architecture.md`](../architecture.md) |
+| `rework-dispatch/` | `src/user-flow.mmd` | `rendered/user-flow.svg` | [`../rework-dispatch.md`](../rework-dispatch.md) |
 | `sdd-stage-flow/` | `src/sdd-stage-flow.mmd` | `rendered/sdd-stage-flow.svg` | [`../spec-driven-development.md`](../spec-driven-development.md) |
+| `skill-genesis-harvest/` | `src/skill-genesis-harvest.mmd` | `rendered/skill-genesis-harvest.svg` | [`../skill-genesis.md`](../skill-genesis.md) |
 
 ## Regeneration
 

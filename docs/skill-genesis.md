@@ -31,7 +31,9 @@ This guide documents the pull-driven inversion that decouples learning harvest f
 
 Skill-genesis operates as a two-edge loop, temporally decoupled:
 
-**Edge 1 (Harvest):** You invoke `/skill-genesis`. The agent runs autonomously in the background, analyzes accumulated learning sources (LEARNINGS.md, verification reports, sentinel findings, memory entries, decision records), triages them into artifact proposals, and writes a timestamped report to `.ai-state/skill_genesis_reports/`. The agent never blocks and never asks you a question.
+![Skill-genesis harvest-and-disposition sequence: /skill-genesis spawns a background agent that runs phases 1-4 and writes a timestamped report to .ai-state/skill_genesis_reports/; after a temporal gap, /skill-genesis-review scans for the latest pending report, presents proposals via a single multi-select, records dispositions, and surfaces skill/rule delegations to context-engineer](diagrams/skill-genesis-harvest/rendered/skill-genesis-harvest.svg)
+
+**Edge 1 (Harvest):** You invoke `/skill-genesis`. The agent runs autonomously in the background, analyzes accumulated learning sources (LEARNINGS.md, verification reports, sentinel findings, decision records), triages them into artifact proposals, and writes a timestamped report to `.ai-state/skill_genesis_reports/`. The agent never blocks and never asks you a question.
 
 **Edge 2 (Disposition):** Later (minutes, hours, or days), when you're ready to decide which proposals matter, you invoke `/skill-genesis-review`. The command auto-discovers the latest unreviewed report, presents every pending proposal in a single batch multi-select, records your disposition (approve / reject / refine / defer) in an append-only log, and surfaces recommended delegations if any proposals were approved.
 
@@ -48,7 +50,7 @@ Run `/skill-genesis` when accumulated learnings are worth harvesting:
 
 **Do NOT run immediately mid-pipeline** — let the pipeline write LEARNINGS.md first. Mid-pipeline harvests will miss the session's final learnings.
 
-**Do NOT run on a fresh project** — no learnings exist yet. Wait until `.ai-work/` or memory entries have accumulated.
+**Do NOT run on a fresh project** — no learnings exist yet. Wait until `.ai-work/` has accumulated learnings.
 
 ## Quick start — first harvest
 
@@ -112,7 +114,7 @@ Pending proposals from SKILL_GENESIS_REPORT_2026-05-15_14-32-58.md:
 
 ☐ Proposal 1: CLI argument parsing (skill, new, P0)
 ☐ Proposal 2: Environment variable conventions (rule, new, P1)
-☐ Proposal 3: Token budgeting pattern (memory, P0)
+☐ Proposal 3: Token budgeting pattern (rule, new, P0)
 ☐ Proposal 4: Refactor request logging (rule, update, P1)
 
 Select which proposals to disposition (space to toggle, enter to confirm):
@@ -155,11 +157,11 @@ Approved delegations:
 Proposal 1 — CLI argument parsing (skill, new)
   → Delegate to: context-engineer (create skills/cli-design/references/argument-parsing.md)
 
-Proposal 3 — Token budgeting pattern (memory, P0)
-  → Execute directly via remember MCP tool
+Proposal 3 — Token budgeting pattern (rule, new, P0)
+  → Delegate to: context-engineer (create rules/swe/token-budgeting.md)
 
 Spawn delegations now, or defer to a later session?
-  spawn now  — invoke context-engineer and execute memory entries immediately
+  spawn now  — invoke context-engineer for the approved proposals immediately
   defer      — print the commands; you'll action them later
 ```
 

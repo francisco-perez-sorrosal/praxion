@@ -9,7 +9,7 @@ sequenceDiagram
 
     U->>SG: /skill-genesis (optional --since, --scope)
     SG->>Agent: Task(...) background
-    SG-->>U: agent spawned; report will land at path
+    SG-->>U: agent spawned — report will land at path
 
     Agent->>Agent: Phases 1-4 (scope, sources, dedup, triage)
     Agent->>FS: write SKILL_GENESIS_REPORT_<TS>.md (review_status: pending)
@@ -22,9 +22,9 @@ sequenceDiagram
     SGR->>FS: scan, find latest pending report
     SGR->>U: single AskUserQuestion multi-select (N proposals)
     U-->>SGR: dispositions (approve / reject / refine / defer)
-    SGR->>FS: append rows to Disposition Log; update frontmatter
+    SGR->>FS: append rows to Disposition Log, update frontmatter
 
-    SGR-->>U: surface skill/rule delegations; confirm?
+    SGR-->>U: surface skill/rule delegations, confirm?
 
     opt user spawns delegations now
         U->>CE: context-engineer with approved proposals

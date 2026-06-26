@@ -1,0 +1,27 @@
+%% L0 — Praxion artifact ecosystem: the seven process drivers and the two+one stores they write to.
+%% Solid = primary write path; dotted = pruning/maintenance.
+flowchart LR
+  subgraph drivers["Process Drivers"]
+    FP["Feature Pipeline<br/>intake → verify"]
+    DS["Decision & Traceability Spine"]
+    OR["Observability & Recovery"]
+    OI["Out-of-Band Intelligence"]
+    CAL["Calibration"]
+    ONB["Onboarding / Cross-Project"]
+    HYG["Ephemeral-Store Hygiene"]
+  end
+  subgraph stores["Stores"]
+    WORK[(".ai-work/<br/>ephemeral · gitignored")]
+    STATE[(".ai-state/<br/>persistent · committed")]
+    DOCS[("docs/<br/>permanent projection")]
+  end
+  FP -->|"coordination docs"| WORK
+  FP -->|"ADRs, specs"| STATE
+  DS --> STATE
+  DS -->|"architecture.md"| DOCS
+  OR -->|"WAL, snapshot"| STATE
+  OR -->|"RECOVERY_LOG, PROGRESS"| WORK
+  OI --> STATE
+  CAL --> STATE
+  ONB -->|"seeds skeleton"| STATE
+  HYG -.->|"prunes"| WORK

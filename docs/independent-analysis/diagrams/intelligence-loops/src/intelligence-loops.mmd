@@ -1,0 +1,14 @@
+%% L1 — Out-of-band intelligence loops. Solid (==>) = CLOSED feedback (learn→recall→apply);
+%% dotted (-.->) = WRITE-ONLY / human-gated (the "apply" phase is missing).
+flowchart LR
+  SENT["sentinel"] ==> SENTR["sentinel_reports/"]
+  SENTR ==>|"mandatory gate ✓"| PROM["promethean"]
+  PROM ==> IDEA["idea_ledgers/"]
+  IDEA ==>|"dedup"| PROM
+  MET["/project-metrics"] ==> METR["metrics_reports/"]
+  METR ==>|"TD dims ✓"| SENT
+  METR -. "readiness score" .-> DASH["dashboard"]
+  DASH -. "human only ✗" .-> HUMAN(("human"))
+  EVALP["/eval-praxion"] -. "write-only ✗" .-> EVALR["praxion_eval_reports/"]
+  EVALR -. "no consumer ✗" .-> HUMAN
+  LEARNX["LEARNINGS.md"] -. "user-invoked" .-> SG["skill-genesis<br/>✗ never run on Praxion"]

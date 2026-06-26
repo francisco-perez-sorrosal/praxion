@@ -1,0 +1,11 @@
+%% L1 — Knowledge promotion to permanence. The concept: which promotion edges are
+%% MECHANICAL (==> git-hook / script enforced) vs ASPIRATIONAL/BROKEN (-.-> prose-only).
+flowchart TD
+  LEARN["LEARNINGS.md<br/>ephemeral"] -. "user-invoked /skill-genesis only" .-> PERM["skills / rules"]
+  ARCHd["architect / planner"] ==>|"fragment"| DRAFT["decisions/drafts/"]
+  DRAFT ==>|"git-hook finalize"| ADR["decisions/NNN-*.md ✓ (248)"]
+  ADR ==> IDX["DECISIONS_INDEX.md"]
+  PLAN["implementation-planner"] -. "prose obligation — STALLED ✗" .-> SPEC["specs/SPEC_*.md<br/>none since 2026-05-11"]
+  ARCH2["systems-architect"] ==> DESIGN["DESIGN.md<br/>(architect-facing)"]
+  DESIGN ==>|"code-verified subset"| ARCHMD["docs/architecture.md ✓"]
+  DESIGN -. "no producer · 44d stale ✗" .-> CHLOG["DESIGN_CHANGELOG.md"]

@@ -1,0 +1,17 @@
+%% L1 — Feature-pipeline artifact flow (producers → artifacts → consumers).
+%% Solid (==>) = wired & exercised; dotted (-.->) = aspirational / broken / lossy edge.
+flowchart LR
+  ORCH(["orchestrator"]) -. "non-obvious gate — NEVER fires ✗" .-> TB["TASK_BRIEF.md"]
+  TB -. "criteria thread (paper-only)" .-> ARCH
+  RES["researcher"] ==> RF["RESEARCH_FINDINGS.md"]
+  RF ==> ARCH["systems-architect"]
+  ARCH ==> SP["SYSTEMS_PLAN.md"]
+  SP ==> PLAN["implementation-planner"]
+  PLAN ==> IMPL["implementer ∥ test-engineer"]
+  IMPL ==> TR["TEST_RESULTS.md"]
+  SP ==> VER["verifier"]
+  TR ==> VER
+  VER ==> VR["VERIFICATION_REPORT.md"]
+  VR ==>|"FAIL/WARN — mechanical loop"| RWK["REWORK_MANIFEST → rework worktree"]
+  IMPL -. "written by all; lost at cleanup" .-> LEARN["LEARNINGS.md<br/>(promotion = theater)"]
+  VR -. "text reminder only" .-> LEARN

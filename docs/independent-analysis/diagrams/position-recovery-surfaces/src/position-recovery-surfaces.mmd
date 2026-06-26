@@ -1,0 +1,21 @@
+%% L1 — The four "where are we" surfaces by reliability tier (dec-248).
+%% Shows they are NOT redundant (distinct tiers) and marks the WAL gap.
+flowchart TD
+  subgraph T1["Tier 1 — arbiter (ground truth)"]
+    GIT["git diff + TEST_RESULTS.md"]
+  end
+  subgraph T2["Tier 2 — localization hint"]
+    WAL["observations.jsonl<br/>6.8 MB · no rotation ✗ · whole-file read"]
+  end
+  subgraph T3["Tier 3 — validated cache"]
+    WIP["WIP.md (step checkboxes)"]
+    PROG["PROGRESS.md<br/>semantic phase names"]
+  end
+  GIT ==> RECON["reconcile_pipeline_state.py ✓ mechanical"]
+  WAL ==> RECON
+  WIP ==> RECON
+  RECON ==> RESUME["/resume-pipeline<br/>(prompt-mediated)"]
+  RESUME -. "5-surface audit" .-> RLOG["RECOVERY_LOG.md"]
+  WIP --> SNAP["precompact hook"]
+  PROG --> SNAP
+  SNAP -->|"snapshots ALL stale slugs ✗"| PSTATE["PIPELINE_STATE.md"]

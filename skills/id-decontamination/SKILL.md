@@ -145,15 +145,11 @@ Three levels of defense, increasing invasiveness:
    This catches contributors who commit outside Claude Code (plain `git commit`) and bypass the Claude-Code hook. Adjust the setup step for your CI provider.
 3. **Git pre-commit hook.** For projects that want enforcement at the git layer (independent of Claude Code), install a git pre-commit hook that invokes the detector. Praxion does not ship this by default — it's an opt-in per-project install.
 
-## Decontamination of Memory Entries
+## Decontamination of Non-Code Surfaces
 
-Often overlooked: the project's `.ai-state/memory.json` (if the Memory MCP is in use) may hold past learnings that reference stale REQ/AC/step identifiers. Scan and update alongside code:
+Stale `REQ-`/`AC-`/`Step N` identifiers also hide outside source files — in hand-written prose that outlives the pipeline that produced it. Praxion carries **no curated cross-session memory store** — the in-house memory subsystem was removed, so there is no `.ai-state/memory.json` to scan — and the surfaces that matter are the durable ones a human edits: project docs under `docs/`, design narrative in `.ai-state/DESIGN.md`, and any insight promoted out of `LEARNINGS.md`. Apply the same rule there as in code — describe the behavior, not the ephemeral identifier.
 
-```bash
-grep -n "REQ-[A-Z0-9]\|AC-[0-9]\|Step [0-9]" .ai-state/memory.json 2>/dev/null
-```
-
-For each hit, edit the memory entry to describe the behavior instead of the identifier. Memory is project-local, so this is a one-time cleanup per project. The memory-protocol rule's discipline applies going forward — new memory entries should describe behavior, not cite ephemeral IDs.
+**Do not "decontaminate" the legitimate system of record.** Archived specs (`.ai-state/specs/SPEC_*.md`) and ADR `affected_reqs` frontmatter carry `REQ-NN` *by design* — they are the durable traceability source, not contamination. Leave them intact.
 
 ## Reporting
 

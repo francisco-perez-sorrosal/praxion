@@ -105,7 +105,7 @@ Four new entries, each created only if missing:
 - `.ai-state/TECH_DEBT_LEDGER.md` — header + empty schema row (14 row fields + structural `dedup_key`; canonical schema in `skills/software-planning/references/tech-debt-ledger.md`)
 - `.ai-state/calibration_log.md` — header + empty schema row (append-only tier-selection log used by `sentinel`)
 
-`.ai-state/memory.json` and `.ai-state/observations.jsonl` are NOT pre-created — they're written on first use by the memory MCP server and the observability hook respectively. Pre-creating them confuses the semantic merge drivers.
+`.ai-state/observations.jsonl` is NOT pre-created — it's written on first use by the observability hook. Pre-creating it confuses the semantic merge driver (which applies to `observations.jsonl` only).
 
 ### Phase 3 — `.gitattributes` + merge driver registration
 

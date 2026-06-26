@@ -220,7 +220,7 @@ The pipeline above takes you from idea to working code. Going from working code 
 | 5 | **CI/CD pipeline** | `cicd-engineer` agent — e.g., "Set up GitHub Actions for CI" | `.github/workflows/*.yml` — automated test, build, lint, security scan on every push |
 | 6 | **Deployment design** | `deployment` skill (consulted by systems-architect on demand) | `compose.yaml`, `Dockerfile`, `.ai-state/SYSTEM_DEPLOYMENT.md` — deployment runbook with section ownership across implementer + cicd-engineer + verifier |
 | 7 | **First release** | `/release` command | Bumped version in `pyproject.toml` (+ `.claude-plugin/plugin.json` for plugin projects), generated `CHANGELOG.md`, git tag, GitHub release |
-| 8 | **Cross-session memory** | The `memory-protocol` rule auto-prompts; explicit `remember()` via the memory MCP | `.ai-state/memory.json` (curated facts, decisions, gotchas) + `.ai-state/observations.jsonl` (auto-captured tool events) — survives across sessions, worktrees, and team members |
+| 8 | **Cross-session learning** | Automatic — the observability hook captures tool events; at end-of-feature, durable insights are promoted out of `LEARNINGS.md` into ADRs and specs | `.ai-state/observations.jsonl` (auto-captured tool events) + committed `.ai-state/` artifacts (ADRs, specs, promoted learnings) — survives across sessions, worktrees, and team members. dec-225 removed the in-house curated-memory subsystem; there is no `memory.json` (`sandbook` is the planned external backend). |
 
 ### Suggested order for a brand-new project
 

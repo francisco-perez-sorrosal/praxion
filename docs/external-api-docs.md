@@ -165,7 +165,7 @@ When context-hub doesn't have coverage for a library, the agent falls back in or
 
 1. **context-hub** — curated, LLM-optimized docs (highest signal)
 2. **Local annotations** — your past learnings about this API
-3. **Memory MCP** — cross-session intelligence from prior work
+3. **Durable project artifacts** — prior `LEARNINGS.md` entries, ADRs, and local chub annotations from past work
 4. **Web search** — official docs, GitHub READMEs
 5. **Training data** — last resort; agent flags uncertainty
 

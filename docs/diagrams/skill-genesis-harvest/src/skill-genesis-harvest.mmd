@@ -6,7 +6,6 @@ sequenceDiagram
     participant FS as .ai-state/skill_genesis_reports/
     participant SGR as /skill-genesis-review
     participant CE as context-engineer
-    participant Mem as remember MCP
 
     U->>SG: /skill-genesis (optional --since, --scope)
     SG->>Agent: Task(...) background
@@ -24,7 +23,6 @@ sequenceDiagram
     SGR->>U: single AskUserQuestion multi-select (N proposals)
     U-->>SGR: dispositions (approve / reject / refine / defer)
     SGR->>FS: append rows to Disposition Log; update frontmatter
-    SGR->>Mem: remember(...) for approved memory proposals
 
     SGR-->>U: surface skill/rule delegations; confirm?
 

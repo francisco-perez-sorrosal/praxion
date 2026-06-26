@@ -171,7 +171,7 @@ When the curated registry has no coverage for a library, fall back in this order
 
 1. **Curated registry** (context-hub via MCP or CLI) -- highest signal, LLM-optimized
 2. **Local annotations** -- past learnings about this API from prior sessions
-3. **Memory MCP** -- cross-session intelligence about API patterns and gotchas
+3. **Durable project artifacts** -- prior `LEARNINGS.md` entries and ADRs capturing API patterns and gotchas
 4. **Web search** -- official documentation sites, GitHub repos
 5. **Training data** -- last resort; flag uncertainty to the user
 
@@ -227,7 +227,7 @@ Action: verify code against v<old> docs, or consider upgrading to v<new>.
 | implementer | `LEARNINGS.md` under `### API Version Drift` | Write code against the project's actual version; log the drift for the architect |
 | systems-architect | `SYSTEMS_PLAN.md` under `### Prerequisites` or `## Risk Assessment` | Flag as a risk or prerequisite; recommend upgrade if warranted |
 | researcher | `RESEARCH_FINDINGS.md` under `### Dependencies` | Note version differences between project and current docs |
-| Any agent | Memory MCP | Store persistent note: `remember({ key: "<library>-version-drift", value: "...", tags: ["api-drift", "<library>"], importance: 7 })` |
+| Any agent | `LEARNINGS.md` under `### API Version Drift` (or an ADR if the drift forces an architectural choice) | Record the drift as a durable note for future sessions; promote it to an ADR when it changes a design decision |
 
 ### Dependency Priority
 

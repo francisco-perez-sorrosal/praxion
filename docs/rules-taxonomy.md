@@ -213,14 +213,13 @@ Disable hook-deliver baseline + declare path-scoped categories as out-of-scope:
 ```yaml
 version: 1
 disable:
-  - swe/memory-protocol
   - swe/agent-model-routing
   - swe/vcs/git-conventions
   - ml/*
   - writing/*
 ```
 
-**SessionStart token reduction:** ~5,100 (all hook-deliver). Path-scoped categories contribute zero baseline cost regardless — disabling them adds declarative guarantees but no SessionStart savings.
+**SessionStart token reduction:** ~2,400 (both hook-deliver rules). Path-scoped categories contribute zero baseline cost regardless — disabling them adds declarative guarantees but no SessionStart savings.
 
 ### ML Project
 
@@ -229,12 +228,11 @@ Disable non-ML conventions while keeping training discipline:
 ```yaml
 version: 1
 disable:
-  - swe/memory-protocol
   - swe/agent-model-routing
   - writing/*
 ```
 
-**Rationale:** Project uses its own model routing and skips Praxion's memory protocol; writing rules are out-of-scope. ML rules stay enabled for training discipline.
+**Rationale:** Project uses its own model routing; writing rules are out-of-scope. ML rules stay enabled for training discipline.
 
 ### Standard Project
 

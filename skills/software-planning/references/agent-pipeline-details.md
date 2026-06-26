@@ -350,7 +350,7 @@ These lines are **optional and backward-compatible**. Existing `TEST_RESULTS.md`
 | `docs/architecture.md` | Low — developer-facing, derived from `.ai-state/DESIGN.md` | Standard git merge. Developer doc is regenerable from architect doc + filesystem verification. If conflict, prefer later version (freshest data) and re-verify paths against disk |
 
 **Automated reconciliation:** Three layers of protection:
-1. **Git merge drivers** (`.gitattributes`) — handle `memory.json` and `observations.jsonl` automatically during `git merge`. Registered by `install.sh code` Step 2.
+1. **Git merge drivers** (`.gitattributes`) — the single semantic driver `observations-jsonl` reconciles `.ai-state/observations.jsonl` automatically during `git merge`. Registered by `install.sh` (and onboard Phase 3). A retired `memory-json` driver, if present from an older onboard (before the in-house memory subsystem was removed), is removed on re-onboard/upgrade — see the onboard cross-version cleanup.
 2. **Post-merge hook** (`.git/hooks/post-merge`) — runs ADR renumbering + index regeneration after every merge that touches `.ai-state/`.
 3. **`/merge-worktree` command** — manual fallback that calls `python scripts/reconcile_ai_state.py` for full reconciliation.
 

@@ -1,7 +1,7 @@
 ---
-id: dec-draft-30aea871
+id: dec-250
 title: Bound the recovery WAL — best-effort rotate-and-archive to a gitignored segment + windowed cross-boundary read
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-26
 summary: Implement the WAL size bound dec-248 assumed already existed — best-effort in-lock rotate-and-archive of observations.jsonl to a gitignored observations.jsonl.1, and a 7-day windowed reconciler read spanning the active file plus the one archived segment, so recovery stays correct and bounded across a rotation boundary.

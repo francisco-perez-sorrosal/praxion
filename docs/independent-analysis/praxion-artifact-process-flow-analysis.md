@@ -96,7 +96,7 @@ scattered across rules and prompts.
 
 **Wave 2 — landed 2026-06-26** (branch `wave2-criticals`, commits `6213e82` + `10b66a5`):
 
-- ✅ **R1 — and B1 now fully resolved.** `observations.jsonl` rotates to a gitignored `.1` at 10 MiB (best-effort, inside the fcntl lock); the reconciler reads active + segment within a 7-day window (active rows kept unconditionally per the pre-mortem scenario-6 refinement). The `DESIGN.md`/`dec-248` rotation claim is now *true*; dec-248 re-affirmed by `dec-draft-30aea871`. The cross-boundary recovery canary is green.
+- ✅ **R1 — and B1 now fully resolved.** `observations.jsonl` rotates to a gitignored `.1` at 10 MiB (best-effort, inside the fcntl lock); the reconciler reads active + segment within a 7-day window (active rows kept unconditionally per the pre-mortem scenario-6 refinement). The `DESIGN.md`/`dec-248` rotation claim is now *true*; dec-248 re-affirmed by `dec-250`. The cross-boundary recovery canary is green.
 - ✅ **R2 — and A1 (the dead criteria-thread gate) now closed.** `TASK_BRIEF.md` is mandatory at Standard/Full (Intake Gate + `goal-disambiguation`, decoupled from the 2×2 blocking-question rule); sentinel **P06** + verifier WARN backstops. Proven by its own dogfood — the verifier's Key-Signal carry-forward check ran live against Wave 2's real `TASK_BRIEF` and **passed**. Always-loaded budget +193 chars (82,691 < 87,500).
 - Verifier verdict: **PASS** (10/10 KS criteria, 1545 tests green). The two ADR drafts finalize to `dec-NNN` when `wave2-criticals` merges to `main`.
 

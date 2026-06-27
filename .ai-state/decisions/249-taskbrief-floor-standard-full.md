@@ -1,7 +1,7 @@
 ---
-id: dec-draft-7a571050
+id: dec-249
 title: Raise the TASK_BRIEF floor — mandatory at Standard/Full, decoupled from the blocking-question gate, with a mechanical absence backstop
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-06-26
 summary: Make TASK_BRIEF.md unconditional at Standard/Full tier in the always-loaded Intake Clarity Gate and the goal-disambiguation skill (the subjective "non-obvious success" gate no longer suppresses it), keep Direct/Lightweight unchanged, and add a sentinel auto-check (primary) plus a verifier WARN (secondary) that flag a Standard/Full run producing no brief.

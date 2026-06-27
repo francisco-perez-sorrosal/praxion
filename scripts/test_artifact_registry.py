@@ -192,10 +192,12 @@ def test_eval_flags_imply_eval_tier() -> None:
 # _GATE_KINDS / _CLEANUP_POLICIES constants added in the declarative spine
 # (artifact_registry.py).  They are expected RED until the declarative-spine fields are added.
 #
-# _GATE_KINDS: {sentinel, script, hook, producer, none, deferred}
+# _GATE_KINDS (production): {script, hook, producer, none, deferred}
+# _DETECTION_GATE_KINDS: {sentinel, none}
 # _CLEANUP_POLICIES: {delete, archive, block-if-active, consume-marker}
 # production_gate format: "<kind>:<ref>" | "none" | "deferred"
-#   none/deferred carry NO ref; sentinel/script/hook/producer REQUIRE a ref.
+#   none/deferred carry NO ref; script/hook/producer REQUIRE a ref.
+# detection_gate format: "sentinel:<id>" | "none"  (sentinel REQUIRES a ref)
 # cleanup_policy: bare string ∈ _CLEANUP_POLICIES
 
 
@@ -212,7 +214,7 @@ def test_production_gate_ref_required_when_kind_demands_it() -> None:
     """Ref-bearing kinds (sentinel/script/hook/producer) must carry a non-empty ref;
     ref-free kinds (none/deferred) must not carry any ref component.
     """
-    ref_required = {"sentinel", "script", "hook", "producer"}
+    ref_required = {"script", "hook", "producer"}
     no_ref = {"none", "deferred"}
 
     for a in registry.ARTIFACTS:
@@ -238,6 +240,41 @@ def test_cleanup_policy_is_known() -> None:
         assert (
             a.cleanup_policy in registry._CLEANUP_POLICIES
         ), f"{a.name}: cleanup_policy {a.cleanup_policy!r} not in _CLEANUP_POLICIES"
+
+
+def test_detection_gate_kind_is_known() -> None:
+    """Every artifact's detection_gate names a kind in the detection vocabulary."""
+    for a in registry.ARTIFACTS:
+        kind = a.detection_gate.split(":")[0]
+        assert (
+            kind in registry._DETECTION_GATE_KINDS
+        ), f"{a.name}: detection_gate kind {kind!r} not in _DETECTION_GATE_KINDS"
+
+
+def test_detection_gate_ref_required_for_sentinel() -> None:
+    """`sentinel` detection gates carry a check-id ref; `none` carries no ref."""
+    for a in registry.ARTIFACTS:
+        parts = a.detection_gate.split(":", 1)
+        kind = parts[0]
+        ref = parts[1] if len(parts) > 1 else ""
+        if kind == "sentinel":
+            assert ref, f"{a.name}: sentinel detection_gate needs a ref ({a.detection_gate!r})"
+        if kind == "none":
+            assert len(parts) == 1, f"{a.name}: 'none' detection_gate must carry no ref"
+
+
+def test_detection_is_not_labelled_as_production() -> None:
+    """The EA-02 fix: a sentinel presence-check is detection, never production.
+
+    No artifact may name a `sentinel:` value in production_gate — that conflation
+    (TASK_BRIEF/INTERFACE_DESIGN/TRANSACTIONS_DESIGN before Wave 4b) is exactly what
+    the detection_gate split corrects. Sentinel checks belong in detection_gate.
+    """
+    for a in registry.ARTIFACTS:
+        assert not a.production_gate.startswith("sentinel:"), (
+            f"{a.name}: sentinel check {a.production_gate!r} is detection, not production — "
+            "move it to detection_gate"
+        )
 
 
 def test_core_artifacts_have_a_gate() -> None:

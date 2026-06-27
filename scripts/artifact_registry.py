@@ -40,17 +40,22 @@ from dataclasses import dataclass
 # here and *checked* by scripts/test_artifact_registry.py — they are not read by
 # the projection helpers, so adding them is back-compatible by construction.
 
-# production_gate kinds. Format is "<kind>:<ref>" for ref-bearing kinds; the
-# ref-free kinds carry no ":<ref>" component:
-#   sentinel:<check-id>  — a sentinel catalog check enforces presence/quality
+# production_gate kinds — the gate that MAKES the artifact exist. Format is
+# "<kind>:<ref>" for ref-bearing kinds; the ref-free kinds carry no ":<ref>":
 #   script:<script-name> — a script produces or enforces the artifact
 #   hook:<hook-name>     — a git/session hook produces it
 #   producer:<agent>     — a pipeline agent produces it as a deliverable
 #   none                 — no gate (the obligation is unenforced)
 #   deferred             — gate is realized later in the same wave (bare, no ref)
-_GATE_KINDS: frozenset[str] = frozenset(
-    {"sentinel", "script", "hook", "producer", "none", "deferred"}
-)
+_GATE_KINDS: frozenset[str] = frozenset({"script", "hook", "producer", "none", "deferred"})
+
+# detection_gate kinds — the gate that DETECTS the artifact's absence or quality,
+# distinct from production: a detector flags a missing/hollow artifact, it does
+# not create one. Separated from production_gate per the Wave-1–3 audit (EA-02),
+# which found `sentinel:Pxx` mislabelled as production when it is presence-detection.
+#   sentinel:<check-id>  — a sentinel catalog check flags absence/quality
+#   none                 — no detection backstop
+_DETECTION_GATE_KINDS: frozenset[str] = frozenset({"sentinel", "none"})
 
 # cleanup_policy values mirror clean_work_safety.py's deletion classes:
 #   delete           — SAFE: deletable once the pipeline ends
@@ -79,6 +84,7 @@ class Artifact:
     eval_required: bool = False  # always-required deliverable at eval_tier
     eval_conditional: bool = False  # required at eval_tier only when its producer ran
     production_gate: str = "none"  # "<kind>:<ref>" | "none" | "deferred"; kind ∈ _GATE_KINDS
+    detection_gate: str = "none"  # "sentinel:<id>" | "none"; kind ∈ _DETECTION_GATE_KINDS
     cleanup_policy: str = "delete"  # ∈ _CLEANUP_POLICIES
     description: str = ""
 
@@ -95,7 +101,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "conditional",
         dashboard=True,
         snapshot=True,
-        production_gate="sentinel:P06",
+        production_gate="producer:orchestrator",
+        detection_gate="sentinel:P06",
         cleanup_policy="delete",
         description="Intake intent / key signals / health guards / uncertainty.",
     ),
@@ -138,7 +145,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "specialist",
         dashboard=True,
         snapshot=True,
-        production_gate="sentinel:P07",  # challenge-disposition gate
+        production_gate="producer:interface-designer",
+        detection_gate="sentinel:P07",  # challenge-disposition detection
         cleanup_policy="delete",
         description="Interface-designer's boundary decisions + challenge loop.",
     ),
@@ -149,7 +157,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "specialist",
         dashboard=True,
         snapshot=True,
-        production_gate="sentinel:P07",  # challenge-disposition gate
+        production_gate="producer:agentic-transactions-architect",
+        detection_gate="sentinel:P07",  # challenge-disposition detection
         cleanup_policy="delete",
         description="Transactions-architect's mandate/settlement/HITL decisions.",
     ),

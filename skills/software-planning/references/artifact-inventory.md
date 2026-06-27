@@ -12,7 +12,6 @@ The file **trees** in the rule are the canonical list of what exists and where. 
 | `optional-lazy` | The feature was not adopted; absence is expected and fine. |
 | `threshold-lazy` | The project has not crossed the growth threshold that activates it yet. |
 | `future-designed` | The producer is designed but not yet wired; absent on essentially all projects today. |
-| `historical-retained` | Present only in older projects or as retained history; no active producer. |
 
 ## `.ai-state/` Persistent Artifacts
 
@@ -24,7 +23,6 @@ The tree in the rule is the canonical list. Per-artifact detail:
 | `sentinel_reports/SENTINEL_REPORT_*.md` + `SENTINEL_LOG.md` | active | sentinel | Timestamped audit reports + an append-only run-summary table (timestamp, report file, health grade, finding counts, coherence grade), co-located. |
 | `skill_genesis_reports/SKILL_GENESIS_REPORT_*.md` + `SKILL_GENESIS_LOG.md` | active | skill-genesis (writes both); `/skill-genesis-review` (updates report frontmatter + Disposition Log; updates log Review Status column) | Per-run report + append-only run log; frozen aggregate-block column contract; co-located. |
 | `metrics_reports/METRICS_REPORT_*.{md,json}` + `METRICS_LOG.md` | active | `/project-metrics` | Per-run JSON+MD report pairs + an append-only aggregate row per run, co-located. |
-| `token_budgeting/TOKEN_BUDGETING_*.md` | historical-retained | — (no active producer) | Historical token-budget audits; retained for history. |
 | `eval_ledger/EVAL_LOG.md` | future-designed | the project's eval loop (appends per kept run) — **no onboarding producer yet**: the agentic-eval archetype scaffold is designed but not yet wired into `/onboard-project`, so this file is created lazily by the first kept run, not at onboard | Append-only one-row-per-kept-run leaderboard (agentic/eval archetype). Schema: `skills/agent-evals/references/run-ledger-schema.md`. |
 | `project_profile.yaml` | future-designed | **no active producer yet** — the archetype-detection scaffold that would create it is designed but not yet wired into `/onboard-project`; downstream agents MUST treat it as optional (absent on most projects) and fall back to live detection | YAML project profile (paradigm, archetype, run_store_root/backend, eval_framework); machine-consumable when present. |
 | `specs/SPEC_<name>_YYYY-MM-DD.md` | active | implementation-planner | Archived behavioral spec + traceability matrix; created at end-of-feature for medium/large tasks. |

@@ -1,7 +1,7 @@
 ---
-id: dec-draft-f93d0d1e
+id: dec-256
 title: Split detection from production in the artifact registry and make it a read source-of-truth
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-27
 summary: Add a detection_gate field separating presence-detection (sentinel checks) from production (producers), reclassify the 3 mislabelled rows, and wire build_doc_manifest to read the registry — closing dec-251's populated-not-read dissent.

@@ -379,6 +379,15 @@ def dashboard_artifacts() -> set[str]:
     return {a.name for a in ARTIFACTS if a.dashboard}
 
 
+def dashboard_artifacts_ordered() -> list[str]:
+    """`dashboard_artifacts` in pipeline-flow (declaration) order.
+
+    The doc manifest lists `.ai-work` artifacts in flow order; `build_doc_manifest`
+    imports this rather than duplicating the list (the first registry *reader*).
+    """
+    return [a.name for a in ARTIFACTS if a.dashboard]
+
+
 def snapshot_artifacts() -> set[str]:
     """Filenames the precompact hook's PIPELINE_DOCS must snapshot."""
     return {a.name for a in ARTIFACTS if a.snapshot}

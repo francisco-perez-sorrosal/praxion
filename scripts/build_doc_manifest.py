@@ -33,6 +33,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from artifact_registry import dashboard_artifacts_ordered
 
 SCHEMA_VERSION = 2  # v2: dropped on-demandable `summary` + redundant `frontmatter` embeds
 GENERATOR_VERSION = "praxion-0.7.0"
@@ -81,30 +82,11 @@ _AI_STATE_FILES = [
 ]
 
 # Pipeline artifacts in .ai-work/<slug>/ (when present), ordered by pipeline flow.
-# Source of truth: the `dashboard` set in scripts/artifact_registry.py; drift from
-# the registry (or from the dashboard's CANONICAL_WORKSHOP_ARTIFACTS) fails
-# scripts/test_artifact_registry.py.
-_AI_WORK_FILES = [
-    "TASK_BRIEF.md",
-    "IDEA_PROPOSAL.md",
-    "RESEARCH_FINDINGS.md",
-    "CONTEXT_REVIEW.md",
-    "INTERFACE_DESIGN.md",
-    "TRANSACTIONS_DESIGN.md",
-    "SYSTEMS_PLAN.md",
-    "PRE_REFACTOR_PLAN.md",
-    "SPEC_DELTA.md",
-    "IMPLEMENTATION_PLAN.md",
-    "WIP.md",
-    "LEARNINGS.md",
-    "TEST_BASELINE.md",
-    "TEST_RESULTS.md",
-    "traceability.yml",
-    "VERIFICATION_REPORT.md",
-    "REWORK_MANIFEST.md",
-    "PROGRESS.md",
-    "RECOVERY_LOG.md",
-]
+# Read straight from the canonical registry (the `dashboard` set, in pipeline-flow
+# order) rather than duplicating the list. This is the first consumer that *reads*
+# the registry instead of being drift-checked against it — see dec-251 (the spine)
+# and the Wave-4b detection-gate ADR (the consumer down-payment, EA-11).
+_AI_WORK_FILES = dashboard_artifacts_ordered()
 
 # Renderer mapping by Diátaxis quadrant + type
 _DEFAULT_RENDERERS = {

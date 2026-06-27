@@ -25,14 +25,14 @@ dissent: A head-truncate-in-place design keeps the whole WAL in one file and nee
 
 `dec-248` made `.ai-state/observations.jsonl` the recovery WAL (the Tier-2 localization journal for pipeline truncation recovery) and, in its Considered-Options-A rationale, asserted the WAL was "already hardened (fcntl locking, merge driver, toggle gate, **auto-rotation**)." The auto-rotation property **did not exist** — neither `hooks/capture_memory.py` nor `hooks/capture_session.py` contained any size check or rotation logic (the Wave-1 honesty sweep already corrected the *documentation* claim in `.ai-state/DESIGN.md` and flagged dec-248; this ADR supplies the missing *mechanism*). The file was 6.8 MB and growing, read **whole** on every recovery by `reconcile_pipeline_state.py:_read_wal()`. A future architect evaluating recovery reliability would trust a safety property that was not there, and recovery cost grew unbounded with the WAL.
 
-One fact makes the design simple: **every event is committed to git history before rotation can move it.** Rotation only relocates already-durable rows out of the working-tree active file.
+One property keeps the read side simple: **rotation only relocates rows out of the working-tree active file — it never discards them.** Recovery durability rests on the local active file plus the archived `.1` segment within the reconciler's 7-day window. Rows already committed are also in git history, but that is best-effort — it depends on the commit cadence outpacing 10 MiB of growth between commits, not a per-row guarantee: a recent uncommitted tail can live only in the working tree, and after a rotation only in the gitignored `.1`.
 
 ## Decision
 
 Implement the bound dec-248 assumed, in two complementary halves:
 
 1. **Best-effort rotate-and-archive in the append path.** Move the duplicated `_append_observation` into `hooks/_hook_utils.py` and add, **inside the existing fcntl-locked critical section**, a size check: when `observations.jsonl` ≥ `OBSERVATIONS_MAX_BYTES` (10 MiB), `os.replace()` it to `observations.jsonl.1` (atomic rename; the next append creates a fresh active file). Any `OSError` is swallowed — rotation never blocks or raises, preserving the async-hook and graceful-no-`.ai-state` guarantees. A single archived segment is kept; the next rotation overwrites it.
-2. **The archived segment is gitignored.** `.ai-state/observations.jsonl.1` is added to `.gitignore`. It never enters git and never touches the `merge=observations-jsonl` driver (which is keyed to the tracked active path only). No `.gitattributes` change, no second merge driver. Losing `.1` costs nothing — its rows were committed to git history before rotation moved them.
+2. **The archived segment is gitignored.** `.ai-state/observations.jsonl.1` is added to `.gitignore`. It never enters git and never touches the `merge=observations-jsonl` driver (which is keyed to the tracked active path only). No `.gitattributes` change, no second merge driver. The reconciler reads `.1` locally within its 7-day window, so gitignoring it costs nothing for recovery: the rows that matter are the recent local ones, and a loss that wipes `.1` (fresh clone, `git clean -x`) has already wiped the local `.ai-work/` pipeline state those hints would recover. Rows committed before rotation also remain in git history; rows not yet committed were never git-durable, with or without rotation.
 3. **Windowed cross-boundary read in the reconciler.** `_read_wal` reads the active file **and** `observations.jsonl.1` when the segment's mtime is within the window, unions the rows, and filters by `timestamp >= now − max_age_days` (default 7, CLI `--max-age-days`). The slug-less backward correlation in `_correlate_agents` is untouched — it operates on the unioned row list, so a rotation that bisects an agent's lifetime (writes in `.1`, `agent_stop` in the active file) still joins.
 
 ## Considered Options
@@ -50,7 +50,7 @@ Implement the bound dec-248 assumed, in two complementary halves:
 ### Option C — git-track the archived segment
 
 - **Pros:** `.1` would be shared across clones/worktrees.
-- **Cons:** needs its own merge driver (or risks line-merge corruption), doubles the git footprint, and the rename shows as a delete+add. Pointless: the segment's rows are already in git history via the committed active file, so tracking `.1` duplicates durable state for no recovery benefit. Rejected.
+- **Cons:** needs its own merge driver (or risks line-merge corruption), doubles the git footprint, and the rename shows as a delete+add. Pointless for recovery: the reconciler reads `.1` **locally** within its window, so tracking it in git adds no recovery benefit (recovery is a local-working-tree operation) while duplicating state. Rejected.
 
 ## Consequences
 
@@ -64,6 +64,7 @@ Implement the bound dec-248 assumed, in two complementary halves:
 - The reconciler reads 2 files instead of 1 (bounded, mtime-pruned).
 - The size bound is "eventually small on a linear history," not "never large": a merge with a long-un-rotated branch re-inflates the active file until the next append re-triggers rotation. The windowed read — not rotation — is what bounds recovery cost unconditionally.
 - A `.gitignore` addition may need mirroring into the onboarding canonical block for downstream parity (flagged to the planner).
+- *Durability scope — clarified by the 2026-06-26 Wave-1–3 audit-remediation pass.* This ADR originally framed the design around "every event is committed to git history before rotation can move it." That is a commit-cadence convention, not an enforced invariant — an external audit (`docs/independent-analysis/wave-1-3-external-audit.md`, EA-01) showed an uncommitted tail can rotate into the gitignored `.1`. The prose above now states the real guarantee (local active file + archived `.1` within the 7-day window). The **decision is unchanged** — only the over-strong durability rationale was corrected. The Reversal trigger (numbered segments / always-read-`.1`) already anticipated the sparse-commit case.
 
 ## Disconfirmation
 

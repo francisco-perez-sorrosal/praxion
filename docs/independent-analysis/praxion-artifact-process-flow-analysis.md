@@ -82,7 +82,9 @@ scattered across rules and prompts.
 | 2 — Criticals | WAL rotation + windowed read; `TASK_BRIEF` floor (mandatory at Standard/Full) | R1, R2 | ✅ **Done** (2026-06-26) |
 | 3 — Production-gate cohort | registry declarative spine + the production gates (+ A6 tail) | R3, R4, R5, R9, R13 | ✅ **Done** (2026-06-26) |
 | **3.5 — Audit remediation** | Independent external audit of Waves 1–3 (`wave-1-3-external-audit.md`); re-verify each finding on disk, fix the confirmed blockers | EA-01, EA-03, EA-04 (5 of 12 findings refuted or by-design; rest → Wave 4/5) | ✅ **Done** (2026-06-26) |
-| 4 — Feedback & hygiene | readiness/eval feedback, idea-ledger, report retention, `doc_manifest`, dead seam, registry import + deferred R9-dashboard/R17/R19 tails | R7, R8, R11, R12, R15, R18 | planned |
+| **4a — Waste pruning** | `doc_manifest` strip (484KB→163KB), `token_budgeting` retirement, retain-last-N report pruning, single living idea-ledger | R7, R11, R12, R17 | ✅ **Done** (2026-06-27) |
+| 4b — Registry & dead seams | registry production-vs-detection + a *reading* consumer (EA-02/EA-11), `build_doc_manifest` registry import (R18), `doc_manifest` regen wiring (R12b), dead-seam ledger row | R15, R18, EA-02, EA-11 | planned |
+| 4c — Feedback & tail | readiness/eval feedback, P06 checker, id-citation dogfood asymmetry, hook `datetime.UTC` portability, `program.md` ML signal, R9-dashboard completion-state | R8, R19, EA-06, EA-09, EA-10, R9-dash | planned |
 | 5 — Capstone | integration eval over the criteria→spec path | R10 | planned |
 
 **Wave 1 — landed 2026-06-26:**
@@ -118,6 +120,15 @@ scattered across rules and prompts.
 - ⊘ **EA-02 (refuted as a bug)** — `production_gate="sentinel:P06"` is not a mislabel: `artifact_registry.py` documents `sentinel:<check-id>` as a valid gate kind ("a sentinel check enforces presence/quality"), used consistently for P06 + 2× P07. The auditor's underlying point (the spine conflates *production* with *presence-detection*) is fair and is logged as a **Wave 4 design refinement** alongside EA-11 (wire a registry consumer).
 - ⊘ **EA-05 (refuted)** — the "1561 green" claim reproduces exactly in the canonical environment; the auditor's 10 failures were Codex install/bridge tests sensitive to their isolated py3.13-venv home layout (they pass here), which the auditor acknowledged.
 - **Deferred / by-design:** EA-06, EA-07 (PROMPT-gate liveness — dec-252 deliberately chose golden fixtures; CODE gate → R10/Wave 5), EA-08 (cosmetic), EA-09 (intentional dogfood asymmetry), EA-10 (pre-existing `datetime.UTC` hook portability — predates Wave 2), EA-11 (dec-251's own recorded dissent), EA-12 (not reproduced) → **Wave 4 hygiene**.
+
+**Wave 4a — waste pruning, landed 2026-06-27** (branch `wave4a-waste-pruning`; the §5 "genuine waste" set, sequenced first per the user's call; ADR drafts dec-draft for R7/R11/R17):
+
+- ✅ **R12 (C3)** — `build_doc_manifest` dropped the per-surface `summary` (25%) **and** the redundant `frontmatter` embed (47%); `doc_manifest.yaml` **484KB → 163KB**, schema v2. Grounding showed the `frontmatter` embed was the larger, equally on-demandable half, so both go (the analysis named only summaries).
+- ✅ **R17 (C4)** — deleted the dead `.ai-state/token_budgeting/` dir and **retired the `historical-retained` lifecycle state** it was the sole member of (5 states → 4); git history is the archive. ADR records the reversal of the prior-audit sanction.
+- ✅ **R11 (C2)** — new `prune_reports.py --keep N` (default 10; `*_LOG.md`/`.lock` exempt; `.md`+`.json` runs grouped; a bites-canary proves it deletes), producer-triggered (sentinel Phase 7 + `/project-metrics`), PATH-installed. Dogfood: pruned **70** backlog reports (metrics 64→22, sentinel 39→11).
+- ✅ **R7 (C1)** — `promethean` now updates **one living `IDEA_LEDGER.md`** in place instead of a copy-forward `IDEA_LEDGER_<timestamp>.md` per run; the 7 files consolidated to 1 (6 in git history); two `build_doc_manifest` globs widened so the date-less file is discovered.
+- **Scope refinements (Register Objection):** **R18 moved to 4b** — it is the EA-11 "make the registry *read*" work (an ordered projection + drift-test rewrite), not waste-pruning; and **R12's regen-wiring (R12b) moved to 4b** with R18 (same `doc_manifest` machinery). 4a stayed the clean §5-waste set.
+- Full suite **1568 green** throughout (+7 from `prune_reports` tests); each item one logical commit; calibration row appended.
 
 Legend: ✅ done · ◑ partial / doc-half · ⊘ refuted/by-design · ▶ in progress · (blank) planned.
 

@@ -548,6 +548,8 @@ After writing the report, append an entry to `.ai-state/sentinel_reports/SENTINE
 
 Where C/I/S = Critical/Important/Suggested finding counts, Ecosystem Coherence = the system-level composite grade (distinct from per-artifact coherence in the scorecard). The Report File column links each log entry to the specific report file (sibling of `SENTINEL_LOG.md` in `.ai-state/sentinel_reports/`).
 
+Then bound the report directory: run `prune_reports.py` (PATH-installed; in the Praxion self-host checkout use `python3 scripts/prune_reports.py`) to retain the last 10 `SENTINEL_REPORT_*` runs. It never touches `SENTINEL_LOG.md` (the full history stays); pruned reports remain in git history.
+
 ## Boundary Discipline
 
 | Boundary | Sentinel Does | Sentinel Does Not |

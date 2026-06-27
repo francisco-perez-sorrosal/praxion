@@ -56,7 +56,7 @@ On success (exit 0), the CLI emits three paths to the repo-root-relative `.ai-st
 2. `.ai-state/metrics_reports/METRICS_REPORT_<timestamp>.md` — human-readable rendering of the same report, with delta table and hot-spot Top-N.
 3. `.ai-state/metrics_reports/METRICS_LOG.md` — append-only summary log; one row per run.
 
-The timestamp shape is `YYYY-MM-DD_HH-MM-SS` (UTC, filename-safe). Multiple runs produce multiple timestamped report pairs and one growing log; no prior report is ever overwritten.
+The timestamp shape is `YYYY-MM-DD_HH-MM-SS` (UTC, filename-safe). Multiple runs produce multiple timestamped report pairs and one growing log; no prior report is ever overwritten. The report **directory** is bounded after each run by a retain-last-N prune (see below); `METRICS_LOG.md` keeps the full per-run history regardless.
 
 Surface the three paths to the user and suggest the next commit as a follow-up (do not auto-commit — the user owns the staging decision):
 
@@ -69,6 +69,8 @@ Three files written:
 Review the MD rendering. If it reflects project state accurately, stage and
 commit with `git add <paths> && git commit`.
 ```
+
+Then bound the directory: run `prune_reports.py` (PATH-installed by `install_claude.sh`; in the Praxion self-host checkout use `python3 scripts/prune_reports.py`) to retain the last 10 `METRICS_REPORT_*` runs — each run's `.md` + `.json` pair is kept or pruned together. It never touches `METRICS_LOG.md` (the full history stays); pruned reports remain in git history. Stage the pruned deletions in the same commit as the new report.
 
 ### Failure modes
 

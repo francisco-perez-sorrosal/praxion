@@ -81,6 +81,7 @@ scattered across rules and prompts.
 | **1 — Honesty sweep** | Stop the design docs asserting capabilities that don't exist | B2, B3, A6, PF-06; partials R17/R19; doc-half of B1 | ✅ **Done** (2026-06-26) |
 | 2 — Criticals | WAL rotation + windowed read; `TASK_BRIEF` floor (mandatory at Standard/Full) | R1, R2 | ✅ **Done** (2026-06-26) |
 | 3 — Production-gate cohort | registry declarative spine + the production gates (+ A6 tail) | R3, R4, R5, R9, R13 | ✅ **Done** (2026-06-26) |
+| **3.5 — Audit remediation** | Independent external audit of Waves 1–3 (`wave-1-3-external-audit.md`); re-verify each finding on disk, fix the confirmed blockers | EA-01, EA-03, EA-04 (5 of 12 findings refuted or by-design; rest → Wave 4/5) | ✅ **Done** (2026-06-26) |
 | 4 — Feedback & hygiene | readiness/eval feedback, idea-ledger, report retention, `doc_manifest`, dead seam, registry import + deferred R9-dashboard/R17/R19 tails | R7, R8, R11, R12, R15, R18 | planned |
 | 5 — Capstone | integration eval over the criteria→spec path | R10 | planned |
 
@@ -97,18 +98,28 @@ scattered across rules and prompts.
 **Wave 2 — landed 2026-06-26** (branch `wave2-criticals`, commits `6213e82` + `10b66a5`):
 
 - ✅ **R1 — and B1 now fully resolved.** `observations.jsonl` rotates to a gitignored `.1` at 10 MiB (best-effort, inside the fcntl lock); the reconciler reads active + segment within a 7-day window (active rows kept unconditionally per the pre-mortem scenario-6 refinement). The `DESIGN.md`/`dec-248` rotation claim is now *true*; dec-248 re-affirmed by `dec-250`. The cross-boundary recovery canary is green.
-- ✅ **R2 — and A1 (the dead criteria-thread gate) now closed.** `TASK_BRIEF.md` is mandatory at Standard/Full (Intake Gate + `goal-disambiguation`, decoupled from the 2×2 blocking-question rule); sentinel **P06** + verifier WARN backstops. Proven by its own dogfood — the verifier's Key-Signal carry-forward check ran live against Wave 2's real `TASK_BRIEF` and **passed**. Always-loaded budget +193 chars (82,691 < 87,500).
+- ✅ **R2 — the criteria-thread floor (A1) is wired and mandatory going forward.** `TASK_BRIEF.md` is mandatory at Standard/Full (Intake Gate + `goal-disambiguation`, decoupled from the 2×2 blocking-question rule); sentinel **P06** + verifier WARN backstops. Proven by its own dogfood — the verifier's Key-Signal carry-forward check ran live against Wave 2's real `TASK_BRIEF` and **passed**. Always-loaded budget +193 chars (82,691 < 87,500). *Scope note (clarified by the 2026-06-26 audit, EA-03): "the gate is live forward" — not "every historical slug has a brief." On disk 2 of 6 `.ai-work/` slugs carry a `TASK_BRIEF`; the 4 without it predate the floor and are **intentionally not backfilled** — retroactive briefs for completed, merged, gitignored pipelines would be theater. Those slugs are stale-slug cleanup candidates (P08), not production gaps.*
 - Verifier verdict: **PASS** (10/10 KS criteria, 1545 tests green). The two ADR drafts finalize to `dec-NNN` when `wave2-criticals` merges to `main`.
 
 **Wave 3 — landed 2026-06-26** (branch `wave3-production-gates`, commits `4e55cfa` + `b2ab61f`; ADRs `dec-251` + `dec-252`):
 
 - ✅ **Registry declarative spine** — `production_gate` + `cleanup_policy` on all 24 artifacts; **0 `deferred`** (every artifact names a real gate); back-compat by construction (consumers parse membership from source text, never see the new fields; the 6 drift assertions stay green). The §8 recommendation, realized.
-- ✅ **R3 / R4 / R13 / R9 gates** — spec-archival (sentinel SH08 + detector), calibration-coverage (CA03 rewire + detector + non-blocking CI advisory), challenge-disposition (P07), stale-slug (P08); each with a gate-liveness proof (canary for CODE, golden bad-case for PROMPT). Two already report *true* findings on Praxion itself: R4 `covered:false` (12 uncalibrated commits — the producer rows are owed), R3 armed-but-green.
+- ✅ **R3 / R4 / R13 / R9 gates** — spec-archival (sentinel SH08 + detector), calibration-coverage (CA03 rewire + detector + non-blocking CI advisory), challenge-disposition (P07), stale-slug (P08); each with a gate-liveness proof (canary for CODE, golden bad-case for PROMPT). Two already report *true* findings on Praxion itself: R4 `covered:false` (**14** uncalibrated commits — the producer rows are owed; **appended in Wave 3.5 → now `covered:true`**, see below), R3 armed-but-green.
 - ✅ **R5 / A6** — verifier harvests `LEARNINGS ### Technical Debt → td-NNN` (four-writer ledger contract intact); `DESIGN_CHANGELOG` producer assigned (closes the Wave-1 A6 deferral).
 - ✅ **Dogfood** — Wave 3 archived its own 13-REQ behavioral spec (the first since 2026-05-11) and ran the R3 gate against it → `gap:false`, closing the very PF-02 gap the analysis found.
 - Verifier verdict: **PASS** after one rework loop (id-citation + plugin-cache guard fixed in-place); 1561 tests green. **R9-dashboard** completion-state separation deferred to Wave 4 (TypeScript UX, not a gate).
 
-Legend: ✅ done · ◑ partial / doc-half · ▶ in progress · (blank) planned.
+**Wave 3.5 — audit remediation, landed 2026-06-26** (source: `docs/independent-analysis/wave-1-3-external-audit.md`; every finding independently re-verified on disk before disposition):
+
+- The external auditor raised **12 findings (EA-01…EA-12), 5 marked blocking.** Independent re-verification in the canonical environment (Python 3.11.5, full suite **1561 passed**) dispositioned them: **3 confirmed-and-fixed**, **2 refuted**, **7 deferred to Wave 4/5 or accepted by design**.
+- ✅ **EA-01 (confirmed, fixed)** — `dec-250`'s "every event is committed to git history before rotation" was a commit-cadence convention stated as an invariant; an uncommitted tail can rotate into the gitignored `.1`. Reworded to the real guarantee (local active file + archived `.1` within the 7-day reconciler window); **decision unchanged**. `DESIGN.md` was already honest (corrected in Wave 1/2). Reclassified from the auditor's "Critical" to doc-honesty — no data-loss risk in practice.
+- ✅ **EA-04 (confirmed, fixed)** — R4 was red on dogfood (14 uncalibrated commits, not the "12" stated above). Appended post-hoc calibration rows for Waves 1/2/3 → detector now `covered:true`.
+- ✅ **EA-03 (confirmed, fixed by wording)** — the prior "A1 closed" line overclaimed retroactive coverage; tightened above. The auditor's backfill option was **refused** as theater (see scope note).
+- ⊘ **EA-02 (refuted as a bug)** — `production_gate="sentinel:P06"` is not a mislabel: `artifact_registry.py` documents `sentinel:<check-id>` as a valid gate kind ("a sentinel check enforces presence/quality"), used consistently for P06 + 2× P07. The auditor's underlying point (the spine conflates *production* with *presence-detection*) is fair and is logged as a **Wave 4 design refinement** alongside EA-11 (wire a registry consumer).
+- ⊘ **EA-05 (refuted)** — the "1561 green" claim reproduces exactly in the canonical environment; the auditor's 10 failures were Codex install/bridge tests sensitive to their isolated py3.13-venv home layout (they pass here), which the auditor acknowledged.
+- **Deferred / by-design:** EA-06, EA-07 (PROMPT-gate liveness — dec-252 deliberately chose golden fixtures; CODE gate → R10/Wave 5), EA-08 (cosmetic), EA-09 (intentional dogfood asymmetry), EA-10 (pre-existing `datetime.UTC` hook portability — predates Wave 2), EA-11 (dec-251's own recorded dissent), EA-12 (not reproduced) → **Wave 4 hygiene**.
+
+Legend: ✅ done · ◑ partial / doc-half · ⊘ refuted/by-design · ▶ in progress · (blank) planned.
 
 ---
 

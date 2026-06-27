@@ -34,7 +34,7 @@ from typing import Any
 
 import yaml
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2  # v2: dropped on-demandable `summary` + redundant `frontmatter` embeds
 GENERATOR_VERSION = "praxion-0.7.0"
 
 # ---------------------------------------------------------------------------
@@ -162,18 +162,6 @@ def _first_h1(body: str) -> str | None:
     return m.group(1).strip() if m else None
 
 
-def _first_paragraph(body: str) -> str | None:
-    for block in re.split(r"\n\s*\n", body.strip()):
-        block = block.strip()
-        # Skip headings and HTML comments (e.g. `<!-- aac:authored ... -->`)
-        # — both render as empty/no-op markdown but the comment shape would
-        # surface as a useless italic in any consuming renderer.
-        if block and not block.startswith("#") and not block.startswith("<!--"):
-            text = re.sub(r"\s+", " ", block)
-            return text[:280] + ("..." if len(text) > 280 else "")
-    return None
-
-
 def _surface_id(rel_path: Path) -> str:
     """`docs/architecture.md` → `docs-architecture`; `.ai-state/DESIGN.md` →
     `ai-state-design`."""
@@ -240,7 +228,6 @@ def _build_surface(root: Path, rel_path: Path) -> dict[str, Any] | None:
     diataxis = frontmatter.get("diataxis")
     audience = frontmatter.get("audience")
     title = frontmatter.get("title") or _first_h1(body) or rel_path.name
-    summary = frontmatter.get("summary") or _first_paragraph(body)
     share_out = bool(frontmatter.get("share_out", False))
     renderer = _pick_renderer(rel_path, file_type, diataxis)
 
@@ -283,16 +270,12 @@ def _build_surface(root: Path, rel_path: Path) -> dict[str, Any] | None:
         descriptor["audience"] = str(audience)
     if renderer:
         descriptor["renderer"] = renderer
-    if summary:
-        descriptor["summary"] = str(summary)
     if share_out:
         descriptor["share_out"] = True
     if referenced_paths:
         descriptor["referenced_paths"] = sorted(set(referenced_paths))
     if diagrams:
         descriptor["diagrams"] = sorted(set(diagrams))
-    if frontmatter:
-        descriptor["frontmatter"] = frontmatter
 
     return descriptor
 

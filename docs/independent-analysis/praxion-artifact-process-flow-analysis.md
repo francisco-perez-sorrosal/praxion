@@ -79,7 +79,7 @@ scattered across rules and prompts.
 | Wave | Scope | Items | Status |
 |---|---|---|---|
 | **1 — Honesty sweep** | Stop the design docs asserting capabilities that don't exist | B2, B3, A6, PF-06; partials R17/R19; doc-half of B1 | ✅ **Done** (2026-06-26) |
-| 2 — Criticals | WAL rotation + windowed read; `TASK_BRIEF` floor (mandatory at Standard/Full) | R1, R2 | ▶ **in progress** |
+| 2 — Criticals | WAL rotation + windowed read; `TASK_BRIEF` floor (mandatory at Standard/Full) | R1, R2 | ✅ **Done** (2026-06-26) |
 | 3 — Production-gate cohort | registry declarative spine + the production gates | R3, R4, R5, R9, R13 | planned |
 | 4 — Feedback & hygiene | readiness/eval feedback, idea-ledger, report retention, `doc_manifest`, dead seam, registry import + deferred R17/R19 tails | R7, R8, R11, R12, R15, R18 | planned |
 | 5 — Capstone | integration eval over the criteria→spec path | R10 | planned |
@@ -93,6 +93,12 @@ scattered across rules and prompts.
 - ◑ **B1 (doc-half only)** — the false "auto-rotates above 10 MiB" claim in `DESIGN.md` / `dec-248` corrected to "documented intent, not yet implemented." **The rotation implementation is R1 (Wave 2).**
 - ◑ **R17 (partial)** — dead `evals/baselines/` orphan removed; `token_budgeting/` removal **deferred** — it conflicts with the `historical-retained` state the prior audit sanctioned, so it becomes a Wave-4 policy call.
 - ◑ **R19 (partial)** — `project_profile.yaml` absent-behavior note added; the `program.md` ML-signal tightening is **deferred** to Wave 4 (behavioral, not a doc truth-fix).
+
+**Wave 2 — landed 2026-06-26** (branch `wave2-criticals`, commits `6213e82` + `10b66a5`):
+
+- ✅ **R1 — and B1 now fully resolved.** `observations.jsonl` rotates to a gitignored `.1` at 10 MiB (best-effort, inside the fcntl lock); the reconciler reads active + segment within a 7-day window (active rows kept unconditionally per the pre-mortem scenario-6 refinement). The `DESIGN.md`/`dec-248` rotation claim is now *true*; dec-248 re-affirmed by `dec-draft-30aea871`. The cross-boundary recovery canary is green.
+- ✅ **R2 — and A1 (the dead criteria-thread gate) now closed.** `TASK_BRIEF.md` is mandatory at Standard/Full (Intake Gate + `goal-disambiguation`, decoupled from the 2×2 blocking-question rule); sentinel **P06** + verifier WARN backstops. Proven by its own dogfood — the verifier's Key-Signal carry-forward check ran live against Wave 2's real `TASK_BRIEF` and **passed**. Always-loaded budget +193 chars (82,691 < 87,500).
+- Verifier verdict: **PASS** (10/10 KS criteria, 1545 tests green). The two ADR drafts finalize to `dec-NNN` when `wave2-criticals` merges to `main`.
 
 Legend: ✅ done · ◑ partial / doc-half · ▶ in progress · (blank) planned.
 

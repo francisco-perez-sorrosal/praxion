@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-06-27T08:40:34Z'
+generated_at: '2026-06-27T14:25:44Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -2063,6 +2063,12 @@ surfaces:
   title: Single living IDEA_LEDGER.md, retiring the per-run timestamped copy-forward scheme
   last_modified: '2026-06-27'
   renderer: adr_card
+- id: ai-state-decisions-256-registry-detection-gate
+  path: .ai-state/decisions/256-registry-detection-gate.md
+  type: markdown
+  title: Split detection from production in the artifact registry and make it a read source-of-truth
+  last_modified: '2026-06-27'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -2966,6 +2972,7 @@ groups:
   - ai-state-decisions-253-retire-token-budgeting
   - ai-state-decisions-254-report-retention
   - ai-state-decisions-255-single-living-idea-ledger
+  - ai-state-decisions-256-registry-detection-gate
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

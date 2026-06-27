@@ -120,7 +120,7 @@ _RENDERER_BY_NAME: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"^IMPLEMENTATION_PLAN\.md$"), "plan_view"),
     (re.compile(r"^VERIFICATION_REPORT\.md$"), "verification_report"),
     (re.compile(r"^IDEA_PROPOSAL\.md$"), "idea_grid"),
-    (re.compile(r"^IDEA_LEDGER_.*\.md$"), "idea_grid"),
+    (re.compile(r"^IDEA_LEDGER.*\.md$"), "idea_grid"),  # living IDEA_LEDGER.md + legacy timestamped
     (re.compile(r"^DESIGN\.md$"), "architecture_explorer"),
     (re.compile(r"^architecture\.md$"), "architecture_explorer"),
     (re.compile(r"^\d{3}-[a-z0-9-]+\.md$"), "adr_card"),
@@ -499,7 +499,7 @@ def build_manifest(root: Path) -> dict[str, Any]:
 
     # .ai-state/idea_ledgers, sentinel_reports, metrics_reports
     for subdir, pattern in [
-        ("idea_ledgers", "IDEA_LEDGER_*.md"),
+        ("idea_ledgers", "IDEA_LEDGER*.md"),
         ("sentinel_reports", "SENTINEL_REPORT_*.md"),
         ("metrics_reports", "METRICS_REPORT_*.json"),
         ("metrics_reports", "METRICS_REPORT_*.md"),

@@ -94,7 +94,7 @@ Build a picture of what exists from three information sources:
 - Structure gaps: thin or missing categories
 
 **Source 2 — Idea ledger** (ideation history):
-- Read the latest `.ai-state/idea_ledgers/IDEA_LEDGER_*.md` file (by timestamp in filename); if `.ai-state/idea_ledgers/` does not yet exist, fall back to a legacy `.ai-state/IDEA_LEDGER.md` if present
+- Read the single living `.ai-state/idea_ledgers/IDEA_LEDGER.md`; if it does not exist yet, fall back to the latest timestamped `IDEA_LEDGER_*.md` (by filename), then to a legacy `.ai-state/IDEA_LEDGER.md`
 - Review implemented ideas — avoid re-proposing past work
 - Review pending ideas — build on them when relevant
 - Review discarded ideas — understand why they were rejected
@@ -221,16 +221,16 @@ In non-interactive mode, include the `[AUTO-VALIDATED]` marker after the title. 
 
 Create the `.ai-work/<task-slug>/` directory if it does not exist. If an `IDEA_PROPOSAL.md` already exists, confirm with the user before overwriting.
 
-After writing the proposal, produce the idea ledger in `.ai-state/idea_ledgers/`:
+After writing the proposal, update the single living idea ledger at `.ai-state/idea_ledgers/IDEA_LEDGER.md`:
 
-1. **Read the previous ledger** — find the latest `.ai-state/idea_ledgers/IDEA_LEDGER_*.md` (by timestamp in filename); if `.ai-state/idea_ledgers/` does not yet exist, fall back to a legacy `.ai-state/IDEA_LEDGER.md` if present. Carry forward all existing entries.
+1. **Read the living ledger** — read `.ai-state/idea_ledgers/IDEA_LEDGER.md`; if it does not exist yet, fall back to the latest timestamped `IDEA_LEDGER_*.md` (by filename), then to a legacy `.ai-state/IDEA_LEDGER.md`. Carry its existing entries forward into the same file.
 2. **Update the content**:
    - Add validated ideas to the **Pending** section
    - Add discarded ideas to the **Discarded** section with a brief reason
    - Update **Future Paths** if the discussion revealed new project directions
    - Set `Sentinel baseline` to the sentinel run timestamp from Phase 2 (e.g., `2026-02-08 14:30:00`)
    - Update the `Last updated` timestamp
-3. **Write to `.ai-state/idea_ledgers/IDEA_LEDGER_YYYY-MM-DD_HH-MM-SS.md`** — timestamped per-run file. Use `-` (not `:`) in the timestamp for filename safety.
+3. **Write back to `.ai-state/idea_ledgers/IDEA_LEDGER.md` in place** — one living file, not a new timestamped per-run file. Append the new cluster under **Pending**; prior runs accrete in the same file (and remain in git history). Do **not** create `IDEA_LEDGER_<timestamp>.md`.
 
 Create the `.ai-state/idea_ledgers/` directory if it does not exist.
 

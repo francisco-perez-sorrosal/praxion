@@ -19,7 +19,7 @@ The tree in the rule is the canonical list. Per-artifact detail:
 
 | Artifact | State | Writers / updaters | Shape · lifecycle · reference |
 |---|---|---|---|
-| `idea_ledgers/IDEA_LEDGER_*.md` | active | promethean | Timestamped; each run carries forward all prior entries (sentinel baseline, implemented/pending/discarded ideas, future paths). |
+| `idea_ledgers/IDEA_LEDGER.md` | active | promethean | Single living file; promethean updates it **in place** per run (sentinel baseline, implemented/pending/discarded ideas, future paths). Prior timestamped per-run files were consolidated into it (Wave 4a); their history is in git. |
 | `sentinel_reports/SENTINEL_REPORT_*.md` + `SENTINEL_LOG.md` | active | sentinel | Timestamped audit reports + an append-only run-summary table (timestamp, report file, health grade, finding counts, coherence grade), co-located. |
 | `skill_genesis_reports/SKILL_GENESIS_REPORT_*.md` + `SKILL_GENESIS_LOG.md` | active | skill-genesis (writes both); `/skill-genesis-review` (updates report frontmatter + Disposition Log; updates log Review Status column) | Per-run report + append-only run log; frozen aggregate-block column contract; co-located. |
 | `metrics_reports/METRICS_REPORT_*.{md,json}` + `METRICS_LOG.md` | active | `/project-metrics` | Per-run JSON+MD report pairs + an append-only aggregate row per run, co-located. |

@@ -3,9 +3,9 @@
 Last updated: 2026-06-05T22:54:33Z
 Sentinel baseline: 2026-04-17T19:25:00Z (grade A, coherence A, 0 critical, 0 important findings) — carried forward; no new sentinel run for this entry.
 
-This ledger carries forward all entries from `IDEA_LEDGER_2026-04-30_20-56-00.md` and adds one new cluster from the **SIA-fit research + design run** (`.ai-work/sia-praxion-fit/`). Unlike prior ledgers, this entry is a **manual promotion by the main agent** (not a `promethean` ideation run) — it records, into the permanent idea-ledger system, the enhancement program derived from researching the external SIA project. The new ideas are clustered under **"Pending — SIA-Fit Agentic/Eval Archetype (2026-06-05)"** and are grounded in six ADRs committed as drafts in `.ai-state/decisions/drafts/` (one already `accepted`, the rest `proposed`).
+> **Single living file (Wave 4a, 2026-06-27).** This is now the **one** idea ledger — `promethean` updates it **in place** rather than emitting a new timestamped `IDEA_LEDGER_<timestamp>.md` per run. The prior per-run files (the copy-forward chain back through `IDEA_LEDGER_2026-04-30_20-56-00.md`) were consolidated into this file and now live only in **git history**; pointers below that name a `IDEA_LEDGER_<timestamp>.md` resolve there.
 
-> **Carry-forward convention note:** prior clusters (ROADMAP migration, AaC+DaC Cornerstone, Future Paths) are retained below as **named pointers**; their full text lives one file back in `IDEA_LEDGER_2026-04-30_20-56-00.md` (the same pointer discipline that ledger used for still-older entries). Nothing is dropped.
+This ledger's most recent entry is one cluster from the **SIA-fit research + design run** (`.ai-work/sia-praxion-fit/`) — a **manual promotion by the main agent** (not a `promethean` ideation run) recording the enhancement program derived from researching the external SIA project. The new ideas are clustered under **"Pending — SIA-Fit Agentic/Eval Archetype (2026-06-05)"** and are grounded in six ADRs committed as drafts in `.ai-state/decisions/drafts/` (one already `accepted`, the rest `proposed`). Earlier clusters (ROADMAP migration, AaC+DaC Cornerstone, Future Paths) are retained below as **named pointers**; their full text is in git history. Nothing is dropped.
 
 ## Implemented
 

@@ -1,7 +1,7 @@
 ---
-id: dec-draft-e6199a12
+id: dec-253
 title: Retire the historical-retained lifecycle state with its sole member token_budgeting
-status: proposed
+status: accepted
 category: configuration
 date: 2026-06-27
 summary: Delete the dead .ai-state/token_budgeting/ dir and retire the historical-retained lifecycle state it was the only member of, reversing a prior-audit sanction.

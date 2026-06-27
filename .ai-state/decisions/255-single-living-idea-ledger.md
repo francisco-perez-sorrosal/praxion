@@ -1,7 +1,7 @@
 ---
-id: dec-draft-10e32041
+id: dec-255
 title: Single living IDEA_LEDGER.md, retiring the per-run timestamped copy-forward scheme
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-06-27
 summary: promethean updates one living .ai-state/idea_ledgers/IDEA_LEDGER.md in place instead of emitting a new timestamped file that copies forward all prior entries.

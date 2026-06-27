@@ -1,7 +1,7 @@
 ---
-id: dec-draft-bcb50377
+id: dec-254
 title: Retain-last-N retention for the metrics and sentinel report families
-status: proposed
+status: accepted
 category: configuration
 date: 2026-06-27
 summary: Bound the unbounded growth of metrics_reports/ and sentinel_reports/ with a retain-last-10 prune script, producer-triggered, git-history as the archive.

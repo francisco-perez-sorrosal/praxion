@@ -83,7 +83,7 @@ scattered across rules and prompts.
 | 3 — Production-gate cohort | registry declarative spine + the production gates (+ A6 tail) | R3, R4, R5, R9, R13 | ✅ **Done** (2026-06-26) |
 | **3.5 — Audit remediation** | Independent external audit of Waves 1–3 (`wave-1-3-external-audit.md`); re-verify each finding on disk, fix the confirmed blockers | EA-01, EA-03, EA-04 (5 of 12 findings refuted or by-design; rest → Wave 4/5) | ✅ **Done** (2026-06-26) |
 | **4a — Waste pruning** | `doc_manifest` strip (484KB→163KB), `token_budgeting` retirement, retain-last-N report pruning, single living idea-ledger | R7, R11, R12, R17 | ✅ **Done** (2026-06-27) |
-| 4b — Registry & dead seams | registry production-vs-detection + a *reading* consumer (EA-02/EA-11), `build_doc_manifest` registry import (R18), `doc_manifest` regen wiring (R12b), dead-seam ledger row | R15, R18, EA-02, EA-11 | planned |
+| **4b — Registry & dead seams** | `detection_gate` split (EA-02, dec-256), `build_doc_manifest` reads the registry (R18/EA-11 partial), R12b honesty fix (regen-hook deferred), dead-seam ledger row td-044 | R15, R18, EA-02, EA-11 | ✅ **Done** (2026-06-27) |
 | 4c — Feedback & tail | readiness/eval feedback, P06 checker, id-citation dogfood asymmetry, hook `datetime.UTC` portability, `program.md` ML signal, R9-dashboard completion-state | R8, R19, EA-06, EA-09, EA-10, R9-dash | planned |
 | 5 — Capstone | integration eval over the criteria→spec path | R10 | planned |
 
@@ -129,6 +129,16 @@ scattered across rules and prompts.
 - ✅ **R7 (C1)** — `promethean` now updates **one living `IDEA_LEDGER.md`** in place instead of a copy-forward `IDEA_LEDGER_<timestamp>.md` per run; the 7 files consolidated to 1 (6 in git history); two `build_doc_manifest` globs widened so the date-less file is discovered.
 - **Scope refinements (Register Objection):** **R18 moved to 4b** — it is the EA-11 "make the registry *read*" work (an ordered projection + drift-test rewrite), not waste-pruning; and **R12's regen-wiring (R12b) moved to 4b** with R18 (same `doc_manifest` machinery). 4a stayed the clean §5-waste set.
 - Full suite **1568 green** throughout (+7 from `prune_reports` tests); each item one logical commit; calibration row appended.
+
+**Wave 4b — registry & dead seams, landed 2026-06-27** (branch `wave4b-registry-seams`; the "make the spine honest + read" work, with one architectural fork the user decided; ADR draft → dec-256):
+
+- ✅ **EA-02** — added a `detection_gate` field; split the gate vocabulary (production = producer/script/hook; detection = sentinel); reclassified `TASK_BRIEF`/`INTERFACE_DESIGN`/`TRANSACTIONS_DESIGN` from `sentinel:Pxx` production to `producer:* ` production + `sentinel:Pxx` detection. A canary forbids any future `sentinel:` in `production_gate`.
+- ✅ **R18 / EA-11 (partial)** — `build_doc_manifest` now *imports* `dashboard_artifacts_ordered()` instead of duplicating the list — the **first consumer that reads the spine**. EA-11 is only *partially* closed: per-artifact `cleanup_policy` still has no reader (the per-dir/per-file granularity gap — `clean_work_safety` classifies whole task-dirs, not files), recorded in dec-256's Disconfirmation.
+- ✅ **R12b (honesty half)** — corrected the false "post-commit hook regenerates the manifest" claim in `document-api.md` + the builder docstring; reality is **manual** regen, with sentinel **F11** flagging staleness. The auto-regen *hook* is **deferred with rationale**: the builder has no content-aware write mode, so a naive finalize regen would churn `generated_at` on every on-main commit, and F11 already provides the freshness backstop. *(The manifest had silently missed dec-253/254/255 since the 4a merge — exactly the gap F11 detects; a manual regen dogfooded the workflow and recovered it.)*
+- ✅ **R15** — filed **td-044** for the `project_profile.yaml` / `eval_ledger/` dead seam (designed schemas, no onboarding producer), so it stays visible.
+- Full suite **1572 green**; one architectural fork (the `detection_gate` schema) surfaced to the user before implementing.
+
+**Remaining Wave 4:** **4c** — Feedback & tail (R8 readiness/eval feedback, R19, EA-06/09/10, R9-dashboard) + the deferred **R12b auto-regen hook** and the **EA-11 `cleanup_policy` reader** (the partial closures above).
 
 Legend: ✅ done · ◑ partial / doc-half · ⊘ refuted/by-design · ▶ in progress · (blank) planned.
 

@@ -1,0 +1,11 @@
+{
+  "ai_work_root": "/home/user/project/.ai-work",
+  "task_dirs": [],
+  "summary": {
+    "total": 0,
+    "block": 0,
+    "warn": 0,
+    "safe": 0,
+    "stale_safe": 0
+  }
+}

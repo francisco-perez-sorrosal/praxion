@@ -457,3 +457,12 @@ promethean --> researcher ---------> systems-architect --> implementation-planne
 - `sentinel (independent audit)` is not part of the pipeline chain — it is a standalone read-only auditor invokable at any time
 - The parallel-implementer / test-engineer / doc-engineer group operates on disjoint file sets per BDD/TDD execution rules
 - The pre-refactor sub-pipeline branch (rooted at the architect's Phase 2.5) runs in the same worktree and rejoins the main flow at the verifier-or-loopback decision; deep-dive in [Pre-Refactor Sub-Pipeline & the Verifier-vs-Loopback Decision](#pre-refactor-sub-pipeline--the-verifier-vs-loopback-decision)
+
+## Pipeline Completion Checklist
+
+After the verifier reports and before cleaning up `.ai-work/<task-slug>/`:
+
+1. Merge `LEARNINGS.md` into permanent locations (CLAUDE.md, ADRs, memory) per the [End of Feature workflow](document-templates.md#end-of-feature).
+2. Append a calibration row to `.ai-state/calibration_log.md` (all tiers — keeps CA01/CA02 analysis unbiased; required per `rules/swe/swe-agent-coordination-protocol.md § Process Calibration`).
+3. Verify `check_calibration_coverage.py` exits 0 (or append a calibration row to `.ai-state/calibration_log.md` if under-covered).
+4. Delete `.ai-work/<task-slug>/` once all durable state has reached its permanent home.

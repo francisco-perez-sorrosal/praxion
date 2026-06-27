@@ -483,8 +483,10 @@ class TestMain:
 
 
 class TestSmokeRealSpecs:
-    def test_real_specs_dir_has_five_rows(self) -> None:
-        """Generator produces one row per real SPEC_*.md in .ai-state/specs/."""
+    def test_real_specs_index_has_one_row_per_spec_file(self) -> None:
+        """Generator produces one row per real SPEC_*.md in .ai-state/specs/ (count-agnostic)."""
+        real_specs_dir = SCRIPTS_DIR.parent / ".ai-state" / "specs"
+        spec_count = len(list(real_specs_dir.glob("SPEC_*.md")))
         result = subprocess.run(
             [sys.executable, str(GENERATOR_SCRIPT)],
             capture_output=True,
@@ -492,7 +494,9 @@ class TestSmokeRealSpecs:
             check=False,
         )
         assert result.returncode == 0, f"Generator failed: {result.stderr}"
-        assert "5" in result.stdout, f"Expected 5 entries; got: {result.stdout.strip()}"
+        assert (
+            str(spec_count) in result.stdout
+        ), f"Expected {spec_count} entries (one per SPEC_*.md); got: {result.stdout.strip()}"
 
     def test_generated_index_readable(self) -> None:
         """The written SPECS_INDEX.md is a well-formed markdown file."""

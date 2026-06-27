@@ -115,7 +115,7 @@ Full schema (14 row fields + structural `dedup_key`), owner-role heuristic, life
 Three tiers by location and lifetime:
 
 - **Ephemeral** — `.ai-work/<task-slug>/` (and `.ai-work/<rework-slug>/`): single pipeline run, deleted at cleanup. Most pipeline docs (`TASK_BRIEF`, `RESEARCH_FINDINGS`, `SYSTEMS_PLAN`, `VERIFICATION_REPORT`, `PROGRESS`, `PRE_REFACTOR_PLAN`, `TEST_*`, `traceability.yml`, …). Merge `VERIFICATION_REPORT.md` patterns into `LEARNINGS.md` first.
-- **Session-persistent** — `.ai-work/<task-slug>/` `IMPLEMENTATION_PLAN.md` / `WIP.md` / `LEARNINGS.md`: survive across sessions; learnings merge to permanent locations at feature end.
+- **Session-persistent** — `.ai-work/<task-slug>/` `IMPLEMENTATION_PLAN.md` / `WIP.md` / `LEARNINGS.md`: survive across sessions; deleted at pipeline end.
 - **Permanent** — `.ai-state/` (committed) + `docs/architecture.md`: project lifetime.
 
 Full per-document writer / reader / lifetime: [`artifact-inventory.md`](../../skills/software-planning/references/artifact-inventory.md#document-lifecycle-full-table).
@@ -123,7 +123,7 @@ Full per-document writer / reader / lifetime: [`artifact-inventory.md`](../../sk
 ### Version Control and Cleanup
 
 - **Never commit `.ai-work/`** — add to `.gitignore`. **Always commit `.ai-state/`**.
-- Clean up with `rm -rf .ai-work/<task-slug>/` after pipeline completion. Merge `LEARNINGS.md` into permanent locations first. Remove `.ai-work/` itself only when all task directories have been cleaned.
+- Clean up with `rm -rf .ai-work/<task-slug>/` after pipeline completion. `LEARNINGS.md` prose sections are `/skill-genesis`-harvested-or-lost. Remove `.ai-work/` itself only when all task directories have been cleaned.
 
 ### Parallel Execution
 

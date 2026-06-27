@@ -163,6 +163,8 @@ When the task involved an interface surface (web UI, TUI/CLI output, API, MCP to
 
 For each per-change debt finding surfaced by Phase 5 or Phase 5.5, append a row to `.ai-state/TECH_DEBT_LEDGER.md` per [`skills/software-planning/references/tech-debt-ledger.md`](../skills/software-planning/references/tech-debt-ledger.md) § Schema and § Producer overlays → **verifier**. Populate all fields from the schema table; apply only the verifier overlay for triggers, severity/class mapping, and producer defaults. Do not re-list field definitions here.
 
+**LEARNINGS harvest (pipeline-end):** Also read `LEARNINGS.md` if present. For each entry under `### Technical Debt`, determine whether it warrants a new `td-NNN` ledger row. Apply the existing ledger producer overlay: check `dedup_key` against the ledger to avoid double-filing; if no matching row exists, emit a new row with `status: open` and `owner-role: verifier`. If a row with the same `dedup_key` already exists (from a prior sentinel run or a previous pipeline), update `last-seen` and `status` in place — do not add a duplicate row. The four-writer ledger contract holds: only the verifier files rows from LEARNINGS, not the planner or implementer.
+
 #### Phase 5.5 -- Behavioral Contract Compliance
 
 Scan the change set for behavioral-contract violations and emit findings in the `### Behavioral Contract Findings` subsection of the report, using exactly the six canonical tags. Consult `rules/swe/agent-behavioral-contract.md` for the four behaviors and `skills/code-review/references/report-template.md` for tag definitions and emission syntax.

@@ -1,0 +1,30 @@
+{
+  "ai_work_root": "/home/user/project/.ai-work",
+  "task_dirs": [
+    {
+      "slug": "auth-flow",
+      "classification": "SAFE",
+      "reasons": [],
+      "age_days": 42
+    },
+    {
+      "slug": "cache-layer",
+      "classification": "SAFE",
+      "reasons": [],
+      "age_days": 31
+    },
+    {
+      "slug": "email-templates",
+      "classification": "SAFE",
+      "reasons": [],
+      "age_days": 21
+    }
+  ],
+  "summary": {
+    "total": 3,
+    "block": 0,
+    "warn": 0,
+    "safe": 3,
+    "stale_safe": 3
+  }
+}

@@ -54,6 +54,8 @@ Skip creation for trivially simple projects (single module, no external dependen
 | New dependency added/removed | 6 (Dependencies: update table) |
 | ADR created | None — Section 8 is a stable pointer to `DECISIONS_INDEX.md` (auto-regenerated). When a new ADR materially shapes a component/interface/constraint, cite `dec-NNN` inline in the affected row instead. |
 
+**DESIGN_CHANGELOG producer (standing instruction):** When updating `.ai-state/DESIGN.md` with architectural decisions or component changes, record the delta in `DESIGN_CHANGELOG.md` — the deep change-history companion to the current-state `DESIGN.md`. One paragraph per change: what changed, why, which ADR drove it. This is the standing producer instruction for `DESIGN_CHANGELOG.md`.
+
 If `.ai-state/DESIGN.md` does not exist, the implementer skips — the systems-architect creates it.
 
 **Validation:** The **verifier** checks design coherence during Phase 8:

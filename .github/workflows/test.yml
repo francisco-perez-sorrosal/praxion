@@ -108,3 +108,22 @@ jobs:
 
       - name: Report unreleased artifacts
         run: python3 scripts/check_release_staleness.py
+
+  calibration-coverage:
+    # Advisory (never blocks): after a merge lands on main, report when
+    # Standard/Full pipeline work has landed since the newest calibration_log.md
+    # row -- the unenforced-producer gap R4 detects. Push-only: noisy on PRs,
+    # meaningful post-merge. Mirrors the release-staleness advisory pattern.
+    name: Calibration coverage (advisory)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          fetch-depth: 0  # full history so git log --since resolves correctly
+
+      - name: Report calibration coverage gap
+        run: python3 scripts/check_calibration_coverage.py

@@ -185,3 +185,93 @@ def test_eval_flags_imply_eval_tier() -> None:
             assert a.eval_tier is not None, f"{a.name}: eval flag without eval_tier"
         # An artifact is required XOR conditional, never both.
         assert not (a.eval_required and a.eval_conditional), f"{a.name}: required and conditional"
+
+
+# -- Registry declarative spine self-consistency ------------------------------
+# These tests validate the production_gate / cleanup_policy fields and the
+# _GATE_KINDS / _CLEANUP_POLICIES constants added in the declarative spine
+# (artifact_registry.py).  They are expected RED until the declarative-spine fields are added.
+#
+# _GATE_KINDS: {sentinel, script, hook, producer, none, deferred}
+# _CLEANUP_POLICIES: {delete, archive, block-if-active, consume-marker}
+# production_gate format: "<kind>:<ref>" | "none" | "deferred"
+#   none/deferred carry NO ref; sentinel/script/hook/producer REQUIRE a ref.
+# cleanup_policy: bare string ∈ _CLEANUP_POLICIES
+
+
+def test_production_gate_kind_is_known() -> None:
+    """Every artifact's production_gate names a kind in the allowed vocabulary."""
+    for a in registry.ARTIFACTS:
+        kind = a.production_gate.split(":")[0]
+        assert (
+            kind in registry._GATE_KINDS
+        ), f"{a.name}: production_gate kind {kind!r} not in _GATE_KINDS"
+
+
+def test_production_gate_ref_required_when_kind_demands_it() -> None:
+    """Ref-bearing kinds (sentinel/script/hook/producer) must carry a non-empty ref;
+    ref-free kinds (none/deferred) must not carry any ref component.
+    """
+    ref_required = {"sentinel", "script", "hook", "producer"}
+    no_ref = {"none", "deferred"}
+
+    for a in registry.ARTIFACTS:
+        parts = a.production_gate.split(":", 1)
+        kind = parts[0]
+        ref = parts[1] if len(parts) > 1 else ""
+
+        if kind in ref_required:
+            assert ref, (
+                f"{a.name}: kind {kind!r} requires a non-empty ref "
+                f"(got production_gate={a.production_gate!r})"
+            )
+        if kind in no_ref:
+            assert len(parts) == 1, (
+                f"{a.name}: kind {kind!r} must not carry a ref "
+                f"(got production_gate={a.production_gate!r})"
+            )
+
+
+def test_cleanup_policy_is_known() -> None:
+    """Every artifact's cleanup_policy is drawn from the allowed vocabulary."""
+    for a in registry.ARTIFACTS:
+        assert (
+            a.cleanup_policy in registry._CLEANUP_POLICIES
+        ), f"{a.name}: cleanup_policy {a.cleanup_policy!r} not in _CLEANUP_POLICIES"
+
+
+def test_core_artifacts_have_a_gate() -> None:
+    """Always-active (core) artifacts must declare a real production gate.
+
+    A hollow 'none' gate on a core artifact means the obligation has no
+    enforcement mechanism — exactly the gap the declarative spine is closing.
+    'deferred' is also disallowed on always-active artifacts (those are
+    specialist/conditional entries that have not been gated yet).
+    """
+    gateless = {"none", "deferred"}
+    for a in registry.ARTIFACTS:
+        if a.activation != "always":
+            continue
+        kind = a.production_gate.split(":")[0]
+        assert kind not in gateless, (
+            f"{a.name}: always-active artifact has ungated production_gate "
+            f"({a.production_gate!r}); core artifacts must name a real gate"
+        )
+
+
+# -- Declarative-spine canary (gate-liveness proof) ---------------------------
+
+
+def test_canary_bogus_gate_kind_is_rejected() -> None:
+    """A production_gate with an unknown kind must be caught by the kind check.
+
+    This canary proves the gate bites on known-bad input: 'bogus' is not a
+    member of _GATE_KINDS, so any row carrying 'bogus:x' would make
+    test_production_gate_kind_is_known fail.  If _GATE_KINDS were accidentally
+    widened to include 'bogus', this assertion catches the regression.
+    """
+    bogus_gate = "bogus:x"
+    kind = bogus_gate.split(":")[0]
+    assert (
+        kind not in registry._GATE_KINDS
+    ), f"'bogus' should never be a valid gate kind; _GATE_KINDS={registry._GATE_KINDS!r}"

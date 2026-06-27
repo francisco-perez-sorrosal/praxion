@@ -34,6 +34,34 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+# -- Declarative-spine vocabularies -------------------------------------------
+# Each artifact names the gate that makes it exist (`production_gate`) and the
+# policy that governs its removal (`cleanup_policy`). The fields are *populated*
+# here and *checked* by scripts/test_artifact_registry.py — they are not read by
+# the projection helpers, so adding them is back-compatible by construction.
+
+# production_gate kinds. Format is "<kind>:<ref>" for ref-bearing kinds; the
+# ref-free kinds carry no ":<ref>" component:
+#   sentinel:<check-id>  — a sentinel catalog check enforces presence/quality
+#   script:<script-name> — a script produces or enforces the artifact
+#   hook:<hook-name>     — a git/session hook produces it
+#   producer:<agent>     — a pipeline agent produces it as a deliverable
+#   none                 — no gate (the obligation is unenforced)
+#   deferred             — gate is realized later in the same wave (bare, no ref)
+_GATE_KINDS: frozenset[str] = frozenset(
+    {"sentinel", "script", "hook", "producer", "none", "deferred"}
+)
+
+# cleanup_policy values mirror clean_work_safety.py's deletion classes:
+#   delete           — SAFE: deletable once the pipeline ends
+#   archive          — preserve into a permanent location before removal
+#   block-if-active  — BLOCK: never delete while the pipeline is in flight
+#   consume-marker   — WARN: deletable only after its handoff marker is consumed
+_CLEANUP_POLICIES: frozenset[str] = frozenset(
+    {"delete", "archive", "block-if-active", "consume-marker"}
+)
+
+
 # -- Model --------------------------------------------------------------------
 
 
@@ -50,6 +78,8 @@ class Artifact:
     eval_tier: str | None = None  # standard | full
     eval_required: bool = False  # always-required deliverable at eval_tier
     eval_conditional: bool = False  # required at eval_tier only when its producer ran
+    production_gate: str = "none"  # "<kind>:<ref>" | "none" | "deferred"; kind ∈ _GATE_KINDS
+    cleanup_policy: str = "delete"  # ∈ _CLEANUP_POLICIES
     description: str = ""
 
 
@@ -65,6 +95,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "conditional",
         dashboard=True,
         snapshot=True,
+        production_gate="sentinel:P06",
+        cleanup_policy="delete",
         description="Intake intent / key signals / health guards / uncertainty.",
     ),
     Artifact(
@@ -74,6 +106,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "conditional",
         dashboard=True,
         snapshot=True,
+        production_gate="producer:promethean",
+        cleanup_policy="delete",
         description="Promethean's validated idea feeding research/design.",
     ),
     Artifact(
@@ -83,6 +117,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "conditional",
         dashboard=True,
         snapshot=True,
+        production_gate="producer:researcher",
+        cleanup_policy="delete",
         description="Researcher's evidence base.",
     ),
     Artifact(
@@ -91,6 +127,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "ephemeral",
         "conditional",
         dashboard=True,
+        production_gate="producer:context-engineer",
+        cleanup_policy="delete",
         description="Context-engineer's cumulative artifact-health review.",
     ),
     Artifact(
@@ -100,6 +138,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "specialist",
         dashboard=True,
         snapshot=True,
+        production_gate="sentinel:P07",  # challenge-disposition gate
+        cleanup_policy="delete",
         description="Interface-designer's boundary decisions + challenge loop.",
     ),
     Artifact(
@@ -109,6 +149,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "specialist",
         dashboard=True,
         snapshot=True,
+        production_gate="sentinel:P07",  # challenge-disposition gate
+        cleanup_policy="delete",
         description="Transactions-architect's mandate/settlement/HITL decisions.",
     ),
     Artifact(
@@ -120,6 +162,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         snapshot=True,
         eval_tier="standard",
         eval_required=True,
+        production_gate="producer:systems-architect",
+        cleanup_policy="consume-marker",  # REQ-bearing plan WARNs until its spec is archived
         description="Architect's system plan with acceptance criteria.",
     ),
     Artifact(
@@ -129,6 +173,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "conditional",
         dashboard=True,
         snapshot=True,
+        production_gate="producer:systems-architect",
+        cleanup_policy="consume-marker",  # WARNs until a [CONSUMED] marker is present
         description="Pre-feature refactor mini-pipeline activation artifact.",
     ),
     Artifact(
@@ -137,6 +183,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "ephemeral",
         "conditional",
         dashboard=True,
+        production_gate="producer:systems-architect",
+        cleanup_policy="delete",
         description="Brownfield behavioral delta from archived specs.",
     ),
     Artifact(
@@ -148,6 +196,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         snapshot=True,
         eval_tier="standard",
         eval_required=True,
+        production_gate="producer:implementation-planner",
+        cleanup_policy="delete",
         description="Planner's approved step decomposition.",
     ),
     Artifact(
@@ -159,6 +209,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         snapshot=True,
         eval_tier="standard",
         eval_required=True,
+        production_gate="producer:implementation-planner",
+        cleanup_policy="block-if-active",  # BLOCK while any step box is unchecked
         description="Live execution position.",
     ),
     Artifact(
@@ -170,6 +222,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         snapshot=True,
         eval_tier="standard",
         eval_required=True,
+        production_gate="producer:implementation-planner",
+        cleanup_policy="consume-marker",  # WARNs until merged to .ai-state/ (verifier harvest)
         description="In-flight learning capture; the bridge to durable intelligence.",
     ),
     Artifact(
@@ -178,6 +232,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "ephemeral",
         "conditional",
         dashboard=True,
+        production_gate="producer:test-engineer",
+        cleanup_policy="delete",
         description="Pre-pipeline failing-test snapshot (verifier regression baseline).",
     ),
     Artifact(
@@ -192,6 +248,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         snapshot=True,
         eval_tier="standard",
         eval_conditional=True,
+        production_gate="producer:implementer",
+        cleanup_policy="delete",
         description="Test-run evidence handoff to the verifier.",
     ),
     Artifact(
@@ -204,6 +262,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         dashboard=True,
         eval_tier="standard",
         eval_conditional=True,
+        production_gate="producer:implementer",
+        cleanup_policy="consume-marker",  # WARNs until rendered into the archived spec matrix
         description="In-flight REQ -> tests -> implementation mapping.",
     ),
     Artifact(
@@ -215,6 +275,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         snapshot=True,
         eval_tier="standard",
         eval_required=True,
+        production_gate="producer:verifier",
+        cleanup_policy="consume-marker",  # WARNs until its patterns are folded into LEARNINGS.md
         description="Verifier's quality-gate report.",
     ),
     Artifact(
@@ -224,6 +286,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "conditional",
         dashboard=True,
         snapshot=True,
+        production_gate="script:rework_manifest.py",
+        cleanup_policy="block-if-active",  # BLOCK: an open manifest means rework may be live
         description="Clustered remediation worktree manifest.",
     ),
     Artifact(
@@ -233,6 +297,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "always",
         dashboard=True,
         snapshot=True,
+        production_gate="producer:orchestrator",
+        cleanup_policy="delete",
         description="Append-only phase-transition log.",
     ),
     Artifact(
@@ -242,6 +308,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "conditional",
         dashboard=True,
         snapshot=True,
+        production_gate="producer:orchestrator",
+        cleanup_policy="consume-marker",  # WARNs: it is the auto-recovery audit trail
         description="Audit trail for truncation auto-recovery actions.",
     ),
     # --- ai-work root (not slug-scoped) ---
@@ -250,6 +318,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "ai-work-root",
         "ephemeral",
         "always",
+        production_gate="hook:precompact_state.py",
+        cleanup_policy="delete",
         description="PreCompact consolidated snapshot (output, not an input doc).",
     ),
     # --- specialty: rework worktree, roadmap, ML (registered, not enforced) ---
@@ -258,6 +328,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "ai-work",
         "ephemeral",
         "rework",
+        production_gate="producer:orchestrator",
+        cleanup_policy="delete",
         description="Rework-intake artifact derived from one manifest row (rework worktree).",
     ),
     Artifact(
@@ -265,6 +337,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "ai-work",
         "ephemeral",
         "roadmap",
+        production_gate="producer:roadmap-cartographer",
+        cleanup_policy="delete",
         description="Cartographer's intermediate roadmap draft.",
     ),
     Artifact(
@@ -272,6 +346,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "ai-work",
         "ephemeral",
         "roadmap",
+        production_gate="producer:roadmap-cartographer",
+        cleanup_policy="delete",
         description="Cartographer's cross-lens conflict list.",
     ),
     Artifact(
@@ -279,6 +355,8 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "ai-work",
         "ephemeral",
         "ml",
+        production_gate="producer:ml-training-run",
+        cleanup_policy="delete",
         description="ML run metrics + budget/eval evidence.",
     ),
 )

@@ -64,10 +64,10 @@ At the end, print a summary of what was created, what was skipped (and why), and
 
 ### 6. Registration — do NOT hand-write a manifest entry
 
-The doc manifest builder (`scripts/build_doc_manifest.py`) **auto-discovers** API-spec surfaces (`openapi.*`, `asyncapi.*`, `*.graphql`) and emits their descriptors itself. A hand-written `doc_manifest.yaml` entry would be **clobbered** by the wholesale-regenerating post-commit hook. So:
+The doc manifest builder (`scripts/build_doc_manifest.py`) **auto-discovers** API-spec surfaces (`openapi.*`, `asyncapi.*`, `*.graphql`) and emits their descriptors itself. A hand-written `doc_manifest.yaml` entry would be **clobbered** the next time the builder runs (it regenerates the manifest wholesale). So:
 
 - Do **not** add a `doc_manifest.yaml` entry by hand.
-- Instead, tell the user to run `python3 scripts/build_doc_manifest.py` (or note that the post-commit hook regenerates the manifest on next commit). The builder picks up the committed spec and registers it with `renderer: api_reference`, `diataxis: reference`, in the `api-reference` group.
+- Instead, run `python3 scripts/build_doc_manifest.py` after committing the spec — the manifest is regenerated **manually**, not by an automatic hook; sentinel **F11** flags the manifest as stale (advisory) when its `generated_at` predates a later commit touching indexed surfaces, so a missed regen is detected, not silent. The builder picks up the committed spec and registers it with `renderer: api_reference`, `diataxis: reference`, in the `api-reference` group.
 
 ### 7. Hand off and point to depth
 

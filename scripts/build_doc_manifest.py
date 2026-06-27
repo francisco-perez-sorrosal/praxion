@@ -6,8 +6,11 @@ Walks the project filesystem according to the schema specified in
 manifest the per-project dashboard reads at session start.
 
 The generator is deterministic: given the same filesystem state, it always
-emits identical YAML (modulo `generated_at`). This is the contract that lets
-the post-merge hook regenerate without merge drivers.
+emits identical YAML (modulo `generated_at`). That determinism is what makes a
+regenerate-in-place safe without merge drivers. Regeneration is currently
+**manual** (run this script) — there is no automatic hook; sentinel F11 flags a
+stale manifest (advisory) when `generated_at` predates a later commit touching
+indexed surfaces.
 
 Usage::
 

@@ -80,8 +80,8 @@ scattered across rules and prompts.
 |---|---|---|---|
 | **1 — Honesty sweep** | Stop the design docs asserting capabilities that don't exist | B2, B3, A6, PF-06; partials R17/R19; doc-half of B1 | ✅ **Done** (2026-06-26) |
 | 2 — Criticals | WAL rotation + windowed read; `TASK_BRIEF` floor (mandatory at Standard/Full) | R1, R2 | ✅ **Done** (2026-06-26) |
-| 3 — Production-gate cohort | registry declarative spine + the production gates | R3, R4, R5, R9, R13 | planned |
-| 4 — Feedback & hygiene | readiness/eval feedback, idea-ledger, report retention, `doc_manifest`, dead seam, registry import + deferred R17/R19 tails | R7, R8, R11, R12, R15, R18 | planned |
+| 3 — Production-gate cohort | registry declarative spine + the production gates (+ A6 tail) | R3, R4, R5, R9, R13 | ✅ **Done** (2026-06-26) |
+| 4 — Feedback & hygiene | readiness/eval feedback, idea-ledger, report retention, `doc_manifest`, dead seam, registry import + deferred R9-dashboard/R17/R19 tails | R7, R8, R11, R12, R15, R18 | planned |
 | 5 — Capstone | integration eval over the criteria→spec path | R10 | planned |
 
 **Wave 1 — landed 2026-06-26:**
@@ -99,6 +99,14 @@ scattered across rules and prompts.
 - ✅ **R1 — and B1 now fully resolved.** `observations.jsonl` rotates to a gitignored `.1` at 10 MiB (best-effort, inside the fcntl lock); the reconciler reads active + segment within a 7-day window (active rows kept unconditionally per the pre-mortem scenario-6 refinement). The `DESIGN.md`/`dec-248` rotation claim is now *true*; dec-248 re-affirmed by `dec-250`. The cross-boundary recovery canary is green.
 - ✅ **R2 — and A1 (the dead criteria-thread gate) now closed.** `TASK_BRIEF.md` is mandatory at Standard/Full (Intake Gate + `goal-disambiguation`, decoupled from the 2×2 blocking-question rule); sentinel **P06** + verifier WARN backstops. Proven by its own dogfood — the verifier's Key-Signal carry-forward check ran live against Wave 2's real `TASK_BRIEF` and **passed**. Always-loaded budget +193 chars (82,691 < 87,500).
 - Verifier verdict: **PASS** (10/10 KS criteria, 1545 tests green). The two ADR drafts finalize to `dec-NNN` when `wave2-criticals` merges to `main`.
+
+**Wave 3 — landed 2026-06-26** (branch `wave3-production-gates`, commits `4e55cfa` + `b2ab61f`; ADRs `dec-251` + `dec-252`):
+
+- ✅ **Registry declarative spine** — `production_gate` + `cleanup_policy` on all 24 artifacts; **0 `deferred`** (every artifact names a real gate); back-compat by construction (consumers parse membership from source text, never see the new fields; the 6 drift assertions stay green). The §8 recommendation, realized.
+- ✅ **R3 / R4 / R13 / R9 gates** — spec-archival (sentinel SH08 + detector), calibration-coverage (CA03 rewire + detector + non-blocking CI advisory), challenge-disposition (P07), stale-slug (P08); each with a gate-liveness proof (canary for CODE, golden bad-case for PROMPT). Two already report *true* findings on Praxion itself: R4 `covered:false` (12 uncalibrated commits — the producer rows are owed), R3 armed-but-green.
+- ✅ **R5 / A6** — verifier harvests `LEARNINGS ### Technical Debt → td-NNN` (four-writer ledger contract intact); `DESIGN_CHANGELOG` producer assigned (closes the Wave-1 A6 deferral).
+- ✅ **Dogfood** — Wave 3 archived its own 13-REQ behavioral spec (the first since 2026-05-11) and ran the R3 gate against it → `gap:false`, closing the very PF-02 gap the analysis found.
+- Verifier verdict: **PASS** after one rework loop (id-citation + plugin-cache guard fixed in-place); 1561 tests green. **R9-dashboard** completion-state separation deferred to Wave 4 (TypeScript UX, not a gate).
 
 Legend: ✅ done · ◑ partial / doc-half · ▶ in progress · (blank) planned.
 

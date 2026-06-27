@@ -1,7 +1,7 @@
 ---
-id: dec-draft-41f7a888
+id: dec-251
 title: Grow the artifact registry into a declarative production-gate spine
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-26
 summary: Add per-artifact `production_gate` + `cleanup_policy` fields to artifact_registry.py so "which obligation has a gate, and what is it?" is one grep, drift-guarded but not auto-generated.

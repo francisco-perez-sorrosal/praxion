@@ -1,7 +1,7 @@
 ---
-id: dec-draft-b8b54821
+id: dec-252
 title: Production-gate cohort — turn four prose obligations into mechanical gates
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-06-26
 summary: R3 spec-archival gap, R4 calibration coverage, R5 LEARNINGS→td promotion, R9 stale-slug advisory, R13 challenge disposition — each gets a gate with a gate-liveness proof; R5 ownership stays with the verifier to preserve the four-writer ledger contract.
@@ -22,7 +22,7 @@ dissent: R4's detector closes the *detection* half, not the *production* half �
 
 ## Context
 
-This is the cohort sibling of `dec-draft-41f7a888` (the declarative spine). Where the
+This is the cohort sibling of `dec-251` (the declarative spine). Where the
 spine decides *how to make gates visible*, this ADR decides *which gates to build and how
 each proves it bites*. Five §6 rows (R3, R4, R5, R9, R13) plus the A6 producer tail share
 one constraint set — each is a prose obligation the analysis verified under-firing on

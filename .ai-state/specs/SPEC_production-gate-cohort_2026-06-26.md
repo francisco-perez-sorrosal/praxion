@@ -8,7 +8,7 @@
 **End date**: 2026-06-26
 **Archived**: 2026-06-26
 **Status**: Shipped — all acceptance criteria verified; AC8 dogfood (R3 on fresh spec) passes at pipeline end
-**ADRs**: `dec-draft-41f7a888` (registry declarative spine — inline string convention), `dec-draft-b8b54821` (gate cohort membership — Full tier, parallel decomposition)
+**ADRs**: `dec-251` (registry declarative spine — inline string convention), `dec-252` (gate cohort membership — Full tier, parallel decomposition)
 
 ## Feature Summary
 
@@ -65,8 +65,8 @@ Two ADR drafts authored by the systems-architect formalize the load-bearing desi
 
 | ADR | Title | Category | Key Decision |
 |-----|-------|----------|--------------|
-| `dec-draft-41f7a888` | Registry declarative spine — inline string convention over nested dataclass / StrEnum | architectural | `production_gate` and `cleanup_policy` are plain `str` fields with `_GATE_KINDS` / `_CLEANUP_POLICIES` constant sets; populated-not-projected avoids touching four consumer projection helpers; self-tests are the enforcement seam |
-| `dec-draft-b8b54821` | Gate cohort — Full tier, parallel-group decomposition, registry spine lands first | architectural | 7 behaviors + ~14 files + cross-cutting exceeds Standard ceiling; parallel groups B/C after the spine (Group A) are safe because their file sets are disjoint except for the single serialized sentinel.md owner; Group D finalizes with spec archival (AC8 dogfood) |
+| `dec-251` | Registry declarative spine — inline string convention over nested dataclass / StrEnum | architectural | `production_gate` and `cleanup_policy` are plain `str` fields with `_GATE_KINDS` / `_CLEANUP_POLICIES` constant sets; populated-not-projected avoids touching four consumer projection helpers; self-tests are the enforcement seam |
+| `dec-252` | Gate cohort — Full tier, parallel-group decomposition, registry spine lands first | architectural | 7 behaviors + ~14 files + cross-cutting exceeds Standard ceiling; parallel groups B/C after the spine (Group A) are safe because their file sets are disjoint except for the single serialized sentinel.md owner; Group D finalizes with spec archival (AC8 dogfood) |
 
 Additional implementation-planner decisions (from `LEARNINGS.md`):
 

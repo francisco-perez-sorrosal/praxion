@@ -1,3 +1,32 @@
+## v0.11.3 (2026-06-27)
+
+### Feat
+
+- split detection from production in artifact registry
+- add retain-last-N report pruning (prune_reports.py)
+- add the production-gate cohort (spec-archival, calibration, challenge, stale-slug)
+- grow the artifact registry into a declarative production-gate spine
+- raise the TASK_BRIEF floor to mandatory at Standard/Full
+- bound the recovery WAL with rotation + windowed read
+- conditional eval specs via ArtifactSpec activation (closes F-10 follow-up)
+- stale-slug advisory for .ai-work cleanup (F-21); resolve F-22
+- sentinel CA03 detects calibration-log under-logging (F-11)
+- add canonical artifact registry + drift gate (F-04)
+- add state-aware /clean-work safety gate
+
+### Fix
+
+- remove dead PRAXION_DISABLE_MEMORY_* env-var family
+- close F-16 disposition gap + reconcile audit verification pass
+- root-align PreCompact PIPELINE_STATE path
+
+### Refactor
+
+- build_doc_manifest reads the registry (R18/EA-11)
+- consolidate idea ledger into one living file
+- strip on-demandable fields from doc_manifest
+- split always-loaded artifact inventory to a reference (F-03)
+
 ## v0.11.2 (2026-06-25)
 
 ### Fix

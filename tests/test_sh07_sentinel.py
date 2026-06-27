@@ -4,7 +4,7 @@ These tests verify the *wiring* of SH07 — the thin wrapper that calls detect_d
 over archived specs and emits sentinel-formatted findings. They do NOT re-test
 detector logic (covered by tests/test_spec_drift.py).
 
-# Assumed call-site contract (Step 6 must honor):
+# Assumed call-site contract (the caller must honor):
 #
 #   from scripts.check_spec_drift import run_sh07
 #
@@ -37,7 +37,6 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-
 # ---------------------------------------------------------------------------
 # Sentinel output shape helpers
 # ---------------------------------------------------------------------------
@@ -49,11 +48,12 @@ def _assert_sentinel_row(row: dict) -> None:
     assert "check" in row, f"sentinel row missing 'check' key: {row!r}"
     assert row["check"] == "SH07", f"expected check=SH07, got {row['check']!r}"
     assert "severity" in row, f"sentinel row missing 'severity' key: {row!r}"
-    assert row["severity"] in _VALID_SEVERITIES, (
-        f"severity must be one of {_VALID_SEVERITIES!r}, got {row['severity']!r}"
-    )
+    assert (
+        row["severity"] in _VALID_SEVERITIES
+    ), f"severity must be one of {_VALID_SEVERITIES!r}, got {row['severity']!r}"
     assert "message" in row, f"sentinel row missing 'message' key: {row!r}"
-    assert isinstance(row["message"], str) and row["message"], "message must be a non-empty string"
+    assert isinstance(row["message"], str), "message must be a string"
+    assert row["message"], "message must be non-empty"
 
 
 # ---------------------------------------------------------------------------
@@ -79,9 +79,9 @@ def test_sh07_skips_when_no_specs_dir(tmp_path: Path) -> None:
 
     # Assert: no important or suggested findings (zero or one info-level skip row)
     important_or_suggested = [r for r in results if r.get("severity") in ("important", "suggested")]
-    assert not important_or_suggested, (
-        f"Expected zero important/suggested rows when specs/ absent, got: {important_or_suggested!r}"
-    )
+    assert (
+        not important_or_suggested
+    ), f"Expected zero important/suggested rows when specs/ absent, got: {important_or_suggested!r}"
     # Any emitted rows must still be valid sentinel rows
     for row in results:
         _assert_sentinel_row(row)
@@ -174,3 +174,21 @@ def test_sh07_defers_orphaned_edge_to_sh01(tmp_path: Path) -> None:
         f"SH07 must not emit rows for orphaned-edge findings (deferred to SH01/SH04); "
         f"got non-info rows: {non_info!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# TODO: wire a mechanical P06 checker once the sentinel P06 prompt-gate has a code-kind validator
+#
+# P06 is a PROMPT-kind gate (sentinel is LLM-interpreted, not a deterministic
+# script). Its proof-it-bites is the golden bad-case fixture at:
+#   tests/fixtures/sentinel/p06_missing_task_brief/
+#
+# The fixture has SYSTEMS_PLAN.md present and TASK_BRIEF.md absent — the exact
+# input that must produce a P06 WARN.
+#
+# If a mechanical P06 checker (e.g., scripts/check_p06_task_brief.py) is added
+# in the future, wire a CODE-kind canary here following the SH07 pattern:
+#   1. Import run_p06 from that script (deferred import for RED handshake).
+#   2. Point repo_root at tests/fixtures/sentinel/p06_missing_task_brief/.
+#   3. Assert at least one row with severity="warn" and check="P06" is returned.
+# ---------------------------------------------------------------------------

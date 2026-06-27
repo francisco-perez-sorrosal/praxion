@@ -23,7 +23,7 @@ This skill operationalizes Praxion's `Surface Assumptions` behavioral contract f
 
 ### When this fires
 
-Run the protocol at intake for **Lightweight tier and above**, and whenever the request is vague, implementation-first, or has no observable success condition. **Direct tier skips it** — a typo fix needs no brief. The orchestrator's always-loaded Intake Clarity Gate (in `swe-agent-coordination-protocol.md`) decides whether the *blocking* question step fires; this skill is the procedure it points to.
+Run the protocol at intake for **Lightweight tier and above**: at **Standard/Full**, the brief is **mandatory regardless of clarity** and must be captured before the first agent spawn; at **Lightweight**, capture when success is non-obvious. **Direct tier skips it** — a typo fix needs no brief. The brief floor governs *writing*, not *asking* — the orchestrator's always-loaded Intake Clarity Gate (in `swe-agent-coordination-protocol.md`) and the 2×2 rule still decide whether a *blocking* question fires; this skill is the procedure it points to.
 
 ### The decision rule — the keystone
 
@@ -79,7 +79,7 @@ Capture calibration rides the existing tier:
 |---|---|
 | Direct | Nothing — skip the brief entirely |
 | Lightweight | Intent + 1–2 Key Signals inline; Health Guards as a checklist |
-| Standard / Full | Full shape in `.ai-work/<task-slug>/TASK_BRIEF.md`; one Key Signal per discrete acceptance criterion; explicit Uncertainty Flags |
+| Standard / Full | Full shape in `.ai-work/<task-slug>/TASK_BRIEF.md`, **mandatory before the first agent spawn regardless of clarity**; one Key Signal per discrete acceptance criterion; explicit Uncertainty Flags. The 2×2 decides only ask-vs-proceed, not whether to write the brief. |
 
 Write `TASK_BRIEF.md` *before* spawning the researcher/architect so it is their first input. It carries the user's success definition **verbatim** — distinct from the researcher's synthesis (provenance hygiene). Downstream: the architect constrains designs to satisfy the Key Signals; the planner turns each into a step acceptance test and each Uncertainty Flag into a spike; the test-engineer maps each signal to a test node; the verifier uses Key Signals as its **primary rubric** (binary) and Health Guards as the regression checklist.
 

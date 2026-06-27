@@ -155,6 +155,9 @@ Requires Task Chronograph data. Skip with a note when unavailable.
 | P03 | A | Agent events have start/stop pairs | Every `agent_start` has a corresponding `agent_stop` |
 | P04 | L | Agents operate within declared scope | Outputs don't include actions outside boundary (e.g., implementer making design decisions) |
 | P05 | L | Handoff docs have required sections | Pipeline docs contain their expected sections |
+| P06 | A | TASK_BRIEF mandatory at Standard/Full | For each `.ai-work/<slug>/` containing `SYSTEMS_PLAN.md` but no `TASK_BRIEF.md`, WARN |
+
+**Golden bad-case (P06):** Any `.ai-work/<slug>/` with `SYSTEMS_PLAN.md` present and `TASK_BRIEF.md` absent must produce a `WARN` for P06. `SYSTEMS_PLAN.md` presence implies Standard/Full tier (the architect only runs there), so a Lightweight slug without a plan file never trips this check. Sentinel fixture: `tests/fixtures/sentinel/p06_missing_task_brief/` (file-existence check, no LLM required).
 
 ### Code Health (CH)
 

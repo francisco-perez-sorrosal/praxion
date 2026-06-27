@@ -17,14 +17,13 @@ Exit 0 unconditionally.
 
 from __future__ import annotations
 
-import fcntl
 import json
 import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from _hook_utils import DISABLE_OBSERVABILITY, is_disabled
+from _hook_utils import DISABLE_OBSERVABILITY, append_observation, is_disabled
 
 # Tools that generate too much noise to capture
 BLOCKLIST = frozenset(
@@ -134,22 +133,6 @@ def build_summary(tool_name: str, tool_input: dict, classification: str) -> str:
     return _truncate(", ".join(parts)) if parts else tool_name
 
 
-def _append_observation(obs_path: Path, observation: dict) -> None:
-    """Append a single observation to the JSONL file with exclusive locking."""
-    obs_path.parent.mkdir(parents=True, exist_ok=True)
-    lock_path = obs_path.parent / "observations.lock"
-    lock_path.touch(exist_ok=True)
-
-    with open(lock_path, "w") as lock_fd:
-        fcntl.flock(lock_fd, fcntl.LOCK_EX)
-        try:
-            with open(obs_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(observation, separators=(",", ":")) + "\n")
-                f.flush()
-        finally:
-            fcntl.flock(lock_fd, fcntl.LOCK_UN)
-
-
 def main() -> None:
     if is_disabled(DISABLE_OBSERVABILITY):
         return
@@ -215,7 +198,7 @@ def main() -> None:
         "parent_span_id": parent_span_id,
     }
 
-    _append_observation(obs_path, observation)
+    append_observation(obs_path, observation)
 
 
 if __name__ == "__main__":

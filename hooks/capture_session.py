@@ -7,13 +7,12 @@ Exit 0 unconditionally.
 
 from __future__ import annotations
 
-import fcntl
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-from _hook_utils import DISABLE_OBSERVABILITY, is_disabled
+from _hook_utils import DISABLE_OBSERVABILITY, append_observation, is_disabled
 
 EVENT_MAP = {
     "SessionStart": "session_start",
@@ -41,22 +40,6 @@ def _build_summary(event_type: str, payload: dict) -> str:
     return event_type
 
 
-def _append_observation(obs_path: Path, observation: dict) -> None:
-    """Append a single observation to the JSONL file with exclusive locking."""
-    obs_path.parent.mkdir(parents=True, exist_ok=True)
-    lock_path = obs_path.parent / "observations.lock"
-    lock_path.touch(exist_ok=True)
-
-    with open(lock_path, "w") as lock_fd:
-        fcntl.flock(lock_fd, fcntl.LOCK_EX)
-        try:
-            with open(obs_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(observation, separators=(",", ":")) + "\n")
-                f.flush()
-        finally:
-            fcntl.flock(lock_fd, fcntl.LOCK_UN)
-
-
 def main() -> None:
     if is_disabled(DISABLE_OBSERVABILITY):
         return
@@ -82,7 +65,7 @@ def main() -> None:
     agent_id = payload.get("agent_id", "") or session_id  # main agent uses session_id
 
     observation = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "session_id": session_id,
         "agent_type": payload.get("agent_type", "main"),
         "agent_id": agent_id,
@@ -95,7 +78,7 @@ def main() -> None:
         "classification": None,
     }
 
-    _append_observation(obs_path, observation)
+    append_observation(obs_path, observation)
 
 
 if __name__ == "__main__":

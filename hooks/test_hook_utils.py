@@ -96,3 +96,97 @@ def test_observability_hook_exits_silently_when_disabled(script):
     result = _run_hook(script, _MINIMAL_PAYLOAD, {"PRAXION_DISABLE_OBSERVABILITY": "1"})
     assert result.returncode == 0, f"{script} exited {result.returncode}: {result.stderr}"
     assert result.stdout == "", f"{script} emitted stdout when disabled: {result.stdout!r}"
+
+
+# -- Rotation-behavior tests --------------------------------------------------
+# These tests target append_observation / _rotate_if_needed / OBSERVATIONS_MAX_BYTES
+# which are added to _hook_utils.py by the paired implementer step.
+# They are intentionally RED until that step lands (AttributeError on missing symbols).
+
+
+def test_rotate_triggers_at_threshold(tmp_path, monkeypatch):
+    """When the active file exceeds the size threshold, append_observation
+    renames it to <obs_path>.1 and the new row lands in a fresh active file."""
+    hu = _import_hook_utils()
+    obs_path = tmp_path / "observations.jsonl"
+    # Pre-populate so file size exceeds the to-be-set threshold of 1 byte.
+    obs_path.write_text('{"existing":"row"}\n', encoding="utf-8")
+
+    monkeypatch.setattr(hu, "OBSERVATIONS_MAX_BYTES", 1)
+    hu.append_observation(obs_path, {"event": "new"})
+
+    rotated = Path(str(obs_path) + ".1")
+    assert rotated.exists(), "original obs file must be renamed to .1 after threshold breach"
+    active_lines = obs_path.read_text(encoding="utf-8").splitlines()
+    assert len(active_lines) == 1, "active file must hold exactly the new row after rotation"
+    assert "new" in active_lines[0], "new row must appear in the fresh active file"
+
+
+def test_rotate_below_threshold_no_rotate(tmp_path, monkeypatch):
+    """A single append that keeps the file below the default (large) threshold
+    must not create a .1 rotation file."""
+    hu = _import_hook_utils()
+    obs_path = tmp_path / "observations.jsonl"
+
+    # Default OBSERVATIONS_MAX_BYTES is 10 MiB; one tiny row is far below it.
+    hu.append_observation(obs_path, {"event": "tiny"})
+
+    rotated = Path(str(obs_path) + ".1")
+    assert not rotated.exists(), "no .1 rotation file must exist when below the threshold"
+
+
+def test_rotate_swallows_oserror(tmp_path, monkeypatch):
+    """When os.replace raises OSError during rotation, append_observation must
+    not propagate the exception and must still write the observation."""
+    hu = _import_hook_utils()
+    obs_path = tmp_path / "observations.jsonl"
+    obs_path.write_text('{"existing":"row"}\n', encoding="utf-8")
+
+    monkeypatch.setattr(hu, "OBSERVATIONS_MAX_BYTES", 1)
+
+    def _fail_replace(*args, **kwargs):
+        raise OSError("forced rename failure")
+
+    monkeypatch.setattr(os, "replace", _fail_replace)
+
+    # Must not raise despite the forced OSError.
+    hu.append_observation(obs_path, {"event": "swallowed"})
+
+    content = obs_path.read_text(encoding="utf-8")
+    assert "swallowed" in content, "observation must be written even when os.replace fails"
+
+
+def test_append_observation_uses_fcntl_lock(tmp_path):
+    """append_observation must use the observations.lock file so that concurrent
+    callers are safely serialized; the observation must also be written."""
+    hu = _import_hook_utils()
+    obs_path = tmp_path / "observations.jsonl"
+    observation = {"event": "lock_check", "value": 42}
+
+    hu.append_observation(obs_path, observation)
+
+    lock_path = obs_path.parent / "observations.lock"
+    assert lock_path.exists(), "lock file must exist after append_observation"
+    content = obs_path.read_text(encoding="utf-8")
+    assert "lock_check" in content, "observation must be written to the active file"
+
+
+def test_canary_rotate_at_threshold_zero(tmp_path, monkeypatch):
+    """Gate-liveness canary: with OBSERVATIONS_MAX_BYTES=0 every existing file
+    satisfies the rotation condition (size >= 0). After append_observation the
+    original file must be at <obs_path>.1.
+
+    This canary must go RED if rotation is ever silently removed."""
+    hu = _import_hook_utils()
+    obs_path = tmp_path / "observations.jsonl"
+    # A zero-byte file: stat().st_size == 0 >= 0 == threshold → rotation fires.
+    obs_path.touch()
+
+    monkeypatch.setattr(hu, "OBSERVATIONS_MAX_BYTES", 0)
+    hu.append_observation(obs_path, {"event": "canary"})
+
+    rotated = Path(str(obs_path) + ".1")
+    assert rotated.exists(), (
+        "rotation canary FAILED: <obs_path>.1 must exist when threshold is 0 "
+        "— rotation is either absent or misconditioned"
+    )

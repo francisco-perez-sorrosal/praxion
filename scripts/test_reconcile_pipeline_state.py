@@ -9,7 +9,10 @@ Run: ``python3 scripts/test_reconcile_pipeline_state.py`` or ``pytest``.
 
 from __future__ import annotations
 
+import json
+import os
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -352,6 +355,178 @@ def test_test_status_red_when_final_run_fails(tmp_path):
     p = tmp_path / "TEST_RESULTS.md"
     p.write_text("All passed earlier: 100 passed\nThen: 2 failed, 98 passed\n", encoding="utf-8")
     assert rps._read_test_status(p) == "red"
+
+
+# --- windowed WAL read + cross-boundary recovery (Step 5 / Group B) ----------
+#
+# These tests call _read_wal(obs_path, max_age_days=7, now=<datetime>) — the
+# new windowed signature that does NOT yet exist. All 6 are expected RED until
+# the implementer's Step 4 lands the 2-file windowed _read_wal.
+#
+# RED trigger: TypeError — _read_wal() got an unexpected keyword argument 'now'
+#
+# Scenario 6 (WIP.md pre-mortem): active-file rows are retained unconditionally;
+# only the .1 segment is mtime/timestamp-pruned. A malformed-timestamp row in
+# the active file must never be dropped. _keeps_active_row_with_malformed_timestamp
+# guards this contract.
+
+
+_NOW = datetime(2026, 6, 26, 12, 0, 0, tzinfo=UTC)
+_WITHIN_WINDOW_TS = "2026-06-25T12:00:00+00:00"  # 1 day before _NOW
+_OUTSIDE_WINDOW_TS = "2026-06-10T12:00:00+00:00"  # 16 days before _NOW
+
+
+def test_cross_boundary_canary_reconciler_sees_events_split_across_rotation(tmp_path):
+    """Load-bearing canary: agent_start+tool_use in .1, agent_stop in active —
+    _read_wal must return all 3 rows AND _correlate_agents must see the stop."""
+    obs_path = tmp_path / "observations.jsonl"
+    seg_path = tmp_path / "observations.jsonl.1"
+
+    declared_file = "src/cross_boundary_feature.py"
+
+    # Two rows written to the rotated segment (.1) — the "old session"
+    seg_rows = [
+        {
+            "event_type": "agent_start",
+            "agent_id": "agent-A",
+            "agent_type": "i-am:implementer",
+            "timestamp": _WITHIN_WINDOW_TS,
+        },
+        {
+            "event_type": "tool_use",
+            "agent_id": "agent-A",
+            "agent_type": "i-am:implementer",
+            "file_paths": [f"/repo/{declared_file}"],
+            "timestamp": _WITHIN_WINDOW_TS,
+        },
+    ]
+    seg_path.write_text("\n".join(json.dumps(r) for r in seg_rows) + "\n", encoding="utf-8")
+
+    # One row in the active file — the stop that arrived after rotation
+    stop_row = {
+        "event_type": "agent_stop",
+        "agent_id": "agent-A",
+        "timestamp": _WITHIN_WINDOW_TS,
+    }
+    obs_path.write_text(json.dumps(stop_row) + "\n", encoding="utf-8")
+
+    # Windowed 2-file read must return all 3 rows (2 from .1 + 1 from active)
+    rows = rps._read_wal(obs_path, max_age_days=7, now=_NOW)
+    assert len(rows) == 3, f"expected 3 rows across boundary, got {len(rows)}"
+
+    # Correlation must surface the agent_stop even though it lived in the active file
+    tier2 = rps._correlate_agents([declared_file], rows)
+    assert (
+        tier2["agent_stop_seen"] is True
+    ), "agent_stop in active file must be visible after 2-file stitch"
+
+
+def test_read_wal_excludes_rows_older_than_window(tmp_path):
+    """Rows with timestamps older than max_age_days in the .1 segment are pruned."""
+    obs_path = tmp_path / "observations.jsonl"
+    seg_path = tmp_path / "observations.jsonl.1"
+
+    stale_row = {"event_type": "tool_use", "agent_id": "stale", "timestamp": _OUTSIDE_WINDOW_TS}
+    seg_path.write_text(json.dumps(stale_row) + "\n", encoding="utf-8")
+    obs_path.write_text("", encoding="utf-8")
+
+    rows = rps._read_wal(obs_path, max_age_days=7, now=_NOW)
+    assert len(rows) == 0, "stale segment row must be excluded from the windowed read"
+
+
+def test_read_wal_skips_segment_when_mtime_out_of_window(tmp_path):
+    """When .1 mtime is older than max_age_days, the segment is not read at all."""
+    obs_path = tmp_path / "observations.jsonl"
+    seg_path = tmp_path / "observations.jsonl.1"
+
+    # Segment has a row with a recent-looking timestamp but the FILE is old
+    recent_looking_row = {"event_type": "tool_use", "timestamp": _WITHIN_WINDOW_TS}
+    seg_path.write_text(json.dumps(recent_looking_row) + "\n", encoding="utf-8")
+
+    # Set mtime to 10 days before _NOW — outside the 7-day window
+    old_mtime = (_NOW - timedelta(days=10)).timestamp()
+    os.utime(seg_path, (old_mtime, old_mtime))
+
+    obs_path.write_text("", encoding="utf-8")
+
+    rows = rps._read_wal(obs_path, max_age_days=7, now=_NOW)
+    assert len(rows) == 0, "segment with out-of-window mtime must be skipped entirely"
+
+
+def test_read_wal_handles_missing_segment_gracefully(tmp_path):
+    """When .1 is absent, _read_wal returns active rows without error."""
+    obs_path = tmp_path / "observations.jsonl"
+    # No seg_path created — .1 does not exist
+
+    active_row = {"event_type": "agent_stop", "agent_id": "agent-B", "timestamp": _WITHIN_WINDOW_TS}
+    obs_path.write_text(json.dumps(active_row) + "\n", encoding="utf-8")
+
+    rows = rps._read_wal(obs_path, max_age_days=7, now=_NOW)
+    assert len(rows) == 1
+    assert rows[0]["event_type"] == "agent_stop"
+
+
+def test_canary_single_file_read_misses_current_session_events_after_rotation(tmp_path):
+    """Gate-liveness canary: when active file is empty and .1 holds recent rows,
+    _read_wal must return the .1 rows — proving 2-file read is required.
+
+    If _read_wal read only the active file (the pre-Step-4 behaviour), this
+    assertion would fail (0 rows returned) — the regression this canary catches.
+    """
+    obs_path = tmp_path / "observations.jsonl"
+    seg_path = tmp_path / "observations.jsonl.1"
+
+    # Post-rotation state: fresh empty active + prior session events in .1
+    obs_path.write_text("", encoding="utf-8")
+    seg_row = {
+        "event_type": "tool_use",
+        "agent_id": "agent-C",
+        "agent_type": "i-am:implementer",
+        "timestamp": _WITHIN_WINDOW_TS,
+    }
+    seg_path.write_text(json.dumps(seg_row) + "\n", encoding="utf-8")
+
+    rows = rps._read_wal(obs_path, max_age_days=7, now=_NOW)
+    assert len(rows) == 1, "post-rotation .1 rows must be returned by the 2-file windowed read"
+    assert rows[0]["agent_id"] == "agent-C"
+
+
+def test_read_wal_keeps_active_row_with_malformed_timestamp(tmp_path):
+    """Active-file rows with missing or garbage timestamps are retained unconditionally.
+
+    Contrast: an equivalently malformed timestamp in the .1 segment is pruned
+    (malformed timestamp parses as epoch → epoch is outside any reasonable window).
+    This guards the pre-mortem scenario 6 correctness refinement: recovery errs
+    toward inclusion; a bad correlation degrades to unknown→user, never a false verdict.
+    """
+    obs_path = tmp_path / "observations.jsonl"
+    seg_path = tmp_path / "observations.jsonl.1"
+
+    # Active file: row with garbage timestamp — must be retained
+    malformed_active = {
+        "event_type": "tool_use",
+        "agent_id": "agent-D",
+        "timestamp": "NOT_A_TIMESTAMP",
+    }
+    obs_path.write_text(json.dumps(malformed_active) + "\n", encoding="utf-8")
+
+    # Segment: row with same garbage timestamp — must be pruned (epoch → old → outside window)
+    malformed_seg = {
+        "event_type": "tool_use",
+        "agent_id": "agent-E",
+        "timestamp": "NOT_A_TIMESTAMP",
+    }
+    seg_path.write_text(json.dumps(malformed_seg) + "\n", encoding="utf-8")
+
+    rows = rps._read_wal(obs_path, max_age_days=7, now=_NOW)
+
+    agent_ids_returned = {r.get("agent_id") for r in rows}
+    assert (
+        "agent-D" in agent_ids_returned
+    ), "active-file row with malformed timestamp must be retained unconditionally"
+    assert (
+        "agent-E" not in agent_ids_returned
+    ), "segment row with malformed timestamp must be pruned (parsed as epoch → outside window)"
 
 
 if __name__ == "__main__":

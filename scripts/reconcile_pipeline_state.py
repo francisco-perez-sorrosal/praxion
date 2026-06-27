@@ -36,6 +36,7 @@ import json
 import re
 import subprocess
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -81,6 +82,7 @@ def reconcile(
     base_ref: str | None,
     *,
     state_root: Path | str | None = None,
+    max_age_days: int = 7,
     _changed_files_override: list[str] | None = None,
     _wal_rows_override: list[dict[str, Any]] | None = None,
     _test_status_override: str | None = None,
@@ -126,7 +128,10 @@ def reconcile(
     wal_rows = (
         _wal_rows_override
         if _wal_rows_override is not None
-        else _read_wal(state_root / ".ai-state" / "observations.jsonl")
+        else _read_wal(
+            state_root / ".ai-state" / "observations.jsonl",
+            max_age_days=max_age_days,
+        )
     )
 
     verdicts: list[dict[str, Any]] = []
@@ -410,10 +415,25 @@ def _read_test_status(path: Path) -> str:
     return status
 
 
-def _read_wal(obs_path: Path) -> list[dict[str, Any]]:
-    """Read observations.jsonl into a list of dicts; tolerate partial lines."""
+def _parse_ts(ts: str) -> datetime:
+    """Parse an ISO 8601 timestamp; return the epoch on parse error.
+
+    Epoch acts as "infinitely old" so malformed timestamps in the .1 segment
+    are pruned by the window filter.  Active-file rows never reach this helper.
+    """
     try:
-        text = obs_path.read_text(encoding="utf-8")
+        dt = datetime.fromisoformat(ts)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        return dt
+    except (ValueError, TypeError):
+        return datetime.fromtimestamp(0, UTC)
+
+
+def _parse_jsonl(path: Path) -> list[dict[str, Any]]:
+    """Parse a JSONL file into a list of dicts; tolerate partial lines and OSError."""
+    try:
+        text = path.read_text(encoding="utf-8")
     except OSError:
         return []
     rows: list[dict[str, Any]] = []
@@ -426,6 +446,41 @@ def _read_wal(obs_path: Path) -> list[dict[str, Any]]:
         except json.JSONDecodeError:
             continue  # a truncated final line never corrupts the read
     return rows
+
+
+def _read_wal(
+    obs_path: Path,
+    *,
+    max_age_days: int = 7,
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """Read observations.jsonl (active) + optional rotated .1 segment within a window.
+
+    Active-file rows are retained unconditionally — the active file is
+    size-bounded by rotation, so a current-session row with a malformed/missing
+    timestamp must still reach correlation (pre-mortem scenario 6).
+
+    The .1 segment is included only when its mtime falls within max_age_days,
+    and its rows are additionally timestamp-filtered to the same window.
+    Malformed timestamps in the segment parse as epoch → outside any window → pruned.
+    """
+    now = now or datetime.now(UTC)
+    cutoff = now - timedelta(days=max_age_days)
+
+    active_rows = _parse_jsonl(obs_path)
+
+    seg_path = Path(str(obs_path) + ".1")
+    seg_rows: list[dict[str, Any]] = []
+    try:
+        seg_mtime = datetime.fromtimestamp(seg_path.stat().st_mtime, UTC)
+        if seg_mtime >= cutoff:
+            seg_rows = [
+                r for r in _parse_jsonl(seg_path) if _parse_ts(r.get("timestamp", "")) >= cutoff
+            ]
+    except OSError:
+        pass  # segment absent or unreadable → skip silently
+
+    return active_rows + seg_rows
 
 
 def _git_changed_files(repo_root: Path, base_ref: str | None) -> set[str]:
@@ -518,6 +573,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--base-ref", default=None, help="git ref to diff against (e.g. main)")
     parser.add_argument("--json", action="store_true", help="emit verdict JSON array on stdout")
     parser.add_argument("--quiet", action="store_true", help="suppress the human summary")
+    parser.add_argument(
+        "--max-age-days",
+        type=int,
+        default=7,
+        help="max age in days for the rotated WAL segment (default: 7)",
+    )
     args = parser.parse_args(argv)
 
     repo_root = resolve_repo_root(args.repo_root, script_dir=SCRIPT_DIR)
@@ -530,7 +591,13 @@ def main(argv: list[str] | None = None) -> int:
     state_root = Path(args.worktree_root).resolve() if args.worktree_root else repo_root
 
     try:
-        verdicts = reconcile(args.slug, repo_root, args.base_ref, state_root=state_root)
+        verdicts = reconcile(
+            args.slug,
+            repo_root,
+            args.base_ref,
+            state_root=state_root,
+            max_age_days=args.max_age_days,
+        )
     except Exception as exc:  # noqa: BLE001 — reconcile errors must not crash a seam
         sys.stderr.write(f"reconcile_pipeline_state: {exc}\n")
         return 3

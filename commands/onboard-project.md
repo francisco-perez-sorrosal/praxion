@@ -187,6 +187,7 @@ The default §Flow runs end-to-end without pause. To let users *learn* the model
 .ai-state/*.lock
 .ai-state/**/*.lock
 .ai-state/*.backup.json
+.ai-state/observations.jsonl.1
 .claude/settings.local.json
 .claude/worktrees/
 .env
@@ -201,6 +202,7 @@ The default §Flow runs end-to-end without pause. To let users *learn* the model
 | `.ai-work/` | Ephemeral pipeline scratch (per-task slug) | Deleted at pipeline end; never useful in history |
 | `.ai-state/*.lock`, `.ai-state/**/*.lock` | Advisory file locks taken by `finalize_adrs.py`, merge drivers | Runtime-only — committing them masks real lock behavior |
 | `.ai-state/*.backup.json` | Temporary local snapshots | Local recovery only |
+| `.ai-state/observations.jsonl.1` | Local WAL rotation archive | Local WAL rotation archive — gitignored; rows are already in git history before rotation moves them. |
 | `.claude/settings.local.json` | Per-machine Claude settings | Machine-specific |
 | `.claude/worktrees/` | Worktree home for `EnterWorktree` | Each branch's own checkout |
 | `.env`, `.env.*`, `.env.local` | Secrets | Never commit secrets |

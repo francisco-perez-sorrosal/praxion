@@ -53,6 +53,7 @@ coverage.xml
 .ai-state/*.lock
 .ai-state/**/*.lock
 .ai-state/*.backup.json
+.ai-state/observations.jsonl.1
 .ai-state/*.pre-forget.json
 
 # User-specific local settings

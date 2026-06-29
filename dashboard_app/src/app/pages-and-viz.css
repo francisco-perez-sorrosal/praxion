@@ -756,6 +756,39 @@
   font-size: var(--text-xs);
 }
 
+/* Group containers separate active from done slugs; each occupies its own row. */
+.workshop-selector__group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.workshop-selector__group-label {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.06em;
+  margin: 0;
+  text-transform: uppercase;
+  width: 100%;
+}
+
+/* Done items carry a muted left-border to signal completion without hiding the content. */
+.workshop-selector__item--done {
+  border-left-color: var(--color-success-border);
+  color: var(--color-text-muted);
+}
+
+.workshop-selector__item--done.workshop-selector__item--active {
+  border-left-color: var(--color-success-text);
+}
+
+/* "Done" badge — inline chip inside the selector button. */
+.workshop-selector__badge {
+  align-self: start;
+}
+
 /* Selected workshop — full width, more breathing room than the old 2-col grid. */
 .workshop-panel {
   background: var(--color-surface-1);

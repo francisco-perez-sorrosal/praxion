@@ -124,38 +124,88 @@ function WorkshopPanel({ workshop }: { readonly workshop: WorkshopState }) {
   );
 }
 
+// ─── Workshop selector button ─────────────────────────────────────────────────
+
+function WorkshopButton({
+  workshop,
+  isActive,
+  onSelect
+}: {
+  readonly workshop: WorkshopState;
+  readonly isActive: boolean;
+  readonly onSelect: (path: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`workshop-selector__item${isActive ? " workshop-selector__item--active" : ""}${workshop.isDone ? " workshop-selector__item--done" : ""}`}
+      onClick={() => onSelect(workshop.path)}
+      aria-pressed={isActive}
+    >
+      <span className="workshop-selector__name">{basename(workshop.path)}</span>
+      {workshop.isDone ? (
+        <span className="chip chip--status-accepted workshop-selector__badge">Done</span>
+      ) : workshop.currentStep ? (
+        <span className="workshop-selector__step muted">{workshop.currentStep}</span>
+      ) : null}
+    </button>
+  );
+}
+
 // ─── Main client component ────────────────────────────────────────────────────
 
 export function WorkshopsClient({ workshops }: { readonly workshops: WorkshopState[] }) {
-  const [selectedPath, setSelectedPath] = useState(workshops[0]?.path ?? "");
+  const activeWorkshops = workshops.filter((workshop) => !workshop.isDone);
+  const doneWorkshops = workshops.filter((workshop) => workshop.isDone);
+
+  const firstWorkshop = activeWorkshops[0] ?? doneWorkshops[0] ?? null;
+  const [selectedPath, setSelectedPath] = useState(firstWorkshop?.path ?? "");
 
   const selected =
-    workshops.find((workshop) => workshop.path === selectedPath) ?? workshops[0] ?? null;
+    workshops.find((workshop) => workshop.path === selectedPath) ?? firstWorkshop ?? null;
 
   if (selected === null) {
     return null;
   }
 
+  const hasBothGroups = activeWorkshops.length > 0 && doneWorkshops.length > 0;
+
   return (
     <div className="workshops-client">
       <nav className="workshop-selector" aria-label="Select a workshop">
-        {workshops.map((workshop) => {
-          const isActive = workshop.path === selected.path;
-          return (
-            <button
-              key={workshop.path}
-              type="button"
-              className={`workshop-selector__item${isActive ? " workshop-selector__item--active" : ""}`}
-              onClick={() => setSelectedPath(workshop.path)}
-              aria-pressed={isActive}
-            >
-              <span className="workshop-selector__name">{basename(workshop.path)}</span>
-              {workshop.currentStep ? (
-                <span className="workshop-selector__step muted">{workshop.currentStep}</span>
-              ) : null}
-            </button>
-          );
-        })}
+        {activeWorkshops.length > 0 && (
+          <div className="workshop-selector__group">
+            {hasBothGroups && (
+              <p className="workshop-selector__group-label" aria-hidden="true">
+                Active
+              </p>
+            )}
+            {activeWorkshops.map((workshop) => (
+              <WorkshopButton
+                key={workshop.path}
+                workshop={workshop}
+                isActive={workshop.path === selected.path}
+                onSelect={setSelectedPath}
+              />
+            ))}
+          </div>
+        )}
+
+        {doneWorkshops.length > 0 && (
+          <div className="workshop-selector__group">
+            <p className="workshop-selector__group-label" aria-hidden="true">
+              Done
+            </p>
+            {doneWorkshops.map((workshop) => (
+              <WorkshopButton
+                key={workshop.path}
+                workshop={workshop}
+                isActive={workshop.path === selected.path}
+                onSelect={setSelectedPath}
+              />
+            ))}
+          </div>
+        )}
       </nav>
 
       <WorkshopPanel workshop={selected} />

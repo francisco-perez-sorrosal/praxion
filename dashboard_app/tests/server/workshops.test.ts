@@ -239,4 +239,53 @@ Ship the server reader
     expect(trace?.body).toBe("req-01: covered\n");
     expect(trace?.renderMode).toBe("code");
   });
+
+  it("marks a workshop done when VERIFICATION_REPORT.md is present", async () => {
+    const root = await createTempProjectRoot("dashboard-workshops-done-report-");
+    const workshop = path.join(root, ".ai-work", "finished-task");
+
+    await mkdir(path.join(root, ".ai-state"), { recursive: true });
+    await mkdir(workshop, { recursive: true });
+    await writeFile(path.join(workshop, "VERIFICATION_REPORT.md"), "# Verification\n\nAll green.\n");
+
+    const workshops = await getWorkshopsData(root);
+
+    expect(workshops[0]?.isDone).toBe(true);
+  });
+
+  it("marks a workshop done when PROGRESS.md ends with a terminal phase", async () => {
+    const root = await createTempProjectRoot("dashboard-workshops-done-progress-");
+    const workshop = path.join(root, ".ai-work", "completed-task");
+
+    await mkdir(path.join(root, ".ai-state"), { recursive: true });
+    await mkdir(workshop, { recursive: true });
+    await writeFile(
+      path.join(workshop, "PROGRESS.md"),
+      [
+        "[2026-05-11T09:00:00Z] [implementer] Phase 1/6: [understand-scope] -- Read the files",
+        "[2026-05-11T10:00:00Z] [implementer] Phase 6/6: [report] -- Step complete",
+        ""
+      ].join("\n")
+    );
+
+    const workshops = await getWorkshopsData(root);
+
+    expect(workshops[0]?.isDone).toBe(true);
+  });
+
+  it("does not mark a workshop done when neither VERIFICATION_REPORT nor terminal phase exists", async () => {
+    const root = await createTempProjectRoot("dashboard-workshops-active-");
+    const workshop = path.join(root, ".ai-work", "active-task");
+
+    await mkdir(path.join(root, ".ai-state"), { recursive: true });
+    await mkdir(workshop, { recursive: true });
+    await writeFile(
+      path.join(workshop, "PROGRESS.md"),
+      "[2026-05-11T09:00:00Z] [implementer] Phase 2/6: [implement] -- Writing code\n"
+    );
+
+    const workshops = await getWorkshopsData(root);
+
+    expect(workshops[0]?.isDone).toBe(false);
+  });
 });

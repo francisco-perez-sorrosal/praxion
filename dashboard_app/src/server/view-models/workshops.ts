@@ -17,6 +17,18 @@ function renderModeFor(name: string): WorkshopArtifact["renderMode"] {
   return /\.(md|markdown)$/i.test(name) ? "markdown" : "code";
 }
 
+/**
+ * A PROGRESS.md phase entry like "6/6" is terminal when the current phase
+ * equals the total. Returns false for malformed or absent phase strings.
+ */
+function isTerminalPhase(phase: string): boolean {
+  const match = /^(\d+)\/(\d+)$/.exec(phase);
+  if (!match || !match[1] || !match[2]) return false;
+  const current = parseInt(match[1], 10);
+  const total = parseInt(match[2], 10);
+  return total > 0 && current === total;
+}
+
 export async function getWorkshopsData(projectRoot: string): Promise<WorkshopState[]> {
   const validatedRoot = await validateProjectRoot(projectRoot);
   const workshopsRoot = path.join(validatedRoot, ".ai-work");
@@ -58,10 +70,18 @@ export async function getWorkshopsData(projectRoot: string): Promise<WorkshopSta
         )
       ).filter((artifact): artifact is WorkshopArtifact => artifact !== null);
 
+      const hasVerificationReport = artifacts.some(
+        (artifact) => artifact.name === "VERIFICATION_REPORT.md"
+      );
+      const lastEvent = events.at(-1);
+      const isDone =
+        hasVerificationReport || (lastEvent !== undefined && isTerminalPhase(lastEvent.phase));
+
       return {
         artifacts,
         currentStep: wipState.currentStep,
         events,
+        isDone,
         path: workshopRoot,
         progress: wipState.progress,
         status: wipState.status

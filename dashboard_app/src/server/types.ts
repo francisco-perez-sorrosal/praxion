@@ -30,6 +30,7 @@ export type WorkshopState = {
   artifacts: WorkshopArtifact[];
   currentStep: string | null;
   events: WorkshopEvent[];
+  isDone: boolean;
   path: string;
   progress: WorkshopProgressItem[];
   status: string | null;

@@ -127,6 +127,15 @@ _finalize_chain_run_on_main() {
     fi
     _finalize_chain_run_script "finalize_tech_debt_ledger" \
         "${FINALIZE_CHAIN_DIR}/finalize_tech_debt_ledger.py" --all --repo-root "$repo_root"
+    # Refresh the committed doc manifest LAST: it must index the dec-NNN renames
+    # finalize_adrs makes and the TECH_DEBT_RESOLVED migrations the ledger makes
+    # (a pre-commit gate runs too early to see them). Content-aware write no-ops
+    # when nothing durable changed. Gated on the manifest already existing so
+    # projects without one are never surprised by a new committed file.
+    if [ -f "${repo_root}/.ai-state/doc_manifest.yaml" ]; then
+        _finalize_chain_run_script "build_doc_manifest" \
+            "${FINALIZE_CHAIN_DIR}/build_doc_manifest.py" --root "$repo_root"
+    fi
 }
 
 # -- Public entry points ------------------------------------------------------

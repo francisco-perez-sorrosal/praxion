@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-06-29T20:57:49Z'
+generated_at: '2026-06-29T23:02:20Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -43,7 +43,7 @@ surfaces:
   path: CLAUDE.md
   type: markdown
   title: Praxion
-  last_modified: '2026-06-11'
+  last_modified: '2026-06-29'
   renderer: default_markdown
   surfaces_referenced:
   - docs-claude-code-limitations
@@ -385,6 +385,12 @@ surfaces:
   title: "Wave 1\u20133 External Audit (Adversarial)"
   last_modified: '2026-06-26'
   audience: implementer / maintainer
+  renderer: default_markdown
+- id: docs-independent-analysis-wave-4-5-external-audit
+  path: docs/independent-analysis/wave-4-5-external-audit.md
+  type: markdown
+  title: "Wave 4\u20135 External Audit (Adversarial)"
+  last_modified: '2026-06-29'
   renderer: default_markdown
 - id: docs-metrics-readme
   path: docs/metrics/README.md
@@ -2686,6 +2692,7 @@ groups:
   - docs-independent-analysis-praxion-artifact-lifecycle-audit
   - docs-independent-analysis-praxion-artifact-process-flow-analysis
   - docs-independent-analysis-wave-1-3-external-audit
+  - docs-independent-analysis-wave-4-5-external-audit
   - docs-multi-session
   - docs-rework-dispatch
   - readme

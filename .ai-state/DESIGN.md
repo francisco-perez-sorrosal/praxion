@@ -227,6 +227,20 @@ Observability: harvest passes surface in `.ai-state/skill_genesis_reports/SKILL_
 
 *Mermaid source: [`docs/diagrams/skill-genesis-harvest/src/skill-genesis-harvest.mmd`](../docs/diagrams/skill-genesis-harvest/src/skill-genesis-harvest.mmd). Render with: `mmdc -i docs/diagrams/skill-genesis-harvest/src/skill-genesis-harvest.mmd -o docs/diagrams/skill-genesis-harvest/rendered/skill-genesis-harvest.svg`*
 
+### Readiness Feedback Edge (Built)
+
+A previously **write-only** out-of-band signal — the agent-readiness level — is now closed into the existing `sentinel → promethean` intelligence loop, rather than being merely computed, embedded in `METRICS_REPORT_*.json`, and dashboarded. Status: `Built` — verified 2026-06-28 (verifier PASS: 12/12 AC, 7/7 REQ; gate-liveness canary bites, full `tests/ scripts/` suite 1288 green). See `dec-draft-89c07cfc` (finalized to `dec-NNN` at merge-to-main). This is *not* a fifth pipeline feedback loop; it is a new **input** to the already-closed `sentinel → promethean` edge.
+
+Flow:
+
+1. **`/project-metrics`** computes the readiness block and writes `readiness.data.adjusted_level` to the metrics-report JSON root (per `dec-213` — root-embedded, not under `collectors`).
+2. **Sentinel Pass-1 (`RD01`, auto)** invokes the committed detector `scripts/check_readiness_feedback.py --json`, which resolves the latest report by chronological filename sort and parses `readiness.data.adjusted_level` (fallback `readiness.data.level`). When `adjusted_level < 3` it reports `below_threshold: true`; sentinel emits an **Important** finding (annotated when `readiness.data.note == "mechanical-only"`, since a mechanical-only level is a floor a full LLM run may raise).
+3. **Existing `sentinel → promethean` edge** carries the finding: promethean reads the latest `SENTINEL_LOG` row plus Critical/Important findings, so a below-floor readiness level now informs ideation. The closure is **transitive** — no `promethean → readiness` direct wire exists.
+
+Contract notes: `RD01` emits a **report finding only** — it writes no `td-NNN` row, so the four-writer tech-debt ledger contract (verifier, sentinel, orchestrator, architect-validator) is unchanged; sentinel exercises only its finding-emission role (identical to `dec-252`'s CA03/SH08). The detector is a CODE gate with a gate-liveness canary + no-false-positive control + a sentinel golden bad-case fixture (`tests/fixtures/sentinel/readiness_below_threshold/`).
+
+**Eval half — deliberately human-gated (not a gap).** The sibling `/eval-praxion` results loop is *consciously* left human-mediated: eval is an out-of-band quality instrument (`dec-204`) whose FAILs frequently reflect corpus/calibration limits, and "recurring FAIL" is unmeasurable on a single-run history. The deliberate human-gating is recorded in `commands/eval-praxion.md` with a reversal trigger — a future reader should treat the absent eval→pipeline edge as an intentional decision, revisited only once a multi-run history makes recurrence measurable.
+
 ## 6. Dependencies
 
 <!-- OWNER: systems-architect (initial), implementer (as-built) | LAST UPDATED: 2026-04-12 by systems-architect -->

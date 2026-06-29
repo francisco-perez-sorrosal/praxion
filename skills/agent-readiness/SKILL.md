@@ -35,7 +35,8 @@ through `/project-metrics`, writing its results into the `readiness` block of
 The readiness engine is a `ReadinessCollector` embedded in the metrics runner.
 It always resolves as `Available` (pure filesystem reads) and always runs by
 default. The `readiness` block appears at the root of `METRICS_REPORT_*.json`
-under `collectors.readiness.data`.
+under `readiness.data` — the readiness block sits at the metrics-report JSON
+root, not nested under a `collectors` key.
 
 ### Invocation patterns
 

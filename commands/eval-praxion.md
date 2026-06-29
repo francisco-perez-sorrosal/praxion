@@ -121,3 +121,32 @@ If any check emits FAIL, surface the check name, the artifact path, and the verd
 - LLM judge calls cost real API credits (or subscription quota). The report header shows estimated cost per run. Use `--mechanical-only` to bound cost to zero when only the structural surface matters.
 - The PASS-only family-2 corpus available at v1 limits calibration for false-negative detection; the `## Calibration Notes` section in every report records this gap explicitly.
 - This command is the single eval entrypoint. The retired `/eval` Tier 1 surface has been folded into Family 1's mechanical artifact-manifest check — invoke via `--task-slug <slug>` to reproduce the old behavior; combine with `--mechanical-only` to keep it free.
+
+## Eval Results Are Human-Gated by Design
+
+`/eval-praxion` FAILs are **not** automatically routed to the tech-debt ledger or to
+promethean for ideation. This is a **deliberate design choice**, not an oversight.
+
+Three grounded reasons:
+
+1. **"Recurring FAIL" is unmeasurable on a single-run history.** The tech-debt ledger
+   and the sentinel → promethean feedback edge are calibrated to route persistent,
+   structural defects. A single eval run cannot distinguish a stable recurring failure
+   from a transient corpus gap. Routing on a sample of one produces noise, not signal.
+
+2. **Sentinel does not read eval reports.** Wiring sentinel to consume
+   `.ai-state/praxion_eval_reports/` would create a new reader–writer surface with
+   its own freshness and format-drift risks. Eval is already a separate quality layer;
+   forcing it through sentinel's feedback pipeline conflates two independent concerns.
+
+3. **Eval is out-of-band by design; its FAILs are frequently expected.** Eval FAILs
+   are a normal outcome of corpus gaps, calibration limits, and in-progress pipeline
+   work. Treating every FAIL as a routable defect would flood the feedback edge with
+   expected findings and dilute the signal that actually warrants ideation.
+
+**Reversal trigger:** If a multi-run history (`PRAXION_EVAL_LOG.md` accumulates ≥ 5
+runs) establishes a stable FAIL-recurrence metric for a specific check — the same
+check FAIL appearing in ≥ 3 consecutive runs — revisit routing those recurring FAILs
+through the `sentinel → promethean` edge, using the same closed-loop template applied
+to readiness (sentinel RD01). The evidence threshold is a stable pattern, not a
+single occurrence.

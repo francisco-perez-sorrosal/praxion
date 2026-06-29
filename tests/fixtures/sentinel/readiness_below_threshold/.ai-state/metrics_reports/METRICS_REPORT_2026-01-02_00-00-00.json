@@ -1,0 +1,10 @@
+{
+  "readiness": {
+    "data": {
+      "adjusted_level": 2,
+      "level": 2,
+      "note": "mechanical-only"
+    }
+  },
+  "status": "ok"
+}

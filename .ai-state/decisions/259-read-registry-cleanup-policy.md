@@ -1,5 +1,5 @@
 ---
-id: dec-draft-1def3b96
+id: dec-259
 title: clean_work_safety reads the registry's cleanup_policy as the file→severity-class source
 status: re-affirmation
 category: architectural

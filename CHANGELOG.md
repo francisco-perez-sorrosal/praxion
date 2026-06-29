@@ -1,3 +1,23 @@
+## v0.12.0 (2026-06-29)
+
+### Feat
+
+- auto-regen committed doc_manifest in the finalize chain (R12b)
+- exclude volatile .ai-work from committed doc_manifest (R12b)
+- give P06 a mechanical CODE-kind gate-liveness checker (EA-06)
+- separate done vs in-flight slugs in dashboard workshops view (R9-dash)
+- add RD01 readiness-feedback gate + document eval human-gating (R8)
+
+### Fix
+
+- build_doc_manifest excludes dirs by path relative to root
+- content-gate the program.md ML-detection signal (R19b)
+- make datetime.UTC usage portable to Python 3.9 (EA-10)
+
+### Refactor
+
+- clean_work_safety reads registry cleanup_policy (EA-11)
+
 ## v0.11.3 (2026-06-27)
 
 ### Feat

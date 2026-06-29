@@ -177,3 +177,71 @@ def test_generated_yaml_round_trips(spec_project: Path) -> None:
     dumped = yaml.safe_dump(manifest, sort_keys=False)
     reloaded = yaml.safe_load(dumped)
     assert reloaded["groups"] == manifest["groups"]
+
+
+# ---------------------------------------------------------------------------
+# New behavioral tests: .ai-work/ exclusion + content-aware write
+# ---------------------------------------------------------------------------
+
+
+def test_excludes_ai_work_surfaces(tmp_path: Path) -> None:
+    """build_manifest emits zero surfaces under .ai-work/ and no transient group."""
+    (tmp_path / ".ai-work" / "slug1").mkdir(parents=True)
+    (tmp_path / ".ai-work" / "slug1" / "WIP.md").write_text("# WIP\n")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "x.md").write_text("# Doc X\n")
+
+    manifest = bdm.build_manifest(tmp_path)
+
+    ai_work_surfaces = [s for s in manifest["surfaces"] if s["path"].startswith(".ai-work/")]
+    assert ai_work_surfaces == [], f"unexpected .ai-work/ surfaces: {ai_work_surfaces}"
+
+    transient_groups = [g for g in manifest["groups"] if g.get("transient")]
+    assert transient_groups == [], f"unexpected transient groups: {transient_groups}"
+
+
+def test_content_aware_write_skips_when_unchanged(tmp_path: Path) -> None:
+    """Second write is skipped when durable surfaces are unchanged."""
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "x.md").write_text("# Doc X\n")
+
+    # First write — creates the manifest
+    assert bdm.main(["--root", str(tmp_path)]) == 0
+    manifest_path = tmp_path / ".ai-state" / "doc_manifest.yaml"
+    assert manifest_path.is_file()
+    first_bytes = manifest_path.read_bytes()
+    first_mtime = manifest_path.stat().st_mtime
+
+    # Second write — content unchanged; write must be skipped
+    assert bdm.main(["--root", str(tmp_path)]) == 0
+    assert manifest_path.read_bytes() == first_bytes, "write was not skipped: file bytes changed"
+    assert manifest_path.stat().st_mtime == first_mtime, "write was not skipped: mtime changed"
+
+    # Mutate a durable surface — write must now fire
+    (tmp_path / "docs" / "y.md").write_text("# Doc Y\n")
+    assert bdm.main(["--root", str(tmp_path)]) == 0
+    assert (
+        manifest_path.read_bytes() != first_bytes
+    ), "write did not fire after durable surface changed"
+
+
+def test_durable_surfaces_preserved_with_and_without_ai_work(tmp_path: Path) -> None:
+    """Durable surface set is identical whether or not .ai-work/ is present."""
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "guide.md").write_text("# Guide\n")
+
+    manifest_without = bdm.build_manifest(tmp_path)
+    durable_without = {s["path"] for s in manifest_without["surfaces"]}
+
+    # Add a .ai-work/ tree — must not alter the durable surface set
+    (tmp_path / ".ai-work" / "my-task").mkdir(parents=True)
+    (tmp_path / ".ai-work" / "my-task" / "WIP.md").write_text("# WIP\n")
+    (tmp_path / ".ai-work" / "my-task" / "LEARNINGS.md").write_text("# Learnings\n")
+
+    manifest_with = bdm.build_manifest(tmp_path)
+    durable_with = {s["path"] for s in manifest_with["surfaces"]}
+
+    assert durable_with == durable_without, (
+        f"durable set changed when .ai-work/ was added: "
+        f"added={durable_with - durable_without}, removed={durable_without - durable_with}"
+    )

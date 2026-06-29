@@ -7,10 +7,12 @@ manifest the per-project dashboard reads at session start.
 
 The generator is deterministic: given the same filesystem state, it always
 emits identical YAML (modulo `generated_at`). That determinism is what makes a
-regenerate-in-place safe without merge drivers. Regeneration is currently
-**manual** (run this script) — there is no automatic hook; sentinel F11 flags a
-stale manifest (advisory) when `generated_at` predates a later commit touching
-indexed surfaces.
+regenerate-in-place safe without merge drivers. Regeneration is automatic via
+the finalize chain (``finalize_chain.sh``) after each merge to ``main`` — the
+chain calls this script when ``.ai-state/doc_manifest.yaml`` already exists,
+after ``finalize_adrs.py`` and ``finalize_tech_debt_ledger.py`` complete.
+Sentinel F11 flags a stale manifest (advisory) as a belt-and-suspenders
+backstop for hook-bypass or hook-failure cases.
 
 Usage::
 
@@ -36,7 +38,6 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from artifact_registry import dashboard_artifacts_ordered
 
 SCHEMA_VERSION = 2  # v2: dropped on-demandable `summary` + redundant `frontmatter` embeds
 GENERATOR_VERSION = "praxion-0.7.0"
@@ -83,13 +84,6 @@ _AI_STATE_FILES = [
     "LANDSCAPE_WATCHLIST.md",
     "UPSTREAM_ISSUES.md",
 ]
-
-# Pipeline artifacts in .ai-work/<slug>/ (when present), ordered by pipeline flow.
-# Read straight from the canonical registry (the `dashboard` set, in pipeline-flow
-# order) rather than duplicating the list. This is the first consumer that *reads*
-# the registry instead of being drift-checked against it — see dec-251 (the spine)
-# and the Wave-4b detection-gate ADR (the consumer down-payment, EA-11).
-_AI_WORK_FILES = dashboard_artifacts_ordered()
 
 # Renderer mapping by Diátaxis quadrant + type
 _DEFAULT_RENDERERS = {
@@ -392,13 +386,10 @@ def _build_groups(surfaces: list[dict[str, Any]]) -> list[dict[str, Any]]:
         "explanation": [],
         "concepts": [],
     }
-    transient: list[str] = []
     api_reference: list[str] = []
     other: list[str] = []
     for s in surfaces:
-        if s["path"].startswith(".ai-work/"):
-            transient.append(s["id"])
-        elif s.get("renderer") == "api_reference":
+        if s.get("renderer") == "api_reference":
             api_reference.append(s["id"])
         elif s.get("diataxis") in by_quadrant:
             by_quadrant[s["diataxis"]].append(s["id"])
@@ -426,16 +417,18 @@ def _build_groups(surfaces: list[dict[str, Any]]) -> list[dict[str, Any]]:
         )
     if other:
         groups.append({"id": "other", "label": "Other", "surface_ids": sorted(other)})
-    if transient:
-        groups.append(
-            {
-                "id": "pipeline-state",
-                "label": "In-flight pipeline",
-                "surface_ids": sorted(transient),
-                "transient": True,
-            }
-        )
     return groups
+
+
+# ---------------------------------------------------------------------------
+# YAML helpers
+# ---------------------------------------------------------------------------
+
+
+def _strip_generated_at(text: str) -> str:
+    """Erase the `generated_at` timestamp value so two manifests can be compared
+    for content equality independent of when they were generated."""
+    return re.sub(r"^generated_at:.*$", "generated_at:", text, flags=re.MULTILINE)
 
 
 # ---------------------------------------------------------------------------
@@ -498,19 +491,6 @@ def build_manifest(root: Path) -> dict[str, Any]:
             entry = _build_surface(root, rel)
             if entry:
                 surfaces.append(entry)
-
-    # .ai-work/<active-slug>/ — for each subdirectory, emit the canonical
-    # pipeline artifacts that exist
-    ai_work = root / ".ai-work"
-    if ai_work.is_dir():
-        for slug_dir in sorted(p for p in ai_work.iterdir() if p.is_dir()):
-            for name in _AI_WORK_FILES:
-                file = slug_dir / name
-                if file.is_file():
-                    rel = file.relative_to(root)
-                    entry = _build_surface(root, rel)
-                    if entry:
-                        surfaces.append(entry)
 
     # API-spec surfaces (OpenAPI / AsyncAPI / GraphQL SDL) in bounded locations
     existing_paths = {s["path"] for s in surfaces}
@@ -575,9 +555,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         # Compare excluding the `generated_at` timestamp (which always drifts)
         old_text = output.read_text()
-        old_no_ts = re.sub(r"^generated_at:.*$", "generated_at:", old_text, flags=re.MULTILINE)
-        new_no_ts = re.sub(r"^generated_at:.*$", "generated_at:", new_yaml, flags=re.MULTILINE)
-        if old_no_ts != new_no_ts:
+        if _strip_generated_at(old_text) != _strip_generated_at(new_yaml):
             print(
                 f"FAIL: {output} is out of sync (run scripts/build_doc_manifest.py)",
                 file=sys.stderr,
@@ -587,6 +565,13 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     output.parent.mkdir(parents=True, exist_ok=True)
+    # Content-aware write: skip when the new manifest equals the existing one
+    # modulo `generated_at`, so a no-op regen produces no diff and no churn.
+    if output.is_file() and _strip_generated_at(output.read_text()) == _strip_generated_at(
+        new_yaml
+    ):
+        print(f"{output} unchanged — skipping write")
+        return 0
     output.write_text(new_yaml)
     print(
         f"Wrote {output} — {len(new_manifest['surfaces'])} surfaces, {len(new_manifest['groups'])} groups"

@@ -1,19 +1,17 @@
 """Drift gate for the canonical artifact registry (scripts/artifact_registry.py).
 
-The four hard-coded `.ai-work/<slug>/` artifact lists must agree with the
+The three hard-coded `.ai-work/<slug>/` artifact lists must agree with the
 registry's projection for their consumer. This test is that gate.
 
 Gate-liveness contract: a gate must be proven to bite on a known-bad input, not
 merely pass on the current good state. The canaries below feed synthetic drifted
 consumer text (a stale `SKILL_GENESIS_REPORT.md`; a dropped required artifact)
 and assert the comparison the live tests make would FAIL — so a future edit that
-re-introduces drift in any of the four consumers turns this suite red.
+re-introduces drift in any of the three consumers turns this suite red.
 
 The dashboard, precompact hook, and eval consumers are parsed from source text
 (no imports), so the gate works uniformly across the hook, the eval package, and
-the TypeScript dashboard module. build_doc_manifest is the exception: since R18 it
-*imports* the registry, so it is verified by reading its effective list rather
-than parsing a literal that no longer exists.
+the TypeScript dashboard module.
 """
 
 from __future__ import annotations
@@ -39,25 +37,6 @@ def _load_registry() -> Any:
 
 
 registry = _load_registry()
-
-
-def _load_build_doc_manifest() -> Any:
-    """Load build_doc_manifest.py — which imports the registry (R18) — by path.
-
-    Runs after `_load_registry` so its `from artifact_registry import ...` resolves
-    to the already-loaded module in sys.modules.
-    """
-    path = Path(__file__).resolve().parent / "build_doc_manifest.py"
-    spec = importlib.util.spec_from_file_location("build_doc_manifest", path)
-    assert spec is not None
-    assert spec.loader is not None
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-bdm = _load_build_doc_manifest()
 
 
 # -- Source extraction --------------------------------------------------------
@@ -91,12 +70,6 @@ def _read(rel: str) -> str:
     return (_REPO_ROOT / rel).read_text(encoding="utf-8")
 
 
-def _build_doc_manifest_ai_work() -> set[str]:
-    # build_doc_manifest now *imports* the registry (R18); read its effective list
-    # rather than parsing a literal that no longer exists in source.
-    return set(bdm._AI_WORK_FILES)
-
-
 def _dashboard_workshop() -> set[str]:
     text = _read("dashboard_app/src/server/artifacts/files.ts")
     return _filenames(_bracketed_block(text, "CANONICAL_WORKSHOP_ARTIFACTS: string[] =", "[", "]"))
@@ -122,23 +95,8 @@ def _eval_standard_conditional() -> set[str]:
 # -- Live drift assertions ----------------------------------------------------
 
 
-def test_build_doc_manifest_matches_registry_dashboard_set() -> None:
-    assert _build_doc_manifest_ai_work() == registry.dashboard_artifacts()
-
-
-def test_build_doc_manifest_reads_registry_in_flow_order() -> None:
-    # R18: build_doc_manifest imports dashboard_artifacts_ordered(); the manifest
-    # relies on pipeline-flow order, so the list (not just the set) must match.
-    assert bdm._AI_WORK_FILES == registry.dashboard_artifacts_ordered()
-
-
 def test_dashboard_workshop_matches_registry_dashboard_set() -> None:
     assert _dashboard_workshop() == registry.dashboard_artifacts()
-
-
-def test_doc_manifest_and_dashboard_agree() -> None:
-    # The two render surfaces must list exactly the same discoverable set.
-    assert _build_doc_manifest_ai_work() == _dashboard_workshop()
 
 
 def test_precompact_matches_registry_snapshot_set() -> None:
@@ -158,7 +116,6 @@ def test_every_consumer_filename_is_registered() -> None:
     # dead SKILL_GENESIS_REPORT.md class of drift in either direction.
     known = registry.all_names()
     for label, names in (
-        ("build_doc_manifest", _build_doc_manifest_ai_work()),
         ("dashboard", _dashboard_workshop()),
         ("precompact", _precompact_pipeline_docs()),
         ("eval-required", _eval_standard_required()),

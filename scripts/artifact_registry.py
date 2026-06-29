@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Canonical registry of Praxion pipeline artifacts — the single source of truth.
 
-Four hard-coded `.ai-work/<slug>/` artifact lists historically drifted apart:
-the documentation manifest (`scripts/build_doc_manifest.py`), the dashboard's
-workshop discovery (`dashboard_app/src/server/artifacts/files.ts`), the eval
-task manifest (`eval/src/praxion_evals/harness/task_manifest.py`), and the
+Three hard-coded `.ai-work/<slug>/` artifact lists historically drifted apart:
+the dashboard's workshop discovery (`dashboard_app/src/server/artifacts/files.ts`),
+the eval task manifest (`eval/src/praxion_evals/harness/task_manifest.py`), and the
 compaction snapshot hook (`hooks/precompact_state.py`). Each lists a *different*
 subset for a *different* purpose, so they cannot share one structure — but they
 must agree on the underlying artifact set.
@@ -18,8 +17,8 @@ artifact is a one-line change) is a clean future step.
 
 Per-consumer membership is expressed as flags on each `Artifact`:
 
-- ``dashboard`` — listed by `build_doc_manifest._AI_WORK_FILES` AND the
-  dashboard's `CANONICAL_WORKSHOP_ARTIFACTS` (the renderable/discoverable set).
+- ``dashboard`` — listed by the dashboard's `CANONICAL_WORKSHOP_ARTIFACTS`
+  in `files.ts` (the renderable/discoverable set).
 - ``snapshot`` — captured by the precompact hook's `PIPELINE_DOCS` (the
   post-compaction orientation set).
 - ``eval_tier`` / ``eval_required`` — the eval task manifest's expected
@@ -27,7 +26,7 @@ Per-consumer membership is expressed as flags on each `Artifact`:
 
 Specialty artifacts (roadmap, ML, rework-worktree) are registered for
 completeness with no consumer flags — documented, but not enforced into the
-four core pipeline consumers.
+three core pipeline consumers.
 """
 
 from __future__ import annotations
@@ -78,7 +77,7 @@ class Artifact:
     location: str  # ai-work | ai-work-root | ai-state | docs
     lifecycle: str  # ephemeral | session-persistent | permanent
     activation: str  # always | conditional | specialist | roadmap | ml | rework
-    dashboard: bool = False  # build_doc_manifest._AI_WORK_FILES + files.ts
+    dashboard: bool = False  # dashboard CANONICAL_WORKSHOP_ARTIFACTS (files.ts)
     snapshot: bool = False  # precompact PIPELINE_DOCS
     eval_tier: str | None = None  # standard | full
     eval_required: bool = False  # always-required deliverable at eval_tier
@@ -377,15 +376,6 @@ ARTIFACTS: tuple[Artifact, ...] = (
 def dashboard_artifacts() -> set[str]:
     """Filenames the doc manifest + dashboard workshop discovery must list."""
     return {a.name for a in ARTIFACTS if a.dashboard}
-
-
-def dashboard_artifacts_ordered() -> list[str]:
-    """`dashboard_artifacts` in pipeline-flow (declaration) order.
-
-    The doc manifest lists `.ai-work` artifacts in flow order; `build_doc_manifest`
-    imports this rather than duplicating the list (the first registry *reader*).
-    """
-    return [a.name for a in ARTIFACTS if a.dashboard]
 
 
 def snapshot_artifacts() -> set[str]:

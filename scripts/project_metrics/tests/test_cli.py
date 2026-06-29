@@ -53,7 +53,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Test-data builders -- construct a minimal but complete Report that the
 # CLI's orchestration layer can feed through without touching real collectors.
@@ -217,18 +216,17 @@ def _install_cli_mocks(
             stderr="fatal: not a git repository",
         )
 
-    # datetime mocking -- CLI is expected to call datetime.now(UTC).strftime(...)
+    # datetime mocking -- CLI is expected to call datetime.now(timezone.utc).strftime(...)
     # or similar. MagicMock chains let any call path return our pinned value.
     now_mock = MagicMock(name="datetime.now")
     now_mock.strftime.return_value = report_timestamp
-    # Both .now(...) and .now(UTC) should return now_mock so any call pattern works.
+    # Both .now(...) and .now(timezone.utc) should return now_mock so any call path works.
     mocks.datetime_module.now.return_value = now_mock
-    # Preserve UTC symbol so "datetime.UTC" lookups work.
-    mocks.datetime_module.UTC = MagicMock(name="UTC")
-    # Some impls do `from datetime import datetime, UTC` then
-    # `datetime.now(UTC).strftime(...)`. In that import pattern, the mock
+    # The CLI uses `from datetime import datetime, timezone` then
+    # `datetime.now(timezone.utc).strftime(...)`. In that import pattern, the mock
     # target is scripts.project_metrics.cli.datetime (the class), and
     # .now(...).strftime(...) resolves through the same chain above.
+    # `timezone` is imported separately and resolves to the real constant -- no mock needed.
 
     # Patchers are built but not started -- caller uses ExitStack.
     # Each patcher covers one module-level import point in cli.py.
@@ -346,21 +344,20 @@ class TestCliArgParsing:
             for p in patchers:
                 p.stop()
 
-        assert exit_code == 0, (
-            "No-arg invocation must succeed using defaults (90/10); "
-            f"got exit {exit_code}."
-        )
+        assert (
+            exit_code == 0
+        ), f"No-arg invocation must succeed using defaults (90/10); got exit {exit_code}."
         # The runner should have been called with defaults.
-        assert mocks.runner_cls.return_value.run.called, (
-            "Runner.run must be invoked on the default path"
-        )
+        assert (
+            mocks.runner_cls.return_value.run.called
+        ), "Runner.run must be invoked on the default path"
         run_kwargs = mocks.runner_cls.return_value.run.call_args.kwargs
-        assert run_kwargs.get("window_days") == 90, (
-            f"Default window_days must be 90; got {run_kwargs.get('window_days')}"
-        )
-        assert run_kwargs.get("top_n") == 10, (
-            f"Default top_n must be 10; got {run_kwargs.get('top_n')}"
-        )
+        assert (
+            run_kwargs.get("window_days") == 90
+        ), f"Default window_days must be 90; got {run_kwargs.get('window_days')}"
+        assert (
+            run_kwargs.get("top_n") == 10
+        ), f"Default top_n must be 10; got {run_kwargs.get('top_n')}"
 
     def test_window_days_zero_is_rejected(self, tmp_path: Path) -> None:
         """window_days must be positive; argparse should reject 0 before I/O."""
@@ -433,16 +430,14 @@ class TestCliArgParsing:
             for p in patchers:
                 p.stop()
 
-        assert excinfo.value.code == 0, (
-            f"--help must exit 0 (argparse convention); got {excinfo.value.code}"
-        )
+        assert (
+            excinfo.value.code == 0
+        ), f"--help must exit 0 (argparse convention); got {excinfo.value.code}"
         captured = capsys.readouterr()
         # Help text is emitted to stdout by argparse; at minimum it names the
         # options documented in the plan.
         combined = captured.out + captured.err
-        assert "--window-days" in combined, (
-            "Help output must mention --window-days flag"
-        )
+        assert "--window-days" in combined, "Help output must mention --window-days flag"
         assert "--top-n" in combined, "Help output must mention --top-n flag"
 
 
@@ -500,10 +495,9 @@ class TestCliNoPartialWrites:
                 p.stop()
 
         after = _snapshot_dir(ai_state)
-        assert after == before, (
-            f"Invalid --top-n must not modify .ai-state/; "
-            f"before={before!r} after={after!r}"
-        )
+        assert (
+            after == before
+        ), f"Invalid --top-n must not modify .ai-state/; before={before!r} after={after!r}"
 
     def test_invalid_args_do_not_invoke_runner(self, tmp_path: Path) -> None:
         """Argparse rejection must short-circuit before the orchestration
@@ -523,12 +517,12 @@ class TestCliNoPartialWrites:
 
         # Runner class MUST NOT have been instantiated; if it was, the CLI
         # called into the orchestration layer despite a rejected arg.
-        assert not mocks.runner_cls.called, (
-            "Runner must not be constructed when argparse rejects input"
-        )
-        assert not mocks.append_log.called, (
-            "append_log must not be invoked when argparse rejects input"
-        )
+        assert (
+            not mocks.runner_cls.called
+        ), "Runner must not be constructed when argparse rejects input"
+        assert (
+            not mocks.append_log.called
+        ), "append_log must not be invoked when argparse rejects input"
 
 
 # ---------------------------------------------------------------------------
@@ -573,9 +567,9 @@ class TestCliHappyPath:
             f"Expected exactly 1 METRICS_REPORT_*.md; found {len(md_files)}: "
             f"{[str(p) for p in md_files]}"
         )
-        assert mocks.append_log.called, (
-            "append_log must be invoked on the happy path (third-file concern)"
-        )
+        assert (
+            mocks.append_log.called
+        ), "append_log must be invoked on the happy path (third-file concern)"
 
     def test_filename_includes_well_formed_timestamp(self, tmp_path: Path) -> None:
         """Filenames match YYYY-MM-DD_HH-MM-SS per the timestamp-formatting rule."""
@@ -588,9 +582,7 @@ class TestCliHappyPath:
         try:
             for p in patchers:
                 p.start()
-            _run_main_with_ai_state_dir(
-                ["--window-days", "90", "--top-n", "10"], ai_state, mocks
-            )
+            _run_main_with_ai_state_dir(["--window-days", "90", "--top-n", "10"], ai_state, mocks)
         finally:
             for p in patchers:
                 p.stop()
@@ -598,9 +590,7 @@ class TestCliHappyPath:
         ts_pattern = re.compile(
             r"^METRICS_REPORT_(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})\.(json|md)$"
         )
-        written = sorted(
-            p.name for p in (ai_state / "metrics_reports").glob("METRICS_REPORT_*")
-        )
+        written = sorted(p.name for p in (ai_state / "metrics_reports").glob("METRICS_REPORT_*"))
         assert len(written) == 2, f"Expected 2 artifact files; got {written}"
         for name in written:
             m = ts_pattern.match(name)
@@ -621,9 +611,7 @@ class TestCliHappyPath:
         try:
             for p in patchers:
                 p.start()
-            _run_main_with_ai_state_dir(
-                ["--window-days", "90", "--top-n", "10"], ai_state, mocks
-            )
+            _run_main_with_ai_state_dir(["--window-days", "90", "--top-n", "10"], ai_state, mocks)
         finally:
             for p in patchers:
                 p.stop()
@@ -631,9 +619,8 @@ class TestCliHappyPath:
         reports_dir = ai_state / "metrics_reports"
         json_files = list(reports_dir.glob("METRICS_REPORT_*.json"))
         md_files = list(reports_dir.glob("METRICS_REPORT_*.md"))
-        assert len(json_files) == 1 and len(md_files) == 1, (
-            "Precondition: one JSON + one MD for the pair contract to hold"
-        )
+        assert len(json_files) == 1, "Precondition: one JSON for the pair contract to hold"
+        assert len(md_files) == 1, "Precondition: one MD for the pair contract to hold"
         json_ts = json_files[0].stem.replace("METRICS_REPORT_", "")
         md_ts = md_files[0].stem.replace("METRICS_REPORT_", "")
         assert json_ts == md_ts, (
@@ -654,9 +641,7 @@ class TestCliHappyPath:
         try:
             for p in patchers:
                 p.start()
-            _run_main_with_ai_state_dir(
-                ["--window-days", "90", "--top-n", "10"], ai_state, mocks
-            )
+            _run_main_with_ai_state_dir(["--window-days", "90", "--top-n", "10"], ai_state, mocks)
         finally:
             for p in patchers:
                 p.stop()
@@ -665,15 +650,13 @@ class TestCliHappyPath:
         # All three expected filenames must appear in stdout; the CLI decides
         # the exact line format, but at minimum the three basenames must be
         # mentioned so a downstream command wrapper can read them.
-        assert "METRICS_REPORT_2026-04-23_18-45-00.json" in out, (
-            f"stdout must mention the JSON filename; got:\n{out!r}"
-        )
-        assert "METRICS_REPORT_2026-04-23_18-45-00.md" in out, (
-            f"stdout must mention the MD filename; got:\n{out!r}"
-        )
-        assert "METRICS_LOG.md" in out, (
-            f"stdout must mention METRICS_LOG.md; got:\n{out!r}"
-        )
+        assert (
+            "METRICS_REPORT_2026-04-23_18-45-00.json" in out
+        ), f"stdout must mention the JSON filename; got:\n{out!r}"
+        assert (
+            "METRICS_REPORT_2026-04-23_18-45-00.md" in out
+        ), f"stdout must mention the MD filename; got:\n{out!r}"
+        assert "METRICS_LOG.md" in out, f"stdout must mention METRICS_LOG.md; got:\n{out!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -707,20 +690,22 @@ class TestCliRepoRootValidation:
             for p in patchers:
                 p.stop()
 
-        assert exit_code not in (0, None), (
-            f"CLI must exit non-zero when not in a git repo; got {exit_code}"
-        )
+        assert exit_code not in (
+            0,
+            None,
+        ), f"CLI must exit non-zero when not in a git repo; got {exit_code}"
         # The error message should be informative enough that a user knows
         # what went wrong. The specific phrasing is a CLI-implementation
         # choice, but "not" + ("git" OR "repo") is a minimal content contract.
         err = capsys.readouterr().err.lower()
-        assert ("git" in err) and ("not" in err or "repo" in err), (
-            f"stderr must mention git and the repo-detection failure; got: {err!r}"
-        )
+        assert "git" in err, f"stderr must mention git; got: {err!r}"
+        assert (
+            "not" in err or "repo" in err
+        ), f"stderr must mention repo-detection failure; got: {err!r}"
         # The Runner must NOT have been invoked if repo validation failed.
-        assert not mocks.runner_cls.called, (
-            "Runner must not be invoked when repo-root validation fails"
-        )
+        assert (
+            not mocks.runner_cls.called
+        ), "Runner must not be invoked when repo-root validation fails"
 
     def test_inside_git_repo_proceeds_to_runner(self, tmp_path: Path) -> None:
         """When git check succeeds, the CLI reaches the orchestration layer."""
@@ -738,15 +723,15 @@ class TestCliRepoRootValidation:
             for p in patchers:
                 p.stop()
 
-        assert exit_code == 0, (
-            f"CLI must proceed and exit 0 when git check succeeds; got {exit_code}"
-        )
-        assert mocks.subprocess_run.called, (
-            "git rev-parse --show-toplevel must be invoked on a valid run"
-        )
-        assert mocks.runner_cls.called, (
-            "Runner must be instantiated after successful repo-root check"
-        )
+        assert (
+            exit_code == 0
+        ), f"CLI must proceed and exit 0 when git check succeeds; got {exit_code}"
+        assert (
+            mocks.subprocess_run.called
+        ), "git rev-parse --show-toplevel must be invoked on a valid run"
+        assert (
+            mocks.runner_cls.called
+        ), "Runner must be instantiated after successful repo-root check"
 
 
 # ---------------------------------------------------------------------------
@@ -760,9 +745,7 @@ class TestCliRepoRootValidation:
 class TestCliOrchestration:
     """The CLI drives its collaborators in the documented sequence."""
 
-    def test_runner_then_compose_then_trends_then_renderers_then_log(
-        self, tmp_path: Path
-    ) -> None:
+    def test_runner_then_compose_then_trends_then_renderers_then_log(self, tmp_path: Path) -> None:
         ai_state = tmp_path / ".ai-state"
         ai_state.mkdir()
 
@@ -770,33 +753,27 @@ class TestCliOrchestration:
         try:
             for p in patchers:
                 p.start()
-            _run_main_with_ai_state_dir(
-                ["--window-days", "90", "--top-n", "10"], ai_state, mocks
-            )
+            _run_main_with_ai_state_dir(["--window-days", "90", "--top-n", "10"], ai_state, mocks)
         finally:
             for p in patchers:
                 p.stop()
 
         # Each collaborator must have been called exactly once on the
         # happy path -- no re-entry, no no-ops.
-        assert mocks.runner_cls.return_value.run.call_count == 1, (
-            "Runner.run must be invoked exactly once per happy-path invocation"
-        )
-        assert mocks.compose_hotspots.call_count == 1, (
-            "compose_hotspots must be invoked exactly once per run"
-        )
-        assert mocks.compute_trends.call_count == 1, (
-            "compute_trends must be invoked exactly once per run"
-        )
-        assert mocks.render_markdown.call_count == 1, (
-            "render_markdown must be invoked exactly once per run"
-        )
-        assert mocks.render_json.call_count == 1, (
-            "render_json must be invoked exactly once per run"
-        )
-        assert mocks.append_log.call_count == 1, (
-            "append_log must be invoked exactly once per run"
-        )
+        assert (
+            mocks.runner_cls.return_value.run.call_count == 1
+        ), "Runner.run must be invoked exactly once per happy-path invocation"
+        assert (
+            mocks.compose_hotspots.call_count == 1
+        ), "compose_hotspots must be invoked exactly once per run"
+        assert (
+            mocks.compute_trends.call_count == 1
+        ), "compute_trends must be invoked exactly once per run"
+        assert (
+            mocks.render_markdown.call_count == 1
+        ), "render_markdown must be invoked exactly once per run"
+        assert mocks.render_json.call_count == 1, "render_json must be invoked exactly once per run"
+        assert mocks.append_log.call_count == 1, "append_log must be invoked exactly once per run"
 
     def test_compose_hotspots_receives_runners_report(self, tmp_path: Path) -> None:
         """compose_hotspots is called with the Report the Runner returned --
@@ -808,9 +785,7 @@ class TestCliOrchestration:
         try:
             for p in patchers:
                 p.start()
-            _run_main_with_ai_state_dir(
-                ["--window-days", "90", "--top-n", "10"], ai_state, mocks
-            )
+            _run_main_with_ai_state_dir(["--window-days", "90", "--top-n", "10"], ai_state, mocks)
         finally:
             for p in patchers:
                 p.stop()
@@ -837,9 +812,7 @@ class TestCliOrchestration:
         try:
             for p in patchers:
                 p.start()
-            _run_main_with_ai_state_dir(
-                ["--window-days", "90", "--top-n", "10"], ai_state, mocks
-            )
+            _run_main_with_ai_state_dir(["--window-days", "90", "--top-n", "10"], ai_state, mocks)
         finally:
             for p in patchers:
                 p.stop()
@@ -877,9 +850,7 @@ class TestCliOrchestration:
         try:
             for p in patchers:
                 p.start()
-            _run_main_with_ai_state_dir(
-                ["--window-days", "90", "--top-n", "10"], ai_state, mocks
-            )
+            _run_main_with_ai_state_dir(["--window-days", "90", "--top-n", "10"], ai_state, mocks)
         finally:
             for p in patchers:
                 p.stop()
@@ -889,20 +860,23 @@ class TestCliOrchestration:
         #   append_log(report, ai_state_dir, report_md_filename) -> None
         # Positional or keyword -- accept both.
         args_and_kwargs = list(call.args) + list(call.kwargs.values())
-        md_filenames = [
-            a for a in args_and_kwargs if isinstance(a, str) and a.endswith(".md")
-        ]
-        assert len(md_filenames) == 1, (
-            f"append_log must receive exactly one .md filename argument; "
-            f"got call_args={call!r}"
-        )
+        md_filenames = [a for a in args_and_kwargs if isinstance(a, str) and a.endswith(".md")]
+        assert (
+            len(md_filenames) == 1
+        ), f"append_log must receive exactly one .md filename argument; got call_args={call!r}"
         md_name = md_filenames[0]
         # The filename passed should be the BASENAME (not a full path) so
         # the log row renders as a relative link, and it should match the
         # MD file actually written.
-        assert "/" not in md_name and "\\" not in md_name, (
-            f"append_log must receive the MD basename, not a full path; got {md_name!r}"
-        )
-        assert md_name.startswith("METRICS_REPORT_") and md_name.endswith(".md"), (
-            f"append_log's MD filename must follow METRICS_REPORT_*.md; got {md_name!r}"
-        )
+        assert (
+            "/" not in md_name
+        ), f"append_log must receive the MD basename, not a full path; got {md_name!r}"
+        assert (
+            "\\" not in md_name
+        ), f"append_log must receive the MD basename, not a full path; got {md_name!r}"
+        assert md_name.startswith(
+            "METRICS_REPORT_"
+        ), f"append_log's MD filename must follow METRICS_REPORT_*.md; got {md_name!r}"
+        assert md_name.endswith(
+            ".md"
+        ), f"append_log's MD filename must follow METRICS_REPORT_*.md; got {md_name!r}"

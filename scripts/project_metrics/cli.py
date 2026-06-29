@@ -39,7 +39,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from scripts.project_metrics.aggregate import compose_aggregate
@@ -110,18 +110,14 @@ def _build_parser() -> argparse.ArgumentParser:
         type=_positive_int,
         default=_DEFAULT_WINDOW_DAYS,
         help=(
-            "Sliding window, in days, for churn-based metrics. "
-            f"Default: {_DEFAULT_WINDOW_DAYS}."
+            f"Sliding window, in days, for churn-based metrics. Default: {_DEFAULT_WINDOW_DAYS}."
         ),
     )
     parser.add_argument(
         "--top-n",
         type=_positive_int,
         default=_DEFAULT_TOP_N,
-        help=(
-            "Number of hotspot files to surface in the top-N block. "
-            f"Default: {_DEFAULT_TOP_N}."
-        ),
+        help=(f"Number of hotspot files to surface in the top-N block. Default: {_DEFAULT_TOP_N}."),
     )
     parser.add_argument(
         "--refresh-coverage",
@@ -195,9 +191,7 @@ def _atomic_write_bytes(path: Path, payload: bytes) -> None:
     """
 
     parent = path.parent
-    fd, tmp_name = tempfile.mkstemp(
-        prefix=path.name + ".", suffix=".tmp", dir=str(parent)
-    )
+    fd, tmp_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=str(parent))
     try:
         with os.fdopen(fd, "wb") as tmp_fh:
             tmp_fh.write(payload)
@@ -265,9 +259,7 @@ def _refresh_coverage_artifact(repo_root: Path) -> None:
         ) from exc
 
     if completed.returncode != 0:
-        raise RuntimeError(
-            f"test-coverage: {target!r} exited with status {completed.returncode}"
-        )
+        raise RuntimeError(f"test-coverage: {target!r} exited with status {completed.returncode}")
 
     artifact = repo_root / _COVERAGE_ARTIFACT_BASENAME
     if not artifact.is_file():
@@ -521,9 +513,7 @@ def _maybe_refresh_coverage(args: argparse.Namespace, repo_root: Path) -> None:
         )
 
 
-def _run_pipeline(
-    args: argparse.Namespace, repo_root: Path, ai_state_dir: Path
-) -> Report:
+def _run_pipeline(args: argparse.Namespace, repo_root: Path, ai_state_dir: Path) -> Report:
     """Execute the read-only metrics pipeline and return the composed report.
 
     ``time.monotonic`` is used (not ``datetime``) so that tests which patch
@@ -744,7 +734,7 @@ def _write_report(report: Report, ai_state_dir: Path) -> None:
     md_text = render_markdown(report)
     json_bytes = render_json(report)
 
-    timestamp = datetime.now(UTC).strftime(_TIMESTAMP_FORMAT)
+    timestamp = datetime.now(timezone.utc).strftime(_TIMESTAMP_FORMAT)
     json_basename = f"{_REPORT_BASENAME_PREFIX}{timestamp}.json"
     md_basename = f"{_REPORT_BASENAME_PREFIX}{timestamp}.md"
     reports_dir = ai_state_dir / _REPORTS_SUBDIR_NAME

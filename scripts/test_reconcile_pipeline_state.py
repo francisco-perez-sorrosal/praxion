@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -371,7 +371,7 @@ def test_test_status_red_when_final_run_fails(tmp_path):
 # guards this contract.
 
 
-_NOW = datetime(2026, 6, 26, 12, 0, 0, tzinfo=UTC)
+_NOW = datetime(2026, 6, 26, 12, 0, 0, tzinfo=timezone.utc)
 _WITHIN_WINDOW_TS = "2026-06-25T12:00:00+00:00"  # 1 day before _NOW
 _OUTSIDE_WINDOW_TS = "2026-06-10T12:00:00+00:00"  # 16 days before _NOW
 

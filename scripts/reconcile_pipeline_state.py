@@ -36,7 +36,7 @@ import json
 import re
 import subprocess
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -424,10 +424,10 @@ def _parse_ts(ts: str) -> datetime:
     try:
         dt = datetime.fromisoformat(ts)
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=UTC)
+            dt = dt.replace(tzinfo=timezone.utc)
         return dt
     except (ValueError, TypeError):
-        return datetime.fromtimestamp(0, UTC)
+        return datetime.fromtimestamp(0, timezone.utc)
 
 
 def _parse_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -464,7 +464,7 @@ def _read_wal(
     and its rows are additionally timestamp-filtered to the same window.
     Malformed timestamps in the segment parse as epoch → outside any window → pruned.
     """
-    now = now or datetime.now(UTC)
+    now = now or datetime.now(timezone.utc)
     cutoff = now - timedelta(days=max_age_days)
 
     active_rows = _parse_jsonl(obs_path)
@@ -472,7 +472,7 @@ def _read_wal(
     seg_path = Path(str(obs_path) + ".1")
     seg_rows: list[dict[str, Any]] = []
     try:
-        seg_mtime = datetime.fromtimestamp(seg_path.stat().st_mtime, UTC)
+        seg_mtime = datetime.fromtimestamp(seg_path.stat().st_mtime, timezone.utc)
         if seg_mtime >= cutoff:
             seg_rows = [
                 r for r in _parse_jsonl(seg_path) if _parse_ts(r.get("timestamp", "")) >= cutoff

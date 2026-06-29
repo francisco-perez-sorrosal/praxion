@@ -31,7 +31,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -530,7 +530,9 @@ def build_manifest(root: Path) -> dict[str, Any]:
     manifest = {
         "schema_version": SCHEMA_VERSION,
         "generator_version": GENERATOR_VERSION,
-        "generated_at": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "generated_at": datetime.now(timezone.utc)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z"),
         "project_name": project_name,
         "project_slug": re.sub(r"[^a-z0-9-]", "-", project_name.lower()).strip("-"),
         "surfaces": surfaces,

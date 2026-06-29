@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -28,7 +28,7 @@ _FIXTURE_ROOT = (
 )
 
 # Fixed "now" used in every test — decouples assertions from wall-clock.
-_NOW = datetime(2026, 6, 26, tzinfo=UTC)
+_NOW = datetime(2026, 6, 26, tzinfo=timezone.utc)
 
 # Thresholds mirroring the script's defaults (kept local to avoid import coupling).
 _N_DAYS = 90

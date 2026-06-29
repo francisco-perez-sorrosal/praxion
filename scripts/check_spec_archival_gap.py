@@ -36,7 +36,7 @@ import json
 import logging
 import re
 import sys
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from _repo_root import is_plugin_cache_path, resolve_repo_root
@@ -68,7 +68,7 @@ logger = logging.getLogger("check_spec_archival_gap")
 def _parse_iso_date(date_str: str) -> datetime | None:
     """Return an aware UTC datetime for an ISO-8601 date string, or None."""
     try:
-        return datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=UTC)
+        return datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     except ValueError:
         return None
 
@@ -149,7 +149,7 @@ def detect_gap(repo_root: Path, now: datetime | None = None) -> dict:
     - ``details`` (str): human-readable summary.
     """
     if now is None:
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
 
     specs_dir = repo_root / ".ai-state" / "specs"
 

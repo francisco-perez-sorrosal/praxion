@@ -267,7 +267,10 @@ def _walk_for_md(root: Path, subdir: str) -> list[Path]:
         return []
     paths: list[Path] = []
     for path in sorted(base.rglob("*.md")):
-        if any(part in _EXCLUDED_DIRS for part in path.parts):
+        # Check parts RELATIVE to root (mirroring _walk_for_api_specs): an
+        # absolute-path check would spuriously exclude every surface when root
+        # itself lives under an excluded dir — e.g. a worktree under .claude/.
+        if any(part in _EXCLUDED_DIRS for part in path.relative_to(root).parts):
             continue
         if "/diagrams/" in str(path) and "/src/" in str(path):
             continue

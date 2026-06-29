@@ -245,3 +245,23 @@ def test_durable_surfaces_preserved_with_and_without_ai_work(tmp_path: Path) -> 
         f"durable set changed when .ai-work/ was added: "
         f"added={durable_with - durable_without}, removed={durable_without - durable_with}"
     )
+
+
+def test_docs_indexed_when_root_lives_under_an_excluded_dir(tmp_path: Path) -> None:
+    """A root nested under an excluded dir (e.g. a worktree under .claude/) must
+    still index its docs.
+
+    Regression: the markdown walk checked the absolute path parts, so a
+    `.claude` component in the root *prefix* spuriously excluded every `docs/`
+    surface — `build_doc_manifest` run from a worktree silently dropped all docs.
+    The check must be relative to root (mirroring the api-spec walk).
+    """
+    root = tmp_path / ".claude" / "worktrees" / "proj"
+    (root / "docs").mkdir(parents=True)
+    (root / "docs" / "guide.md").write_text("# Guide\n", encoding="utf-8")
+
+    manifest = bdm.build_manifest(root)
+    doc_paths = [s["path"] for s in manifest["surfaces"] if s["path"].startswith("docs/")]
+    assert (
+        "docs/guide.md" in doc_paths
+    ), f"docs/ surface excluded when root is under an excluded dir; got {doc_paths}"

@@ -52,7 +52,7 @@ Before any phase runs, gather facts. Pre-flight writes nothing — it produces a
 4b. **ML signal detection.** Probe for ML/AI training signals and set an `ml_signals_detected` flag (used to set Gate 8c's default and skip Phase 8c when absent). Signals:
    - `test -f train.py` OR `test -f prepare.py` → Python training entry point detected
    - `grep -qE 'torch|jax|tensorflow' pyproject.toml requirements.txt setup.py Pipfile 2>/dev/null` → ML framework dependency declared
-   - `test -f program.md` → project-local ML meta-prompt present
+   - `test -f program.md && grep -qiE 'train|checkpoint|epoch|gpu|loss|dataset|ml-training' program.md` → project-local ML meta-prompt present (content-gated: a bare `program.md` with no training vocabulary is **not** an ML signal — the filename is generic enough that mere existence would false-positive on non-ML projects)
    Set `ml_signals_detected=true` if ANY of these succeeds; `ml_signals_detected=false` otherwise. Record in pre-flight report.
 4c. **Diagram-toolchain probes.** Probe both diagram toolchain binaries and record their presence in the pre-flight report. Do NOT block onboarding on missing binaries.
    - `command -v likec4 >/dev/null 2>&1` → record `likec4` present/absent; if present, capture `likec4 --version`
@@ -632,7 +632,7 @@ Phase 9 verification handoff lists every staged file across all phases — Phase
 
 1. `train.py` or `prepare.py` exists at the project root
 2. `pyproject.toml` (or `requirements.txt`, `setup.py`, `Pipfile`) declares `torch`, `jax`, or `tensorflow` as a dependency
-3. `program.md` exists at the project root (recognized ML meta-prompt artifact)
+3. `program.md` exists at the project root **and** contains ML-training vocabulary (`grep -qiE 'train|checkpoint|epoch|gpu|loss|dataset|ml-training' program.md` succeeds) — content-gated so a bare `program.md` with no training content is not an ML signal, and a non-ML project that happens to use that filename is not falsely scaffolded
 
 When none of these signals is detected, skip Phase 8c entirely and emit: `Phase 8c: skipped (no ML training signals detected — train.py, torch/jax/tensorflow dependency, or program.md)`.
 

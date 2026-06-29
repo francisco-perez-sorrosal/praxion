@@ -8,8 +8,8 @@ const METRICS_REPORT_JSON = /^METRICS_REPORT_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d
 const SENTINEL_REPORT = /^SENTINEL_REPORT_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.md$/;
 
 // Source of truth: the `dashboard` set in scripts/artifact_registry.py; drift
-// from the registry (or from build_doc_manifest._AI_WORK_FILES) fails
-// scripts/test_artifact_registry.py. Ordered by pipeline flow.
+// from the registry fails scripts/test_artifact_registry.py. Ordered by
+// pipeline flow.
 export const CANONICAL_WORKSHOP_ARTIFACTS: string[] = [
   "TASK_BRIEF.md",
   "IDEA_PROPOSAL.md",

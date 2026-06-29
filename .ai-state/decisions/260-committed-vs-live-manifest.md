@@ -1,7 +1,7 @@
 ---
-id: dec-draft-97093ff8
+id: dec-260
 title: Split the doc manifest into a committed-static durable index and a live .ai-work/ dimension
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-29
 summary: Exclude volatile .ai-work/ from the committed doc_manifest.yaml (durable surfaces only), add a content-aware write, and wire a finalize-time regen — the live .ai-work/ dimension is owned by the dashboard's runtime workshops discovery, not the committed manifest.

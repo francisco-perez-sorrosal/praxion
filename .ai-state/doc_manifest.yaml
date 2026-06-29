@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-06-27T14:25:44Z'
+generated_at: '2026-06-29T20:57:49Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -33,7 +33,7 @@ surfaces:
   path: README_DEV.md
   type: markdown
   title: Developer Guide
-  last_modified: '2026-06-25'
+  last_modified: '2026-06-29'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-040-eval-framework-out-of-band
@@ -57,7 +57,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-06-25'
+  last_modified: '2026-06-27'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -122,7 +122,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-06-26'
+  last_modified: '2026-06-29'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -376,7 +376,7 @@ surfaces:
   path: docs/independent-analysis/praxion-artifact-process-flow-analysis.md
   type: markdown
   title: Praxion Artifact Process-Flow Analysis
-  last_modified: '2026-06-27'
+  last_modified: '2026-06-29'
   audience: architect / context-engineer / implementation-planner / maintainer
   renderer: default_markdown
 - id: docs-independent-analysis-wave-1-3-external-audit
@@ -472,7 +472,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-06-26'
+  last_modified: '2026-06-29'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -513,7 +513,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-06-27'
+  last_modified: '2026-06-29'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -771,7 +771,7 @@ surfaces:
   path: .ai-state/decisions/040-eval-framework-out-of-band.md
   type: markdown
   title: Eval framework is out-of-band only (/eval command + CI, never hook-driven)
-  last_modified: '2026-05-26'
+  last_modified: '2026-06-29'
   renderer: adr_card
 - id: ai-state-decisions-041-pyright-over-mypy
   path: .ai-state/decisions/041-pyright-over-mypy.md
@@ -2067,13 +2067,37 @@ surfaces:
   path: .ai-state/decisions/256-registry-detection-gate.md
   type: markdown
   title: Split detection from production in the artifact registry and make it a read source-of-truth
-  last_modified: '2026-06-27'
+  last_modified: '2026-06-29'
+  renderer: adr_card
+- id: ai-state-decisions-257-readiness-feedback-gate
+  path: .ai-state/decisions/257-readiness-feedback-gate.md
+  type: markdown
+  title: Close the readiness write-only loop via a sentinel RD check; document eval human-gating as deliberate
+  last_modified: '2026-06-29'
+  renderer: adr_card
+- id: ai-state-decisions-258-chain-eval-form
+  path: .ai-state/decisions/258-chain-eval-form.md
+  type: markdown
+  title: "Criteria\u2192spec chain gate-liveness eval lives in the always-green pytest suite, not the out-of-band eval framework"
+  last_modified: '2026-06-29'
+  renderer: adr_card
+- id: ai-state-decisions-259-read-registry-cleanup-policy
+  path: .ai-state/decisions/259-read-registry-cleanup-policy.md
+  type: markdown
+  title: "clean_work_safety reads the registry's cleanup_policy as the file\u2192severity-class source"
+  last_modified: '2026-06-29'
+  renderer: adr_card
+- id: ai-state-decisions-260-committed-vs-live-manifest
+  path: .ai-state/decisions/260-committed-vs-live-manifest.md
+  type: markdown
+  title: Split the doc manifest into a committed-static durable index and a live .ai-work/ dimension
+  last_modified: '2026-06-29'
   renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-06-27'
+  last_modified: '2026-06-29'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -2299,378 +2323,6 @@ surfaces:
   type: markdown
   title: "SPEC: `/project-metrics` Command \u2014 Project Complexity/Health Metrics"
   last_modified: '2026-05-23'
-  renderer: default_markdown
-- id: ai-work-agent-truncation-recovery-systems-plan
-  path: .ai-work/agent-truncation-recovery/SYSTEMS_PLAN.md
-  type: markdown
-  title: 'Plan: Verifiable Pipeline Step-Completion (truncation-proof artifacts)'
-  last_modified: '2026-06-22'
-  renderer: default_markdown
-- id: ai-work-agent-truncation-recovery-learnings
-  path: .ai-work/agent-truncation-recovery/LEARNINGS.md
-  type: markdown
-  title: "LEARNINGS \u2014 agent-truncation-recovery"
-  last_modified: '2026-06-22'
-  renderer: default_markdown
-- id: ai-work-agent-truncation-recovery-verification-report
-  path: .ai-work/agent-truncation-recovery/VERIFICATION_REPORT.md
-  type: markdown
-  title: "Verification Report \u2014 Verifiable Pipeline Step-Completion (truncation-recovery)"
-  last_modified: '2026-06-22'
-  renderer: verification_report
-- id: ai-work-agent-truncation-recovery-rework-manifest
-  path: .ai-work/agent-truncation-recovery/REWORK_MANIFEST.md
-  type: markdown
-  title: REWORK_MANIFEST.md
-  last_modified: '2026-06-22'
-  renderer: default_markdown
-  surfaces_referenced:
-  - ai-work-agent-truncation-recovery-verification-report
-- id: ai-work-agent-truncation-recovery-progress
-  path: .ai-work/agent-truncation-recovery/PROGRESS.md
-  type: markdown
-  title: PROGRESS.md
-  last_modified: '2026-06-22'
-  renderer: default_markdown
-- id: ai-work-agentic-reliability-integration-context-review
-  path: .ai-work/agentic-reliability-integration/CONTEXT_REVIEW.md
-  type: markdown
-  title: "Context Review \u2014 Agentic Reliability Integration"
-  last_modified: '2026-06-20'
-  renderer: default_markdown
-- id: ai-work-agentic-reliability-integration-systems-plan
-  path: .ai-work/agentic-reliability-integration/SYSTEMS_PLAN.md
-  type: markdown
-  title: 'Integration Design: Blending Agentic-App-Reliability Frontier Practices into Praxion'
-  last_modified: '2026-06-20'
-  renderer: default_markdown
-- id: ai-work-agentic-reliability-integration-verification-report
-  path: .ai-work/agentic-reliability-integration/VERIFICATION_REPORT.md
-  type: markdown
-  title: "Verification Report \u2014 agentic-app-reliability skills build"
-  last_modified: '2026-06-20'
-  renderer: verification_report
-- id: ai-work-agentic-reliability-integration-progress
-  path: .ai-work/agentic-reliability-integration/PROGRESS.md
-  type: markdown
-  title: PROGRESS.md
-  last_modified: '2026-06-20'
-  renderer: default_markdown
-- id: ai-work-api-documentation-progress
-  path: .ai-work/api-documentation/PROGRESS.md
-  type: markdown
-  title: PROGRESS.md
-  last_modified: '2026-06-16'
-  renderer: default_markdown
-- id: ai-work-artifact-flow-analysis-progress
-  path: .ai-work/artifact-flow-analysis/PROGRESS.md
-  type: markdown
-  title: PROGRESS.md
-  last_modified: '2026-06-25'
-  renderer: default_markdown
-- id: ai-work-artifact-memory-cleanup-test-results
-  path: .ai-work/artifact-memory-cleanup/TEST_RESULTS.md
-  type: markdown
-  title: "TEST_RESULTS \u2014 artifact-memory-cleanup"
-  last_modified: '2026-06-25'
-  renderer: default_markdown
-- id: ai-work-artifact-memory-cleanup-verification-report
-  path: .ai-work/artifact-memory-cleanup/VERIFICATION_REPORT.md
-  type: markdown
-  title: "Verification Report \u2014 artifact-memory-cleanup"
-  last_modified: '2026-06-25'
-  renderer: verification_report
-- id: ai-work-artifact-memory-cleanup-progress
-  path: .ai-work/artifact-memory-cleanup/PROGRESS.md
-  type: markdown
-  title: PROGRESS.md
-  last_modified: '2026-06-25'
-  renderer: default_markdown
-- id: ai-work-ci-autofix-research-research-findings
-  path: .ai-work/ci-autofix-research/RESEARCH_FINDINGS.md
-  type: markdown
-  title: "RESEARCH_FINDINGS \u2014 Autonomous CI/PR Failure Remediation + Independent Cursor Review Lens"
-  last_modified: '2026-06-21'
-  renderer: default_markdown
-- id: ai-work-ci-autofix-research-progress
-  path: .ai-work/ci-autofix-research/PROGRESS.md
-  type: markdown
-  title: PROGRESS.md
-  last_modified: '2026-06-20'
-  renderer: default_markdown
-- id: ai-work-finalize-consumer-bugs-verification-report
-  path: .ai-work/finalize-consumer-bugs/VERIFICATION_REPORT.md
-  type: markdown
-  title: "Verification Report \u2014 finalize-consumer-bugs"
-  last_modified: '2026-06-19'
-  renderer: verification_report
-- id: ai-work-finalize-consumer-bugs-progress
-  path: .ai-work/finalize-consumer-bugs/PROGRESS.md
-  type: markdown
-  title: PROGRESS.md
-  last_modified: '2026-06-19'
-  renderer: default_markdown
-- id: ai-work-head-milestone-verify-verification-report
-  path: .ai-work/head-milestone-verify/VERIFICATION_REPORT.md
-  type: markdown
-  title: "Verification Report \u2014 Milestone Quality Pass (HEAD `5675431`)"
-  last_modified: '2026-05-24'
-  renderer: verification_report
-- id: ai-work-head-milestone-verify-progress
-  path: .ai-work/head-milestone-verify/PROGRESS.md
-  type: markdown
-  title: PROGRESS.md
-  last_modified: '2026-05-24'
-  renderer: default_markdown
-- id: ai-work-healthcheck-baseline-research-findings
-  path: .ai-work/healthcheck-baseline/RESEARCH_FINDINGS.md
-  type: markdown
-  title: 'Research Findings: Healthcheck Patterns for Web / MCP / Agent Services'
-  last_modified: '2026-06-20'
-  renderer: default_markdown
-- id: ai-work-healthcheck-baseline-verification-report
-  path: .ai-work/healthcheck-baseline/VERIFICATION_REPORT.md
-  type: markdown
-  title: "Verification Report \u2014 healthcheck-baseline"
-  last_modified: '2026-06-20'
-  renderer: verification_report
-- id: ai-work-healthcheck-baseline-progress
-  path: .ai-work/healthcheck-baseline/PROGRESS.md
-  type: markdown
-  title: PROGRESS.md
-  last_modified: '2026-06-20'
-  renderer: default_markdown
-- id: ai-work-l3-readiness-config-research-findings
-  path: .ai-work/l3-readiness-config/RESEARCH_FINDINGS.md
-  type: markdown
-  title: 'Research Findings: Structured Logging Library Selection (Python + TypeScript/Node.js)'
-  last_modified: '2026-06-20'
-  renderer: default_markdown
-- id: ai-work-l3-readiness-config-systems-plan
-  path: .ai-work/l3-readiness-config/SYSTEMS_PLAN.md
-  type: markdown
-  title: "Plan: L3 Readiness \u2014 Pre-commit Unification, Typecheck, Logging, Dependency-Scanning + Scaffolding"
-  last_modified: '2026-06-20'
-  renderer: default_markdown
-- id: ai-work-l3-readiness-config-implementation-plan
-  path: .ai-work/l3-readiness-config/IMPLEMENTATION_PLAN.md
-  type: markdown
-  title: "Plan: L3 Readiness \u2014 Pre-commit Unification, Typecheck, Logging, Dependency-Scanning + Scaffolding"
-  last_modified: '2026-06-20'
-  renderer: plan_view
-- id: ai-work-l3-readiness-config-wip
-  path: .ai-work/l3-readiness-config/WIP.md
-  type: markdown
-  title: "WIP: L3 Readiness \u2014 Pre-commit Unification, Typecheck, Logging, Dependency-Scanning + Scaffolding"
-  last_modified: '2026-06-20'
-  renderer: default_markdown
-- id: ai-work-l3-readiness-config-learnings
-  path: .ai-work/l3-readiness-config/LEARNINGS.md
-  type: markdown
-  title: "Learnings \u2014 L3 Readiness Config"
-  last_modified: '2026-06-20'
-  renderer: default_markdown
-- id: ai-work-l3-readiness-config-test-baseline
-  path: .ai-work/l3-readiness-config/TEST_BASELINE.md
-  type: markdown
-  title: "Test Baseline \u2014 L3 Readiness Config"
-  last_modified: '2026-06-20'
-  renderer: default_markdown
-- id: ai-work-l3-readiness-config-test-results
-  path: .ai-work/l3-readiness-config/TEST_RESULTS.md
-  type: markdown
-  title: "Test Results \u2014 L3 Readiness Config"
-  last_modified: '2026-06-20'
-  renderer: default_markdown
-- id: ai-work-l3-readiness-config-verification-report
-  path: .ai-work/l3-readiness-config/VERIFICATION_REPORT.md
-  type: markdown
-  title: "Verification Report \u2014 L3 Readiness Config"
-  last_modified: '2026-06-20'
-  renderer: verification_report
-- id: ai-work-l3-readiness-config-progress
-  path: .ai-work/l3-readiness-config/PROGRESS.md
-  type: markdown
-  title: PROGRESS.md
-  last_modified: '2026-06-20'
-  renderer: default_markdown
-- id: ai-work-praxion-competitive-eval-systems-plan
-  path: .ai-work/praxion-competitive-eval/SYSTEMS_PLAN.md
-  type: markdown
-  title: 'Plan: Praxion Competitive-Parity Triage (advisory / baseline-audit)'
-  last_modified: '2026-06-19'
-  renderer: default_markdown
-- id: ai-work-praxion-competitive-eval-progress
-  path: .ai-work/praxion-competitive-eval/PROGRESS.md
-  type: markdown
-  title: PROGRESS.md
-  last_modified: '2026-06-19'
-  renderer: default_markdown
-- id: ai-work-process-governance-study-progress
-  path: .ai-work/process-governance-study/PROGRESS.md
-  type: markdown
-  title: PROGRESS.md
-  last_modified: '2026-06-19'
-  renderer: default_markdown
-- id: ai-work-production-gate-cohort-task-brief
-  path: .ai-work/production-gate-cohort/TASK_BRIEF.md
-  type: markdown
-  title: "TASK_BRIEF \u2014 Wave 3: Production-Gate Cohort + Registry Declarative Spine"
-  last_modified: '2026-06-26'
-  renderer: default_markdown
-- id: ai-work-production-gate-cohort-systems-plan
-  path: .ai-work/production-gate-cohort/SYSTEMS_PLAN.md
-  type: markdown
-  title: "Plan: Wave 3 \u2014 Production-Gate Cohort + Registry Declarative Spine"
-  last_modified: '2026-06-26'
-  renderer: default_markdown
-- id: ai-work-production-gate-cohort-implementation-plan
-  path: .ai-work/production-gate-cohort/IMPLEMENTATION_PLAN.md
-  type: markdown
-  title: "Plan: Wave 3 \u2014 Production-Gate Cohort + Registry Declarative Spine"
-  last_modified: '2026-06-26'
-  renderer: plan_view
-- id: ai-work-production-gate-cohort-wip
-  path: .ai-work/production-gate-cohort/WIP.md
-  type: markdown
-  title: "WIP: Wave 3 \u2014 Production-Gate Cohort + Registry Declarative Spine"
-  last_modified: '2026-06-26'
-  renderer: default_markdown
-- id: ai-work-production-gate-cohort-learnings
-  path: .ai-work/production-gate-cohort/LEARNINGS.md
-  type: markdown
-  title: "LEARNINGS \u2014 Wave 3 Production-Gate Cohort"
-  last_modified: '2026-06-26'
-  renderer: default_markdown
-- id: ai-work-production-gate-cohort-test-baseline
-  path: .ai-work/production-gate-cohort/TEST_BASELINE.md
-  type: markdown
-  title: "TEST_BASELINE \u2014 Wave 3 Production-Gate Cohort"
-  last_modified: '2026-06-26'
-  renderer: default_markdown
-- id: ai-work-production-gate-cohort-test-results
-  path: .ai-work/production-gate-cohort/TEST_RESULTS.md
-  type: markdown
-  title: "Test Results \u2014 Wave 3 Production-Gate Cohort"
-  last_modified: '2026-06-26'
-  renderer: default_markdown
-- id: ai-work-production-gate-cohort-traceability
-  path: .ai-work/production-gate-cohort/traceability.yml
-  type: yaml
-  title: 'Traceability map: REQ IDs to tests and implementation.'
-  last_modified: '2026-06-26'
-  renderer: traceability_matrix
-- id: ai-work-production-gate-cohort-verification-report
-  path: .ai-work/production-gate-cohort/VERIFICATION_REPORT.md
-  type: markdown
-  title: "VERIFICATION REPORT \u2014 Wave 3: Production-Gate Cohort + Registry Declarative Spine"
-  last_modified: '2026-06-26'
-  renderer: verification_report
-- id: ai-work-production-gate-cohort-rework-manifest
-  path: .ai-work/production-gate-cohort/REWORK_MANIFEST.md
-  type: markdown
-  title: "REWORK MANIFEST \u2014 Wave 3: Production-Gate Cohort"
-  last_modified: '2026-06-26'
-  renderer: default_markdown
-  surfaces_referenced:
-  - ai-work-production-gate-cohort-verification-report
-- id: ai-work-production-gate-cohort-progress
-  path: .ai-work/production-gate-cohort/PROGRESS.md
-  type: markdown
-  title: PROGRESS.md
-  last_modified: '2026-06-26'
-  renderer: default_markdown
-- id: ai-work-skills-coherence-pass-learnings
-  path: .ai-work/skills-coherence-pass/LEARNINGS.md
-  type: markdown
-  title: "Skills Coherence Pass \u2014 LEARNINGS"
-  last_modified: '2026-05-25'
-  renderer: default_markdown
-- id: ai-work-skills-conformance-learnings
-  path: .ai-work/skills-conformance/LEARNINGS.md
-  type: markdown
-  title: "LEARNINGS \u2014 skills-conformance pipeline"
-  last_modified: '2026-05-25'
-  renderer: default_markdown
-- id: ai-work-skills-conformance-progress
-  path: .ai-work/skills-conformance/PROGRESS.md
-  type: markdown
-  title: PROGRESS.md
-  last_modified: '2026-05-25'
-  renderer: default_markdown
-- id: ai-work-task-intake-disambiguation-research-findings
-  path: .ai-work/task-intake-disambiguation/RESEARCH_FINDINGS.md
-  type: markdown
-  title: "Task Intake & Goal Disambiguation \u2014 Consolidated Findings + Design Proposal"
-  last_modified: '2026-06-18'
-  renderer: default_markdown
-- id: ai-work-task-intake-disambiguation-progress
-  path: .ai-work/task-intake-disambiguation/PROGRESS.md
-  type: markdown
-  title: PROGRESS.md
-  last_modified: '2026-06-18'
-  renderer: default_markdown
-- id: ai-work-wal-bound-brief-floor-task-brief
-  path: .ai-work/wal-bound-brief-floor/TASK_BRIEF.md
-  type: markdown
-  title: "TASK_BRIEF \u2014 Wave 2 Criticals (WAL bounding + TASK_BRIEF floor)"
-  last_modified: '2026-06-26'
-  renderer: default_markdown
-- id: ai-work-wal-bound-brief-floor-systems-plan
-  path: .ai-work/wal-bound-brief-floor/SYSTEMS_PLAN.md
-  type: markdown
-  title: "Plan: Wave 2 Criticals \u2014 Bound the recovery WAL (R1) + raise the TASK_BRIEF floor (R2)"
-  last_modified: '2026-06-26'
-  renderer: default_markdown
-- id: ai-work-wal-bound-brief-floor-implementation-plan
-  path: .ai-work/wal-bound-brief-floor/IMPLEMENTATION_PLAN.md
-  type: markdown
-  title: "Plan: Wave 2 Criticals \u2014 Bound the recovery WAL (R1) + raise the TASK_BRIEF floor (R2)"
-  last_modified: '2026-06-26'
-  renderer: plan_view
-- id: ai-work-wal-bound-brief-floor-wip
-  path: .ai-work/wal-bound-brief-floor/WIP.md
-  type: markdown
-  title: "WIP: Wave 2 Criticals \u2014 WAL bounding (R1) + TASK_BRIEF floor (R2)"
-  last_modified: '2026-06-26'
-  renderer: default_markdown
-- id: ai-work-wal-bound-brief-floor-learnings
-  path: .ai-work/wal-bound-brief-floor/LEARNINGS.md
-  type: markdown
-  title: "LEARNINGS \u2014 wal-bound-brief-floor (Wave 2 Criticals)"
-  last_modified: '2026-06-26'
-  renderer: default_markdown
-- id: ai-work-wal-bound-brief-floor-test-baseline
-  path: .ai-work/wal-bound-brief-floor/TEST_BASELINE.md
-  type: markdown
-  title: "TEST_BASELINE \u2014 wal-bound-brief-floor"
-  last_modified: '2026-06-26'
-  renderer: default_markdown
-- id: ai-work-wal-bound-brief-floor-test-results
-  path: .ai-work/wal-bound-brief-floor/TEST_RESULTS.md
-  type: markdown
-  title: 'Test Results: wal-bound-brief-floor'
-  last_modified: '2026-06-26'
-  renderer: default_markdown
-- id: ai-work-wal-bound-brief-floor-verification-report
-  path: .ai-work/wal-bound-brief-floor/VERIFICATION_REPORT.md
-  type: markdown
-  title: "Verification Report \u2014 Wave 2 Criticals (WAL bounding R1 + TASK_BRIEF floor R2)"
-  last_modified: '2026-06-26'
-  renderer: verification_report
-- id: ai-work-wal-bound-brief-floor-rework-manifest
-  path: .ai-work/wal-bound-brief-floor/REWORK_MANIFEST.md
-  type: markdown
-  title: "Rework Manifest \u2014 wal-bound-brief-floor"
-  last_modified: '2026-06-26'
-  renderer: default_markdown
-  surfaces_referenced:
-  - ai-work-wal-bound-brief-floor-verification-report
-- id: ai-work-wal-bound-brief-floor-progress
-  path: .ai-work/wal-bound-brief-floor/PROGRESS.md
-  type: markdown
-  title: PROGRESS.md
-  last_modified: '2026-06-26'
   renderer: default_markdown
 groups:
 - id: tutorial
@@ -2973,6 +2625,10 @@ groups:
   - ai-state-decisions-254-report-retention
   - ai-state-decisions-255-single-living-idea-ledger
   - ai-state-decisions-256-registry-detection-gate
+  - ai-state-decisions-257-readiness-feedback-gate
+  - ai-state-decisions-258-chain-eval-form
+  - ai-state-decisions-259-read-registry-cleanup-policy
+  - ai-state-decisions-260-committed-vs-live-manifest
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -3034,68 +2690,3 @@ groups:
   - docs-rework-dispatch
   - readme
   - readme-dev
-- id: pipeline-state
-  label: In-flight pipeline
-  surface_ids:
-  - ai-work-agent-truncation-recovery-learnings
-  - ai-work-agent-truncation-recovery-progress
-  - ai-work-agent-truncation-recovery-rework-manifest
-  - ai-work-agent-truncation-recovery-systems-plan
-  - ai-work-agent-truncation-recovery-verification-report
-  - ai-work-agentic-reliability-integration-context-review
-  - ai-work-agentic-reliability-integration-progress
-  - ai-work-agentic-reliability-integration-systems-plan
-  - ai-work-agentic-reliability-integration-verification-report
-  - ai-work-api-documentation-progress
-  - ai-work-artifact-flow-analysis-progress
-  - ai-work-artifact-memory-cleanup-progress
-  - ai-work-artifact-memory-cleanup-test-results
-  - ai-work-artifact-memory-cleanup-verification-report
-  - ai-work-ci-autofix-research-progress
-  - ai-work-ci-autofix-research-research-findings
-  - ai-work-finalize-consumer-bugs-progress
-  - ai-work-finalize-consumer-bugs-verification-report
-  - ai-work-head-milestone-verify-progress
-  - ai-work-head-milestone-verify-verification-report
-  - ai-work-healthcheck-baseline-progress
-  - ai-work-healthcheck-baseline-research-findings
-  - ai-work-healthcheck-baseline-verification-report
-  - ai-work-l3-readiness-config-implementation-plan
-  - ai-work-l3-readiness-config-learnings
-  - ai-work-l3-readiness-config-progress
-  - ai-work-l3-readiness-config-research-findings
-  - ai-work-l3-readiness-config-systems-plan
-  - ai-work-l3-readiness-config-test-baseline
-  - ai-work-l3-readiness-config-test-results
-  - ai-work-l3-readiness-config-verification-report
-  - ai-work-l3-readiness-config-wip
-  - ai-work-praxion-competitive-eval-progress
-  - ai-work-praxion-competitive-eval-systems-plan
-  - ai-work-process-governance-study-progress
-  - ai-work-production-gate-cohort-implementation-plan
-  - ai-work-production-gate-cohort-learnings
-  - ai-work-production-gate-cohort-progress
-  - ai-work-production-gate-cohort-rework-manifest
-  - ai-work-production-gate-cohort-systems-plan
-  - ai-work-production-gate-cohort-task-brief
-  - ai-work-production-gate-cohort-test-baseline
-  - ai-work-production-gate-cohort-test-results
-  - ai-work-production-gate-cohort-traceability
-  - ai-work-production-gate-cohort-verification-report
-  - ai-work-production-gate-cohort-wip
-  - ai-work-skills-coherence-pass-learnings
-  - ai-work-skills-conformance-learnings
-  - ai-work-skills-conformance-progress
-  - ai-work-task-intake-disambiguation-progress
-  - ai-work-task-intake-disambiguation-research-findings
-  - ai-work-wal-bound-brief-floor-implementation-plan
-  - ai-work-wal-bound-brief-floor-learnings
-  - ai-work-wal-bound-brief-floor-progress
-  - ai-work-wal-bound-brief-floor-rework-manifest
-  - ai-work-wal-bound-brief-floor-systems-plan
-  - ai-work-wal-bound-brief-floor-task-brief
-  - ai-work-wal-bound-brief-floor-test-baseline
-  - ai-work-wal-bound-brief-floor-test-results
-  - ai-work-wal-bound-brief-floor-verification-report
-  - ai-work-wal-bound-brief-floor-wip
-  transient: true

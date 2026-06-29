@@ -84,7 +84,7 @@ scattered across rules and prompts.
 | **3.5 — Audit remediation** | Independent external audit of Waves 1–3 (`wave-1-3-external-audit.md`); re-verify each finding on disk, fix the confirmed blockers | EA-01, EA-03, EA-04 (5 of 12 findings refuted or by-design; rest → Wave 4/5) | ✅ **Done** (2026-06-26) |
 | **4a — Waste pruning** | `doc_manifest` strip (484KB→163KB), `token_budgeting` retirement, retain-last-N report pruning, single living idea-ledger | R7, R11, R12, R17 | ✅ **Done** (2026-06-27) |
 | **4b — Registry & dead seams** | `detection_gate` split (EA-02, dec-256), `build_doc_manifest` reads the registry (R18/EA-11 partial), R12b honesty fix (regen-hook deferred), dead-seam ledger row td-044 | R15, R18, EA-02, EA-11 | ✅ **Done** (2026-06-27) |
-| 4c — Feedback & tail | readiness/eval feedback, P06 checker, id-citation dogfood asymmetry, hook `datetime.UTC` portability, `program.md` ML signal, R9-dashboard completion-state | R8, R19, EA-06, EA-09, EA-10, R9-dash | planned |
+| 4c — Feedback & tail | readiness/eval feedback, P06 checker, id-citation dogfood asymmetry, hook `datetime.UTC` portability, `program.md` ML signal, R9-dashboard completion-state | R8, R19, EA-06, EA-09, EA-10, R9-dash | ▶ **R8 ✅** (2026-06-28); rest planned |
 | 5 — Capstone | integration eval over the criteria→spec path | R10 | planned |
 
 **Wave 1 — landed 2026-06-26:**
@@ -138,7 +138,14 @@ scattered across rules and prompts.
 - ✅ **R15** — filed **td-044** for the `project_profile.yaml` / `eval_ledger/` dead seam (designed schemas, no onboarding producer), so it stays visible.
 - Full suite **1572 green**; one architectural fork (the `detection_gate` schema) surfaced to the user before implementing.
 
-**Remaining Wave 4:** **4c** — Feedback & tail (R8 readiness/eval feedback, R19, EA-06/09/10, R9-dashboard) + the deferred **R12b auto-regen hook** and the **EA-11 `cleanup_policy` reader** (the partial closures above).
+**Wave 4c (R8) — readiness/eval feedback, landed 2026-06-28** (branch `wave4c-r8-feedback`; ADR draft → dec-draft-89c07cfc; full agent pipeline architect→planner→implementer→verifier):
+
+- ✅ **R8 / D1 (A1 — readiness loop closed)** — new mechanical sentinel check `RD01` reads `readiness.data.adjusted_level` and flags **Important** when `< 3`, routing a below-floor readiness level into the existing `sentinel → promethean` edge (the closed-loop template §7 named). A `dec-252`-style CODE gate: a pytest canary drives `adjusted_level: 2` and **bites**; no-false-positive control at `3`; sentinel golden bad-case + control fixtures. `RD01` emits an **Important finding only — no `td-NNN` row**, so the four-writer ledger contract is untouched. Three sub-questions resolved: JSON path → `readiness.data.adjusted_level` (the `collectors.*` skill-doc bug fixed in lockstep); `mechanical-only` → **fire-but-annotate** (don't go inert in auth-less CI); threshold → `< 3`.
+- ✅ **R8 / D1 (B2 — eval loop documented)** — `commands/eval-praxion.md` records the eval human-gating as a **deliberate** feedback-model choice (not a gap), with a concrete reversal trigger (a multi-run history that makes "recurring FAIL" measurable). No machinery built on a 1-run history.
+- ✅ **Dogfood (armed-and-red, intended)** — `RD01` fires Important-with-annotation on Praxion's own `adjusted_level: 2, mechanical-only` readiness — a *true* finding, exactly D1's point.
+- Verifier verdict: **PASS WITH FINDINGS** (12/12 AC, 7/7 REQ, 1 WARN — a dangling `dec-draft` ADR ref that `finalize_adrs.py`'s literal replace would skip, fixed in the gated DESIGN-§5 Built-flip). Full suite **1288 green** (`tests/ scripts/`). Two orchestration catches worth recording: the architect prematurely tagged DESIGN §5 "Built" (Theme-B drift — corrected to "Designed" until verifier PASS), and the implementer return truncated (completion re-derived from ground truth per the handshake protocol, not from checkboxes).
+
+**Remaining Wave 4:** **4c** — Feedback & tail: R19, EA-06/09/10, R9-dashboard (**R8 ✅** landed 2026-06-28) + the deferred **R12b auto-regen hook** and the **EA-11 `cleanup_policy` reader** (the partial closures above).
 
 Legend: ✅ done · ◑ partial / doc-half · ⊘ refuted/by-design · ▶ in progress · (blank) planned.
 

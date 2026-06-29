@@ -413,3 +413,9 @@ def by_name(name: str) -> Artifact | None:
         if a.name == name:
             return a
     return None
+
+
+def cleanup_policy_for(name: str) -> str | None:
+    """The artifact's cleanup_policy, or None if unregistered (read-only projection)."""
+    a = by_name(name)
+    return a.cleanup_policy if a is not None else None

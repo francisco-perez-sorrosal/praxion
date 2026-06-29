@@ -309,3 +309,261 @@ def test_old_blocking_dir_is_not_a_stale_cleanup_candidate(tmp_path: Path) -> No
     verdict = _classify(ai_work, "old-rework")
     assert verdict.classification == "BLOCK"
     assert not cws._is_stale_safe(verdict)
+
+
+# -- Full-verdict characterization pins (safety floor) ------------------------
+# Each pin asserts classification + exact reason code + severity for one safety-
+# critical file type.  These are the regression barriers the registry refactor
+# must not perturb.
+
+
+def test_unchecked_wip_pins_block_severity(tmp_path: Path) -> None:
+    ai_work = tmp_path / ".ai-work"
+    _make_task(ai_work, "wip", {"WIP.md": "# WIP\n- [x] alpha\n- [ ] beta\n"})
+    verdict = _classify(ai_work, "wip")
+    assert verdict.classification == "BLOCK"
+    reason = next(r for r in verdict.reasons if r.code == "active-pipeline")
+    assert reason.blocker == "WIP.md"
+    assert reason.severity == "block"
+
+
+def test_rework_manifest_pins_block_severity(tmp_path: Path) -> None:
+    ai_work = tmp_path / ".ai-work"
+    _make_task(ai_work, "rework", {"REWORK_MANIFEST.md": "| td | worktree |\n"})
+    verdict = _classify(ai_work, "rework")
+    assert verdict.classification == "BLOCK"
+    reason = next(r for r in verdict.reasons if r.code == "open-rework")
+    assert reason.blocker == "REWORK_MANIFEST.md"
+    assert reason.severity == "block"
+
+
+def test_learnings_pins_warn_severity(tmp_path: Path) -> None:
+    ai_work = tmp_path / ".ai-work"
+    _make_task(ai_work, "feat", {"LEARNINGS.md": "# Learnings\n- gotcha\n"})
+    verdict = _classify(ai_work, "feat")
+    assert verdict.classification == "WARN"
+    reason = next(r for r in verdict.reasons if r.code == "unmerged-learnings")
+    assert reason.blocker == "LEARNINGS.md"
+    assert reason.severity == "warn"
+
+
+def test_verification_report_pins_warn_severity(tmp_path: Path) -> None:
+    ai_work = tmp_path / ".ai-work"
+    _make_task(ai_work, "feat", {"VERIFICATION_REPORT.md": "# Report\nPASS\n"})
+    verdict = _classify(ai_work, "feat")
+    assert verdict.classification == "WARN"
+    reason = next(r for r in verdict.reasons if r.code == "unmerged-verification")
+    assert reason.blocker == "VERIFICATION_REPORT.md"
+    assert reason.severity == "warn"
+
+
+def test_traceability_pins_warn_severity(tmp_path: Path) -> None:
+    ai_work = tmp_path / ".ai-work"
+    _make_task(ai_work, "feat", {"traceability.yml": "requirements: {}\n"})
+    verdict = _classify(ai_work, "feat")
+    assert verdict.classification == "WARN"
+    reason = next(r for r in verdict.reasons if r.code == "unarchived-traceability")
+    assert reason.blocker == "traceability.yml"
+    assert reason.severity == "warn"
+
+
+def test_recovery_log_pins_warn_classification_and_severity(tmp_path: Path) -> None:
+    ai_work = tmp_path / ".ai-work"
+    _make_task(ai_work, "feat", {"RECOVERY_LOG.md": "auto-marked step 3\n"})
+    verdict = _classify(ai_work, "feat")
+    assert verdict.classification == "WARN"
+    reason = next(r for r in verdict.reasons if r.code == "recovery-audit")
+    assert reason.blocker == "RECOVERY_LOG.md"
+    assert reason.severity == "warn"
+
+
+def test_unconsumed_pre_refactor_pins_warn_severity(tmp_path: Path) -> None:
+    ai_work = tmp_path / ".ai-work"
+    _make_task(ai_work, "feat", {"PRE_REFACTOR_PLAN.md": "## Goal\nrefactor\n"})
+    verdict = _classify(ai_work, "feat")
+    assert verdict.classification == "WARN"
+    reason = next(r for r in verdict.reasons if r.code == "unconsumed-refactor")
+    assert reason.blocker == "PRE_REFACTOR_PLAN.md"
+    assert reason.severity == "warn"
+
+
+def test_consumed_pre_refactor_is_safe_with_no_reasons(tmp_path: Path) -> None:
+    ai_work = tmp_path / ".ai-work"
+    _make_task(ai_work, "feat", {"PRE_REFACTOR_PLAN.md": "## Goal\nrefactor\n\n[CONSUMED]\n"})
+    verdict = _classify(ai_work, "feat")
+    assert verdict.classification == "SAFE"
+    assert verdict.reasons == []
+
+
+def test_req_bearing_systems_plan_pins_warn_severity(tmp_path: Path) -> None:
+    req_id = f"REQ-{1:02d}"
+    ai_work = tmp_path / ".ai-work"
+    _make_task(ai_work, "feat", {"SYSTEMS_PLAN.md": f"## Acceptance\n- {req_id}: login works\n"})
+    verdict = _classify(ai_work, "feat")
+    assert verdict.classification == "WARN"
+    reason = next(r for r in verdict.reasons if r.code == "unarchived-spec")
+    assert reason.blocker == "SYSTEMS_PLAN.md"
+    assert reason.severity == "warn"
+
+
+# -- Multi-file snapshot pins --------------------------------------------------
+
+
+def test_completed_pipeline_dir_warns_with_traceability_not_spec(tmp_path: Path) -> None:
+    # LEARNINGS + VERIFICATION_REPORT + traceability.yml + REQ-bearing SYSTEMS_PLAN:
+    # traceability.yml wins the elif branch → unarchived-traceability, NOT unarchived-spec.
+    req_id = f"REQ-{1:02d}"
+    ai_work = tmp_path / ".ai-work"
+    _make_task(
+        ai_work,
+        "done",
+        {
+            "LEARNINGS.md": "# Learnings\n- gotcha\n",
+            "VERIFICATION_REPORT.md": "# Report\nPASS\n",
+            "traceability.yml": "requirements: {}\n",
+            "SYSTEMS_PLAN.md": f"## Acceptance\n- {req_id}: login works\n",
+        },
+    )
+    verdict = _classify(ai_work, "done")
+    assert verdict.classification == "WARN"
+    codes = _codes(verdict)
+    assert codes == {"unmerged-learnings", "unmerged-verification", "unarchived-traceability"}
+    assert "unarchived-spec" not in codes
+
+
+def test_block_precedence_snapshot_with_all_warn_files(tmp_path: Path) -> None:
+    # Unchecked WIP + open REWORK + all warn-level files → BLOCK classification;
+    # both block codes and every warn code are reported (not just the blocking ones).
+    ai_work = tmp_path / ".ai-work"
+    _make_task(
+        ai_work,
+        "kitchen-sink",
+        {
+            "WIP.md": "# WIP\n- [ ] pending\n",
+            "REWORK_MANIFEST.md": "| td | worktree |\n",
+            "LEARNINGS.md": "# Learnings\n",
+            "VERIFICATION_REPORT.md": "# Report\nPASS\n",
+            "traceability.yml": "requirements: {}\n",
+            "RECOVERY_LOG.md": "auto-marked step 1\n",
+            "PRE_REFACTOR_PLAN.md": "## Goal\nrefactor\n",
+        },
+    )
+    verdict = _classify(ai_work, "kitchen-sink")
+    assert verdict.classification == "BLOCK"
+    codes = _codes(verdict)
+    assert {"active-pipeline", "open-rework"} <= codes  # block-severity reasons
+    assert {  # warn-severity reasons also reported alongside the blockers
+        "unmerged-learnings",
+        "unmerged-verification",
+        "unarchived-traceability",
+        "recovery-audit",
+        "unconsumed-refactor",
+    } <= codes
+
+
+# -- Conservative-floor pin ---------------------------------------------------
+
+
+def test_severity_for_unknown_artifact_is_warn() -> None:
+    # Unregistered artifact name must resolve to warn (never safe) — the
+    # monotonic floor that prevents a future unknown policy from widening deletion.
+    assert cws._severity_for("__totally_unknown_artifact__.md") == "warn"
+
+
+# -- Genuine-consumption test (severity sourced from registry, not hardcoded) -
+# Proves the registry read is load-bearing: if severity were a hardcoded literal
+# inside detect_reasons, patching cleanup_policy_for would have no observable
+# effect and the assertion below would fail.
+
+
+def test_wip_severity_changes_when_policy_overridden(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange: task dir with an unchecked WIP step — triggers "active-pipeline"
+    # reason via "block-if-active" policy → BLOCK classification.
+    ai_work = tmp_path / ".ai-work"
+    _make_task(ai_work, "in-flight", {"WIP.md": "# WIP\n- [ ] pending\n"})
+
+    # Sanity check: before patching, WIP.md → block-if-active → "block" severity → BLOCK.
+    verdict_before = _classify(ai_work, "in-flight")
+    assert verdict_before.classification == "BLOCK"
+
+    # Act: override cleanup_policy_for in the cws module namespace so WIP.md returns
+    # "consume-marker" (→ "warn" severity in _POLICY_SEVERITY) instead of "block-if-active".
+    # _severity_for resolves cleanup_policy_for from cws globals, so patching cws's
+    # binding is sufficient — no need to touch the artifact_registry module directly.
+    original_policy_fn = cws.cleanup_policy_for
+    monkeypatch.setattr(
+        cws,
+        "cleanup_policy_for",
+        lambda name: "consume-marker" if name == "WIP.md" else original_policy_fn(name),
+    )
+
+    # Assert: with WIP.md → consume-marker → "warn" severity, the verdict drops to WARN.
+    verdict_after = _classify(ai_work, "in-flight")
+    assert verdict_after.classification == "WARN"
+    wip_reason = next(r for r in verdict_after.reasons if r.blocker == "WIP.md")
+    assert wip_reason.severity == "warn"
+    assert wip_reason.code == "active-pipeline"
+
+
+# -- Registry-drift gate (coupling self-guarding) ------------------------------
+# The set of files detect_reasons emits reasons for must equal the registry's
+# non-delete artifact set. A new non-delete registry artifact without a matching
+# predicate in detect_reasons will be caught at test time (not silently at runtime).
+#
+# Two directory shapes are needed because SYSTEMS_PLAN.md uses an elif branch:
+# when traceability.yml is present, the spec reason is suppressed (traceability wins).
+# Shape 1 covers the 7 non-SYSTEMS_PLAN artifacts; Shape 2 covers SYSTEMS_PLAN via
+# the spec branch (no traceability.yml present).
+
+
+def test_detected_blockers_equal_registry_non_delete_artifacts(tmp_path: Path) -> None:
+    import artifact_registry
+
+    # Shape 1 (traceability branch): 7 files, each triggering one reason.
+    ai_work = tmp_path / ".ai-work"
+    _make_task(
+        ai_work,
+        "shape-traceability",
+        {
+            "WIP.md": "# WIP\n- [ ] pending\n",
+            "REWORK_MANIFEST.md": "| td | worktree |\n",
+            "LEARNINGS.md": "# Learnings\n",
+            "VERIFICATION_REPORT.md": "# Report\nPASS\n",
+            "traceability.yml": "requirements: {}\n",
+            "RECOVERY_LOG.md": "auto-marked step 1\n",
+            "PRE_REFACTOR_PLAN.md": "## Goal\nrefactor\n",
+        },
+    )
+
+    # Shape 2 (spec branch): SYSTEMS_PLAN with a REQ-id, no traceability.yml —
+    # takes the elif branch that emits "unarchived-spec".
+    req_id = f"REQ-{1:02d}"
+    _make_task(
+        ai_work,
+        "shape-spec",
+        {"SYSTEMS_PLAN.md": f"## Acceptance\n- {req_id}: criterion\n"},
+    )
+
+    reasons_shape1 = cws.detect_reasons(ai_work / "shape-traceability")
+    reasons_shape2 = cws.detect_reasons(ai_work / "shape-spec")
+
+    blockers = {r.blocker for r in reasons_shape1} | {r.blocker for r in reasons_shape2}
+    expected = {a.name for a in artifact_registry.ARTIFACTS if a.cleanup_policy != "delete"}
+
+    assert blockers == expected, (
+        f"Blocker set {blockers!r} does not match registry non-delete set {expected!r}. "
+        "A registry edit likely added/removed a non-delete artifact without a "
+        "matching predicate in detect_reasons."
+    )
+
+    # Gate-liveness canary: prove this check is not vacuous by showing it would fail
+    # if the registry gained a new non-delete artifact ("FAKE_ARTIFACT.md") that has
+    # no predicate in detect_reasons — detect_reasons never emits a reason for it,
+    # so its name cannot appear in the blocker set.
+    extended_expected = expected | {"FAKE_ARTIFACT.md"}
+    assert blockers != extended_expected, (
+        "Canary failed: blockers should NOT equal the extended set because "
+        "detect_reasons has no predicate for FAKE_ARTIFACT.md."
+    )

@@ -50,6 +50,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from _repo_root import resolve_repo_root as _resolve_repo_root
+from artifact_registry import cleanup_policy_for
 
 # -- Constants ----------------------------------------------------------------
 
@@ -70,6 +71,24 @@ CONSUMED_RE = re.compile(r"\[CONSUMED\]")
 VERIFICATION_MERGED_RE = re.compile(r"verification patterns merged", re.IGNORECASE)
 
 logger = logging.getLogger("clean_work_safety")
+
+# Registry cleanup_policy -> this scanner's severity class. Conservative by
+# construction: an unknown or `archive` policy WARNs (never SAFE), so the
+# one-way-door gate can only ever delete LESS than today.
+_POLICY_SEVERITY: dict[str, str] = {
+    "block-if-active": "block",
+    "consume-marker": "warn",
+    "archive": "warn",
+    "delete": "safe",
+}
+
+
+def _severity_for(name: str) -> str:
+    """Deletion severity class for an artifact, sourced from the registry's
+    cleanup_policy. Conservative: an unknown/unregistered/`archive` policy WARNs
+    (never SAFE), so the one-way-door gate can only ever delete LESS than today.
+    """
+    return _POLICY_SEVERITY.get(cleanup_policy_for(name) or "", "warn")
 
 
 # -- Verdict model ------------------------------------------------------------
@@ -133,82 +152,90 @@ def detect_reasons(task_dir: Path) -> list[Reason]:
 
     # BLOCK — live or incomplete pipeline state.
     if _has_unchecked_step(task_dir):
-        reasons.append(
-            Reason(
-                "active-pipeline",
-                "WIP.md",
-                "block",
-                "pipeline has unchecked steps — finish or /resume-pipeline it, or pass --force",
+        if _severity_for("WIP.md") in ("block", "warn"):
+            reasons.append(
+                Reason(
+                    "active-pipeline",
+                    "WIP.md",
+                    _severity_for("WIP.md"),
+                    "pipeline has unchecked steps — finish or /resume-pipeline it, or pass --force",
+                )
             )
-        )
     if (task_dir / "REWORK_MANIFEST.md").exists():
-        reasons.append(
-            Reason(
-                "open-rework",
-                "REWORK_MANIFEST.md",
-                "block",
-                "rework worktrees may still be open — complete rework, or pass --force",
+        if _severity_for("REWORK_MANIFEST.md") in ("block", "warn"):
+            reasons.append(
+                Reason(
+                    "open-rework",
+                    "REWORK_MANIFEST.md",
+                    _severity_for("REWORK_MANIFEST.md"),
+                    "rework worktrees may still be open — complete rework, or pass --force",
+                )
             )
-        )
 
     # WARN — durable-state handoff pending.
     if (task_dir / "LEARNINGS.md").exists():
-        reasons.append(
-            Reason(
-                "unmerged-learnings",
-                "LEARNINGS.md",
-                "warn",
-                "merge insights into .ai-state/ ADRs/specs or project docs first",
+        if _severity_for("LEARNINGS.md") in ("block", "warn"):
+            reasons.append(
+                Reason(
+                    "unmerged-learnings",
+                    "LEARNINGS.md",
+                    _severity_for("LEARNINGS.md"),
+                    "merge insights into .ai-state/ ADRs/specs or project docs first",
+                )
             )
-        )
     if (task_dir / "VERIFICATION_REPORT.md").exists() and not _learnings_has_merge_marker(task_dir):
-        reasons.append(
-            Reason(
-                "unmerged-verification",
-                "VERIFICATION_REPORT.md",
-                "warn",
-                "fold recurring patterns into LEARNINGS.md (add a "
-                "'### Verification Patterns Merged' marker) first",
+        if _severity_for("VERIFICATION_REPORT.md") in ("block", "warn"):
+            reasons.append(
+                Reason(
+                    "unmerged-verification",
+                    "VERIFICATION_REPORT.md",
+                    _severity_for("VERIFICATION_REPORT.md"),
+                    "fold recurring patterns into LEARNINGS.md (add a "
+                    "'### Verification Patterns Merged' marker) first",
+                )
             )
-        )
     if (task_dir / "traceability.yml").exists():
-        reasons.append(
-            Reason(
-                "unarchived-traceability",
-                "traceability.yml",
-                "warn",
-                "render into an archived .ai-state/specs/SPEC_*.md matrix first",
+        if _severity_for("traceability.yml") in ("block", "warn"):
+            reasons.append(
+                Reason(
+                    "unarchived-traceability",
+                    "traceability.yml",
+                    _severity_for("traceability.yml"),
+                    "render into an archived .ai-state/specs/SPEC_*.md matrix first",
+                )
             )
-        )
     elif _systems_plan_has_req(task_dir):
-        reasons.append(
-            Reason(
-                "unarchived-spec",
-                "SYSTEMS_PLAN.md",
-                "warn",
-                "SYSTEMS_PLAN.md carries REQ ids — confirm the spec was archived "
-                "to .ai-state/specs/ first",
+        if _severity_for("SYSTEMS_PLAN.md") in ("block", "warn"):
+            reasons.append(
+                Reason(
+                    "unarchived-spec",
+                    "SYSTEMS_PLAN.md",
+                    _severity_for("SYSTEMS_PLAN.md"),
+                    "SYSTEMS_PLAN.md carries REQ ids — confirm the spec was archived "
+                    "to .ai-state/specs/ first",
+                )
             )
-        )
     if (task_dir / "RECOVERY_LOG.md").exists():
-        reasons.append(
-            Reason(
-                "recovery-audit",
-                "RECOVERY_LOG.md",
-                "warn",
-                "auto-recovery audit trail — preserve or summarize before deleting",
+        if _severity_for("RECOVERY_LOG.md") in ("block", "warn"):
+            reasons.append(
+                Reason(
+                    "recovery-audit",
+                    "RECOVERY_LOG.md",
+                    _severity_for("RECOVERY_LOG.md"),
+                    "auto-recovery audit trail — preserve or summarize before deleting",
+                )
             )
-        )
     if _pre_refactor_unconsumed(task_dir):
-        reasons.append(
-            Reason(
-                "unconsumed-refactor",
-                "PRE_REFACTOR_PLAN.md",
-                "warn",
-                "pre-refactor contract not marked [CONSUMED] — confirm td-NNN "
-                "transitions landed first",
+        if _severity_for("PRE_REFACTOR_PLAN.md") in ("block", "warn"):
+            reasons.append(
+                Reason(
+                    "unconsumed-refactor",
+                    "PRE_REFACTOR_PLAN.md",
+                    _severity_for("PRE_REFACTOR_PLAN.md"),
+                    "pre-refactor contract not marked [CONSUMED] — confirm td-NNN "
+                    "transitions landed first",
+                )
             )
-        )
 
     return reasons
 

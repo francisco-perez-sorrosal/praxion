@@ -84,7 +84,7 @@ scattered across rules and prompts.
 | **3.5 — Audit remediation** | Independent external audit of Waves 1–3 (`wave-1-3-external-audit.md`); re-verify each finding on disk, fix the confirmed blockers | EA-01, EA-03, EA-04 (5 of 12 findings refuted or by-design; rest → Wave 4/5) | ✅ **Done** (2026-06-26) |
 | **4a — Waste pruning** | `doc_manifest` strip (484KB→163KB), `token_budgeting` retirement, retain-last-N report pruning, single living idea-ledger | R7, R11, R12, R17 | ✅ **Done** (2026-06-27) |
 | **4b — Registry & dead seams** | `detection_gate` split (EA-02, dec-256), `build_doc_manifest` reads the registry (R18/EA-11 partial), R12b honesty fix (regen-hook deferred), dead-seam ledger row td-044 | R15, R18, EA-02, EA-11 | ✅ **Done** (2026-06-27) |
-| 4c — Feedback & tail | readiness/eval feedback, P06 checker, id-citation dogfood asymmetry, hook `datetime.UTC` portability, `program.md` ML signal, R9-dashboard completion-state | R8, R19, EA-06, EA-09, EA-10, R9-dash | ▶ **R8 ✅** (2026-06-28); rest planned |
+| 4c — Feedback & tail | readiness/eval feedback, P06 checker, id-citation dogfood asymmetry, hook `datetime.UTC` portability, `program.md` ML signal, R9-dashboard completion-state | R8, R19, EA-06, EA-09, EA-10, R9-dash | ▶ **R8 · R19b · EA-09 · EA-10 ✅** (2026-06-28); EA-06, R9-dash planned |
 | 5 — Capstone | integration eval over the criteria→spec path | R10 | planned |
 
 **Wave 1 — landed 2026-06-26:**
@@ -144,8 +144,9 @@ scattered across rules and prompts.
 - ✅ **R8 / D1 (B2 — eval loop documented)** — `commands/eval-praxion.md` records the eval human-gating as a **deliberate** feedback-model choice (not a gap), with a concrete reversal trigger (a multi-run history that makes "recurring FAIL" measurable). No machinery built on a 1-run history.
 - ✅ **Dogfood (armed-and-red, intended)** — `RD01` fires Important-with-annotation on Praxion's own `adjusted_level: 2, mechanical-only` readiness — a *true* finding, exactly D1's point.
 - Verifier verdict: **PASS WITH FINDINGS** (12/12 AC, 7/7 REQ, 1 WARN — a dangling `dec-draft` ADR ref that `finalize_adrs.py`'s literal replace would skip, fixed in the gated DESIGN-§5 Built-flip). Full suite **1288 green** (`tests/ scripts/`). Two orchestration catches worth recording: the architect prematurely tagged DESIGN §5 "Built" (Theme-B drift — corrected to "Designed" until verifier PASS), and the implementer return truncated (completion re-derived from ground truth per the handshake protocol, not from checkboxes).
+- ✅ **Tail batch (EA-10 · R19b · EA-09), landed 2026-06-28** — three file-disjoint hygiene items run in parallel: **EA-10** swept `datetime.UTC` → `timezone.utc` across hooks + scripts (Python-3.9 portability for the shipped capture hooks; a per-file `UP017` ignore stops ruff reverting it; 3 docstring-only files dropped to stay surgical); **R19b** content-gated the `program.md` ML-detection signal so a bare file no longer false-triggers the ML scaffold default; **EA-09** documented the id-citation dogfood asymmetry in `README_DEV.md` (Praxion's meta-tests legitimately embed `REQ-*`/`AC-*` fixtures, so a self-run's ~180 violations are mostly false — the exemption is honest, dogfooding disproportionate). R19a was already shipped in Wave 1. `scripts/` suite 1077 green; each item one commit.
 
-**Remaining Wave 4:** **4c** — Feedback & tail: R19, EA-06/09/10, R9-dashboard (**R8 ✅** landed 2026-06-28) + the deferred **R12b auto-regen hook** and the **EA-11 `cleanup_policy` reader** (the partial closures above).
+**Remaining Wave 4:** **4c** — only **EA-06** (P06 PROMPT-gate liveness) and **R9-dashboard** (completion-state separation) remain (**R8 · R19b · EA-09 · EA-10 ✅** landed 2026-06-28; R19a shipped in Wave 1) + the deferred **R12b auto-regen hook** and the **EA-11 `cleanup_policy` reader** (the partial closures above).
 
 Legend: ✅ done · ◑ partial / doc-half · ⊘ refuted/by-design · ▶ in progress · (blank) planned.
 

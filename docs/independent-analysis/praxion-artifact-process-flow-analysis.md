@@ -138,7 +138,7 @@ scattered across rules and prompts.
 - ✅ **R15** — filed **td-044** for the `project_profile.yaml` / `eval_ledger/` dead seam (designed schemas, no onboarding producer), so it stays visible.
 - Full suite **1572 green**; one architectural fork (the `detection_gate` schema) surfaced to the user before implementing.
 
-**Wave 4c (R8) — readiness/eval feedback, landed 2026-06-28** (branch `wave4c-r8-feedback`; ADR draft → dec-draft-89c07cfc; full agent pipeline architect→planner→implementer→verifier):
+**Wave 4c (R8) — readiness/eval feedback, landed 2026-06-28** (branch `wave4c-r8-feedback`; ADR draft → dec-257; full agent pipeline architect→planner→implementer→verifier):
 
 - ✅ **R8 / D1 (A1 — readiness loop closed)** — new mechanical sentinel check `RD01` reads `readiness.data.adjusted_level` and flags **Important** when `< 3`, routing a below-floor readiness level into the existing `sentinel → promethean` edge (the closed-loop template §7 named). A `dec-252`-style CODE gate: a pytest canary drives `adjusted_level: 2` and **bites**; no-false-positive control at `3`; sentinel golden bad-case + control fixtures. `RD01` emits an **Important finding only — no `td-NNN` row**, so the four-writer ledger contract is untouched. Three sub-questions resolved: JSON path → `readiness.data.adjusted_level` (the `collectors.*` skill-doc bug fixed in lockstep); `mechanical-only` → **fire-but-annotate** (don't go inert in auth-less CI); threshold → `< 3`.
 - ✅ **R8 / D1 (B2 — eval loop documented)** — `commands/eval-praxion.md` records the eval human-gating as a **deliberate** feedback-model choice (not a gap), with a concrete reversal trigger (a multi-run history that makes "recurring FAIL" measurable). No machinery built on a 1-run history.

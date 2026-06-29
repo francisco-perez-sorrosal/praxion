@@ -1,7 +1,7 @@
 ---
-id: dec-draft-89c07cfc
+id: dec-257
 title: Close the readiness write-only loop via a sentinel RD check; document eval human-gating as deliberate
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-28
 summary: Readiness gains its "apply" phase as a new mechanical sentinel check (RD01) reading readiness.data.adjusted_level and flagging Important when < 3, riding the existing sentinel → promethean edge; the eval-results loop is consciously left human-gated and documented as such because "recurring FAIL" is unmeasurable on a 1-run history.

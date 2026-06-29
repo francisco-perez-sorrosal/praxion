@@ -229,7 +229,7 @@ Observability: harvest passes surface in `.ai-state/skill_genesis_reports/SKILL_
 
 ### Readiness Feedback Edge (Built)
 
-A previously **write-only** out-of-band signal — the agent-readiness level — is now closed into the existing `sentinel → promethean` intelligence loop, rather than being merely computed, embedded in `METRICS_REPORT_*.json`, and dashboarded. Status: `Built` — verified 2026-06-28 (verifier PASS: 12/12 AC, 7/7 REQ; gate-liveness canary bites, full `tests/ scripts/` suite 1288 green). See `dec-draft-89c07cfc` (finalized to `dec-NNN` at merge-to-main). This is *not* a fifth pipeline feedback loop; it is a new **input** to the already-closed `sentinel → promethean` edge.
+A previously **write-only** out-of-band signal — the agent-readiness level — is now closed into the existing `sentinel → promethean` intelligence loop, rather than being merely computed, embedded in `METRICS_REPORT_*.json`, and dashboarded. Status: `Built` — verified 2026-06-28 (verifier PASS: 12/12 AC, 7/7 REQ; gate-liveness canary bites, full `tests/ scripts/` suite 1288 green). See `dec-257` (finalized to `dec-NNN` at merge-to-main). This is *not* a fifth pipeline feedback loop; it is a new **input** to the already-closed `sentinel → promethean` edge.
 
 Flow:
 

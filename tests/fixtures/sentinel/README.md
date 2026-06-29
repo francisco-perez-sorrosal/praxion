@@ -8,9 +8,13 @@ named check MUST flag, paired per `rules/swe/gate-liveness.md`.
   required section EXCEPT it omits `## Loop-Back Conditions`. The sentinel
   must FAIL on it.
 - `p06_missing_task_brief/` — `P06` (TASK_BRIEF mandatory at Standard/Full):
-  a pipeline slug directory containing `SYSTEMS_PLAN.md` but no `TASK_BRIEF.md`.
-  The sentinel must WARN on it. PROMPT-kind gate — golden bad-case proof, not a
-  deterministic canary. Wire to automated test once a mechanical P06 checker lands.
+  **README-only, no committed bad-case input.** The P06 input shape is a
+  `.ai-work/<slug>/` directory, and `.ai-work/` is globally gitignored
+  (`.gitignore:50`), so a committed fixture there would never reach CI. The
+  CODE-kind canary `scripts/test_check_p06_task_brief.py` therefore builds the
+  bad-case (`SYSTEMS_PLAN.md` present, no `TASK_BRIEF.md`) in `tmp_path` at
+  runtime and asserts a `check="P06"`, `severity="warn"` row
+  (`test_canary_p06_fires_on_known_bad_input`). See the directory's `README.md`.
 - `challenge_no_disposition/` — `P07` (Undisposed Architecture Challenges):
   a minimal `INTERFACE_DESIGN.md` carrying a non-empty `## Architecture Challenges`
   section with no disposition paragraph ("Status:", "Decision:", or "Resolved:"). The

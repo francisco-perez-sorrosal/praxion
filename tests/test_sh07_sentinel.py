@@ -177,18 +177,12 @@ def test_sh07_defers_orphaned_edge_to_sh01(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# TODO: wire a mechanical P06 checker once the sentinel P06 prompt-gate has a code-kind validator
+# P06 canary lives in scripts/test_check_p06_task_brief.py
 #
-# P06 is a PROMPT-kind gate (sentinel is LLM-interpreted, not a deterministic
-# script). Its proof-it-bites is the golden bad-case fixture at:
-#   tests/fixtures/sentinel/p06_missing_task_brief/
+# The mechanical P06 checker (scripts/check_p06_task_brief.py) was added and
+# its gate-liveness canary lives in scripts/test_check_p06_task_brief.py. The
+# canary builds its known-bad input in tmp_path (no committed fixture — the P06
+# input is a `.ai-work/<slug>/` directory and `.ai-work/` is gitignored).
 #
-# The fixture has SYSTEMS_PLAN.md present and TASK_BRIEF.md absent — the exact
-# input that must produce a P06 WARN.
-#
-# If a mechanical P06 checker (e.g., scripts/check_p06_task_brief.py) is added
-# in the future, wire a CODE-kind canary here following the SH07 pattern:
-#   1. Import run_p06 from that script (deferred import for RED handshake).
-#   2. Point repo_root at tests/fixtures/sentinel/p06_missing_task_brief/.
-#   3. Assert at least one row with severity="warn" and check="P06" is returned.
+# Run it with:  python3 -m pytest scripts/test_check_p06_task_brief.py -q
 # ---------------------------------------------------------------------------

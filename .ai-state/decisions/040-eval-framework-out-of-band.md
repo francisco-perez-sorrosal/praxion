@@ -22,6 +22,7 @@ affected_reqs:
 superseded_by: dec-204
 re_affirmed_by:
   - dec-204
+  - dec-draft-9abb2fde
 ---
 
 ## Context

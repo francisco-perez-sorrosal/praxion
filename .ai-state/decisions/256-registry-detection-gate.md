@@ -13,6 +13,8 @@ affected_files:
   - scripts/artifact_registry.py
   - scripts/test_artifact_registry.py
   - scripts/build_doc_manifest.py
+re_affirmed_by:
+  - dec-draft-1def3b96
 dissent: A second gate field is more schema to keep honest; the documented `sentinel:` kind already meant "enforces presence/quality", so sharpening the comment could have addressed EA-02's labelling complaint without a structural change.
 ---
 

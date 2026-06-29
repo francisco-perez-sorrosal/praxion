@@ -14,6 +14,7 @@ Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.m
 
 ## Build / test / lint
 
+- **Runtime:** Python ≥3.11 required (root `requires-python`) — the suite imports stdlib `tomllib`; on 3.9/3.10 `scripts/` + `tests/` collection fails with `ModuleNotFoundError: No module named 'tomllib'`. `eval/` and `task-chronograph-mcp/` need ≥3.13. Use `uv run` or a 3.11+ interpreter for full-suite green claims.
 - `bash install.sh` — install plugin to `~/.claude` (registers rules, hooks, settings)
 - `bash install.sh --check` — verify install without applying
 - `python3 -m pytest tests/ -q` — Praxion's own tests

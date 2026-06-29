@@ -1,7 +1,7 @@
 ---
-id: dec-draft-9abb2fde
+id: dec-258
 title: Criteria→spec chain gate-liveness eval lives in the always-green pytest suite, not the out-of-band eval framework
-status: proposed
+status: accepted
 category: architectural
 date: 2026-06-29
 summary: The R10 end-to-end criteria→spec chain liveness proof is a pytest integration test in tests/ (always-green suite), not a /eval-praxion check or an eval/ replay-harness, because a gate-liveness proof must run free/deterministic/auth-less on every suite run.

@@ -1,18 +1,36 @@
-"""Tests for hooks/inject_subagent_context.py — PreToolUse(Agent) context injection.
+"""Tests for hooks/inject_subagent_context.py — the single PreToolUse(Agent)
+updatedInput emitter (dec-266).
 
 Behavioral specification:
 
 - Host-native subagents (Explore, Plan, general-purpose) receive a compact Praxion
   preamble prepended to their prompt when launched from a Praxion-managed project.
-- Praxion-native subagents (i-am:*) are skipped by default (they already encode
-  the behavioral contract in their system prompts).
+- Praxion-native subagents (i-am:*) are skipped by default for the PREAMBLE ONLY
+  (they already encode the behavioral contract in their system prompts).
 - Praxion-native subagents receive the preamble when PRAXION_INJECT_NATIVE_SUBAGENTS=1.
-- Projects without a .ai-state/ directory receive no injection (not a Praxion project).
-- PRAXION_DISABLE_SUBAGENT_INJECT=1 disables injection in any project.
+- Projects without a .ai-state/ directory receive no preamble (not a Praxion project) —
+  this gate is scoped to the preamble only.
+- PRAXION_DISABLE_SUBAGENT_INJECT=1 disables the preamble in any project.
+- A session inside a *linked* git worktree (`--git-dir` != `--git-common-dir`) gets a
+  session-worktree briefing line prepended for EVERY subagent type, i-am:* included —
+  no .ai-state/ requirement, no i-am skip.
+- A prompt that names an absolute `.claude/worktrees/<name>` path differing from the
+  session's own cwd gets a briefed-root line prepended for EVERY subagent type — pure
+  text regex, no filesystem walk, no git call.
+- At most ONE updatedInput is ever emitted per spawn, composing whichever of the three
+  segments (preamble, session-worktree line, briefed-root line) apply; when none apply,
+  the hook emits nothing.
 - Malformed or empty stdin is tolerated — hook exits 0 without crashing.
 - Per-session-id caching: a second call with the same session_id avoids re-statting
   the filesystem for .ai-state/ presence.
-- Fast-path (no .ai-state/) completes in < 200ms per invocation (generous CI bound).
+- Fast-path (no .ai-state/, no git repo) completes in < 200ms per invocation
+  (generous CI bound).
+
+Gate-liveness contract (rules/swe/gate-liveness.md): each of the three composed
+segments is its own CODE gate. Every gate below ships a canary (a fixture proving
+the segment DOES fire) paired with a suppression case (a fixture proving it does
+NOT fire when the triggering condition is absent) — ruling out both "never fires"
+and "fires unconditionally" failure modes.
 
 The hook interface contract (stdin/stdout shapes) is documented in SYSTEMS_PLAN.md
 §Interfaces → Hook contract — PreToolUse(Agent). Tests use that shape directly.
@@ -33,6 +51,7 @@ from typing import Any
 import pytest
 
 HOOKS_DIR = Path(__file__).resolve().parent
+MODULE_PATH = HOOKS_DIR / "inject_subagent_context.py"
 
 # ---------------------------------------------------------------------------
 # Deferred import pattern — production module may not exist when tests are
@@ -44,12 +63,11 @@ HOOKS_DIR = Path(__file__).resolve().parent
 
 def _load_module():
     """Load inject_subagent_context.py as a module, or raise ImportError."""
-    script_path = HOOKS_DIR / "inject_subagent_context.py"
-    if not script_path.exists():
+    if not MODULE_PATH.exists():
         raise ImportError(
             "hooks/inject_subagent_context.py not found. The production module does not yet exist."
         )
-    spec = importlib.util.spec_from_file_location("inject_subagent_context", script_path)
+    spec = importlib.util.spec_from_file_location("inject_subagent_context", MODULE_PATH)
     if spec is None or spec.loader is None:
         raise ImportError("Could not load spec for inject_subagent_context.py")
     module = importlib.util.module_from_spec(spec)
@@ -63,6 +81,8 @@ def _load_module():
 # ---------------------------------------------------------------------------
 
 PREAMBLE_MARKER = "[Praxion process active]"
+SESSION_WORKTREE_MARKER = "[Worktree session]"
+BRIEFED_ROOT_MARKER = "[Worktree briefing]"
 _ORIGINAL_PROMPT = "Research X for the current task."
 
 
@@ -86,9 +106,10 @@ def _pretooluse_payload(
 
 
 def _run_hook(
-    payload: dict[str, Any],
+    payload: dict[str, Any] | None,
     env_extra: dict[str, str] | None = None,
     cwd_override: str | None = None,
+    raw_stdin: str | None = None,
 ) -> subprocess.CompletedProcess:
     """Run inject_subagent_context.py as a subprocess with the given payload."""
     env = {**os.environ}
@@ -98,9 +119,10 @@ def _run_hook(
             del env[key]
     if env_extra:
         env.update(env_extra)
+    stdin = raw_stdin if raw_stdin is not None else json.dumps(payload)
     return subprocess.run(
-        [sys.executable, str(HOOKS_DIR / "inject_subagent_context.py")],
-        input=json.dumps(payload),
+        [sys.executable, str(MODULE_PATH)],
+        input=stdin,
         capture_output=True,
         text=True,
         env=env,
@@ -109,8 +131,13 @@ def _run_hook(
     )
 
 
+def _prompt_that_names(worktree_path: str, note: str = _ORIGINAL_PROMPT) -> str:
+    """A prompt whose text names an absolute .claude/worktrees/<name> path."""
+    return f"Your target worktree root is {worktree_path}. {note}"
+
+
 # ---------------------------------------------------------------------------
-# Fixtures
+# Fixtures — plain dirs (preamble gate) and hermetic git repos (worktree gates)
 # ---------------------------------------------------------------------------
 
 
@@ -118,8 +145,8 @@ def _run_hook(
 def praxion_project(tmp_path: Path) -> Path:
     """A temporary directory that looks like a Praxion-managed project.
 
-    Contains a .ai-state/ directory, which is the presence signal used by
-    inject_subagent_context.py to decide whether to inject.
+    Contains a .ai-state/ directory (the preamble's presence signal) but is
+    NOT a git repo — isolates preamble behavior from worktree-line behavior.
     """
     ai_state = tmp_path / ".ai-state"
     ai_state.mkdir()
@@ -128,8 +155,49 @@ def praxion_project(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def non_praxion_project(tmp_path: Path) -> Path:
-    """A temporary directory without .ai-state/ — not a Praxion project."""
+    """A temporary directory without .ai-state/ and without git — not a
+    Praxion project, no worktree boundary."""
     return tmp_path
+
+
+@pytest.fixture
+def main_repo(tmp_path: Path) -> Path:
+    """A real git repo serving as the 'main' (canonical) worktree — no
+    .ai-state/, so the preamble gate stays independently closed."""
+    repo = tmp_path / "main"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "t@example.com"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "test"], check=True)
+    (repo / "README.md").write_text("seed\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "init"], check=True)
+    return repo
+
+
+@pytest.fixture
+def praxion_main_repo(main_repo: Path) -> Path:
+    """The main_repo fixture, additionally marked as a Praxion project."""
+    (main_repo / ".ai-state").mkdir()
+    return main_repo
+
+
+@pytest.fixture
+def linked_worktree(main_repo: Path, tmp_path: Path) -> Path:
+    """A linked worktree created from the main repo — no .ai-state/."""
+    wt = tmp_path / "linked"
+    subprocess.run(
+        ["git", "-C", str(main_repo), "worktree", "add", "-q", str(wt), "-b", "feature"],
+        check=True,
+    )
+    return wt
+
+
+@pytest.fixture
+def praxion_linked_worktree(linked_worktree: Path) -> Path:
+    """The linked_worktree fixture, additionally marked as a Praxion project."""
+    (linked_worktree / ".ai-state").mkdir()
+    return linked_worktree
 
 
 @pytest.fixture(autouse=True)
@@ -141,7 +209,7 @@ def _clear_praxion_env(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Group 1: Host-native subagent injection
+# Group 1: Preamble — host-native subagent injection
 # ---------------------------------------------------------------------------
 
 
@@ -261,7 +329,7 @@ def test_output_hook_event_name_is_pretooluse(praxion_project: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Group 2: Praxion-native subagent skip (default behavior)
+# Group 2: Preamble — Praxion-native subagent skip (default behavior)
 # ---------------------------------------------------------------------------
 
 
@@ -278,7 +346,8 @@ def test_output_hook_event_name_is_pretooluse(praxion_project: Path) -> None:
 def test_praxion_native_subagent_skipped_by_default(
     subagent_type: str, praxion_project: Path
 ) -> None:
-    """Praxion-native agents (i-am:*) produce no injection by default."""
+    """Praxion-native agents (i-am:*) produce no injection by default (no
+    preamble; not a worktree session; prompt names no worktree)."""
     payload = _pretooluse_payload(subagent_type=subagent_type, cwd=str(praxion_project))
     result = _run_hook(payload)
 
@@ -291,7 +360,7 @@ def test_praxion_native_subagent_skipped_by_default(
 
 
 # ---------------------------------------------------------------------------
-# Group 3: Praxion-native opt-in via PRAXION_INJECT_NATIVE_SUBAGENTS=1
+# Group 3: Preamble — Praxion-native opt-in via PRAXION_INJECT_NATIVE_SUBAGENTS=1
 # ---------------------------------------------------------------------------
 
 
@@ -329,13 +398,14 @@ def test_praxion_native_injection_opt_in_does_not_affect_host_native(
 
 
 # ---------------------------------------------------------------------------
-# Group 4: .ai-state/ gate — non-Praxion project → no injection
+# Group 4: Preamble — .ai-state/ gate (non-Praxion project → no preamble)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("subagent_type", ["Explore", "Plan", "i-am:researcher"])
 def test_no_injection_when_ai_state_absent(subagent_type: str, non_praxion_project: Path) -> None:
-    """No injection occurs for any subagent type when .ai-state/ is absent."""
+    """No injection occurs for any subagent type when .ai-state/ is absent and
+    the cwd is not a git repo (none-apply composition case)."""
     payload = _pretooluse_payload(subagent_type=subagent_type, cwd=str(non_praxion_project))
     result = _run_hook(payload)
 
@@ -344,7 +414,7 @@ def test_no_injection_when_ai_state_absent(subagent_type: str, non_praxion_proje
 
 
 def test_no_injection_when_cwd_has_no_ai_state_subdirectory(tmp_path: Path) -> None:
-    """Even with a valid filesystem path, no injection if .ai-state/ is missing."""
+    """Even with a valid filesystem path, no preamble if .ai-state/ is missing."""
     # Create unrelated dirs to confirm it's not just "any dir triggers injection"
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
@@ -355,13 +425,13 @@ def test_no_injection_when_cwd_has_no_ai_state_subdirectory(tmp_path: Path) -> N
 
 
 # ---------------------------------------------------------------------------
-# Group 5: PRAXION_DISABLE_SUBAGENT_INJECT opt-out
+# Group 5: Preamble — PRAXION_DISABLE_SUBAGENT_INJECT opt-out
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("subagent_type", ["Explore", "Plan", "general-purpose"])
 def test_injection_disabled_when_opt_out_env_set(subagent_type: str, praxion_project: Path) -> None:
-    """PRAXION_DISABLE_SUBAGENT_INJECT=1 suppresses injection even in Praxion projects."""
+    """PRAXION_DISABLE_SUBAGENT_INJECT=1 suppresses the preamble even in Praxion projects."""
     payload = _pretooluse_payload(subagent_type=subagent_type, cwd=str(praxion_project))
     result = _run_hook(payload, env_extra={"PRAXION_DISABLE_SUBAGENT_INJECT": "1"})
 
@@ -383,48 +453,45 @@ def test_opt_out_also_suppresses_native_opt_in(praxion_project: Path) -> None:
     assert result.stdout == "", "Opt-out must override opt-in"
 
 
+def test_disable_preamble_flag_does_not_suppress_worktree_line(
+    linked_worktree: Path,
+) -> None:
+    """PRAXION_DISABLE_SUBAGENT_INJECT is scoped to the preamble only — the
+    session-worktree line still fires inside a linked worktree."""
+    payload = _pretooluse_payload(subagent_type="i-am:implementer", cwd=str(linked_worktree))
+    result = _run_hook(payload, env_extra={"PRAXION_DISABLE_SUBAGENT_INJECT": "1"})
+
+    assert result.returncode == 0
+    assert result.stdout, "Session-worktree line must still fire"
+    output = json.loads(result.stdout)
+    prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
+    assert SESSION_WORKTREE_MARKER in prompt
+    assert PREAMBLE_MARKER not in prompt
+
+
 # ---------------------------------------------------------------------------
-# Group 6: Malformed stdin — unconditional exit 0
+# Group 6: Malformed stdin — unconditional exit 0 (fail-open)
 # ---------------------------------------------------------------------------
 
 
 def test_empty_stdin_exits_zero_without_crash() -> None:
     """Empty stdin must not cause an exception — exit 0, no stdout."""
-    result = subprocess.run(
-        [sys.executable, str(HOOKS_DIR / "inject_subagent_context.py")],
-        input="",
-        capture_output=True,
-        text=True,
-        env={k: v for k, v in os.environ.items() if not k.startswith("PRAXION_")},
-        timeout=10,
-    )
+    result = _run_hook(None, raw_stdin="")
     assert result.returncode == 0, f"Expected exit 0, got {result.returncode}: {result.stderr}"
+    assert result.stdout == ""
 
 
 def test_malformed_json_stdin_exits_zero_without_crash() -> None:
     """Malformed JSON on stdin must not crash the hook — exit 0."""
-    result = subprocess.run(
-        [sys.executable, str(HOOKS_DIR / "inject_subagent_context.py")],
-        input="not valid json {{{",
-        capture_output=True,
-        text=True,
-        env={k: v for k, v in os.environ.items() if not k.startswith("PRAXION_")},
-        timeout=10,
-    )
+    result = _run_hook(None, raw_stdin="not valid json {{{")
     assert result.returncode == 0, f"Expected exit 0, got {result.returncode}: {result.stderr}"
+    assert "Traceback" not in result.stderr
 
 
 def test_missing_tool_input_field_exits_zero() -> None:
     """Payload missing tool_input must not crash the hook — exit 0."""
     payload = {"tool_name": "Agent", "cwd": "/tmp", "session_id": "s1"}
-    result = subprocess.run(
-        [sys.executable, str(HOOKS_DIR / "inject_subagent_context.py")],
-        input=json.dumps(payload),
-        capture_output=True,
-        text=True,
-        env={k: v for k, v in os.environ.items() if not k.startswith("PRAXION_")},
-        timeout=10,
-    )
+    result = _run_hook(payload)
     assert result.returncode == 0
 
 
@@ -436,33 +503,21 @@ def test_missing_subagent_type_field_exits_zero() -> None:
         "cwd": "/tmp",
         "session_id": "s1",
     }
-    result = subprocess.run(
-        [sys.executable, str(HOOKS_DIR / "inject_subagent_context.py")],
-        input=json.dumps(payload),
-        capture_output=True,
-        text=True,
-        env={k: v for k, v in os.environ.items() if not k.startswith("PRAXION_")},
-        timeout=10,
-    )
+    result = _run_hook(payload)
     assert result.returncode == 0
 
 
 def test_missing_cwd_field_exits_zero() -> None:
-    """Payload missing cwd must not crash the hook — exit 0."""
+    """Payload missing cwd must not crash the hook — exit 0, and neither the
+    preamble nor the worktree lines fire without a cwd."""
     payload = {
         "tool_name": "Agent",
         "tool_input": {"subagent_type": "Explore", "prompt": "research"},
         "session_id": "s1",
     }
-    result = subprocess.run(
-        [sys.executable, str(HOOKS_DIR / "inject_subagent_context.py")],
-        input=json.dumps(payload),
-        capture_output=True,
-        text=True,
-        env={k: v for k, v in os.environ.items() if not k.startswith("PRAXION_")},
-        timeout=10,
-    )
+    result = _run_hook(payload)
     assert result.returncode == 0
+    assert result.stdout == ""
 
 
 def test_non_agent_tool_name_exits_zero_silently(praxion_project: Path) -> None:
@@ -478,8 +533,16 @@ def test_non_agent_tool_name_exits_zero_silently(praxion_project: Path) -> None:
     assert result.stdout == ""
 
 
+def test_tool_input_not_a_dict_exits_zero() -> None:
+    """A non-object tool_input must not crash the hook — exit 0."""
+    payload = {"tool_name": "Agent", "tool_input": "not-a-dict", "cwd": "/tmp"}
+    result = _run_hook(payload)
+    assert result.returncode == 0
+    assert result.stdout == ""
+
+
 # ---------------------------------------------------------------------------
-# Group 7: Per-session-id caching
+# Group 7: Per-session-id caching (preamble .ai-state/ stat cache)
 # ---------------------------------------------------------------------------
 
 
@@ -517,34 +580,29 @@ def test_different_session_ids_both_inject(praxion_project: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Group 8: Latency assertion (fast-path, no .ai-state/)
+# Group 8: Latency assertion (fast-path, no .ai-state/, no git repo)
 # ---------------------------------------------------------------------------
 
 
-def test_fast_path_no_ai_state_completes_under_200ms(
+def test_fast_path_no_ai_state_completes_under_2000ms(
     non_praxion_project: Path,
 ) -> None:
-    """No-.ai-state/ fast-path (skip) completes in < 200ms excluding Python startup.
+    """No-.ai-state/, non-git fast-path (skip) completes well within CI bounds.
 
     Methodology: warm up Python import by loading the module once in a subprocess,
-    then time the actual hook execution.  The 200ms bound is generous for CI —
-    the latency budget is < 100ms per spawn, but Python startup (~30-50ms)
-    consumes part of that budget; 200ms covers the logic path only.
-
-    Note: this is a unit-level timing assertion.  Flaky risk is low because the
-    no-.ai-state/ path performs only one filesystem stat before returning.
+    then time the actual hook execution. 2000ms is a generous CI-safe ceiling —
+    the logic path itself (one filesystem stat + failed git subprocess calls for
+    the worktree gate) is expected to run in low tens of milliseconds.
     """
     payload = _pretooluse_payload(subagent_type="Explore", cwd=str(non_praxion_project))
     payload_json = json.dumps(payload)
-
     env = {k: v for k, v in os.environ.items() if not k.startswith("PRAXION_")}
 
-    # Run multiple times to get a stable measurement; take the median
     times: list[float] = []
     for _ in range(5):
         t0 = time.perf_counter()
         result = subprocess.run(
-            [sys.executable, str(HOOKS_DIR / "inject_subagent_context.py")],
+            [sys.executable, str(MODULE_PATH)],
             input=payload_json,
             capture_output=True,
             text=True,
@@ -555,14 +613,10 @@ def test_fast_path_no_ai_state_completes_under_200ms(
         times.append(elapsed)
         assert result.returncode == 0
 
-    # Sort and take the minimum (best-case run, removes OS scheduling noise)
     best_ms = min(times) * 1000
-    # Allow up to 2 seconds for the entire subprocess (Python startup + logic)
-    # The 200ms bound is for the *logic* portion only, but we can't separate
-    # startup cleanly in a subprocess test. Use 2000ms as the CI-safe ceiling.
     assert best_ms < 2000, (
         f"Fast-path hook took {best_ms:.0f}ms (best of 5). "
-        "If Python startup is unusually slow on this system, consider adjusting."
+        "If Python/git startup is unusually slow on this system, consider adjusting."
     )
 
 
@@ -571,10 +625,8 @@ def test_inject_path_completes_under_2000ms_including_python_startup(
 ) -> None:
     """Injection path completes in < 2000ms including Python startup (CI-safe bound).
 
-    The spec claims < 100ms per spawn. Python startup is ~30-50ms. The full
-    subprocess (startup + stat + inject) should stay well under 2s on any
-    modern CI runner. This test catches regressions caused by accidental I/O
-    (file reads, network calls, heavy imports) in the injection path.
+    Catches regressions caused by accidental heavy I/O (file reads, network
+    calls, heavy imports) in the injection path.
     """
     payload = _pretooluse_payload(subagent_type="Explore", cwd=str(praxion_project))
     payload_json = json.dumps(payload)
@@ -582,7 +634,7 @@ def test_inject_path_completes_under_2000ms_including_python_startup(
 
     t0 = time.perf_counter()
     result = subprocess.run(
-        [sys.executable, str(HOOKS_DIR / "inject_subagent_context.py")],
+        [sys.executable, str(MODULE_PATH)],
         input=payload_json,
         capture_output=True,
         text=True,
@@ -610,11 +662,373 @@ def test_module_is_importable_and_has_expected_callable() -> None:
     the implementer creates the file, and passes (GREEN) after.
     """
     mod = _load_module()
-    # The hook should expose a top-level callable — either `main`, `run`,
-    # or be directly runnable.  We check for at least one of these.
     has_main = hasattr(mod, "main") and callable(mod.main)
     has_run = hasattr(mod, "run") and callable(mod.run)
     assert has_main or has_run, (
         "inject_subagent_context.py must expose a callable `main` or `run` "
         "for testability. If the hook only has __main__ guard, add a main() function."
     )
+
+
+# ---------------------------------------------------------------------------
+# Group 10: Session-worktree line — canary + suppression + all subagent types
+# ---------------------------------------------------------------------------
+
+
+def test_injects_session_worktree_line_from_worktree_cwd(linked_worktree: Path) -> None:
+    """Gate-liveness canary: a session cwd inside a linked worktree must inject
+    the absolute-path session-worktree line into the spawned subagent's prompt.
+
+    Self-test: if the worktree-detection branch were gutted (always returning
+    None), stdout would stay empty and this test would fail — proving the gate
+    is not a no-op that only ever passes on the current (non-firing) state.
+    """
+    payload = _pretooluse_payload(subagent_type="i-am:implementer", cwd=str(linked_worktree))
+    result = _run_hook(payload)
+
+    assert result.returncode == 0, f"Hook exited non-zero: {result.stderr}"
+    assert result.stdout, "Expected updatedInput JSON on stdout for a worktree cwd"
+    output = json.loads(result.stdout)
+    updated_prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
+    assert SESSION_WORKTREE_MARKER in updated_prompt
+    assert (
+        str(linked_worktree.resolve()) in updated_prompt
+    ), "Briefing must name the absolute worktree root"
+    assert "absolute paths" in updated_prompt.lower()
+    assert "never relative" in updated_prompt.lower() or "relative paths" in updated_prompt.lower()
+    assert _ORIGINAL_PROMPT in updated_prompt, "Original prompt must be preserved"
+
+
+def test_no_session_worktree_line_from_canonical_checkout_cwd(main_repo: Path) -> None:
+    """Gate-liveness suppression case: the main (canonical) checkout has no
+    worktree boundary to brief — no session-worktree line.
+
+    Paired with the canary above: same hook, same subagent payload shape, the
+    only variable is cwd (linked worktree vs main checkout). This rules out a
+    hook that fires unconditionally regardless of worktree state.
+    """
+    payload = _pretooluse_payload(subagent_type="i-am:implementer", cwd=str(main_repo))
+    result = _run_hook(payload)
+
+    assert result.returncode == 0
+    assert (
+        result.stdout == ""
+    ), f"No injection expected from the main checkout; got: {result.stdout!r}"
+
+
+def test_no_session_worktree_line_when_cwd_is_not_a_git_repo(tmp_path: Path) -> None:
+    """A non-git cwd has no worktree boundary — no injection, fail-open."""
+    non_git = tmp_path / "not-a-repo"
+    non_git.mkdir()
+    payload = _pretooluse_payload(subagent_type="i-am:implementer", cwd=str(non_git))
+    result = _run_hook(payload)
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+
+
+@pytest.mark.parametrize(
+    "subagent_type",
+    ["i-am:implementer", "i-am:systems-architect", "Explore", "Plan", "general-purpose"],
+)
+def test_session_worktree_line_injects_for_every_subagent_type(
+    subagent_type: str, linked_worktree: Path
+) -> None:
+    """Unlike the preamble's gate (d), i-am:* agents are NOT skipped for the
+    session-worktree line: they are the common case in worktree pipelines
+    (EnterWorktree is a Standard/Full requirement), so excluding them would
+    leave the most frequent spawn path unmitigated.
+    """
+    payload = _pretooluse_payload(subagent_type=subagent_type, cwd=str(linked_worktree))
+    result = _run_hook(payload)
+
+    assert result.returncode == 0
+    assert result.stdout, f"Expected injection for subagent_type={subagent_type!r}"
+    output = json.loads(result.stdout)
+    assert output["hookSpecificOutput"]["updatedInput"]["subagent_type"] == subagent_type
+    assert SESSION_WORKTREE_MARKER in output["hookSpecificOutput"]["updatedInput"]["prompt"]
+
+
+def test_disable_worktree_flag_suppresses_session_worktree_line(linked_worktree: Path) -> None:
+    payload = _pretooluse_payload(subagent_type="i-am:implementer", cwd=str(linked_worktree))
+    result = _run_hook(payload, env_extra={"PRAXION_DISABLE_WORKTREE_PATH_BRIEFING": "1"})
+    assert result.returncode == 0
+    assert result.stdout == ""
+
+
+# ---------------------------------------------------------------------------
+# Group 11: Briefed-root line (td-051 direction) — canary + suppression
+# ---------------------------------------------------------------------------
+
+
+def test_injects_briefed_root_line_when_canonical_session_names_a_worktree(
+    main_repo: Path,
+) -> None:
+    """Gate-liveness canary for the td-051 direction: a CANONICAL session (no
+    worktree boundary of its own) briefing an agent INTO a worktree via the
+    prompt text must get a deterministic reinforcement line — the exact gap
+    that let a doc-engineer commit to the wrong tree despite an absolute-path
+    briefing.
+
+    Self-test: if the prompt-regex branch were gutted (always returning None),
+    stdout would stay empty (main_repo has no worktree boundary of its own,
+    so the session-worktree line does not fire either) and this test would
+    fail.
+    """
+    named_worktree = "/Users/example/project/.claude/worktrees/other-feature"
+    payload = _pretooluse_payload(
+        subagent_type="i-am:doc-engineer",
+        prompt=_prompt_that_names(named_worktree),
+        cwd=str(main_repo),
+    )
+    result = _run_hook(payload)
+
+    assert result.returncode == 0, f"Hook exited non-zero: {result.stderr}"
+    assert result.stdout, "Expected updatedInput JSON when prompt names a worktree root"
+    output = json.loads(result.stdout)
+    updated_prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
+    assert BRIEFED_ROOT_MARKER in updated_prompt
+    assert named_worktree in updated_prompt
+    assert SESSION_WORKTREE_MARKER not in updated_prompt, "main_repo has no worktree of its own"
+    assert _ORIGINAL_PROMPT in updated_prompt
+
+
+def test_no_briefed_root_line_when_prompt_names_no_worktree(main_repo: Path) -> None:
+    """Suppression case: a canonical session with an ordinary prompt (no
+    worktree path named) gets no briefed-root line."""
+    payload = _pretooluse_payload(subagent_type="i-am:implementer", cwd=str(main_repo))
+    result = _run_hook(payload)
+    assert result.returncode == 0
+    assert result.stdout == ""
+
+
+def test_no_briefed_root_line_when_prompt_names_the_sessions_own_root(
+    linked_worktree: Path,
+) -> None:
+    """Suppression case: when the prompt names the SAME worktree root the
+    session is already in, the briefed-root line does not duplicate the
+    session-worktree line — only one line fires."""
+    own_root = str(linked_worktree.resolve())
+    payload = _pretooluse_payload(
+        subagent_type="i-am:implementer",
+        prompt=_prompt_that_names(own_root),
+        cwd=str(linked_worktree),
+    )
+    result = _run_hook(payload)
+
+    assert result.returncode == 0
+    assert result.stdout, "Session-worktree line should still fire"
+    output = json.loads(result.stdout)
+    prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
+    assert SESSION_WORKTREE_MARKER in prompt
+    assert BRIEFED_ROOT_MARKER not in prompt, "Naming the session's own root is not a mismatch"
+
+
+def test_no_briefed_root_line_when_prompt_names_a_subpath_of_sessions_own_root(
+    linked_worktree: Path,
+) -> None:
+    """A prompt naming a FILE under the session's own worktree root (not just
+    the bare root) is still recognized as 'already there' — no duplicate line."""
+    sub_path = f"{linked_worktree.resolve()}/src/module.py"
+    payload = _pretooluse_payload(
+        subagent_type="i-am:implementer",
+        prompt=_prompt_that_names(str(linked_worktree.resolve()), note=f"Edit {sub_path}."),
+        cwd=str(linked_worktree),
+    )
+    result = _run_hook(payload)
+    assert result.returncode == 0
+    output = json.loads(result.stdout)
+    prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
+    assert BRIEFED_ROOT_MARKER not in prompt
+
+
+@pytest.mark.parametrize(
+    "subagent_type",
+    ["i-am:implementer", "i-am:doc-engineer", "Explore", "Plan", "general-purpose"],
+)
+def test_briefed_root_line_injects_for_every_subagent_type(
+    subagent_type: str, main_repo: Path
+) -> None:
+    """No i-am:* skip for the briefed-root line either — symmetric with the
+    session-worktree line's all-agent-types contract."""
+    named_worktree = "/Users/example/project/.claude/worktrees/other-feature"
+    payload = _pretooluse_payload(
+        subagent_type=subagent_type,
+        prompt=_prompt_that_names(named_worktree),
+        cwd=str(main_repo),
+    )
+    result = _run_hook(payload)
+    assert result.returncode == 0
+    assert result.stdout, f"Expected injection for subagent_type={subagent_type!r}"
+    output = json.loads(result.stdout)
+    assert BRIEFED_ROOT_MARKER in output["hookSpecificOutput"]["updatedInput"]["prompt"]
+
+
+def test_disable_worktree_flag_suppresses_briefed_root_line(main_repo: Path) -> None:
+    named_worktree = "/Users/example/project/.claude/worktrees/other-feature"
+    payload = _pretooluse_payload(
+        subagent_type="i-am:implementer",
+        prompt=_prompt_that_names(named_worktree),
+        cwd=str(main_repo),
+    )
+    result = _run_hook(payload, env_extra={"PRAXION_DISABLE_WORKTREE_PATH_BRIEFING": "1"})
+    assert result.returncode == 0
+    assert result.stdout == ""
+
+
+def test_briefed_root_and_session_worktree_lines_both_fire_on_worktree_mismatch(
+    linked_worktree: Path,
+) -> None:
+    """A session already inside worktree A, whose prompt names a DIFFERENT
+    worktree B, gets BOTH lines: its own session-worktree boundary and the
+    mismatch reinforcement for the named target."""
+    other_worktree = "/Users/example/project/.claude/worktrees/other-feature"
+    payload = _pretooluse_payload(
+        subagent_type="i-am:implementer",
+        prompt=_prompt_that_names(other_worktree),
+        cwd=str(linked_worktree),
+    )
+    result = _run_hook(payload)
+
+    assert result.returncode == 0
+    output = json.loads(result.stdout)
+    prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
+    assert SESSION_WORKTREE_MARKER in prompt
+    assert BRIEFED_ROOT_MARKER in prompt
+    assert str(linked_worktree.resolve()) in prompt
+    assert other_worktree in prompt
+
+
+# ---------------------------------------------------------------------------
+# Group 12: Composition matrix — preamble / worktree-line-only / briefed-root-
+# only / combos / none-apply
+# ---------------------------------------------------------------------------
+
+
+def test_composition_preamble_only(praxion_project: Path) -> None:
+    """Praxion project, non-git cwd, host-native agent: preamble fires alone."""
+    payload = _pretooluse_payload(subagent_type="Explore", cwd=str(praxion_project))
+    result = _run_hook(payload)
+    assert result.returncode == 0
+    output = json.loads(result.stdout)
+    prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
+    assert PREAMBLE_MARKER in prompt
+    assert SESSION_WORKTREE_MARKER not in prompt
+    assert BRIEFED_ROOT_MARKER not in prompt
+
+
+def test_composition_session_worktree_line_only_no_preamble_for_iam_agent(
+    linked_worktree: Path,
+) -> None:
+    """i-am agent in a worktree session (no .ai-state/, not opted in): the
+    session-worktree line fires, but the preamble does NOT — i-am:* agents
+    are skipped by default and this worktree has no .ai-state/ either way."""
+    payload = _pretooluse_payload(subagent_type="i-am:implementer", cwd=str(linked_worktree))
+    result = _run_hook(payload)
+    assert result.returncode == 0
+    output = json.loads(result.stdout)
+    prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
+    assert SESSION_WORKTREE_MARKER in prompt
+    assert PREAMBLE_MARKER not in prompt
+    assert BRIEFED_ROOT_MARKER not in prompt
+
+
+def test_composition_briefed_root_only_canonical_session_names_worktree(
+    non_praxion_project: Path,
+) -> None:
+    """The td-051 canary in composition-matrix form: a non-Praxion, non-git
+    session (no preamble, no session-worktree boundary) whose prompt names a
+    worktree root gets ONLY the briefed-root line."""
+    named_worktree = "/Users/example/project/.claude/worktrees/other-feature"
+    payload = _pretooluse_payload(
+        subagent_type="Explore",
+        prompt=_prompt_that_names(named_worktree),
+        cwd=str(non_praxion_project),
+    )
+    result = _run_hook(payload)
+    assert result.returncode == 0
+    output = json.loads(result.stdout)
+    prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
+    assert BRIEFED_ROOT_MARKER in prompt
+    assert PREAMBLE_MARKER not in prompt
+    assert SESSION_WORKTREE_MARKER not in prompt
+
+
+def test_composition_preamble_plus_session_worktree_line(
+    praxion_linked_worktree: Path,
+) -> None:
+    """Praxion project inside a linked worktree, host-native agent: preamble
+    AND session-worktree line both fire."""
+    payload = _pretooluse_payload(subagent_type="Explore", cwd=str(praxion_linked_worktree))
+    result = _run_hook(payload)
+    assert result.returncode == 0
+    output = json.loads(result.stdout)
+    prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
+    assert PREAMBLE_MARKER in prompt
+    assert SESSION_WORKTREE_MARKER in prompt
+    assert BRIEFED_ROOT_MARKER not in prompt
+
+
+def test_composition_preamble_plus_briefed_root_line(praxion_main_repo: Path) -> None:
+    """Praxion project, canonical (non-worktree) session, host-native agent,
+    prompt names a different worktree: preamble AND briefed-root line both
+    fire; the session-worktree line does not (main_repo has no boundary)."""
+    named_worktree = "/Users/example/project/.claude/worktrees/other-feature"
+    payload = _pretooluse_payload(
+        subagent_type="Explore",
+        prompt=_prompt_that_names(named_worktree),
+        cwd=str(praxion_main_repo),
+    )
+    result = _run_hook(payload)
+    assert result.returncode == 0
+    output = json.loads(result.stdout)
+    prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
+    assert PREAMBLE_MARKER in prompt
+    assert BRIEFED_ROOT_MARKER in prompt
+    assert SESSION_WORKTREE_MARKER not in prompt
+
+
+def test_composition_none_apply_yields_no_output(non_praxion_project: Path) -> None:
+    """Non-Praxion, non-git cwd, i-am agent, ordinary prompt: none of the
+    three conditions hold — the hook emits nothing at all."""
+    payload = _pretooluse_payload(subagent_type="i-am:implementer", cwd=str(non_praxion_project))
+    result = _run_hook(payload)
+    assert result.returncode == 0
+    assert result.stdout == ""
+
+
+# ---------------------------------------------------------------------------
+# Group 13: updatedInput envelope contract — direct object, no wrapper key
+# ---------------------------------------------------------------------------
+
+
+def test_updated_input_is_the_tool_input_object_directly(linked_worktree: Path) -> None:
+    """Harness contract: updatedInput's value IS the replacement tool-input
+    params object directly — never wrapped in an envelope key such as
+    {"tool_input": ...}."""
+    payload = _pretooluse_payload(subagent_type="i-am:implementer", cwd=str(linked_worktree))
+    result = _run_hook(payload)
+    assert result.returncode == 0
+    output = json.loads(result.stdout)
+    updated = output["hookSpecificOutput"]["updatedInput"]
+    assert "tool_input" not in updated, "updatedInput must not be wrapped in a tool_input envelope"
+    assert "prompt" in updated
+    assert "subagent_type" in updated
+
+
+def test_worktree_lines_preserve_other_tool_input_fields(linked_worktree: Path) -> None:
+    """description/model/run_in_background must survive the worktree-line
+    injection untouched — the same field-preservation contract as the
+    preamble path."""
+    payload = _pretooluse_payload(subagent_type="i-am:implementer", cwd=str(linked_worktree))
+    payload["tool_input"]["description"] = "implement step 3"
+    payload["tool_input"]["model"] = "sonnet"
+    payload["tool_input"]["run_in_background"] = True
+
+    result = _run_hook(payload)
+    assert result.returncode == 0
+    output = json.loads(result.stdout)
+    updated = output["hookSpecificOutput"]["updatedInput"]
+    assert updated["description"] == "implement step 3"
+    assert updated["model"] == "sonnet"
+    assert updated["run_in_background"] is True

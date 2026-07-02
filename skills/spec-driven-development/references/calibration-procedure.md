@@ -101,22 +101,21 @@ Append each tier decision to `.ai-state/calibration_log.md`. Create the file on 
 ```markdown
 # Calibration Log
 
-| Timestamp | Task | Signals | Score | Recommended | Actual | Source | Retrospective |
-|-----------|------|---------|-------|-------------|--------|--------|---------------|
-| 2026-03-15T10:00:00Z | Add OAuth2 flow | F:5 B:3 A:1 P:1 T:0 C:1 | 8 | Standard | Standard | recommended | [pending] |
-| 2026-03-15T14:00:00Z | Fix typo in README | F:1 B:0 A:0 P:0 T:0 C:0 | 1 | Direct | Direct | recommended | correct |
+| Timestamp | Task | Signals | Recommended Tier | Actual Tier | Source | Retrospective |
+|-----------|------|---------|-------------------|--------------|--------|----------------|
+| 2026-03-15T10:00:00Z | Add OAuth2 flow | F:5 B:3 A:1 P:1 T:0 C:1 (score 8) | Standard | Standard | recommended | [pending] |
+| 2026-03-15T14:00:00Z | Fix typo in README | F:1 B:0 A:0 P:0 T:0 C:0 (score 1) | Direct | Direct | recommended | correct — one-line typo fix, no follow-up needed |
 ```
 
 **Field definitions**:
 
 - **Timestamp**: ISO 8601 UTC
 - **Task**: one-sentence description of the task
-- **Signals**: abbreviated signal values — F=File count, B=Behavior count, A=Architectural scope, P=Prior specs, T=Test coverage (inverted: 1=no tests), C=Request complexity
-- **Score**: composite numeric score
-- **Recommended**: the tier the procedure recommended
-- **Actual**: the tier actually used (may differ if overridden)
-- **Source**: `recommended` (user accepted), `user-override` (user chose different tier)
-- **Retrospective**: filled post-pipeline — `correct` (tier was appropriate), `under-calibrated` (should have been higher), `over-calibrated` (should have been lower), `[pending]` (not yet assessed)
+- **Signals**: abbreviated signal values — F=File count, B=Behavior count, A=Architectural scope, P=Prior specs, T=Test coverage (inverted: 1=no tests), C=Request complexity. The composite numeric score folds into this cell as a trailing parenthetical (`(score 8)`) rather than a dedicated column.
+- **Recommended Tier**: the tier the procedure recommended
+- **Actual Tier**: the tier actually used (may differ if overridden)
+- **Source**: `recommended` (user accepted), `user-override` (user chose different tier). Execution-mode prose (e.g. "direct-execution by main agent") belongs in this cell — never conflate it with the `pipeline_tier` frontmatter value used in ADR files; see [adr-conventions.md](../../../rules/swe/adr-conventions.md) for that distinction.
+- **Retrospective**: filled post-pipeline — an enum value (`correct` tier was appropriate, `under-calibrated` should have been higher, `over-calibrated` should have been lower, `[pending]` not yet assessed), optionally followed by an em-dash and a one-sentence micro-capture note. This cell doubles as the Direct-tier sanctioned micro-journal: a learning, gotcha, debt item, or decision captured in one sentence at commit time — a sentence, not a section. Substantial items promote to an ADR or a `td-NNN` tech-debt-ledger row.
 
 ## Assessment Examples
 

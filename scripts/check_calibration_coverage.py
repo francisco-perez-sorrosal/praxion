@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""Detect calibration-coverage lapses: Standard/Full pipeline merges since the newest row.
+"""Detect calibration-coverage lapses: task-completing commits since the newest row.
 
 Called by sentinel CA03 (which rewires that check to invoke this script mechanically),
 but runs standalone too — no sentinel infrastructure required.
 
 A calibration row in `.ai-state/calibration_log.md` anchors what the latest calibrated
-pipeline was. If `feat:` or `fix:` commits have landed in git since that anchor, the
-project has uncalibrated pipeline work. This script counts those commits and flags
-under-coverage when the count reaches `K_COMMITS` (default: 2).
+task was. If task-completing commits of any tier (Direct through Full — see
+`_PIPELINE_PREFIXES`, excluding release/bookkeeping commits in `_EXCLUDED_PREFIXES`)
+have landed in git since that anchor, the project has uncalibrated task work. This
+script counts those commits and flags under-coverage when the count reaches
+`K_COMMITS` (default: 2).
 
 Conditional-activation on absent substrate: when `.ai-state/calibration_log.md` is
 absent, no verdict is produced (skip-with-INFO, exit 0). A project that has never
@@ -43,8 +45,25 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 CALIBRATION_LOG_REL = ".ai-state/calibration_log.md"
 
-# Prefixes that signal Standard/Full pipeline merge commits.
-_PIPELINE_PREFIXES = ("feat:", "fix:")
+# Prefixes that signal a task-completing commit, of any tier (Direct through Full).
+_PIPELINE_PREFIXES = (
+    "feat:",
+    "fix:",
+    "docs:",
+    "refactor:",
+    "test:",
+    "perf:",
+    "style:",
+    "build:",
+    "ci:",
+    "revert:",
+    "chore:",
+)
+
+# Prefixes excluded from the count even though they match _PIPELINE_PREFIXES —
+# release automation (bump:) and ADR-finalize bookkeeping (chore(finalize)) are not
+# task-completing work.
+_EXCLUDED_PREFIXES = ("bump:", "chore(finalize)")
 
 # Threshold: uncalibrated pipeline-commit count that triggers under-coverage.
 K_COMMITS = 2
@@ -81,11 +100,13 @@ def _git(repo_root: Path, *args: str) -> str | None:
 
 
 def _pipeline_commits_since(repo_root: Path, since: str) -> int:
-    """Count feat:/fix: commits reachable from HEAD that post-date `since`.
+    """Count task-completing commits reachable from HEAD that post-date `since`.
 
     Uses `git log --oneline --since=<date>` then filters by commit message prefix.
-    Only commits whose first line starts with `feat:` or `fix:` (case-sensitive)
-    count as Standard/Full pipeline merges.
+    Commits whose first line starts with a prefix in `_PIPELINE_PREFIXES`
+    (case-sensitive) count as task-completing work of any tier — except commits
+    starting with a prefix in `_EXCLUDED_PREFIXES` (`bump:`, `chore(finalize)`),
+    which are release automation or ADR-finalize bookkeeping, never task work.
     """
     output = _git(repo_root, "log", "--oneline", f"--since={since}")
     if not output:
@@ -97,6 +118,8 @@ def _pipeline_commits_since(repo_root: Path, since: str) -> int:
         if len(parts) < 2:
             continue
         message = parts[1].strip()
+        if any(message.startswith(prefix) for prefix in _EXCLUDED_PREFIXES):
+            continue
         if any(message.startswith(prefix) for prefix in _PIPELINE_PREFIXES):
             count += 1
     return count
@@ -223,8 +246,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="check_calibration_coverage",
         description=(
-            "Advisory: flag when Standard/Full pipeline work has merged since the "
-            "newest calibration_log.md row (the unenforced-producer gap). "
+            "Advisory: flag when task-completing commits (any tier) have landed since "
+            "the newest calibration_log.md row (the unenforced-producer gap). "
             "Runs standalone — no /sentinel invocation required. Called by sentinel CA03."
         ),
     )

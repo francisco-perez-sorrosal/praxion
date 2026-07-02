@@ -60,8 +60,14 @@ Consume all available learning sources in priority order. Skip any source that d
 3. **Latest SENTINEL_REPORT_*.md** (`.ai-state/sentinel_reports/`) -- ecosystem patterns and recurring findings
 4. **Latest IDEA_LEDGER_*.md** (`.ai-state/idea_ledgers/`) -- avoid re-proposing implemented or discarded ideas
 5. **ADR files** -- read `.ai-state/decisions/DECISIONS_INDEX.md` for a scannable overview. Recurring decision patterns across multiple features (same category, similar rationale in the summary column) are candidates for rule or skill formalization. Read the full ADR files for promising matches.
+6. **`.ai-state/calibration_log.md` `Retrospective` cells** newer than the last harvest -- Direct-tier learning/gotcha/debt/decision micro-notes captured via the commit-time convention (see `swe-agent-coordination-protocol.md` § Process Calibration).
 
 For each source, extract discrete learning items. A learning item is a pattern, gotcha, convention, workflow, decision rationale, or recurring issue that appears actionable and reusable beyond its original context.
+
+**Golden bad-case for source 6** (PROMPT gate, per `gate-liveness.md`): an enum-only `Retrospective` cell -- `correct`, `under-calibrated`, `over-calibrated`, or `[pending]` with no text appended after an em-dash -- carries zero extractable content. Do NOT synthesize a learning item from an enum-only cell. Only cells with a note following the em-dash are extractable. Worked contrast:
+
+- **Skip**: `correct` -- no em-dash, no note. Nothing to extract.
+- **Extract**: `correct — ruff version skew between pre-commit (0.8.6) and local (0.15.4) broke assert-message formatting; escape by committing via Bash, not re-Edit` -- the text after the em-dash is a candidate learning item (gotcha).
 
 **Minimum threshold**: if fewer than 3 learning items are extracted across all sources, write a report noting that the volume is too low for a full triage pass and that the user should wait for more experience to accumulate.
 
@@ -192,6 +198,7 @@ Review status: pending.>
 | Latest SENTINEL_REPORT_*.md | `.ai-state/sentinel_reports/<file>` | N | Read / Not found |
 | Latest IDEA_LEDGER_*.md | `.ai-state/idea_ledgers/<file>` | N | Read / Not found |
 | ADRs (recent) | `.ai-state/decisions/` | N | Read / N matched |
+| Calibration log Retrospective cells | `.ai-state/calibration_log.md` | N | Read / Not found |
 
 ## Triage Results
 

@@ -8,7 +8,7 @@ summary: "Remove .devN pre-release scheme; align all version files to last relea
 tags: [versioning, simplification, commitizen, release-flow]
 made_by: user
 branch: main
-pipeline_tier: direct
+pipeline_tier: standard
 affected_files:
   - "pyproject.toml"
   - "memory-mcp/pyproject.toml"

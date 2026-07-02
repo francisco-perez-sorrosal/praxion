@@ -179,7 +179,7 @@ The hook fires only when:
 3. `PRAXION_DISABLE_OBSERVABILITY` is not set in the environment that ran `claude --bg`
 4. The hook is registered in the installed plugin's `hooks/hooks.json` and the hook script is in the installed plugin cache
 
-If the marker file persists in `~/.claude/rework_sessions/` after the session ended, the hook never ran — most likely the installed plugin's `hooks/notify_bg_session_state.py` is missing or out of date. See [`README_DEV.md` § Local-edit testing workaround](../README_DEV.md#local-edit-testing-workaround) for the development-time workaround.
+If the marker file persists in `~/.claude/rework_sessions/` after the session ended, the hook never ran — most likely the installed plugin's `hooks/notify_bg_session_state.py` is missing or out of date. See [`README_DEV.md` § Dev-link mode](../README_DEV.md#dev-link-mode) for the development-time fix.
 
 Run `osascript -e 'display notification "test" with title "Praxion"'` directly to confirm macOS notifications work at all on your machine.
 
@@ -252,6 +252,6 @@ This is an upstream design choice (preventing nested-session confusion) rather t
 - [`commands/dispatch-reworks.md`](../commands/dispatch-reworks.md) — slash-command surface; same flag passthrough as the script
 - [`scripts/dispatch-reworks --help`](../scripts/dispatch-reworks) — authoritative flag and exit-code reference
 - [`hooks/notify_bg_session_state.py`](../hooks/notify_bg_session_state.py) — the osascript notification hook
-- [`README_DEV.md` § Local-edit testing workaround](../README_DEV.md#local-edit-testing-workaround) — for contributors editing the hook locally
+- [`README_DEV.md` § Dev-link mode](../README_DEV.md#dev-link-mode) — for contributors editing the hook locally
 - [`CLAUDE.md` § Known Claude Code Limitations](../CLAUDE.md) — `claude agents` process-tree gate, other upstream caveats
 - [`.ai-state/decisions/drafts/20260514-1413-fperezsorrosal-worktree-orchestrator-handoff-ux-research-hybrid-rework-dispatch.md`](../.ai-state/decisions/drafts/) — the ADR for the hybrid-dispatch + notification-hook decision

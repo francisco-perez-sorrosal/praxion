@@ -489,26 +489,20 @@ After modifying the plugin manifest or adding new components, update the install
 claude plugin install i-am@bit-agora --scope user   # Or install directly from the marketplace
 ```
 
-### Local-edit testing workaround
+### Dev-link mode
 
-`./install.sh code` performs a marketplace fetch — local file edits in the worktree do not propagate to the installed plugin cache. When iterating on files Claude Code resolves through `${CLAUDE_PLUGIN_ROOT}` (hook scripts, `hooks/hooks.json`, plugin-cache-resolved commands), copy edited files directly into the cache:
+`./install.sh code` performs a marketplace fetch — local file edits in the worktree do not propagate to the installed plugin cache. `--dev-link` closes that gap: it replaces the cache copies of the three plugin-cache-resolved runtime surfaces (`hooks/`, `scripts/`, `commands/` — the directories Claude Code resolves through `${CLAUDE_PLUGIN_ROOT}`, e.g. `hooks/hooks.json` and `hooks/notify_bg_session_state.py`) with directory-level symlinks back to this working tree, so edits take effect immediately with no copy step.
 
 ```bash
-# Example: a notification-hook edit
-cp hooks/notify_bg_session_state.py ~/.claude/plugins/cache/bit-agora/i-am/0.2.0/hooks/
-
-# Example: a hooks.json registration change
-cp hooks/hooks.json ~/.claude/plugins/cache/bit-agora/i-am/0.2.0/
-
-# Verify the cache copy matches the worktree
-diff hooks/notify_bg_session_state.py ~/.claude/plugins/cache/bit-agora/i-am/0.2.0/hooks/notify_bg_session_state.py
+./install.sh --dev-link        # symlink hooks/, scripts/, commands/ into the pinned plugin cache
+./install.sh --dev-link=off    # restore the fetched copies from the pre-link backup
 ```
 
-The version in the cache path (`0.2.0/`) comes from `.claude-plugin/plugin.json`. After a plugin version bump, the cache directory name changes — re-run `./install.sh code` once, then resume the `cp` workflow against the new version directory.
+Idempotent — safe to re-run. Refuses cleanly (non-zero exit, no changes) when no pinned plugin install can be resolved from `~/.claude/plugins/installed_plugins.json`, or when the resolved cache path falls outside `~/.claude/plugins/cache/bit-agora/i-am/`. `--dev-link=off` restores from a same-directory `.pre-dev-link` backup taken at link time; a plain `./install.sh code` re-fetch or `claude plugin update i-am` is also expected to overwrite the cache, but `--dev-link=off` is the explicit, script-verified path back.
 
-Scripts invoked from the worktree directly (e.g., `scripts/dispatch-reworks`) do not need this — they run from the worktree's own path. Only files Claude Code resolves through the installed plugin cache need the copy.
+Scripts invoked from the worktree directly (e.g., `scripts/dispatch-reworks`) do not need this — they run from the worktree's own path. Only files Claude Code resolves through the installed plugin cache need dev-link.
 
-This is a documented workaround tracked as `td-036` in `.ai-state/TECH_DEBT_LEDGER.md`. A first-class `bash install.sh --dev-link` mode is the long-term resolution.
+Resolves `td-036` in `.ai-state/TECH_DEBT_LEDGER.md`.
 
 ### Verifying changes
 

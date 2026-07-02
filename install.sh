@@ -431,6 +431,13 @@ Usage: $(basename "$0") [code|desktop|cursor [path]|codex path] [--check] [--dry
                remove context-hub MCP. Plugin body is preserved — run
                'claude plugin uninstall i-am' separately to remove it.
                Only valid with 'code'.
+  --dev-link   Symlink the pinned plugin cache's hooks/, scripts/, and
+               commands/ back to this working tree's own copies, so local
+               edits take effect immediately without a manual cp between
+               iterations. Only valid with 'code'.
+  --dev-link=off
+               Reverse of --dev-link: restore the plugin cache's fetched
+               copies from the pre-link backup. Only valid with 'code'.
   --help       Show this help
 EOF
     exit 0
@@ -447,6 +454,8 @@ UNINSTALL=false
 RELINK=false
 COMPLETE_INSTALL=false
 COMPLETE_UNINSTALL=false
+DEV_LINK=false
+DEV_LINK_OFF=false
 NATIVE=false
 COMPAT_ONLY=false
 CURSOR_TARGET=""
@@ -467,6 +476,8 @@ while [ $# -gt 0 ]; do
         --relink)     RELINK=true ;;
         --complete-install)   COMPLETE_INSTALL=true ;;
         --complete-uninstall) COMPLETE_UNINSTALL=true ;;
+        --dev-link)   DEV_LINK=true ;;
+        --dev-link=off) DEV_LINK_OFF=true ;;
         -h|--help)    show_usage ;;
         *)            fail "Unknown argument: $1. Use --help for usage." ;;
     esac
@@ -502,6 +513,8 @@ case "$MODE" in
         $RELINK             && delegate_args+=(--relink)
         $COMPLETE_INSTALL   && delegate_args+=(--complete-install)
         $COMPLETE_UNINSTALL && delegate_args+=(--complete-uninstall)
+        $DEV_LINK           && delegate_args+=(--dev-link)
+        $DEV_LINK_OFF       && delegate_args+=(--dev-link=off)
         ;;
     cursor)
         [ -n "$CURSOR_TARGET" ] && delegate_args+=("$CURSOR_TARGET")
@@ -539,6 +552,8 @@ if [ "$MODE" = "codex" ]; then
 elif $RELINK; then
     delegate
     relink_obsidian_deps
+elif $DEV_LINK || $DEV_LINK_OFF; then
+    delegate
 elif $CHECK; then
     delegate_rc=0
     delegate || delegate_rc=$?

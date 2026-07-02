@@ -684,6 +684,138 @@ PYEOF
     step "Plugin body still installed — run 'claude plugin uninstall i-am' to remove it"
 }
 
+# =============================================================================
+# Dev-Link mode — symlink the installed plugin cache back to this working tree
+# =============================================================================
+#
+# `bash install.sh` performs a marketplace fetch (`claude plugin install`),
+# which clones a pinned copy into ~/.claude/plugins/cache/<marketplace>/
+# <plugin>/<version>/. Local edits to hooks/, scripts/, or commands/ never
+# reach that cache, so contributors testing plugin-cache-resolved code paths
+# (${CLAUDE_PLUGIN_ROOT}-based hooks, `claude --bg` sessions, etc.) have had
+# to manually `cp` files into the cache between iterations — see td-036 in
+# .ai-state/TECH_DEBT_LEDGER.md.
+#
+# `--dev-link` replaces the cache copies of the three plugin-cache-resolved
+# runtime surfaces (hooks/, scripts/, commands/ — the directories Claude Code
+# actually loads through ${CLAUDE_PLUGIN_ROOT}/<surface>/...) with
+# directory-level symlinks back to this repo's own hooks/, scripts/,
+# commands/. Edits then take effect immediately, no copy step needed.
+# `--dev-link=off` reverses it, restoring the pre-link cache contents from a
+# sibling `.pre-dev-link` backup taken at link time — a plain marketplace
+# re-fetch is also expected to overwrite the cache wholesale, but that
+# overwrite behavior isn't part of Claude Code's documented contract, so the
+# explicit backup/restore path is the one this script relies on for
+# reversibility.
+#
+# Test-only override: lets scripts/test_install_dev_link.py point dev-link's
+# "source of truth" at a synthetic tree instead of this repo's own hooks/,
+# scripts/, commands/. Production runs always resolve to SCRIPT_DIR.
+DEV_LINK_SOURCE_DIR="${PRAXION_DEV_LINK_SOURCE_DIR:-$SCRIPT_DIR}"
+DEV_LINK_SURFACES=(hooks scripts commands)
+
+# Resolves the pinned i-am install path + version from the plugin registry —
+# same registry and lookup shape as scripts/upgrade_project_pins.sh's
+# resolve_plugin() (prefers a user-scope entry, falls back to the first
+# match). Sets DEV_LINK_INSTALL_PATH and DEV_LINK_VERSION, or fail()s with an
+# actionable message. Also refuses (fail()s) if the resolved path escapes
+# this plugin's own cache tree — never touch another plugin's cache.
+dev_link_resolve_target() {
+    local reg="${HOME}/.claude/plugins/installed_plugins.json"
+    [ -f "$reg" ] || fail "No plugin registry at ${reg} — install the plugin first ('./install.sh code' or 'claude plugin install ${PLUGIN_NAME}@${MARKETPLACE_NAME}')."
+    require_cmd "jq" "jq is required to resolve the pinned plugin version for --dev-link."
+
+    local plugin_key="${PLUGIN_NAME}@${MARKETPLACE_NAME}"
+    DEV_LINK_INSTALL_PATH="$(jq -r --arg key "$plugin_key" '
+        (.plugins[$key] // [])
+        | (map(select(.scope=="user")) + .)
+        | (.[0].installPath // empty)' "$reg")"
+    DEV_LINK_VERSION="$(jq -r --arg key "$plugin_key" '
+        (.plugins[$key] // [])
+        | (map(select(.scope=="user")) + .)
+        | (.[0].version // empty)' "$reg")"
+
+    [ -n "$DEV_LINK_INSTALL_PATH" ] || fail "${plugin_key} is not installed (no entry in ${reg}). Run './install.sh code' or 'claude plugin install ${plugin_key}' first."
+    if [ -z "$DEV_LINK_VERSION" ] || [ "$DEV_LINK_VERSION" = "null" ]; then
+        DEV_LINK_VERSION="$(basename "$DEV_LINK_INSTALL_PATH")"
+    fi
+
+    case "$DEV_LINK_INSTALL_PATH" in
+        "$PLUGIN_CACHE_DIR"/*) ;;
+        *) fail "Resolved install path '${DEV_LINK_INSTALL_PATH}' is not under ${PLUGIN_CACHE_DIR}/ — refusing to touch it." ;;
+    esac
+}
+
+dev_link_install() {
+    header "Dev-Link — symlink plugin cache to working tree"
+    dev_link_resolve_target
+
+    printf "\n  Plugin:  %s@%s\n  Cache:   %s\n  Source:  %s\n" \
+        "$PLUGIN_NAME" "$DEV_LINK_VERSION" "$DEV_LINK_INSTALL_PATH" "$DEV_LINK_SOURCE_DIR"
+
+    local surface target source backup
+    for surface in "${DEV_LINK_SURFACES[@]}"; do
+        target="${DEV_LINK_INSTALL_PATH}/${surface}"
+        source="${DEV_LINK_SOURCE_DIR}/${surface}"
+        backup="${target}.pre-dev-link"
+
+        if [ ! -d "$source" ]; then
+            warn "${surface}: no such directory in working tree (${source}) — skipping"
+            continue
+        fi
+        if [ -L "$target" ] && [ "$(readlink "$target")" = "$source" ]; then
+            info "${surface}: already dev-linked"
+            continue
+        fi
+        if [ -L "$target" ]; then
+            rm "$target"
+        elif [ -d "$target" ]; then
+            rm -rf "$backup"
+            mv "$target" "$backup"
+        elif [ -e "$target" ]; then
+            fail "${surface}: unexpected non-directory at ${target} — refusing to touch"
+        fi
+        ln -s "$source" "$target"
+        info "${surface}: linked -> ${source}"
+    done
+
+    printf "\n"
+    info "Dev-link active — edits to hooks/, scripts/, commands/ now take effect immediately"
+    step "Restore the fetched copies with: ./install.sh --dev-link=off"
+}
+
+dev_link_remove() {
+    header "Dev-Link Off — restoring plugin cache"
+    dev_link_resolve_target
+
+    local surface target source backup skipped=0
+    for surface in "${DEV_LINK_SURFACES[@]}"; do
+        target="${DEV_LINK_INSTALL_PATH}/${surface}"
+        source="${DEV_LINK_SOURCE_DIR}/${surface}"
+        backup="${target}.pre-dev-link"
+
+        if [ -L "$target" ] && [ "$(readlink "$target")" = "$source" ]; then
+            rm "$target"
+            if [ -d "$backup" ]; then
+                mv "$backup" "$target"
+                info "${surface}: restored from backup"
+            else
+                warn "${surface}: no backup found — re-fetch with 'claude plugin update ${PLUGIN_NAME}' or './install.sh code'"
+                skipped=$((skipped + 1))
+            fi
+        else
+            info "${surface}: not dev-linked, nothing to do"
+        fi
+    done
+
+    printf "\n"
+    if [ "$skipped" -eq 0 ]; then
+        info "Dev-link removed — plugin cache restored to its fetched copies"
+    else
+        warn "Dev-link removed for some surfaces; ${skipped} surface(s) need a manual re-fetch (see above)"
+    fi
+}
+
 install_plugin_permissions() {
     local settings_file="${HOME}/.claude/settings.json"
 
@@ -1315,7 +1447,7 @@ dry_run_claude_desktop() {
 
 show_usage() {
     cat <<EOF
-Usage: $(basename "$0") code|desktop [--check] [--dry-run] [--uninstall] [--relink] [--reconfigure] [--complete-install] [--complete-uninstall] [--help]
+Usage: $(basename "$0") code|desktop [--check] [--dry-run] [--uninstall] [--relink] [--reconfigure] [--complete-install] [--complete-uninstall] [--dev-link] [--dev-link=off] [--help]
 
   code           Install for Claude Code
   desktop        Install for Claude Desktop
@@ -1325,6 +1457,9 @@ Usage: $(basename "$0") code|desktop [--check] [--dry-run] [--uninstall] [--reli
   --relink       Re-symlink config, rules, and scripts (no prompts)
   --reconfigure  Re-prompt for personal identifiers (username/email/github)
                  even if saved values exist in .personal_info.env
+  --dev-link     Symlink the pinned plugin cache's hooks/, scripts/, and
+                 commands/ back to this working tree (code mode only)
+  --dev-link=off Reverse of --dev-link: restore fetched cache copies
   --help         Show this help
 EOF
     exit 0
@@ -1342,6 +1477,8 @@ RELINK=false
 RECONFIGURE=false
 COMPLETE_INSTALL=false
 COMPLETE_UNINSTALL=false
+DEV_LINK=false
+DEV_LINK_OFF=false
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -1353,6 +1490,8 @@ while [ $# -gt 0 ]; do
         --reconfigure)        RECONFIGURE=true ;;
         --complete-install)   COMPLETE_INSTALL=true ;;
         --complete-uninstall) COMPLETE_UNINSTALL=true ;;
+        --dev-link)           DEV_LINK=true ;;
+        --dev-link=off)       DEV_LINK_OFF=true ;;
         -h|--help)            show_usage ;;
         *)                    fail "Unknown argument: $1. Use --help for usage." ;;
     esac
@@ -1364,14 +1503,31 @@ if ( $COMPLETE_INSTALL || $COMPLETE_UNINSTALL ) && [ "$MODE" != "code" ]; then
     fail "--complete-install / --complete-uninstall are only supported with 'code' mode."
 fi
 
-# Dispatch the complete-install/uninstall actions before the generic flow
-# so they exit cleanly without triggering the full interactive install.
+# --dev-link / --dev-link=off are 'code' mode only, and mutually exclusive.
+if $DEV_LINK && $DEV_LINK_OFF; then
+    fail "--dev-link and --dev-link=off are mutually exclusive."
+fi
+if ( $DEV_LINK || $DEV_LINK_OFF ) && [ "$MODE" != "code" ]; then
+    fail "--dev-link is only supported with 'code' mode."
+fi
+
+# Dispatch the complete-install/uninstall/dev-link actions before the
+# generic flow so they exit cleanly without triggering the full interactive
+# install.
 if $COMPLETE_INSTALL; then
     complete_install_from_plugin
     exit 0
 fi
 if $COMPLETE_UNINSTALL; then
     complete_uninstall_from_plugin
+    exit 0
+fi
+if $DEV_LINK; then
+    dev_link_install
+    exit 0
+fi
+if $DEV_LINK_OFF; then
+    dev_link_remove
     exit 0
 fi
 

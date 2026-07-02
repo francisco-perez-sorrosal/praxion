@@ -83,11 +83,14 @@ def _emit_updated_input(tool_input: dict, prompt: str) -> None:
     """
     updated = dict(tool_input)
     updated["prompt"] = f"{_PREAMBLE}\n\n{prompt}"
+    # Harness contract: updatedInput's value IS the replacement tool-input params
+    # object — never wrap it in an envelope key. The harness validates it directly
+    # against the tool's schema; a wrapper makes every required param "missing".
     output = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "allow",
-            "updatedInput": {"tool_input": updated},
+            "updatedInput": updated,
         }
     }
     print(json.dumps(output))

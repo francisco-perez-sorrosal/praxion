@@ -114,7 +114,7 @@ def _run_hook(
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture()
+@pytest.fixture
 def praxion_project(tmp_path: Path) -> Path:
     """A temporary directory that looks like a Praxion-managed project.
 
@@ -126,7 +126,7 @@ def praxion_project(tmp_path: Path) -> Path:
     return tmp_path
 
 
-@pytest.fixture()
+@pytest.fixture
 def non_praxion_project(tmp_path: Path) -> Path:
     """A temporary directory without .ai-state/ — not a Praxion project."""
     return tmp_path
@@ -159,10 +159,10 @@ def test_host_native_subagent_receives_preamble_in_praxion_project(
     assert result.returncode == 0, f"Hook exited non-zero: {result.stderr}"
     assert result.stdout, "Expected updatedInput JSON on stdout"
     output = json.loads(result.stdout)
-    updated_prompt = output["hookSpecificOutput"]["updatedInput"]["tool_input"]["prompt"]
-    assert updated_prompt.startswith(PREAMBLE_MARKER), (
-        f"Preamble not prepended for {subagent_type!r}: {updated_prompt[:80]!r}"
-    )
+    updated_prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
+    assert updated_prompt.startswith(
+        PREAMBLE_MARKER
+    ), f"Preamble not prepended for {subagent_type!r}: {updated_prompt[:80]!r}"
     assert _ORIGINAL_PROMPT in updated_prompt, "Original prompt must be preserved after preamble"
 
 
@@ -174,7 +174,7 @@ def test_preamble_contains_behavioral_contract_keywords(
     result = _run_hook(payload)
     assert result.returncode == 0
     output = json.loads(result.stdout)
-    prompt = output["hookSpecificOutput"]["updatedInput"]["tool_input"]["prompt"]
+    prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
     for keyword in [
         "Surface Assumptions",
         "Register Objection",
@@ -191,7 +191,7 @@ def test_preamble_contains_return_contract(praxion_project: Path) -> None:
     result = _run_hook(payload)
     assert result.returncode == 0
     output = json.loads(result.stdout)
-    prompt = output["hookSpecificOutput"]["updatedInput"]["tool_input"]["prompt"]
+    prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
     for phrase in ["pointer, not a payload", ".ai-work/"]:
         assert phrase in prompt, f"Return-contract phrase {phrase!r} missing"
 
@@ -202,12 +202,12 @@ def test_preamble_length_is_compact(praxion_project: Path) -> None:
     result = _run_hook(payload)
     assert result.returncode == 0
     output = json.loads(result.stdout)
-    prompt = output["hookSpecificOutput"]["updatedInput"]["tool_input"]["prompt"]
+    prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
     # Extract only the prepended preamble (everything before the original prompt)
     preamble = prompt[: prompt.index(_ORIGINAL_PROMPT)]
-    assert len(preamble) <= 300, (
-        f"Preamble too long ({len(preamble)} chars, spec ~180+separator): {preamble!r}"
-    )
+    assert (
+        len(preamble) <= 300
+    ), f"Preamble too long ({len(preamble)} chars, spec ~180+separator): {preamble!r}"
 
 
 def test_output_preserves_subagent_type_unchanged(praxion_project: Path) -> None:
@@ -216,7 +216,7 @@ def test_output_preserves_subagent_type_unchanged(praxion_project: Path) -> None
     result = _run_hook(payload)
     assert result.returncode == 0
     output = json.loads(result.stdout)
-    returned_type = output["hookSpecificOutput"]["updatedInput"]["tool_input"]["subagent_type"]
+    returned_type = output["hookSpecificOutput"]["updatedInput"]["subagent_type"]
     assert returned_type == "Plan"
 
 
@@ -241,10 +241,10 @@ def test_output_preserves_description_and_other_tool_input_fields(
     result = _run_hook(payload)
     assert result.returncode == 0, f"Hook exited non-zero: {result.stderr}"
     output = json.loads(result.stdout)
-    returned = output["hookSpecificOutput"]["updatedInput"]["tool_input"]
-    assert returned.get("description") == "probe task", (
-        "description field dropped — host-native Agent spawns will fail schema validation"
-    )
+    returned = output["hookSpecificOutput"]["updatedInput"]
+    assert (
+        returned.get("description") == "probe task"
+    ), "description field dropped — host-native Agent spawns will fail schema validation"
     assert returned.get("model") == "sonnet", "model field dropped"
     assert returned.get("run_in_background") is True, "run_in_background field dropped"
     # And the prompt is still injected
@@ -306,10 +306,10 @@ def test_praxion_native_receives_preamble_when_opt_in_env_set(
     assert result.returncode == 0
     assert result.stdout, "Expected updatedInput JSON when opt-in env is set"
     output = json.loads(result.stdout)
-    prompt = output["hookSpecificOutput"]["updatedInput"]["tool_input"]["prompt"]
-    assert prompt.startswith(PREAMBLE_MARKER), (
-        f"Preamble not prepended for {subagent_type!r} with opt-in env set"
-    )
+    prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
+    assert prompt.startswith(
+        PREAMBLE_MARKER
+    ), f"Preamble not prepended for {subagent_type!r} with opt-in env set"
 
 
 def test_praxion_native_injection_opt_in_does_not_affect_host_native(
@@ -499,7 +499,7 @@ def test_second_call_same_session_id_still_injects(praxion_project: Path) -> Non
         assert result.returncode == 0
         assert result.stdout, "Injection must fire on each call (same session_id)"
         output = json.loads(result.stdout)
-        prompt = output["hookSpecificOutput"]["updatedInput"]["tool_input"]["prompt"]
+        prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
         assert prompt.startswith(PREAMBLE_MARKER)
 
 

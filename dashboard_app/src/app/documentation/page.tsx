@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { EmptyState } from "@/components/empty-state";
 import { PageShell } from "@/components/page-shell";
-import { resolveRenderer } from "@/components/registry";
+import { RENDERER_REGISTRY, resolveRenderer } from "@/components/registry";
 import { getConfig } from "@/lib/config";
 import {
   getDocumentationData,
@@ -57,6 +57,7 @@ export default async function DocumentationPage({
 
   if (selectedSurfaceData?.renderMode === "markdown") {
     const Renderer = resolveRenderer(
+      selectedSurface?.renderer,
       selectedSurface?.diataxis,
       selectedSurface?.type
     );
@@ -67,7 +68,7 @@ export default async function DocumentationPage({
         <Renderer body={selectedSurfaceData.body} surface={selectedSurface ?? undefined} />
       );
   } else if (selectedSurfaceData?.renderMode === "api") {
-    const Renderer = resolveRenderer(undefined, "api_reference");
+    const Renderer = resolveRenderer(undefined, undefined, "api_reference");
     renderedBody =
       selectedSurfaceData.body === null ? (
         <p className="muted">{selectedSurfaceData.errorMessage ?? "Unreadable file."}</p>
@@ -75,9 +76,14 @@ export default async function DocumentationPage({
         <Renderer body={selectedSurfaceData.body} surface={selectedSurface ?? undefined} />
       );
   } else if (selectedSurfaceData?.renderMode === "code") {
+    const rendererKey = selectedSurface?.renderer;
+    const CodeRenderer =
+      rendererKey !== undefined ? RENDERER_REGISTRY.get(rendererKey) : undefined;
     renderedBody =
       selectedSurfaceData.body === null ? (
         <p className="muted">{selectedSurfaceData.errorMessage ?? "Unreadable file."}</p>
+      ) : CodeRenderer !== undefined ? (
+        <CodeRenderer body={selectedSurfaceData.body} surface={selectedSurface ?? undefined} />
       ) : (
         <pre className="code-block">{selectedSurfaceData.body}</pre>
       );

@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-07-02T06:44:06Z'
+generated_at: '2026-07-02T06:58:40Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -33,7 +33,7 @@ surfaces:
   path: README_DEV.md
   type: markdown
   title: Developer Guide
-  last_modified: '2026-06-29'
+  last_modified: '2026-07-01'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-040-eval-framework-out-of-band
@@ -439,7 +439,7 @@ surfaces:
   path: docs/rework-dispatch.md
   type: markdown
   title: Dispatching Reworks
-  last_modified: '2026-05-15'
+  last_modified: '2026-07-01'
   renderer: default_markdown
   surfaces_referenced:
   - claude

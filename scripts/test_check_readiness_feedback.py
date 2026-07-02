@@ -281,3 +281,25 @@ def test_latest_report_resolved_by_filename_sort(
     assert (
         exc.value.code == 0
     ), "Must read the newest file (level=3) by filename sort, not the older file (level=2)"
+
+
+def test_flags_below_floor_readiness(tmp_path: Path) -> None:
+    """Canary: adjusted_level=2 (below the READINESS_FLOOR of 3) must be flagged.
+
+    Drives the detection logic directly through `compute_readiness_verdict` (the
+    core computation, independent of the CLI/argparse/SystemExit plumbing) with a
+    known-bad fixture. If the `below_threshold = adjusted_level < READINESS_FLOOR`
+    comparison in `_extract_readiness` were gutted — e.g. hardcoded to always
+    return False — this assertion goes red. Gate-liveness canary per
+    rules/swe/gate-liveness.md.
+    """
+    _write_report(tmp_path, {"adjusted_level": 2, "level": 2, "note": "mechanical-only"})
+
+    mod = _load_module()
+    verdict = mod.compute_readiness_verdict(tmp_path)
+
+    assert (
+        verdict["below_threshold"] is True
+    ), "adjusted_level=2 is below READINESS_FLOOR=3 — the gate must flag it as below_threshold"
+    assert verdict["adjusted_level"] == 2
+    assert "below the production floor" in verdict["details"]

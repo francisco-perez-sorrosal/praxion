@@ -65,7 +65,17 @@ dev = [
 # so downstream tooling finds it at the first-candidate path.
 
 [tool.pytest.ini_options]
-addopts = "--cov --cov-report=xml --cov-report=term-missing"
+# --cov-config is pinned explicitly (rather than left to pytest-cov's
+# ".coveragerc" default) so that subprocess coverage embedding -- triggered
+# automatically via pytest-cov's globally-installed .pth site hook whenever
+# a spawned child inherits the COV_CORE_* env vars -- resolves to this exact
+# file's [tool.coverage.run] branch=true, regardless of the child's own cwd.
+# Tests that spawn `sys.executable` subprocesses with cwd set to a tmp_path
+# fixture (not the repo root) cannot auto-discover pyproject.toml by relative
+# search; without this pin they silently fall back to statement-only
+# coverage, which the session-level combine step cannot merge with the
+# parent's branch-mode data (INTERNALERROR coverage.exceptions.DataError).
+addopts = "--cov --cov-config=pyproject.toml --cov-report=xml --cov-report=term-missing"
 testpaths = ["tests", "scripts"]
 markers = [
     "slow: marks tests that invoke real pip/venv operations (deselect with -m 'not slow')",

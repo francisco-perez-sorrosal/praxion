@@ -10,7 +10,7 @@ Architecture Decision Records live in `.ai-state/decisions/` as Markdown files w
 
 ### File Format
 
-Pipeline-authored ADRs follow the **fragment-name-at-create, finalize-at-merge** path: the ADR lands as a fragment under `.ai-state/decisions/drafts/` with a collision-safe filename and a provisional `dec-draft-<hash>` id, then is promoted to a stable `<NNN>-<slug>.md` record at merge-to-main. The legacy NNN-at-create path survives only for direct-tier user-authored ADRs that bypass a pipeline (see [Finalized ADRs (post-merge)](#finalized-adrs-post-merge)).
+Pipeline-authored ADRs follow the **fragment-name-at-create, finalize-at-merge** path: the ADR lands as a fragment under `.ai-state/decisions/drafts/` with a collision-safe filename and a provisional `dec-draft-<hash>` id, then is promoted to a stable `<NNN>-<slug>.md` record at merge-to-main. The legacy NNN-at-create path survives only for manual, no-session ADRs — hand-authored with no session or agent involved (see [Finalized ADRs (post-merge)](#finalized-adrs-post-merge)).
 
 #### Fragment Filename Schema
 
@@ -36,7 +36,7 @@ After finalize runs at merge-to-main (see [Finalize Protocol](#finalize-protocol
 
 **Naming**: `<NNN>-<slug>.md` — zero-padded 3-digit sequence number, kebab-case slug. The `<NNN>` is assigned by the finalize script at merge-to-main, not at creation; pipeline-authored ADRs never pick their own `<NNN>`.
 
-**Direct-tier user-authored ADRs** (no pipeline, no agent) MAY be created directly at `.ai-state/decisions/<NNN>-<slug>.md`, the next `<NNN>` assigned by scanning existing filenames (ignoring `drafts/`). This legacy path is for one-off human decisions outside a pipeline; it is deprecated for all agent- and pipeline-authored ADRs.
+**Manual, no-session ADRs** (hand-authored with no session or agent involved) MAY be created directly at `.ai-state/decisions/<NNN>-<slug>.md`, the next `<NNN>` assigned by scanning existing filenames (ignoring `drafts/`) — deprecated for all agent- and pipeline-authored ADRs, orchestrator-authored ones included.
 
 #### Frontmatter
 
@@ -52,9 +52,9 @@ The frontmatter schema is shared between draft and finalized ADRs. Only the `id`
 | `summary` | string | Yes | One-line description for index and scanning |
 | `tags` | list | Yes | Lowercase topic tags for filtering |
 | `made_by` | string | Yes | `agent` / `user` |
-| `agent_type` | string | When agent | Which agent (e.g., `systems-architect`) |
+| `agent_type` | string | When agent | Which agent (e.g., `systems-architect`, `orchestrator`) |
 | `branch` | string | Recommended on drafts | Sanitized authoring branch (`[a-z0-9-]+`). Lets `finalize_adrs.py` disambiguate hyphenated branches from slugs without sibling-prefix discovery — eliminates the single-fragment parsing ambiguity (td-017). Optional for backward compat; pre-existing fragments without it still parse via filename heuristics |
-| `pipeline_tier` | string | No | `direct` / `lightweight` / `standard` / `full` / `spike` |
+| `pipeline_tier` | string | No | `direct` / `lightweight` / `standard` / `full` / `spike` — the 5-tier calibration value (process weight actually used), never an execution-mode label; "no agent fan-out" and similar notes belong in the calibration-log `Source` field/prose, not here |
 | `affected_files` | list | No | Paths impacted by the decision |
 | `affected_reqs` | list | No | REQ IDs linked to the decision |
 | `supersedes` | string | No | id of prior decision |
@@ -93,7 +93,8 @@ For the full step sequence (draft detection, NNN assignment, file rename + front
 | systems-architect | Phase 4 (trade-off analysis) | Significant trade-offs: system boundaries, data model, technology selection, security | `.ai-state/decisions/drafts/` (fragment) |
 | implementation-planner | Step decomposition | Decisions affecting step ordering, module structure, approach | `.ai-state/decisions/drafts/` (fragment) |
 | interface-designer | Phase 4 (trade-off analysis) | Interface-layer decisions: UI framework / API paradigm / MCP tool decomposition / error format / pagination / component-pattern selection | `.ai-state/decisions/drafts/` (fragment) |
-| user | Direct tier or manual | Any decision worth preserving | `.ai-state/decisions/drafts/` preferred; `<NNN>-<slug>.md` acceptable for direct-tier, no-pipeline authoring |
+| orchestrator | Direct/Lightweight tier, no pipeline agent spawned | Any decision worth preserving during an interactive session | `.ai-state/decisions/drafts/` (fragment; preferred) |
+| user | Manual (no session, no agent) | Any decision worth preserving | `.ai-state/decisions/drafts/` preferred; `<NNN>-<slug>.md` acceptable only for this manual, no-session, no-agent path |
 
 All ADR authors also record decisions in `LEARNINGS.md ### Decisions Made` using the structured format. While a pipeline is in flight, `LEARNINGS.md` carries `dec-draft-<hash>` references; finalize rewrites these to `dec-NNN` at merge-to-main.
 

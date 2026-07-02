@@ -1,10 +1,11 @@
 """Tests for check_calibration_coverage.py -- calibration-coverage detector.
 
 Gate-liveness contract (rules/swe/gate-liveness.md): this is a CODE gate
-detecting uncalibrated pipeline work (Standard/Full-tier merges that landed
-after the newest calibration_log.md row). It ships canaries — tests that feed
-a known-lapsed calibration state and assert the gate bites (exit 1 / covered:false).
-A detector that only passes when the log is current is indistinguishable from no gate.
+detecting uncalibrated task work (task-completing commits of any tier that
+landed after the newest calibration_log.md row). It ships canaries — tests that
+feed a known-lapsed calibration state and assert the gate bites (exit 1 /
+covered:false). A detector that only passes when the log is current is
+indistinguishable from no gate.
 
 All tests are hermetic: each builds a temporary git repo with controlled history
 and an injected .ai-state/calibration_log.md (controlled timestamps). The real
@@ -144,30 +145,58 @@ def test_no_warning_when_log_is_current(tmp_path: Path, capsys: pytest.CaptureFi
     ), "Current calibration log (future timestamp) must not report under-coverage"
 
 
-def test_no_warning_on_docs_or_chore_only_merges(
+def test_flags_docs_and_refactor_and_test_only_commits(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """docs: and chore: commits are not Standard/Full pipeline work and must not trigger the gate.
+    """docs:/refactor:/test: commits are task-completing work of any tier and must trigger the gate.
 
-    Scenario: calibration log is old (2025-01-01) but every commit since is docs: or chore:.
-    The detector filters by feat:/fix: prefix; no pipeline work means exit 0.
+    Scenario: calibration log is old (2025-01-01) and every commit since is docs:,
+    refactor:, or test: — no feat:/fix: at all. Under the widened any-tier contract
+    these still count toward under-coverage, since the Direct/Lightweight tiers
+    routinely complete tasks under exactly these prefixes.
     """
     _init_repo(tmp_path)
     _write_calibration_log(tmp_path, "2025-01-01")
     _git(tmp_path, "add", ".ai-state")
     _git(tmp_path, "commit", "-m", "chore: add calibration baseline")
     _make_commit(tmp_path, "docs: update README")
-    _make_commit(tmp_path, "docs: revise architecture documentation")
-    _make_commit(tmp_path, "chore: upgrade CI action pins")
-    _make_commit(tmp_path, "chore: bump dependency versions")
+    _make_commit(tmp_path, "refactor: extract helper module")
+    _make_commit(tmp_path, "test: add regression coverage")
+
+    mod = _load_module()
+    with pytest.raises(SystemExit) as exc:
+        mod.main(["--repo-root", str(tmp_path), "--check"])
+
+    assert exc.value.code == 1, (
+        "docs:/refactor:/test: commits are task-completing work of any tier — "
+        "they must count toward under-coverage under the widened contract"
+    )
+
+
+def test_excludes_bump_and_chore_finalize_commits(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """bump: and chore(finalize) commits are release/bookkeeping, never task work.
+
+    Scenario: calibration log is old (2025-01-01) but every commit since is a
+    version bump or an ADR-finalize commit. Even though `chore(finalize)` shares
+    the `chore:` family now counted by the widened prefix set, both remain
+    excluded — the detector must still report exit 0.
+    """
+    _init_repo(tmp_path)
+    _write_calibration_log(tmp_path, "2025-01-01")
+    _git(tmp_path, "add", ".ai-state")
+    _git(tmp_path, "commit", "-m", "chore: add calibration baseline")
+    _make_commit(tmp_path, "bump: version 0.1.0 → 0.2.0")
+    _make_commit(tmp_path, "chore(finalize): promote draft ADR to dec-999")
 
     mod = _load_module()
     with pytest.raises(SystemExit) as exc:
         mod.main(["--repo-root", str(tmp_path), "--check"])
 
     assert exc.value.code == 0, (
-        "docs:/chore: only merges must not trigger under-coverage — "
-        "only feat:/fix: pipeline commits count as uncalibrated work"
+        "bump:/chore(finalize) commits must be excluded from the count even when "
+        "they post-date the calibration log — they are not task-completing work"
     )
 
 
@@ -206,7 +235,7 @@ def test_runs_to_verdict_without_sentinel(
     ), "check_calibration_coverage.py must not subprocess-invoke agents/sentinel.md"
 
 
-def test_canary_stale_log_bites(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_flags_stale_calibration_log(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """Gate-liveness canary: known-lapsed calibration state must yield covered=false.
 
     A gate that never fires on known-bad input is indistinguishable from no gate

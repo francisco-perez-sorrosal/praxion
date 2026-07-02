@@ -1032,10 +1032,11 @@
 /* ─── DiagramModal ───────────────────────────────────────────────────────────
    Fullscreen pan/zoom inspector opened by DiagramFrame's Expand button. */
 
-/* Dim backdrop: covers the entire viewport behind the dialog. */
-.diagram-modal__backdrop {
+/* Overlay: fixed full-viewport flex container centering the dialog above
+   the backdrop. Not aria-hidden — the dialog is a normal, accessible
+   sibling of the backdrop rather than its descendant. */
+.diagram-modal__overlay {
   align-items: center;
-  background: rgba(15, 23, 42, 0.6);
   bottom: 0;
   display: flex;
   justify-content: center;
@@ -1046,7 +1047,17 @@
   z-index: var(--z-modal);
 }
 
-/* Dialog surface: centred, elevated, large viewport. */
+/* Dim backdrop: covers the entire viewport behind the dialog. Sibling of
+   the dialog, not an ancestor. */
+.diagram-modal__backdrop {
+  background: rgba(15, 23, 42, 0.6);
+  inset: 0;
+  position: absolute;
+  z-index: 0;
+}
+
+/* Dialog surface: centred, elevated, large viewport. Stacked above the
+   backdrop within the overlay's stacking context. */
 .diagram-modal {
   background: var(--color-surface-1);
   border: 1px solid var(--color-border);
@@ -1058,7 +1069,9 @@
   max-width: 96vw;
   outline: none;
   overflow: hidden;
+  position: relative;
   width: 96vw;
+  z-index: 1;
 }
 
 /* Header: diagram title + control buttons in a single row. */

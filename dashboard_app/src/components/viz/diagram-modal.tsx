@@ -114,20 +114,13 @@ export function DiagramModal({ svg, label, onClose, triggerRef }: DiagramModalPr
     }
   }
 
-  // ── Backdrop click (close) ────────────────────────────────────────────────
-  function handleBackdropClick(e: React.MouseEvent<HTMLDivElement>): void {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  }
-
   return (
-    /* Backdrop */
-    <div
-      className="diagram-modal__backdrop"
-      onClick={handleBackdropClick}
-      aria-hidden="true"
-    >
+    /* Overlay: positions the backdrop and dialog as siblings so aria-hidden
+       on the backdrop never hides the dialog from the accessibility tree. */
+    <div className="diagram-modal__overlay">
+      {/* Backdrop: click anywhere on it to close */}
+      <div className="diagram-modal__backdrop" onClick={onClose} aria-hidden="true" />
+
       {/* Dialog surface */}
       <div
         ref={dialogRef}

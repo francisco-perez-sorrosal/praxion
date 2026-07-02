@@ -31,14 +31,11 @@ describe("DiagramFrame — Expand opens the fullscreen pan/zoom modal", () => {
     const user = userEvent.setup();
     render(<DiagramFrame svg={SVG} label="Agent Pipeline" />);
 
-    expect(screen.queryByRole("dialog", { hidden: true })).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
 
     await user.click(screen.getByRole("button", { name: /expand agent pipeline/i }));
 
-    // The modal backdrop carries aria-hidden="true", which hides the nested
-    // dialog from the default accessible-role query; { hidden: true } opts
-    // back in for this structural assertion (see LEARNINGS.md).
-    expect(screen.getByRole("dialog", { hidden: true })).toBeTruthy();
+    expect(screen.getByRole("dialog")).toBeTruthy();
   });
 });
 
@@ -51,7 +48,19 @@ describe("DiagramFrame — Escape closes the modal and restores focus", () => {
     await user.click(trigger);
     await user.keyboard("{Escape}");
 
-    expect(screen.queryByRole("dialog", { hidden: true })).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(trigger);
+  });
+});
+
+describe("DiagramFrame — the open dialog is exposed to the accessibility tree", () => {
+  it("is discoverable via getByRole('dialog') and carries aria-modal", async () => {
+    const user = userEvent.setup();
+    render(<DiagramFrame svg={SVG} label="Agent Pipeline" />);
+
+    await user.click(screen.getByRole("button", { name: /expand agent pipeline/i }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
   });
 });

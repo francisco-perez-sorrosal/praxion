@@ -387,7 +387,7 @@ def test_subagent_context_hook_updates_agent_and_task_payloads(tmp_path: Path):
         spec = output["hookSpecificOutput"]
         assert spec["hookEventName"] == "PreToolUse"
         assert spec["permissionDecision"] == "allow"
-        prompt = spec["updatedInput"]["tool_input"]["prompt"]
+        prompt = spec["updatedInput"]["prompt"]
         assert "Surface Assumptions" in prompt
         assert "Inspect the adapter surface." in prompt
 

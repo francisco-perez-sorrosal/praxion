@@ -446,6 +446,102 @@ class TestParseFragmentBranchFromFrontmatter:
         result = finalize._read_draft_branch(tmp_path / "does-not-exist.md")
         assert result is None
 
+    def _mock_mismatched_git_hints(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Simulate finalize running post-merge on `main` under a git
+        identity whose email-derived slug does not match the fragment's
+        (hyphenated) filename user segment -- the exact condition that
+        defeated the pre-td-052 user-hint-first split.
+        """
+
+        def _fake_run(args, **_kwargs):
+            if args[:3] == ["git", "rev-parse", "--abbrev-ref"]:
+                return subprocess.CompletedProcess(
+                    args=args, returncode=0, stdout="main\n", stderr=""
+                )
+            if args[:3] == ["git", "config", "--get"] and "user.email" in args:
+                return subprocess.CompletedProcess(
+                    args=args,
+                    returncode=0,
+                    stdout="fperezsorrosal@gmail.com\n",
+                    stderr="",
+                )
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+
+        monkeypatch.setattr(finalize.subprocess, "run", _fake_run)
+
+    def test_hyphenated_user_with_frontmatter_branch_parses_correctly(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """td-052 regression: the exact historical fragment name --
+        ``francisco-perez-sorrosal`` (a hyphenated user slug) with
+        ``branch: dashboard-debt-trio`` in frontmatter -- must split to
+        slug=``renderer-field-resolver-key``, not the junk
+        ``sorrosal-dashboard-debt-trio-renderer-field-resolver-key`` the
+        pre-fix parser produced when the git-config user hint (here,
+        email-derived ``fperezsorrosal``) didn't prefix-match the
+        filename's hyphenated user segment and the frontmatter branch was
+        never consulted as a fallback.
+        """
+        self._mock_mismatched_git_hints(monkeypatch)
+
+        path = self._write_fragment(
+            tmp_path,
+            "20260701-2352-francisco-perez-sorrosal-dashboard-debt-trio-"
+            "renderer-field-resolver-key.md",
+            frontmatter_extra={"branch": "dashboard-debt-trio"},
+        )
+
+        _, user, branch, slug = finalize.parse_fragment_filename(path)
+        assert user == "francisco-perez-sorrosal"
+        assert branch == "dashboard-debt-trio"
+        assert slug == "renderer-field-resolver-key"
+
+    def test_conforming_user_with_frontmatter_branch_still_parses_identically(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The td-052 fix must not disturb the conforming (non-hyphenated
+        user) case: same branch and slug tokens as the historical fragment
+        above, single-token user -- still splits cleanly via the
+        frontmatter branch token-run strip.
+        """
+        self._mock_mismatched_git_hints(monkeypatch)
+
+        path = self._write_fragment(
+            tmp_path,
+            "20260701-2352-alice-dashboard-debt-trio-renderer-field-resolver-key.md",
+            frontmatter_extra={"branch": "dashboard-debt-trio"},
+        )
+
+        _, user, branch, slug = finalize.parse_fragment_filename(path)
+        assert user == "alice"
+        assert branch == "dashboard-debt-trio"
+        assert slug == "renderer-field-resolver-key"
+
+    def test_hyphenated_user_without_frontmatter_branch_keeps_current_heuristic(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Characterization, not a fix: a hyphenated-user fragment with NO
+        `branch:` frontmatter (predating td-017, or an agent that omitted
+        it) has no authoritative signal to strip first, so it still falls
+        through to the pre-existing first-token/second-token heuristic --
+        which mis-splits multi-word users exactly as it always has. That
+        fallback path is out of scope for td-052; this test locks down its
+        current (imperfect) output so a future change to it is deliberate.
+        """
+        self._mock_mismatched_git_hints(monkeypatch)
+
+        path = self._write_fragment(
+            tmp_path,
+            "20260701-2352-francisco-perez-sorrosal-dashboard-debt-trio-"
+            "renderer-field-resolver-key.md",
+            frontmatter_extra=None,  # no branch field -- Tier 0 never engages
+        )
+
+        _, user, branch, slug = finalize.parse_fragment_filename(path)
+        assert user == "francisco"
+        assert branch == "perez"
+        assert slug == "sorrosal-dashboard-debt-trio-renderer-field-resolver-key"
+
 
 # -- Next-NNN assignment ------------------------------------------------------
 
@@ -797,7 +893,8 @@ class TestFinalizeIndex:
         # Load regenerate_adr_index as a module
         regen_path = Path(__file__).resolve().parent / "regenerate_adr_index.py"
         regen_spec = importlib.util.spec_from_file_location("regenerate_adr_index", regen_path)
-        assert regen_spec is not None and regen_spec.loader is not None
+        assert regen_spec is not None
+        assert regen_spec.loader is not None
         regen_mod = importlib.util.module_from_spec(regen_spec)
         regen_spec.loader.exec_module(regen_mod)
 
@@ -1319,7 +1416,8 @@ class TestMalformedSlugVisibility:
         filename = f"20260612-2310-alice-main-{slug}.md"
 
         assert finalize.FRAGMENT_ADR_PATTERN.match(filename) is not None
-        assert "." not in slug and ":" not in slug
+        assert "." not in slug
+        assert ":" not in slug
 
 
 # -- Plugin-cache write guard -------------------------------------------------
@@ -1380,4 +1478,5 @@ class TestWidenedCrossReferenceScope:
         assert modified == len(targets)
         for path in targets:
             text = path.read_text(encoding="utf-8")
-            assert new in text and old not in text
+            assert new in text
+            assert old not in text

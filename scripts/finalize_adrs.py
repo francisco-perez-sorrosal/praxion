@@ -90,11 +90,23 @@ def parse_fragment_filename(path: Path) -> tuple[datetime, str, str, str]:
     contain hyphens, pure-filename parsing is ambiguous. The parser resolves
     the user/branch/slug boundaries in order of decreasing confidence:
 
-    1. **Frontmatter `branch:` field (td-017 fix)**: when the fragment
-       carries an explicit `branch:` value in frontmatter, use it as the
-       authoritative branch name and split the filename around it. Eliminates
-       the single-fragment hyphenated-branch ambiguity. Backward compatible:
-       fragments without the field fall through to the heuristics below.
+    1. **Frontmatter `branch:` token-run strip (td-052 fix, extends
+       td-017)**: when the fragment carries an explicit `branch:` value,
+       search `rest`'s dash-delimited tokens for a contiguous run matching
+       the branch's own tokens (requiring at least one token before it for
+       the user, and at least one after for the slug) and strip it --
+       *independent* of whether the current git user matches the filename's
+       user segment. This is what makes the frontmatter branch authoritative
+       even when the filename's user slug is itself hyphenated (e.g. a
+       legal-name-derived slug like `francisco-perez-sorrosal` recorded at
+       fragment-creation time, diverging from the git-config-derived
+       `user_hint` computed at finalize time). The original td-017 fix only
+       consulted the frontmatter branch *after* an exact user-hint prefix
+       match, so a hyphenated-user mismatch skipped it entirely and fell
+       through to the ambiguous heuristic below. Falls through to the tiers
+       below when the branch value doesn't appear as a clean token run
+       (e.g. stale frontmatter after a since-renamed branch) or the field
+       is absent.
     2. Exact match against `git config user.*` + `git rev-parse HEAD`. The
        happy path when `finalize` runs on the branch that created the draft.
     3. Sibling-prefix discovery: scan fragments sharing `path.parent` for a
@@ -119,9 +131,10 @@ def parse_fragment_filename(path: Path) -> tuple[datetime, str, str, str]:
         raise ValueError(f"fragment filename too short (need user-branch-slug): {path.name}")
 
     # Tier 1: authoritative branch from frontmatter, if present. Takes
-    # precedence over the current-git-branch hint because it is the value
-    # the creating agent recorded at fragment-write time, immune to drift
-    # when finalize runs post-merge on `main`.
+    # precedence over the current-git-branch hint -- and over user-hint
+    # matching (td-052) -- because it is the value the creating agent
+    # recorded at fragment-write time, immune to drift when finalize runs
+    # post-merge on `main` or under a different git identity.
     branch_from_frontmatter = _read_draft_branch(path)
 
     user_slug_hint = _current_git_user_slug()
@@ -133,6 +146,7 @@ def parse_fragment_filename(path: Path) -> tuple[datetime, str, str, str]:
         branch_slug_hint,
         siblings_dir=path.parent,
         self_name=path.name,
+        branch_from_frontmatter=branch_from_frontmatter,
     )
     return timestamp, user, branch, slug
 
@@ -161,16 +175,27 @@ def _split_user_branch_slug(
     branch_hint: str | None,
     siblings_dir: Path | None = None,
     self_name: str | None = None,
+    branch_from_frontmatter: str | None = None,
 ) -> tuple[str, str, str]:
     """Split `<user>-<branch>-<slug>` using hints and sibling discovery.
 
     Priority order:
+        0. Frontmatter `branch:` token-run strip (td-052) -- when present,
+           strip its dash-token run from `rest` first, independent of
+           user-hint matching. Immune to hyphenated user slugs that defeat
+           the prefix-match tiers below.
         1. Both git hints match a prefix of `rest` -- consume exactly.
         2. Sibling-prefix discovery -- scan other fragments in
            `siblings_dir` for a common `<user>-<branch>-` prefix.
         3. Heuristic fallback -- user=first, branch=second, slug=rest
            (imperfect for multi-hyphen branches but deterministic).
     """
+    if branch_from_frontmatter:
+        stripped = _strip_branch_token_run(rest, branch_from_frontmatter)
+        if stripped is not None:
+            user, slug = stripped
+            return user, branch_from_frontmatter, slug
+
     if user_hint and rest.startswith(user_hint + "-"):
         after_user = rest[len(user_hint) + 1 :]
         if branch_hint and after_user.startswith(branch_hint + "-"):
@@ -208,6 +233,28 @@ def _split_user_branch_slug(
     if len(tokens) < 3:
         raise ValueError(f"fragment tail too short to split: {rest}")
     return tokens[0], tokens[1], tokens[2]
+
+
+def _strip_branch_token_run(rest: str, branch: str) -> tuple[str, str] | None:
+    """Strip the branch's dash-tokens from `rest` as a contiguous run.
+
+    Splits both `rest` and `branch` into dash-delimited tokens and searches
+    (left to right) for the first position where `branch`'s tokens appear as
+    a contiguous run in `rest`'s tokens, requiring at least one token before
+    the run (the user) and at least one after (the slug). Returns
+    (user, slug), each rejoined with dashes, on a match; None when the
+    branch value does not appear as a clean token run -- e.g. stale
+    frontmatter left over after the authoring branch was renamed -- so the
+    caller falls through to the heuristics below.
+    """
+    tokens = rest.split("-")
+    branch_tokens = branch.split("-")
+    run_len = len(branch_tokens)
+    last_start = len(tokens) - run_len - 1
+    for start in range(1, last_start + 1):
+        if tokens[start : start + run_len] == branch_tokens:
+            return "-".join(tokens[:start]), "-".join(tokens[start + run_len :])
+    return None
 
 
 def _discover_branch_from_siblings(

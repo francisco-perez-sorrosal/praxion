@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-07-02T05:30:11Z'
+generated_at: '2026-07-02T07:57:46Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
@@ -279,7 +279,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 17337
+  chars: 18198
   paths:
   - dashboard_app/**
   - '**/doc_manifest.yaml'

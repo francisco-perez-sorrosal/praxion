@@ -54,8 +54,9 @@ HTML rendering is **not hand-authored per artifact**. The as-built Next.js App R
 |---|---|---|
 | **Server view-models** | `dashboard_app/src/server/view-models/<surface>.ts` | Data shaping — reads MD/JSON/YAML from disk, returns typed props |
 | **Presentation primitives** | `dashboard_app/src/components/` | Stateless React components: `EmptyState`, `MarkdownSurface`, `LiveRefresh`, `MetricsDashboard`, `SidebarNav`, `MetricsSummaryCards`, `MetricsTrends`, `ArtifactCard`, `MetadataChips`, `EducationalPopover`, `AppHeader`, `PageShell`, `MarkdownToc` |
-| **Diátaxis shells** | `dashboard_app/src/components/shells/` | Layout chrome wrapping `MarkdownSurface`: `ReferenceShell`, `ExplanationShell`, `DefaultShell`; `TutorialShell`/`HowToShell`/`ConceptsShell` are default-aliasing stubs (see Diátaxis-Typed Shells) |
-| **Renderer registry** | `dashboard_app/src/components/registry.ts` | `RENDERER_REGISTRY: Map<string, ComponentType<{body: string; surface?: ManifestSurface}>>` + `resolveRenderer(diataxis?, contentType?)` |
+| **Diátaxis shells** | `dashboard_app/src/components/shells/` | Layout chrome wrapping `MarkdownSurface`: `ReferenceShell`, `ExplanationShell`, `DefaultShell`, `TutorialShell` (ordered step-rail), `HowToShell` (goal-banner), `ConceptsShell` (narrative + takeaway aside) |
+| **Per-artifact renderers** | `dashboard_app/src/components/renderers/` | Five specialized components for artifact types: `MetricsViewRenderer`, `PlanViewRenderer`, `VerificationReportRenderer`, `IdeaGridRenderer`, `ArchitectureExplorerRenderer`; all accept `{body, surface?}` and gracefully degrade to `DefaultShell` on malformed input |
+| **Renderer registry** | `dashboard_app/src/components/registry.ts` | `RENDERER_REGISTRY: Map<string, ComponentType<{body: string; surface?: ManifestSurface}>>` + `resolveRenderer(renderer?, diataxis?, contentType?)` — `renderer:` field is highest-priority key; preserves pre-existing diataxis/contentType fallback chain |
 | **Viz components** | `dashboard_app/src/components/viz/` | Interactive: `DiagramFrame`, `DiagramModal`, `DecisionGraph`, `TrendChart`, `Sparkline`, `usePanZoom` |
 | **Library utilities** | `dashboard_app/src/lib/`, `dashboard_app/src/server/` | Pure utilities: `markdown-headings.ts` (slugify, extractToc), `health-tone.ts` (metrics aggregation), `sidebar-signals.ts` (view-model for sidebar state), `normalize-svg.ts` (SVG attribute normalization) |
 | **Chrome components** | `dashboard_app/src/components/chrome/` | `Chip`, `Tabs`, `ErrorState` |
@@ -65,13 +66,13 @@ HTML rendering is **not hand-authored per artifact**. The as-built Next.js App R
 
 | Surface | Consumes | Implemented in |
 |---|---|---|
-| `plan_view` | `IMPLEMENTATION_PLAN.md` + `WIP.md` | `dashboard_app/` (via `MarkdownSurface` + registry) |
+| `plan_view` | `IMPLEMENTATION_PLAN.md` + `WIP.md` | `dashboard_app/src/components/renderers/plan-view.tsx` — derives step list from task items or H2/H3 headings |
 | `adr_card` | `<NNN>-*.md` ADR + graph | `dashboard_app/src/app/adrs/` |
-| `verification_report` | `VERIFICATION_REPORT.md` | `dashboard_app/` (via `MarkdownSurface`) |
-| `architecture_explorer` | `DESIGN.md` + `architecture.md` + diagrams | `dashboard_app/src/app/architecture/` |
+| `verification_report` | `VERIFICATION_REPORT.md` | `dashboard_app/src/components/renderers/verification-report.tsx` — scans for PASS/FAIL/WARN verdict badge |
+| `architecture_explorer` | `DESIGN.md` + `architecture.md` + diagrams | **Pathway A (full page)**: `dashboard_app/src/app/architecture/` — interactive; **Pathway B (thin renderer)**: `src/components/renderers/architecture-explorer.tsx` — compact section nav + link-out |
 | `traceability_matrix` | `traceability.yml` + spec | `dashboard_app/` (via `MarkdownSurface`) |
-| `idea_grid` | `IDEA_PROPOSAL.md` + `IDEA_LEDGER_*.md` | `dashboard_app/` (via `MarkdownSurface`) |
-| `metrics_view` | `METRICS_REPORT_*.json` | Implemented in `dashboard_app/src/app/metrics/` + `src/components/metrics-dashboard.tsx` |
+| `idea_grid` | `IDEA_PROPOSAL.md` + `IDEA_LEDGER_*.md` | `dashboard_app/src/components/renderers/idea-grid.tsx` — renders three status columns (Implemented/Pending/Discarded) from H2 sections |
+| `metrics_view` | `METRICS_REPORT_*.json` | **Pathway A (full page)**: `dashboard_app/src/app/metrics/` — interactive dashboard; **Pathway B (thin renderer)**: `src/components/renderers/metrics-view.tsx` — summary cards + link-out |
 
 **Adding a new component:** add a server view-model under `dashboard_app/src/server/view-models/`, a React component in `dashboard_app/src/components/`, and wire a page route under `dashboard_app/src/app/<surface>/page.tsx`. For content-typed rendering, register the component in `RENDERER_REGISTRY` keyed by its `diataxis:` value or content-type string. There is no `render(source_paths)` callable, no `__init__.ts`, and no top-level `dashboard_app/components/` directory — these do not exist in the as-built Next.js structure.
 
@@ -83,9 +84,9 @@ The renderer registry (`dashboard_app/src/components/registry.ts`) maps `diataxi
 |---|---|---|
 | `reference` | `ReferenceShell` — fixed ToC sidebar slot + dense-table styling | Implemented |
 | `explanation` | `ExplanationShell` — wide prose column + "why this matters" aside slot | Implemented |
-| `tutorial` | `TutorialShell` — default-aliasing stub (`export { DefaultShell as TutorialShell }`) | Stub — pending dedicated chrome (tracked in `.ai-state/TECH_DEBT_LEDGER.md`) |
-| `how-to` | `HowToShell` — default-aliasing stub | Stub — pending dedicated chrome |
-| `concepts` | `ConceptsShell` — default-aliasing stub | Stub — pending dedicated chrome |
+| `tutorial` | `TutorialShell` — ordered step-rail layout with left nav of H2 headings | Implemented |
+| `how-to` | `HowToShell` — goal-first layout with goal banner and body | Implemented |
+| `concepts` | `ConceptsShell` — narrative layout with key-takeaway aside | Implemented |
 | *(fallback)* | `DefaultShell` — plain card wrapping `MarkdownSurface` | Implemented |
 
 The MD body is rendered into the shell's content slot. **Same source, different cognitive ergonomics.** Other pages may dispatch through the registry but are not required to; the documentation page does.

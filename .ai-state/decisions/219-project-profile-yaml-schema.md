@@ -15,6 +15,7 @@ affected_files:
   - rules/swe/agent-intermediate-documents.md
   - commands/onboard-project.md
 related: [dec-221, dec-220, dec-216]
+superseded_by: dec-263
 ---
 
 ## Context
@@ -65,3 +66,10 @@ or env, never in `project_profile.yaml`.
   false-positive.
 - **Dogfood:** Praxion adopts its own `project_profile.yaml` (`paradigm: hybrid`,
   `eval_framework: custom`) per Decision E.
+
+## Prior Decision Note (partial supersession)
+
+The Phase 8f *producer clause* of this decision (project_profile.yaml written by /onboard-project
+Phase 8f) is retired by dec-263 — the producer was never built and the file has zero
+live consumers (every consumer falls back to live detection). The schema and location decision in
+this ADR stands unchanged and re-activates if the agentic-eval archetype feature ships a producer.

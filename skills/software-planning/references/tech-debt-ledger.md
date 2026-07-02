@@ -12,7 +12,7 @@ Back-link: [`../SKILL.md`](../SKILL.md) · Index entry in [`../../../rules/swe/a
 
 - **verifier** — appends per-change findings (dead-code survivors, bloat, duplication, size/nesting breaches) during Phase 5/5.5
 - **sentinel** — appends repo-wide findings via its TD dimension (hotspots, cyclic SCCs, coverage-floor breaches, p95 complexity crossings); TD05 audits the ledger but never writes
-- **orchestrator** — the main agent appends rows under explicit user direction when a grounded finding fits neither verifier's per-change nor sentinel's periodic-audit scope. Exception, not routine; verifier/sentinel may re-source orchestrator rows on later runs
+- **orchestrator** — the main agent appends rows under explicit user direction when a grounded finding fits neither verifier's per-change nor sentinel's periodic-audit scope, or when a standalone Direct-tier fix surfaces adjacent debt (the Stay-Surgical redirect: record the finding, don't expand the fix to address it). Exception, not routine; verifier/sentinel may re-source orchestrator rows on later runs
 - **architect-validator** — appends per-PR drift findings (`class: drift`, `goal-ref-type: architecture`, `owner-role: systems-architect`) in `--mode=pre-merge` or `--mode=on-demand`. Reserved for code↔DSL↔ADR triangle validation
 
 Consumer agents (systems-architect, implementation-planner, implementer, test-engineer, doc-engineer) read the ledger, filter by their `owner-role`, and update `status` / `resolved-by` / `last-seen` on existing rows when they address an item. No agent outside the four writers above creates new ledger rows.
@@ -186,6 +186,7 @@ Populate `location`, dates, `notes` (one sentence + why-filed), and remaining sc
 1. **Explicit user direction** — the user asks to file a grounded finding as tracked debt.
 2. **`defer-with-rationale` disposition** — the architect recorded defer on a Continuous Improvement Signal per [`disposition-vocabulary.md`](disposition-vocabulary.md); the documented defer criteria become the row's `notes`. Verifier or sentinel remain preferred if the finding fits their scope on a later pass.
 3. **Scope gap** — a grounded finding fits neither verifier's per-change scope (Phase 5/5.5) nor sentinel's periodic-audit scope (TD/TT/EC dimensions). File with honest `source: orchestrator` rather than misattributing to verifier or sentinel.
+4. **Standalone Direct-tier session, adjacent debt surfaced by a fix** — the fix reveals a grounded problem outside its own declared scope; the orchestrator records the finding as a row rather than expanding the fix to address it (the Stay-Surgical redirect).
 
 **When NOT to append.** Per-change findings during verification → § Producer overlays → **verifier**. Metrics/repo-wide audit signals → **sentinel**. Per-PR structural drift → **architect-validator**. Verifier and sentinel may **re-source** orchestrator rows on subsequent runs.
 

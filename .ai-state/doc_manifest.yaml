@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-07-02T08:20:00Z'
+generated_at: '2026-07-02T14:57:49Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -513,13 +513,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-07-01'
+  last_modified: '2026-07-02'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-07-01'
+  last_modified: '2026-07-02'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -2129,6 +2129,12 @@ surfaces:
   title: Manifest `renderer:` field becomes a first-class resolveRenderer key
   last_modified: '2026-07-02'
   renderer: adr_card
+- id: ai-state-decisions-266-consolidate-subagent-prompt-injection
+  path: .ai-state/decisions/266-consolidate-subagent-prompt-injection.md
+  type: markdown
+  title: Consolidate subagent prompt injections into a single PreToolUse(Agent) emitter
+  last_modified: '2026-07-02'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -2670,6 +2676,7 @@ groups:
   - ai-state-decisions-263-retire-future-designed-producers
   - ai-state-decisions-264-tier-threshold-drift-accepted
   - ai-state-decisions-265-renderer-field-resolver-key
+  - ai-state-decisions-266-consolidate-subagent-prompt-injection
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

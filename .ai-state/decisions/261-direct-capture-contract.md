@@ -1,7 +1,7 @@
 ---
-id: dec-draft-1d0d6914
+id: dec-261
 title: Direct-tier capture contract — one row at commit as the universal durable write
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-01
 summary: Close the Direct-tier durable-capture leaks with a deterministic commit-time nudge, a one-line calibration row whose Retrospective cell is the micro-capture slot, and a tier-blind coverage detector — enforcement moved up the reliability hierarchy, zero new artifacts.
@@ -40,7 +40,7 @@ Adopt the **Direct Capture Contract**, keeping the Direct tier's process shape u
 - **D7:** widen the tech-debt-ledger orchestrator exception to cover standalone Direct-tier sessions (record adjacent debt, don't expand into it — the Stay-Surgical redirect).
 - **D8 (consolidation):** a single canonical Direct-tier wording; derivative surfaces point rather than restate; the change mirrored into the canonical block + both install commands. **D8's optional mechanical threshold-drift check is deferred** (see Consequences).
 
-This re-affirms `dec-252` (which added the CA03 *detector*) and completes it with the missing *producer-side* trigger (D2) and *tier-blind* scope (D3). (D6 — orchestrator as Direct/Lightweight ADR author — and the tier-vs-execution-mode taxonomy are split into the sibling ADR `dec-draft-8c08e257`.)
+This re-affirms `dec-252` (which added the CA03 *detector*) and completes it with the missing *producer-side* trigger (D2) and *tier-blind* scope (D3). (D6 — orchestrator as Direct/Lightweight ADR author — and the tier-vs-execution-mode taxonomy are split into the sibling ADR `dec-262`.)
 
 ## Considered Options
 

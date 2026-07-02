@@ -1,7 +1,7 @@
 ---
-id: dec-draft-8c08e257
+id: dec-262
 title: Tier is not execution mode — pipeline_tier semantics + orchestrator as Direct/Lightweight ADR author
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-07-01
 summary: Resolve the dec-133-class conflation by documenting that pipeline_tier is the 5-tier calibration value (process weight), not an execution-mode label; name the orchestrator as a sanctioned Direct/Lightweight ADR author; demote the NNN-at-create path to manual-user-only.

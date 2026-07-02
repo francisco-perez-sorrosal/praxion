@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-06-29T23:02:20Z'
+generated_at: '2026-07-02T06:21:16Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -57,7 +57,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-06-27'
+  last_modified: '2026-06-29'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -478,7 +478,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-06-29'
+  last_modified: '2026-07-01'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -505,7 +505,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-06-27'
+  last_modified: '2026-07-01'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -519,7 +519,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-06-29'
+  last_modified: '2026-07-01'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -1335,7 +1335,7 @@ surfaces:
   path: .ai-state/decisions/133-drop-dev-prereleases.md
   type: markdown
   title: Drop PEP 440 dev pre-releases for simpler SemVer-only flow
-  last_modified: '2026-05-08'
+  last_modified: '2026-07-01'
   renderer: adr_card
 - id: ai-state-decisions-134-dashboard-nextjs-runtime
   path: .ai-state/decisions/134-dashboard-nextjs-runtime.md
@@ -2099,11 +2099,23 @@ surfaces:
   title: Split the doc manifest into a committed-static durable index and a live .ai-work/ dimension
   last_modified: '2026-06-29'
   renderer: adr_card
+- id: ai-state-decisions-261-direct-capture-contract
+  path: .ai-state/decisions/261-direct-capture-contract.md
+  type: markdown
+  title: "Direct-tier capture contract \u2014 one row at commit as the universal durable write"
+  last_modified: '2026-07-01'
+  renderer: adr_card
+- id: ai-state-decisions-262-tier-vs-execution-mode-taxonomy
+  path: .ai-state/decisions/262-tier-vs-execution-mode-taxonomy.md
+  type: markdown
+  title: "Tier is not execution mode \u2014 pipeline_tier semantics + orchestrator as Direct/Lightweight ADR author"
+  last_modified: '2026-07-01'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-06-29'
+  last_modified: '2026-07-01'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -2635,6 +2647,8 @@ groups:
   - ai-state-decisions-258-chain-eval-form
   - ai-state-decisions-259-read-registry-cleanup-policy
   - ai-state-decisions-260-committed-vs-live-manifest
+  - ai-state-decisions-261-direct-capture-contract
+  - ai-state-decisions-262-tier-vs-execution-mode-taxonomy
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

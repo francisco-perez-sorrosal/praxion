@@ -93,10 +93,16 @@ def _script_gates(root: Path) -> list[Path]:
 
 
 def _hook_gates(root: Path) -> list[Path]:
-    """All hooks/*_gate.py, hooks/*_guard.py, hooks/*_gate.sh, excluding test_ files and skipped gates."""
+    """All hooks/*_gate.py, hooks/*_guard.py, hooks/*_gate.sh, hooks/remind_*.py.
+
+    Excludes test_ files and skipped gates. The remind_*.py advisory-hook family
+    (remind_adr.py, remind_calibration.py) fires fail-open stderr reminders rather
+    than blocking a commit, but is still a CODE gate under rules/swe/gate-liveness.md
+    -- it must be proven to bite on a known-bad input, not merely absent from scan.
+    """
     hooks = root / "hooks"
     gates: list[Path] = []
-    for pattern in ("*_gate.py", "*_guard.py", "*_gate.sh"):
+    for pattern in ("*_gate.py", "*_guard.py", "*_gate.sh", "remind_*.py"):
         for p in sorted(hooks.glob(pattern)):
             if p.name.startswith("test_"):
                 continue
@@ -140,8 +146,7 @@ def gates_without_canary(root: Path) -> list[str]:
         existing = [c for c in candidates if c.exists()]
         if not existing:
             missing.append(
-                f"{rel}: no test found (looked for test_{gate.stem}.py "
-                f"co-located or in tests/)"
+                f"{rel}: no test found (looked for test_{gate.stem}.py co-located or in tests/)"
             )
             continue
         if not any(_has_canary(c) for c in existing):
@@ -192,9 +197,9 @@ def test_flags_gate_without_canary(tmp_path: Path) -> None:
     _make_gate_file(tmp_path, "scripts/check_no_canary.py", "# gate without test\n")
     # Deliberately do NOT create a sibling test
     missing = gates_without_canary(tmp_path)
-    assert any("check_no_canary.py" in m for m in missing), (
-        f"meta-test must flag a gate with no sibling test; got: {missing}"
-    )
+    assert any(
+        "check_no_canary.py" in m for m in missing
+    ), f"meta-test must flag a gate with no sibling test; got: {missing}"
 
 
 def test_flags_sibling_test_without_canary_function(tmp_path: Path) -> None:
@@ -206,9 +211,9 @@ def test_flags_sibling_test_without_canary_function(tmp_path: Path) -> None:
         "def test_accepts_valid_input():\n    assert True\n",
     )
     missing = gates_without_canary(tmp_path)
-    assert any("check_happy_only.py" in m for m in missing), (
-        f"meta-test must flag a gate whose sibling has only happy-path tests; got: {missing}"
-    )
+    assert any(
+        "check_happy_only.py" in m for m in missing
+    ), f"meta-test must flag a gate whose sibling has only happy-path tests; got: {missing}"
 
 
 def test_accepts_gate_with_valid_canary(tmp_path: Path) -> None:
@@ -220,9 +225,9 @@ def test_accepts_gate_with_valid_canary(tmp_path: Path) -> None:
         "def test_flags_bad_input():\n    assert True\n",
     )
     missing = gates_without_canary(tmp_path)
-    assert not any("check_good.py" in m for m in missing), (
-        f"meta-test must not flag a gate with a valid canary; got: {missing}"
-    )
+    assert not any(
+        "check_good.py" in m for m in missing
+    ), f"meta-test must not flag a gate with a valid canary; got: {missing}"
 
 
 def test_accepts_fitness_gate_with_canary(tmp_path: Path) -> None:
@@ -235,9 +240,9 @@ def test_accepts_fitness_gate_with_canary(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     missing = gates_without_canary(tmp_path)
-    assert not any("test_my_rule.py" in m for m in missing), (
-        f"fitness gate with canary must not be flagged; got: {missing}"
-    )
+    assert not any(
+        "test_my_rule.py" in m for m in missing
+    ), f"fitness gate with canary must not be flagged; got: {missing}"
 
 
 def test_flags_fitness_gate_without_canary(tmp_path: Path) -> None:
@@ -250,6 +255,6 @@ def test_flags_fitness_gate_without_canary(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     missing = gates_without_canary(tmp_path)
-    assert any("test_bare_rule.py" in m for m in missing), (
-        f"meta-test must flag a fitness gate with no canary; got: {missing}"
-    )
+    assert any(
+        "test_bare_rule.py" in m for m in missing
+    ), f"meta-test must flag a fitness gate with no canary; got: {missing}"

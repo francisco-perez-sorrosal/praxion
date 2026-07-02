@@ -79,10 +79,10 @@ describe("getDocumentationSurfaceData — api_reference surfaces", () => {
   it("degrades to an empty/error body when the spec is unreadable", async () => {
     const root = await createTempProjectRoot("dashboard-docapi-missing-");
 
-    const result = await getDocumentationSurfaceData(
-      root,
-      apiSurface({ path: "does-not-exist.yaml" })
-    );
+    // `openapi.yaml` is never written to disk in this test — it exercises
+    // the "listed in the manifest but missing on disk" path, not the
+    // allowlist (see documentation-surface-allowlist.test.ts for that).
+    const result = await getDocumentationSurfaceData(root, apiSurface({ path: "openapi.yaml" }));
 
     expect(result.body).toBeNull();
     expect(result.errorMessage).toBe("Unreadable file.");

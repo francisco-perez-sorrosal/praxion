@@ -1,7 +1,7 @@
 ---
-id: dec-draft-cf359394
+id: dec-265
 title: Manifest `renderer:` field becomes a first-class resolveRenderer key
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-01
 summary: Extend resolveRenderer to consult the manifest `renderer:` field as highest-priority lookup key, generalizing the api_reference special-case so the five per-artifact renderers resolve without hijacking shared diataxis/type keys.

@@ -1,3 +1,28 @@
+## v0.13.0 (2026-07-02)
+
+### Feat
+
+- **dashboard**: make manifest renderer field the highest-priority resolver key
+- **dashboard**: add five per-artifact renderer components
+- **dashboard**: add dedicated Tutorial/HowTo/Concepts Diátaxis shells
+- add install.sh --dev-link mode for plugin-cache local testing
+- add commit-time calibration reminder hook with canary tests
+- add calibration-log Retrospective cells as skill-genesis harvest source
+- widen calibration coverage detector to any-tier task commits
+
+### Fix
+
+- finalize_adrs frontmatter branch strip immune to hyphenated user slugs (td-052)
+- resolve td-050 aria-hidden-on-ancestor a11y defect in DiagramModal
+- deterministic worktree-path briefing for spawned subagents (td-034 residual)
+- **dashboard**: add secondary allowlist for documentation surface paths (td-029)
+- make subprocess coverage consistent with branch mode
+- unwrap updatedInput envelope in subagent context hook
+
+### Refactor
+
+- **hooks**: consolidate subagent prompt injection into single emitter
+
 ## v0.12.0 (2026-06-29)
 
 ### Feat

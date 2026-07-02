@@ -155,6 +155,10 @@ describe("resolveRenderer — unknown values fall back to DefaultShell", () => {
     expect(resolveRenderer("nonexistent-renderer")).toBe(DefaultShell);
   });
 
+  it("falls through to the diataxis shell when the renderer value is unrecognized", () => {
+    expect(resolveRenderer("nonexistent-renderer", "reference", "markdown")).toBe(ReferenceShell);
+  });
+
   it("returns DefaultShell for an unrecognized diataxis value", () => {
     expect(resolveRenderer(undefined, "unknown-type")).toBe(DefaultShell);
   });

@@ -596,6 +596,43 @@ jobs:
       - run: echo "Deploy to production"
 ```
 
+## Railway Deploy
+<!-- last-verified: 2026-07-02 -->
+
+Railway ships no first-party GitHub Action — the official pattern is the CLI container image plus a project-scoped `RAILWAY_TOKEN` secret. Prefer Railway's built-in GitHub autodeploy with "Wait for CI" (holds the deploy until checks pass) when the repo is linked; deploy from Actions only when the pipeline must own the deploy step (monorepo carve-outs, promotion after gates).
+
+```yaml
+name: Deploy to Railway
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: railway-deploy-${{ github.ref }}
+  cancel-in-progress: false  # never cancel a deploy mid-flight
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: ghcr.io/railwayapp/cli:latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+    steps:
+      - uses: actions/checkout@<full-sha>
+        with:
+          persist-credentials: false
+      - run: railway up --service "${{ vars.RAILWAY_SERVICE_ID }}" --detach
+```
+
+- `RAILWAY_TOKEN` is project- and environment-scoped — one secret per target environment. Use `RAILWAY_API_TOKEN` only for account-level operations.
+- `--detach` returns after upload; drop it to stream build logs into the job at the cost of runner minutes.
+- The remote Railway MCP server is OAuth-only and cannot authenticate in CI — the CLI is the only headless path.
+- Target-side configuration (environments, PR environments, config-as-code, auth matrix): deployment skill → [railway.md](../../deployment/references/railway.md).
+
 ## Scheduled Maintenance
 
 ```yaml

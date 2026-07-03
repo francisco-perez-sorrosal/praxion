@@ -17,6 +17,8 @@ Platform-as-a-Service deployment patterns for Railway, Render, Fly.io, and Verce
 
 ## Railway
 
+Agent-facing integration — installing Railway's first-party Claude Code plugin/MCP, per-context auth, environment and PR-environment lifecycle, CI wiring — lives in [railway.md](railway.md). This section covers platform basics.
+
 ### Project Structure
 
 Railway organizes work into **projects** containing **services** and **environments** (staging, production).

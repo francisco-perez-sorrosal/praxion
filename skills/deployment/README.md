@@ -6,6 +6,7 @@ Application deployment guidance from local Docker Compose through cloud PaaS to 
 
 - Writing or reviewing `compose.yaml`, `Dockerfile`, or `Caddyfile`
 - Choosing a deployment platform (Railway, Render, Fly.io, Cloud Run, ECS, Modal, CoreWeave)
+- Wiring Railway's agent tooling (plugin, MCP server, CLI) or managing Railway environments and PR environments
 - Configuring GPU passthrough or AI/ML model serving (Ollama, vLLM)
 - Setting up secrets management (`.env`, SOPS+age, 1Password CLI)
 - Deploying to Kubernetes or self-hosted PaaS (Coolify, CapRover)
@@ -26,6 +27,7 @@ Activates automatically when working on deployment configuration files (`compose
 | `references/ai-ml-serving.md` | Ollama, vLLM, GPU memory estimation, model serving patterns |
 | `references/secrets-management.md` | .env, direnv, SOPS+age, 1Password CLI progression |
 | `references/paas-deployment.md` | Railway, Render, Fly.io, Vercel patterns and config examples |
+| `references/railway.md` | Railway agent integration: consume Railway's plugin/MCP/CLI, auth matrix (OAuth vs CI tokens), environments + PR environments |
 | `references/self-hosted-paas.md` | Coolify, CapRover, Docker Compose as PaaS descriptor |
 | `references/cloud-containers.md` | Cloud Run, ECS/Fargate, Azure Container Apps |
 | `references/kubernetes-patterns.md` | When K8s is warranted, essential patterns, managed K8s comparison |

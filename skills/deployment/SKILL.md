@@ -6,13 +6,18 @@ description: >
   reverse proxy, secrets management, AI/ML model serving. Triggers: deploying an
   app, writing compose.yaml or Dockerfile, choosing a hosting platform, configuring
   Caddy/nginx, deploying Ollama/vLLM, GPU passthrough, choosing Render/Railway/Fly.io/
-  Vercel, deploying to Cloud Run/ECS/Modal/CoreWeave, writing systemd units for
-  Compose. Siblings: cicd-engineer (pipeline automation), observability (monitoring).
+  Vercel, managing Railway environments or PR environments, wiring Railway's agent
+  plugin/MCP/CLI, deploying to Cloud Run/ECS/Modal/CoreWeave, writing systemd units
+  for Compose. Siblings: cicd-engineer (pipeline automation), observability (monitoring).
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:
   - "Platform Quick Reference"
   - "GPU Compute Budgeting"
+  - "Railway Agent Components"
+  - "Environments from an Agent"
+  - "Config-as-Code Surfaces"
+  - "CI/CD Wiring"
 ---
 
 # Deployment
@@ -32,6 +37,7 @@ Opinionated guidance for deploying applications -- from local Docker Compose thr
 - [references/ai-ml-serving.md](references/ai-ml-serving.md) -- Ollama, vLLM, GPU memory, model serving patterns, Python environment isolation
 - [references/secrets-management.md](references/secrets-management.md) -- .env, direnv, SOPS+age, 1Password CLI, progression from solo to team
 - [references/paas-deployment.md](references/paas-deployment.md) -- Render, Railway, Fly.io, Vercel patterns and config examples
+- [references/railway.md](references/railway.md) -- Railway agent integration: consume Railway's first-party plugin/MCP/CLI (never vendor), per-context auth matrix (OAuth vs CI tokens), environments + PR-environments lifecycle, CI wiring
 - [references/self-hosted-paas.md](references/self-hosted-paas.md) -- Coolify, CapRover, Docker Compose as PaaS descriptor
 - [references/cloud-containers.md](references/cloud-containers.md) -- Cloud Run, ECS/Fargate, Azure Container Apps
 - [references/kubernetes-patterns.md](references/kubernetes-patterns.md) -- when K8s is warranted, basic patterns, managed K8s comparison

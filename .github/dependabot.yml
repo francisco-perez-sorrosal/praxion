@@ -47,6 +47,15 @@ updates:
     groups:
       npm-dashboard:
         patterns: ["*"]
+    ignore:
+      # Hold typescript at 6.x: v7 is the Go-native compiler port (no
+      # lib/typescript.js), which Next 16.2.10's build tooling cannot load
+      # (crashes in verify-typescript-setup; ignoreBuildErrors fails in CI).
+      # Our code is already TS-7-clean (tsc --noEmit passes) — the blocker is
+      # upstream in Next. Revisit when Next stable supports the native package.
+      # 6.x minor/patch updates still flow through.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   # GitHub Actions workflows.
   - package-ecosystem: "github-actions"

@@ -81,6 +81,13 @@ Use factories, builders, or fixture functions for complex test objects.
 - Avoid inline dictionaries or constructors with many positional arguments
 - Shared test data lives in shared fixture files (e.g., `conftest.py` in pytest, setup modules in Jest) or dedicated factory modules, not copy-pasted across tests
 
+### Fixtures Under Gitignored Paths
+
+A committed bad-case fixture only reaches a fresh checkout or CI if git tracks its path. When the input shape a test exercises lives under a gitignored location (e.g. an ephemeral `.ai-work/<slug>/`-shaped directory), a fixture committed there passes locally yet is invisible after a clean clone -- the test sees an empty directory and its failure path never triggers (a silent false green).
+
+- Build such inputs at runtime in the framework temp dir (`tmp_path`, `t.TempDir()`, `os.tmpdir()`) -- gitignore constrains git, not filesystem reads, so the runtime construction is itself the proof the test can actually fail
+- Choose the fixture strategy by whether the input's location is git-tracked: a committed fixture when the path is tracked, runtime construction when it is ignored
+
 ### Mocking Boundaries
 
 Mock at system boundaries: external APIs, databases, file systems, network calls, clocks.

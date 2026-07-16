@@ -60,7 +60,11 @@ new command. Scoring has two tiers split along the metrics pipeline's determinis
   CLI enrichment step) so the collector stays byte-deterministic, is **on by default**, and is
   **grounded on the prior report** to keep run-to-run variance low. When no API credential is
   available (e.g. offline CI) it **degrades gracefully** to a mechanical-only score rather than
-  failing.
+  failing. Each criterion's evidence comes from a per-criterion gatherer
+  (`collectors/readiness/artifacts.py`): documentation criteria read the README, `test_quality`
+  gets a bounded multi-section bundle (framework config across monorepo apps, coverage config +
+  this run's measured coverage, a test-file inventory, deterministic samples of real test code,
+  and testing-policy docs), and unregistered criteria fall back to a top-level repo listing.
 
 The dashboard reads the `readiness` block and renders a level badge, an 8-pillar radar, the
 Pillar-9 sub-score, and the top failing criteria.

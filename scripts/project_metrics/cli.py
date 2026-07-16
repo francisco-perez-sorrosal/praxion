@@ -43,7 +43,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from scripts.project_metrics.aggregate import compose_aggregate
-from scripts.project_metrics.collectors.readiness import judge, score
+from scripts.project_metrics.collectors.readiness import artifacts, judge, score
 from scripts.project_metrics.hotspot import compose_hotspots
 from scripts.project_metrics.logappend import append_log
 from scripts.project_metrics.report import render_json, render_markdown
@@ -547,6 +547,7 @@ def _run_pipeline(args: argparse.Namespace, repo_root: Path, ai_state_dir: Path)
 # ---------------------------------------------------------------------------
 
 _READINESS_COLLECTOR_NAME = "readiness"
+_COVERAGE_COLLECTOR_NAME = "coverage"
 _LLM_STATUS_SCORED = "scored"
 _LLM_STATUS_SKIPPED = "llm_skipped"
 _READINESS_AI_MISSING_AUTH = (
@@ -630,46 +631,20 @@ def _prior_verdict(prior: dict | None, criterion_id: str) -> dict | None:
     return None
 
 
-def _artifact_for(criterion: dict, repo_root: Path) -> str:
-    """Return the project text the judge evaluates for ``criterion``.
+def _artifact_context(report: Report, repo_root: Path) -> artifacts.ArtifactContext:
+    """Build the gatherer context, reusing this run's coverage collector data.
 
-    Documentation criteria read the README; the remaining LLM criteria read a
-    compact, deterministic listing of the repository's top-level entries so the
-    model has stable, reproducible context. Missing files degrade to an empty
-    string rather than raising — the judge then evaluates against whatever
-    signal is available.
+    A ``report.collectors`` entry is either a ``CollectorResult`` or a plain
+    skip/error marker dict (see ``Runner.run``); only a successful result
+    carries a ``data`` payload worth threading to the gatherers.
     """
 
-    crit_id = criterion.get("id", "")
-    if crit_id.startswith("c.docs."):
-        return _read_readme(repo_root)
-    return _repo_listing(repo_root)
-
-
-def _read_readme(repo_root: Path) -> str:
-    """Read the project README, trying common casings; empty string if absent."""
-
-    for name in ("README.md", "README.rst", "README.txt", "README"):
-        candidate = repo_root / name
-        if candidate.is_file():
-            try:
-                return candidate.read_text(encoding="utf-8", errors="replace")
-            except OSError:
-                return ""
-    return ""
-
-
-def _repo_listing(repo_root: Path) -> str:
-    """Return a sorted, newline-joined listing of top-level repo entries.
-
-    Deterministic (sorted) so the judge prompt is reproducible across runs.
-    """
-
-    try:
-        entries = sorted(p.name for p in repo_root.iterdir())
-    except OSError:
-        return ""
-    return "\n".join(entries)
+    coverage_block = report.collectors.get(_COVERAGE_COLLECTOR_NAME)
+    coverage = getattr(coverage_block, "data", None)
+    return artifacts.ArtifactContext(
+        repo_root=repo_root,
+        coverage=coverage if isinstance(coverage, dict) else None,
+    )
 
 
 def enrich_readiness(report: Report, repo_root: Path, args: object) -> None:
@@ -702,12 +677,13 @@ def enrich_readiness(report: Report, repo_root: Path, args: object) -> None:
         return
 
     prior, prior_file = _load_prior_readiness(repo_root)
+    artifact_ctx = _artifact_context(report, repo_root)
     llm_criteria = [c for c in data["criteria"] if c["llm"] and c["applicable"]]
     try:
         for crit in llm_criteria:
             verdict = judge.judge_criterion(
                 crit,
-                _artifact_for(crit, repo_root),
+                artifacts.artifact_for(crit["id"], artifact_ctx),
                 _prior_verdict(prior, crit["id"]),
             )
             crit["passed"] = verdict["passed"]

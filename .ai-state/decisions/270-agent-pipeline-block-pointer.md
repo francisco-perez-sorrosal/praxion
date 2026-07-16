@@ -1,7 +1,7 @@
 ---
-id: dec-draft-7946c190
+id: dec-270
 title: Agent-pipeline canonical block becomes a minimal pointer
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-16
 summary: Restructure the agent-pipeline canonical block from a ~658-token process mirror to a ~205-token pointer (universal framing + prose pointer to the coordination rule and software-planning skill + absolute docs URL); relocate the PoC-to-production journey into the software-planning skill; resolves td-002.

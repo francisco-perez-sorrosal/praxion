@@ -6,8 +6,11 @@ Rules are **contextual domain knowledge files** that AI assistants load automati
 
 ```
 rules/
+├── eval/
+│   └── eval-data-governance.md
 ├── ml/
 │   ├── eval-driven-verification.md
+│   ├── experiment-commit-conventions.md
 │   ├── experiment-tracking-conventions.md
 │   └── gpu-budget-conventions.md
 ├── swe/
@@ -18,6 +21,7 @@ rules/
 │   ├── coding-style.md
 │   ├── gate-liveness.md
 │   ├── id-citation-discipline.md
+│   ├── plugin-install-conventions.md
 │   ├── shipped-artifact-isolation.md
 │   ├── staleness-policy.md
 │   ├── swe-agent-coordination-protocol.md
@@ -37,12 +41,9 @@ rules/
 
 | File | Purpose |
 | ---- | ------- |
-| `ml/eval-driven-verification.md` | ML acceptance criteria as metric thresholds — verifier evaluates `TRAINING_RESULTS.md` recorded metrics against PASS/FAIL/WARN tolerance bands |
-| `ml/gpu-budget-conventions.md` | Compute-budget declaration in WIP.md and step prompts; open-ended training runs prohibited |
 | `swe/agent-behavioral-contract.md` | Four-behavior contract (Surface Assumptions, Register Objection, Stay Surgical, Simplicity First) for every write/plan/review agent |
 | `swe/agent-intermediate-documents.md` | Agent document locations (`.ai-work/` ephemeral, `.ai-state/` persistent), lifecycle tiers, cleanup |
 | `swe/agent-model-routing.md` | Per-agent Claude model tier table (13 agents → opus/sonnet/haiku), 4-layer override precedence, operator kill switch, quality-cliff guards |
-| `swe/coding-style.md` | Immutability, function/file size, nesting, error handling, naming, validation |
 | `swe/adr-conventions.md` | ADR file format (YAML frontmatter + MADR body), naming convention, supersession protocol, agent authoring guidance |
 | `swe/swe-agent-coordination-protocol.md` | Agent selection, coordination pipeline, parallel execution — detailed tables in `software-planning` skill reference |
 | `swe/vcs/git-conventions.md` | Commit scope, staging discipline, secrets, exclusions, message format |
@@ -53,9 +54,15 @@ Path-scoped rules load only when editing files matching their `paths:` pattern. 
 
 | File | Purpose |
 | ---- | ------- |
+| `eval/eval-data-governance.md` | Held-out vs public data split discipline, ground-truth isolation, dataset provenance MANIFEST.json requirement. Paths: `evaluate.py`, `data/private/**`, `tasks/**`, `**/MANIFEST.json` |
+| `ml/eval-driven-verification.md` | ML acceptance criteria as metric thresholds — verifier evaluates `TRAINING_RESULTS.md` recorded metrics against PASS/FAIL/WARN tolerance bands. Paths: `program.md`, `train.py`, `prepare.py`, `runs/**`, `experiments/**`, `TRAINING_RESULTS.md` |
+| `ml/experiment-commit-conventions.md` | Experiment-branch commit semantics — kept runs as logical units with run-tag labels. Paths: `program.md`, `train.py`, `prepare.py`, `runs/**`, `experiments/**`, `TRAINING_RESULTS.md` |
 | `ml/experiment-tracking-conventions.md` | Experiment lineage, run-tag mapping, tracker selection (MLflow/W&B/Aim). Paths: `runs/**`, `experiments/**`, `program.md` |
+| `ml/gpu-budget-conventions.md` | Compute-budget declaration in WIP.md and step prompts; open-ended training runs prohibited. Paths: `program.md`, `train.py`, `prepare.py`, `runs/**`, `experiments/**`, `neo_cloud_backend.yaml` |
+| `swe/coding-style.md` | Immutability, function/file size, nesting, error handling, naming, validation. Paths: source files across all tracked languages |
 | `swe/gate-liveness.md` | A gate must be proven to bite: substance-over-structure, a named producer for every consumer, no self-contradiction, and a verification path per gate (a canary for CODE gates, a golden bad-case for PROMPT gates). Paths: gate-authoring surfaces (`fitness/**`, `scripts/check_*`/`validate_*`, `hooks/*.py`, sentinel/verifier/planner agents) |
 | `swe/id-citation-discipline.md` | Detection and remediation rules for ephemeral identifier citations (REQ, AC, step numbers) leaking into production source. Paths: source files across all tracked languages |
+| `swe/plugin-install-conventions.md` | Prefer upstream-documented plugin install methods (marketplace > npx skills add > manual); verification checklist for install workflows. Paths: `install*.sh`, `scripts/install*.sh`, `claude/canonical-blocks/**/*.md`, `commands/onboard-project*.md`, `commands/new-project.md`, `new_project.sh` |
 | `swe/shipped-artifact-isolation.md` | Isolation rules preventing shipped artifacts (`rules/`, `skills/`, `agents/`, `commands/`) from referencing project-specific `.ai-state/` entries. Paths: `rules/**`, `skills/**`, `agents/**`, `commands/**`, `claude/config/**` |
 | `swe/staleness-policy.md` | Marker syntax and threshold protocol for drift-prone skill sections. Paths: `**/SKILL.md` |
 | `swe/testing-conventions.md` | Test file placement, naming, coverage expectations, and test isolation. Paths: `tests/**` |

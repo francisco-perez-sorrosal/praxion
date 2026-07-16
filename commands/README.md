@@ -46,6 +46,7 @@ Reusable slash commands for AI coding assistants. Each `.md` file becomes a `/co
 | `/skill-genesis-review` | Disposition pending proposals from a skill-genesis report — batch multi-select presentation, append-only disposition log, surface delegation handoffs |
 | `/star-repo` | Star the Praxion repo on GitHub |
 | `/test` | Auto-detect test framework and run tests |
+| `/upgrade-project` | Re-point this project's version-pinned Praxion surfaces (git hooks, merge driver) to the live plugin install after an i-am plugin upgrade |
 
 ## How Commands Work
 

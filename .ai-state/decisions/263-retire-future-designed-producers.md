@@ -17,6 +17,7 @@ affected_files:
   - .ai-state/decisions/219-project-profile-yaml-schema.md
 supersedes: dec-219
 re_affirms: dec-231
+re_affirmed_by: [dec-draft-cd07e6c1]
 dissent: If the agentic-eval archetype loop lands soon, a minimal Phase 8f stub now would have saved re-opening this; retiring an almost-ready seam risks it being rebuilt from scratch rather than resumed.
 ---
 

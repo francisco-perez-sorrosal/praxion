@@ -10,9 +10,10 @@ writes an executable `claude` shell script there, and passes it via the
 `env=` dict of subprocess.run.  The stub emits the same "backgrounded · <id>"
 output shape Claude Code produces on a real `claude --bg` invocation.
 
-The stub generates a distinct 8-hex-character session ID per invocation using
-shell arithmetic (RANDOM gives enough entropy for test isolation; IDs are not
-cryptographically significant here).  Passing a magic `--fail-me` flag causes
+The stub generates a distinct 8-hex-character session ID per invocation from
+its own PID — distinct per process by construction, POSIX-sh portable (a
+$RANDOM-based version emitted a constant '00000000' under dash on CI); IDs are
+not cryptographically significant here.  Passing a magic `--fail-me` flag causes
 the stub to exit non-zero with an error on stderr — used for failure-path tests.
 
 All tests reuse the helpers and worktree-root detection established in the
@@ -26,7 +27,6 @@ import os
 import subprocess
 import textwrap
 from pathlib import Path
-
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -118,8 +118,10 @@ def make_worktree_dir(name: str) -> Path:
 #     claude logs <id>          show recent output
 #     claude stop <id>          stop this session
 #
-# The ID is generated per invocation via shell arithmetic on $RANDOM so that
-# multiple calls within one test receive distinct IDs.  Passing `--fail-me`
+# The ID is derived from the stub's own PID ($$) so that multiple calls
+# within one test receive distinct IDs. POSIX-portable on purpose: $RANDOM
+# is a bash-ism that expands empty under dash (Ubuntu's /bin/sh), which
+# made every CI invocation emit the same '00000000'. Passing `--fail-me`
 # causes the stub to exit non-zero — used for failure-path tests.
 
 _STUB_CLAUDE_TEMPLATE = textwrap.dedent("""\
@@ -134,8 +136,8 @@ _STUB_CLAUDE_TEMPLATE = textwrap.dedent("""\
                 ;;
         esac
     done
-    # Generate an 8-hex-char ID from two 4-digit RANDOM values.
-    ID=$(printf "%04x%04x" $RANDOM $RANDOM)
+    # 8-hex-char ID from the stub's PID: distinct per invocation, POSIX sh.
+    ID=$(printf "%08x" $$)
     printf "Starting background service\\xe2\\x80\\xa6\\n"
     printf "backgrounded \\xc2\\xb7 %s\\n" "$ID"
     printf "  claude agents             list sessions\\n"
@@ -219,9 +221,9 @@ def test_one_row_manifest_dispatches_one_session(tmp_path, tmp_path_factory):
             f"Expected exit 0, got {result.returncode}. "
             f"stdout={result.stdout!r} stderr={result.stderr!r}"
         )
-        assert "Dispatched 1 rework session(s):" in result.stdout, (
-            f"Expected 'Dispatched 1 rework session(s):' in stdout: {result.stdout!r}"
-        )
+        assert (
+            "Dispatched 1 rework session(s):" in result.stdout
+        ), f"Expected 'Dispatched 1 rework session(s):' in stdout: {result.stdout!r}"
     finally:
         if wt_dir.exists() and not any(wt_dir.iterdir()):
             wt_dir.rmdir()
@@ -246,14 +248,14 @@ def test_two_row_manifest_dispatches_two_sessions(tmp_path, tmp_path_factory):
             f"Expected exit 0, got {result.returncode}. "
             f"stdout={result.stdout!r} stderr={result.stderr!r}"
         )
-        assert "Dispatched 2 rework session(s):" in result.stdout, (
-            f"Expected 'Dispatched 2 rework session(s):' in stdout: {result.stdout!r}"
-        )
+        assert (
+            "Dispatched 2 rework session(s):" in result.stdout
+        ), f"Expected 'Dispatched 2 rework session(s):' in stdout: {result.stdout!r}"
         # Both worktree names should appear in the summary block.
         for name in names:
-            assert name in result.stdout, (
-                f"Expected worktree name '{name}' in stdout: {result.stdout!r}"
-            )
+            assert (
+                name in result.stdout
+            ), f"Expected worktree name '{name}' in stdout: {result.stdout!r}"
     finally:
         for d in wt_dirs:
             if d.exists() and not any(d.iterdir()):
@@ -275,12 +277,12 @@ def test_three_row_manifest_preserves_row_order(tmp_path, tmp_path_factory):
             cwd=str(REPO_ROOT),
             env=env,
         )
-        assert result.returncode == 0, (
-            f"Expected exit 0, got {result.returncode}. stderr: {result.stderr!r}"
-        )
-        assert "Dispatched 3 rework session(s):" in result.stdout, (
-            f"Expected 'Dispatched 3 rework session(s):' in stdout: {result.stdout!r}"
-        )
+        assert (
+            result.returncode == 0
+        ), f"Expected exit 0, got {result.returncode}. stderr: {result.stderr!r}"
+        assert (
+            "Dispatched 3 rework session(s):" in result.stdout
+        ), f"Expected 'Dispatched 3 rework session(s):' in stdout: {result.stdout!r}"
         # Verify row order: alpha must appear before beta, beta before gamma.
         alpha_pos = result.stdout.find("bg-order-alpha")
         beta_pos = result.stdout.find("bg-order-beta")
@@ -298,8 +300,8 @@ def test_three_row_manifest_preserves_row_order(tmp_path, tmp_path_factory):
 def test_two_rows_produce_distinct_session_ids(tmp_path, tmp_path_factory):
     """Two rows dispatched via the stub must receive distinct session IDs.
 
-    The stub generates IDs using $RANDOM per invocation.  This test asserts
-    the stub's PRNG behaviour produces two different values so that the
+    The stub derives its ID from its own PID per invocation.  This test
+    asserts two invocations produce two different values so that the
     per-session hints in the output are not aliased.
     """
     names = ["bg-distinct-id-x", "bg-distinct-id-y"]
@@ -315,16 +317,16 @@ def test_two_rows_produce_distinct_session_ids(tmp_path, tmp_path_factory):
             cwd=str(REPO_ROOT),
             env=env,
         )
-        assert result.returncode == 0, (
-            f"Expected exit 0, got {result.returncode}. stderr: {result.stderr!r}"
-        )
+        assert (
+            result.returncode == 0
+        ), f"Expected exit 0, got {result.returncode}. stderr: {result.stderr!r}"
         # Extract session IDs from the "peek: claude logs <id>" lines.
         import re
 
         ids = re.findall(r"peek:\s+claude logs ([0-9a-f]+)", result.stdout)
-        assert len(ids) == 2, (
-            f"Expected 2 peek lines in stdout, found: {ids!r}. stdout: {result.stdout!r}"
-        )
+        assert (
+            len(ids) == 2
+        ), f"Expected 2 peek lines in stdout, found: {ids!r}. stdout: {result.stdout!r}"
         assert ids[0] != ids[1], (
             f"Both rows received the same session ID '{ids[0]}'; "
             "stub must generate distinct IDs per invocation."
@@ -387,16 +389,16 @@ def test_session_id_not_extracted_from_word_backgrounded(tmp_path, tmp_path_fact
             f"stdout={result.stdout!r} stderr={result.stderr!r}"
         )
         # The correct session ID must appear in the output.
-        assert known_id in result.stdout, (
-            f"Expected session ID '{known_id}' in stdout but got: {result.stdout!r}"
-        )
+        assert (
+            known_id in result.stdout
+        ), f"Expected session ID '{known_id}' in stdout but got: {result.stdout!r}"
         # False-positive substrings of 'backgrounded' must NOT appear as IDs.
-        assert "peek:   claude logs bac" not in result.stdout, (
-            "Script extracted 'bac' (hex from 'backgrounded') — middle-dot bug still present."
-        )
-        assert "peek:   claude logs acd" not in result.stdout, (
-            "Script extracted 'acd' (hex from 'backgrounded') — middle-dot bug still present."
-        )
+        assert (
+            "peek:   claude logs bac" not in result.stdout
+        ), "Script extracted 'bac' (hex from 'backgrounded') — middle-dot bug still present."
+        assert (
+            "peek:   claude logs acd" not in result.stdout
+        ), "Script extracted 'acd' (hex from 'backgrounded') — middle-dot bug still present."
     finally:
         if wt_dir.exists() and not any(wt_dir.iterdir()):
             wt_dir.rmdir()
@@ -439,13 +441,13 @@ def test_session_id_containing_bac_extracted_correctly(tmp_path, tmp_path_factor
             cwd=str(REPO_ROOT),
             env=env,
         )
-        assert result.returncode == 0, (
-            f"Expected exit 0, got {result.returncode}. stderr: {result.stderr!r}"
-        )
+        assert (
+            result.returncode == 0
+        ), f"Expected exit 0, got {result.returncode}. stderr: {result.stderr!r}"
         # Full tricky ID must appear; partial match (just "bac") must not be the only one.
-        assert f"peek:   claude logs {tricky_id}" in result.stdout, (
-            f"Expected full ID '{tricky_id}' in peek line. stdout: {result.stdout!r}"
-        )
+        assert (
+            f"peek:   claude logs {tricky_id}" in result.stdout
+        ), f"Expected full ID '{tricky_id}' in peek line. stdout: {result.stdout!r}"
     finally:
         if wt_dir.exists() and not any(wt_dir.iterdir()):
             wt_dir.rmdir()
@@ -476,9 +478,9 @@ def test_closing_summary_contains_claude_agents_line(tmp_path, tmp_path_factory)
             "To monitor all sessions in one view: open a fresh Cursor terminal pane "
             "and run `claude agents`."
         )
-        assert expected_line in result.stdout, (
-            f"Closing 'claude agents' line not found. stdout: {result.stdout!r}"
-        )
+        assert (
+            expected_line in result.stdout
+        ), f"Closing 'claude agents' line not found. stdout: {result.stdout!r}"
     finally:
         if wt_dir.exists() and not any(wt_dir.iterdir()):
             wt_dir.rmdir()
@@ -504,9 +506,9 @@ def test_closing_summary_contains_osascript_hook_note(tmp_path, tmp_path_factory
             "macOS notifications will fire when each session completes "
             "(via the osascript Stop hook)."
         )
-        assert expected_line in result.stdout, (
-            f"osascript notification line not found. stdout: {result.stdout!r}"
-        )
+        assert (
+            expected_line in result.stdout
+        ), f"osascript notification line not found. stdout: {result.stdout!r}"
     finally:
         if wt_dir.exists() and not any(wt_dir.iterdir()):
             wt_dir.rmdir()
@@ -532,16 +534,14 @@ def test_per_session_hints_use_exact_format(tmp_path, tmp_path_factory):
         import re
 
         ids = re.findall(r"peek:\s+claude logs ([0-9a-f]+)", result.stdout)
-        assert ids, (
-            f"No 'peek: claude logs <id>' line found in stdout: {result.stdout!r}"
-        )
+        assert ids, f"No 'peek: claude logs <id>' line found in stdout: {result.stdout!r}"
         session_id = ids[0]
-        assert f"peek:   claude logs {session_id}" in result.stdout, (
-            f"'peek:   claude logs <id>' format wrong. stdout: {result.stdout!r}"
-        )
-        assert f"cancel: claude stop {session_id}" in result.stdout, (
-            f"'cancel: claude stop <id>' format wrong. stdout: {result.stdout!r}"
-        )
+        assert (
+            f"peek:   claude logs {session_id}" in result.stdout
+        ), f"'peek:   claude logs <id>' format wrong. stdout: {result.stdout!r}"
+        assert (
+            f"cancel: claude stop {session_id}" in result.stdout
+        ), f"'cancel: claude stop <id>' format wrong. stdout: {result.stdout!r}"
     finally:
         if wt_dir.exists() and not any(wt_dir.iterdir()):
             wt_dir.rmdir()
@@ -584,13 +584,13 @@ def test_stub_failure_for_one_row_continues_remaining(tmp_path, tmp_path_factory
             f"Expected exit 0 when one row succeeds. "
             f"stdout={result.stdout!r} stderr={result.stderr!r}"
         )
-        assert "Dispatched 1 rework session(s):" in result.stdout, (
-            f"Expected 1 dispatched in stdout: {result.stdout!r}"
-        )
+        assert (
+            "Dispatched 1 rework session(s):" in result.stdout
+        ), f"Expected 1 dispatched in stdout: {result.stdout!r}"
         # A warning for the failed row must appear on stderr.
-        assert fail_name_slug in result.stderr, (
-            f"Expected warning for '{fail_name_slug}' in stderr: {result.stderr!r}"
-        )
+        assert (
+            fail_name_slug in result.stderr
+        ), f"Expected warning for '{fail_name_slug}' in stderr: {result.stderr!r}"
     finally:
         for d in wt_dirs:
             if d.exists() and not any(d.iterdir()):
@@ -630,9 +630,9 @@ def test_all_rows_fail_exits_non_zero(tmp_path, tmp_path_factory):
         )
         # A clear error must appear — either on stderr or stdout.
         combined = result.stdout + result.stderr
-        assert "failed" in combined.lower(), (
-            f"Expected failure message in output: stdout={result.stdout!r} stderr={result.stderr!r}"
-        )
+        assert (
+            "failed" in combined.lower()
+        ), f"Expected failure message in output: stdout={result.stdout!r} stderr={result.stderr!r}"
     finally:
         if wt_dir.exists() and not any(wt_dir.iterdir()):
             wt_dir.rmdir()
@@ -690,9 +690,7 @@ def test_zero_valid_rows_after_parse_exits_empty(tmp_path):
         f"Expected non-zero exit for zero-valid-row manifest, got {result.returncode}. "
         f"stdout={result.stdout!r} stderr={result.stderr!r}"
     )
-    assert "Traceback" not in result.stderr, (
-        f"Unexpected Python traceback: {result.stderr!r}"
-    )
+    assert "Traceback" not in result.stderr, f"Unexpected Python traceback: {result.stderr!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -720,9 +718,9 @@ def test_dispatch_writes_marker_file_with_worktree_name(tmp_path, tmp_path_facto
             cwd=str(REPO_ROOT),
             env=env,
         )
-        assert result.returncode == 0, (
-            f"Expected exit 0, got {result.returncode}. stderr={result.stderr!r}"
-        )
+        assert (
+            result.returncode == 0
+        ), f"Expected exit 0, got {result.returncode}. stderr={result.stderr!r}"
 
         markers_dir = tmp_path / ".claude" / "rework_sessions"
         assert markers_dir.is_dir(), (
@@ -739,12 +737,12 @@ def test_dispatch_writes_marker_file_with_worktree_name(tmp_path, tmp_path_facto
         marker = markers[0]
         # Filename is the 8-hex short ID, matching the dispatch summary's
         # "peek: claude logs <id>" line.
-        assert len(marker.name) == 8, (
-            f"Marker filename must be 8-char short ID, got {marker.name!r}"
-        )
-        assert all(c in "0123456789abcdef" for c in marker.name), (
-            f"Marker filename must be hex, got {marker.name!r}"
-        )
+        assert (
+            len(marker.name) == 8
+        ), f"Marker filename must be 8-char short ID, got {marker.name!r}"
+        assert all(
+            c in "0123456789abcdef" for c in marker.name
+        ), f"Marker filename must be hex, got {marker.name!r}"
 
         # Content is the worktree slug (no trailing newline guaranteed by the
         # dispatcher, but tolerate whitespace).
@@ -782,9 +780,9 @@ def test_dispatch_writes_one_marker_per_row(tmp_path, tmp_path_factory):
         )
 
         slugs = {m.read_text(encoding="utf-8").strip() for m in markers}
-        assert slugs == set(names), (
-            f"Marker contents must equal worktree slugs {set(names)}, got {slugs}"
-        )
+        assert slugs == set(
+            names
+        ), f"Marker contents must equal worktree slugs {set(names)}, got {slugs}"
     finally:
         for d in wt_dirs:
             if d.exists() and not any(d.iterdir()):

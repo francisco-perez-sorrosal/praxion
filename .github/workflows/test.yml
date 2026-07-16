@@ -56,13 +56,93 @@ jobs:
         working-directory: ${{ matrix.project }}
         run: uv run pytest
 
+  test-root:
+    # Soft-launch (ROADMAP item 1.1): report-only for one observed run; a
+    # follow-up commit flips to strict and adds the coverage floor once the
+    # in-CI baseline is confirmed. Gates the root pytest corpus (tests/ +
+    # scripts/) — the automation substrate (finalize chain, hooks, sync
+    # gates, project-metrics) that previously ran in no CI job at all.
+    # Python 3.11 = the root requires-python floor, so the gate proves the
+    # contract, not just the maintainer's local interpreter.
+    name: Test root suite (report-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+
+    concurrency:
+      group: test-root-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up uv (manages Python 3.11)
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Pytest (tests/ + scripts/)
+        run: uv run --frozen pytest
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
+        with:
+          name: root-coverage
+          path: coverage.xml
+          if-no-files-found: warn
+
+  test-dashboard:
+    # Soft-launch (ROADMAP item 1.1): report-only for one observed run; the
+    # strict flip lands together with test-root's. Gates the dashboard_app
+    # vitest suite. pnpm version comes from package.json's packageManager
+    # field (single source of truth); pnpm/action-setup must precede
+    # setup-node so the pnpm store cache resolves.
+    name: Test dashboard (report-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+
+    concurrency:
+      group: test-dashboard-${{ github.ref }}
+      cancel-in-progress: true
+
+    defaults:
+      run:
+        working-directory: dashboard_app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up pnpm (version from packageManager field)
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v6
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: dashboard_app/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Vitest
+        run: pnpm test
+
   validate-context-artifacts:
-    # Soft-launch (SYSTEMS_PLAN.md §4.4): continue-on-error for the first
-    # 14 days; follow-up PR flips to strict on 2026-04-30.
-    name: Validate Context Artifacts (soft-launch)
+    # Strict since 2026-07-16 (ROADMAP item 1.1). Soft-launched 2026-04
+    # (SYSTEMS_PLAN.md §4.4); the flip was verified against a local
+    # `validate_references.py --all` exit-0 run and a green CI history
+    # before removing continue-on-error.
+    name: Validate Context Artifacts
     runs-on: ubuntu-latest
     timeout-minutes: 3
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0

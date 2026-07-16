@@ -22,6 +22,8 @@ affected_files:
   - .ai-state/DESIGN.md
   - docs/architecture.md
   - .ai-state/DESIGN_CHANGELOG.md
+re_affirmed_by:
+  - dec-183
 ---
 
 ## Context

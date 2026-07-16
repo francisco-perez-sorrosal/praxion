@@ -16,6 +16,8 @@ affected_files:
   - agents/systems-architect.md
   - agents/verifier.md
   - commands/resume-rework.md
+re_affirmed_by:
+  - dec-182
 ---
 
 ## Context

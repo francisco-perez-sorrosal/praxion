@@ -11,6 +11,8 @@ agent_type: systems-architect
 pipeline_tier: standard
 affected_files:
   - rules/writing/diagram-conventions.md
+re_affirmed_by:
+  - dec-093
 ---
 
 ## Context

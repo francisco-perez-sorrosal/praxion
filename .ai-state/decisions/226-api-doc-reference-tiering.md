@@ -14,6 +14,9 @@ affected_files:
   - skills/api-documentation/SKILL.md
   - skills/api-documentation/references/
 re_affirms: dec-227
+re_affirmed_by:
+  - dec-227
+  - dec-228
 ---
 
 ## Context

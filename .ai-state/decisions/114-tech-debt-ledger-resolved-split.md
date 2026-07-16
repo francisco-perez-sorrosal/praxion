@@ -16,6 +16,8 @@ affected_files:
   - scripts/finalize_tech_debt_ledger.py
   - scripts/test_finalize_tech_debt_ledger.py
   - agents/sentinel.md
+re_affirmed_by:
+  - dec-262
 ---
 
 ## Context

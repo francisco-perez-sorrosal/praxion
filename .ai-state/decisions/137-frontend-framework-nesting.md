@@ -16,6 +16,8 @@ affected_files:
   - skills/typescript-development/contexts/react.md
   - skills/typescript-development/contexts/vue.md
 re_affirms: dec-139
+re_affirmed_by:
+  - dec-135
 ---
 
 ## Context

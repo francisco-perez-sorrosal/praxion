@@ -12,6 +12,7 @@ branch: worktree-obsidian-shape-b-onboarding
 pipeline_tier: standard
 re_affirmed_by:
   - dec-200
+  - dec-197
 affected_files:
   - install.sh
   - scripts/install-obsidian-deps.sh

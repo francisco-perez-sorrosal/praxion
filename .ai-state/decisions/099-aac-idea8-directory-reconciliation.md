@@ -14,6 +14,8 @@ affected_files:
   - commands/new-project.md
   - new_project.sh
 re_affirms: dec-094
+re_affirmed_by:
+  - dec-113
 ---
 
 ## Context

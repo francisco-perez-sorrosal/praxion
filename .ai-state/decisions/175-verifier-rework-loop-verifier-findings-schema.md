@@ -15,6 +15,8 @@ affected_files:
   - agents/systems-architect.md
   - agents/implementation-planner.md
   - commands/resume-rework.md
+re_affirmed_by:
+  - dec-178
 ---
 
 ## Context

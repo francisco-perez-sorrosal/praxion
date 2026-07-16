@@ -17,6 +17,8 @@ affected_files:
   - skills/deployment/references/gpu-compute-budgeting.md
   - skills/cicd/references/ml-experiment-ci.md
 affected_reqs: []
+re_affirmed_by:
+  - dec-120
 ---
 
 # ADR — Skill scope and extension strategy for ML training onramp

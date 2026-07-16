@@ -18,6 +18,8 @@ affected_files:
   - rules/swe/agent-intermediate-documents.md
   - skills/software-planning/references/architecture-documentation.md
 dissent: R4's detector closes the *detection* half, not the *production* half — without a task-complete hook event the calibration row still depends on a voluntary orchestrator nudge, so the producer gap is mitigated, not closed.
+re_affirmed_by:
+  - dec-261
 ---
 
 ## Context

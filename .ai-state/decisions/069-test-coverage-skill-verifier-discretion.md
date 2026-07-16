@@ -11,6 +11,8 @@ pipeline_tier: standard
 affected_files:
   - agents/verifier.md
   - skills/test-coverage/SKILL.md
+re_affirmed_by:
+  - dec-070
 ---
 
 ## Context

@@ -18,6 +18,8 @@ affected_files:
   - commands/new-project.md
   - skills/hook-crafting/references/output-patterns.md
 affected_reqs: [REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-06, REQ-07, REQ-08, REQ-14, REQ-15]
+re_affirmed_by:
+  - dec-073
 ---
 
 ## Context

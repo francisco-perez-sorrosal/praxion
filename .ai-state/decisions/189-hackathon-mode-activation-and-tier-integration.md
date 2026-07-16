@@ -23,6 +23,8 @@ affected_files:
   - claude/aac-templates/hackathon-directive.md.tmpl
   - claude/aac-templates/hackathon-settings.json.tmpl
   - tests/test_hackathon_mode.py
+re_affirmed_by:
+  - dec-190
 ---
 
 ## Context

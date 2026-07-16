@@ -21,6 +21,8 @@ affected_files:
   - .ai-state/DESIGN.md
   - docs/skill-genesis.md
 re_affirms: # none — fresh decision per researcher's ADR survey
+re_affirmed_by:
+  - dec-187
 ---
 
 ## Context

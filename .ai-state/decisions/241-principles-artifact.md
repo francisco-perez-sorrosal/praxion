@@ -26,6 +26,8 @@ dissent: >
   principles read-site to fold in later; the cleaner one-location design
   would wait for the profile producer — at the cost of blocking a real
   capability gap indefinitely.
+re_affirmed_by:
+  - dec-242
 ---
 
 ## Context

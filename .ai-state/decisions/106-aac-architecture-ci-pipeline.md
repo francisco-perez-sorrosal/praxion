@@ -13,6 +13,8 @@ affected_files:
   - .github/workflows/architecture.yml
   - agents/cicd-engineer.md
 re_affirms: dec-108
+re_affirmed_by:
+  - dec-108
 ---
 
 ## Context

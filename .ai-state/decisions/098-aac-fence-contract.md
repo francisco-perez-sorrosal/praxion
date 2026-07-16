@@ -15,6 +15,8 @@ affected_files:
   - skills/software-planning/assets/ARCHITECTURE_TEMPLATE.md
   - skills/doc-management/assets/ARCHITECTURE_GUIDE_TEMPLATE.md
 re_affirms: dec-094
+re_affirmed_by:
+  - dec-100
 ---
 
 ## Context

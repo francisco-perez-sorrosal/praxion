@@ -17,6 +17,10 @@ affected_files:
   - skills/node-prj-mgmt/SKILL.md
   - skills/typescript-development/SKILL.md
   - skills/architectural-fitness-functions/SKILL.md
+re_affirmed_by:
+  - dec-136
+  - dec-137
+  - dec-140
 ---
 
 ## Context

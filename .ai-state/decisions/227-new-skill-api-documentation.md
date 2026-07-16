@@ -15,6 +15,8 @@ affected_files:
   - skills/doc-management/references/documentation-types.md
   - commands/document-api.md
 re_affirms: dec-226
+re_affirmed_by:
+  - dec-226
 ---
 
 ## Context

@@ -15,6 +15,10 @@ affected_files:
   - rules/writing/aac-dac-conventions.md
   - agents/sentinel.md
 re_affirms: dec-106
+re_affirmed_by:
+  - dec-106
+  - dec-107
+  - dec-110
 ---
 
 ## Context

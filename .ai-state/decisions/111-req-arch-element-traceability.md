@@ -13,6 +13,8 @@ affected_files:
   - skills/spec-driven-development/SKILL.md
   - skills/spec-driven-development/references/spec-format-guide.md
   - agents/verifier.md
+re_affirmed_by:
+  - dec-112
 ---
 
 ## Context

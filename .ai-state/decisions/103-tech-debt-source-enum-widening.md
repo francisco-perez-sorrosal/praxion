@@ -11,6 +11,8 @@ pipeline_tier: standard
 affected_files:
   - rules/swe/agent-intermediate-documents.md
   - .ai-state/TECH_DEBT_LEDGER.md
+re_affirmed_by:
+  - dec-105
 ---
 
 ## Context

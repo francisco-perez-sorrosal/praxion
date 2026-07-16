@@ -15,6 +15,8 @@ affected_files:
   - .ai-state/specs/
   - agents/sentinel.md
 dissent: "If drift is rare in practice and verifier/sentinel already catch it acceptably, even a detection-only check is ceremony for change that won't come."
+re_affirmed_by:
+  - dec-239
 ---
 
 ## Context

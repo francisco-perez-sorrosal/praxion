@@ -1480,3 +1480,70 @@ class TestWidenedCrossReferenceScope:
             text = path.read_text(encoding="utf-8")
             assert new in text
             assert old not in text
+
+
+# -- re_affirmed_by back-link self-healing (dec-070/DL06) ---------------------
+
+
+class TestFinalizeReAffirmedByBackfill:
+    """Finalize self-heals a missing reciprocal `re_affirmed_by` back-link."""
+
+    def test_finalize_backfills_missing_back_link(
+        self, repo_root: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A draft that re_affirms a pre-existing ADR backfills that ADR's
+        re_affirmed_by list at finalize, even though the target predates the
+        field entirely."""
+        target = make_finalized(repo_root, 50, "target-decision")
+        assert "re_affirmed_by" not in target.read_text(encoding="utf-8")
+
+        make_draft(
+            repo_root,
+            "20260419-1810",
+            "alice",
+            "main",
+            "re-affirmer",
+            frontmatter_extra={"re_affirms": "dec-050"},
+        )
+
+        def _fake_run(*_args: Any, **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+            return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+        monkeypatch.setattr(finalize.subprocess, "run", _fake_run)
+
+        exit_code = _invoke_main(monkeypatch, ["--all", "--repo-root", str(repo_root)])
+        assert exit_code == 0
+
+        target_content = target.read_text(encoding="utf-8")
+        assert "re_affirmed_by:\n  - dec-051" in target_content
+
+    def test_backfill_does_not_duplicate_existing_back_link(
+        self, repo_root: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A target that already carries the back-link is left untouched."""
+        target = make_finalized(
+            repo_root,
+            60,
+            "already-linked",
+            frontmatter_extra={"re_affirmed_by": "\n  - dec-061"},
+        )
+
+        make_draft(
+            repo_root,
+            "20260419-1810",
+            "alice",
+            "main",
+            "re-affirmer",
+            frontmatter_extra={"re_affirms": "dec-060"},
+        )
+
+        def _fake_run(*_args: Any, **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+            return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+        monkeypatch.setattr(finalize.subprocess, "run", _fake_run)
+
+        exit_code = _invoke_main(monkeypatch, ["--all", "--repo-root", str(repo_root)])
+        assert exit_code == 0
+
+        target_content = target.read_text(encoding="utf-8")
+        assert target_content.count("dec-061") == 1

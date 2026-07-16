@@ -30,6 +30,8 @@ affected_files:
   - rules/swe/agent-intermediate-documents.md
   - rules/swe/swe-agent-coordination-protocol.md
 supersedes: dec-020
+re_affirmed_by:
+  - dec-132
 ---
 
 ## Context

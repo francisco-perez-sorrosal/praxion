@@ -24,6 +24,8 @@ affected_files:
   - commands/save-changes.md
   - .claude-plugin/plugin.json
   - .gitattributes
+re_affirmed_by:
+  - dec-237
 ---
 
 ## Context

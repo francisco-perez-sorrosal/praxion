@@ -17,6 +17,8 @@ affected_files:
   - agents/README.md
   - rules/swe/agent-model-routing.md
 affected_reqs: [REQ-01, REQ-02, REQ-03]
+re_affirmed_by:
+  - dec-212
 ---
 
 ## Context

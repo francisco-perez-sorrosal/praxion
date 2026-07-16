@@ -19,6 +19,8 @@ affected_files:
   - fitness/README.md
   - skills/architectural-fitness-functions/SKILL.md
   - skills/architectural-fitness-functions/references/import-linter-recipes.md
+re_affirmed_by:
+  - dec-104
 ---
 
 ## Context

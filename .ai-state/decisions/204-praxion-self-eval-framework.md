@@ -20,6 +20,7 @@ affected_files:
 supersedes: dec-040
 re_affirmed_by:
   - dec-206
+  - dec-205
 ---
 
 ## Context

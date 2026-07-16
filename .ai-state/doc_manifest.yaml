@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-07-03T07:11:33Z'
+generated_at: '2026-07-16T07:12:08Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -107,7 +107,7 @@ surfaces:
   path: docs/agent-readiness.md
   type: markdown
   title: Agent Readiness
-  last_modified: '2026-06-04'
+  last_modified: '2026-07-15'
   diataxis: explanation
   renderer: explanation_shell
 - id: docs-architecture-diagrams
@@ -505,7 +505,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-07-02'
+  last_modified: '2026-07-15'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -513,13 +513,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-07-02'
+  last_modified: '2026-07-15'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-07-03'
+  last_modified: '2026-07-16'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -663,7 +663,7 @@ surfaces:
   path: .ai-state/decisions/021-dual-audience-architecture-docs.md
   type: markdown
   title: Dual-audience architecture documentation
-  last_modified: '2026-06-24'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-022-coordination-detail-extraction
   path: .ai-state/decisions/022-coordination-detail-extraction.md
@@ -705,7 +705,7 @@ surfaces:
   path: .ai-state/decisions/028-diagram-conventions-path-scoping.md
   type: markdown
   title: Narrow `rules/writing/diagram-conventions.md` path-scope from `**/*.md` to doc-authoring surfaces
-  last_modified: '2026-06-24'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-029-roadmap-creation-shape-b-hybrid
   path: .ai-state/decisions/029-roadmap-creation-shape-b-hybrid.md
@@ -951,7 +951,7 @@ surfaces:
   path: .ai-state/decisions/069-test-coverage-skill-verifier-discretion.md
   type: markdown
   title: Verifier loads test-coverage skill at its own discretion (not hard trigger)
-  last_modified: '2026-05-08'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-070-consumer-contract
   path: .ai-state/decisions/070-consumer-contract.md
@@ -987,7 +987,7 @@ surfaces:
   path: .ai-state/decisions/075-praxion-first-class-praxion-first-class-process.md
   type: markdown
   title: "Praxion-as-First-Class \u2014 process-driven development with universal rule-inheritance"
-  last_modified: '2026-05-08'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-076-agent-model-routing-routing-dimensionality-1d-defer-2d
   path: .ai-state/decisions/076-agent-model-routing-routing-dimensionality-1d-defer-2d.md
@@ -1125,13 +1125,13 @@ surfaces:
   path: .ai-state/decisions/098-aac-fence-contract.md
   type: markdown
   title: Hybrid generated/authored markdown contract via fenced HTML-comment regions
-  last_modified: '2026-06-24'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-099-aac-idea8-directory-reconciliation
   path: .ai-state/decisions/099-aac-idea8-directory-reconciliation.md
   type: markdown
   title: "Idea 8 directory premise reconciled \u2014 `.c4` source lives at `<doc-dir>/diagrams/`, not `architecture/` at project root"
-  last_modified: '2026-04-30'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-100-architect-validator-charter
   path: .ai-state/decisions/100-architect-validator-charter.md
@@ -1143,7 +1143,7 @@ surfaces:
   path: .ai-state/decisions/101-fitness-functions-infra.md
   type: markdown
   title: "Architectural fitness functions infrastructure \u2014 fitness/ at project root, import-linter + pytest, citation contract, waiver mechanism"
-  last_modified: '2026-05-08'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-102-planner-decomposition-decisions
   path: .ai-state/decisions/102-planner-decomposition-decisions.md
@@ -1155,7 +1155,7 @@ surfaces:
   path: .ai-state/decisions/103-tech-debt-source-enum-widening.md
   type: markdown
   title: TECH_DEBT_LEDGER source enum widened to include orchestrator
-  last_modified: '2026-05-08'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-104-aac-dac-foundation-aac-dac-foundation-worktree1-decompositi
   path: .ai-state/decisions/104-aac-dac-foundation-aac-dac-foundation-worktree1-decompositi.md
@@ -1173,7 +1173,7 @@ surfaces:
   path: .ai-state/decisions/106-aac-architecture-ci-pipeline.md
   type: markdown
   title: "Architecture CI pipeline \u2014 three parallel jobs invoking architect-validator on architectural-touch PRs"
-  last_modified: '2026-06-24'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-107-aac-diataxis-companion
   path: .ai-state/decisions/107-aac-diataxis-companion.md
@@ -1185,7 +1185,7 @@ surfaces:
   path: .ai-state/decisions/108-aac-golden-rule-enforcement-hook.md
   type: markdown
   title: Golden-rule enforcement at commit time via standalone script invoked from pre-commit hook
-  last_modified: '2026-06-24'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-109-aac-likec4-querying-skill
   path: .ai-state/decisions/109-aac-likec4-querying-skill.md
@@ -1203,7 +1203,7 @@ surfaces:
   path: .ai-state/decisions/111-req-arch-element-traceability.md
   type: markdown
   title: 111-req-arch-element-traceability.md
-  last_modified: '2026-05-08'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-112-aac-dac-traceability-sentinel-ac-traceability-checks
   path: .ai-state/decisions/112-aac-dac-traceability-sentinel-ac-traceability-checks.md
@@ -1221,7 +1221,7 @@ surfaces:
   path: .ai-state/decisions/114-tech-debt-ledger-resolved-split.md
   type: markdown
   title: Split TECH_DEBT_LEDGER into active + resolved file pair
-  last_modified: '2026-05-08'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-115-ai-training-program-md-meta-prompt
   path: .ai-state/decisions/115-ai-training-program-md-meta-prompt.md
@@ -1239,7 +1239,7 @@ surfaces:
   path: .ai-state/decisions/117-ai-training-skill-scope-decision.md
   type: markdown
   title: ML training onramp uses four new skills + extensions to deployment/cicd, not one mega-skill
-  last_modified: '2026-05-08'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-118-ai-training-tiered-backend-strategy
   path: .ai-state/decisions/118-ai-training-tiered-backend-strategy.md
@@ -1359,7 +1359,7 @@ surfaces:
   path: .ai-state/decisions/137-frontend-framework-nesting.md
   type: markdown
   title: Frontend framework contexts nest inside typescript-development, not as sibling skills
-  last_modified: '2026-05-11'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-138-mcp-sdk-v2-promotion-criteria
   path: .ai-state/decisions/138-mcp-sdk-v2-promotion-criteria.md
@@ -1371,7 +1371,7 @@ surfaces:
   path: .ai-state/decisions/139-polyglot-skill-template.md
   type: markdown
   title: "Polyglot skill template \u2014 references/ vs contexts/ separation with extension protocol"
-  last_modified: '2026-05-11'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-140-zod-version-split-housing
   path: .ai-state/decisions/140-zod-version-split-housing.md
@@ -1521,7 +1521,7 @@ surfaces:
   path: .ai-state/decisions/164-architecture-c4-dual-agent-representation.md
   type: markdown
   title: Architecture C4 dual-agent representation (knowledge.agents + orchestration.pipeline)
-  last_modified: '2026-05-12'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-165-praxion-dashboard-launcher-contract
   path: .ai-state/decisions/165-praxion-dashboard-launcher-contract.md
@@ -1587,7 +1587,7 @@ surfaces:
   path: .ai-state/decisions/175-verifier-rework-loop-verifier-findings-schema.md
   type: markdown
   title: VERIFIER_FINDINGS.md is a self-contained problem statement consumed by stock systems-architect / implementation-planner
-  last_modified: '2026-05-14'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-176-verifier-rework-loop-cluster-rubric-smell-class-then-file
   path: .ai-state/decisions/176-verifier-rework-loop-cluster-rubric-smell-class-then-file.md
@@ -1611,7 +1611,7 @@ surfaces:
   path: .ai-state/decisions/179-verifier-rework-loop-shared-disposition-vocabulary.md
   type: markdown
   title: CIS and rework-loop share a disposition vocabulary defined once in a skill reference
-  last_modified: '2026-05-14'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-180-verifier-rework-loop-subagent-isolation-test-harness
   path: .ai-state/decisions/180-verifier-rework-loop-subagent-isolation-test-harness.md
@@ -1653,7 +1653,7 @@ surfaces:
   path: .ai-state/decisions/186-skill-genesis-pull-driven-inversion.md
   type: markdown
   title: 'Skill-genesis: pull-driven autonomous-report inversion with deferred disposition via /skill-genesis-review'
-  last_modified: '2026-05-15'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-187-static-analysis-test-strategy
   path: .ai-state/decisions/187-static-analysis-test-strategy.md
@@ -1671,7 +1671,7 @@ surfaces:
   path: .ai-state/decisions/189-hackathon-mode-activation-and-tier-integration.md
   type: markdown
   title: "Hackathon mode \u2014 flexible-entry Hackathon Spine, activation, and process integration"
-  last_modified: '2026-05-15'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-190-hackathon-mode-plan-decomposition
   path: .ai-state/decisions/190-hackathon-mode-plan-decomposition.md
@@ -1725,7 +1725,7 @@ surfaces:
   path: .ai-state/decisions/198-shape-b-default-on.md
   type: markdown
   title: Adopt Obsidian Shape B as default-on integration for Praxion-managed projects
-  last_modified: '2026-05-20'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-199-obsidian-skills-marketplace-install
   path: .ai-state/decisions/199-obsidian-skills-marketplace-install.md
@@ -1761,7 +1761,7 @@ surfaces:
   path: .ai-state/decisions/204-praxion-self-eval-framework.md
   type: markdown
   title: "Praxion self-eval v1 \u2014 `/eval-praxion` adds LLM-as-judge over completed artifacts (narrow supersession of dec-040 clause 3)"
-  last_modified: '2026-05-26'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-205-harness-module-layout
   path: .ai-state/decisions/205-harness-module-layout.md
@@ -1803,7 +1803,7 @@ surfaces:
   path: .ai-state/decisions/211-transactions-architect-role-placement.md
   type: markdown
   title: New agentic-transactions-architect is a shadow + on-demand sub-architect (interface-designer-shaped), emitting TRANSACTIONS_DESIGN.md with a challenge loop
-  last_modified: '2026-06-02'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-212-sequential-markdown-build-execution
   path: .ai-state/decisions/212-sequential-markdown-build-execution.md
@@ -1887,19 +1887,19 @@ surfaces:
   path: .ai-state/decisions/225-remove-in-house-memory-subsystem.md
   type: markdown
   title: Remove the in-house curated-memory subsystem (blank slate for sandbook)
-  last_modified: '2026-06-11'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-226-api-doc-reference-tiering
   path: .ai-state/decisions/226-api-doc-reference-tiering.md
   type: markdown
   title: "api-documentation reference tiering \u2014 universal core in SKILL.md, per-surface references, one extension seam"
-  last_modified: '2026-06-16'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-227-new-skill-api-documentation
   path: .ai-state/decisions/227-new-skill-api-documentation.md
   type: markdown
   title: New api-documentation skill (peer to doc-management) rather than extending doc-management
-  last_modified: '2026-06-16'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-228-dashboard-api-spec-rendering
   path: .ai-state/decisions/228-dashboard-api-spec-rendering.md
@@ -1923,7 +1923,7 @@ surfaces:
   path: .ai-state/decisions/231-defer-eval-lens-and-ach-matrix.md
   type: markdown
   title: Defer the agentic eval-lens and the full ACH matrix
-  last_modified: '2026-06-18'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-232-di-disconfirmation-replaces-ach
   path: .ai-state/decisions/232-di-disconfirmation-replaces-ach.md
@@ -1965,7 +1965,7 @@ surfaces:
   path: .ai-state/decisions/238-spec-drift-detect-not-regenerate.md
   type: markdown
   title: "Proactive spec\u2194artifact drift \u2014 detect-and-surface, NOT auto-regenerate"
-  last_modified: '2026-06-19'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-239-where-it-lives
   path: .ai-state/decisions/239-where-it-lives.md
@@ -1983,7 +1983,7 @@ surfaces:
   path: .ai-state/decisions/241-principles-artifact.md
   type: markdown
   title: "Per-project principles artifact \u2014 standalone `.ai-state/principles.yaml`, Shape B, per-principle gate severity"
-  last_modified: '2026-06-20'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-242-principles-loader
   path: .ai-state/decisions/242-principles-loader.md
@@ -2049,7 +2049,7 @@ surfaces:
   path: .ai-state/decisions/252-production-gate-cohort.md
   type: markdown
   title: "Production-gate cohort \u2014 turn four prose obligations into mechanical gates"
-  last_modified: '2026-06-26'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-253-retire-token-budgeting
   path: .ai-state/decisions/253-retire-token-budgeting.md
@@ -2103,7 +2103,7 @@ surfaces:
   path: .ai-state/decisions/261-direct-capture-contract.md
   type: markdown
   title: "Direct-tier capture contract \u2014 one row at commit as the universal durable write"
-  last_modified: '2026-07-01'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-262-tier-vs-execution-mode-taxonomy
   path: .ai-state/decisions/262-tier-vs-execution-mode-taxonomy.md
@@ -2145,7 +2145,7 @@ surfaces:
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-07-03'
+  last_modified: '2026-07-16'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -2153,12 +2153,6 @@ surfaces:
   title: Idea Ledger
   last_modified: '2026-06-27'
   renderer: idea_grid
-- id: ai-state-sentinel-reports-sentinel-report-2026-05-17-15-21-45
-  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-05-17_15-21-45.md
-  type: markdown
-  title: Sentinel Report
-  last_modified: '2026-05-17'
-  renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-05-17-23-10-00
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-05-17_23-10-00.md
   type: markdown
@@ -2212,6 +2206,12 @@ surfaces:
   type: markdown
   title: Sentinel Report
   last_modified: '2026-06-20'
+  renderer: default_markdown
+- id: ai-state-sentinel-reports-sentinel-report-2026-07-15-21-32-25
+  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-07-15_21-32-25.md
+  type: markdown
+  title: Sentinel Report
+  last_modified: '2026-07-15'
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-06-05-18-26-42
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-05_18-26-42.json
@@ -2273,6 +2273,24 @@ surfaces:
   title: METRICS_REPORT_2026-06-21_01-14-35.json
   last_modified: '2026-06-20'
   renderer: metrics_view
+- id: ai-state-metrics-reports-metrics-report-2026-07-16-05-08-18
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_05-08-18.json
+  type: json
+  title: METRICS_REPORT_2026-07-16_05-08-18.json
+  last_modified: '2026-07-15'
+  renderer: metrics_view
+- id: ai-state-metrics-reports-metrics-report-2026-07-16-06-05-57
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_06-05-57.json
+  type: json
+  title: METRICS_REPORT_2026-07-16_06-05-57.json
+  last_modified: '2026-07-15'
+  renderer: metrics_view
+- id: ai-state-metrics-reports-metrics-report-2026-07-16-06-44-58
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_06-44-58.json
+  type: json
+  title: METRICS_REPORT_2026-07-16_06-44-58.json
+  last_modified: '2026-07-15'
+  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-06-05-18-26-42
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-05_18-26-42.md
   type: markdown
@@ -2332,6 +2350,24 @@ surfaces:
   type: markdown
   title: Project Metrics Report
   last_modified: '2026-06-20'
+  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-07-16-05-08-18
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_05-08-18.md
+  type: markdown
+  title: Project Metrics Report
+  last_modified: '2026-07-15'
+  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-07-16-06-05-57
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_06-05-57.md
+  type: markdown
+  title: Project Metrics Report
+  last_modified: '2026-07-15'
+  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-07-16-06-44-58
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_06-44-58.md
+  type: markdown
+  title: Project Metrics Report
+  last_modified: '2026-07-15'
   renderer: default_markdown
 - id: ai-state-specs-spec-agent-model-routing-2026-04-25
   path: .ai-state/specs/SPEC_agent-model-routing_2026-04-25.md
@@ -2708,7 +2744,12 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-06-20-23-30-00
   - ai-state-metrics-reports-metrics-report-2026-06-21-01-14-35
   - ai-state-metrics-reports-metrics-report-2026-06-21-01-14-35
-  - ai-state-sentinel-reports-sentinel-report-2026-05-17-15-21-45
+  - ai-state-metrics-reports-metrics-report-2026-07-16-05-08-18
+  - ai-state-metrics-reports-metrics-report-2026-07-16-05-08-18
+  - ai-state-metrics-reports-metrics-report-2026-07-16-06-05-57
+  - ai-state-metrics-reports-metrics-report-2026-07-16-06-05-57
+  - ai-state-metrics-reports-metrics-report-2026-07-16-06-44-58
+  - ai-state-metrics-reports-metrics-report-2026-07-16-06-44-58
   - ai-state-sentinel-reports-sentinel-report-2026-05-17-23-10-00
   - ai-state-sentinel-reports-sentinel-report-2026-05-23-15-17-18
   - ai-state-sentinel-reports-sentinel-report-2026-05-24-01-52-04
@@ -2718,6 +2759,7 @@ groups:
   - ai-state-sentinel-reports-sentinel-report-2026-06-11-01-25-30
   - ai-state-sentinel-reports-sentinel-report-2026-06-17-11-21-44
   - ai-state-sentinel-reports-sentinel-report-2026-06-20-13-34-25
+  - ai-state-sentinel-reports-sentinel-report-2026-07-15-21-32-25
   - ai-state-specs-spec-agent-model-routing-2026-04-25
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30

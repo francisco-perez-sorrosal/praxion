@@ -162,6 +162,11 @@ jobs:
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
         with:
           python-version: "3.13"
+          # This job runs a bare script and never `uv sync`s, so no cache
+          # dir is ever created; setup-uv's post-job prune hard-errors on
+          # the missing path. Failing post-step was previously masked by
+          # the soft-launch continue-on-error — the strict flip exposed it.
+          enable-cache: false
 
       - name: Cross-reference validation
         run: python skills/skill-crafting/scripts/validate_references.py --all --format text

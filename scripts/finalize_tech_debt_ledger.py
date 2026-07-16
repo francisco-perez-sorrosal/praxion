@@ -21,7 +21,7 @@ Invocation modes:
 Exit codes:
 
     0 -- success, or no changes (idempotent no-op)
-    1 -- manual intervention required (malformed row, I/O error)
+    1 -- manual intervention required (malformed row, id collision, I/O error)
 
 Design notes:
 - Single-purpose script: only ledger-pair reconciliation.
@@ -289,6 +289,26 @@ def _is_terminal(status: str) -> bool:
     return status in TERMINAL_STATUSES
 
 
+def _detect_id_collisions(rows: list[LedgerRow]) -> dict[str, list[str]]:
+    """Return ids that label 2+ distinct findings (a true `id` collision).
+
+    Two rows sharing an `id` with the SAME `dedup_key` are the same finding
+    (a legitimate collapse candidate) -- not a collision. Two rows sharing an
+    `id` with DIFFERENT `dedup_key`s means one `td-NNN` number was assigned
+    to two unrelated findings (precedent: the td-038/td-039 collisions,
+    renumbered to td-053/td-054). Checked across the full pair so a
+    collision spanning LEDGER and RESOLVED is caught too.
+    """
+    dedup_keys_by_id: dict[str, set[str]] = {}
+    for row in rows:
+        dedup_keys_by_id.setdefault(row.get("id"), set()).add(row.get("dedup_key"))
+    return {
+        row_id: sorted(dedup_keys)
+        for row_id, dedup_keys in dedup_keys_by_id.items()
+        if len(dedup_keys) > 1
+    }
+
+
 # -- Pair reconciliation ------------------------------------------------------
 
 
@@ -450,6 +470,18 @@ def finalize_pair(
                 "row will be skipped for manual intervention): %r",
                 COLUMN_COUNT,
                 line.rstrip("\n"),
+            )
+        return 1
+
+    id_collisions = _detect_id_collisions(ledger_rows + resolved_rows)
+    if id_collisions:
+        for row_id, dedup_keys in sorted(id_collisions.items()):
+            logger.error(
+                "finalize_tech_debt_ledger: id collision -- %r labels %d distinct "
+                "findings (dedup_keys=%s); renumber one of them before finalizing",
+                row_id,
+                len(dedup_keys),
+                dedup_keys,
             )
         return 1
 

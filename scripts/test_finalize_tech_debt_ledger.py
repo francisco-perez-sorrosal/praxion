@@ -682,9 +682,88 @@ class TestMalformedRowHandling:
 
         code = finalize_td.finalize_ledger(ledger_path, dry_run=False)
 
-        assert code == MALFORMED_EXIT_CODE, (
-            f"malformed row must trigger non-zero exit for manual intervention, " f"got exit={code}"
+        assert (
+            code == MALFORMED_EXIT_CODE
+        ), f"malformed row must trigger non-zero exit for manual intervention, got exit={code}"
+
+
+# -- Id collision handling -----------------------------------------------------
+
+
+class TestIdCollisionHandling:
+    """Two rows sharing an `id` but labeling different findings refuse to finalize.
+
+    Regression for the td-038/td-039 id-collision defect (SENTINEL_REPORT
+    finding I2): two unrelated findings assigned the same `td-NNN` number.
+    Distinct `dedup_key`s are the signal that the `id` labels two different
+    findings, not a legitimate collapse candidate.
+    """
+
+    def test_same_id_with_different_dedup_keys_triggers_manual_intervention_exit(
+        self, ledger_path: Path
+    ) -> None:
+        """Two rows, same id, different dedup_key -> exit == MALFORMED_EXIT_CODE."""
+        colliding_rows = [
+            make_row(row_id="td-038", dedup_key="findingaaaaa1", notes="first finding"),
+            make_row(row_id="td-038", dedup_key="findingbbbbb2", notes="unrelated finding"),
+        ]
+        write_ledger(ledger_path, colliding_rows)
+
+        code = finalize_td.finalize_ledger(ledger_path, dry_run=False)
+
+        assert (
+            code == MALFORMED_EXIT_CODE
+        ), f"id collision must trigger non-zero exit for manual intervention, got exit={code}"
+
+    def test_same_id_with_different_dedup_key_does_not_write(self, ledger_path: Path) -> None:
+        """Refusal is loud, not silent -- the ledger is left byte-unchanged."""
+        colliding_rows = [
+            make_row(row_id="td-039", dedup_key="findingccccc3", notes="first finding"),
+            make_row(row_id="td-039", dedup_key="findingddddd4", notes="unrelated finding"),
+        ]
+        write_ledger(ledger_path, colliding_rows)
+        original_bytes = ledger_path.read_bytes()
+
+        finalize_td.finalize_ledger(ledger_path, dry_run=False)
+
+        assert ledger_path.read_bytes() == original_bytes
+
+    def test_same_id_with_same_dedup_key_is_not_a_collision(self, ledger_path: Path) -> None:
+        """Same id + same dedup_key is a legitimate collapse candidate, not a collision."""
+        shared_key = "legitcollapse"
+        rows = [
+            make_row(row_id="td-001", dedup_key=shared_key, status="open", notes="first"),
+            make_row(row_id="td-001", dedup_key=shared_key, status="resolved", notes="second"),
+        ]
+        write_ledger(ledger_path, rows)
+
+        code = finalize_td.finalize_ledger(ledger_path, dry_run=False)
+
+        assert code == 0
+
+    def test_id_collision_across_ledger_and_resolved_is_detected(
+        self, ledger_path: Path, resolved_path: Path
+    ) -> None:
+        """A collision spanning both files (not just one) is still caught."""
+        write_ledger(
+            ledger_path,
+            [make_row(row_id="td-040", dedup_key="activefinding1", status="open")],
         )
+        write_resolved(
+            resolved_path,
+            [
+                make_row(
+                    row_id="td-040",
+                    dedup_key="resolvedfindin",
+                    status="resolved",
+                    resolved_by="abc1234",
+                )
+            ],
+        )
+
+        code = finalize_td.finalize_ledger(ledger_path, dry_run=False)
+
+        assert code == MALFORMED_EXIT_CODE
 
 
 # -- Advisory lock ------------------------------------------------------------

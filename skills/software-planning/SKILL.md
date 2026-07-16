@@ -294,6 +294,8 @@ When all steps are complete: verify all acceptance criteria met, merge learnings
 
 --> See [references/document-templates.md](references/document-templates.md#end-of-feature) for the full verification, merge, and cleanup workflow.
 
+**From PoC to production.** A feature pipeline is one milestone of many. The full journey: baseline audit (`/sentinel`) → CI/CD setup (`cicd-engineer` agent) → deployment (`deployment` skill) → first release (`/release`) → ongoing decisions captured as ADRs in `.ai-state/decisions/`.
+
 ## Breaking Down Complex Features
 
 Start with a specific goal (not vague), identify concrete acceptance criteria, then decompose by asking "What's the smallest change that moves toward the goal?" Validate each step can be described in one sentence and done in one session.

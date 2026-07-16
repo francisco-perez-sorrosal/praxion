@@ -29,7 +29,6 @@ from pathlib import Path
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -110,10 +109,9 @@ def _extract_block_section(content: str, section_heading: str) -> str:
     """
     escaped = re.escape(section_heading)
     match = re.search(rf"^{escaped}\b.*$", content, re.MULTILINE)
-    assert match is not None, (
-        f"Heading '{section_heading}' not found in content "
-        f"(first 200 chars: {content[:200]!r})"
-    )
+    assert (
+        match is not None
+    ), f"Heading '{section_heading}' not found in content (first 200 chars: {content[:200]!r})"
     start = match.start()
 
     # Find where the next canonical-block section heading begins (or EOF).
@@ -149,9 +147,9 @@ def _extract_fenced_content(content: str, section_heading: str) -> str:
 
     # Find the matching closing ``` (must be at line-start)
     fence_close = re.search(r"^```\s*$", section[content_start:], re.MULTILINE)
-    assert fence_close is not None, (
-        f"No closing ``` fence found after ```markdown in '{section_heading}' section."
-    )
+    assert (
+        fence_close is not None
+    ), f"No closing ``` fence found after ```markdown in '{section_heading}' section."
     content_end = content_start + fence_close.start()
 
     # Strip only the leading newline introduced by the fence opener line ending
@@ -161,9 +159,7 @@ def _extract_fenced_content(content: str, section_heading: str) -> str:
     return raw
 
 
-def _extract_inline_block(
-    content: str, section_heading: str, claude_md_heading: str
-) -> str:
+def _extract_inline_block(content: str, section_heading: str, claude_md_heading: str) -> str:
     """Extract the injectable prose that will be written into user CLAUDE.md.
 
     Starting from the claude_md_heading inside the section, returns from there
@@ -173,9 +169,7 @@ def _extract_inline_block(
     section = _extract_block_section(content, section_heading)
     escaped = re.escape(claude_md_heading)
     match = re.search(rf"^{escaped}\b.*$", section, re.MULTILINE)
-    assert match is not None, (
-        f"'{claude_md_heading}' not found inside '{section_heading}' section"
-    )
+    assert match is not None, f"'{claude_md_heading}' not found inside '{section_heading}' section"
     start = match.start()
 
     next_heading = re.search(r"^## ", section[match.end() :], re.MULTILINE)
@@ -192,32 +186,28 @@ def _extract_inline_block(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("slug,block_meta", BLOCKS.items())
+@pytest.mark.parametrize(("slug", "block_meta"), BLOCKS.items())
 def test_block_section_exists_in_onboard_project(slug: str, block_meta: dict) -> None:
     """Each canonical block section heading must exist in onboard-project.md."""
     content = _read_command_file(ONBOARD_PATH)
     heading = block_meta["section_heading"]
-    assert heading in content, (
-        f"'{heading}' not found in {ONBOARD_PATH.name}. "
-        f"The {slug} block section is missing."
-    )
+    assert (
+        heading in content
+    ), f"'{heading}' not found in {ONBOARD_PATH.name}. The {slug} block section is missing."
 
 
-@pytest.mark.parametrize("slug,block_meta", BLOCKS.items())
+@pytest.mark.parametrize(("slug", "block_meta"), BLOCKS.items())
 def test_block_section_exists_in_new_project(slug: str, block_meta: dict) -> None:
     """Each canonical block section heading must exist in new-project.md."""
     content = _read_command_file(NEW_PROJECT_PATH)
     heading = block_meta["section_heading"]
-    assert heading in content, (
-        f"'{heading}' not found in {NEW_PROJECT_PATH.name}. "
-        f"The {slug} block section is missing."
-    )
+    assert (
+        heading in content
+    ), f"'{heading}' not found in {NEW_PROJECT_PATH.name}. The {slug} block section is missing."
 
 
-@pytest.mark.parametrize("slug,block_meta", BLOCKS.items())
-def test_injectable_heading_present_in_onboard_project_block(
-    slug: str, block_meta: dict
-) -> None:
+@pytest.mark.parametrize(("slug", "block_meta"), BLOCKS.items())
+def test_injectable_heading_present_in_onboard_project_block(slug: str, block_meta: dict) -> None:
     """Each §<Block> Block section in onboard-project.md must contain its injectable heading."""
     content = _read_command_file(ONBOARD_PATH)
     section = _extract_block_section(content, block_meta["section_heading"])
@@ -227,10 +217,8 @@ def test_injectable_heading_present_in_onboard_project_block(
     )
 
 
-@pytest.mark.parametrize("slug,block_meta", BLOCKS.items())
-def test_injectable_heading_present_in_new_project_block(
-    slug: str, block_meta: dict
-) -> None:
+@pytest.mark.parametrize(("slug", "block_meta"), BLOCKS.items())
+def test_injectable_heading_present_in_new_project_block(slug: str, block_meta: dict) -> None:
     """Each §<Block> Block section in new-project.md must contain its injectable heading."""
     content = _read_command_file(NEW_PROJECT_PATH)
     section = _extract_block_section(content, block_meta["section_heading"])
@@ -245,7 +233,7 @@ def test_injectable_heading_present_in_new_project_block(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("slug,block_meta", BLOCKS.items())
+@pytest.mark.parametrize(("slug", "block_meta"), BLOCKS.items())
 def test_fenced_content_is_byte_identical_between_both_command_files(
     slug: str, block_meta: dict
 ) -> None:
@@ -257,12 +245,8 @@ def test_fenced_content_is_byte_identical_between_both_command_files(
     onboard_content = _read_command_file(ONBOARD_PATH)
     new_project_content = _read_command_file(NEW_PROJECT_PATH)
 
-    onboard_fenced = _extract_fenced_content(
-        onboard_content, block_meta["section_heading"]
-    )
-    new_project_fenced = _extract_fenced_content(
-        new_project_content, block_meta["section_heading"]
-    )
+    onboard_fenced = _extract_fenced_content(onboard_content, block_meta["section_heading"])
+    new_project_fenced = _extract_fenced_content(new_project_content, block_meta["section_heading"])
 
     assert onboard_fenced == new_project_fenced, (
         f"'{block_meta['section_heading']}' fenced content is NOT byte-identical "
@@ -282,10 +266,8 @@ def test_fenced_content_is_byte_identical_between_both_command_files(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("slug,block_meta", BLOCKS.items())
-def test_fenced_content_matches_canonical_file_byte_for_byte(
-    slug: str, block_meta: dict
-) -> None:
+@pytest.mark.parametrize(("slug", "block_meta"), BLOCKS.items())
+def test_fenced_content_matches_canonical_file_byte_for_byte(slug: str, block_meta: dict) -> None:
     """Each block's fenced content in onboard-project.md must equal its canonical file.
 
     This is the primary regression guarantee for the extraction refactor: a drift
@@ -312,7 +294,7 @@ def test_fenced_content_matches_canonical_file_byte_for_byte(
     )
 
 
-@pytest.mark.parametrize("slug,block_meta", BLOCKS.items())
+@pytest.mark.parametrize(("slug", "block_meta"), BLOCKS.items())
 def test_new_project_fenced_content_matches_canonical_file_byte_for_byte(
     slug: str, block_meta: dict
 ) -> None:
@@ -346,10 +328,8 @@ def test_new_project_fenced_content_matches_canonical_file_byte_for_byte(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("slug,block_meta", BLOCKS.items())
-def test_block_contains_no_specific_ai_state_entries(
-    slug: str, block_meta: dict
-) -> None:
+@pytest.mark.parametrize(("slug", "block_meta"), BLOCKS.items())
+def test_block_contains_no_specific_ai_state_entries(slug: str, block_meta: dict) -> None:
     """Each block's fenced content must contain no specific .ai-state/ or .ai-work/ entries.
 
     Canonical blocks are injected into user CLAUDE.md files in external projects.
@@ -374,23 +354,12 @@ def test_block_contains_no_specific_ai_state_entries(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("slug,block_meta", BLOCKS.items())
+@pytest.mark.parametrize(("slug", "block_meta"), BLOCKS.items())
 def test_block_stays_within_token_budget(slug: str, block_meta: dict) -> None:
     """Each block's fenced content must be under ~250 tokens (bytes/3.6 estimate).
 
     Combined budget across all four blocks is ~8KB. Per-block ceiling is ~900 bytes.
     """
-    if slug == "agent-pipeline":
-        pytest.xfail(
-            reason=(
-                "td-002: agent-pipeline canonical block (~1818 bytes / ~505 tokens) "
-                "exceeds the per-block ~250-token budget. Pre-existing condition "
-                "surfaced by the canonical-blocks refactor; not introduced by it. "
-                "Trimming the block changes downstream injection content and "
-                "requires its own content review + ADR; tracked in "
-                ".ai-state/TECH_DEBT_LEDGER.md."
-            )
-        )
     content = _read_command_file(ONBOARD_PATH)
     fenced = _extract_fenced_content(content, block_meta["section_heading"])
     block_bytes = len(fenced.encode("utf-8"))
@@ -407,7 +376,7 @@ def test_block_stays_within_token_budget(slug: str, block_meta: dict) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("slug,block_meta", BLOCKS.items())
+@pytest.mark.parametrize(("slug", "block_meta"), BLOCKS.items())
 def test_injectable_heading_is_idempotency_predicate_anchor(
     slug: str, block_meta: dict, tmp_path: Path
 ) -> None:
@@ -442,21 +411,17 @@ def test_injectable_heading_is_idempotency_predicate_anchor(
 # ---------------------------------------------------------------------------
 
 
-def test_praxion_process_block_appears_after_behavioral_contract_in_onboard_project() -> (
-    None
-):
+def test_praxion_process_block_appears_after_behavioral_contract_in_onboard_project() -> None:
     """The §Praxion Process Block must appear after §Behavioral Contract Block in onboard-project.md."""
     content = _read_command_file(ONBOARD_PATH)
 
     behavioral_contract_pos = content.find("## §Behavioral Contract Block")
     praxion_process_pos = content.find("## §Praxion Process Block")
 
-    assert behavioral_contract_pos != -1, (
-        "'## §Behavioral Contract Block' not found in onboard-project.md"
-    )
-    assert praxion_process_pos != -1, (
-        "'## §Praxion Process Block' not found in onboard-project.md"
-    )
+    assert (
+        behavioral_contract_pos != -1
+    ), "'## §Behavioral Contract Block' not found in onboard-project.md"
+    assert praxion_process_pos != -1, "'## §Praxion Process Block' not found in onboard-project.md"
     assert praxion_process_pos > behavioral_contract_pos, (
         "'## §Praxion Process Block' must appear after '## §Behavioral Contract Block'. "
         f"Behavioral contract at pos {behavioral_contract_pos}, "
@@ -475,13 +440,9 @@ def test_phase_6_references_praxion_process_in_onboard_project() -> None:
     phase6_match = re.search(r"^## §Phase 6.*$", content, re.MULTILINE)
     assert phase6_match is not None, "§Phase 6 section not found in onboard-project.md"
 
-    next_section = re.search(
-        r"^## §Phase 7", content[phase6_match.end() :], re.MULTILINE
-    )
+    next_section = re.search(r"^## §Phase 7", content[phase6_match.end() :], re.MULTILINE)
     if next_section:
-        phase6_text = content[
-            phase6_match.start() : phase6_match.end() + next_section.start()
-        ]
+        phase6_text = content[phase6_match.start() : phase6_match.end() + next_section.start()]
     else:
         phase6_text = content[phase6_match.start() :]
 
@@ -611,6 +572,6 @@ def test_second_phase6_run_produces_no_duplicate_when_block_already_present(
         f"(expected 1 — idempotency predicate should have suppressed the second append)."
     )
 
-    assert after_first_run == after_second_run, (
-        "CLAUDE.md changed between first and second Phase 6 run — idempotency violated."
-    )
+    assert (
+        after_first_run == after_second_run
+    ), "CLAUDE.md changed between first and second Phase 6 run — idempotency violated."

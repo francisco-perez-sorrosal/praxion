@@ -1,3 +1,19 @@
+## v0.14.0 (2026-07-16)
+
+### Feat
+
+- wire the eval-ledger producer (append_eval_log_row)
+- emit first-class skill_activation events from the WAL emitter
+- evidence-bundle artifacts for the readiness LLM judge
+- add Railway agent-integration recipe to skills
+
+### Fix
+
+- two CI-surfaced portability defects from the report-only run
+- backfill re_affirmed_by ADR reciprocity (sentinel I3/DL06)
+- resolve td-038/td-039 ledger id collisions (sentinel I2)
+- regenerate AGENTS.md.tmpl from CLAUDE.md
+
 ## v0.13.0 (2026-07-02)
 
 ### Feat

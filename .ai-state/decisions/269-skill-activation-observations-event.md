@@ -1,7 +1,7 @@
 ---
-id: dec-draft-10421709
+id: dec-269
 title: First-class `skill_activation` observations event via the single PostToolUse WAL emitter
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-16
 summary: Emit a first-class `skill_activation` event (with a `skill_name` field) into observations.jsonl by extending capture_memory.py's Skill branch — not a new hook; deliberately excludes agent-frontmatter availability and leaves the relay's `skill_use` name unchanged.

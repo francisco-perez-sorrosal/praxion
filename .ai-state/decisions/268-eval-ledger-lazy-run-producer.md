@@ -1,7 +1,7 @@
 ---
-id: dec-draft-cd07e6c1
+id: dec-268
 title: Realize the eval-ledger lazy-run producer mechanism (helper + skill step); flip EVAL_LOG.md to optional-lazy
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-16
 summary: Make the eval_ledger/EVAL_LOG.md producer operational as a stdlib helper + a named agent-evals skill step — the mechanism dec-263 blessed in design — decoupled from the deferred archetype feature and from onboarding; flip the artifact state future-designed → optional-lazy. Re-affirms dec-263.

@@ -57,17 +57,19 @@ jobs:
         run: uv run pytest
 
   test-root:
-    # Soft-launch (ROADMAP item 1.1): report-only for one observed run; a
-    # follow-up commit flips to strict and adds the coverage floor once the
-    # in-CI baseline is confirmed. Gates the root pytest corpus (tests/ +
-    # scripts/) — the automation substrate (finalize chain, hooks, sync
-    # gates, project-metrics) that previously ran in no CI job at all.
+    # Strict since 2026-07-16 after one observed green report-only run
+    # (ROADMAP item 1.1). Gates the root pytest corpus (tests/ + scripts/)
+    # — the automation substrate (finalize chain, hooks, sync gates,
+    # project-metrics) that previously ran in no CI job at all.
     # Python 3.11 = the root requires-python floor, so the gate proves the
     # contract, not just the maintainer's local interpreter.
-    name: Test root suite (report-only)
+    # The coverage floor lives HERE, not in pyproject [tool.coverage.report]:
+    # a global fail_under would break scoped inner-loop runs (a single test
+    # file measures only its own slice). 80 sits just under the observed
+    # full-suite in-CI baseline (82.1%, run of 2026-07-16).
+    name: Test root suite
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    continue-on-error: true
 
     concurrency:
       group: test-root-${{ github.ref }}
@@ -86,7 +88,7 @@ jobs:
         run: uv sync --frozen
 
       - name: Pytest (tests/ + scripts/)
-        run: uv run --frozen pytest
+        run: uv run --frozen pytest --cov-fail-under=80
 
       - name: Upload coverage artifact
         if: always()

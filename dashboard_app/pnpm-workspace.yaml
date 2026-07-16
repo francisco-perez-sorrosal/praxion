@@ -1,9 +1,15 @@
 # pnpm settings for the standalone dashboard app (not a monorepo — no `packages:`).
-# `sharp` is a transitive native dep of Next.js (image optimization). The dashboard
-# does not use next/image, so its native build is unnecessary; listing it here lets
-# pnpm 10/11 build it during a fresh install instead of leaving it "ignored" (which
-# pnpm 11 / CI mode treats as an error). `scripts/praxion-dashboard install`
-# additionally warn-and-continues past a non-zero pnpm exit, with the next-binary
-# check as the real gate — so the install completes through to `next build` either way.
-onlyBuiltDependencies:
-  - sharp
+# `allowBuilds` is the pnpm 11 schema for approving dependency build scripts (a
+# per-package boolean map written by `pnpm approve-builds`); the pnpm 10
+# `onlyBuiltDependencies` list form is silently ignored by v11, which is exactly
+# how CI hit ERR_PNPM_IGNORED_BUILDS despite an allowlist being present.
+# - sharp: transitive native dep of Next.js (image optimization). The dashboard
+#   does not use next/image, but building it keeps a fresh `CI=true` install
+#   green instead of erroring on an undispositioned script.
+# - vue-demi: transitive of @scalar/api-reference-react; its postinstall is a
+#   trivial vue2/vue3 API switch. Approved for the same reason.
+# `scripts/praxion-dashboard install` additionally warn-and-continues past a
+# non-zero pnpm exit, with the next-binary check as the real gate.
+allowBuilds:
+  sharp: true
+  vue-demi: true

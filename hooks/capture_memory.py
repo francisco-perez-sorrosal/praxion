@@ -133,6 +133,77 @@ def build_summary(tool_name: str, tool_input: dict, classification: str) -> str:
     return _truncate(", ".join(parts)) if parts else tool_name
 
 
+def build_observation(payload: dict) -> dict:
+    """Assemble an observation record from a completed PostToolUse payload.
+
+    Pure function -- reads only ``payload`` and performs no I/O, so the
+    classification branches are unit-testable without a stdin/subprocess
+    harness (mirrors the ``classify_event``/``build_summary``/
+    ``extract_file_paths`` extraction pattern already in this file).
+
+    A ``tool_name == "Skill"`` call is recorded as a first-class
+    ``skill_activation`` event carrying a top-level ``skill_name``; every
+    other tool stays a generic ``tool_use`` event. Both event types populate
+    the identical envelope so the merge dedup key and all downstream readers
+    stay valid.
+    """
+    tool_name = payload.get("tool_name", "")
+    cwd = payload.get("cwd", ".")
+
+    tool_input = payload.get("tool_input", {})
+    if isinstance(tool_input, str):
+        tool_input = {}
+
+    file_paths = extract_file_paths(tool_input, tool_name)
+    command = tool_input.get("command", "") if tool_name == "Bash" else ""
+    classification = classify_event(tool_name, file_paths, command)
+    summary = build_summary(tool_name, tool_input, classification)
+
+    tool_response = payload.get("tool_response", {})
+    has_error = isinstance(tool_response, dict) and tool_response.get("error")
+    outcome = "failure" if has_error else "success"
+
+    session_id = payload.get("session_id", "")
+    agent_id = payload.get("agent_id", "") or session_id  # main agent uses session_id
+
+    # Correlation: W3C trace-context IDs may be surfaced by a tool handler via
+    # ``tool_response["additionalContext"]``. Missing/malformed additionalContext
+    # degrades silently to empty strings (the common case -- no in-tree tool
+    # currently populates these fields).
+    additional_context = (
+        tool_response.get("additionalContext", {}) if isinstance(tool_response, dict) else {}
+    )
+    if not isinstance(additional_context, dict):
+        additional_context = {}
+    trace_id = str(additional_context.get("trace_id") or "")
+    span_id = str(additional_context.get("span_id") or "")
+    parent_span_id = str(additional_context.get("parent_span_id") or "")
+
+    event_type = "skill_activation" if tool_name == "Skill" else "tool_use"
+
+    observation = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "session_id": session_id,
+        "agent_type": payload.get("agent_type", "main"),
+        "agent_id": agent_id,
+        "project": Path(cwd).name,
+        "event_type": event_type,
+        "tool_name": tool_name,
+        "summary": summary,
+        "file_paths": file_paths,
+        "outcome": outcome,
+        "classification": classification,
+        "trace_id": trace_id,
+        "span_id": span_id,
+        "parent_span_id": parent_span_id,
+    }
+
+    if tool_name == "Skill":
+        observation["skill_name"] = tool_input.get("skill", "")
+
+    return observation
+
+
 def main() -> None:
     if is_disabled(DISABLE_OBSERVABILITY):
         return
@@ -152,52 +223,7 @@ def main() -> None:
         return  # graceful degradation
 
     obs_path = ai_state_dir / "observations.jsonl"
-    tool_input = payload.get("tool_input", {})
-    if isinstance(tool_input, str):
-        tool_input = {}
-
-    file_paths = extract_file_paths(tool_input, tool_name)
-    command = tool_input.get("command", "") if tool_name == "Bash" else ""
-    classification = classify_event(tool_name, file_paths, command)
-    summary = build_summary(tool_name, tool_input, classification)
-
-    tool_response = payload.get("tool_response", {})
-    has_error = isinstance(tool_response, dict) and tool_response.get("error")
-    outcome = "failure" if has_error else "success"
-
-    session_id = payload.get("session_id", "")
-    agent_id = payload.get("agent_id", "") or session_id  # main agent uses session_id
-
-    # Correlation: W3C trace-context IDs may be surfaced by a tool handler via
-    # ``tool_response["additionalContext"]``. Missing/malformed additionalContext
-    # degrades silently to empty strings (the common case — no in-tree tool
-    # currently populates these fields).
-    additional_context = (
-        tool_response.get("additionalContext", {}) if isinstance(tool_response, dict) else {}
-    )
-    if not isinstance(additional_context, dict):
-        additional_context = {}
-    trace_id = str(additional_context.get("trace_id") or "")
-    span_id = str(additional_context.get("span_id") or "")
-    parent_span_id = str(additional_context.get("parent_span_id") or "")
-
-    observation = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "session_id": session_id,
-        "agent_type": payload.get("agent_type", "main"),
-        "agent_id": agent_id,
-        "project": Path(cwd).name,
-        "event_type": "tool_use",
-        "tool_name": tool_name,
-        "summary": summary,
-        "file_paths": file_paths,
-        "outcome": outcome,
-        "classification": classification,
-        "trace_id": trace_id,
-        "span_id": span_id,
-        "parent_span_id": parent_span_id,
-    }
-
+    observation = build_observation(payload)
     append_observation(obs_path, observation)
 
 

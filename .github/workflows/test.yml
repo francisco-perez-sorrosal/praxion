@@ -90,6 +90,12 @@ jobs:
       - name: Pytest (tests/ + scripts/)
         run: uv run --frozen pytest --cov-fail-under=80
 
+      - name: Pytest (hooks/)
+        # testpaths deliberately excludes hooks/, so the WAL-emitter suite
+        # must be invoked explicitly or its regressions ship CI-green
+        # (pre-mortem finding from the efficacy-measurement pipeline).
+        run: uv run --frozen pytest hooks/ -q --no-cov
+
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0

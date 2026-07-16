@@ -27,6 +27,8 @@ Evaluate AI agent behavior systematically. Agent evals differ fundamentally from
 - [references/run-ledger-schema.md](references/run-ledger-schema.md) -- run_store_descriptor, EVAL_RESULTS.md schema (13 fields), EVAL_LOG.md aggregate columns (11 cols), verifier reuse
 - [references/data-governance.md](references/data-governance.md) -- held-out split design, MANIFEST.json schema (sha256/version/source/split), answer-key isolation, eval determinism practices, contamination detection
 
+**Ledger producer.** When a run is kept (the same event that writes project-root `EVAL_RESULTS.md`), append one row to the aggregate ledger via `append_eval_log_row()` in [`scripts/append_eval_log.py`](scripts/append_eval_log.py) -- the named producer for `.ai-state/eval_ledger/EVAL_LOG.md` (schema: [references/run-ledger-schema.md](references/run-ledger-schema.md)).
+
 ## Gotchas
 
 - **Non-determinism is not a bug, it's the medium.** Never expect exact output matching. Use rubrics, partial credit, and statistical aggregation. A single trial tells you almost nothing.

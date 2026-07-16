@@ -3,7 +3,7 @@
 Schema reference for `EVAL_RESULTS.md`, `EVAL_LOG.md`, and the `run_store_descriptor`.
 Owned by the `agent-evals` skill. Back to [SKILL.md](../SKILL.md).
 
-<!-- last-verified: 2026-06-05 -->
+<!-- last-verified: 2026-07-16 -->
 <!-- conceptual ancestry: skills/llm-training-eval/references/training-results-schema.md -->
 
 ## Contents
@@ -237,6 +237,7 @@ evaluation (scoring errors, API timeouts, unexpected task failures).]
 
 **Append-only table at `.ai-state/eval_ledger/EVAL_LOG.md`:**
 - One row appended per kept run (same event that writes/overwrites project-root `EVAL_RESULTS.md`)
+- Producer: `append_eval_log_row()` in [`../scripts/append_eval_log.py`](../scripts/append_eval_log.py)
 - Never overwritten — only appended; the log is the full history
 - Columns: see [EVAL_LOG.md column set](#eval_logmd-column-set) below
 

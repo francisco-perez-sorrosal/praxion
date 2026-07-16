@@ -47,3 +47,20 @@ def _rebuild_git_fixtures() -> None:
     ):
         return
     build_fixtures.build_all()
+
+
+@pytest.fixture(autouse=True)
+def _scrub_judge_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Remove Anthropic judge credentials from every test's environment.
+
+    Hermeticity guard: without it, an ambient developer credential (a shell
+    export, or a leak from code-under-test writing ``os.environ``) lets
+    ``enrich_readiness`` pass its auth gate inside the integration tests and
+    POST real judge requests to the Anthropic API mid-suite — slow, billable,
+    and order-dependent. Tests that exercise auth explicitly are unaffected:
+    their own ``monkeypatch.setenv`` runs after this autouse fixture and wins
+    for the test's duration.
+    """
+
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)

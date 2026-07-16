@@ -3,18 +3,51 @@
 Each test writes a ``.env`` fixture under ``tmp_path`` and asserts how
 ``load_dotenv`` / ``find_dotenv`` merge it into ``os.environ``. The loader is
 pure-with-respect-to-the-filesystem and deterministic — no network, no clocks —
-so a fixed file always yields the same result. ``monkeypatch`` isolates
-``os.environ`` and the working directory so no test leaks state.
+so a fixed file always yields the same result.
+
+``monkeypatch`` alone does NOT isolate these tests: it restores only keys the
+*test* touched, while the code under test writes ``os.environ`` directly. A
+key the loader wrote into a previously-absent slot would survive teardown and
+leak process-wide — historically leaking fake Anthropic credentials into the
+later integration tests. The autouse snapshot fixture below restores every
+key these fixtures write.
 """
 
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 
 from scripts.project_metrics._dotenv import find_dotenv, load_dotenv
+
+_MUTATED_KEYS: tuple[str, ...] = (
+    "ANTHROPIC_API_KEY",
+    "CLAUDE_CODE_OAUTH_TOKEN",
+    "PLAIN",
+    "GOOD",
+    "KEY",
+)
+
+
+@pytest.fixture(autouse=True)
+def _restore_loader_written_environ() -> Iterator[None]:
+    """Snapshot and restore every env key the ``.env`` fixtures write.
+
+    Covers the gap monkeypatch leaves: keys mutated by the code under test
+    (not by the test) are restored to their pre-test value — including
+    restored-to-absent — so nothing leaks into later tests in the process.
+    """
+
+    snapshot = {key: os.environ.get(key) for key in _MUTATED_KEYS}
+    yield
+    for key, value in snapshot.items():
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
 
 
 def _write_env(directory: Path, body: str) -> Path:

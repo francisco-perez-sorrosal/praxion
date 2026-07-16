@@ -129,9 +129,9 @@ def _read_report_md(ai_state_dir: Path) -> str:
 
     reports_dir = ai_state_dir / "metrics_reports"
     candidates = sorted(reports_dir.glob("METRICS_REPORT_*.md"))
-    assert len(candidates) >= 1, (
-        f"Expected at least one METRICS_REPORT_*.md under {ai_state_dir}; found none"
-    )
+    assert (
+        len(candidates) >= 1
+    ), f"Expected at least one METRICS_REPORT_*.md under {ai_state_dir}; found none"
     # Most-recent by filename ordering — suffices since the timestamp prefix
     # is lexically ordered.
     return candidates[-1].read_text(encoding="utf-8")
@@ -171,9 +171,7 @@ def test_full_pipeline_on_minimal_repo_produces_three_files(
 
     exit_code = main(["--window-days", "30", "--top-n", "5"])
 
-    assert exit_code == 0, (
-        f"CLI must exit 0 on the minimal_repo happy path; got {exit_code}"
-    )
+    assert exit_code == 0, f"CLI must exit 0 on the minimal_repo happy path; got {exit_code}"
     ai_state = repo_copy / ".ai-state"
     assert ai_state.is_dir(), "CLI must create .ai-state/ under the repo root"
 
@@ -182,12 +180,10 @@ def test_full_pipeline_on_minimal_repo_produces_three_files(
     md_files = sorted(reports_dir.glob("METRICS_REPORT_*.md"))
     log_file = reports_dir / "METRICS_LOG.md"
 
-    assert len(json_files) == 1, (
-        f"Expected exactly 1 JSON report; found {[p.name for p in json_files]}"
-    )
-    assert len(md_files) == 1, (
-        f"Expected exactly 1 MD report; found {[p.name for p in md_files]}"
-    )
+    assert (
+        len(json_files) == 1
+    ), f"Expected exactly 1 JSON report; found {[p.name for p in json_files]}"
+    assert len(md_files) == 1, f"Expected exactly 1 MD report; found {[p.name for p in md_files]}"
     assert log_file.is_file(), "METRICS_LOG.md must be written on happy path"
 
     payload = json.loads(json_files[0].read_text(encoding="utf-8"))
@@ -233,10 +229,9 @@ def test_pipeline_completes_when_optional_tools_are_hidden(
 
     exit_code = main(["--window-days", "30", "--top-n", "5"])
 
-    assert exit_code == 0, (
-        f"Pipeline must complete even when optional tools are absent; "
-        f"got exit {exit_code}"
-    )
+    assert (
+        exit_code == 0
+    ), f"Pipeline must complete even when optional tools are absent; got exit {exit_code}"
 
     ai_state = repo_copy / ".ai-state"
     reports_dir = ai_state / "metrics_reports"
@@ -339,9 +334,7 @@ def test_second_run_computes_delta_against_first(
 
     ai_state = repo_copy / ".ai-state"
     payloads = _read_all_report_jsons(ai_state)
-    assert len(payloads) == 2, (
-        f"Two runs must produce two JSON files; found {len(payloads)}"
-    )
+    assert len(payloads) == 2, f"Two runs must produce two JSON files; found {len(payloads)}"
 
     # The second-run JSON is the most recent by filename ordering.
     second = payloads[-1]
@@ -356,10 +349,9 @@ def test_second_run_computes_delta_against_first(
     )
 
     md_content = _read_report_md(ai_state)
-    assert "| Metric | Current | Prior | Delta | Delta % |" in md_content, (
-        "Second-run MD must render the computed-delta table header; "
-        f"got MD:\n{md_content!r}"
-    )
+    assert (
+        "| Metric | Current | Prior | Delta | Delta % |" in md_content
+    ), f"Second-run MD must render the computed-delta table header; got MD:\n{md_content!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -432,10 +424,9 @@ def test_schema_mismatch_surfaced_when_prior_report_has_older_schema(
         f"got {trends.get('status')!r}. Full trends: {trends!r}"
     )
     # Diagnostic fields should identify both versions for the reader.
-    assert trends.get("prior_schema") == "0.9.0", (
-        f"trends.prior_schema must surface the prior's version; "
-        f"got {trends.get('prior_schema')!r}"
-    )
+    assert (
+        trends.get("prior_schema") == "0.9.0"
+    ), f"trends.prior_schema must surface the prior's version; got {trends.get('prior_schema')!r}"
     assert trends.get("current_schema", "").startswith("1."), (
         f"trends.current_schema must surface the current version; "
         f"got {trends.get('current_schema')!r}"
@@ -479,10 +470,9 @@ def test_full_pipeline_embeds_readiness_block_with_llm_skipped(
     assert readiness.get("status") == "ok"
     data = readiness.get("data", {})
 
-    assert data.get("llm", {}).get("status") == "llm_skipped", (
-        "With no auth credential the LLM tier must be skipped offline; "
-        f"got {data.get('llm')!r}"
-    )
+    assert (
+        data.get("llm", {}).get("status") == "llm_skipped"
+    ), f"With no auth credential the LLM tier must be skipped offline; got {data.get('llm')!r}"
 
     level = data.get("level")
     assert isinstance(level, int), f"readiness level must be an int; got {level!r}"
@@ -529,9 +519,9 @@ def test_readiness_feature_leaves_log_header_frozen(
     header_line = log_file.read_text(encoding="utf-8").strip().splitlines()[0]
     cells = tuple(c.strip() for c in header_line.strip("|").split("|"))
 
-    assert cells == _GOLDEN_LOG_HEADER_CELLS, (
-        f"METRICS_LOG.md header drifted from the frozen 17-column golden; got {cells!r}"
-    )
+    assert (
+        cells == _GOLDEN_LOG_HEADER_CELLS
+    ), f"METRICS_LOG.md header drifted from the frozen 17-column golden; got {cells!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -550,3 +540,18 @@ def test_integration_fixtures_are_buildable() -> None:
             f"Fixture '{fixture_name}' at {target} must contain a built "
             ".git/ directory (session-autouse builder should have run)"
         )
+
+
+def test_judge_credentials_never_reach_a_test_environment() -> None:
+    """Canary for the conftest hermeticity guard.
+
+    If an ambient shell credential or a leak from code-under-test reached a
+    test's environment, the ``main()`` runs in this module would pass the
+    readiness auth gate and POST real judge requests to the Anthropic API
+    mid-suite. The autouse ``_scrub_judge_credentials`` fixture must keep
+    both variables absent; this test fails loudly if that guard is removed
+    while any credential is present in the invoking environment.
+    """
+
+    assert "ANTHROPIC_API_KEY" not in os.environ
+    assert "CLAUDE_CODE_OAUTH_TOKEN" not in os.environ

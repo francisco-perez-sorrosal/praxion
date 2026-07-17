@@ -155,17 +155,51 @@ If `.claude/settings.json` already has other top-level keys (`permissions`, `mod
 
 ### Phase 6 — `CLAUDE.md` blocks
 
-Five independent appends, each guarded by heading detection:
+The command classifies each of four refresh-eligible canonical blocks in your `CLAUDE.md` into one of three states:
+
+- **Absent** — the block doesn't exist yet. The canonical version from the installed plugin is appended to `CLAUDE.md`.
+- **Stale** — the block exists but its content is outdated (earlier version than what the plugin ships). It's silently auto-replaced in place — safe to change because you haven't customized it.
+- **Modified** — the block exists and differs from the plugin's canonical version. This indicates you've locally customized it. The block is left untouched; Phase 6 prints a pointer to the `/refresh-claude-blocks` command if you want to align with the newer canonical version later.
+
+The four refresh-eligible blocks are:
 
 - `## Agent Pipeline` — describes the 5-stage pipeline (researcher → systems-architect → implementation-planner → implementer + test-engineer → verifier), independent audits via `sentinel`, and the PoC-to-production journey. Self-contained — no cross-references to Praxion-internal docs that don't exist in your project.
 - `## Compaction Guidance` — what to preserve when the conversation compacts (active task slug, current WIP step, acceptance criteria, modified files).
 - `## Behavioral Contract` — Surface Assumptions / Register Objection / Stay Surgical / Simplicity First.
 - `## Praxion Process` — apply the tier-driven pipeline for non-trivial work; carry the behavioral contract into every delegation prompt; the orchestrator names the task slug + deliverables + contract on each delegation.
-- `## Working in this project` — your verification command sequence (typecheck → test → lint → build), your 3–5 most frequent operations, and the "when corrected, propose a durable rule" habit. Phase 6 fills the project-specific placeholders from your config (`pyproject.toml`, `package.json`, the test gate, the README); a value it can't determine is left as a `# TODO:` for you.
+
+Two additional blocks are installed but not refresh-eligible by design:
+
+- `## Working in this project` — your verification command sequence (typecheck → test → lint → build), your 3–5 most frequent operations, and the "when corrected, propose a durable rule" habit. Phase 6 fills the project-specific placeholders from your config (`pyproject.toml`, `package.json`, the test gate, the README); a value it can't determine is left as a `# TODO:` for you. This block is templated to your project and stays as-is.
+- `## Obsidian Integration` (if your project uses Obsidian) — included only when the optional `.claude/settings.json` toggle is enabled. Conditional blocks are never refreshed.
 
 If `CLAUDE.md` doesn't exist, the command instructs you to run `/init` first (which analyzes your codebase and produces a tailored `CLAUDE.md`), then re-run `/onboard-project` to append the blocks. The command never authors `CLAUDE.md` itself — `/init` is better at that.
 
-**Keep `CLAUDE.md` lean.** The official guideline is **under 200 lines per `CLAUDE.md` file** — longer files consume more context and reduce adherence (`CLAUDE.md` is delivered as context, not enforced config). A project `CLAUDE.md` past ~150 lines is a smell: relocate detail to path-scoped rules (`.claude/rules/*.md` with `paths:` frontmatter) or skills, and keep the top-level file an *index* that points at them. For calibration — e.g., HumanLayer's published `CLAUDE.md` runs ~57 lines; well-tuned team files land around 80–100; ones past ~200 tend to bloat. The five Praxion blocks above add roughly 40 lines combined, so budget the rest of your file accordingly.
+**Keep `CLAUDE.md` lean.** The official guideline is **under 200 lines per `CLAUDE.md` file** — longer files consume more context and reduce adherence (`CLAUDE.md` is delivered as context, not enforced config). A project `CLAUDE.md` past ~150 lines is a smell: relocate detail to path-scoped rules (`.claude/rules/*.md` with `paths:` frontmatter) or skills, and keep the top-level file an *index* that points at them. For calibration — e.g., HumanLayer's published `CLAUDE.md` runs ~57 lines; well-tuned team files land around 80–100; ones past ~200 tend to bloat. The canonical blocks above add roughly 40 lines combined, so budget the rest of your file accordingly.
+
+### Refreshing canonical blocks after a plugin upgrade
+
+Run `/refresh-claude-blocks` to synchronize your project's canonical blocks with a newly installed or upgraded i-am plugin version. The command auto-applies safe updates and prompts you for locally customized blocks.
+
+**When to use:**
+
+- After upgrading the i-am plugin — you want to pick up the latest canonical blocks shipped by the new version
+- When `/onboard-project` Phase 6 reports a block needs attention
+- Anytime you want to audit whether your blocks are current vs. stale vs. customized
+
+**What it does:**
+
+1. Resolves the currently installed plugin path from your Claude configuration
+2. Classifies each of the four refresh-eligible blocks (same three states as Phase 6: absent / stale / modified)
+3. **Auto-applies safe actions** — appends each `absent` block and replaces each `stale` block without prompting (these carry no local customization by definition)
+4. **Prompts for modified blocks** — for each block you've customized locally, shows the diff between your version and the canonical, then asks whether you want to **Replace with canonical**, **Keep local**, or **Skip for now**. You're never forced to overwrite local changes.
+5. Reports what was applied and updated
+
+The command is idempotent: running it multiple times produces the same result. A block you choose to "Keep local" stays `modified` on future runs — that's not drift, it's an honored customization.
+
+**Troubleshooting:** an unexpected `modified` verdict on apparent boilerplate usually means the block predates the plugin's shipped history manifest (very old onboards often carry pre-extraction-era phrasing). The mechanism deliberately refuses to guess whether such a block should be considered stale or customized. If this happens, run `/refresh-claude-blocks --check` to see the diff, then decide manually via the disposition loop.
+
+**Refresh semantics:** the command targets the **currently installed plugin's** canonical version. After upgrading the i-am plugin to a newer version, re-run `/refresh-claude-blocks` to pick up the newer blocks. If you downgrade the plugin, the older canonical version is used instead — the mechanism is always "refresh to what the installed plugin ships, not what Praxion main ships."
 
 ### Phase 7 — Companion CLIs (advisory)
 

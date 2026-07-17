@@ -17,6 +17,8 @@ affected_files:
   - hooks/test_onboard_praxion_block.py
   - skills/software-planning/SKILL.md
 dissent: A no-Praxion collaborator loses the only in-repo narrative of the maintainer's pipeline, and the pointer assumes the coordination rule and skill surfaces stay installed and discoverable wherever the pipeline actually runs.
+re_affirmed_by:
+  - dec-draft-1766b3cd
 ---
 
 ## Context

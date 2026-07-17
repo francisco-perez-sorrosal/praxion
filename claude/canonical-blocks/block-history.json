@@ -1,0 +1,37 @@
+{
+  "blocks": {
+    "agent-pipeline": {
+      "current": "dcede62a4f52aa3824e54199b17457e8165971abd2541c8c8819c0c0c390ed4e",
+      "history": [
+        "3a355bf260f0a457ffda884027b11228200ac194daa54fea38e296bacc664185",
+        "73c5ed1f4fec7307d4ea31105b728c88b23ff9a114b8e07c2c26233f542fff17",
+        "6c92968e16f24bdef5fbdb69350e36ac0323f21da2a578e1eec7e62d3fbf8dfd",
+        "37f289e40e5b9204e52239cc69f0281dd8e2ca205cff27018d6053c41234a172",
+        "b73fb805fb05640d553103475cc34592217c6494b3b16f9d2d1b0419fee19583",
+        "035fed58684e15f522adceea75788c7eb8b9a668567243dbc40037b645ea91d0",
+        "dcede62a4f52aa3824e54199b17457e8165971abd2541c8c8819c0c0c390ed4e"
+      ]
+    },
+    "behavioral-contract": {
+      "current": "78f7ea2eb6c37c70d70bc0eb97ddc3e32a239086ae5e1b4e009512f1e118c6f7",
+      "history": [
+        "059536f6c8a299b1f33b384561f078edb3116875e59881e4fc6b4f5077d5a062",
+        "78f7ea2eb6c37c70d70bc0eb97ddc3e32a239086ae5e1b4e009512f1e118c6f7"
+      ]
+    },
+    "compaction-guidance": {
+      "current": "0f0da04f7e0dbb6f0733c37a362a67671cef7412e63ec54e218da015c117da62",
+      "history": [
+        "03a9d00fd85907180b28a78c62271844dc45656c47ed6ed4cf0cf10af399003c",
+        "0f0da04f7e0dbb6f0733c37a362a67671cef7412e63ec54e218da015c117da62"
+      ]
+    },
+    "praxion-process": {
+      "current": "4248ea741327173ffd912600fc3f5053d246af5a72c881e4f9a72017069790bb",
+      "history": [
+        "4248ea741327173ffd912600fc3f5053d246af5a72c881e4f9a72017069790bb"
+      ]
+    }
+  },
+  "schema_version": "1.0"
+}

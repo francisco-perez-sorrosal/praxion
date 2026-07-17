@@ -20,30 +20,45 @@ Two fence styles are supported, configured per-block in ``BLOCKS`` below:
   in rendered Markdown, so the embedded content reads as a normal part of
   the command prompt rather than as a code block.
 
-Three invocation modes:
+Five invocation modes:
 
     sync_canonical_blocks.py                     # --check (default)
     sync_canonical_blocks.py --check             # exit 0 if in sync, else 1
     sync_canonical_blocks.py --write             # rewrite embedded blocks from canonical
     sync_canonical_blocks.py --dry-run           # print what --write would do; no writes
+    sync_canonical_blocks.py --write-history     # regenerate the history manifest
+    sync_canonical_blocks.py --check-history     # exit 1 if the manifest is stale
+
+The last two modes generate and verify ``claude/canonical-blocks/block-history.json``
+-- a plugin-shipped, git-derived manifest mapping each refresh-eligible block slug
+(``canonical_block_identity.REFRESHABLE_SLUGS``) to its current body hash and a
+deduped, oldest-to-newest history of prior body hashes. This is the build-time half
+of the canonical-block refresh mechanism; ``refresh_claude_blocks.py`` is the
+run-time consumer that classifies a managed project's live blocks against it.
 
 Exit codes:
-    0  -- all blocks in sync (--check / --dry-run) or all rewrites succeeded (--write)
-    1  -- drift detected (--check) or would rewrite (--dry-run with drift)
+    0  -- all blocks in sync (--check / --dry-run) or all rewrites succeeded (--write);
+           history manifest up to date (--check-history) or written (--write-history)
+    1  -- drift detected (--check / --check-history) or would rewrite (--dry-run with drift)
     2  -- script error (missing file, parse failure, unexpected structure)
 
 Usage:
-    python3 scripts/sync_canonical_blocks.py [--check | --write | --dry-run]
+    python3 scripts/sync_canonical_blocks.py [--check | --write | --dry-run |
+                                               --write-history | --check-history]
 """
 
 from __future__ import annotations
 
 import argparse
 import difflib
+import json
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
+
+from canonical_block_identity import REFRESHABLE_SLUGS, hash_block_body
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -53,6 +68,11 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 
 CANONICAL_DIR = REPO_ROOT / "claude" / "canonical-blocks"
+
+# History-manifest generator: schema version stamped into every manifest, and
+# the manifest's filename (lives alongside the canonical files it describes).
+HISTORY_SCHEMA_VERSION = "1.0"
+HISTORY_MANIFEST_FILENAME = "block-history.json"
 
 # Default fence style: a Markdown code block. Used by blocks that the consumer
 # command will install verbatim into a destination file (e.g., CLAUDE.md).
@@ -130,9 +150,7 @@ def _slugs_for(cmd_path: Path) -> list[str]:
 
     if not is_repo_path:
         return [slug for slug in SLUGS if slug in BLOCKS]
-    return [
-        slug for slug in SLUGS if slug in BLOCKS and cmd_path in BLOCKS[slug].consumers
-    ]
+    return [slug for slug in SLUGS if slug in BLOCKS and cmd_path in BLOCKS[slug].consumers]
 
 
 CANONICAL_SOURCE_PREFIX = "canonical-source: claude/canonical-blocks/"
@@ -150,10 +168,7 @@ def _remediation_hint() -> str:
             # back to the absolute path so the hint stays readable in test output.
             parts.append(str(path))
     files_str = " ".join(parts)
-    return (
-        "  Fix:  python3 scripts/sync_canonical_blocks.py --write\n"
-        f"        git add {files_str}"
-    )
+    return f"  Fix:  python3 scripts/sync_canonical_blocks.py --write\n        git add {files_str}"
 
 
 # ---------------------------------------------------------------------------
@@ -444,9 +459,124 @@ def run_dry_run() -> int:
         return 0
 
     print()
-    print(
-        f"dry-run: {len(COMMAND_FILES)} file(s) checked; re-run with --write to apply."
+    print(f"dry-run: {len(COMMAND_FILES)} file(s) checked; re-run with --write to apply.")
+    return 1
+
+
+# ---------------------------------------------------------------------------
+# History-manifest generator (--write-history / --check-history)
+# ---------------------------------------------------------------------------
+#
+# Builds claude/canonical-blocks/block-history.json: for each refresh-eligible
+# slug (REFRESHABLE_SLUGS, imported from canonical_block_identity -- the single
+# membership source), enumerates the canonical file's git history, normalizes
+# and hashes each historical body through the shared identity module, and
+# dedupes while preserving oldest-to-newest order. "current" always reflects
+# the LIVE on-disk canonical body, not merely the last commit -- a pre-commit
+# check fires on working-tree state before a commit exists, so current must be
+# freshly computed on every regeneration for the drift gate to have any teeth.
+
+
+def _history_manifest_path() -> Path:
+    """Where the history manifest lives, alongside the canonical files it describes."""
+    return CANONICAL_DIR / HISTORY_MANIFEST_FILENAME
+
+
+def _historical_hashes_for_slug(slug: str) -> list[str]:
+    """Return slug's deduped, oldest-to-newest body hashes from git history.
+
+    Enumerates every commit that touched the canonical file (``git log
+    --follow``), reads each revision's body (``git show <sha>:<path>``), and
+    hashes it via the shared ``canonical_block_identity`` module. A hash
+    already present in the list is skipped -- order is preserved, never
+    reordered or re-inserted.
+    """
+    canonical_path = CANONICAL_DIR / f"{slug}.md"
+    relpath = canonical_path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+
+    log_result = subprocess.run(
+        ["git", "log", "--follow", "--format=%H", "--reverse", "--", relpath],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        check=True,
     )
+    shas = [line for line in log_result.stdout.splitlines() if line]
+
+    history: list[str] = []
+    for sha in shas:
+        show_result = subprocess.run(
+            ["git", "show", f"{sha}:{relpath}"],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        body_hash = hash_block_body(show_result.stdout)
+        if body_hash not in history:
+            history.append(body_hash)
+    return history
+
+
+def _build_history_manifest() -> dict[str, object]:
+    """Regenerate the full history manifest in-memory (no disk write)."""
+    blocks: dict[str, object] = {}
+    for slug in sorted(REFRESHABLE_SLUGS):
+        history = _historical_hashes_for_slug(slug)
+        canonical_path = CANONICAL_DIR / f"{slug}.md"
+        try:
+            live_body = canonical_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            _error(f"cannot read {canonical_path}: {exc}")
+
+        live_hash = hash_block_body(live_body)
+        if live_hash not in history:
+            history.append(live_hash)
+        blocks[slug] = {"current": live_hash, "history": history}
+
+    return {"schema_version": HISTORY_SCHEMA_VERSION, "blocks": blocks}
+
+
+def _render_history_manifest(manifest: dict[str, object]) -> str:
+    """Serialize the manifest deterministically: sorted keys, one trailing newline."""
+    return json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+
+
+def run_write_history() -> int:
+    """--write-history mode: regenerate and write the history manifest."""
+    manifest_text = _render_history_manifest(_build_history_manifest())
+    manifest_path = _history_manifest_path()
+    manifest_path.write_text(manifest_text, encoding="utf-8")
+    print(f"wrote history manifest: {manifest_path}")
+    return 0
+
+
+def run_check_history() -> int:
+    """--check-history mode: diff the committed manifest against a fresh regeneration."""
+    manifest_path = _history_manifest_path()
+    try:
+        committed_text = manifest_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        _error(f"history manifest not found: {manifest_path} (run --write-history first)")
+    except OSError as exc:
+        _error(f"cannot read {manifest_path}: {exc}")
+
+    fresh_text = _render_history_manifest(_build_history_manifest())
+    if committed_text == fresh_text:
+        print("history manifest check passed; up to date.")
+        return 0
+
+    diff = difflib.unified_diff(
+        committed_text.splitlines(keepends=True),
+        fresh_text.splitlines(keepends=True),
+        fromfile=str(manifest_path),
+        tofile="freshly regenerated",
+    )
+    print("history manifest drift detected:")
+    for line in diff:
+        print("  " + line, end="")
+    print()
+    print("Fix:  python3 scripts/sync_canonical_blocks.py --write-history")
     return 1
 
 
@@ -479,12 +609,30 @@ def main(argv: list[str] | None = None) -> int:
         dest="dry_run",
         help="Print what --write would do without modifying files.",
     )
+    mode_group.add_argument(
+        "--write-history",
+        action="store_true",
+        default=False,
+        dest="write_history",
+        help="Regenerate the history manifest (block-history.json) from git history.",
+    )
+    mode_group.add_argument(
+        "--check-history",
+        action="store_true",
+        default=False,
+        dest="check_history",
+        help="Check the history manifest against a fresh regeneration; exit 1 on drift.",
+    )
     args = parser.parse_args(argv if argv is not None else sys.argv[1:])
 
     if args.write:
         return run_write()
     if args.dry_run:
         return run_dry_run()
+    if args.write_history:
+        return run_write_history()
+    if args.check_history:
+        return run_check_history()
     # Default to --check
     return run_check()
 

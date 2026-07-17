@@ -27,6 +27,7 @@ Block-locator contract (derived from SYSTEMS_PLAN + actual implementation):
 from __future__ import annotations
 
 import importlib
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -130,9 +131,7 @@ def _make_minimal_repo(
     _make_canonical_file(canonical_dir, slug, canonical_content)
 
     onboard_body = onboard_fenced if onboard_fenced is not None else canonical_content
-    new_project_body = (
-        new_project_fenced if new_project_fenced is not None else canonical_content
-    )
+    new_project_body = new_project_fenced if new_project_fenced is not None else canonical_content
 
     onboard_path = _make_command_file_with_one_block(
         commands_dir, "onboard-project.md", slug, onboard_body
@@ -180,9 +179,7 @@ def test_help_flag_exits_zero_and_prints_usage() -> None:
         capture_output=True,
         text=True,
     )
-    assert result.returncode == 0, (
-        f"--help returned {result.returncode}.\nstderr: {result.stderr}"
-    )
+    assert result.returncode == 0, f"--help returned {result.returncode}.\nstderr: {result.stderr}"
     assert result.stdout, "--help produced no output"
 
 
@@ -190,8 +187,8 @@ def test_check_exits_zero_on_in_sync_real_repo() -> None:
     """--check exits 0 against the real repo when canonical blocks are in sync.
 
     This verifies the full CLI pipeline end-to-end. It is a read-only test
-    (no file mutation) and relies on Step 3 (sync script) + Step 1 (canonical
-    files) both being complete.
+    (no file mutation) and relies on the sync script and the canonical block
+    files both being present.
     """
     result = subprocess.run(
         [sys.executable, str(SYNC_SCRIPT), "--check"],
@@ -225,9 +222,7 @@ def test_dry_run_exits_zero_on_in_sync_real_repo() -> None:
 
 
 @pytest.mark.parametrize("slug", ALL_BLOCK_SLUGS)
-def test_check_file_returns_empty_when_block_matches_canonical(
-    tmp_path: Path, slug: str
-) -> None:
+def test_check_file_returns_empty_when_block_matches_canonical(tmp_path: Path, slug: str) -> None:
     """check_file returns an empty drift list when the embedded block is
     byte-identical to the canonical file."""
     canonical = f"## {slug.replace('-', ' ').title()}\n\nBlock prose.\n"
@@ -238,10 +233,9 @@ def test_check_file_returns_empty_when_block_matches_canonical(
     mod.SLUGS = (slug,)  # type: ignore[attr-defined]
 
     drifted = mod.check_file(onboard_path)
-    assert drifted == [], (
-        f"check_file should return [] for '{slug}' when block matches canonical. "
-        f"Got: {drifted}"
-    )
+    assert (
+        drifted == []
+    ), f"check_file should return [] for '{slug}' when block matches canonical. Got: {drifted}"
 
 
 @pytest.mark.parametrize("slug", ALL_BLOCK_SLUGS)
@@ -261,17 +255,15 @@ def test_check_file_returns_drift_entry_when_block_differs_from_canonical(
     mod.SLUGS = (slug,)  # type: ignore[attr-defined]
 
     drifted = mod.check_file(onboard_path)
-    assert len(drifted) == 1, (
-        f"check_file should return one drift entry for '{slug}'. Got: {drifted}"
-    )
+    assert (
+        len(drifted) == 1
+    ), f"check_file should return one drift entry for '{slug}'. Got: {drifted}"
     found_slug, diff_lines = drifted[0]
     assert found_slug == slug
     assert diff_lines, "Drift entry must include non-empty diff lines"
 
 
-def test_check_file_includes_remediation_hint_in_printed_output(
-    tmp_path: Path, capsys
-) -> None:
+def test_check_file_includes_remediation_hint_in_printed_output(tmp_path: Path, capsys) -> None:
     """When check_file detects drift, the overall --check run prints a
     remediation hint that names the --write command."""
     slug = "behavioral-contract"
@@ -292,10 +284,9 @@ def test_check_file_includes_remediation_hint_in_printed_output(
     output = captured.out + captured.err
 
     assert exit_code == 1, f"run_check should return 1 on drift. Got {exit_code}"
-    assert "--write" in output, (
-        "run_check output on drift must reference --write as remediation hint. "
-        f"Got:\n{output}"
-    )
+    assert (
+        "--write" in output
+    ), f"run_check output on drift must reference --write as remediation hint. Got:\n{output}"
 
 
 # ---------------------------------------------------------------------------
@@ -304,9 +295,7 @@ def test_check_file_includes_remediation_hint_in_printed_output(
 
 
 @pytest.mark.parametrize("slug", ALL_BLOCK_SLUGS)
-def test_write_file_corrects_drifted_block_to_canonical(
-    tmp_path: Path, slug: str
-) -> None:
+def test_write_file_corrects_drifted_block_to_canonical(tmp_path: Path, slug: str) -> None:
     """write_file rewrites the drifted embedded block so it matches the
     canonical file byte-for-byte."""
     canonical = f"## {slug.replace('-', ' ').title()}\n\nCanonical prose.\n"
@@ -324,10 +313,9 @@ def test_write_file_corrects_drifted_block_to_canonical(
 
     # Verify the embedded content now matches canonical
     drifted_after = mod.check_file(onboard_path)
-    assert drifted_after == [], (
-        f"After write_file, check_file should return [] for '{slug}'. "
-        f"Got: {drifted_after}"
-    )
+    assert (
+        drifted_after == []
+    ), f"After write_file, check_file should return [] for '{slug}'. Got: {drifted_after}"
 
 
 # ---------------------------------------------------------------------------
@@ -374,9 +362,7 @@ def test_write_file_returns_empty_on_already_synced_file(tmp_path: Path) -> None
     mod.SLUGS = (slug,)  # type: ignore[attr-defined]
 
     updated = mod.write_file(onboard_path, dry_run=False)
-    assert updated == [], (
-        f"write_file on already-synced file should return []. Got: {updated}"
-    )
+    assert updated == [], f"write_file on already-synced file should return []. Got: {updated}"
 
 
 # ---------------------------------------------------------------------------
@@ -400,9 +386,9 @@ def test_write_file_dry_run_makes_no_file_changes(tmp_path: Path, slug: str) -> 
     mod.SLUGS = (slug,)  # type: ignore[attr-defined]
     mod.write_file(onboard_path, dry_run=True)
 
-    assert onboard_path.read_text(encoding="utf-8") == before, (
-        "write_file(dry_run=True) must not modify the file."
-    )
+    assert (
+        onboard_path.read_text(encoding="utf-8") == before
+    ), "write_file(dry_run=True) must not modify the file."
 
 
 def test_write_file_dry_run_returns_drifted_slugs_without_writing(
@@ -423,12 +409,10 @@ def test_write_file_dry_run_returns_drifted_slugs_without_writing(
     mod.SLUGS = (slug,)  # type: ignore[attr-defined]
     would_update = mod.write_file(onboard_path, dry_run=True)
 
-    assert slug in would_update, (
-        f"dry_run should return drifted slug '{slug}'. Got: {would_update}"
-    )
-    assert onboard_path.read_text(encoding="utf-8") == before, (
-        "File must be unchanged after dry_run."
-    )
+    assert slug in would_update, f"dry_run should return drifted slug '{slug}'. Got: {would_update}"
+    assert (
+        onboard_path.read_text(encoding="utf-8") == before
+    ), "File must be unchanged after dry_run."
 
 
 # ---------------------------------------------------------------------------
@@ -459,9 +443,9 @@ def test_check_file_exits_with_error_when_canonical_file_missing(
 
     with pytest.raises(SystemExit) as exc_info:
         mod.check_file(onboard_path)
-    assert exc_info.value.code == 2, (
-        f"Missing canonical file should cause SystemExit(2). Got: {exc_info.value.code}"
-    )
+    assert (
+        exc_info.value.code == 2
+    ), f"Missing canonical file should cause SystemExit(2). Got: {exc_info.value.code}"
 
 
 def test_write_file_exits_with_error_when_canonical_file_missing(
@@ -488,9 +472,9 @@ def test_write_file_exits_with_error_when_canonical_file_missing(
 
     with pytest.raises(SystemExit) as exc_info:
         mod.write_file(onboard_path, dry_run=False)
-    assert exc_info.value.code == 2, (
-        f"Missing canonical file should cause SystemExit(2). Got: {exc_info.value.code}"
-    )
+    assert (
+        exc_info.value.code == 2
+    ), f"Missing canonical file should cause SystemExit(2). Got: {exc_info.value.code}"
 
 
 # ---------------------------------------------------------------------------
@@ -518,10 +502,9 @@ def test_write_then_check_always_exits_clean(tmp_path: Path) -> None:
 
     mod.write_file(onboard_path, dry_run=False)
     drifted = mod.check_file(onboard_path)
-    assert drifted == [], (
-        "Round-trip failure: check_file returned drift after write_file. "
-        f"Drift: {drifted}"
-    )
+    assert (
+        drifted == []
+    ), f"Round-trip failure: check_file returned drift after write_file. Drift: {drifted}"
 
 
 def test_round_trip_preserves_fenced_content_byte_for_byte(tmp_path: Path) -> None:
@@ -580,12 +563,7 @@ def test_extract_block_handles_canonical_with_blank_lines_inside(
     """extract_block correctly handles canonical content containing blank
     lines — the locator must not stop at an interior blank line."""
     slug = "agent-pipeline"
-    canonical = (
-        "## Agent Pipeline\n\n"
-        "First paragraph.\n\n"
-        "Second paragraph.\n\n"
-        "Third paragraph.\n"
-    )
+    canonical = "## Agent Pipeline\n\nFirst paragraph.\n\nSecond paragraph.\n\nThird paragraph.\n"
     canonical_dir, onboard_path, _ = _make_minimal_repo(tmp_path, slug, canonical)
 
     # extract_block does not use CANONICAL_DIR — no need to patch SLUGS
@@ -638,9 +616,7 @@ def test_write_file_preserves_surrounding_prose_between_comment_and_fence(
 
 
 @pytest.mark.parametrize("slug", ALL_BLOCK_SLUGS)
-def test_all_block_slugs_locate_their_canonical_source_comment(
-    tmp_path: Path, slug: str
-) -> None:
+def test_all_block_slugs_locate_their_canonical_source_comment(tmp_path: Path, slug: str) -> None:
     """All four slugs are correctly identified via the canonical-source
     HTML comment. A missing or misspelled comment would cause SystemExit(2)."""
     canonical = f"## {slug.replace('-', ' ').title()}\n\nContent.\n"
@@ -652,9 +628,9 @@ def test_all_block_slugs_locate_their_canonical_source_comment(
 
     # Should not raise — all four slugs have canonical-source comments in fixture
     drifted = mod.check_file(onboard_path)
-    assert isinstance(drifted, list), (
-        f"slug '{slug}': check_file should return a list, not raise. Got: {drifted}"
-    )
+    assert isinstance(
+        drifted, list
+    ), f"slug '{slug}': check_file should return a list, not raise. Got: {drifted}"
 
 
 # ---------------------------------------------------------------------------
@@ -676,9 +652,7 @@ def test_run_check_returns_zero_when_all_blocks_in_sync(tmp_path: Path, capsys) 
     for slug, content in contents.items():
         _make_canonical_file(canonical_dir, slug, content)
 
-    onboard = _make_four_block_command_file(
-        commands_dir, "onboard-project.md", contents
-    )
+    onboard = _make_four_block_command_file(commands_dir, "onboard-project.md", contents)
     new_proj = _make_four_block_command_file(commands_dir, "new-project.md", contents)
 
     mod = _load_module()
@@ -697,8 +671,7 @@ def test_run_check_returns_one_when_any_block_drifted(tmp_path: Path, capsys) ->
     """run_check returns 1 when at least one embedded block differs from its
     canonical file."""
     contents = {
-        slug: f"## {slug.replace('-', ' ').title()}\n\nContent.\n"
-        for slug in ALL_BLOCK_SLUGS
+        slug: f"## {slug.replace('-', ' ').title()}\n\nContent.\n" for slug in ALL_BLOCK_SLUGS
     }
     canonical_dir = tmp_path / "claude" / "canonical-blocks"
     commands_dir = tmp_path / "commands"
@@ -720,17 +693,14 @@ def test_run_check_returns_one_when_any_block_drifted(tmp_path: Path, capsys) ->
     mod.SLUGS = tuple(ALL_BLOCK_SLUGS)  # type: ignore[attr-defined]
 
     exit_code = mod.run_check()
-    assert exit_code == 1, (
-        f"run_check should return 1 when drift detected. Got {exit_code}."
-    )
+    assert exit_code == 1, f"run_check should return 1 when drift detected. Got {exit_code}."
 
 
 def test_run_write_corrects_drift_and_check_passes(tmp_path: Path, capsys) -> None:
     """run_write followed by run_check returns 0 — the round-trip guarantee
     at the mode-function level."""
     contents = {
-        slug: f"## {slug.replace('-', ' ').title()}\n\nContent.\n"
-        for slug in ALL_BLOCK_SLUGS
+        slug: f"## {slug.replace('-', ' ').title()}\n\nContent.\n" for slug in ALL_BLOCK_SLUGS
     }
     canonical_dir = tmp_path / "claude" / "canonical-blocks"
     commands_dir = tmp_path / "commands"
@@ -766,17 +736,15 @@ def test_run_write_corrects_drift_and_check_passes(tmp_path: Path, capsys) -> No
     mod2.SLUGS = tuple(ALL_BLOCK_SLUGS)  # type: ignore[attr-defined]
 
     check_code = mod2.run_check()
-    assert check_code == 0, (
-        "Round-trip failure: run_check returned non-zero after run_write. "
-        f"Got {check_code}."
-    )
+    assert (
+        check_code == 0
+    ), f"Round-trip failure: run_check returned non-zero after run_write. Got {check_code}."
 
 
 def test_run_dry_run_does_not_modify_files(tmp_path: Path, capsys) -> None:
     """run_dry_run on drifted files exits non-zero but does not modify any file."""
     contents = {
-        slug: f"## {slug.replace('-', ' ').title()}\n\nContent.\n"
-        for slug in ALL_BLOCK_SLUGS
+        slug: f"## {slug.replace('-', ' ').title()}\n\nContent.\n" for slug in ALL_BLOCK_SLUGS
     }
     canonical_dir = tmp_path / "claude" / "canonical-blocks"
     commands_dir = tmp_path / "commands"
@@ -801,12 +769,321 @@ def test_run_dry_run_does_not_modify_files(tmp_path: Path, capsys) -> None:
     mod.SLUGS = tuple(ALL_BLOCK_SLUGS)  # type: ignore[attr-defined]
 
     exit_code = mod.run_dry_run()
+    assert exit_code != 0, f"run_dry_run should exit non-zero on drift. Got {exit_code}."
+    assert (
+        onboard.read_text(encoding="utf-8") == before_onboard
+    ), "run_dry_run must not modify onboard-project.md"
+    assert (
+        new_proj.read_text(encoding="utf-8") == before_new_proj
+    ), "run_dry_run must not modify new-project.md"
+
+
+# ---------------------------------------------------------------------------
+# History-manifest generator: --write-history / --check-history (new mode)
+# ---------------------------------------------------------------------------
+#
+# The history-manifest generator enumerates each refresh-eligible canonical
+# file's git history, normalizes+hashes each historical body via the shared
+# canonical_block_identity module, dedupes, and writes/verifies a JSON
+# manifest at <CANONICAL_DIR>/block-history.json. Tests build a real,
+# throwaway git repository per fixture (git init/add/commit via subprocess,
+# mirroring test_check_aac_golden_rule.py's micro-repo convention) so the
+# git-log-derived dedup and drift-detection behavior is exercised for real,
+# not mocked.
+#
+# Interface contract these tests pin (the history-manifest generator must satisfy):
+#   - CANONICAL_DIR / REPO_ROOT stay overridable module attributes (mirrors
+#     the existing SLUGS/CANONICAL_DIR override convention above).
+#   - REFRESHABLE_SLUGS (imported from canonical_block_identity) is a plain
+#     module-level binding on sync_canonical_blocks, overridable the same
+#     way SLUGS already is, so tests can scope a fixture to one slug.
+#   - The manifest's "current" hash must be computed from the canonical
+#     file's LIVE on-disk content, not solely from the last git-log commit.
+#     This is load-bearing for the gate-liveness canary below: a pre-commit
+#     hook fires on staged/working-tree state *before* a commit exists, so
+#     if "current" only reflected git log, an uncommitted edit would never
+#     be caught -- defeating the "caught at commit time" guarantee the
+#     manifest's producer-liveness gate exists for.
+
+sys.path.insert(0, str(SCRIPTS_DIR))  # ensure canonical_block_identity is importable
+from canonical_block_identity import REFRESHABLE_SLUGS, hash_block_body  # noqa: E402
+
+
+def _git_history_repo(tmp_path: Path) -> Path:
+    """Init a throwaway git repo at tmp_path with a claude/canonical-blocks/ dir.
+
+    Returns the canonical-blocks directory path. Mirrors the micro-repo
+    convention in test_check_aac_golden_rule.py: real git init/add/commit via
+    subprocess, so the generator's actual git-log-derived history enumeration
+    is exercised rather than a mocked stub.
+    """
+    canonical_dir = tmp_path / "claude" / "canonical-blocks"
+    canonical_dir.mkdir(parents=True)
+    subprocess.run(["git", "init"], check=True, capture_output=True, cwd=str(tmp_path))
+    subprocess.run(
+        ["git", "config", "user.name", "Test"],
+        check=True,
+        capture_output=True,
+        cwd=str(tmp_path),
+    )
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"],
+        check=True,
+        capture_output=True,
+        cwd=str(tmp_path),
+    )
+    return canonical_dir
+
+
+def _commit_canonical_body(canonical_dir: Path, slug: str, body: str, msg: str) -> None:
+    """Write+commit one revision of a canonical file's body."""
+    repo_root = canonical_dir.parent.parent
+    path = canonical_dir / f"{slug}.md"
+    path.write_text(body, encoding="utf-8")
+    relpath = str(path.relative_to(repo_root))
+    subprocess.run(["git", "add", relpath], check=True, capture_output=True, cwd=str(repo_root))
+    subprocess.run(
+        ["git", "commit", "-m", msg], check=True, capture_output=True, cwd=str(repo_root)
+    )
+
+
+def _mutate_canonical_body_uncommitted(canonical_dir: Path, slug: str, body: str) -> None:
+    """Overwrite a canonical file's live content WITHOUT committing -- simulates
+    an edit the manifest has not yet been regenerated for."""
+    (canonical_dir / f"{slug}.md").write_text(body, encoding="utf-8")
+
+
+def _load_module_for_synthetic_history(canonical_dir: Path, slugs: frozenset[str] | None = None):
+    """Load sync_canonical_blocks scoped to a throwaway git-history fixture.
+
+    Patches CANONICAL_DIR and REPO_ROOT to the fixture's tmp git repo so the
+    generator's git-log enumeration resolves within it regardless of whether
+    the implementation anchors git commands via cwd=CANONICAL_DIR or an
+    explicit REPO_ROOT path (both resolve correctly here, since REPO_ROOT is
+    the tmp repo's root and CANONICAL_DIR is one of its subdirectories). When
+    `slugs` is given, also restricts REFRESHABLE_SLUGS to that set -- mirrors
+    the file's existing SLUGS-override convention used to scope fixtures to
+    a minimal, focused subset.
+    """
+    mod = _load_module()
+    mod.CANONICAL_DIR = canonical_dir  # type: ignore[attr-defined]
+    mod.REPO_ROOT = canonical_dir.parent.parent  # type: ignore[attr-defined]
+    if slugs is not None:
+        mod.REFRESHABLE_SLUGS = slugs  # type: ignore[attr-defined]
+    return mod
+
+
+def _history_manifest_path(canonical_dir: Path) -> Path:
+    """The manifest's expected on-disk location, per the shipped schema path
+    (claude/canonical-blocks/block-history.json)."""
+    return canonical_dir / "block-history.json"
+
+
+def test_write_history_manifest_maps_slug_to_current_and_deduped_ordered_history(
+    tmp_path: Path,
+) -> None:
+    """--write-history maps a refresh-eligible slug to its current hash and a
+    deduped, oldest-to-newest history list, with current == history[-1]."""
+    slug = "agent-pipeline"
+    canonical_dir = _git_history_repo(tmp_path)
+
+    body_a = "## Agent Pipeline\n\nFirst revision.\n"
+    body_b = "## Agent Pipeline\n\nSecond revision.\n"
+    body_b_whitespace_variant = body_b + "\n"  # normalizes to the same hash as body_b
+
+    _commit_canonical_body(canonical_dir, slug, body_a, "rev 1")
+    _commit_canonical_body(canonical_dir, slug, body_b, "rev 2")
+    _commit_canonical_body(
+        canonical_dir, slug, body_b_whitespace_variant, "rev 3 (whitespace-only)"
+    )
+
+    mod = _load_module_for_synthetic_history(canonical_dir, frozenset({slug}))
+    exit_code = mod.run_write_history()
+    assert exit_code == 0, f"run_write_history should return 0. Got {exit_code}."
+
+    manifest = json.loads(_history_manifest_path(canonical_dir).read_text(encoding="utf-8"))
+    assert manifest["schema_version"] == "1.0"
+    assert set(manifest["blocks"].keys()) == {slug}, (
+        "manifest must map exactly the scoped refresh-eligible slugs, nothing "
+        f"more/less. Got keys: {sorted(manifest['blocks'].keys())}"
+    )
+
+    block_entry = manifest["blocks"][slug]
+    expected_history = [hash_block_body(body_a), hash_block_body(body_b)]
+    assert block_entry["history"] == expected_history, (
+        "history must be oldest-to-newest and deduped by normalized body -- the "
+        "whitespace-only third revision must collapse into the second entry, "
+        f"not add a third. Got: {block_entry['history']}"
+    )
+    assert (
+        block_entry["current"] == block_entry["history"][-1]
+    ), "current must equal the last (newest) history entry"
+
+
+def test_write_history_manifest_excludes_slugs_outside_refreshable_set(
+    tmp_path: Path,
+) -> None:
+    """A canonical file for a non-eligible slug (e.g. a template-filled or
+    conditional block) present alongside the refresh-eligible files is never
+    included in the manifest -- REFRESHABLE_SLUGS is a hard membership
+    boundary, not a filter applied downstream of a naive directory scan."""
+    canonical_dir = _git_history_repo(tmp_path)
+    for slug in REFRESHABLE_SLUGS:
+        _commit_canonical_body(
+            canonical_dir,
+            slug,
+            f"## {slug.replace('-', ' ').title()}\n\nContent.\n",
+            f"init {slug}",
+        )
+    excluded_slug = "project-essentials"
+    _commit_canonical_body(
+        canonical_dir,
+        excluded_slug,
+        "## Working in this project\n\nTemplate.\n",
+        "init excluded",
+    )
+
+    mod = _load_module_for_synthetic_history(canonical_dir)  # real REFRESHABLE_SLUGS
+    exit_code = mod.run_write_history()
+    assert exit_code == 0, f"run_write_history should return 0. Got {exit_code}."
+
+    manifest = json.loads(_history_manifest_path(canonical_dir).read_text(encoding="utf-8"))
+    assert set(manifest["blocks"].keys()) == set(REFRESHABLE_SLUGS), (
+        f"manifest must map exactly REFRESHABLE_SLUGS, excluding "
+        f"'{excluded_slug}'. Got keys: {sorted(manifest['blocks'].keys())}"
+    )
+
+
+def test_check_history_exits_zero_when_manifest_matches_fresh_generation(
+    tmp_path: Path,
+) -> None:
+    """--check-history exits 0 immediately after --write-history with no
+    intervening edits (the non-vacuity control for the drift canary below --
+    proves the gate does not simply always fail)."""
+    slug = "compaction-guidance"
+    canonical_dir = _git_history_repo(tmp_path)
+    _commit_canonical_body(canonical_dir, slug, "## Compaction Guidance\n\nOriginal.\n", "init")
+
+    mod = _load_module_for_synthetic_history(canonical_dir, frozenset({slug}))
+    mod.run_write_history()
+
+    mod2 = _load_module_for_synthetic_history(canonical_dir, frozenset({slug}))
+    exit_code = mod2.run_check_history()
+    assert exit_code == 0, (
+        "--check-history should exit 0 when the manifest matches a fresh "
+        f"generation. Got {exit_code}."
+    )
+
+
+def test_check_history_exits_nonzero_and_reports_drift_when_canonical_file_edited_without_regenerating(
+    tmp_path: Path, capsys
+) -> None:
+    """The manifest's own producer-liveness gate: editing a canonical file's
+    live content without re-running --write-history is caught by
+    --check-history -- exits non-zero and names the drifted slug.
+
+    This is the load-bearing gate-liveness canary: it proves the gate BITES,
+    not just that it passes on an untouched repo. The edit is deliberately
+    left uncommitted (not a new git commit) -- the "caught at commit time"
+    guarantee only makes sense if the fresh regeneration reads the live
+    file, since a pre-commit hook fires before the commit exists.
+    """
+    slug = "praxion-process"
+    canonical_dir = _git_history_repo(tmp_path)
+    _commit_canonical_body(canonical_dir, slug, "## Praxion Process\n\nOriginal.\n", "init")
+
+    mod = _load_module_for_synthetic_history(canonical_dir, frozenset({slug}))
+    mod.run_write_history()
+
+    _mutate_canonical_body_uncommitted(
+        canonical_dir, slug, "## Praxion Process\n\nEdited but not regenerated.\n"
+    )
+
+    mod2 = _load_module_for_synthetic_history(canonical_dir, frozenset({slug}))
+    exit_code = mod2.run_check_history()
+    output = capsys.readouterr().out
+
     assert exit_code != 0, (
-        f"run_dry_run should exit non-zero on drift. Got {exit_code}."
+        "--check-history must exit non-zero when a canonical file's live "
+        "content diverges from the committed manifest's regeneration."
     )
-    assert onboard.read_text(encoding="utf-8") == before_onboard, (
-        "run_dry_run must not modify onboard-project.md"
+    assert (
+        slug in output
+    ), f"--check-history drift report must name the drifted slug '{slug}'. Got:\n{output}"
+
+
+def test_write_history_produces_byte_identical_manifest_across_consecutive_runs(
+    tmp_path: Path,
+) -> None:
+    """Two consecutive --write-history runs over the same git history produce
+    byte-identical manifest content -- deterministic: no timestamps, stable
+    key ordering."""
+    slug = "behavioral-contract"
+    canonical_dir = _git_history_repo(tmp_path)
+    _commit_canonical_body(canonical_dir, slug, "## Behavioral Contract\n\nRev 1.\n", "rev 1")
+    _commit_canonical_body(canonical_dir, slug, "## Behavioral Contract\n\nRev 2.\n", "rev 2")
+
+    mod = _load_module_for_synthetic_history(canonical_dir, frozenset({slug}))
+    mod.run_write_history()
+    first_bytes = _history_manifest_path(canonical_dir).read_bytes()
+
+    mod2 = _load_module_for_synthetic_history(canonical_dir, frozenset({slug}))
+    mod2.run_write_history()
+    second_bytes = _history_manifest_path(canonical_dir).read_bytes()
+
+    assert first_bytes == second_bytes, (
+        "Two consecutive --write-history runs over unchanged history must "
+        "produce byte-identical manifest content."
     )
-    assert new_proj.read_text(encoding="utf-8") == before_new_proj, (
-        "run_dry_run must not modify new-project.md"
+
+
+def test_help_flag_lists_write_history_and_check_history_flags() -> None:
+    """--help documents the new history-manifest generator flags."""
+    result = subprocess.run(
+        [sys.executable, str(SYNC_SCRIPT), "--help"],
+        capture_output=True,
+        text=True,
     )
+    assert (
+        "--write-history" in result.stdout
+    ), f"--help output must document --write-history.\n{result.stdout}"
+    assert (
+        "--check-history" in result.stdout
+    ), f"--help output must document --check-history.\n{result.stdout}"
+
+
+def test_main_write_history_flag_invokes_generator_and_produces_manifest(
+    tmp_path: Path,
+) -> None:
+    """`main(["--write-history"])` (the CLI entry point) wires the flag to the
+    history generator and produces the manifest file -- not just the
+    lower-level function existing in isolation."""
+    slug = "compaction-guidance"
+    canonical_dir = _git_history_repo(tmp_path)
+    _commit_canonical_body(canonical_dir, slug, "## Compaction Guidance\n\nContent.\n", "init")
+
+    mod = _load_module_for_synthetic_history(canonical_dir, frozenset({slug}))
+    exit_code = mod.main(["--write-history"])
+
+    assert exit_code == 0, f"main(['--write-history']) should return 0. Got {exit_code}."
+    assert _history_manifest_path(
+        canonical_dir
+    ).exists(), "main(['--write-history']) must produce the manifest file."
+
+
+def test_main_check_history_flag_returns_zero_when_manifest_up_to_date(
+    tmp_path: Path,
+) -> None:
+    """`main(["--check-history"])` wires the flag to the check mode and
+    returns 0 when the committed manifest matches a fresh generation."""
+    slug = "behavioral-contract"
+    canonical_dir = _git_history_repo(tmp_path)
+    _commit_canonical_body(canonical_dir, slug, "## Behavioral Contract\n\nContent.\n", "init")
+
+    mod = _load_module_for_synthetic_history(canonical_dir, frozenset({slug}))
+    mod.main(["--write-history"])
+
+    mod2 = _load_module_for_synthetic_history(canonical_dir, frozenset({slug}))
+    exit_code = mod2.main(["--check-history"])
+
+    assert exit_code == 0, f"main(['--check-history']) should return 0. Got {exit_code}."

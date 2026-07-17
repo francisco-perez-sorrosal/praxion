@@ -1,3 +1,13 @@
+## v0.15.0 (2026-07-17)
+
+### Feat
+
+- canonical block refresh mechanism (manifest-only)
+
+### Refactor
+
+- trim agent-pipeline block to pointer form
+
 ## v0.14.0 (2026-07-16)
 
 ### Feat

@@ -63,6 +63,17 @@ repos:
         files: '^(claude/canonical-blocks/.*\.md|commands/(onboard-project|new-project)\.md)$'
         pass_filenames: false
 
+      # Block B2 — canonical-block history-manifest liveness. Whole-repo
+      # --check-history; fires only when a canonical block, the generated
+      # history manifest, or the generator/identity scripts are staged. One
+      # concern per hook (sibling to canonical-block-sync, not merged into it).
+      - id: canonical-block-history
+        name: Canonical-block history-manifest liveness
+        entry: python3 scripts/sync_canonical_blocks.py --check-history
+        language: system
+        files: '^(claude/canonical-blocks/.*\.(md|json)|scripts/(sync_canonical_blocks|canonical_block_identity)\.py)$'
+        pass_filenames: false
+
       # Block C — diagram regeneration. Self-discovers staged .c4; skips when
       # likec4/d2 are absent.
       - id: diagram-regen

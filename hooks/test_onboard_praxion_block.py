@@ -20,6 +20,14 @@ Canonical-file byte-identity tests:
   - These tests are expected to be RED until `claude/canonical-blocks/<slug>.md` files
     are created by the concurrent implementer. They transition to GREEN at the
     Group A integration checkpoint.
+
+Phase 6 delegation regression guard + onboard-only asymmetry canary:
+  - Phase 6's predicate references the refresh_claude_blocks.py delegation rather than
+    performing raw per-heading checks for the four refreshable blocks. Expected RED
+    until the concurrent Phase 6 predicate-upgrade step lands; transitions to GREEN
+    once it does.
+  - new-project.md never references the refresh script or command — a standing
+    invariant protecting the intentional onboard-only asymmetry, GREEN from the start.
 """
 
 from __future__ import annotations
@@ -575,3 +583,97 @@ def test_second_phase6_run_produces_no_duplicate_when_block_already_present(
     assert (
         after_first_run == after_second_run
     ), "CLAUDE.md changed between first and second Phase 6 run — idempotency violated."
+
+
+# ---------------------------------------------------------------------------
+# Phase 6 delegation regression guard
+#
+# Regression guard against silently reverting the refresh-eligible blocks'
+# absent/current/stale/modified classification back to a raw independent
+# `heading present -> skip` predicate per block. Anchors on durable semantics
+# (the script is referenced somewhere in the Phase 6 predicate/action context;
+# none of the four core blocks' old binary heading-check bullets survive) rather
+# than exact prose, which may legitimately be reworded as part of the delegation.
+#
+# Expected RED until the concurrent Phase 6 predicate-upgrade step lands; GREEN
+# once it does.
+# ---------------------------------------------------------------------------
+
+
+def _extract_phase6_section(content: str) -> str:
+    """Extract the §Phase 6 section from onboard-project.md (heading to next §Phase or EOF)."""
+    phase6_match = re.search(r"^## §Phase 6.*$", content, re.MULTILINE)
+    assert phase6_match is not None, "§Phase 6 section not found in onboard-project.md"
+
+    next_section = re.search(r"^## §Phase 7", content[phase6_match.end() :], re.MULTILINE)
+    if next_section is None:
+        return content[phase6_match.start() :]
+    return content[phase6_match.start() : phase6_match.end() + next_section.start()]
+
+
+def test_phase_6_references_refresh_script_delegation() -> None:
+    """Phase 6 must delegate the four core blocks' classification to refresh_claude_blocks.py.
+
+    A future revert that reimplements absent/stale/modified handling inline in
+    onboard-project.md prose, without calling the shipped script, must fail this test.
+    """
+    content = _read_command_file(ONBOARD_PATH)
+    phase6_text = _extract_phase6_section(content)
+
+    assert re.search(r"refresh[_-]claude[_-]blocks", phase6_text) is not None, (
+        "§Phase 6 does not reference the refresh_claude_blocks.py delegation. "
+        "The four refreshable core blocks' absent/stale/modified classification must be "
+        "delegated to the shipped script rather than reimplemented as raw per-heading checks."
+    )
+
+
+@pytest.mark.parametrize(("slug", "block_meta"), BLOCKS.items())
+def test_phase_6_no_longer_contains_raw_binary_heading_check_for_refreshable_block(
+    slug: str, block_meta: dict
+) -> None:
+    """Phase 6 must not retain the old raw `heading present -> skip` bullet for a core block.
+
+    Each of the four refreshable blocks previously had its own independent binary
+    predicate bullet (e.g. `` `## Agent Pipeline` heading present -> skip the Agent
+    Pipeline append ``). This bullet must be gone once classification is delegated to
+    refresh_claude_blocks.py — its survival for any of the four blocks means the
+    revert this guard exists to catch.
+    """
+    content = _read_command_file(ONBOARD_PATH)
+    phase6_text = _extract_phase6_section(content)
+    heading = block_meta["claude_md_heading"]
+
+    old_binary_bullet = re.search(rf"`{re.escape(heading)}`\s+heading present", phase6_text)
+    assert old_binary_bullet is None, (
+        f"§Phase 6 still contains the raw binary heading-check bullet for '{heading}' "
+        f"('{slug}'). This must be replaced by delegation to refresh_claude_blocks.py "
+        "for the four refreshable core blocks."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Onboard-only asymmetry canary (negative)
+#
+# Gap-2 scope ruling: the refresh predicate is deliberately onboard-only.
+# new-project.md is greenfield/first-run-only and must never grow refresh logic.
+# This canary is GREEN from the start (new-project.md is never touched by this
+# feature) and stays GREEN through the concurrent Phase 6 predicate-upgrade step —
+# a standing invariant, not a RED-first assertion.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("forbidden_reference", ["refresh_claude_blocks", "refresh-claude-blocks"])
+def test_new_project_never_references_refresh_script(forbidden_reference: str) -> None:
+    """new-project.md must never reference the refresh script or its dedicated command.
+
+    Protects the intentional onboard-only asymmetry: refresh is Phase-6-territory
+    (re-onboarding an existing project), while new-project.md is a first-run-only
+    greenfield flow. A future well-meaning "parity" edit that wires refresh logic
+    into new-project.md is a scope violation this canary catches.
+    """
+    content = _read_command_file(NEW_PROJECT_PATH)
+    assert forbidden_reference not in content, (
+        f"new-project.md contains '{forbidden_reference}'. Refresh delegation is "
+        "onboard-only (Phase 6 of onboard-project.md) — new-project.md must never "
+        "reference the refresh script or command."
+    )

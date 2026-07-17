@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-07-16T20:23:18Z'
+generated_at: '2026-07-17T01:14:18Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -306,7 +306,7 @@ surfaces:
   path: docs/existing-project-onboarding.md
   type: markdown
   title: Existing-Project Onboarding
-  last_modified: '2026-06-25'
+  last_modified: '2026-07-16'
   diataxis: tutorial
   audience: developer
   renderer: tutorial_shell
@@ -2159,6 +2159,12 @@ surfaces:
   title: Agent-pipeline canonical block becomes a minimal pointer
   last_modified: '2026-07-16'
   renderer: adr_card
+- id: ai-state-decisions-271-manifest-only-block-refresh
+  path: .ai-state/decisions/271-manifest-only-block-refresh.md
+  type: markdown
+  title: Manifest-only version identity for canonical CLAUDE.md block refresh
+  last_modified: '2026-07-16'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -2741,6 +2747,7 @@ groups:
   - ai-state-decisions-268-eval-ledger-lazy-run-producer
   - ai-state-decisions-269-skill-activation-observations-event
   - ai-state-decisions-270-agent-pipeline-block-pointer
+  - ai-state-decisions-271-manifest-only-block-refresh
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

@@ -1,7 +1,7 @@
 ---
-id: dec-draft-1766b3cd
+id: dec-271
 title: Manifest-only version identity for canonical CLAUDE.md block refresh
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-16
 summary: Refresh onboarded CLAUDE.md blocks via a plugin-shipped git-derived historical-hash manifest that classifies each live block (absent/current/stale/modified) with no in-file marker and no consumer-site git — auto-replacing stale boilerplate, refusing to clobber locally-modified blocks; resolves td-055.

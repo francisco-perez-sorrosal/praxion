@@ -24,12 +24,15 @@
 #   agent authenticates as the app — PRs it opens then trigger CI and
 #   self-validate. `id-token: write` enables the OIDC exchange.
 #
-# KNOWN UNVERIFIED ASSUMPTION: claude-code-action@v1 is documented to work with
-# "any GitHub event", but it explicitly rejects `push` ("Unsupported event
-# type: push"). Whether it accepts `workflow_run` is not confirmed by the docs.
-# If the agent step fails with "Unsupported event type: workflow_run", split
-# this into a tiny `workflow_run`-triggered job that re-dispatches via
-# `repository_dispatch` (a confirmed-supported event) to a second job.
+# EVENT SUPPORT — VERIFIED (P0, 2026-07-22): claude-code-action's event switch
+# lists `workflow_run` in AUTOMATION_EVENT_NAMES with a real `case "workflow_run"`
+# handler (src/github/context.ts at the pinned SHA 51ea8ea below); `push` is
+# absent, which is why it hard-errors "Unsupported event type: push". So this
+# workflow's trigger is natively supported — no bridge required. See ADR
+# dec-draft-85e6d0dc. Documented fallback, retained but unused: if a future
+# action version ever drops `workflow_run`, split this into a tiny
+# `workflow_run` job that re-dispatches via `repository_dispatch` (also a
+# verified-supported event) to a second job.
 
 name: CI Autofix
 
@@ -72,7 +75,30 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Enforce daily run budget
+        id: budget
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Cost guardrail against a fix -> fail-differently churn loop. The
+          # open-PR dedup below throttles concurrency; this caps total spend per
+          # day. Counting THIS workflow's runs today (current run included, so
+          # `> MAX` allows exactly MAX diagnosing runs). P0 hardcodes the cap;
+          # P1 sources it from .github/autofix-policy.yml (safety.max_runs_per_day).
+          MAX_RUNS_PER_DAY: "5"
+        run: |
+          today=$(date -u +%Y-%m-%d)
+          runs_today=$(gh run list --workflow ci-autofix.yml \
+            --created ">=${today}" --limit 100 --json databaseId --jq 'length')
+          echo "runs_today=${runs_today}" >> "$GITHUB_OUTPUT"
+          if [ "${runs_today}" -gt "${MAX_RUNS_PER_DAY}" ]; then
+            echo "::notice::CI Autofix daily budget (${MAX_RUNS_PER_DAY}) reached (${runs_today} runs today); skipping diagnosis."
+            echo "over_budget=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "over_budget=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Skip if an autofix PR is already open
+        if: steps.budget.outputs.over_budget == 'false'
         id: dedup
         env:
           GH_TOKEN: ${{ github.token }}

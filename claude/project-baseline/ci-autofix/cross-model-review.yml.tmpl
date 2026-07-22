@@ -1,0 +1,40 @@
+# P2 PLACEHOLDER — NOT YET IMPLEMENTED.
+#
+# This file is a shape-only stub for the future `reusable-cross-model-review.yml`
+# caller (the P2 cross-model review gate designed alongside P1's installable
+# core but not built in this phase). It documents the intended trigger and
+# inputs; it does not invoke any review provider, and /onboard-project does
+# not install or wire this file in P1 — it ships only as a reference shape in
+# this template package.
+#
+# When P2 lands, this stub becomes the real caller template — the counterpart
+# to ci-autofix.yml.tmpl for the review gate, invoking a hub reusable workflow
+# (`reusable-cross-model-review.yml`) that reads `policy.review.*` from
+# `autofix-policy.yml` (`reviewer_family`, `cross_model_gate`, `on_unavailable`)
+# and posts a review on agent-authored PRs using a model family other than the
+# fixer's own (never 'claude' — see autofix-policy.yml.tmpl's `review:` section).
+#
+# TODO(P2): implement `reusable-cross-model-review.yml` (the hub) and this
+# caller together; fill in the real `on:` / `permissions:` / `uses:` /
+# `secrets:` shape below once the hub exists. Until then this entire block
+# stays commented out — a placeholder, not a working gate.
+
+# name: Cross-Model Review
+# on:
+#   pull_request:
+#     types: [opened, synchronize]
+# permissions: {}
+# jobs:
+#   review:
+#     if: startsWith(github.head_ref, 'ci-autofix/')
+#     permissions:
+#       pull-requests: write
+#     uses: {{PRAXION_HUB}}/.github/workflows/reusable-cross-model-review.yml@{{HUB_SHA}}
+#     with:
+#       policy_path: .github/autofix-policy.yml
+#     secrets:
+#       REVIEWER_API_KEY: ${{ secrets.REVIEWER_API_KEY }}   # example only — P2
+#                                                            # defines the real
+#                                                            # secret name(s)
+#                                                            # for the chosen
+#                                                            # reviewer_family

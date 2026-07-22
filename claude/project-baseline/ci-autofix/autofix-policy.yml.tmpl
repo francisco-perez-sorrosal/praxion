@@ -1,0 +1,53 @@
+# Canonical Praxion baseline CI-autofix policy template — per-repo tunables read
+# by the `reusable-ci-autofix.yml` hub (installed alongside `ci-autofix.yml.tmpl`
+# as the caller).
+#
+# Single source of truth for what an installed ci-autofix caller may tune.
+# Every value below is read by the hub from THIS file — the caller workflow
+# stays thin and never hardcodes safety/behavior tunables. Changing this file
+# changes behavior; no caller edit required. The /onboard-project ci-autofix
+# onboarding sub-step installs this as `.github/autofix-policy.yml` when
+# neither that file nor `.github/workflows/ci-autofix.yml` already exists —
+# never overwriting an existing installation. Delete this comment after
+# tailoring.
+
+watched_workflows: [Test]   # Documentary only — the caller's own
+                            # on.workflow_run.workflows is the GHA-required
+                            # static literal and is authoritative. Keep this
+                            # list in sync with that literal by hand.
+
+surfaces:
+  main_branch: fix-pr       # fix-pr | off   (P1 — the only surface implemented)
+  pr_checks:   fix-commit   # P3 — reserved, not yet read by the hub
+  dependabot:  fix-commit   # P3 — reserved, not yet read by the hub
+  fork_prs:    suggest      # P3 — reserved, not yet read by the hub
+
+review:                        # Consumed by reusable-cross-model-review.yml
+                                # (P2 — designed, not yet built; see
+                                # cross-model-review.yml.tmpl in this directory).
+  cross_model_gate: agent-prs  # all-prs | agent-prs | off
+  reviewer_family: gpt         # gpt | gemini | composer — NEVER 'claude': the
+                                # fixer below is already claude, so the review
+                                # gate must come from a different model family
+                                # or it reviews nothing.
+  on_unavailable: fail-open
+
+safety:
+  max_attempts_per_pr: 2
+  max_runs_per_day: 5
+  sensitive_paths: [.github/, scripts/, hooks/]
+  auto_commit_tiers: [lint, format, doc-refs, lockfile]
+
+provider:
+  fixer: claude               # 'cursor' is a documented P1 break-glass value —
+                               # the hub errors clearly if selected; not
+                               # implemented in P1.
+  fixer_model: opus           # Replaces the old hardcoded --model opus literal.
+  # plugin_dir: "."           # Optional — NO default (unlike fixer/fixer_model
+                               # above). Only set this if the caller repo's own
+                               # CI needs to load its own skills/agents as a
+                               # Claude Code plugin root (the --plugin-dir
+                               # flag). Praxion's own caller sets this to "."
+                               # to preserve its pre-hub dogfooding behavior;
+                               # most managed repos should leave it
+                               # unset/commented.

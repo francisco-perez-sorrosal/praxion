@@ -1,0 +1,53 @@
+# Praxion's own ci-autofix policy — per-repo tunables read by the
+# `reusable-ci-autofix.yml` hub, installed alongside `.github/workflows/ci-autofix.yml`
+# (caller #1, dogfooding).
+#
+# The values P0 actually used — the main-branch fix-PR surface, the daily
+# budget cap, sensitive paths, fixer model, and plugin_dir — are migrated 1:1
+# from the P0 monolith this repo ran inline; the refactor to a thin caller
+# changes WHERE those tunables live, not WHAT they are. The remaining fields
+# (the `review` block, the P3 `surfaces`, and safety's
+# `max_attempts_per_pr`/`auto_commit_tiers`) are schema fields reserved for
+# P2/P3 and are documentary-only in P1. See
+# `claude/project-baseline/ci-autofix/autofix-policy.yml.tmpl` for the full schema.
+
+watched_workflows: [Test, Architecture]  # Documentary only — the caller's own
+                                          # on.workflow_run.workflows is the
+                                          # GHA-required static literal and is
+                                          # authoritative. Keep this list in
+                                          # sync with that literal by hand.
+
+surfaces:
+  main_branch: fix-pr       # P0's only behavior: open a fix PR on main-branch failure
+  pr_checks:   fix-commit   # P3 — reserved, not yet read by the hub
+  dependabot:  fix-commit   # P3 — reserved, not yet read by the hub
+  fork_prs:    suggest      # P3 — reserved, not yet read by the hub
+
+review:                        # Consumed by reusable-cross-model-review.yml
+                                # (P2 — designed, not yet built). Documentary
+                                # only in P1: the gate itself does not exist yet.
+  cross_model_gate: agent-prs  # all-prs | agent-prs | off
+  reviewer_family: gpt         # gpt | gemini | composer — NEVER 'claude': the
+                                # fixer below is already claude, so the review
+                                # gate must come from a different model family
+                                # or it reviews nothing.
+  on_unavailable: fail-open
+
+safety:
+  max_attempts_per_pr: 2    # P3 — reserved (per-PR attempt counter for the
+                             # pr_checks surface); not yet read by the hub
+  max_runs_per_day: 5       # the P0 daily budget cap
+  sensitive_paths: [.github/, scripts/, hooks/]   # the P0 tripwire paths
+  auto_commit_tiers: [lint, format, doc-refs, lockfile]   # P3 — reserved
+
+provider:
+  fixer: claude               # the only fixer wired in P1
+  fixer_model: opus           # replaces P0's hardcoded --model opus literal
+  plugin_dir: "."              # CRITICAL for Praxion specifically: Praxion IS
+                               # a Claude Code plugin, so the hub's
+                               # --plugin-dir flag must load "." to preserve
+                               # the pre-hub dogfooding behavior of loading
+                               # this repo's own skills/agents. Most managed
+                               # repos should leave this unset/commented — see
+                               # the template's own header for why this has NO
+                               # default, unlike fixer/fixer_model above.

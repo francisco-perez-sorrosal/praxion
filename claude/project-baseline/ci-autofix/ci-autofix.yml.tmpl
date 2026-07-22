@@ -1,0 +1,51 @@
+# Canonical Praxion baseline CI-autofix caller template — thin, SHA-pinned invoker
+# of the public `reusable-ci-autofix.yml` hub.
+#
+# Single source of truth for the installable ci-autofix caller. The
+# /onboard-project ci-autofix onboarding sub-step installs this as
+# `.github/workflows/ci-autofix.yml` when neither that file nor
+# `.github/autofix-policy.yml` already exists — never overwriting an existing
+# installation. Three placeholders are filled at install time:
+#   {{WATCHED_WORKFLOWS}} — comma-separated, quoted CI workflow names to watch.
+#     GitHub Actions requires `on.workflow_run.workflows` to be a static literal
+#     list, so this cannot be sourced from the policy file at runtime; keep it
+#     in sync with `policy.watched_workflows` below by hand.
+#   {{PRAXION_HUB}}       — the hub's owner/repo (francisco-perez-sorrosal/praxion).
+#   {{HUB_SHA}}           — the hub's commit SHA, resolved at install time to a
+#     real 40-hex value — never left as an unresolved placeholder or a mutable
+#     tag/branch; every other `uses:` in this ecosystem is SHA-pinned the same way.
+#
+# All per-repo tunables (budget caps, sensitive paths, fixer model, review
+# policy) live in `.github/autofix-policy.yml`, installed alongside this
+# caller — this file stays thin in logic, explicit only in trigger and
+# privilege. See that template's own header for the full policy schema.
+#
+# Praxion's own caller (`.github/workflows/ci-autofix.yml`) differs only in the
+# `uses:` ref: a same-repo local `uses: ./.github/workflows/reusable-ci-autofix.yml`
+# (tracks HEAD — correct for the repo that develops the hub), never a
+# cross-repo SHA pin. Delete this comment after tailoring.
+
+name: CI Autofix
+
+on:
+  workflow_run:
+    workflows: [{{WATCHED_WORKFLOWS}}]   # static literal — GHA requirement
+    types: [completed]
+
+permissions: {}  # least-privilege; the job below grants only what the hub needs
+
+jobs:
+  autofix:
+    permissions:                          # ceiling GitHub caps the hub's
+                                           # effective token at — an
+                                           # under-scoped grant here silently
+                                           # starves the hub's PR-open step
+      contents: write       # create the ci-autofix/ branch
+      pull-requests: write  # open the fix PR
+      actions: read         # read the failed run's logs
+      id-token: write       # OIDC — lets claude-code-action auth as the Claude app
+    uses: {{PRAXION_HUB}}/.github/workflows/reusable-ci-autofix.yml@{{HUB_SHA}}
+    with:
+      policy_path: .github/autofix-policy.yml
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

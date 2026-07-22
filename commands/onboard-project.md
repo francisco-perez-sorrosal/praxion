@@ -23,7 +23,7 @@ Onboard the **current existing** project to work cleanly with the Praxion plugin
 13. §Phase 8b — AaC Tier Install (opt-in, default-skip — fence seed, fitness scaffold, hook block, workflow, diagrams)
 14. §Phase 8c — ML/AI Training Scaffold (opt-in, default-skip; default-yes when ML signals detected)
 15. §Phase 8d — Obsidian integration (opt-in, default-yes)
-16. §Phase 8e — Code-quality baseline (opt-in, default-yes — `.editorconfig` + per-stack linter/formatter/type-check config + pre-commit + `CONTRIBUTING.md` from canonical assets)
+16. §Phase 8e — Code-quality baseline (opt-in, default-yes — `.editorconfig` + per-stack linter/formatter/type-check config + pre-commit + `CONTRIBUTING.md` + dependency-scanning + ci-autofix caller/policy from canonical assets)
 17. §Phase 9 — Verification + handoff
 18. §Agent Pipeline Block — canonical source of truth
 19. §Compaction Guidance Block
@@ -98,7 +98,7 @@ Execute these phases in order. Each phase honors §Idempotency Predicates — re
 | 8b | AaC tier install — fence seed, `fitness/` scaffold, golden-rule Block D, `architecture.yml` workflow, `docs/diagrams/` scaffold | User picks "Skip AaC" (default) at Gate 8b; or per-sub-step predicates (see §Phase 8b) |
 | 8c | ML/AI training scaffold — experiment tracking config, checkpoint `.gitignore` block, GPU budget declaration, `program.md` template, mode callout | No ML signals detected (skip) OR user picks "Skip" at Gate 8c; per-sub-step predicates (see §Phase 8c) |
 | 8d | Obsidian integration — `.gitignore` Obsidian block, verify `obsidian@obsidian-skills` plugin install, `CLAUDE.md` Obsidian Integration block, `settings.json` deny entries | User picks "Skip" at Gate 8d; per-sub-step predicates (see §Phase 8d) |
-| 8e | Code-quality baseline — universal `.editorconfig` + pre-commit config + `CONTRIBUTING.md` + per-detected-stack linter/formatter/type-check config + dependency-scanning config installed from canonical assets (never overwriting existing config) | User picks "Skip" at Gate 8e; per-sub-step predicates (see §Phase 8e) |
+| 8e | Code-quality baseline — universal `.editorconfig` + pre-commit config + `CONTRIBUTING.md` + per-detected-stack linter/formatter/type-check config + dependency-scanning config + ci-autofix caller/policy installed from canonical assets (never overwriting existing config) | User picks "Skip" at Gate 8e; per-sub-step predicates (see §Phase 8e) |
 | 9 | Print summary + stage modified files (no commit) | None — terminal phase |
 
 ## §Phase Gates
@@ -961,17 +961,17 @@ full allowlist rationale.
 
 **Stack reuse.** This phase consumes the **Stack detection** captured in §Pre-flight (step 4) — Python, JavaScript/TypeScript, etc. It performs no new detection beyond reading `package.json` dependencies to distinguish framework (React/Vue/Next) from non-framework JS/TS.
 
-**Asset resolution.** Canonical assets live in the i-am plugin install (the `installPath` captured in §Pre-flight): `skills/python-development/assets/{ruff-baseline.toml, mypy-baseline.toml}`, `skills/typescript-development/assets/{biome.json, eslint.config.mjs, prettierrc.json, tsconfig.json}`, and `claude/project-baseline/{editorconfig, pre-commit-config.yaml, CONTRIBUTING.md.tmpl, dependabot.yml.tmpl}`. Read the asset from there; write the materialized file into the project. Edit the asset (never the per-project copy) to evolve the baseline.
+**Asset resolution.** Canonical assets live in the i-am plugin install (the `installPath` captured in §Pre-flight): `skills/python-development/assets/{ruff-baseline.toml, mypy-baseline.toml}`, `skills/typescript-development/assets/{biome.json, eslint.config.mjs, prettierrc.json, tsconfig.json}`, `claude/project-baseline/{editorconfig, pre-commit-config.yaml, CONTRIBUTING.md.tmpl, dependabot.yml.tmpl}`, and `claude/project-baseline/ci-autofix/{ci-autofix.yml.tmpl, autofix-policy.yml.tmpl}`. Read the asset from there; write the materialized file into the project. Edit the asset (never the per-project copy) to evolve the baseline.
 
 **Gate 8e — three-option AskUserQuestion.** Use `AskUserQuestion` with `header: "Next?"`, `multiSelect: false`, the Gate 8e headline from the gate map, and these three options:
 
 | Option | Effect |
 |--------|--------|
-| `Install code-quality baseline` | **Default.** Run sub-steps 8e.1–8e.7; each is independently idempotent and skips when its config already exists. |
+| `Install code-quality baseline` | **Default.** Run sub-steps 8e.1–8e.8; each is independently idempotent and skips when its config already exists. |
 | `Skip` | Skip Phase 8e entirely. Re-run `/onboard-project` later — all sub-steps are idempotent. |
 | `Run all rest` | Skip remaining gates, default this choice to `Install code-quality baseline`, run autonomously through Phase 9. |
 
-**Action when "Install code-quality baseline" is chosen.** Run sub-steps 8e.1 through 8e.7 in order. Each prints one line on completion or skip. None overwrites an existing config — the baseline is additive only.
+**Action when "Install code-quality baseline" is chosen.** Run sub-steps 8e.1 through 8e.8 in order. Each prints one line on completion or skip. None overwrites an existing config — the baseline is additive only.
 
 ### Sub-step 8e.1 — Universal `.editorconfig`
 
@@ -1014,6 +1014,27 @@ full allowlist rationale.
 **Predicate.** Any of `.github/dependabot.yml` / `.github/dependabot.yaml` / `renovate.json` / `.renovaterc` / `.renovaterc.json` / `.snyk` exists → skip with `8e.7: skipped (dependency-scanning config already present)`.
 
 **Action.** Read `claude/project-baseline/dependabot.yml.tmpl` (from the plugin install). Strip the leading template-doc comment lines. Emit `updates:` blocks only for detected ecosystems: a Python manifest present anywhere in the repo → include the `pip` block with `directory:` set to the discovered manifest directory; a `package.json` present anywhere in the repo → include the `npm` block with `directory:` set to the discovered `package.json` directory; a `.github/workflows/` directory present → include the `github-actions` block. Multiple Python or npm manifests at different directories each get their own `updates:` entry. Strip blocks for undetected ecosystems. Write the result to `<repo-root>/.github/dependabot.yml` (creating `.github/` if absent). Print: `8e.7: .github/dependabot.yml installed (dependency scanning enabled for detected ecosystems)`.
+
+### Sub-step 8e.8 — CI autofix caller + policy
+
+**Predicate.** `.github/workflows/ci-autofix.yml` OR `.github/autofix-policy.yml` already exists at the repo root → skip with `8e.8: skipped (ci-autofix caller or policy already present)`. Never overwrite an existing installation — this mirrors 8e.7's file-existence guard exactly.
+
+**Action.** Read `claude/project-baseline/ci-autofix/ci-autofix.yml.tmpl` and `claude/project-baseline/ci-autofix/autofix-policy.yml.tmpl` (from the plugin install) and strip each file's leading template-doc comment header. Fill the caller template's three placeholders:
+
+- `{{WATCHED_WORKFLOWS}}` → the comma-separated, quoted names of the project's own CI workflows (detected under `.github/workflows/`, confirmed with the user). GitHub Actions requires `on.workflow_run.workflows` to be a static literal, so this cannot be read from the policy at runtime — keep it in sync with the policy's `watched_workflows` by hand.
+- `{{PRAXION_HUB}}` → `francisco-perez-sorrosal/praxion` (the public hub's owner/repo).
+- `{{HUB_SHA}}` → the hub's **real, current 40-hex commit SHA**, resolved at install time — e.g. `gh api repos/francisco-perez-sorrosal/praxion/commits/main --jq .sha` (the tip of the hub's default branch), or the SHA behind a pinned hub release tag. Resolve it to an actual SHA: **never** a placeholder, and never a mutable tag or branch ref — a dangling `uses:` ref makes the installed caller fail to load.
+
+After writing, self-check the installed caller: grep `.github/workflows/ci-autofix.yml` for any surviving `{{` and abort loudly if one remains — no unresolved placeholder may survive into the installed file.
+
+Write the rendered caller to `<repo-root>/.github/workflows/ci-autofix.yml` and the rendered policy to `<repo-root>/.github/autofix-policy.yml` (creating `.github/workflows/` if absent). Do **not** install the P2 `cross-model-review.yml.tmpl` stub — it is designed-not-built and stays deferred to a later phase.
+
+Do **not** execute any secret-setup or org-configuration command on the operator's behalf — **print** these one-time manual steps instead:
+
+- Secret setup: `gh secret set CLAUDE_CODE_OAUTH_TOKEN` — the autofixer authenticates the hub's fixer with this token; without it the fixer step no-ops. (P2, print only if the caller opts into cross-model review: `gh secret set CURSOR_API_KEY`.)
+- Org Actions-allowlist: if the caller repo's org restricts Actions to an allowlist, the repo owner must add the hub explicitly using the reusable-workflow `OWNER/REPOSITORY/PATH/FILENAME@<ref>` syntax — e.g. `francisco-perez-sorrosal/praxion/.github/workflows/reusable-ci-autofix.yml@<HUB_SHA>` — substitute the same resolved SHA used in the caller's `uses:` line above, not the literal string `<HUB_SHA>` (or use a wildcard covering the hub). This is a one-time, deliberate operator step, never auto-injected.
+
+Print: `8e.8: .github/workflows/ci-autofix.yml + .github/autofix-policy.yml installed (ci-autofix caller wired to the public hub — see the two printed one-time operator steps to activate)`.
 
 **Verification handoff.** Phase 9 lists every file staged here. The agent-readiness Style, Code Quality, Documentation, and Security criteria covered by this phase (linter/formatter/editorconfig/pre-commit, type-check, contributing, dependency-scanning) flip to pass on the next `/project-metrics --refresh` run.
 
@@ -1065,11 +1086,16 @@ full allowlist rationale.
      "artifacts": {
        "hooks": ["pre-commit", "post-merge", "post-commit", "post-checkout"],
        "merge_drivers": ["observations-jsonl"],
-       "gitattributes": [".ai-state/observations.jsonl merge=observations-jsonl"]
+       "gitattributes": [".ai-state/observations.jsonl merge=observations-jsonl"],
+       "ci_autofix": {
+         "caller": ".github/workflows/ci-autofix.yml",
+         "policy": ".github/autofix-policy.yml",
+         "hub_sha": "<resolved 40-hex hub commit SHA>"
+       }
      }
    }
    ```
-   List only artifacts actually installed this run (omit hooks if Phase 4 was skipped). If the plugin version could not be captured at pre-flight (skip-phase-4 flag), write `"onboarded_with_version": "unknown"` and emit a one-line note. Add `.ai-state/.praxion-onboard.json` to the staged set.
+   List only artifacts actually installed this run (omit hooks if Phase 4 was skipped; omit `ci_autofix` if Phase 8e was skipped or its caller/policy predicate already hit). If the plugin version could not be captured at pre-flight (skip-phase-4 flag), write `"onboarded_with_version": "unknown"` and emit a one-line note. Add `.ai-state/.praxion-onboard.json` to the staged set.
 
 4. **Stage modified files**: run `git add` with the explicit list of files this command touched (built up through phases 1–6, plus `.ai-state/.praxion-onboard.json`). Do NOT run `git add -A`. Do NOT commit. The user reviews staging and decides.
 

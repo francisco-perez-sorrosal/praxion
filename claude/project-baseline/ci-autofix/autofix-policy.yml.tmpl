@@ -22,15 +22,18 @@ surfaces:
   dependabot:  fix-commit   # P3 — reserved, not yet read by the hub
   fork_prs:    suggest      # P3 — reserved, not yet read by the hub
 
-review:                        # Consumed by reusable-cross-model-review.yml
-                                # (P2 — designed, not yet built; see
-                                # cross-model-review.yml.tmpl in this directory).
+review:                        # Consumed live by reusable-cross-model-review.yml
+                                # (built and dogfooding on Praxion's own
+                                # ci-autofix/* PRs — see cross-model-review.yml.tmpl
+                                # in this directory for the caller shape).
   cross_model_gate: agent-prs  # all-prs | agent-prs | off
   reviewer_family: gpt         # gpt | gemini | composer — NEVER 'claude': the
-                                # fixer below is already claude, so the review
-                                # gate must come from a different model family
-                                # or it reviews nothing.
-  on_unavailable: fail-open
+                                # fixer below is already claude, so a
+                                # same-family value is a hard misconfiguration
+                                # the hub labels `cross-model-review:misconfigured`
+                                # and exits 0 without running a review.
+  on_unavailable: fail-open    # fail-open is the only value the hub implements;
+                                # fail-closed is reserved, not implemented.
 
 safety:
   max_attempts_per_pr: 2

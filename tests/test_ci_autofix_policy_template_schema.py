@@ -1,13 +1,19 @@
-"""Structural schema tests for the ci-autofix caller/policy/P2-stub template package.
+"""Structural schema tests for the ci-autofix caller/policy/cross-model-review
+template package.
 
-`claude/project-baseline/ci-autofix/{ci-autofix.yml.tmpl, autofix-policy.yml.tmpl,
-cross-model-review.yml.tmpl}` do not exist yet — these tests define the contract
-the implementer must satisfy when creating the caller-facing template package
-(the counterpart to the hub reusable workflow tested in
-`test_ci_autofix_hub_invariants.py`). Every test reads its target file lazily
-(inside the function body, not at module import time) so collection succeeds
-before the files exist; running this module now is expected to fail with a
-clear "file not found" assertion (RED), not an import error.
+`claude/project-baseline/ci-autofix/{ci-autofix.yml.tmpl, autofix-policy.yml.tmpl}`
+are the fixer-side caller/policy templates. `cross-model-review.yml.tmpl` is the
+P2 reviewer-gate's caller template — realized here from a commented-out
+placeholder stub into a working caller, the peer of `ci-autofix.yml.tmpl`,
+invoking `reusable-cross-model-review.yml` instead of `reusable-ci-autofix.yml`.
+These tests define the contract the implementer must satisfy when creating or
+realizing the caller-facing template package (the counterpart to the hub
+reusable workflows tested in `test_ci_autofix_hub_invariants.py` and
+`test_cross_model_review_hub_invariants.py`). Every test reads its target file
+lazily (inside the function body, not at module import time); the
+cross-model-review realized-caller assertions below are expected to fail
+against the still-commented-out stub file (RED) until the realized caller
+template lands.
 
 Scope note: these tests verify the TEMPLATE package as shipped from Praxion —
 unresolved `{{...}}` placeholder tokens are expected and tolerated. Resolving
@@ -29,7 +35,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE_DIR = PROJECT_ROOT / "claude" / "project-baseline" / "ci-autofix"
 CALLER_TEMPLATE_FILE = TEMPLATE_DIR / "ci-autofix.yml.tmpl"
 POLICY_TEMPLATE_FILE = TEMPLATE_DIR / "autofix-policy.yml.tmpl"
-CROSS_MODEL_REVIEW_STUB_FILE = TEMPLATE_DIR / "cross-model-review.yml.tmpl"
+CROSS_MODEL_REVIEW_TEMPLATE_FILE = TEMPLATE_DIR / "cross-model-review.yml.tmpl"
 
 SHA_PIN_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 MUSTACHE_TOKEN_PATTERN = re.compile(r"^\{\{[A-Z0-9_]+\}\}$")
@@ -91,7 +97,7 @@ def _mentions_near(raw: str, term_a: str, term_b: str, window: int = 200) -> boo
 
 
 def test_template_package_directory_contains_all_three_files() -> None:
-    for path in (CALLER_TEMPLATE_FILE, POLICY_TEMPLATE_FILE, CROSS_MODEL_REVIEW_STUB_FILE):
+    for path in (CALLER_TEMPLATE_FILE, POLICY_TEMPLATE_FILE, CROSS_MODEL_REVIEW_TEMPLATE_FILE):
         assert path.exists(), (
             f"{path} not found. The implementer must create the ci-autofix "
             "template package under claude/project-baseline/ci-autofix/."
@@ -274,36 +280,142 @@ def test_policy_template_documents_plugin_dir_as_optional_with_no_default() -> N
     )
 
 
+def test_policy_template_review_block_declares_all_three_gate_fields() -> None:
+    """The `review:` block is now consumed live by the built P2 hub — not a
+    documentary placeholder for a future phase. All three fields the hub
+    reads (`cross_model_gate`, `reviewer_family`, `on_unavailable`) must be
+    declared.
+    """
+    parsed = _parsed_with_placeholders_stubbed(POLICY_TEMPLATE_FILE)
+    review = parsed["review"]
+    for field in ("cross_model_gate", "reviewer_family", "on_unavailable"):
+        assert field in review, (
+            f"policy.review.{field} must be declared — the built cross-model "
+            "review hub reads this field live, it is no longer a P2-deferred "
+            "placeholder"
+        )
+
+
+def test_policy_template_documents_fail_closed_as_reserved_near_on_unavailable() -> None:
+    parsed = _parsed_with_placeholders_stubbed(POLICY_TEMPLATE_FILE)
+    assert parsed["review"].get("on_unavailable") == "fail-open", (
+        "policy.review.on_unavailable must default to 'fail-open' — the only "
+        "value the hub implements"
+    )
+    raw = _raw_text(POLICY_TEMPLATE_FILE)
+    assert _mentions_near(raw, "on_unavailable", "fail-closed"), (
+        "The template must document, near on_unavailable, that 'fail-closed' "
+        "is a reserved-but-not-implemented value — not merely omit it"
+    )
+
+
 # ---------------------------------------------------------------------------
-# P2 placeholder stub: claude/project-baseline/ci-autofix/cross-model-review.yml.tmpl
+# Cross-model-review caller template:
+# claude/project-baseline/ci-autofix/cross-model-review.yml.tmpl
 # ---------------------------------------------------------------------------
 
 
-def test_cross_model_review_stub_is_recognizable_as_a_deferred_placeholder() -> None:
-    raw = _raw_text(CROSS_MODEL_REVIEW_STUB_FILE)
-    assert re.search(r"\bP2\b", raw), (
-        "The cross-model-review stub must be recognizably marked as a "
-        "deferred, not-yet-built phase, not a completed gate"
-    )
-    assert re.search(r"TODO|placeholder|stub|not (yet )?implemented", raw, re.IGNORECASE), (
-        "The stub must carry an explicit not-yet-implemented marker so a "
-        "reader (or a future onboarding pass) never mistakes it for the real gate"
+def test_cross_model_review_template_is_realized_not_a_placeholder_stub() -> None:
+    parsed = _parsed_with_placeholders_stubbed(CROSS_MODEL_REVIEW_TEMPLATE_FILE)
+    assert isinstance(parsed, dict), (
+        f"{CROSS_MODEL_REVIEW_TEMPLATE_FILE} must parse to a working YAML "
+        "caller (once its {{TOKEN}} placeholders are stubbed) — it is still "
+        "the commented-out P2 placeholder. The implementer must realize it "
+        "into a real caller workflow, the peer of ci-autofix.yml.tmpl."
     )
 
 
-def test_cross_model_review_stub_never_invokes_a_real_cursor_gate() -> None:
-    raw = _raw_text(CROSS_MODEL_REVIEW_STUB_FILE)
-    assert "CURSOR_API_KEY" not in raw, (
-        "The stub must not reference CURSOR_API_KEY — that wiring is "
-        "deferred, not implemented in this phase"
+def test_cross_model_review_template_triggers_on_pull_request_never_pull_request_target() -> None:
+    parsed = _parsed_with_placeholders_stubbed(CROSS_MODEL_REVIEW_TEMPLATE_FILE)
+    on_block = _on_block(parsed)
+    assert "pull_request" in on_block, (
+        "Cross-model-review caller template must trigger on `pull_request` — "
+        "the ordinary event, never the privileged fork-context variant"
     )
-    assert "cursor-agent" not in raw, (
-        "The stub must not shell out to a Cursor CLI/agent — this phase "
-        "ships shape/comment-only scaffolding, not the working gate"
+    types = (on_block["pull_request"] or {}).get("types")
+    assert types == ["opened", "synchronize", "reopened"], (
+        "on.pull_request.types must be exactly ['opened', 'synchronize', "
+        f"'reopened'] so the gate re-fires on every push to an open fix PR — got {types!r}"
     )
-    assert (
-        "cursor agent" not in raw.lower()
-    ), "The stub must not describe invoking a Cursor agent as an active step"
+    raw = _raw_text(CROSS_MODEL_REVIEW_TEMPLATE_FILE)
+    assert "pull_request_target" not in raw, (
+        "Cross-model-review caller template must never use "
+        "`pull_request_target` — fork PRs must get a read-only token with no "
+        "secret access"
+    )
+
+
+def test_cross_model_review_template_uses_references_the_review_hub_pinned_by_sha_or_placeholder() -> (
+    None
+):
+    raw = _raw_text(CROSS_MODEL_REVIEW_TEMPLATE_FILE)
+    match = re.search(
+        r"uses:\s*(?P<owner_repo>\S+?)/\.github/workflows/reusable-cross-model-review\.yml@(?P<ref>\S+)",
+        raw,
+    )
+    assert match, (
+        "Cross-model-review caller template must reference the review hub "
+        "via `uses: <owner/repo>/.github/workflows/reusable-cross-model-review.yml@<ref>`"
+    )
+    owner_repo = match.group("owner_repo")
+    assert owner_repo in ("{{PRAXION_HUB}}", "francisco-perez-sorrosal/praxion"), (
+        "Expected the review hub's owner/repo to be the documented "
+        "{{PRAXION_HUB}} placeholder or the literal "
+        f"francisco-perez-sorrosal/praxion, got {owner_repo!r}"
+    )
+    ref = match.group("ref")
+    is_full_sha = bool(SHA_PIN_PATTERN.match(ref))
+    is_placeholder = bool(MUSTACHE_TOKEN_PATTERN.match(ref))
+    assert is_full_sha or is_placeholder, (
+        "The review hub reference must be pinned by a full 40-hex commit SHA "
+        f"or a documented {{TOKEN}} placeholder — got {ref!r} (never a "
+        "mutable tag or branch)"
+    )
+
+
+def test_cross_model_review_template_denies_permissions_by_default_at_workflow_level() -> None:
+    parsed = _parsed_with_placeholders_stubbed(CROSS_MODEL_REVIEW_TEMPLATE_FILE)
+    assert parsed.get("permissions") == {}, (
+        "Top-level `permissions:` must be the empty mapping (deny-by-default); "
+        "only the job below should raise the ceiling explicitly"
+    )
+
+
+def test_cross_model_review_template_job_carries_the_inverted_privilege_pair_only() -> None:
+    parsed = _parsed_with_placeholders_stubbed(CROSS_MODEL_REVIEW_TEMPLATE_FILE)
+    job = next(iter(parsed["jobs"].values()))
+    permissions = job.get("permissions") or {}
+    assert permissions == {"pull-requests": "write", "contents": "read"}, (
+        "Cross-model-review caller template's job permissions must be "
+        "EXACTLY `pull-requests: write` + `contents: read` — the reviewer's "
+        "inverted privilege profile, never the fixer's `{contents: write, "
+        f"actions: read, id-token: write}}` set — got {permissions!r}"
+    )
+
+
+def test_cross_model_review_template_passes_cursor_api_key_by_explicit_mapping() -> None:
+    parsed = _parsed_with_placeholders_stubbed(CROSS_MODEL_REVIEW_TEMPLATE_FILE)
+    job = next(iter(parsed["jobs"].values()))
+    secrets_block = job.get("secrets") or {}
+    assert "CURSOR_API_KEY" in secrets_block, (
+        "Cross-model-review caller template's job must map CURSOR_API_KEY "
+        "explicitly to the caller repo's own secret store — never "
+        "`secrets: inherit`"
+    )
+    assert "secrets.CURSOR_API_KEY" in str(secrets_block["CURSOR_API_KEY"]), (
+        "The mapped value must reference the caller's own "
+        "`secrets.CURSOR_API_KEY`, not a different secret name"
+    )
+
+
+def test_cross_model_review_templates_with_block_points_at_the_policy_path() -> None:
+    parsed = _parsed_with_placeholders_stubbed(CROSS_MODEL_REVIEW_TEMPLATE_FILE)
+    job = next(iter(parsed["jobs"].values()))
+    with_block = job.get("with") or {}
+    assert with_block.get("policy_path") == ".github/autofix-policy.yml", (
+        "Cross-model-review caller template's job must pass "
+        "`with.policy_path: .github/autofix-policy.yml` to the review hub"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -312,7 +424,7 @@ def test_cross_model_review_stub_never_invokes_a_real_cursor_gate() -> None:
 
 
 def test_no_template_in_the_package_ever_uses_secrets_inherit() -> None:
-    for path in (CALLER_TEMPLATE_FILE, POLICY_TEMPLATE_FILE, CROSS_MODEL_REVIEW_STUB_FILE):
+    for path in (CALLER_TEMPLATE_FILE, POLICY_TEMPLATE_FILE, CROSS_MODEL_REVIEW_TEMPLATE_FILE):
         raw = _raw_text(path)
         assert "secrets: inherit" not in raw, (
             "`secrets: inherit` must never appear anywhere in the ci-autofix "

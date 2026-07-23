@@ -1,7 +1,7 @@
 ---
-id: dec-draft-d17c1b09
+id: dec-273
 title: Distribute CI autofix machinery via hub reusable workflows + SHA-pinned per-repo callers + autofix-policy.yml
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-22
 summary: Praxion distributes the self-healing CI/PR autofix machinery as hub reusable workflows (workflow_call) in the public Praxion repo, invoked by thin SHA-pinned per-repo caller templates that pass secrets by explicit mapping (never inherit) and are tuned by a per-repo autofix-policy.yml — chosen over fully-copied templates refreshed via the dec-271 manifest and over a GitHub App, because centralizing security-critical injection/sanitization logic in one audited hub with deliberate blast-radius-controlled per-repo upgrades beats N-copy logic duplication for a privileged surface.
@@ -25,7 +25,7 @@ dissent: "SHA-pinned callers make every hub security fix a manual, per-repo pin-
 ## Context
 
 Praxion ships a first-iteration CI autofixer — `.github/workflows/ci-autofix.yml` (P0, ADR
-`dec-draft-85e6d0dc`): a `workflow_run`-triggered, SHA-pinned Claude agent that diagnoses from
+`dec-272`): a `workflow_run`-triggered, SHA-pinned Claude agent that diagnoses from
 sanitized failure logs read **as data**, opens a `ci-autofix/` fix PR (never pushes to `main`),
 and carries layered loop prevention, a daily budget cap, and a sensitive-path tripwire. That
 workflow lives only in the Praxion repo. The self-healing-loop brief (§4.1, §9 seed 2) requires
@@ -140,7 +140,7 @@ P2 reviewer job gets **no `contents: write`**; the gate fails open; no AI author
   their blast radius is bounded; Praxion is caller #1 and validates the cross-org secrets path on
   itself; the design forward-links cleanly to P2 (`reusable-cross-model-review.yml` + its caller)
   and P3 (policy `surfaces.pr_checks`/`dependabot`/`fork_prs`) without rework; it builds directly
-  on `dec-draft-85e6d0dc` (the P0 shipped workflow) — that ADR's Consequences already named this
+  on `dec-272` (the P0 shipped workflow) — that ADR's Consequences already named this
   fixer "caller #1 of the hub."
 - **Negative / cost:** fleet upgrade discipline is now a human responsibility (mitigated by
   Praxion-dogfoods-first + a documented pin-bump path; measurable at P6); a one-time
@@ -174,7 +174,7 @@ P2 reviewer job gets **no `contents: write`**; the gate fails open; no AI author
 
 ## Prior Decision
 
-Builds directly on `dec-draft-85e6d0dc` (P0 shipped `ci-autofix.yml`). This ADR does **not**
+Builds directly on `dec-272` (P0 shipped `ci-autofix.yml`). This ADR does **not**
 supersede or re-affirm it — it **generalizes** the shipped workflow into the hub the P0 ADR's
 Consequences already anticipated ("this fixer is caller #1 of the hub `reusable-ci-autofix.yml`
 (P1)"). The P0 design and all its invariants are preserved unchanged inside the reusable workflow.

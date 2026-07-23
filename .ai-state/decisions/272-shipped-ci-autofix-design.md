@@ -1,5 +1,5 @@
 ---
-id: dec-draft-85e6d0dc
+id: dec-272
 title: workflow_run-triggered Claude autofixer opens fix PRs, never pushes to main
 status: accepted
 category: architectural

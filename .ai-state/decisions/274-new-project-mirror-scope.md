@@ -1,7 +1,7 @@
 ---
-id: dec-draft-1e54360e
+id: dec-274
 title: AC7 "/new-project mirrors the install" satisfied by existing defer pattern, no new-project.md code change
-status: proposed
+status: accepted
 category: implementation
 date: 2026-07-22
 summary: The P1 ci-autofix onboarding install (caller + policy templates) lands only in /onboard-project Phase 8e; /new-project needs no duplicate logic because its existing generic exit-handoff already defers all Phase 8e-style baseline installs (dependabot, pre-commit, CONTRIBUTING) to a subsequent /onboard-project run.
@@ -72,4 +72,4 @@ required, since the enumeration is already deliberately partial today.
 ## Prior Decision
 
 None — this is a scoping clarification made during P1 step decomposition, not a
-supersession of `dec-draft-d17c1b09`.
+supersession of `dec-273`.

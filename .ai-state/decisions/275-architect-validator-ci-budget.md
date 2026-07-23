@@ -1,5 +1,5 @@
 ---
-id: dec-draft-0d0e21b7
+id: dec-275
 title: Align the architect-validator CI gate's allowlist + turn budget with its pre-merge protocol
 status: accepted
 category: configuration

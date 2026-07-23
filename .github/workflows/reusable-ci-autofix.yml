@@ -32,7 +32,7 @@
 #   - a `concurrency` group (per calling repo) serializes runs so two agents
 #     never race to open conflicting PRs.
 #
-# Fail-safe policy parsing (pre-mortem FM-2): a caller's `autofix-policy.yml`
+# Fail-safe policy parsing: a caller's `autofix-policy.yml`
 # may be absent (not yet created) or malformed (a typo, a bad merge). Neither
 # case may silently relax a safety control — the daily budget cap or the
 # sensitive-path tripwire. The "Read autofix policy" step bakes P0's own
@@ -117,7 +117,7 @@ jobs:
         id: policy
         # Self-contained: uv provisions PyYAML per-invocation so this step
         # works on any managed caller repo without relying on `yq` or
-        # pre-installed PyYAML. FM-2: every value below has a safe default
+        # pre-installed PyYAML. Every value below has a safe default
         # baked into this script itself — a missing or malformed
         # autofix-policy.yml degrades to P0-equivalent behavior, never to
         # "no limits".

@@ -19,7 +19,7 @@ audience: developer
 | Attribute | Value |
 |-----------|-------|
 | **System** | Praxion |
-| **Last verified against code** | 2026-07-16 — §3 Observability-log row (skill_activation event + verified reconciler consumers) and new Eval-ledger-producer row; 2026-07-01 — §3 Pipeline Dashboard row (renderer registry + Diátaxis shells + per-artifact renderers); test-topology M2 — §9 agent wiring verified 2026-05-19; other sections last verified 2026-05-12 |
+| **Last verified against code** | 2026-07-22 — §3 Self-Healing Loop — Installable Core row (P1 shipped: hub reusable workflow + caller #1 + project-baseline templates + onboarding sub-step 8e.8); 2026-07-16 — §3 Observability-log row (skill_activation event + verified reconciler consumers) and new Eval-ledger-producer row; 2026-07-01 — §3 Pipeline Dashboard row (renderer registry + Diátaxis shells + per-artifact renderers); test-topology M2 — §9 agent wiring verified 2026-05-19; other sections last verified 2026-05-12 |
 
 This document is the **developer-facing** navigation guide: every component, file path, and interface listed here exists on disk and resolves at the cited path. It is the code-verified subset of [`.ai-state/DESIGN.md`](../.ai-state/DESIGN.md), which is the design-target architect-facing document. Use this guide to navigate the codebase; consult the architect doc for system attributes (type, language, pattern), design rationale, planned components, and architectural evolution.
 

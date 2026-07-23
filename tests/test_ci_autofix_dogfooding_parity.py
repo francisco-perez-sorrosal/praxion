@@ -43,7 +43,7 @@ _RENDER_SUBSTITUTIONS = {
     "{{WATCHED_WORKFLOWS}}": '"Test", "Architecture"',
     "{{PRAXION_HUB}}": "francisco-perez-sorrosal/praxion",
     # The SHA's actual value is irrelevant to this suite: the whole `uses:`
-    # line is the one documented, tolerated divergence (A2). Any
+    # line is the one documented, tolerated divergence. Any
     # well-formed-looking 40-hex value keeps the rendered template parseable.
     "{{HUB_SHA}}": "a" * 40,
 }
@@ -110,7 +110,7 @@ def _job_sans_uses(job: dict) -> dict:
 
     `uses:` is the one documented, tolerated divergence between Praxion's
     caller (a local `uses: ./...` ref, tracking HEAD) and the rendered
-    template (a cross-repo SHA-pinned ref) — see the plan's A2 assumption.
+    template (a cross-repo SHA-pinned ref).
     Every other job-level key must match exactly for the two to be
     considered a faithful instance of one another.
     """
@@ -186,7 +186,7 @@ def test_installed_caller_job_matches_the_rendered_template_job_on_every_key_exc
 
 
 # ---------------------------------------------------------------------------
-# Named security-relevant dimensions (the intentional `uses:` divergence, A2)
+# Named security-relevant dimensions (the intentional `uses:` divergence)
 # ---------------------------------------------------------------------------
 
 
@@ -210,7 +210,7 @@ def test_installed_caller_and_template_invoke_the_same_reusable_workflow_file() 
 def test_installed_caller_pins_the_hub_via_a_local_ref_while_the_template_uses_a_cross_repo_pin() -> (
     None
 ):
-    """Documents the one intentional divergence (A2): Praxion's caller #1
+    """Documents the one intentional divergence: Praxion's caller #1
     tracks HEAD via a same-repo local ref; the shipped template ships the
     cross-repo SHA-pinned form every managed caller receives.
     """
@@ -257,7 +257,7 @@ def test_installed_caller_passes_the_oauth_secret_by_explicit_mapping_never_inhe
     assert "secrets: inherit" not in _raw_text(INSTALLED_CALLER_FILE), (
         "`secrets: inherit` must never appear in the installed caller — it "
         "silently no-ops cross-org auth, defeating the reason this caller "
-        "exercises an explicit mapping (A3) even though it happens to be "
+        "exercises an explicit mapping even though it happens to be "
         "same-repo"
     )
 

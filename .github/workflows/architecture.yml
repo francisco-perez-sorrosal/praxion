@@ -224,6 +224,15 @@ jobs:
             | xargs -r -I {} python3 scripts/aac_fence_validator.py {}
 
       - name: Architect-validator pre-merge sweep
+        # Fixed 2026-07-22 (dec-draft-0d0e21b7): the agent's documented pre-merge
+        # protocol runs `uv run lint-imports` and `python3 scripts/aac_fence_validator.py`
+        # and prefers the likec4 MCP (absent in CI). With those commands denied by a
+        # too-narrow allowlist, the agent burned all 15 turns on permission denials and
+        # failed CLOSED with no verdict (it flaked on main too, on doc-heavy PRs). The
+        # allowlist below now matches the protocol, the turn budget is raised, and the
+        # likec4 binary is disabled so the agent takes its documented no-likec4 fallback.
+        env:
+          AAC_FENCE_VALIDATOR_LIKEC4: disabled
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -248,5 +257,5 @@ jobs:
           claude_args: |
             --plugin-dir .
             --model opus
-            --max-turns 15
-            --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(find:*)"
+            --max-turns 30
+            --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(find:*),Bash(uv run lint-imports:*),Bash(python scripts/aac_fence_validator.py:*),Bash(python3 scripts/aac_fence_validator.py:*)"

@@ -14,7 +14,8 @@ Candidate ecosystem-defect reports awaiting `/report-praxion-issue`. This file i
 - reproduction_command: gh pr merge <pr> --merge  # then: git fetch origin && git ls-tree origin/main .ai-state/decisions/drafts/  # drafts still present
 - environment: Praxion self-host; finalize is a local git-hook chain (post-merge/commit/checkout); no GitHub Actions finalize workflow
 - regression_status: no
-- status: pending
+- status: filed
+- issue_url: https://github.com/francisco-perez-sorrosal/praxion/issues/45
 
 ```
 GitHub-UI merge to main bypasses the local post-merge finalize hook chain; draft ADRs land on main unfinalized until a later local git operation fires the chain. No server-side finalize workflow exists.

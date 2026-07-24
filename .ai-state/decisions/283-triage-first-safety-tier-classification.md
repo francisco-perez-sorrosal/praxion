@@ -1,7 +1,7 @@
 ---
-id: dec-draft-f96c42a4
+id: dec-283
 title: Triage-first, deny-by-default safety-tier classification for issue autofix
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-24
 summary: >-

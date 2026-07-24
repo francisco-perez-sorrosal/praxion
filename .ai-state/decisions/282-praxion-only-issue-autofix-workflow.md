@@ -1,7 +1,7 @@
 ---
-id: dec-draft-d8d47128
+id: dec-282
 title: Praxion-only issue-autofix workflow; reusable-hub extraction deferred
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-24
 summary: >-

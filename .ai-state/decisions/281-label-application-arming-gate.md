@@ -1,7 +1,7 @@
 ---
-id: dec-draft-a9869c66
+id: dec-281
 title: Label application (ecosystem-feedback) is the HITL arming gate for issue autofix
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-24
 summary: >-

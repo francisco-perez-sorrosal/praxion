@@ -1,0 +1,22 @@
+# Praxion gitleaks configuration.
+#
+# Extends the upstream default rule set — real-secret detection stays ON for the
+# entire repository — and adds ONE narrow allowlist: files whose PURPOSE is to
+# embed secret-shaped strings as fixtures.
+#
+# The healing sidecar's sanitizer must be proven to redact real-looking tokens
+# (stripe keys, slack `xox*-` tokens, etc.) BEFORE any captured error text lands
+# in the git-committed `.ai-state/praxion_feedback/PENDING.md`. Its redaction
+# test therefore contains fake-but-realistic tokens on purpose; scanning that
+# file yields only false positives. Weakening the fixtures to dodge the scanner
+# would couple the test to gitleaks' heuristics and blunt it. So we allowlist the
+# one all-fixtures-by-design file and leave every other path fully scanned.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Secret-redaction test fixtures intentionally contain secret-shaped strings"
+paths = [
+  '''scripts/praxion_feedback/tests/test_sanitizer\.py''',
+]

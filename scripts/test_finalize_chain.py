@@ -119,3 +119,97 @@ def test_all_three_finalizers_fire_on_main_with_drafts_and_manifest(tmp_path: Pa
     fired = _run_state_driven(on_main=True, drafts_present=True, repo_root=str(tmp_path))
 
     assert fired == ["finalize_adrs", "finalize_tech_debt_ledger", "build_doc_manifest"]
+
+
+def _run_on_main_real(
+    *,
+    repo_root: Path,
+    finalize_dir: Path,
+    strict: bool = False,
+) -> subprocess.CompletedProcess[str]:
+    """Source the chain and run `_finalize_chain_run_on_main` end-to-end.
+
+    Overrides ``FINALIZE_CHAIN_DIR`` to point at a fake finalizer directory so
+    the REAL (non-stubbed) `_finalize_chain_run_script` executes an actual
+    python script — this proves exit-code propagation rather than assuming it
+    from a stubbed return value.
+    """
+    strict_line = "export FINALIZE_CHAIN_STRICT=1" if strict else ""
+    snippet = f"""
+        source {CHAIN_PATH}
+        FINALIZE_CHAIN_DIR={str(finalize_dir)!r}
+        {strict_line}
+        _finalize_chain_run_on_main {str(repo_root)!r}
+    """
+    return subprocess.run(["bash", "-c", snippet], capture_output=True, text=True)
+
+
+def test_run_on_main_swallows_failing_finalizer_by_default(tmp_path: Path) -> None:
+    """Characterization: non-strict on-main composition always exits 0, even when
+    a finalizer fails. Pins the CURRENT hook semantics before the strict-mode
+    refactor — a failing finalizer warns but never aborts the (already-completed)
+    git operation.
+    """
+    finalize_dir = tmp_path / "scripts"
+    finalize_dir.mkdir()
+    (finalize_dir / "finalize_tech_debt_ledger.py").write_text("import sys\nsys.exit(1)\n")
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    result = _run_on_main_real(repo_root=repo_root, finalize_dir=finalize_dir)
+
+    assert result.returncode == 0
+    assert "warned (non-blocking)" in result.stdout
+
+
+def test_strict_mode_propagates_failing_finalizer_exit(tmp_path: Path) -> None:
+    """New behavior: FINALIZE_CHAIN_STRICT=1 makes a failing finalizer abort loudly
+    instead of warning-and-continuing — the server-side (CI) safety contract.
+    """
+    finalize_dir = tmp_path / "scripts"
+    finalize_dir.mkdir()
+    (finalize_dir / "finalize_tech_debt_ledger.py").write_text("import sys\nsys.exit(1)\n")
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    result = _run_on_main_real(repo_root=repo_root, finalize_dir=finalize_dir, strict=True)
+
+    assert result.returncode != 0
+
+
+def test_finalize_chain_run_on_main_runs_full_composition_in_order(tmp_path: Path) -> None:
+    """New public entry point: full composition fires in fixed order adr -> ledger -> manifest."""
+    ai_state = tmp_path / ".ai-state"
+    ai_state.mkdir()
+    (ai_state / "doc_manifest.yaml").write_text("generated_at: 2025-01-01\n")
+    drafts_dir = ai_state / "decisions" / "drafts"
+    drafts_dir.mkdir(parents=True)
+    (drafts_dir / "20260101-0000-fake.md").write_text("---\nid: dec-draft-aaaaaaaa\n---\n")
+
+    snippet = f"""
+        source {CHAIN_PATH}
+        _finalize_chain_run_script() {{ echo "RAN:$1"; }}
+        finalize_chain_run_on_main {str(tmp_path)!r}
+    """
+    result = subprocess.run(["bash", "-c", snippet], capture_output=True, text=True, check=True)
+    fired = [
+        line.split(":", 1)[1] for line in result.stdout.splitlines() if line.startswith("RAN:")
+    ]
+
+    assert fired == ["finalize_adrs", "finalize_tech_debt_ledger", "build_doc_manifest"]
+
+
+def test_finalize_chain_run_on_main_resolves_repo_root_when_omitted(tmp_path: Path) -> None:
+    """When called with no argument, repo_root is resolved via `_finalize_chain_repo_root`."""
+    snippet = f"""
+        source {CHAIN_PATH}
+        _finalize_chain_run_script() {{ echo "RAN:$1"; }}
+        _finalize_chain_repo_root() {{ echo {str(tmp_path)!r}; }}
+        finalize_chain_run_on_main
+    """
+    result = subprocess.run(["bash", "-c", snippet], capture_output=True, text=True, check=True)
+    fired = [
+        line.split(":", 1)[1] for line in result.stdout.splitlines() if line.startswith("RAN:")
+    ]
+
+    assert fired == ["finalize_tech_debt_ledger"]

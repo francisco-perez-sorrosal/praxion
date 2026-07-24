@@ -271,10 +271,21 @@ jobs:
           fi
 
           # Resolve the reviewer model at RUN TIME from the live catalogue —
-          # never a hardcoded id (Cursor model ids churn). Pick the first model
-          # whose family prefix matches reviewer_family and is not the fixer
-          # family.
-          models_raw="$(agent --list-models 2>/dev/null)"
+          # never a hardcoded id (Cursor model ids churn). `--list-models`
+          # REQUIRES auth (it is not an auth-free catalog), so pass the key
+          # explicitly with --api-key — the CURSOR_API_KEY env var alone did NOT
+          # authenticate the CLI in CI (live-verified); the env var is kept too,
+          # belt-and-suspenders. Pick the first model whose family prefix matches
+          # reviewer_family and is not the fixer family.
+          agent --list-models --api-key "$CURSOR_API_KEY" > tmp/list-models.out 2> tmp/list-models.err
+          list_rc=$?
+          models_raw="$(cat tmp/list-models.out 2>/dev/null)"
+          if [ "${list_rc}" -ne 0 ] || [ -z "${models_raw}" ]; then
+            # Debuggability: surface the real Cursor stderr BEFORE fail-opening
+            # so a future failure shows the true error instead of hiding it.
+            echo "::warning::cross-model-review: 'agent --list-models' failed (exit ${list_rc}) — Cursor stderr follows:"
+            cat tmp/list-models.err 2>/dev/null || true
+          fi
           cat > tmp/resolve_model.py <<'PY'
           import re
           import sys
@@ -378,10 +389,22 @@ jobs:
           # security boundary is this job's token scope, not a CLI flag — any
           # local edit is inert without contents:write or a git step. Cost is
           # bounded by this step's timeout-minutes and the job timeout.
-          agent -p "$REVIEW_PROMPT" --output-format json --model "$RESOLVED_MODEL" \
+          # --api-key is passed explicitly (the env var alone did NOT
+          # authenticate the CLI in CI — live-verified; the CLI's own error
+          # message recommends the flag). The env var is kept too.
+          agent -p "$REVIEW_PROMPT" --output-format json \
+            --model "$RESOLVED_MODEL" --api-key "$CURSOR_API_KEY" \
             > tmp/review-raw.json 2> tmp/review-err.log
           rc=$?
-          echo "[cross-model-review] cursor exit=${rc} ($(wc -c < tmp/review-raw.json 2>/dev/null || echo 0) bytes)"
+          bytes=$(wc -c < tmp/review-raw.json 2>/dev/null || echo 0)
+          echo "[cross-model-review] cursor exit=${rc} (${bytes} bytes)"
+          # Debuggability: on any non-zero exit OR empty output, surface the real
+          # Cursor stderr BEFORE the fail-open owner labels this `unavailable`,
+          # so a future failure shows the true error instead of hiding it.
+          if [ "${rc}" -ne 0 ] || [ ! -s tmp/review-raw.json ]; then
+            echo "::warning::cross-model-review: 'agent -p' failed (exit ${rc}, ${bytes} bytes) — Cursor stderr follows:"
+            cat tmp/review-err.log 2>/dev/null || true
+          fi
           exit 0
 
       - name: Parse verdict and act (fail-open owner)
@@ -423,36 +446,50 @@ jobs:
               "message", "answer", "stdout", "data",
           )
 
-          def unwrap(node, depth=0):
-              """Walk Cursor's envelope toward the agent's answer, tolerantly."""
+          def loads_lenient(s):
+              """Parse a string that should contain exactly one JSON object,
+              tolerating markdown ``` fences and surrounding prose by brace-
+              scanning from the first '{' to the last '}'."""
+              s = s.strip()
+              if s.startswith("```"):
+                  s = s.split("\n", 1)[-1]
+                  fence = s.rfind("```")
+                  if fence != -1:
+                      s = s[:fence]
+              start, end = s.find("{"), s.rfind("}")
+              if start != -1 and end > start:
+                  return json.loads(s[start:end + 1])
+              raise ValueError("no JSON object found in string")
+
+          def find_verdict_obj(node, depth=0):
+              """Fallback tolerance for churned/other envelope shapes: walk dicts
+              (by candidate answer keys), lists (stream-json), and strings
+              (fenced JSON) until a dict carrying `verdict` is found."""
               if depth > 6:
-                  return node
+                  raise ValueError("verdict object not found")
               if isinstance(node, dict):
                   if "verdict" in node:
                       return node
                   for key in ANSWER_KEYS:
                       if key in node:
-                          return unwrap(node[key], depth + 1)
-                  return node
+                          child = node[key]
+                          try:
+                              if isinstance(child, str):
+                                  return loads_lenient(child)
+                              return find_verdict_obj(child, depth + 1)
+                          except (ValueError, json.JSONDecodeError):
+                              continue
+                  raise ValueError("verdict object not found")
               if isinstance(node, list):
                   for item in reversed(node):
-                      got = unwrap(item, depth + 1)
-                      if isinstance(got, dict) and "verdict" in got:
-                          return got
-                      if isinstance(got, str) and "verdict" in got:
-                          return got
-                  return node
-              return node
-
-          def as_obj(answer):
-              if isinstance(answer, dict):
-                  return answer
-              if isinstance(answer, str):
-                  s = answer.strip()
-                  start, end = s.find("{"), s.rfind("}")
-                  if start != -1 and end > start:
-                      return json.loads(s[start:end + 1])
-              raise ValueError("no JSON verdict object found")
+                      try:
+                          return find_verdict_obj(item, depth + 1)
+                      except (ValueError, json.JSONDecodeError):
+                          continue
+                  raise ValueError("verdict object not found")
+              if isinstance(node, str):
+                  return loads_lenient(node)
+              raise ValueError("verdict object not found")
 
           def write(verdict, findings):
               pathlib.Path("tmp/verdict.txt").write_text(verdict + "\n", encoding="utf-8")
@@ -483,24 +520,42 @@ jobs:
               text = raw_path.read_text(encoding="utf-8")
               if not text.strip():
                   raise ValueError("empty reviewer output")
+
               try:
-                  top = json.loads(text)
+                  envelope = json.loads(text)
               except json.JSONDecodeError:
-                  top = None
-                  for line in reversed(text.splitlines()):
-                      line = line.strip()
-                      if line.startswith("{") and line.endswith("}"):
-                          try:
-                              top = json.loads(line)
-                              break
-                          except json.JSONDecodeError:
-                              continue
-                  if top is None:
-                      top = text
-              answer = top if isinstance(top, str) else unwrap(top)
-              obj = as_obj(answer)
-              if isinstance(obj, dict) and "verdict" not in obj:
-                  obj = as_obj(unwrap(obj))
+                  envelope = None
+
+              obj = None
+              # PRIMARY PATH — Cursor's confirmed `--output-format json` envelope:
+              #   {"type":"result","is_error":<bool>,"result":"<agent answer str>", ...}
+              # The agent's answer is the `.result` STRING; per the review prompt
+              # it contains the stringified {"verdict":..., "findings":[...]}.
+              if isinstance(envelope, dict):
+                  if envelope.get("is_error") is True:
+                      raise ValueError("Cursor reported is_error=true")
+                  if isinstance(envelope.get("result"), str):
+                      obj = loads_lenient(envelope["result"])
+
+              # FALLBACKS — other/churned shapes (already-unwrapped object, nested
+              # answer keys, stream-json lines, fenced raw text).
+              if obj is None:
+                  if envelope is not None:
+                      obj = find_verdict_obj(envelope)
+                  else:
+                      for line in reversed(text.splitlines()):
+                          line = line.strip()
+                          if line.startswith("{") and line.endswith("}"):
+                              try:
+                                  obj = find_verdict_obj(json.loads(line))
+                                  break
+                              except (ValueError, json.JSONDecodeError):
+                                  continue
+                      if obj is None:
+                          obj = loads_lenient(text)
+
+              if not isinstance(obj, dict):
+                  raise ValueError("verdict payload is not an object")
               verdict = str(obj.get("verdict", "")).strip().lower()
               findings = obj.get("findings") or []
               if not isinstance(findings, list):

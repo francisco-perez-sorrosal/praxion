@@ -1,0 +1,104 @@
+# Finalize ADRs — server-side backstop for web-UI (server-side) merges.
+#
+# A GitHub web-UI merge runs server-side, where the client-side finalize git
+# hooks cannot fire (issue #45): draft ADRs land on `main` un-promoted, the
+# decisions index is un-regenerated, cross-references dangle, and the ledger /
+# doc-manifest reconciliation is skipped until the maintainer's next LOCAL git
+# op. This workflow is the symmetric backstop: on every push to `main` it
+# reruns the SAME on-main finalize composition the hooks run, sourced from the
+# single shared library so the two callers can never drift.
+#
+# SECURITY ENVELOPE (this file establishes exactly these controls):
+#   - Trigger is `push` to `main` only — never a PR-context event that would
+#     run untrusted code with write credentials.
+#   - `permissions: {}` at the workflow floor; the single `finalize` job
+#     re-grants ONLY `contents: write` (the commit-back push).
+#   - Every `uses:` is pinned to a full 40-hex commit SHA with a `# vX.Y.Z`
+#     comment (dec-024) — never a mutable tag a hijack could repoint.
+#   - Deterministic governance automation: NO agent/LLM step. The finalize
+#     scripts already encode every judgment call (frontmatter validation,
+#     collision handling, ordering), so no model is in the loop.
+#   - Anti-recursion is STRUCTURAL: a push authenticated with the default
+#     `GITHUB_TOKEN` does not re-trigger a `push` workflow, so the loop
+#     terminates naturally with no commit-message CI-skip hack.
+#   - `concurrency` (no cancel) serializes two rapid pushes; the queued run
+#     re-scans idempotently.
+#
+# FAIL-LOUD: `FINALIZE_CHAIN_STRICT=1` makes a finalizer's non-zero exit fail
+# the job BEFORE the commit-back step, so a broken finalize can never land a
+# partial/corrupt commit on `main`.
+
+name: Finalize ADRs
+
+on:
+  push:
+    branches: [main]
+
+# Least-privilege floor; the job below re-grants only `contents: write`.
+permissions: {}
+
+concurrency:
+  # Serialize pushes to the same ref so two rapid web-UI merges never race the
+  # commit-back. Never cancel: a mid-push run must finish; the queued run
+  # re-scans idempotently (nothing to promote -> clean porcelain -> no push).
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write   # the ONLY write grant — the commit-back push to `main`
+    steps:
+      - name: Checkout main (shallow)
+        # Shallow is sufficient: NNN assignment scans the checked-out working
+        # tree, not git log, and the commit-back is a single commit appended
+        # onto the just-checked-out `main` tip.
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c  # v6.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install PyYAML into the finalize interpreter
+        # Install via `python3 -m pip` so PyYAML lands in the SAME interpreter
+        # the finalize chain's bare `python3` resolves to (the doc-manifest
+        # finalizer needs it; the others are stdlib). The verification line
+        # proves the import resolves in that interpreter, not a separate venv.
+        run: |
+          python3 -m pip install pyyaml
+          python3 -c "import yaml; print(yaml.__version__)"
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Run the on-main finalize composition (fail-loud)
+        # Source the shared library and call its single public entry point — the
+        # composition (which finalizers, order, per-finalizer gate) is owned
+        # exclusively by scripts/finalize_chain.sh, never re-listed here.
+        # STRICT mode propagates any finalizer's non-zero exit, so the default
+        # shell's `set -e` fails the job before the commit-back step runs.
+        run: |
+          source scripts/finalize_chain.sh
+          FINALIZE_CHAIN_STRICT=1 finalize_chain_run_on_main "$GITHUB_WORKSPACE"
+
+      - name: Commit and push the finalize promotion
+        # Gated on `git status --porcelain`: commit + push ONLY when finalize
+        # changed tracked files. An idle run (no drafts, idle ledger, unchanged
+        # manifest) makes no commit and no push — no empty-commit churn on
+        # `main`. The push uses the checkout-provided GITHUB_TOKEN (structurally
+        # loop-proof) and carries no AI-authorship trailer.
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "chore(state): finalize draft ADRs on main (web-UI merge backstop)"
+            git push
+          else
+            echo "Finalize produced no tracked-file changes; nothing to commit."
+          fi

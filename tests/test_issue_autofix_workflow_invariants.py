@@ -835,3 +835,20 @@ def test_prompt_forbids_ai_authorship_commit_lines() -> None:
         "The prompt must explicitly forbid AI-authorship commit lines, not "
         "merely mention them descriptively"
     )
+
+
+# ---------------------------------------------------------------------------
+# gh's embedded jq does not support --arg (runtime-semantics guard)
+# ---------------------------------------------------------------------------
+
+
+def test_gh_jq_calls_do_not_use_the_unsupported_arg_flag() -> None:
+    # `gh ... --jq`/`-q` runs a built-in jq that, unlike the standalone `jq`
+    # CLI, does NOT accept `--arg name value` to bind a variable. Passing it
+    # makes `gh` treat the flag + value + expression as unknown positional
+    # arguments and exit 1 at runtime — invisible to YAML-structure checks.
+    # Interpolate shell values into the jq string instead.
+    raw = _raw_text()
+    unsupported = "does not support jq's `--arg`; interpolate the shell value into the jq string"
+    assert "--jq --arg" not in raw, f"`gh --jq {unsupported}"
+    assert "-q --arg" not in raw, f"`gh -q {unsupported}"

@@ -135,8 +135,7 @@ jobs:
           has_terminal_label=$(gh issue view "${ISSUE_NUMBER}" --json labels \
             --jq '[.labels[].name] | any(. == "triage:invalid" or . == "duplicate" or . == "needs-adr")')
           open_fix_pr=$(gh pr list --state open --json headRefName \
-            --jq --arg n "${ISSUE_NUMBER}" \
-            '[.[] | select(.headRefName | startswith("issue-autofix/" + $n + "-"))] | length')
+            --jq "[.[] | select(.headRefName | startswith(\"issue-autofix/${ISSUE_NUMBER}-\"))] | length")
           if [ "${has_terminal_label}" = "true" ]; then
             echo "::notice::Issue #${ISSUE_NUMBER} already carries a terminal triage label (triage:invalid/duplicate/needs-adr); skipping (idempotent no-op)."
             echo "proceed=false" >> "$GITHUB_OUTPUT"
@@ -216,8 +215,7 @@ jobs:
           )
 
           match=$(gh issue list --search "${fingerprint}" --state all --json number \
-            --jq --arg n "${ISSUE_NUMBER}" \
-            '[.[] | select((.number | tostring) != $n)] | .[0].number // empty')
+            --jq "[.[] | select((.number | tostring) != \"${ISSUE_NUMBER}\")] | .[0].number // empty")
 
           if [ -n "${match}" ]; then
             gh issue edit "${ISSUE_NUMBER}" --add-label "duplicate" \
@@ -413,8 +411,7 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
           pr=$(gh pr list --state open --json number,headRefName \
-            --jq --arg n "${ISSUE_NUMBER}" \
-            '[.[] | select(.headRefName == ("issue-autofix/" + $n + "-autofix"))][0].number // empty' \
+            --jq "[.[] | select(.headRefName == \"issue-autofix/${ISSUE_NUMBER}-autofix\")][0].number // empty" \
             2>/dev/null) \
             || { echo "::warning::Could not list PRs for issue #${ISSUE_NUMBER}; skipping sensitive-path check"; exit 0; }
           if [ -z "${pr}" ]; then

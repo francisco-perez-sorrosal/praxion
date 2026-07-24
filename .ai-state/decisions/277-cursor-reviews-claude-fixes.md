@@ -1,7 +1,7 @@
 ---
-id: dec-draft-d9c4bdb9
+id: dec-277
 title: Claude fixes / Cursor reviews — a foreign-model, non-generative review gate on every agent-authored fix PR
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-22
 summary: The self-healing loop's second model family (Cursor-brokered, non-Anthropic) reviews every Claude-authored fix PR as an independent, NON-GENERATIVE gate — it emits a JSON verdict {approve|request-changes, findings[]}, marks the PR draft on request-changes, and never counter-fixes. Supersedes v1's Cursor-first-failover hypothesis (never itself an ADR), because self-preference bias is causal and stronger in larger models, and a non-generative gate captures the cross-model-diversity benefit without the popularity-trap cost of reconciling two fixers' output.
@@ -86,7 +86,7 @@ independent, non-generative gate.** Concretely, the P2 hub `reusable-cross-model
    managed project adopts the gate (dogfood first).
 
 Fail-open behavior on reviewer error/timeout/malformed output is the companion decision
-`dec-draft-d140854d` (this ADR presumes it).
+`dec-276` (this ADR presumes it).
 
 ## Considered Options
 
@@ -127,7 +127,7 @@ Fail-open behavior on reviewer error/timeout/malformed output is the companion d
   builds directly on `dec-272` (whose Consequences already named "a non-Anthropic model
   reviews") and `dec-273` (the hub+caller distribution shape) without rework.
 - **Negative / cost:** a second vendor's key in every adopting repo; a foreign-model dependency and
-  its JSON-parse brittleness (mitigated by fail-open, `dec-draft-d140854d`); the review-prompt step
+  its JSON-parse brittleness (mitigated by fail-open, `dec-276`); the review-prompt step
   is the highest-risk element (a defect-focused, gate-only JSON verdict must be elicited from a
   foreign model) — flagged `tier: H` for the implementation planner; unproven catch-rate until P6.
 - **Activation:** honest-uncertainty gate fired (catch-rate unproven; two-vendor complexity vs

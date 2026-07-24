@@ -1,7 +1,7 @@
 ---
-id: dec-draft-ebf8352b
+id: dec-279
 title: HITL-gated healing sidecar — no unattended cross-repo issue filing in v1
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-23
 summary: The managed-project→Praxion healing sidecar files ecosystem-defect issues only through an explicit human-in-the-loop gate riding the operator's own `gh` auth in v1 — no unattended cross-repo filing, no PAT, no GitHub App — because the outward-facing, hard-to-retract action of opening an issue on a foreign repo demands deliberate human authority (dec-014's stance) and because the false-positive rate of auto-captured candidates is unmeasured; the reversal trigger is a sustained low false-positive rate in the PENDING.md candidate stream, which then justifies auto-filing a whitelisted category subset via a minimal-permission GitHub App (never a wide PAT).
@@ -18,6 +18,8 @@ affected_files:
   - commands/onboard-project.md
 affected_reqs: [REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-06, REQ-07, REQ-08]
 dissent: "If capture precision is high, an Issues:Write-only GitHub App filing whitelisted mechanical categories (hooks/scripts) would close the healing loop faster and avoid a candidate backlog that never gets filed — the dec-014 'user must remember' failure mode. We hold HITL-only because that precision is unmeasured today; auto-filing on an unproven rate risks spamming the upstream tracker with false ecosystem-defect reports, an asymmetric downside a human dismissal cheaply avoids."
+re_affirmed_by:
+  - dec-280
 ---
 
 ## Context

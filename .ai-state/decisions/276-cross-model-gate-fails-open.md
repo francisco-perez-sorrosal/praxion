@@ -1,7 +1,7 @@
 ---
-id: dec-draft-d140854d
+id: dec-276
 title: The cross-model review gate fails open — reviewer unavailability never blocks a fix
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-22
 summary: Any Cursor error, timeout, malformed/unparseable output, or no-model-of-family condition degrades the cross-model review gate to "review unavailable" — the workflow labels the PR cross-model-review:unavailable, comments once, and exits 0. The gate never blocks a fix; the human merge gate is the backstop. A distinct cross-model-review:misconfigured outcome (reviewer_family == fixer family) also exits 0 but stays loud so operators fix the config rather than silently losing cross-model coverage.
@@ -19,7 +19,7 @@ dissent: "Fail-open means a defect the gate would have caught can merge whenever
 
 ## Context
 
-The P2 cross-model review gate (`dec-draft-d9c4bdb9`) inserts a second vendor, Cursor, into the
+The P2 cross-model review gate (`dec-277`) inserts a second vendor, Cursor, into the
 self-healing loop's PR path. That vendor's reliability is only partly knowable in advance
 (`RESEARCH_CURSOR.md`):
 
@@ -52,7 +52,7 @@ job `timeout-minutes` (there is no native turn cap to rely on).
 
 **One outcome is carved out as distinct-but-still-fail-open:** if `review.reviewer_family` resolves
 to the fixer's own family (`claude`), the review would be same-family and worthless
-(`dec-draft-d9c4bdb9`). This is an operator *misconfiguration*, not a runtime unavailability, so it
+(`dec-277`). This is an operator *misconfiguration*, not a runtime unavailability, so it
 gets its own loud label `cross-model-review:misconfigured` and a comment naming the exact conflict —
 but it **still exits 0**, because a config error must not become the one thing that blocks a fix
 either. The distinct label ensures the operator *sees and fixes* it rather than silently receiving

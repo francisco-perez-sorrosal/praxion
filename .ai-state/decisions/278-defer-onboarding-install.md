@@ -1,7 +1,7 @@
 ---
-id: dec-draft-ba138363
+id: dec-278
 title: P2 build scope excludes onboard-project.md/new-project.md install wiring — fleet rollout deferred to a follow-on pass
-status: proposed
+status: accepted
 category: implementation
 date: 2026-07-23
 summary: The P2 cross-model review gate implementation pass builds the hub, Praxion's own caller (dogfood), the realized caller template, and the annotated policy template — but does NOT wire `/onboard-project` or `/new-project` to install the review caller for managed (fleet) repos. Fleet rollout is a separate follow-on task once Praxion's own dogfooding has produced a live signal. Chosen over including the onboarding install in this pass, because SYSTEMS_PLAN.md's own Prerequisites section already separates "built" from "usefully fleet-adopted," and dec-274 set the precedent that onboarding-install wiring is properly its own scoped unit of work, not bundled into the gate's core build.

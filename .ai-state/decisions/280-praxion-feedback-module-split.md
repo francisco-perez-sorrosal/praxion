@@ -1,7 +1,7 @@
 ---
-id: dec-draft-82168f75
+id: dec-280
 title: Split the reporter script into a praxion_feedback package by responsibility
-status: proposed
+status: accepted
 category: implementation
 date: 2026-07-23
 summary: scripts/report_praxion_issue.py becomes a thin argparse CLI over a new scripts/praxion_feedback/ package (fingerprint.py, sanitizer.py, candidate_store.py, render.py), each independently unit-testable with no CLI/network concerns — because the fingerprint/normalization logic is explicitly the dedup contract and the primary test target, and mixing it with argparse plumbing, file I/O, and rendering in one file would both blow past the file-size/single-responsibility conventions and make the highest-risk logic harder to test in isolation.
@@ -18,12 +18,12 @@ affected_files:
   - scripts/praxion_feedback/candidate_store.py
   - scripts/praxion_feedback/render.py
 affected_reqs: [REQ-01, REQ-02, REQ-03, REQ-07, REQ-08]
-re_affirms: dec-draft-ebf8352b
+re_affirms: dec-279
 ---
 
 ## Context
 
-`SYSTEMS_PLAN.md` (dec-draft-ebf8352b) names the reporter as a single file,
+`SYSTEMS_PLAN.md` (dec-279) names the reporter as a single file,
 `scripts/report_praxion_issue.py`, exposing `capture` / `render` / `list` / `mark-filed`
 subcommands. That is the external CLI contract — not a mandate that all logic lives in
 one file. The plan's own Risk Assessment singles out fingerprint normalization as the
@@ -102,7 +102,7 @@ The external CLI surface (subcommand names, flags, file paths) is unchanged from
 
 ## Prior Decision
 
-This ADR does not supersede `dec-draft-ebf8352b` (now finalized as the parent architecture
+This ADR does not supersede `dec-279` (now finalized as the parent architecture
 ADR) — it re-affirms its filing-authority decision and its `scripts/report_praxion_issue.py`
 CLI-contract naming while resolving an internal module-layout question the parent ADR left
 to "the implementer/planner's call" (see `SYSTEMS_PLAN.md` § Existing Patterns).

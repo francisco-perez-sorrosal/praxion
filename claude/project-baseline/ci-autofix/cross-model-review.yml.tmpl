@@ -1,40 +1,57 @@
-# P2 PLACEHOLDER — NOT YET IMPLEMENTED.
+# Canonical Praxion baseline cross-model-review caller template — thin,
+# SHA-pinned invoker of the public `reusable-cross-model-review.yml` hub (the
+# review-gate peer of `reusable-ci-autofix.yml`).
 #
-# This file is a shape-only stub for the future `reusable-cross-model-review.yml`
-# caller (the P2 cross-model review gate designed alongside P1's installable
-# core but not built in this phase). It documents the intended trigger and
-# inputs; it does not invoke any review provider, and /onboard-project does
-# not install or wire this file in P1 — it ships only as a reference shape in
-# this template package.
+# This is the installable shape for the cross-model review gate's caller,
+# realized from the earlier commented-out placeholder stub. Wiring an
+# automated /onboard-project install step for this template (fleet rollout)
+# is a separate, not-yet-built concern — see this repo's own
+# `.github/workflows/cross-model-review.yml` for how Praxion installs and
+# dogfoods this shape today.
 #
-# When P2 lands, this stub becomes the real caller template — the counterpart
-# to ci-autofix.yml.tmpl for the review gate, invoking a hub reusable workflow
-# (`reusable-cross-model-review.yml`) that reads `policy.review.*` from
-# `autofix-policy.yml` (`reviewer_family`, `cross_model_gate`, `on_unavailable`)
-# and posts a review on agent-authored PRs using a model family other than the
-# fixer's own (never 'claude' — see autofix-policy.yml.tmpl's `review:` section).
+# Two placeholders are filled at install time:
+#   {{PRAXION_HUB}} — the hub's owner/repo (francisco-perez-sorrosal/praxion).
+#   {{HUB_SHA}}     — the hub's commit SHA, resolved at install time to a real
+#     40-hex value — never left as an unresolved placeholder or a mutable
+#     tag/branch; every other `uses:` in this ecosystem is SHA-pinned the same way.
 #
-# TODO(P2): implement `reusable-cross-model-review.yml` (the hub) and this
-# caller together; fill in the real `on:` / `permissions:` / `uses:` /
-# `secrets:` shape below once the hub exists. Until then this entire block
-# stays commented out — a placeholder, not a working gate.
+# All per-repo tunables (`cross_model_gate`, `reviewer_family`,
+# `on_unavailable`) live in `.github/autofix-policy.yml`, installed alongside
+# this caller — this file stays thin in logic, explicit only in trigger and
+# privilege. See that template's own `review:` block for the full schema.
+#
+# The gate decision (which branches/PRs get reviewed, given the policy) lives
+# in the hub, not here — this caller's only job is to own the real
+# `pull_request` trigger (the ordinary event, never the privileged
+# fork-context variant), the inverted-privilege permissions ceiling
+# (`pull-requests: write` + `contents: read` ONLY — never the fixer's
+# `contents: write` set), and the explicit `CURSOR_API_KEY` mapping — never
+# the blanket inherit-all shorthand.
+#
+# Praxion's own caller (`.github/workflows/cross-model-review.yml`) differs
+# only in the `uses:` ref: a same-repo local
+# `uses: ./.github/workflows/reusable-cross-model-review.yml` (tracks HEAD —
+# correct for the repo that develops the hub), never a cross-repo SHA pin —
+# the same deliberate divergence as `ci-autofix.yml.tmpl`'s own caller #1.
+# Delete this comment after tailoring.
 
-# name: Cross-Model Review
-# on:
-#   pull_request:
-#     types: [opened, synchronize]
-# permissions: {}
-# jobs:
-#   review:
-#     if: startsWith(github.head_ref, 'ci-autofix/')
-#     permissions:
-#       pull-requests: write
-#     uses: {{PRAXION_HUB}}/.github/workflows/reusable-cross-model-review.yml@{{HUB_SHA}}
-#     with:
-#       policy_path: .github/autofix-policy.yml
-#     secrets:
-#       REVIEWER_API_KEY: ${{ secrets.REVIEWER_API_KEY }}   # example only — P2
-#                                                            # defines the real
-#                                                            # secret name(s)
-#                                                            # for the chosen
-#                                                            # reviewer_family
+name: Cross-Model Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions: {}  # least-privilege; the job below grants only the inverted-privilege ceiling
+
+jobs:
+  review:
+    permissions:                          # the load-bearing invariant — EXACTLY
+                                           # these two grants, never the fixer's
+                                           # contents:write/id-token:write set
+      pull-requests: write
+      contents: read
+    uses: {{PRAXION_HUB}}/.github/workflows/reusable-cross-model-review.yml@{{HUB_SHA}}
+    with:
+      policy_path: .github/autofix-policy.yml
+    secrets:
+      CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}

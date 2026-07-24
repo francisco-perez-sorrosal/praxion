@@ -1,0 +1,48 @@
+# Cross-Model Review — Praxion's own caller (caller #1) of the public
+# `reusable-cross-model-review.yml` hub.
+#
+# This is the review-gate peer of `ci-autofix.yml`: where that file triggers
+# the FIXER hub on a failed watched workflow, this one triggers the REVIEWER
+# hub on every pull request and gates agent-authored fix PRs (`ci-autofix/*`,
+# `issue-autofix/*` branches, per the default `agent-prs` policy scope) with a
+# second, non-Anthropic model family before a human merges them. See the hub
+# (`.github/workflows/reusable-cross-model-review.yml`) for the gate-decision,
+# model-resolution, and fail-open logic; see `.github/autofix-policy.yml`'s
+# `review:` block for Praxion's own tunables (`cross_model_gate`,
+# `reviewer_family`, `on_unavailable`).
+#
+# Praxion is caller #1 (dogfooding) and differs from every other managed
+# caller installed by `/onboard-project` in the same deliberate way
+# `ci-autofix.yml` does: the `uses:` below is a same-repo local ref (`./...`,
+# tracks HEAD — correct for the repo that develops the hub), never a
+# cross-repo SHA pin. It maps CURSOR_API_KEY via an explicit `secrets:`
+# mapping rather than the blanket inherit-all shorthand, exercising the same
+# contract every managed caller relies on.
+#
+# Prerequisites:
+#   CURSOR_API_KEY — repository secret brokering the reviewer model
+#   (gpt/gemini/composer families all resolve under this one key). Until this
+#   secret is registered, the gate degrades fail-open
+#   (`cross-model-review:unavailable`) rather than erroring — see the hub's
+#   fail-open contract.
+
+name: Cross-Model Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions: {}  # least-privilege; the job below adds only the inverted-privilege ceiling
+
+jobs:
+  review:
+    permissions:                          # the load-bearing invariant — EXACTLY
+                                           # these two grants, never the fixer's
+                                           # contents:write/id-token:write set
+      pull-requests: write
+      contents: read
+    uses: ./.github/workflows/reusable-cross-model-review.yml
+    with:
+      policy_path: .github/autofix-policy.yml
+    secrets:
+      CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}

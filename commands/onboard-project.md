@@ -257,6 +257,17 @@ If the user agrees, remove that line. If they decline, proceed without changing 
 
   **Note:** The interactive metrics viewer lives in the dashboard. Launch it with `praxion-dashboard start <project-path>` or `/dashboard` in Claude Code, then open the Metrics tab. Offline reading is available via the `METRICS_REPORT_*.md` files in the same directory.
 
+- `.ai-state/praxion_feedback/PENDING.md` (header-only skeleton) — the managed-project-side capture ledger for the healing sidecar (`/report-praxion-issue`, a Praxion-origin ecosystem-defect reporting channel). The reporter script and the command are plugin-global (no per-project copy needed); the SessionStart advisory hook ships with the plugin via `hooks/hooks.json` (already registered — no additional per-project wiring required). This skeleton is the entire per-project install footprint for the sidecar.
+
+  **Predicate (skip if present).** If `.ai-state/praxion_feedback/PENDING.md` already exists, skip — never overwrite (the project may already hold captured candidates).
+
+  **Action.** Create `.ai-state/praxion_feedback/` if missing, then write:
+  ```markdown
+  # Pending Praxion Feedback
+
+  Candidate ecosystem-defect reports awaiting `/report-praxion-issue`. This file is git-committed and mechanically sanitized at capture time.
+  ```
+
 Do NOT create `.ai-state/observations.jsonl` — that is written on first use by the observability hook. Pre-creating it confuses the semantic merge driver.
 
 ## §Phase 3 — `.gitattributes` + merge driver registration
@@ -1091,11 +1102,12 @@ Print: `8e.8: .github/workflows/ci-autofix.yml + .github/autofix-policy.yml inst
          "caller": ".github/workflows/ci-autofix.yml",
          "policy": ".github/autofix-policy.yml",
          "hub_sha": "<resolved 40-hex hub commit SHA>"
-       }
+       },
+       "praxion_feedback": ".ai-state/praxion_feedback/PENDING.md"
      }
    }
    ```
-   List only artifacts actually installed this run (omit hooks if Phase 4 was skipped; omit `ci_autofix` if Phase 8e was skipped or its caller/policy predicate already hit). If the plugin version could not be captured at pre-flight (skip-phase-4 flag), write `"onboarded_with_version": "unknown"` and emit a one-line note. Add `.ai-state/.praxion-onboard.json` to the staged set.
+   List only artifacts actually installed this run (omit hooks if Phase 4 was skipped; omit `ci_autofix` if Phase 8e was skipped or its caller/policy predicate already hit; omit `praxion_feedback` if Phase 2's predicate already hit — the ledger pre-existed). If the plugin version could not be captured at pre-flight (skip-phase-4 flag), write `"onboarded_with_version": "unknown"` and emit a one-line note. Add `.ai-state/.praxion-onboard.json` to the staged set.
 
 4. **Stage modified files**: run `git add` with the explicit list of files this command touched (built up through phases 1–6, plus `.ai-state/.praxion-onboard.json`). Do NOT run `git add -A`. Do NOT commit. The user reviews staging and decides.
 

@@ -29,6 +29,7 @@ Reusable slash commands for AI coding assistants. Each `.md` file becomes a `/co
 | `/refresh-skill` | Refresh version-sensitive sections of a skill against current upstream documentation |
 | `/refresh-topology` | Create or refresh the project's test-group topology for scoped test execution (`--init` for first-time creation, no flag for drift-response refresh) |
 | `/release` | Bump version, update changelog, and create a release tag |
+| `/report-praxion-issue` | File a Praxion-origin `ecosystem-defect` issue on the Praxion repo from a captured healing-sidecar candidate — HITL-gated (never auto-files), category taxonomy `hooks\|blocks\|agents\|scripts\|skills` |
 | `/report-upstream` | File a well-formed bug report on an upstream open-source project |
 | `/praxion-complete-install` | Reconfigure or recover a marketplace-installed Praxion setup — symlink rules, CLI scripts, and optional context-hub MCP |
 | `/praxion-complete-uninstall` | Reverse `/praxion-complete-install` — remove rule/script symlinks and optional context-hub MCP; plugin body is preserved |

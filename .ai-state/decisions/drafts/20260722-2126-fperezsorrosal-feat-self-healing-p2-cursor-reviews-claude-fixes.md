@@ -72,7 +72,12 @@ independent, non-generative gate.** Concretely, the P2 hub `reusable-cross-model
    **NOT propose a rewritten fix**. Non-generativity is enforced *structurally*, not by prompt
    alone: the review job holds **no `contents: write`**, no `id-token: write`, no write tools, and
    runs no git/commit/PR step — any local edit a foreign model makes is inert and dies with the
-   ephemeral runner.
+   ephemeral runner. *(O1 update, live-verified P2: the headless `cursor-agent -p` call must pass
+   `--force` to bypass Cursor's workspace-trust confirmation prompt — without it the CLI blocks in
+   the TTY-less runner and exits non-zero with zero bytes. This reverses O1's original "omit
+   `--force`" conclusion but not its principle: `--force` does not compromise non-generativity
+   because the security boundary is the read-only-plus-PR token scope above, not the CLI flag — an
+   edit the flag would permit has nowhere to land.)*
 4. On `approve`: posts the findings as a PR comment, labels `cross-model-review:approved` +
    `reviewed-by:<family>` (audit trail), leaves the PR mergeable. On `request-changes`: posts
    findings, labels `cross-model-review:changes-requested` + `reviewed-by:<family>`, and **marks the

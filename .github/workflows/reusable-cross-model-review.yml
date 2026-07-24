@@ -385,14 +385,20 @@ jobs:
         run: |
           set +e
           export PATH="$HOME/.local/bin:$HOME/.cursor/bin:$PATH"
-          # Gate-only review. No unconfirmed-edit flag is passed (O1): the
-          # security boundary is this job's token scope, not a CLI flag — any
-          # local edit is inert without contents:write or a git step. Cost is
-          # bounded by this step's timeout-minutes and the job timeout.
+          # Gate-only review. `--force` bypasses Cursor's workspace-trust /
+          # confirmation prompt so the agent runs headlessly; without it
+          # `cursor-agent -p` blocks on a trust prompt in the TTY-less CI runner
+          # and exits non-zero with 0 bytes (live-verified). Non-generativity is
+          # still enforced STRUCTURALLY by this job's read-only-plus-PR token
+          # scope (pull-requests: write + contents: read only, no write tools,
+          # no git step) — any edit the agent attempts is inert and dies with
+          # the runner — not by omitting the flag (this reverses O1's conclusion,
+          # not its principle). Cost is bounded by this step's timeout-minutes
+          # and the job timeout.
           # --api-key is passed explicitly (the env var alone did NOT
           # authenticate the CLI in CI — live-verified; the CLI's own error
           # message recommends the flag). The env var is kept too.
-          agent -p "$REVIEW_PROMPT" --output-format json \
+          agent -p "$REVIEW_PROMPT" --output-format json --force \
             --model "$RESOLVED_MODEL" --api-key "$CURSOR_API_KEY" \
             > tmp/review-raw.json 2> tmp/review-err.log
           rc=$?

@@ -197,15 +197,35 @@ def test_never_triggers_on_pull_request_target() -> None:
     ), "`pull_request_target` must never appear anywhere in the hub"
 
 
-def test_never_uses_force_or_yolo_flag() -> None:
-    """Non-generativity is enforced by permission scope (see the
-    `test_no_job_grants_*` tests below), not by a CLI flag. `--force`/
-    `--yolo` would enable unconfirmed file edits in a gate that must never
-    edit, so neither flag may appear anywhere in the hub.
+def test_non_generativity_is_enforced_by_permission_scope_not_by_banning_force() -> None:
+    """The real non-generativity invariant is STRUCTURAL — the reviewer job's
+    token scope, not the absence of a CLI flag.
+
+    `--force` is REQUIRED for the Cursor CLI to run headlessly in the TTY-less
+    CI runner: it bypasses Cursor's workspace-trust / confirmation prompt, which
+    would otherwise block `cursor-agent -p` and make it exit non-zero with zero
+    bytes (live-verified). So `--force` legitimately appears on the review call.
+
+    What guarantees the gate can never mutate code is that the review job holds
+    EXACTLY `pull-requests: write` + `contents: read` — no `contents: write`, no
+    `id-token`, and no git-write / PR-create step anywhere — so any edit the
+    foreign model attempts is inert and dies with the ephemeral runner. This
+    test asserts that structural boundary directly (superseding the earlier,
+    now-wrong assertion that `--force`/`--yolo` must never appear).
     """
-    raw = _raw_text()
-    assert "--force" not in raw, "`--force` must never appear in the hub"
-    assert "--yolo" not in raw, "`--yolo` must never appear in the hub"
+    parsed = _parsed()
+    permissions = _job_permissions(parsed)
+    assert any(
+        perm == {"pull-requests": "write", "contents": "read"} for perm in permissions
+    ), "The review job must grant EXACTLY pull-requests:write + contents:read"
+    for perm in permissions:
+        assert perm.get("contents") != "write", "No job may hold `contents: write`"
+        assert "id-token" not in perm, "No job may hold `id-token`"
+    for step in _all_steps(parsed):
+        run = step.get("run") or ""
+        assert "git commit" not in run, "The review job must never run `git commit`"
+        assert "git push" not in run, "The review job must never run `git push`"
+        assert "gh pr create" not in run, "The review job must never run `gh pr create`"
 
 
 # ---------------------------------------------------------------------------

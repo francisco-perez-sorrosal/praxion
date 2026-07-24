@@ -404,3 +404,71 @@ class TestPluginCacheSafeRootResolution:
         assert not (
             plugin_root / ".ai-state"
         ).exists(), "a refused run must not have written anything under the plugin cache"
+
+
+# ---------------------------------------------------------------------------
+# Plain-file invocation: the wrapper must bootstrap its own import path,
+# never rely on the caller's sys.path / PYTHONPATH.
+# ---------------------------------------------------------------------------
+
+
+class TestPlainFileInvocationBootstrapsItsOwnImportPath:
+    """Regression guard for a real dogfood failure: running the wrapper as a
+    plain file (``python3 scripts/report_praxion_issue.py --help``) from a cwd
+    other than the repo root, with no ``PYTHONPATH`` set by the caller, raised
+    ``ModuleNotFoundError: No module named 'scripts'`` -- the wrapper's
+    absolute ``from scripts.praxion_feedback.cli import main`` relied on the
+    caller's ``sys.path``/``PYTHONPATH`` rather than bootstrapping its own.
+    pytest's own ``pythonpath = ["."]`` config hid this in every test above,
+    since collection always runs from the repo root.
+
+    Distinct from ``TestPluginCacheSafeRootResolution`` above: this is
+    "import your own package via ``__file__``" (a legitimate, required use of
+    ``__file__``), not the forbidden "resolve the CONSUMER repo root via
+    ``__file__``" pitfall -- the two must not be conflated.
+    """
+
+    def test_help_succeeds_from_a_non_repo_cwd_with_pythonpath_removed(
+        self, tmp_path: Path
+    ) -> None:
+        wrapper = Path(__file__).resolve().parent / "report_praxion_issue.py"
+        clean_env = {key: value for key, value in os.environ.items() if key != "PYTHONPATH"}
+
+        result = subprocess.run(
+            [sys.executable, str(wrapper), "--help"],
+            cwd=str(tmp_path),
+            capture_output=True,
+            text=True,
+            env=clean_env,
+        )
+
+        assert result.returncode == 0, (
+            "the wrapper must bootstrap its own import path rather than rely "
+            f"on the caller's sys.path/PYTHONPATH; stderr={result.stderr!r}"
+        )
+        assert "usage" in result.stdout.lower()
+
+    def test_subcommand_help_succeeds_from_an_unrelated_cwd(self, tmp_path: Path) -> None:
+        """A second cwd, with a subcommand that needs no git (``capture
+        --help`` short-circuits inside argparse before any repo-root
+        resolution), confirms the import bootstrap is cwd-independent on its
+        own -- distinct from the CONSUMER-root git resolution (tested above),
+        which correctly still requires a real git repo.
+        """
+        wrapper = Path(__file__).resolve().parent / "report_praxion_issue.py"
+        clean_env = {key: value for key, value in os.environ.items() if key != "PYTHONPATH"}
+        unrelated_cwd = tmp_path / "not_a_repo_either"
+        unrelated_cwd.mkdir()
+
+        result = subprocess.run(
+            [sys.executable, str(wrapper), "capture", "--help"],
+            cwd=str(unrelated_cwd),
+            capture_output=True,
+            text=True,
+            env=clean_env,
+        )
+
+        assert (
+            result.returncode == 0
+        ), f"`capture --help` must not require a git repo; stderr={result.stderr!r}"
+        assert "usage" in result.stdout.lower()

@@ -19,4 +19,5 @@ useDefault = true
 description = "Secret-redaction test fixtures intentionally contain secret-shaped strings"
 paths = [
   '''scripts/praxion_feedback/tests/test_sanitizer\.py''',
+  '''scripts/test_report_praxion_issue\.py''',
 ]

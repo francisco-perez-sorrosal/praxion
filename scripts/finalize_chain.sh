@@ -14,6 +14,11 @@
 #   finalize_chain_post_merge       — reconcile + state-driven finalize + squash-safety
 #   finalize_chain_post_commit      — state-driven finalize on main (ADR promotion sub-gated on drafts)
 #   finalize_chain_post_checkout    — state-driven finalize on branch switch to main
+#   finalize_chain_run_on_main      — on-main composition (adr -> ledger -> manifest) for
+#                                     non-hook callers (e.g. CI); resolves repo_root from the
+#                                     argument or the current working tree. Honors
+#                                     FINALIZE_CHAIN_STRICT (unset = non-blocking hook
+#                                     semantics; set = fail-loud, for server-side callers).
 #
 # Design rules:
 #
@@ -93,13 +98,20 @@ _finalize_chain_state_was_touched() {
 
 # -- Script invocation --------------------------------------------------------
 
-# Run a python script with non-blocking failure semantics.
+# Run a python script. Default: non-blocking failure semantics (warn, return 0)
+# — hooks cannot abort an already-completed git operation. When
+# FINALIZE_CHAIN_STRICT is set (non-empty), propagate the script's exit code
+# instead — for server-side callers (e.g. CI) that must fail loud.
 # Args: <label> <absolute-script-path> [extra-args...]
 _finalize_chain_run_script() {
     local label="$1"; shift
     local script="$1"; shift
     [ -f "$script" ] || return 0
     command -v python3 >/dev/null 2>&1 || return 0
+    if [ -n "${FINALIZE_CHAIN_STRICT:-}" ]; then
+        python3 "$script" "$@"
+        return $?
+    fi
     python3 "$script" "$@" 2>&1 || \
         echo "${label}: warned (non-blocking) — inspect output above"
 }
@@ -123,10 +135,10 @@ _finalize_chain_run_on_main() {
     # consumer's .ai-state/ instead of the plugin's (empty) one.
     if _finalize_chain_drafts_present "$repo_root"; then
         _finalize_chain_run_script "finalize_adrs" \
-            "${FINALIZE_CHAIN_DIR}/finalize_adrs.py" --all --repo-root "$repo_root"
+            "${FINALIZE_CHAIN_DIR}/finalize_adrs.py" --all --repo-root "$repo_root" || return $?
     fi
     _finalize_chain_run_script "finalize_tech_debt_ledger" \
-        "${FINALIZE_CHAIN_DIR}/finalize_tech_debt_ledger.py" --all --repo-root "$repo_root"
+        "${FINALIZE_CHAIN_DIR}/finalize_tech_debt_ledger.py" --all --repo-root "$repo_root" || return $?
     # Refresh the committed doc manifest LAST: it must index the dec-NNN renames
     # finalize_adrs makes and the TECH_DEBT_RESOLVED migrations the ledger makes
     # (a pre-commit gate runs too early to see them). Content-aware write no-ops
@@ -134,11 +146,22 @@ _finalize_chain_run_on_main() {
     # projects without one are never surprised by a new committed file.
     if [ -f "${repo_root}/.ai-state/doc_manifest.yaml" ]; then
         _finalize_chain_run_script "build_doc_manifest" \
-            "${FINALIZE_CHAIN_DIR}/build_doc_manifest.py" --root "$repo_root"
+            "${FINALIZE_CHAIN_DIR}/build_doc_manifest.py" --root "$repo_root" || return $?
     fi
 }
 
 # -- Public entry points ------------------------------------------------------
+
+# Public wrapper around the on-main composition, for callers that source this
+# library directly instead of going through a git hook (e.g. a CI workflow).
+# repo_root defaults to the current working tree's root when omitted. Honors
+# FINALIZE_CHAIN_STRICT the same way _finalize_chain_run_script does — this
+# function adds no error-handling policy of its own, it only resolves repo_root.
+finalize_chain_run_on_main() {
+    local repo_root="${1:-$(_finalize_chain_repo_root)}"
+    [ -n "$repo_root" ] || return 0
+    _finalize_chain_run_on_main "$repo_root"
+}
 
 # State-driven finalize on main. Shared body for post-commit and post-checkout
 # entry points. Inlined into both for clarity (the entry name is part of the

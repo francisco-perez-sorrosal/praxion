@@ -5,10 +5,11 @@
 # The values P0 actually used — the main-branch fix-PR surface, the daily
 # budget cap, sensitive paths, fixer model, and plugin_dir — are migrated 1:1
 # from the P0 monolith this repo ran inline; the refactor to a thin caller
-# changes WHERE those tunables live, not WHAT they are. The remaining fields
-# (the `review` block, the P3 `surfaces`, and safety's
-# `max_attempts_per_pr`/`auto_commit_tiers`) are schema fields reserved for
-# P2/P3 and are documentary-only in P1. See
+# changes WHERE those tunables live, not WHAT they are. As of P3a the
+# `surfaces.pr_checks` / `surfaces.dependabot` / `surfaces.fork_prs` toggles and
+# `safety.max_attempts_per_pr` are now LIVE — read by the hub's `classify` job
+# and the new per-surface fix jobs. The `review` block remains documentary-only
+# (P2 — designed, not yet built), as does `safety.auto_commit_tiers`. See
 # `claude/project-baseline/ci-autofix/autofix-policy.yml.tmpl` for the full schema.
 
 watched_workflows: [Test, Architecture]  # Documentary only — the caller's own
@@ -19,9 +20,9 @@ watched_workflows: [Test, Architecture]  # Documentary only — the caller's own
 
 surfaces:
   main_branch: fix-pr       # P0's only behavior: open a fix PR on main-branch failure
-  pr_checks:   fix-commit   # P3 — reserved, not yet read by the hub
-  dependabot:  fix-commit   # P3 — reserved, not yet read by the hub
-  fork_prs:    suggest      # P3 — reserved, not yet read by the hub
+  pr_checks:   fix-commit   # P3a — LIVE: fix-commit to a same-repo human PR's own branch
+  dependabot:  fix-commit   # P3a — LIVE: fix-commit to a Dependabot PR's own branch
+  fork_prs:    suggest      # P3a — LIVE: suggest-only patch comment (never a commit)
 
 review:                        # Consumed by reusable-cross-model-review.yml
                                 # (P2 — designed, not yet built). Documentary
@@ -34,9 +35,13 @@ review:                        # Consumed by reusable-cross-model-review.yml
   on_unavailable: fail-open
 
 safety:
-  max_attempts_per_pr: 2    # P3 — reserved (per-PR attempt counter for the
-                             # pr_checks surface); not yet read by the hub
-  max_runs_per_day: 5       # the P0 daily budget cap
+  max_attempts_per_pr: 2    # P3a — LIVE: per-PR fix-commit attempt cap (counted
+                             # via the `Autofix-Attempt:` commit trailer) that
+                             # bounds the fix->fail-differently loop
+  max_runs_per_day: 15      # daily budget cap — bumped from P0's 5 because the
+                             # budget now aggregates across all four surfaces
+                             # (main + pr_checks + dependabot + fork); a busy
+                             # Dependabot day must not starve main-branch fixes
   sensitive_paths: [.github/, scripts/, hooks/]   # the P0 tripwire paths
   auto_commit_tiers: [lint, format, doc-refs, lockfile]   # P3 — reserved
 

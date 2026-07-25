@@ -14,6 +14,22 @@ what actually happens when a real `autofix-policy.yml` is missing on a live
 run) — that closes via dogfooding once Praxion's own caller exercises the hub
 in production CI. Where a test is a structural proxy for a runtime guarantee,
 its docstring says so explicitly.
+
+Extension (this module, later section): the hub above already exists and
+ships a single `autofix` job (main-branch fix-PR). The later section of this
+file defines structural contracts for three NEW jobs — a classifier plus a
+same-repo (human-PR/Dependabot) fix-commit job and a fork suggest-only job —
+that do not exist in the file yet. Those assertions are expected to fail on
+the first run (job absent / empty step collections / missing job output),
+never with a collection or import error.
+
+Scope boundary (dogfood-only — no structural test is fabricated for these):
+this suite cannot verify that a fix-commit loop stays bounded across
+multiple real CI runs, that a genuinely unfixable dependency bump is
+classified and left uncommitted end-to-end, or that a probe-of-the-default-
+branch gate correctly declines when that branch is itself failing. Those are
+runtime properties validated by a live dogfood against real pull requests,
+not by parsing this YAML file.
 """
 
 from __future__ import annotations
@@ -94,6 +110,33 @@ def _mentions_default_near(raw: str, field: str, window: int = 400) -> bool:
         re.IGNORECASE | re.DOTALL,
     )
     return bool(pattern.search(raw))
+
+
+def _job(parsed: dict, name: str) -> dict:
+    """Return a named job's body, or `{}` if the job doesn't exist yet (RED-safe)."""
+    return (parsed.get("jobs") or {}).get(name) or {}
+
+
+def _agent_steps(job: dict) -> list[dict]:
+    """Return every `claude-code-action` step within a single job."""
+    return [
+        step for step in job.get("steps") or [] if "claude-code-action" in (step.get("uses") or "")
+    ]
+
+
+def _claude_args(step: dict) -> str:
+    """Return a claude-code-action step's `with.claude_args` block (the `--allowedTools` carrier)."""
+    return (step.get("with") or {}).get("claude_args", "") or ""
+
+
+def _job_text(job: dict) -> str:
+    """Flatten a job's step names, shell bodies, and agent prompts into one search haystack."""
+    parts: list[str] = []
+    for step in job.get("steps") or []:
+        parts.append(step.get("name", "") or "")
+        parts.append(step.get("run", "") or "")
+        parts.append((step.get("with") or {}).get("prompt", "") or "")
+    return " ".join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -389,3 +432,340 @@ def test_missing_or_malformed_policy_falls_back_to_a_safe_surface_toggle() -> No
         "fix-pr surface in an undefined state — a safe default value must be "
         "defined near surfaces.main_branch"
     )
+
+
+# ---------------------------------------------------------------------------
+# Main-path preservation (byte-stability anchor for the P3a extension below)
+# ---------------------------------------------------------------------------
+
+
+def test_existing_autofix_job_is_unchanged_by_the_new_surface_jobs() -> None:
+    """Anchor for the byte-stability guarantee: the pre-existing `autofix`
+    job's gate condition, privilege grant, and step sequence must survive
+    the new surface jobs' addition completely unmodified.
+    """
+    parsed = _parsed()
+    jobs = parsed.get("jobs") or {}
+    assert "autofix" in jobs, "The pre-existing `autofix` job must still exist"
+    autofix_job = jobs["autofix"]
+    condition = autofix_job.get("if") or ""
+    assert (
+        "head_branch == github.event.repository.default_branch" in condition
+    ), "The `autofix` job's branch gate must remain unchanged"
+    assert (
+        autofix_job.get("permissions", {}).get("contents") == "write"
+    ), "The `autofix` job's `contents: write` grant must remain unchanged"
+    step_names = [step.get("name") for step in autofix_job.get("steps") or []]
+    assert step_names == [
+        "Checkout caller repo's default branch",
+        "Set up uv (manages Python 3.13)",
+        "Read autofix policy (fail-safe defaults)",
+        "Enforce daily run budget",
+        "Skip if an autofix PR is already open",
+        "Fetch failure logs (non-agent, untrusted output)",
+        "Diagnose failure and open a fix PR",
+        "Flag sensitive-path changes for review",
+    ], "The `autofix` job's step sequence must remain byte-identical"
+
+
+# ---------------------------------------------------------------------------
+# `classify` job (new) — reads policy + github.event once, emits `surface`
+# ---------------------------------------------------------------------------
+
+
+def test_classify_job_exists() -> None:
+    parsed = _parsed()
+    assert "classify" in (parsed.get("jobs") or {}), (
+        "A `classify` job must exist to read the caller policy and "
+        "github.event once and emit a `surface` output for the new "
+        "PR/Dependabot/fork surface jobs"
+    )
+
+
+def test_classify_job_reads_the_caller_policy_in_a_non_agent_step() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "classify")
+    policy_steps = [
+        step
+        for step in job.get("steps") or []
+        if "autofix-policy" in (step.get("run") or "") or "policy_path" in (step.get("run") or "")
+    ]
+    assert policy_steps, "classify must read the caller's autofix-policy.yml in a plain `run:` step"
+    for step in policy_steps:
+        assert (
+            "uses" not in step
+        ), "The policy-read step in `classify` must be a non-agent `run:` step"
+
+
+def test_classify_job_distinguishes_same_repo_from_fork_by_repository_fields() -> None:
+    """Structural proxy: the classification logic must inspect
+    `head_repository` vs `repository` to tell a same-repo PR from a fork PR,
+    and must distinguish the Dependabot actor from other same-repo authors.
+    The exact variable names/mechanism are an implementer choice.
+    """
+    parsed = _parsed()
+    job = _job(parsed, "classify")
+    job_run_text = " ".join(step.get("run", "") or "" for step in job.get("steps") or [])
+    assert "head_repository" in job_run_text, (
+        "classify must inspect github.event.workflow_run.head_repository to "
+        "distinguish same-repo PRs from fork PRs"
+    )
+    assert re.search(
+        r"dependabot", job_run_text, re.IGNORECASE
+    ), "classify must distinguish the Dependabot actor from other same-repo PR authors"
+
+
+def test_classify_job_emits_a_surface_output() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "classify")
+    outputs = job.get("outputs") or {}
+    assert "surface" in outputs, (
+        "`classify` must declare a job-level `surface` output so downstream "
+        "surface jobs (via `needs: classify`) can gate on it"
+    )
+
+
+# ---------------------------------------------------------------------------
+# `autofix-same-repo-pr` job (new) — fix-commit to the PR's own head branch
+# ---------------------------------------------------------------------------
+
+
+def test_autofix_same_repo_pr_job_exists() -> None:
+    parsed = _parsed()
+    assert "autofix-same-repo-pr" in (parsed.get("jobs") or {}), (
+        "An `autofix-same-repo-pr` job must exist to fix-commit same-repo "
+        "human-PR and Dependabot-PR CI failures to the PR's own head branch"
+    )
+
+
+def test_autofix_same_repo_pr_agent_allowlist_excludes_branch_movement_and_push() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    agent_steps = _agent_steps(job)
+    assert agent_steps, "autofix-same-repo-pr must contain a claude-code-action fixer step"
+    for step in agent_steps:
+        allowed_tools = _claude_args(step)
+        assert "git checkout" not in allowed_tools, (
+            "The fixer's allowlist must not grant `git checkout` — the PR "
+            "head is positioned by a non-agent step, not the agent"
+        )
+        assert (
+            "git branch" not in allowed_tools
+        ), "The fixer's allowlist must not grant `git branch`"
+        assert "git push" not in allowed_tools, (
+            "The fixer's allowlist must not grant `git push` — pushing the "
+            "fix commit is a non-agent step's responsibility"
+        )
+
+
+def test_autofix_same_repo_pr_agent_allowlist_excludes_pr_merge() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    agent_steps = _agent_steps(job)
+    assert agent_steps, "autofix-same-repo-pr must contain a claude-code-action fixer step"
+    for step in agent_steps:
+        assert (
+            "gh pr merge" not in _claude_args(step)
+        ), "The fixer's allowlist must not grant `gh pr merge` — a human always owns the merge decision"
+
+
+def test_autofix_same_repo_pr_fetches_and_sanitizes_failure_logs_in_a_non_agent_step() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    fetch_steps = [
+        step
+        for step in job.get("steps") or []
+        if "gh run view" in (step.get("run") or "") and "log" in (step.get("run") or "").lower()
+    ]
+    assert fetch_steps, (
+        "autofix-same-repo-pr must fetch the failed run's logs via a plain "
+        "shell step, writing them to a file the agent reads as DATA"
+    )
+    for step in fetch_steps:
+        assert "uses" not in step, (
+            "The log-fetch step must be a `run:` step, not an agent action — "
+            "logs must never be interpolated directly into the agent's prompt"
+        )
+
+
+def test_autofix_same_repo_pr_prompt_frames_logs_as_untrusted_data() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    agent_steps = _agent_steps(job)
+    assert agent_steps, "autofix-same-repo-pr must contain a claude-code-action fixer step"
+    for step in agent_steps:
+        prompt = (step.get("with") or {}).get("prompt", "") or ""
+        assert re.search(
+            r"untrusted", prompt, re.IGNORECASE
+        ), "The fixer's own prompt must frame fetched CI log content as untrusted data"
+        assert re.search(
+            r"instruction", prompt, re.IGNORECASE
+        ), "The fixer's own prompt must distinguish log content from instructions"
+
+
+def test_autofix_same_repo_pr_gates_on_an_attempt_counter_commit_trailer() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    gate_steps = [
+        step
+        for step in job.get("steps") or []
+        if "Autofix-Attempt" in (step.get("run") or "")
+        and "max_attempts_per_pr" in (step.get("run") or "")
+    ]
+    assert gate_steps, (
+        "A non-agent step must count `Autofix-Attempt:` commit trailers on "
+        "the PR branch and compare against `max_attempts_per_pr` to bound "
+        "the fix-commit loop"
+    )
+
+
+def test_autofix_same_repo_pr_stamps_the_attempt_trailer_from_a_non_agent_step() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    stamp_steps = [
+        step
+        for step in job.get("steps") or []
+        if "Autofix-Attempt:" in (step.get("run") or "") and "git commit" in (step.get("run") or "")
+    ]
+    assert stamp_steps, (
+        "The `Autofix-Attempt: N` trailer must be stamped by a non-agent "
+        "commit step, never by the agent, so the counter can never be missed"
+    )
+    for step in stamp_steps:
+        assert "uses" not in step, "The trailer-stamping step must be a non-agent `run:` step"
+
+
+def test_autofix_same_repo_pr_declines_idempotently_via_a_terminal_label() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    assert (
+        "autofix:declined" in _job_text(job)
+    ), "An `autofix:declined` label must gate re-arming the fixer (idempotency) on an already-declined PR"
+
+
+def test_autofix_same_repo_pr_pushes_without_force_to_the_pr_head_branch() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    push_steps = [
+        step
+        for step in job.get("steps") or []
+        if "git push origin HEAD:" in (step.get("run") or "")
+    ]
+    assert push_steps, (
+        "A non-agent step must push the fix commit via `git push origin "
+        "HEAD:<head-branch>` — the PR's own head, never an implicit push"
+    )
+    for step in push_steps:
+        assert "--force" not in (step.get("run") or ""), (
+            "The push must never use `--force` — a rejected push (non-fast-"
+            "forward or permission/read-only) must skip-and-flag instead"
+        )
+
+
+def test_autofix_same_repo_pr_includes_a_sensitive_path_tripwire_step() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    assert "sensitive" in _job_text(job).lower(), (
+        "autofix-same-repo-pr must include its own sensitive-path tripwire "
+        "step, converting the PR to draft when a fix touches CI/automation surfaces"
+    )
+
+
+# ---------------------------------------------------------------------------
+# `autofix-fork` job (new) — suggest-only, inverted (read-only) privilege
+# ---------------------------------------------------------------------------
+
+
+def test_autofix_fork_job_exists() -> None:
+    parsed = _parsed()
+    assert "autofix-fork" in (
+        parsed.get("jobs") or {}
+    ), "An `autofix-fork` job must exist to post suggest-only patch comments on fork PR CI failures"
+
+
+def test_autofix_fork_job_grants_read_only_contents_permission() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "autofix-fork")
+    permissions = job.get("permissions") or {}
+    assert permissions.get("contents") == "read", (
+        "autofix-fork must hold `contents: read` — no write grant to an "
+        "untrusted fork head, even for a compromised agent step"
+    )
+
+
+def test_autofix_fork_agent_allowlist_grants_no_write_or_git_or_merge() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "autofix-fork")
+    agent_steps = _agent_steps(job)
+    assert agent_steps, "autofix-fork must contain a claude-code-action suggest-only step"
+    for step in agent_steps:
+        allowed_tools = _claude_args(step)
+        assert (
+            "Edit" not in allowed_tools
+        ), "The fork suggest-only fixer's allowlist must not grant `Edit`"
+        assert (
+            "Write" not in allowed_tools
+        ), "The fork suggest-only fixer's allowlist must not grant `Write`"
+        assert not re.search(
+            r"Bash\(git", allowed_tools
+        ), "The fork suggest-only fixer's allowlist must not grant any git subcommand — it never commits"
+        assert (
+            "gh pr merge" not in allowed_tools
+        ), "The fork suggest-only fixer's allowlist must not grant `gh pr merge`"
+        assert (
+            "gh pr comment" in allowed_tools
+        ), "The fork suggest-only fixer must be able to post a suggested-patch comment via `gh pr comment`"
+
+
+def test_autofix_fork_grants_no_bash_execution_scoped_to_the_isolated_checkout() -> None:
+    """If the fork job checks the fork head out into an isolated directory
+    (a `pr-head` subdirectory), the agent may read it via `--add-dir` but the
+    allowlist must never contain a Bash pattern that could execute anything
+    from within it.
+    """
+    parsed = _parsed()
+    job = _job(parsed, "autofix-fork")
+    agent_steps = _agent_steps(job)
+    assert agent_steps, "autofix-fork must contain a claude-code-action suggest-only step"
+    for step in agent_steps:
+        assert not re.search(r"Bash\([^)]*pr-head", _claude_args(step)), (
+            "The fork job must never grant Bash execution scoped to "
+            "`pr-head` — isolated fork content may be read, never executed"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Cross-cutting (P3a) — concurrency scoping and pin auditability
+# ---------------------------------------------------------------------------
+
+
+def test_concurrency_group_is_scoped_per_branch_not_shared_across_the_repo() -> None:
+    """A single repo-wide group would race one PR's fix-commit run against
+    unrelated runs on other branches; a per-branch dynamic group keeps
+    main's own runs serializing among themselves (behavior-identical to
+    today) while different PRs fix in parallel.
+    """
+    parsed = _parsed()
+    group = (parsed.get("concurrency") or {}).get("group") or ""
+    assert "head_branch" in group, (
+        "The concurrency group must interpolate the failed run's head "
+        "branch (e.g. `ci-autofix-${{ github.event.workflow_run.head_branch "
+        "}}`) so different PRs fix in parallel while main's own runs still "
+        "serialize among themselves"
+    )
+
+
+def test_every_uses_reference_carries_a_version_comment() -> None:
+    """SHA pins are unreadable without a version anchor — every `uses:`
+    line must carry a trailing `# vX.Y.Z` (or `# v<major>`) comment so a
+    human bumping the pin knows which release it corresponds to, matching
+    the convention already used throughout this workflow.
+    """
+    raw = _raw_text()
+    uses_lines = [line for line in raw.splitlines() if re.search(r"uses:\s*\S+@[0-9a-f]{40}", line)]
+    assert uses_lines, "Expected at least one SHA-pinned `uses:` line"
+    for line in uses_lines:
+        assert re.search(r"#\s*v\d+(\.\d+){0,2}", line), (
+            f"{line.strip()!r} must carry a trailing version comment "
+            "(`# vX.Y.Z` or `# v<major>`) for auditability"
+        )

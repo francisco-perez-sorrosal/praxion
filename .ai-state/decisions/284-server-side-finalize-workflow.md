@@ -1,7 +1,7 @@
 ---
-id: dec-draft-d4c0943f
+id: dec-284
 title: Server-side GitHub Actions finalize backstop for web-UI merges
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-24
 summary: Add a push:main GitHub Actions workflow that reruns the on-main finalize composition and commits the promotion back with GITHUB_TOKEN, backstopping web-UI merges that client-side git hooks cannot reach.

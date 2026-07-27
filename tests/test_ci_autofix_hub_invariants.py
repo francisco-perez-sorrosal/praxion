@@ -569,6 +569,25 @@ def test_autofix_same_repo_pr_agent_allowlist_excludes_pr_merge() -> None:
         ), "The fixer's allowlist must not grant `gh pr merge` — a human always owns the merge decision"
 
 
+def test_autofix_same_repo_pr_allowlists_only_dependabot_bot() -> None:
+    """The dependabot surface reacts to Dependabot-initiated workflow_run events;
+    claude-code-action blocks bot-initiated runs by default, so the fixer step must
+    allowlist dependabot[bot] to act on them — scoped, never '*' (which the action
+    warns would let external Apps invoke it on this public repo)."""
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    agent_steps = _agent_steps(job)
+    assert agent_steps, "autofix-same-repo-pr must contain a claude-code-action fixer step"
+    for step in agent_steps:
+        allowed = str(step.get("with", {}).get("allowed_bots", ""))
+        assert (
+            "dependabot[bot]" in allowed
+        ), "The fixer must allowlist dependabot[bot] or the dependabot surface is DOA (agent never runs)"
+        assert (
+            allowed.strip() != "*"
+        ), "Never allow all bots ('*') on a public repo — the action warns against it"
+
+
 def test_autofix_same_repo_pr_fetches_and_sanitizes_failure_logs_in_a_non_agent_step() -> None:
     parsed = _parsed()
     job = _job(parsed, "autofix-same-repo-pr")

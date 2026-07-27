@@ -17,10 +17,10 @@ watched_workflows: [Test]   # Documentary only — the caller's own
                             # list in sync with that literal by hand.
 
 surfaces:
-  main_branch: fix-pr       # fix-pr | off   (P1 — the only surface implemented)
-  pr_checks:   fix-commit   # P3 — reserved, not yet read by the hub
-  dependabot:  fix-commit   # P3 — reserved, not yet read by the hub
-  fork_prs:    suggest      # P3 — reserved, not yet read by the hub
+  main_branch: fix-pr       # fix-pr | off
+  pr_checks:   fix-commit   # Live — the hub applies same-repo human-PR fixes as commits
+  dependabot:  fix-commit   # Live — the hub applies Dependabot-PR fixes as commits
+  fork_prs:    suggest      # Live — the hub posts fork-PR fix suggestions (no push access)
 
 review:                        # Consumed live by reusable-cross-model-review.yml
                                 # (built and dogfooding on Praxion's own

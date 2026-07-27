@@ -734,6 +734,31 @@ def test_autofix_fork_grants_no_bash_execution_scoped_to_the_isolated_checkout()
         )
 
 
+def test_autofix_fork_gates_on_the_daily_run_budget() -> None:
+    """Even though the fork surface is suggest-only, each fork agent run still
+    counts toward the caller workflow's shared daily run tally — so it must
+    enforce the same daily run-budget cap as the other fix surfaces via a
+    non-agent gate step, or an uncapped fork job could inflate the count and
+    starve the privileged surfaces of their budget.
+    """
+    parsed = _parsed()
+    job = _job(parsed, "autofix-fork")
+    budget_steps = [
+        step
+        for step in job.get("steps") or []
+        if "runs_today" in (step.get("run") or "") and "MAX_RUNS_PER_DAY" in (step.get("run") or "")
+    ]
+    assert budget_steps, (
+        "autofix-fork must include a non-agent step that counts today's runs "
+        "and compares them against the daily run-budget cap before invoking "
+        "the fixer agent"
+    )
+    for step in budget_steps:
+        assert (
+            "uses" not in step
+        ), "The budget gate must be a non-agent `run:` step, evaluated before the fixer agent runs"
+
+
 # ---------------------------------------------------------------------------
 # Cross-cutting (P3a) — concurrency scoping and pin auditability
 # ---------------------------------------------------------------------------

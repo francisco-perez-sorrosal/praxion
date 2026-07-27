@@ -812,8 +812,41 @@ jobs:
             echo "proceed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Fetch failure logs (non-agent, untrusted output)
+      - name: Gate — daily run budget
+        id: budget
         if: steps.pr.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MAX_RUNS_PER_DAY: ${{ needs.classify.outputs.max_runs_per_day }}
+        run: |
+          # Per-surface daily budget cap. Even though this fork surface is
+          # suggest-only (never commits, so it cannot self-re-trigger CI), each
+          # fork agent run STILL counts toward the caller workflow's daily run
+          # tally — so without this gate a burst of fork-PR CI failures could
+          # inflate runs_today and starve the privileged autofix /
+          # autofix-same-repo-pr surfaces of their shared budget. Aggregated
+          # across surfaces via the caller workflow's display name, exactly like
+          # the same-repo-pr gate. No probe-main branch here: that health check
+          # is same-repo-only (fork never touches the default branch).
+          today=$(date -u +%Y-%m-%d)
+          # Fail CLOSED on a gh error (skip this run): if we cannot verify we are
+          # under budget, erring toward not-spending an uncapped agent run is the
+          # fail-safe posture — consistent with the sibling gates.
+          if ! runs_today=$(gh run list --workflow "${{ github.workflow }}" \
+              --created ">=${today}" --limit 100 --json databaseId --jq 'length' 2>/dev/null); then
+            echo "::warning::Could not read today's run count (gh error); failing closed — skipping this run."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "${runs_today}" -gt "${MAX_RUNS_PER_DAY}" ]; then
+            echo "::notice::CI Autofix daily budget (${MAX_RUNS_PER_DAY}) reached (${runs_today} runs today); skipping."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "proceed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch failure logs (non-agent, untrusted output)
+        if: steps.budget.outputs.proceed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -825,7 +858,7 @@ jobs:
           echo "[ci-autofix] wrote $(wc -l < tmp/ci-failure.log) sanitized log lines"
 
       - name: Checkout the fork head into an isolated, read-only subdirectory
-        if: steps.pr.outputs.proceed == 'true'
+        if: steps.budget.outputs.proceed == 'true'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           repository: ${{ github.event.workflow_run.head_repository.full_name }}
@@ -838,7 +871,7 @@ jobs:
 
       - name: Suggest a fix as a PR comment (read-only fixer agent)
         id: fixer
-        if: steps.pr.outputs.proceed == 'true'
+        if: steps.budget.outputs.proceed == 'true'
         # SHA-pinned to the SAME audited commit the other fixers pin (# v1). This
         # job holds NO contents:write, and the allowlist grants only Read/Glob/
         # Grep + gh pr comment — no Edit/Write, no git, no gh pr merge, and no

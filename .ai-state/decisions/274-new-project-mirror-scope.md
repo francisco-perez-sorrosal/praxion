@@ -14,6 +14,8 @@ affected_files:
   - commands/onboard-project.md
   - commands/new-project.md
 affected_reqs: [REQ-06, REQ-07]
+re_affirmed_by:
+  - dec-draft-63c735d9
 ---
 
 ## Context

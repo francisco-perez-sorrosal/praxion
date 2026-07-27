@@ -339,6 +339,10 @@ Inline `dec-NNN` references in this document's component, interface, and constra
 - `dec-281` — Label application (`ecosystem-feedback`) is the HITL arming gate, enforced by three independent layers (GitHub label-permission model + non-Bot actor guard + payload gate); defense-in-depth, not the sole control.
 - `dec-283` — Triage-first, deny-by-default safety-tier classification: mechanical → `issue-autofix/*` PR, behavioral/architectural (and any governance-surface touch) → `needs-adr`; an issue is not a license to redesign.
 
+**In-flight P3a decisions** (Designed, not yet Built — promoted to stable `dec-NNN` at merge-to-main):
+- `dec-draft-ef47bb76` — Self-healing Loop P3a: extend the `reusable-ci-autofix.yml` hub (Subsystem A) additively to the `pr_checks` + `dependabot` fix-commit surfaces via an **N-jobs-one-file seam** (the main `autofix` job stays byte-unchanged); fixes commit to the PR's own branch under **P5's structural no-git-reach containment** (no `git checkout`/`branch`/`push` in the agent allowlist; non-agent push `HEAD:<branch>` no-`--force`, fails closed); loop bounded by a commit-trailer attempt counter + `autofix:declined` terminal label + per-branch concurrency + a Dependabot probe-main gate; unfixable failures (the TS7↔Next16 case) escalate without committing. fix-COMMIT never merges. Re-affirms `dec-273`.
+- `dec-draft-160fc228` — Self-healing Loop P3a: the `fork_prs` surface is **suggest-only with inverted privilege** (`contents: read`, no write) — posts a suggested-patch comment, never commits to an untrusted head; `pull_request_target` stays banned; fork-file inspection uses a base-at-root + isolated `pr-head` checkout the read-only agent may read but never execute. Re-affirms `dec-277`. Fleet rollout of these surfaces (templates + onboarding) is deferred to **P3b**, consistent with `dec-278`/`dec-274`.
+
 ## 9. Test Topology
 
 <!-- OWNER: systems-architect (skeleton, ownership boundaries) | LAST UPDATED: 2026-05-19 by systems-architect -->

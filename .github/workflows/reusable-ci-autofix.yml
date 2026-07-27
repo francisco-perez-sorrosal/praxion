@@ -660,6 +660,15 @@ jobs:
         uses: anthropics/claude-code-action@51ea8ea73a139f2a74ff649e3092c25a904aed7e  # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Lift claude-code-action's default bot-actor guard for Dependabot ONLY.
+          # The action blocks bot-initiated workflow_run events by default (its own
+          # anti-loop feature); the dependabot surface reacts to Dependabot PR CI
+          # failures, so without this the fixer agent never runs (surface DOA — see
+          # the live dogfood on #38). Scoped to dependabot[bot] — never '*'
+          # (action.yml warns '*' lets external Apps invoke the action on a public
+          # repo). Loop safety is already enforced by the attempt-cap + declined
+          # label + per-branch concurrency + probe-main gates.
+          allowed_bots: "dependabot[bot]"
           prompt: |
             A CI workflow failed on pull request #${{ steps.pr.outputs.number }}
             of ${{ github.repository }}. The repository has ALREADY been checked

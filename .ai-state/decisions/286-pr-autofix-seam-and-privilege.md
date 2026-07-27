@@ -1,7 +1,7 @@
 ---
-id: dec-draft-ef47bb76
+id: dec-286
 title: P3a CI-autofix extends to PR/Dependabot surfaces via N-jobs seam, fix-commit-to-PR-branch under P5 containment, commit-trailer attempt cap
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-25
 summary: The main-only CI autofix hub gains PR-check and Dependabot fix-commit surfaces as new jobs (main job byte-unchanged); fixes commit to the PR's own branch under P5's structural no-git-reach containment; a commit-trailer attempt counter, an autofix:declined terminal label, per-branch concurrency, and a probe-main gate bound the loop; unfixable failures escalate without committing.
@@ -26,7 +26,7 @@ default-branch CI failures: its single `autofix` job gates on
 `head_branch == default_branch`, and the policy reader consumes only `surfaces.main_branch`. The
 `autofix-policy.yml` schema already reserves `pr_checks`, `dependabot`, `fork_prs`, and
 `max_attempts_per_pr` as P3 fields "not yet read by the hub." P3a activates the first two same-repo
-surfaces (fork is a separate trust boundary — see `dec-draft-160fc228`) **additively: the existing
+surfaces (fork is a separate trust boundary — see `dec-285`) **additively: the existing
 main-branch fix-PR path must not regress.**
 
 The per-repo caller (`ci-autofix.yml`) already fires on `workflow_run: [Test, Architecture] completed`

@@ -1,7 +1,7 @@
 ---
-id: dec-draft-160fc228
+id: dec-285
 title: Fork-PR CI autofix is suggest-only with inverted privilege — never a commit to an untrusted head
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-25
 summary: The fork_prs surface posts a suggested-patch comment and never commits; its job holds contents:read (no write), pull_request_target stays banned, and any fork-file inspection uses a base-at-root + isolated pr-head checkout the agent may read but never execute.

@@ -1,13 +1,13 @@
 ---
 description: Re-point this project's version-pinned Praxion surfaces (git hooks, merge driver) to the live plugin install after an i-am plugin upgrade
 argument-hint: "[--check | --dry-run]"
-allowed-tools: [Bash(scripts/upgrade_project_pins.sh:*), Bash(bash:*), Bash(git:*), Bash(jq:*), Bash(ls:*), Bash(readlink:*), Read]
+allowed-tools: [Bash(scripts/upgrade_project_pins.sh:*), Bash(bash:*), Bash(git:*), Bash(gh:*), Bash(jq:*), Bash(ls:*), Bash(readlink:*), Read]
 disable-model-invocation: true
 ---
 
 # Upgrade Praxion pins for this project
 
-Reconcile the four **version-pinned** surfaces that `/onboard-project` installed
+Reconcile the **version-pinned** surfaces that `/onboard-project` installed
 into this project so they point at the **currently installed** i-am plugin
 version. Run this once after upgrading the i-am plugin (e.g. `0.8.0 → 0.9.0`):
 the per-project git-hook symlinks and merge-driver registration encode the old
@@ -20,6 +20,13 @@ This is the focused, gate-free counterpart to re-running the full
 2. The `merge.observations-jsonl.driver` git config
 3. Any retired merge driver + its `.gitattributes` line (cross-version cleanup)
 4. The `.ai-state/.praxion-onboard.json` version stamp
+5. The `ci-autofix.yml` caller's pinned hub commit reference (re-pointed to the
+   current tip), and the `cross-model-review.yml` caller (added when absent and
+   `autofix-policy.yml`'s gate allows it) — reconciled only when `gh` can
+   resolve the current hub commit for this run; skipped with an advisory
+   otherwise (see Process, below). Never overwrites an existing
+   `cross-model-review.yml`, and never touches a foreign / hand-edited /
+   non-SHA-pinned `ci-autofix.yml` caller.
 
 The pre-commit hook resolves the plugin path at run time, so it is never stale
 and is left untouched.
@@ -52,24 +59,61 @@ surfaces the result, and reminds you to commit.
    `claude plugin install i-am@bit-agora` or `./install.sh code` from a Praxion
    checkout.)
 
-2. **Run the reconciler**, forwarding `$ARGUMENTS` (`--check` / `--dry-run` or
-   nothing). The script auto-detects the repo root via `git rev-parse`:
+2. **Resolve the current hub SHA**, so surface 5 (the ci-autofix caller
+   re-point + cross-model-review add) always uses a real, current commit —
+   never a placeholder, and never a mutable tag or branch ref:
+   ```bash
+   NEW_SHA="$(gh api repos/francisco-perez-sorrosal/praxion/commits/main --jq .sha 2>/dev/null)" || NEW_SHA=""
+   ```
+   Validate the result matches **40 hex characters** before forwarding it —
+   this is the same `gh api` + `--jq .sha` resolution call and 40-hex
+   validation onboard sub-step 8e.8 uses to resolve `{{HUB_SHA}}`:
+   ```bash
+   printf '%s' "$NEW_SHA" | grep -Eq '^[0-9a-f]{40}$' || NEW_SHA=""
+   ```
+   If `gh` is unavailable, unauthenticated, or the call above produced
+   anything other than a 40-hex SHA, print an advisory to the user and skip
+   surface 5 entirely for this run — proceed without `--hub-sha`; the four
+   pre-existing surfaces still reconcile normally:
+   ```
+   Advisory: gh is unavailable or unauthenticated — the ci-autofix SHA
+   re-point and cross-model-review add are skipped this run. The four
+   pre-existing surfaces still reconcile below.
+   ```
+
+3. **Run the reconciler**, forwarding `$ARGUMENTS` (`--check` / `--dry-run` or
+   nothing). The script auto-detects the repo root via `git rev-parse`. When
+   `NEW_SHA` resolved successfully, forward it:
+   ```bash
+   bash "$PLUGIN_ROOT/scripts/upgrade_project_pins.sh" --hub-sha "$NEW_SHA" $ARGUMENTS
+   ```
+   Otherwise, run without `--hub-sha` — the script skips surface 5 and
+   reconciles the four pre-existing surfaces exactly as before:
    ```bash
    bash "$PLUGIN_ROOT/scripts/upgrade_project_pins.sh" $ARGUMENTS
    ```
 
-3. **Report the outcome** verbatim from the script — which surfaces were stale,
-   what was re-pointed, and what was staged.
+4. **Report the outcome** verbatim from the script — which surfaces were
+   stale, what was re-pointed, and what was staged. If the script's
+   `[caller]` section reports the `cross-model-review.yml` caller was
+   installed this run, print the one-time operator step (never auto-run it —
+   the same print-not-inject convention onboard 8e.8 uses for this secret):
+   ```
+   gh secret set CURSOR_API_KEY
+   ```
+   Without it, the review gate's reviewer step no-ops.
 
-4. **If changes were applied** (not `--check`/`--dry-run`), remind the user that
+5. **If changes were applied** (not `--check`/`--dry-run`), remind the user that
    the staged changes are ready and propose a commit message — do **not** commit
    for them:
    ```
    chore: re-point Praxion pins to <version>
    ```
    Note that the hook symlink and git-config changes are **not** tracked files
-   (they live in `.git/`), so the staged diff only covers `.gitattributes` and
-   the onboard manifest. The hook/driver re-points take effect immediately.
+   (they live in `.git/`), so the staged diff covers `.gitattributes`, the
+   onboard manifest, and — when surface 5 reconciled — the caller workflow
+   file(s) under `.github/workflows/`. The hook/driver re-points take effect
+   immediately.
 
 ## Notes
 
@@ -80,5 +124,9 @@ surfaces the result, and reminds you to commit.
 - **Never overwrites a non-Praxion hook or merge driver** — a foreign value in
   the `merge.observations-jsonl.driver` slot is reported and left as-is; a
   non-Praxion hook is backed up to `<name>.pre-praxion` before installing.
+- **Surface 5 is gh-gated, not a hard dependency.** A missing or unauthenticated
+  `gh` never fails the whole upgrade — it only skips the ci-autofix SHA
+  re-point and the cross-model-review add; the four pre-existing surfaces
+  reconcile regardless.
 - This command is the maintenance path; the full `/onboard-project` re-run still
   works and reconciles the same surfaces as part of its broader flow.

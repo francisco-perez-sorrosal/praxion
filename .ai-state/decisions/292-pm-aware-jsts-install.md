@@ -1,7 +1,7 @@
 ---
-id: dec-draft-db303aa8
+id: dec-292
 title: PM-aware JS/TS install via default-branch lockfile detection + install-failure-degrades-to-decline
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-28
 summary: Supersede dec-291's install-derivation — decouple the package manager (detected from the trusted default-branch lockfile, provisioned via corepack) from the js_test_runner enum, and make the install step continue-on-error + gate the fixer so an install failure degrades to Bug A's green clean decline

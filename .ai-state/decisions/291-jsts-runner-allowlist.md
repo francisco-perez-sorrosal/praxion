@@ -2,7 +2,7 @@
 id: dec-291
 title: Proceed with the JS/TS test-runner allowlist expansion for the same-repo fixer
 status: superseded
-superseded_by: dec-draft-db303aa8
+superseded_by: dec-292
 category: architectural
 date: 2026-07-28
 summary: User-approved PROCEED (overriding the systems-architect's advisory DEFER) with the safe design — enum-selected runner, non-agent --ignore-scripts lockfile install, runner-only agent grant, policy sourced from the trusted default branch

@@ -1,7 +1,7 @@
 ---
-id: dec-draft-b772d931
+id: dec-288
 title: upgrade_project_pins gains an in-place hub-SHA rewrite + add-caller-if-absent op; SHA resolved in the command layer, script deterministic given --hub-sha
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-27
 summary: The existing-project upgrade path re-points a Praxion-authored ci-autofix caller's pinned hub @<40-hex> and adds the cross-model-review caller if absent. The hub SHA is resolved in the LLM/gh-capable /upgrade-project command layer and passed to the deterministic bash reconciler as --hub-sha (resolving in-script would depend on main's moving tip, breaking determinism); the rewrite edits only the SHA token on a uses:-line matching the Praxion-hub reusable-workflow shape, leaving foreign/hand-edited/self-host callers untouched.

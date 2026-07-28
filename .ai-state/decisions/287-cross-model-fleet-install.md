@@ -1,7 +1,7 @@
 ---
-id: dec-draft-63c735d9
+id: dec-287
 title: Fleet-install the cross-model review gate — onboard 8e.8 installs the caller gated on policy; /new-project unchanged (defer contract); closes dec-278
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-27
 summary: /onboard-project sub-step 8e.8 is flipped to install the cross-model-review.yml caller alongside ci-autofix.yml, gated on policy review.cross_model_gate != off, under the same file-existence idempotency guard, printing (never injecting) gh secret set CURSOR_API_KEY. The stale autofix-policy.yml.tmpl comments (pr_checks/dependabot/fork_prs) are corrected to LIVE. /new-project gains no install logic — its existing defer-to-/onboard-project handoff covers the new caller (dec-274 pattern, re-affirmed by dec-278). Closes dec-278's deferral of P2 fleet rollout.

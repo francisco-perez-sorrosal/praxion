@@ -57,15 +57,23 @@ provider:
   # js_test_runner: off       # Optional enum: off | vitest | jest | npm-test |
                                # pnpm-test. Defaults to "off" — a missing or
                                # malformed value never grants the fixer agent
-                               # a test-runner tool. When set, the hub adds a
-                               # non-agent `npm ci`/`pnpm install
-                               # --frozen-lockfile` step (lifecycle scripts
-                               # disabled via --ignore-scripts) and grants the
-                               # fixer agent EXACTLY that runner invocation —
-                               # never an install command — so it can verify a
-                               # JS/TS fix. The enum maps through a hardcoded
-                               # table in the hub; a free-form command is
-                               # never accepted.
+                               # a test-runner tool. The enum selects ONLY the
+                               # runner invocation (e.g. `./node_modules/.bin/
+                               # vitest run`), via a hardcoded table — never a
+                               # free-form command. When set, the hub also
+                               # adds a non-agent install step (lifecycle
+                               # scripts disabled via --ignore-scripts) and
+                               # grants the fixer agent EXACTLY the runner
+                               # invocation, never an install command. The
+                               # install command is picked separately: the hub
+                               # DETECTS the package manager from whichever
+                               # lockfile (pnpm-lock.yaml, yarn.lock, or
+                               # package-lock.json — checked in that
+                               # precedence) is present in the trusted
+                               # default-branch tree, then provisions pnpm/
+                               # yarn via the runner's bundled `corepack
+                               # enable` — no explicit package-manager key is
+                               # needed here.
   # js_project_dir: ""        # Optional — NO default. Set this only when the
                                # JS/TS project lives in a subdirectory rather
                                # than the repo root (e.g. a monorepo's

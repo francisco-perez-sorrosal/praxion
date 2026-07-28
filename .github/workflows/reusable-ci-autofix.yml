@@ -405,23 +405,51 @@ jobs:
               "js_test_runner": "off",
           }
 
-          # Fixed table mapping the js_test_runner enum to an (install_cmd,
-          # runner_cmd) pair of RAW shell commands — injection-safe by
-          # construction: the raw policy string is never templated directly
-          # into an output line, only used as a lookup key into this
-          # hardcoded table (unrecognized values fall back to "off"'s tuple).
-          # The install command intentionally omits --ignore-scripts here —
-          # the non-agent install step below always appends it, so the flag
-          # can never be dropped by a future table edit. runner_cmd is wrapped
-          # into a Bash(...) allowlist grant below, after the optional
-          # js_project_dir prefix is applied.
+          # Fixed table mapping the js_test_runner enum to a RAW runner shell
+          # command — injection-safe by construction: the raw policy string is
+          # never templated directly into an output line, only used as a
+          # lookup key into this hardcoded table (unrecognized values fall
+          # back to "off"). The INSTALL half lives in JS_PM_INSTALL below,
+          # keyed on the package manager DETECTED from the trusted
+          # default-branch lockfile (see detect_pm) rather than this enum — a
+          # vitest repo may use npm, pnpm, or yarn, so coupling "runner" to
+          # "installer" here was the root cause of a prior dogfood failure.
+          # runner_cmd is wrapped into a Bash(...) allowlist grant below,
+          # after the optional js_project_dir prefix is applied.
           JS_RUNNER_TABLE = {
-              "off": ("", ""),
-              "vitest": ("npm ci", "./node_modules/.bin/vitest run"),
-              "jest": ("npm ci", "./node_modules/.bin/jest"),
-              "npm-test": ("npm ci", "npm test"),
-              "pnpm-test": ("pnpm install --frozen-lockfile", "pnpm test"),
+              "off": "",
+              "vitest": "./node_modules/.bin/vitest run",
+              "jest": "./node_modules/.bin/jest",
+              "npm-test": "npm test",
+              "pnpm-test": "pnpm test",
           }
+
+          # Closed table keyed on a package manager DETECTED from the trusted
+          # default-branch lockfile (never from PR-head content) — see
+          # detect_pm below. Each row's install verb is the row's TAIL so the
+          # non-agent install step's appended ` --ignore-scripts` always binds
+          # to the actual install command, never to the corepack-provisioning
+          # prefix. pnpm/yarn are provisioned via corepack (bundled with the
+          # runner's Node) rather than a new SHA-pinned `uses:` action.
+          JS_PM_INSTALL = {
+              "npm": "npm ci",
+              "pnpm": "corepack enable && pnpm install --frozen-lockfile",
+              "yarn": "corepack enable && yarn install --frozen-lockfile",
+          }
+
+          def detect_pm(project_dir):
+              """Detect the package manager from lockfile presence under
+              project_dir (repo root when unset), fixed precedence
+              pnpm > yarn > npm; falls back to npm when no lockfile is found
+              (fail-safe, matching the file's existing DEFAULTS pattern)."""
+              base = project_dir or "."
+              if os.path.exists(os.path.join(base, "pnpm-lock.yaml")):
+                  return "pnpm"
+              if os.path.exists(os.path.join(base, "yarn.lock")):
+                  return "yarn"
+              if os.path.exists(os.path.join(base, "package-lock.json")):
+                  return "npm"
+              return "npm"
 
           policy_path = sys.argv[1]
           policy = {}
@@ -450,22 +478,32 @@ jobs:
           fixer_model = provider.get("fixer_model", DEFAULTS["fixer_model"])
 
           # Enum selector, never a free-form command: js_test_runner picks a
-          # row of JS_RUNNER_TABLE. An unrecognized value falls back to
-          # "off"'s tuple (fail-safe, matching the file's existing DEFAULTS
+          # row of JS_RUNNER_TABLE (runner only). An unrecognized value falls
+          # back to "off" (fail-safe, matching the file's existing DEFAULTS
           # pattern) rather than raising.
           js_test_runner = provider.get("js_test_runner", DEFAULTS["js_test_runner"])
-          js_install_cmd, js_runner_cmd = JS_RUNNER_TABLE.get(js_test_runner, JS_RUNNER_TABLE["off"])
+          js_runner_cmd = JS_RUNNER_TABLE.get(js_test_runner, JS_RUNNER_TABLE["off"])
 
           # js_project_dir has deliberately NO default — most managed repos
-          # keep their JS/TS project at the repo root, where the table's
-          # commands above already resolve correctly. A caller sets this only
+          # keep their JS/TS project at the repo root, where detect_pm's own
+          # "." default already resolves correctly. A caller sets this only
           # when the project lives in a subdirectory (e.g. Praxion's own
-          # dashboard_app/). Applied as a uniform `cd <dir> &&` prefix so it
-          # works identically across every package manager in the table,
-          # rather than a manager-specific flag (npm's --prefix, pnpm's -C).
+          # dashboard_app/). detect_pm reads this SAME already-checked-out
+          # default-branch tree the policy file itself was read from above, so
+          # detection never trusts PR-head content.
           js_project_dir = provider.get("js_project_dir")
-          if js_project_dir and js_install_cmd:
-              js_install_cmd = f"cd {js_project_dir} && {js_install_cmd}"
+          pm_install_cmd = JS_PM_INSTALL[detect_pm(js_project_dir)]
+          if js_project_dir:
+              pm_install_cmd = f"cd {js_project_dir} && {pm_install_cmd}"
+          # Gated on a granted runner, not on lockfile presence alone: a repo
+          # with any lockfile but js_test_runner: off must never receive an
+          # install command — the install surface only ever widens for repos
+          # that opted a runner in.
+          js_install_cmd = pm_install_cmd if js_runner_cmd else ""
+
+          # Applied as a uniform `cd <dir> &&` prefix so it works identically
+          # across every runner in the table, rather than a manager-specific
+          # flag.
           if js_project_dir and js_runner_cmd:
               js_runner_cmd = f"cd {js_project_dir} && {js_runner_cmd}"
           js_test_grant = f"Bash({js_runner_cmd}:*)" if js_runner_cmd else ""
@@ -696,12 +734,25 @@ jobs:
         # future table edit can never silently drop it. This is the largest
         # asymmetry vs the Python path: only the runner and the repo's own
         # test files execute, never an install-time lifecycle script.
+        #
+        # id + continue-on-error: an install failure (e.g. a lockfile out of
+        # sync with a dependency bump) must not fail the job — the fixer step
+        # below skips on this step's 'failure' outcome and finalize still
+        # degrades the run to a clean, green decline (never a red job).
+        id: js_install
+        continue-on-error: true
         if: steps.budget.outputs.proceed == 'true' && needs.classify.outputs.js_test_grant != ''
+        env:
+          # pnpm/yarn are provisioned via the runner's bundled corepack (no
+          # new SHA-pinned `uses:` action); this disables corepack's
+          # interactive first-use download prompt, which would otherwise
+          # block indefinitely in non-TTY CI.
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
         run: ${{ needs.classify.outputs.js_install_cmd }} --ignore-scripts
 
       - name: Fix the failing PR in place (the fixer agent)
         id: fixer
-        if: steps.budget.outputs.proceed == 'true'
+        if: steps.budget.outputs.proceed == 'true' && steps.js_install.outcome != 'failure'
         # continue-on-error: an agent crash (e.g. turn-budget exhaustion) must
         # not fail the job — the finalize step below converts every non-fix
         # terminal state (crash, ambiguous exit, self-decline) into a clean,

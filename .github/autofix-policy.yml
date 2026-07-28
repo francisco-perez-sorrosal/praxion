@@ -60,7 +60,13 @@ provider:
                                # JS/TS Dependabot bump can be verified, not just
                                # cleanly declined. See dec-draft-735a4612 for
                                # the residual-risk acceptance (--ignore-scripts
-                               # closes install-time execution only).
+                               # closes install-time execution only). The
+                               # install command itself is NOT selected by
+                               # this enum — the hub DETECTS the package
+                               # manager from js_project_dir's lockfile
+                               # (dashboard_app/pnpm-lock.yaml selects a pnpm
+                               # install via corepack), never a hardcoded
+                               # `npm ci`.
   js_project_dir: dashboard_app  # Praxion's JS/TS project lives in this
                                # subdirectory, not the repo root — the vitest
                                # binary is at dashboard_app/node_modules/.bin/

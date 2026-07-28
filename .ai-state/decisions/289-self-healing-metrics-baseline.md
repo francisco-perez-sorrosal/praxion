@@ -1,7 +1,7 @@
 ---
-id: dec-draft-f2d6c106
+id: dec-289
 title: P6 self-healing-loop metrics baseline — on-demand gh-run-history collector in a distinct SELF_HEALING_* namespace, non-skipped attempts metric, deferred gate-verdict and in-place-fix detection
-status: proposed
+status: accepted
 category: implementation
 date: 2026-07-28
 summary: P6 stands up a read-only, on-demand collector (`scripts/self_healing_metrics.py`) over the loop's GitHub Actions run history, emitting a SELF_HEALING_* report triple to `.ai-state/metrics_reports/` — a namespace deliberately distinct from the code-health METRICS_REPORT_* triple to avoid schema collision. It counts non-skipped autofix *attempts* (not raw runs, which skips dominate), flags fetch-limit saturation, and records credit-burn, gate-verdict classification, in-place-fix detection, and override rate as explicit deferred/operator-supplied nulls rather than fabricated zeros.

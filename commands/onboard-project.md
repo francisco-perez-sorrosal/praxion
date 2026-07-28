@@ -972,7 +972,7 @@ full allowlist rationale.
 
 **Stack reuse.** This phase consumes the **Stack detection** captured in §Pre-flight (step 4) — Python, JavaScript/TypeScript, etc. It performs no new detection beyond reading `package.json` dependencies to distinguish framework (React/Vue/Next) from non-framework JS/TS.
 
-**Asset resolution.** Canonical assets live in the i-am plugin install (the `installPath` captured in §Pre-flight): `skills/python-development/assets/{ruff-baseline.toml, mypy-baseline.toml}`, `skills/typescript-development/assets/{biome.json, eslint.config.mjs, prettierrc.json, tsconfig.json}`, `claude/project-baseline/{editorconfig, pre-commit-config.yaml, CONTRIBUTING.md.tmpl, dependabot.yml.tmpl}`, and `claude/project-baseline/ci-autofix/{ci-autofix.yml.tmpl, autofix-policy.yml.tmpl}`. Read the asset from there; write the materialized file into the project. Edit the asset (never the per-project copy) to evolve the baseline.
+**Asset resolution.** Canonical assets live in the i-am plugin install (the `installPath` captured in §Pre-flight): `skills/python-development/assets/{ruff-baseline.toml, mypy-baseline.toml}`, `skills/typescript-development/assets/{biome.json, eslint.config.mjs, prettierrc.json, tsconfig.json}`, `claude/project-baseline/{editorconfig, pre-commit-config.yaml, CONTRIBUTING.md.tmpl, dependabot.yml.tmpl}`, and `claude/project-baseline/ci-autofix/{ci-autofix.yml.tmpl, autofix-policy.yml.tmpl, cross-model-review.yml.tmpl}`. Read the asset from there; write the materialized file into the project. Edit the asset (never the per-project copy) to evolve the baseline.
 
 **Gate 8e — three-option AskUserQuestion.** Use `AskUserQuestion` with `header: "Next?"`, `multiSelect: false`, the Gate 8e headline from the gate map, and these three options:
 
@@ -1026,11 +1026,11 @@ full allowlist rationale.
 
 **Action.** Read `claude/project-baseline/dependabot.yml.tmpl` (from the plugin install). Strip the leading template-doc comment lines. Emit `updates:` blocks only for detected ecosystems: a Python manifest present anywhere in the repo → include the `pip` block with `directory:` set to the discovered manifest directory; a `package.json` present anywhere in the repo → include the `npm` block with `directory:` set to the discovered `package.json` directory; a `.github/workflows/` directory present → include the `github-actions` block. Multiple Python or npm manifests at different directories each get their own `updates:` entry. Strip blocks for undetected ecosystems. Write the result to `<repo-root>/.github/dependabot.yml` (creating `.github/` if absent). Print: `8e.7: .github/dependabot.yml installed (dependency scanning enabled for detected ecosystems)`.
 
-### Sub-step 8e.8 — CI autofix caller + policy
+### Sub-step 8e.8 — CI autofix caller + policy + cross-model review gate
 
 **Predicate.** `.github/workflows/ci-autofix.yml` OR `.github/autofix-policy.yml` already exists at the repo root → skip with `8e.8: skipped (ci-autofix caller or policy already present)`. Never overwrite an existing installation — this mirrors 8e.7's file-existence guard exactly.
 
-**Action.** Read `claude/project-baseline/ci-autofix/ci-autofix.yml.tmpl` and `claude/project-baseline/ci-autofix/autofix-policy.yml.tmpl` (from the plugin install) and strip each file's leading template-doc comment header. Fill the caller template's three placeholders:
+**Action.** Read `claude/project-baseline/ci-autofix/ci-autofix.yml.tmpl`, `claude/project-baseline/ci-autofix/autofix-policy.yml.tmpl`, and `claude/project-baseline/ci-autofix/cross-model-review.yml.tmpl` (from the plugin install) and strip each file's leading template-doc comment header. Fill the caller template's three placeholders:
 
 - `{{WATCHED_WORKFLOWS}}` → the comma-separated, quoted names of the project's own CI workflows (detected under `.github/workflows/`, confirmed with the user). GitHub Actions requires `on.workflow_run.workflows` to be a static literal, so this cannot be read from the policy at runtime — keep it in sync with the policy's `watched_workflows` by hand.
 - `{{PRAXION_HUB}}` → `francisco-perez-sorrosal/praxion` (the public hub's owner/repo).
@@ -1038,14 +1038,17 @@ full allowlist rationale.
 
 After writing, self-check the installed caller: grep `.github/workflows/ci-autofix.yml` for any surviving `{{` and abort loudly if one remains — no unresolved placeholder may survive into the installed file.
 
-Write the rendered caller to `<repo-root>/.github/workflows/ci-autofix.yml` and the rendered policy to `<repo-root>/.github/autofix-policy.yml` (creating `.github/workflows/` if absent). Do **not** install the P2 `cross-model-review.yml.tmpl` stub — it is designed-not-built and stays deferred to a later phase.
+Write the rendered caller to `<repo-root>/.github/workflows/ci-autofix.yml` and the rendered policy to `<repo-root>/.github/autofix-policy.yml` (creating `.github/workflows/` if absent).
+
+**Cross-model review gate (policy-gated, own idempotency guard).** IF `.github/workflows/cross-model-review.yml` already exists → skip this part with `8e.8: cross-model caller skipped (already present)` and never overwrite it — the same file-existence idempotency guard as the ci-autofix caller above, applied to its own file. ELSE IF the policy just written has `review.cross_model_gate` explicitly set to `off` → the system never installs the cross-model caller — an explicit opt-out means the project is not forced into a second vendor's secret requirement. OTHERWISE — the install proceeds whenever `review.cross_model_gate != off` (the template default `agent-prs`, or `all-prs`, both qualify) — fill `{{PRAXION_HUB}}` and the same resolved, real, current 40-hex `{{HUB_SHA}}` into `cross-model-review.yml.tmpl`, self-check for a surviving `{{` and abort loudly if one remains, and write the rendered result to `<repo-root>/.github/workflows/cross-model-review.yml`.
 
 Do **not** execute any secret-setup or org-configuration command on the operator's behalf — **print** these one-time manual steps instead:
 
-- Secret setup: `gh secret set CLAUDE_CODE_OAUTH_TOKEN` — the autofixer authenticates the hub's fixer with this token; without it the fixer step no-ops. (P2, print only if the caller opts into cross-model review: `gh secret set CURSOR_API_KEY`.)
+- Secret setup: `gh secret set CLAUDE_CODE_OAUTH_TOKEN` — the autofixer authenticates the hub's fixer with this token; without it the fixer step no-ops.
+- When the cross-model caller is installed: `gh secret set CURSOR_API_KEY` — the review gate's reviewer authenticates with this token; without it the review step no-ops. This is a real, unconditional one-time operator step whenever the caller is installed, never a deferred aside.
 - Org Actions-allowlist: if the caller repo's org restricts Actions to an allowlist, the repo owner must add the hub explicitly using the reusable-workflow `OWNER/REPOSITORY/PATH/FILENAME@<ref>` syntax — e.g. `francisco-perez-sorrosal/praxion/.github/workflows/reusable-ci-autofix.yml@<HUB_SHA>` — substitute the same resolved SHA used in the caller's `uses:` line above, not the literal string `<HUB_SHA>` (or use a wildcard covering the hub). This is a one-time, deliberate operator step, never auto-injected.
 
-Print: `8e.8: .github/workflows/ci-autofix.yml + .github/autofix-policy.yml installed (ci-autofix caller wired to the public hub — see the two printed one-time operator steps to activate)`.
+Print: `8e.8: .github/workflows/ci-autofix.yml + .github/autofix-policy.yml installed (ci-autofix caller wired to the public hub — see the printed one-time operator steps to activate)`. When the cross-model caller is also installed, print an additional line: `8e.8: .github/workflows/cross-model-review.yml installed (cross-model review gate wired to the public hub)`.
 
 **Verification handoff.** Phase 9 lists every file staged here. The agent-readiness Style, Code Quality, Documentation, and Security criteria covered by this phase (linter/formatter/editorconfig/pre-commit, type-check, contributing, dependency-scanning) flip to pass on the next `/project-metrics --refresh` run.
 

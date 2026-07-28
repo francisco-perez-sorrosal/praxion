@@ -23,12 +23,26 @@
 # The pre-commit hook is written inline and resolves the plugin path at run time,
 # so it is version-independent and never goes stale — this script leaves it be.
 #
+# A fifth surface is reconciled ONLY when --hub-sha <SHA> is passed: the
+# .github/workflows/ ci-autofix.yml + cross-model-review.yml reusable-workflow
+# callers, whose version identity is a cross-repo hub git ref (the pinned SHA)
+# rather than a local plugin-cache path. The script never resolves the SHA
+# itself (that would depend on the hub's moving tip and break determinism) — the
+# SHA is resolved in the /upgrade-project command layer and passed in. Without
+# --hub-sha the caller surface is skipped entirely and the four surfaces above
+# reconcile exactly as before (backward compatible).
+#
 # Usage
 # -----
 #   scripts/upgrade_project_pins.sh [options]
 #
 #   --repo-root <path>    Project root (default: git rev-parse --show-toplevel)
 #   --plugin-path <path>  Override the live plugin install path (for tests)
+#   --hub-sha <SHA>       Re-point the ci-autofix.yml caller's pinned hub SHA to
+#                         this 40-hex value and add the cross-model-review.yml
+#                         caller if policy-gated on + absent. Resolved by the
+#                         command layer; the script never touches the network.
+#                         Omit to skip the caller surface (backward compatible).
 #   --check               Report drift and exit 1 if any is found; mutate nothing
 #   --dry-run             Print what would change; mutate nothing
 #   --no-stage            Skip `git add` of touched tracked files
@@ -41,13 +55,17 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 PLUGIN_KEY="i-am@bit-agora"
 EXPECTED_DRIVERS=("observations-jsonl")
 FINALIZE_HOOKS=("post-merge" "post-commit" "post-checkout")
 LEGACY_HOOK_BASENAME="git-post-merge-hook.sh"
+PRAXION_HUB="francisco-perez-sorrosal/praxion"
 
 REPO_ROOT=""
 PLUGIN_PATH_OVERRIDE=""
+HUB_SHA=""     # empty = skip the caller surface (backward compatible)
 MODE="apply"   # apply | check | dry-run
 STAGE=1
 
@@ -60,6 +78,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --repo-root)   REPO_ROOT="$2"; shift 2 ;;
         --plugin-path) PLUGIN_PATH_OVERRIDE="$2"; shift 2 ;;
+        --hub-sha)     HUB_SHA="$2"; shift 2 ;;
         --check)       MODE="check"; shift ;;
         --dry-run)     MODE="dry-run"; shift ;;
         --no-stage)    STAGE=0; shift ;;
@@ -67,6 +86,13 @@ while [ $# -gt 0 ]; do
         *) err "unknown option: $1"; exit 1 ;;
     esac
 done
+
+# --hub-sha is a boundary input: it must be a bare 40-hex commit SHA, never a
+# tag/branch/placeholder (the script writes it verbatim into a `uses:` ref).
+if [ -n "$HUB_SHA" ] && ! printf '%s' "$HUB_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+    err "--hub-sha must be a 40-hex commit SHA (got: '$HUB_SHA')"
+    exit 1
+fi
 
 # ---- preconditions ---------------------------------------------------------
 
@@ -125,6 +151,133 @@ declare -a STAGED_FILES=()
 
 note_change() { CHANGES=$((CHANGES + 1)); }
 mutating()    { [ "$MODE" = "apply" ]; }
+
+# ---- caller-reconcile helpers (only reached when --hub-sha is passed) -------
+
+# Locate the shipped cross-model-review caller template: prefer the resolved live
+# plugin install (the same tree that provides the finalize hook), fall back to
+# the script's own checkout. Never fetched over the network.
+find_cross_model_template() {
+    local rel="claude/project-baseline/ci-autofix/cross-model-review.yml.tmpl"
+    local c
+    for c in "$PLUGIN_INSTALL_PATH/$rel" "$SCRIPT_DIR/../$rel"; do
+        [ -f "$c" ] && { printf '%s\n' "$c"; return 0; }
+    done
+    return 1
+}
+
+# Render a caller template to stdout: strip the leading doc-comment header (the
+# contiguous run of # lines plus the blank line[s] that follow, up to the first
+# YAML line) and fill the two placeholders. GitHub Actions ${{ }} expressions are
+# left intact — they are not template placeholders.
+render_caller_template() {
+    local tmpl="$1"
+    awk 'seen {print; next}
+         /^[[:space:]]*#/ {next}
+         /^[[:space:]]*$/ {next}
+         {seen=1; print}' "$tmpl" \
+        | sed -e "s|{{PRAXION_HUB}}|$PRAXION_HUB|g" -e "s|{{HUB_SHA}}|$HUB_SHA|g"
+}
+
+# Re-point a Praxion-authored, SHA-pinned ci-autofix.yml caller's hub SHA in
+# place. Provenance is the uses:-line SHAPE: only a
+# francisco-perez-sorrosal/praxion reusable-ci-autofix.yml@<40-hex> ref is
+# upgradable. The rewrite edits ONLY the 40-hex token — every other byte
+# (comments, permissions, an operator's watched-workflow edits) is preserved. A
+# foreign-hub / mutable-ref / self-host ./ / hand-renamed caller does not match
+# the shape and is left untouched + reported. Idempotent by construction (no-op
+# when the SHA already matches).
+reconcile_ci_autofix_caller() {
+    local caller="$REPO_ROOT/.github/workflows/ci-autofix.yml"
+    [ -f "$caller" ] || { info "ci-autofix.yml: absent → nothing to re-point"; return 0; }
+
+    # Count the shape-matching uses: lines BEFORE extracting. grep -Eq only
+    # guarantees ≥1 match; a caller with two matching refs (an operator
+    # matrix/canary job — the "operator-edited, never clobber" category) would
+    # make the single-value extraction below return a multi-line token and crash
+    # the rewrite (sed: unterminated substitute pattern), mid-apply. Branch on
+    # the count: 0 → not a Praxion caller (leave alone); 1 → rewrite the token;
+    # >1 → ambiguous shape → leave untouched + report (mirrors the foreign-caller
+    # path). Never crash.
+    local match_re='uses:[[:space:]]*francisco-perez-sorrosal/praxion/\.github/workflows/reusable-ci-autofix\.yml@[0-9a-f]{40}'
+    local match_count
+    match_count="$(grep -Ec "$match_re" "$caller")" || true
+    if [ "$match_count" -eq 0 ]; then
+        info "ci-autofix.yml: uses: not a Praxion-pinned reusable-ci-autofix ref → left untouched"
+        return 0
+    fi
+    if [ "$match_count" -gt 1 ]; then
+        info "ci-autofix.yml: $match_count Praxion-pinned reusable-ci-autofix refs → ambiguous shape, left untouched"
+        return 0
+    fi
+
+    # Single-pass extract of the currently pinned token (no pipe → no pipefail
+    # SIGPIPE surprise); the count above guarantees exactly one such line.
+    local cur_sha
+    cur_sha="$(sed -nE 's|.*reusable-ci-autofix\.yml@([0-9a-f]{40}).*|\1|p' "$caller")"
+    if [ "$cur_sha" = "$HUB_SHA" ]; then
+        info "ci-autofix.yml: already pinned to $HUB_SHA"
+        return 0
+    fi
+
+    note_change
+    info "ci-autofix.yml: re-point hub SHA $cur_sha → $HUB_SHA"
+    if mutating; then
+        # Token-scoped replace: only reusable-ci-autofix.yml@<old-sha> is
+        # rewritten, so a coincidental bare SHA elsewhere is never touched; sed
+        # preserves every other byte, including the trailing newline.
+        sed "s|reusable-ci-autofix\.yml@$cur_sha|reusable-ci-autofix.yml@$HUB_SHA|g" \
+            "$caller" > "$caller.tmp" && mv "$caller.tmp" "$caller"
+        STAGED_FILES+=("$caller")
+    fi
+}
+
+# Install the cross-model-review.yml caller when the ci-autofix policy exists,
+# its review.cross_model_gate is not `off`, and the caller is absent. Never
+# overwrites an existing caller. Renders the shipped template, aborts loudly on a
+# surviving {{placeholder}} (a GitHub ${{ }} is not one), then writes.
+reconcile_cross_model_caller() {
+    local policy="$REPO_ROOT/.github/autofix-policy.yml"
+    local cross="$REPO_ROOT/.github/workflows/cross-model-review.yml"
+
+    [ -f "$policy" ] || { info "cross-model-review.yml: no autofix-policy.yml → skip"; return 0; }
+    if [ -f "$cross" ]; then
+        info "cross-model-review.yml: already present → skip (never overwrite)"
+        return 0
+    fi
+
+    # Single-pass extract of the first gate value (no grep|head|sed|tr pipe →
+    # no pipefail SIGPIPE surprise, matching the cur_sha idiom above): capture
+    # the first non-space/non-# token after the colon, drop any trailing
+    # comment, and quit on the first matching line.
+    local gate
+    gate="$(sed -nE '/^[[:space:]]*cross_model_gate:/{s/^[[:space:]]*cross_model_gate:[[:space:]]*([^[:space:]#]*).*/\1/p;q;}' "$policy")"
+    if [ -z "$gate" ] || [ "$gate" = "off" ]; then
+        info "cross-model-review.yml: gate '${gate:-unset}' → not installed"
+        return 0
+    fi
+
+    local tmpl
+    tmpl="$(find_cross_model_template)" || {
+        err "cross-model-review.yml.tmpl not found under plugin install or script tree"
+        exit 1; }
+
+    note_change
+    info "cross-model-review.yml: gate '$gate', absent → install"
+    if mutating; then
+        mkdir -p "$(dirname "$cross")"
+        render_caller_template "$tmpl" > "$cross.tmp"
+        # Abort loudly if an unfilled {{PLACEHOLDER}} survived; ${{ }} is skipped
+        # via the not-preceded-by-$ guard so GitHub expressions never trip it.
+        if grep -Eq '(^|[^$])\{\{' "$cross.tmp"; then
+            rm -f "$cross.tmp"
+            err "cross-model-review.yml: unresolved {{placeholder}} survived render — aborting"
+            exit 1
+        fi
+        mv "$cross.tmp" "$cross"
+        STAGED_FILES+=("$cross")
+    fi
+}
 
 echo "Plugin: $PLUGIN_KEY @ $PLUGIN_VERSION"
 echo "Live install path: $PLUGIN_INSTALL_PATH"
@@ -248,14 +401,17 @@ echo "[4/4] Onboard manifest"
 now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 if [ -f "$MANIFEST" ] && command -v jq >/dev/null 2>&1; then
     recorded="$(jq -r '.onboarded_with_version // "unknown"' "$MANIFEST")"
-    # Canonical artifact inventory after reconciliation: the expected driver set
-    # and its sole .gitattributes mapping. Retired entries are dropped here so a
-    # future run does not reprocess them (the step-3 guard is the safety net).
+    # Canonical CORE artifact inventory after reconciliation: the expected driver
+    # set and its sole .gitattributes mapping. Applied as a SHALLOW MERGE
+    # (.artifacts + $expected) rather than a wholesale overwrite: the canonical
+    # core keys win (so a retired driver is still pruned from merge_drivers /
+    # gitattributes), while a conditional caller-set key an onboard recorded
+    # (e.g. ci_autofix) is preserved across the upgrade.
     expected_artifacts='{"hooks":["pre-commit","post-merge","post-commit","post-checkout"],"merge_drivers":["observations-jsonl"],"gitattributes":[".ai-state/observations.jsonl merge=observations-jsonl"]}'
     cur_artifacts="$(jq -cS '.artifacts // {}' "$MANIFEST")"
-    want_artifacts="$(jq -cS '.' <<<"$expected_artifacts")"
+    merged_artifacts="$(jq -cS '(.artifacts // {}) + $a' --argjson a "$expected_artifacts" "$MANIFEST")"
 
-    if [ "$recorded" = "$PLUGIN_VERSION" ] && [ "$cur_artifacts" = "$want_artifacts" ]; then
+    if [ "$recorded" = "$PLUGIN_VERSION" ] && [ "$cur_artifacts" = "$merged_artifacts" ]; then
         info "version already $PLUGIN_VERSION; artifacts current"
     else
         note_change
@@ -263,7 +419,7 @@ if [ -f "$MANIFEST" ] && command -v jq >/dev/null 2>&1; then
             || info "version $recorded → $PLUGIN_VERSION"
         if mutating; then
             jq --arg v "$PLUGIN_VERSION" --arg t "$now" --argjson a "$expected_artifacts" \
-               '.onboarded_with_version=$v | .onboarded_at=$t | .artifacts=$a' \
+               '.onboarded_with_version=$v | .onboarded_at=$t | .artifacts=((.artifacts // {}) + $a)' \
                "$MANIFEST" > "$MANIFEST.tmp" && mv "$MANIFEST.tmp" "$MANIFEST"
             STAGED_FILES+=("$MANIFEST")
         fi
@@ -272,6 +428,17 @@ else
     info "manifest absent — run /onboard-project to create it (skipping stamp)"
 fi
 echo
+
+# ---- 5. CI-autofix + cross-model callers (only with --hub-sha) -------------
+# The cross-repo hub-ref surface. Skipped entirely without --hub-sha so the four
+# surfaces above behave exactly as before this op existed.
+
+if [ -n "$HUB_SHA" ]; then
+    echo "[caller] CI-autofix + cross-model review callers"
+    reconcile_ci_autofix_caller
+    reconcile_cross_model_caller
+    echo
+fi
 
 # ---- staging + summary -----------------------------------------------------
 

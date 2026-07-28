@@ -41,8 +41,8 @@ SHA_PIN_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 
 # The exact commits P1 (`reusable-ci-autofix.yml`) pins — P5 must match
 # character-for-character, never re-resolve to a newer/older SHA.
-CHECKOUT_SHA = "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0"  # actions/checkout v7.0.0
-SETUP_UV_SHA = "11f9893b081a58869d3b5fccaea48c9e9e46f990"  # astral-sh/setup-uv v8.3.2
+CHECKOUT_SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1"  # actions/checkout v7.0.1
+SETUP_UV_SHA = "c771a70e6277c0a99b617c7a806ffedaca235ff9"  # astral-sh/setup-uv v9.0.0
 CLAUDE_CODE_ACTION_SHA = (
     "51ea8ea73a139f2a74ff649e3092c25a904aed7e"  # anthropics/claude-code-action v1
 )

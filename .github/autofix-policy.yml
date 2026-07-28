@@ -56,3 +56,13 @@ provider:
                                # repos should leave this unset/commented — see
                                # the template's own header for why this has NO
                                # default, unlike fixer/fixer_model above.
+  js_test_runner: vitest      # dogfoods dashboard_app's own vitest suite so a
+                               # JS/TS Dependabot bump can be verified, not just
+                               # cleanly declined. See dec-draft-735a4612 for
+                               # the residual-risk acceptance (--ignore-scripts
+                               # closes install-time execution only).
+  js_project_dir: dashboard_app  # Praxion's JS/TS project lives in this
+                               # subdirectory, not the repo root — the vitest
+                               # binary is at dashboard_app/node_modules/.bin/
+                               # vitest, so both the install and runner
+                               # commands need this `cd` prefix to resolve.

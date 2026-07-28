@@ -352,6 +352,8 @@ jobs:
       sensitive_paths_regex: ${{ steps.classify.outputs.sensitive_paths_regex }}
       fixer_model: ${{ steps.classify.outputs.fixer_model }}
       plugin_dir_flag: ${{ steps.classify.outputs.plugin_dir_flag }}
+      js_install_cmd: ${{ steps.classify.outputs.js_install_cmd }}
+      js_test_grant: ${{ steps.classify.outputs.js_test_grant }}
 
     steps:
       - name: Checkout caller repo's default branch
@@ -388,9 +390,10 @@ jobs:
 
           import yaml
 
-          # Fail-safe defaults. The three NEW surfaces default to "off" so a
-          # missing/malformed policy never silently activates a fix-commit
-          # surface; max_attempts_per_pr caps the fix->fail-differently loop.
+          # Fail-safe defaults. The three surfaces (and js_test_runner) default
+          # to "off" so a missing/malformed policy never silently activates a
+          # fix-commit surface or grants a JS/TS test-runner tool;
+          # max_attempts_per_pr caps the fix->fail-differently loop.
           DEFAULTS = {
               "max_runs_per_day": 5,
               "max_attempts_per_pr": 2,
@@ -399,6 +402,25 @@ jobs:
               "dependabot": "off",
               "fork_prs": "off",
               "fixer_model": "opus",
+              "js_test_runner": "off",
+          }
+
+          # Fixed table mapping the js_test_runner enum to an (install_cmd,
+          # runner_cmd) pair of RAW shell commands — injection-safe by
+          # construction: the raw policy string is never templated directly
+          # into an output line, only used as a lookup key into this
+          # hardcoded table (unrecognized values fall back to "off"'s tuple).
+          # The install command intentionally omits --ignore-scripts here —
+          # the non-agent install step below always appends it, so the flag
+          # can never be dropped by a future table edit. runner_cmd is wrapped
+          # into a Bash(...) allowlist grant below, after the optional
+          # js_project_dir prefix is applied.
+          JS_RUNNER_TABLE = {
+              "off": ("", ""),
+              "vitest": ("npm ci", "./node_modules/.bin/vitest run"),
+              "jest": ("npm ci", "./node_modules/.bin/jest"),
+              "npm-test": ("npm ci", "npm test"),
+              "pnpm-test": ("pnpm install --frozen-lockfile", "pnpm test"),
           }
 
           policy_path = sys.argv[1]
@@ -426,6 +448,27 @@ jobs:
           dependabot = surfaces.get("dependabot", DEFAULTS["dependabot"])
           fork_prs = surfaces.get("fork_prs", DEFAULTS["fork_prs"])
           fixer_model = provider.get("fixer_model", DEFAULTS["fixer_model"])
+
+          # Enum selector, never a free-form command: js_test_runner picks a
+          # row of JS_RUNNER_TABLE. An unrecognized value falls back to
+          # "off"'s tuple (fail-safe, matching the file's existing DEFAULTS
+          # pattern) rather than raising.
+          js_test_runner = provider.get("js_test_runner", DEFAULTS["js_test_runner"])
+          js_install_cmd, js_runner_cmd = JS_RUNNER_TABLE.get(js_test_runner, JS_RUNNER_TABLE["off"])
+
+          # js_project_dir has deliberately NO default — most managed repos
+          # keep their JS/TS project at the repo root, where the table's
+          # commands above already resolve correctly. A caller sets this only
+          # when the project lives in a subdirectory (e.g. Praxion's own
+          # dashboard_app/). Applied as a uniform `cd <dir> &&` prefix so it
+          # works identically across every package manager in the table,
+          # rather than a manager-specific flag (npm's --prefix, pnpm's -C).
+          js_project_dir = provider.get("js_project_dir")
+          if js_project_dir and js_install_cmd:
+              js_install_cmd = f"cd {js_project_dir} && {js_install_cmd}"
+          if js_project_dir and js_runner_cmd:
+              js_runner_cmd = f"cd {js_project_dir} && {js_runner_cmd}"
+          js_test_grant = f"Bash({js_runner_cmd}:*)" if js_runner_cmd else ""
 
           # provider.plugin_dir has deliberately NO default (a managed caller's
           # checked-out repo generally has no .claude-plugin/plugin.json) — the
@@ -471,6 +514,8 @@ jobs:
           print(f"sensitive_paths_regex={sensitive_paths_regex}")
           print(f"fixer_model={fixer_model}")
           print(f"plugin_dir_flag={plugin_dir_flag}")
+          print(f"js_install_cmd={js_install_cmd}")
+          print(f"js_test_grant={js_test_grant}")
           PY
 
   autofix-same-repo-pr:
@@ -642,9 +687,28 @@ jobs:
             > tmp/ci-failure.log || true
           echo "[ci-autofix] wrote $(wc -l < tmp/ci-failure.log) sanitized log lines"
 
+      - name: Install JS/TS deps (lockfile, no scripts)
+        # Non-agent, policy-gated: only runs when the caller's policy selects
+        # a JS/TS test runner (provider.js_test_runner != off). The install
+        # command itself is resolved from the trusted default-branch policy
+        # read in `classify`, never from the PR head; --ignore-scripts is
+        # always appended here (not baked into the classifier table) so a
+        # future table edit can never silently drop it. This is the largest
+        # asymmetry vs the Python path: only the runner and the repo's own
+        # test files execute, never an install-time lifecycle script.
+        if: steps.budget.outputs.proceed == 'true' && needs.classify.outputs.js_test_grant != ''
+        run: ${{ needs.classify.outputs.js_install_cmd }} --ignore-scripts
+
       - name: Fix the failing PR in place (the fixer agent)
         id: fixer
         if: steps.budget.outputs.proceed == 'true'
+        # continue-on-error: an agent crash (e.g. turn-budget exhaustion) must
+        # not fail the job — the finalize step below converts every non-fix
+        # terminal state (crash, ambiguous exit, self-decline) into a clean,
+        # idempotent decline. `steps.fixer.outcome` still records the real
+        # pre-continue-on-error result ('failure' on a crash), which the
+        # finalize step reads to compose its root-cause comment.
+        continue-on-error: true
         # SHA-pinned to the SAME audited commit the `autofix` job + issue-autofix
         # pin (# v1). This job holds contents/pull-requests/id-token write — a
         # mutable tag would let a compromised tag push run arbitrary code with
@@ -707,7 +771,7 @@ jobs:
             ${{ needs.classify.outputs.plugin_dir_flag }}
             --model ${{ needs.classify.outputs.fixer_model }}
             --max-turns 30
-            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr edit:*),Bash(uv run pytest:*),Bash(python3 -m pytest:*),Bash(pytest:*)"
+            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr edit:*),Bash(uv run pytest:*),Bash(python3 -m pytest:*),Bash(pytest:*)${{ needs.classify.outputs.js_test_grant != '' && format(',{0}', needs.classify.outputs.js_test_grant) || '' }}"
 
       - name: Stamp attempt trailer and push the fix (non-agent, fast-forward only)
         id: push
@@ -744,6 +808,50 @@ jobs:
               || echo "::warning::Could not comment on PR #${PR_NUMBER}"
             echo "::warning::Push to ${HEAD_BRANCH} rejected; skipped-and-flagged (no forced retry)."
           fi
+
+      - name: Finalize terminal state (decline if no fix)
+        # Normalizes every non-fix terminal state (a fixer crash surfaced via
+        # continue-on-error, an ambiguous exit with no commit and no explicit
+        # decline, or a prior/self-decline) into an idempotent decline: a
+        # bounded root-cause comment + the `autofix:declined` label + a clean
+        # `exit 0`. `always()` is required because `continue-on-error` leaves
+        # this step's own default `success()` condition unmet on the crash
+        # path; `steps.budget.outputs.proceed` still skips this step entirely
+        # when an earlier gate already declined the run.
+        id: finalize
+        if: always() && steps.budget.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          PRE_AGENT_HEAD: ${{ steps.setup.outputs.pre_agent_head }}
+          FIXER_OUTCOME: ${{ steps.fixer.outcome }}
+        run: |
+          current_head=$(git rev-parse HEAD)
+          if [ "${current_head}" != "${PRE_AGENT_HEAD}" ]; then
+            echo "[ci-autofix] a fix commit exists — the push step owns it; finalize is a no-op"
+            exit 0
+          fi
+          # Fail CLOSED on a gh error: if the label state cannot be read, skip
+          # rather than risk a duplicate comment/label on a run we can't verify.
+          if ! declined=$(gh pr view "${PR_NUMBER}" --json labels \
+              --jq '[.labels[].name] | any(. == "autofix:declined")' 2>/dev/null); then
+            echo "::warning::Could not read labels for PR #${PR_NUMBER} (gh error); failing closed — skipping finalize."
+            exit 0
+          fi
+          if [ "${declined}" = "true" ]; then
+            echo "[ci-autofix] PR #${PR_NUMBER} already carries autofix:declined; finalize is an idempotent no-op"
+            exit 0
+          fi
+          if [ "${FIXER_OUTCOME}" = "failure" ]; then
+            reason="the fixer exited abnormally (e.g. turn-budget exhaustion)"
+          else
+            reason="the fixer finished without producing a fix or an explicit decline"
+          fi
+          gh pr comment "${PR_NUMBER}" --body "CI Autofix: ${reason}. Declining further automated attempts on this PR; a human should take over." \
+            || echo "::warning::Could not comment on PR #${PR_NUMBER}"
+          gh pr edit "${PR_NUMBER}" --add-label "autofix:declined" \
+            || echo "::warning::Could not apply autofix:declined — does the label exist? (create once with gh label create)"
+          exit 0
 
       - name: Flag sensitive-path changes for review
         # Tripwire (reused from the `autofix` job): the fixer may touch

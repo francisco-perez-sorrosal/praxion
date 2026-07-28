@@ -813,3 +813,425 @@ def test_every_uses_reference_carries_a_version_comment() -> None:
             f"{line.strip()!r} must carry a trailing version comment "
             "(`# vX.Y.Z` or `# v<major>`) for auditability"
         )
+
+
+# ---------------------------------------------------------------------------
+# Bug A — finalize/decline step (normalize every non-fix terminal state)
+#
+# RED-phase note: every assertion below expects the shipped file, at time of
+# writing, to lack `continue-on-error` on the fixer step and to lack a
+# finalize/decline step entirely — expected failures are "attribute absent" /
+# "step not found" shapes, never a collection or import error. The two
+# exceptions are explicitly called out in their own docstrings as GREEN by
+# construction (a preventive regression guard, not a TDD-red assertion):
+# `test_allowedtools_value_stays_a_single_physical_line_in_every_agent_step`
+# and `test_finalize_step_is_scoped_to_autofix_same_repo_pr_only` (the latter
+# is a negative/absence proxy for the "main and fork jobs stay byte-unchanged"
+# guarantee, not explicitly named in the plan's RED list, but structurally
+# identical in kind to the single-line invariant: it cannot go RED before the
+# finalize step exists anywhere to misplace).
+# ---------------------------------------------------------------------------
+
+
+def _finalize_step(job: dict) -> dict | None:
+    """Return the non-agent finalize/decline step in a job, or `None` if it
+    does not exist yet (RED-safe)."""
+    for step in job.get("steps") or []:
+        if "finalize" in (step.get("name") or "").lower():
+            return step
+    return None
+
+
+def _all_agent_steps(parsed: dict) -> list[dict]:
+    """Return every `claude-code-action` step across every job in the workflow."""
+    return [step for step in _all_steps(parsed) if "claude-code-action" in (step.get("uses") or "")]
+
+
+def _allowed_tools_value(step: dict) -> str | None:
+    """Extract the quoted value of `--allowedTools "..."` from a step's `claude_args`."""
+    match = re.search(r'--allowedTools "([^"]*)"', _claude_args(step))
+    return match.group(1) if match else None
+
+
+def test_fixer_step_has_continue_on_error_so_a_crash_does_not_fail_the_job() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    agent_steps = _agent_steps(job)
+    assert agent_steps, "autofix-same-repo-pr must contain a claude-code-action fixer step"
+    fixer_step = agent_steps[0]
+    assert fixer_step.get("continue-on-error") is True, (
+        "The fixer step must carry `continue-on-error: true` so an agent crash "
+        "(e.g. turn-budget exhaustion) does not fail the job — the finalize "
+        "step converts every non-fix outcome into a clean decline instead"
+    )
+
+
+def test_finalize_step_exists_as_a_non_agent_step_after_the_push_step() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    step_names = [step.get("name", "") for step in job.get("steps") or []]
+    finalize_step = _finalize_step(job)
+    assert (
+        finalize_step is not None
+    ), "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    assert "uses" not in finalize_step, "The finalize step must be a non-agent `run:` step"
+    push_index = next(i for i, name in enumerate(step_names) if "push" in name.lower())
+    tripwire_index = next(i for i, name in enumerate(step_names) if "sensitive" in name.lower())
+    finalize_index = step_names.index(finalize_step.get("name", ""))
+    assert (
+        push_index < finalize_index < tripwire_index
+    ), "The finalize step must run after the push step and before the sensitive-path tripwire step"
+
+
+def test_finalize_step_is_guarded_on_always_and_budget_proceed() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    finalize_step = _finalize_step(job)
+    assert (
+        finalize_step is not None
+    ), "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    condition = finalize_step.get("if") or ""
+    assert "always()" in condition, (
+        "The finalize step's `if:` must include `always()` so it still runs "
+        "on the fixer-crash path, where `continue-on-error` leaves the "
+        "step's own default `success()` condition unmet"
+    )
+    assert "steps.budget.outputs.proceed" in condition, (
+        "The finalize step's `if:` must gate on `steps.budget.outputs.proceed` "
+        "so it is skipped when an earlier gate already declined the run"
+    )
+
+
+def test_finalize_step_declines_when_no_fix_commit_and_no_existing_label() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    finalize_step = _finalize_step(job)
+    assert (
+        finalize_step is not None
+    ), "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    run = finalize_step.get("run") or ""
+    assert "PRE_AGENT_HEAD" in run, (
+        "The finalize step must compare current HEAD against a "
+        "PRE_AGENT_HEAD-shaped value to detect whether a fix commit exists"
+    )
+    assert re.search(r"gh pr view.*--json labels", run), (
+        "The finalize step must read the PR's labels via `gh pr view ... "
+        "--json labels` to check for an existing autofix:declined label"
+    )
+    assert (
+        "gh pr comment" in run
+    ), "The no-fix/no-label branch must post a bounded root-cause comment via `gh pr comment`"
+    assert re.search(r"gh pr edit.*--add-label.*autofix:declined", run), (
+        "The no-fix/no-label branch must apply the `autofix:declined` label "
+        "via `gh pr edit --add-label`"
+    )
+    assert re.search(r"^exit 0$", run, re.MULTILINE), (
+        "The finalize step must end with a bare, top-level `exit 0` so the "
+        "job always reports success on this path"
+    )
+
+
+def test_finalize_step_is_idempotent_noop_when_declined_label_already_present() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    finalize_step = _finalize_step(job)
+    assert (
+        finalize_step is not None
+    ), "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    run = finalize_step.get("run") or ""
+    assert run.count("gh pr comment") == 1, (
+        "The finalize step must call `gh pr comment` exactly once — the "
+        "already-declined branch must short-circuit before reaching it, "
+        "never posting a duplicate comment"
+    )
+    assert "autofix:declined" in run, "The finalize step must reference the autofix:declined label"
+    assert run.count("--add-label") == 1, (
+        "The finalize step must apply the `autofix:declined` label exactly "
+        "once — the already-declined branch must short-circuit before "
+        "reaching a second label write"
+    )
+
+
+def test_finalize_step_noops_when_a_fix_commit_was_produced() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    finalize_step = _finalize_step(job)
+    assert (
+        finalize_step is not None
+    ), "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    run = finalize_step.get("run") or ""
+    assert re.search(
+        r"git rev-parse HEAD", run
+    ), "The finalize step must read the current HEAD via `git rev-parse HEAD`"
+    assert re.search(r"!=.{0,40}PRE_AGENT_HEAD|PRE_AGENT_HEAD.{0,40}!=", run, re.DOTALL), (
+        "The finalize step must compare current HEAD against PRE_AGENT_HEAD "
+        "and exit before reaching the decline branch when a fix commit exists"
+    )
+
+
+def test_finalize_step_wires_fixer_outcome_and_pre_agent_head_via_env() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    finalize_step = _finalize_step(job)
+    assert (
+        finalize_step is not None
+    ), "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    env = finalize_step.get("env") or {}
+    assert "steps.fixer.outcome" in str(
+        env.get("FIXER_OUTCOME", "")
+    ), "The finalize step's `env:` must wire a FIXER_OUTCOME-shaped key from `steps.fixer.outcome`"
+    assert "steps.setup.outputs.pre_agent_head" in str(env.get("PRE_AGENT_HEAD", "")), (
+        "The finalize step's `env:` must wire a PRE_AGENT_HEAD-shaped key from "
+        "`steps.setup.outputs.pre_agent_head`"
+    )
+
+
+def test_finalize_step_fails_closed_on_a_gh_label_read_error() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    finalize_step = _finalize_step(job)
+    assert (
+        finalize_step is not None
+    ), "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    run = finalize_step.get("run") or ""
+    assert re.search(r"gh pr view.*--json labels.*2>/dev/null", run) or re.search(
+        r"if\s*!\s*declined=", run
+    ), (
+        "The label-read command must fail CLOSED on a `gh` error (e.g. "
+        "`2>/dev/null` behind an `if ! declined=...` guard), mirroring the "
+        "`gate` step's fail-closed pattern, rather than crashing or "
+        "blind-declining"
+    )
+
+
+def test_finalize_step_is_scoped_to_autofix_same_repo_pr_only() -> None:
+    """Bug A's finalize/decline step must never appear in the pre-existing
+    `autofix` (main-branch) job or the `autofix-fork` (suggest-only) job —
+    those surfaces are byte-unchanged by this fix. Expected GREEN on first
+    run (the finalize step does not exist anywhere in the file yet); stays
+    GREEN once Bug A lands, since the step is scoped to
+    `autofix-same-repo-pr` only — a preventive regression guard, not a
+    TDD-red assertion.
+    """
+    parsed = _parsed()
+    assert (
+        _finalize_step(_job(parsed, "autofix")) is None
+    ), "The `autofix` job must never gain the finalize/decline step — it is byte-unchanged by Bug A"
+    assert _finalize_step(_job(parsed, "autofix-fork")) is None, (
+        "The `autofix-fork` job must never gain the finalize/decline step — "
+        "it is byte-unchanged by Bug A"
+    )
+
+
+def test_allowedtools_value_stays_a_single_physical_line_in_every_agent_step() -> None:
+    """New general invariant (protects both Bug A's no-op case and Bug B's
+    later token append): for every `claude-code-action` step across the
+    whole workflow, the `--allowedTools "..."` value must never contain an
+    embedded newline — a wrapped allowlist is silently narrowed at runtime
+    (each newline-split fragment is parsed as its own, often malformed,
+    comma-separated token). This is a source-text structural proxy: it
+    cannot prove the *rendered* (post `${{ }}` substitution) line stays
+    unwrapped at runtime — that closes via the live dogfood.
+
+    Expected GREEN on first run: today's file already satisfies this
+    invariant. This is a preventive regression guard, not a TDD-red
+    assertion — call this out so it is not mistaken for a broken RED
+    expectation.
+    """
+    parsed = _parsed()
+    agent_steps = _all_agent_steps(parsed)
+    assert agent_steps, "Expected at least one claude-code-action step in the workflow"
+    for step in agent_steps:
+        value = _allowed_tools_value(step)
+        assert (
+            value is not None
+        ), f'Expected an --allowedTools "..." value in {step.get("name")!r}\'s claude_args'
+        assert "\n" not in value, (
+            f"{step.get('name')!r}'s --allowedTools value must stay a single "
+            "physical line — a wrapped allowlist is silently narrowed at runtime"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Bug B — policy-gated JS/TS runner (enum-mapped allowlist grant)
+#
+# RED-phase note: every assertion below expects the shipped file, at time of
+# writing, to lack the `js_test_runner` policy key, the classifier table, the
+# new classify outputs, and the non-agent install step — expected failures
+# are "output/step absent" shapes. `test_fixer_allowlist_contains_no_install_
+# command_for_js_test_runner` is a negative/absence proxy (structurally
+# identical in kind to the single-line invariant above): it cannot go RED
+# before an install command could be added to the allowlist, and stays GREEN
+# forever by design — flagged here rather than silently miscounted as a
+# broken RED expectation.
+# ---------------------------------------------------------------------------
+
+BUG_A_BASELINE_ALLOWED_TOOLS = (
+    "Read,Glob,Grep,Edit,Write,Bash(git add:*),Bash(git commit:*),Bash(git status:*),"
+    "Bash(git diff:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),"
+    "Bash(gh pr edit:*),Bash(uv run pytest:*),Bash(python3 -m pytest:*),Bash(pytest:*)"
+)
+
+
+def _classify_step(job: dict) -> dict | None:
+    """Return the `classify` job's `id: classify` step, or `None` if absent."""
+    return next((step for step in job.get("steps") or [] if step.get("id") == "classify"), None)
+
+
+def test_classify_emits_js_install_cmd_and_js_test_grant_outputs() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "classify")
+    outputs = job.get("outputs") or {}
+    assert "js_install_cmd" in outputs, (
+        "`classify` must declare a job-level `js_install_cmd` output, "
+        "sourced from steps.classify.outputs.js_install_cmd"
+    )
+    assert "js_test_grant" in outputs, (
+        "`classify` must declare a job-level `js_test_grant` output, "
+        "sourced from steps.classify.outputs.js_test_grant"
+    )
+
+
+def test_js_test_runner_enum_defaults_to_off_when_policy_key_absent() -> None:
+    """Structural proxy: the classifier's `DEFAULTS` table must carry a safe
+    "off" default for the JS/TS runner selector, mirroring the existing
+    `pr_checks`/`dependabot`/`fork_prs` default-off pattern — a missing or
+    malformed policy key must never silently activate the runner grant.
+    """
+    parsed = _parsed()
+    job = _job(parsed, "classify")
+    classify_step = _classify_step(job)
+    assert classify_step is not None, "classify job must contain its `classify` step"
+    run = classify_step.get("run") or ""
+    assert _mentions_default_near(run, "js_test_runner"), (
+        'The classifier\'s DEFAULTS table must define a safe default ("off") '
+        "for js_test_runner, matching the existing default-off convention "
+        "for pr_checks/dependabot/fork_prs"
+    )
+
+
+def test_js_test_runner_enum_maps_through_a_fixed_table_not_a_raw_policy_string() -> None:
+    """Injection-safety structural proxy: the classifier must map the JS/TS
+    runner enum value through a hardcoded table (e.g. a dict literal keyed on
+    `off`/`vitest`/`jest`/`npm-test`/`pnpm-test`) rather than f-string-
+    interpolating the raw policy value directly into the `js_install_cmd`/
+    `js_test_grant` output lines — a free-form policy string reaching the
+    agent allowlist would be an injection vector.
+    """
+    parsed = _parsed()
+    job = _job(parsed, "classify")
+    classify_step = _classify_step(job)
+    assert classify_step is not None, "classify job must contain its `classify` step"
+    run = classify_step.get("run") or ""
+    assert re.search(r"vitest", run), "The classifier must contain a hardcoded 'vitest' table entry"
+    assert not re.search(
+        r'print\(f"js_(install_cmd|test_grant)=\{[^}]*provider\.get\("js_test_runner"', run
+    ), (
+        "js_install_cmd/js_test_grant must never be produced by directly "
+        "f-string-interpolating the raw policy value — map it through a "
+        "hardcoded table first"
+    )
+
+
+def test_install_js_deps_step_is_non_agent_and_uses_ignore_scripts() -> None:
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    install_steps = [
+        step
+        for step in job.get("steps") or []
+        if "install" in (step.get("name") or "").lower()
+        and re.search(r"js|ts|npm|pnpm|node", step.get("name") or "", re.IGNORECASE)
+    ]
+    assert install_steps, (
+        "autofix-same-repo-pr must contain a non-agent step installing "
+        "JS/TS dependencies from the lockfile"
+    )
+    install_step = install_steps[0]
+    assert "uses" not in install_step, "The JS/TS install step must be a non-agent `run:` step"
+    assert "--ignore-scripts" in (
+        install_step.get("run") or ""
+    ), "The JS/TS install step must disable lifecycle scripts via --ignore-scripts"
+    condition = install_step.get("if") or ""
+    assert "js_test_grant" in condition, (
+        "The JS/TS install step must be guarded on "
+        "needs.classify.outputs.js_test_grant being non-empty"
+    )
+    assert (
+        "steps.budget.outputs.proceed" in condition
+    ), "The JS/TS install step must also be guarded on steps.budget.outputs.proceed == 'true'"
+
+
+def test_fixer_allowlist_contains_no_install_command_for_js_test_runner() -> None:
+    """Negative/absence invariant: the agent allowlist must never grant an
+    install command, only a runner invocation. Expected GREEN on first run —
+    there is no install command in today's allowlist to remove — and must
+    stay GREEN once Bug B lands, since the design forbids granting install to
+    the agent under any policy selection.
+    """
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    agent_steps = _agent_steps(job)
+    assert agent_steps, "autofix-same-repo-pr must contain a claude-code-action fixer step"
+    allowed_tools = _claude_args(agent_steps[0])
+    assert "npm ci" not in allowed_tools, "The fixer allowlist must never grant `npm ci`"
+    assert "npm install" not in allowed_tools, "The fixer allowlist must never grant `npm install`"
+    assert (
+        "pnpm install" not in allowed_tools
+    ), "The fixer allowlist must never grant `pnpm install`"
+
+
+def test_allowedtools_value_stays_a_single_physical_line_after_js_test_grant_token_appended() -> (
+    None
+):
+    """Bug B appends `${{ needs.classify.outputs.js_test_grant }}` as one
+    more comma-separated token onto the SAME physical `--allowedTools` line
+    tested generally above. Re-invoked here, scoped to the specific fixer
+    step Bug B modifies, so a regression introduced while wiring the JS/TS
+    grant token is caught at the exact site of the change — a source-text
+    proxy only; the live dogfood confirms the rendered line.
+    """
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    agent_steps = _agent_steps(job)
+    assert agent_steps, "autofix-same-repo-pr must contain a claude-code-action fixer step"
+    value = _allowed_tools_value(agent_steps[0])
+    assert (
+        value is not None
+    ), 'Expected an --allowedTools "..." value in the fixer step\'s claude_args'
+    assert "\n" not in value, (
+        "The fixer step's --allowedTools value must stay a single physical "
+        "line even after the JS/TS test-runner grant token is appended"
+    )
+
+
+def test_js_test_runner_off_leaves_the_same_repo_pr_allowlist_byte_identical_to_bug_a() -> None:
+    """Structural proxy for the "runner off means byte-identical to Bug A"
+    guarantee: the Bug-A-only baseline tokens (captured verbatim, pre-Bug-B)
+    must remain the leading, unmodified prefix of
+    `--allowedTools` — Bug B may only APPEND a templated JS/TS grant token
+    after them, never rewrite or reorder the existing grant. When the
+    selector is `off` (default), the appended template expression evaluates
+    to an empty string and the rendered line becomes byte-identical to this
+    baseline; that runtime evaluation is confirmed by the live dogfood, not
+    by this structural test.
+    """
+    parsed = _parsed()
+    job = _job(parsed, "autofix-same-repo-pr")
+    agent_steps = _agent_steps(job)
+    assert agent_steps, "autofix-same-repo-pr must contain a claude-code-action fixer step"
+    value = _allowed_tools_value(agent_steps[0])
+    assert (
+        value is not None
+    ), 'Expected an --allowedTools "..." value in the fixer step\'s claude_args'
+    assert value.startswith(BUG_A_BASELINE_ALLOWED_TOOLS), (
+        "The Bug-A-only baseline tokens must remain the leading, unmodified "
+        "prefix of --allowedTools — Bug B may only append a templated JS/TS "
+        "grant token after them"
+    )
+    assert "needs.classify.outputs.js_test_grant" in value, (
+        "Bug B must template the JS/TS runner grant token from "
+        "needs.classify.outputs.js_test_grant onto the allowlist — when the "
+        "selector is off (default) this expression evaluates to an empty "
+        "string, so the rendered line becomes byte-identical to the Bug-A "
+        "baseline"
+    )

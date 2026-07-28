@@ -1,0 +1,71 @@
+{
+  "provenance": {
+    "schema_version": "1.0.0",
+    "generated_at": "2026-07-28T05:58:29.137586+00:00",
+    "window_days": 90,
+    "since": "2026-04-29T05:58:29.137586+00:00",
+    "commit_sha": "14b0c57",
+    "fetch_limit": 200,
+    "source_counts": {
+      "autofix_runs": 200,
+      "gate_runs": 15,
+      "issue_autofix_runs": 4,
+      "declined_prs": 0,
+      "all_prs": 49
+    },
+    "saturated_sources": [
+      "autofix_runs"
+    ],
+    "gh_errors": []
+  },
+  "metrics": {
+    "gate": {
+      "runs_total": 15,
+      "runs_by_conclusion": {
+        "success": 15
+      },
+      "verdicts_classified": null,
+      "_note": "Verdict (request-changes vs approve vs unavailable) lives in the PR review comment, not the run conclusion; classification wiring is deferred to the recalibration pass once real gate comments exist to pattern-match. Baseline reports run counts only."
+    },
+    "credit_burn": {
+      "cursor_credits": null,
+      "_note": "Cursor's credit pool is not GitHub-queryable; operator-supplied (brief \u00a77 [U])."
+    },
+    "fix_success": {
+      "autofix_runs_total": 200,
+      "autofix_attempts": 17,
+      "autofix_failures": 12,
+      "autofix_runs_by_conclusion": {
+        "success": 5,
+        "failure": 12,
+        "skipped": 170,
+        "cancelled": 13
+      },
+      "issue_autofix_runs_total": 4,
+      "issue_autofix_attempts": 2,
+      "issue_autofix_runs_by_conclusion": {
+        "skipped": 2,
+        "success": 1,
+        "failure": 1
+      },
+      "declines_total": 0,
+      "fix_prs_opened": 1,
+      "fix_prs_merged": 0,
+      "fix_success_rate": 0.0,
+      "_scope_note": "fix_prs_* = new-branch fixes (ci-autofix/, issue-autofix/) only; in-place P3a fixes (Autofix-Attempt trailer on the PR branch) are uncounted pending trailer-scan wiring."
+    },
+    "time_to_green": {
+      "sample_size": 0,
+      "median_hours": null,
+      "_note": "Proxy = mergedAt \u2212 createdAt of merged fix PRs; refine to first-failing-run \u2192 merge in the recalibration pass."
+    },
+    "override_rate": {
+      "value": null,
+      "_note": "Requires correlating gate request-changes verdicts with human merges; deferred with gate-verdict classification."
+    },
+    "cost_per_fix": {
+      "value": null,
+      "_note": "credit_burn / fix_prs_merged; null until credit burn is operator-supplied."
+    }
+  }
+}

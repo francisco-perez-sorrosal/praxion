@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-07-28T08:12:07Z'
+generated_at: '2026-07-28T08:14:23Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -2281,6 +2281,18 @@ surfaces:
   title: "P6 self-healing-loop metrics baseline \u2014 on-demand gh-run-history collector in a distinct SELF_HEALING_* namespace, non-skipped attempts metric, deferred gate-verdict and in-place-fix detection"
   last_modified: '2026-07-28'
   renderer: adr_card
+- id: ai-state-decisions-290-decline-on-fixer-exit
+  path: .ai-state/decisions/290-decline-on-fixer-exit.md
+  type: markdown
+  title: Normalize every non-fix fixer terminal state to an idempotent decline
+  last_modified: '2026-07-28'
+  renderer: adr_card
+- id: ai-state-decisions-291-jsts-runner-allowlist
+  path: .ai-state/decisions/291-jsts-runner-allowlist.md
+  type: markdown
+  title: Proceed with the JS/TS test-runner allowlist expansion for the same-repo fixer
+  last_modified: '2026-07-28'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -2882,6 +2894,8 @@ groups:
   - ai-state-decisions-287-cross-model-fleet-install
   - ai-state-decisions-288-upgrade-caller-sha-rewrite
   - ai-state-decisions-289-self-healing-metrics-baseline
+  - ai-state-decisions-290-decline-on-fixer-exit
+  - ai-state-decisions-291-jsts-runner-allowlist
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

@@ -1,7 +1,7 @@
 ---
-id: dec-draft-5ae6bd53
+id: dec-290
 title: Normalize every non-fix fixer terminal state to an idempotent decline
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-07-28
 summary: continue-on-error on the fixer agent step plus a non-agent finalize step converts crash/timeout/ambiguous-exit into a clean autofix:declined decline that exits 0

@@ -1,7 +1,7 @@
 ---
-id: dec-draft-735a4612
+id: dec-291
 title: Proceed with the JS/TS test-runner allowlist expansion for the same-repo fixer
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-28
 summary: User-approved PROCEED (overriding the systems-architect's advisory DEFER) with the safe design — enum-selected runner, non-agent --ignore-scripts lockfile install, runner-only agent grant, policy sourced from the trusted default branch
@@ -20,7 +20,7 @@ dissent: A --ignore-scripts install stops postinstall/lifecycle-script execution
 
 ## Context
 
-The `autofix-same-repo-pr` fixer agent's `--allowedTools` grants Python test runners only (`Bash(uv run pytest:*)`, `Bash(python3 -m pytest:*)`, `Bash(pytest:*)`). On a JS/TS failure (e.g. the dashboard's vitest suite) the agent cannot run the tests to verify a candidate fix, so it iterates blind and exhausts `--max-turns` — the likely root cause of Bug A's live #48 instance. Bug A (`dec-draft-5ae6bd53`) converts that thrash into a bounded, clean decline; this ADR is about whether to go further and let the fixer *verify* a JS/TS fix.
+The `autofix-same-repo-pr` fixer agent's `--allowedTools` grants Python test runners only (`Bash(uv run pytest:*)`, `Bash(python3 -m pytest:*)`, `Bash(pytest:*)`). On a JS/TS failure (e.g. the dashboard's vitest suite) the agent cannot run the tests to verify a candidate fix, so it iterates blind and exhausts `--max-turns` — the likely root cause of Bug A's live #48 instance. Bug A (`dec-290`) converts that thrash into a bounded, clean decline; this ADR is about whether to go further and let the fixer *verify* a JS/TS fix.
 
 The load-bearing concern is that this job holds `contents: write` (to the PR head) + `id-token: write` (OIDC as the Claude app) and processes untrusted CI-log data. Any capability added here is added on a privileged surface. Running JS/TS tests requires installing JS deps, and JS `postinstall`/lifecycle scripts are a materially larger and more actively-exploited supply-chain surface than the Python path. On a Dependabot PR — the primary target — install executes the *changed* dependency's code in a higher-privilege context than the PR's own CI.
 
@@ -73,4 +73,4 @@ The vetted design (PROCEED, chosen):
 
 ## Prior Decision
 
-Extends the fix-commit envelope established by dec-286 (single job owns the security controls) and dec-283 (sensitive-path deny-by-default), and pairs with `dec-draft-5ae6bd53` (Bug A) — Bug A's finalize/decline step is what makes accepting this residual risk tractable: any JS/TS-runner failure converges to a bounded clean decline rather than a stranded or thrashing PR. This entry amends the systems-architect's original DEFER recommendation in place (still `status: proposed`, not yet finalized) to record the user's explicit PROCEED override at the implementation-planning stage, per direct user instruction.
+Extends the fix-commit envelope established by dec-286 (single job owns the security controls) and dec-283 (sensitive-path deny-by-default), and pairs with `dec-290` (Bug A) — Bug A's finalize/decline step is what makes accepting this residual risk tractable: any JS/TS-runner failure converges to a bounded clean decline rather than a stranded or thrashing PR. This entry amends the systems-architect's original DEFER recommendation in place (still `status: proposed`, not yet finalized) to record the user's explicit PROCEED override at the implementation-planning stage, per direct user instruction.

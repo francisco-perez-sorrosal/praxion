@@ -74,3 +74,6 @@ coverage.xml
 # Third-party community plugin code — per-user install, not vendored.
 # community-plugins.json (the enabled-list) IS committed as a recommendation.
 .obsidian/plugins/
+
+# Praxion carries no living ROADMAP.md — regenerated on demand by /roadmap (dec-092)
+ROADMAP.md

@@ -21,6 +21,9 @@ PraxionOrchestration: {
     Interface_des: {
       label: "Interface Designer"
     }
+    Transactions_arch: {
+      label: "Agentic Transactions Architect"
+    }
     Verifier: {
       label: "Verifier"
     }
@@ -55,6 +58,9 @@ PraxionOrchestration: {
   Doc_interface: {
     label: "INTERFACE_DESIGN.md"
   }
+  Doc_transactions: {
+    label: "TRANSACTIONS_DESIGN.md"
+  }
   Doc_impl_plan: {
     label: "IMPLEMENTATION_PLAN.md"
   }
@@ -81,6 +87,7 @@ PraxionOrchestration.Orchestrator -> PraxionOrchestration.Pipeline.Promethean: "
 PraxionOrchestration.Orchestrator -> PraxionOrchestration.Pipeline.Researcher: "dispatches"
 PraxionOrchestration.Orchestrator -> PraxionOrchestration.Pipeline.Architect: "dispatches"
 PraxionOrchestration.Orchestrator -> PraxionOrchestration.Pipeline.Interface_des: "dispatches"
+PraxionOrchestration.Orchestrator -> PraxionOrchestration.Pipeline.Transactions_arch: "dispatches (shadow)"
 PraxionOrchestration.Orchestrator -> PraxionOrchestration.Pipeline.Planner: "dispatches"
 PraxionOrchestration.Orchestrator -> PraxionOrchestration.Pipeline.Implementer: "dispatches"
 PraxionOrchestration.Orchestrator -> PraxionOrchestration.Pipeline.Test_engineer: "dispatches"
@@ -93,6 +100,9 @@ PraxionOrchestration.Doc_systems -> PraxionOrchestration.Pipeline.Planner: "read
 PraxionOrchestration.Pipeline.Architect -> PraxionOrchestration.Doc_interface: "revises per architect re-eval"
 PraxionOrchestration.Pipeline.Interface_des -> PraxionOrchestration.Doc_interface: "writes"
 PraxionOrchestration.Doc_interface -> PraxionOrchestration.Pipeline.Architect: "reads challenges"
+PraxionOrchestration.Pipeline.Architect -> PraxionOrchestration.Doc_transactions: "revises per architect re-eval"
+PraxionOrchestration.Pipeline.Transactions_arch -> PraxionOrchestration.Doc_transactions: "writes"
+PraxionOrchestration.Doc_transactions -> PraxionOrchestration.Pipeline.Architect: "reads challenges"
 PraxionOrchestration.Pipeline.Planner -> PraxionOrchestration.Doc_impl_plan: "writes"
 PraxionOrchestration.Doc_impl_plan -> PraxionOrchestration.Pipeline.Implementer: "reads"
 PraxionOrchestration.Doc_impl_plan -> PraxionOrchestration.Pipeline.Test_engineer: "reads"

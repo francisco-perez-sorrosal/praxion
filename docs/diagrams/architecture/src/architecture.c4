@@ -32,7 +32,7 @@
  *   - forward         — primary forward flow (promethean -> verifier)
  *   - cis_loop        — Continuous Improvement Signals (researcher -> architect)
  *   - rework_loop     — Verifier rework (verifier -> orchestrator -> architect)
- *   - challenge_loop  — Interface-designer architecture challenges (one round)
+ *   - challenge_loop  — Interface-designer / Agentic-transactions-architect challenges (one round)
  *
  * Document handoff edges (R4): pipeline-document reads/writes are modeled as
  * agent <-> .ai-work edges rather than agent <-> agent direct calls, matching
@@ -97,6 +97,7 @@ model {
         researcher       = agent "Researcher"       { description "Hat 1 codebase + Hat 2 external research; surfaces CIS" }
         architect        = agent "Systems Architect" { description "Trade-off analysis; CIS disposition; rework first-stop" }
         interface_des    = agent "Interface Designer" { description "Interface-layer peer sub-architect" }
+        transactions_arch = agent "Agentic Transactions Architect" { description "Transaction-domain shadow sub-architect (payments/trading); challenge loop" }
         context_eng      = agent "Context Engineer" { description "Context artifact domain expert (shadow)" }
         planner          = agent "Implementation Planner" { description "Step decomposition; supervises step execution" }
         implementer      = agent "Implementer"      { description "Executes implementation steps" }
@@ -116,6 +117,7 @@ model {
       doc_research    = document "RESEARCH_FINDINGS.md"    { description "researcher output; carries CIS section" }
       doc_systems     = document "SYSTEMS_PLAN.md"         { description "architect output; carries dispositions" }
       doc_interface   = document "INTERFACE_DESIGN.md"     { description "interface-designer output; carries Architecture Challenges" }
+      doc_transactions = document "TRANSACTIONS_DESIGN.md" { description "agentic-transactions-architect output; carries Architecture Challenges" }
       doc_context     = document "CONTEXT_REVIEW.md"       { description "context-engineer cumulative review" }
       doc_impl_plan   = document "IMPLEMENTATION_PLAN.md"  { description "planner output" }
       doc_wip         = document "WIP.md"                  { description "step state" }
@@ -153,6 +155,7 @@ model {
     orchestration.orchestrator -> orchestration.pipeline.researcher    "dispatches"
     orchestration.orchestrator -> orchestration.pipeline.architect     "dispatches"
     orchestration.orchestrator -> orchestration.pipeline.interface_des "dispatches"
+    orchestration.orchestrator -> orchestration.pipeline.transactions_arch "dispatches (shadow)"
     orchestration.orchestrator -> orchestration.pipeline.context_eng   "dispatches (shadow)"
     orchestration.orchestrator -> orchestration.pipeline.planner       "dispatches"
     orchestration.orchestrator -> orchestration.pipeline.implementer   "dispatches"
@@ -187,6 +190,11 @@ model {
     orchestration.pipeline.interface_des -> orchestration.doc_interface  "writes" { #challenge_loop }
     orchestration.doc_interface          -> orchestration.pipeline.architect "reads challenges" { #challenge_loop }
     orchestration.pipeline.architect     -> orchestration.doc_interface  "revises per architect re-eval" { #challenge_loop }
+
+    // Agentic-transactions-architect shadow + challenge loop (one round, orchestrator-mediated)
+    orchestration.pipeline.transactions_arch -> orchestration.doc_transactions "writes" { #challenge_loop }
+    orchestration.doc_transactions           -> orchestration.pipeline.architect "reads challenges" { #challenge_loop }
+    orchestration.pipeline.architect         -> orchestration.doc_transactions "revises per architect re-eval" { #challenge_loop }
 
     // Context-engineer shadow (cumulative single-writer)
     orchestration.pipeline.context_eng   -> orchestration.doc_context    "writes (cumulative)"
@@ -321,6 +329,7 @@ views {
       praxion.orchestration.pipeline.researcher,
       praxion.orchestration.pipeline.architect,
       praxion.orchestration.pipeline.interface_des,
+      praxion.orchestration.pipeline.transactions_arch,
       praxion.orchestration.pipeline.planner,
       praxion.orchestration.pipeline.implementer,
       praxion.orchestration.pipeline.test_engineer,
@@ -329,6 +338,7 @@ views {
       praxion.orchestration.doc_research,
       praxion.orchestration.doc_systems,
       praxion.orchestration.doc_interface,
+      praxion.orchestration.doc_transactions,
       praxion.orchestration.doc_impl_plan,
       praxion.orchestration.doc_verify,
       praxion.orchestration.doc_rework,

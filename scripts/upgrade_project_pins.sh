@@ -24,13 +24,13 @@
 # so it is version-independent and never goes stale — this script leaves it be.
 #
 # A fifth surface is reconciled ONLY when --hub-sha <SHA> is passed: the
-# .github/workflows/ ci-autofix.yml + cross-model-review.yml reusable-workflow
-# callers, whose version identity is a cross-repo hub git ref (the pinned SHA)
-# rather than a local plugin-cache path. The script never resolves the SHA
-# itself (that would depend on the hub's moving tip and break determinism) — the
-# SHA is resolved in the /upgrade-project command layer and passed in. Without
-# --hub-sha the caller surface is skipped entirely and the four surfaces above
-# reconcile exactly as before (backward compatible).
+# .github/workflows/ ci-autofix.yml + cross-model-review.yml + labels-reconcile.yml
+# reusable-workflow callers, whose version identity is a cross-repo hub git ref
+# (the pinned SHA) rather than a local plugin-cache path. The script never
+# resolves the SHA itself (that would depend on the hub's moving tip and break
+# determinism) — the SHA is resolved in the /upgrade-project command layer and
+# passed in. Without --hub-sha the caller surface is skipped entirely and the
+# four surfaces above reconcile exactly as before (backward compatible).
 #
 # Usage
 # -----
@@ -227,6 +227,47 @@ reconcile_ci_autofix_caller() {
         # rewritten, so a coincidental bare SHA elsewhere is never touched; sed
         # preserves every other byte, including the trailing newline.
         sed "s|reusable-ci-autofix\.yml@$cur_sha|reusable-ci-autofix.yml@$HUB_SHA|g" \
+            "$caller" > "$caller.tmp" && mv "$caller.tmp" "$caller"
+        STAGED_FILES+=("$caller")
+    fi
+}
+
+# Re-point a Praxion-authored, SHA-pinned labels-reconcile.yml caller's hub SHA
+# in place. Mirrors reconcile_ci_autofix_caller exactly: provenance is the
+# uses:-line SHAPE (only a francisco-perez-sorrosal/praxion
+# reusable-labels-reconcile.yml@<40-hex> ref is upgradable), the same
+# 0/1/>1-match branching (0 → not a Praxion caller, left untouched; 1 →
+# rewrite the token; >1 → ambiguous shape, left untouched + reported), and the
+# same token-scoped sed rewrite that edits ONLY the 40-hex token — every other
+# byte (comments, permissions, an operator's manifest_path edit) is preserved.
+# Idempotent by construction (no-op when the SHA already matches).
+reconcile_labels_caller() {
+    local caller="$REPO_ROOT/.github/workflows/labels-reconcile.yml"
+    [ -f "$caller" ] || { info "labels-reconcile.yml: absent → nothing to re-point"; return 0; }
+
+    local match_re='uses:[[:space:]]*francisco-perez-sorrosal/praxion/\.github/workflows/reusable-labels-reconcile\.yml@[0-9a-f]{40}'
+    local match_count
+    match_count="$(grep -Ec "$match_re" "$caller")" || true
+    if [ "$match_count" -eq 0 ]; then
+        info "labels-reconcile.yml: uses: not a Praxion-pinned reusable-labels-reconcile ref → left untouched"
+        return 0
+    fi
+    if [ "$match_count" -gt 1 ]; then
+        info "labels-reconcile.yml: $match_count Praxion-pinned reusable-labels-reconcile refs → ambiguous shape, left untouched"
+        return 0
+    fi
+
+    local cur_sha
+    cur_sha="$(sed -nE 's|.*reusable-labels-reconcile\.yml@([0-9a-f]{40}).*|\1|p' "$caller")"
+    if [ "$cur_sha" = "$HUB_SHA" ]; then
+        info "labels-reconcile.yml: already pinned to $HUB_SHA"
+        return 0
+    fi
+
+    note_change
+    info "labels-reconcile.yml: re-point hub SHA $cur_sha → $HUB_SHA"
+    if mutating; then
+        sed "s|reusable-labels-reconcile\.yml@$cur_sha|reusable-labels-reconcile.yml@$HUB_SHA|g" \
             "$caller" > "$caller.tmp" && mv "$caller.tmp" "$caller"
         STAGED_FILES+=("$caller")
     fi
@@ -429,14 +470,15 @@ else
 fi
 echo
 
-# ---- 5. CI-autofix + cross-model callers (only with --hub-sha) -------------
+# ---- 5. CI-autofix + cross-model + labels-reconcile callers (only with --hub-sha) --
 # The cross-repo hub-ref surface. Skipped entirely without --hub-sha so the four
 # surfaces above behave exactly as before this op existed.
 
 if [ -n "$HUB_SHA" ]; then
-    echo "[caller] CI-autofix + cross-model review callers"
+    echo "[caller] CI-autofix + cross-model review + labels-reconcile callers"
     reconcile_ci_autofix_caller
     reconcile_cross_model_caller
+    reconcile_labels_caller
     echo
 fi
 

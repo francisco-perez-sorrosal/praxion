@@ -1,0 +1,40 @@
+# Labels Reconcile — Praxion's own caller (caller #1) of the public
+# `reusable-labels-reconcile.yml` hub.
+#
+# This is the additive-only label-taxonomy reconciler's caller, the third
+# instance of this hub+caller shape (alongside `ci-autofix.yml` and
+# `cross-model-review.yml`). See the hub for the manifest-parsing and
+# `gh label create --force` reconciliation logic; see `.github/labels.yml`
+# for Praxion's own baseline/additional label taxonomy.
+#
+# Praxion is caller #1 (dogfooding) and differs from every other managed
+# caller installed by `/onboard-project` in the same deliberate way
+# `ci-autofix.yml` and `cross-model-review.yml` do: the `uses:` below is a
+# same-repo local ref (`./...`, tracks HEAD — correct for the repo that
+# develops the hub), never a cross-repo SHA pin. No `secrets:` mapping is
+# needed here — the hub uses only the built-in `GITHUB_TOKEN`.
+#
+# Trigger: committing the manifest (`.github/labels.yml`) on `main`
+# reconciles labels automatically — no manual `gh label create` required.
+# `workflow_dispatch` supports an on-demand manual run too.
+
+name: Labels Reconcile
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/labels.yml"]
+  workflow_dispatch:
+
+permissions: {}  # least-privilege; the job below adds only what the hub needs
+
+jobs:
+  reconcile:
+    permissions:                          # ceiling GitHub caps the hub's
+                                           # effective token at — must match
+                                           # the hub's own job grant exactly
+      issues: write
+      contents: read
+    uses: ./.github/workflows/reusable-labels-reconcile.yml
+    with:
+      manifest_path: .github/labels.yml

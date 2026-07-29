@@ -1,0 +1,111 @@
+# Reusable Labels Reconcile (hub) — the additive-only label-taxonomy
+# reconciler that guarantees every label the self-healing loop depends on
+# exists in the caller repo, seeded from a project-owned manifest.
+#
+# This is the THIRD instance of the hub+SHA-pinned-caller shape, alongside
+# `reusable-ci-autofix.yml` (the fixer) and `reusable-cross-model-review.yml`
+# (the reviewer) — but with a far simpler, non-agentic job: read
+# `.github/labels.yml` and run `gh label create ... --force` per entry. No
+# secret is required (this job needs only the built-in `GITHUB_TOKEN`), so
+# unlike its two agent-driven peers this hub declares NO `secrets:` mapping
+# under `workflow_call` — the no-secret simplification below is deliberate,
+# not an oversight.
+#
+# Additive-only invariant, enforced STRUCTURALLY (not by a CLI flag or a
+# prompt): this job's only `gh label` subcommand is `create --force` (an
+# idempotent create-or-update, never a removal), and it never touches the
+# label-*application* endpoint family that a `pr`- or `issue`-scoped `gh`
+# invocation would reach — only the label-*definition* endpoint family. This
+# re-affirms dec-281: `ecosystem-feedback` remains human-applied-only,
+# because this hub is structurally incapable of ever applying a label to a
+# pull request or an issue — it can only define labels, never assign them.
+#
+# This workflow is NEVER triggered directly — its only trigger is
+# `workflow_call`. A thin caller owns the real trigger (`push` on the
+# manifest path + `workflow_dispatch`) and the least-privilege `permissions:`
+# ceiling. Praxion's own caller (`labels-reconcile.yml`) pins this hub via a
+# same-repo local `./...` ref; every managed/fleet caller pins it by a
+# resolved 40-hex commit SHA instead, exactly like the two peer hubs.
+
+name: Reusable Labels Reconcile (hub)
+
+on:
+  workflow_call:
+    inputs:
+      manifest_path:
+        description: >-
+          Path (relative to the caller repo root) to the label-taxonomy
+          manifest. Declares the two-block `baseline:`/`additional:` schema
+          consumed below.
+        type: string
+        required: false
+        default: ".github/labels.yml"
+
+permissions: {}  # least-privilege; the job below adds only what it needs
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      # The load-bearing invariant. EXACTLY these two grants — no more. This
+      # job can define labels (issues: write, per GitHub's label-endpoint
+      # scoping) and read the manifest (contents: read) — it holds no grant
+      # that would let it write repository contents, open PRs, or apply a
+      # label to any issue or PR.
+      issues: write
+      contents: read
+
+    steps:
+      - name: Checkout caller repo (read-only; this job never pushes)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up uv (manages Python + PyYAML for manifest parsing)
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+        with:
+          python-version: "3.13"
+
+      - name: Read manifest and build the reconcile command list
+        id: manifest
+        env:
+          MANIFEST_PATH: ${{ inputs.manifest_path }}
+        run: |
+          set +e
+          mkdir -p tmp
+          uv run --with pyyaml python3 - "$MANIFEST_PATH" > tmp/gh-label-commands.txt <<'PY'
+          import shlex
+          import sys
+
+          import yaml
+
+          path = sys.argv[1] if len(sys.argv) > 1 else ".github/labels.yml"
+          with open(path, encoding="utf-8") as handle:
+              manifest = yaml.safe_load(handle) or {}
+
+          entries = list(manifest.get("baseline") or []) + list(manifest.get("additional") or [])
+          for entry in entries:
+              name = str(entry["name"])
+              color = str(entry["color"])
+              description = str(entry["description"])
+              print(f"gh label create {shlex.quote(name)} -c {shlex.quote(color)} -d {shlex.quote(description)} --force")
+          PY
+          exit 0
+
+      - name: Reconcile labels (additive-only — gh label create --force per entry)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          # Only ever `gh label create ... --force` (idempotent create-or-
+          # update) — the label-*definition* endpoint, never a removal and
+          # never the label-*application* endpoints a pull-request- or
+          # issue-scoped invocation would reach. Each line was built above
+          # from the manifest, one command per entry.
+          status=0
+          while IFS= read -r cmd; do
+            [ -z "$cmd" ] && continue
+            eval "$cmd" || status=1
+          done < tmp/gh-label-commands.txt
+          exit "$status"

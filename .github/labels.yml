@@ -1,0 +1,37 @@
+# baseline: Praxion-owned. Refreshed by /upgrade-project. Do not hand-edit — edits are overwritten.
+#           GitHub defaults (bug, duplicate) intentionally omitted — always provisioned by GitHub.
+baseline:
+  # --- reporter (from-managed-project reporter set) — scripts/praxion_feedback/render.py::_BASE_ISSUE_LABELS ---
+  - { name: auto-filed,           color: "5319e7", description: "Auto-filed via /report-praxion-issue or the ecosystem-defect template" }
+  - { name: from-managed-project, color: "5319e7", description: "Filed from a managed project's healing sidecar" }
+  # --- category:<slug> family — enum: scripts/praxion_feedback/cli.py::_CATEGORY_CHOICES ---
+  - { name: "category:agents",  color: "5319e7", description: "Ecosystem-defect category: agents" }
+  - { name: "category:blocks",  color: "5319e7", description: "Ecosystem-defect category: blocks" }
+  - { name: "category:hooks",   color: "5319e7", description: "Ecosystem-defect category: hooks" }
+  - { name: "category:scripts", color: "5319e7", description: "Ecosystem-defect category: scripts" }
+  - { name: "category:skills",  color: "5319e7", description: "Ecosystem-defect category: skills" }
+  # --- arming/triage — issue-autofix.yml ---
+  - { name: ecosystem-feedback, color: "5319e7", description: "Arming gate: maintainer-applied, arms the P5 issue-autofix agent" }
+  - { name: needs-adr,          color: "fbca04", description: "Issue autofix: behavioral/architectural defect routed to the human pipeline" }
+  - { name: "triage:invalid",   color: "e11d21", description: "Issue autofix: malformed ecosystem-defect (fails template validation)" }
+  # --- intake-assessment:<state> — issue-intake-assessment.yml ---
+  - { name: "intake-assessment:unavailable",   color: "BFBFBF", description: "Intake gate: assessment unavailable (fail-open)" }
+  - { name: "intake-assessment:misconfigured", color: "B60205", description: "Intake gate: reviewer_family==fixer (misconfigured)" }
+  # --- intake:<value> family — enum: ASSESSMENT_VALUES in issue-intake-assessment.yml ---
+  - { name: "intake:defect",      color: "0E8A16", description: "Intake gate: assessed as a genuine defect" }
+  - { name: "intake:improvement", color: "1D76DB", description: "Intake gate: assessed as an improvement request, not a bug" }
+  - { name: "intake:non-issue",   color: "FBCA04", description: "Intake gate: assessed as a non-issue" }
+  - { name: "intake:unclear",     color: "D4C5F9", description: "Intake gate: assessment inconclusive" }
+  # --- cross-model-review:<verdict> — reusable-cross-model-review.yml ---
+  - { name: "cross-model-review:approved",          color: "0E8A16", description: "Cross-model gate: reviewer approved" }
+  - { name: "cross-model-review:changes-requested", color: "FBCA04", description: "Cross-model gate: reviewer requested changes" }
+  - { name: "cross-model-review:unavailable",       color: "BFBFBF", description: "Cross-model gate: review unavailable (fail-open)" }
+  - { name: "cross-model-review:misconfigured",     color: "B60205", description: "Cross-model gate: reviewer_family==fixer (misconfigured)" }
+  # --- reviewed-by:<family> family — enum: .github/autofix-policy.yml reviewer_family (gpt|gemini|composer) ---
+  - { name: "reviewed-by:gpt",      color: "1D76DB", description: "Cross-model gate: reviewed by a GPT-family model" }
+  - { name: "reviewed-by:gemini",   color: "1D76DB", description: "Cross-model gate: reviewed by a Gemini-family model" }    # closes live gap
+  - { name: "reviewed-by:composer", color: "1D76DB", description: "Cross-model gate: reviewed by a Composer-family model" } # closes live gap
+  # --- ci-autofix — reusable-ci-autofix.yml ---
+  - { name: "autofix:declined", color: "d93f0b", description: "CI autofix declined (attempt-cap reached or unfixable); human takeover" }
+# additional: project-owned. Never touched by Praxion. Add your project's own labels here.
+additional: []

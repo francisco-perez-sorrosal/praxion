@@ -972,17 +972,17 @@ full allowlist rationale.
 
 **Stack reuse.** This phase consumes the **Stack detection** captured in §Pre-flight (step 4) — Python, JavaScript/TypeScript, etc. It performs no new detection beyond reading `package.json` dependencies to distinguish framework (React/Vue/Next) from non-framework JS/TS.
 
-**Asset resolution.** Canonical assets live in the i-am plugin install (the `installPath` captured in §Pre-flight): `skills/python-development/assets/{ruff-baseline.toml, mypy-baseline.toml}`, `skills/typescript-development/assets/{biome.json, eslint.config.mjs, prettierrc.json, tsconfig.json}`, `claude/project-baseline/{editorconfig, pre-commit-config.yaml, CONTRIBUTING.md.tmpl, dependabot.yml.tmpl}`, and `claude/project-baseline/ci-autofix/{ci-autofix.yml.tmpl, autofix-policy.yml.tmpl, cross-model-review.yml.tmpl}`. Read the asset from there; write the materialized file into the project. Edit the asset (never the per-project copy) to evolve the baseline.
+**Asset resolution.** Canonical assets live in the i-am plugin install (the `installPath` captured in §Pre-flight): `skills/python-development/assets/{ruff-baseline.toml, mypy-baseline.toml}`, `skills/typescript-development/assets/{biome.json, eslint.config.mjs, prettierrc.json, tsconfig.json}`, `claude/project-baseline/{editorconfig, pre-commit-config.yaml, CONTRIBUTING.md.tmpl, dependabot.yml.tmpl}`, `claude/project-baseline/ci-autofix/{ci-autofix.yml.tmpl, autofix-policy.yml.tmpl, cross-model-review.yml.tmpl}`, and `claude/project-baseline/labels/{labels.yml.tmpl, labels-reconcile.yml.tmpl}`. Read the asset from there; write the materialized file into the project. Edit the asset (never the per-project copy) to evolve the baseline.
 
 **Gate 8e — three-option AskUserQuestion.** Use `AskUserQuestion` with `header: "Next?"`, `multiSelect: false`, the Gate 8e headline from the gate map, and these three options:
 
 | Option | Effect |
 |--------|--------|
-| `Install code-quality baseline` | **Default.** Run sub-steps 8e.1–8e.8; each is independently idempotent and skips when its config already exists. |
+| `Install code-quality baseline` | **Default.** Run sub-steps 8e.1–8e.9; each is independently idempotent and skips when its config already exists. |
 | `Skip` | Skip Phase 8e entirely. Re-run `/onboard-project` later — all sub-steps are idempotent. |
 | `Run all rest` | Skip remaining gates, default this choice to `Install code-quality baseline`, run autonomously through Phase 9. |
 
-**Action when "Install code-quality baseline" is chosen.** Run sub-steps 8e.1 through 8e.8 in order. Each prints one line on completion or skip. None overwrites an existing config — the baseline is additive only.
+**Action when "Install code-quality baseline" is chosen.** Run sub-steps 8e.1 through 8e.9 in order. Each prints one line on completion or skip. None overwrites an existing config — the baseline is additive only.
 
 ### Sub-step 8e.1 — Universal `.editorconfig`
 
@@ -1051,6 +1051,23 @@ Do **not** execute any secret-setup or org-configuration command on the operator
 Print: `8e.8: .github/workflows/ci-autofix.yml + .github/autofix-policy.yml installed (ci-autofix caller wired to the public hub — see the printed one-time operator steps to activate)`. When the cross-model caller is also installed, print an additional line: `8e.8: .github/workflows/cross-model-review.yml installed (cross-model review gate wired to the public hub)`.
 
 **Verification handoff.** Phase 9 lists every file staged here. The agent-readiness Style, Code Quality, Documentation, and Security criteria covered by this phase (linter/formatter/editorconfig/pre-commit, type-check, contributing, dependency-scanning) flip to pass on the next `/project-metrics --refresh` run.
+
+### Sub-step 8e.9 — Label taxonomy manifest + reconciler caller
+
+**Predicate.** `.github/labels.yml` OR `.github/workflows/labels-reconcile.yml` already exists at the repo root → skip with `8e.9: skipped (labels manifest or reconciler caller already present)`. Never overwrite an existing installation — this mirrors sub-step 8e.8's own file-existence idempotency guard exactly.
+
+**Action.** Read `claude/project-baseline/labels/labels.yml.tmpl` and `claude/project-baseline/labels/labels-reconcile.yml.tmpl` (from the plugin install) and strip each file's leading template-doc comment header. Fill the caller template's two placeholders:
+
+- `{{PRAXION_HUB}}` → `francisco-perez-sorrosal/praxion` (the public hub's owner/repo).
+- `{{HUB_SHA}}` → the hub's **real, current 40-hex commit SHA**, resolved at install time — reuse the SHA already resolved earlier in this same onboarding run if sub-step 8e.8 ran first, rather than re-resolving; otherwise resolve it the same way 8e.8 does, e.g. `gh api repos/francisco-perez-sorrosal/praxion/commits/main --jq .sha` (the tip of the hub's default branch), or the SHA behind a pinned hub release tag. Resolve it to an actual SHA: **never** a placeholder, and never a mutable tag or branch ref — a dangling `uses:` ref makes the installed caller fail to load.
+
+After writing, self-check the installed caller: grep `.github/workflows/labels-reconcile.yml` for any surviving `{{` and abort loudly if one remains — no unresolved placeholder may survive into the installed file.
+
+Write the rendered manifest to `<repo-root>/.github/labels.yml` and the rendered caller to `<repo-root>/.github/workflows/labels-reconcile.yml` (creating `.github/workflows/` if absent).
+
+Print: `8e.9: .github/labels.yml + .github/workflows/labels-reconcile.yml installed (label taxonomy reconciler wired to the public hub)`.
+
+**Verification handoff.** Phase 9 lists every file staged here. Committing `.github/labels.yml` triggers the reconciler on push, so any label the self-healing loop depends on is created or updated automatically — no manual `gh label create` needed.
 
 ## §Phase 9 — Verification + handoff
 

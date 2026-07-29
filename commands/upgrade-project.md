@@ -1,7 +1,7 @@
 ---
 description: Re-point this project's version-pinned Praxion surfaces (git hooks, merge driver) to the live plugin install after an i-am plugin upgrade
 argument-hint: "[--check | --dry-run]"
-allowed-tools: [Bash(scripts/upgrade_project_pins.sh:*), Bash(bash:*), Bash(git:*), Bash(gh:*), Bash(jq:*), Bash(ls:*), Bash(readlink:*), Read]
+allowed-tools: [Bash(scripts/upgrade_project_pins.sh:*), Bash(bash:*), Bash(git:*), Bash(gh:*), Bash(jq:*), Bash(ls:*), Bash(readlink:*), Bash(python3:*), Read]
 disable-model-invocation: true
 ---
 
@@ -21,12 +21,20 @@ This is the focused, gate-free counterpart to re-running the full
 3. Any retired merge driver + its `.gitattributes` line (cross-version cleanup)
 4. The `.ai-state/.praxion-onboard.json` version stamp
 5. The `ci-autofix.yml` caller's pinned hub commit reference (re-pointed to the
-   current tip), and the `cross-model-review.yml` caller (added when absent and
-   `autofix-policy.yml`'s gate allows it) — reconciled only when `gh` can
-   resolve the current hub commit for this run; skipped with an advisory
-   otherwise (see Process, below). Never overwrites an existing
-   `cross-model-review.yml`, and never touches a foreign / hand-edited /
-   non-SHA-pinned `ci-autofix.yml` caller.
+   current tip), the `cross-model-review.yml` caller (added when absent and
+   `autofix-policy.yml`'s gate allows it), and the `labels-reconcile.yml`
+   caller's pinned hub commit reference (re-pointed the same way as the
+   `ci-autofix.yml` caller) — reconciled only when `gh` can resolve the
+   current hub commit for this run; skipped with an advisory otherwise (see
+   Process, below). Never overwrites an existing `cross-model-review.yml`,
+   and never touches a foreign / hand-edited / non-SHA-pinned `ci-autofix.yml`
+   or `labels-reconcile.yml` caller.
+6. When `.github/labels.yml` exists, its `baseline:` block is refreshed from
+   `claude/project-baseline/labels/labels.yml.tmpl` (resolved from the live
+   plugin install) via `scripts/refresh_labels_baseline.py`, preserving the
+   project's `additional:` block — and any comments around either key —
+   untouched. This runs whenever the manifest is present — it needs no
+   cross-repo commit pin, only the shipped template.
 
 The pre-commit hook resolves the plugin path at run time, so it is never stale
 and is left untouched.
@@ -60,8 +68,9 @@ surfaces the result, and reminds you to commit.
    checkout.)
 
 2. **Resolve the current hub SHA**, so surface 5 (the ci-autofix caller
-   re-point + cross-model-review add) always uses a real, current commit —
-   never a placeholder, and never a mutable tag or branch ref:
+   re-point + cross-model-review add + labels-reconcile caller re-point)
+   always uses a real, current commit — never a placeholder, and never a
+   mutable tag or branch ref:
    ```bash
    NEW_SHA="$(gh api repos/francisco-perez-sorrosal/praxion/commits/main --jq .sha 2>/dev/null)" || NEW_SHA=""
    ```
@@ -93,7 +102,21 @@ surfaces the result, and reminds you to commit.
    bash "$PLUGIN_ROOT/scripts/upgrade_project_pins.sh" $ARGUMENTS
    ```
 
-4. **Report the outcome** verbatim from the script — which surfaces were
+4. **Refresh the labels-taxonomy baseline**, independent of whether `NEW_SHA`
+   resolved (this surface needs no hub SHA — only the shipped template). If
+   `.github/labels.yml` exists at the repo root, run
+   `scripts/refresh_labels_baseline.py`:
+   ```bash
+   python3 "$PLUGIN_ROOT/scripts/refresh_labels_baseline.py" \
+     "$PLUGIN_ROOT/claude/project-baseline/labels/labels.yml.tmpl" .github/labels.yml
+   ```
+   This replaces the manifest's Praxion-owned `baseline:` block with the
+   currently-shipped template's, preserving the project's `additional:` block
+   — and any comments around either key — untouched. `git add .github/labels.yml`
+   if it changed. Skip entirely (no print needed) when `.github/labels.yml`
+   is absent.
+
+5. **Report the outcome** verbatim from the script — which surfaces were
    stale, what was re-pointed, and what was staged. If the script's
    `[caller]` section reports the `cross-model-review.yml` caller was
    installed this run, print the one-time operator step (never auto-run it —
@@ -103,7 +126,7 @@ surfaces the result, and reminds you to commit.
    ```
    Without it, the review gate's reviewer step no-ops.
 
-5. **If changes were applied** (not `--check`/`--dry-run`), remind the user that
+6. **If changes were applied** (not `--check`/`--dry-run`), remind the user that
    the staged changes are ready and propose a commit message — do **not** commit
    for them:
    ```
@@ -126,7 +149,10 @@ surfaces the result, and reminds you to commit.
   non-Praxion hook is backed up to `<name>.pre-praxion` before installing.
 - **Surface 5 is gh-gated, not a hard dependency.** A missing or unauthenticated
   `gh` never fails the whole upgrade — it only skips the ci-autofix SHA
-  re-point and the cross-model-review add; the four pre-existing surfaces
-  reconcile regardless.
+  re-point, the cross-model-review add, and the labels-reconcile caller
+  re-point; the four pre-existing surfaces reconcile regardless.
+- **The labels-taxonomy baseline refresh (surface 6) needs no `gh` and no hub
+  SHA** — it runs whenever `.github/labels.yml` is present, independent of
+  whether surface 5 resolved this run.
 - This command is the maintenance path; the full `/onboard-project` re-run still
   works and reconciles the same surfaces as part of its broader flow.

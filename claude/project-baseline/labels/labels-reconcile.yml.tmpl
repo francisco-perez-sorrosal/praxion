@@ -1,0 +1,49 @@
+# Canonical Praxion baseline label-taxonomy-reconciler caller template — thin,
+# SHA-pinned invoker of the public `reusable-labels-reconcile.yml` hub.
+#
+# The /onboard-project label-taxonomy onboarding sub-step (8e.9) installs this
+# as `.github/workflows/labels-reconcile.yml` alongside `labels.yml.tmpl`, when
+# neither `.github/labels.yml` nor this caller already exists — never
+# overwriting an existing installation. Two placeholders are filled at install
+# time:
+#   {{PRAXION_HUB}} — the hub's owner/repo (francisco-perez-sorrosal/praxion).
+#   {{HUB_SHA}}     — the hub's commit SHA, resolved at install time to a real
+#     40-hex value — never left as an unresolved placeholder or a mutable
+#     tag/branch; every other `uses:` in this ecosystem is SHA-pinned the same way.
+#
+# This caller stays thin: it owns only the real `push`-on-manifest-path +
+# `workflow_dispatch` triggers and the least-privilege permission ceiling
+# (`issues: write` + `contents: read` — the hub's job re-declares exactly the
+# same grant, since GitHub caps the hub's effective token at the caller's own
+# ceiling). The reconciliation logic (parsing the manifest, looping
+# `gh label create --force`) lives entirely in the hub, not here.
+#
+# Praxion's own caller (`.github/workflows/labels-reconcile.yml`) differs only
+# in the `uses:` ref: a same-repo local
+# `uses: ./.github/workflows/reusable-labels-reconcile.yml` (tracks HEAD —
+# correct for the repo that develops the hub), never a cross-repo SHA pin —
+# the same deliberate divergence as `ci-autofix.yml.tmpl`'s and
+# `cross-model-review.yml.tmpl`'s own caller #1.
+# Delete this comment after tailoring.
+
+name: Labels Reconcile
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/labels.yml"]
+  workflow_dispatch:
+
+permissions: {}  # least-privilege; the job below grants only the ceiling the hub needs
+
+jobs:
+  reconcile:
+    permissions:                          # ceiling GitHub caps the hub's
+                                           # effective token at — must
+                                           # re-declare exactly what the hub
+                                           # job grants, no more, no less
+      issues: write
+      contents: read
+    uses: {{PRAXION_HUB}}/.github/workflows/reusable-labels-reconcile.yml@{{HUB_SHA}}
+    with:
+      manifest_path: .github/labels.yml

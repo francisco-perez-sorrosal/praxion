@@ -78,7 +78,7 @@ No new technical debt introduced by this pipeline. All implementations are on-de
 - `skills/software-planning/contexts/typescript.md`
 - `skills/test-coverage/references/typescript.md`
 - `skills/agent-evals/references/typescript.md`
-- `rules/swe/coding-style-typescript.md`
+- `rules/swe/coding-style-typescript.md` (consolidated into `skills/typescript-development/contexts/typescript.md` in commit `57013be`, 2026-05-13 — historical record preserved as-is; this note is informational only)
 - `.ai-state/specs/SPEC_multi-language-support_2026-05-11.md` (this file)
 
 **Existing files modified**: 10

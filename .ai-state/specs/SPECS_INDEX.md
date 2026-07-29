@@ -5,6 +5,7 @@ Regenerate: `python scripts/regenerate_specs_index.py`
 
 | Spec | Slug | Archived | Status | Tier | ADRs | Summary |
 |------|------|----------|--------|------|------|---------|
+| [SPEC_p5-issue-autofix_2026-07-24.md](SPEC_p5-issue-autofix_2026-07-24.md) | p5-issue-autofix | 2026-07-29 (retroactively, per ground-truth reconciliation — see Note below) | Shipped | Standard | dec-281, dec-282, dec-283 | Ships `.github/workflows/issue-autofix.yml` (label-gated on `ecosystem-feedback`, non-Bot actor) and `scripts/praxion_fe... |
 | [SPEC_production-gate-cohort_2026-06-26.md](SPEC_production-gate-cohort_2026-06-26.md) | production-gate-cohort | 2026-06-26 | Shipped | Full | dec-251, dec-252 | Turned the analysis's central theme — "designed obligation without a production mechanism" — into reality by adding five... |
 | [SPEC_multi-language-support_2026-05-11.md](SPEC_multi-language-support_2026-05-11.md) | multi-language-support | 2026-05-11 | Shipped | Full | dec-135, dec-136, dec-137, dec-138, dec-139, dec-140 | Extended Praxion from Python-only to a polyglot ecosystem covering Node.js, TypeScript, React 19, and Vue 3 by formalizi... |
 | [SPEC_diagrams_2026-04-30.md](SPEC_diagrams_2026-04-30.md) | structurizr-d2-diagrams | 2026-04-30 | Shipped | Standard | dec-093, dec-094, dec-095, dec-096 | Replaced the Mermaid-only diagram convention with a dual-toolchain policy: LikeC4 + D2 for C4-architectural diagrams (Sy... |

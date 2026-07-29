@@ -205,6 +205,24 @@ def test_hub_every_gh_label_create_invocation_passes_force() -> None:
         )
 
 
+def test_hub_reconcile_loop_concatenates_baseline_and_additional() -> None:
+    raw = _raw_text(HUB_WORKFLOW_FILE)
+    assert re.search(
+        r'manifest\.get\(\s*["\']baseline["\']', raw
+    ), "The reconcile loop must read the manifest's `baseline:` block"
+    assert re.search(
+        r'manifest\.get\(\s*["\']additional["\']', raw
+    ), "The reconcile loop must read the manifest's `additional:` block"
+    assert re.search(
+        r'manifest\.get\(\s*["\']baseline["\'][^\n]*\+[^\n]*manifest\.get\(\s*["\']additional["\']',
+        raw,
+    ), (
+        "baseline: and additional: must be concatenated into ONE entry list — "
+        "a project's additional: labels must reconcile alongside the shipped "
+        "baseline, not be read and silently discarded"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Praxion's own thin caller — existence and trigger
 # ---------------------------------------------------------------------------

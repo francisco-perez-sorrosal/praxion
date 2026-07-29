@@ -1,5 +1,5 @@
 ---
-id: dec-draft-0f1596ea
+id: dec-295
 title: Scope HTML authorship boundary to canonical surfaces; permit ephemeral user-requested HTML
 status: accepted
 category: architectural

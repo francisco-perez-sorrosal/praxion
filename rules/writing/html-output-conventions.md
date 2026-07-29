@@ -183,6 +183,19 @@ Two operational invariants apply to every dashboard surface:
 
 This is the same single-author-per-surface discipline already enforced for MD docs (per `rules/writing/readme-style.md`) — extended to the HTML layer.
 
+### Scope: Canonical Surfaces, Not Ephemeral Output
+
+The Authorship Boundary above governs **canonical, persistent human-facing surfaces** — the artifacts covered by the Hybrid Render Boundary, where an MD source of truth exists (or should exist) and must stay in sync with any HTML view. It does not extend to **ephemeral HTML explicitly requested by the user in-session** (e.g. "show me this as an HTML page/chart/table") that has no persistent MD counterpart. There, the responding agent may author HTML directly — there is no MD source for it to drift out of sync with, so the dual-maintenance risk this boundary exists to prevent does not apply.
+
+Two conditions keep the exception from becoming a loophole:
+
+- **No persistent MD backing.** If the content already exists (or should exist) as a canonical MD artifact, render *that* through the dashboard instead of hand-authoring a parallel HTML copy — the exception covers content with no MD source, not an escape hatch around one.
+- **Not committed by default.** Ephemeral HTML lives inside `.ai-work/<task-slug>/` when a pipeline task slug is active — this narrows, but does not contradict, the global "temporary files in `tmp/`" convention: `.ai-work/` is already the documented ephemeral-pipeline-intermediates home (see `rules/swe/agent-intermediate-documents.md`), gitignored and cleaned up with the pipeline like every other ephemeral document there. Outside a pipeline (no active task slug), it falls back to plain `tmp/`. Either way it is uncommitted by default, so it carries none of the dual-maintenance burden this rule otherwise guards against; a mechanical pre-commit guard (`scripts/check_html_authorship.py`) backstops this by blocking any staged `.html` file that is neither an allowlisted standalone tool UI nor backed by a `share_out: true` MD sibling. If the user wants the output kept, that's a decision to make a canonical `share_out: true` MD-sourced artifact, not to leave an orphaned `.html` file outside the manifest.
+
+**Promote durable learnings, not just the HTML.** An ephemeral artifact can still surface something worth keeping — a decision, a gotcha, a pattern. When it does, that content goes into the normal stateful home (`LEARNINGS.md`, an ADR, `.ai-state/DESIGN.md`) in MD form — the HTML itself stays disposable either way. Markdown-is-canonical holds even for content that started life as a one-off HTML answer.
+
+For visual polish (palette, type scale, motion, accessibility), load `web-ui-design` — ad hoc HTML still owes the same visual-craft bar as the dashboard, it just skips the renderer-registry plumbing.
+
 ### Visual Style Defers to `web-ui-design`
 
 This rule covers HTML *architecture* (Markdown-as-source-of-truth, no JS in committed HTML, server-only data access, renderer registry). It does **not** define visual style — color palette, typography scale, spacing rhythm, component density, motion timing, dark-mode handling, accessibility bar. Those live in [`skills/web-ui-design/SKILL.md`](../../skills/web-ui-design/SKILL.md) and its references. Authors working in `dashboard_app/` or producing `share_out: true` HTML defer to:

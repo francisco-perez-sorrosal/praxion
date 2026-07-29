@@ -140,6 +140,30 @@ Don't wait until the end. When you discover something:
 
 The `## Assumptions & Constraints Taken` section follows the same rule — record each load-bearing assumption the moment you take it, not batched at end-of-task, so a [Conversation Checkpoint](coordination-details.md#conversation-checkpoints) digests an accurate, current set.
 
+## Handoff Prompt Structure
+
+Generated on request from `WIP.md` + `TASK_BRIEF.md` (when present) + `LEARNINGS.md`, to resume work in a fresh session. A handoff prompt is a different artifact from a `WIP.md` "Next Action" line — it must stand alone for a session with zero prior context, so it carries the same explicit/disambiguated/test-criteria discipline the [`goal-disambiguation`](../../goal-disambiguation/SKILL.md) skill already applies at task intake, applied a second time at the handoff seam.
+
+```markdown
+Resume [Feature Name] (task slug: <slug>) — read `.ai-work/<slug>/WIP.md` and `.ai-work/<slug>/LEARNINGS.md` first.
+
+**Goal**: <one sentence, from TASK_BRIEF.md Intent — the actual behavior being built, not "continue the work">
+
+**Where it stands**: Step N of M complete. Current step: <WIP.md Current Step + Status>.
+
+**Constraints already decided** (don't re-litigate): <load-bearing assumptions from LEARNINGS.md § Assumptions & Constraints Taken>
+
+**Next action**: <WIP.md Next Action field, verbatim>
+
+**Verify it worked by**: <the acceptance criterion or test command for the current step — from TASK_BRIEF.md Key Signals or IMPLEMENTATION_PLAN.md's Tests: field>
+```
+
+**Rules:**
+
+- **`Verify it worked by` is mandatory whenever a source for it exists** (`TASK_BRIEF.md` Key Signals or the plan's `Tests:` field) — never skip composing it just because it's inconvenient. A handoff prompt that drops an available verification path reintroduces the exact ambiguity `goal-disambiguation` exists to prevent, one session later with less context to catch it.
+- **Omit fields with no source rather than inventing content.** When `TASK_BRIEF.md` is absent (Direct/Lightweight tier, no pipeline), compose from `WIP.md` and conversational context alone; do not fabricate a Goal, Key Signal, or verification path that was never captured. This rule governs every field equally — `Verify it worked by` included — the "mandatory" clause above is about not skipping an available source, not about guaranteeing the field always appears.
+- **This is a template, not a command.** Compose it inline when a user asks to continue elsewhere — it does not require its own pipeline document or tooling to exist.
+
 ## End of Feature
 
 When all steps are complete:

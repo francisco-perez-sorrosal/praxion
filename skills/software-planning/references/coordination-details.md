@@ -237,6 +237,8 @@ The parser at `scripts/parse_pre_refactor_yaml.py` (which raises `PreRefactorYam
 
 The recommendation is *advisory* — the user retains final say in every case.
 
+**Presentation.** Surface the three options via `AskUserQuestion` (one option per recommendation) rather than as plain prose. Set each option's `preview` to the mechanical evaluation detail behind it — the bypass criteria that matched, or the loop-back condition that triggered — and order the orchestrator's recommended option first. This gives the user a side-by-side comparison instead of a paragraph to parse before deciding.
+
 ### Recursion Bound
 
 The architect's re-entry runs in `post-refactor-adaptation` mode, which is **forbidden from re-running Phase 2.5**. This single contractual restriction (documented in the architect agent's Phase 1 mode-detection and Phase 2.5 mode-gate) bounds the loop at one pass. There is no machinery for arbitrary recursion; the bound is structural.
@@ -327,7 +329,7 @@ The subsection is **advisory only and never blocks**. The user proceeds to verif
 
 ### The pre-verification checkpoint
 
-Before the orchestrator invokes the `verifier`, it presents the curated digest of the whole pipeline run plus an **acknowledgement of the load-bearing residue** — the load-bearing assumptions not already dispositioned at an earlier checkpoint. The acknowledgement is a single multi-select ("which of these do you want to revisit before verification?"), not one dialog per assumption — the user inspects every major item but in one interaction.
+Before the orchestrator invokes the `verifier`, it presents the curated digest of the whole pipeline run plus an **acknowledgement of the load-bearing residue** — the load-bearing assumptions not already dispositioned at an earlier checkpoint. The acknowledgement is a single `AskUserQuestion` call with `multiSelect: true` ("which of these do you want to revisit before verification?"), one option per residue item, not one dialog per assumption — the user inspects every major item but in one interaction. Set each option's `preview` to the assumption text, why it's load-bearing, and its self-challenge result from `LEARNINGS.md`, so the user compares all residue items side-by-side instead of re-reading the digest prose.
 
 The user then either:
 

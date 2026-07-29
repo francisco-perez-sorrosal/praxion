@@ -19,6 +19,7 @@ affected_reqs: [REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-06, REQ-07, REQ-09, 
 dissent: "Embedding a second vendor (Cursor) as a mandatory non-generative gate doubles the CI secret surface and adds a foreign-model dependency whose defect-catch value is unproven until P6; same-family self-review or no gate is cheaper and the human merge gate already backstops every fix — accepted because self-preference bias is causal/stronger in larger models and the forfeit-if-unused credits make cross-family review nearly free."
 re_affirmed_by:
   - dec-285
+  - dec-293
 ---
 
 ## Context

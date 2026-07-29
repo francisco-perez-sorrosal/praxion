@@ -1,5 +1,5 @@
 ---
-id: dec-draft-7ceb05f8
+id: dec-293
 title: Cross-model INTAKE gate (Praxion-only, read-only) + shared producer-free PROJECT-PRISM sourced from CLAUDE.md
 status: accepted
 category: architectural

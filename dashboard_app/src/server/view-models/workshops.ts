@@ -11,6 +11,7 @@ import { assertAllowedArtifactPath, validateProjectRoot } from "@/server/artifac
 import { readMarkdown } from "@/server/parsers/content";
 import { parseProgressBody, parseWipBody } from "@/server/parsers/workshops";
 import type { WorkshopArtifact, WorkshopState } from "@/server/types";
+import { composeHandoffPrompt } from "@/server/view-models/handoff-prompt";
 
 /** Markdown artifacts render through MarkdownSurface; everything else as code. */
 function renderModeFor(name: string): WorkshopArtifact["renderMode"] {
@@ -77,10 +78,20 @@ export async function getWorkshopsData(projectRoot: string): Promise<WorkshopSta
       const isDone =
         hasVerificationReport || (lastEvent !== undefined && isTerminalPhase(lastEvent.phase));
 
+      const artifactBody = (name: string): string | null =>
+        artifacts.find((artifact) => artifact.name === name)?.body ?? null;
+      const handoffPrompt = composeHandoffPrompt({
+        learningsBody: artifactBody("LEARNINGS.md"),
+        taskBriefBody: artifactBody("TASK_BRIEF.md"),
+        taskSlug: dirName,
+        wipBody: wip?.body ?? null
+      });
+
       return {
         artifacts,
         currentStep: wipState.currentStep,
         events,
+        handoffPrompt,
         isDone,
         path: workshopRoot,
         progress: wipState.progress,

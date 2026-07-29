@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { CopyAsPromptButton } from "@/components/copy-as-prompt-button";
 import { MarkdownSurface } from "@/components/markdown-surface";
 import { DecisionGraph } from "@/components/viz/decision-graph";
 import type { AdrGraphNode } from "@/server/view-models/adr-graph";
@@ -58,7 +59,10 @@ function WorkshopPanel({ workshop }: { readonly workshop: WorkshopState }) {
   return (
     <article className="workshop-panel">
       <header className="workshop-panel__header">
-        <h3>{basename(workshop.path)}</h3>
+        <div className="workshop-panel__title-row">
+          <h3>{basename(workshop.path)}</h3>
+          <CopyAsPromptButton prompt={workshop.handoffPrompt} />
+        </div>
         <div className="artifact-meta">
           {workshop.currentStep ? <span className="chip">{workshop.currentStep}</span> : null}
           {workshop.status ? <span className="chip">{workshop.status}</span> : null}

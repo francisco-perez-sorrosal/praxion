@@ -56,6 +56,38 @@ Draft failing tests
     ]);
   });
 
+  it("extracts the Next Action field from WIP markdown", () => {
+    const parsed = parseWipBody(`
+## Current Step
+
+Draft failing tests
+
+## Next Action
+
+Run the new test suite and fix any failures.
+
+## Status
+
+[IN-PROGRESS]
+`);
+
+    expect(parsed.nextAction).toBe("Run the new test suite and fix any failures.");
+  });
+
+  it("returns a null Next Action when the section is absent", () => {
+    const parsed = parseWipBody(`
+## Current Step
+
+Draft failing tests
+
+## Status
+
+[IN-PROGRESS]
+`);
+
+    expect(parsed.nextAction).toBeNull();
+  });
+
   it("extracts workshop events from PROGRESS entries", () => {
     const events = parseProgressBody(`
 [2026-05-11T09:00:00Z] [test-engineer] Phase 1/6: [understand-scope] -- Read the first-slice spec

@@ -10,11 +10,13 @@ const EVENT_LINE =
 
 export function parseWipBody(body: string): {
   currentStep: string | null;
+  nextAction: string | null;
   progress: WorkshopProgressItem[];
   status: string | null;
 } {
   let currentStep: string | null = null;
   let status: string | null = null;
+  let nextAction: string | null = null;
   const progress: WorkshopProgressItem[] = [];
   let section = "";
 
@@ -24,6 +26,8 @@ export function parseWipBody(body: string): {
       const heading = line.slice(3).toLowerCase();
       if (heading.includes("current step") || heading.includes("current batch")) {
         section = "current";
+      } else if (heading.includes("next action")) {
+        section = "next-action";
       } else if (heading.includes("status")) {
         section = "status";
       } else if (heading.includes("progress")) {
@@ -48,6 +52,11 @@ export function parseWipBody(body: string): {
       continue;
     }
 
+    if (section === "next-action" && nextAction === null) {
+      nextAction = line.replaceAll("*", "").trim();
+      continue;
+    }
+
     if (section !== "progress") {
       continue;
     }
@@ -69,7 +78,7 @@ export function parseWipBody(body: string): {
     });
   }
 
-  return { currentStep, progress, status };
+  return { currentStep, nextAction, progress, status };
 }
 
 export function parseProgressBody(body: string): WorkshopEvent[] {

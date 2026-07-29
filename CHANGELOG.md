@@ -1,3 +1,52 @@
+## v0.16.0 (2026-07-29)
+
+### Feat
+
+- Add dashboard Copy-as-prompt handoff feature
+- Add prompting-UX touchpoints from technique research
+- Add HTML authorship boundary pre-commit guard
+- Add project-owned label-taxonomy manifest + reconciler
+- Add cross-model INTAKE gate + shared PROJECT-PRISM
+- Add P6 self-healing metrics collector
+- **upgrade**: /upgrade-project resolves + forwards hub SHA (P3b Scope C)
+- **upgrade**: re-point ci-autofix caller hub SHA + add cross-model caller (P3b Scope B)
+- **onboard**: install cross-model review caller in 8e.8 (P3b Scope A)
+- **ci**: autofix PR-check + Dependabot + fork surfaces (P3a)
+- **ci**: server-side finalize workflow for web-UI merges
+- **issue-autofix**: add label-gated triage-first issue autofix workflow
+- **issue-autofix**: add issue_triage template-validation module
+- **sidecar**: wire healing sidecar into /onboard-project + sync docs
+- **sidecar**: add SessionStart hook to surface pending feedback
+- **sidecar**: add /report-praxion-issue HITL command
+- **sidecar**: add reporter CLI + ecosystem-defect issue template
+- **sidecar**: add praxion_feedback reporter package + gitleaks fixture allowlist
+- **ci**: add cross-model-review caller template + Praxion caller #1
+- **ci**: add reusable-cross-model-review hub
+- **onboarding**: install ci-autofix caller + policy via /onboard-project
+- **ci**: refactor Praxion autofixer into hub caller #1
+- **ci**: P1 group A+B — hub reusable workflow + installable templates
+- **ci**: cap CI autofixer at a daily run budget
+
+### Fix
+
+- Add agentic-transactions-architect to the architecture diagram
+- Restore calibration_log.md append-only chronological order
+- Make issue-autofix read fixer_model from policy
+- Make autofix JS/TS install package-manager-aware + robust
+- Harden autofix fixer against terminal-state stranding + polyglot thrash
+- **ci**: allowlist dependabot[bot] for the autofix fixer (P3a follow-up)
+- **ci**: add daily-budget gate to the autofix-fork job (V-01)
+- **state**: rewrite dangling dec-draft ref to dec-284 in calibration log
+- **issue-autofix**: gh --jq lacks --arg; interpolate ISSUE_NUMBER inline
+- **sidecar**: make report_praxion_issue.py runnable as a plain file
+- **ci**: cross-model gate — add --force to bypass Cursor workspace-trust prompt
+- **ci**: cross-model gate — explicit --api-key, .result envelope unwrap, stderr
+- **ci**: unflake dsl-validate — align architect-validator gate with its protocol
+
+### Refactor
+
+- **finalize**: share on-main entry + strict-mode gate
+
 ## v0.15.0 (2026-07-17)
 
 ### Feat

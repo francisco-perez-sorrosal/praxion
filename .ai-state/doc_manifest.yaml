@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-07-29T23:30:32Z'
+generated_at: '2026-07-29T23:30:53Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -2329,12 +2329,6 @@ surfaces:
   title: Idea Ledger
   last_modified: '2026-06-27'
   renderer: idea_grid
-- id: ai-state-sentinel-reports-sentinel-report-2026-05-17-23-10-00
-  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-05-17_23-10-00.md
-  type: markdown
-  title: Sentinel Report
-  last_modified: '2026-07-29'
-  renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-05-23-15-17-18
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-05-23_15-17-18.md
   type: markdown
@@ -2388,6 +2382,12 @@ surfaces:
   type: markdown
   title: Sentinel Report
   last_modified: '2026-07-15'
+  renderer: default_markdown
+- id: ai-state-sentinel-reports-sentinel-report-2026-07-29-15-11-15
+  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-07-29_15-11-15.md
+  type: markdown
+  title: Sentinel Report
+  last_modified: '2026-07-29'
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-06-11-08-38-15
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-11_08-38-15.json
@@ -2898,7 +2898,6 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-07-16-06-44-58
   - ai-state-metrics-reports-metrics-report-2026-07-29-22-11-31
   - ai-state-metrics-reports-metrics-report-2026-07-29-22-11-31
-  - ai-state-sentinel-reports-sentinel-report-2026-05-17-23-10-00
   - ai-state-sentinel-reports-sentinel-report-2026-05-23-15-17-18
   - ai-state-sentinel-reports-sentinel-report-2026-05-24-01-52-04
   - ai-state-sentinel-reports-sentinel-report-2026-05-25-21-11-42
@@ -2908,6 +2907,7 @@ groups:
   - ai-state-sentinel-reports-sentinel-report-2026-06-17-11-21-44
   - ai-state-sentinel-reports-sentinel-report-2026-06-20-13-34-25
   - ai-state-sentinel-reports-sentinel-report-2026-07-15-21-32-25
+  - ai-state-sentinel-reports-sentinel-report-2026-07-29-15-11-15
   - ai-state-specs-spec-agent-model-routing-2026-04-25
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30

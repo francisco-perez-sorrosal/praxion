@@ -36,6 +36,7 @@ TEMPLATE_DIR = PROJECT_ROOT / "claude" / "project-baseline" / "ci-autofix"
 CALLER_TEMPLATE_FILE = TEMPLATE_DIR / "ci-autofix.yml.tmpl"
 POLICY_TEMPLATE_FILE = TEMPLATE_DIR / "autofix-policy.yml.tmpl"
 CROSS_MODEL_REVIEW_TEMPLATE_FILE = TEMPLATE_DIR / "cross-model-review.yml.tmpl"
+LIVE_POLICY_FILE = PROJECT_ROOT / ".github" / "autofix-policy.yml"
 
 SHA_PIN_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 MUSTACHE_TOKEN_PATTERN = re.compile(r"^\{\{[A-Z0-9_]+\}\}$")
@@ -89,6 +90,16 @@ def _mentions_near(raw: str, term_a: str, term_b: str, window: int = 200) -> boo
         re.IGNORECASE | re.DOTALL,
     )
     return bool(pattern.search(raw))
+
+
+def _parsed_live_policy() -> dict:
+    """Parse the live, installed policy file directly.
+
+    Unlike the fleet template, `.github/autofix-policy.yml` carries no
+    `{{TOKEN}}` install-time placeholders — it is a real, already-resolved
+    policy file — so a direct `yaml.safe_load` is sufficient.
+    """
+    return yaml.safe_load(_raw_text(LIVE_POLICY_FILE))
 
 
 # ---------------------------------------------------------------------------
@@ -294,6 +305,59 @@ def test_policy_template_review_block_declares_all_three_gate_fields() -> None:
             "review hub reads this field live, it is no longer a P2-deferred "
             "placeholder"
         )
+
+
+def test_policy_template_review_block_declares_intake_gate_with_fail_safe_default() -> None:
+    """`review.intake_gate` gates the cross-model INTAKE workflow the same way
+    `cross_model_gate` gates the PR review hub — a missing/malformed value must
+    degrade to the documented fail-safe default, never to an unbounded run.
+    """
+    parsed = _parsed_with_placeholders_stubbed(POLICY_TEMPLATE_FILE)
+    review = parsed["review"]
+    assert review.get("intake_gate") == "agent-issues", (
+        "policy.review.intake_gate must default to 'agent-issues' — the "
+        "fail-safe value the intake gate degrades to on a missing/malformed key"
+    )
+    raw = _raw_text(POLICY_TEMPLATE_FILE)
+    for enum_value in ("agent-issues", "all-issues", "off"):
+        assert _mentions_near(raw, "intake_gate", enum_value), (
+            f"The template must document {enum_value!r} as a valid "
+            "intake_gate value near the key itself"
+        )
+
+
+def test_policy_template_review_block_declares_project_prism_with_fail_safe_default() -> None:
+    """`review.project_prism` names the CLAUDE.md-as-prism file both the intake
+    gate and the PR review gate read as bounded base-ref DATA; 'off' disables it.
+    """
+    parsed = _parsed_with_placeholders_stubbed(POLICY_TEMPLATE_FILE)
+    review = parsed["review"]
+    assert review.get("project_prism") == "CLAUDE.md", (
+        "policy.review.project_prism must default to 'CLAUDE.md' — the "
+        "fail-safe value both cross-model gates read the project prism from"
+    )
+    raw = _raw_text(POLICY_TEMPLATE_FILE)
+    assert _mentions_near(raw, "project_prism", "off"), (
+        "The template must document 'off' as the value that disables the "
+        "project prism, near the key itself"
+    )
+
+
+def test_live_policy_review_block_mirrors_intake_gate_and_project_prism() -> None:
+    """The schema mirror requirement covers BOTH files, not the template alone —
+    nothing pre-existing enforced the live installed policy's half of this
+    mirror for these two brand-new keys (see the sibling caller-vs-template
+    parity suite, which tests a different mirror entirely).
+    """
+    review = _parsed_live_policy()["review"]
+    assert review.get("intake_gate") == "agent-issues", (
+        ".github/autofix-policy.yml's review.intake_gate must be declared, "
+        "mirroring the fleet template's fail-safe default"
+    )
+    assert review.get("project_prism") == "CLAUDE.md", (
+        ".github/autofix-policy.yml's review.project_prism must be declared, "
+        "mirroring the fleet template's fail-safe default"
+    )
 
 
 def test_policy_template_documents_fail_closed_as_reserved_near_on_unavailable() -> None:

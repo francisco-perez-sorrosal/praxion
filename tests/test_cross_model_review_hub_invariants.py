@@ -534,3 +534,162 @@ def test_timeout_minutes_is_declared_on_a_job() -> None:
         "The review job must declare `timeout-minutes` — cost is bounded by "
         "job timeout since no native Cursor CLI turn cap exists"
     )
+
+
+# ---------------------------------------------------------------------------
+# Prism retrofit — a shared, producer-free PROJECT-PRISM (the caller repo's
+# own CLAUDE.md, read as bounded base-ref DATA) is injected into the review
+# so the reviewer judges fitness-to-this-project, not just generic
+# correctness. Every assertion below targets the CURRENT, pre-retrofit file
+# and is expected RED until the prism-fetch step, prompt paragraph, and
+# DEFAULTS key land; the two regression guards at the end assert invariants
+# that already hold today and must keep holding unchanged after the retrofit.
+#
+# Load-bearing anti-self-whitewash invariant: the prism must be read from the
+# PR's BASE ref, never its head — otherwise a PR could mutate its own prism
+# to whitewash itself past the reviewer.
+# ---------------------------------------------------------------------------
+
+# The verdict JSON schema line as it exists in the file today (copied
+# verbatim). This exact string must remain byte-identical across the prism
+# retrofit — dec-277's non-generative contract and every existing caller's
+# tolerant parser depend on this shape never changing.
+VERDICT_SCHEMA_LINE = (
+    '{"verdict": "approve" | "request-changes", "findings": ["<short finding>", ...]}'
+)
+
+
+def _prism_fetch_steps(parsed: dict) -> list[dict]:
+    """Return every step whose name mentions "prism" (case-insensitive).
+
+    A structural proxy for "the non-agent prism-fetch step, peer of the
+    existing 'Fetch PR diff and body' step" — the implementer's exact step
+    name is not pinned, only that it is discoverable by name.
+    """
+    return [step for step in _all_steps(parsed) if "prism" in str(step.get("name") or "").lower()]
+
+
+def test_prism_fetch_step_exists_as_a_non_agent_peer_of_the_diff_fetch_step() -> None:
+    parsed = _parsed()
+    prism_steps = _prism_fetch_steps(parsed)
+    assert prism_steps, (
+        "A non-agent step fetching the shared PROJECT-PRISM (the caller "
+        "repo's own CLAUDE.md) must exist as a peer of the 'Fetch PR diff "
+        "and body' step"
+    )
+    for step in prism_steps:
+        assert "uses" not in step, (
+            "The prism-fetch step must be a `run:` step, not a `uses:` agent "
+            "action — the prism is written to a file for the reviewer to "
+            "read as DATA, never interpolated into its instructions"
+        )
+
+
+def test_prism_fetch_step_reads_the_pr_base_ref_and_never_head() -> None:
+    """Anti-self-whitewash invariant: a PR must not be able to mutate its own
+    prism by editing CLAUDE.md on its own head branch and having the
+    reviewer read that mutated copy.
+    """
+    parsed = _parsed()
+    prism_steps = _prism_fetch_steps(parsed)
+    assert prism_steps, "expects a prism-fetch step to exist (see the sibling existence test)"
+    for step in prism_steps:
+        run = step.get("run") or ""
+        assert re.search(r"base\.(ref|sha)", run), (
+            "The prism-fetch step's `run:` must reference the PR's base "
+            "ref/sha (github.event.pull_request.base.ref or .base.sha) — "
+            "reading the prism from anywhere else would let a PR whitewash "
+            "itself"
+        )
+        assert not re.search(r"\bhead\b", run), (
+            "The prism-fetch step's `run:` must NOT reference `head` — the "
+            "prism must always be read from the base ref, never the PR's "
+            "own head, to prevent self-whitewash"
+        )
+
+
+def test_prism_content_is_sanitized_before_the_reviewer_reads_it() -> None:
+    parsed = _parsed()
+    prism_steps = _prism_fetch_steps(parsed)
+    assert prism_steps, "expects a prism-fetch step to exist (see the sibling existence test)"
+    for step in prism_steps:
+        run = step.get("run") or ""
+        assert re.search(r"\\x1b|sed -E", run), (
+            "The prism-fetch step must strip ANSI escape codes, mirroring "
+            "the existing diff-fetch step's sanitization"
+        )
+        assert "cut -c1-2000" in run, (
+            "The prism-fetch step must cap content with the same "
+            "`cut -c1-2000` pattern the existing diff-fetch step uses"
+        )
+        assert "tmp/prism.md" in run, "The sanitized prism content must be written to tmp/prism.md"
+
+
+def test_review_prompt_gains_a_prism_paragraph_referencing_tmp_prism_md() -> None:
+    raw = _raw_text()
+    assert (
+        "tmp/prism.md" in raw
+    ), "REVIEW_PROMPT's env block must reference tmp/prism.md as a new DATA file for the reviewer"
+    assert _mentions_near(raw, "tmp/prism.md", "fit", window=800), (
+        "The new prism paragraph must instruct the reviewer to judge "
+        "fitness-to-this-project, in addition to correctness/minimality"
+    )
+
+
+def test_verdict_json_schema_is_byte_unchanged_by_the_prism_retrofit() -> None:
+    """Regression guard: the prism retrofit must enrich judgment, never the
+    output shape. This assertion passes today (the schema is copied verbatim
+    from the current file) and must keep passing after the retrofit lands.
+    """
+    raw = _raw_text()
+    assert (
+        VERDICT_SCHEMA_LINE in raw
+    ), f"The verdict JSON schema line must remain byte-identical: {VERDICT_SCHEMA_LINE!r}"
+
+
+def test_policy_defaults_gain_a_project_prism_key() -> None:
+    raw = _raw_text()
+    assert "project_prism" in raw, (
+        "The 'Read review policy' step's Python DEFAULTS dict must gain a "
+        "project_prism key alongside the four existing keys"
+    )
+    assert _mentions_near(
+        raw, "project_prism", "CLAUDE.md"
+    ), "project_prism's safe default value must be CLAUDE.md"
+
+
+def test_prism_off_or_absent_degrades_without_failure() -> None:
+    """Structural proxy for the "no failure when project_prism is off or
+    CLAUDE.md is absent" requirement — see the module docstring for what
+    real runtime behavior this cannot verify.
+    """
+    raw = _raw_text()
+    assert _mentions_default_near(raw, "project_prism"), (
+        "A missing/malformed project_prism value must not silently fail — "
+        "a safe default must be defined near project_prism"
+    )
+
+
+# --- Regression guards: these already hold today and must keep holding ----
+
+
+def test_review_job_permissions_unchanged_by_prism_retrofit() -> None:
+    parsed = _parsed()
+    permissions = _job_permissions(parsed)
+    assert any(perm == {"pull-requests": "write", "contents": "read"} for perm in permissions), (
+        "The prism retrofit must not alter the review job's permissions — "
+        "still EXACTLY pull-requests:write + contents:read"
+    )
+
+
+def test_fail_open_owner_step_unchanged_by_prism_retrofit() -> None:
+    parsed = _parsed()
+    act_steps = [
+        step
+        for step in _all_steps(parsed)
+        if step.get("id") == "act" or "Parse verdict and act" in str(step.get("name") or "")
+    ]
+    assert act_steps, "The fail-open owner step ('act') must still exist"
+    for step in act_steps:
+        condition = str(step.get("if") or "")
+        assert "always()" in condition, "The fail-open owner step must still be gated by always()"

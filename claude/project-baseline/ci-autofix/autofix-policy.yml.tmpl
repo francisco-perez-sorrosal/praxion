@@ -34,6 +34,22 @@ review:                        # Consumed live by reusable-cross-model-review.ym
                                 # and exits 0 without running a review.
   on_unavailable: fail-open    # fail-open is the only value the hub implements;
                                 # fail-closed is reserved, not implemented.
+  intake_gate: agent-issues    # agent-issues | all-issues | off — documentary
+                                # only in this fleet template: the cross-model
+                                # INTAKE gate is a Praxion-only direct workflow
+                                # (.github/workflows/issue-intake-assessment.yml),
+                                # not installed by any caller template here.
+                                # Declared for schema-mirroring so a future
+                                # second consumer can adopt it without a
+                                # breaking key rename — the same
+                                # documentary-key precedent as surfaces.pr_checks
+                                # before P3a gave it a real consumer.
+  project_prism: CLAUDE.md     # off disables — the shared, producer-free
+                                # project prism (this repo's own CLAUDE.md,
+                                # read as bounded base-ref DATA) the
+                                # cross-model review hub above reads to judge
+                                # fitness to THIS project, not just generic
+                                # correctness.
 
 safety:
   max_attempts_per_pr: 2

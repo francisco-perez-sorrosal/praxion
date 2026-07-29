@@ -33,6 +33,16 @@ review:                        # Consumed by reusable-cross-model-review.yml
                                 # gate must come from a different model family
                                 # or it reviews nothing.
   on_unavailable: fail-open
+  intake_gate: agent-issues    # agent-issues | all-issues | off — consumed by
+                                # .github/workflows/issue-intake-assessment.yml,
+                                # the cross-model INTAKE gate on filed
+                                # ecosystem-defect issues (Praxion-only direct
+                                # workflow, no PR context involved).
+  project_prism: CLAUDE.md     # off disables — the shared, producer-free
+                                # project prism (this repo's own CLAUDE.md,
+                                # read as bounded base-ref DATA) both the
+                                # intake gate above and the review gate read
+                                # to judge fitness to THIS project.
 
 safety:
   max_attempts_per_pr: 2    # P3a — LIVE: per-PR fix-commit attempt cap (counted

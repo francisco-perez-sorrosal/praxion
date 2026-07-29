@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-07-29T23:47:37Z'
+generated_at: '2026-07-29T23:59:21Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -8,7 +8,7 @@ surfaces:
   path: README.md
   type: markdown
   title: Praxion
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-16'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-ledger
@@ -33,7 +33,7 @@ surfaces:
   path: README_DEV.md
   type: markdown
   title: Developer Guide
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-01'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-040-eval-framework-out-of-band
@@ -43,7 +43,7 @@ surfaces:
   path: CLAUDE.md
   type: markdown
   title: Praxion
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-29'
   renderer: default_markdown
   surfaces_referenced:
   - docs-claude-code-limitations
@@ -51,7 +51,7 @@ surfaces:
   path: AGENTS.md
   type: markdown
   title: Development Guidelines for Codex
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-11'
   renderer: default_markdown
 - id: changelog
   path: CHANGELOG.md
@@ -63,7 +63,7 @@ surfaces:
   path: docs/README.md
   type: markdown
   title: Praxion docs
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-11'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -95,7 +95,7 @@ surfaces:
   path: docs/aac-dac.md
   type: markdown
   title: Architecture-as-Code + Documentation-as-Code
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-24'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -107,14 +107,14 @@ surfaces:
   path: docs/agent-readiness.md
   type: markdown
   title: Agent Readiness
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   diataxis: explanation
   renderer: explanation_shell
 - id: docs-architecture-diagrams
   path: docs/architecture-diagrams.md
   type: markdown
   title: Architecture Diagrams
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -138,13 +138,13 @@ surfaces:
   path: docs/claude-code-limitations.md
   type: markdown
   title: Known Claude Code Limitations
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-22'
   renderer: default_markdown
 - id: docs-claude-ecosystem-learning-resources
   path: docs/claude-ecosystem-learning-resources.md
   type: markdown
   title: Claude Ecosystem Learning Resources
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -152,7 +152,7 @@ surfaces:
   path: docs/concepts.md
   type: markdown
   title: Core Concepts
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-11'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -166,13 +166,13 @@ surfaces:
   path: docs/context-prj-comparison-2026-05-12/00-karpathy-critique.md
   type: markdown
   title: 'Grounding: What Andrej Karpathy Actually Said About LLM Coding Agents (and what people inferred for CLAUDE.md)'
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: default_markdown
 - id: docs-context-prj-comparison-2026-05-12-05-comparison
   path: docs/context-prj-comparison-2026-05-12/05-comparison.md
   type: markdown
   title: "Context-Engineering Comparison \u2014 Karpathy-Inspired CLAUDE.md Approaches vs. Praxion"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -189,7 +189,7 @@ surfaces:
   path: docs/context-prj-comparison-2026-05-12/06-not-comparable.md
   type: markdown
   title: "What Praxion Should *Not* Chase \u2014 Scope Mismatches & Non-Goals"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -202,7 +202,7 @@ surfaces:
   path: docs/context-prj-comparison-2026-05-12/07-praxion-roadmap.md
   type: markdown
   title: "Praxion Context-Engineering Roadmap \u2014 Derived from the 2026-05-12 Comparison Study"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-13'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -216,7 +216,7 @@ surfaces:
   path: docs/context-prj-comparison-2026-05-12/08-claude-code-behavior-verification.md
   type: markdown
   title: "Claude Code Behavior Verification \u2014 2026-05-12"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-13'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -227,7 +227,7 @@ surfaces:
   path: docs/context-prj-comparison-2026-05-12/README.md
   type: markdown
   title: "Context-Engineering Comparison Study \u2014 2026-05-12"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-13'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -246,25 +246,25 @@ surfaces:
   path: docs/context-prj-comparison-2026-05-12/sources/01-forrestchang-andrej-karpathy-skills.md
   type: markdown
   title: 'Analysis: forrestchang/andrej-karpathy-skills'
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   renderer: default_markdown
 - id: docs-context-prj-comparison-2026-05-12-sources-02-abhishekray07-claude-md-templates
   path: docs/context-prj-comparison-2026-05-12/sources/02-abhishekray07-claude-md-templates.md
   type: markdown
   title: 'Analysis: abhishekray07/claude-md-templates'
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: default_markdown
 - id: docs-context-prj-comparison-2026-05-12-sources-03-danielrosehill-repo-managers-claudemd
   path: docs/context-prj-comparison-2026-05-12/sources/03-danielrosehill-repo-managers-claudemd.md
   type: markdown
   title: 'Analysis: danielrosehill/Claude-Code-Repo-Managers-ClaudeMD'
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   renderer: default_markdown
 - id: docs-context-prj-comparison-2026-05-12-sources-04-alphasignal-karpathy-inspired-claudemd
   path: docs/context-prj-comparison-2026-05-12/sources/04-alphasignal-karpathy-inspired-claudemd.md
   type: markdown
   title: "Analysis: AlphaSignal \u2014 \"Karpathy-Inspired CLAUDE.md\""
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: default_markdown
   surfaces_referenced:
   - docs-context-prj-comparison-2026-05-12-00-karpathy-critique
@@ -272,7 +272,7 @@ surfaces:
   path: docs/cursor-compat.md
   type: markdown
   title: 'Claude Code vs Cursor: differences'
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -282,7 +282,7 @@ surfaces:
   path: docs/decision-tracking.md
   type: markdown
   title: Decision Tracking
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -290,7 +290,7 @@ surfaces:
   path: docs/diagrams/README.md
   type: markdown
   title: Diagrams
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-25'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -306,7 +306,7 @@ surfaces:
   path: docs/existing-project-onboarding.md
   type: markdown
   title: Existing-Project Onboarding
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-16'
   diataxis: tutorial
   audience: developer
   renderer: tutorial_shell
@@ -317,7 +317,7 @@ surfaces:
   path: docs/external-api-docs.md
   type: markdown
   title: External API Documentation
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-25'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -325,7 +325,7 @@ surfaces:
   path: docs/getting-started.md
   type: markdown
   title: Getting Started
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-25'
   diataxis: tutorial
   audience: developer
   renderer: tutorial_shell
@@ -342,7 +342,7 @@ surfaces:
   path: docs/greenfield-onboarding.md
   type: markdown
   title: Greenfield Project Onboarding
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-17'
   diataxis: tutorial
   audience: developer
   renderer: tutorial_shell
@@ -356,34 +356,34 @@ surfaces:
   path: docs/independent-analysis/cursor-ci-autofix-research-brief.md
   type: markdown
   title: "Research Brief \u2014 Autonomous CI/PR Failure Remediation via the Cursor Agent (installable across Praxion + managed projects)"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   renderer: default_markdown
 - id: docs-independent-analysis-linear-integration-analysis
   path: docs/independent-analysis/linear-integration-analysis.md
   type: markdown
   title: "Integrating Linear into Praxion \u2014 Feasibility, Vision, and Approach"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-24'
   audience: architect / maintainer
   renderer: default_markdown
 - id: docs-independent-analysis-praxion-artifact-lifecycle-audit
   path: docs/independent-analysis/praxion-artifact-lifecycle-audit.md
   type: markdown
   title: Praxion Generated Artifact Lifecycle Audit
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-25'
   audience: architect / context-engineer / implementation-planner / maintainer
   renderer: default_markdown
 - id: docs-independent-analysis-praxion-artifact-process-flow-analysis
   path: docs/independent-analysis/praxion-artifact-process-flow-analysis.md
   type: markdown
   title: Praxion Artifact Process-Flow Analysis
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-29'
   audience: architect / context-engineer / implementation-planner / maintainer
   renderer: default_markdown
 - id: docs-independent-analysis-self-healing-loop-implementation-brief
   path: docs/independent-analysis/self-healing-loop-implementation-brief.md
   type: markdown
   title: "Self-Healing Loop \u2014 Implementation Brief (v3, research-grounded)"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-22'
   renderer: default_markdown
   surfaces_referenced:
   - docs-independent-analysis-cursor-ci-autofix-research-brief
@@ -391,20 +391,20 @@ surfaces:
   path: docs/independent-analysis/wave-1-3-external-audit.md
   type: markdown
   title: "Wave 1\u20133 External Audit (Adversarial)"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-26'
   audience: implementer / maintainer
   renderer: default_markdown
 - id: docs-independent-analysis-wave-4-5-external-audit
   path: docs/independent-analysis/wave-4-5-external-audit.md
   type: markdown
   title: "Wave 4\u20135 External Audit (Adversarial)"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-29'
   renderer: default_markdown
 - id: docs-metrics-readme
   path: docs/metrics/README.md
   type: markdown
   title: "Project Metrics \u2014 Storage Schema and Consumption Reference"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -412,7 +412,7 @@ surfaces:
   path: docs/ml-training-onramp.md
   type: markdown
   title: ML Training Onramp
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   diataxis: tutorial
   audience: developer
   renderer: tutorial_shell
@@ -423,7 +423,7 @@ surfaces:
   path: docs/multi-session.md
   type: markdown
   title: Multi-Session Workflows
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-29'
   renderer: default_markdown
   surfaces_referenced:
   - docs-rework-dispatch
@@ -431,7 +431,7 @@ surfaces:
   path: docs/observability.md
   type: markdown
   title: Observability
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-09'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -439,7 +439,7 @@ surfaces:
   path: docs/obsidian-integration.md
   type: markdown
   title: Obsidian integration
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-22'
   diataxis: reference
   audience: operator
   renderer: reference_shell
@@ -447,7 +447,7 @@ surfaces:
   path: docs/rework-dispatch.md
   type: markdown
   title: Dispatching Reworks
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-01'
   renderer: default_markdown
   surfaces_referenced:
   - claude
@@ -457,7 +457,7 @@ surfaces:
   path: docs/rules-taxonomy.md
   type: markdown
   title: Rules Taxonomy and Disable Guide
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-25'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -467,7 +467,7 @@ surfaces:
   path: docs/skill-genesis.md
   type: markdown
   title: Harvesting Learnings with Skill-Genesis
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-25'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -478,7 +478,7 @@ surfaces:
   path: docs/spec-driven-development.md
   type: markdown
   title: Spec-Driven Development
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -503,7 +503,7 @@ surfaces:
   path: .ai-state/SYSTEM_DEPLOYMENT.md
   type: markdown
   title: System Deployment
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-24'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-116-ai-training-results-schema-owner
@@ -521,7 +521,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-16'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -533,1699 +533,1699 @@ surfaces:
   path: .ai-state/DESIGN_CHANGELOG.md
   type: markdown
   title: Architecture Changelog
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-02'
   renderer: default_markdown
 - id: ai-state-landscape-watchlist
   path: .ai-state/LANDSCAPE_WATCHLIST.md
   type: markdown
   title: Praxion Landscape Watchlist
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-30'
   renderer: default_markdown
 - id: ai-state-upstream-issues
   path: .ai-state/UPSTREAM_ISSUES.md
   type: markdown
   title: Upstream Issues
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-15'
   renderer: default_markdown
 - id: ai-state-decisions-001-skill-wrapper-over-mcp-server
   path: .ai-state/decisions/001-skill-wrapper-over-mcp-server.md
   type: markdown
   title: Skill wrapper as primary context-hub integration
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-02'
   renderer: adr_card
 - id: ai-state-decisions-002-otel-relay-architecture
   path: .ai-state/decisions/002-otel-relay-architecture.md
   type: markdown
   title: Chronograph as OTel relay for hook telemetry
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-02'
   renderer: adr_card
 - id: ai-state-decisions-003-phoenix-isolated-venv
   path: .ai-state/decisions/003-phoenix-isolated-venv.md
   type: markdown
   title: Dedicated Phoenix venv separate from chronograph
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-02'
   renderer: adr_card
 - id: ai-state-decisions-004-openinference-span-kinds
   path: .ai-state/decisions/004-openinference-span-kinds.md
   type: markdown
   title: CHAIN span kind for session root, AGENT for pipeline agents
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-02'
   renderer: adr_card
 - id: ai-state-decisions-005-dual-storage-eventstore-otel
   path: .ai-state/decisions/005-dual-storage-eventstore-otel.md
   type: markdown
   title: 'Dual storage: EventStore for real-time MCP + OTel/Phoenix for persistence'
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-02'
   renderer: adr_card
 - id: ai-state-decisions-006-commitizen-over-release-please
   path: .ai-state/decisions/006-commitizen-over-release-please.md
   type: markdown
   title: Use Commitizen over Release Please for versioning
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-02'
   renderer: adr_card
 - id: ai-state-decisions-007-skill-centric-security-watchdog
   path: .ai-state/decisions/007-skill-centric-security-watchdog.md
   type: markdown
   title: Skill-centric security watchdog instead of dedicated agent
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-008-diff-mode-default-security-review
   path: .ai-state/decisions/008-diff-mode-default-security-review.md
   type: markdown
   title: Diff mode by default with full-scan on command for security review
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-009-dual-layer-memory-architecture
   path: .ai-state/decisions/009-dual-layer-memory-architecture.md
   type: markdown
   title: Dual-layer memory architecture (curated + observations)
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-11'
   renderer: adr_card
 - id: ai-state-decisions-010-zero-llm-observation-capture
   path: .ai-state/decisions/010-zero-llm-observation-capture.md
   type: markdown
   title: Zero-LLM observation capture via pattern extraction
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-011-adr-injection-memory-first-budget
   path: .ai-state/decisions/011-adr-injection-memory-first-budget.md
   type: markdown
   title: Memory-first budget allocation with ADR soft cap for hook injection
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-012-command-hook-over-prompt-hook
   path: .ai-state/decisions/012-command-hook-over-prompt-hook.md
   type: markdown
   title: Deterministic command hook for duplication detection, LLM judgment reserved for verifier
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-013-layered-duplication-prevention
   path: .ai-state/decisions/013-layered-duplication-prevention.md
   type: markdown
   title: Layered duplication prevention via existing agents, not a new dedicated agent
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-014-upstream-stewardship-skill-command-composition
   path: .ai-state/decisions/014-upstream-stewardship-skill-command-composition.md
   type: markdown
   title: Skill + Command composition for upstream issue stewardship
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-21'
   renderer: adr_card
 - id: ai-state-decisions-015-project-exploration-skill-command-composition
   path: .ai-state/decisions/015-project-exploration-skill-command-composition.md
   type: markdown
   title: Skill+Command composition for project exploration (no agent)
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-016-explore-project-naming
   path: .ai-state/decisions/016-explore-project-naming.md
   type: markdown
   title: Naming convention for project exploration components
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-017-deployment-skill-local-first-compose-center
   path: .ai-state/decisions/017-deployment-skill-local-first-compose-center.md
   type: markdown
   title: Local-first Docker Compose as deployment skill gravity center
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-06'
   renderer: adr_card
 - id: ai-state-decisions-018-deployment-skill-opinionated-defaults
   path: .ai-state/decisions/018-deployment-skill-opinionated-defaults.md
   type: markdown
   title: Opinionated tool defaults in deployment skill decision framework
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-06'
   renderer: adr_card
 - id: ai-state-decisions-019-system-deployment-living-artifact
   path: .ai-state/decisions/019-system-deployment-living-artifact.md
   type: markdown
   title: Living SYSTEM_DEPLOYMENT.md artifact in .ai-state/
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-020-architecture-md-living-artifact
   path: .ai-state/decisions/020-architecture-md-living-artifact.md
   type: markdown
   title: Living ARCHITECTURE.md artifact in .ai-state/
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-17'
   renderer: adr_card
 - id: ai-state-decisions-021-dual-audience-architecture-docs
   path: .ai-state/decisions/021-dual-audience-architecture-docs.md
   type: markdown
   title: Dual-audience architecture documentation
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-17'
   renderer: adr_card
 - id: ai-state-decisions-022-coordination-detail-extraction
   path: .ai-state/decisions/022-coordination-detail-extraction.md
   type: markdown
   title: Extract coordination procedures to on-demand skill reference
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-16'
   renderer: adr_card
 - id: ai-state-decisions-023-adr-first-hook-injection
   path: .ai-state/decisions/023-adr-first-hook-injection.md
   type: markdown
   title: ADR-first budget allocation with memory filling remainder for hook injection
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-024-ci-test-pipeline
   path: .ai-state/decisions/024-ci-test-pipeline.md
   type: markdown
   title: CI test pipeline via GitHub Actions matrix over MCP servers
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-025-memory-hygiene-rules
   path: .ai-state/decisions/025-memory-hygiene-rules.md
   type: markdown
   title: "Memory hygiene disposition rules (R1\u2013R7)"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-11'
   renderer: adr_card
 - id: ai-state-decisions-026-session-count-from-observations
   path: .ai-state/decisions/026-session-count-from-observations.md
   type: markdown
   title: Derive session_count from observations.jsonl instead of a counter in memory.json
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-027-principles-embedding-strategy
   path: .ai-state/decisions/027-principles-embedding-strategy.md
   type: markdown
   title: Praxion-specific principles embedded via compact bullet block + README prose, anchored by diagram-conventions path-scoping
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-028-diagram-conventions-path-scoping
   path: .ai-state/decisions/028-diagram-conventions-path-scoping.md
   type: markdown
   title: Narrow `rules/writing/diagram-conventions.md` path-scope from `**/*.md` to doc-authoring surfaces
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-17'
   renderer: adr_card
 - id: ai-state-decisions-029-roadmap-creation-shape-b-hybrid
   path: .ai-state/decisions/029-roadmap-creation-shape-b-hybrid.md
   type: markdown
   title: Shape B-hybrid for roadmap-creation capability (agent + skill + command)
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-030-roadmap-planning-skill-coexistence
   path: .ai-state/decisions/030-roadmap-planning-skill-coexistence.md
   type: markdown
   title: Existing `roadmap-planning` skill coexists with new `roadmap-synthesis` skill
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-031-roadmap-creation-pipeline-placement
   path: .ai-state/decisions/031-roadmap-creation-pipeline-placement.md
   type: markdown
   title: "Roadmap-creation is user-initiated and standalone, not inserted into the promethean\u2192SDD chain"
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-032-roadmap-md-location-and-lifecycle
   path: .ai-state/decisions/032-roadmap-md-location-and-lifecycle.md
   type: markdown
   title: 032-roadmap-md-location-and-lifecycle.md
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-28'
   renderer: adr_card
 - id: ai-state-decisions-033-six-dimension-lens-placement
   path: .ai-state/decisions/033-six-dimension-lens-placement.md
   type: markdown
   title: "Lens content placement \u2014 skill reference file + template asset + SKILL.md summary"
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-034-roadmap-budget-offset-via-prune
   path: .ai-state/decisions/034-roadmap-budget-offset-via-prune.md
   type: markdown
   title: Zero-net always-loaded budget impact via prune of redundant ASCII Coordination Pipeline block
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-24'
   renderer: adr_card
 - id: ai-state-decisions-035-roadmap-parallel-audit-via-researchers
   path: .ai-state/decisions/035-roadmap-parallel-audit-via-researchers.md
   type: markdown
   title: "Parallel audit fan-out via N=3\u20136 researchers, not a new project-auditor agent"
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-036-lens-framework-project-derived
   path: .ai-state/decisions/036-lens-framework-project-derived.md
   type: markdown
   title: Lens framework is project-derived; SPIRIT is an exemplar, not the canonical default
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-17'
   renderer: adr_card
 - id: ai-state-decisions-037-opportunities-forward-lines
   path: .ai-state/decisions/037-opportunities-forward-lines.md
   type: markdown
   title: Opportunities (Forward Lines) as a first-class roadmap section; Motivation field generalization
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-24'
   renderer: adr_card
 - id: ai-state-decisions-038-test-results-md-artifact
   path: .ai-state/decisions/038-test-results-md-artifact.md
   type: markdown
   title: "TEST_RESULTS.md as formal implementer\u2192verifier handoff artifact"
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-039-memory-gate-exemption-shared-constant
   path: .ai-state/decisions/039-memory-gate-exemption-shared-constant.md
   type: markdown
   title: Share memory-gate EXEMPT_AGENTS via _hook_utils single source of truth
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-11'
   renderer: adr_card
 - id: ai-state-decisions-040-eval-framework-out-of-band
   path: .ai-state/decisions/040-eval-framework-out-of-band.md
   type: markdown
   title: Eval framework is out-of-band only (/eval command + CI, never hook-driven)
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-29'
   renderer: adr_card
 - id: ai-state-decisions-041-pyright-over-mypy
   path: .ai-state/decisions/041-pyright-over-mypy.md
   type: markdown
   title: pyright over mypy for MCP server type checking
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-042-scripts-filter-combined-predicate
   path: .ai-state/decisions/042-scripts-filter-combined-predicate.md
   type: markdown
   title: Scripts install filter uses a combined predicate (executable + not-internal-helper) plus stale-symlink sweep
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-12'
   renderer: adr_card
 - id: ai-state-decisions-043-behavioral-contract-layer
   path: .ai-state/decisions/043-behavioral-contract-layer.md
   type: markdown
   title: Introduce a four-behavior Agent Behavioral Contract as a first-class operational pillar
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-24'
   renderer: adr_card
 - id: ai-state-decisions-044-coding-style-path-scoping
   path: .ai-state/decisions/044-coding-style-path-scoping.md
   type: markdown
   title: Path-scope `rules/swe/coding-style.md` to code-file globs to reclaim always-loaded budget
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-13'
   renderer: adr_card
 - id: ai-state-decisions-045-llm-prompt-engineering-skill
   path: .ai-state/decisions/045-llm-prompt-engineering-skill.md
   type: markdown
   title: Create `llm-prompt-engineering` skill with framework-agnostic scope
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-16'
   renderer: adr_card
 - id: ai-state-decisions-046-staleness-detection-system
   path: .ai-state/decisions/046-staleness-detection-system.md
   type: markdown
   title: 046-staleness-detection-system.md
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-16'
   renderer: adr_card
 - id: ai-state-decisions-047-cross-reference-validator
   path: .ai-state/decisions/047-cross-reference-validator.md
   type: markdown
   title: Cross-reference validator as sibling script with soft-launch CI
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-16'
   renderer: adr_card
 - id: ai-state-decisions-048-observation-span-correlation
   path: .ai-state/decisions/048-observation-span-correlation.md
   type: markdown
   title: Observation/span correlation via OpenInference `session.id` + W3C trace-context
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-16'
   renderer: adr_card
 - id: ai-state-decisions-049-reaffirm-dec022-coord-cohort
   path: .ai-state/decisions/049-reaffirm-dec022-coord-cohort.md
   type: markdown
   title: Re-affirm dec-022 and ship symmetry + lightweight-tier + tier-template cohort
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-16'
   renderer: adr_card
 - id: ai-state-decisions-050-always-loaded-budget-revision
   path: .ai-state/decisions/050-always-loaded-budget-revision.md
   type: markdown
   title: Raise always-loaded budget to 25,000 tokens and reframe as attention-relevance guardrail
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-16'
   renderer: adr_card
 - id: ai-state-decisions-051-pre-impl-design-synthesis
   path: .ai-state/decisions/051-pre-impl-design-synthesis.md
   type: markdown
   title: Pre-implementation design-synthesis capability (H1-wide)
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-16'
   renderer: adr_card
 - id: ai-state-decisions-052-telemetry-span-model-v2
   path: .ai-state/decisions/052-telemetry-span-model-v2.md
   type: markdown
   title: Duration-aware OTel spans with openinference-standard attribution and parallel-execution markers
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-17'
   renderer: adr_card
 - id: ai-state-decisions-053-prompt-over-template-greenfield-scaffold
   path: .ai-state/decisions/053-prompt-over-template-greenfield-scaffold.md
   type: markdown
   title: Prompt-over-template discipline for greenfield project scaffolding
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-17'
   renderer: adr_card
 - id: ai-state-decisions-054-separate-new-cc-project-from-install
   path: .ai-state/decisions/054-separate-new-cc-project-from-install.md
   type: markdown
   title: Separate new_cc_project.sh from install.sh
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-17'
   renderer: adr_card
 - id: ai-state-decisions-055-hybrid-bash-slash-command-orchestration
   path: .ai-state/decisions/055-hybrid-bash-slash-command-orchestration.md
   type: markdown
   title: Hybrid bash + slash-command orchestration for greenfield onboarding (Option C)
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-17'
   renderer: adr_card
 - id: ai-state-decisions-056-concurrency-collab-research-fragment-adr-naming
   path: .ai-state/decisions/056-concurrency-collab-research-fragment-adr-naming.md
   type: markdown
   title: Fragment-ADR Naming Scheme (Timestamp + User + Branch + Slug)
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-057-concurrency-collab-research-unified-worktree-home
   path: .ai-state/decisions/057-concurrency-collab-research-unified-worktree-home.md
   type: markdown
   title: 057-concurrency-collab-research-unified-worktree-home.md
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-058-concurrency-collab-research-pr-conventions-rule
   path: .ai-state/decisions/058-concurrency-collab-research-pr-conventions-rule.md
   type: markdown
   title: PR-Conventions Rule -- path-scoped, no always-loaded budget impact
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-059-concurrency-collab-research-squash-merge-safety
   path: .ai-state/decisions/059-concurrency-collab-research-squash-merge-safety.md
   type: markdown
   title: Squash-Merge Safety -- post-merge warning + `/merge-worktree` refuse-or-rebase
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-060-concurrency-collab-research-auto-memory-orphan-cleanup
   path: .ai-state/decisions/060-concurrency-collab-research-auto-memory-orphan-cleanup.md
   type: markdown
   title: Auto-Memory Orphan Cleanup -- `/clean-auto-memory` opt-in command
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-061-concurrency-collab-research-finalize-protocol
   path: .ai-state/decisions/061-concurrency-collab-research-finalize-protocol.md
   type: markdown
   title: ADR Finalize Protocol -- draft to NNN at merge-to-main
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-062-metrics-storage-schema
   path: .ai-state/decisions/062-metrics-storage-schema.md
   type: markdown
   title: "Metrics storage schema \u2014 JSON canonical + MD derived + append-only METRICS_LOG.md"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-063-collector-protocol
   path: .ai-state/decisions/063-collector-protocol.md
   type: markdown
   title: Collector protocol as extension seam for /project-metrics
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-064-graceful-degradation-policy
   path: .ai-state/decisions/064-graceful-degradation-policy.md
   type: markdown
   title: "Graceful degradation policy \u2014 git+stdlib hard floor, everything else optional"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-065-hotspot-formula
   path: .ai-state/decisions/065-hotspot-formula.md
   type: markdown
   title: "Hot-spot composition formula \u2014 churn_lines \xD7 max CCN, cross-language default"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-066-project-metrics-planning-conventions
   path: .ai-state/decisions/066-project-metrics-planning-conventions.md
   type: markdown
   title: "/project-metrics planning conventions \u2014 Full-tier escalation, test placement, committed fixture repo"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-067-dispatcher-renderer-split
   path: .ai-state/decisions/067-dispatcher-renderer-split.md
   type: markdown
   title: test-coverage skill as dispatcher + renderer, not tool installer
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-068-presentation-model
   path: .ai-state/decisions/068-presentation-model.md
   type: markdown
   title: "test-coverage presentation model \u2014 pp-deltas, threshold bands, per-file column order"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-069-test-coverage-skill-verifier-discretion
   path: .ai-state/decisions/069-test-coverage-skill-verifier-discretion.md
   type: markdown
   title: Verifier loads test-coverage skill at its own discretion (not hard trigger)
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-070-consumer-contract
   path: .ai-state/decisions/070-consumer-contract.md
   type: markdown
   title: "Tech-debt ledger consumer contract \u2014 single-line input on five agents (permission, not obligation)"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-071-ledger-living-artifact
   path: .ai-state/decisions/071-ledger-living-artifact.md
   type: markdown
   title: Tech-debt ledger as a living artifact in `.ai-state/`
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-24'
   renderer: adr_card
 - id: ai-state-decisions-072-tech-debt-integration-tech-debt-producer-integration
   path: .ai-state/decisions/072-tech-debt-integration-tech-debt-producer-integration.md
   type: markdown
   title: "Tech-debt producers \u2014 verifier migration + sentinel TD dimension"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-073-unified-phase-plan
   path: .ai-state/decisions/073-unified-phase-plan.md
   type: markdown
   title: "Praxion-first-class \u2014 unified four-phase implementation plan"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-074-praxion-first-class-install-completeness-auto-first-session
   path: .ai-state/decisions/074-praxion-first-class-install-completeness-auto-first-session.md
   type: markdown
   title: Install-path completeness via first-session auto-completion + retain /praxion-complete-install
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-075-praxion-first-class-praxion-first-class-process
   path: .ai-state/decisions/075-praxion-first-class-praxion-first-class-process.md
   type: markdown
   title: "Praxion-as-First-Class \u2014 process-driven development with universal rule-inheritance"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-076-agent-model-routing-routing-dimensionality-1d-defer-2d
   path: .ai-state/decisions/076-agent-model-routing-routing-dimensionality-1d-defer-2d.md
   type: markdown
   title: "Routing dimensionality \u2014 1D now, defer 2D (model \xD7 effort)"
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-27'
   renderer: adr_card
 - id: ai-state-decisions-077-agent-model-routing-routing-frontmatter-floor-semantic
   path: .ai-state/decisions/077-agent-model-routing-routing-frontmatter-floor-semantic.md
   type: markdown
   title: 077-agent-model-routing-routing-frontmatter-floor-semantic.md
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-27'
   renderer: adr_card
 - id: ai-state-decisions-078-agent-model-routing-routing-mechanism-hybrid
   path: .ai-state/decisions/078-agent-model-routing-routing-mechanism-hybrid.md
   type: markdown
   title: "Hybrid routing \u2014 central rule table with sparing per-spawn overrides"
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-27'
   renderer: adr_card
 - id: ai-state-decisions-079-agent-model-routing-routing-placement-always-loaded-rule
   path: .ai-state/decisions/079-agent-model-routing-routing-placement-always-loaded-rule.md
   type: markdown
   title: Model-routing policy lives in a new always-loaded rule
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-27'
   renderer: adr_card
 - id: ai-state-decisions-080-agent-model-routing-routing-telemetry-defer
   path: .ai-state/decisions/080-agent-model-routing-routing-telemetry-defer.md
   type: markdown
   title: "Defer routing telemetry \u2014 ship v1 without transcript-scraping"
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-27'
   renderer: adr_card
 - id: ai-state-decisions-081-onboard-self-host-guard
   path: .ai-state/decisions/081-onboard-self-host-guard.md
   type: markdown
   title: Self-host guard for /onboard-project and /new-project
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-082-extract-canonical-blocks-build-time-canonical-block-sync
   path: .ai-state/decisions/082-extract-canonical-blocks-build-time-canonical-block-sync.md
   type: markdown
   title: Build-time canonical-block sync over runtime bash injection
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-083-separate-test-scopes-integration-vs-unit
   path: .ai-state/decisions/083-separate-test-scopes-integration-vs-unit.md
   type: markdown
   title: "Separate test scopes for canonical-blocks refactor \u2014 integration vs. unit"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-084-integration-checkpoint-scope
   path: .ai-state/decisions/084-integration-checkpoint-scope.md
   type: markdown
   title: Integration checkpoint runs the full pipeline-tier suite
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-085-lightweight-tier-activation-policy
   path: .ai-state/decisions/085-lightweight-tier-activation-policy.md
   type: markdown
   title: Test-topology protocol does not activate at Lightweight tier; escalation path is the sole exit
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-086-parallel-unsafe-and-marker-conflicts
   path: .ai-state/decisions/086-parallel-unsafe-and-marker-conflicts.md
   type: markdown
   title: "Parallel-unsafe groups isolate at runner level; kebab-id \u2192 snake_case marker form; reserved-name set"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-087-pilot-strategy-trunk-only-then-defer-behavioral-pilot
   path: .ai-state/decisions/087-pilot-strategy-trunk-only-then-defer-behavioral-pilot.md
   type: markdown
   title: "Pilot strategy \u2014 trunk-only at this pipeline; defer behavioral pilot to first consumer project"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-24'
   renderer: adr_card
 - id: ai-state-decisions-088-runtime-envelope-opt-in-policy
   path: .ai-state/decisions/088-runtime-envelope-opt-in-policy.md
   type: markdown
   title: expected_runtime_envelope is opt-in at M1 and M2; required from M3 (sentinel TT04 activation)
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-089-selector-manual-justification-format
   path: .ai-state/decisions/089-selector-manual-justification-format.md
   type: markdown
   title: selector=manual justification is a closed enum with an "other" escape hatch
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-090-topology-regeneration-cadence
   path: .ai-state/decisions/090-topology-regeneration-cadence.md
   type: markdown
   title: Topology regeneration is human-initiated or sentinel-triggered, never automatic per-pipeline
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-19'
   renderer: adr_card
 - id: ai-state-decisions-091-test-partitioning-typed-pluggable-identifier-registry
   path: .ai-state/decisions/091-test-partitioning-typed-pluggable-identifier-registry.md
   type: markdown
   title: Typed-pluggable-identifier registries (selector_strategy and parallel_runner) as the trunk's language-additive primitive
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-23'
   renderer: adr_card
 - id: ai-state-decisions-092-retire-roadmap-living-document
   path: .ai-state/decisions/092-retire-roadmap-living-document.md
   type: markdown
   title: Retire `ROADMAP.md` as living document; route content to TECH_DEBT_LEDGER and idea_ledgers
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-28'
   renderer: adr_card
 - id: ai-state-decisions-093-diagram-coexistence-policy
   path: .ai-state/decisions/093-diagram-coexistence-policy.md
   type: markdown
   title: "Two-toolchain coexistence policy \u2014 LikeC4 for C4-architectural; Mermaid for everything else"
-  last_modified: '2026-07-29'
+  last_modified: '2026-04-30'
   renderer: adr_card
 - id: ai-state-decisions-094-render-storage-commit-both
   path: .ai-state/decisions/094-render-storage-commit-both.md
   type: markdown
   title: Commit both diagram source DSL and rendered SVG; regenerate via repo hook
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-24'
   renderer: adr_card
 - id: ai-state-decisions-095-toolchain-likec4-d2
   path: .ai-state/decisions/095-toolchain-likec4-d2.md
   type: markdown
   title: LikeC4 + D2 chosen as C4-architectural diagramming toolchain
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-24'
   renderer: adr_card
 - id: ai-state-decisions-096-structurizr-d2-diagrams-step-ordering-constraint
   path: .ai-state/decisions/096-structurizr-d2-diagrams-step-ordering-constraint.md
   type: markdown
   title: "Step ordering constraint \u2014 rule update must commit before any .c4/.d2 file"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-17'
   renderer: adr_card
 - id: ai-state-decisions-097-aac-dac-cornerstone-framing
   path: .ai-state/decisions/097-aac-dac-cornerstone-framing.md
   type: markdown
   title: AaC+DaC cornerstone framed as clauses under existing principles, not a new top-level principle
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-098-aac-fence-contract
   path: .ai-state/decisions/098-aac-fence-contract.md
   type: markdown
   title: Hybrid generated/authored markdown contract via fenced HTML-comment regions
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-099-aac-idea8-directory-reconciliation
   path: .ai-state/decisions/099-aac-idea8-directory-reconciliation.md
   type: markdown
   title: "Idea 8 directory premise reconciled \u2014 `.c4` source lives at `<doc-dir>/diagrams/`, not `architecture/` at project root"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-100-architect-validator-charter
   path: .ai-state/decisions/100-architect-validator-charter.md
   type: markdown
   title: "architect-validator agent \u2014 pre-merge / on-demand structural validator for code\u2194DSL\u2194ADR coherence"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-24'
   renderer: adr_card
 - id: ai-state-decisions-101-fitness-functions-infra
   path: .ai-state/decisions/101-fitness-functions-infra.md
   type: markdown
   title: "Architectural fitness functions infrastructure \u2014 fitness/ at project root, import-linter + pytest, citation contract, waiver mechanism"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-102-planner-decomposition-decisions
   path: .ai-state/decisions/102-planner-decomposition-decisions.md
   type: markdown
   title: "AaC+DaC v1 implementation decomposition \u2014 two-worktree split at Phase 3/4 boundary"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-103-tech-debt-source-enum-widening
   path: .ai-state/decisions/103-tech-debt-source-enum-widening.md
   type: markdown
   title: TECH_DEBT_LEDGER source enum widened to include orchestrator
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-104-aac-dac-foundation-aac-dac-foundation-worktree1-decompositi
   path: .ai-state/decisions/104-aac-dac-foundation-aac-dac-foundation-worktree1-decompositi.md
   type: markdown
   title: "AaC+DaC Worktree 1 decomposition \u2014 fitness tests in separate invocation, import-linter in dev group"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-105-aac-dac-wireup-w2-agent-intermediate-docs-verify-only
   path: .ai-state/decisions/105-aac-dac-wireup-w2-agent-intermediate-docs-verify-only.md
   type: markdown
   title: "W2 agent-intermediate-documents \u2014 verify-only; no further edit needed"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-106-aac-architecture-ci-pipeline
   path: .ai-state/decisions/106-aac-architecture-ci-pipeline.md
   type: markdown
   title: "Architecture CI pipeline \u2014 three parallel jobs invoking architect-validator on architectural-touch PRs"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-17'
   renderer: adr_card
 - id: ai-state-decisions-107-aac-diataxis-companion
   path: .ai-state/decisions/107-aac-diataxis-companion.md
   type: markdown
   title: "Di\xE1taxis-aligned DaC companion as reference under doc-management with per-mode fence-regenerability rules"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-108-aac-golden-rule-enforcement-hook
   path: .ai-state/decisions/108-aac-golden-rule-enforcement-hook.md
   type: markdown
   title: Golden-rule enforcement at commit time via standalone script invoked from pre-commit hook
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-109-aac-likec4-querying-skill
   path: .ai-state/decisions/109-aac-likec4-querying-skill.md
   type: markdown
   title: "likec4-querying skill \u2014 path-scoped progressive-disclosure rubric for MCP-vs-direct-read decisions"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-17'
   renderer: adr_card
 - id: ai-state-decisions-110-aac-dac-v1-1-block-d-hook-slot-correction
   path: .ai-state/decisions/110-aac-dac-v1-1-block-d-hook-slot-correction.md
   type: markdown
   title: golden-rule hook placement in Block D, not Block C
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-111-req-arch-element-traceability
   path: .ai-state/decisions/111-req-arch-element-traceability.md
   type: markdown
   title: 111-req-arch-element-traceability.md
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-112-aac-dac-traceability-sentinel-ac-traceability-checks
   path: .ai-state/decisions/112-aac-dac-traceability-sentinel-ac-traceability-checks.md
   type: markdown
   title: "Sentinel AC-dimension extension \u2014 three conditional-activation checks for fence integrity, model\u2194markdown agreement, and traceability orphans"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-24'
   renderer: adr_card
 - id: ai-state-decisions-113-aac-dac-onboarding-aac-onboarding-tier
   path: .ai-state/decisions/113-aac-dac-onboarding-aac-onboarding-tier.md
   type: markdown
   title: "AaC tier integrates into onboarding via plugin-path-resolved scripts and templated artifacts \u2014 greenfield default-ON, existing-project default-OFF"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-24'
   renderer: adr_card
 - id: ai-state-decisions-114-tech-debt-ledger-resolved-split
   path: .ai-state/decisions/114-tech-debt-ledger-resolved-split.md
   type: markdown
   title: Split TECH_DEBT_LEDGER into active + resolved file pair
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-115-ai-training-program-md-meta-prompt
   path: .ai-state/decisions/115-ai-training-program-md-meta-prompt.md
   type: markdown
   title: "program.md is a project-local meta-prompt \u2014 sibling artifact category to CLAUDE.md"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-116-ai-training-results-schema-owner
   path: .ai-state/decisions/116-ai-training-results-schema-owner.md
   type: markdown
   title: TRAINING_RESULTS.md schema is owned by llm-training-eval skill; verifier reads it; /run-experiment writes it
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-117-ai-training-skill-scope-decision
   path: .ai-state/decisions/117-ai-training-skill-scope-decision.md
   type: markdown
   title: ML training onramp uses four new skills + extensions to deployment/cicd, not one mega-skill
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-118-ai-training-tiered-backend-strategy
   path: .ai-state/decisions/118-ai-training-tiered-backend-strategy.md
   type: markdown
   title: Neo-cloud abstraction uses tiered backend strategy (local default + SkyPilot default-remote + opt-in direct adapters)
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-119-ai-training-verifier-eval-mode
   path: .ai-state/decisions/119-ai-training-verifier-eval-mode.md
   type: markdown
   title: Extend verifier with eval-aware mode rather than introducing a peer ml-verifier
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-120-ai-training-onramp-step-ordering-for-ml-training-onramp
   path: .ai-state/decisions/120-ai-training-onramp-step-ordering-for-ml-training-onramp.md
   type: markdown
   title: "ML training onramp step ordering \u2014 skills-first, no test-engineer pairing"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-121-pipeline-dashboard-dashboard-claudemd-placement
   path: .ai-state/decisions/121-pipeline-dashboard-dashboard-claudemd-placement.md
   type: markdown
   title: "Pipeline Dashboard CLAUDE.md placement \u2014 Working Here mention, no philosophical block"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-24'
   renderer: adr_card
 - id: ai-state-decisions-122-pipeline-dashboard-dashboard-cross-platform-scope
   path: .ai-state/decisions/122-pipeline-dashboard-dashboard-cross-platform-scope.md
   type: markdown
   title: "Pipeline Dashboard cross-platform scope \u2014 macOS-only v1, Linux deferred"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-123-pipeline-dashboard-dashboard-dependency-isolation
   path: .ai-state/decisions/123-pipeline-dashboard-dashboard-dependency-isolation.md
   type: markdown
   title: "Pipeline Dashboard dependency isolation \u2014 dedicated ~/.praxion-dashboard/venv/"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-124-pipeline-dashboard-dashboard-frontmatter-parsing
   path: .ai-state/decisions/124-pipeline-dashboard-dashboard-frontmatter-parsing.md
   type: markdown
   title: "Pipeline Dashboard frontmatter parsing \u2014 stdlib re + pyyaml, no python-frontmatter"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-125-pipeline-dashboard-dashboard-mermaid-strategy
   path: .ai-state/decisions/125-pipeline-dashboard-dashboard-mermaid-strategy.md
   type: markdown
   title: "Pipeline Dashboard Mermaid rendering \u2014 defer to v2"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-126-pipeline-dashboard-dashboard-poll-interval
   path: .ai-state/decisions/126-pipeline-dashboard-dashboard-poll-interval.md
   type: markdown
   title: "Pipeline Dashboard auto-refresh interval \u2014 15s default, env-overridable"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-127-pipeline-dashboard-dashboard-port-allocation
   path: .ai-state/decisions/127-pipeline-dashboard-dashboard-port-allocation.md
   type: markdown
   title: "Pipeline Dashboard port allocation \u2014 sha256 per-project derivation"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-128-pipeline-dashboard-dashboard-process-model
   path: .ai-state/decisions/128-pipeline-dashboard-dashboard-process-model.md
   type: markdown
   title: "Pipeline Dashboard process model \u2014 bash ctl + macOS launchd, not MCP-bound"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-129-pipeline-dashboard-dashboard-supersede-metrics-viewer
   path: .ai-state/decisions/129-pipeline-dashboard-dashboard-supersede-metrics-viewer.md
   type: markdown
   title: 129-pipeline-dashboard-dashboard-supersede-metrics-viewer.md
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-130-pipeline-dashboard-dashboard-visualization-stack
   path: .ai-state/decisions/130-pipeline-dashboard-dashboard-visualization-stack.md
   type: markdown
   title: "Pipeline Dashboard visualization stack \u2014 graphviz + plotly + pyvis (lazy)"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-131-dashboard-sequential-data-then-parallel-pages
   path: .ai-state/decisions/131-dashboard-sequential-data-then-parallel-pages.md
   type: markdown
   title: "Pipeline Dashboard \u2014 sequential data layer before parallel page steps"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-08'
   renderer: adr_card
 - id: ai-state-decisions-132-rename-architecture-to-design
   path: .ai-state/decisions/132-rename-architecture-to-design.md
   type: markdown
   title: "Rename .ai-state/ARCHITECTURE.md to .ai-state/DESIGN.md for Di\xE1taxis clarity"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-24'
   renderer: adr_card
 - id: ai-state-decisions-133-drop-dev-prereleases
   path: .ai-state/decisions/133-drop-dev-prereleases.md
   type: markdown
   title: Drop PEP 440 dev pre-releases for simpler SemVer-only flow
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-01'
   renderer: adr_card
 - id: ai-state-decisions-134-dashboard-nextjs-runtime
   path: .ai-state/decisions/134-dashboard-nextjs-runtime.md
   type: markdown
   title: Dashboard rewrite uses Next.js with isolated local Node runtime
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-11'
   renderer: adr_card
 - id: ai-state-decisions-135-angular-exclusion-from-contexts
   path: .ai-state/decisions/135-angular-exclusion-from-contexts.md
   type: markdown
   title: Angular intentionally excluded from first-class typescript-development contexts
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-11'
   renderer: adr_card
 - id: ai-state-decisions-136-biome-eslint-coexistence
   path: .ai-state/decisions/136-biome-eslint-coexistence.md
   type: markdown
   title: "Biome / ESLint coexistence in typescript-development \u2014 one context file, conditional guidance"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-11'
   renderer: adr_card
 - id: ai-state-decisions-137-frontend-framework-nesting
   path: .ai-state/decisions/137-frontend-framework-nesting.md
   type: markdown
   title: Frontend framework contexts nest inside typescript-development, not as sibling skills
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-138-mcp-sdk-v2-promotion-criteria
   path: .ai-state/decisions/138-mcp-sdk-v2-promotion-criteria.md
   type: markdown
   title: "MCP TypeScript SDK v2 promotion \u2014 trigger-based review, not date-based"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-11'
   renderer: adr_card
 - id: ai-state-decisions-139-polyglot-skill-template
   path: .ai-state/decisions/139-polyglot-skill-template.md
   type: markdown
   title: "Polyglot skill template \u2014 references/ vs contexts/ separation with extension protocol"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-140-zod-version-split-housing
   path: .ai-state/decisions/140-zod-version-split-housing.md
   type: markdown
   title: "Zod v3/v4 cross-skill version split \u2014 canonical home in node-prj-mgmt"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-11'
   renderer: adr_card
 - id: ai-state-decisions-141-adr-graph-pure-svg
   path: .ai-state/decisions/141-adr-graph-pure-svg.md
   type: markdown
   title: "ADR relationship graph \u2014 pure-SVG layered layout, no graph-layout library"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-142-charting-recharts
   path: .ai-state/decisions/142-charting-recharts.md
   type: markdown
   title: "Dashboard charting \u2014 adopt recharts via a TrendChart wrapper; parse METRICS_LOG.md / SENTINEL_LOG.md for historical series"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-143-design-token-layer
   path: .ai-state/decisions/143-design-token-layer.md
   type: markdown
   title: "Dashboard design system \u2014 globals.css CSS-custom-property token layer, single polished light theme, no icon dependency"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-144-diagram-serving-and-svg-sanitization
   path: .ai-state/decisions/144-diagram-serving-and-svg-sanitization.md
   type: markdown
   title: "Dashboard diagram serving \u2014 route handler + markdown image-ref rewrite + server-side SVG sanitization"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-145-metrics-viewer-stub
   path: .ai-state/decisions/145-metrics-viewer-stub.md
   type: markdown
   title: Replace metrics-viewer.html.tmpl with a static redirect stub; remove the committed index.html and orphaned SENTRUX_* files
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-146-renderer-registry-and-diataxis-shells
   path: .ai-state/decisions/146-renderer-registry-and-diataxis-shells.md
   type: markdown
   title: "Dashboard renderer registry + Di\xE1taxis-typed shells (Next.js App Router shape)"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-147-validate-project-root-relaxation
   path: .ai-state/decisions/147-validate-project-root-relaxation.md
   type: markdown
   title: Dashboard validateProjectRoot requires only .ai-state/; missing PRAXION_PROJECT_ROOT renders an actionable error page
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-148-step-decomposition-design
   path: .ai-state/decisions/148-step-decomposition-design.md
   type: markdown
   title: Dashboard redesign step ordering and decomposition design
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-149-agent-shape-and-role-model
   path: .ai-state/decisions/149-agent-shape-and-role-model.md
   type: markdown
   title: "One `interface-designer` agent \u2014 advisory sub-architect with interface-layer decision authority, four skills as hats"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-150-four-skill-decomposition
   path: .ai-state/decisions/150-four-skill-decomposition.md
   type: markdown
   title: Four interface-design skills; `api-design-craft` is a new skill; cross-cutting fundamentals duplicated as `references/design-fundamentals.md` in each skill
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-151-interface-designer-architect-boundary
   path: .ai-state/decisions/151-interface-designer-architect-boundary.md
   type: markdown
   title: "The `interface-designer` \u2194 `systems-architect` boundary \u2014 the default partition (interface-layer technology selection moves to `interface-designer`)"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-152-interface-designer-opus-tier
   path: .ai-state/decisions/152-interface-designer-opus-tier.md
   type: markdown
   title: 152-interface-designer-opus-tier.md
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-153-review-interface-skill-command-pattern
   path: .ai-state/decisions/153-review-interface-skill-command-pattern.md
   type: markdown
   title: 153-review-interface-skill-command-pattern.md
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-154-specialist-sub-architects-active-advocates
   path: .ai-state/decisions/154-specialist-sub-architects-active-advocates.md
   type: markdown
   title: "Specialist sub-architects are active quality advocates with standing \u2014 the orchestrator-mediated challenge loop"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-155-context-engineer-executes-artifact-steps
   path: .ai-state/decisions/155-context-engineer-executes-artifact-steps.md
   type: markdown
   title: context-engineer executes all interface-design artifact steps; main-agent handles plugin.json and diagram re-render
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-156-architecture-page-composition
   path: .ai-state/decisions/156-architecture-page-composition.md
   type: markdown
   title: "Architecture page two-column composition \u2014 Diagrams row + Component-index ToC + DESIGN.md/architecture.md cards"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-157-dashboard-visual-language-shift
   path: .ai-state/decisions/157-dashboard-visual-language-shift.md
   type: markdown
   title: Shift the dashboard visual language from literary/glassmorphic to professional operations-console
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-158-markdown-heading-anchor-strategy
   path: .ai-state/decisions/158-markdown-heading-anchor-strategy.md
   type: markdown
   title: Markdown heading anchoring via rehype AST plugins (no rehype-raw), with a shared slugify/extractToc util
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-159-metrics-page-information-architecture
   path: .ai-state/decisions/159-metrics-page-information-architecture.md
   type: markdown
   title: "Metrics page information architecture \u2014 health-strip glance, KPI sparkline tiles, Tufte trend pass, relocated snapshot selector"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-160-overview-landing-surface
   path: .ai-state/decisions/160-overview-landing-surface.md
   type: markdown
   title: Add an /overview landing surface aggregating sentinel grade, metrics health, active workshops and ADR counts
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-161-svg-server-side-normalization
   path: .ai-state/decisions/161-svg-server-side-normalization.md
   type: markdown
   title: Server-side SVG normalization + responsive-default diagram frame + opt-in pan/zoom Expand modal
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-162-token-palette-character-refinement
   path: .ai-state/decisions/162-token-palette-character-refinement.md
   type: markdown
   title: "Token palette character refinement \u2014 warmer-neutral base with identity anchors"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-163-worktree-orientation-banner
   path: .ai-state/decisions/163-worktree-orientation-banner.md
   type: markdown
   title: Worktree-orientation banner via a SessionStart hook
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-12'
   renderer: adr_card
 - id: ai-state-decisions-164-architecture-c4-dual-agent-representation
   path: .ai-state/decisions/164-architecture-c4-dual-agent-representation.md
   type: markdown
   title: Architecture C4 dual-agent representation (knowledge.agents + orchestration.pipeline)
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-165-praxion-dashboard-launcher-contract
   path: .ai-state/decisions/165-praxion-dashboard-launcher-contract.md
   type: markdown
   title: "praxion-dashboard launcher contract \u2014 stable user-facing interface across runtime changes"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-13'
   renderer: adr_card
 - id: ai-state-decisions-166-frontmatter-taxonomy-no-rename
   path: .ai-state/decisions/166-frontmatter-taxonomy-no-rename.md
   type: markdown
   title: Frontmatter-metadata taxonomy for rules; no directory rename
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-13'
   renderer: adr_card
 - id: ai-state-decisions-167-hook-delivered-blacklist-mechanism
   path: .ai-state/decisions/167-hook-delivered-blacklist-mechanism.md
   type: markdown
   title: Hook-delivered blacklist for always-loaded rules; symlink-based for core and path-scoped
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-13'
   renderer: adr_card
 - id: ai-state-decisions-168-core-frontmatter-single-source-of-truth
   path: .ai-state/decisions/168-core-frontmatter-single-source-of-truth.md
   type: markdown
   title: 168-core-frontmatter-single-source-of-truth.md
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-13'
   renderer: adr_card
 - id: ai-state-decisions-169-git-conventions-blacklistable
   path: .ai-state/decisions/169-git-conventions-blacklistable.md
   type: markdown
   title: 169-git-conventions-blacklistable.md
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-13'
   renderer: adr_card
 - id: ai-state-decisions-170-auto-complete-install-per-file-refactor
   path: .ai-state/decisions/170-auto-complete-install-per-file-refactor.md
   type: markdown
   title: Refactor auto_complete_install.py _link_rules() to per-file symlinking
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-13'
   renderer: adr_card
 - id: ai-state-decisions-171-no-ai-authorship-to-behavioral-contract
   path: .ai-state/decisions/171-no-ai-authorship-to-behavioral-contract.md
   type: markdown
   title: Relocate "No AI authorship" clause to agent-behavioral-contract.md
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-13'
   renderer: adr_card
 - id: ai-state-decisions-172-schema-gt-1-fail-open
   path: .ai-state/decisions/172-schema-gt-1-fail-open.md
   type: markdown
   title: inject_rules.py schema version > 1 behavior is fail-open
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-13'
   renderer: adr_card
 - id: ai-state-decisions-173-verifier-rework-loop-resume-rework-arg-shape
   path: .ai-state/decisions/173-verifier-rework-loop-resume-rework-arg-shape.md
   type: markdown
   title: /resume-rework takes no positional argument; reads VERIFIER_FINDINGS.md from cwd
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-14'
   renderer: adr_card
 - id: ai-state-decisions-174-verifier-rework-loop-rework-manifest-format
   path: .ai-state/decisions/174-verifier-rework-loop-rework-manifest-format.md
   type: markdown
   title: REWORK_MANIFEST.md uses a markdown table with one fenced JSON block per row
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-14'
   renderer: adr_card
 - id: ai-state-decisions-175-verifier-rework-loop-verifier-findings-schema
   path: .ai-state/decisions/175-verifier-rework-loop-verifier-findings-schema.md
   type: markdown
   title: VERIFIER_FINDINGS.md is a self-contained problem statement consumed by stock systems-architect / implementation-planner
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-176-verifier-rework-loop-cluster-rubric-smell-class-then-file
   path: .ai-state/decisions/176-verifier-rework-loop-cluster-rubric-smell-class-then-file.md
   type: markdown
   title: Verifier clusters findings by smell-class first, then file-locality within a class
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-14'
   renderer: adr_card
 - id: ai-state-decisions-177-verifier-rework-loop-manifest-lifecycle-ephemeral
   path: .ai-state/decisions/177-verifier-rework-loop-manifest-lifecycle-ephemeral.md
   type: markdown
   title: REWORK_MANIFEST.md is ephemeral alongside VERIFICATION_REPORT.md; parent cleanup deferred; VERIFICATION_REPORT.md snapshotted into each rework worktree
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-14'
   renderer: adr_card
 - id: ai-state-decisions-178-verifier-rework-loop-rework-routing-architect-first
   path: .ai-state/decisions/178-verifier-rework-loop-rework-routing-architect-first.md
   type: markdown
   title: All rework worktrees route through systems-architect first
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-14'
   renderer: adr_card
 - id: ai-state-decisions-179-verifier-rework-loop-shared-disposition-vocabulary
   path: .ai-state/decisions/179-verifier-rework-loop-shared-disposition-vocabulary.md
   type: markdown
   title: CIS and rework-loop share a disposition vocabulary defined once in a skill reference
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-180-verifier-rework-loop-subagent-isolation-test-harness
   path: .ai-state/decisions/180-verifier-rework-loop-subagent-isolation-test-harness.md
   type: markdown
   title: Subagent isolation in rework worktrees verified by controlled-test harness; ship blocked if hook does not fire
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-14'
   renderer: adr_card
 - id: ai-state-decisions-181-verifier-rework-loop-td-linkage-notes-suffix
   path: .ai-state/decisions/181-verifier-rework-loop-td-linkage-notes-suffix.md
   type: markdown
   title: TECH_DEBT_LEDGER rework-worktree linkage via notes-field suffix; main agent owns the in-flight status flip
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-14'
   renderer: adr_card
 - id: ai-state-decisions-182-group-a-before-h-disposition-first
   path: .ai-state/decisions/182-group-a-before-h-disposition-first.md
   type: markdown
   title: Disposition-vocabulary step is Group A prerequisite; Groups B-H depend on shared reference
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-14'
   renderer: adr_card
 - id: ai-state-decisions-183-likec4-feedback-loop-modeling
   path: .ai-state/decisions/183-likec4-feedback-loop-modeling.md
   type: markdown
   title: "LikeC4 feedback-loop modeling \u2014 multiple focused views, tagged edges, document-substrate handoffs"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   renderer: adr_card
 - id: ai-state-decisions-184-hybrid-rework-dispatch
   path: .ai-state/decisions/184-hybrid-rework-dispatch.md
   type: markdown
   title: "Hybrid rework dispatch \u2014 headless --bg default, opt-in --terminals visible, single script + notification hook"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-15'
   renderer: adr_card
 - id: ai-state-decisions-185-tests-after-shell-io-dispatch
   path: .ai-state/decisions/185-tests-after-shell-io-dispatch.md
   type: markdown
   title: Tests-after approach for I/O-heavy shell dispatch script; TDD pairing reserved for pure-logic steps
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-15'
   renderer: adr_card
 - id: ai-state-decisions-186-skill-genesis-pull-driven-inversion
   path: .ai-state/decisions/186-skill-genesis-pull-driven-inversion.md
   type: markdown
   title: 'Skill-genesis: pull-driven autonomous-report inversion with deferred disposition via /skill-genesis-review'
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-187-static-analysis-test-strategy
   path: .ai-state/decisions/187-static-analysis-test-strategy.md
   type: markdown
   title: 'Skill-genesis inversion: static-analysis test strategy for Markdown agent definitions'
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-15'
   renderer: adr_card
 - id: ai-state-decisions-188-verifier-baseline-disposition
   path: .ai-state/decisions/188-verifier-baseline-disposition.md
   type: markdown
   title: Verifier dispositions every failing test against a captured baseline
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-15'
   renderer: adr_card
 - id: ai-state-decisions-189-hackathon-mode-activation-and-tier-integration
   path: .ai-state/decisions/189-hackathon-mode-activation-and-tier-integration.md
   type: markdown
   title: "Hackathon mode \u2014 flexible-entry Hackathon Spine, activation, and process integration"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-190-hackathon-mode-plan-decomposition
   path: .ai-state/decisions/190-hackathon-mode-plan-decomposition.md
   type: markdown
   title: 190-hackathon-mode-plan-decomposition.md
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-15'
   renderer: adr_card
 - id: ai-state-decisions-191-conversation-discipline
   path: .ai-state/decisions/191-conversation-discipline.md
   type: markdown
   title: "Operationalize the Conversation C as a human\u2194agent inspect discipline"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-18'
   renderer: adr_card
 - id: ai-state-decisions-192-growth-trigger-thresholds
   path: .ai-state/decisions/192-growth-trigger-thresholds.md
   type: markdown
   title: "Test-topology growth-trigger thresholds \u2014 two-factor gate with calibratable values"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-19'
   renderer: adr_card
 - id: ai-state-decisions-193-test-topology-m2-activation
   path: .ai-state/decisions/193-test-topology-m2-activation.md
   type: markdown
   title: "Test-topology M2 \u2014 behavioral agent wiring plus advisory growth trigger"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-19'
   renderer: adr_card
 - id: ai-state-decisions-194-verifier-tier-appropriateness
   path: .ai-state/decisions/194-verifier-tier-appropriateness.md
   type: markdown
   title: Verifier validates scoped-test tier-appropriateness as a document cross-check, not a re-run
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-19'
   renderer: adr_card
 - id: ai-state-decisions-195-sequential-group-ordering
   path: .ai-state/decisions/195-sequential-group-ordering.md
   type: markdown
   title: 'Sequential group ordering for test-topology activation: trunk-first, then agents in parallel'
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-19'
   renderer: adr_card
 - id: ai-state-decisions-196-cli-allowlist-policy
   path: .ai-state/decisions/196-cli-allowlist-policy.md
   type: markdown
   title: "Obsidian CLI agent allowlist \u2014 enforced via .claude/settings.json tool-permission denies + prose policy in CLAUDE.md"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-20'
   renderer: adr_card
 - id: ai-state-decisions-197-kepano-shipping-mechanism
   path: .ai-state/decisions/197-kepano-shipping-mechanism.md
   type: markdown
   title: Ship kepano/obsidian-skills via fetch-at-install (shallow git clone) to a global location
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-20'
   renderer: adr_card
 - id: ai-state-decisions-198-shape-b-default-on
   path: .ai-state/decisions/198-shape-b-default-on.md
   type: markdown
   title: Adopt Obsidian Shape B as default-on integration for Praxion-managed projects
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-199-obsidian-skills-marketplace-install
   path: .ai-state/decisions/199-obsidian-skills-marketplace-install.md
   type: markdown
   title: Ship kepano/obsidian-skills via the Claude Code marketplace, not a clone+symlink
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-20'
   renderer: adr_card
 - id: ai-state-decisions-200-harden-obsidian-link-safety
   path: .ai-state/decisions/200-harden-obsidian-link-safety.md
   type: markdown
   title: "Harden Obsidian Shape B link safety \u2014 pin .obsidian/app.json link config and deny move/rename"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-20'
   renderer: adr_card
 - id: ai-state-decisions-201-gate-liveness-prove-enforcement-bites
   path: .ai-state/decisions/201-gate-liveness-prove-enforcement-bites.md
   type: markdown
   title: "Gate Liveness \u2014 prove Praxion's enforcement layer bites"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-23'
   renderer: adr_card
 - id: ai-state-decisions-202-register-python-topology-selectors
   path: .ai-state/decisions/202-register-python-topology-selectors.md
   type: markdown
   title: "Register Python selector & parallel-runner identifiers in the test-topology registries (M1\u2192M2 for Python)"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-23'
   renderer: adr_card
 - id: ai-state-decisions-203-sentinel-t03-threshold-exception
   path: .ai-state/decisions/203-sentinel-t03-threshold-exception.md
   type: markdown
   title: Recalibrate T03 with a line-count exception for the gate-encoding agents (sentinel + verifier)
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-23'
   renderer: adr_card
 - id: ai-state-decisions-204-praxion-self-eval-framework
   path: .ai-state/decisions/204-praxion-self-eval-framework.md
   type: markdown
   title: "Praxion self-eval v1 \u2014 `/eval-praxion` adds LLM-as-judge over completed artifacts (narrow supersession of dec-040 clause 3)"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-205-harness-module-layout
   path: .ai-state/decisions/205-harness-module-layout.md
   type: markdown
   title: "praxion-self-eval-v1 harness \u2014 flat 2-level module layout at v1; deep checks/ sub-package deferred"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-26'
   renderer: adr_card
 - id: ai-state-decisions-206-praxion-hardening-nested-invocation-refusal
   path: .ai-state/decisions/206-praxion-hardening-nested-invocation-refusal.md
   type: markdown
   title: "AgentSdkJudgeClient refuses to run from inside a nested Claude Code session \u2014 no graceful degradation, no retry"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-04'
   renderer: adr_card
 - id: ai-state-decisions-207-pre-refactor-sub-pipeline
   path: .ai-state/decisions/207-pre-refactor-sub-pipeline.md
   type: markdown
   title: "Architect Phase 2.5 Pre-Refactor Sub-Pipeline \u2014 bundled architecture decision"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-27'
   renderer: adr_card
 - id: ai-state-decisions-208-provider-contract-shape
   path: .ai-state/decisions/208-provider-contract-shape.md
   type: markdown
   title: Provider contract = thin required core + declared optional capabilities + pluggable transport + typed rail_detail/venue_detail extension
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-02'
   renderer: adr_card
 - id: ai-state-decisions-209-robinhood-first-provider
   path: .ai-state/decisions/209-robinhood-first-provider.md
   type: markdown
   title: Robinhood (MCP transport) is the first Provider plugin; supports_sandbox=false is first-class with HITL + capital-segregated budget as real-money guardrails
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-02'
   renderer: adr_card
 - id: ai-state-decisions-210-trading-only-v1-scope
   path: .ai-state/decisions/210-trading-only-v1-scope.md
   type: markdown
   title: v1 scope is trading-only PoC with a payments-ready contract
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-02'
   renderer: adr_card
 - id: ai-state-decisions-211-transactions-architect-role-placement
   path: .ai-state/decisions/211-transactions-architect-role-placement.md
   type: markdown
   title: New agentic-transactions-architect is a shadow + on-demand sub-architect (interface-designer-shaped), emitting TRANSACTIONS_DESIGN.md with a challenge loop
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-212-sequential-markdown-build-execution
   path: .ai-state/decisions/212-sequential-markdown-build-execution.md
   type: markdown
   title: Sequential execution for Markdown artifact family build (agentic-transactions)
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-02'
   renderer: adr_card
 - id: ai-state-decisions-213-readiness-embed-vs-sibling
   path: .ai-state/decisions/213-readiness-embed-vs-sibling.md
   type: markdown
   title: Agent-readiness output embeds as a `readiness` block in the metrics JSON, not a sibling readiness_reports/ artifact
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-04'
   renderer: adr_card
 - id: ai-state-decisions-214-readiness-judge-transport
   path: .ai-state/decisions/214-readiness-judge-transport.md
   type: markdown
   title: Agent-readiness LLM judge uses a stdlib-urllib direct Messages API call, not the anthropic SDK nor a shell-out to eval
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-04'
   renderer: adr_card
 - id: ai-state-decisions-215-readiness-llm-contract-shift
   path: .ai-state/decisions/215-readiness-llm-contract-shift.md
   type: markdown
   title: "The agent-readiness LLM enrichment runs outside the metrics collect pass \u2014 a conditional network dependency entering a previously pure-offline package"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-04'
   renderer: adr_card
 - id: ai-state-decisions-216-agentic-eval-archetype-detection
   path: .ai-state/decisions/216-agentic-eval-archetype-detection.md
   type: markdown
   title: Broaden paradigm-detection for the agentic-eval archetype; cite-as-canonical from onboarding
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-05'
   renderer: adr_card
 - id: ai-state-decisions-217-eval-results-schema-verifier-reuse
   path: .ai-state/decisions/217-eval-results-schema-verifier-reuse.md
   type: markdown
   title: EVAL_RESULTS.md schema as sibling to TRAINING_RESULTS.md with verifier tolerance-band reuse
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-05'
   renderer: adr_card
 - id: ai-state-decisions-218-ml-branch-storage-reconciliation
   path: .ai-state/decisions/218-ml-branch-storage-reconciliation.md
   type: markdown
   title: Reconcile the ML experiment-storage convention onto the unified out-of-tree model
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-05'
   renderer: adr_card
 - id: ai-state-decisions-219-project-profile-yaml-schema
   path: .ai-state/decisions/219-project-profile-yaml-schema.md
   type: markdown
   title: .ai-state/project_profile.yaml as the machine-consumable archetype + run-store record
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-01'
   renderer: adr_card
 - id: ai-state-decisions-220-run-store-backend-abstraction
   path: .ai-state/decisions/220-run-store-backend-abstraction.md
   type: markdown
   title: Pluggable run-store backend abstraction (storage analog of neo-cloud-abstraction)
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-05'
   renderer: adr_card
 - id: ai-state-decisions-221-unified-out-of-tree-storage-model
   path: .ai-state/decisions/221-unified-out-of-tree-storage-model.md
   type: markdown
   title: Unified out-of-tree run-storage model for experiment/eval-bearing projects
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-05'
   renderer: adr_card
 - id: ai-state-decisions-222-wave0-schema-first-step-ordering
   path: .ai-state/decisions/222-wave0-schema-first-step-ordering.md
   type: markdown
   title: "Wave 0 step ordering \u2014 schema first, backend section as parallel extension"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-05'
   renderer: adr_card
 - id: ai-state-decisions-223-wave1-dashboard-scope
   path: .ai-state/decisions/223-wave1-dashboard-scope.md
   type: markdown
   title: "Wave 1 Dashboard Eval Panel \u2014 Kept in Wave 1"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-05'
   renderer: adr_card
 - id: ai-state-decisions-224-nebius-neocloud-nebius-direct-adapter
   path: .ai-state/decisions/224-nebius-neocloud-nebius-direct-adapter.md
   type: markdown
   title: "ADR \u2014 Nebius as a direct dispatch adapter and an inference target"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-05'
   renderer: adr_card
 - id: ai-state-decisions-225-remove-in-house-memory-subsystem
   path: .ai-state/decisions/225-remove-in-house-memory-subsystem.md
   type: markdown
   title: Remove the in-house curated-memory subsystem (blank slate for sandbook)
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-226-api-doc-reference-tiering
   path: .ai-state/decisions/226-api-doc-reference-tiering.md
   type: markdown
   title: "api-documentation reference tiering \u2014 universal core in SKILL.md, per-surface references, one extension seam"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-227-new-skill-api-documentation
   path: .ai-state/decisions/227-new-skill-api-documentation.md
   type: markdown
   title: New api-documentation skill (peer to doc-management) rather than extending doc-management
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-228-dashboard-api-spec-rendering
   path: .ai-state/decisions/228-dashboard-api-spec-rendering.md
   type: markdown
   title: Dashboard surfaces project API specs as rendered API reference (Scalar standalone)
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-16'
   renderer: adr_card
 - id: ai-state-decisions-229-solid-ai-era-embedding-balanced-coupling-principle
   path: .ai-state/decisions/229-solid-ai-era-embedding-balanced-coupling-principle.md
   type: markdown
   title: Embed SOLID for the AI era as the "Balanced Coupling" principle + software-design-principles skill
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-17'
   renderer: adr_card
 - id: ai-state-decisions-230-calibrated-confidence-schema
   path: .ai-state/decisions/230-calibrated-confidence-schema.md
   type: markdown
   title: Calibrated-confidence schema uses verbal tiers anchored to numeric ranges plus GRADE downgrade factors
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-18'
   renderer: adr_card
 - id: ai-state-decisions-231-defer-eval-lens-and-ach-matrix
   path: .ai-state/decisions/231-defer-eval-lens-and-ach-matrix.md
   type: markdown
   title: Defer the agentic eval-lens and the full ACH matrix
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-232-di-disconfirmation-replaces-ach
   path: .ai-state/decisions/232-di-disconfirmation-replaces-ach.md
   type: markdown
   title: Dialectical Inquiry + two-tier Disconfirmation replaces an ACH matrix for ADR deliberation
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-18'
   renderer: adr_card
 - id: ai-state-decisions-233-extend-context-engineering-principle
   path: .ai-state/decisions/233-extend-context-engineering-principle.md
   type: markdown
   title: Extend the Context Engineering principle rather than create a new principle for multi-perspective deliberation
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-18'
   renderer: adr_card
 - id: ai-state-decisions-234-multi-perspective-analysis-skill
   path: .ai-state/decisions/234-multi-perspective-analysis-skill.md
   type: markdown
   title: "multi-perspective-analysis skill \u2014 GO as a composition layer (Step-1 kill-switch verdict)"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-18'
   renderer: adr_card
 - id: ai-state-decisions-235-intake-clarity-gate
   path: .ai-state/decisions/235-intake-clarity-gate.md
   type: markdown
   title: Intake Clarity Gate + goal-disambiguation skill for task-intent disambiguation
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-18'
   renderer: adr_card
 - id: ai-state-decisions-236-decline-verified-merge-queue
   path: .ai-state/decisions/236-decline-verified-merge-queue.md
   type: markdown
   title: Decline verified merge queue (Gastown Refinery) at Praxion's target operating point
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-19'
   renderer: adr_card
 - id: ai-state-decisions-237-sandbook-subsumes-beads-memory-direction
   path: .ai-state/decisions/237-sandbook-subsumes-beads-memory-direction.md
   type: markdown
   title: "Memory direction \u2014 sandbook subsumes beads-class capability; defer-by-dependency, not by-priority"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-19'
   renderer: adr_card
 - id: ai-state-decisions-238-spec-drift-detect-not-regenerate
   path: .ai-state/decisions/238-spec-drift-detect-not-regenerate.md
   type: markdown
   title: "Proactive spec\u2194artifact drift \u2014 detect-and-surface, NOT auto-regenerate"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-239-where-it-lives
   path: .ai-state/decisions/239-where-it-lives.md
   type: markdown
   title: "Spec-drift detection lives in a shared module with two consumers \u2014 sentinel check + pipeline checkpoint, NOT a git hook"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-19'
   renderer: adr_card
 - id: ai-state-decisions-240-reviewer-reuse-vs-new-agent
   path: .ai-state/decisions/240-reviewer-reuse-vs-new-agent.md
   type: markdown
   title: Intra-step pair-review reuses the verifier in a scoped light-review mode rather than a new agent
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-19'
   renderer: adr_card
 - id: ai-state-decisions-241-principles-artifact
   path: .ai-state/decisions/241-principles-artifact.md
   type: markdown
   title: "Per-project principles artifact \u2014 standalone `.ai-state/principles.yaml`, Shape B, per-principle gate severity"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-242-principles-loader
   path: .ai-state/decisions/242-principles-loader.md
   type: markdown
   title: Introduce `scripts/principles_loader.py` pure-function helper for principles YAML parsing
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   renderer: adr_card
 - id: ai-state-decisions-243-reliability-skills-not-agent
   path: .ai-state/decisions/243-reliability-skills-not-agent.md
   type: markdown
   title: Agentic-app-reliability frontier practices land as skills, not a 17th agent
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   renderer: adr_card
 - id: ai-state-decisions-244-dependency-scanning-scaffolding
   path: .ai-state/decisions/244-dependency-scanning-scaffolding.md
   type: markdown
   title: Add dependency-scanning scaffolding (dependabot) to the onboarding baseline
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   renderer: adr_card
 - id: ai-state-decisions-245-structlog-pino-logging-default
   path: .ai-state/decisions/245-structlog-pino-logging-default.md
   type: markdown
   title: Sharpen the observability logging default to structlog (Python) and pino (TypeScript)
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   renderer: adr_card
 - id: ai-state-decisions-246-unify-commit-gate-precommit
   path: .ai-state/decisions/246-unify-commit-gate-precommit.md
   type: markdown
   title: Unify the bespoke commit gate into the pre-commit framework
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   renderer: adr_card
 - id: ai-state-decisions-247-monorepo-healthcheck-detection
   path: .ai-state/decisions/247-monorepo-healthcheck-detection.md
   type: markdown
   title: Make readiness healthcheck detection monorepo-aware (subdir-service + route-handler signals)
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   renderer: adr_card
 - id: ai-state-decisions-248-observations-wal-recovery-reconciliation
   path: .ai-state/decisions/248-observations-wal-recovery-reconciliation.md
   type: markdown
   title: observations.jsonl as recovery WAL + deterministic reconciliation + auto-resume-with-audit; WIP.md demoted to a verified cache
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-26'
   renderer: adr_card
 - id: ai-state-decisions-249-taskbrief-floor-standard-full
   path: .ai-state/decisions/249-taskbrief-floor-standard-full.md
   type: markdown
   title: "Raise the TASK_BRIEF floor \u2014 mandatory at Standard/Full, decoupled from the blocking-question gate, with a mechanical absence backstop"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-26'
   renderer: adr_card
 - id: ai-state-decisions-250-wal-bounding-rotation
   path: .ai-state/decisions/250-wal-bounding-rotation.md
   type: markdown
   title: "Bound the recovery WAL \u2014 best-effort rotate-and-archive to a gitignored segment + windowed cross-boundary read"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-26'
   renderer: adr_card
 - id: ai-state-decisions-251-artifact-registry-declarative-spine
   path: .ai-state/decisions/251-artifact-registry-declarative-spine.md
   type: markdown
   title: Grow the artifact registry into a declarative production-gate spine
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-26'
   renderer: adr_card
 - id: ai-state-decisions-252-production-gate-cohort
   path: .ai-state/decisions/252-production-gate-cohort.md
   type: markdown
   title: "Production-gate cohort \u2014 turn four prose obligations into mechanical gates"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-253-retire-token-budgeting
   path: .ai-state/decisions/253-retire-token-budgeting.md
   type: markdown
   title: Retire the historical-retained lifecycle state with its sole member token_budgeting
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-27'
   renderer: adr_card
 - id: ai-state-decisions-254-report-retention
   path: .ai-state/decisions/254-report-retention.md
   type: markdown
   title: Retain-last-N retention for the metrics and sentinel report families
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-27'
   renderer: adr_card
 - id: ai-state-decisions-255-single-living-idea-ledger
   path: .ai-state/decisions/255-single-living-idea-ledger.md
   type: markdown
   title: Single living IDEA_LEDGER.md, retiring the per-run timestamped copy-forward scheme
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-27'
   renderer: adr_card
 - id: ai-state-decisions-256-registry-detection-gate
   path: .ai-state/decisions/256-registry-detection-gate.md
   type: markdown
   title: Split detection from production in the artifact registry and make it a read source-of-truth
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-29'
   renderer: adr_card
 - id: ai-state-decisions-257-readiness-feedback-gate
   path: .ai-state/decisions/257-readiness-feedback-gate.md
   type: markdown
   title: Close the readiness write-only loop via a sentinel RD check; document eval human-gating as deliberate
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-29'
   renderer: adr_card
 - id: ai-state-decisions-258-chain-eval-form
   path: .ai-state/decisions/258-chain-eval-form.md
   type: markdown
   title: "Criteria\u2192spec chain gate-liveness eval lives in the always-green pytest suite, not the out-of-band eval framework"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-29'
   renderer: adr_card
 - id: ai-state-decisions-259-read-registry-cleanup-policy
   path: .ai-state/decisions/259-read-registry-cleanup-policy.md
   type: markdown
   title: "clean_work_safety reads the registry's cleanup_policy as the file\u2192severity-class source"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-29'
   renderer: adr_card
 - id: ai-state-decisions-260-committed-vs-live-manifest
   path: .ai-state/decisions/260-committed-vs-live-manifest.md
   type: markdown
   title: Split the doc manifest into a committed-static durable index and a live .ai-work/ dimension
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-29'
   renderer: adr_card
 - id: ai-state-decisions-261-direct-capture-contract
   path: .ai-state/decisions/261-direct-capture-contract.md
   type: markdown
   title: "Direct-tier capture contract \u2014 one row at commit as the universal durable write"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: adr_card
 - id: ai-state-decisions-262-tier-vs-execution-mode-taxonomy
   path: .ai-state/decisions/262-tier-vs-execution-mode-taxonomy.md
   type: markdown
   title: "Tier is not execution mode \u2014 pipeline_tier semantics + orchestrator as Direct/Lightweight ADR author"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-01'
   renderer: adr_card
 - id: ai-state-decisions-263-retire-future-designed-producers
   path: .ai-state/decisions/263-retire-future-designed-producers.md
   type: markdown
   title: Retire the onboarding-producer expectation for the future-designed agentic-eval artifacts
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-16'
   renderer: adr_card
 - id: ai-state-decisions-264-tier-threshold-drift-accepted
   path: .ai-state/decisions/264-tier-threshold-drift-accepted.md
   type: markdown
   title: "Accept periodic-detection-only for tier-threshold agreement \u2014 no bespoke drift check"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-01'
   renderer: adr_card
 - id: ai-state-decisions-265-renderer-field-resolver-key
   path: .ai-state/decisions/265-renderer-field-resolver-key.md
   type: markdown
   title: Manifest `renderer:` field becomes a first-class resolveRenderer key
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-02'
   renderer: adr_card
 - id: ai-state-decisions-266-consolidate-subagent-prompt-injection
   path: .ai-state/decisions/266-consolidate-subagent-prompt-injection.md
   type: markdown
   title: Consolidate subagent prompt injections into a single PreToolUse(Agent) emitter
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-02'
   renderer: adr_card
 - id: ai-state-decisions-267-railway-deployment-lane-not-neo-cloud
   path: .ai-state/decisions/267-railway-deployment-lane-not-neo-cloud.md
   type: markdown
   title: Railway integrates via the deployment-skill lane, consuming Railway's first-party tooling
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-03'
   renderer: adr_card
 - id: ai-state-decisions-268-eval-ledger-lazy-run-producer
   path: .ai-state/decisions/268-eval-ledger-lazy-run-producer.md
   type: markdown
   title: Realize the eval-ledger lazy-run producer mechanism (helper + skill step); flip EVAL_LOG.md to optional-lazy
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-16'
   renderer: adr_card
 - id: ai-state-decisions-269-skill-activation-observations-event
   path: .ai-state/decisions/269-skill-activation-observations-event.md
   type: markdown
   title: First-class `skill_activation` observations event via the single PostToolUse WAL emitter
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-16'
   renderer: adr_card
 - id: ai-state-decisions-270-agent-pipeline-block-pointer
   path: .ai-state/decisions/270-agent-pipeline-block-pointer.md
   type: markdown
   title: Agent-pipeline canonical block becomes a minimal pointer
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-16'
   renderer: adr_card
 - id: ai-state-decisions-271-manifest-only-block-refresh
   path: .ai-state/decisions/271-manifest-only-block-refresh.md
   type: markdown
   title: Manifest-only version identity for canonical CLAUDE.md block refresh
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-16'
   renderer: adr_card
 - id: ai-state-decisions-272-shipped-ci-autofix-design
   path: .ai-state/decisions/272-shipped-ci-autofix-design.md
   type: markdown
   title: workflow_run-triggered Claude autofixer opens fix PRs, never pushes to main
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-22'
   renderer: adr_card
 - id: ai-state-decisions-273-hub-reusable-workflow-distribution
   path: .ai-state/decisions/273-hub-reusable-workflow-distribution.md
   type: markdown
   title: Distribute CI autofix machinery via hub reusable workflows + SHA-pinned per-repo callers + autofix-policy.yml
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-27'
   renderer: adr_card
 - id: ai-state-decisions-274-new-project-mirror-scope
   path: .ai-state/decisions/274-new-project-mirror-scope.md
   type: markdown
   title: AC7 "/new-project mirrors the install" satisfied by existing defer pattern, no new-project.md code change
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-27'
   renderer: adr_card
 - id: ai-state-decisions-275-architect-validator-ci-budget
   path: .ai-state/decisions/275-architect-validator-ci-budget.md
   type: markdown
   title: Align the architect-validator CI gate's allowlist + turn budget with its pre-merge protocol
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-22'
   renderer: adr_card
 - id: ai-state-decisions-276-cross-model-gate-fails-open
   path: .ai-state/decisions/276-cross-model-gate-fails-open.md
   type: markdown
   title: "The cross-model review gate fails open \u2014 reviewer unavailability never blocks a fix"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-24'
   renderer: adr_card
 - id: ai-state-decisions-277-cursor-reviews-claude-fixes
   path: .ai-state/decisions/277-cursor-reviews-claude-fixes.md
   type: markdown
   title: "Claude fixes / Cursor reviews \u2014 a foreign-model, non-generative review gate on every agent-authored fix PR"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-28'
   renderer: adr_card
 - id: ai-state-decisions-278-defer-onboarding-install
   path: .ai-state/decisions/278-defer-onboarding-install.md
   type: markdown
   title: "P2 build scope excludes onboard-project.md/new-project.md install wiring \u2014 fleet rollout deferred to a follow-on pass"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-24'
   renderer: adr_card
 - id: ai-state-decisions-279-hitl-gated-healing-sidecar
   path: .ai-state/decisions/279-hitl-gated-healing-sidecar.md
   type: markdown
   title: "HITL-gated healing sidecar \u2014 no unattended cross-repo issue filing in v1"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-24'
   renderer: adr_card
 - id: ai-state-decisions-280-praxion-feedback-module-split
   path: .ai-state/decisions/280-praxion-feedback-module-split.md
   type: markdown
   title: Split the reporter script into a praxion_feedback package by responsibility
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-24'
   renderer: adr_card
 - id: ai-state-decisions-281-label-application-arming-gate
   path: .ai-state/decisions/281-label-application-arming-gate.md
@@ -2237,73 +2237,73 @@ surfaces:
   path: .ai-state/decisions/282-praxion-only-issue-autofix-workflow.md
   type: markdown
   title: Praxion-only issue-autofix workflow; reusable-hub extraction deferred
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-24'
   renderer: adr_card
 - id: ai-state-decisions-283-triage-first-safety-tier-classification
   path: .ai-state/decisions/283-triage-first-safety-tier-classification.md
   type: markdown
   title: Triage-first, deny-by-default safety-tier classification for issue autofix
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-24'
   renderer: adr_card
 - id: ai-state-decisions-284-server-side-finalize-workflow
   path: .ai-state/decisions/284-server-side-finalize-workflow.md
   type: markdown
   title: Server-side GitHub Actions finalize backstop for web-UI merges
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-24'
   renderer: adr_card
 - id: ai-state-decisions-285-fork-pr-autofix-suggest-only
   path: .ai-state/decisions/285-fork-pr-autofix-suggest-only.md
   type: markdown
   title: "Fork-PR CI autofix is suggest-only with inverted privilege \u2014 never a commit to an untrusted head"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-27'
   renderer: adr_card
 - id: ai-state-decisions-286-pr-autofix-seam-and-privilege
   path: .ai-state/decisions/286-pr-autofix-seam-and-privilege.md
   type: markdown
   title: P3a CI-autofix extends to PR/Dependabot surfaces via N-jobs seam, fix-commit-to-PR-branch under P5 containment, commit-trailer attempt cap
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-27'
   renderer: adr_card
 - id: ai-state-decisions-287-cross-model-fleet-install
   path: .ai-state/decisions/287-cross-model-fleet-install.md
   type: markdown
   title: "Fleet-install the cross-model review gate \u2014 onboard 8e.8 installs the caller gated on policy; /new-project unchanged (defer contract); closes dec-278"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-27'
   renderer: adr_card
 - id: ai-state-decisions-288-upgrade-caller-sha-rewrite
   path: .ai-state/decisions/288-upgrade-caller-sha-rewrite.md
   type: markdown
   title: upgrade_project_pins gains an in-place hub-SHA rewrite + add-caller-if-absent op; SHA resolved in the command layer, script deterministic given --hub-sha
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-27'
   renderer: adr_card
 - id: ai-state-decisions-289-self-healing-metrics-baseline
   path: .ai-state/decisions/289-self-healing-metrics-baseline.md
   type: markdown
   title: "P6 self-healing-loop metrics baseline \u2014 on-demand gh-run-history collector in a distinct SELF_HEALING_* namespace, non-skipped attempts metric, deferred gate-verdict and in-place-fix detection"
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-28'
   renderer: adr_card
 - id: ai-state-decisions-290-decline-on-fixer-exit
   path: .ai-state/decisions/290-decline-on-fixer-exit.md
   type: markdown
   title: Normalize every non-fix fixer terminal state to an idempotent decline
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-28'
   renderer: adr_card
 - id: ai-state-decisions-291-jsts-runner-allowlist
   path: .ai-state/decisions/291-jsts-runner-allowlist.md
   type: markdown
   title: Proceed with the JS/TS test-runner allowlist expansion for the same-repo fixer
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-28'
   renderer: adr_card
 - id: ai-state-decisions-292-pm-aware-jsts-install
   path: .ai-state/decisions/292-pm-aware-jsts-install.md
   type: markdown
   title: PM-aware JS/TS install via default-branch lockfile detection + install-failure-degrades-to-decline
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-28'
   renderer: adr_card
 - id: ai-state-decisions-293-intake-gate-and-project-prism
   path: .ai-state/decisions/293-intake-gate-and-project-prism.md
   type: markdown
   title: Cross-model INTAKE gate (Praxion-only, read-only) + shared producer-free PROJECT-PRISM sourced from CLAUDE.md
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-28'
   renderer: adr_card
 - id: ai-state-decisions-294-label-taxonomy-manifest
   path: .ai-state/decisions/294-label-taxonomy-manifest.md
@@ -2327,61 +2327,61 @@ surfaces:
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
   type: markdown
   title: Idea Ledger
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-27'
   renderer: idea_grid
 - id: ai-state-sentinel-reports-sentinel-report-2026-05-23-15-17-18
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-05-23_15-17-18.md
   type: markdown
   title: Sentinel Report
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-23'
   renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-05-24-01-52-04
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-05-24_01-52-04.md
   type: markdown
   title: Sentinel Report
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-23'
   renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-05-25-21-11-42
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-05-25_21-11-42.md
   type: markdown
   title: Sentinel Report
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-25'
   renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-06-02-14-04-03
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-06-02_14-04-03.md
   type: markdown
   title: Sentinel Report
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-02'
   renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-06-11-01-06-26
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-06-11_01-06-26.md
   type: markdown
   title: Sentinel Report
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-11'
   renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-06-11-01-25-30
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-06-11_01-25-30.md
   type: markdown
   title: Sentinel Report
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-11'
   renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-06-17-11-21-44
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-06-17_11-21-44.md
   type: markdown
   title: Sentinel Report
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-17'
   renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-06-20-13-34-25
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-06-20_13-34-25.md
   type: markdown
   title: Sentinel Report
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-07-15-21-32-25
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-07-15_21-32-25.md
   type: markdown
   title: Sentinel Report
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-07-29-15-11-15
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-07-29_15-11-15.md
@@ -2393,49 +2393,49 @@ surfaces:
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-11_08-38-15.json
   type: json
   title: METRICS_REPORT_2026-06-11_08-38-15.json
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-06-18-23-41-03
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-18_23-41-03.json
   type: json
   title: METRICS_REPORT_2026-06-18_23-41-03.json
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-06-20-20-40-35
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-20_20-40-35.json
   type: json
   title: METRICS_REPORT_2026-06-20_20-40-35.json
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-06-20-23-30-00
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-20_23-30-00.json
   type: json
   title: METRICS_REPORT_2026-06-20_23-30-00.json
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-06-21-01-14-35
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-21_01-14-35.json
   type: json
   title: METRICS_REPORT_2026-06-21_01-14-35.json
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-07-16-05-08-18
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_05-08-18.json
   type: json
   title: METRICS_REPORT_2026-07-16_05-08-18.json
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-07-16-06-05-57
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_06-05-57.json
   type: json
   title: METRICS_REPORT_2026-07-16_06-05-57.json
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-07-16-06-44-58
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_06-44-58.json
   type: json
   title: METRICS_REPORT_2026-07-16_06-44-58.json
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-07-29-22-11-31
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-29_22-11-31.json
@@ -2447,49 +2447,49 @@ surfaces:
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-11_08-38-15.md
   type: markdown
   title: Project Metrics Report
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-11'
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-06-18-23-41-03
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-18_23-41-03.md
   type: markdown
   title: Project Metrics Report
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-18'
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-06-20-20-40-35
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-20_20-40-35.md
   type: markdown
   title: Project Metrics Report
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-06-20-23-30-00
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-20_23-30-00.md
   type: markdown
   title: Project Metrics Report
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-06-21-01-14-35
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-21_01-14-35.md
   type: markdown
   title: Project Metrics Report
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-07-16-05-08-18
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_05-08-18.md
   type: markdown
   title: Project Metrics Report
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-07-16-06-05-57
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_06-05-57.md
   type: markdown
   title: Project Metrics Report
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-07-16-06-44-58
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_06-44-58.md
   type: markdown
   title: Project Metrics Report
-  last_modified: '2026-07-29'
+  last_modified: '2026-07-15'
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-07-29-22-11-31
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-29_22-11-31.md
@@ -2501,13 +2501,13 @@ surfaces:
   path: .ai-state/specs/SPEC_agent-model-routing_2026-04-25.md
   type: markdown
   title: 'SPEC: Per-Agent Model Routing Policy'
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-20'
   renderer: default_markdown
 - id: ai-state-specs-spec-design-dialectic-2026-04-17
   path: .ai-state/specs/SPEC_design-dialectic_2026-04-17.md
   type: markdown
   title: 'SPEC: Pre-Implementation Design-Synthesis Capability (H1-wide)'
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-24'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-050-always-loaded-budget-revision
@@ -2516,7 +2516,7 @@ surfaces:
   path: .ai-state/specs/SPEC_diagrams_2026-04-30.md
   type: markdown
   title: 'SPEC: LikeC4 + D2 Dual-Toolchain Diagram Convention'
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-24'
   renderer: default_markdown
 - id: ai-state-specs-spec-multi-language-support-2026-05-11
   path: .ai-state/specs/SPEC_multi-language-support_2026-05-11.md
@@ -2524,17 +2524,23 @@ surfaces:
   title: "SPEC: Multi-Language Support \u2014 Polyglot Skill Architecture"
   last_modified: '2026-07-29'
   renderer: default_markdown
+- id: ai-state-specs-spec-p5-issue-autofix-2026-07-24
+  path: .ai-state/specs/SPEC_p5-issue-autofix_2026-07-24.md
+  type: markdown
+  title: "SPEC: P5 \u2014 Praxion-Side Issue Autofix (Self-Healing Loop Subsystem C)"
+  last_modified: '2026-07-29'
+  renderer: default_markdown
 - id: ai-state-specs-spec-production-gate-cohort-2026-06-26
   path: .ai-state/specs/SPEC_production-gate-cohort_2026-06-26.md
   type: markdown
   title: "SPEC: Wave 3 \u2014 Production-Gate Cohort + Registry Declarative Spine"
-  last_modified: '2026-07-29'
+  last_modified: '2026-06-26'
   renderer: default_markdown
 - id: ai-state-specs-spec-project-metrics-2026-04-23
   path: .ai-state/specs/SPEC_project-metrics_2026-04-23.md
   type: markdown
   title: "SPEC: `/project-metrics` Command \u2014 Project Complexity/Health Metrics"
-  last_modified: '2026-07-29'
+  last_modified: '2026-05-23'
   renderer: default_markdown
 groups:
 - id: tutorial
@@ -2912,6 +2918,7 @@ groups:
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30
   - ai-state-specs-spec-multi-language-support-2026-05-11
+  - ai-state-specs-spec-p5-issue-autofix-2026-07-24
   - ai-state-specs-spec-production-gate-cohort-2026-06-26
   - ai-state-specs-spec-project-metrics-2026-04-23
   - ai-state-system-deployment

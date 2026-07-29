@@ -2,7 +2,7 @@
 #
 # Unifies the standard baseline Praxion ships to managed projects
 # (claude/project-baseline/pre-commit-config.yaml — UNIVERSAL file-hygiene +
-# gitleaks + PYTHON ruff) with the five Praxion-author gates that formerly lived
+# gitleaks + PYTHON ruff) with the six Praxion-author gates that formerly lived
 # in the bespoke scripts/git-pre-commit-hook.sh (now retired). Each author block
 # is re-expressed as a repo:local hook invoking the same checker script with the
 # same staged-file filter — behavior-preserving by construction.
@@ -100,3 +100,13 @@ repos:
         language: system
         files: '^rules/(_manifest\.yaml|.*\.md)$'
         pass_filenames: false
+
+      # Block F — HTML authorship boundary. --files receives the staged .html
+      # paths; each must be allowlisted (EXEMPT_PATH_PREFIXES) or have a
+      # same-basename .md sibling carrying share_out: true.
+      - id: html-authorship-boundary
+        name: HTML authorship boundary
+        entry: python3 scripts/check_html_authorship.py --repo-root . --files
+        language: system
+        files: '\.html$'
+        pass_filenames: true

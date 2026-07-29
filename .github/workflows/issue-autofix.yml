@@ -107,6 +107,44 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Read autofix policy (fail-safe defaults)
+        # Reads provider.fixer_model from .github/autofix-policy.yml -- the
+        # SAME key reusable-ci-autofix.yml's fixer already reads, so both
+        # fixer surfaces stay policy-driven and in sync rather than one of
+        # them hardcoding a --model literal. Absent/malformed policy falls
+        # back to the safe default, never a hard error.
+        id: policy
+        run: |
+          set +e
+          mkdir -p tmp
+          uv run --with pyyaml python3 - ".github/autofix-policy.yml" > tmp/policy.out <<'PY'
+          import sys
+
+          import yaml
+
+          DEFAULTS = {"fixer_model": "opus"}
+
+          path = sys.argv[1] if len(sys.argv) > 1 else ".github/autofix-policy.yml"
+          policy = {}
+          try:
+              with open(path, encoding="utf-8") as handle:
+                  loaded = yaml.safe_load(handle)
+              policy = loaded if isinstance(loaded, dict) else {}
+          except (OSError, yaml.YAMLError):
+              policy = {}
+
+          provider = policy.get("provider") or {}
+          provider = provider if isinstance(provider, dict) else {}
+          fixer_model = (
+              str(provider.get("fixer_model", DEFAULTS["fixer_model"])).strip()
+              or DEFAULTS["fixer_model"]
+          )
+
+          print(f"fixer_model={fixer_model}")
+          PY
+          cat tmp/policy.out >> "$GITHUB_OUTPUT"
+          exit 0
+
       - name: Enforce daily run budget
         id: budget
         env:
@@ -374,7 +412,7 @@ jobs:
           # yield whitespace-prefixed tokens that fail the runtime comma-split
           # tool match.
           claude_args: |
-            --model opus
+            --model ${{ steps.policy.outputs.fixer_model }}
             --max-turns 30
             --allowedTools "Read,Glob,Grep,Edit,Write,Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(gh pr create:*),Bash(gh pr list:*),Bash(gh pr diff:*),Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(uv run pytest:*),Bash(python3 -m pytest:*),Bash(pytest:*)"
 

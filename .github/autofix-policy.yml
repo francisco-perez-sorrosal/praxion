@@ -57,7 +57,14 @@ safety:
 
 provider:
   fixer: claude               # the only fixer wired in P1
-  fixer_model: opus           # replaces P0's hardcoded --model opus literal
+  fixer_model: claude-sonnet-5 # consumed by BOTH reusable-ci-autofix.yml and
+                               # issue-autofix.yml (the latter previously
+                               # hardcoded --model opus, ignoring this key --
+                               # fixed alongside this value change). Full
+                               # model id, not the bare "opus" alias -- an
+                               # alias resolved to an older point release
+                               # (claude-opus-4-7) rather than tracking
+                               # latest, so this key now pins explicitly.
   plugin_dir: "."              # CRITICAL for Praxion specifically: Praxion IS
                                # a Claude Code plugin, so the hub's
                                # --plugin-dir flag must load "." to preserve

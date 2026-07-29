@@ -1,5 +1,5 @@
 ---
-id: dec-draft-61fc79a0
+id: dec-294
 title: Project-owned label-taxonomy manifest + additive-only reconciler (resolves #52)
 status: accepted
 category: architectural

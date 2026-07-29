@@ -14,7 +14,7 @@ made_by: agent
 agent_type: systems-architect
 pipeline_tier: standard
 branch: feat-self-healing-p5
-re_affirmed_by: [dec-draft-61fc79a0]
+re_affirmed_by: [dec-294]
 affected_files:
   - .github/workflows/issue-autofix.yml
 affected_reqs: [REQ-01, REQ-02, REQ-05]

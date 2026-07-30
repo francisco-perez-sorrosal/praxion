@@ -760,7 +760,97 @@ breadth; three convened by default is cost.
 
 ---
 
-## 17. Citations
+## 17. Roadmap (Wave C outcome)
+
+Recorded 2026-07-30. The detailed step decomposition lives in
+`.ai-work/multidisciplinary-identities/IMPLEMENTATION_PLAN.md` (565 lines), which is **gitignored and
+deleted at pipeline cleanup**. This section is its durable form: enough to reconstruct intent and
+re-derive the steps if the working plan is gone.
+
+**Shape:** 16 steps across 7 milestones (0–6), test baseline clean at 573 tests passing.
+
+### 17.1 Milestones
+
+| Milestone | Steps | Purpose |
+|---|---|---|
+| **0 — Foundation** | 1 | Prove the load-bearing mechanism before anything is built |
+| **1 — Instrumentation** | 2–3 | Ship the disposition ledger and the extensibility fitness test **before any discipline exists** |
+| **2 — Mechanism skeleton** | 4–6 | The parameterized consultant, always-loaded wiring, manifest registration — still **zero** disciplines bound |
+| **3 — Knowledge gap** | 7–8 | The `applied-statistics` skill + catalog entry + a duplication check against existing benchmarking material |
+| **4 — Bind `statistician`** | 9 | The registry stops being empty; the mechanism becomes *spawnable* |
+| **5 — Protocol + selection** | 10–13 | Dialogue procedure, `Discipline:` directive contract, Tier-2 self-nomination, sentinel self-reference |
+| **6 — Entry point + proof** | 14–16 | `/consult` command, **end-to-end live smoke test**, documentation flipped to `Built` |
+
+**Milestone A (the milestone that matters):** a usable, proven, documented `statistician` consultation
+— reached at step 16, not step 9. Spawnable ≠ verified-usable, and the plan keeps those distinct.
+
+### 17.2 Load-bearing ordering
+
+1. **Step 1 is a falsification spike, not a build step.** The design's "identity N+1 is structurally
+   free" property rests on a subagent invoking the `Skill` tool at runtime to load a plugin skill it
+   does not declare in `skills:`. That mechanism is **unverified** — `agent-crafting` documents that
+   agents do not *inherit* skills, but says nothing about dynamic invocation. It is the initiative's
+   **only genuine one-way door**; a FAIL blocks every downstream step and requires an architect
+   loop-back rather than a workaround.
+2. **Instrumentation precedes the roster.** The ledger and the fitness test land at steps 2–3, before
+   any discipline artifact exists. Both Wave A lenses converged that the disposition counter is the
+   router's *calibration loop*, not a report card; and a fitness test landed early cannot be
+   retro-fitted around later files.
+3. **Documentation catch-up is a step, not a footnote.** Step 16 flips `docs/architecture.md` to
+   `Built`, including the hardcoded agent-count strings the architect flagged.
+
+### 17.3 RISKY steps (`tier: H` / `review: force`)
+
+| Step | Why |
+|---|---|
+| 1 | One-way door — the mechanism either holds or the design changes |
+| 4 | Touches three always-loaded rule files plus a new agent and `plugin.json` in one atomic commit, to avoid leaving a sentinel FAIL window open between commits |
+| 11 | Five files across four pipeline-agent boundaries |
+| 12 | Sentinel self-reference (count bump + scope extension) — flagged twice by the architect as the easiest insertion point to silently miss |
+
+### 17.4 Wave 2 phase gates — falsifiable thresholds, not hopes
+
+| Gate | Threshold | Unlocks |
+|---|---|---|
+| **Discipline #2** | Ledger shows a **non-degenerate** distribution for `statistician`: dismiss rate **not >60%** over ≥10 challenges spanning ≥3 tasks | A second registry row |
+| **Tier-3 identity genesis** | ≥20 ledger rows across ≥2 disciplines, dismiss rate under the discipline-#2 threshold. **Deadlock watch:** fewer than 5 rows after two calendar quarters *reopens* the tier question rather than silently freezing the roster | One triage leaf + one enum value + one delegation row in the harvest agent |
+| **Ledger promotion** | ≥4 active disciplines, **or** a demonstrated need for a rate-over-time series that `grep` cannot produce | Collector-plus-report shape; existing rows migrate |
+| **Leave-One-Out audit** | Ongoing and **sampled**, not per-task: same-task runs with and without the consultant | Keeps the disposition ratio honest. A disagreeing LOO result **demotes the ratio from falsifier to indicator** — this is the surviving form of the Option-D comparison from §15.7, preserved as a continuing audit rather than a blocking pre-build gate |
+| **Portable distillation** | Same gate as Tier-3 | A generic, Praxion-number-free reference for managed projects |
+| **`performance-engineer` escalation relationship** | Must be written **before** that discipline ships | Unblocks the one discipline that collides with an existing lens (§16 ruling 1's deferred condition) |
+
+### 17.5 Known limitation and two registered objections
+
+**AC13 cannot be exercised end-to-end in Wave 1.** The multi-instance acceptance criterion requires two
+*different* disciplines running concurrently, and ruling 4 ships only one. Recorded as a scoped
+verifier WARN rather than silently dropped. This is a direct, benign collision between ruling 4
+(statistician only) and ruling 6 (multi-instance by design) — the mechanism is built for N and tested
+at N=1.
+
+The cheapest route to closing it, if desired: bind **one additional binding-only discipline** with no
+lens collision (reliability-shaped knowledge already exists per §7.4). Per §9.1 that costs **one
+registry row and zero always-loaded bytes** — which would simultaneously make AC13 testable and serve
+as the *empirical proof* that identity N+1 is free. It widens Wave 1 beyond ruling 4, so it is a user
+decision, not a planning one.
+
+**Objections registered by the planner:**
+
+1. "Tier-2 self-nomination is separately gated" was re-read as *sequenced later*, not *evidence-gated*
+   — literal evidence-gating would contradict the selection-tiers ADR. Correct reading; the
+   orchestrator's instruction was the loose one.
+2. AC13's untestability was documented rather than dropped (above).
+
+### 17.6 Project-local disciplines — deferred with a recorded path
+
+The registry lives in a **shipped** skill reference, so a managed project cannot add its own discipline
+without editing an installed file. Since the requirement includes identities "optionally proposed by
+the praxion users," this is a genuine gap along a *different* extensibility axis than N+1: extensibility
+for **users**, not for Praxion. Deferred deliberately rather than resolved at planning stage, with the
+concrete path recorded — a project-local overlay consulted before the shipped registry.
+
+---
+
+## 18. Citations
 
 - [Reasoning Models Generate Societies of Thought](https://arxiv.org/html/2601.10825v1) — Kim, Lai, Scherrer, Agüera y Arcas, Evans (arXiv:2601.10825v1, Jan 2026)
 - [When "A Helpful Assistant" Is Not Really Helpful: Personas in System Prompts Do Not Improve Performances of LLMs](https://aclanthology.org/2024.findings-emnlp.888/) — Zheng et al., EMNLP Findings 2024

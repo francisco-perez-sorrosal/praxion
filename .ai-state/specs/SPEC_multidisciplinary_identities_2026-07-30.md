@@ -55,24 +55,24 @@ rather than by prose.
 
 ## Acceptance Criteria
 
-- [ ] **AC1 (gating):** no `CONSULT_*.md` exists for a task with no load-bearing specialist claim in scope; the consultant is never spawned unconditionally at a phase boundary. → REQ-04
-- [ ] **AC2 (parameterization):** a `Discipline: statistician` spawn resolves the registry row, loads `applied-statistics` via the `Skill` tool, and logs the discipline to `PROGRESS.md`. → REQ-03, REQ-05
-- [ ] **AC3 (fail loud):** an unknown `Discipline:` value produces `[BLOCKED]` with the value named, and zero challenges. → REQ-18
-- [ ] **AC4 (isolation checkable):** `## Sources Read` is present and excludes `SYSTEMS_PLAN.md`, `IMPLEMENTATION_PLAN.md`, and every sibling `CONSULT_*.md`. → REQ-08
-- [ ] **AC5 (challenge shape):** every `## Challenges` entry carries claim + decision-at-stake + settling test + confidence. → REQ-09
-- [ ] **AC6 (zero undispositioned):** every challenge carries one of the three vocabulary values with a rationale. → REQ-10
-- [ ] **AC7 (one loop-back):** at most one re-evaluation round per task; non-convergence escalates rather than iterating. → REQ-11
-- [ ] **AC8 (single-owner adjudication):** per-challenge dispositions present; no blended summary substituting for them. → REQ-12
-- [ ] **AC9 (countability):** `.ai-state/CONSULT_LEDGER.md` has one row per challenge; dismiss rate derivable by `grep`+count. → REQ-13, REQ-17
-- [ ] **AC10 (extensibility asserted):** `fitness/tests/test_discipline_registry_invariants.py` passes on the shipped tree, and **fails** on a canary tree where a registry discipline name is injected into the consultant `description:` (gate-liveness proof — the test must bite before it is trusted). → REQ-16
-- [ ] **AC11 (generic description):** the consultant `description:` contains no registry discipline name. → REQ-16
-- [ ] **AC12 (budget):** total always-loaded content stays under 25,000 tokens; the measured rules-budget delta is ~330 tok (14.3% of the 2,309-tok headroom), reported separately from the ~344-tok skill/agent listing-pool delta. → REQ-07, REQ-16
+- [x] **AC1 (gating):** no `CONSULT_*.md` exists for a task with no load-bearing specialist claim in scope; the consultant is never spawned unconditionally at a phase boundary. → REQ-04
+- [x] **AC2 (parameterization):** a `Discipline: statistician` spawn resolves the registry row, loads `applied-statistics` via the `Skill` tool, and logs the discipline to `PROGRESS.md`. → REQ-03, REQ-05
+- [x] **AC3 (fail loud):** an unknown `Discipline:` value produces `[BLOCKED]` with the value named, and zero challenges. → REQ-18
+- [x] **AC4 (isolation checkable):** `## Sources Read` is present and excludes `SYSTEMS_PLAN.md`, `IMPLEMENTATION_PLAN.md`, and every sibling `CONSULT_*.md`. → REQ-08
+- [x] **AC5 (challenge shape):** every `## Challenges` entry carries claim + decision-at-stake + settling test + confidence. → REQ-09
+- [x] **AC6 (zero undispositioned):** every challenge carries one of the three vocabulary values with a rationale. → REQ-10
+- [x] **AC7 (one loop-back):** at most one re-evaluation round per task; non-convergence escalates rather than iterating. → REQ-11
+- [x] **AC8 (single-owner adjudication):** per-challenge dispositions present; no blended summary substituting for them. → REQ-12
+- [x] **AC9 (countability):** `.ai-state/CONSULT_LEDGER.md` has one row per challenge; dismiss rate derivable by `grep`+count. → REQ-13, REQ-17
+- [x] **AC10 (extensibility asserted):** `fitness/tests/test_discipline_registry_invariants.py` passes on the shipped tree, and **fails** on a canary tree where a registry discipline name is injected into the consultant `description:` (gate-liveness proof — the test must bite before it is trusted). → REQ-16
+- [x] **AC11 (generic description):** the consultant `description:` contains no registry discipline name. → REQ-16
+- [x] **AC12 (budget):** total always-loaded content stays under 25,000 tokens; the measured rules-budget delta is ~330 tok (14.3% of the 2,309-tok headroom), reported separately from the ~344-tok skill/agent listing-pool delta. → REQ-07, REQ-16
 - [ ] **AC13 (multi-instance):** two concurrent disciplines write `CONSULT_<a>.md` and `CONSULT_<b>.md` with no shared-file write and no cross-read during round 0. → REQ-08, REQ-13 — **DEFERRED, not failed** (`td-070`): untestable by construction at a one-discipline roster. Becomes testable the moment a second registry row ships, and should be exercised as the *first* act of Wave 2 rather than assumed.
-- [ ] **AC14 (methodological framing):** no registry row, agent body line, or skill line frames a discipline sociodemographically; framing is procedure-shaped. → REQ-01
+- [x] **AC14 (methodological framing):** no registry row, agent body line, or skill line frames a discipline sociodemographically; framing is procedure-shaped. → REQ-01
 - [x] **AC15 (cost envelope):** a convened consultation stays within ≤3× baseline routine / ≤6× high-stakes total pipeline cost, bounded by the 2–3 concurrent cap and the one-round bound. → REQ-06, REQ-11 — **MEASURED 2026-07-30** (`docs/multidisciplinary-identities-evidence.md` §17.12): observed **1.255×** against ≤3× and **1.466×** at the 3-concurrent cap against ≤6×, on a deliberately conservative (small) denominator. Previously discharged by structural argument; `n`=1 `standard` consult, no `high-stakes` consult observed.
-- [ ] **AC16 (no knowledge duplication):** `skills/applied-statistics/` covers pre-collection power/sample-size planning, inferential statistics for evals (multiple comparisons, bootstrap CIs on pass@k, judge agreement, non-determinism variance), confounding and Simpson's paradox in metric trends, and **derived** tolerance bands; it cross-references rather than restates `skills/performance-architecture/references/benchmarking.md § Statistical Rigor`. → REQ-05
-- [ ] **AC17 (sentinel self-reference):** `agents/sentinel.md` check `BC03`'s enumerated agent list and its literal count are updated in the same change as the new agent, and `P07`'s scope covers `CONSULT_*.md`. → REQ-14
-- [ ] **AC18 (registry completeness):** every registry row has all seven fields populated, `lens-collision` included. → REQ-02, REQ-16
+- [x] **AC16 (no knowledge duplication):** `skills/applied-statistics/` covers pre-collection power/sample-size planning, inferential statistics for evals (multiple comparisons, bootstrap CIs on pass@k, judge agreement, non-determinism variance), confounding and Simpson's paradox in metric trends, and **derived** tolerance bands; it cross-references rather than restates `skills/performance-architecture/references/benchmarking.md § Statistical Rigor`. → REQ-05
+- [x] **AC17 (sentinel self-reference):** `agents/sentinel.md` check `BC03`'s enumerated agent list and its literal count are updated in the same change as the new agent, and `P07`'s scope covers `CONSULT_*.md`. → REQ-14
+- [x] **AC18 (registry completeness):** every registry row has all seven fields populated, `lens-collision` included. → REQ-02, REQ-16
 
 ## Traceability Matrix
 

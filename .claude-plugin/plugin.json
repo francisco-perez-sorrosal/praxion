@@ -64,6 +64,7 @@
     "./agents/cicd-engineer.md",
     "./agents/roadmap-cartographer.md",
     "./agents/architect-validator.md",
-    "./agents/agentic-transactions-architect.md"
+    "./agents/agentic-transactions-architect.md",
+    "./agents/discipline-consultant.md"
   ]
 }

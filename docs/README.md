@@ -49,6 +49,7 @@ Discursive explanations of design decisions and ideas. Read for understanding, n
 - [Architecture-as-Code (AaC) and Documentation-as-Code (DaC)](aac-dac.md) — the toolchain and rationale for the LikeC4 + Diátaxis approach
 - [Claude ecosystem learning resources](claude-ecosystem-learning-resources.md) — curated external links for Claude API/SDK/Code
 - [Context-engineering comparison study (2026-05-12)](context-prj-comparison-2026-05-12/README.md) — four "Karpathy-inspired CLAUDE.md" projects vs. Praxion; the adoptable-ideas roadmap (P1–P6 completed 2026-05-12) is preserved as study material at [`07-praxion-roadmap.md`](context-prj-comparison-2026-05-12/07-praxion-roadmap.md)
+- [Multidisciplinary identities — evidence dossier](multidisciplinary-identities-evidence.md) — the research base for adding disciplinary consulting identities (statistician, performance, reliability, formalist) to the pipeline: societies-of-thought evidence, the persona paradox, multi-agent failure data, measured token constraints, and the dialogue protocol
 
 ## Diagrams
 

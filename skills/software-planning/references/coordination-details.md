@@ -209,6 +209,49 @@ Information flows **forward only between concurrent agents**: the architect read
 
 `INTERFACE_DESIGN.md` is single-writer (interface-designer only) and cumulative per pipeline run. It is ephemeral — deleted with `.ai-work/<task-slug>/` after the pipeline completes. It is not subject to fragment file patterns.
 
+## Discipline-Consultant Dialogue Protocol
+
+The discipline-consultant (`agents/discipline-consultant.md`) runs an isolate → challenge → disposition → reconcile protocol once spawned against a specific discipline via a `Discipline: <name>` directive. This section is the canonical procedural reference the consultant's own Round 0–3 summary points at.
+
+### Round 0 — Isolation
+
+The consultant reads the same source materials the researcher and architect read — task brief, research findings, the codebase — with **no access to their draft**: not `SYSTEMS_PLAN.md`, not `IMPLEMENTATION_PLAN.md`, not any sibling `CONSULT_*.md`. Sharing the draft at this stage produces **correlation collapse** — the consultant's view anchors on the draft's framing, and the pipeline pays N× the spawn cost for one correlated opinion instead of an independent one. `## Independent Reading` plus an explicit `## Sources Read` list make the isolation checkable from the artifact itself, not merely asserted.
+
+### Round 1 — Challenge
+
+The consultant reads the draft and appends `## Challenges`, one `### CH-NN` entry per challenge. **Every entry carries a falsifiable claim and the decision it would change.** A challenge that changes no decision is dropped before it is written — this is the filter against decorative expertise: a discipline offering only observations with nothing at stake is padding the artifact, not exercising standing to object. `## Not Challenged` records what was checked and found sound, so silence is distinguishable from endorsement.
+
+### Round 2 — Disposition
+
+The convener — never the consultant — adjudicates **each challenge individually**, one of `switch-now` / `defer-with-rationale` / `dismiss-with-rationale` (see [disposition-vocabulary.md](disposition-vocabulary.md) — cite the definitions, never redefine the terms). **Never a blended narrative**: a summary verdict spanning several challenges hides which specific claim was actually answered, and an un-adjudicated challenge can disappear inside an averaged paragraph. Disposition and rationale are recorded per-entry, in place, in the same `CONSULT_<discipline>.md` fragment.
+
+### Round 3 — Reconcile, Then Stop
+
+At most **one** orchestrator-mediated loop-back round per task per discipline, reusing the interface-designer's architecture-challenge loop-back shape verbatim (see § Interface-Designer Shadowing & the Architecture-Challenge Loop above) — only the section name differs (`## Challenges` vs. `## Architecture Challenges`). The orchestrator routes back to the convener; the consultant and convener never message each other directly. Reconciliation is owned by **one party** — the convener — never negotiated between the consultant and convener as peers; the consultant does not get a rebuttal round. Non-convergence after the one loop-back escalates to the user with both positions stated, exactly as the interface-designer loop escalates.
+
+### Termination
+
+A consult is judged complete on **dispositions recorded**, not on the absence of visible disagreement. A consult with zero challenges is not automatically done — it is done only when `## Not Challenged` is populated and every `## Challenges` entry (if any) carries a disposition. A quiet consult with an empty `## Sources Read` or a missing `## Not Challenged` is incomplete, not agreeable.
+
+### `CONSULT_<discipline>.md` Template
+
+```markdown
+# Consult — <discipline> (<task-slug>)
+**Discipline:** <name>  **Convened by:** <agent|/consult>  **Model:** <alias>  **Round reached:** 0|1|2
+## Independent Reading          <!-- Round 0; written with NO access to the draft -->
+## Sources Read                 <!-- explicit list; makes isolation checkable -->
+## Challenges                   <!-- Round 1; one ### per challenge -->
+### CH-01 — <one-line falsifiable claim>
+- **Decision it would change:** …
+- **Test that would settle it:** …
+- **Confidence:** high|med|low — basis
+- **Disposition:** switch-now | defer-with-rationale | dismiss-with-rationale   <!-- Round 2, by convener -->
+- **Rationale:** …
+## Not Challenged                <!-- explicit: what was checked and found sound -->
+```
+
+`## Challenges` is deliberately named differently from `## Architecture Challenges` so sentinel P07's existing grep stays unambiguous across artifact types; P07's scope extends to `CONSULT_*.md` with this heading.
+
 <a id="pre-refactor-sub-pipeline--the-verifier-vs-loopback-decision"></a>
 ## Pre-Refactor Sub-Pipeline & the Verifier-vs-Loopback Decision
 

@@ -9,6 +9,8 @@ tags: [model-routing, dimensionality, effort-parameter, opus, sonnet, deferred]
 made_by: agent
 agent_type: systems-architect
 pipeline_tier: standard
+re_affirmed_by:
+  - dec-draft-459098fa
 affected_files:
   - rules/swe/agent-model-routing.md
 affected_reqs:

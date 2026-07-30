@@ -28,6 +28,7 @@ Composition layer for multi-perspective deliberation. **This skill owns the shar
 - [references/lens-independence.md](references/lens-independence.md) — isolation/reconciliation/gate discipline for parallel lens sweeps; correlation-collapse rationale; fragment-file enforcement
 - [references/heterogeneous-orchestration.md](references/heterogeneous-orchestration.md) — Haiku-proposer / Opus-aggregator recipe, prompt-caching guidance, cost-model references (MoA, PoLL, MasRouter)
 - [references/disconfirmation-tiers.md](references/disconfirmation-tiers.md) — DI vs. DA distinction; Tier-A (always-on for `category: architectural`): Falsifier / Steelmanned runner-up / Reversal trigger; Tier-B: cross-model adversarial challenge, gating conditions, protocol
+- [references/discipline-registry.md](references/discipline-registry.md) — the consulting-discipline roster as data: 7-field row schema (trigger predicate, runtime skill binding, challenge obligations, difficulty hint, attaching stages, lens collision), read pre-spawn by conveners and post-spawn by the consultant
 
 ## Activation Gate
 
@@ -57,6 +58,9 @@ activate_multi_perspective(task) =
 | Parallel lens fan-out | Moderate (N agent calls) | Honest-uncertainty gate | [references/lens-independence.md](references/lens-independence.md) |
 | Heterogeneous model assignment | Moderate (mixed tiers) | Honest-uncertainty gate | [references/heterogeneous-orchestration.md](references/heterogeneous-orchestration.md) |
 | Tier-B cross-model challenge | High (extra frontier call) | Honest-uncertainty AND stakes ∈ {security, one-way-door, user-visible-breaking} | [references/disconfirmation-tiers.md](references/disconfirmation-tiers.md) |
+| Discipline-consultant dialogue | Moderate (1 agent call per discipline) | Registry trigger predicate matches, a pipeline agent nominates the discipline citing the signal and decision at stake, or on human request | [`agents/discipline-consultant.md`](../../agents/discipline-consultant.md), [coordination-details.md § Discipline-Consultant Dialogue Protocol](../software-planning/references/coordination-details.md) |
+
+**Domain vs. model diversity — not substitutes.** The discipline-consultant supplies **domain diversity** (different expertise applied against the same model backbone); Tier-B cross-model challenge supplies **model diversity** (the same question posed to a different backbone). They compose — a high-stakes contested decision may warrant both — neither supersedes the other.
 
 ## Pipeline Wiring
 

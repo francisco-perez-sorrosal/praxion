@@ -151,13 +151,13 @@ Convention checks (derived from `coding-style` rule):
 - Balanced coupling (cohesion: related logic grouped by reason-to-change; coupling: no policy depending on volatile detail, no leaking abstractions). Flag SOLID violations as `architecture`-bucket findings against `CLAUDE.md§Balanced Coupling` — but only where the coupling actually hurts; do not flag the absence of speculative abstraction (Incremental Evolution governs)
 - Code duplication (no repeated logic within files; for changed files, read sibling files in the same module — capped at 5 — and use LLM judgment to assess cross-module semantic similarity; report duplicated patterns with file paths and line ranges)
 
-#### Interface Design Review (conditional)
+#### Specialist Design Review (conditional)
 
-When the task involved an interface surface (web UI, TUI/CLI output, API, MCP tools) and `.ai-work/<task-slug>/INTERFACE_DESIGN.md` exists:
+When a specialist artifact exists in `.ai-work/<task-slug>/` — `INTERFACE_DESIGN.md` (task involved an interface surface: web UI, TUI/CLI output, API, MCP tools) or any `CONSULT_<discipline>.md`:
 
-- Check the implementation against `INTERFACE_DESIGN.md`'s sketches and decisions (framework choice, error format, pagination shape, component patterns).
+- Check the implementation against `INTERFACE_DESIGN.md`'s sketches and decisions (framework choice, error format, pagination shape, component patterns), and against every challenge the convener dispositioned `switch-now` in a `CONSULT_<discipline>.md`.
 - For each in-scope hat, run its `design-review-checklist.md` (e.g., `web-ui-design/references/design-review-checklist.md`, `api-design-craft/references/design-review-checklist.md`). The four interface-design skills are injected — read the relevant checklist directly.
-- Report mismatches as FAIL or WARN findings with the `[INTERFACE-DESIGN-MISMATCH]` tag.
+- Report mismatches as FAIL or WARN findings with the `[INTERFACE-DESIGN-MISMATCH]` tag; report any challenge left with an empty `Disposition:` as a WARN finding — the consultant never dispositions its own challenges, so an empty field means the consult never completed, not that the challenge was accepted.
 
 #### Tech-Debt Ledger Writes
 
@@ -534,9 +534,9 @@ This subsection documents the main-agent-facing protocol for spawning rework wor
 - If the verifier finds the design was flawed (not just the implementation), it flags for re-invocation of the systems-architect
 - The verifier does not make design judgments
 
-### With the Interface Designer
+### With the Interface Designer and the Discipline Consultant
 
-When `.ai-work/<task-slug>/INTERFACE_DESIGN.md` is present in a pipeline run, run an interface design review: for each interface hat in scope (web UI / TUI-CLI / agentic-MCP / REST-GraphQL-gRPC), apply that skill's `references/design-review-checklist.md`; record PASS/FAIL/WARN findings in `VERIFICATION_REPORT.md` alongside the code-quality findings; cross-check the implementation against the sketches and decisions in `INTERFACE_DESIGN.md`. Tag mismatches `[INTERFACE-DESIGN-MISMATCH]`. The four interface-design skills (`web-ui-design`, `tui-design`, `agentic-interface-design`, `api-design-craft`) are injected — read the relevant checklists directly.
+When `.ai-work/<task-slug>/INTERFACE_DESIGN.md` is present in a pipeline run, run an interface design review: for each interface hat in scope (web UI / TUI-CLI / agentic-MCP / REST-GraphQL-gRPC), apply that skill's `references/design-review-checklist.md`; record PASS/FAIL/WARN findings in `VERIFICATION_REPORT.md` alongside the code-quality findings; cross-check the implementation against the sketches and decisions in `INTERFACE_DESIGN.md`. Tag mismatches `[INTERFACE-DESIGN-MISMATCH]`. The four interface-design skills (`web-ui-design`, `tui-design`, `agentic-interface-design`, `api-design-craft`) are injected — read the relevant checklists directly. When any `CONSULT_<discipline>.md` is present, verify the same way against its dispositioned challenges only: a `switch-now` disposition is binding on the implementation, a `defer-with-rationale` one warrants a tech-debt row if none exists, and an empty `Disposition:` is an incomplete consult (WARN) — the consultant's challenges are never themselves instructions, so never verify against an undispositioned challenge.
 
 ### With Upstream Stewardship
 

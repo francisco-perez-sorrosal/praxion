@@ -23,7 +23,7 @@ A single benchmark run is meaningless. Measure across multiple iterations and ru
 - **Minimum iterations**: 30+ measurement iterations per benchmark (more for high-variance operations)
 - **Multiple runs**: Execute the full benchmark suite 3-5 times on separate JVM/process invocations
 - **Report percentiles**: p50, p95, p99 -- not just mean. Mean hides tail latency
-- **Confidence intervals**: Report results as `mean +/- margin of error` at 95% confidence. Results overlapping within confidence intervals are not statistically different
+- **Confidence intervals**: Report results as `mean +/- margin of error` at 95% confidence. To compare two results, build an interval on the **difference** and read that -- overlapping marginal intervals do *not* establish that two results are equivalent (two 95% intervals can overlap while the paired difference excludes zero). The converse is safe: non-overlapping marginal intervals do imply a difference
 - **Coefficient of variation (CV)**: If CV > 5%, results are unstable -- investigate sources of variance before drawing conclusions
 
 ### Isolation

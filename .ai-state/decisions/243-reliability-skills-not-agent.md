@@ -11,7 +11,7 @@ agent_type: systems-architect
 pipeline_tier: full
 branch: main
 re_affirmed_by:
-  - dec-draft-b5c319e0
+  - dec-302
 affected_files:
   - skills/agent-runtime-guardrails/
   - skills/agent-failure-taxonomy/

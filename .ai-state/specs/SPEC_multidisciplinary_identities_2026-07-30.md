@@ -8,7 +8,7 @@
 **End date**: _[pending — filled at pipeline end]_
 **Archived**: _[pending — filled at pipeline end; `SPECS_INDEX.md` is auto-generated, regenerate via `python scripts/regenerate_specs_index.py`, never by hand]_
 **Status**: Specified — pre-implementation (authored by the systems-architect at Phase 10; requirements are the verifier's rubric)
-**ADRs**: `dec-draft-13c8d820` (peer not lens), `dec-draft-b5c319e0` (parameterized agent + registry + runtime binding; re-affirms `dec-243`), `dec-draft-459098fa` (model/effort routing; re-affirms `dec-076`), `dec-draft-94ea6d25` (dialogue protocol; re-affirms `dec-154`), `dec-draft-1317679c` (disposition ledger), `dec-draft-a8ac476c` (selection tiers + Wave-1 scope fence)
+**ADRs**: `dec-303` (peer not lens), `dec-302` (parameterized agent + registry + runtime binding; re-affirms `dec-243`), `dec-301` (model/effort routing; re-affirms `dec-076`), `dec-298` (dialogue protocol; re-affirms `dec-154`), `dec-299` (disposition ledger), `dec-300` (selection tiers + Wave-1 scope fence)
 **Evidence base**: [`docs/multidisciplinary-identities-evidence.md`](../../docs/multidisciplinary-identities-evidence.md) (committed; §9.1 extensibility criterion, §10 dialogue protocol, §11 selection model, §15 Wave-A outcomes, §16 binding user rulings)
 
 ## Feature Summary
@@ -78,42 +78,42 @@ rather than by prose.
 
 | REQ | Behaviour | ADR | Primary artifact | Verifying AC |
 |---|---|---|---|---|
-| REQ-01 | Peer, not lens; methodological framing | `dec-draft-13c8d820` | `agents/discipline-consultant.md` | AC14 |
-| REQ-02 | `lens-collision` declared per row | `dec-draft-13c8d820` | `discipline-registry.md` | AC18 |
-| REQ-03 | `Discipline:` directive resolution | `dec-draft-b5c319e0` | `agents/discipline-consultant.md`, `agents/CLAUDE.md` | AC2 |
-| REQ-04 | Registry `fires-when` = Tier-1 table | `dec-draft-b5c319e0`, `dec-draft-a8ac476c` | `discipline-registry.md` | AC1 |
-| REQ-05 | Runtime `Skill`-tool binding; fixed frontmatter | `dec-draft-b5c319e0` | `agents/discipline-consultant.md` | AC2, AC16 |
-| REQ-06 | Generic difficulty→model policy | `dec-draft-459098fa` | `rules/swe/agent-model-routing.md`, `discipline-registry.md` | AC15 |
-| REQ-07 | 1D routing preserved; no `effort:` | `dec-draft-459098fa` | `rules/swe/agent-model-routing.md` | AC12 |
-| REQ-08 | Round-0 isolation + `## Sources Read` | `dec-draft-94ea6d25` | `CONSULT_<discipline>.md` schema | AC4, AC13 |
-| REQ-09 | Challenge carries decision + test | `dec-draft-94ea6d25` | `CONSULT_<discipline>.md` schema | AC5 |
-| REQ-10 | Disposition obligation | `dec-draft-94ea6d25` | `coordination-details.md`, `agents/systems-architect.md` | AC6 |
-| REQ-11 | One loop-back, then escalate | `dec-draft-94ea6d25` | `coordination-details.md` | AC7, AC15 |
-| REQ-12 | Single-owner, per-challenge adjudication | `dec-draft-94ea6d25` | `agents/systems-architect.md` | AC8 |
-| REQ-13 | One ledger row per challenge, one writer | `dec-draft-1317679c` | `.ai-state/CONSULT_LEDGER.md` | AC9, AC13 |
-| REQ-14 | `P07` presence gate extended | `dec-draft-1317679c` | `agents/sentinel.md` | AC17 |
-| REQ-15 | Self-nomination cites signal + decision | `dec-draft-a8ac476c` | nominators: `agents/researcher.md`, `agents/systems-architect.md`; consumers (read/check, never nominate): `agents/implementation-planner.md`, `agents/verifier.md` | AC6 |
-| **REQ-16** | **Extensibility criterion (health guard)** | `dec-draft-b5c319e0` | `fitness/tests/test_discipline_registry_invariants.py` | AC10, AC11, AC12, AC18 |
-| **REQ-17** | **Disposition counter (health guard)** | `dec-draft-1317679c` | `.ai-state/CONSULT_LEDGER.md` | AC9 |
-| REQ-18 | Wave-1 scope fence; no self-instantiation | `dec-draft-a8ac476c`, `dec-draft-13c8d820` | `agents/discipline-consultant.md`, `agents/skill-genesis.md` (deferred path) | AC3 |
+| REQ-01 | Peer, not lens; methodological framing | `dec-303` | `agents/discipline-consultant.md` | AC14 |
+| REQ-02 | `lens-collision` declared per row | `dec-303` | `discipline-registry.md` | AC18 |
+| REQ-03 | `Discipline:` directive resolution | `dec-302` | `agents/discipline-consultant.md`, `agents/CLAUDE.md` | AC2 |
+| REQ-04 | Registry `fires-when` = Tier-1 table | `dec-302`, `dec-300` | `discipline-registry.md` | AC1 |
+| REQ-05 | Runtime `Skill`-tool binding; fixed frontmatter | `dec-302` | `agents/discipline-consultant.md` | AC2, AC16 |
+| REQ-06 | Generic difficulty→model policy | `dec-301` | `rules/swe/agent-model-routing.md`, `discipline-registry.md` | AC15 |
+| REQ-07 | 1D routing preserved; no `effort:` | `dec-301` | `rules/swe/agent-model-routing.md` | AC12 |
+| REQ-08 | Round-0 isolation + `## Sources Read` | `dec-298` | `CONSULT_<discipline>.md` schema | AC4, AC13 |
+| REQ-09 | Challenge carries decision + test | `dec-298` | `CONSULT_<discipline>.md` schema | AC5 |
+| REQ-10 | Disposition obligation | `dec-298` | `coordination-details.md`, `agents/systems-architect.md` | AC6 |
+| REQ-11 | One loop-back, then escalate | `dec-298` | `coordination-details.md` | AC7, AC15 |
+| REQ-12 | Single-owner, per-challenge adjudication | `dec-298` | `agents/systems-architect.md` | AC8 |
+| REQ-13 | One ledger row per challenge, one writer | `dec-299` | `.ai-state/CONSULT_LEDGER.md` | AC9, AC13 |
+| REQ-14 | `P07` presence gate extended | `dec-299` | `agents/sentinel.md` | AC17 |
+| REQ-15 | Self-nomination cites signal + decision | `dec-300` | nominators: `agents/researcher.md`, `agents/systems-architect.md`; consumers (read/check, never nominate): `agents/implementation-planner.md`, `agents/verifier.md` | AC6 |
+| **REQ-16** | **Extensibility criterion (health guard)** | `dec-302` | `fitness/tests/test_discipline_registry_invariants.py` | AC10, AC11, AC12, AC18 |
+| **REQ-17** | **Disposition counter (health guard)** | `dec-299` | `.ai-state/CONSULT_LEDGER.md` | AC9 |
+| REQ-18 | Wave-1 scope fence; no self-instantiation | `dec-300`, `dec-303` | `agents/discipline-consultant.md`, `agents/skill-genesis.md` (deferred path) | AC3 |
 
 ## Key Decisions (Cross-Reference)
 
 | Decision | ADR | One-line |
 |---|---|---|
-| Peer, not lens; Lens Catalog untouched | `dec-draft-13c8d820` | Verified precedent + mechanical difference; deferred collision becomes a required registry field plus a reversal trigger |
-| One parameterized agent; roster as data; runtime binding | `dec-draft-b5c319e0` | Re-affirms `dec-243` — a consultant gives *any* skill standing to object without a per-domain agent |
-| Model axis real, effort axis not settable per spawn | `dec-draft-459098fa` | Re-affirms `dec-076` — both its 2D re-open triggers verified un-fired; `ultrathink` is the disclosed fallback |
-| Four rounds, one loop-back, adjudicate per challenge | `dec-draft-94ea6d25` | Re-affirms `dec-154` — same orchestrator-mediated loop, heavier disposition obligation (no decision authority) |
-| Dedicated single-writer append-only ledger | `dec-draft-1317679c` | Four-writer tech-debt contract preserved; a dismissed challenge is not debt |
-| Tier 1 + Tier 2 ship, Tier 3 gated | `dec-draft-a8ac476c` | Proposing new routes before the existing route has one measured disposition breeds uncalibrated routers |
+| Peer, not lens; Lens Catalog untouched | `dec-303` | Verified precedent + mechanical difference; deferred collision becomes a required registry field plus a reversal trigger |
+| One parameterized agent; roster as data; runtime binding | `dec-302` | Re-affirms `dec-243` — a consultant gives *any* skill standing to object without a per-domain agent |
+| Model axis real, effort axis not settable per spawn | `dec-301` | Re-affirms `dec-076` — both its 2D re-open triggers verified un-fired; `ultrathink` is the disclosed fallback |
+| Four rounds, one loop-back, adjudicate per challenge | `dec-298` | Re-affirms `dec-154` — same orchestrator-mediated loop, heavier disposition obligation (no decision authority) |
+| Dedicated single-writer append-only ledger | `dec-299` | Four-writer tech-debt contract preserved; a dismissed challenge is not debt |
+| Tier 1 + Tier 2 ship, Tier 3 gated | `dec-300` | Proposing new routes before the existing route has one measured disposition breeds uncalibrated routers |
 
 ## Registered Objections (carried, not resolved)
 
 1. **Ruling 3 as literally stated is not implementable.** Per-instance reasoning-effort selection has no
    Agent-tool per-invocation parameter; per-subagent thinking is explicitly absent and `thinking.budget_tokens`
    is forbidden on routed Opus. The ruling's *intent* is complied with via per-spawn `model` + `ultrathink`;
-   the gap is disclosed in `dec-draft-459098fa` rather than papered over.
+   the gap is disclosed in `dec-301` rather than papered over.
 2. **Hand-authored routing remains untested against a random baseline.** Every validated router in the retrieved
    literature is learned or model-scored. Tier 1 is *analogous to* a validated mechanism, not an instance of one.
    The falsifier should be measured on **variance as well as mean** accepted-challenge rate. Only the ledger can

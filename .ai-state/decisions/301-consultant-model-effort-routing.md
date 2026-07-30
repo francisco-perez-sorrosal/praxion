@@ -1,7 +1,7 @@
 ---
-id: dec-draft-459098fa
+id: dec-301
 title: Consultant difficulty routing — per-spawn model is real, per-spawn API effort is not settable; ultrathink is the honest fallback
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-30
 summary: Difficulty-keyed heterogeneity for the discipline consultant uses the verified per-spawn model parameter plus the ultrathink prompt keyword; per-invocation API effort is not settable for a subagent spawn today, so no effort column enters the routing table and dec-076's 1D policy is re-affirmed rather than superseded.

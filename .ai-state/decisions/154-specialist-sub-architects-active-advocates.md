@@ -11,7 +11,7 @@ agent_type: systems-architect
 branch: worktree-interface-design
 pipeline_tier: full
 re_affirmed_by:
-  - dec-draft-94ea6d25
+  - dec-298
 affected_files:
   - agents/interface-designer.md
   - agents/systems-architect.md

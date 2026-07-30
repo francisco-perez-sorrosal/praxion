@@ -1,7 +1,7 @@
 ---
-id: dec-draft-13c8d820
+id: dec-303
 title: The discipline consultant is a peer sub-architect, not an evaluation lens — Lens Catalog untouched in Wave 1
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-30
 summary: A discipline consultant is architecturally a shadow sub-architect with standing to object, not a Lens-Catalog lens; Wave 1 carries no supersession, and the deferred lens-collision condition becomes a mechanically-visible registry field plus a recorded reversal trigger.

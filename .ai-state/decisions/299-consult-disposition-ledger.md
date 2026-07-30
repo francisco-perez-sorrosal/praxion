@@ -1,7 +1,7 @@
 ---
-id: dec-draft-1317679c
+id: dec-299
 title: Disposition counter is a dedicated append-only .ai-state/CONSULT_LEDGER.md, single-writer, shipped as a prerequisite
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-30
 summary: The accept/defer/dismiss counter lands as a new dedicated append-only markdown ledger in .ai-state/ written only by the convener, rather than as tech-debt-ledger rows (which would break the four-writer contract) or a metrics-report triple (over-built); it ships before or with the first discipline because it is the router's calibration loop, not a report card.

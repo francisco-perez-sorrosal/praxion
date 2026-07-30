@@ -1,7 +1,7 @@
 ---
-id: dec-draft-b5c319e0
+id: dec-302
 title: One parameterized consultant agent; the discipline roster is data in a skill reference; bindings resolve at runtime via the Skill tool
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-30
 summary: Ship a single discipline-parameterized consultant agent whose roster lives as a data table in skills/multi-perspective-analysis/references/discipline-registry.md and whose discipline-to-knowledge bindings load at runtime through the Skill tool, making description/skills/tools/rules/plugin.json all discipline-count-independent by construction and enforced by a committed fitness test.

@@ -1,7 +1,7 @@
 ---
-id: dec-draft-a8ac476c
+id: dec-300
 title: Wave-1 selection scope — Tier 1 registry predicates and Tier 2 self-nomination ship; Tier 3 identity genesis defers behind an evidence gate
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-30
 summary: The authored trigger table lives in the discipline registry's fires-when column (zero always-loaded cost) and self-nomination reuses the existing nomination path unchanged; Tier-3 identity genesis is deferred because skill-genesis has no discipline-proposal slot and because proposing new routes before the existing route has produced one measured disposition is an uncalibrated router breeding routers.

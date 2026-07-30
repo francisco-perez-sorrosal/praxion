@@ -4,9 +4,9 @@
      Producer: the convener only (the systems-architect in pipeline mode; the
      orchestrator in standalone /consult mode) -- one row appended per
      challenge, at round 2, once the challenge is dispositioned. The
-     consultant itself never writes this file (Decision E, dec-draft-1317679c)
+     consultant itself never writes this file (Decision E, dec-299)
      -- it authors only its own CONSULT_<discipline>.md fragment.
-     Schema and rationale: dec-draft-1317679c (Disposition counter is a
+     Schema and rationale: dec-299 (Disposition counter is a
      dedicated append-only .ai-state/CONSULT_LEDGER.md, single-writer). -->
 
 **Schema**: 11 columns, one row per dispositioned challenge (I4, `SYSTEMS_PLAN.md § Interfaces`). See Column Definitions below.
@@ -50,4 +50,4 @@ The header row does not match a discipline key, because its third column holds t
 
 ## Single Writer
 
-The consultant never writes this file. Only the convener appends rows, at round 2, once each challenge is dispositioned (Decision E, dec-draft-1317679c). This removes a write race under concurrent consultant instances and matches single-owner reconciliation -- the party that adjudicates the disposition is the party that records it.
+The consultant never writes this file. Only the convener appends rows, at round 2, once each challenge is dispositioned (Decision E, dec-299). This removes a write race under concurrent consultant instances and matches single-owner reconciliation -- the party that adjudicates the disposition is the party that records it.

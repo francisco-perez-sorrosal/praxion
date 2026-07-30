@@ -1,7 +1,7 @@
 ---
-id: dec-draft-94ea6d25
+id: dec-298
 title: Consult dialogue protocol — isolate, challenge, disposition, reconcile; one loop-back; adjudicate per challenge, never blended synthesis
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-30
 summary: The consultant dialogue is four rounds bounded at one orchestrator-mediated loop-back, reusing dec-154's challenge-loop mechanism verbatim; reconciliation is single-owner and adjudicates each challenge individually rather than producing a blended narrative, and termination is judged on dispositions rather than on absence of visible disagreement.

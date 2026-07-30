@@ -95,7 +95,7 @@ The full step sequence:
    | Location | Surface to rewrite |
    |----------|-------------------|
    | `.ai-state/decisions/**/*.md` | Frontmatter `supersedes` / `superseded_by` / `re_affirms` / `re_affirmed_by`; inline body references (`[dec-draft-<hash>]` or bare). Both drafts and finalized records. |
-   | `.ai-state/DESIGN.md`, `.ai-state/TECH_DEBT_LEDGER.md`, `.ai-state/TECH_DEBT_RESOLVED.md`, project-root `ROADMAP.md` | All occurrences — persistent files that cite the ADR a decision or debt row resolved |
+   | `.ai-state/DESIGN.md`, `.ai-state/TECH_DEBT_LEDGER.md`, `.ai-state/TECH_DEBT_RESOLVED.md`, `.ai-state/CONSULT_LEDGER.md`, project-root `ROADMAP.md` | All occurrences — persistent files that cite the ADR a decision, debt, or consult-disposition row resolved |
    | `docs/**/*.md` | All occurrences — design notes and integration docs cite ADR ids outside `.ai-state/` (subsumes `docs/architecture.md`) |
    | `.ai-work/*/LEARNINGS.md` | All occurrences |
    | `.ai-work/*/SYSTEMS_PLAN.md`, `.ai-work/*/IMPLEMENTATION_PLAN.md` | All occurrences |

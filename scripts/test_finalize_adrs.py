@@ -1481,6 +1481,50 @@ class TestWidenedCrossReferenceScope:
             assert new in text
             assert old not in text
 
+    def test_rewrites_consult_ledger(self, repo_root: Path) -> None:
+        """The consult disposition ledger's `rationale-ref` column is documented
+        to hold a `dec-draft-<hash>` before finalize, so it must be in scope.
+
+        Regression: the ledger was omitted from the named-persistent-files list,
+        so every consult ADR left a permanently dangling draft id in a committed
+        ledger row.
+        """
+        old, new = "dec-draft-c0ffee11", "dec-304"
+        ledger = repo_root / ".ai-state" / "CONSULT_LEDGER.md"
+        ledger.parent.mkdir(parents=True, exist_ok=True)
+        ledger.write_text(
+            "| ts | slug | statistician | architecture | CH-01 | claim "
+            f"| decision | switch-now | {old} | opus | standard |\n",
+            encoding="utf-8",
+        )
+
+        modified = finalize.rewrite_cross_references(repo_root, old, new)
+
+        assert modified == 1
+        text = ledger.read_text(encoding="utf-8")
+        assert new in text
+        assert old not in text
+
+    def test_rewrites_spec_despite_separator_mismatch(self, repo_root: Path) -> None:
+        """Spec filenames use underscores; task slugs are kebab-case.
+
+        Regression: matching was a literal substring test, so a slug like
+        `auth-flow` never matched `SPEC_auth_flow_2026-07-30.md` and specs were
+        silently skipped by the rewrite.
+        """
+        old, new = "dec-draft-feedface", "dec-305"
+        (repo_root / ".ai-work" / "auth-flow").mkdir(parents=True, exist_ok=True)
+        spec = repo_root / ".ai-state" / "specs" / "SPEC_auth_flow_2026-07-30.md"
+        spec.parent.mkdir(parents=True, exist_ok=True)
+        spec.write_text(f"decided in {old}\n", encoding="utf-8")
+
+        modified = finalize.rewrite_cross_references(repo_root, old, new)
+
+        assert modified == 1
+        text = spec.read_text(encoding="utf-8")
+        assert new in text
+        assert old not in text
+
 
 # -- re_affirmed_by back-link self-healing (dec-070/DL06) ---------------------
 

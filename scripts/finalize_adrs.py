@@ -728,13 +728,17 @@ def rewrite_cross_references(repo_root: Path, old_id: str, new_id: str) -> int:
     Bounded scope:
     - All files under `.ai-state/decisions/` (both drafts/ and finalized).
     - `.ai-state/DESIGN.md`, `.ai-state/TECH_DEBT_LEDGER.md`,
-      `.ai-state/TECH_DEBT_RESOLVED.md`, and a project-root `ROADMAP.md` --
-      named persistent files that cite the ADR a decision/debt row resolved.
+      `.ai-state/TECH_DEBT_RESOLVED.md`, `.ai-state/CONSULT_LEDGER.md`, and a
+      project-root `ROADMAP.md` -- named persistent files that cite the ADR a
+      decision/debt/disposition row resolved.
     - Every markdown file under `docs/` (subsumes `docs/architecture.md`):
       design notes and integration docs cite ADR ids outside `.ai-state/`.
     - All `.ai-work/*/LEARNINGS.md`.
     - All `.ai-work/*/SYSTEMS_PLAN.md` and `.ai-work/*/IMPLEMENTATION_PLAN.md`.
     - `.ai-state/specs/SPEC_*.md` files matching any active pipeline task slug.
+      Matching is separator-insensitive: spec filenames conventionally use
+      underscores (`SPEC_auth_flow_YYYY-MM-DD.md`) while task slugs are
+      kebab-case (`auth-flow`), so a literal substring test never matches.
 
     `scripts/` is deliberately excluded: id-citation-discipline forbids
     `dec-draft-<hash>` in committed code, so the only scripts carrying a
@@ -760,13 +764,16 @@ def _cross_reference_targets(repo_root: Path) -> Iterator[Path]:
             if entry.is_file():
                 yield entry
 
-    # Named persistent files that legitimately cite ADR ids: the design target
-    # and both tech-debt ledgers (rows reference the ADR that resolved them),
-    # plus a project-root ROADMAP.md when present.
+    # Named persistent files that legitimately cite ADR ids: the design target,
+    # both tech-debt ledgers (rows reference the ADR that resolved them), the
+    # consult disposition ledger (its `rationale-ref` column is documented to
+    # hold `dec-NNN` or, pre-finalize, `dec-draft-<hash>`), plus a project-root
+    # ROADMAP.md when present.
     for persistent_doc in (
         repo_root / ".ai-state" / "DESIGN.md",
         repo_root / ".ai-state" / "TECH_DEBT_LEDGER.md",
         repo_root / ".ai-state" / "TECH_DEBT_RESOLVED.md",
+        repo_root / ".ai-state" / "CONSULT_LEDGER.md",
         repo_root / "ROADMAP.md",
     ):
         if persistent_doc.is_file():
@@ -807,8 +814,12 @@ def _cross_reference_targets(repo_root: Path) -> Iterator[Path]:
     specs = repo_root / ".ai-state" / "specs"
     task_slugs = _active_task_slugs(repo_root)
     if specs.is_dir() and task_slugs:
+        # Spec filenames conventionally use underscores while task slugs are
+        # kebab-case, so compare with both separators normalized to `-`.
+        normalized_slugs = {slug.replace("_", "-") for slug in task_slugs}
         for entry in specs.glob("SPEC_*.md"):
-            if any(slug in entry.name for slug in task_slugs):
+            normalized_name = entry.name.replace("_", "-")
+            if any(slug in normalized_name for slug in normalized_slugs):
                 yield entry
 
 

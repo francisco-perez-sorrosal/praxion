@@ -3,14 +3,18 @@ name: python-development
 description: >
   Python development conventions: type hints, pytest, code quality tools (ruff,
   mypy, pyright), data modeling (dataclasses, Pydantic), async patterns, error
-  handling, structural pattern matching. Triggers: writing Python code, implementing
-  tests, configuring linting/formatting, choosing between dataclasses and Pydantic,
-  pytest fixtures and parametrize, ruff formatting/linting, mypy type checking,
-  pytest configuration.
+  handling, structural pattern matching, version-specific idioms (3.10-3.14+), and
+  a curated battle-tested library catalog by project archetype. Triggers: writing
+  Python code, implementing tests, configuring linting/formatting, choosing between
+  dataclasses and Pydantic, pytest fixtures and parametrize, ruff formatting/linting,
+  mypy type checking, pytest configuration, picking a library for a new capability
+  (web framework, ORM, CLI parsing, dataframes, async task queue, logging, config).
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:
   - "Python Version Guidelines"
+  - "Library Catalog by Archetype"
+staleness_threshold_days: 90
 ---
 
 # Modern Python Development
@@ -21,6 +25,7 @@ Comprehensive guidance for Python development following pragmatic, production-re
 
 - [references/testing-and-tooling.md](references/testing-and-tooling.md) -- pytest patterns, pyproject.toml config, pre-commit setup
 - [references/patterns-and-examples.md](references/patterns-and-examples.md) -- dataclasses, Pydantic, protocols, context managers, pattern matching, async, error handling
+- [references/essential-libraries.md](references/essential-libraries.md) -- curated, battle-tested libraries by project archetype (web API, CLI, data/ML, async services, general-purpose, scripting)
 - For advanced pytest strategy (conftest architecture, hypothesis, fixture composition, coverage philosophy), see the [testing-strategy](../testing-strategy/SKILL.md) skill
 
 ## Gotchas
@@ -46,15 +51,27 @@ Non-obvious pitfalls that cause silent failures or confusing errors:
 **Project Management**: Commands in this skill use `<tool>` as a placeholder for your project management tool (pixi or uv). See the [Python Project Management](../python-prj-mgmt/SKILL.md) skill for environment setup, dependency management, and choosing between pixi (default) and uv.
 
 ## Python Version Guidelines
-<!-- last-verified: 2026-05-25 -->
+<!-- last-verified: 2026-07-29 -->
 
-**Target Python 3.13+** for new projects:
-- Better error messages
-- Faster performance
-- Modern type hint syntax (`X | Y`, `Self`)
-- Exception groups
+**Target the latest stable CPython for new projects** (3.14 as of this verification date)
+unless a dependency forces a lower floor. **For libraries**, support 3.10+ unless specific
+constraints require older versions.
 
-**For libraries**, support Python 3.10+ unless specific constraints require older versions.
+Idiom-changing features by version — adopt each once the project's minimum supported
+version allows it; earlier projects keep the prior idiom rather than backporting syntax:
+
+| Version | What changed idiomatically |
+|---|---|
+| 3.10 | Structural pattern matching (`match`/`case`); `X \| Y` union syntax; `X \| None` instead of `Optional[X]` |
+| 3.11 | Exception groups + `except*` (PEP 654) — first-class handling of multiple unrelated exceptions, notably from `asyncio.TaskGroup` failures; `tomllib` added to stdlib |
+| 3.12 | **PEP 695 generic syntax** — `class Box[T]`, `def first[T](xs: list[T]) -> T`, `type Alias[T] = ...` — eliminates `TypeVar`/`Generic` boilerplate and scopes type params to the declaring class/function. The biggest idiom shift since union syntax. On 3.10/3.11, keep using `TypeVar`/`Generic` |
+| 3.14 | Template strings (`t"..."`, PEP 750) — a `t"..."` literal returns a structured `Template` object (static parts + interpolations) instead of a plain `str`, enabling safe custom string-processing (SQL-injection-safe query builders, HTML-escaping templaters) without eval-like hacks |
+
+**Free-threading (PEP 703/779) and the JIT are deployment/compatibility concerns, not
+coding idioms.** Both remain non-default, opt-in builds as of 3.14 — treat them as "does
+this project's C-extension dependency graph tolerate the free-threaded/JIT binary?", not
+as a reason to change how code is written, unless the project explicitly targets
+high-core-count CPU-bound parallelism.
 
 ## Project Structure
 
@@ -145,6 +162,16 @@ Use dataclasses for simple containers with no validation; Pydantic when parsing 
 
 --> See [references/patterns-and-examples.md](references/patterns-and-examples.md) for code examples and the full dataclasses-vs-Pydantic decision guide.
 
+## Essential Libraries
+
+Don't reinvent common functionality — a curated, battle-tested library likely already
+solves it well. Check the catalog before hand-rolling something in the HTTP client, ORM,
+validation, CLI, dataframe, logging, or config-management space.
+
+--> See [references/essential-libraries.md](references/essential-libraries.md) for the
+full catalog, organized by project archetype (web API, CLI, data/ML, async services,
+general-purpose, scripting).
+
 ## Async Patterns
 
 Use `async/await` with `httpx` for HTTP, `asynccontextmanager` for resource lifecycle. Test with `pytest-asyncio`. Common libraries: `asyncio`, `httpx`, `aiohttp`, `anyio`.
@@ -218,5 +245,5 @@ When invoked from a pipeline agent (`implementer`, `test-engineer`, or any subag
 
 ## Related Skills
 
-- [`python-prj-mgmt`](../python-prj-mgmt/SKILL.md) — pixi and uv: project initialization, dependency management, environment setup
+- [`python-prj-mgmt`](../python-prj-mgmt/SKILL.md) — pixi and uv: project initialization, dependency management, environment setup. Use it to add whatever this skill's [essential-libraries.md](references/essential-libraries.md) recommends
 - [`testing-strategy`](../testing-strategy/SKILL.md) — advanced pytest patterns: conftest architecture, hypothesis, fixture composition, coverage philosophy

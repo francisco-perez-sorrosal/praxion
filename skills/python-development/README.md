@@ -22,6 +22,7 @@ Trigger explicitly by mentioning "python skill", "pytest", "ruff", "mypy", "pyri
 - `SKILL.md` — core conventions: project structure, type hints, code style, async, error handling, gotchas, quick commands
 - `references/patterns-and-examples.md` — dataclasses vs Pydantic decision guide, protocols, context managers, structural pattern matching, async, error handling examples
 - `references/testing-and-tooling.md` — pytest fixtures, parametrize, ruff/mypy/pyright configuration, pre-commit setup
+- `references/essential-libraries.md` — curated, battle-tested library catalog by project archetype (index page; `references/libraries-*.md` hold the per-archetype tables)
 
 ## Related Skills
 

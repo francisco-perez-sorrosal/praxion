@@ -1,3 +1,17 @@
+## v0.18.0 (2026-07-30)
+
+### Feat
+
+- record discipline-gap signals for human disposition
+- prove discipline-consult loop live, first ledger rows
+
+### Fix
+
+- settle the always-loaded budget basis and correct T02
+- close verification findings and archive the spec
+- widen finalize rewrite scope to the consult ledger and specs
+- revise the discipline-expansion criterion after its first consult
+
 ## v0.17.0 (2026-07-30)
 
 ### Feat

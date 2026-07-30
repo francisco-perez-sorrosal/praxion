@@ -20,7 +20,9 @@ Contextual domain knowledge files loaded automatically based on relevance. Rules
 
 IMPORTANT: Rules without `paths:` frontmatter are **always loaded** — each costs tokens every session. The always-loaded budget (CLAUDE.md files + unconditional rules) is **25,000 tokens** — a failure-mode guardrail, not a target. Every always-loaded token must earn its attention share: applied in >30% of sessions, or unconditionally relevant. Scope with `paths:`, or move to a skill, anything not universally needed.
 
-**Measure the always-loaded surface**: `wc -c` over the project + global `CLAUDE.md` files and every `rules/**/*.md` lacking `paths:`; divide bytes by 3.6 for a conservative token estimate (4.0 is more realistic for markdown). Re-measure when touching an always-loaded rule — a cached baseline decays with every commit.
+**Measure the always-loaded surface**: `wc -c` over the project + global `CLAUDE.md` files and every `rules/**/*.md` lacking `paths:`, **excluding catalog `README.md` files**; divide bytes by 3.6 for a conservative token estimate (4.0 is more realistic for markdown). Re-measure when touching an always-loaded rule — a cached baseline decays with every commit.
+
+The catalog exclusion is not a convenience — it is what the loader actually does, and it is worth 4,500 tokens. A `rules/README.md` carries no `paths:` and so reads as always-loaded under a naive "no frontmatter = always loaded" test, but it is a **catalog, not a rule**, and observing a live session's loaded context confirms it is not injected. Measuring it in swings the total from ~23,100 to ~27,600 against a 25,000 ceiling — i.e. from passing to failing on a file the session never loads. Any budget check must state its basis explicitly; three mutually inconsistent bases have coexisted in this repo before, and every historical PASS was basis-dependent. The authoritative basis is this paragraph.
 
 ## Installation
 

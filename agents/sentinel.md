@@ -399,7 +399,7 @@ missing = [a for a in agents if not os.path.exists(a.lstrip('./'))]
 print(f'Registered: {len(agents)}, Missing: {missing or \"none\"}')"
 echo "=== X05: coordination protocol agents ===" && grep -c "^\| " rules/swe/swe-agent-coordination-protocol.md
 echo "=== X06: agents/README.md ===" && grep -c "^\| " agents/README.md
-echo "=== T02: token budget ===" && cat CLAUDE.md rules/swe/*.md rules/swe/vcs/*.md rules/CLAUDE.md 2>/dev/null | wc -c
+echo "=== T02: token budget ===" && { cat CLAUDE.md claude/config/CLAUDE.md 2>/dev/null; find rules -name '*.md' ! -name 'README.md' -exec sh -c 'head -5 "$1" | grep -q "^paths:" || cat "$1"' _ {} \; ; } | wc -c
 echo "=== DL03: ADR index (finalized only) ===" && ls .ai-state/decisions/[0-9]*.md 2>/dev/null | wc -l && grep -c "^| dec-" .ai-state/decisions/DECISIONS_INDEX.md 2>/dev/null
 echo "=== DL01/DL05: draft fragments (informational — excluded from DL03 by design) ===" && ls .ai-state/decisions/drafts/*.md 2>/dev/null | grep -v '/CLAUDE\.md$' | wc -l
 ```

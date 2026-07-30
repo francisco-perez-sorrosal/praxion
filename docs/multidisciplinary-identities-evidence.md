@@ -1019,6 +1019,68 @@ Re-deriving from ground truth — files on disk, manifest parity, an actual test
 steps had in fact completed**; only the reporting was cut. This is the completion-handshake rule
 working as designed, and the reason it insists on the codebase rather than the checkboxes.
 
+### 17.10 Milestones 3–6 executed — steps 7–14 complete
+
+Committed 2026-07-30. Wave 1 is complete except Steps 15–16, which require a fresh session (see below).
+
+**What exists on disk and is guarded:** the consultant agent, a registry with its first row
+(`statistician`), the `applied-statistics` skill (1,047 lines, validator PASSED, cataloged), the
+disposition ledger, the `/consult` entry point, the four-round dialogue protocol with the consult
+template, selection Tiers 1–2 wired across four agents, sentinel `BC03`/`P07` extended with golden
+fixtures, and 22 fitness tests of which 7 assert live invariants. Canonical suite **595 passed**
+throughout; always-loaded surface ≈**23,052 of 25,000**.
+
+#### The pattern worth preserving: four measurement-validity defects, three of which showed green
+
+Every defect this pipeline caught was an **instrument reporting confidently while measuring the wrong
+thing** — the class of error a test suite cannot detect because the suite is itself the instrument.
+
+| Defect | Why it was invisible |
+|---|---|
+| The ledger's unanchored grep counted other disciplines' rows, inflating the denominator and **deflating** the dismiss rate | Biased the expansion gate toward *passing* — a falsifier failing unsafe. Author's own test used input where the name appeared only in its own column |
+| A correction to `benchmarking.md` restated inference content the new skill owns, near-verbatim | Both artifacts *agreed*, so nothing looked wrong; agreement had been achieved by duplication rather than cross-reference, and duplicates drift |
+| `P07`'s detection, if copied verbatim, would have grepped tokens that never occur in a consult file | Would have flagged **every** consult unconditionally — a gate that fires always looks healthier than one that never fires |
+| The extensibility fitness test, had it landed before the spike, would have asserted an invariant protecting an unverified mechanism | Green, continuously, while guarding nothing |
+
+Two were caught by an **independent reviewer of a different agent type** than the author; one by
+**adversarial input** rather than happy-path verification; one by **ordering the cheapest falsifiable
+check first**. None would have been caught by running the tests again.
+
+Notably, the second was authored by the orchestrator and failed by a subagent's audit — which is the
+case independent review exists for, and an argument against letting the party that made a decision also
+certify it.
+
+#### Design points confirmed in execution
+
+- **The consultant authors no ADRs.** A late narrowing from the original proposal, and the sharper
+  boundary: it gives the agent exactly one job (object), keeps decision authority undivided, and makes
+  the distinction from the two existing sub-architects unambiguous — the *duplicate-agent-roles* failure
+  mode, addressed structurally rather than by documentation.
+- **Only recorded dispositions bind a downstream consumer.** An undispositioned challenge is an
+  incomplete consult to flag, not an instruction to follow. Without this, a planner reading raw
+  challenges would hand the consultant de-facto decision authority and break the adversarial-only
+  boundary exactly where it matters.
+- **Nomination is gated by the registry, not by the requirement.** Two agents nominate
+  (`attaches-to`); two consume. Conflating the roles would imply four live nomination paths where two
+  exist — corrected in the spec after the light review flagged it.
+- **A generalization can pay for itself.** Holding `implementation-planner.md` at net +0 lines forced
+  generalizing an interface-specific intake item into a class-level one, which simultaneously admitted
+  the consult artifact and fixed a **pre-existing blind spot** — the transactions architect's output had
+  never been listed since that agent shipped. A line budget produced a better design than an unbounded
+  one would have.
+
+#### Remaining: Steps 15–16, and why they were not run early
+
+`agents/discipline-consultant.md` was created *during* the session that built it, and agents load at
+session start — so it is not spawnable there. Step 15 (the end-to-end live proof) spawns exactly that
+agent, and Step 16 flips `docs/architecture.md` to `Built`, a document carrying a **Built-only
+contract**.
+
+Running Step 16 early would document as built a component whose binding mechanism remains unproven in
+its deployed form — the shortcut the whole verification discipline exists to prevent, and precisely the
+residual risk the pre-mortem named *before* Step 1 ran: the spike used a **project-scope** probe agent,
+not the real plugin-namespaced consultant. Step 15 is what closes it.
+
 ---
 
 ## 18. Citations

@@ -940,6 +940,47 @@ Cheap decisive follow-up, if the answer is ever needed: place the agent in **one
 fresh session, and check whether it appears in the registry. Untested here because both copies were
 slated for deletion.
 
+### 17.8 Milestones 0–1 executed — two findings worth keeping
+
+Committed 2026-07-30 (`974bca1`). Steps 1–3 done; full fitness suite green at 22 tests.
+
+**Finding 1 — agent bodies are snapshotted at session start, and that settles an open design choice.**
+While attempting to disambiguate which probe copy resolved, a marker was added to one copy and the
+agent re-spawned; the marker read as **absent**, but the signal is confounded — an agent's *body* is
+captured at session start, so "absent" is equally consistent with "the other copy won" and with "this
+copy won but its cached body was used." Correctly recorded as indeterminate rather than inferred.
+
+The incidental finding matters more than the question it failed to answer. [§9.1](#91-extensibility-requirement-user-mandated-non-negotiable)
+permitted the discipline roster to live **either** in the consultant's own body **or** in one bound
+reference file. Those options are now demonstrably *not* equivalent: a roster in the **agent body**
+would require a **session restart per discipline added**, which is a far worse per-discipline cost than
+tokens and would silently violate the spirit of the N+1 criterion. The architecture's choice of a
+separate `discipline-registry.md`, read at runtime, keeps roster edits **live**. That choice was made on
+other grounds; this finding retroactively confirms it, and forecloses the body-resident alternative.
+
+**Finding 2 — the ledger's falsifier recipe was defective on arrival, in the unsafe direction.**
+The first form was an unanchored literal match (`grep -F '| statistician |'`). Stress-testing against a
+synthetic ledger showed it also matches rows belonging to *other* disciplines whose free-text cells
+happen to contain the name — returning 3 rows for a discipline that had 2. That inflates the
+denominator and therefore **deflates** the computed dismiss rate, biasing the discipline-expansion gate
+(§17.4: "dismiss rate not >60%") toward *passing*. A falsifier that errs toward permitting expansion is
+worse than no falsifier, because it carries the authority of a measurement.
+
+Corrected to a column-anchored form (`grep -E '^\|[^|]*\|[^|]*\| *<discipline> *\|'`), verified to
+return 2 where the unanchored form returned 3. The rationale is recorded in the ledger itself so the
+anchor is not "simplified away" by a future editor who reads it as noise.
+
+There is a fitting symmetry here: the initiative's first measurement instrument shipped with a
+measurement-validity defect, caught only by adversarial testing rather than by the happy-path check its
+author ran. That is precisely the failure mode the `statistician` identity exists to catch — and an
+argument for the discipline being worth having.
+
+**Residual risk carried forward.** The step-1 spike used a **project-scope** probe agent, not the real
+**plugin-namespaced** consultant. The pre-mortem anticipated this before the probe ran: step 1 is
+necessary, not sufficient, and **step 15's end-to-end smoke test against the real shipped artifacts is
+the load-bearing second checkpoint**. Skipping it under time pressure would leave the binding mechanism
+unverified in its actual deployed form.
+
 ---
 
 ## 18. Citations

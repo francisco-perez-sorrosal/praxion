@@ -282,76 +282,9 @@ Check if any steps should be delegated to specialized methodologies:
 
 Complete the planning documents:
 
-**IMPLEMENTATION_PLAN.md** — create with the steps derived from `SYSTEMS_PLAN.md`:
+**IMPLEMENTATION_PLAN.md** — create with the steps derived from `SYSTEMS_PLAN.md`, using the base structure defined in the software-planning skill's [`IMPLEMENTATION_PLAN.md Structure`](../skills/software-planning/SKILL.md#implementation_planmd-structure) (Goal / Tech Stack / Acceptance Criteria / Steps with `Implementation`/`Tests`/`Testing`/`Done when` fields). Layer on the annotations already described above per step as applicable: `[parallel-group: X]`, `[depends-on: N, M]`, `Assignee`, `[Phase: Refactoring]`, `[Architecture]`, `[Deployment]`, `tier: H`, `review:`. For a fully worked example combining a paired implementer/test-engineer group, an integration checkpoint, and a refactoring-phase step, see [`document-templates.md § IMPLEMENTATION_PLAN.md Annotated Example`](../skills/software-planning/references/document-templates.md#implementation_planmd-annotated-example).
 
-```markdown
-## Steps
-
-### Step 1: [One sentence description] [parallel-group: A]
-
-**Assignee**: implementer
-**Implementation**: What code will we write?
-**Files**: [production files]
-**Tests:** groups=[<group_id>, ...] tier=<step|phase|pipeline> selector=<auto|manual>   # schema in test-topology.md §"Document Conventions"; only when the project has a populated TEST_TOPOLOGY.md
-**Done when**: How do we know it's complete?
-
-### Step 2: Design behavioral tests for [acceptance criteria] [parallel-group: A]
-
-**Assignee**: test-engineer
-**Testing**: Which acceptance criteria from SYSTEMS_PLAN.md does this validate?
-**Files**: [test files]
-**Done when**: Tests written, runnable (expected to fail until implementation lands)
-
-### Step 3: [Integration checkpoint after group A]
-
-**Assignee**: implementer
-**Implementation**: Run full test suite, fix failures (new tests + pre-existing broken tests)
-**Done when**: All tests pass
-
-### Step N: [Phase: Refactoring] [One sentence description]
-
-**Skill**: [Refactoring](link/to/SKILL.md)
-**Implementation**: What structural change will we make?
-**Testing**: How do we verify behavior is preserved?
-**Done when**: Concrete exit condition
-
-### Step M: [One sentence description]
-
-**Implementation**: ...
-**Done when**: ...
-```
-
-**WIP.md** — initialize tracking.
-
-Sequential Mode (default):
-
-```markdown
-# WIP: [Feature Name]
-
-## Current Step
-
-Step 1 of N: [Description]
-
-## Status
-
-[IMPLEMENTING] - Writing code
-
-## Progress
-
-- [ ] Step 1: [Description] ← current
-- [ ] Step 2: [Description]
-- [ ] Step N: [Description]
-
-## Blockers
-
-None
-
-## Next Action
-
-[Specific next thing to do]
-```
-
-Parallel Mode (when parallel groups exist): Use the WIP.md parallel format from the software-planning skill. Key fields: `Mode: parallel`, `Steps: [list]`, per-step `Assignee`, `Status`, and `Files`.
+**WIP.md** — initialize tracking using the Sequential Mode template from the software-planning skill's [`document-templates.md § WIP.md Structure`](../skills/software-planning/references/document-templates.md#wipmd-structure); switch to that file's Parallel Mode template once the plan contains `[parallel-group]` steps. Key parallel-mode fields: `Mode: parallel`, `Steps: [list]`, per-step `Assignee`, `Status`, and `Files`.
 
 **LEARNINGS.md** — initialize using the structure from the software-planning skill (sections: Gotchas, Patterns That Worked, Decisions Made, Edge Cases, Technical Debt, Assumptions & Constraints Taken). Record load-bearing assumptions (ones that, if wrong, would invalidate the plan) under `### Assumptions & Constraints Taken` as you make them — the orchestrator harvests this section to compose phase-transition and pre-verification checkpoints, so it must be populated during work, not reconstructed at the end. Every entry must be prefixed with the source agent in brackets (e.g., `**[implementation-planner]**`). Tag your own entries with `[implementation-planner]`. For medium/large features, initialize the `Decisions Made` section with structured format guidance: `**[agent-name] [Decision title]**: [What]. **Why**: [rationale]. **Alternatives**: [rejected options].` This enables the verifier to check for substantive decision documentation and the persistent spec to archive decisions with full context.
 

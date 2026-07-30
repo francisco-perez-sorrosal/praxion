@@ -2,6 +2,47 @@
 
 Detailed templates for WIP.md and LEARNINGS.md, plus the end-of-feature workflow. Reference material for the [Software Planning](../SKILL.md) skill.
 
+## IMPLEMENTATION_PLAN.md Annotated Example
+
+Extends the base [`IMPLEMENTATION_PLAN.md Structure`](../SKILL.md#implementation_planmd-structure) with the annotations the [`implementation-planner`](../../../agents/implementation-planner.md) agent layers on during step decomposition: `[parallel-group: X]`, per-step `Assignee`, a paired implementer/test-engineer group, an integration checkpoint, and a `[Phase: Refactoring]` step.
+
+```markdown
+## Steps
+
+### Step 1: [One sentence description] [parallel-group: A]
+
+**Assignee**: implementer
+**Implementation**: What code will we write?
+**Files**: [production files]
+**Tests:** groups=[<group_id>, ...] tier=<step|phase|pipeline> selector=<auto|manual>   # schema in test-topology.md §"Document Conventions"; only when the project has a populated TEST_TOPOLOGY.md
+**Done when**: How do we know it's complete?
+
+### Step 2: Design behavioral tests for [acceptance criteria] [parallel-group: A]
+
+**Assignee**: test-engineer
+**Testing**: Which acceptance criteria from SYSTEMS_PLAN.md does this validate?
+**Files**: [test files]
+**Done when**: Tests written, runnable (expected to fail until implementation lands)
+
+### Step 3: [Integration checkpoint after group A]
+
+**Assignee**: implementer
+**Implementation**: Run full test suite, fix failures (new tests + pre-existing broken tests)
+**Done when**: All tests pass
+
+### Step N: [Phase: Refactoring] [One sentence description]
+
+**Skill**: [Refactoring](link/to/SKILL.md)
+**Implementation**: What structural change will we make?
+**Testing**: How do we verify behavior is preserved?
+**Done when**: Concrete exit condition
+
+### Step M: [One sentence description]
+
+**Implementation**: ...
+**Done when**: ...
+```
+
 ## WIP.md Structure
 
 ### Sequential Mode (default)

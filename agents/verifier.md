@@ -153,10 +153,10 @@ Convention checks (derived from `coding-style` rule):
 
 #### Specialist Design Review (conditional)
 
-When a specialist artifact exists in `.ai-work/<task-slug>/` — `INTERFACE_DESIGN.md` (task involved an interface surface: web UI, TUI/CLI output, API, MCP tools) or any `CONSULT_<discipline>.md`:
+When a specialist artifact exists in `.ai-work/<task-slug>/` — `INTERFACE_DESIGN.md` (task involved an interface surface: web UI, TUI/CLI output, API, MCP tools), `TRANSACTIONS_DESIGN.md` (task involved agentic payments or trading), or any `CONSULT_<discipline>.md`:
 
-- Check the implementation against `INTERFACE_DESIGN.md`'s sketches and decisions (framework choice, error format, pagination shape, component patterns), and against every challenge the convener dispositioned `switch-now` in a `CONSULT_<discipline>.md`.
-- For each in-scope hat, run its `design-review-checklist.md` (e.g., `web-ui-design/references/design-review-checklist.md`, `api-design-craft/references/design-review-checklist.md`). The four interface-design skills are injected — read the relevant checklist directly.
+- Check the implementation against `INTERFACE_DESIGN.md`'s sketches and decisions (framework choice, error format, pagination shape, component patterns), against `TRANSACTIONS_DESIGN.md`'s provider-contract and HITL spend-gating decisions, and against every challenge the convener dispositioned `switch-now` in a `CONSULT_<discipline>.md` or in a specialist doc's `## Architecture Challenges` section.
+- For each in-scope hat, run its `design-review-checklist.md` (e.g., `web-ui-design/references/design-review-checklist.md`, `api-design-craft/references/design-review-checklist.md`). The four interface-design skills are injected — read the relevant checklist directly. **The transactions domain has no such checklist yet**, so `TRANSACTIONS_DESIGN.md` is reviewed for dispositioned challenges and decision adherence only; do not invent a checklist to run against it — a gate with no proof it bites is worse than a declared gap.
 - Report mismatches as FAIL or WARN findings with the `[INTERFACE-DESIGN-MISMATCH]` tag; report any challenge left with an empty `Disposition:` as a WARN finding — the consultant never dispositions its own challenges, so an empty field means the consult never completed, not that the challenge was accepted.
 
 #### Tech-Debt Ledger Writes

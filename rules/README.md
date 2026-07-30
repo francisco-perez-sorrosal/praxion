@@ -43,7 +43,7 @@ rules/
 | ---- | ------- |
 | `swe/agent-behavioral-contract.md` | Four-behavior contract (Surface Assumptions, Register Objection, Stay Surgical, Simplicity First) for every write/plan/review agent |
 | `swe/agent-intermediate-documents.md` | Agent document locations (`.ai-work/` ephemeral, `.ai-state/` persistent), lifecycle tiers, cleanup |
-| `swe/agent-model-routing.md` | Per-agent Claude model tier table (13 agents → opus/sonnet/haiku), 4-layer override precedence, operator kill switch, quality-cliff guards |
+| `swe/agent-model-routing.md` | Per-agent Claude model tier table (one row per agent → opus/sonnet/haiku), 4-layer override precedence, operator kill switch, quality-cliff guards |
 | `swe/adr-conventions.md` | ADR file format (YAML frontmatter + MADR body), naming convention, supersession protocol, agent authoring guidance |
 | `swe/swe-agent-coordination-protocol.md` | Agent selection, coordination pipeline, parallel execution — detailed tables in `software-planning` skill reference |
 | `swe/vcs/git-conventions.md` | Commit scope, staging discipline, secrets, exclusions, message format |

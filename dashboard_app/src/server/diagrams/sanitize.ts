@@ -7,18 +7,29 @@ import sanitizeHtml from "sanitize-html";
 // an <img>-sourced SVG cannot execute script even when it contains <script> elements,
 // so those bytes are served as-is without sanitization.
 
-// sanitize-html / htmlparser2 lowercases all tag names AND all attribute names
-// before matching. SVG camelCase element names (clipPath, linearGradient,
-// feDropShadow, etc.) and camelCase attribute names (viewBox, preserveAspectRatio,
+// Attribute names: sanitize-html / htmlparser2 lowercases all attribute names
+// before matching, with no case-restoring adjustment table (unlike tag names,
+// below). camelCase attribute names (viewBox, preserveAspectRatio,
 // gradientTransform, markerWidth, refX, stdDeviation, etc.) must therefore be
-// registered in their lowercase form in BOTH SVG_ALLOWED_TAGS and
-// SVG_ALLOWED_ATTRIBUTES, or they are silently stripped. (Registering only the
-// camelCase form leaves the diagram without its viewBox → it renders at intrinsic
-// size with no fit-to-container — the original "diagrams render badly" defect.)
-// The sanitized output carries lowercased tag/attribute names; when that markup is
-// later injected via dangerouslySetInnerHTML, the HTML5 parser's foreign-content
-// attribute-adjustment step restores the canonical SVG casing (viewbox → viewBox),
-// so rendering is unaffected.
+// registered in their lowercase form in SVG_ALLOWED_ATTRIBUTES, or they are
+// silently stripped. (Registering only the camelCase form leaves the diagram
+// without its viewBox → it renders at intrinsic size with no fit-to-container —
+// the original "diagrams render badly" defect.) The sanitized output carries
+// lowercased attribute names; when that markup is later injected via
+// dangerouslySetInnerHTML, the HTML5 parser's foreign-content attribute-adjustment
+// step restores the canonical SVG casing (viewbox → viewBox), so rendering is
+// unaffected.
+//
+// Tag names: htmlparser2 >= 12 implements the WHATWG HTML5 foreign-content
+// spec's SVG tag-name adjustment table — inside an <svg> element, it rewrites a
+// fixed set of known SVG element names (feDropShadow, foreignObject,
+// linearGradient, clipPath, animateTransform, etc.) from their lowercase parsed
+// form back to their spec-correct camelCase form *before* sanitize-html's
+// allowedTags check runs. A lowercase-only allowlist entry for one of these
+// specific elements therefore no longer matches and the (now camelCase) tag is
+// silently unwrapped, even though it was intentionally allowlisted. Every such
+// element below carries both its lowercase and camelCase form for this reason —
+// unlike attributes, tag names have no single canonical casing to register.
 const SVG_ALLOWED_TAGS = [
   "svg",
   "g",
@@ -38,37 +49,37 @@ const SVG_ALLOWED_TAGS = [
   "title",
   "desc",
   "style",
-  "clippath",          // SVG: clipPath
+  "clippath", "clipPath",                             // SVG: clipPath
   "mask",
   "pattern",
-  "lineargradient",    // SVG: linearGradient
-  "radialgradient",    // SVG: radialGradient
+  "lineargradient", "linearGradient",                 // SVG: linearGradient
+  "radialgradient", "radialGradient",                 // SVG: radialGradient
   "stop",
   "a",
   "image",
   "filter",
-  "feblend",           // SVG: feBlend
-  "fecolormatrix",     // SVG: feColorMatrix
-  "fecomponenttransfer", // SVG: feComponentTransfer
-  "fecomposite",       // SVG: feComposite
-  "feconvolvematrix",  // SVG: feConvolveMatrix
-  "fediffuselighting", // SVG: feDiffuseLighting
-  "fedisplacementmap", // SVG: feDisplacementMap
-  "fedropshadow",      // SVG: feDropShadow
-  "feflood",           // SVG: feFlood
-  "fefunca",           // SVG: feFuncA
-  "fefuncb",           // SVG: feFuncB
-  "fefuncg",           // SVG: feFuncG
-  "fefuncr",           // SVG: feFuncR
-  "fegaussianblur",    // SVG: feGaussianBlur
-  "feimage",           // SVG: feImage
-  "femerge",           // SVG: feMerge
-  "femergenode",       // SVG: feMergeNode
-  "femorphology",      // SVG: feMorphology
-  "feoffset",          // SVG: feOffset
-  "fespecularlighting", // SVG: feSpecularLighting
-  "fetile",            // SVG: feTile
-  "feturbulence",      // SVG: feTurbulence
+  "feblend", "feBlend",                               // SVG: feBlend
+  "fecolormatrix", "feColorMatrix",                   // SVG: feColorMatrix
+  "fecomponenttransfer", "feComponentTransfer",       // SVG: feComponentTransfer
+  "fecomposite", "feComposite",                       // SVG: feComposite
+  "feconvolvematrix", "feConvolveMatrix",             // SVG: feConvolveMatrix
+  "fediffuselighting", "feDiffuseLighting",           // SVG: feDiffuseLighting
+  "fedisplacementmap", "feDisplacementMap",           // SVG: feDisplacementMap
+  "fedropshadow", "feDropShadow",                     // SVG: feDropShadow
+  "feflood", "feFlood",                               // SVG: feFlood
+  "fefunca", "feFuncA",                               // SVG: feFuncA
+  "fefuncb", "feFuncB",                               // SVG: feFuncB
+  "fefuncg", "feFuncG",                               // SVG: feFuncG
+  "fefuncr", "feFuncR",                               // SVG: feFuncR
+  "fegaussianblur", "feGaussianBlur",                 // SVG: feGaussianBlur
+  "feimage", "feImage",                               // SVG: feImage
+  "femerge", "feMerge",                               // SVG: feMerge
+  "femergenode", "feMergeNode",                       // SVG: feMergeNode
+  "femorphology", "feMorphology",                     // SVG: feMorphology
+  "feoffset", "feOffset",                             // SVG: feOffset
+  "fespecularlighting", "feSpecularLighting",         // SVG: feSpecularLighting
+  "fetile", "feTile",                                 // SVG: feTile
+  "feturbulence", "feTurbulence",                     // SVG: feTurbulence
   // <foreignObject> is included because Mermaid uses it exclusively to embed node
   // labels as HTML <div> elements. Without it, every Mermaid node renders as an
   // empty yellow box. The contents of foreignObject are sanitized by the same
@@ -77,7 +88,7 @@ const SVG_ALLOWED_TAGS = [
   // The risk profile is therefore equivalent to any other HTML in an allow-listed
   // SVG: CSS-injection via <style> is already accepted (allowVulnerableTags: true)
   // and script-execution vectors are covered by the existing exclusions.
-  "foreignobject",      // SVG: foreignObject (htmlparser2 lowercases)
+  "foreignobject", "foreignObject",                   // SVG: foreignObject
   // HTML tags Mermaid embeds inside foreignObject label divs:
   "div",
   "span",
@@ -117,7 +128,7 @@ const SVG_ALLOWED_TAGS = [
   // Intentionally excluded from foreignObject contents: <script>, <iframe>,
   // <object>, <embed>, <form>, <input> — these can execute or exfiltrate.
   "animate",
-  "animatetransform",  // SVG: animateTransform
+  "animatetransform", "animateTransform",  // SVG: animateTransform
   "mpath",
   "set"
 ];

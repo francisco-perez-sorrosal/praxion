@@ -321,6 +321,39 @@ Option A.
 Working name for the agent in this dossier is deliberately left open; naming is a low-stakes
 decision for the architecture stage.
 
+### 9.1 Extensibility requirement (user-mandated, non-negotiable)
+
+Multidisciplinarity is a **goal of this initiative, not a side effect of it**. Whatever is built must
+make adding identity N+1 cheap and safe, indefinitely. Stated below as a measurable acceptance
+criterion, because "flexible" is the class of goal that erodes silently unless it is verifiable.
+
+| Criterion | Threshold for adding discipline N+1 |
+|---|---|
+| Always-loaded token delta | **0** |
+| Always-loaded rule files changed | **0** |
+| New agent files | **0** |
+| `.claude-plugin/plugin.json` edits | **0** |
+| Consultant agent `tools:` list changes | **0** — a mid-session `tools` mutation invalidates the entire prompt cache (`tools` → `system` → `messages`), so the tool list must be discipline-independent by construction |
+| Files touched | **≤2** — one roster/binding entry, plus a new skill only when the discipline is a genuine knowledge gap (three of four Wave-1 disciplines need none) |
+| Pipeline stages added | **0** |
+
+Two design consequences follow. The architect should treat these as constraints, not options.
+
+1. **The roster is data, not structure.** Discipline definitions must live in a single enumerable
+   registry inside the consultant's own body (or one bound reference file) — never spread across
+   always-loaded rules, and never one-file-per-discipline in a location that must be separately
+   registered. A design that requires touching `plugin.json`, a catalog README, and an always-loaded
+   rule table per discipline has failed this criterion regardless of how elegant it looks at N=1.
+2. **Enforce the criterion mechanically rather than documenting it.** This is a natural
+   architectural fitness function (see `skills/architectural-fitness-functions/`): an invariant test
+   asserting that a discipline addition touches zero always-loaded surface. Encoding it as a test is
+   what prevents extensibility from regressing the first time someone adds a discipline in a hurry.
+
+Extensibility already appears at three distinct levels in the proposed design, and all three must be
+preserved: **roster** (add a binding — §9), **discovery** (tier-3 identity genesis proposes new
+disciplines from harvested signals — §11), and **promotion** (the graduation rule moves a proven
+discipline to a dedicated agent — §12.3). The roster level is the one this criterion governs.
+
 ---
 
 ## 10. Dialogue protocol

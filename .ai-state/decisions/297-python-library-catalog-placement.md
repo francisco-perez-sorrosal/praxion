@@ -1,7 +1,7 @@
 ---
-id: dec-draft-6419af7d
+id: dec-297
 title: "Python essential-library catalog: per-archetype files, architect-owned selection"
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-30
 summary: >-

@@ -1136,6 +1136,56 @@ to make the distribution look healthy would corrupt the counter the criterion re
 rule, the anchored counting recipe's column anchoring, and the Wave-1 roster size are all untouched.
 The revision narrows to the *shape of the expansion criterion* and its aggregation unit.
 
+### 17.12 AC15 measured — the cost envelope, with one observation
+
+AC15 states that a convened consultation stays within **≤3× baseline routine / ≤6× high-stakes total
+pipeline cost**, bounded by the 2–3 concurrent cap and the one-round bound. Verification found it had
+been discharged by **structural argument rather than measurement** — the exact defect this feature's own
+consultant raised against the project's expansion gate (CH-04), reproduced inside the project's own
+acceptance criteria. It is now measured.
+
+**Observation window.** The 2026-07-30 closeout session, in which every agent spawn reported its token
+usage. Cost is measured in subagent tokens, a proxy for spend rather than a currency figure.
+
+| Spawn | Tokens |
+|---|---|
+| `statistician` consult (`standard` → `opus`) | 101,030 |
+| `nonexistent-xyz` probe (blocked at resolution, pre-Round-0) | 64,794 |
+| doc-engineer | 114,438 |
+| verifier | 222,806 |
+| sentinel | 163,288 |
+| skill-genesis | 149,751 |
+
+| Quantity | Value |
+|---|---|
+| Consult spawns | 165,824 |
+| Non-consult agents (denominator) | 650,283 |
+| Total with consults | 816,107 |
+| **Observed ratio** | **1.255×** against the ≤3× routine envelope |
+| **Three concurrent consults** (the cap) | **1.466×** against the ≤6× high-stakes envelope |
+| One consult as a share of the window | 12.4% |
+
+**PASS on both envelopes**, with 2.4× and 4.5× headroom respectively. A `standard` consult cost less than
+every other agent measured — 45% of a verifier run.
+
+**Why the denominator is deliberately small.** It counts only the closeout session's non-consult agents,
+not the full 16-step pipeline. A smaller denominator produces a *larger* ratio, so this is the
+worst-case framing available from real data: a full Full-tier pipeline (multi-wave research, architecture,
+planning, parallel implementers, test-engineer) would push the ratio materially closer to 1. The envelope
+passes even under the framing least favourable to it.
+
+**Limits of this measurement, stated rather than buried.** `n` = 1 consult, of `standard` difficulty
+only — no `high-stakes` consult has been run, so that row is projected from the concurrency cap rather
+than observed. One session, one routing configuration. Subagent tokens are a proxy for cost. The
+three-concurrent figure is arithmetic on the cap, not a measured concurrent run. This is *a measurement
+with one observation*, which is a different and weaker claim than a characterised distribution — but it
+is no longer a structural argument, which is what the criterion required.
+
+**Nothing is accumulating this series.** `.ai-state/observations.jsonl` carries no token or cost fields,
+and the ledger's 11-column schema has no cost column. Today's figures exist only because agent
+completions surfaced them in-session. Recording an ongoing series is a schema decision on an append-only
+file and is deliberately left open rather than resolved here.
+
 ---
 
 ## 18. Citations

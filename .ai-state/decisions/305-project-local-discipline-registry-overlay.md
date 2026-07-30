@@ -1,7 +1,7 @@
 ---
-id: dec-draft-1bbf04aa
+id: dec-305
 title: Project-local discipline registry overlay with collision-as-error precedence
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-30
 summary: A managed project may add consulting disciplines via an optional .ai-state overlay unioned with the shipped registry; a duplicate key is a named [BLOCKED] error, never an override.

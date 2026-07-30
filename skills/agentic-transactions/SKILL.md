@@ -41,6 +41,7 @@ capabilities. The contract is the subject of this skill.
 - [references/provider-contract.md](references/provider-contract.md) — formal contract spec: six required verbs, typed return shapes, `TransactionError` grammar, Python binding sketch
 - [references/robinhood.md](references/robinhood.md) — v1 Robinhood trading-provider plugin shape (MCP transport); `supports_sandbox: false` guardrails; volatile specifics flagged for re-fetch
 - [references/_provider-template.md](references/_provider-template.md) — blank-slate template for adding a new provider behind the contract
+- [references/design-review-checklist.md](references/design-review-checklist.md) — transaction-design audit checklist for both spaces (PASS/FAIL/WARN)
 
 ---
 
@@ -58,6 +59,7 @@ Answer these three questions before loading any reference file.
 - Building or reviewing a Robinhood provider → `references/robinhood.md`
 - Adding a new provider → copy `references/_provider-template.md` → fill all bracketed fields
 - Formal pseudotype spec, Python binding → `references/provider-contract.md`
+- Reviewing a transaction design or provider integration → `references/design-review-checklist.md`
 
 **Key composition note:** Robinhood (Space B — trades equities) and Nevermined/x402 (Space A — pays for services) are orthogonal layers. A "pay-for-the-service, then trade" flow *composes* the two; neither replaces the other. Note: Robinhood also ships a separate **Banking MCP server (Agentic Credit Card — Space A, payments)**, orthogonal to the Trading MCP (Space B). The Banking MCP endpoint URL is not yet publicly documented; when documented it becomes a second Robinhood provider on the payments side.
 

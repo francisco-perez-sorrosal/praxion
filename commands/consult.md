@@ -1,0 +1,27 @@
+---
+description: Convene a discipline consultant to challenge a target artifact
+argument-hint: <discipline> [--on <artifact>]
+allowed-tools: [Bash, Read, Grep, Glob, Task]
+---
+
+Run a discipline consultation using the [discipline-consultant](../agents/discipline-consultant.md) agent, human-convened — the third path alongside a registry trigger predicate firing and a pipeline agent self-nominating. Produces independent reading, falsifiable challenges, and per-challenge disposition for exactly one discipline resolved against the roster at `skills/multi-perspective-analysis/references/discipline-registry.md` (e.g. `statistician`; the roster is discipline-generic and grows by adding rows, never by naming disciplines here).
+
+## Process
+
+1. **Resolve the discipline and target** from `$ARGUMENTS`:
+
+   - `<discipline>` (required, first token) — pass it through **verbatim, unresolved**. This command performs no registry lookup of its own; resolution against the roster is the consultant's own Phase 1 contract, and duplicating it here would risk a second, drifting source of truth.
+   - `[--on <artifact>]` (optional) — the file, PR, branch, or named surface to challenge. If omitted, default to the current branch diff against the repo's default branch.
+
+2. **Invoke the discipline-consultant** via the Task tool as convener:
+
+   - Spawn prompt carries `Discipline: <discipline>` and `Task slug: consult`, per the directive contract in `agents/discipline-consultant.md`
+   - Pass the resolved target as the artifact to read at Round 1 — never expose it during the consultant's Round 0 independent reading
+   - **Unresolvable discipline**: if the consultant returns `[BLOCKED]`, surface that verdict verbatim with the offending value named. Never substitute a neighboring discipline, never guess, never proceed with a degraded consult — the registry is the only roster.
+
+3. **Output the review** directly in the conversation:
+
+   - Resolved discipline, skill(s) bound at runtime, round reached
+   - Challenges (one per `### CH-NN`) — claim, decision it would change, confidence
+   - Path to `.ai-work/consult/CONSULT_<discipline>.md`
+   - Terminal marker: `[COMPLETE]` / `[BLOCKED]` / `[PARTIAL]`

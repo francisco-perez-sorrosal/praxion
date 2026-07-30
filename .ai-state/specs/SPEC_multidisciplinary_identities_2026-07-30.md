@@ -5,9 +5,9 @@
 **Tier**: Full
 **Pipeline branch**: `worktree-multidisciplinary-identities`
 **Start date**: 2026-07-29
-**End date**: _[pending — filled at pipeline end]_
-**Archived**: _[pending — filled at pipeline end; `SPECS_INDEX.md` is auto-generated, regenerate via `python scripts/regenerate_specs_index.py`, never by hand]_
-**Status**: Specified — pre-implementation (authored by the systems-architect at Phase 10; requirements are the verifier's rubric)
+**End date**: 2026-07-30
+**Archived**: 2026-07-30
+**Status**: Implemented and verified — all 16 steps complete; verifier verdict **FAIL on one record-keeping finding** (this spec's absent REQ→test mapping, now reconstructed below), with **16/18 ACs PASS, 1 WARN, 1 out-of-scope, and zero unmet acceptance criteria**. AC13 (two disciplines concurrently) is untestable at a one-discipline roster
 **ADRs**: `dec-303` (peer not lens), `dec-302` (parameterized agent + registry + runtime binding; re-affirms `dec-243`), `dec-301` (model/effort routing; re-affirms `dec-076`), `dec-298` (dialogue protocol; re-affirms `dec-154`), `dec-299` (disposition ledger), `dec-300` (selection tiers + Wave-1 scope fence)
 **Evidence base**: [`docs/multidisciplinary-identities-evidence.md`](../../docs/multidisciplinary-identities-evidence.md) (committed; §9.1 extensibility criterion, §10 dialogue protocol, §11 selection model, §15 Wave-A outcomes, §16 binding user rulings)
 
@@ -51,7 +51,7 @@ rather than by prose.
 - **REQ-15 — self-nomination is auditable.** When an agent nominates a consultant, it cites the triggering signal and the decision at stake, so a bad nomination surfaces as a dismissed challenge and is counted rather than being invisible. **Nominators are gated by the registry's `attaches-to` field, not by this requirement**: at Wave 1 that is `researcher` and `systems-architect` only. `implementation-planner` and `verifier` are **consumers**, not nominators — they read and check `CONSULT_<discipline>.md` but never convene one. The two roles are deliberately distinct, and conflating them would imply four live nomination paths where the registry permits two.
 - **REQ-16 — extensibility criterion (health guard).** When a discipline is added to the registry, the change touches **≤2** files and produces **0** byte delta in every `paths:`-less rule file and every `CLAUDE.md`, **0** new `agents/*.md` files, **0** `.claude-plugin/plugin.json` entries, **0** consultant `tools:` entries, **0** consultant `skills:` entries, and **0** new pipeline stages; and when any of these is violated — including a registry discipline name appearing in the consultant's `description:`, in a `paths:`-less rule, or in a `CLAUDE.md` — the committed fitness test `fitness/tests/test_discipline_registry_invariants.py` fails, so the criterion is asserted rather than documented.
 - **REQ-17 — disposition counter (health guard).** When at least one consultation has completed, a dismiss rate per discipline is derivable from `.ai-state/CONSULT_LEDGER.md` by a `grep` and a count with no parser, and the ledger exists before or in the same change as the first discipline's registry row, so the initiative's falsifier is measurable from day one rather than retrofitted.
-- **REQ-18 — Wave-1 scope fence.** When the consultant is spawned with a `Discipline:` value absent from the registry, it writes no challenges and returns `[BLOCKED]` naming the unresolvable value; and when a recurring "we needed a discipline X here" signal appears, the system records it for human disposition rather than instantiating a new discipline, so the roster stays bounded and open-ended self-selection — the mechanism the literature predicts will fail — is never entered.
+- **REQ-18 — Wave-1 scope fence.** When the consultant is spawned with a `Discipline:` value absent from the registry, it writes no challenges and returns `[BLOCKED]` naming the unresolvable value; and when a recurring "we needed a discipline X here" signal appears, the system records it for human disposition rather than instantiating a new discipline, so the roster stays bounded and open-ended self-selection — the mechanism the literature predicts will fail — is never entered. **Clause 2 did not ship** (verification 2026-07-30, W-03 / `td-067`): `dec-300` deferred Tier-3 identity genesis behind a ≥20-ledger-row gate, so nothing records the recurring signal today. Clause 1 (`[BLOCKED]` on an unresolvable discipline) is live-proven. The clause is retained here as the written requirement a Wave-2 architect must either implement or explicitly amend — not as a description of shipped behaviour.
 
 ## Acceptance Criteria
 
@@ -96,6 +96,36 @@ rather than by prose.
 | **REQ-16** | **Extensibility criterion (health guard)** | `dec-302` | `fitness/tests/test_discipline_registry_invariants.py` | AC10, AC11, AC12, AC18 |
 | **REQ-17** | **Disposition counter (health guard)** | `dec-299` | `.ai-state/CONSULT_LEDGER.md` | AC9 |
 | REQ-18 | Wave-1 scope fence; no self-instantiation | `dec-300`, `dec-303` | `agents/discipline-consultant.md`, `agents/skill-genesis.md` (deferred path) | AC3 |
+
+### Test coverage (reconstructed at verification, 2026-07-30)
+
+The matrix above is the **design-time** REQ→ADR→artifact mapping authored by the architect. The
+**as-built** REQ→test mapping was never captured: the pipeline's `traceability.yml` shipped with 18 of
+19 `tests:` arrays empty, the implementer's fragment was never merged into it, and no test-engineer
+fragment was ever written. The verifier reconstructed the mapping below by reading the shipped tree and
+`fitness/tests/test_discipline_registry_invariants.py` function by function — **not** by grepping test
+names for REQ ids, which correctly contain none. It is rendered here because `.ai-work/` is deleted at
+pipeline end and this is the only durable home.
+
+| Bucket | Count | REQs |
+|---|---|---|
+| Test-covered — an automated regression test would catch a regression | **3** | REQ-02, REQ-05, REQ-16 |
+| Partially test-covered — one clause tested, others not | **5** | REQ-04, REQ-13, REQ-14, REQ-17, REQ-18 |
+| Code present, no test, live-demonstrated once (Step 15) | **6** | REQ-03, REQ-08, REQ-09, REQ-10, REQ-12, REQ-18 clause 1 |
+| Code present, no test, no live exercise | **4** | REQ-01, REQ-06, REQ-07, REQ-15 |
+| Prose only — no test, no live exercise | **1** | REQ-11 |
+| **No implementation at all** | **1** | REQ-18 clause 2 — the skill-genesis recording path |
+
+**Honest reading.** REQ-16 (the extensibility health guard) is armoured — seven assertions including a
+live canary. REQ-02 and REQ-05 are solid. Everything else rests on prose plus the single Step-15 smoke
+test. That distribution is *defensible* for a feature whose behaviour is mostly LLM-interpreted contract
+— a fitness test cannot assert that an agent genuinely refrained from reading a file, which is why
+Round-0 isolation is evidenced by the artifact's `## Sources Read` rather than by a unit test — but it is
+materially weaker than an unpopulated `traceability.yml` communicated, which was nothing at all.
+
+Known gap carried forward as tech debt: **REQ-18 clause 2 has no implementation** — nothing records a
+recurring "we needed discipline X here" signal, so the Tier-3 deferral has no data-collection path
+feeding it. Filed rather than silently closed.
 
 ## Key Decisions (Cross-Reference)
 

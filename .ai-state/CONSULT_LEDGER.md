@@ -9,7 +9,7 @@
      Schema and rationale: dec-299 (Disposition counter is a
      dedicated append-only .ai-state/CONSULT_LEDGER.md, single-writer). -->
 
-**Schema**: 11 columns, one row per dispositioned challenge (I4, `SYSTEMS_PLAN.md § Interfaces`). See Column Definitions below.
+**Schema**: 11 columns, one row per dispositioned challenge. See Column Definitions below.
 
 **Append new rows at the end of this ledger.** This file is append-only -- no row is ever edited or deleted after being written. If a disposition is revisited later, append a new row rather than mutating the old one; both remain part of the record.
 

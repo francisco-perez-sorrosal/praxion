@@ -33,7 +33,7 @@ from pathlib import Path
 import yaml
 
 # ---------------------------------------------------------------------------
-# The seven I2 registry-row fields, in column order.
+# The seven registry-row fields, in column order.
 # ---------------------------------------------------------------------------
 
 REGISTRY_ROW_FIELDS: tuple[str, ...] = (
@@ -68,9 +68,9 @@ def check_no_discipline_name_in_text(text: str, discipline_names: list[str]) -> 
 
 
 def check_registry_row_shape(rows: list[dict[str, str]]) -> list[str]:
-    """Return a failure string per row that leaves an I2 field missing or blank.
+    """Return a failure string per row that leaves a registry field missing or blank.
 
-    Every row must carry all seven I2 columns (`discipline` through
+    Every row must carry all seven registry columns (`discipline` through
     `lens-collision`) populated with non-empty content -- substance over
     structure: a field present but blank is as inert as one that is absent.
     """
@@ -171,7 +171,7 @@ def test_flags_registry_row_with_blank_field_value() -> None:
 
 
 def test_accepts_registry_row_with_all_seven_fields_populated() -> None:
-    """Happy path: a row with all seven I2 fields populated passes."""
+    """Happy path: a row with all seven registry fields populated passes."""
     complete_row = {
         "discipline": "statistician",
         "fires-when": "a task claims a statistically significant effect",
@@ -299,9 +299,9 @@ def _split_into_table_blocks(markdown_text: str) -> list[list[str]]:
 
 
 def parse_registry_table_rows(markdown_text: str) -> list[dict[str, str]]:
-    """Parse the I2 registry table out of markdown_text into a list of row dicts.
+    """Parse the registry table out of markdown_text into a list of row dicts.
 
-    Locates the table whose header row contains all seven I2 field names
+    Locates the table whose header row contains all seven registry field names
     (REGISTRY_ROW_FIELDS), ignoring any other table in the same document (a
     schema/example table documenting the columns, for instance). Keys are the
     header row's cell text; the mandatory `---|---|...` separator row is
@@ -315,7 +315,7 @@ def parse_registry_table_rows(markdown_text: str) -> list[dict[str, str]]:
             continue
         header_cells = [cell.strip() for cell in block[0].strip().strip("|").split("|")]
         if set(REGISTRY_ROW_FIELDS) - set(header_cells):
-            continue  # not the I2 registry table -- some other table in the same document
+            continue  # not the registry registry table -- some other table in the same document
         data_lines = block[2:]  # skip the header row and the --- separator row
         rows: list[dict[str, str]] = []
         for line in data_lines:
@@ -344,15 +344,15 @@ def _registry_discipline_names(project_root: Path) -> list[str]:
     return [row["discipline"] for row in rows if row.get("discipline")]
 
 
-_I2_HEADER_ROW = "| " + " | ".join(REGISTRY_ROW_FIELDS) + " |"
-_I2_SEPARATOR_ROW = "|" + "|".join(["---"] * len(REGISTRY_ROW_FIELDS)) + "|"
+_REGISTRY_HEADER_ROW = "| " + " | ".join(REGISTRY_ROW_FIELDS) + " |"
+_REGISTRY_SEPARATOR_ROW = "|" + "|".join(["---"] * len(REGISTRY_ROW_FIELDS)) + "|"
 
 
 def test_parses_registry_table_rows_from_header_and_data_row() -> None:
     """Happy path: a two-row table (header + one data row) parses to one dict
     keyed by the header's column names."""
     table = (
-        f"{_I2_HEADER_ROW}\n{_I2_SEPARATOR_ROW}\n"
+        f"{_REGISTRY_HEADER_ROW}\n{_REGISTRY_SEPARATOR_ROW}\n"
         "| statistician | claims a significant effect | applied-statistics | "
         "power/sample-size adequacy | standard | researcher | none |\n"
     )
@@ -374,7 +374,7 @@ def test_registry_table_rows_returns_empty_for_header_only_table() -> None:
     """Canary: a table with a header + separator but no data rows returns [],
     never miscounting the header or separator row as data (which would inflate
     a downstream row count and mask an empty registry as populated)."""
-    header_only_table = f"{_I2_HEADER_ROW}\n{_I2_SEPARATOR_ROW}\n"
+    header_only_table = f"{_REGISTRY_HEADER_ROW}\n{_REGISTRY_SEPARATOR_ROW}\n"
     rows = parse_registry_table_rows(header_only_table)
     assert rows == [], f"expected no rows for a header-only table; got: {rows!r}"
 
@@ -383,7 +383,7 @@ def test_ignores_a_non_registry_table_sharing_the_same_document() -> None:
     """Canary: a document with an unrelated 2-column example table (e.g. the
     real registry file's own "Field | Purpose" schema-reference table) ahead
     of the real registry table must not have its rows conflated into the
-    parse -- proves the table is located by its I2 header shape, not by
+    parse -- proves the table is located by its registry header shape, not by
     "every `|`-prefixed line in the file" (the bug this test was written to
     catch: a document with two tables produced phantom rows from the wrong one).
     """
@@ -393,7 +393,7 @@ def test_ignores_a_non_registry_table_sharing_the_same_document() -> None:
         "| `discipline` | Registry key |\n"
         "| `fires-when` | Trigger predicate |\n"
         "\n"
-        f"{_I2_HEADER_ROW}\n{_I2_SEPARATOR_ROW}\n"
+        f"{_REGISTRY_HEADER_ROW}\n{_REGISTRY_SEPARATOR_ROW}\n"
         "| statistician | x | applied-statistics | y | standard | researcher | none |\n"
     )
     rows = parse_registry_table_rows(document)

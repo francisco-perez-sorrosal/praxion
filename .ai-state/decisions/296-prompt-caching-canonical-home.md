@@ -1,7 +1,7 @@
 ---
-id: dec-draft-42e5db85
+id: dec-296
 title: Single canonical home for Anthropic prompt-caching mechanics
-status: proposed
+status: accepted
 category: implementation
 date: 2026-07-30
 summary: platform-services.md is the canonical, detailed home for Anthropic prompt-caching mechanics; api-features.md keeps only the cache_control parameter shape and a link back.

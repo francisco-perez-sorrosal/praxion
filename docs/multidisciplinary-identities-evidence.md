@@ -755,11 +755,26 @@ The mechanism must be able to run **several consultant instances at once, each p
 different discipline**, and must not assume a single consultant per task. Wave 1 ships one discipline
 (`statistician`), but the *mechanism* must not foreclose N.
 
-**This is the axis with the strongest empirical support of anything in this dossier.** Wave A's Q2
-found, in a controlled comparison, that the **agent-count** coefficient is 0.066 (p<0.001) while the
-**dialogue-depth** coefficient is 0.019 (not significant). Breadth of independent perspectives pays;
-depth of argument does not. Ruling 6 therefore strengthens the design on evidence, while
-[§10](#10-dialogue-protocol)'s one-round bound is confirmed as correct rather than stingy.
+> **Attribution withdrawn 2026-07-30** (`evidence-appraiser` consult, §17.14). The coefficients below
+> **name no source anywhere in this repository** — §18's citation list contains no candidate, no section
+> attributes them to an identifier, and the only upstream was a Wave A research fragment under `.ai-work/`,
+> which is gitignored and has been deleted. The claim is therefore **permanently unre-appraisable**: a
+> reader cannot check it, and neither can we. It is retained below as a record of what was believed at
+> design time, **not** as evidence. Two further defects were upheld: this dossier's own verification
+> convention (§15.1, §15.2) was applied to weaker claims and skipped here; and the depth coefficient
+> measures *peer-visible debate rounds*, a construct our protocol contains **zero** of — so it is silent
+> on the one-loop-back bound rather than confirming it, an objection `dec-298`'s own `dissent:` field had
+> already registered independently.
+
+~~**This is the axis with the strongest empirical support of anything in this dossier.**~~ Wave A's Q2
+reported, in what was described as a controlled comparison, an **agent-count** coefficient of 0.066
+(p<0.001) against a **dialogue-depth** coefficient of 0.019 (not significant) — *source unidentified*.
+The design conclusion it was used to support (breadth of independent perspectives over depth of argument)
+is unchanged, because the multi-instance design and the one-round bound each rest on independent grounds:
+the sequential-probability-ratio result and the ICML self-consistency result in §10, and the termination
+and conformity arguments that do not depend on these coefficients at all. **What changes is the stated
+evidence base, not the design.** The one-round bound should be described as *defensible on termination
+grounds*, never as *confirmed by measurement*.
 
 Design constraints that follow:
 
@@ -1168,30 +1183,51 @@ usage. Cost is measured in subagent tokens, a proxy for spend rather than a curr
 | sentinel | 163,288 |
 | skill-genesis | 149,751 |
 
-| Quantity | Value |
-|---|---|
-| Consult spawns | 165,824 |
-| Non-consult agents (denominator) | 650,283 |
-| Total with consults | 816,107 |
-| **Observed ratio** | **1.255×** against the ≤3× routine envelope |
-| **Three concurrent consults** (the cap) | **1.466×** against the ≤6× high-stakes envelope |
-| One consult as a share of the window | 12.4% |
+| Quantity | Tokens (raw) | Opus-equivalents (spend) |
+|---|---|---|
+| Consult spawns | 165,824 | 165,824 |
+| Non-consult agents (denominator) | 650,283 | 293,424 |
+| **Observed ratio** | 1.255× | **1.565×** against the ≤3× routine envelope |
+| Headroom | 2.4× | **1.9×** |
+| Break-even — consults before the routine envelope binds | 12.9 | **5.8** |
 
-**PASS on both envelopes**, with 2.4× and 4.5× headroom respectively. A `standard` consult cost less than
-every other agent measured — 45% of a verifier run.
+**PASS on the routine envelope.** But the currency matters, and the first version of this section got it
+wrong — corrected 2026-07-30 after a `statistician` consult on this very measurement.
 
-**Why the denominator is deliberately small.** It counts only the closeout session's non-consult agents,
-not the full 16-step pipeline. A smaller denominator produces a *larger* ratio, so this is the
-worst-case framing available from real data: a full Full-tier pipeline (multi-wave research, architecture,
-planning, parallel implementers, test-engineer) would push the ratio materially closer to 1. The envelope
-passes even under the framing least favourable to it.
+**Why tokens are the wrong unit here.** AC15 bounds *cost*, and the token proxy is biased in the direction
+that flatters the verdict: the numerator is entirely tier-H (`opus`), while the denominator is a mix —
+verifier `opus`, sentinel and skill-genesis `sonnet`, doc-engineer `haiku`. Weighting each agent by its
+tier's relative list price (opus 1.0, sonnet ≈0.2, haiku ≈0.07) shrinks the denominator by more than half
+and leaves the numerator untouched. The *excess over 1* — the only part of the ratio that is the consult's
+cost — is roughly **2.2× larger** than first reported.
 
-**Limits of this measurement, stated rather than buried.** `n` = 1 consult, of `standard` difficulty
-only — no `high-stakes` consult has been run, so that row is projected from the concurrency cap rather
-than observed. One session, one routing configuration. Subagent tokens are a proxy for cost. The
-three-concurrent figure is arithmetic on the cap, not a measured concurrent run. This is *a measurement
-with one observation*, which is a different and weaker claim than a characterised distribution — but it
-is no longer a structural argument, which is what the criterion required.
+Two claims in the original text inverted under this correction and are withdrawn:
+
+- *"A `standard` consult cost less than every other agent measured."* True in tokens, **false in spend**. In
+  opus-equivalents the consult is the **second most expensive agent in the window**, behind only the
+  verifier. That sentence was the section's reassurance and it pointed the wrong way.
+- The break-even falls from ~12.9 consults to **~5.8**. That is the difference between an envelope that
+  effectively cannot bind and one that plausibly can, given a design permitting 2–3 concurrent instances at
+  two attaching stages.
+
+**The high-stakes row is withdrawn as an observation.** It was arithmetic on the concurrency cap
+(3 × a `standard` consult), presented in the same table with the same bolding under a shared "PASS on both."
+It is a plug-in estimate *across treatment arms*: `high-stakes` adds `ultrathink` to the spawn prompt, which
+acts directly on the quantity being measured, so three standard consults do not estimate three high-stakes
+ones. Recorded separately: price-weighted, three concurrent *standard* consults would run ≈**2.03×** against
+the ≤6× bound — informative, but not an observation of the high-stakes case, which remains **unmeasured**.
+
+**The conservative-denominator argument is weaker than stated.** Choosing the closeout session rather than a
+full pipeline holds the numerator fixed while shrinking the denominator — but in a genuinely smaller
+pipeline both co-scale, and the binding scenario (a small `sonnet`-dominated pipeline with fan-out at both
+attaching stages) was never computed. The framing was not wrong in direction; it was asserted rather than
+derived.
+
+**Limits, restated.** `n` = 1 consult, `standard` only. One session, one routing configuration. Opus-equivalents
+use list-price ratios and ignore cache-read discounts — which would move the number further in the same
+direction, since a fresh-context consult caches worse than a warm pipeline agent. The 3× and 6× thresholds
+themselves remain **asserted, not derived**. The verdict survives every sensitivity constructed against it;
+what changed is what the number licenses and how it is recorded.
 
 **Nothing is accumulating this series.** `.ai-state/observations.jsonl` carries no token or cost fields,
 and the ledger's 11-column schema has no cost column. Today's figures exist only because agent
@@ -1243,6 +1279,45 @@ for a rule.
 threshold to an estimate a human adjudicates, a human choosing to ship is the mechanism working rather than
 a bypass — but it is the risk the prior decision's reversal trigger named, so it is recorded here and in the
 ADR rather than passed over.
+
+### 17.14 AC13 exercised — two disciplines, concurrently, and what they found
+
+`AC13` (two *different* disciplines running at once, each writing its own fragment, with no shared-file
+write and no cross-read during round 0) was untestable through Wave 1 at a one-discipline roster. With
+`evidence-appraiser` shipped (§17.13) it was exercised on 2026-07-30: a `statistician` and an
+`evidence-appraiser` were spawned concurrently against **deliberately different targets**, chosen so the
+run would also test whether the boundary written into their registry rows actually holds.
+
+**AC13 verdict: PASS**, in the strong sense.
+
+| Assertion | Observed |
+|---|---|
+| Separate fragment per discipline | `CONSULT_statistician.md` and `CONSULT_evidence-appraiser.md` |
+| No cross-read during round 0 | Both `## Sources Read` sections declare the sibling fragment and `SYSTEMS_PLAN.md` unread |
+| No shared-file write | Both appended to one `PROGRESS.md`; the four entries **interleave** (appraiser R0, statistician R0, statistician R1, appraiser R1) with no corruption |
+| Single-writer ledger honoured | Neither touched `CONSULT_LEDGER.md` |
+
+**The boundary held with zero overlap** — the stronger result. The statistician challenged the token
+proxy, a plug-in estimate across treatment arms, denominator co-scaling, `n`=1 tail bounds, and underived
+thresholds: all inferences on *our own* numbers. The appraiser challenged missing attribution, a skipped
+verification convention, and a construct mismatch: all properties of an *imported* claim. Not one
+challenge from either would have belonged in the other's fragment. The registry's one-line split —
+*the statistician asks whether our analysis of our data is sound; the appraiser asks whether their claim
+about their data licenses what we are doing with it* — is discriminating in practice, not just on paper.
+
+**One degradation, declared rather than hidden.** The appraiser's `Skill`-tool binding **failed**
+(`Unknown skill: i-am:evidence-appraisal`) because the skill was authored minutes earlier and the
+installed plugin cache predates it. The consultant did not improvise: it reported the failure, loaded the
+canonical in-repo source by direct read, and left the void/no-void call to the convener. This is the same
+self-hosting staleness that halted the Wave-1 smoke test, and it exposes a real limit on the
+"two files to add a discipline" claim — **two files are necessary but not sufficient until a release
+ships them**, because the runtime binding resolves against the installed plugin, not the working tree. The
+degradation does not void AC13, whose assertions concern the concurrency contract rather than the binding;
+it is recorded as an AC2-adjacent caveat.
+
+**Both consults found real defects, and both were dispositioned** — the statistician's correction to the
+AC15 measurement is applied in §17.12; the appraiser's attribution withdrawal is applied in §15.5. Neither
+changed a design decision. Both changed what this dossier is entitled to claim.
 
 ---
 

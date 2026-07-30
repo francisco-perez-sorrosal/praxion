@@ -865,15 +865,29 @@ def test_ledger_falsifier_recipe_returns_correct_counts_on_the_real_ledger(
     .ai-state/CONSULT_LEDGER.md: the documented column-anchored recipe must
     return the actual dispositioned-challenge counts for `statistician`,
     proving the recipe bites on the real file rather than only on invented
-    strings."""
+    strings.
+
+    Asserts invariants rather than literal counts: the ledger is append-only
+    and grows with every consult, so pinning exact totals would make routine
+    data growth indistinguishable from a broken recipe."""
     ledger_path = _require_file(
         project_root / ".ai-state" / "CONSULT_LEDGER.md", "disposition ledger"
     )
     ledger_text = ledger_path.read_text(encoding="utf-8")
 
-    assert count_ledger_rows_for_discipline(ledger_text, "statistician") == 12
-    assert count_dismissed_for_discipline(ledger_text, "statistician") == 0
-    assert count_distinct_consults_for_discipline(ledger_text, "statistician") == 1
+    total = count_ledger_rows_for_discipline(ledger_text, "statistician")
+    dismissed = count_dismissed_for_discipline(ledger_text, "statistician")
+    consults = count_distinct_consults_for_discipline(ledger_text, "statistician")
+    naive = count_rows_naive_substring_match(ledger_text, "statistician")
+
+    assert total > 0, "the shipped ledger carries statistician rows"
+    assert 0 <= dismissed <= total
+    assert 1 <= consults <= total, "challenges cluster within consults"
+    assert naive >= total, (
+        "the unanchored form must over-count or tie, never under-count -- "
+        "if it ever returns fewer rows than the anchored form, the anchoring "
+        "regex has stopped matching real rows"
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -41,6 +41,9 @@ Wave A closed the round-count question with four independent convergent sources:
 sequential-probability-ratio governor stops at **1.01 average rounds** (97.0% accuracy, 4.06 calls) versus
 fixed-five rounds (99.0%, 15 calls) — rounds 2–5 bought 2pp for 3.7× the calls; a controlled six-factor study
 found the **debate-depth coefficient 0.019, not significant**, while the **agent-count coefficient was 0.066,
+
+> **Amendment 2026-07-30 (`dec-306`, evidence-appraiser consult).** The coefficients cited in this paragraph **name no source anywhere in this repository**, and their only upstream was a deleted, gitignored research fragment — they are permanently unre-appraisable and are withdrawn as evidence, though retained as a record of what was believed at decision time. Separately, the depth coefficient measures *peer-visible debate rounds*, a construct this protocol contains zero of, so it was silent on the one-loop-back bound rather than confirming it — an objection this ADR's own `dissent:` field registered independently. **The decision stands unchanged**: the bound is defensible on termination grounds and on the sequential-probability-ratio and ICML self-consistency results, none of which depend on these numbers. What changes is the stated evidence base.
+
 p<0.001**; a peer-reviewed ICML result found multi-agent debate does not reliably beat self-consistency and that
 the larger lever was first-round *agreement intensity*, not round count; and the one dissenting result (benefit
 extending to five rounds) applies only to **RL-trained** agents, whereas these consultants are prompt-level.

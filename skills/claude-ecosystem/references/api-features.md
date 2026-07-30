@@ -166,18 +166,9 @@ Tools invoked from within the code execution sandbox. The model can call defined
 
 ### Prompt Caching
 
-Cache repeated message prefixes to reduce latency and cost on subsequent requests.
+Mark cacheable content boundaries with `cache_control: { "type": "ephemeral" }` on a content block (or as a single top-level field for automatic caching), optionally with `"ttl": "1h"` for the extended tier. Maximum 4 cache breakpoints per request.
 
-| TTL | Cost (cached read) | Activation |
-|-----|-------------------|------------|
-| 5 minutes | ~90% reduction vs uncached | Default for `cache_control` blocks |
-| 1 hour | ~90% reduction vs uncached | Set `ttl: "ephemeral_1h"` in `cache_control` |
-
-Mark cacheable content boundaries with `cache_control: { type: "ephemeral" }` on content blocks. Place breakpoints at stable prefixes -- system prompts, large document sets, few-shot examples. Maximum 4 cache breakpoints per request.
-
-**Workspace isolation (GA):** 1-hour cache is workspace-scoped. Different API keys in the same workspace share cache, but different workspaces do not.
-
-**When to use:** Any workload with repeated prefixes -- multi-turn conversations, batch processing with shared context, RAG with stable document sets. Cost savings compound across requests.
+**Full mechanics -- TTL/cost tables, automatic caching, the 20-block lookback window, invalidation hierarchy, per-model minimum block sizes -- live in [platform-services.md § Prompt Caching](platform-services.md#prompt-caching)**, the canonical home for this feature (avoids the two files drifting apart, which is what happened before this note was added).
 
 ### Compaction
 

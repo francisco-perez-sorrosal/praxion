@@ -125,7 +125,7 @@ except ValidationError:
 - **Anthropic SDK silently rewrites schema constraints.** `minimum`, `maximum`, `minLength`, `pattern` get moved into the description and enforced post-generation, not as decoding constraints. Validate with Pydantic at the boundary regardless.
 - **Tool-use adds ~313-346 tokens of system overhead.** Material at scale. If you need 50 concurrent classifications per second, benchmark before concluding tool-based structured output is "free".
 - **First request pays grammar compilation latency.** Compiled grammars are cached ~24h. Don't measure steady-state cost from a cold start.
-- **Prompt caching** on the Anthropic provider requires 1024-token blocks on Opus/Sonnet (2048 on Haiku). Under-threshold `cache_control` markers silently no-op. See the [`claude-ecosystem`](../../claude-ecosystem/SKILL.md) skill for the full treatment.
+- **Prompt caching** on the Anthropic provider requires a per-model minimum block size (512-4,096 tokens depending on model as of 2026-07-29). Under-threshold `cache_control` markers silently no-op. See [`claude-ecosystem`](../../claude-ecosystem/references/platform-services.md#prompt-caching) for the current table and the 20-block lookback / invalidation-hierarchy gotchas.
 
 ## OpenAI SDK Call Shape
 

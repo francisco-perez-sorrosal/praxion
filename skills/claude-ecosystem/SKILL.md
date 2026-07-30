@@ -35,7 +35,8 @@ Structured knowledge of the Anthropic/Claude platform -- models, API features, S
 ## Gotchas
 <!-- last-verified: 2026-05-01 -->
 
-- **Prompt caching silently ignores small blocks**: Content below 1024 tokens (Opus/Sonnet) or 2048 tokens (Haiku) is never cached regardless of `cache_control` markers -- no error returned, just no cache. See [references/platform-services.md](references/platform-services.md).
+- **Prompt caching silently ignores small blocks**: content below the per-model minimum token count is never cached regardless of `cache_control` markers -- no error returned, just no cache. The minimum varies by model (512-4,096 tokens as of 2026-07-29) and shifts with every release. See [references/platform-services.md § Minimum Block Sizes](references/platform-services.md#minimum-block-sizes) for the current table.
+- **Prompt caching reads only walk back 20 blocks**: a breakpoint placed on a block that changes every request (e.g., after a per-request timestamp) never gets a cache hit -- silently, no error. See [references/platform-services.md § The 20-Block Lookback Window](references/platform-services.md#the-20-block-lookback-window-highest-value-gotcha).
 - **1M context requires a beta header**: The default context limit is 200K. Extended context (1M tokens) requires the `interleaved-thinking-2025-05-14` or `extended-context` beta header -- without it, requests exceeding 200K fail.
 - **`max_tokens` has no default**: Every `messages.create` call must set `max_tokens` explicitly. Omitting it produces an API error, not a sensible default. See [references/sdk-patterns.md](references/sdk-patterns.md).
 - **Extended thinking is incompatible with `temperature`**: When using `thinking.budget_tokens`, temperature must be unset or exactly 1. Any other value produces an error.

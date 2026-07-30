@@ -55,17 +55,45 @@ POST /v1/messages/batches
 Batches support all Messages API features including tool use, extended thinking, and structured outputs.
 
 ## Prompt Caching
+<!-- last-verified: 2026-07-29 -->
 
-Cache repeated message prefixes to reduce latency and cost. The API stores cacheable content blocks server-side and serves them on cache hits. See [api-features.md](api-features.md) for the `cache_control` parameter and block placement.
+Cache repeated message prefixes to reduce latency and cost. The API stores cacheable content blocks server-side and serves them on cache hits. This is the canonical home for Anthropic prompt-caching mechanics and cost model — [api-features.md](api-features.md) covers the `cache_control` parameter shape only and links back here for details.
 
 ### TTL Tiers
 
-| TTL | Cost Model | Activation |
-|-----|-----------|------------|
-| 5 minutes | Write: 25% premium over base input. Read: ~90% reduction | Default -- set `cache_control: { type: "ephemeral" }` |
-| 1 hour | Write: 25% premium over base input. Read: ~90% reduction | Set `cache_control: { type: "ephemeral", ttl: "ephemeral_1h" }` |
+| TTL | Write cost | Read cost | Activation |
+|-----|-----------|-----------|------------|
+| 5 minutes | 1.25x base input (25% premium) | 0.1x base input (~90% reduction) | Default -- `cache_control: { "type": "ephemeral" }` |
+| 1 hour | 2x base input (100% premium) | 0.1x base input (~90% reduction) | `cache_control: { "type": "ephemeral", "ttl": "1h" }` -- note: no `ephemeral_` prefix on the TTL value |
 
-**Cache write** occurs on the first request with a new prefix. **Cache read** occurs on subsequent requests with the same prefix within the TTL window. Each cache hit resets the TTL timer.
+The 1-hour tier's write premium (100%) is 4x the 5-minute tier's (25%) -- not the same rate applied to a longer window, a common source of drift when copying these numbers. **Cache write** occurs on the first request with a new prefix. **Cache read** occurs on subsequent requests with the same prefix within the TTL window. Each cache hit resets the TTL timer.
+
+### Automatic Caching (recommended starting point)
+
+A single top-level `cache_control` field (not per-block) auto-tracks a growing conversation: the system finds the last cacheable block and advances the breakpoint forward each turn without manual marker updates. Compatible with explicit block-level breakpoints -- automatic caching consumes one of the 4 available breakpoint slots. Default TTL is 5 minutes, settable to 1 hour. Anthropic's own docs now recommend automatic caching as the default; reach for explicit per-block breakpoints only when different sections of the prompt need different change-frequency handling (e.g., a stable system prompt vs. a document set that rotates hourly).
+
+### The 20-Block Lookback Window (highest-value gotcha)
+
+A cache **write** happens only at the exact block marked with `cache_control` -- it hashes everything up to and including that block. A cache **read** walks backward at most **20 blocks** looking for a prior write at that position. It does not scan forward and does not "find" stable content on its own.
+
+**Common failure mode:** static system context occupies blocks 1-5, a per-request block 6 carries a timestamp + user message, and the breakpoint is placed on block 6. Every request writes a new cache entry that is never reused -- the hash differs every time and no earlier position was ever written to. This fails **silently**: no error, just a full-price write on every call.
+
+**Fix:** place the breakpoint on the *last block that stays identical across the calls you want to share a cache* -- in the example, block 5, not block 6. In a growing multi-turn conversation, if a single turn adds 20+ blocks, the lookback window can miss the prior write entirely -- add a second breakpoint closer to that position.
+
+### Cache Invalidation Hierarchy
+
+Cache follows `tools` -> `system` -> `messages` order; a change at one level invalidates that level and everything after it:
+
+| Change | Invalidates |
+|--------|-------------|
+| Tool definitions (add/remove/reorder) | `tools` + `system` + `messages` (full cache wipe) |
+| Toggling web search / citations | `system` + `messages` (not `tools`) |
+| `tool_choice` | `messages` only |
+| Thinking/effort parameter | `messages` always; `tools`/`system` too on some models |
+
+This is why varying a subagent's tool list mid-pipeline is expensive, not just inelegant -- it forces a full cache rebuild, not a partial one. Praxion's own agents keep static, per-agent tool lists in frontmatter (see the `agent-crafting` skill), which is validated practice under this model, not just tidiness.
+
+**Mid-conversation system updates:** on some (not all) current models, appending `{"role": "system"}` as a message instead of editing the top-level `system` field lets you add instructions without invalidating the cached system-prompt prefix.
 
 ### Workspace Isolation
 
@@ -81,14 +109,22 @@ The 1-hour cache is scoped to the API workspace. Different API keys within the s
 
 ### Minimum Block Sizes
 
-Content must meet a minimum token count to be cacheable:
+Content must meet a minimum token count to be cacheable, and the minimum is **per-model**, not a flat Opus/Sonnet-vs-Haiku split. As of 2026-07-29:
 
-| Model | Minimum Tokens |
-|-------|---------------|
-| Opus, Sonnet | 1,024 |
-| Haiku | 2,048 |
+| Minimum tokens | Models |
+|---|---|
+| 512 | Claude Opus 5, Claude Fable 5, Claude Mythos 5 |
+| 1,024 | Claude Opus 4.8, Claude Sonnet 5, Claude Sonnet 4.6, Claude Sonnet 4.5, Claude Opus 4.1, Claude Opus 4, Claude Sonnet 4 |
+| 2,048 | Claude Mythos Preview, Claude Opus 4.7 |
+| 4,096 | Claude Opus 4.6, Claude Opus 4.5, Claude Haiku 4.5 |
 
-Content below these thresholds is silently ignored for caching (no error, just no cache). Maximum 4 cache breakpoints per request.
+This table shifts with every model release -- verify current per-model minimums at [platform.claude.com/docs/en/build-with-claude/prompt-caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) before relying on a specific number. Content below the applicable threshold is silently ignored for caching (no error, just no cache). Maximum 4 cache breakpoints per request.
+
+### Further Reading (third-party, cite before trusting)
+
+- **Anthropic engineering blog, "Lessons from building Claude Code: prompt caching is everything"** (Thariq Shihipar, Apr 2026) -- official production experience: never add/remove tools mid-session; switching models mid-conversation forces a full cache rebuild; non-deterministic tool ordering, timestamps in system prompts, or tool-parameter reordering silently break the cache; append turn updates as messages rather than editing the system prompt; Claude Code treats cache-hit-rate as uptime-grade infra.
+- **Simon Willison, "Prompt caching with Claude"** (Aug 2024, updated Jan 2025) -- independent but technically substantive: if your app calls the API less often than once every 5 minutes on average, the write premium means caching *costs* more than it saves; ordinary multi-turn conversation auto-benefits from caching even with zero deliberate engineering; caching reduces compute/token billing only, not wire-transmission cost or client-perceived latency for large payloads.
+- **arXiv:2601.06007, "Don't Break the Cache"** (Jan 2026, cross-provider study, 500+ agent sessions) -- caching *everything*, including dynamic tool-call results, can increase latency in some conditions; caching only the system prompt and excluding dynamic tool results from the cached prefix gave the most consistent savings (41-80% across providers). Complicates blanket "cache as much as possible" advice for long-horizon agentic workloads.
 
 ## Files API
 

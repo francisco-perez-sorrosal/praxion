@@ -164,14 +164,31 @@ For prompts with many candidate versions, a multi-armed bandit allocates traffic
 
 ## Cache-Friendly Prompt Structure
 
-Prompt caching (Anthropic, OpenAI, others) reduces cost and latency for stable prefixes. To preserve cache hits across prompt versions:
+Prompt caching (Anthropic, OpenAI, Gemini, and others) reduces cost and latency for stable prefixes. To preserve cache hits across prompt versions:
 
-- Keep the **stable prefix** (system prompt, few-shot block, tool definitions) **first** and byte-identical across minor edits.
+- Keep the **stable prefix** (system prompt, few-shot block, tool definitions) **first** and byte-identical across minor edits — this ordering discipline is the one universal rule; every provider's own docs give the identical advice.
 - Put volatile content (the user message, retrieval context) **last**.
 - When you must edit the stable prefix, cut a new prompt version — the cache miss is expected.
-- Cacheable block sizes vary by provider: Anthropic Opus/Sonnet require ≥ 1024 tokens per cached block; Haiku requires ≥ 2048. Blocks below the threshold silently do not cache. See `claude-ecosystem` for the current thresholds.
+- Cacheable block sizes vary by provider **and, on Anthropic, by model** — see `claude-ecosystem`'s [platform-services.md § Minimum Block Sizes](../../claude-ecosystem/references/platform-services.md#minimum-block-sizes) for the current per-model table (this table shifts with every model release; don't hardcode it here).
 
 Cache-friendliness trades off against instruction-after-data positioning (`./prompt-injection-hardening.md`). Resolve by keeping the system/tool content stable at the head and placing the instruction shortly before the untrusted user input, not at the very end of a long prefix. The stable prefix can still end above the cache threshold even with the instruction closer to the end.
+
+### Provider Comparison
+<!-- last-verified: 2026-07-29 -->
+
+The structural mechanics diverge more than the "keep the stable prefix first" heuristic suggests:
+
+| Provider | Default | Write premium | Read discount | Min. prefix | Notes |
+|---|---|---|---|---|---|
+| **Anthropic** | Explicit `cache_control` (or automatic top-level field) | 1.25x (5m) / 2x (1h) | ~90% | Per-model, 512-4,096 tokens | Manual breakpoints, 20-block read lookback (see `claude-ecosystem`) |
+| **OpenAI** | Automatic, no code changes (gpt-4o+ and most current models) | None (historically) | ~50% | 1,024 tokens, +128-token increments | GPT-5.6+ adds an *explicit* mode (`prompt_cache_options.mode: "explicit"`) with a 1.25x write premium and configurable TTL (30min floor, 24h ceiling) — converging toward Anthropic's model rather than staying purely automatic |
+| **Gemini** | Implicit (automatic, default on 2.5+) and explicit (manual cache-object lifecycle) side by side | N/A (implicit); explicit has separate storage cost | 90% (2.5+), 75% (2.0) | ~2,048 tokens (2.5 Flash/Pro), reportedly higher (~4,096) on newer 3.x models | Explicit mode requires managing the cache object's lifetime yourself |
+| **DeepSeek** | Automatic, on-disk, no explicit markers | — | — | — | No developer-facing cache API |
+| **Bedrock / Azure** | Passthrough | — | — | — | No provider-native scheme — Claude-on-Bedrock uses Anthropic's `cache_control`; Azure OpenAI mirrors OpenAI's model |
+
+**Frame OpenAI's newest tier as convergence, not a static dichotomy** — the historical "Anthropic charges to write, OpenAI doesn't" framing is eroding as OpenAI's explicit mode adds its own write premium.
+
+**Break-even framing (Simon Willison, independent, Aug 2024 / Jan 2025 update):** if your application calls the API less often than once every 5 minutes on average, the write premium means you are *losing* money on caching, not saving it. Ordinary multi-turn conversation (resending the full transcript each turn) auto-benefits from caching even with zero deliberate engineering — caching reduces compute/token billing only, not wire-transmission cost or client-perceived latency for large payloads.
 
 ## DSPy / MIPROv2 as a Compilation Layer
 
@@ -331,7 +348,7 @@ flagged by the sentinel.
 - `./structured-output.md` — schema hashing in the envelope.
 - `./reasoning-and-cot.md` — reasoning-effort as a pinnable envelope field.
 - `../assets/envelope-manifest.yaml` — canonical starter manifest.
-- Sibling skill: `claude-ecosystem` — prompt-caching thresholds (Opus/Sonnet 1024, Haiku 2048) that constrain cache-friendly layout.
+- Sibling skill: `claude-ecosystem` — per-model prompt-caching thresholds, automatic caching, and the 20-block lookback window that constrain cache-friendly layout.
 - Sibling skill: `external-api-docs` — verify current SDK parameter shapes before pinning envelope fields.
 - Sibling skill: `agent-evals` — eval CI architecture beyond single-prompt testing; `references/run-ledger-schema.md` defines the `prompt_hash` field bound to this hashing convention.
 
@@ -340,5 +357,8 @@ flagged by the sentinel.
 - DSPy docs — https://dspy.ai/ — MIPROv2 optimizer.
 - *Optimizing Instructions and Demonstrations* (arxiv 2406.11695).
 - LangSmith, Langfuse, PromptLayer, Humanloop, Braintrust, Maxim AI, Mirascope — vendor docs (verify current).
-- Anthropic, *Prompt caching* — block-size thresholds and 5m/1h tiers.
-- OpenAI, *Prompt caching* — provider-specific semantics.
+- Anthropic, *Prompt caching* — https://platform.claude.com/docs/en/build-with-claude/prompt-caching — block-size thresholds, 5m/1h tiers, automatic caching, invalidation hierarchy.
+- OpenAI, *Prompt caching* — provider-specific semantics, automatic default + explicit mode.
+- Anthropic engineering blog, *Lessons from building Claude Code: prompt caching is everything* (Thariq Shihipar, Apr 2026) — production cache-hygiene lessons.
+- Simon Willison, *Prompt caching with Claude* (simonwillison.net, Aug 2024 / Jan 2025 update) — break-even framing for when caching helps vs. hurts.
+- arXiv:2601.06007, *Don't Break the Cache* (Jan 2026) — cross-provider empirical study; caveat on caching dynamic tool results in long-horizon agentic tasks.

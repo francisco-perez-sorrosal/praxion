@@ -669,6 +669,9 @@ objection with a reason rather than silently deviating.
 | 4 | **One identity only: `statistician`** | §12.1's four-identity Wave 1 |
 | 5 | **Fix §9.1 before designing** — done; see the corrected criterion | §15.7 item 5 |
 | 6 | **Multi-instance by design** — the mechanism must support **N concurrent consultant instances, each configured with a different discipline**, not one-discipline-at-a-time | Extends §9; see §16.3 |
+| 7 | **Scope amendment — a second, binding-only discipline ships alongside `statistician`** (reliability-shaped; knowledge already owned per §7.4). Costs one registry row and **0** always-loaded bytes | Amends ruling 4. Makes AC13 (§17.5) testable and converts the N+1 property from a fitness-test assertion into an empirical demonstration |
+| 8 | **Effort axis resolves as model-parameter + in-context `ultrathink` directive** — accepted *with* the stated limitation that the effort half is a prompt convention, not mechanically assertable | Confirms ruling 3's fallback after the architect's verified objection |
+| 9 | **Implementation bounded to Milestones 0–1** (steps 1–3: mechanism spike, disposition ledger, extensibility fitness test), then stop for review | Bounds the first implementation wave to the cheapest evidence-producing slice |
 
 **Ruling 4 dissolves the §15.4 conflict entirely for Wave 1.** The CRITICAL finding was specifically
 that `performance-engineer` duplicates the existing Performance lens. With `performance-engineer`

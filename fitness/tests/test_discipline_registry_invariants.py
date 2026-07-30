@@ -617,3 +617,393 @@ def test_ledger_exists_given_the_registrys_current_row_count(project_root: Path)
 
     result = check_ledger_exists_if_registry_has_rows(registry_rows, ledger_path)
     assert result is None, result
+
+
+# ---------------------------------------------------------------------------
+# Ledger row-shape parsing -- the eleven-column contract documented in
+# .ai-state/CONSULT_LEDGER.md § Column Definitions and § Falsifier. Split from
+# the registry parsing above because a ledger row is read as a raw cell list,
+# not a header-keyed dict: the row-shape check below needs the raw cell
+# *count*, and an unescaped `|` inside a free-text cell (claim /
+# decision-at-stake / rationale-ref) is exactly what inflates that count.
+# ---------------------------------------------------------------------------
+
+LEDGER_ROW_FIELDS: tuple[str, ...] = (
+    "timestamp",
+    "task-slug",
+    "discipline",
+    "stage",
+    "challenge-id",
+    "claim",
+    "decision-at-stake",
+    "disposition",
+    "rationale-ref",
+    "model",
+    "difficulty",
+)
+
+
+def parse_ledger_table_rows(ledger_text: str) -> list[list[str]]:
+    """Parse the ledger's data rows (header + `---` separator skipped by
+    position, never counted as data) into a list of raw cell lists.
+
+    Locates the table whose header row is exactly LEDGER_ROW_FIELDS, ignoring
+    any other `|`-prefixed lines in the same document -- the real ledger's
+    own § Falsifier section embeds a fenced shell snippet whose `grep`/`cut`
+    lines also start with `|`, and those must never be swept in as data rows.
+    """
+    for block in _split_into_table_blocks(ledger_text):
+        if len(block) < 2:
+            continue
+        header_cells = [cell.strip() for cell in block[0].strip().strip("|").split("|")]
+        if header_cells != list(LEDGER_ROW_FIELDS):
+            continue  # not the ledger's data table -- some other pipe-prefixed block
+        data_lines = block[2:]  # skip the header row and the --- separator row
+        return [
+            [cell.strip() for cell in line.strip().strip("|").split("|")] for line in data_lines
+        ]
+    return []
+
+
+def check_ledger_row_has_eleven_columns(rows: list[list[str]]) -> list[str]:
+    """Return a failure string per row whose cell count isn't exactly eleven.
+
+    A cell count above eleven is the direct symptom of an unescaped `|`
+    inside a free-text column: the extra pipe is read as a delimiter both by
+    this check and by any markdown renderer, so "wrong column count" and
+    "unescaped pipe present" are the same defect under two names.
+    """
+    failures: list[str] = []
+    for index, row in enumerate(rows):
+        if len(row) != len(LEDGER_ROW_FIELDS):
+            failures.append(
+                f"row {index}: expected {len(LEDGER_ROW_FIELDS)} columns, got {len(row)}: {row!r}"
+            )
+    return failures
+
+
+_LEDGER_HEADER_ROW = "| " + " | ".join(LEDGER_ROW_FIELDS) + " |"
+_LEDGER_SEPARATOR_ROW = "|" + "|".join(["---"] * len(LEDGER_ROW_FIELDS)) + "|"
+
+
+def test_parses_ledger_table_rows_from_header_and_data_row() -> None:
+    """Happy path: a two-row table (header + one well-formed data row) parses
+    to one row list with exactly eleven cells."""
+    good_row = (
+        "| 2026-07-30T10:00:00Z | task-a | statistician | architecture | CH-01 | "
+        "a claim | a decision | switch-now | dec-100 | opus | standard |"
+    )
+    table = f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n{good_row}\n"
+    rows = parse_ledger_table_rows(table)
+    assert rows == [
+        [
+            "2026-07-30T10:00:00Z",
+            "task-a",
+            "statistician",
+            "architecture",
+            "CH-01",
+            "a claim",
+            "a decision",
+            "switch-now",
+            "dec-100",
+            "opus",
+            "standard",
+        ]
+    ]
+
+
+def test_flags_ledger_row_with_unescaped_pipe_inflating_column_count() -> None:
+    """Canary: a decision-at-stake cell containing a raw, unescaped `|`
+    splits into an extra column, and check_ledger_row_has_eleven_columns
+    flags it -- this is the shape a mis-escaped free-text cell actually
+    takes, not an invented malformation."""
+    bad_row = (
+        "| 2026-07-30T10:00:00Z | task-a | statistician | architecture | CH-01 | "
+        "a claim | decision A | B (unescaped pipe above) | switch-now | dec-100 | opus | standard |"
+    )
+    table = f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n{bad_row}\n"
+    rows = parse_ledger_table_rows(table)
+    failures = check_ledger_row_has_eleven_columns(rows)
+    assert failures, (
+        "check_ledger_row_has_eleven_columns must flag a row whose unescaped "
+        "pipe inflates its cell count past eleven; got an empty list"
+    )
+
+
+def test_accepts_ledger_row_with_exactly_eleven_columns() -> None:
+    """Happy path: a well-formed, eleven-cell row produces no failures."""
+    good_row = (
+        "| 2026-07-30T10:00:00Z | task-a | statistician | architecture | CH-01 | "
+        "a claim | a decision | switch-now | dec-100 | opus | standard |"
+    )
+    table = f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n{good_row}\n"
+    rows = parse_ledger_table_rows(table)
+    failures = check_ledger_row_has_eleven_columns(rows)
+    assert not failures, f"expected no failures for a well-formed row; got: {failures}"
+
+
+def test_every_real_ledger_row_has_exactly_eleven_columns(project_root: Path) -> None:
+    """The row-shape invariant, exercised against the real, shipped
+    .ai-state/CONSULT_LEDGER.md."""
+    ledger_path = _require_file(
+        project_root / ".ai-state" / "CONSULT_LEDGER.md", "disposition ledger"
+    )
+    rows = parse_ledger_table_rows(ledger_path.read_text(encoding="utf-8"))
+    assert rows, "expected at least one data row in the real ledger"
+    failures = check_ledger_row_has_eleven_columns(rows)
+    assert not failures, "Ledger row shape violations:\n  " + "\n  ".join(failures)
+
+
+# ---------------------------------------------------------------------------
+# Disposition-counter falsifier -- the column-anchored grep+count recipes
+# documented in .ai-state/CONSULT_LEDGER.md § Falsifier, reimplemented here as
+# pure functions so they can be proven correct against a synthetic ledger
+# *and* run against the real one. The recipe was already defective once (an
+# unanchored form that matched a discipline name anywhere in the row, not
+# only in the discipline column, inflating the denominator and biasing the
+# discipline-expansion gate toward passing) -- the canary below reproduces
+# that exact defect shape.
+# ---------------------------------------------------------------------------
+
+
+def _discipline_column_pattern(discipline: str) -> re.Pattern[str]:
+    """The anchored, column-position regex from the ledger's own documented
+    falsifier recipe: matches only when `discipline` occupies the third
+    pipe-delimited column, never a free-text cell that happens to mention it."""
+    return re.compile(rf"^\|[^|]*\|[^|]*\| *{re.escape(discipline)} *\|", re.MULTILINE)
+
+
+def count_ledger_rows_for_discipline(ledger_text: str, discipline: str) -> int:
+    """Total dispositioned-challenge rows for `discipline` -- the raw count
+    the falsifier's first documented command computes."""
+    return len(_discipline_column_pattern(discipline).findall(ledger_text))
+
+
+def count_dismissed_for_discipline(ledger_text: str, discipline: str) -> int:
+    """Dismissed rows for `discipline`, among the rows matched above."""
+    matched_lines = [
+        line
+        for line in ledger_text.splitlines()
+        if _discipline_column_pattern(discipline).match(line)
+    ]
+    return sum(1 for line in matched_lines if "dismiss-with-rationale" in line)
+
+
+def count_distinct_consults_for_discipline(ledger_text: str, discipline: str) -> int:
+    """Distinct task-slugs (independent consults) for `discipline` -- the
+    discipline-expansion criterion's actual denominator, per the ledger's own
+    note that challenges raised within one consult are a cluster sharing a
+    consultant/draft/convener, not independent observations."""
+    matched_lines = [
+        line
+        for line in ledger_text.splitlines()
+        if _discipline_column_pattern(discipline).match(line)
+    ]
+    slugs = {line.strip().strip("|").split("|")[1].strip() for line in matched_lines}
+    return len(slugs)
+
+
+def count_rows_naive_substring_match(ledger_text: str, discipline: str) -> int:
+    """The DEFECTIVE recipe form the falsifier documents having shipped once:
+    an unanchored substring search that also matches a *different*
+    discipline's row whose free-text cell happens to mention the name."""
+    return sum(
+        1
+        for line in ledger_text.splitlines()
+        if line.strip().startswith("|") and discipline in line
+    )
+
+
+def test_unanchored_discipline_match_inflates_count_the_anchored_form_avoids() -> None:
+    """Canary reproducing the falsifier's own documented defect: three rows
+    exist, but only two belong to `statistician` -- the third is a
+    `linguist` row whose decision-at-stake cell happens to mention
+    'statistician'. The anchored recipe returns 2; the unanchored one
+    inflates to 3, exactly as the ledger's own Falsifier section warns."""
+    rows = [
+        "| 2026-07-30T10:00:00Z | task-a | statistician | architecture | CH-01 | "
+        "claim | decision | switch-now | dec-1 | opus | standard |",
+        "| 2026-07-30T10:00:00Z | task-a | statistician | architecture | CH-02 | "
+        "claim | decision | defer-with-rationale | dec-2 | opus | standard |",
+        "| 2026-07-30T11:00:00Z | task-b | linguist | architecture | CH-01 | "
+        "claim | statistician should have weighed in here | switch-now | dec-3 | opus | standard |",
+    ]
+    ledger_text = f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n" + "\n".join(rows) + "\n"
+
+    assert count_ledger_rows_for_discipline(ledger_text, "statistician") == 2
+    assert count_rows_naive_substring_match(ledger_text, "statistician") == 3, (
+        "expected the unanchored recipe to reproduce the documented inflation "
+        "(3 rows matched for a discipline that has 2) -- if this drops to 2 the "
+        "canary no longer exercises the defect it exists to guard against"
+    )
+
+
+def test_counts_dismissed_and_distinct_consults_for_a_discipline() -> None:
+    """Happy path: dismissed-row count and distinct-consult count are computed
+    correctly against a small synthetic ledger with a known-by-construction
+    answer (2 statistician rows in task-a, 1 in task-b; 1 of the 3 is
+    dismissed)."""
+    rows = [
+        "| 2026-07-30T10:00:00Z | task-a | statistician | architecture | CH-01 | "
+        "claim | decision | dismiss-with-rationale | dec-1 | opus | standard |",
+        "| 2026-07-30T10:00:00Z | task-a | statistician | architecture | CH-02 | "
+        "claim | decision | switch-now | dec-2 | opus | standard |",
+        "| 2026-07-30T11:00:00Z | task-b | statistician | architecture | CH-01 | "
+        "claim | decision | defer-with-rationale | dec-3 | opus | standard |",
+    ]
+    ledger_text = f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n" + "\n".join(rows) + "\n"
+
+    assert count_ledger_rows_for_discipline(ledger_text, "statistician") == 3
+    assert count_dismissed_for_discipline(ledger_text, "statistician") == 1
+    assert count_distinct_consults_for_discipline(ledger_text, "statistician") == 2
+
+
+def test_ledger_falsifier_recipe_returns_correct_counts_on_the_real_ledger(
+    project_root: Path,
+) -> None:
+    """The disposition-counter falsifier, exercised against the shipped
+    .ai-state/CONSULT_LEDGER.md: the documented column-anchored recipe must
+    return the actual dispositioned-challenge counts for `statistician`,
+    proving the recipe bites on the real file rather than only on invented
+    strings."""
+    ledger_path = _require_file(
+        project_root / ".ai-state" / "CONSULT_LEDGER.md", "disposition ledger"
+    )
+    ledger_text = ledger_path.read_text(encoding="utf-8")
+
+    assert count_ledger_rows_for_discipline(ledger_text, "statistician") == 12
+    assert count_dismissed_for_discipline(ledger_text, "statistician") == 0
+    assert count_distinct_consults_for_discipline(ledger_text, "statistician") == 1
+
+
+# ---------------------------------------------------------------------------
+# fires-when predicate strength -- the registry's own Row Schema says "any
+# numeric claim" is not a predicate; this check gives that prose a mechanical
+# floor so a future row can't slip in a one-word or empty trigger.
+# ---------------------------------------------------------------------------
+
+_MIN_FIRES_WHEN_WORDS = 6
+
+
+def check_fires_when_is_restrictive(rows: list[dict[str, str]]) -> list[str]:
+    """Return a failure per row whose fires-when reads as a placeholder
+    rather than an authored predicate (fewer than _MIN_FIRES_WHEN_WORDS
+    words -- a short generic phrase like "any numeric claim" is exactly the
+    shape this rejects)."""
+    failures: list[str] = []
+    for row in rows:
+        label = row.get("discipline") or "row"
+        value = row.get("fires-when", "")
+        word_count = len(value.split())
+        if word_count < _MIN_FIRES_WHEN_WORDS:
+            failures.append(
+                f"{label}: fires-when has only {word_count} word(s), reads as a "
+                f"placeholder rather than an authored predicate: {value!r}"
+            )
+    return failures
+
+
+def test_flags_fires_when_that_reads_as_a_placeholder_predicate() -> None:
+    """Canary: a row whose fires-when is the registry's own named
+    non-example ("any numeric claim") is flagged as too weak to be a
+    predicate."""
+    row = {"discipline": "statistician", "fires-when": "any numeric claim"}
+    failures = check_fires_when_is_restrictive([row])
+    assert failures, (
+        "check_fires_when_is_restrictive must flag a row whose fires-when is "
+        "the registry's own named non-example ('any numeric claim'); got an "
+        "empty list"
+    )
+
+
+def test_accepts_fires_when_that_reads_as_an_authored_predicate() -> None:
+    """Happy path: a long, specific trigger predicate is accepted."""
+    row = {
+        "discipline": "statistician",
+        "fires-when": (
+            "A load-bearing decision rests on a quantitative claim: an asserted "
+            "effect or regression, a chosen sample or run count"
+        ),
+    }
+    failures = check_fires_when_is_restrictive([row])
+    assert not failures, f"expected no failures for a specific predicate; got: {failures}"
+
+
+def test_registrys_fires_when_column_is_a_restrictive_predicate_for_every_row(
+    project_root: Path,
+) -> None:
+    """The predicate-strength invariant, exercised against the real registry:
+    every row's fires-when must read as an authored trigger, never a
+    one-word or near-empty placeholder."""
+    registry_files = find_discipline_registry_files(project_root)
+    assert registry_files, "expected at least one discipline-registry.md under skills/"
+    rows = parse_registry_table_rows(registry_files[0].read_text(encoding="utf-8"))
+    assert rows, "expected at least one registry row"
+    failures = check_fires_when_is_restrictive(rows)
+    assert not failures, "fires-when predicate-strength violations:\n  " + "\n  ".join(failures)
+
+
+# ---------------------------------------------------------------------------
+# Fail-loud resolution contract -- an unresolvable Discipline: value must
+# produce [BLOCKED], never a silently degraded consult. Checked as a
+# documentation invariant over the two files that state the contract, since
+# no test harness spawns the real consultant agent here.
+# ---------------------------------------------------------------------------
+
+
+def check_documents_fail_loud_resolution(text: str) -> str | None:
+    """Return a failure string unless text documents both halves of the
+    fail-loud resolution contract: a `[BLOCKED]` outcome, and that it fires
+    on an unresolvable Discipline: value."""
+    if "[BLOCKED]" not in text:
+        return "no '[BLOCKED]' marker found"
+    if re.search(r"unresolvable", text, re.IGNORECASE) is None:
+        return "'[BLOCKED]' present but no mention of an unresolvable directive/value"
+    return None
+
+
+def test_flags_text_missing_the_blocked_marker() -> None:
+    """Canary: text describing only a generic error path, with no
+    `[BLOCKED]` marker, fails the fail-loud check."""
+    text = "If the discipline cannot be resolved, the consultant stops and reports an error."
+    result = check_documents_fail_loud_resolution(text)
+    assert (
+        result is not None
+    ), "check_documents_fail_loud_resolution must flag text with no '[BLOCKED]' marker; got None"
+
+
+def test_flags_blocked_marker_not_tied_to_an_unresolvable_value() -> None:
+    """Canary: `[BLOCKED]` present, but never connected to an unresolvable
+    directive/value, still fails -- the marker alone isn't the contract."""
+    text = "On any failure the agent may return [BLOCKED] with a generic message."
+    result = check_documents_fail_loud_resolution(text)
+    assert result is not None, (
+        "check_documents_fail_loud_resolution must flag '[BLOCKED]' text that "
+        "never mentions an unresolvable directive/value; got None"
+    )
+
+
+def test_accepts_text_documenting_both_halves_of_the_fail_loud_contract() -> None:
+    """Happy path: text naming both the [BLOCKED] outcome and the
+    unresolvable-value trigger passes."""
+    text = "An unresolvable Discipline: value returns [BLOCKED] naming the value."
+    result = check_documents_fail_loud_resolution(text)
+    assert result is None, f"expected no failure; got: {result!r}"
+
+
+def test_consultant_agent_documents_the_fail_loud_resolution_contract(project_root: Path) -> None:
+    """The real agents/discipline-consultant.md documents the fail-loud
+    contract for an unresolvable Discipline: value."""
+    consultant_path = _require_file(
+        project_root / "agents" / "discipline-consultant.md", "discipline-consultant agent"
+    )
+    result = check_documents_fail_loud_resolution(consultant_path.read_text(encoding="utf-8"))
+    assert result is None, f"discipline-consultant agent: {result}"
+
+
+def test_agents_claude_md_documents_the_fail_loud_resolution_contract(project_root: Path) -> None:
+    """The real agents/CLAUDE.md documents the same fail-loud contract for
+    the consultant's caller-facing summary."""
+    claude_md_path = _require_file(project_root / "agents" / "CLAUDE.md", "agents/CLAUDE.md")
+    result = check_documents_fail_loud_resolution(claude_md_path.read_text(encoding="utf-8"))
+    assert result is None, f"agents/CLAUDE.md: {result}"

@@ -7,10 +7,12 @@ flowchart TD
         CE["context-engineer (shadow) → CONTEXT_REVIEW.md"]
         ID["interface-designer (shadow) → INTERFACE_DESIGN.md"]
         TA["agentic-transactions-architect (shadow) → TRANSACTIONS_DESIGN.md"]
+        DC["discipline-consultant (shadow) → CONSULT_<discipline>.md"]
     end
-    SHADOW -.->|"CONTEXT_REVIEW.md + INTERFACE_DESIGN.md + TRANSACTIONS_DESIGN.md → planner"| IP
+    SHADOW -.->|"CONTEXT_REVIEW.md + INTERFACE_DESIGN.md + TRANSACTIONS_DESIGN.md + CONSULT_<discipline>.md → planner"| IP
     ID -.->|"## Architecture Challenges → orchestrator routes back → re-evaluate"| SA
     TA -.->|"## Architecture Challenges → orchestrator routes back → re-evaluate"| SA
+    DC -.->|"## Challenges → convener dispositions each → re-evaluate"| SA
 
     SA["systems-architect"] -->|"SYSTEMS_PLAN.md"| IP
 

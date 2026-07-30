@@ -1,3 +1,22 @@
+## v0.17.0 (2026-07-30)
+
+### Feat
+
+- **commands**: add /consult human entry point
+- extend sentinel BC03 and P07 to the discipline consultant
+- document Discipline directive and wire self-nomination
+- document the discipline-consultant dialogue protocol
+- bind statistician into the discipline registry
+- **skills**: add applied-statistics skill
+- add discipline-consultant agent, registry and live invariants
+- add disposition ledger and extensibility fitness test
+- **state**: add identity-consultant design, ADRs and spec
+- **python-development**: add curated library catalog + version idioms
+
+### Fix
+
+- **skills**: correct CI-overlap inference in benchmarking guidance
+
 ## v0.16.0 (2026-07-29)
 
 ### Feat

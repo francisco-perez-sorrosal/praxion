@@ -851,10 +851,14 @@ the praxion users," this is a genuine gap along a *different* extensibility axis
 for **users**, not for Praxion. Deferred deliberately rather than resolved at planning stage, with the
 concrete path recorded — a project-local overlay consulted before the shipped registry.
 
-### 17.7 Step 1 spike outcome — the binding mechanism is NOT verified
+### 17.7 Step 1 spike outcome — mechanism 1 CONFIRMED after a two-round probe
 
-Run 2026-07-30. Step 1 was ordered first precisely so this could surface cheaply, and it did: the
-spike **falsified the assumption rather than confirming it**.
+Run 2026-07-30. Step 1 was ordered first precisely so the binding assumption could be falsified
+cheaply. Round 1 failed to confirm it and left the load-bearing question open; round 2, run from a
+fresh session with a purpose-built probe agent, **confirmed mechanism 1**. Both rounds are recorded
+below — round 1 because its intermediate negative is what motivated the probe, and because two of its
+findings (no listing on existing Praxion agents; `Skill` absent from all 16 agents' allowlists) still
+stand.
 
 | Question | Result |
 |---|---|
@@ -862,7 +866,7 @@ spike **falsified the assumption rather than confirming it**.
 | Does static `skills:` frontmatter injection work? | **Confirmed** — full skill bodies arrive verbatim in the agent's context |
 | Does a **custom plugin agent** receive an available-skills **listing**? | **NO** — a probe on an existing Praxion agent reported neither listing nor tool |
 | Does a custom plugin agent receive the `Skill` **tool**? | **Only if explicitly declared.** Tools are a strict allowlist — and **zero of Praxion's 16 agents declare `Skill`**; every one uses static `skills:` frontmatter |
-| Can an agent holding `Skill` but receiving **no listing** invoke a skill by a name it was *told*? | **UNKNOWN** — the load-bearing question, unresolvable in-session |
+| Can an agent holding `Skill` but receiving **no listing** invoke a skill by a name it was *told*? | **Resolved in round 2 — see below.** The premise turned out to be false: a custom agent declaring `tools: Read, Skill` *does* receive a full listing, and invocation succeeds either way |
 
 **Why it cannot be resolved in-session.** Agents load at session start, so a newly authored agent file
 is not spawnable until a restart. The `Skill` tool's own contract states the name must come *"from the
@@ -881,24 +885,60 @@ The design degrades under a negative result; it does not die.
 
 | Mechanism | Status | Cost profile |
 |---|---|---|
-| **1. Runtime `Skill` invocation** (the design's choice) | Unverified for custom agents | Ideal — only the active discipline's knowledge loads per consultation |
+| **1. Runtime `Skill` invocation** (the design's choice) | **VERIFIED for custom agents** (round 2, 2026-07-30) | Ideal — only the active discipline's knowledge loads per consultation |
 | **2. Static `skills:` frontmatter listing all disciplines** | Works today, proven | **0** always-loaded tokens (frontmatter never reaches the orchestrator's context), so the N+1 guarantee *survives on the always-loaded ledger* — but every consultation loads every discipline's body. Tolerable at N=2, serious context pollution by N=8. Contradicts REQ-16 as currently written |
 | **3. Orchestrator-injected skill content in the spawn prompt** | Works today | Keeps per-consultation loading selective; shifts binding work to the orchestrator and weakens prompt-cache reuse |
 
-#### Resolution in flight
+#### Round 2 — the probe verdict: `WORKS`
 
-A throwaway project-local probe agent exists at `.claude/agents/skill-probe.md` — `tools: Read, Skill`,
-no `skills:` frontmatter, deliberately configured to isolate the open question. It is **untracked and
-must not be committed**; delete it once the answer is recorded.
+Run 2026-07-30 from a genuinely fresh session (a restart was required; `--continue` / `--resume`
+restores the conversation but keeps the agent registry captured at the original session start, so a
+newly authored agent stays invisible — observed directly). The probe agent was a throwaway declaring
+`tools: Read, Skill` and **no** `skills:` frontmatter, spawned once.
 
-**Resume action after a session restart:** spawn `skill-probe` once and record its verdict here. A
-`WORKS` result confirms mechanism 1 and unblocks steps 2–3 unchanged. A `FAILS` result selects between
-mechanisms 2 and 3, requires REQ-16 to be amended, and warrants an architect loop-back rather than an
-in-place patch.
+| Probe question | Observed result |
+|---|---|
+| Does a custom agent with `tools: Read, Skill` receive an available-skills listing? | **YES** — ~95 entries, beginning `digitalocean-ai` and `plugin-dev:create-plugin`; both target skills present verbatim |
+| Is `Skill` among its granted tools? | **YES** |
+| Does runtime invocation of a plugin-namespaced skill succeed? | **YES** — `i-am:testing-strategy` returned `Launching skill: i-am:testing-strategy`, resolving to `~/.claude/plugins/cache/bit-agora/i-am/0.16.0/skills/testing-strategy` |
+| Did the content genuinely load? | **YES** — distinctive verbatim line quoted: *"**Coverage theater.** Chasing a line coverage target (e.g., 90%) incentivizes testing trivial code (getters, framework glue) while ignoring complex logic that is hard to cover."* |
+| Second skill, to rule out a fluke | **YES** — `i-am:multi-perspective-analysis` loaded, distinctive HARD-gate line quoted |
+| Is the `i-am:` namespace prefix required? | **Optional** — bare `testing-strategy` resolved to the same skill (deduplicated against the already-loaded body rather than erroring) |
 
-**Steps 2–3 are deliberately NOT started.** Step 2 (the disposition ledger) is genuinely
-mechanism-independent and could proceed; step 3 (the fitness test) is not, because it encodes which
-mechanism won.
+**Verdict recorded as `WORKS`.** The probe's own return header self-labelled `FAILS`, which is a
+mislabel worth preserving as a lesson: it graded itself against its *precondition* ("no listing
+present") rather than against the *research question* ("can a `skills:`-less agent invoke a
+plugin-namespaced skill at runtime"). The precondition was violated; the research question was
+answered affirmatively, twice, with content proof. **The violated precondition strengthens the design
+rather than weakening it** — granting the `Skill` tool also supplies the listing, so a consultant does
+not depend on being told a name it cannot verify. There is no branch of this result in which the
+design receives less capability than REQ-16 assumes.
+
+**Residual risk, bounded.** Invocation was proven for skills *present in the listing*. If a
+discipline's skill were ever absent from a consultant's listing, name-only invocation is still
+untested. Not a realistic concern for a Praxion-shipped skill, and cheap to re-probe if it arises.
+
+**Consequence for the roadmap:** mechanism 1 is the binding mechanism. REQ-16 stands unamended, no
+architect loop-back is required, and steps 2–3 proceed as planned — step 3's
+`fitness/tests/test_discipline_registry_invariants.py` may now legitimately assert *"0 consultant
+`skills:` entries"*, since the mechanism that invariant protects is confirmed to exist.
+
+#### Secondary finding — worktree project-agent discovery: INDETERMINATE
+
+The brief asked which copy of the probe resolved: user scope (`~/.claude/agents/`) or worktree project
+scope (`.claude/agents/` under `.claude/worktrees/…`). This matters beyond the probe, since every
+Standard/Full Praxion pipeline runs inside a worktree.
+
+**Unresolved.** The two copies were byte-identical, so content could not disambiguate them. A marker
+was then added to the project-scope copy and the probe re-spawned; it reported `MARKER ABSENT` — but
+that is *confounded*, because agent bodies are snapshotted at session start and the marker was written
+afterwards. `MARKER ABSENT` is therefore consistent with both "user scope won" and "project scope won
+but the body is cached". What *is* established: `skill-probe` appeared in the session's agent registry
+while both copies existed, so it was discovered from at least one scope.
+
+Cheap decisive follow-up, if the answer is ever needed: place the agent in **one** scope only, start a
+fresh session, and check whether it appears in the registry. Untested here because both copies were
+slated for deletion.
 
 ---
 

@@ -1,13 +1,16 @@
 ---
 name: performance-architecture
 description: >
-  Architectural patterns and decisions for performant software systems. Triggers:
-  designing for performance, analyzing bottlenecks, choosing caching strategies,
-  planning capacity, optimizing latency/throughput, setting up load testing,
-  defining performance budgets, reviewing for performance anti-patterns;
-  performance budgets, latency analysis, throughput, caching, connection
-  pooling, async/concurrent patterns, database query optimization, load testing,
-  benchmarking, capacity planning, scaling/scalability.
+  Architectural patterns and decisions for performant software systems, including
+  agentic/multi-agent systems. Triggers: designing for performance, analyzing
+  bottlenecks, choosing caching strategies, planning capacity, optimizing
+  latency/throughput, setting up load testing, defining performance budgets,
+  reviewing for performance anti-patterns; performance budgets, latency analysis,
+  throughput, caching, connection pooling, async/concurrent patterns, database
+  query optimization, load testing, benchmarking, capacity planning,
+  scaling/scalability; token budget, context-window efficiency, agent spawn cost,
+  subagent fan-out, multi-agent pipeline wall-clock, progressive disclosure as
+  a performance optimization.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---
@@ -21,6 +24,7 @@ Architectural patterns and decisions for building performant software systems. P
 - [references/performance-patterns.md](references/performance-patterns.md) -- caching strategies, connection pooling, async patterns, batching, pagination optimization
 - [references/benchmarking.md](references/benchmarking.md) -- microbenchmark methodology, load testing patterns, profiling workflows, regression detection
 - [references/capacity-planning.md](references/capacity-planning.md) -- back-of-envelope estimation, Little's law, scaling decisions, cost-performance optimization
+- [references/agent-era-performance.md](references/agent-era-performance.md) -- token budget as a capacity constraint, context-window efficiency, spawn cost and fan-out, pipeline wall-clock, measurement discipline for agentic systems
 
 ## Core Principles
 
@@ -208,6 +212,22 @@ Rate limiting is not just protection -- it is a performance architecture tool. U
 - Shape traffic to match downstream capacity
 - Provide predictable degradation under load
 
+## Agent-Era Performance
+
+Agentic and multi-agent systems spend a resource classical performance work doesn't budget for: tokens, attention, and spawns rather than only CPU, memory, and network. The same rigor applies -- measure before optimizing, define budgets, find the critical path -- but the existing frames (Amdahl, Little's Law, cost-per-unit-of-work) transfer rather than need re-deriving.
+
+**Token budget as a capacity constraint**: always-loaded context (system prompt, CLAUDE.md, unconditional rules) is a fixed cost paid on every invocation; on-demand content (skill bodies, reference files) is a marginal cost paid only when relevant. Progressive disclosure is the optimization technique -- the direct analogue of cache-aside deferring an expensive fetch until needed. Measuring a budget requires stating its *basis* (exactly which files load, for whom) -- a stale or plausible-but-wrong basis can move a measurement across its own ceiling, especially when utilization is already near 100%.
+
+**Context-window efficiency**: attention is the scarce resource, not window size. An irrelevant token displaces attention from relevant content (context rot) -- so the quantity to optimize is relevance-per-token, not raw context size.
+
+**Spawn cost and fan-out**: a subagent spawn is a discrete, chunky cost unit (new context window, permission setup, cache miss) -- not a marginal loop increment. Fan-out multiplies it; concurrency caps bound it the way a connection-pool limit bounds downstream load. The right question is cost per *useful outcome*, not cost per call -- this skill's existing cost-per-unit-of-work framing (see [capacity-planning.md](references/capacity-planning.md#cost-performance-optimization)) applies directly: a cheap spawn producing a discarded result is worse value than an expensive one that resolves the task.
+
+**Pipeline wall-clock**: multi-agent pipeline latency is dominated by the critical path, not total agent-seconds. Barriers (a synthesis step waiting on every fan-out result) serialize; independent stages pipeline. This is Amdahl's Law from this skill's Core Principles applied almost verbatim -- map the pipeline's dependency chain the same way Step 2 of this skill's methodology maps any critical path.
+
+**Measurement discipline**: a budget that is never measured is an assertion. Token budgets are cheaply and statically re-measurable (`wc -c` over the file set); pipeline wall-clock is recoverable from phase-transition timestamps if logged. Per-spawn cost is the exception -- **unrecoverable after the fact unless captured at spawn time** -- which makes instrumentation-before-optimization a prerequisite for this dimension specifically, not a general nicety.
+
+--> See [references/agent-era-performance.md](references/agent-era-performance.md) for the full treatment of each quantity, including the basis-dependent measurement gotcha and the observability table for what's recoverable post-hoc.
+
 ## Anti-Patterns
 
 | Anti-Pattern | Why It Hurts | Fix |
@@ -221,6 +241,9 @@ Rate limiting is not just protection -- it is a performance architecture tool. U
 | **Missing backpressure** | Unbounded queues exhaust memory | Bound queues, reject or shed load on overflow |
 | **Premature distributed caching** | Complexity without proportional benefit | Start with in-process caching, add distributed when needed |
 | **N+1 queries** | Database round-trips dominate latency | Eager load, batch fetch, use data loaders |
+| **Unbounded always-loaded context** | Every added token is a fixed cost paid on every invocation, displacing attention (context rot) | Use progressive disclosure -- move to on-demand skill/reference content, measure the basis before adding |
+| **Fan-out without a concurrency cap** | Spawn cost is discrete and chunky; unchecked fan-out multiplies it without shortening the critical path | Cap concurrent spawns, optimize spawns-per-resolved-task, map the pipeline's critical path first |
+| **Optimizing spawn count after the fact** | Per-spawn cost is unrecoverable unless captured at spawn time | Instrument before fan-out runs, not after it looks expensive |
 
 ## Integration with Other Skills
 
@@ -228,6 +251,8 @@ Rate limiting is not just protection -- it is a performance architecture tool. U
 - **[API Design](../api-design/SKILL.md)** -- pagination contracts, rate limiting policies, payload design
 - **[Observability](../observability/SKILL.md)** -- monitoring validates performance decisions; metrics, traces, and alerts
 - **[CI/CD](../cicd/SKILL.md)** -- performance regression detection in CI pipelines
+- **[skill-crafting](../skill-crafting/SKILL.md)** -- progressive disclosure mechanics and context-engineering foundations that the token-budget and context-window-efficiency dimensions build on
+- **[rule-crafting](../rule-crafting/SKILL.md)** -- the always-loaded token budget's measurement and placement discipline (`paths:` scoping, the 25,000-token ecosystem ceiling)
 
 ## Verification Checklist
 
@@ -244,3 +269,6 @@ Before considering performance work complete:
 - [ ] N+1 queries eliminated or mitigated
 - [ ] Performance verified under realistic load conditions
 - [ ] No regressions in non-target metrics
+- [ ] For agentic designs: token budget basis stated (which files load, for whom) and re-measured, not assumed from a cached figure
+- [ ] For agentic designs: fan-out has a concurrency cap and is justified by cost-per-useful-outcome, not cost-per-call
+- [ ] For agentic designs: per-spawn cost instrumentation is in place before fan-out runs, not added retroactively

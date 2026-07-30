@@ -474,12 +474,24 @@ expertise exists, the standing to object does not.
 
 ### 12.2 Wave 2 — gated on Wave 1 evidence
 
-| Identity | Gap | Why it waits |
+**Revised 2026-07-30** (`dec-draft-e457d2df`, §17.13). The roster below is filtered by a criterion that did
+not exist when it was first drafted: **a discipline earns a consultant only when its errors are silent.** A
+lens and a consultant deliver identical knowledge; the consultant's only marginal contribution is *standing
+to object*. Where a wrong answer is caught by ordinary feedback — a benchmark, a profiler, a cost bill — the
+knowledge belongs in a lens's owning skill, delivered free on every pass, and gating it behind a spawn makes
+it *less* available rather than more rigorous.
+
+| Identity | Gap | Status |
 |---|---|---|
-| queueing-modeler | Little's Law, Universal Scalability Law, capacity/saturation modelling, Fermi estimation | Real gap, narrower trigger surface |
-| cost-economist | Token economics, cost-per-decision, tier ROI | Partially covered by `heterogeneous-orchestration.md` |
-| cognitive-ergonomist | Human error, alarm fatigue, cognitive load | Overlaps `web-ui-design` / `tui-design` |
-| data-steward | Privacy, retention, lineage, consent | Project-dependent; may warrant a dedicated agent instead |
+| **evidence-appraiser** | Source provenance, study-design-vs-claim-strength, external validity and transfer, citation drift, vendor-claim quarantine | **SHIPPED 2026-07-30** as discipline #2, bound to `evidence-appraisal`. Errors are silent: a misread import propagates carrying the authority of a number. Charter is concrete — the first live consult declined to verify the coefficients its own analysis rested on, recording them as *relayed* |
+| ~~queueing-modeler~~ | Little's Law, Universal Scalability Law, capacity/saturation modelling, Fermi estimation | **REMOVED.** `performance-architecture/references/capacity-planning.md` already contains Little's Law and back-of-envelope estimation, and the Performance lens delivers it unconditionally. A consultant here would duplicate free knowledge at spawn cost |
+| ~~performance-engineer~~ | Order-of-magnitude estimation, saturation reasoning | **REMOVED.** Same reason, plus it was the named `lens-collision` instance. Performance errors surface through measurement, so the silence criterion excludes it. The lens was strengthened instead — `performance-architecture` gained the agent-era dimension (token budget, context efficiency, spawn cost, pipeline wall-clock), which it did not previously carry |
+| cost-economist | Token economics, cost-per-decision, tier ROI | Still waiting — and now weaker: the agent-era performance work absorbs part of this gap into the always-on lens |
+| cognitive-ergonomist | Human error, alarm fatigue, cognitive load | Still waiting. Overlaps `web-ui-design` / `tui-design`, and more seriously overlaps the **context-engineer agent**, which holds decision authority — an agent collision is worse than a lens collision |
+| data-steward | Privacy, retention, lineage, consent | Still waiting. Project-dependent; may warrant a dedicated agent instead |
+
+**A non-`none` `lens-collision` value is now read as a design signal**, not a documentation chore: it asks
+first whether the discipline should exist at all, and only then what its escalation relationship would be.
 
 ### 12.3 Graduation rule
 
@@ -1185,6 +1197,52 @@ is no longer a structural argument, which is what the criterion required.
 and the ledger's 11-column schema has no cost column. Today's figures exist only because agent
 completions surfaced them in-session. Recording an ongoing series is a schema decision on an append-only
 file and is deliberately left open rather than resolved here.
+
+### 17.13 The lens-versus-consultant criterion — and why performance is a lens
+
+Writing the escalation relationship `dec-303` required before `performance-engineer` could ship exposed a
+prior question the design had never answered: **what makes a discipline worth a consultant at all?**
+
+Two facts settled it. First, a lens and a consultant deliver **identical knowledge** — Wave A established
+this when it eliminated the skills-into-existing-agents option, because a skill read by the architect *is
+the architect thinking with better knowledge*, with no second party to disagree. The consultant's entire
+marginal contribution is **standing to object**. Second, the specific knowledge was already present:
+`performance-architecture/references/capacity-planning.md` already contains Little's Law, back-of-envelope
+estimation, and cost-performance modelling — exactly what §12.2 reserved for `queueing-modeler` and §13
+routed to `performance-engineer`.
+
+That inverts the usual framing. **Gating knowledge that improves every decision does not add rigor; it
+subtracts availability.**
+
+> **A discipline earns a consultant only when its errors are silent.** Otherwise the knowledge belongs in
+> the owning artifact of a lens, delivered free and unconditionally.
+
+The discriminator is whether the error surfaces through ordinary feedback. **Performance errors surface** —
+benchmarks, profilers, latency graphs, cost bills falsify a wrong intuition, usually before it becomes
+load-bearing. **Statistical errors do not** — an inadequate sample produces a number that looks correct
+indefinitely, which is precisely how the first live consult found six defects in a gate its author believed
+sound.
+
+Three consequences, all applied: `performance-engineer` and `queueing-modeler` are removed from the roster;
+the Performance lens is strengthened instead, gaining the agent-era dimension it did not carry (token budget
+as a capacity constraint, context-window efficiency, spawn cost and fan-out, pipeline wall-clock, and the
+measurement discipline each needs); and `evidence-appraiser` becomes discipline #2, with a boundary against
+`statistician` written into both rows — *the statistician asks whether our analysis of our data is sound;
+the appraiser asks whether their claim about their data licenses what we are doing with it.*
+
+**The criterion's weakness is recorded rather than hidden.** "Would this error have surfaced?" is a
+counterfactual, and counterfactuals are where motivated reasoning lives. A blunter rule — no consultant for
+any domain that already owns a lens — is harder to game and reaches the same verdict here; it was rejected
+only because it would exclude a security consultant on structural grounds rather than on merit. The ADR's
+`dissent:` field carries this in full, along with the observation that a criterion which happens to justify
+the one discipline already shipped and exclude the one a user proposed has the shape of a conclusion looking
+for a rule.
+
+**Discipline #2 shipped ahead of its own evidence gate**, knowingly. The gate reads *not yet informative*
+(one consult, two of three disposition values). Because that gate was deliberately demoted from an automatic
+threshold to an estimate a human adjudicates, a human choosing to ship is the mechanism working rather than
+a bypass — but it is the risk the prior decision's reversal trigger named, so it is recorded here and in the
+ADR rather than passed over.
 
 ---
 

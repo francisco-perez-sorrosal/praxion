@@ -851,6 +851,55 @@ the praxion users," this is a genuine gap along a *different* extensibility axis
 for **users**, not for Praxion. Deferred deliberately rather than resolved at planning stage, with the
 concrete path recorded — a project-local overlay consulted before the shipped registry.
 
+### 17.7 Step 1 spike outcome — the binding mechanism is NOT verified
+
+Run 2026-07-30. Step 1 was ordered first precisely so this could surface cheaply, and it did: the
+spike **falsified the assumption rather than confirming it**.
+
+| Question | Result |
+|---|---|
+| Is `Skill` invocable inside *a* subagent, resolving a plugin namespace, with content genuinely loading? | **Proven** — distinctive verbatim lines quoted from two different plugin skills by a `general-purpose` agent (which holds all tools *and* a full skills listing) |
+| Does static `skills:` frontmatter injection work? | **Confirmed** — full skill bodies arrive verbatim in the agent's context |
+| Does a **custom plugin agent** receive an available-skills **listing**? | **NO** — a probe on an existing Praxion agent reported neither listing nor tool |
+| Does a custom plugin agent receive the `Skill` **tool**? | **Only if explicitly declared.** Tools are a strict allowlist — and **zero of Praxion's 16 agents declare `Skill`**; every one uses static `skills:` frontmatter |
+| Can an agent holding `Skill` but receiving **no listing** invoke a skill by a name it was *told*? | **UNKNOWN** — the load-bearing question, unresolvable in-session |
+
+**Why it cannot be resolved in-session.** Agents load at session start, so a newly authored agent file
+is not spawnable until a restart. The `Skill` tool's own contract states the name must come *"from the
+listing"* and warns against guessing — and a custom agent has no listing. Whether the tool nonetheless
+resolves from the plugin registry decides whether the "identity N+1 is structurally free" property
+holds as designed.
+
+**The methodological point worth preserving:** had the roadmap begun with the ledger and fitness test,
+`fitness/tests/test_discipline_registry_invariants.py` would have been written asserting *"0 consultant
+`skills:` entries"* — an invariant encoding a binding mechanism that may not exist. The test would have
+passed while protecting the wrong design. Cheap falsification first is what prevented that.
+
+#### Three candidate binding mechanisms
+
+The design degrades under a negative result; it does not die.
+
+| Mechanism | Status | Cost profile |
+|---|---|---|
+| **1. Runtime `Skill` invocation** (the design's choice) | Unverified for custom agents | Ideal — only the active discipline's knowledge loads per consultation |
+| **2. Static `skills:` frontmatter listing all disciplines** | Works today, proven | **0** always-loaded tokens (frontmatter never reaches the orchestrator's context), so the N+1 guarantee *survives on the always-loaded ledger* — but every consultation loads every discipline's body. Tolerable at N=2, serious context pollution by N=8. Contradicts REQ-16 as currently written |
+| **3. Orchestrator-injected skill content in the spawn prompt** | Works today | Keeps per-consultation loading selective; shifts binding work to the orchestrator and weakens prompt-cache reuse |
+
+#### Resolution in flight
+
+A throwaway project-local probe agent exists at `.claude/agents/skill-probe.md` — `tools: Read, Skill`,
+no `skills:` frontmatter, deliberately configured to isolate the open question. It is **untracked and
+must not be committed**; delete it once the answer is recorded.
+
+**Resume action after a session restart:** spawn `skill-probe` once and record its verdict here. A
+`WORKS` result confirms mechanism 1 and unblocks steps 2–3 unchanged. A `FAILS` result selects between
+mechanisms 2 and 3, requires REQ-16 to be amended, and warrants an architect loop-back rather than an
+in-place patch.
+
+**Steps 2–3 are deliberately NOT started.** Step 2 (the disposition ledger) is genuinely
+mechanism-independent and could proceed; step 3 (the fitness test) is not, because it encodes which
+mechanism won.
+
 ---
 
 ## 18. Citations

@@ -327,15 +327,60 @@ Multidisciplinarity is a **goal of this initiative, not a side effect of it**. W
 make adding identity N+1 cheap and safe, indefinitely. Stated below as a measurable acceptance
 criterion, because "flexible" is the class of goal that erodes silently unless it is verifiable.
 
-| Criterion | Threshold for adding discipline N+1 |
+> [!NOTE]
+> **Corrected 2026-07-30 at the Wave A/B gate.** The first version of this criterion demanded a flat
+> `0` always-loaded delta *and* permitted a new skill for genuine knowledge gaps. Those two rows are
+> **jointly unsatisfiable**, because a skill's `description` frontmatter is itself always-loaded
+> (~142 tok mean) — so the criterion as originally written would have failed `statistician`, the very
+> first identity requested. The defect was conflating two different costs. The corrected form below
+> separates them.
+
+**The distinction that fixes it: structural cost vs knowledge cost.**
+
+- **Structural cost** is what adding a discipline demands of the *machinery* — rule edits, manifest
+  entries, catalog rows, new agent files, pipeline stages. This must be **exactly zero**. It is pure
+  friction with no compensating value, it is mechanically checkable, and it is what actually decays
+  extensibility as N grows.
+- **Knowledge cost** is what a genuinely new domain contributes — one skill carrying expertise Praxion
+  does not yet own. This is **irreducible and legitimate**. Demanding it be zero is incoherent: the
+  only way to add new knowledge for free is to not add knowledge. It is budgeted and tracked, not
+  asserted away.
+
+### Cost classes
+
+| Cost class | When it applies | Threshold |
+|---|---|---|
+| **One-time machinery** | Built once, for the first discipline | ≤1,100 always-loaded tok, charged against headroom at design time (Wave A measured ≈925–1,050) |
+| **Per-discipline — binding-only** | The discipline's expertise is already owned by an existing skill (e.g. performance, reliability, invariants) | **0** always-loaded bytes. A roster entry inside the consultant body only |
+| **Per-discipline — genuine gap** | The discipline brings knowledge Praxion does not own (e.g. applied statistics) | **≤1 skill `description`** (~120–160 tok) and **zero** bytes in every other always-loaded surface |
+
+### Structural invariants — apply to every class, no exceptions
+
+| Invariant | Threshold |
 |---|---|
-| Always-loaded token delta | **0** |
-| Always-loaded rule files changed | **0** |
+| Always-loaded **rule** files changed | **0** |
 | New agent files | **0** |
 | `.claude-plugin/plugin.json` edits | **0** |
-| Consultant agent `tools:` list changes | **0** — a mid-session `tools` mutation invalidates the entire prompt cache (`tools` → `system` → `messages`), so the tool list must be discipline-independent by construction |
-| Files touched | **≤2** — one roster/binding entry, plus a new skill only when the discipline is a genuine knowledge gap (three of four Wave-1 disciplines need none) |
+| Catalog/README rows or agent-count strings changed | **0** |
+| Consultant `tools:` list changes | **0** — a mid-session `tools` mutation invalidates the entire prompt cache (`tools` → `system` → `messages`), so the tool list must be discipline-independent by construction |
 | Pipeline stages added | **0** |
+| Files touched | **≤2** — the roster entry, plus at most one new skill for a gap discipline |
+
+### Extensibility runway
+
+The corrected criterion yields a concrete, checkable forward budget rather than an aspiration:
+with ~2,309 tok of headroom and ~1,050 tok of one-time machinery, roughly **1,259 tok remain** —
+about **8 further gap disciplines** at ~150 tok each, and an **unbounded** number of binding-only
+disciplines. Any design whose per-discipline cost is structural rather than knowledge-shaped burns
+that runway for nothing.
+
+### Model and effort routing must be generic, not per-discipline
+
+A consequence of parameterizing the consultant by model tier *and* reasoning effort: the
+difficulty→tier mapping must live as **one generic policy**, not one row per discipline. A design that
+adds a per-discipline row to `rules/swe/agent-model-routing.md` (an always-loaded surface) converts
+routing into a **structural** per-discipline cost and fails the invariants above. The roster entry may
+carry a model/effort *hint*; the *policy* that interprets it stays generic and is written once.
 
 Two design consequences follow. The architect should treat these as constraints, not options.
 
@@ -608,7 +653,84 @@ first**, at small cost:
 
 ---
 
-## 16. Citations
+## 16. User rulings at the Wave A/B gate
+
+Recorded 2026-07-30. These are **binding decisions**, made by the user after reading the Wave A
+digest. They supersede the corresponding proposals in [§9](#9-recommended-architecture-hypothesis),
+[§12](#12-identity-roster), and [§15.7](#157-revised-recommendation). Downstream stages honor them
+and do not re-litigate them; a stage that believes a ruling is structurally unsafe registers an
+objection with a reason rather than silently deviating.
+
+| # | Ruling | Supersedes |
+|---|---|---|
+| 1 | **Peer, not lens** — the consultant is a parameterizable *peer* (shadow sub-architect with standing to object), not an evaluation lens | Resolves the §15.4 contradiction in favour of the internal-surface lens. The closed Lens Catalog needs **no** Wave-1 supersession |
+| 2 | **Parameterized/configurable agent** — Option C proceeds. Option D (no new party) is **not** adopted as the build path | §15.7 item 1 (A/B-first) |
+| 3 | **Heterogeneity opens on two axes — model *and* reasoning effort** — selected by task difficulty, using frontier-lab published model-selection guidance | §9's single-Opus floor; §2 item 3 |
+| 4 | **One identity only: `statistician`** | §12.1's four-identity Wave 1 |
+| 5 | **Fix §9.1 before designing** — done; see the corrected criterion | §15.7 item 5 |
+
+**Ruling 4 dissolves the §15.4 conflict entirely for Wave 1.** The CRITICAL finding was specifically
+that `performance-engineer` duplicates the existing Performance lens. With `performance-engineer`
+deferred, no Wave-1 discipline collides with the Lens Catalog. The collision becomes a **deferred
+condition**: any future discipline whose name matches an existing lens must either bind to that lens's
+owning artifact as a peer, or carry an ADR supersession. Record this as a reversal trigger.
+
+### 16.1 The reasoning-model-era argument — verified, and stronger than first summarized
+
+The user's rationale for overriding [§15.1](#151-confirmed-threat-to-the-premise) is that the 2024
+null result predates strong reasoning models, and that the primary paper's format-over-content finding
+is the relevant evidence for the 2025–2026 model generation. **Verified at orchestrator level:**
+
+> "Notably, both conditions are trained on identical problems and correct answers, yet
+> conversation-fine-tuned models consistently improve faster and reach higher asymptotic accuracy."
+> — Results, Reinforcement Learning Experiments
+
+The controls are genuine. The monologue arm generates "standard chain-of-thought traces for the 'same
+problems' with correct answers, where a single voice reasons within `<think> … </think>` tags"; the
+dialogue arm has personas "engage in turn-taking dialogue where they build on, question, and correct
+each other's reasoning." **Identical problems, identical correct answers — only the format varies.**
+
+This is a controlled format-vs-content experiment, and dialogue wins on *both* convergence speed and
+the ceiling. It also corrects an earlier paraphrase in this dossier's own §3.1, which reported faster
+convergence "without changing asymptotic performance" — the paper's own wording says **higher
+asymptotic accuracy**. Format is not merely an accelerant; it raises the ceiling. That materially
+strengthens ruling 2.
+
+### 16.2 The load-bearing assumption, stated so it can fail
+
+The paper is explicit that it does **not** claim transfer to deployed multi-agent systems:
+
+> "Without deploying separate models prompted to interact with one another, we suggest that
+> behaviourally similar conversations between diverse perspectives occur and are leveraged within
+> reasoning models."
+
+So ruling 2 rests on an **inference**: that the value of dialogue format transfers from
+*intra-model* (one model's trace) to *inter-agent* (separate agents in a pipeline). The paper's
+Discussion encourages exactly this exploration ([§3.2](#32-the-paper-is-pro-multi-agent-corrects-a-common-misreading-of-the-abstract))
+but does not test it.
+
+The competing hypothesis must be named so the bet is falsifiable rather than an article of faith:
+
+> **Substitution hypothesis.** If reasoning models *already* internally simulate a society of thought,
+> an external society may be redundant — and stronger reasoning models would make explicit multi-agent
+> deliberation *less* valuable, not more.
+
+Evidence against pure substitution, and therefore for the bet: the internal society is **incomplete**
+— [§3.3](#33-the-reconciliation-deficit--the-most-actionable-finding)'s reconciliation deficit shows
+internal perspectives "compete rather than forming an effective ensemble." That is a concrete
+mechanism by which external structure adds what the internal society lacks: enforced, single-owner
+synthesis. It is also corroborated independently by Wave A's Q4 finding that selector quality
+dominates generator diversity.
+
+**Falsifier for ruling 2 specifically:** if the consultant's challenges are dispositioned
+`dismiss-with-rationale` at a high rate while the architect's unaided output with the same knowledge
+injected is indistinguishable in quality, the substitution hypothesis holds and the external party
+should be removed in favour of Option D. The disposition counter is what makes this measurable — which
+is why Wave A ranked it a prerequisite, not a report card.
+
+---
+
+## 17. Citations
 
 - [Reasoning Models Generate Societies of Thought](https://arxiv.org/html/2601.10825v1) — Kim, Lai, Scherrer, Agüera y Arcas, Evans (arXiv:2601.10825v1, Jan 2026)
 - [When "A Helpful Assistant" Is Not Really Helpful: Personas in System Prompts Do Not Improve Performances of LLMs](https://aclanthology.org/2024.findings-emnlp.888/) — Zheng et al., EMNLP Findings 2024

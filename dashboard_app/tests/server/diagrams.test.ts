@@ -69,8 +69,10 @@ describe("sanitizeSvg — strips XSS vectors", () => {
     expect(output).toContain("<text");
     expect(output).toContain("<defs");
     expect(output).toContain("<marker");
-    // sanitize-html / htmlparser2 lowercases SVG camelCase element names
-    expect(output).toContain("fedropshadow");
+    // htmlparser2 >= 12 restores the spec-correct camelCase tag name for known
+    // SVG elements inside foreign content (feDropShadow, not fedropshadow) —
+    // checked case-insensitively since the sanitizer's allowlist accepts both.
+    expect(output.toLowerCase()).toContain("fedropshadow");
   });
 
   it("preserves the root viewBox and other camelCase SVG attributes (regression: htmlparser2 lowercases attribute names)", () => {
@@ -114,7 +116,9 @@ describe("sanitizeSvg — strips XSS vectors", () => {
 
     const output = sanitizeSvg(input);
 
-    // sanitize-html lowercases tag names — foreignObject → foreignobject
+    // Checked case-insensitively: htmlparser2 >= 12 restores foreignObject's
+    // spec-correct camelCase inside SVG foreign content (was foreignobject
+    // pre-upgrade); the allowlist accepts both forms.
     expect(output.toLowerCase()).toContain("foreignobject");
     expect(output).toContain("nodeLabel");
     expect(output).toContain("Some Label");

@@ -21,6 +21,12 @@ named check MUST flag, paired per `rules/swe/gate-liveness.md`.
   sentinel must flag **Important** on it. Control: `INTERFACE_DESIGN_no_challenge.md`
   (no `## Architecture Challenges` section) — sentinel must NOT warn.
   PROMPT-kind gate — golden bad-case proof per `rules/swe/gate-liveness.md`.
+- `consult_no_disposition/` — `P07`'s discipline-consultant extension: a minimal
+  `CONSULT_statistician.md` carrying a non-empty `## Challenges` section whose `### CH-01`
+  entry left `**Disposition:**` as the `<!-- convener, Round 2 -->` placeholder. The
+  sentinel must flag **Important** on it. Control: `CONSULT_statistician_no_challenge.md`
+  (no `## Challenges` section) — sentinel must NOT warn. PROMPT-kind gate — golden
+  bad-case proof per `rules/swe/gate-liveness.md`.
 - `stale_slug_advisory/` — `P08` (Stale `.ai-work/` slugs accumulating without cleanup):
   a synthetic `clean_work_safety.py --json` output (`clean_work_safety_stale.json`)
   with `summary.stale_safe = 3` (threshold for advisory). The sentinel must emit an

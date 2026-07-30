@@ -668,6 +668,7 @@ objection with a reason rather than silently deviating.
 | 3 | **Heterogeneity opens on two axes — model *and* reasoning effort** — selected by task difficulty, using frontier-lab published model-selection guidance | §9's single-Opus floor; §2 item 3 |
 | 4 | **One identity only: `statistician`** | §12.1's four-identity Wave 1 |
 | 5 | **Fix §9.1 before designing** — done; see the corrected criterion | §15.7 item 5 |
+| 6 | **Multi-instance by design** — the mechanism must support **N concurrent consultant instances, each configured with a different discipline**, not one-discipline-at-a-time | Extends §9; see §16.3 |
 
 **Ruling 4 dissolves the §15.4 conflict entirely for Wave 1.** The CRITICAL finding was specifically
 that `performance-engineer` duplicates the existing Performance lens. With `performance-engineer`
@@ -727,6 +728,35 @@ dominates generator diversity.
 injected is indistinguishable in quality, the substitution hypothesis holds and the external party
 should be removed in favour of Option D. The disposition counter is what makes this measurable — which
 is why Wave A ranked it a prerequisite, not a report card.
+
+### 16.3 Multi-instance concurrency (ruling 6) — the best-evidenced axis in the design
+
+The mechanism must be able to run **several consultant instances at once, each parameterized to a
+different discipline**, and must not assume a single consultant per task. Wave 1 ships one discipline
+(`statistician`), but the *mechanism* must not foreclose N.
+
+**This is the axis with the strongest empirical support of anything in this dossier.** Wave A's Q2
+found, in a controlled comparison, that the **agent-count** coefficient is 0.066 (p<0.001) while the
+**dialogue-depth** coefficient is 0.019 (not significant). Breadth of independent perspectives pays;
+depth of argument does not. Ruling 6 therefore strengthens the design on evidence, while
+[§10](#10-dialogue-protocol)'s one-round bound is confirmed as correct rather than stingy.
+
+Design constraints that follow:
+
+| Constraint | Requirement |
+|---|---|
+| **Fragment isolation** | Each instance writes `CONSULT_<discipline>.md` — never a shared canonical file. This is Praxion's existing parallel-execution fragment pattern; no new convention is needed |
+| **Lens independence holds *across* instances** | During round 0, no instance may read a sibling's fragment. Concurrent consultants that can see each other collapse into one correlated opinion at N× the cost — the exact failure the isolate/reconcile discipline exists to prevent |
+| **Single-owner reconciliation still holds** | The architect merges N fragments. Consultants never negotiate with each other. Q4's finding that selector quality dominates generator diversity (g=3.86) means the merge is where quality is won, and it must not be distributed |
+| **Concurrency cap** | 2–3 concurrent instances, matching Praxion's existing multiplicity guidance, bounded by the design-synthesis cost envelope (≤3× baseline routine, ≤6× high-stakes) |
+| **Composes with ruling 3** | Per-instance model *and* effort selection turns a multi-instance fan-out into the established Haiku-proposer / Opus-aggregator recipe already documented in `skills/multi-perspective-analysis/references/heterogeneous-orchestration.md` — cheap proposers, frontier aggregator |
+| **No effect on §9.1** | Instances are a **runtime** concern; disciplines are a **registry** concern. Running three consultants costs three spawns, not three roster edits, and adds zero always-loaded bytes |
+
+**Objection registered against a plausible misreading of ruling 6:** "more identities" is not
+free quality. Q2's agent-count result was measured at small N, and MAST's inter-agent-misalignment
+category (~37% of failures) scales with participant count. The cap is load-bearing, and the trigger
+gate must still fire per discipline — three consultants convened because three triggers fired is
+breadth; three convened by default is cost.
 
 ---
 

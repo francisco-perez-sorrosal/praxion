@@ -98,9 +98,24 @@ TRIAGE DECISION TREE
 3. Is this project identity, workflow preference, or must be always-on?
    YES --> CLAUDE.md addition
 
-4. Does this not fit any artifact type, or is it too narrow/transient to formalize?
+4. Is this a recurring "we needed a specialist voice here" signal -- a decision that
+   would have benefited from a discipline the consultant registry does not carry?
+   YES --> Discipline-gap signal: RECORD it for human disposition. Do NOT propose a
+           discipline artifact and do NOT draft a registry row.
+
+5. Does this not fit any artifact type, or is it too narrow/transient to formalize?
    YES --> Skip (note the reason)
 ```
+
+**Discipline-gap signals are recorded, never acted on.** Leaf 4 exists so a recurring
+"we needed an X here" observation is captured for a human to disposition, rather than
+being lost in an ephemeral document or -- worse -- answered by inventing a discipline.
+Automatic identity genesis is deliberately not built: the literature's clearest negative
+result is that *automatically* identifying the right specialist performs no better than
+random, whereas routing over a bounded, authored roster beats it. Recording is the safe
+half and is what makes the roster's eventual expansion evidence-based; proposing is the
+unsafe half and stays a human decision. Record the signal, the decision it would have
+changed, and where it recurred -- an observation naming no decision is noise.
 
 **Skill qualification criteria** (from skill-crafting spec):
 - Supports at least 3 concrete usage scenarios
@@ -199,12 +214,22 @@ Review status: pending.>
 | Latest IDEA_LEDGER_*.md | `.ai-state/idea_ledgers/<file>` | N | Read / Not found |
 | ADRs (recent) | `.ai-state/decisions/` | N | Read / N matched |
 | Calibration log Retrospective cells | `.ai-state/calibration_log.md` | N | Read / Not found |
+| Consult fragments | `.ai-work/<slug>/CONSULT_<discipline>.md` | N | Read / Not found |
 
 ## Triage Results
 
 | # | Item | Source | Decision | Rationale |
 |---|---|---|---|---|
-| 1 | <one-line> | <source> | Skill / Rule / CLAUDE.md / Skip | <rationale> |
+| 1 | <one-line> | <source> | Skill / Rule / CLAUDE.md / Discipline-gap / Skip | <rationale> |
+
+## Discipline-Gap Signals
+
+Recorded for human disposition only -- this agent never proposes a discipline, drafts a
+registry row, or instantiates one. Omit the section when no signal was recorded.
+
+| # | Signal (what specialist voice was missing) | Decision it would have changed | Where it recurred | Times seen |
+|---|---|---|---|---|
+| 1 | <one-line> | <the decision at stake> | <slug / artifact> | N |
 
 ## Proposals
 

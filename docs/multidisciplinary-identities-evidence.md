@@ -488,7 +488,127 @@ The initiative should be **deleted, not tuned**, if:
 
 ---
 
-## 15. Citations
+## 15. Wave A outcomes — the premise is under threat
+
+Recorded 2026-07-30 at the Wave A/B gate. Three agents ran in isolation (external-evidence
+researcher at Opus, internal-surface researcher, context-engineer), each forbidden from reading
+sibling fragments during collection. Fragments live in gitignored `.ai-work/multidisciplinary-identities/`
+(~144 KB); this section is their durable reconciliation.
+
+### 15.1 Confirmed threat to the premise
+
+[Rethinking the Bounds of LLM Reasoning: Are Multi-Agent Discussions the Key?](https://aclanthology.org/2024.acl-long.331/)
+— Wang, Wang, Su, Tong, Song, ACL 2024 (arXiv:2402.18272). **Verified independently at orchestrator
+level, not relayed on trust:**
+
+> "A single-agent LLM with strong prompts can achieve almost the same best performance as the best
+> existing discussion approach on a wide range of reasoning tasks and backbone LLMs."
+
+> "The multi-agent discussion performs better than a single agent only when there is no
+> demonstration in the prompt."
+
+**Praxion is demonstration-dense by construction** — skills, rules, and agent bodies are largely
+worked examples. This paper's boundary condition therefore lands squarely on Praxion's own
+configuration, and it predicts a *small or null* gain from adding a discussing party.
+
+Consequence: [§8](#8-design-space) is incomplete. It evaluated A (N agents), B (N skills), and C
+(parameterized consultant) but **never evaluated Option D — no new party, stronger architect
+context**. B was dismissed for lacking dialogue; D1 says dialogue may not pay here. The null option
+deserved a seat and did not get one.
+
+### 15.2 Partially confirmed: expert personas can damage accuracy
+
+[Expert Personas Improve LLM Alignment but Damage Accuracy: Bootstrapping Intent-Based Persona
+Routing with PRISM](https://arxiv.org/abs/2603.18507) — Hu, Rostami, Thomason, 19 Mar 2026.
+
+**Confirmed at orchestrator level:** the paper exists and its title asserts the directional claim —
+expert personas improve alignment but damage accuracy.
+
+**Not confirmed at orchestrator level:** the specific figures reported by the research lens (MMLU
+71.6% → 68.0%/66.3%; MT-Bench Coding −0.65; routed 73.5 > always-on 72.2 > random 70.5; gate/effect
+correlation r=0.65). The abstract page did not expose them. These remain **agent-sourced and
+unverified** — treat as medium confidence pending a full-text read.
+
+The MT-Bench *Coding* regression, if it holds, is the most uncomfortable single datum for this
+initiative: coding is Praxion's domain.
+
+### 15.3 Convergences reached independently (strongest signals)
+
+| Finding | Reached by | Why it counts |
+|---|---|---|
+| Always-loaded budget is **GO**, but the cost is higher than [§9](#9-recommended-architecture-hypothesis) claimed — one-time wiring ≈925–1,050 tok; Wave-1 total ≈640–790 tok (30–34% of headroom) | both internal lenses, independently | The ~500 tok figure in §9 conflated two budget ledgers. Corrected. |
+| Per-discipline **recurring** cost genuinely can be **0** always-loaded tokens | context-engineer (by construction) + internal researcher (by git archaeology: `Mode:` #2 cost 0 bytes; #3 cost 4 lines only because it added a new *artifact type*) | Two independent methods, same answer. §9.1's N+1 criterion is achievable. |
+| **Isolate-then-dialogue is correct** | external lens (Anthropic Tier-1 docs independently name *anchoring* as the failure independence prevents) + context-engineer (`context: fork` inherits the full parent conversation and mechanically breaks Round-0 isolation) | Convergent, and `context: fork` is now disqualified as a cheaper substrate. |
+| **Agent teams are disqualified** as the dialogue substrate | external lens (three Tier-1 blockers: `skills:` frontmatter **silently dropped** for teammates — which would kill the discipline→skill bindings entirely; no nested teams — which would kill Tier-2 self-nomination; body appended not replaced) + context-engineer | Convergent. Subagent topology stands. |
+| The accept/defer/dismiss counter is **a prerequisite, not a postscript** | external lens (PRISM's gate beats random *because* it correlates with measured persona effect — the counter is the router's calibration loop) + internal lens (no countable persistent artifact exists today; `switch-now` persists via ADRs but `defer`/`dismiss` land only in ephemeral prose) | Elevates the counter from falsifier to **precondition**. Must ship first. |
+
+### 15.4 Unresolved contradiction — lens or peer?
+
+The two lenses that could not see each other **directly contradict** on a load-bearing point:
+
+| Lens | Verdict on the closed Lens Catalog |
+|---|---|
+| context-engineer | **CRITICAL** — `performance-engineer` duplicates the existing Performance lens *today*. Requires a Wave-1 ADR supersession, not a deferred one. |
+| internal-surface | Lens Catalog **needs no edit** — the consultant is architecturally a *shadow sub-architect*, not a lens. Conflation risk flagged explicitly. |
+
+The underlying question is genuinely architectural: **is a disciplinary consultant a *lens* (an
+evaluation criterion applied to options) or a *peer* (an agent with standing to object)?** The answer
+determines whether Wave 1 carries an ADR supersession. Unadjudicated at the gate — a disagreement
+surviving isolation marks real ambiguity, not noise.
+
+### 15.5 Answered questions and their design consequences
+
+| Q | Verdict | Consequence |
+|---|---|---|
+| Q1 domain vs conversational diversity | **PARTIAL — and disconfirming.** No source ablates role content with structure held fixed. The nearest evidence is negative (§15.2). Critically: **every diversity result that pays varies the *backbone*** — the axis §9's single-Opus floor forecloses. | §9's Opus floor is right for *capability* (SPP's frontier-only synergy) but it eliminated **model heterogeneity**, which is the diversity axis with actual evidence behind it. Reopen. |
+| Q2 one round or two | **ANSWERED — one round, possibly generous.** A sequential-probability-ratio governor stops at 1.01 average rounds reaching 97.0% vs 99.0% for fixed-5 rounds at 3.7× the calls. Controlled depth coefficient 0.019 (n.s.) vs agent-count 0.066 (p<0.001). | Value is in **breadth (independent perspectives)**, not **depth (dialogue rounds)**. Gate *before* round 0 — conformity harm fires at first exposure (K=2). |
+| Q3 bounded routing vs random | **ANSWERED with a caveat.** Guided routing over a bounded roster beats random, replicated. **But every validated router is learned or model-scored — hand-authored routing remains untested.** | The [§13](#13-registered-objections) objection **stands**. Tier-1's authored trigger table is still unvalidated; the counter is what would calibrate it. |
+| Q4 reconciliation deficit transfer | **ANSWERED — transfers, and dominates.** Five 2026 sources converge: *"selector quality may be a more impactful design lever than generator diversity."* Judge 0.810 / vote 0.496 / **synthesis 0.179** (g=3.86); oracle gap 32.3pp. | Invest in **synthesis quality**, not roster size. Synthesis is the weakest link by a large margin. |
+| Q5 agent teams | **ANSWERED — no.** See §15.3. | Subagent + orchestrator-mediated dialogue confirmed. |
+
+### 15.6 Additional internal findings
+
+- **Pre-existing debt:** `agents/implementation-planner.md` is already **526 lines, past its own
+  sentinel FAIL threshold of 500**, before this task touches it. `systems-architect.md` (472) and
+  `researcher.md` (319) are in WARN.
+- **No harness to extend:** the `Mode:` directive has **zero** test, hook, or sentinel validation —
+  pure prompt convention. A `Discipline:` directive must have validation *built*, not inherited.
+- **Insertion surface is larger than mapped:** 18 one-time points, including `adr-conventions.md`'s
+  "Who Writes ADRs" table, the pipeline Mermaid diagram, hardcoded agent-count strings in
+  `docs/architecture.md`, and sentinel's own self-referential name list. 11+ sentinel checks implicated.
+- **Tier-3 identity genesis is not free:** `skill-genesis`'s triage schema has **no "new discipline"
+  slot**. [§11](#11-identity-selection-model)'s "reuses existing machinery" was aspirational.
+- **§9.1 is internally inconsistent:** its "new skill only when a genuine knowledge gap" row and its
+  "0 always-loaded token delta" row are **jointly unsatisfiable** for a gap discipline such as
+  `statistician`, because a new skill's `description` is itself always-loaded (~142 tok). The
+  criterion must separate **one-time** from **per-discipline recurring** cost.
+- **Clean:** no shipped-artifact-isolation violation; no canonical-block mirroring required.
+- **Placement (Q12):** split verdict — this dossier stays in `docs/` (Praxion-specific numbers do not
+  transfer); a distilled, portable reference belongs under
+  `skills/multi-perspective-analysis/references/` since that surface ships to managed projects.
+
+### 15.7 Revised recommendation
+
+The evidence no longer supports building Option C on faith. It supports **testing it against the null
+first**, at small cost:
+
+1. **Phase 0 becomes a comparison, not a build.** Run both arms on the same real decisions —
+   *Arm D*: architect with an applied-statistics skill injected and a strong prompt (no new party).
+   *Arm C*: architect plus a separate statistician consultant using the dialogue protocol.
+   Measure decision changes, accepted-challenge rate, and cost. This directly tests D1 inside
+   Praxion's own demonstration-dense configuration, which is exactly where the external evidence is
+   silent — and it is what the `statistician` identity would itself demand.
+2. **Ship the disposition counter before the roster.** Q3 + Q4 make it the calibration loop, not the
+   report card.
+3. **Reopen backbone heterogeneity.** Per Q1, model diversity is the axis with evidence; Praxion
+   already owns the machinery in `heterogeneous-orchestration.md`.
+4. **Spend on synthesis, not on more identities.** Q4's effect size (g=3.86) says the selector
+   dominates the generators.
+5. **Fix §9.1's inconsistency** and adjudicate §15.4 before any artifact is written.
+
+---
+
+## 16. Citations
 
 - [Reasoning Models Generate Societies of Thought](https://arxiv.org/html/2601.10825v1) — Kim, Lai, Scherrer, Agüera y Arcas, Evans (arXiv:2601.10825v1, Jan 2026)
 - [When "A Helpful Assistant" Is Not Really Helpful: Personas in System Prompts Do Not Improve Performances of LLMs](https://aclanthology.org/2024.findings-emnlp.888/) — Zheng et al., EMNLP Findings 2024
@@ -499,3 +619,5 @@ The initiative should be **deleted, not tuned**, if:
 - [MetaGPT: Meta Programming for a Multi-Agent Collaborative Framework](https://arxiv.org/pdf/2308.00352)
 - [SPOQ: Specialist Orchestrated Queuing for Multi-Agent Software Engineering](https://arxiv.org/abs/2606.03115) — Carbowitz & Kumar, June 2026
 - [Rigorous Benchmarking in Reasonable Time](https://dl.acm.org/doi/10.1145/2491894.2464160) — Kalibera & Jones, ISMM 2013
+- [Rethinking the Bounds of LLM Reasoning: Are Multi-Agent Discussions the Key?](https://aclanthology.org/2024.acl-long.331/) — Wang, Wang, Su, Tong, Song, ACL 2024 (arXiv:2402.18272)
+- [Expert Personas Improve LLM Alignment but Damage Accuracy (PRISM)](https://arxiv.org/abs/2603.18507) — Hu, Rostami, Thomason, Mar 2026

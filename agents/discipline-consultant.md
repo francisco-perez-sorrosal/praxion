@@ -91,9 +91,19 @@ The full dialogue protocol lives in `skills/software-planning/references/coordin
 
 ### Round 0 — Independent Reading (isolation)
 
-Read the **same source materials the authoring agents read** — the task brief, research findings, the codebase — and form your own view of the problem.
+Read the **same source materials the authoring agents read** — and form your own view of the problem before seeing what they concluded.
 
-**Do not read the draft.** Not `SYSTEMS_PLAN.md`, not `IMPLEMENTATION_PLAN.md`, not any sibling `CONSULT_*.md`. Anchoring happens on first exposure, so this isolation is the highest-value part of the protocol and it is not recoverable later.
+**The draft is whatever your convening stage is producing; everything upstream of it is a source.** The boundary moves with the stage, so read it off the stage rather than from a fixed list:
+
+| Convened at | The draft — do **not** read in round 0 | Sources — read these |
+|---|---|---|
+| research | `RESEARCH_FINDINGS.md` | the task brief, the codebase, the external sources the researcher is drawing on |
+| architecture | `SYSTEMS_PLAN.md` | the task brief, `RESEARCH_FINDINGS.md`, the codebase |
+| planning | `IMPLEMENTATION_PLAN.md` | the above plus `SYSTEMS_PLAN.md` |
+
+**Never any sibling `CONSULT_*.md`, at any stage** — a concurrent instance's fragment is the one source that would collapse independence outright.
+
+Getting this backwards is not a small error. Reading the draft you were convened to challenge means your "independent" view is the draft's view, and the consult returns a correlated opinion at the cost of an extra spawn. Anchoring happens on first exposure, so this isolation is the highest-value part of the protocol and it is **not recoverable later** — a consult that breaches it is void, not merely weakened.
 
 Write `## Independent Reading` and `## Sources Read` into `.ai-work/<task-slug>/CONSULT_<discipline>.md`. `## Sources Read` is an explicit list — it is what makes the isolation checkable rather than merely asserted.
 

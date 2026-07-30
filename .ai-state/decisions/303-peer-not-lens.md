@@ -19,6 +19,8 @@ affected_reqs:
   - REQ-02
   - REQ-18
 dissent: A disciplinary consultant that evaluates a design against a domain criterion is behaviorally indistinguishable from a lens, and the Lens Catalog's "No new lenses" clause exists precisely to stop the design space from being re-entered through a differently-named door; calling the same function a "peer" to avoid a supersession is a naming manoeuvre, and the first colliding discipline (performance-engineer) proves the collision is real rather than hypothetical.
+re_affirmed_by:
+  - dec-306
 ---
 
 ## Context

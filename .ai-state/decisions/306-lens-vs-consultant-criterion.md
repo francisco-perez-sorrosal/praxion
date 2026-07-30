@@ -1,7 +1,7 @@
 ---
-id: dec-draft-e457d2df
+id: dec-306
 title: A discipline earns a consultant only when its errors are silent; otherwise the knowledge belongs in the lens's owning skill
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-30
 summary: Establishes the lens-versus-consultant criterion — convene a consultant only when a wrong answer produces an artifact indistinguishable from a right one absent expert challenge — and applies it to remove performance-engineer and queueing-modeler from the Wave-2 roster, strengthen the Performance lens with the agent-era dimension instead, and select evidence-appraiser as discipline #2.

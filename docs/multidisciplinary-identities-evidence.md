@@ -474,7 +474,7 @@ expertise exists, the standing to object does not.
 
 ### 12.2 Wave 2 — gated on Wave 1 evidence
 
-**Revised 2026-07-30** (`dec-draft-e457d2df`, §17.13). The roster below is filtered by a criterion that did
+**Revised 2026-07-30** (`dec-306`, §17.13). The roster below is filtered by a criterion that did
 not exist when it was first drafted: **a discipline earns a consultant only when its errors are silent.** A
 lens and a consultant deliver identical knowledge; the consultant's only marginal contribution is *standing
 to object*. Where a wrong answer is caught by ordinary feedback — a benchmark, a profiler, a cost bill — the

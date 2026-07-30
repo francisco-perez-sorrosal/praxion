@@ -50,7 +50,17 @@
 - **claim** -- the one-line falsifiable claim from that challenge, verbatim or tightly summarized. Escape any literal `|` in free text as `\|` -- see Falsifier below for why this matters.
 - **decision-at-stake** -- the decision the claim would change, copied from the challenge's own field.
 - **disposition** -- exactly one of `switch-now` | `defer-with-rationale` | `dismiss-with-rationale`.
-- **rationale-ref** -- pointer to where the disposition's rationale lives: an ADR id (`dec-NNN` or, pre-finalize, `dec-draft-<hash>`) or a plan section (e.g. `SYSTEMS_PLAN.md § Risk Assessment`).
+- **rationale-ref** -- pointer to where the disposition's rationale lives. **The target must be durable**: an ADR id (`dec-NNN` or, pre-finalize, `dec-draft-<hash>`), a `td-NNN` tech-debt row, or a section of a committed document. It must **never** point into `.ai-work/` -- that tree is deleted at pipeline cleanup, and a permanent ledger row citing a deleted file leaves the challenge's reasoning unrecoverable while still *looking* recorded. This ledger's first six rows made exactly that mistake and were superseded by replacement rows (see the two 2026-07-30 timestamps for the same challenge ids).
+
+  **Every disposition has a durable home, and the vocabulary already provides one for each:**
+
+  | Disposition | Durable home |
+  |---|---|
+  | `switch-now` | The ADR recording the change, or the committed section it altered |
+  | `defer-with-rationale` | A tech-debt row when residual risk remains; otherwise the plan section stating the deferral and its trigger |
+  | `dismiss-with-rationale` | A `wontfix` tech-debt row when the reasoning is worth remembering -- `wontfix` is a tombstone in `TECH_DEBT_RESOLVED.md` that the sentinel may re-surface but never removes, which is precisely the semantics of *considered, declined, and worth not re-deriving* |
+
+  The dismissal case is the one most often skipped and the one that costs most. A dismissed challenge means the convener judged the objection inapplicable **here** -- and the reasoning for why it does not apply is exactly the constraint a later researcher or architect would otherwise re-derive from scratch. Recording it is how a consult stops being a one-pipeline event.
 - **model** -- the model tier that ran the consult (e.g. `sonnet`, `opus`).
 - **difficulty** -- the `difficulty-hint` value used for this consult (`routine` | `standard` | `high-stakes`).
 

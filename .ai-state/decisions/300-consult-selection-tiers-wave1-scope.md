@@ -85,7 +85,7 @@ is mechanically identical to nominating either existing sub-architect today.
 **Gate:** ≥20 ledger rows spanning ≥2 disciplines, with a dismiss rate below the pre-registered falsifier
 threshold. **Path:** the three edits named above.
 
-> **Amendment 2026-07-30 (`dec-draft-c6b4fca6`).** There is no longer a "pre-registered falsifier threshold"
+> **Amendment 2026-07-30 (`dec-304`).** There is no longer a "pre-registered falsifier threshold"
 > to be below — the discipline-#2 criterion was demoted from a binary threshold to a reported estimate with a
 > Wilson interval, denominated in distinct consults rather than challenge rows. Read this gate as: ≥20 ledger
 > rows spanning ≥2 disciplines, with the discipline-#2 criterion satisfied **per discipline, not pooled**

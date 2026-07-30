@@ -1,7 +1,7 @@
 ---
-id: dec-draft-c6b4fca6
+id: dec-304
 title: The discipline-expansion criterion is a reported estimate over consults, not a binary threshold over challenges
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-30
 summary: The Wave-2 discipline-expansion gate is demoted from an automatic "dismiss rate not >60% over >=10 challenges" pass/fail to a human-dispositioned estimate with a Wilson interval, denominated in distinct consults rather than challenge rows, with a two-sided standing condition requiring all three disposition values to have been observed.

@@ -24,6 +24,7 @@ Every field is required on every row. A field left blank is a populated-looking 
 
 | discipline | fires-when | binds-to | challenge-obligations | difficulty-hint | attaches-to | lens-collision |
 |---|---|---|---|---|---|---|
+| statistician | A load-bearing decision rests on a quantitative claim: an asserted effect or regression, a chosen sample or run count, a comparison across benchmarks or runs, a derived threshold or tolerance band, or a stopping rule. The mere presence of a number does not fire this predicate; the claim must be one a decision turns on | applied-statistics | Is the sample or run count adequate to detect the effect being claimed, and was that asked before collection rather than after? Is multiple-comparisons exposure across the reported set accounted for? Is any trend claim exposed to confounding or Simpson's-paradox reversal? Is a tolerance band derived from an error model or merely asserted? Was the stopping rule fixed in advance of looking? | standard | researcher, systems-architect | none |
 
 ## Adding a Discipline
 

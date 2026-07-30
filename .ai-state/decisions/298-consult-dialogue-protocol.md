@@ -192,3 +192,11 @@ demonstrating the mechanism generalizes to a second, differently-shaped party.
   rate — is what would justify widening the bound to two rounds. Separately, if Claude Code applies `skills:`
   frontmatter to teammates and permits nested teams, the agent-teams substrate becomes viable and Option 4
   should be re-evaluated.
+
+> **Amendment 2026-07-30 (`dec-draft-c6b4fca6`).** The "over ≥10 challenges" sample condition above predates
+> the finding that challenges cluster within a consult and are not independent observations. Read the trigger
+> over **distinct consults**, not challenge rows; the aggregation rule is now defined in
+> `docs/multidisciplinary-identities-evidence.md` §17.4. The trigger's substance — that the *signature* of the
+> dismissals (mutual misunderstanding vs. disagreement on the merits) is what matters, not a raw rate — is
+> unchanged and was, if anything, strengthened: the revised criterion no longer treats any raw rate as
+> automatically decisive.

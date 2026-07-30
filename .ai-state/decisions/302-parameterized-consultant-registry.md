@@ -197,3 +197,10 @@ its own decision-authority agent, which nothing here shows.
   spanning ≥3 tasks *while* the architect's unaided output with the same knowledge injected is indistinguishable
   in quality. That is the substitution hypothesis holding, and the correct response is to delete the agent and
   keep the skills — collapsing to Option 2 rather than tuning the mechanism.
+
+> **Amendment 2026-07-30 (`dec-draft-c6b4fca6`).** "Across ≥10 challenges spanning ≥3 tasks" overstates the
+> evidence: challenges cluster within a consult (shared consultant, draft, and convener), so the effective
+> sample of that condition is roughly half its nominal size. Read the trigger over **distinct consults**
+> (≥3), per `docs/multidisciplinary-identities-evidence.md` §17.4. The trigger's substance — that the
+> substitution hypothesis is confirmed only when a high dismiss rate coincides with *indistinguishable
+> unaided architect output* — is unchanged; only the sample unit is corrected.

@@ -523,7 +523,12 @@ than silently absorbed.
 The initiative should be **deleted, not tuned**, if:
 
 1. Across ~10 Standard/Full tasks, identity challenges are dispositioned `dismiss-with-rationale` at
-   a high rate — the identities are producing decoration, not decisions.
+   a high rate — the identities are producing decoration, not decisions. **This is a judgment call on
+   a reported estimate, not a threshold test** (revised 2026-07-30, §17.11): read the dismiss rate with
+   its Wilson interval per §17.4, over distinct consults rather than challenge rows. No number is
+   pre-registered here, because a single number cannot both mark "delete the initiative" and "do not
+   expand it" without the two verdicts colliding at the boundary — which is precisely the defect the
+   first live consult found in the earlier form of this falsifier.
 2. Tier-1 trigger-table selection performs no better than random discipline assignment on
    accepted-challenge rate.
 3. The measured cost per accepted challenge exceeds the existing design-synthesis cost envelope
@@ -811,12 +816,20 @@ re-derive the steps if the working plan is gone.
 | 11 | Five files across four pipeline-agent boundaries |
 | 12 | Sentinel self-reference (count bump + scope extension) — flagged twice by the architect as the easiest insertion point to silently miss |
 
-### 17.4 Wave 2 phase gates — falsifiable thresholds, not hopes
+### 17.4 Wave 2 phase gates — reported estimates and standing conditions
 
-| Gate | Threshold | Unlocks |
+> **Revised 2026-07-30**, after the mechanism's first live consult challenged this very table. The
+> `statistician` consult raised six defects in the original binary form; the repair is recorded in
+> §17.11 with its full reasoning. The short version: **at n=10 a binary pass/fail gate on this
+> statistic cannot distinguish the cases the decision turns on**, so the discipline-#2 gate is now a
+> *reported estimate with an interval plus standing conditions*, not an automatic threshold. Earlier
+> revisions of this table stated "dismiss rate not >60% over ≥10 challenges spanning ≥3 tasks"; that
+> form is superseded and should not be cited.
+
+| Gate | Criterion | Unlocks |
 |---|---|---|
-| **Discipline #2** | Ledger shows a **non-degenerate** distribution for `statistician`: dismiss rate **not >60%** over ≥10 challenges spanning ≥3 tasks | A second registry row |
-| **Tier-3 identity genesis** | ≥20 ledger rows across ≥2 disciplines, dismiss rate under the discipline-#2 threshold. **Deadlock watch:** fewer than 5 rows after two calendar quarters *reopens* the tier question rather than silently freezing the roster | One triage leaf + one enum value + one delegation row in the harvest agent |
+| **Discipline #2** | **Reported, not automatic.** Compute the dismiss rate for `statistician` as `k/n` with a Wilson 95% interval, where **`n` is the number of distinct consults** (`task-slug` values), not the number of challenge rows — challenges cluster within a consult and are not independent observations. Report the interval alongside the point estimate; a human dispositions it. **Two standing conditions gate the report's informativeness**, both of which must hold before the number is read as evidence at all: (a) **all three disposition values** (`switch-now` / `defer-with-rationale` / `dismiss-with-rationale`) have been observed at least once — a ledger with no dismissals is equally consistent with a well-calibrated router and with a convener who never adjudicates; (b) `n` ≥ 3 distinct consults. **No pre-registration burden**: because nothing is decided automatically, the estimate may be read at any time without inflating an error rate | A second registry row |
+| **Tier-3 identity genesis** | ≥20 ledger rows across ≥2 disciplines, with the discipline-#2 criterion satisfied **per discipline, not pooled** — a pooled rate lets one discipline's failure be concealed by another's volume (4 rows at 90% pooled with 16 at 30% reads as 42%, comfortably healthy, while one of the two is exactly the decoration §14 exists to catch). **Deadlock watch:** fewer than 5 rows after two calendar quarters *reopens* the tier question rather than silently freezing the roster | One triage leaf + one enum value + one delegation row in the harvest agent |
 | **Ledger promotion** | ≥4 active disciplines, **or** a demonstrated need for a rate-over-time series that `grep` cannot produce | Collector-plus-report shape; existing rows migrate |
 | **Leave-One-Out audit** | Ongoing and **sampled**, not per-task: same-task runs with and without the consultant | Keeps the disposition ratio honest. A disagreeing LOO result **demotes the ratio from falsifier to indicator** — this is the surviving form of the Option-D comparison from §15.7, preserved as a continuing audit rather than a blocking pre-build gate |
 | **Portable distillation** | Same gate as Tier-3 | A generic, Praxion-number-free reference for managed projects |
@@ -963,8 +976,9 @@ The first form was an unanchored literal match (`grep -F '| statistician |'`). S
 synthetic ledger showed it also matches rows belonging to *other* disciplines whose free-text cells
 happen to contain the name — returning 3 rows for a discipline that had 2. That inflates the
 denominator and therefore **deflates** the computed dismiss rate, biasing the discipline-expansion gate
-(§17.4: "dismiss rate not >60%") toward *passing*. A falsifier that errs toward permitting expansion is
-worse than no falsifier, because it carries the authority of a measurement.
+(§17.4, then stated as "dismiss rate not >60%" — since revised, see §17.11) toward *passing*. A falsifier
+that errs toward permitting expansion is worse than no falsifier, because it carries the authority of a
+measurement.
 
 Corrected to a column-anchored form (`grep -E '^\|[^|]*\|[^|]*\| *<discipline> *\|'`), verified to
 return 2 where the unanchored form returned 3. The rationale is recorded in the ledger itself so the
@@ -1080,6 +1094,47 @@ Running Step 16 early would document as built a component whose binding mechanis
 its deployed form — the shortcut the whole verification discipline exists to prevent, and precisely the
 residual risk the pre-mortem named *before* Step 1 ran: the spike used a **project-scope** probe agent,
 not the real plugin-namespaced consultant. Step 15 is what closes it.
+
+### 17.11 Steps 15–16 executed — the mechanism worked, and its first act was to break this document
+
+Steps 15 and 16 ran on 2026-07-30 from a fresh session, after a Step 0 install-parity gate confirmed the
+shipped plugin (v0.17.0) was `diff`-identical to repo HEAD. Both passed. The mechanism is proven live:
+registry resolution, runtime `Skill` binding, Round-0 isolation, decision-naming challenges, convener
+disposition, and the ledger's first rows — plus a fail-loud `[BLOCKED]` on an unresolvable discipline
+that declined an obvious and available substitution.
+
+**The finding that matters is not that it worked.** The consult's target was this document's own
+discipline-expansion gate (§17.4), chosen because it is a genuine stopping rule plus threshold plus
+sample-size claim. It raised **six** challenges, all six accepted, and the gate as written did not
+survive them. Recorded here because a falsifier that gets quietly rewritten is no longer a falsifier.
+
+| # | Defect in the original gate | Resolution |
+|---|---|---|
+| CH-01 | The denominator counted **challenges**, but challenges cluster within a consult — same consultant, same draft, and decisively the same **convener**, whose dismissal propensity is a rater effect. At ~3.3 challenges per consult and a plausible intra-cluster correlation of 0.3–0.5, "≥10 challenges spanning ≥3 tasks" had an effective n of **~5–6**, and the binding constraint was really the "≥3 tasks" floor. Three is not a sample | Denominator restated on the independent unit: **distinct consults** |
+| CH-02 | At n=10, "pass iff dismiss rate ≤ 0.60" passes a discipline whose *true* rate is 0.70 **35%** of the time, and blocks one sitting exactly at the 0.60 bar **38%** of the time. The Wilson interval for 6/10 is [0.31, 0.83] — passing and failing observations overlap across nearly the whole decision-relevant range | Gate **demoted from binary pass/fail to a reported estimate with a Wilson interval**, dispositioned by a human |
+| CH-03 | "≥10 challenges" was a floor, not a fixed evaluation point, so the gate was evaluated under unbounded optional stopping — and the party checking is the party who wants expansion. Simulated inflation was real but bounded (~+13 points of false-pass at a true 0.70) | **Dissolved by the demotion.** With nothing decided automatically, there is no error rate to inflate; the estimate is anytime-readable. Stated explicitly in §17.4 |
+| CH-04 | 60% was **asserted, not derived**, and collided with §14 falsifier 1: if 60% was also the delete line, a discipline at 59% simultaneously survived deletion and unlocked expansion — one number doing two opposite jobs with no gap between them | **Dissolved by the demotion** (no threshold remains to derive). §14 falsifier 1 restated as an explicit judgment call on the reported interval |
+| CH-05 | The gate was **one-sided**, so a ledger of ten `switch-now` rows and zero dismissals — maximally degenerate — passed cleanly, while §17.4's own prose demanded a "non-degenerate" distribution. A convener who never dismisses supplies no evidence the trigger predicate is *selective* | Two-sided standing condition added: **all three disposition values must have been observed** before the estimate is read as evidence |
+| CH-06 | The Tier-3 gate reused the statistic without naming its aggregation unit, permitting one discipline's failure to be masked by another's volume | Tier-3 criterion stated **per discipline, not pooled** |
+
+**Two things the consult endorsed rather than challenged**, worth recording because silence would be
+ambiguous: the column-anchored `grep` recipe in `CONSULT_LEDGER.md` (and specifically its *direction* of
+bias — an unanchored match inflates the denominator and therefore deflates the rate, biasing toward
+passing; "a falsifier must fail safe" was applied correctly), and **instrumentation-before-roster**
+(§17.2), which it called "the single most important statistical property of the whole plan" — deciding
+the measurement before generating the data is what made all six of these defects free to fix.
+
+**A defect the disposition pattern demonstrated by accident.** The convener dispositioned all six as
+`defer-with-rationale` and none as `dismiss-with-rationale`. That set is itself maximally degenerate —
+under the *old* one-sided gate it would have read as a 0% dismiss rate and passed cleanly; under the
+revised criterion it correctly reads as **not yet informative**, because only one of three disposition
+values has been observed and `n` = 1 consult. CH-05 was instantiated by the ledger's own first content
+on the day the ledger was created. The dispositions were left as they stood: manufacturing a dismissal
+to make the distribution look healthy would corrupt the counter the criterion reads.
+
+**What did not change.** The one-loop-back bound, the disposition vocabulary, the single-writer ledger
+rule, the anchored counting recipe's column anchoring, and the Wave-1 roster size are all untouched.
+The revision narrows to the *shape of the expansion criterion* and its aggregation unit.
 
 ---
 

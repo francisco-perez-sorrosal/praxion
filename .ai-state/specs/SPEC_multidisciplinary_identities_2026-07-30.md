@@ -131,8 +131,10 @@ rather than by prose.
 
 1. **Tier-3 identity genesis** — one triage leaf + one `Type:` enum value + one Recommended-Delegations row in
    `agents/skill-genesis.md`, routing to `context-engineer`. Gate: ≥20 ledger rows across ≥2 disciplines with
-   dismiss rate under threshold. **Deadlock watch:** fewer than five rows after two calendar quarters reopens the
-   tier question rather than silently freezing the roster.
+   the discipline-#2 criterion satisfied **per discipline, not pooled** (revised 2026-07-30,
+   `dec-draft-c6b4fca6`: there is no longer a single "threshold" to be under — see
+   `docs/multidisciplinary-identities-evidence.md` §17.4). **Deadlock watch:** fewer than five rows after two
+   calendar quarters reopens the tier question rather than silently freezing the roster.
 2. **Portable distillation reference** for managed projects (generic design rules + round structure + selection
    pattern, zero project-specific numbers) — same gate.
 3. **Leave-One-Out audit** of the introspective disposition ratio — same-task runs with and without the

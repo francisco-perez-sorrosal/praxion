@@ -30,6 +30,7 @@ Aliases only (`opus`/`sonnet`/`haiku`); pin full IDs at spawn time only when ver
 | `architect-validator` | H | `opus` | Structural reasoning across DSL + code graph + ADR set; pre-merge gate |
 | `interface-designer` | H | `opus` | Design taste under trade-offs across web/TUI/API/agentic surfaces; like systems-architect/verifier, value is quality judgement across a broad space |
 | `agentic-transactions-architect` | H | `opus` | Domain-expert shadow sub-architect: mandate/finality/ToS/HITL judgment in a regulated, high-stakes, fast-moving domain; peers with systems-architect and interface-designer |
+| `discipline-consultant` | H | `opus` | Adversarial specialist judgment against a draft; frontmatter floor is `sonnet` so a `routine` consult can route down — the only sanctioned downgrade |
 | `implementation-planner` | M | `sonnet` | Feature-scoped decomposition |
 | `implementer` | M | `sonnet` | Single-step execution; step-H/L override |
 | `test-engineer` | M | `sonnet` | Per-step judgment paired with implementer |

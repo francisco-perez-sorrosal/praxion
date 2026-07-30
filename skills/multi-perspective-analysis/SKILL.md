@@ -28,6 +28,7 @@ Composition layer for multi-perspective deliberation. **This skill owns the shar
 - [references/lens-independence.md](references/lens-independence.md) — isolation/reconciliation/gate discipline for parallel lens sweeps; correlation-collapse rationale; fragment-file enforcement
 - [references/heterogeneous-orchestration.md](references/heterogeneous-orchestration.md) — Haiku-proposer / Opus-aggregator recipe, prompt-caching guidance, cost-model references (MoA, PoLL, MasRouter)
 - [references/disconfirmation-tiers.md](references/disconfirmation-tiers.md) — DI vs. DA distinction; Tier-A (always-on for `category: architectural`): Falsifier / Steelmanned runner-up / Reversal trigger; Tier-B: cross-model adversarial challenge, gating conditions, protocol
+- [references/discipline-registry.md](references/discipline-registry.md) — the consulting-discipline roster as data: 7-field row schema (trigger predicate, runtime skill binding, challenge obligations, difficulty hint, attaching stages, lens collision), read pre-spawn by conveners and post-spawn by the consultant
 
 ## Activation Gate
 

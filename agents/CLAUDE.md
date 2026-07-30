@@ -37,3 +37,27 @@ The `systems-architect` agent supports three invocation modes, signaled by an ex
 **`baseline-audit`**: no `SYSTEMS_PLAN.md`, no `PRE_REFACTOR_PLAN.md`, no Phase 2.5, no invented components (every diagram node + table row must be code-verified), no L2 detail, no source edits.
 
 **`post-refactor-adaptation`**: no Phase 2.5 (one-pass recursion bound — same hard rule as baseline-audit mode), no second `PRE_REFACTOR_PLAN.md` for the same task slug, no spawning another mini-pipeline. The architect re-reads research findings + refactored codebase, re-runs Phase 1 + Phase 2, then proceeds through Phases 3–10 against the refactored shape; on completion, the orchestrator (or the architect) flips remaining `in-flight` tech-debt rows to `resolved` and emits the `[CONSUMED]` marker on the `PRE_REFACTOR_PLAN.md`.
+
+## Discipline Consultant Directive
+
+The `discipline-consultant` agent carries no discipline of its own — it is parameterized at spawn time by an explicit `Discipline: <name>` directive in the spawn prompt (no frontmatter, no marker file; the same signaling mechanism as the architect's `Mode:` directive above). Phase 1 resolves the directive before any other work and logs the resolved discipline on the first `PROGRESS.md` line. When updating `agents/discipline-consultant.md`, preserve the resolution contract below.
+
+| Directive | Required | Resolves against | Effect once resolved |
+|---|---|---|---|
+| `Discipline: <name>` | Yes — exactly one per instance | Exact match on the `discipline` column of `skills/multi-perspective-analysis/references/discipline-registry.md` | The matched row's `binds-to` skill(s) load at runtime through the `Skill` tool (never through `skills:` frontmatter); `challenge-obligations` become the consult's checklist; `difficulty-hint` drives the convener's model routing |
+| `Task slug: <slug>` | Yes | — | Scopes every read and write to `.ai-work/<task-slug>/`; the fragment lands at `CONSULT_<discipline>.md` |
+| `Round: 0 \| 1` | No — default is 0-then-1 in a single spawn | — | Round 0 (independent reading, no draft access) always precedes Round 1 (challenge) |
+
+**The registry is the complete roster.** A discipline absent from that table does not exist, and `<name>` is a registry key rather than a free-text label. Adding a discipline is one registry row plus at most one new skill file — never a new agent file, manifest entry, consultant `tools:`/`skills:` entry, or always-loaded byte.
+
+### When the directive does not resolve
+
+An unresolvable directive is a hard stop, not a degraded run. If `<name>` matches no row, if the matched row's `binds-to` skill cannot be loaded, or if the registry itself cannot be read, the consultant writes no challenges and returns `[BLOCKED]` naming the unresolvable value and which of those failures occurred. A silently degraded consult is worse than no consult, because it looks like coverage.
+
+### Anti-instructions
+
+Never improvise a discipline — no plausible-sounding invention, no substituting a neighbouring one, no proceeding from memory when the registry is unreadable. Never widen one instance to two disciplines: a second discipline is a second spawn, and concurrent instances never read each other's fragments. Never name a discipline in an always-loaded surface (a `paths:`-less rule, a `CLAUDE.md`) — the registry row is the only roster, and naming disciplines elsewhere re-imposes the per-discipline structural cost the registry exists to remove. Never let the consultant disposition its own challenges, author ADR fragments, write plan steps or production code, or write the disposition ledger — all of those belong to the convener.
+
+### Who may convene
+
+The orchestrator spawns; agents nominate. A pipeline agent whose stage appears in the matched row's `attaches-to` column may nominate a discipline when a signal matches that row's `fires-when` predicate, and the nomination must cite **the triggering signal and the decision at stake** — a nomination naming no decision is noise the convener has to filter. Humans may also convene directly. The consultant is adversarial-only: it challenges and never decides, so the convener adjudicates each challenge individually (`switch-now` / `defer-with-rationale` / `dismiss-with-rationale`) and records one `.ai-state/CONSULT_LEDGER.md` row per challenge. Full round protocol: `skills/software-planning/references/coordination-details.md § Discipline-Consultant Dialogue Protocol`.

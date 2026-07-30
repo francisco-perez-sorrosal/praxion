@@ -433,6 +433,10 @@ Your `SYSTEMS_PLAN.md` is the implementation planner's primary input. Focus on:
 - **Obligation to re-evaluate**: when the agentic-transactions-architect raises an `## Architecture Challenges` entry, read each contested decision and incorporate the proposed alternative unless you can articulate a concrete architectural reason to reject it. The orchestrator mediates if the parties cannot converge in one round
 - **Scope boundary**: you make load-bearing structural decisions; the agentic-transactions-architect refines transaction-safety and provider semantics within those constraints — but a transaction decision that affects correctness or real-money risk is a structural concern and rises to you for resolution
 
+### With the Discipline Consultant
+
+- **Convening (self-nomination)**: when a load-bearing decision matches a `fires-when` predicate in `skills/multi-perspective-analysis/references/discipline-registry.md`, you may nominate a `discipline-consultant` for that discipline — citing **the triggering signal and the decision at stake**, the same shape as nominating the interface-designer on an interface signal. You nominate; the orchestrator spawns. The consultant is adversarial-only — it challenges and never decides — so you disposition **each** challenge individually (`switch-now` / `defer-with-rationale` / `dismiss-with-rationale`; see `skills/software-planning/references/disposition-vocabulary.md` and never redefine the terms), and its surviving challenges become your `## Disconfirmation` block and `dissent:` frontmatter. Spawn contract: `agents/CLAUDE.md § Discipline Consultant Directive`
+
 Structural coherence of the architect's outputs (DSL, `.ai-state/DESIGN.md`, ADR cross-references) is verified downstream by `architect-validator` once the design is committed; the architect does not run this check.
 
 ## Output

@@ -30,7 +30,7 @@ the generic [MCP Server Development](../SKILL.md) skill. Back to [SKILL.md](../S
 - [CLI Quick Reference](#cli-quick-reference)
 - [Bundles -- Python Examples](#bundles----python-examples)
 - [Common Pitfalls -- Python-Specific](#common-pitfalls----python-specific)
-- [Resources](#resources-1)
+- [Further Reading](#further-reading)
 
 ## SDK Landscape
 <!-- last-verified: 2026-05-25 -->
@@ -521,7 +521,7 @@ my-server.mcpb (ZIP)
 - **Not testing with pytest** -- use in-memory clients, not manual chat testing
 - **Missing `asyncio_mode`** -- add `asyncio_mode = "auto"` to `pyproject.toml` `[tool.pytest.ini_options]`
 
-## Resources
+## Further Reading
 
 ### Official Python
 

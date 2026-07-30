@@ -292,8 +292,8 @@ jobs:
           claude_args: |
             ${{ steps.policy.outputs.plugin_dir_flag }}
             --model ${{ steps.policy.outputs.fixer_model }}
-            --max-turns 30
-            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(git checkout:*),Bash(git add:*),Bash(git commit:*),Bash(git branch:*),Bash(git status:*),Bash(git diff:*),Bash(gh pr create:*),Bash(gh pr list:*),Bash(gh issue create:*),Bash(gh run view:*)"
+            --max-turns 60
+            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(git checkout:*),Bash(git add:*),Bash(git commit:*),Bash(git branch:*),Bash(git status:*),Bash(git diff:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(find:*),Bash(git log:*),Bash(git show:*),Bash(gh pr create:*),Bash(gh pr list:*),Bash(gh issue create:*),Bash(gh run view:*)"
 
       - name: Flag sensitive-path changes for review
         # Tripwire: autofix is allowed to change CI/automation surfaces
@@ -821,8 +821,8 @@ jobs:
           claude_args: |
             ${{ needs.classify.outputs.plugin_dir_flag }}
             --model ${{ needs.classify.outputs.fixer_model }}
-            --max-turns 30
-            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr edit:*),Bash(uv run pytest:*),Bash(python3 -m pytest:*),Bash(pytest:*)${{ needs.classify.outputs.js_test_grant != '' && format(',{0}', needs.classify.outputs.js_test_grant) || '' }}"
+            --max-turns 60
+            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr edit:*),Bash(uv run pytest:*),Bash(python3 -m pytest:*),Bash(pytest:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(find:*),Bash(git log:*),Bash(git show:*)${{ needs.classify.outputs.js_test_grant != '' && format(',{0}', needs.classify.outputs.js_test_grant) || '' }}"
 
       - name: Stamp attempt trailer and push the fix (non-agent, fast-forward only)
         id: push
@@ -1071,5 +1071,5 @@ jobs:
             ${{ needs.classify.outputs.plugin_dir_flag }}
             --add-dir pr-head
             --model ${{ needs.classify.outputs.fixer_model }}
-            --max-turns 30
+            --max-turns 60
             --allowedTools "Read,Glob,Grep,Bash(gh pr comment:*)"

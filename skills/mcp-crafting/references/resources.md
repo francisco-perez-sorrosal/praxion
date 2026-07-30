@@ -197,7 +197,7 @@ See your language context for the appropriate `command` and `args` values.
 - [MCP Blog](https://blog.modelcontextprotocol.io/)
 - [Anthropic MCP Course (Skilljar)](https://anthropic.skilljar.com/introduction-to-model-context-protocol)
 
-### Security
+### Security Reading
 
 - [Simon Willison: MCP Prompt Injection](https://simonwillison.net/2025/Apr/9/mcp-prompt-injection/)
 - [The Lethal Trifecta for AI Agents](https://simonw.substack.com/p/the-lethal-trifecta-for-ai-agents)

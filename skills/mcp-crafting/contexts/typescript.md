@@ -28,7 +28,7 @@ the generic [MCP Server Development](../SKILL.md) skill. Back to [SKILL.md](../S
 - [Zod Version Note](#zod-version-note)
 - [SDK v2 Alpha Note](#sdk-v2-alpha-note)
 - [Common Pitfalls -- TypeScript-Specific](#common-pitfalls----typescript-specific)
-- [Resources](#resources-1)
+- [Further Reading](#further-reading)
 
 ## SDK Landscape
 <!-- last-verified: 2026-05-25 -->
@@ -504,7 +504,7 @@ production servers.
 
 ---
 
-## Resources
+## Further Reading
 
 - [MCP TypeScript SDK — GitHub](https://github.com/modelcontextprotocol/typescript-sdk)
 - [Build an MCP server — modelcontextprotocol.io](https://modelcontextprotocol.io/docs/develop/build-server)

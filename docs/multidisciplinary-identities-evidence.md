@@ -449,7 +449,7 @@ day-one automation; tier 3 is where "ideally automatically identified" lives saf
 
 **Instrumentation is mandatory from day one.** The accept/defer/dismiss ratio per discipline is
 mechanically countable from the artifacts and is the initiative's own falsifier
-([§13](#13-falsifiers)). Shipping the selection tiers without the counter would make the value
+([§14](#14-falsifiers)). Shipping the selection tiers without the counter would make the value
 question permanently unanswerable — which is itself the W7 failure mode this initiative claims to fix.
 
 ---

@@ -981,6 +981,44 @@ necessary, not sufficient, and **step 15's end-to-end smoke test against the rea
 the load-bearing second checkpoint**. Skipping it under time pressure would leave the binding mechanism
 unverified in its actual deployed form.
 
+### 17.9 Milestone 2 executed — the consultant exists
+
+Committed 2026-07-30 (`8ab77c0`), 9 files. Steps 4–6 done and independently reviewed.
+
+**Measured against the guards.** Always-loaded delta **+1,300 B / +361 tok** against a predicted
+~1,188 B / ~330 tok — a ~9% overshoot, disclosed rather than trimmed to fit; total ≈**23,052 of
+25,000**, leaving ~1,948 tok. `plugin.json` ↔ `agents/*.md` parity 17/17. Consultant `description:`
+216 tok and discipline-free. Canonical suite **595 passed** against a 573 baseline, no regressions.
+
+**Independent light-review: PASS on all six dimensions**, including the check that mattered most —
+whether live assertion #3's glob genuinely covers every always-loaded surface. The reviewer
+cross-validated the glob against `rules/_manifest.yaml`'s `always_on` entries rather than merely
+reading the code, and found an exact match. Its two over-inclusions (`rules/README.md`, subtree
+`CLAUDE.md` files) **err safe rather than silent** — the failure mode that would matter is a glob that
+*misses* a file, leaving the zero-cost property unguarded while showing green.
+
+#### Process finding: manifest regeneration is missing from the plan
+
+Editing any always-loaded rule invalidates `rules/_manifest.yaml`, and the pre-commit
+`rules-manifest-drift` gate blocks the commit until it is regenerated. **No step in the
+implementation plan says to do this**, and Step 4 touched three rule files. It surfaced only because
+the gate fired.
+
+**Carry-forward rule: any step touching `rules/**/*.md` must regenerate the rules manifest in the same
+commit.** Before running the generator from a worktree, note that it is safe to do so — it resolves
+its root from `__file__` and has no `.claude` exclusion, unlike the doc-manifest generator, which
+silently drops every entry when run from under `.claude/`. That asymmetry between two sibling
+generators is itself worth remembering.
+
+#### Both implementing agents truncated; ground-truth reconciliation resolved it
+
+Step 4's return ended mid-sentence on the manifest registration; Step 5's ended mid-sentence on a test
+re-run. Neither carried a terminal marker. Both naive readings fail: trusting the marker-less return
+advances on unverified work, while re-running discards ~65 tool-calls of completed effort each.
+Re-deriving from ground truth — files on disk, manifest parity, an actual test run — showed **both
+steps had in fact completed**; only the reporting was cut. This is the completion-handshake rule
+working as designed, and the reason it insists on the codebase rather than the checkboxes.
+
 ---
 
 ## 18. Citations

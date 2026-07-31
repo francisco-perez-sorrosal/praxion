@@ -33,6 +33,16 @@ on:
       - 'docs/architecture.md'
       - '.ai-state/decisions/**'
       - '.ai-state/CONSULT_*.md'
+      # The five surfaces the discipline-registry invariants actually police.
+      # Without them a PR touching only the registry or a contract site runs
+      # ZERO fitness jobs — the gate-liveness scope-fidelity failure: correct
+      # firing inside a narrower-than-documented scope still returns a false
+      # "all clear" for everything outside it.
+      - 'skills/multi-perspective-analysis/references/discipline-registry.md'
+      - 'skills/software-planning/references/coordination-details.md'
+      - 'agents/discipline-consultant.md'
+      - 'agents/CLAUDE.md'
+      - 'commands/consult.md'
       - 'fitness/**'
       - 'scripts/aac_fence_validator.py'
       - 'scripts/check_aac_golden_rule.py'
@@ -45,6 +55,16 @@ on:
       - 'docs/architecture.md'
       - '.ai-state/decisions/**'
       - '.ai-state/CONSULT_*.md'
+      # The five surfaces the discipline-registry invariants actually police.
+      # Without them a PR touching only the registry or a contract site runs
+      # ZERO fitness jobs — the gate-liveness scope-fidelity failure: correct
+      # firing inside a narrower-than-documented scope still returns a false
+      # "all clear" for everything outside it.
+      - 'skills/multi-perspective-analysis/references/discipline-registry.md'
+      - 'skills/software-planning/references/coordination-details.md'
+      - 'agents/discipline-consultant.md'
+      - 'agents/CLAUDE.md'
+      - 'commands/consult.md'
       - 'fitness/**'
       - 'scripts/aac_fence_validator.py'
       - 'scripts/check_aac_golden_rule.py'
@@ -161,6 +181,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # fetch-depth: 0 is load-bearing, not hygiene. The sealed-prior gate's
+          # witness check resolves `git show <seal-witness>:.ai-state/CONSULT_PRIORS.md`
+          # against a commit that predates the PR head. Under the default shallow
+          # clone that commit is unreachable, and the test SKIPS with "shallow
+          # clone, or the branch was squash-merged" — so the tamper-evidence
+          # claim would hold only for the convener's local run, never in CI.
+          fetch-depth: 0
 
       - name: Set up uv (manages Python 3.13)
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0

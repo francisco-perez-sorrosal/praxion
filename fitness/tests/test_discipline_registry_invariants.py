@@ -1155,7 +1155,7 @@ def test_agents_claude_md_documents_the_fail_loud_resolution_contract(project_ro
 # ---------------------------------------------------------------------------
 # Cost-series coverage gate (td-071) -- .ai-state/CONSULT_COSTS.md carries one
 # row per consult spawn (grain differs from the ledger's one-row-per-challenge:
-# cost is a property of the consult, not of the challenge, dec-draft-6a94ce05).
+# cost is a property of the consult, not of the challenge, dec-308).
 # This gate fails when a post-boundary ledger consult has no matching, positive,
 # consistent cost row -- the omission the file exists to make CI-visible.
 # ---------------------------------------------------------------------------
@@ -1661,7 +1661,7 @@ def test_no_cost_data_row_exists_outside_the_parsed_table(project_root: Path) ->
 # concern/source/prior-id is malformed, when a challenge carries no
 # classification, or when a classification's matched-prior-id or seal-witness
 # is malformed or inconsistent -- the omissions the file exists to make
-# CI-visible (dec-draft-2c51b2f6).
+# CI-visible (td-081; see .ai-state/decisions/ for the ADR that resolved it).
 # ---------------------------------------------------------------------------
 
 PRIOR_ROW_FIELDS: tuple[str, ...] = (
@@ -1810,6 +1810,9 @@ def check_every_post_boundary_consult_has_a_sealed_prior(
     prior_index = {field: pos for pos, field in enumerate(PRIOR_ROW_FIELDS)}
 
     for row in prior_rows:
+        timestamp = row[prior_index["timestamp"]]
+        if not _TIMESTAMP_RE.match(timestamp):
+            failures.append(f"sealed prior has a malformed timestamp: {timestamp!r}")
         concern = row[prior_index["concern"]]
         if concern.strip().lower() in _PLACEHOLDER_CONCERNS:
             failures.append(f"sealed prior has an empty or placeholder concern: {concern!r}")
@@ -2061,6 +2064,36 @@ def check_witness_priors_equal_working_priors(
     # rows keeps both sides in one representation and removes git from the
     # comparison entirely.
     prior_index = {field: pos for pos, field in enumerate(PRIOR_ROW_FIELDS)}
+
+    # Fail closed on a non-canonical timestamp; never exempt on one. The
+    # `not_after` scoping below is a *lexical* comparison, so an offset form
+    # ("2026-07-31T07:00:00+02:00") sorts as later than the same instant
+    # written in UTC ("2026-07-31T05:00:00Z") -- which would silently exempt a
+    # row appended AFTER the seal as though it were a legitimate later
+    # re-seal. That is the precise cheat this check exists to catch, defeated
+    # by one character. The earlier revision fixed the git-date-vs-row-
+    # timestamp seam and left this row-vs-row one open, because its canaries
+    # supplied both sides in a single representation.
+    #
+    # Both sides are validated here, not only in G2: G2 parses the *working*
+    # file, and never sees the witness commit's copy.
+    for side, rows in (("witness", witness_prior_rows), ("working", working_prior_rows)):
+        for row in rows:
+            if (
+                row[prior_index["task-slug"]],
+                row[prior_index["discipline"]],
+                row[prior_index["stage"]],
+            ) != triple:
+                continue
+            stamp = row[prior_index["timestamp"]]
+            if not _TIMESTAMP_RE.match(stamp):
+                return (
+                    f"sealed prior for {triple!r} in the {side} set carries a non-canonical "
+                    f"timestamp {stamp!r}; expected ISO 8601 UTC 'YYYY-MM-DDTHH:MM:SSZ'. The "
+                    "witness scope comparison is lexical, so any other representation would "
+                    "silently exempt the row instead of comparing it"
+                )
+
     sealed_timestamps = [
         row[prior_index["timestamp"]]
         for row in witness_prior_rows
@@ -2500,6 +2533,60 @@ def test_flags_a_prior_appended_after_the_witness_commit() -> None:
     )
     assert "P-02" in result
     assert "not sealed" in result
+
+
+def test_flags_a_prior_appended_after_the_seal_in_an_offset_timezone() -> None:
+    """Canary for the representation seam, not the ordering logic.
+
+    The bad input is the SAME cheat as the canary above -- a prior appended
+    after reading the challenges -- written with a UTC offset instead of `Z`.
+    `2026-08-01T12:00:00+02:00` is `10:00:00Z`, i.e. exactly the seal instant
+    and therefore *not* a later re-seal; lexically, though, `1` sorts after
+    `0` and the row was silently exempted.
+
+    This is the defect class the previous revision moved rather than removed:
+    it fixed a git-date-vs-row-timestamp comparison and left the resulting
+    row-vs-row one open, because every canary supplied both sides in a single
+    representation. A canary that cannot express the mismatch cannot catch it,
+    so this one supplies the two operands in two representations on purpose.
+    """
+    sealed = [_prior_row("P-01", "sealed before the spawn")]  # 2026-08-01T10:00:00Z
+    working = sealed + [
+        _prior_row(
+            "P-02",
+            "appended after reading the challenges, stamped in +02:00",
+            timestamp="2026-08-01T12:00:00+02:00",
+        )
+    ]
+
+    result = check_witness_priors_equal_working_priors(sealed, working, _G6_TRIPLE)
+
+    assert result is not None, (
+        "G6 must flag a prior whose timestamp is not canonical UTC; got None -- "
+        "the witness scope comparison is lexical, so an offset form silently "
+        "exempts the row rather than comparing it"
+    )
+    assert "non-canonical" in result
+    assert "+02:00" in result
+
+
+def test_flags_a_sealed_prior_with_a_malformed_timestamp() -> None:
+    """G2 companion to the canary above: the working file's own rows are
+    rejected at parse time, so a non-canonical stamp cannot reach the witness
+    comparison in the first place. Defence in depth -- G2 never sees the
+    witness commit's copy, which is why G6 validates both sides too."""
+    bad_row = (
+        "| 2026-08-01T12:00:00+02:00 | task-a | statistician | architecture "
+        "| P-01 | lens | a real concern, stamped in +02:00 |"
+    )
+    priors_table = f"{_PRIOR_HEADER_ROW}\n{_PRIOR_SEPARATOR_ROW}\n{bad_row}\n"
+
+    prior_rows = parse_prior_table_rows(priors_table)
+    failures = check_every_post_boundary_consult_has_a_sealed_prior([], prior_rows, SEAL_BOUNDARY)
+
+    assert any(
+        "malformed timestamp" in f for f in failures
+    ), f"G2 must flag a sealed prior whose timestamp is not ISO 8601 UTC; got {failures!r}"
 
 
 def test_flags_a_sealed_prior_missing_from_the_working_file() -> None:

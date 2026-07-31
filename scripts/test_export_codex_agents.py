@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXPORTER_PATH = REPO_ROOT / "codex" / "config" / "export-codex-agents.py"
@@ -31,10 +32,7 @@ def test_export_agents_writes_required_codex_fields(tmp_path: Path):
     assert 'name = "researcher"' in text
     assert "description =" in text
     assert "developer_instructions =" in text
-    assert (
-        str((REPO_ROOT / "agents" / "researcher.md").resolve()).replace("\\", "/")
-        in text
-    )
+    assert str((REPO_ROOT / "agents" / "researcher.md").resolve()).replace("\\", "/") in text
     assert "source file remains authoritative" in text
     assert "Surface Assumptions" in text
     developer_instructions = text.split("developer_instructions =", maxsplit=1)[1]
@@ -56,18 +54,11 @@ def test_export_agents_translates_routing_and_keeps_contract_capsule(tmp_path: P
 
     assert 'model = "gpt-5.5"' in promethean
     assert 'model_reasoning_effort = "high"' in promethean
-    assert (
-        "tools: Read, Glob, Grep, Bash, Write, Edit, AskUserQuestion, WebFetch"
-        in promethean
-    )
-    assert "permissionMode: default" in promethean
-    assert "hooks:" in promethean
-    assert "async: true" in promethean
+    assert "tools: Read, Glob, Grep, Bash, Write, Edit, AskUserQuestion, WebFetch" in promethean
+    assert "permissionMode:" not in promethean
+    assert "hooks:" not in promethean
     assert "Do not duplicate the canonical agent body here." in promethean
-    assert (
-        str((REPO_ROOT / "agents" / "promethean.md").resolve()).replace("\\", "/")
-        in promethean
-    )
+    assert str((REPO_ROOT / "agents" / "promethean.md").resolve()).replace("\\", "/") in promethean
 
 
 def test_parse_rejects_missing_frontmatter(tmp_path: Path):
@@ -75,9 +66,5 @@ def test_parse_rejects_missing_frontmatter(tmp_path: Path):
     path = tmp_path / "bad.md"
     path.write_text("No frontmatter\n", encoding="utf-8")
 
-    try:
+    with pytest.raises(exporter.AgentParseError, match="missing YAML frontmatter"):
         exporter.parse_frontmatter_agent(path)
-    except exporter.AgentParseError as exc:
-        assert "missing YAML frontmatter" in str(exc)
-    else:
-        raise AssertionError("expected AgentParseError")

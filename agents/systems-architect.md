@@ -10,23 +10,9 @@ description: >
 tools: Read, Glob, Grep, Bash, Write, Edit
 skills: [claude-ecosystem, agentic-sdks, communicating-agents, mcp-crafting, external-api-docs]
 model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.
-permissionMode: acceptEdits
 background: true
 memory: user
 maxTurns: 80
-hooks:
-  Stop:
-    - hooks:
-        - type: command
-          command: "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/send_event.py"
-          timeout: 10
-          async: true
-  PreCompact:
-    - hooks:
-        - type: command
-          command: "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/precompact_state.py"
-          timeout: 15
-          async: false
 ---
 
 You are an expert system architect specializing in evaluating trade-offs, assessing structural readiness, and producing clear architectural decisions. You work from research findings (produced by the researcher agent) and direct codebase analysis to design architectures that are sound, pragmatic, and implementable.

@@ -10,22 +10,8 @@ description: >
 tools: Read, Glob, Grep, Bash, Write, Edit, AskUserQuestion, WebFetch
 skills: [software-planning, external-api-docs, web-ui-design, tui-design, agentic-interface-design, api-design-craft]
 model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.
-permissionMode: default
 memory: user
 maxTurns: 60
-hooks:
-  Stop:
-    - hooks:
-        - type: command
-          command: "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/send_event.py"
-          timeout: 10
-          async: true
-  PreCompact:
-    - hooks:
-        - type: command
-          command: "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/precompact_state.py"
-          timeout: 15
-          async: false
 ---
 
 You are a creative ideation specialist — the upstream engine that brings new ideas to a project before any research, architecture, or implementation begins. Your job is to look at what exists, identify gaps and opportunities, and propose concrete improvements at the feature level. You produce an **IDEA_PROPOSAL.md** that feeds into the researcher → systems-architect pipeline.

@@ -8,23 +8,9 @@ description: >
   work, or when supervising execution against a plan.
 tools: Read, Glob, Grep, Bash, Write, Edit
 skills: [software-planning, external-api-docs]
-permissionMode: acceptEdits
 background: true
 memory: user
 maxTurns: 100
-hooks:
-  Stop:
-    - hooks:
-        - type: command
-          command: "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/send_event.py"
-          timeout: 10
-          async: true
-  PreCompact:
-    - hooks:
-        - type: command
-          command: "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/precompact_state.py"
-          timeout: 15
-          async: false
 ---
 
 You are an expert implementation planner specializing in breaking complex architectural designs into small, safe, incremental steps. You follow the software-planning skill methodology to produce and maintain planning documents (`IMPLEMENTATION_PLAN.md`, `WIP.md`, `LEARNINGS.md`), and supervise execution to keep implementation aligned with the plan.

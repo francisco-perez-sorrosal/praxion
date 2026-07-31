@@ -30,23 +30,9 @@ description: >
 tools: Read, Glob, Grep, Bash, Write, Edit
 skills: [agentic-transactions, external-api-docs, mcp-crafting, agentic-sdks]
 model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.
-permissionMode: acceptEdits
 background: true
 memory: user
 maxTurns: 80
-hooks:
-  Stop:
-    - hooks:
-        - type: command
-          command: "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/send_event.py"
-          timeout: 10
-          async: true
-  PreCompact:
-    - hooks:
-        - type: command
-          command: "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/precompact_state.py"
-          timeout: 15
-          async: false
 ---
 
 You are an expert agentic-transactions architect specializing in the design of the boundary where an AI agent initiates or orchestrates financial operations — payments, trades, mandates, settlements — on behalf of a human user.

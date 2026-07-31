@@ -9,7 +9,6 @@ import json
 import re
 from pathlib import Path
 
-
 FRONTMATTER_BOUNDARY = "---"
 SKIP_AGENT_FILES = {"CLAUDE.md", "README.md"}
 
@@ -30,9 +29,7 @@ class AgentParseError(ValueError):
 
 def load_model_routes(repo_root: Path) -> dict[str, dict[str, object]]:
     exporter_path = repo_root / "codex" / "config" / "export-codex-pipeline-adapter.py"
-    spec = importlib.util.spec_from_file_location(
-        "export_codex_pipeline_adapter", exporter_path
-    )
+    spec = importlib.util.spec_from_file_location("export_codex_pipeline_adapter", exporter_path)
     if spec is None or spec.loader is None:
         raise AgentParseError(f"Unable to load routing exporter from {exporter_path}")
     module = importlib.util.module_from_spec(spec)
@@ -115,9 +112,7 @@ def parse_simple_yaml(lines: list[str], path: Path) -> dict[str, str]:
 
     for required in ("name", "description"):
         if not metadata.get(required):
-            raise AgentParseError(
-                f"{path}: missing required frontmatter key: {required}"
-            )
+            raise AgentParseError(f"{path}: missing required frontmatter key: {required}")
     return metadata
 
 
@@ -126,16 +121,14 @@ def toml_string(value: str) -> str:
 
 
 def render_frontmatter_capsule(frontmatter_lines: list[str]) -> str:
-    frontmatter_block = "\n".join(
-        [FRONTMATTER_BOUNDARY, *frontmatter_lines, FRONTMATTER_BOUNDARY]
-    )
+    frontmatter_block = "\n".join([FRONTMATTER_BOUNDARY, *frontmatter_lines, FRONTMATTER_BOUNDARY])
     return "\n".join(
         [
             "Praxion agent contract:",
             "",
             "The YAML block below preserves the canonical Claude frontmatter contract.",
-            "Treat it as authoritative for tool scope, permission mode, memory, hooks,",
-            "skills, max turns, background execution, and any other source-only settings.",
+            "Treat it as authoritative for tool scope, memory, skills, max turns,",
+            "background execution, and any other source-only settings.",
             "",
             "```yaml",
             frontmatter_block,
@@ -217,9 +210,7 @@ def export_agents(repo_root: Path, out_dir: Path) -> list[Path]:
             )
         target_path = out_dir / f"{metadata['name']}.toml"
         target_path.write_text(
-            render_codex_agent(
-                metadata, source_path.resolve(), frontmatter_lines, routing
-            ),
+            render_codex_agent(metadata, source_path.resolve(), frontmatter_lines, routing),
             encoding="utf-8",
         )
         written.append(target_path)

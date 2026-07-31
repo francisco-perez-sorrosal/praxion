@@ -42,12 +42,13 @@ _CIS_SECTION_RE = re.compile(r"##\s+Continuous\s+Improvement\s+Signals", re.IGNO
 _POINTER_RE = re.compile(re.escape(SHARED_REF))
 
 # Fields that currently exist in each file's frontmatter and must survive the CIS redirect.
+# permissionMode was removed fleet-wide (td-072: Claude Code ignores it for
+# plugin-distributed agents), so it is no longer part of this contract.
 _RESEARCHER_FM_FIELDS = (
     "name:",
     "description:",
     "tools:",
     "skills:",
-    "permissionMode:",
 )
 _ARCHITECT_FM_FIELDS = (
     "name:",
@@ -55,7 +56,6 @@ _ARCHITECT_FM_FIELDS = (
     "tools:",
     "model:",
     "skills:",
-    "permissionMode:",
 )
 
 
@@ -86,9 +86,7 @@ def test_researcher_cis_points_to_shared_reference():
     """The CIS section in researcher.md must contain a markdown link to the shared vocab file."""
     text = _read(RESEARCHER)
     block = _cis_block(text)
-    assert block, (
-        "No '## Continuous Improvement Signals' section found in researcher.md"
-    )
+    assert block, "No '## Continuous Improvement Signals' section found in researcher.md"
     assert _POINTER_RE.search(block), (
         f"researcher.md CIS section does not contain a link to '{SHARED_REF}'; "
         "CIS redirect has not landed yet"

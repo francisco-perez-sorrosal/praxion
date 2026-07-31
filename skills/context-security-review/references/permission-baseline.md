@@ -4,7 +4,7 @@ Expected tool permissions, permission modes, and access levels for all Praxion p
 
 ## Baseline Table
 
-| Agent | Tools | Permission Mode | Disallowed Tools | Web Access | Notes |
+| Agent | Tools | Permission Mode (intended) | Disallowed Tools | Web Access | Notes |
 |-------|-------|-----------------|------------------|------------|-------|
 | researcher | Read, Glob, Grep, Bash, WebSearch, WebFetch, Write | default | -- | Yes | Only agent with web access |
 | systems-architect | Read, Glob, Grep, Bash, Write, Edit | acceptEdits | -- | No | Full filesystem write |
@@ -18,6 +18,8 @@ Expected tool permissions, permission modes, and access levels for all Praxion p
 | sentinel | Read, Glob, Grep, Bash, Write | default | Edit | No | Read-heavy, write-only (no edit) |
 | verifier | Read, Glob, Grep, Bash, Write | default | Edit | No | Read-heavy, no edit |
 | skill-genesis | Read, Glob, Grep, Bash, Write, AskUserQuestion | default | -- | No | Can prompt user |
+
+> **Not machine-enforced.** Praxion's agents ship as plugin subagents (`.claude-plugin/plugin.json`), and Claude Code ignores the `permissionMode` frontmatter field for plugin subagents. The field was removed from `agents/*.md` (see `td-072`); this column records the *intended* posture for review purposes. Enforcement of what an agent can touch comes from `tools` / `disallowedTools`, which are honoured.
 
 ## Permission Mode Summary
 
@@ -67,7 +69,7 @@ When reviewing a PR that modifies `agents/*.md`, check for these escalation patt
 
 ## How to Use This Baseline
 
-1. **During PR review**: Compare the agent's current frontmatter against this table. Any difference in `tools`, `permissionMode`, or `disallowedTools` is a finding.
+1. **During PR review**: Compare the agent's current frontmatter against this table. Any difference in `tools` or `disallowedTools` is a finding. `permissionMode` is no longer declared in agent frontmatter -- its **presence** is a finding (see `td-072`), not its absence.
 2. **During full-scan**: Read all `agents/*.md` files and compare against this table. Report any deviations.
 3. **When adding new agents**: Verify the new agent follows least-privilege -- only tools it actually needs, `default` permission mode unless `acceptEdits` is justified, `disallowedTools` for tools it should never use.
 4. **Updating this baseline**: When a legitimate permission change is approved, update this table to reflect the new baseline. This file is the source of truth for expected permissions.

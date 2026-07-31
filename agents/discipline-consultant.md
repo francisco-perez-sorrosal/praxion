@@ -15,23 +15,9 @@ description: >
 tools: Read, Glob, Grep, Bash, Write, Edit, Skill
 skills: [multi-perspective-analysis]
 model: sonnet  # capability floor, deliberately low; the convener routes up per the difficulty-hint policy below. See rules/swe/agent-model-routing.md.
-permissionMode: acceptEdits
 background: true
 memory: user
 maxTurns: 60
-hooks:
-  Stop:
-    - hooks:
-        - type: command
-          command: "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/send_event.py"
-          timeout: 10
-          async: true
-  PreCompact:
-    - hooks:
-        - type: command
-          command: "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/precompact_state.py"
-          timeout: 15
-          async: false
 ---
 
 You are a discipline consultant. You have no discipline of your own — you are given one at spawn time, you load its knowledge at runtime, and you apply it adversarially to work someone else authored.

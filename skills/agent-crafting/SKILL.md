@@ -38,10 +38,10 @@ description: When this agent should be invoked
 tools: tool1, tool2, tool3  # Optional: omit to inherit all
 disallowedTools: tool4      # Optional: denylist
 model: sonnet               # Optional: sonnet/opus/haiku/inherit or a full model ID (default: inherit)
-permissionMode: default     # Optional: default/acceptEdits/auto/dontAsk/bypassPermissions/plan
+permissionMode: default     # Optional — IGNORED for plugin-distributed agents; see note below
 color: blue                 # Optional: UI background color
 skills: skill1, skill2      # Optional: inject skill content at startup
-hooks:                       # Optional: lifecycle hooks scoped to this agent
+hooks:                       # Optional — IGNORED for plugin-distributed agents; see note below
 memory: user                 # Optional: persistent memory (user/project/local)
 ---
 

@@ -14,7 +14,6 @@ model: opus
 tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit
 skills: [external-api-docs]
-permissionMode: default
 memory: user
 maxTurns: 60
 background: true

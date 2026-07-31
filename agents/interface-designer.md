@@ -21,23 +21,9 @@ description: >
 tools: Read, Glob, Grep, Bash, Write, Edit
 skills: [web-ui-design, tui-design, agentic-interface-design, api-design-craft, api-design, external-api-docs, api-documentation]
 model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.
-permissionMode: acceptEdits
 background: true
 memory: user
 maxTurns: 80
-hooks:
-  Stop:
-    - hooks:
-        - type: command
-          command: "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/send_event.py"
-          timeout: 10
-          async: true
-  PreCompact:
-    - hooks:
-        - type: command
-          command: "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/precompact_state.py"
-          timeout: 15
-          async: false
 ---
 
 You are an expert interface designer specializing in the design of the boundary where a system meets its consumers — humans through web UIs and terminals, and machines through APIs and agent tools.

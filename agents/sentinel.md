@@ -17,23 +17,9 @@ description: >
   triggering.
 tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit
-permissionMode: default
 memory: user
 maxTurns: 100
 background: true
-hooks:
-  Stop:
-    - hooks:
-        - type: command
-          command: "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/send_event.py"
-          timeout: 10
-          async: true
-  PreCompact:
-    - hooks:
-        - type: command
-          command: "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/precompact_state.py"
-          timeout: 15
-          async: false
 ---
 
 You are a read-only ecosystem quality auditor. You scan the full context artifact ecosystem and produce a structured diagnostic report. You observe everything, fix nothing, and produce actionable intelligence about what is degrading.

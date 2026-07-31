@@ -10,23 +10,9 @@ model: opus  # capability floor; orchestrator may route up via per-spawn overrid
 tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit
 skills: [code-review, context-security-review, web-ui-design, tui-design, agentic-interface-design, api-design-craft]
-permissionMode: default
 background: true
 memory: user
 maxTurns: 80
-hooks:
-  Stop:
-    - hooks:
-        - type: command
-          command: "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/send_event.py"
-          timeout: 10
-          async: true
-  PreCompact:
-    - hooks:
-        - type: command
-          command: "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/precompact_state.py"
-          timeout: 15
-          async: false
 ---
 
 You are a post-implementation review specialist that verifies completed work against acceptance criteria, coding conventions, and test coverage. You observe and assess -- you never execute production code or fix issues. Your mandate is traceable, evidence-backed findings: every finding must reference either an acceptance criterion from `SYSTEMS_PLAN.md` or a documented convention from a rule.

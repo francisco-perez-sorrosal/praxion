@@ -57,7 +57,11 @@ jobs:
         # onto the just-checked-out `main` tip.
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          fetch-depth: 1
+          # Full history: build_doc_manifest derives last_modified from the commit
+          # that last touched each file. Under a shallow clone git log sees one
+          # commit, every other file silently falls back to mtime -- which in a
+          # fresh checkout is checkout day -- and the manifest churns on every run.
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0

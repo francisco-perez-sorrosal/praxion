@@ -389,7 +389,27 @@ def test_pip_install_pyyaml_step_exists() -> None:
     )
 
 
-def test_checkout_step_is_shallow_not_full_history() -> None:
+def test_checkout_step_fetches_full_history_for_the_manifest_generator() -> None:
+    """Checkout depth is a deliberate, tested choice — and the choice inverted.
+
+    This invariant previously required a shallow checkout on the grounds that
+    `finalize_adrs.py` needs no history: its NNN assignment scans the working
+    tree, and the commit-back is one commit onto the just-checked-out tip. Both
+    remain true, and full history breaks neither.
+
+    What changed is that a second consumer joined the same job.
+    `build_doc_manifest.py` derives each surface's `last_modified` from the
+    commit that last touched it, precisely so the manifest is identical in
+    every checkout. Under `fetch-depth: 1` git log exposes one commit, every
+    other file falls back to filesystem mtime, and mtime in a fresh checkout is
+    checkout day — so the manifest churns on every CI run and the regenerate-
+    in-place step commits that churn back. The shallow requirement was correct
+    for its original consumer and became wrong when a history-dependent one was
+    added alongside it.
+
+    The cost is a slower clone; the benefit is a reproducible manifest and the
+    end of a self-inflicted commit-per-run loop.
+    """
     parsed = _parsed()
     steps = _all_steps(parsed)
     checkout_steps = [step for step in steps if "actions/checkout" in (step.get("uses") or "")]
@@ -397,10 +417,10 @@ def test_checkout_step_is_shallow_not_full_history() -> None:
     for step in checkout_steps:
         with_block = step.get("with") or {}
         fetch_depth = with_block.get("fetch-depth")
-        assert fetch_depth != 0, (
-            "checkout must not use `fetch-depth: 0` (full history) — "
-            "`finalize_adrs.py`'s NNN assignment scans the checked-out "
-            "working tree, not git log, and the commit-back is a single "
-            "commit appended directly onto the just-checked-out `main` tip "
-            f"(got fetch-depth={fetch_depth!r})"
+        assert fetch_depth == 0, (
+            "checkout must use `fetch-depth: 0` (full history) — "
+            "`build_doc_manifest.py` derives `last_modified` from git commit "
+            "dates so the manifest is reproducible across checkouts; under a "
+            "shallow clone it falls back to mtime and the manifest churns on "
+            f"every run (got fetch-depth={fetch_depth!r})"
         )

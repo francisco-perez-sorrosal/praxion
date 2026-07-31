@@ -206,6 +206,24 @@ def _git_commit_dates(root: str) -> dict[str, str]:
     no-op-regen guard actually hold. One subprocess for the whole history
     rather than one per file.
     """
+    shallow = subprocess.run(
+        ["git", "-C", root, "rev-parse", "--is-shallow-repository"],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if shallow == "true":
+        # A shallow clone exposes one commit, so git log can date almost nothing
+        # and nearly every surface falls back to mtime -- which in a fresh
+        # checkout is checkout day. That reintroduces the churn this function
+        # exists to remove, and it does so silently. Say so.
+        print(
+            "WARNING: build_doc_manifest: shallow repository -- last_modified will "
+            "fall back to filesystem mtime for most surfaces and the manifest will "
+            "not be reproducible across checkouts. Fetch full history "
+            "(actions/checkout fetch-depth: 0) before regenerating.",
+            file=sys.stderr,
+        )
+
     try:
         out = subprocess.run(
             ["git", "-C", root, "log", "--name-only", "--format=%x00%cs", "--no-merges"],

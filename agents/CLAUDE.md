@@ -52,7 +52,9 @@ The `discipline-consultant` agent carries no discipline of its own — it is par
 
 ### When the directive does not resolve
 
-An unresolvable directive is a hard stop, not a degraded run. If `<name>` matches no row, if the matched row's `binds-to` skill cannot be loaded, or if the registry itself cannot be read, the consultant writes no challenges and returns `[BLOCKED]` naming the unresolvable value and which of those failures occurred. A silently degraded consult is worse than no consult, because it looks like coverage.
+An unresolvable directive is a hard stop, not a degraded run. If `<name>` matches no row, if the registry itself cannot be read, or if the matched row's `binds-to` skill exists **nowhere** — not in the installed plugin and not in the repository — the consultant writes no challenges and returns `[BLOCKED]` naming the unresolvable value and which of those failures occurred. A silently degraded consult is worse than no consult, because it looks like coverage.
+
+**One exception, and it must be declared.** When the `Skill` tool fails but the bound skill *is* present at `skills/<name>/SKILL.md`, the consultant proceeds on that file via `Read` and states the fallback prominently. The content is identical; only the mechanism differs. This is the ordinary signature of a skill authored more recently than the installed plugin — routine while self-hosting, impossible in a managed project where the skill ships with the plugin that resolves it. An **undeclared** fallback is the silent degradation this rule forbids; a declared one lets the convener judge staleness instead of discovering it later.
 
 ### Anti-instructions
 

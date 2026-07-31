@@ -68,10 +68,20 @@ Round: 0 | 1                       # optional; default is 0-then-1 in one spawn
 
 1. Read `skills/multi-perspective-analysis/references/discipline-registry.md`. The `multi-perspective-analysis` skill is injected into your context and is plugin-resolved, so its satellite files are reachable where a file sitting next to an agent definition would not be. If the registry itself cannot be read, that is a `[BLOCKED]` condition — not a reason to proceed from memory.
 2. Match `<registry-name>` against the `discipline` column, exactly.
-3. Log the resolved discipline on your first `PROGRESS.md` line.
+3. Log the resolved discipline to `PROGRESS.md` by **appending only — never read that file during Round 0.** It is a shared log carrying other agents' phase lines, including the compressed conclusions of the very draft you must not see yet, so reading it to orient is partial draft exposure by construction. Append blind (`>>`), or defer your first log line until `## Independent Reading` and `## Sources Read` are committed to disk. From Round 1 onward, read it freely.
 4. Load the row's `binds-to` skill(s) with the **`Skill` tool** at runtime. They are deliberately absent from your `skills:` frontmatter — that frontmatter is fixed and never grows per discipline.
 
-**Fail loud, never improvise.** If `<registry-name>` has no row, or the row's `binds-to` skill cannot be loaded, stop immediately: write no challenges, and return `[BLOCKED]` naming the unresolvable value and which of the two failures occurred. Do **not** invent a plausible discipline, do **not** substitute a neighbouring one, and do **not** proceed with a degraded consult. The registry is the complete roster; a discipline absent from it does not exist for you. A silently degraded consult is worse than no consult, because it looks like coverage.
+**Fail loud, never improvise.** Do **not** invent a plausible discipline, do **not** substitute a neighbouring one, and do **not** proceed with a degraded consult. The registry is the complete roster; a discipline absent from it does not exist for you. A silently degraded consult is worse than no consult, because it looks like coverage.
+
+Three distinct failures, and they do **not** all mean `[BLOCKED]` — the distinction is whether the *knowledge* is reachable, not whether one mechanism worked:
+
+| What failed | Do |
+|---|---|
+| `<registry-name>` matches no row | `[BLOCKED]`, naming the unresolvable value. The discipline does not exist |
+| The row matches, but its `binds-to` skill exists **nowhere** — not in the installed plugin, not in the repository | `[BLOCKED]`, naming the skill. The knowledge does not exist |
+| The row matches and the `Skill` tool fails, but the skill **is present in the repository** at `skills/<name>/SKILL.md` | **Proceed on the declared fallback.** Load that file with `Read`, state prominently in your return and at the top of your fragment that the runtime binding failed and which path you used, and continue |
+
+The third case is not a degraded consult — the content is identical and only the mechanism differs. It is the ordinary signature of a skill authored more recently than the installed plugin, which is routine in a self-hosting repository and impossible in a managed project, where the skill ships with the plugin that resolves it. Blocking there would spend a whole spawn on an artifact of the development environment. **Declaring it is mandatory**: an undeclared fallback is exactly the silent degradation this section forbids, and the declaration is what lets the convener judge staleness rather than discover it later.
 
 ## Model Routing Policy (generic — one policy, never per-discipline)
 

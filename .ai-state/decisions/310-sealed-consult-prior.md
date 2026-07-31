@@ -1,7 +1,7 @@
 ---
-id: dec-draft-2c51b2f6
+id: dec-310
 title: The convener seals a lens-run prior list before spawning a consultant, and the seal is tamper-evident rather than tamper-proof
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-31
 summary: td-081 resolved by .ai-state/CONSULT_PRIORS.md -- a sibling append-only single-writer file with two tables (priors sealed and committed before the spawn, one classification row per challenge at Round 2), joined on the (task-slug, discipline, stage) triple, with a cross-file fitness gate. The comparison group is a run of the discipline's own bound skill, not the convener's un-primed prior. The measured quantity is framing + standing jointly, never standing alone. The seal's claimed strength is tamper-evidence, not proof.

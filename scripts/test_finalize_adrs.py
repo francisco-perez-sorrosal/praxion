@@ -1462,7 +1462,7 @@ class TestWidenedCrossReferenceScope:
     """dec-draft ids in persistent non-ADR files are rewritten at finalize."""
 
     def test_rewrites_ledger_roadmap_and_docs(self, repo_root: Path) -> None:
-        old, new = "dec-draft-abcd1234", "dec-042"
+        old, new = "dec-draft-abcd1234", "dec-042"  # id-citation-discipline:ignore
         targets = {
             repo_root / ".ai-state" / "TECH_DEBT_LEDGER.md": f"resolved by {old}\n",
             repo_root / ".ai-state" / "TECH_DEBT_RESOLVED.md": f"see {old}\n",
@@ -1489,7 +1489,7 @@ class TestWidenedCrossReferenceScope:
         so every consult ADR left a permanently dangling draft id in a committed
         ledger row.
         """
-        old, new = "dec-draft-c0ffee11", "dec-304"
+        old, new = "dec-draft-c0ffee11", "dec-304"  # id-citation-discipline:ignore
         ledger = repo_root / ".ai-state" / "CONSULT_LEDGER.md"
         ledger.parent.mkdir(parents=True, exist_ok=True)
         ledger.write_text(
@@ -1512,12 +1512,12 @@ class TestWidenedCrossReferenceScope:
         Regression: this is the second occurrence of the same defect the sibling
         ledger test records. `CONSULT_LEDGER.md` was added to the named-persistent
         -files list after it left a dangling draft id; `CONSULT_COSTS.md` was
-        created later and inherited the omission, leaving `dec-draft-6a94ce05` in
+        created later and inherited the omission, leaving a dangling draft id in
         a committed file after its ADR finalized to `dec-308`. The allowlist's
         computed scope must be re-checked whenever a new `.ai-state/` file is
         given a documented ADR reference.
         """
-        old, new = "dec-draft-c0ffee22", "dec-308"
+        old, new = "dec-draft-c0ffee22", "dec-308"  # id-citation-discipline:ignore
         costs = repo_root / ".ai-state" / "CONSULT_COSTS.md"
         costs.parent.mkdir(parents=True, exist_ok=True)
         costs.write_text(
@@ -1541,14 +1541,14 @@ class TestWidenedCrossReferenceScope:
         sibling ledger and cost-series tests record. `CONSULT_LEDGER.md` was
         added to the named-persistent-files list only after it left a dangling
         draft id; `CONSULT_COSTS.md` was created later and inherited the
-        omission, leaving `dec-draft-6a94ce05` in a committed file after its
+        omission, leaving a dangling draft id in a committed file after its
         ADR finalized to `dec-308`. `CONSULT_PRIORS.md` would have repeated the
         identical omission a third time had it not been added to the allowlist
         in the same commit that created the file. The allowlist's computed
         scope must be re-checked whenever a new `.ai-state/` file is given a
         documented ADR reference.
         """
-        old, new = "dec-draft-c0ffee33", "dec-310"
+        old, new = "dec-draft-c0ffee33", "dec-310"  # id-citation-discipline:ignore
         priors = repo_root / ".ai-state" / "CONSULT_PRIORS.md"
         priors.parent.mkdir(parents=True, exist_ok=True)
         priors.write_text(
@@ -1571,7 +1571,7 @@ class TestWidenedCrossReferenceScope:
         `auth-flow` never matched `SPEC_auth_flow_2026-07-30.md` and specs were
         silently skipped by the rewrite.
         """
-        old, new = "dec-draft-feedface", "dec-305"
+        old, new = "dec-draft-feedface", "dec-305"  # id-citation-discipline:ignore
         (repo_root / ".ai-work" / "auth-flow").mkdir(parents=True, exist_ok=True)
         spec = repo_root / ".ai-state" / "specs" / "SPEC_auth_flow_2026-07-30.md"
         spec.parent.mkdir(parents=True, exist_ok=True)
@@ -1650,3 +1650,76 @@ class TestFinalizeReAffirmedByBackfill:
 
         target_content = target.read_text(encoding="utf-8")
         assert target_content.count("dec-061") == 1
+
+
+# -- Rename staging: index must carry the rewritten frontmatter ---------------
+
+
+class TestPromotionStaging:
+    """`git mv` stages the index blob, so the rewrite must be re-staged.
+
+    Unlike the rest of this module, these tests drive a real git repo: the
+    behavior under test *is* git's index semantics, and a monkeypatched
+    subprocess cannot reproduce it. A release once shipped a finalized ADR
+    whose staged blob still read `status: proposed` with a draft `id:` --
+    the working tree was correct and the index was a commit behind.
+    """
+
+    @staticmethod
+    def _git(root: Path, *args: str) -> str:
+        result = subprocess.run(
+            ["git", "-C", str(root), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout
+
+    def _init_repo_with_committed_draft(self, root: Path) -> Path:
+        (root / ".ai-state" / "decisions" / "drafts").mkdir(parents=True)
+        self._git(root, "init", "-q", "-b", "main")
+        self._git(root, "config", "user.email", "tester@example.com")
+        self._git(root, "config", "user.name", "Tester")
+        draft = make_draft(
+            root,
+            "20260101-1200",
+            "tester",
+            "main",
+            "staged-blob",
+            frontmatter_extra={"branch": "main"},
+        )
+        self._git(root, "add", "-A")
+        self._git(root, "commit", "-qm", "add draft")
+        return draft
+
+    def test_promotion_stages_rewritten_frontmatter_not_the_committed_blob(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The index matches the working tree, and `git status` reads `R `.
+
+        `RM` is what made the defect easy to miss: the rename is staged, so
+        the promotion reads as done, while the `M` records the frontmatter
+        rewrite sitting unstaged behind it.
+        """
+        root = tmp_path / "repo"
+        root.mkdir()
+        draft = self._init_repo_with_committed_draft(root)
+        monkeypatch.setattr(finalize, "REPO_ROOT", root)
+        monkeypatch.setattr(finalize, "DECISIONS_DIR", root / ".ai-state" / "decisions")
+        monkeypatch.setattr(finalize, "DRAFTS_DIR", draft.parent)
+
+        new_path, _ = finalize.promote_draft(draft, 311, root)
+
+        rel = str(new_path.relative_to(root))
+        staged = self._git(root, "show", f":{rel}")
+        working_tree = new_path.read_text(encoding="utf-8")
+        status_lines = [
+            line for line in self._git(root, "status", "--short").splitlines() if rel in line
+        ]
+        assert staged == working_tree, (
+            "index holds a stale blob for the promoted ADR; "
+            f"staged frontmatter starts:\n{staged[:120]}"
+        )
+        assert "id: dec-311" in staged
+        assert "status: accepted" in staged
+        assert status_lines == [f"R  {draft.relative_to(root)} -> {rel}"], status_lines

@@ -154,6 +154,28 @@ The finalize flow activates only when `.ai-state/decisions/drafts/` has entries;
 
 **Local-hook + server-backstop pairing (issue #45, dec-284).** The on-main finalize composition (`finalize_adrs.py --all` when drafts present → `finalize_tech_debt_ledger.py --all` always → `build_doc_manifest.py --root` when a manifest exists, factored as `_finalize_chain_run_on_main` in `scripts/finalize_chain.sh`) has **two callers of one shared definition**: (1) the client-side git-hook chain (`git-finalize-hook.sh` → `post-merge`/`post-commit`/`post-checkout`), and (2) a server-side GitHub Actions workflow `.github/workflows/finalize-adrs.yml` (`push:main`). The workflow is the symmetric backstop for **GitHub web-UI merges**, which run server-side where client-side hooks cannot fire — otherwise drafts land on `main` un-promoted until the maintainer's next local git op. Both callers source `finalize_chain.sh` and invoke the public entry point `finalize_chain_run_on_main`; the only difference is error policy, expressed as `FINALIZE_CHAIN_STRICT` (unset = non-blocking hook semantics, exit 0; set = fail-loud CI semantics). The workflow commits the promotion back to `main` with the default `GITHUB_TOKEN` (structurally loop-proof — a `GITHUB_TOKEN` push does not re-trigger `push` workflows), gated on `git status --porcelain` for no-empty-commits. Fleet propagation to managed projects is deferred (mirrors dec-278).
 
+**Staging invariant.** `git mv` stages the **index** blob, not a
+just-written working-tree modification — so `promote_draft`'s write-frontmatter-then-`git mv`
+sequence stages a *stale* version of the file it just rewrote, and `git status` reports the
+result as `RM` (renamed-and-staged **and** content-modified-and-unstaged), which reads as done.
+A released tag carried a finalized ADR self-identifying as an unpromoted draft because of this.
+The invariant the flow holds is **whatever finalize stages is what finalize wrote**:
+`_rename` stages (`git add`) the destination path's post-rewrite content immediately after a
+successful `git mv`, so the promotion settles as `R ` rather than `RM`. That staging step is
+best-effort and logged-on-failure rather than raising: the rename has already succeeded by then,
+and this runs inside the post-merge hook chain where raising would abort a promotion mid-flight
+with no recovery path. The `Path.rename` fallback stages nothing, by design — it runs only when
+there is no git worktree, where staging is meaningless. Cross-reference rewrites in the sibling
+files remain unstaged, unchanged — those are
+staged by name by the caller, as the finalize protocol documents. The invariant is
+independently guarded by a state-reading gate (`scripts/check_adr_frontmatter_promotion.py`)
+asserting for every `.ai-state/decisions/<NNN>-<slug>.md` that frontmatter `id`
+equals `dec-<NNN>` and `status` is not `proposed`; its `--staged` mode reads index blobs, since
+the defect is invisible in the working tree at the moment it is created. Placement in
+`scripts/` rather than `fitness/` is deliberate — the root pytest job carries no `paths:`
+filter, so the gate fires on a pull request touching only `finalize_adrs.py`. See
+`dec-draft-0466baf3`.
+
 ### Tech-Debt Ledger Flow
 
 ![Tech-Debt Ledger Flow — producers (verifier, sentinel) write rows; five consumers filter by owner-role](diagrams/tech-debt-ledger-flow/rendered/tech-debt-ledger-flow.svg)

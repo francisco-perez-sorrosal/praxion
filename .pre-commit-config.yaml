@@ -110,3 +110,14 @@ repos:
         language: system
         files: '\.html$'
         pass_filenames: true
+
+      # Block G — ADR frontmatter promotion (td-103). Self-scans the staged
+      # git index under .ai-state/decisions/ via --staged, so it catches a
+      # finalize_adrs.py staging defect at the commit that would ship it,
+      # even when the working tree already looks correct.
+      - id: adr-frontmatter-promotion
+        name: ADR frontmatter promotion
+        entry: python3 scripts/check_adr_frontmatter_promotion.py --repo-root . --staged
+        language: system
+        files: '^\.ai-state/decisions/.*\.md$'
+        pass_filenames: false

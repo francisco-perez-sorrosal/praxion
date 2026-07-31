@@ -701,7 +701,19 @@ def promote_draft(draft_path: Path, nnn: int, repo_root: Path) -> tuple[Path, st
 
 
 def _rename(src: Path, dst: Path, repo_root: Path) -> None:
-    """Rename src -> dst, preferring `git mv` when inside a git worktree."""
+    """Rename src -> dst, preferring `git mv` when inside a git worktree.
+
+    `git mv` stages the rename from the *index* blob, not from the working
+    tree, so the frontmatter rewrite `promote_draft` applies just before the
+    move is left behind as an unstaged modification against the new path --
+    the `RM` shape that once shipped a finalized ADR still carrying its draft
+    `id:` and `status: proposed`. `_stage_path` re-stages the destination so
+    the index matches the working tree.
+
+    The `Path.rename` fallback stages nothing, by design: it runs only when
+    there is no git worktree (or `git mv` itself failed), where staging is
+    meaningless.
+    """
     if _is_git_worktree():
         result = subprocess.run(
             ["git", "mv", str(src), str(dst)],
@@ -711,12 +723,38 @@ def _rename(src: Path, dst: Path, repo_root: Path) -> None:
             check=False,
         )
         if result.returncode == 0:
+            _stage_path(dst, repo_root)
             return
         logger.debug(
             "git mv failed (%s); falling back to Path.rename",
             result.stderr.strip(),
         )
     src.rename(dst)
+
+
+def _stage_path(path: Path, repo_root: Path) -> None:
+    """Stage `path` so the index carries its current working-tree content.
+
+    Best-effort by design: the rename has already succeeded by the time this
+    runs, and this function executes inside the post-merge/post-commit hook
+    chain, where raising would abort the promotion mid-flight with no recovery
+    path. A failure is logged at warning level so the resulting stale-index
+    state is visible rather than silent.
+    """
+    result = subprocess.run(
+        ["git", "add", "--", str(path)],
+        capture_output=True,
+        text=True,
+        cwd=repo_root,
+        check=False,
+    )
+    if result.returncode != 0:
+        logger.warning(
+            "git add failed for %s (%s); the promoted ADR is renamed but its "
+            "frontmatter rewrite is left unstaged",
+            path,
+            result.stderr.strip(),
+        )
 
 
 # -- Cross-reference rewrite --------------------------------------------------

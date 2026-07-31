@@ -25,6 +25,7 @@ aggregation sums rows per triple.
 | timestamp | task-slug | discipline | stage | tokens | model | difficulty | notes |
 |---|---|---|---|---|---|---|---|
 | 2026-07-30T17:20:00Z | multidisciplinary-identities | statistician | architecture | 101030 | opus | standard | Backfilled from docs/multidisciplinary-identities-evidence.md §17.12; pre-boundary seed -- the only prior consult whose figure survived in a durable artifact |
+| 2026-07-31T02:30:00Z | multidisciplinary-identities-wave2 | statistician | architecture | 161321 | opus | high-stakes | First consult recorded under the series (post-boundary). Convened to challenge the convener's own roster verdict; seven challenges, six switch-now, one defer, zero dismissed. |
 
 ## Column Definitions
 

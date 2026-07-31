@@ -45,6 +45,13 @@
 | 2026-07-31T00:05:00Z | wave1-gap-closure | evidence-appraiser | research | CH-04 | Documented-current-Tier-1-not-inference mislabels the evidentiary class and manufactures convergence | Whether the findings may present a single vendor page as convergent evidence | switch-now | dec-306 section 17.13's convergence standard; the claim is single-source and must say so | opus | standard |
 | 2026-07-31T00:05:00Z | wave1-gap-closure | evidence-appraiser | research | CH-05 | Without-scope-qualification is contradicted by qualifications on the pages the findings themselves fetched | Whether the unconditional reading of the vendor claim stands | switch-now | td-072; the qualifications are now the operative text | opus | standard |
 | 2026-07-31T00:05:00Z | wave1-gap-closure | evidence-appraiser | research | CH-06 | A sentence on the cited page links preload and runtime invocation to the same resolution set | Whether runtime invocation can be claimed to reach a wider set than preload | defer-with-rationale | td-072; resolvable only by the spike, not by further reading | opus | standard |
+| 2026-07-31T02:30:00Z | multidisciplinary-identities-wave2 | statistician | architecture | CH-01 | The method used to reject `data-steward` cannot detect the property it was used to measure -- an artifact grep enumerates decisions someone already recognised as decisions, so it can't find undetected governance gaps | Whether `data-steward`'s disposition may be recorded as rejected on an absent decision surface, or must be recorded as undetermined -- decision surface not estimable by the method used | switch-now | PENDING-ROSTER-ADR | opus | high-stakes |
+| 2026-07-31T02:30:00Z | multidisciplinary-identities-wave2 | statistician | architecture | CH-02 | Rejected by three different routes is evidence of more rejection routes, not of discrimination -- 3 rejections and 0 acceptances leaves sensitivity unestimable, and route diversity is the multiple-comparisons problem in different clothes | Whether the ADR may cite this wave as evidence the silence criterion discriminates, and whether dec-306's dissent/reversal trigger is addressed or still open | switch-now | PENDING-ROSTER-ADR | opus | high-stakes |
+| 2026-07-31T02:30:00Z | multidisciplinary-identities-wave2 | statistician | architecture | CH-03 | The entire instrumentation stack measures Type-I error only, so ship-zero accumulates exclusively the error the system cannot see -- no artifact, gate, or falsifier exists that would fire on a wrongly-excluded discipline | Whether the ADR records ship-zero as the conservative default or as a deliberate acceptance of unmeasured Type-II risk, with the missing instrument named | switch-now | PENDING-ROSTER-ADR | opus | high-stakes |
+| 2026-07-31T02:30:00Z | multidisciplinary-identities-wave2 | statistician | architecture | CH-04 | The consult convened to adjudicate the gate is counted in that gate's denominator, and clearing condition (b) alone changes nothing -- at n=3 the first readable interval still can't distinguish 0.10 from 0.60 | Whether this consult's rows count toward dec-304's standing conditions for statistician at all, and whether the ledger needs a marker for a disposition issued when the convener had a declared interest in its value | switch-now | PENDING-ROSTER-ADR | opus | high-stakes |
+| 2026-07-31T02:30:00Z | multidisciplinary-identities-wave2 | statistician | architecture | CH-05 | Two live defects in the shipped counting helpers -- task-slug-only consult keying undercounts n, and superseded rows are counted as live -- both bias the discipline-expansion criterion toward restraint | Whether the counting helpers and the § Falsifier recipe are corrected before the wave verdict is written into an ADR that cites their output | switch-now | PENDING-ROSTER-ADR | opus | high-stakes |
+| 2026-07-31T02:30:00Z | multidisciplinary-identities-wave2 | statistician | architecture | CH-06 | dec-306's falsifier is unidentified, not underpowered -- it requires a two-arm comparison and the ledger records only one arm, so no n will make it estimable | Whether dec-306's Disconfirmation block is left as written or amended to state the falsifier requires a design change to become estimable, with that design named | defer-with-rationale | PENDING-ROSTER-ADR | opus | high-stakes |
+| 2026-07-31T02:30:00Z | multidisciplinary-identities-wave2 | statistician | architecture | CH-07 | This consult cannot test dec-304's falsifier, and agreement with the draft's ledger reading is near-uninformative by construction -- the consultant is not independent of the convener on any axis that matters | Whether the resulting ADR may cite this consult as evidence bearing on dec-304's falsifier or dec-306's dissent, and whether a genuine blind second reading is scheduled | switch-now | PENDING-ROSTER-ADR | opus | high-stakes |
 
 ## Column Definitions
 
@@ -75,15 +82,23 @@
 Dismiss rate per discipline must be derivable with a `grep` and a count -- no parser. Rows are pipe-delimited with single-space padding and `discipline` is the third column, so the filter is anchored to that column *position* rather than matching the name anywhere in the row:
 
 ```
-# total dispositioned challenges for a discipline
+# total dispositioned challenges for a discipline (RAW row count -- includes
+# superseded rows written by a later re-disposition; see "Live vs raw counts"
+# below for the corrected figure)
 grep -E '^\|[^|]*\|[^|]*\| *statistician *\|' .ai-state/CONSULT_LEDGER.md | wc -l
 
-# dismissed challenges for that discipline
+# dismissed challenges for that discipline (RAW row count -- same caveat)
 grep -E '^\|[^|]*\|[^|]*\| *statistician *\|' .ai-state/CONSULT_LEDGER.md | grep -c 'dismiss-with-rationale'
 
-# INDEPENDENT observations for that discipline -- distinct consults, i.e. distinct task-slugs.
-# This is the denominator the expansion criterion uses; the challenge count above is NOT.
-grep -E '^\|[^|]*\|[^|]*\| *statistician *\|' .ai-state/CONSULT_LEDGER.md | cut -d'|' -f3 | sort -u | wc -l
+# INDEPENDENT observations for that discipline -- distinct consults, keyed on
+# the (task-slug, stage) pair. A consult's identity is the (task-slug,
+# discipline, stage) triple (the same convention .ai-state/CONSULT_COSTS.md
+# § Column Definitions uses for its own join key): one discipline can attach
+# at both `research` and `architecture` within a single task, and those are
+# two independent consultant spawns sharing a task-slug but nothing else.
+# This is the denominator the expansion criterion uses; the challenge count
+# above is NOT.
+grep -E '^\|[^|]*\|[^|]*\| *statistician *\|' .ai-state/CONSULT_LEDGER.md | cut -d'|' -f3,5 | sort -u | wc -l
 
 # which disposition values have been observed at all (the two-sided standing condition)
 grep -E '^\|[^|]*\|[^|]*\| *statistician *\|' .ai-state/CONSULT_LEDGER.md \
@@ -101,6 +116,19 @@ three disposition values have been observed (fourth command) before the ratio is
 all — a ledger with no dismissals is equally consistent with a well-calibrated router and with a
 convener who never adjudicates. Both conditions and their derivation:
 `docs/multidisciplinary-identities-evidence.md` §17.4 and §17.11.
+
+**Live vs raw counts.** The ledger is append-only: a challenge revisited later (e.g. a
+`defer-with-rationale` superseded by a `switch-now`) is recorded as a *second*, later-timestamped row
+for the same (task-slug, discipline, stage, challenge-id), never as an edit to the first. The raw row
+and dismissed counts above therefore overstate the number of *live* challenges whenever supersession
+has occurred — with a fixed dismiss numerator, an inflated row denominator *deflates* the computed
+dismiss rate, which is exactly the fail-open direction this section already forbids. Supersession is
+detected structurally (collapsing to the latest timestamp per key), never by parsing `rationale-ref`
+prose, and this collapse is not expressible as a single `grep` one-liner. The authoritative
+implementation is `collapse_ledger_rows_to_latest_per_challenge` /
+`count_live_challenges_for_discipline` / `count_live_dismissed_for_discipline` in
+`fitness/tests/test_discipline_registry_invariants.py`, each proven against a canary. Use those, not
+the raw grep counts, whenever the live figure matters.
 
 **Why the column anchor is load-bearing.** An unanchored literal match (`grep -F '| statistician |'`) also matches rows belonging to *other* disciplines whose free-text cells happen to contain the name -- a `decision-at-stake` reading `statistician`, for instance. That inflates the denominator and therefore *deflates* the computed dismiss rate, which biases the discipline-expansion gate toward passing. A falsifier must fail safe. Verified against a synthetic ledger in which the unanchored form returned 3 rows for a discipline that had 2; the anchored form returns 2.
 

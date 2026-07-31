@@ -791,17 +791,73 @@ def count_dismissed_for_discipline(ledger_text: str, discipline: str) -> int:
 
 
 def count_distinct_consults_for_discipline(ledger_text: str, discipline: str) -> int:
-    """Distinct task-slugs (independent consults) for `discipline` -- the
+    """Distinct consults (independent observations) for `discipline` -- the
     discipline-expansion criterion's actual denominator, per the ledger's own
     note that challenges raised within one consult are a cluster sharing a
-    consultant/draft/convener, not independent observations."""
+    consultant/draft/convener, not independent observations.
+
+    Keyed on the (task-slug, stage) pair, not task-slug alone: a consult's
+    identity is the (task-slug, discipline, stage) triple -- the same
+    convention .ai-state/CONSULT_COSTS.md § Column Definitions documents for
+    its own join key -- because one discipline can attach at both `research`
+    and `architecture` within a single task, and those are two independent
+    consultant spawns (different stage, different draft, different spawn)
+    sharing only a task-slug. Keying on task-slug alone collapses them into
+    one, undercounting n and biasing the discipline-expansion criterion
+    toward "not yet informative"."""
     matched_lines = [
         line
         for line in ledger_text.splitlines()
         if _discipline_column_pattern(discipline).match(line)
     ]
-    slugs = {line.strip().strip("|").split("|")[1].strip() for line in matched_lines}
-    return len(slugs)
+    consult_keys: set[tuple[str, str]] = set()
+    for line in matched_lines:
+        cells = line.strip().strip("|").split("|")
+        consult_keys.add((cells[1].strip(), cells[3].strip()))
+    return len(consult_keys)
+
+
+def collapse_ledger_rows_to_latest_per_challenge(
+    ledger_text: str, discipline: str
+) -> list[list[str]]:
+    """Collapse `discipline`'s ledger rows to one row per (task-slug, stage,
+    challenge-id) -- the latest by timestamp.
+
+    The ledger is append-only: a challenge revisited later (e.g. a
+    `defer-with-rationale` superseded by a `switch-now`, per
+    .ai-state/CONSULT_LEDGER.md § Column Definitions) is written as a
+    *second*, later-timestamped row for the same challenge, never as an edit
+    to the first. Counting both rows as independent, live observations
+    overstates the live-challenge count. Supersession is detected
+    structurally -- keeping the row with the latest timestamp per key -- never
+    by parsing `rationale-ref` prose, which no grep recipe reads reliably."""
+    matched_lines = [
+        line
+        for line in ledger_text.splitlines()
+        if _discipline_column_pattern(discipline).match(line)
+    ]
+    latest_by_key: dict[tuple[str, str, str], list[str]] = {}
+    for line in matched_lines:
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        timestamp, task_slug, _discipline, stage, challenge_id = cells[:5]
+        key = (task_slug, stage, challenge_id)
+        current_latest = latest_by_key.get(key)
+        if current_latest is None or timestamp > current_latest[0]:
+            latest_by_key[key] = cells
+    return list(latest_by_key.values())
+
+
+def count_live_challenges_for_discipline(ledger_text: str, discipline: str) -> int:
+    """Count of live (non-superseded) dispositioned challenges for
+    `discipline`. See collapse_ledger_rows_to_latest_per_challenge."""
+    return len(collapse_ledger_rows_to_latest_per_challenge(ledger_text, discipline))
+
+
+def count_live_dismissed_for_discipline(ledger_text: str, discipline: str) -> int:
+    """Dismissed count among live (non-superseded) challenges for
+    `discipline`. See collapse_ledger_rows_to_latest_per_challenge."""
+    live_rows = collapse_ledger_rows_to_latest_per_challenge(ledger_text, discipline)
+    return sum(1 for cells in live_rows if cells[7] == "dismiss-with-rationale")
 
 
 def count_rows_naive_substring_match(ledger_text: str, discipline: str) -> int:
@@ -888,6 +944,77 @@ def test_ledger_falsifier_recipe_returns_correct_counts_on_the_real_ledger(
         "the unanchored form must over-count or tie, never under-count -- "
         "if it ever returns fewer rows than the anchored form, the anchoring "
         "regex has stopped matching real rows"
+    )
+
+
+def count_distinct_consults_by_task_slug_only(ledger_text: str, discipline: str) -> int:
+    """The DEFECTIVE keying `count_distinct_consults_for_discipline` shipped
+    with: task-slug alone. Undercounts whenever a discipline attaches at more
+    than one stage within a single task-slug -- reproduced here only so the
+    canary below can assert the delta explicitly."""
+    matched_lines = [
+        line
+        for line in ledger_text.splitlines()
+        if _discipline_column_pattern(discipline).match(line)
+    ]
+    slugs = {line.strip().strip("|").split("|")[1].strip() for line in matched_lines}
+    return len(slugs)
+
+
+def test_task_slug_only_keying_undercounts_consults_the_triple_keying_avoids() -> None:
+    """Canary reproducing the counting defect found while re-deriving the
+    ledger's own numbers: one task-slug, two stages, same discipline -- two
+    independent consultant spawns (different stage, different draft,
+    different spawn) sharing a task-slug but nothing else, per
+    .ai-state/CONSULT_COSTS.md's own (task-slug, discipline, stage)
+    consult-identity convention. The task-slug-only recipe collapses them to
+    1; keying on (task-slug, stage) correctly returns 2."""
+    rows = [
+        "| 2026-07-30T23:10:00Z | task-a | statistician | architecture | CH-01 | "
+        "claim | decision | switch-now | dec-1 | opus | standard |",
+        "| 2026-07-31T00:05:00Z | task-a | statistician | research | CH-01 | "
+        "claim | decision | switch-now | dec-2 | opus | standard |",
+    ]
+    ledger_text = f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n" + "\n".join(rows) + "\n"
+
+    assert count_distinct_consults_by_task_slug_only(ledger_text, "statistician") == 1, (
+        "expected the defective task-slug-only recipe to reproduce the documented "
+        "undercount (1 consult for a discipline that has 2) -- if this changes the "
+        "canary no longer exercises the defect it exists to guard against"
+    )
+    assert count_distinct_consults_for_discipline(ledger_text, "statistician") == 2, (
+        "keying on (task-slug, stage) must count the two stage-distinct spawns "
+        "as two independent consults, not one"
+    )
+
+
+def test_collapses_superseded_rows_to_the_latest_disposition_per_challenge() -> None:
+    """Canary reproducing the second counting defect found while re-deriving
+    the ledger's own numbers: a challenge revised later (a
+    defer-with-rationale superseded by a switch-now, written as a second,
+    later-timestamped row rather than an edit to the first, per
+    .ai-state/CONSULT_LEDGER.md § Column Definitions) must count once, at its
+    live disposition -- not once per row appended."""
+    rows = [
+        "| 2026-07-30T17:05:00Z | task-a | statistician | architecture | CH-01 | "
+        "claim | decision | defer-with-rationale | dec-1 | opus | standard |",
+        "| 2026-07-30T17:20:00Z | task-a | statistician | architecture | CH-01 | "
+        "claim | decision | switch-now | dec-2 (revises the defer) | opus | standard |",
+        "| 2026-07-30T17:05:00Z | task-a | statistician | architecture | CH-02 | "
+        "claim | decision | dismiss-with-rationale | dec-3 | opus | standard |",
+    ]
+    ledger_text = f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n" + "\n".join(rows) + "\n"
+
+    assert (
+        count_ledger_rows_for_discipline(ledger_text, "statistician") == 3
+    ), "the raw row count is unchanged -- three rows were appended"
+    assert count_live_challenges_for_discipline(ledger_text, "statistician") == 2, (
+        "the two CH-01 rows collapse to one live challenge (its latest "
+        "disposition, switch-now), leaving 2 live challenges total"
+    )
+    assert count_live_dismissed_for_discipline(ledger_text, "statistician") == 1, (
+        "CH-02's dismiss-with-rationale is live and uncontested; CH-01's "
+        "superseded defer-with-rationale must not be counted at all"
     )
 
 

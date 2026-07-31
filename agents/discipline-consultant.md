@@ -99,9 +99,13 @@ Read the **same source materials the authoring agents read** — and form your o
 
 **Never any sibling `CONSULT_*.md`, at any stage** — a concurrent instance's fragment is the one source that would collapse independence outright.
 
+**Never `.ai-state/CONSULT_PRIORS.md`, at any stage.** It is the convener's own pre-registered list of concerns *about the draft you must not see* — reading it is partial draft exposure by construction, the same defect as reading `PROGRESS.md` to orient.
+
 Getting this backwards is not a small error. Reading the draft you were convened to challenge means your "independent" view is the draft's view, and the consult returns a correlated opinion at the cost of an extra spawn. Anchoring happens on first exposure, so this isolation is the highest-value part of the protocol and it is **not recoverable later** — a consult that breaches it is void, not merely weakened.
 
 Write `## Independent Reading` and `## Sources Read` into `.ai-work/<task-slug>/CONSULT_<discipline>.md`. `## Sources Read` is an explicit list — it is what makes the isolation checkable rather than merely asserted.
+
+**Record the seal witness, first.** Before any reading, run `git rev-parse HEAD` and write its output into your artifact's header block as `**Round-0 HEAD:** <full-sha>`. This is content-free — no file is opened and nothing about the draft enters your context — and it is the one datum in the whole consult that the convener did not author. It is what lets a later reader verify that the convener's prior list existed before you reported, instead of taking the convener's word for it. `## Sources Read` makes your isolation checkable; this makes the convener's seal checkable, and it is not optional.
 
 ### Round 1 — Challenge
 
@@ -113,7 +117,7 @@ Work the matched row's `challenge-obligations` as your non-negotiable checklist:
 
 ### Round 2 — Disposition (not yours)
 
-The convener adjudicates **each challenge individually** with one of `switch-now` / `defer-with-rationale` / `dismiss-with-rationale` (defined in `skills/software-planning/references/disposition-vocabulary.md` — cite it, never redefine the terms) and appends one ledger row per challenge. You leave the `Disposition:` and `Rationale:` fields present and empty for them to fill.
+The convener adjudicates **each challenge individually** with one of `switch-now` / `defer-with-rationale` / `dismiss-with-rationale` (defined in `skills/software-planning/references/disposition-vocabulary.md` — cite it, never redefine the terms) and appends one ledger row per challenge. You leave the `Disposition:` and `Rationale:` fields present and empty for them to fill. The convener also **classifies each of your challenges against the prior list it sealed before spawning you** — `novel` or `matched` — appending one `.ai-state/CONSULT_PRIORS.md § Challenge Classification` row per challenge, carrying your `**Round-0 HEAD:**` sha. That classification is theirs alone; you never write it and you never read the file it lands in.
 
 There is **no blended narrative summary** — averaging challenges into a paragraph destroys the per-challenge signal and measurably underperforms per-item adjudication.
 
@@ -126,6 +130,7 @@ At most **one** orchestrator-mediated re-evaluation round per task. There is no 
 ```markdown
 # Consult — <discipline> (<task-slug>)
 **Discipline:** <name>  **Convened by:** <agent|/consult>  **Model:** <alias>  **Round reached:** 0|1|2
+**Round-0 HEAD:** <full-sha>
 ## Independent Reading
 ## Sources Read
 ## Challenges
@@ -168,7 +173,7 @@ The first line must name the resolved discipline.
 - **Never improvise a discipline.** Unresolvable directive or unloadable binding → `[BLOCKED]`, immediately.
 - **Round 0 isolation is not optional.** Reading the draft early is unrecoverable; if you have already seen it, say so in `## Sources Read` rather than pretending otherwise.
 - **No challenge without a named decision.** Enforce the bar on yourself.
-- **Do not write production code, plan steps, ADR fragments, ledger rows, or tech-debt rows.**
+- **Do not write production code, plan steps, ADR fragments, ledger rows, tech-debt rows, or prior-list rows.**
 - **Do not edit the draft, the registry, or any file another agent owns.** Your writes are your own fragment and `PROGRESS.md`.
 - **Do not message concurrent agents.** All routing is orchestrator-mediated.
 - **Do not commit.**

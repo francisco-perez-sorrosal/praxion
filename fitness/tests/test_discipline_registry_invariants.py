@@ -1984,6 +1984,78 @@ def check_fragment_witness_agrees(fragment_text: str, seal_witness: str) -> str 
     return None
 
 
+def _sealed_prior_identities(
+    prior_rows: list[list[str]],
+    triple: tuple[str, str, str],
+    not_after: str | None = None,
+) -> set[tuple[str, str, str]]:
+    """The `(prior-id, source, concern)` identities sealed for `triple`.
+
+    When `not_after` is supplied, rows timestamped strictly after it are
+    dropped -- ISO-8601 UTC strings order correctly under string comparison, so
+    no date parsing is needed. That scoping is what lets a legitimate Round-3
+    re-seal append further rows without failing the equality below.
+    """
+    index = {field: pos for pos, field in enumerate(PRIOR_ROW_FIELDS)}
+    identities: set[tuple[str, str, str]] = set()
+    for row in prior_rows:
+        row_triple = (
+            row[index["task-slug"]],
+            row[index["discipline"]],
+            row[index["stage"]],
+        )
+        if row_triple != triple:
+            continue
+        if not_after is not None and row[index["timestamp"]] > not_after:
+            continue
+        identities.add((row[index["prior-id"]], row[index["source"]], row[index["concern"]]))
+    return identities
+
+
+def check_witness_priors_equal_working_priors(
+    witness_prior_rows: list[list[str]],
+    working_prior_rows: list[list[str]],
+    triple: tuple[str, str, str],
+    witness_commit_date: str | None = None,
+) -> str | None:
+    """G6. Assert **set equality** -- not containment -- between the sealed
+    priors in the witness commit and those in the working file, for `triple`.
+
+    Containment was the original formulation and it failed open in two distinct
+    ways, both found by a live `statistician` consult against this design and
+    both reproduced before this rewrite:
+
+    1. The original predicate was three unanchored substring tests over the
+       whole file (`task_slug in blob and discipline in blob and stage in
+       blob`). Both tables carry those three columns, so a witness file holding
+       only *Challenge Classification* rows for the triple -- and zero sealed
+       priors -- satisfied it.
+    2. Containment is monotone under appending. A convener that reads the
+       challenges, appends a prior for the same triple, and cites it as
+       `matched` fabricates nothing: the fragment is untouched, the sha is
+       genuine, and the witness commit still *contains* the original rows. The
+       seal then binds the existence of a prior list but not its contents --
+       and the contents are the whole measurement.
+
+    Set equality detects an addition and a deletion. Scoping the working-side
+    set by the witness commit's own date preserves the legitimate re-seal path.
+    """
+    sealed = _sealed_prior_identities(witness_prior_rows, triple)
+    working = _sealed_prior_identities(working_prior_rows, triple, not_after=witness_commit_date)
+
+    added = {identity[0] for identity in working - sealed}
+    removed = {identity[0] for identity in sealed - working}
+    if not added and not removed:
+        return None
+
+    parts = [f"sealed priors for {triple!r} disagree with the witness commit"]
+    if added:
+        parts.append(f"present in the working file but not sealed: {sorted(added)}")
+    if removed:
+        parts.append(f"sealed but absent from the working file: {sorted(removed)}")
+    return "; ".join(parts)
+
+
 # ---------------------------------------------------------------------------
 # Canaries: the six checks above fail on known-bad inputs. Each bad input is
 # valid in every dimension except the one under test -- the ledger row is
@@ -2236,6 +2308,105 @@ def test_flags_a_fragment_witness_disagreeing_with_the_recorded_seal_witness() -
     )
     assert "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef" in result
     assert "0123456789abcdef0123456789abcdef01234567" in result
+
+
+_G6_TRIPLE = ("task-a", "statistician", "architecture")
+
+
+def _prior_row(prior_id: str, concern: str, timestamp: str = "2026-08-01T10:00:00Z") -> list[str]:
+    """One well-formed Sealed Priors row for `_G6_TRIPLE`."""
+    return [timestamp, "task-a", "statistician", "architecture", prior_id, "lens", concern]
+
+
+def test_flags_a_witness_holding_no_sealed_priors_for_the_triple() -> None:
+    """Canary for the defect the original containment form shipped with: a
+    witness commit carrying *Challenge Classification* rows for the triple but
+    **zero** Sealed Priors rows for it.
+
+    The superseded predicate was three unanchored substring tests over the
+    whole file; both tables carry `task-slug`, `discipline` and `stage`, so it
+    returned True on exactly this input. Reproduced against the real file
+    before the rewrite."""
+    working = [_prior_row("P-01", "a real sealed concern")]
+
+    result = check_witness_priors_equal_working_priors([], working, _G6_TRIPLE)
+
+    assert result is not None, (
+        "G6 must flag a witness commit with no sealed priors for the triple; got None -- "
+        "this is the fail-open the substring form shipped with"
+    )
+    assert "P-01" in result
+
+
+def test_flags_a_prior_appended_after_the_witness_commit() -> None:
+    """Canary for the cheat the seal exists to prevent: a convener reads the
+    challenges, appends a prior for the same triple, and cites it as `matched`.
+
+    Nothing is fabricated -- the fragment is untouched and the sha is genuine --
+    so only set equality catches it. Containment cannot: appending only ever
+    increases presence."""
+    sealed = [_prior_row("P-01", "sealed before the spawn")]
+    working = sealed + [_prior_row("P-02", "appended after reading the challenges")]
+
+    result = check_witness_priors_equal_working_priors(sealed, working, _G6_TRIPLE)
+
+    assert result is not None, (
+        "G6 must flag a prior appended after the witness commit; got None -- "
+        "containment is monotone under appending and cannot detect an addition"
+    )
+    assert "P-02" in result
+    assert "not sealed" in result
+
+
+def test_flags_a_sealed_prior_missing_from_the_working_file() -> None:
+    """Canary for the other direction: a row present in the witness commit and
+    absent from the working file. The file is documented append-only, so this
+    is a deletion -- set equality makes that rule mechanically enforced rather
+    than conventional."""
+    sealed = [_prior_row("P-01", "sealed"), _prior_row("P-02", "also sealed")]
+    working = [_prior_row("P-01", "sealed")]
+
+    result = check_witness_priors_equal_working_priors(sealed, working, _G6_TRIPLE)
+
+    assert result is not None, "G6 must flag a sealed prior deleted from the working file"
+    assert "P-02" in result
+    assert "absent from the working file" in result
+
+
+def test_accepts_witness_and_working_priors_that_match_exactly() -> None:
+    """Non-firing control: identical sets produce no failure."""
+    rows = [_prior_row("P-01", "one"), _prior_row("P-02", "two")]
+
+    assert check_witness_priors_equal_working_priors(rows, list(rows), _G6_TRIPLE) is None
+
+
+def test_accepts_a_later_reseal_row_scoped_out_by_the_witness_commit_date() -> None:
+    """Non-firing control: a Round-3 re-seal appends rows *after* the witness
+    commit's own date, and those must not fail the equality. Without this
+    scoping the gate would forbid a legitimate path and be disabled within a
+    wave."""
+    sealed = [_prior_row("P-01", "sealed", timestamp="2026-08-01T10:00:00Z")]
+    working = sealed + [_prior_row("P-09", "re-seal", timestamp="2026-08-05T10:00:00Z")]
+
+    result = check_witness_priors_equal_working_priors(
+        sealed, working, _G6_TRIPLE, witness_commit_date="2026-08-01T12:00:00Z"
+    )
+
+    assert result is None, f"a post-witness re-seal row must be scoped out; got: {result}"
+
+
+def test_flags_an_unscoped_post_witness_row_when_no_commit_date_is_supplied() -> None:
+    """Canary guarding the scoping itself: without a witness commit date the
+    later row is *not* exempt. This keeps the exemption deliberate -- a caller
+    that forgets to pass the date gets the strict comparison, not a silent
+    pass."""
+    sealed = [_prior_row("P-01", "sealed", timestamp="2026-08-01T10:00:00Z")]
+    working = sealed + [_prior_row("P-09", "re-seal", timestamp="2026-08-05T10:00:00Z")]
+
+    result = check_witness_priors_equal_working_priors(sealed, working, _G6_TRIPLE)
+
+    assert result is not None, "without a witness commit date the strict comparison must apply"
+    assert "P-09" in result
 
 
 # ---------------------------------------------------------------------------
@@ -2530,13 +2701,24 @@ def test_the_witness_commit_contains_the_sealed_prior_rows(project_root: Path) -
         assert (
             show.returncode == 0
         ), f"git show {seal_witness}:.ai-state/CONSULT_PRIORS.md failed: {show.stderr}"
-        task_slug, discipline, stage = triple
-        contains_triple = (
-            task_slug in show.stdout and discipline in show.stdout and stage in show.stdout
+        commit_date = subprocess.run(
+            ["git", "show", "-s", "--format=%cI", seal_witness],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            check=False,
         )
-        assert (
-            contains_triple
-        ), f"witness commit {seal_witness!r} does not contain a Sealed Priors row for {triple!r}"
+        witness_commit_date = commit_date.stdout.strip() if commit_date.returncode == 0 else None
+
+        witness_prior_rows = parse_prior_table_rows(show.stdout)
+        working_prior_rows = parse_prior_table_rows(priors_path.read_text(encoding="utf-8"))
+        failure = check_witness_priors_equal_working_priors(
+            witness_prior_rows,
+            working_prior_rows,
+            triple,
+            witness_commit_date=witness_commit_date,
+        )
+        assert failure is None, f"witness commit {seal_witness!r}: {failure}"
         checked_any = True
 
     if not checked_any:

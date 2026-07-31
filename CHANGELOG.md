@@ -1,3 +1,19 @@
+## v0.20.0 (2026-07-31)
+
+### Feat
+
+- **consult**: record and classify the verification statistician consult
+- **consult**: classify the td-081 consult, and fix G6's scope boundary
+- **fitness**: gate the sealed prior register, and widen finalize again
+- **consult**: add the sealed prior-list register and its four contract sites
+
+### Fix
+
+- **state**: correct six claims the independent verification falsified
+- **fitness**: close the G6 timezone bypass and make the witness checks CI-reachable
+- **consult**: close the three remaining statistician challenges
+- **fitness**: G6 asserts set equality, not containment
+
 ## v0.19.0 (2026-07-31)
 
 ### Feat

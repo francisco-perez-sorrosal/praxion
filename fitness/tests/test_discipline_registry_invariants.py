@@ -1683,6 +1683,7 @@ CLASSIFICATION_ROW_FIELDS: tuple[str, ...] = (
     "classification",
     "matched-prior-id",
     "seal-witness",
+    "prompt-areas",
 )
 
 # Same rationale as SERIES_BOUNDARY above: the gate's source of truth is this
@@ -1698,6 +1699,7 @@ _PLACEHOLDER_CONCERNS = frozenset({"", "-", "--", "n/a", "na", "tbd", "none."})
 
 _PRIOR_ID_RE = re.compile(r"^P-\d{2}$")
 _SEAL_WITNESS_RE = re.compile(r"^[0-9a-f]{7,40}$")
+_PROMPT_AREAS_RE = re.compile(r"^\d+$")
 _ROUND0_HEAD_RE = re.compile(r"\*\*Round-0 HEAD:\*\*\s*([0-9a-f]{7,40})")
 
 _PRIOR_HEADER_ROW = "| " + " | ".join(PRIOR_ROW_FIELDS) + " |"
@@ -1755,7 +1757,7 @@ def check_prior_row_has_seven_columns(rows: list[list[str]]) -> list[str]:
     return failures
 
 
-def check_classification_row_has_eight_columns(rows: list[list[str]]) -> list[str]:
+def check_classification_row_has_nine_columns(rows: list[list[str]]) -> list[str]:
     """Return a failure string per row whose cell count isn't exactly eight (G0b)."""
     failures: list[str] = []
     for index, row in enumerate(rows):
@@ -1924,6 +1926,13 @@ def check_every_challenge_is_classified(
         if not _SEAL_WITNESS_RE.match(seal_witness):
             failures.append(f"classification row has a malformed seal-witness: {seal_witness!r}")
 
+        prompt_areas = row[classification_index["prompt-areas"]]
+        if not _PROMPT_AREAS_RE.match(prompt_areas):
+            failures.append(
+                "classification row has a malformed prompt-areas count "
+                f"(expected a non-negative integer): {prompt_areas!r}"
+            )
+
         witness_by_triple.setdefault(triple, set()).add(seal_witness)
 
     for triple, witnesses in witness_by_triple.items():
@@ -2056,6 +2065,36 @@ def check_witness_priors_equal_working_priors(
     return "; ".join(parts)
 
 
+def novelty_rate_by_consult(
+    classification_rows: list[list[str]], discipline: str
+) -> dict[tuple[str, str], tuple[int, int]]:
+    """`{(task-slug, stage): (novel, total)}` for `discipline` -- the criterion's
+    statistic, computed per consult and never pooled.
+
+    This is the authoritative implementation of the primary recipe published in
+    `.ai-state/CONSULT_PRIORS.md` § Reading the series; if the shell recipe and
+    this function disagree, this function is correct.
+
+    Challenges cluster within a consult -- one convener, one sealed list, one
+    draft -- so the consult is the independent unit. Pooling challenges across
+    consults reintroduces exactly the defect `dec-304` removed from the sibling
+    dismiss rate, and it is not a small effect: see the canary below, where a
+    talkative consult drags the pooled figure 0.27 away from the consult mean.
+    """
+    index = {field: pos for pos, field in enumerate(CLASSIFICATION_ROW_FIELDS)}
+    by_consult: dict[tuple[str, str], tuple[int, int]] = {}
+    for row in classification_rows:
+        if row[index["discipline"]] != discipline:
+            continue
+        classification = row[index["classification"]]
+        if classification not in ("novel", "matched"):
+            continue
+        key = (row[index["task-slug"]], row[index["stage"]])
+        novel, total = by_consult.get(key, (0, 0))
+        by_consult[key] = (novel + (classification == "novel"), total + 1)
+    return by_consult
+
+
 # ---------------------------------------------------------------------------
 # Canaries: the six checks above fail on known-bad inputs. Each bad input is
 # valid in every dimension except the one under test -- the ledger row is
@@ -2175,7 +2214,7 @@ def test_flags_a_matched_classification_naming_an_absent_prior() -> None:
     priors_table = f"{_PRIOR_HEADER_ROW}\n{_PRIOR_SEPARATOR_ROW}\n{prior_row}\n"
     classification_row = (
         "| 2026-08-01T12:05:00Z | task-a | statistician | architecture | CH-01 | matched | "
-        "P-09 | 0123456789abcdef0123456789abcdef01234567 |"
+        "P-09 | 0123456789abcdef0123456789abcdef01234567 | 7 |"
     )
     classification_table = (
         f"{_CLASSIFICATION_HEADER_ROW}\n{_CLASSIFICATION_SEPARATOR_ROW}\n{classification_row}\n"
@@ -2200,7 +2239,7 @@ def test_flags_a_novel_classification_carrying_a_matched_prior_id() -> None:
     priors_table = f"{_PRIOR_HEADER_ROW}\n{_PRIOR_SEPARATOR_ROW}\n{prior_row}\n"
     classification_row = (
         "| 2026-08-01T12:05:00Z | task-a | statistician | architecture | CH-01 | novel | "
-        "P-01 | 0123456789abcdef0123456789abcdef01234567 |"
+        "P-01 | 0123456789abcdef0123456789abcdef01234567 | 7 |"
     )
     classification_table = (
         f"{_CLASSIFICATION_HEADER_ROW}\n{_CLASSIFICATION_SEPARATOR_ROW}\n{classification_row}\n"
@@ -2215,15 +2254,98 @@ def test_flags_a_novel_classification_carrying_a_matched_prior_id() -> None:
     assert len(failures) == 1, f"expected exactly one failure; got: {failures}"
 
 
+def test_pooled_and_per_consult_novelty_rates_diverge_on_the_consults_worked_example() -> None:
+    """The settling test a live `statistician` consult named, committed.
+
+    That consult found the file's published recipes computed the **pooled**
+    challenge-level rate `dec-304` removed, while the mandated consult-level
+    denominator appeared only in prose one section away. It supplied the
+    arithmetic and the falsification condition verbatim: two consults, one with
+    12 challenges at 11 novel and one with 3 at 0 novel, give pooled 11/15 =
+    0.73 against a consult mean of 0.46 -- *"if a reader following the published
+    instructions can reach 0.46, I am wrong."*
+
+    This test pins that divergence so the two readings cannot quietly converge
+    in a reader's head, and so a future edit to `novelty_rate_by_consult` that
+    silently pools is caught.
+    """
+    rows: list[str] = []
+    for n in range(12):
+        classification = "novel" if n < 11 else "matched"
+        prior = "" if classification == "novel" else "P-01"
+        rows.append(
+            f"| 2026-08-01T12:{n:02d}:00Z | talkative | statistician | architecture | "
+            f"CH-{n:02d} | {classification} | {prior} | aaaaaaa | 7 |"
+        )
+    for n in range(3):
+        rows.append(
+            f"| 2026-08-02T12:{n:02d}:00Z | quiet | statistician | architecture | "
+            f"CH-{n:02d} | matched | P-01 | bbbbbbb | 7 |"
+        )
+    table = (
+        f"{_CLASSIFICATION_HEADER_ROW}\n{_CLASSIFICATION_SEPARATOR_ROW}\n" + "\n".join(rows) + "\n"
+    )
+
+    by_consult = novelty_rate_by_consult(parse_classification_table_rows(table), "statistician")
+
+    assert by_consult[("talkative", "architecture")] == (11, 12)
+    assert by_consult[("quiet", "architecture")] == (0, 3)
+
+    per_consult = [novel / total for novel, total in by_consult.values()]
+    consult_mean = sum(per_consult) / len(per_consult)
+    pooled = sum(n for n, _ in by_consult.values()) / sum(t for _, t in by_consult.values())
+
+    assert round(pooled, 2) == 0.73, f"pooled rate should be 0.73; got {pooled:.4f}"
+    assert round(consult_mean, 2) == 0.46, f"consult mean should be 0.46; got {consult_mean:.4f}"
+    assert round(pooled - consult_mean, 2) == 0.27, (
+        "the pooled reading must remain materially different from the consult mean -- "
+        "if this converges, the fixture no longer exercises the defect it guards"
+    )
+
+
+def test_flags_a_classification_row_whose_prompt_areas_cell_is_not_a_count() -> None:
+    """Canary: `prompt-areas` must be a non-negative integer.
+
+    The column exists because the convener authors the *spawn prompt* as well
+    as the sealed list, and prompt specificity moves the novelty rate without
+    touching a sealed row or a classification -- so it trips no other gate and
+    leaves no trace inside the instrumented files. A prose placeholder here
+    would make the series unstratifiable on its largest uncontrolled covariate
+    while still looking populated, which is the hollow-artifact shape
+    `gate-liveness.md` names."""
+    prior_row = (
+        "| 2026-07-31T02:00:00Z | task-a | statistician | architecture | P-01 | lens | "
+        "a real concern |"
+    )
+    priors_table = f"{_PRIOR_HEADER_ROW}\n{_PRIOR_SEPARATOR_ROW}\n{prior_row}\n"
+    classification_row = (
+        "| 2026-08-01T12:05:00Z | task-a | statistician | architecture | CH-01 | novel | "
+        " | 0123456789abcdef0123456789abcdef01234567 | several |"
+    )
+    classification_table = (
+        f"{_CLASSIFICATION_HEADER_ROW}\n{_CLASSIFICATION_SEPARATOR_ROW}\n{classification_row}\n"
+    )
+
+    prior_rows = parse_prior_table_rows(priors_table)
+    classification_rows = parse_classification_table_rows(classification_table)
+    failures = check_every_challenge_is_classified(
+        [], classification_rows, prior_rows, SEAL_BOUNDARY
+    )
+
+    assert len(failures) == 1, f"expected exactly one failure; got: {failures}"
+    assert "prompt-areas" in failures[0]
+    assert "several" in failures[0]
+
+
 def test_flags_seal_witness_values_disagreeing_within_one_consult() -> None:
     """Canary: `seal-witness` must agree across every classification row of
     one triple -- disagreement means the fragment was fabricated or the
     triple keys collided."""
     rows = [
         "| 2026-08-01T12:05:00Z | task-a | statistician | architecture | CH-01 | novel | "
-        " | aaaaaaa |",
+        " | aaaaaaa | 7 |",
         "| 2026-08-01T12:06:00Z | task-a | statistician | architecture | CH-02 | novel | "
-        " | bbbbbbb |",
+        " | bbbbbbb | 7 |",
     ]
     classification_table = (
         f"{_CLASSIFICATION_HEADER_ROW}\n{_CLASSIFICATION_SEPARATOR_ROW}\n" + "\n".join(rows) + "\n"
@@ -2254,11 +2376,11 @@ def test_flags_a_prior_row_with_an_unescaped_pipe_inflating_the_column_count() -
 
 
 def test_flags_a_classification_row_with_an_unescaped_pipe_inflating_the_column_count() -> None:
-    """Canary: an unescaped pipe inflates a classification row past eight cells.
+    """Canary: an unescaped pipe inflates a classification row past nine cells.
 
     Added by the orchestrator during verification, not by the plan: neutering
     each of the six checks in turn showed that
-    `check_classification_row_has_eight_columns` was the one check whose
+    `check_classification_row_has_nine_columns` was the one check whose
     canaries did not exist -- zero tests went red when it was stubbed. The gate
     specification listed the check but omitted its canary, and
     `test_gate_canary_coverage.py` could not catch that because it asks whether
@@ -2266,11 +2388,11 @@ def test_flags_a_classification_row_with_an_unescaped_pipe_inflating_the_column_
     """
     bad_row = (
         "| 2026-08-01T12:00:00Z | task-a | statistician | architecture | CH-01 | matched | "
-        "P-01 | 0123456789abcdef0123456789abcdef01234567 | trailing | cell |"
+        "P-01 | 0123456789abcdef0123456789abcdef01234567 | 7 with an unescaped | pipe |"
     )
     table = f"{_CLASSIFICATION_HEADER_ROW}\n{_CLASSIFICATION_SEPARATOR_ROW}\n{bad_row}\n"
     rows = parse_classification_table_rows(table)
-    failures = check_classification_row_has_eight_columns(rows)
+    failures = check_classification_row_has_nine_columns(rows)
 
     assert len(failures) == 1, f"expected exactly one failure; got: {failures}"
     assert "got 10" in failures[0], f"expected the row to report 10 cells; got: {failures}"
@@ -2449,7 +2571,7 @@ def test_accepts_a_none_only_seal_as_a_valid_declaration() -> None:
     priors_table = f"{_PRIOR_HEADER_ROW}\n{_PRIOR_SEPARATOR_ROW}\n{prior_row}\n"
     classification_row = (
         "| 2026-08-01T12:05:00Z | task-a | statistician | architecture | CH-01 | novel | "
-        " | 0123456789abcdef0123456789abcdef01234567 |"
+        " | 0123456789abcdef0123456789abcdef01234567 | 7 |"
     )
     classification_table = (
         f"{_CLASSIFICATION_HEADER_ROW}\n{_CLASSIFICATION_SEPARATOR_ROW}\n{classification_row}\n"
@@ -2486,7 +2608,7 @@ def test_accepts_a_superseded_challenge_with_one_classification_row() -> None:
     )
     classification_row = (
         "| 2026-08-01T14:05:00Z | task-a | statistician | architecture | CH-01 | novel | "
-        " | 0123456789abcdef0123456789abcdef01234567 |"
+        " | 0123456789abcdef0123456789abcdef01234567 | 7 |"
     )
     classification_table = (
         f"{_CLASSIFICATION_HEADER_ROW}\n{_CLASSIFICATION_SEPARATOR_ROW}\n{classification_row}\n"
@@ -2609,7 +2731,7 @@ def test_every_real_prior_row_has_exactly_seven_columns(project_root: Path) -> N
     assert not failures, "Sealed Priors row shape violations:\n  " + "\n  ".join(failures)
 
 
-def test_every_real_classification_row_has_exactly_eight_columns(project_root: Path) -> None:
+def test_every_real_classification_row_has_exactly_nine_columns(project_root: Path) -> None:
     """The row-shape invariant for the classification table, exercised
     against the real, shipped .ai-state/CONSULT_PRIORS.md (skips cleanly if
     the file does not exist yet)."""
@@ -2617,7 +2739,7 @@ def test_every_real_classification_row_has_exactly_eight_columns(project_root: P
     if not priors_path.is_file():
         pytest.skip("CONSULT_PRIORS.md does not exist yet")
     rows = parse_classification_table_rows(priors_path.read_text(encoding="utf-8"))
-    failures = check_classification_row_has_eight_columns(rows)
+    failures = check_classification_row_has_nine_columns(rows)
     assert not failures, "Challenge Classification row shape violations:\n  " + "\n  ".join(
         failures
     )

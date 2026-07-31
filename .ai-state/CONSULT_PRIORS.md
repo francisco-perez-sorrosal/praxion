@@ -11,7 +11,7 @@
      stage) triple. Schema and rationale: dec-draft-2c51b2f6. -->
 
 **Schema**: two tables. `## Sealed Priors` is 7 columns, one row per prior concern.
-`## Challenge Classification` is 8 columns, one row per dispositioned challenge.
+`## Challenge Classification` is 9 columns, one row per dispositioned challenge.
 
 **Series begins**: 2026-07-31T03:00:00Z
 
@@ -40,8 +40,8 @@ the first.
 
 ## Challenge Classification
 
-| timestamp | task-slug | discipline | stage | challenge-id | classification | matched-prior-id | seal-witness |
-|---|---|---|---|---|---|---|---|
+| timestamp | task-slug | discipline | stage | challenge-id | classification | matched-prior-id | seal-witness | prompt-areas |
+|---|---|---|---|---|---|---|---|---|
 
 ## Column Definitions
 
@@ -55,7 +55,7 @@ the first.
 | `source` | `lens` (surfaced by the lens pass over the `binds-to` skill) \| `prior` (the convener already held it before the pass). Recording provenance costs one enum column and lets a later analyst compute both the literal lens-arm estimand and the wider "would have caught it anyway" one from the same file |
 | `concern` | One line, specific enough that a reader can judge whether a given challenge is the same concern: name the element of the draft and the property at issue, not the topic. Escape any literal `\|`. Must be non-empty and non-placeholder |
 
-**Table 2 — `## Challenge Classification`** (8 columns, written at Round 2):
+**Table 2 — `## Challenge Classification`** (9 columns, written at Round 2):
 
 | Column | Definition |
 |---|---|
@@ -68,6 +68,36 @@ the first.
 
 The two enums are chosen **disjoint** (`{lens, prior}` vs `{novel, matched}`) so a
 discipline-anchored `grep` can tell the tables apart with a single cell match and no parser.
+- `prompt-areas` — the number of attack areas the spawn prompt explicitly enumerated; `0` when it
+  named none. The convener authors the spawn prompt as well as the sealed list, and prompt
+  specificity moves the novelty rate without touching a sealed row or a classification — so it
+  trips no gate and leaves no trace inside these files. This is a **crude proxy, not a digest**:
+  the prompt is not a committed artifact, so its sha cannot be recorded. It exists so the series
+  can be stratified on its largest uncontrolled covariate rather than confounded by it silently.
+
+## What counts as one concern
+
+The granularity of a sealed prior sets the denominator's grain, so leaving it to the
+convener's pen leaves the comparison arm's scale in the hands of the party the
+measurement is about. Sealing fixes *when* that choice is made; it does not fix the
+choice. And the bias it admits is not noise -- a standing habit of writing narrow,
+specific priors raises novelty across every consult in the series and never averages out.
+
+So the unit is anchored to the registry, not to the convener:
+
+- **One concern = one `challenge-obligations` clause of the bound skill, failing at one
+  identified site in the draft.** Two sites failing the same clause are two rows. One site
+  failing two clauses is two rows. A concern that names no clause is not a sealed prior.
+- **A `source: lens` row must name the clause it derives from** in its `concern` cell, in
+  the clause's own words. That is what makes the granularity checkable by a reader who was
+  not present, rather than asserted by the party who benefits from it.
+- **A `source: prior` row** -- a concern the convener already held, independent of the lens
+  pass -- carries no clause anchor by construction, and is expected to be rare. If a series
+  shows many, the lens pass is being run after the fact rather than before.
+
+This does not make granularity objective; two careful parties will still split some
+concerns differently. It makes the split *arguable from the registry* instead of
+unfalsifiable, which is the most a definition can do here.
 
 ## Reading the series
 
@@ -76,23 +106,40 @@ to `.ai-state/CONSULT_LEDGER.md` § Falsifier and for the identical reason: an u
 match also catches rows whose free text happens to contain the name.
 
 ```
-# challenges classified for a discipline (denominator)
-grep -E '^\|[^|]*\|[^|]*\| *statistician *\|' .ai-state/CONSULT_PRIORS.md \
-  | grep -cE '\| *(novel|matched) *\|'
+# PRIMARY -- the criterion's statistic. One rate per consult, reported per
+# consult and never pooled. Challenges cluster within a consult (one convener,
+# one sealed list, one draft), so the consult is the independent unit. This is
+# the same correction dec-304 applied to the sibling dismiss rate; pooling
+# challenges here would reintroduce the defect that decision removed.
+D=statistician
+grep -E "^\|[^|]*\|[^|]*\| *$D *\|" .ai-state/CONSULT_PRIORS.md \
+  | grep -E '\| *(novel|matched) *\|' \
+  | awk -F'|' '{ gsub(/^ +| +$/,"",$3); gsub(/^ +| +$/,"",$5); gsub(/^ +| +$/,"",$7);
+                 k=$3" / "$5; n[k]++; if ($7=="novel") v[k]++ }
+               END { for (k in n) printf "%-46s novel %d/%d  rate %.2f\n", k, v[k]+0, n[k], (v[k]+0)/n[k] }'
 
-# novel challenges (numerator)
-grep -E '^\|[^|]*\|[^|]*\| *statistician *\|' .ai-state/CONSULT_PRIORS.md \
-  | grep -c '| novel |'
-
-# distinct sealed consults for a discipline (the independent unit -- challenges
-# within one consult cluster, exactly as CONSULT_LEDGER.md § Falsifier records)
-grep -E '^\|[^|]*\|[^|]*\| *statistician *\|' .ai-state/CONSULT_PRIORS.md \
+# distinct sealed consults for a discipline (the denominator of the series --
+# how many independent observations exist at all)
+grep -E "^\|[^|]*\|[^|]*\| *$D *\|" .ai-state/CONSULT_PRIORS.md \
   | grep -E '\| *(lens|prior) *\|' | cut -d'|' -f3,5 | sort -u | wc -l
+
+# NOT THE CRITERION'S STATISTIC -- the pooled challenge-level ratio.
+# Recorded here only so a reader who computes it recognises what it is. It
+# ignores clustering, so a single talkative consult dominates it; on the worked
+# example the live statistician consult raised, it diverges from the per-consult
+# reading by 0.73 vs 0.46. Do not publish it, and do not cite it in an ADR.
+#   grep ... | grep -c '| novel |'   over   grep ... | grep -cE '\| *(novel|matched) *\|'
 
 # priors sealed but never matched by any challenge (the lens's own miss rate is
 # NOT computable from this; a prior nobody challenged may simply have been fixed
 # before the spawn -- see § What is not recorded here)
 ```
+
+The authoritative implementation of the primary recipe is
+`novelty_rate_by_consult()` in `fitness/tests/test_discipline_registry_invariants.py`,
+which is canaried against a worked example showing the pooled and per-consult
+readings diverging. If this shell recipe and that function ever disagree, the
+function is correct and this block is stale.
 
 ## Named consumer
 

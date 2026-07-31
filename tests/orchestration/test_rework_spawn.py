@@ -169,7 +169,7 @@ def test_documents_td_nnn_flip() -> None:
         "from 'open' to 'in-flight'.  This is the ledger-linkage contract for "
         "the rework loop."
     )
-    # Confirm the notes-suffix pattern is documented (per dec-draft-4dc602ce)
+    # Confirm the notes-suffix pattern is documented (per dec-181)
     assert re.search(
         r"in.flight via rework worktree|notes.{0,60}suffix|// in.flight",
         body,

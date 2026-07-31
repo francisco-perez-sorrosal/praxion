@@ -97,9 +97,8 @@ def test_worktree_guard_loads_without_error() -> None:
     spec = importlib.util.spec_from_file_location(
         "worktree_guard_smoke", _HOOKS_DIR / "worktree_guard.py"
     )
-    assert spec is not None and spec.loader is not None, (
-        "worktree_guard.py must be importable from hooks/"
-    )
+    assert spec is not None, "worktree_guard.py must be importable from hooks/"
+    assert spec.loader is not None, "worktree_guard.py must be importable from hooks/"
     import sys
 
     mod_name = "worktree_guard_smoke"
@@ -190,5 +189,5 @@ def test_absolute_path_briefing_present_in_resume_rework() -> None:
         "The '## Dispatch' section of commands/resume-rework.md must explicitly "
         "reference absolute paths for the spawned agent's cwd / VERIFIER_FINDINGS.md "
         "path.  Accepted signals: 'absolute path', 'absolute-path', '$PWD'. "
-        "This is the defense-in-depth layer required by dec-draft-29904a3b."
+        "This is the defense-in-depth layer required by dec-180."
     )

@@ -7,7 +7,7 @@ produces one pipe-separated Markdown row in
 serialized across concurrent invocations by ``fcntl.flock(LOCK_EX)``, and
 atomic against mid-write interruption via a temp-file-then-rename pattern.
 
-The storage schema ADR (``dec-draft-b068ad8e``) freezes the 16 aggregate
+The storage schema ADR (``dec-062``) freezes the 16 aggregate
 columns plus a trailing ``report_file`` link column. The stability contract
 for that header is this test suite's responsibility: the header MUST come
 verbatim from ``schema.aggregate_header_for_log()`` so column drift shows
@@ -42,7 +42,6 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Sample-data helpers -- construct a minimal but complete Report that can be
@@ -241,10 +240,9 @@ class TestSubsequentAppendOnly:
         header = aggregate_header_for_log()
         first_line = header.splitlines()[0]
         # The header's first line should appear exactly once in the file.
-        assert content.count(first_line) == 1, (
-            "Header row must appear exactly once; "
-            f"found {content.count(first_line)} copies."
-        )
+        assert (
+            content.count(first_line) == 1
+        ), f"Header row must appear exactly once; found {content.count(first_line)} copies."
 
     def test_two_appends_preserve_row_order(self, tmp_path: Path) -> None:
         """Order is first-in / first-row after header -- timestamps are
@@ -273,9 +271,7 @@ class TestSubsequentAppendOnly:
 class TestRowContent:
     """Each aggregate column surfaces as a pipe-separated cell; final cell is report_file link."""
 
-    def test_row_contains_all_sixteen_aggregate_column_values(
-        self, tmp_path: Path
-    ) -> None:
+    def test_row_contains_all_sixteen_aggregate_column_values(self, tmp_path: Path) -> None:
         from scripts.project_metrics.logappend import append_log
 
         report = _build_report()
@@ -304,14 +300,11 @@ class TestRowContent:
             "123.4",  # hotspot_top_score
             "0.75",  # hotspot_gini
         ):
-            assert value in data_row, (
-                f"Aggregate value {value!r} must appear in the data row: "
-                f"got {data_row!r}"
-            )
+            assert (
+                value in data_row
+            ), f"Aggregate value {value!r} must appear in the data row: got {data_row!r}"
 
-    def test_row_cell_count_matches_columns_plus_report_file(
-        self, tmp_path: Path
-    ) -> None:
+    def test_row_cell_count_matches_columns_plus_report_file(self, tmp_path: Path) -> None:
         from scripts.project_metrics.logappend import append_log
         from scripts.project_metrics.schema import AGGREGATE_COLUMNS
 
@@ -341,10 +334,9 @@ class TestRowContent:
         lines = _read_log_lines(tmp_path)
         cells = _row_cells(lines[2])
         last_cell = cells[-1]
-        assert md_filename in last_cell, (
-            "Final cell must reference the passed report_md_filename; "
-            f"got {last_cell!r}"
-        )
+        assert (
+            md_filename in last_cell
+        ), f"Final cell must reference the passed report_md_filename; got {last_cell!r}"
 
     def test_final_cell_renders_as_markdown_link(self, tmp_path: Path) -> None:
         """Per plan's File Format section, the report_file column is a
@@ -361,9 +353,9 @@ class TestRowContent:
         last_cell = cells[-1]
         # Markdown-link shape: [text](target). Accept either exact
         # "[file.md](file.md)" or any link embedding the filename.
-        assert (
-            last_cell.startswith("[") and "](" in last_cell and last_cell.endswith(")")
-        ), f"Final cell must be a Markdown link; got {last_cell!r}"
+        assert last_cell.startswith("["), f"Final cell must be a Markdown link; got {last_cell!r}"
+        assert "](" in last_cell, f"Final cell must be a Markdown link; got {last_cell!r}"
+        assert last_cell.endswith(")"), f"Final cell must be a Markdown link; got {last_cell!r}"
 
     def test_no_python_none_literal_appears_in_row(self, tmp_path: Path) -> None:
         """Guardrail: even with all-populated fields, Python's ``None``
@@ -409,9 +401,7 @@ class TestNullColumnRendering:
         )
 
     @pytest.mark.parametrize("column", _NULLABLE_COLUMNS)
-    def test_nullable_column_renders_as_non_empty_marker(
-        self, tmp_path: Path, column: str
-    ) -> None:
+    def test_nullable_column_renders_as_non_empty_marker(self, tmp_path: Path, column: str) -> None:
         """Cell must be non-empty so the column alignment holds. Empty
         cells break trailing-column detection in downstream parsers that
         split on ``|`` and count cells."""
@@ -438,18 +428,14 @@ class TestNullColumnRendering:
         from scripts.project_metrics.logappend import append_log
         from scripts.project_metrics.schema import AGGREGATE_COLUMNS
 
-        null_kwargs = {col: None for col in self._NULLABLE_COLUMNS}
+        null_kwargs = dict.fromkeys(self._NULLABLE_COLUMNS)
         report = _build_report(**null_kwargs)
         append_log(report, tmp_path, "METRICS_REPORT_2026-04-23_14-30-00.md")
 
         lines = _read_log_lines(tmp_path)
         cells = _row_cells(lines[2])
-        markers = {
-            cells[AGGREGATE_COLUMNS.index(col)] for col in self._NULLABLE_COLUMNS
-        }
-        assert len(markers) == 1, (
-            f"All nullable columns must share one marker; found {markers!r}"
-        )
+        markers = {cells[AGGREGATE_COLUMNS.index(col)] for col in self._NULLABLE_COLUMNS}
+        assert len(markers) == 1, f"All nullable columns must share one marker; found {markers!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -462,9 +448,7 @@ class TestNullColumnRendering:
 class TestAtomicWrite:
     """Temp-file-then-rename: rename failure preserves the original file content."""
 
-    def test_rename_failure_preserves_original_file_content(
-        self, tmp_path: Path
-    ) -> None:
+    def test_rename_failure_preserves_original_file_content(self, tmp_path: Path) -> None:
         from scripts.project_metrics.logappend import append_log
 
         # Seed an initial log via a clean append_log call.
@@ -498,10 +482,9 @@ class TestAtomicWrite:
         # After the failed append, the log content must be byte-identical
         # to the pre-failure snapshot. No partial row, no tail corruption.
         post_failure_content = (tmp_path / "METRICS_LOG.md").read_text(encoding="utf-8")
-        assert post_failure_content == pristine_content, (
-            "Rename failure must leave METRICS_LOG.md unchanged; "
-            "atomic-write contract violated."
-        )
+        assert (
+            post_failure_content == pristine_content
+        ), "Rename failure must leave METRICS_LOG.md unchanged; atomic-write contract violated."
 
     def test_rename_failure_leaves_no_temp_file_artifacts(self, tmp_path: Path) -> None:
         """A failed rename should clean up or never materialize temp
@@ -528,7 +511,7 @@ class TestAtomicWrite:
                 create=True,
             ),
         ):
-            with pytest.raises(OSError):
+            with pytest.raises(OSError, match="simulated rename failure"):
                 append_log(second, tmp_path, "METRICS_REPORT_2026-04-23_11-00-00.md")
 
         # Enumerate stray artifacts. The legitimate files are
@@ -540,14 +523,9 @@ class TestAtomicWrite:
             if entry.name == "METRICS_LOG.md":
                 continue
             # Temp-file patterns commonly used by atomic-write implementations.
-            if any(
-                marker in entry.name
-                for marker in (".tmp", ".part", ".new", "~", ".swp")
-            ):
+            if any(marker in entry.name for marker in (".tmp", ".part", ".new", "~", ".swp")):
                 suspicious.append(entry.name)
-        assert not suspicious, (
-            f"Atomic-write failure left stale temp artifacts: {suspicious!r}"
-        )
+        assert not suspicious, f"Atomic-write failure left stale temp artifacts: {suspicious!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -617,9 +595,7 @@ def _repo_root_for_subprocess() -> Path:
 class TestFlockConcurrency:
     """Two parallel subprocess appends serialize via fcntl.flock -- no corruption."""
 
-    def test_two_concurrent_appends_produce_exactly_two_rows(
-        self, tmp_path: Path
-    ) -> None:
+    def test_two_concurrent_appends_produce_exactly_two_rows(self, tmp_path: Path) -> None:
         from scripts.project_metrics.logappend import append_log
 
         # Seed the log with a first write so the concurrent workers append
@@ -630,9 +606,9 @@ class TestFlockConcurrency:
         first = _build_report(timestamp="2026-04-23T10:00:00Z")
         append_log(first, tmp_path, "METRICS_REPORT_2026-04-23_10-00-00.md")
         header_plus_sep_plus_first_row = _read_log_lines(tmp_path)
-        assert len(header_plus_sep_plus_first_row) == 3, (
-            "Test-design precondition: seed must yield 3 non-empty lines."
-        )
+        assert (
+            len(header_plus_sep_plus_first_row) == 3
+        ), "Test-design precondition: seed must yield 3 non-empty lines."
 
         # Spawn two concurrent workers. Popen.wait() is blocking; we
         # start both before waiting so they really overlap.
@@ -785,9 +761,7 @@ class TestFlockConcurrency:
 class TestExceptionSafety:
     """fcntl.flock raising OSError re-propagates and leaves the file unchanged."""
 
-    def test_flock_raising_oserror_propagates_out_of_append_log(
-        self, tmp_path: Path
-    ) -> None:
+    def test_flock_raising_oserror_propagates_out_of_append_log(self, tmp_path: Path) -> None:
         from scripts.project_metrics.logappend import append_log
 
         report = _build_report()
@@ -795,15 +769,11 @@ class TestExceptionSafety:
         def _flock_raises(*_args: Any, **_kwargs: Any) -> None:
             raise OSError("simulated lock acquisition failure")
 
-        with patch(
-            "scripts.project_metrics.logappend.fcntl.flock", side_effect=_flock_raises
-        ):
+        with patch("scripts.project_metrics.logappend.fcntl.flock", side_effect=_flock_raises):
             with pytest.raises(OSError, match="simulated lock acquisition failure"):
                 append_log(report, tmp_path, "METRICS_REPORT_2026-04-23_14-30-00.md")
 
-    def test_flock_failure_leaves_pre_existing_file_unchanged(
-        self, tmp_path: Path
-    ) -> None:
+    def test_flock_failure_leaves_pre_existing_file_unchanged(self, tmp_path: Path) -> None:
         from scripts.project_metrics.logappend import append_log
 
         # Seed a known-good log first.
@@ -817,10 +787,8 @@ class TestExceptionSafety:
         def _flock_raises(*_args: Any, **_kwargs: Any) -> None:
             raise OSError("EDEADLK-like simulated failure")
 
-        with patch(
-            "scripts.project_metrics.logappend.fcntl.flock", side_effect=_flock_raises
-        ):
-            with pytest.raises(OSError):
+        with patch("scripts.project_metrics.logappend.fcntl.flock", side_effect=_flock_raises):
+            with pytest.raises(OSError, match="EDEADLK-like"):
                 append_log(second, tmp_path, "METRICS_REPORT_2026-04-23_11-00-00.md")
 
         post = (tmp_path / "METRICS_LOG.md").read_text(encoding="utf-8")

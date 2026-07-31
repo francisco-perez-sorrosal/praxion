@@ -24,7 +24,7 @@ import json
 from typing import Any
 
 # ---------------------------------------------------------------------------
-# Golden data -- mirrors dec-draft-b068ad8e "Frozen aggregate-block columns
+# Golden data -- mirrors dec-062 "Frozen aggregate-block columns
 # (v1.0.0)" in exact declaration order. Any drift in the ADR OR in the
 # production code triggers the freeze-violation test below.
 # ---------------------------------------------------------------------------

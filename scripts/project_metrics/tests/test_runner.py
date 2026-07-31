@@ -7,11 +7,11 @@ These tests encode the contract *from the ADRs and the plan*, not from the
 implementation — production code (`scripts/project_metrics/runner.py`) is not
 read while authoring these tests. Two ADRs are load-bearing:
 
-* Collector-protocol ADR (`dec-draft-c566b978`) — lifecycle: resolve-before-collect,
+* Collector-protocol ADR (`dec-063`) — lifecycle: resolve-before-collect,
   registration-order determinism, error isolation ("a collector's top-level
   process errors is caught by the runner"), GitCollector exception as the only
   fatal case.
-* Graceful-degradation ADR (`dec-draft-8b26adef`) — five-status tool_availability
+* Graceful-degradation ADR (`dec-064`) — five-status tool_availability
   shape (`available`/`unavailable`/`not_applicable`/`error`/`timeout`), uniform
   three-key namespace skip-marker `{"status", "reason", "tool"}`.
 
@@ -117,8 +117,8 @@ def _make_available_ok_collector(
 
     from scripts.project_metrics.collectors.base import (
         Available,
-        Collector,
         CollectionContext,
+        Collector,
         CollectorResult,
         ResolutionEnv,
     )
@@ -156,8 +156,8 @@ def _make_unavailable_collector(
     """Return a Collector whose resolve() -> Unavailable. collect() must never run."""
 
     from scripts.project_metrics.collectors.base import (
-        Collector,
         CollectionContext,
+        Collector,
         CollectorResult,
         ResolutionEnv,
         Unavailable,
@@ -198,8 +198,8 @@ def _make_not_applicable_collector(
     """Return a Collector whose resolve() -> NotApplicable. Silent skip."""
 
     from scripts.project_metrics.collectors.base import (
-        Collector,
         CollectionContext,
+        Collector,
         CollectorResult,
         NotApplicable,
         ResolutionEnv,
@@ -239,8 +239,8 @@ def _make_raising_collector(
 
     from scripts.project_metrics.collectors.base import (
         Available,
-        Collector,
         CollectionContext,
+        Collector,
         CollectorResult,
         ResolutionEnv,
     )
@@ -277,8 +277,8 @@ def _make_sleeping_collector(name: str, *, sleep_seconds: float = 10.0):
 
     from scripts.project_metrics.collectors.base import (
         Available,
-        Collector,
         CollectionContext,
+        Collector,
         CollectorResult,
         ResolutionEnv,
     )
@@ -477,8 +477,7 @@ class TestRegistrationOrderDeterminism:
 
         assert collect_calls == ["zulu", "yankee", "xray"], (
             "Registration order must be preserved. If the runner sorted by "
-            "name, the order would be ['xray', 'yankee', 'zulu']. Observed: "
-            + repr(collect_calls)
+            "name, the order would be ['xray', 'yankee', 'zulu']. Observed: " + repr(collect_calls)
         )
 
     def test_collect_runs_in_registration_order_even_when_tiers_differ(
@@ -492,12 +491,8 @@ class TestRegistrationOrderDeterminism:
         """
         collect_calls: list[str] = []
         collectors = [
-            _make_available_ok_collector(
-                "tier_one_first", tier=1, collect_calls=collect_calls
-            ),
-            _make_available_ok_collector(
-                "tier_zero_second", tier=0, collect_calls=collect_calls
-            ),
+            _make_available_ok_collector("tier_one_first", tier=1, collect_calls=collect_calls),
+            _make_available_ok_collector("tier_zero_second", tier=0, collect_calls=collect_calls),
         ]
         runner = _build_runner(collectors)
 
@@ -520,9 +515,7 @@ class TestRegistrationOrderDeterminism:
         # attribute contract. It still succeeds here; the fatal-path test
         # elsewhere exercises the raising case.
         collectors = [
-            _make_available_ok_collector(
-                "git", required=True, collect_calls=collect_calls
-            ),
+            _make_available_ok_collector("git", required=True, collect_calls=collect_calls),
             _make_available_ok_collector("scc", collect_calls=collect_calls),
             _make_available_ok_collector("lizard", collect_calls=collect_calls),
             _make_available_ok_collector("complexipy", collect_calls=collect_calls),
@@ -534,9 +527,7 @@ class TestRegistrationOrderDeterminism:
         runner.run(window_days=90, top_n=10)
 
         assert collect_calls[0] == "git", "Git must run first when registered first."
-        assert collect_calls[-1] == "coverage", (
-            "Coverage must run last when registered last."
-        )
+        assert collect_calls[-1] == "coverage", "Coverage must run last when registered last."
         assert collect_calls == [
             "git",
             "scc",
@@ -555,7 +546,7 @@ class TestRegistrationOrderDeterminism:
 class TestErrorIsolationForNonRequiredCollectors:
     """A non-required collector raising in collect() is caught; the run continues.
 
-    Per dec-draft-8b26adef and dec-draft-c566b978, an uncaught exception in
+    Per dec-064 and dec-063, an uncaught exception in
     `collect()` is wrapped by the runner into `tool_availability[name] =
     {"status": "error", ...}` with a truncated traceback excerpt, and the
     namespace block is a skip/error marker. Subsequent collectors still run.
@@ -635,7 +626,7 @@ class TestErrorIsolationForNonRequiredCollectors:
     def test_raising_collector_produces_namespace_skip_or_error_marker(self) -> None:
         """The namespace block for a raising collector must be a skip/error marker.
 
-        Per dec-draft-8b26adef, a skipped namespace block uses the uniform
+        Per dec-064, a skipped namespace block uses the uniform
         3-key shape `{"status": "skipped"|"error", "reason": ..., "tool": ...}`.
         For a raising collector, the namespace block carries status="error"
         rather than the normal collector data payload — the MD renderer must
@@ -711,7 +702,10 @@ class TestHardFloorGitFatalContract:
         # BaseException covers SystemExit (a common abort idiom for CLI tools)
         # AND every normal Exception subclass. The invariant asserted is "the
         # run did not complete normally" — not any specific exception type.
-        with pytest.raises(BaseException):
+        # noqa rationale: the breadth is the point. The invariant is "the run did
+        # not complete normally", and SystemExit (a common CLI abort idiom) is not
+        # an Exception subclass. Narrowing this would weaken the assertion.
+        with pytest.raises(BaseException):  # noqa: B017, PT011
             runner.run(window_days=90, top_n=10)
 
         # The non-required collector registered after the fatal one must NOT
@@ -737,7 +731,10 @@ class TestHardFloorGitFatalContract:
         ]
         runner = _build_runner(collectors)
 
-        with pytest.raises(BaseException):
+        # noqa rationale: the breadth is the point. The invariant is "the run did
+        # not complete normally", and SystemExit (a common CLI abort idiom) is not
+        # an Exception subclass. Narrowing this would weaken the assertion.
+        with pytest.raises(BaseException):  # noqa: B017, PT011
             runner.run(window_days=90, top_n=10)
 
         assert "scc" not in collect_calls
@@ -840,9 +837,7 @@ class TestNamespaceBlockShape:
     def test_successful_collector_namespace_block_contains_raw_data(self) -> None:
         """A status=ok collector's namespace block carries the CollectorResult.data."""
         collectors = [
-            _make_available_ok_collector(
-                "alpha", payload={"some_metric": 42, "notes": "hi"}
-            ),
+            _make_available_ok_collector("alpha", payload={"some_metric": 42, "notes": "hi"}),
         ]
         runner = _build_runner(collectors)
 
@@ -1056,10 +1051,11 @@ class TestCollectorRegistryShape:
         registry = CollectorRegistry([alpha, beta, gamma])
 
         names = [c.name for c in registry.collectors]
-        assert names == ["alpha", "beta", "gamma"], (
-            "CollectorRegistry.collectors must preserve registration order. "
-            f"Got: {names!r}"
-        )
+        assert names == [
+            "alpha",
+            "beta",
+            "gamma",
+        ], f"CollectorRegistry.collectors must preserve registration order. Got: {names!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -1140,9 +1136,7 @@ def _namespace_block(report: Any, collector_name: str) -> Any:
     # (d) Fallback: the entire Report may be stored as a dict in some
     # transitional implementations.
     if isinstance(report, dict):
-        return report.get(collector_name) or report.get("collectors", {}).get(
-            collector_name
-        )
+        return report.get(collector_name) or report.get("collectors", {}).get(collector_name)
     return None
 
 
@@ -1257,9 +1251,7 @@ class TestDefaultRegistry:
     """Validates the registry wire-up: the concrete collectors in declaration
     order, with the always-available readiness collector registered last."""
 
-    def test_default_registry_contains_all_collectors_in_declaration_order(
-        self, tmp_path
-    ):
+    def test_default_registry_contains_all_collectors_in_declaration_order(self, tmp_path):
         from scripts.project_metrics.runner import default_registry
 
         registry = default_registry(repo_root=tmp_path)

@@ -9,7 +9,7 @@ do not exist yet — all tests that read those files produce FileNotFoundError-e
 failures via Path.exists() assertions. They go GREEN once the two command files exist.
 
 Test strategy: static analysis (YAML frontmatter parse + grep + fixture-based logic).
-Rationale is documented in ADR dec-draft-95fc1a73.
+Rationale is documented in ADR dec-187.
 """
 
 from __future__ import annotations
@@ -129,7 +129,11 @@ def test_review_command_description_is_non_empty() -> None:
     text = REVIEW_COMMAND.read_text(encoding="utf-8")
     fm = _parse_frontmatter(text)
     desc = fm.get("description", "")
-    assert isinstance(desc, str) and desc.strip(), (
+    assert isinstance(desc, str), (
+        "The 'description' field in commands/skill-genesis-review.md must be a non-empty string. "
+        f"Got: {desc!r}"
+    )
+    assert desc.strip(), (
         "The 'description' field in commands/skill-genesis-review.md must be a non-empty string. "
         f"Got: {desc!r}"
     )
@@ -179,7 +183,11 @@ def test_review_argument_hint_present() -> None:
     text = REVIEW_COMMAND.read_text(encoding="utf-8")
     fm = _parse_frontmatter(text)
     hint = fm.get("argument-hint", "")
-    assert isinstance(hint, str) and hint.strip(), (
+    assert isinstance(hint, str), (
+        "'argument-hint' in commands/skill-genesis-review.md must be a non-empty string. "
+        f"Got: {hint!r}"
+    )
+    assert hint.strip(), (
         "'argument-hint' in commands/skill-genesis-review.md must be a non-empty string. "
         f"Got: {hint!r}"
     )

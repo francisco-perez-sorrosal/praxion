@@ -184,7 +184,9 @@ def test_finalize_chain_run_on_main_runs_full_composition_in_order(tmp_path: Pat
     (ai_state / "doc_manifest.yaml").write_text("generated_at: 2025-01-01\n")
     drafts_dir = ai_state / "decisions" / "drafts"
     drafts_dir.mkdir(parents=True)
-    (drafts_dir / "20260101-0000-fake.md").write_text("---\nid: dec-draft-aaaaaaaa\n---\n")
+    (drafts_dir / "20260101-0000-fake.md").write_text(
+        "---\nid: dec-draft-aaaaaaaa\n---\n"  # id-citation-discipline:ignore
+    )
 
     snippet = f"""
         source {CHAIN_PATH}

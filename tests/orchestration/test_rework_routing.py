@@ -25,9 +25,9 @@ def _body() -> str:
 def test_architecture_class_routes_to_architect() -> None:
     body = _body()
     # The command must document that architecture-class rows dispatch to systems-architect.
-    assert "systems-architect" in body, (
-        "commands/resume-rework.md must document dispatch to 'systems-architect'"
-    )
+    assert (
+        "systems-architect" in body
+    ), "commands/resume-rework.md must document dispatch to 'systems-architect'"
     assert re.search(
         r"(architecture.{0,80}systems.architect|systems.architect.{0,80}architecture)",
         body,
@@ -75,7 +75,7 @@ def test_no_direct_planner_dispatch() -> None:
 def test_routing_decision_cites_architect_always_first_rationale() -> None:
     body = _body()
     # The command body or its dispatch section must contain rationale for routing
-    # all classes through the architect first. The specific ADR dec-draft-b3b1abda
+    # all classes through the architect first. The specific ADR dec-178
     # was the decision vehicle; the shipped command should carry inline rationale
     # or a reference to preserve the decision intent for readers.
     assert re.search(

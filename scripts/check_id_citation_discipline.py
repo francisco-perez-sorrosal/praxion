@@ -3,9 +3,10 @@
 
 Scans code files (Python, TS, JS, Rust, Go, etc.) for references to ephemeral
 pipeline identifiers — REQ-*, AC-*, EC-X.X.X, Step N, test_req{NN}_* /
-test_ac{NN}_* function naming, and class Test*Req{NN}* / class Test*Ac{NN}*
-class naming. Those identifiers live in documents that get deleted with
-.ai-work/, so in-code citations dangle the moment the pipeline cleans up.
+test_ac{NN}_* function naming, class Test*Req{NN}* / class Test*Ac{NN}*
+class naming, and dec-draft-<hash> citations. Those identifiers live in
+documents that get deleted with .ai-work/ or renamed at ADR finalize, so
+in-code citations dangle the moment the pipeline cleans up or promotes.
 
 This is the inbound counterpart to
 ``scripts/check_shipped_artifact_isolation.py``: that script prevents shipped
@@ -178,6 +179,12 @@ PATTERNS: tuple[tuple[str, re.Pattern[str], str], ...] = (
         "class-ac-name",
         re.compile(r"\bclass Test\w*Ac\d+\w*"),
         "test class name with Ac{NN} in the identifier — name after the behavioral concept",
+    ),
+    (
+        "draft-adr-id",
+        re.compile(r"\bdec-draft-[0-9a-f]{8}\b"),
+        "draft ADR id — drafts/ fragments are renamed at finalize; cite the "
+        "finalized dec-NNN instead, or mark a fixture literal with the ignore marker",
     ),
 )
 

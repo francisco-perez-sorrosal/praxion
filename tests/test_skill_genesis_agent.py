@@ -10,7 +10,7 @@ current agents/skill-genesis.md still has the old interactive behavior. They go
 GREEN once the agent is rewritten to autonomous pull-driven mode.
 
 Test strategy: static analysis (YAML frontmatter parse + grep + fixture schema).
-Rationale is documented in ADR dec-draft-95fc1a73.
+Rationale is documented in ADR dec-187.
 """
 
 from __future__ import annotations

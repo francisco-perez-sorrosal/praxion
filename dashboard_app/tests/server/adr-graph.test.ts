@@ -144,18 +144,18 @@ describe("buildAdrGraph", () => {
     const records = [
       {
         data: {
-          id: "dec-draft-a1b2c3d4",
+          id: "dec-draft-a1b2c3d4", // id-citation-discipline:ignore
           title: "Draft decision",
           status: "proposed",
-          supersedes: "dec-draft-e5f6a7b8"
+          supersedes: "dec-draft-e5f6a7b8" // id-citation-discipline:ignore
         },
         slug: "draft-slug"
       }
     ];
 
     const graph = buildAdrGraph(records);
-    expect(graph[0]?.id).toBe("dec-draft-a1b2c3d4");
-    expect(graph[0]?.supersedes).toBe("dec-draft-e5f6a7b8");
+    expect(graph[0]?.id).toBe("dec-draft-a1b2c3d4"); // id-citation-discipline:ignore
+    expect(graph[0]?.supersedes).toBe("dec-draft-e5f6a7b8"); // id-citation-discipline:ignore
   });
 });
 

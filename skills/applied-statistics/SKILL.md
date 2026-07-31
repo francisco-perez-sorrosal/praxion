@@ -98,6 +98,7 @@ Two disciplines make this checklist useful rather than obstructive. First, **nam
 
 ## Related Skills
 
+- **[evidence-appraisal](../evidence-appraisal/SKILL.md)** -- the sibling discipline, and the boundary is load-bearing: this skill audits inference on **our own** numbers; evidence-appraisal asks whether **someone else's** source supports the claim being made of it. A relayed coefficient is theirs; a sample size we chose is ours.
 - **[agent-evals](../agent-evals/SKILL.md)** -- eval suite design, `pass@k` and `pass^k` as metric definitions, trial-count conventions, judge-calibration protocol as a pipeline gate. This skill supplies the inference those metrics need; agent-evals owns the metrics and the gate.
 - **[performance-architecture](../performance-architecture/SKILL.md)** -- performance measurement and load testing; its `benchmarking.md` owns microbenchmark measurement mechanics (see Content boundary above).
 - **[llm-training-eval](../llm-training-eval/SKILL.md)** -- metric-threshold and tolerance-band *syntax* for acceptance criteria; this skill derives the width that goes into it.

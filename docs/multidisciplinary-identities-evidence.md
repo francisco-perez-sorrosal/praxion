@@ -483,7 +483,7 @@ it *less* available rather than more rigorous.
 
 | Identity | Gap | Status |
 |---|---|---|
-| **evidence-appraiser** | Source provenance, study-design-vs-claim-strength, external validity and transfer, citation drift, vendor-claim quarantine | **SHIPPED 2026-07-30** as discipline #2, bound to `evidence-appraisal`. Errors are silent: a misread import propagates carrying the authority of a number. Charter is concrete — the first live consult declined to verify the coefficients its own analysis rested on, recording them as *relayed* |
+| **evidence-appraiser** | Source provenance, study-design-vs-claim-strength, external validity and transfer, citation drift, vendor-claim quarantine | **MERGED 2026-07-30 on `main`; NOT YET RELEASED** as discipline #2, bound to `evidence-appraisal`. Corrected 2026-07-30 (Wave 2) — this row previously read "SHIPPED", which was false with respect to what installed copies receive: the `v0.18.0` tag tree carries `skills/applied-statistics` but not `skills/evidence-appraisal`, and its registry carries zero `evidence-appraiser` rows. A managed project on `v0.18.0` therefore resolves `Discipline: evidence-appraiser` to `[BLOCKED]` — fail-loud, as designed, but not the advertised behaviour. `scripts/check_release_staleness.py` detected this correctly and is CI-wired; it is advisory, and nothing consumed its output (`td-073`). Errors are silent: a misread import propagates carrying the authority of a number. Charter is concrete — the first live consult declined to verify the coefficients its own analysis rested on, recording them as *relayed* |
 | ~~queueing-modeler~~ | Little's Law, Universal Scalability Law, capacity/saturation modelling, Fermi estimation | **REMOVED.** `performance-architecture/references/capacity-planning.md` already contains Little's Law and back-of-envelope estimation, and the Performance lens delivers it unconditionally. A consultant here would duplicate free knowledge at spawn cost |
 | ~~performance-engineer~~ | Order-of-magnitude estimation, saturation reasoning | **REMOVED.** Same reason, plus it was the named `lens-collision` instance. Performance errors surface through measurement, so the silence criterion excludes it. The lens was strengthened instead — `performance-architecture` gained the agent-era dimension (token budget, context efficiency, spawn cost, pipeline wall-clock), which it did not previously carry |
 | cost-economist | Token economics, cost-per-decision, tier ROI | Still waiting — and now weaker: the agent-era performance work absorbs part of this gap into the always-on lens |
@@ -1284,7 +1284,9 @@ ADR rather than passed over.
 
 `AC13` (two *different* disciplines running at once, each writing its own fragment, with no shared-file
 write and no cross-read during round 0) was untestable through Wave 1 at a one-discipline roster. With
-`evidence-appraiser` shipped (§17.13) it was exercised on 2026-07-30: a `statistician` and an
+`evidence-appraiser` merged (§17.13) it was exercised on 2026-07-30 **against the working tree, not a
+released plugin** — see the §12.2 correction: discipline #2 is on `main` but absent from `v0.18.0`, so
+this exercise proves the mechanism, not the shipped artefact: a `statistician` and an
 `evidence-appraiser` were spawned concurrently against **deliberately different targets**, chosen so the
 run would also test whether the boundary written into their registry rows actually holds.
 

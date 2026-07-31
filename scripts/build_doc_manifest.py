@@ -32,8 +32,10 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
+from functools import cache
 from pathlib import Path
 from typing import Any
 
@@ -189,6 +191,59 @@ def _pick_renderer(rel_path: Path, file_type: str, diataxis: str | None) -> str 
 # ---------------------------------------------------------------------------
 
 
+@cache
+def _git_commit_dates(root: str) -> dict[str, str]:
+    """Map every tracked path to the date of the commit that last touched it.
+
+    Filesystem mtime cannot be used for `last_modified`: a fresh clone or CI
+    checkout sets mtime to checkout time for every file, so the same tree
+    yields a different manifest depending on where it is generated. That
+    breaks the determinism this module documents and turns the regenerate-in-
+    place step into a ping-pong -- CI stamps checkout day, a local run stamps
+    real write times, and each commits over the other forever.
+
+    Git commit dates are identical in every checkout, which is what makes the
+    no-op-regen guard actually hold. One subprocess for the whole history
+    rather than one per file.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "-C", root, "log", "--name-only", "--format=%x00%cs", "--no-merges"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=120,
+        ).stdout
+    except (subprocess.SubprocessError, OSError):
+        return {}
+
+    dates: dict[str, str] = {}
+    current = ""
+    for line in out.splitlines():
+        if line.startswith("\x00"):
+            current = line[1:].strip()
+        elif line.strip() and current and line not in dates:
+            # git log walks newest-first, so the first sighting wins
+            dates[line] = current
+    return dates
+
+
+def _last_modified(root: Path, abs_path: Path) -> str:
+    """`last_modified` for a surface -- git commit date, mtime only as fallback.
+
+    The fallback covers untracked files (a surface authored but not yet
+    committed), where mtime is the only signal available.
+    """
+    try:
+        rel = abs_path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        rel = ""
+    committed = _git_commit_dates(str(root)).get(rel)
+    if committed:
+        return committed
+    return datetime.fromtimestamp(abs_path.stat().st_mtime).date().isoformat()
+
+
 def _build_surface(root: Path, rel_path: Path) -> dict[str, Any] | None:
     """Build a manifest entry for one file. Returns None if the file is
     skipped (e.g., empty, unreadable)."""
@@ -241,7 +296,7 @@ def _build_surface(root: Path, rel_path: Path) -> dict[str, Any] | None:
         "path": str(rel_path),
         "type": file_type,
         "title": str(title),
-        "last_modified": datetime.fromtimestamp(abs_path.stat().st_mtime).date().isoformat(),
+        "last_modified": _last_modified(root, abs_path),
     }
     if diataxis:
         descriptor["diataxis"] = str(diataxis)
@@ -361,7 +416,7 @@ def _build_api_spec_surface(root: Path, rel_path: Path) -> dict[str, Any] | None
         "title": _spec_title(abs_path, file_type, rel_path),
         "diataxis": "reference",
         "renderer": "api_reference",
-        "last_modified": datetime.fromtimestamp(abs_path.stat().st_mtime).date().isoformat(),
+        "last_modified": _last_modified(root, abs_path),
     }
 
 

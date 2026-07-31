@@ -1368,7 +1368,7 @@ changed a design decision. Both changed what this dossier is entitled to claim.
 
 `dec-306`'s Falsifier was **unidentified, not underpowered** (`td-081`): nothing distinguished a
 challenge the convener would have caught anyway from one it would not, so no sample size could evaluate
-it. `dec-draft-2c51b2f6` makes it computable.
+it. `dec-310` makes it computable.
 
 **The estimand and its comparison arm.** `dec-306` names the arm twice and both namings agree: *"what a
 lens-style always-on reference would have produced"* and *"things the architect would have caught **by

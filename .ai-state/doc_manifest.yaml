@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-07-31T04:02:01Z'
+generated_at: '2026-07-31T19:50:36Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -57,7 +57,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-07-30'
+  last_modified: '2026-07-31'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -432,7 +432,7 @@ surfaces:
   path: docs/multidisciplinary-identities-evidence.md
   type: markdown
   title: "Multidisciplinary Identities \u2014 Evidence Dossier"
-  last_modified: '2026-07-30'
+  last_modified: '2026-07-31'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -522,7 +522,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-07-30'
+  last_modified: '2026-07-31'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -536,7 +536,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-07-30'
+  last_modified: '2026-07-31'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -2389,8 +2389,8 @@ surfaces:
 - id: ai-state-decisions-306-lens-vs-consultant-criterion
   path: .ai-state/decisions/306-lens-vs-consultant-criterion.md
   type: markdown
-  title: 306-lens-vs-consultant-criterion.md
-  last_modified: '2026-07-30'
+  title: A discipline earns a consultant only when its errors are silent; otherwise the knowledge belongs in the lens's owning skill
+  last_modified: '2026-07-31'
   renderer: adr_card
 - id: ai-state-decisions-307-strip-inert-plugin-agent-frontmatter
   path: .ai-state/decisions/307-strip-inert-plugin-agent-frontmatter.md
@@ -2407,14 +2407,20 @@ surfaces:
 - id: ai-state-decisions-309-roster-ship-zero
   path: .ai-state/decisions/309-roster-ship-zero.md
   type: markdown
-  title: 309-roster-ship-zero.md
-  last_modified: '2026-07-30'
+  title: Wave 2 ships zero new consulting disciplines, on operational grounds rather than criterion failure
+  last_modified: '2026-07-31'
+  renderer: adr_card
+- id: ai-state-decisions-310-sealed-consult-prior
+  path: .ai-state/decisions/310-sealed-consult-prior.md
+  type: markdown
+  title: The convener seals a lens-run prior list before spawning a consultant, and the seal is tamper-evident rather than tamper-proof
+  last_modified: '2026-07-31'
   renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-07-30'
+  last_modified: '2026-07-31'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -2481,6 +2487,12 @@ surfaces:
   type: markdown
   title: Sentinel Report
   last_modified: '2026-07-30'
+  renderer: default_markdown
+- id: ai-state-sentinel-reports-sentinel-report-2026-07-31-11-52-24
+  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-07-31_11-52-24.md
+  type: markdown
+  title: Sentinel Report
+  last_modified: '2026-07-31'
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-06-11-08-38-15
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-11_08-38-15.json
@@ -2998,6 +3010,7 @@ groups:
   - ai-state-decisions-307-strip-inert-plugin-agent-frontmatter
   - ai-state-decisions-308-consult-cost-series
   - ai-state-decisions-309-roster-ship-zero
+  - ai-state-decisions-310-sealed-consult-prior
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -3030,6 +3043,7 @@ groups:
   - ai-state-sentinel-reports-sentinel-report-2026-07-15-21-32-25
   - ai-state-sentinel-reports-sentinel-report-2026-07-29-15-11-15
   - ai-state-sentinel-reports-sentinel-report-2026-07-30-11-03-40
+  - ai-state-sentinel-reports-sentinel-report-2026-07-31-11-52-24
   - ai-state-specs-spec-agent-model-routing-2026-04-25
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30

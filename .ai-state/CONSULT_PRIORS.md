@@ -8,7 +8,7 @@
      convener's compressed statement of concerns about the very draft round-0
      isolation withholds. Sibling of .ai-state/CONSULT_LEDGER.md and
      .ai-state/CONSULT_COSTS.md, joined on the same (task-slug, discipline,
-     stage) triple. Schema and rationale: dec-draft-2c51b2f6. -->
+     stage) triple. Schema and rationale: dec-310. -->
 
 **Schema**: two tables. `## Sealed Priors` is 7 columns, one row per prior concern.
 `## Challenge Classification` is 9 columns, one row per dispositioned challenge.

@@ -18,6 +18,7 @@ Run a discipline consultation using the [discipline-consultant](../agents/discip
    - Spawn prompt carries `Discipline: <discipline>` and `Task slug: consult`, per the directive contract in `agents/discipline-consultant.md`
    - Pass the resolved target as the artifact to read at Round 1 — never expose it during the consultant's Round 0 independent reading
    - **Unresolvable discipline**: if the consultant returns `[BLOCKED]`, surface that verdict verbatim with the offending value named. Never substitute a neighboring discipline, never guess, never proceed with a degraded consult — the registry is the only roster.
+   - **Round 2 disposition**: as convener, adjudicate each challenge and append one `.ai-state/CONSULT_LEDGER.md` row per challenge (`agents/CLAUDE.md § Who may convene`), **plus one `.ai-state/CONSULT_COSTS.md` row for the consult as a whole** — aggregate token count, model tier, difficulty class. Schema: `.ai-state/CONSULT_COSTS.md § Column Definitions`.
 
 3. **Output the review** directly in the conversation:
 

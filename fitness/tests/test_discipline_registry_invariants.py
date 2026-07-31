@@ -30,6 +30,7 @@ import json
 import re
 from pathlib import Path
 
+import pytest
 import yaml
 
 # ---------------------------------------------------------------------------
@@ -1021,3 +1022,373 @@ def test_agents_claude_md_documents_the_fail_loud_resolution_contract(project_ro
     claude_md_path = _require_file(project_root / "agents" / "CLAUDE.md", "agents/CLAUDE.md")
     result = check_documents_fail_loud_resolution(claude_md_path.read_text(encoding="utf-8"))
     assert result is None, f"agents/CLAUDE.md: {result}"
+
+
+# ---------------------------------------------------------------------------
+# Cost-series coverage gate (td-071) -- .ai-state/CONSULT_COSTS.md carries one
+# row per consult spawn (grain differs from the ledger's one-row-per-challenge:
+# cost is a property of the consult, not of the challenge, dec-draft-6a94ce05).
+# This gate fails when a post-boundary ledger consult has no matching, positive,
+# consistent cost row -- the omission the file exists to make CI-visible.
+# ---------------------------------------------------------------------------
+
+COST_ROW_FIELDS: tuple[str, ...] = (
+    "timestamp",
+    "task-slug",
+    "discipline",
+    "stage",
+    "tokens",
+    "model",
+    "difficulty",
+    "notes",
+)
+
+# The gate's source of truth for the series boundary is this constant, not the
+# file's own "**Series begins**:" header line -- the gate must still fail when
+# the file is absent (a managed project's first consult, or a deletion), and a
+# boundary read only from a missing file would silently exempt everything. A
+# second check (below) asserts the file's header line equals this constant so
+# the two can never silently drift apart.
+SERIES_BOUNDARY = "2026-07-31T01:00:00Z"
+
+_COST_HEADER_ROW = "| " + " | ".join(COST_ROW_FIELDS) + " |"
+_COST_SEPARATOR_ROW = "|" + "|".join(["---"] * len(COST_ROW_FIELDS)) + "|"
+_SERIES_BEGINS_RE = re.compile(r"^\*\*Series begins\*\*:\s*(\S+)", re.MULTILINE)
+_TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+
+
+def parse_cost_table_rows(cost_text: str) -> list[list[str]]:
+    """Parse CONSULT_COSTS.md's data rows into a list of raw cell lists.
+
+    Same block-scan + exact-header-match shape as parse_ledger_table_rows --
+    the header row and the `---` separator row are skipped by position, never
+    counted as data.
+    """
+    for block in _split_into_table_blocks(cost_text):
+        if len(block) < 2:
+            continue
+        header_cells = [cell.strip() for cell in block[0].strip().strip("|").split("|")]
+        if header_cells != list(COST_ROW_FIELDS):
+            continue  # not the cost table -- some other pipe-prefixed block
+        data_lines = block[2:]  # skip the header row and the --- separator row
+        return [
+            [cell.strip() for cell in line.strip().strip("|").split("|")] for line in data_lines
+        ]
+    return []
+
+
+def parse_series_boundary(cost_text: str) -> str | None:
+    """Return the ISO timestamp in the file's `**Series begins**:` line, or None."""
+    match = _SERIES_BEGINS_RE.search(cost_text)
+    return match.group(1) if match else None
+
+
+def check_cost_row_has_eight_columns(rows: list[list[str]]) -> list[str]:
+    """Return a failure string per row whose cell count isn't exactly eight.
+
+    Same unescaped-pipe defect class as the ledger's eleven-column check: an
+    extra pipe in a free-text cell (here, only `notes`) inflates the count.
+    """
+    failures: list[str] = []
+    for index, row in enumerate(rows):
+        if len(row) != len(COST_ROW_FIELDS):
+            failures.append(
+                f"row {index}: expected {len(COST_ROW_FIELDS)} columns, got {len(row)}: {row!r}"
+            )
+    return failures
+
+
+def check_series_boundary_matches_gate_constant(cost_text: str) -> str | None:
+    """Return a failure string unless the file's header boundary line equals
+    SERIES_BOUNDARY exactly."""
+    found = parse_series_boundary(cost_text)
+    if found is None:
+        return "no '**Series begins**:' header line found in CONSULT_COSTS.md"
+    if found != SERIES_BOUNDARY:
+        return f"series boundary header {found!r} does not match gate constant {SERIES_BOUNDARY!r}"
+    return None
+
+
+def check_every_post_boundary_consult_has_a_cost_row(
+    ledger_rows: list[list[str]],
+    cost_rows: list[list[str]],
+    boundary: str,
+) -> list[str]:
+    """Return one failure string per violation found while checking that every
+    post-`boundary` (task-slug, discipline, stage) triple in `ledger_rows` has
+    a matching row in `cost_rows`.
+
+    Checks, per triple:
+      - presence -- >=1 cost row carries the triple
+      - substance -- that row's `tokens` cell is a positive integer (digits
+        only, > 0); a "", an "n/a", or a "0" does not count
+      - consistency -- the row's `model` and `difficulty` equal the ledger's
+        values for the same triple
+
+    A ledger `timestamp` that doesn't match the ISO 8601 shape is itself a
+    failure, rather than being silently mis-ordered against `boundary`.
+    """
+    failures: list[str] = []
+    ledger_index = {field: pos for pos, field in enumerate(LEDGER_ROW_FIELDS)}
+    cost_index = {field: pos for pos, field in enumerate(COST_ROW_FIELDS)}
+
+    post_boundary_triples: dict[tuple[str, str, str], tuple[str, str]] = {}
+    for row in ledger_rows:
+        timestamp = row[ledger_index["timestamp"]]
+        if not _TIMESTAMP_RE.match(timestamp):
+            failures.append(f"ledger row has a malformed timestamp: {timestamp!r}")
+            continue
+        if timestamp < boundary:
+            continue
+        triple = (
+            row[ledger_index["task-slug"]],
+            row[ledger_index["discipline"]],
+            row[ledger_index["stage"]],
+        )
+        post_boundary_triples[triple] = (
+            row[ledger_index["model"]],
+            row[ledger_index["difficulty"]],
+        )
+
+    for triple, (expected_model, expected_difficulty) in post_boundary_triples.items():
+        matching_cost_rows = [
+            row
+            for row in cost_rows
+            if (
+                row[cost_index["task-slug"]],
+                row[cost_index["discipline"]],
+                row[cost_index["stage"]],
+            )
+            == triple
+        ]
+        if not matching_cost_rows:
+            failures.append(f"no CONSULT_COSTS.md row for post-boundary consult {triple!r}")
+            continue
+        for row in matching_cost_rows:
+            tokens = row[cost_index["tokens"]]
+            if not tokens.isdigit() or int(tokens) <= 0:
+                failures.append(
+                    f"consult {triple!r}: tokens cell is not a positive integer: {tokens!r}"
+                )
+            model = row[cost_index["model"]]
+            if model != expected_model:
+                failures.append(
+                    f"consult {triple!r}: model {model!r} disagrees with ledger {expected_model!r}"
+                )
+            difficulty = row[cost_index["difficulty"]]
+            if difficulty != expected_difficulty:
+                failures.append(
+                    f"consult {triple!r}: difficulty {difficulty!r} disagrees with ledger "
+                    f"{expected_difficulty!r}"
+                )
+
+    return failures
+
+
+# ---------------------------------------------------------------------------
+# Canaries: check_every_post_boundary_consult_has_a_cost_row and its siblings
+# fail on known-bad inputs.
+# ---------------------------------------------------------------------------
+
+
+def test_flags_a_post_boundary_consult_missing_from_the_cost_series() -> None:
+    """Canary: the omission td-071 exists to prevent -- a post-boundary
+    ledger consult with zero matching cost rows."""
+    ledger_row = (
+        "| 2026-08-01T12:00:00Z | task-x | statistician | architecture | CH-01 | "
+        "a claim | a decision | switch-now | dec-999 | opus | standard |"
+    )
+    ledger_table = f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n{ledger_row}\n"
+    cost_table = (
+        f"{_COST_HEADER_ROW}\n{_COST_SEPARATOR_ROW}\n"  # header + separator, zero data rows
+    )
+
+    ledger_rows = parse_ledger_table_rows(ledger_table)
+    cost_rows = parse_cost_table_rows(cost_table)
+    failures = check_every_post_boundary_consult_has_a_cost_row(
+        ledger_rows, cost_rows, SERIES_BOUNDARY
+    )
+
+    assert len(failures) == 1, f"expected exactly one failure; got: {failures}"
+    assert "'task-x'" in failures[0]
+    assert "'statistician'" in failures[0]
+    assert "'architecture'" in failures[0]
+
+
+def test_flags_a_cost_row_whose_tokens_cell_is_not_a_positive_integer() -> None:
+    """Canary: substance over structure -- a present-but-invalid tokens cell
+    (blank, non-numeric, or zero) is flagged, not just an absent row."""
+    ledger_row = (
+        "| 2026-08-01T12:00:00Z | task-y | statistician | architecture | CH-01 | "
+        "a claim | a decision | switch-now | dec-999 | opus | standard |"
+    )
+    ledger_table = f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n{ledger_row}\n"
+    bad_tokens_rows = [
+        "| 2026-08-01T12:05:00Z | task-y | statistician | architecture |  | opus | standard | blank |",
+        "| 2026-08-01T12:06:00Z | task-y | statistician | architecture | n/a | opus | standard | not-a-number |",
+        "| 2026-08-01T12:07:00Z | task-y | statistician | architecture | 0 | opus | standard | zero |",
+    ]
+    cost_table = f"{_COST_HEADER_ROW}\n{_COST_SEPARATOR_ROW}\n" + "\n".join(bad_tokens_rows) + "\n"
+
+    ledger_rows = parse_ledger_table_rows(ledger_table)
+    cost_rows = parse_cost_table_rows(cost_table)
+    failures = check_every_post_boundary_consult_has_a_cost_row(
+        ledger_rows, cost_rows, SERIES_BOUNDARY
+    )
+
+    assert (
+        len(failures) == 3
+    ), f"expected exactly three failures (one per bad tokens cell); got: {failures}"
+
+
+def test_flags_a_cost_row_whose_model_disagrees_with_the_ledger() -> None:
+    """Canary: the denormalized `model` copy must agree with the ledger's
+    recorded model for the same triple."""
+    ledger_row = (
+        "| 2026-08-01T12:00:00Z | task-z | statistician | architecture | CH-01 | "
+        "a claim | a decision | switch-now | dec-999 | opus | standard |"
+    )
+    ledger_table = f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n{ledger_row}\n"
+    cost_row = (
+        "| 2026-08-01T12:05:00Z | task-z | statistician | architecture | 50000 | "
+        "sonnet | standard | mismatched model |"
+    )
+    cost_table = f"{_COST_HEADER_ROW}\n{_COST_SEPARATOR_ROW}\n{cost_row}\n"
+
+    ledger_rows = parse_ledger_table_rows(ledger_table)
+    cost_rows = parse_cost_table_rows(cost_table)
+    failures = check_every_post_boundary_consult_has_a_cost_row(
+        ledger_rows, cost_rows, SERIES_BOUNDARY
+    )
+
+    assert len(failures) == 1, f"expected exactly one failure; got: {failures}"
+    assert "'sonnet'" in failures[0]
+    assert "'opus'" in failures[0]
+
+
+def test_flags_cost_row_with_unescaped_pipe_inflating_column_count() -> None:
+    """Canary: an unescaped pipe in the notes cell inflates the column count
+    past eight -- the same defect class as the ledger's eleven-column check."""
+    bad_row = (
+        "| 2026-08-01T12:00:00Z | task-w | statistician | architecture | 12345 | "
+        "opus | standard | note with an unescaped | pipe |"
+    )
+    table = f"{_COST_HEADER_ROW}\n{_COST_SEPARATOR_ROW}\n{bad_row}\n"
+    rows = parse_cost_table_rows(table)
+    failures = check_cost_row_has_eight_columns(rows)
+
+    assert len(failures) == 1, f"expected exactly one failure; got: {failures}"
+    assert "got 9" in failures[0], f"expected the row to report 9 cells; got: {failures}"
+
+
+def test_flags_series_boundary_header_missing_from_the_cost_file() -> None:
+    """Canary: a cost file with no `**Series begins**:` header line is flagged
+    -- the gate's file-absent-or-header-absent case must fail, not pass silently."""
+    cost_text = f"# Consultation Cost Series\n\n{_COST_HEADER_ROW}\n{_COST_SEPARATOR_ROW}\n"
+    result = check_series_boundary_matches_gate_constant(cost_text)
+    assert result is not None, (
+        "check_series_boundary_matches_gate_constant must flag a cost file with no "
+        "'**Series begins**:' header line; got None"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Non-canary controls: prove the gate does not over-fire.
+# ---------------------------------------------------------------------------
+
+
+def test_accepts_a_pre_boundary_consult_absent_from_the_cost_series() -> None:
+    """Happy path: a pre-boundary ledger consult with zero matching cost rows
+    is exempt -- the four pre-adoption consults must not turn the gate red."""
+    ledger_row = (
+        "| 2026-07-30T17:05:00Z | task-v | statistician | architecture | CH-01 | "
+        "a claim | a decision | defer-with-rationale | dec-1 | opus | standard |"
+    )
+    ledger_table = f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n{ledger_row}\n"
+    cost_table = f"{_COST_HEADER_ROW}\n{_COST_SEPARATOR_ROW}\n"
+
+    ledger_rows = parse_ledger_table_rows(ledger_table)
+    cost_rows = parse_cost_table_rows(cost_table)
+    failures = check_every_post_boundary_consult_has_a_cost_row(
+        ledger_rows, cost_rows, SERIES_BOUNDARY
+    )
+    assert not failures, f"expected no failures for a pre-boundary consult; got: {failures}"
+
+
+def test_accepts_a_consult_with_two_cost_rows_for_one_triple() -> None:
+    """Happy path: a Round-3 loop-back re-spawn appends a second cost row for
+    the same triple rather than mutating the first -- >=1 satisfies the gate."""
+    ledger_row = (
+        "| 2026-08-01T12:00:00Z | task-u | statistician | architecture | CH-01 | "
+        "a claim | a decision | switch-now | dec-999 | opus | standard |"
+    )
+    ledger_table = f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n{ledger_row}\n"
+    cost_rows_text = [
+        "| 2026-08-01T12:05:00Z | task-u | statistician | architecture | 40000 | opus | standard | first spawn |",
+        "| 2026-08-01T13:00:00Z | task-u | statistician | architecture | 15000 | opus | standard | loop-back increment |",
+    ]
+    cost_table = f"{_COST_HEADER_ROW}\n{_COST_SEPARATOR_ROW}\n" + "\n".join(cost_rows_text) + "\n"
+
+    ledger_rows = parse_ledger_table_rows(ledger_table)
+    cost_rows = parse_cost_table_rows(cost_table)
+    failures = check_every_post_boundary_consult_has_a_cost_row(
+        ledger_rows, cost_rows, SERIES_BOUNDARY
+    )
+    assert (
+        not failures
+    ), f"expected no failures for two consistent cost rows on one triple; got: {failures}"
+
+
+# ---------------------------------------------------------------------------
+# Real-file tests -- the ones that actually bite in CI.
+# ---------------------------------------------------------------------------
+
+
+def test_every_post_boundary_consult_in_the_real_ledger_has_a_cost_row(project_root: Path) -> None:
+    """The coverage gate, exercised against the shipped ledger and cost
+    series. Skips only when the cost file is absent AND the ledger carries no
+    post-boundary consult yet (nothing the gate could meaningfully check);
+    fails when the file is absent but a post-boundary consult exists."""
+    ledger_path = _require_file(
+        project_root / ".ai-state" / "CONSULT_LEDGER.md", "disposition ledger"
+    )
+    ledger_rows = parse_ledger_table_rows(ledger_path.read_text(encoding="utf-8"))
+
+    cost_path = project_root / ".ai-state" / "CONSULT_COSTS.md"
+    cost_text = cost_path.read_text(encoding="utf-8") if cost_path.is_file() else ""
+    cost_rows = parse_cost_table_rows(cost_text) if cost_text else []
+
+    ledger_index = {field: pos for pos, field in enumerate(LEDGER_ROW_FIELDS)}
+    has_post_boundary_consult = any(
+        _TIMESTAMP_RE.match(row[ledger_index["timestamp"]])
+        and row[ledger_index["timestamp"]] >= SERIES_BOUNDARY
+        for row in ledger_rows
+    )
+    if not cost_path.is_file() and not has_post_boundary_consult:
+        pytest.skip("CONSULT_COSTS.md absent and no post-boundary consult exists yet")
+
+    failures = check_every_post_boundary_consult_has_a_cost_row(
+        ledger_rows, cost_rows, SERIES_BOUNDARY
+    )
+    assert not failures, "Post-boundary consult(s) missing a cost row:\n  " + "\n  ".join(failures)
+
+
+def test_every_real_cost_row_has_exactly_eight_columns(project_root: Path) -> None:
+    """The row-shape invariant, exercised against the real, shipped
+    .ai-state/CONSULT_COSTS.md (skips cleanly if the file does not exist yet)."""
+    cost_path = project_root / ".ai-state" / "CONSULT_COSTS.md"
+    if not cost_path.is_file():
+        pytest.skip("CONSULT_COSTS.md does not exist yet")
+    rows = parse_cost_table_rows(cost_path.read_text(encoding="utf-8"))
+    failures = check_cost_row_has_eight_columns(rows)
+    assert not failures, "Cost row shape violations:\n  " + "\n  ".join(failures)
+
+
+def test_real_cost_file_boundary_matches_the_gate_constant(project_root: Path) -> None:
+    """The series-boundary invariant, exercised against the real, shipped
+    .ai-state/CONSULT_COSTS.md (skips cleanly if the file does not exist yet)."""
+    cost_path = project_root / ".ai-state" / "CONSULT_COSTS.md"
+    if not cost_path.is_file():
+        pytest.skip("CONSULT_COSTS.md does not exist yet")
+    result = check_series_boundary_matches_gate_constant(cost_path.read_text(encoding="utf-8"))
+    assert result is None, result

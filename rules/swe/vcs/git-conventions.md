@@ -19,6 +19,7 @@ See also: [`pr-conventions.md`](pr-conventions.md) for PR workflow, merge policy
 - Stage specific files by name — avoid `git add -A` or `git add .`
 - Review `git diff --staged` before every commit
 - Verify the staged diff matches intent — no accidental inclusions
+- **Never a bare `git stash` / `git stash pop` in a worktree concurrent agents may share** — it sweeps up every other writer's uncommitted work regardless of pathspec staging discipline. Prefer a temporary WIP commit to set work aside. If a stash is unavoidable: `git stash push -u -m "<unique-tag>"`, capture the SHA immediately via `git stash list --format='%H %gs'`, restore with `git stash apply <sha>` (never `pop`), and drop the entry afterward by re-finding it by tag.
 
 ### Secrets and Sensitive Files
 

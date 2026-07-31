@@ -129,3 +129,19 @@ For plugin-distributed skills, store persistent data in `${CLAUDE_PLUGIN_DATA}` 
 This grants read access to all installed plugin files. The wildcard covers version changes, so approvals survive plugin updates.
 
 **Verification:** After adding the allowlist, activate a plugin skill and trigger a reference file read. Use `/context` to confirm the reference file was loaded without a permission prompt.
+
+### Live Agent Spawn Against a Stale Plugin Cache
+
+**Symptom:** A live agent spawn meant to prove a shipped-plugin behavior (a smoke test, a "does the installed plugin actually do X" check) passes or fails inconsistently across sessions, or a session that paused mid-verification silently resumes against a different plugin state than it started with.
+
+**Cause:** The spawn resolves against the **installed plugin cache**, not the working-tree repo. If the cache copy was pinned before the repository advanced (a fix landed on the default branch after the last plugin install/update), the spawn proves the stale cached behavior, not the current repo state — and either a `[BLOCKED]` or a `PASS` from that spawn is void, because it answers a different question than the one being asked.
+
+**Fix:** Before spawning an agent to prove a shipped-plugin behavior, diff the installed copy against the repo:
+
+```bash
+diff -q ~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/agents/<agent>.md agents/<agent>.md
+```
+
+If they differ, either refresh the installed plugin (reinstall/update) or, when developing the plugin itself, point the session at the working tree directly via `claude --plugin-dir <path>` so the spawn resolves against source rather than cache.
+
+**Verification:** Re-run the spawn only after the diff is empty (or after confirming the working-tree-as-plugin-source flag is active); record which path was used alongside the spawn's result.

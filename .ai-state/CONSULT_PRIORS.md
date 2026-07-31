@@ -56,6 +56,15 @@ the first.
 | 2026-07-31T06:40:00Z | td-081-sealed-prior | statistician | architecture | CH-05 | matched | P-06 | cd128039e225aab9ec504542b42b673feb44feae | 7 |
 | 2026-07-31T06:40:00Z | td-081-sealed-prior | statistician | architecture | CH-06 | novel |  | cd128039e225aab9ec504542b42b673feb44feae | 7 |
 | 2026-07-31T06:40:00Z | td-081-sealed-prior | statistician | architecture | CH-07 | novel |  | cd128039e225aab9ec504542b42b673feb44feae | 7 |
+| 2026-07-31T19:33:43Z | verify-multidisciplinary | statistician | verification | CH-01 | novel |  | 37df0f33084e0268ec85b85fe6c34e7997150560 | 0 |
+| 2026-07-31T19:33:43Z | verify-multidisciplinary | statistician | verification | CH-02 | novel |  | 37df0f33084e0268ec85b85fe6c34e7997150560 | 0 |
+| 2026-07-31T19:33:43Z | verify-multidisciplinary | statistician | verification | CH-03 | novel |  | 37df0f33084e0268ec85b85fe6c34e7997150560 | 0 |
+| 2026-07-31T19:33:43Z | verify-multidisciplinary | statistician | verification | CH-04 | matched | P-01 | 37df0f33084e0268ec85b85fe6c34e7997150560 | 0 |
+| 2026-07-31T19:33:43Z | verify-multidisciplinary | statistician | verification | CH-05 | novel |  | 37df0f33084e0268ec85b85fe6c34e7997150560 | 0 |
+| 2026-07-31T19:33:43Z | verify-multidisciplinary | statistician | verification | CH-06 | matched | P-02 | 37df0f33084e0268ec85b85fe6c34e7997150560 | 0 |
+| 2026-07-31T19:33:43Z | verify-multidisciplinary | statistician | verification | CH-07 | matched | P-04 | 37df0f33084e0268ec85b85fe6c34e7997150560 | 0 |
+| 2026-07-31T19:33:43Z | verify-multidisciplinary | statistician | verification | CH-08 | novel |  | 37df0f33084e0268ec85b85fe6c34e7997150560 | 0 |
+| 2026-07-31T19:33:43Z | verify-multidisciplinary | statistician | verification | CH-09 | matched | P-05 | 37df0f33084e0268ec85b85fe6c34e7997150560 | 0 |
 
 ## Column Definitions
 

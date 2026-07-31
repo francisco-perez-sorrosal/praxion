@@ -1,3 +1,34 @@
+## v0.19.0 (2026-07-31)
+
+### Feat
+
+- **state**: close the Wave-2 roster with zero new disciplines
+- **state**: add per-consult cost series (td-071); rules(vcs): forbid bare git stash (td-078)
+- attach consultants at research, warrant ideation inputs, persist dispositions
+- adopt the lens-vs-consultant criterion; ship evidence-appraiser
+- author the transactions design-review checklist, closing td-062
+
+### Fix
+
+- **consult**: key consult identity on the (task-slug, stage) triple and collapse superseded challenges
+- unambiguous append-point wording in consult ledger/cost files + stray-row gate
+- strip inert frontmatter from plugin agents
+- give CI the history the manifest fix needs, and warn when it lacks it
+- derive doc-manifest last_modified from git, not filesystem mtime
+- close the PROGRESS.md isolation leak and the binding-fallback gap
+- prove the research-stage attach point, and file what it found
+- make round-0 isolation stage-relative, not a fixed draft list
+- unblock the reference validator and stop autofix burning turns on denials
+- correct AC15's currency and withdraw an unattributed claim
+- **spec**: tick the 16 acceptance criteria the verifier confirmed PASS
+- measure the AC15 cost envelope and record the AC13 deferral
+- **state**: repair td-069 row shape and migrate it to resolved
+
+### Refactor
+
+- close td-060 and td-061, wire transactions into verifier review
+- decompose the metrics dashboard component
+
 ## v0.18.0 (2026-07-30)
 
 ### Feat

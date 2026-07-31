@@ -1349,6 +1349,77 @@ changed a design decision. Both changed what this dossier is entitled to claim.
 
 ---
 
+### 17.15 The falsifier instrumented — and what the number does not yet mean
+
+`dec-306`'s Falsifier was **unidentified, not underpowered** (`td-081`): nothing distinguished a
+challenge the convener would have caught anyway from one it would not, so no sample size could evaluate
+it. `dec-draft-2c51b2f6` makes it computable.
+
+**The estimand and its comparison arm.** `dec-306` names the arm twice and both namings agree: *"what a
+lens-style always-on reference would have produced"* and *"things the architect would have caught **by
+reading the skill**."* The counterfactual is the architect *with* the skill, not the architect as it
+happened to be. So the sealed step is **running the lens**: the convener loads the registry row's
+`binds-to` skill, works that row's own `challenge-obligations` against the draft, and seals the
+concerns that surface — in a commit made **before** the spawn. Recording what the convener merely
+already believed would measure a strictly smaller set and would bias the novelty rate **upward**,
+flattering the consultant. That is the one direction of error a measurement built to test a mechanism
+must not have.
+
+**The delta measures framing + standing jointly, never standing alone.** `dec-306` claimed the
+consultant's *entire* marginal contribution over a lens is standing to object. That is one term short by
+its own §4.1, which resolves the persona paradox with *"methodological framing supplies a **procedure**"*
+— and a procedure is not knowledge. Three things are in play, and the sealed arm separates only one:
+
+| Arm | Second party? | Framing | Delta measures |
+|---|---|---|---|
+| **A** — convener runs the lens | no | its own | *baseline* |
+| **B** — generic agent, same skill, asked to challenge | yes | generic | **A→B = standing** |
+| **C** — the discipline consultant | yes | disciplinary | **B→C = disciplinary identity** |
+
+Only A and C are built. **Arm B is named and deliberately unbuilt** — three arms triple per-consult cost
+against a series of one. It is not academic: §15.2 records *"Expert Personas Improve LLM Alignment but
+Damage Accuracy"*, whose MT-Bench **Coding** regression this dossier already calls *"the most
+uncomfortable single datum for this initiative"*. B→C could return negative, meaning disciplinary
+identity performs *worse* than a generic challenger holding the same skill. The design must be able to
+discover that. `dec-306`'s "identical knowledge" premise stands and the `performance-engineer` removal is
+**not** reversed — that had an independent reason.
+
+**Producer, boundary, strength.** The producer is `.ai-state/CONSULT_PRIORS.md` (sealed priors written
+pre-spawn; per-challenge classification at Round 2), joined to the ledger and cost files on the same
+`(task-slug, discipline, stage)` triple. The series begins `2026-07-31T03:00:00Z`; the five earlier
+consults are exempt **by construction**, since none was sealed and none can be retro-classified without
+inventing the record the file exists to supply. There is no skip-list. The claim is **tamper-evident,
+not tamper-proof**: every artifact passes through the convener's hands before becoming a commit, which
+is a property of the trust topology rather than of the budget.
+
+**The first observation, recorded and not interpreted.** One consult — the design's own, convened against
+its `SYSTEMS_PLAN.md` as `AC-02`. Eight priors sealed, seven challenges, **novel 4/7, rate 0.57**;
+6 `switch-now`, 1 `defer`, 0 dismissed. At `n` = 1 a high rate is **not** evidence the consultant is
+valuable and a low one is **not** evidence the falsifier fired — both are what a single observation looks
+like either way. `dec-306`'s Falsifier is therefore **instrumented for the post-boundary series, and not
+live**: computable is not decidable, and no rate or `n` is pre-registered at which anyone concludes
+anything. That absence is deliberate — `dec-304` demoted exactly such a threshold on the sibling
+statistic. `td-084` records the standing condition: the run-to-run spread of this rate has never been
+observed, because the unit of noise is the *spawn* rather than the consult, so any ADR citing the rate
+must first run the replication or state its absence.
+
+**What the exercise found in itself.** The consult it validated found two fail-open defects in the gate
+committed an hour earlier — a witness check that was three unanchored substring matches, and a
+containment test that is monotone under appending and so could never detect the addition it existed to
+catch. Both are fixed; both were reproduced before being conceded. The gate then failed on its own first
+live run over real data, on a scope boundary that compared a git commit date in local offset against
+row timestamps in UTC. None of the three was caught by a canary, because a canary supplies both sides of
+a comparison from one source and reality supplies them from two.
+
+**A CI finding surfaced alongside.** `pyproject.toml` sets `testpaths = ["tests", "scripts"]`, so a bare
+`pytest` collects zero tests from `fitness/`; `test.yml` runs bare `pytest` on every PR and cannot see
+these gates, while `architecture.yml` can see them but its `paths:` filter did not list
+`.ai-state/CONSULT_*.md`. A consult-only PR therefore triggered the workflow that cannot see the gate and
+not the one that can. Consequence: `dec-308`'s cost gate, `td-079`'s stray-row check and the
+consult-identity checks ran in CI **only on the PR that introduced them**, never again on the change
+class they police. The filter is fixed here; the general shape is the `gate-liveness.md` clause added
+this wave — a correct producer with no named consumer.
+
 ## 18. Citations
 
 - [Reasoning Models Generate Societies of Thought](https://arxiv.org/html/2601.10825v1) — Kim, Lai, Scherrer, Agüera y Arcas, Evans (arXiv:2601.10825v1, Jan 2026)

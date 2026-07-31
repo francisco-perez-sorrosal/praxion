@@ -1392,3 +1392,133 @@ def test_real_cost_file_boundary_matches_the_gate_constant(project_root: Path) -
         pytest.skip("CONSULT_COSTS.md does not exist yet")
     result = check_series_boundary_matches_gate_constant(cost_path.read_text(encoding="utf-8"))
     assert result is None, result
+
+
+# ---------------------------------------------------------------------------
+# Stray-row-outside-the-table gate (td-079) -- both CONSULT_LEDGER.md and
+# CONSULT_COSTS.md instructed their single writer to "append... at the end of
+# this file/ledger", which an orchestrator followed literally by landing a row
+# after the trailing prose sections (`## Column Definitions`, `## Falsifier`,
+# `## Single Writer`) rather than inside the parsed data table. Every parser
+# above reads only the table, so that row is invisible to the counting recipe
+# and to the cost-coverage gate while still rendering as a plausible stray
+# table to a human reader. The instructions themselves were reworded to name
+# the table and the section that follows it; this gate is the mechanical
+# backstop, reusing parse_ledger_table_rows / parse_cost_table_rows rather
+# than a third parser: it counts lines that LOOK like a data row (a
+# pipe-delimited ISO 8601 timestamp in the first column, the shared shape of
+# both tables) across the WHOLE document and compares that count to what the
+# table parser actually captured.
+# ---------------------------------------------------------------------------
+
+_TIMESTAMP_ROW_SHAPE_RE = re.compile(r"^\| *\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z *\|", re.MULTILINE)
+
+
+def check_no_data_row_outside_table(full_text: str, table_rows: list[list[str]]) -> str | None:
+    """Return a failure string if a timestamp-shaped data row exists outside
+    the rows the table parser returned.
+
+    A mismatch between "rows that look like data, counted anywhere in the
+    file" and "rows the table parser actually captured" means a row landed
+    outside the parsed table -- invisible to every counting recipe above, but
+    still rendering as a plausible stray table to a human reader.
+    """
+    total_shaped_lines = len(_TIMESTAMP_ROW_SHAPE_RE.findall(full_text))
+    if total_shaped_lines != len(table_rows):
+        return (
+            f"found {total_shaped_lines} timestamp-shaped row(s) across the whole "
+            f"file but the table parser returned {len(table_rows)} row(s) -- "
+            f"{total_shaped_lines - len(table_rows)} row(s) exist outside the parsed table"
+        )
+    return None
+
+
+def test_accepts_document_with_no_stray_rows() -> None:
+    """Happy path: a well-formed ledger table with no stray row is accepted."""
+    good_row = (
+        "| 2026-07-30T10:00:00Z | task-a | statistician | architecture | CH-01 | "
+        "a claim | a decision | switch-now | dec-100 | opus | standard |"
+    )
+    document = f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n{good_row}\n"
+    table_rows = parse_ledger_table_rows(document)
+    result = check_no_data_row_outside_table(document, table_rows)
+    assert result is None, f"expected no failure for a clean table; got: {result!r}"
+
+
+def test_flags_ledger_row_landing_outside_the_parsed_table() -> None:
+    """Canary: a stray data row appended after the ledger's trailing prose
+    sections (outside the parsed table) is flagged -- reproduces the exact
+    defect an orchestrator following the ledger's former 'append at the end
+    of this ledger' instruction literally would produce."""
+    good_row = (
+        "| 2026-07-30T10:00:00Z | task-a | statistician | architecture | CH-01 | "
+        "a claim | a decision | switch-now | dec-100 | opus | standard |"
+    )
+    stray_row = (
+        "| 2026-08-01T09:00:00Z | task-b | statistician | architecture | CH-02 | "
+        "a stray claim | a stray decision | switch-now | dec-200 | opus | standard |"
+    )
+    document = (
+        f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n{good_row}\n\n"
+        "## Column Definitions\n\nSome prose describing the columns.\n\n"
+        "## Falsifier\n\nSome prose with a recipe.\n\n"
+        "## Single Writer\n\nSome trailing prose.\n\n"
+        f"{stray_row}\n"
+    )
+    table_rows = parse_ledger_table_rows(document)
+    result = check_no_data_row_outside_table(document, table_rows)
+    assert result is not None, (
+        "check_no_data_row_outside_table must flag a stray ledger row appended "
+        "after the trailing prose sections; got None (the gate does not bite)"
+    )
+
+
+def test_flags_cost_row_landing_outside_the_parsed_table() -> None:
+    """Canary: the same defect shape for CONSULT_COSTS.md -- a stray row
+    appended after its trailing prose sections."""
+    good_row = (
+        "| 2026-07-30T17:20:00Z | task-a | statistician | architecture | 101030 | "
+        "opus | standard | seed |"
+    )
+    stray_row = (
+        "| 2026-08-01T09:00:00Z | task-b | statistician | architecture | 5000 | "
+        "opus | standard | stray |"
+    )
+    document = (
+        f"{_COST_HEADER_ROW}\n{_COST_SEPARATOR_ROW}\n{good_row}\n\n"
+        "## Column Definitions\n\nSome prose describing the columns.\n\n"
+        "## Reading the series\n\nSome prose with a recipe.\n\n"
+        "## Single Writer\n\nSome trailing prose.\n\n"
+        f"{stray_row}\n"
+    )
+    table_rows = parse_cost_table_rows(document)
+    result = check_no_data_row_outside_table(document, table_rows)
+    assert result is not None, (
+        "check_no_data_row_outside_table must flag a stray cost row appended "
+        "after the trailing prose sections; got None (the gate does not bite)"
+    )
+
+
+def test_no_ledger_data_row_exists_outside_the_parsed_table(project_root: Path) -> None:
+    """The real, shipped .ai-state/CONSULT_LEDGER.md carries no stray data
+    row outside the parsed table -- the real-file proof, not just the
+    synthetic canary above."""
+    ledger_path = _require_file(
+        project_root / ".ai-state" / "CONSULT_LEDGER.md", "disposition ledger"
+    )
+    text = ledger_path.read_text(encoding="utf-8")
+    table_rows = parse_ledger_table_rows(text)
+    result = check_no_data_row_outside_table(text, table_rows)
+    assert result is None, result
+
+
+def test_no_cost_data_row_exists_outside_the_parsed_table(project_root: Path) -> None:
+    """The real, shipped .ai-state/CONSULT_COSTS.md carries no stray data row
+    outside the parsed table (skips cleanly if the file does not exist yet)."""
+    cost_path = project_root / ".ai-state" / "CONSULT_COSTS.md"
+    if not cost_path.is_file():
+        pytest.skip("CONSULT_COSTS.md does not exist yet")
+    text = cost_path.read_text(encoding="utf-8")
+    table_rows = parse_cost_table_rows(text)
+    result = check_no_data_row_outside_table(text, table_rows)
+    assert result is None, result

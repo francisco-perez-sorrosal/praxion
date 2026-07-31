@@ -11,7 +11,7 @@
 
 **Schema**: 11 columns, one row per dispositioned challenge. See Column Definitions below.
 
-**Append new rows at the end of this ledger.** This file is append-only -- no row is ever edited or deleted after being written. If a disposition is revisited later, append a new row rather than mutating the old one; both remain part of the record.
+**Append new rows as the last row of the data table directly below (the `| timestamp | ... |` table that ends just before the `## Column Definitions` section) -- never after that section.** This file is append-only -- no row is ever edited or deleted after being written. If a disposition is revisited later, append a new row rather than mutating the old one; both remain part of the record.
 
 | timestamp | task-slug | discipline | stage | challenge-id | claim | decision-at-stake | disposition | rationale-ref | model | difficulty |
 |---|---|---|---|---|---|---|---|---|---|---|

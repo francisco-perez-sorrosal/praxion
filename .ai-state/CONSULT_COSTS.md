@@ -16,10 +16,11 @@ Consults timestamped before that instant are exempt from the coverage gate: thei
 token figures were never recorded and are unrecoverable. One pre-boundary row is
 seeded below because its figure survived in the evidence dossier.
 
-**Append new rows at the end of this file.** This file is append-only -- no row is
-ever edited or deleted. A consult that runs a second time (a Round-3 loop-back
-re-spawn) appends a *second* row for the same triple rather than mutating the
-first; aggregation sums rows per triple.
+**Append new rows as the last row of the data table directly below (the `| timestamp | ... |` table
+that ends just before the `## Column Definitions` section) -- never after that section.** This file
+is append-only -- no row is ever edited or deleted. A consult that runs a second time (a Round-3
+loop-back re-spawn) appends a *second* row for the same triple rather than mutating the first;
+aggregation sums rows per triple.
 
 | timestamp | task-slug | discipline | stage | tokens | model | difficulty | notes |
 |---|---|---|---|---|---|---|---|

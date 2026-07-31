@@ -4,7 +4,7 @@ title: Wave 2 ships zero new consulting disciplines, on operational grounds rath
 status: accepted
 category: architectural
 date: 2026-07-31
-summary: Closes the Wave-2 roster with no new discipline. cost-economist is excluded as absorbed by the Performance lens; cognitive-ergonomist and data-steward are deferred, not refused — the reasoning that would have refused data-steward was withdrawn under challenge. The binding reason is operational: discipline #2 is merged but unreleased, so a #3 decision is premature.
+summary: Closes the Wave-2 roster with no new discipline. cost-economist is excluded as absorbed by the Performance lens; cognitive-ergonomist and data-steward are deferred, not refused — the reasoning that would have refused data-steward was withdrawn under challenge. The binding reason is operational — discipline #2 is merged but unreleased, so a #3 decision is premature.
 tags: [multidisciplinary-identities, discipline-consultant, roster, wave-2, expansion-gate, type-ii-error, lens-collision, ship-zero]
 made_by: user
 agent_type: orchestrator

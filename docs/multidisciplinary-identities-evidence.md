@@ -1255,10 +1255,25 @@ direction, since a fresh-context consult caches worse than a warm pipeline agent
 themselves remain **asserted, not derived**. The verdict survives every sensitivity constructed against it;
 what changed is what the number licenses and how it is recorded.
 
-**Nothing is accumulating this series.** `.ai-state/observations.jsonl` carries no token or cost fields,
-and the ledger's 11-column schema has no cost column. Today's figures exist only because agent
-completions surfaced them in-session. Recording an ongoing series is a schema decision on an append-only
-file and is deliberately left open rather than resolved here.
+**A series is now accumulating — this paragraph previously said it was not.** `dec-308` resolved the
+question left open here by adding `.ai-state/CONSULT_COSTS.md`: a sibling append-only single-writer file,
+one row per consult spawn, joined to `.ai-state/CONSULT_LEDGER.md` on the `(task-slug, discipline, stage)`
+triple, with a cross-file fitness gate that fails when a post-boundary consult carries no cost row. The
+ledger's 11-column schema is untouched; cost is a property of the consult, not of the challenge, which is
+why it lives in a sibling rather than a twelfth column. `.ai-state/observations.jsonl` still carries no
+token or cost fields — the figures are still hand-recorded from what the harness surfaces at completion,
+which is the residual `dec-308` accepted explicitly.
+
+**The series as of 2026-07-31**: three rows — `101,030` (pre-boundary seed, backfilled from §17.12 above),
+`161,321` (`high-stakes`), `202,830` (`standard`). All `opus`, all `statistician`. The `**Series begins**`
+boundary is `2026-07-31T01:00:00Z`; earlier consults are exempt by construction because their figures were
+never recorded and are unrecoverable.
+
+**What the series still does not license.** `n` = 3 observations across 2 difficulty classes, one
+discipline, one session's routing configuration. It instruments the **numerator only** — the denominator of
+the cost ratio (non-consult pipeline-agent cost) is not knowable at this writing seam and has no series,
+which is why the `3×`/`6×` thresholds above remain **asserted, not derived**. Read the rows; do not read a
+trend into three points.
 
 ### 17.13 The lens-versus-consultant criterion — and why performance is a lens
 

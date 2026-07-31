@@ -88,6 +88,24 @@ grep -E '^\|[^|]*\|[^|]*\|[^|]*\|[^|]*\|[^|]*\|[^|]*\| *high-stakes *\|' \
 `cut -d'|' -f6` is the `tokens` cell and `-f7` the `model` cell only while the schema
 has these 8 columns in this order; a schema change must restate these recipes.
 
+## Named consumer
+
+Required by the gate-liveness clause that a computed value must have a named reader — the clause this
+file's own wave authored, and which it did not itself satisfy until now.
+
+The token series here **is** the numerator of the consult cost-ratio recorded in
+`docs/multidisciplinary-identities-evidence.md` § 17.12. Any artifact that states a consult's cost, a
+cost ratio, or a break-even consult count — an ADR, the evidence dossier, a roadmap, an evaluation —
+must cite the rows in this file rather than an in-session recollection, and must carry two caveats with
+the figure: it is **hand-recorded** from what the harness surfaced at completion (the residual `dec-308`
+accepted explicitly), and it instruments the **numerator only**. The denominator — non-consult
+pipeline-agent cost — is not knowable at this writing seam and has no series, which is why every
+threshold derived from these figures is asserted rather than derived.
+
+`§ 17.12` previously asserted that *"nothing is accumulating this series"* while this file held three
+rows. That is the exact drift this section exists to prevent: a human-authored claim contradicting a
+gate's own output, indefinitely, with nothing to surface the mismatch.
+
 ## Single Writer
 
 Only the convener appends, at Round 2, at the same moment it appends this consult's

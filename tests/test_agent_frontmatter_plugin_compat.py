@@ -7,7 +7,7 @@ of its agents exclusively via `.claude-plugin/plugin.json`, so any declaration
 of these fields is inert and misleading to future agent authors.
 
 Test strategy: static analysis (YAML frontmatter parse). No fixtures, no mocks.
-Rationale is documented in ADR dec-draft-5fbed7fd (td-072).
+Rationale is documented in ADR dec-307 (td-072).
 """
 
 from __future__ import annotations

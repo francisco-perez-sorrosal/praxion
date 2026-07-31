@@ -26,6 +26,7 @@ aggregation sums rows per triple.
 |---|---|---|---|---|---|---|---|
 | 2026-07-30T17:20:00Z | multidisciplinary-identities | statistician | architecture | 101030 | opus | standard | Backfilled from docs/multidisciplinary-identities-evidence.md §17.12; pre-boundary seed -- the only prior consult whose figure survived in a durable artifact |
 | 2026-07-31T02:30:00Z | multidisciplinary-identities-wave2 | statistician | architecture | 161321 | opus | high-stakes | First consult recorded under the series (post-boundary). Convened to challenge the convener's own roster verdict; seven challenges, six switch-now, one defer, zero dismissed. |
+| 2026-07-31T06:10:00Z | td-081-sealed-prior | statistician | architecture | 202830 | opus | standard | Second consult of the series and the first sealed one. Convened against this task's own SYSTEMS_PLAN.md as AC-02. 8 priors sealed at cd12803 before the spawn; 7 challenges, 6 switch-now, 1 defer, 0 dismissed. |
 
 ## Column Definitions
 

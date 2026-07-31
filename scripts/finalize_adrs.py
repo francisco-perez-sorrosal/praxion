@@ -729,7 +729,7 @@ def rewrite_cross_references(repo_root: Path, old_id: str, new_id: str) -> int:
     - All files under `.ai-state/decisions/` (both drafts/ and finalized).
     - `.ai-state/DESIGN.md`, `.ai-state/TECH_DEBT_LEDGER.md`,
       `.ai-state/TECH_DEBT_RESOLVED.md`, `.ai-state/CONSULT_LEDGER.md`,
-      `.ai-state/CONSULT_COSTS.md`, and a
+      `.ai-state/CONSULT_COSTS.md`, `.ai-state/CONSULT_PRIORS.md`, and a
       project-root `ROADMAP.md` -- named persistent files that cite the ADR a
       decision/debt/disposition row resolved.
     - Every markdown file under `docs/` (subsumes `docs/architecture.md`):
@@ -776,6 +776,7 @@ def _cross_reference_targets(repo_root: Path) -> Iterator[Path]:
         repo_root / ".ai-state" / "TECH_DEBT_RESOLVED.md",
         repo_root / ".ai-state" / "CONSULT_LEDGER.md",
         repo_root / ".ai-state" / "CONSULT_COSTS.md",
+        repo_root / ".ai-state" / "CONSULT_PRIORS.md",
         repo_root / "ROADMAP.md",
     ):
         if persistent_doc.is_file():

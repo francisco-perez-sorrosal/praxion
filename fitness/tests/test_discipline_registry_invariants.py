@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -1649,3 +1650,942 @@ def test_no_cost_data_row_exists_outside_the_parsed_table(project_root: Path) ->
     table_rows = parse_cost_table_rows(text)
     result = check_no_data_row_outside_table(text, table_rows)
     assert result is None, result
+
+
+# ---------------------------------------------------------------------------
+# Sealed-prior-list coverage gate (td-081) -- .ai-state/CONSULT_PRIORS.md carries
+# two tables: `## Sealed Priors` (one row per pre-spawn concern, written before
+# the consultant spawns) and `## Challenge Classification` (one row per
+# dispositioned challenge, written at Round 2). This gate fails when a
+# post-boundary ledger consult has no sealed prior, when a sealed prior's
+# concern/source/prior-id is malformed, when a challenge carries no
+# classification, or when a classification's matched-prior-id or seal-witness
+# is malformed or inconsistent -- the omissions the file exists to make
+# CI-visible (dec-draft-2c51b2f6).
+# ---------------------------------------------------------------------------
+
+PRIOR_ROW_FIELDS: tuple[str, ...] = (
+    "timestamp",
+    "task-slug",
+    "discipline",
+    "stage",
+    "prior-id",
+    "source",
+    "concern",
+)
+
+CLASSIFICATION_ROW_FIELDS: tuple[str, ...] = (
+    "timestamp",
+    "task-slug",
+    "discipline",
+    "stage",
+    "challenge-id",
+    "classification",
+    "matched-prior-id",
+    "seal-witness",
+)
+
+# Same rationale as SERIES_BOUNDARY above: the gate's source of truth is this
+# constant, not the file's own header line, so the gate still fails when the
+# file is absent. G1 below cross-checks the header line against this constant
+# so the two can never silently drift apart.
+SEAL_BOUNDARY = "2026-07-31T03:00:00Z"
+
+# Placeholder concern values a shallow lens pass or a rushed convener might
+# write instead of a substantive one -- compared lowercased so "TBD"/"N/A"
+# also match.
+_PLACEHOLDER_CONCERNS = frozenset({"", "-", "--", "n/a", "na", "tbd", "none."})
+
+_PRIOR_ID_RE = re.compile(r"^P-\d{2}$")
+_SEAL_WITNESS_RE = re.compile(r"^[0-9a-f]{7,40}$")
+_ROUND0_HEAD_RE = re.compile(r"\*\*Round-0 HEAD:\*\*\s*([0-9a-f]{7,40})")
+
+_PRIOR_HEADER_ROW = "| " + " | ".join(PRIOR_ROW_FIELDS) + " |"
+_PRIOR_SEPARATOR_ROW = "|" + "|".join(["---"] * len(PRIOR_ROW_FIELDS)) + "|"
+_CLASSIFICATION_HEADER_ROW = "| " + " | ".join(CLASSIFICATION_ROW_FIELDS) + " |"
+_CLASSIFICATION_SEPARATOR_ROW = "|" + "|".join(["---"] * len(CLASSIFICATION_ROW_FIELDS)) + "|"
+
+
+def parse_prior_table_rows(priors_text: str) -> list[list[str]]:
+    """Parse the `## Sealed Priors` table's data rows into raw cell lists.
+
+    Same block-scan + exact-header-match shape as parse_cost_table_rows -- two
+    tables share one file, so matching the header cell-list exactly is what
+    keeps `## Sealed Priors` and `## Challenge Classification` from being
+    conflated by a naive "every pipe-prefixed block" scan.
+    """
+    for block in _split_into_table_blocks(priors_text):
+        if len(block) < 2:
+            continue
+        header_cells = [cell.strip() for cell in block[0].strip().strip("|").split("|")]
+        if header_cells != list(PRIOR_ROW_FIELDS):
+            continue  # not the Sealed Priors table -- some other pipe-prefixed block
+        data_lines = block[2:]  # skip the header row and the --- separator row
+        return [
+            [cell.strip() for cell in line.strip().strip("|").split("|")] for line in data_lines
+        ]
+    return []
+
+
+def parse_classification_table_rows(priors_text: str) -> list[list[str]]:
+    """Parse the `## Challenge Classification` table's data rows into raw cell
+    lists. Same shape as parse_prior_table_rows, matched on its own header."""
+    for block in _split_into_table_blocks(priors_text):
+        if len(block) < 2:
+            continue
+        header_cells = [cell.strip() for cell in block[0].strip().strip("|").split("|")]
+        if header_cells != list(CLASSIFICATION_ROW_FIELDS):
+            continue  # not the Challenge Classification table -- some other block
+        data_lines = block[2:]  # skip the header row and the --- separator row
+        return [
+            [cell.strip() for cell in line.strip().strip("|").split("|")] for line in data_lines
+        ]
+    return []
+
+
+def check_prior_row_has_seven_columns(rows: list[list[str]]) -> list[str]:
+    """Return a failure string per row whose cell count isn't exactly seven
+    (G0a) -- an unescaped `|` inside the free-text `concern` cell inflates it."""
+    failures: list[str] = []
+    for index, row in enumerate(rows):
+        if len(row) != len(PRIOR_ROW_FIELDS):
+            failures.append(
+                f"row {index}: expected {len(PRIOR_ROW_FIELDS)} columns, got {len(row)}: {row!r}"
+            )
+    return failures
+
+
+def check_classification_row_has_eight_columns(rows: list[list[str]]) -> list[str]:
+    """Return a failure string per row whose cell count isn't exactly eight (G0b)."""
+    failures: list[str] = []
+    for index, row in enumerate(rows):
+        if len(row) != len(CLASSIFICATION_ROW_FIELDS):
+            failures.append(
+                f"row {index}: expected {len(CLASSIFICATION_ROW_FIELDS)} columns, "
+                f"got {len(row)}: {row!r}"
+            )
+    return failures
+
+
+def check_seal_boundary_matches_gate_constant(priors_text: str) -> str | None:
+    """Return a failure string unless the file's header boundary line equals
+    SEAL_BOUNDARY exactly (G1). Reuses parse_series_boundary unchanged -- the
+    priors file uses the identical `**Series begins**:` header key, so no
+    second regex is introduced."""
+    found = parse_series_boundary(priors_text)
+    if found is None:
+        return "no '**Series begins**:' header line found in CONSULT_PRIORS.md"
+    if found != SEAL_BOUNDARY:
+        return f"series boundary header {found!r} does not match gate constant {SEAL_BOUNDARY!r}"
+    return None
+
+
+def check_every_post_boundary_consult_has_a_sealed_prior(
+    ledger_rows: list[list[str]],
+    prior_rows: list[list[str]],
+    boundary: str,
+) -> list[str]:
+    """Return one failure string per violation while checking that every
+    post-`boundary` (task-slug, discipline, stage) triple in `ledger_rows` has
+    at least one well-formed `## Sealed Priors` row (G2), and that no triple
+    carries both a `NONE` row and a listed `P-NN` row (G3).
+
+    Checks, independent of ledger presence:
+      - substance -- every prior row's `concern` is non-empty and not a
+        placeholder; `source` is `lens` or `prior`; `prior-id` matches
+        `P-NN` or is the literal `NONE`
+      - G3 -- an explicit-empty `NONE` row cannot coexist with a `P-NN` row
+        for the same triple
+
+    Checks, keyed off the ledger:
+      - presence -- every post-boundary triple has >=1 matching prior row
+
+    A ledger `timestamp` that doesn't match the ISO 8601 shape is itself a
+    failure, rather than being silently mis-ordered against `boundary`.
+    """
+    failures: list[str] = []
+    ledger_index = {field: pos for pos, field in enumerate(LEDGER_ROW_FIELDS)}
+    prior_index = {field: pos for pos, field in enumerate(PRIOR_ROW_FIELDS)}
+
+    for row in prior_rows:
+        concern = row[prior_index["concern"]]
+        if concern.strip().lower() in _PLACEHOLDER_CONCERNS:
+            failures.append(f"sealed prior has an empty or placeholder concern: {concern!r}")
+        source = row[prior_index["source"]]
+        if source not in ("lens", "prior"):
+            failures.append(f"sealed prior has an unrecognised source value: {source!r}")
+        prior_id = row[prior_index["prior-id"]]
+        if not (_PRIOR_ID_RE.match(prior_id) or prior_id == "NONE"):
+            failures.append(f"sealed prior has a malformed prior-id: {prior_id!r}")
+
+    priors_by_triple: dict[tuple[str, str, str], list[str]] = {}
+    for row in prior_rows:
+        triple = (
+            row[prior_index["task-slug"]],
+            row[prior_index["discipline"]],
+            row[prior_index["stage"]],
+        )
+        priors_by_triple.setdefault(triple, []).append(row[prior_index["prior-id"]])
+
+    for triple, prior_ids in priors_by_triple.items():
+        if "NONE" in prior_ids and any(pid != "NONE" for pid in prior_ids):
+            failures.append(
+                f"consult {triple!r}: a NONE declaration coexists with listed priors: {prior_ids!r}"
+            )
+
+    post_boundary_triples: set[tuple[str, str, str]] = set()
+    for row in ledger_rows:
+        timestamp = row[ledger_index["timestamp"]]
+        if not _TIMESTAMP_RE.match(timestamp):
+            failures.append(f"ledger row has a malformed timestamp: {timestamp!r}")
+            continue
+        if timestamp < boundary:
+            continue
+        post_boundary_triples.add(
+            (
+                row[ledger_index["task-slug"]],
+                row[ledger_index["discipline"]],
+                row[ledger_index["stage"]],
+            )
+        )
+
+    for triple in post_boundary_triples:
+        if triple not in priors_by_triple:
+            failures.append(
+                f"no CONSULT_PRIORS.md Sealed Priors row for post-boundary consult {triple!r}"
+            )
+
+    return failures
+
+
+def check_every_challenge_is_classified(
+    ledger_rows: list[list[str]],
+    classification_rows: list[list[str]],
+    prior_rows: list[list[str]],
+    boundary: str,
+) -> list[str]:
+    """Return one failure string per violation while checking that every
+    post-`boundary` `(triple, challenge-id)` pair in `ledger_rows` has exactly
+    one classification row present (G4), and that every classification row is
+    itself well-formed.
+
+    Checks, independent of ledger presence:
+      - substance -- `classification` is `novel` or `matched`; a `matched`
+        row's `matched-prior-id` resolves to a Sealed Priors row of the same
+        triple; a `novel` row carries an empty `matched-prior-id`;
+        `seal-witness` matches `[0-9a-f]{7,40}`
+      - consistency -- `seal-witness` agrees across every row of one triple
+
+    Checks, keyed off the ledger:
+      - presence -- every post-boundary `(triple, challenge-id)` pair, keyed
+        on the *distinct set* so a re-dispositioned challenge with two ledger
+        rows still needs exactly one classification row (no use of
+        collapse_ledger_rows_to_latest_per_challenge is required)
+    """
+    failures: list[str] = []
+    ledger_index = {field: pos for pos, field in enumerate(LEDGER_ROW_FIELDS)}
+    classification_index = {field: pos for pos, field in enumerate(CLASSIFICATION_ROW_FIELDS)}
+    prior_index = {field: pos for pos, field in enumerate(PRIOR_ROW_FIELDS)}
+
+    priors_by_triple: dict[tuple[str, str, str], set[str]] = {}
+    for row in prior_rows:
+        triple = (
+            row[prior_index["task-slug"]],
+            row[prior_index["discipline"]],
+            row[prior_index["stage"]],
+        )
+        priors_by_triple.setdefault(triple, set()).add(row[prior_index["prior-id"]])
+
+    witness_by_triple: dict[tuple[str, str, str], set[str]] = {}
+    for row in classification_rows:
+        triple = (
+            row[classification_index["task-slug"]],
+            row[classification_index["discipline"]],
+            row[classification_index["stage"]],
+        )
+        classification = row[classification_index["classification"]]
+        matched_prior_id = row[classification_index["matched-prior-id"]]
+        seal_witness = row[classification_index["seal-witness"]]
+
+        if classification not in ("novel", "matched"):
+            failures.append(f"classification row has an invalid classification: {classification!r}")
+        elif classification == "matched":
+            if matched_prior_id not in priors_by_triple.get(triple, set()):
+                failures.append(
+                    f"consult {triple!r}: matched classification names an absent prior "
+                    f"{matched_prior_id!r}"
+                )
+        elif matched_prior_id:
+            failures.append(
+                f"consult {triple!r}: novel classification carries a non-empty "
+                f"matched-prior-id {matched_prior_id!r}"
+            )
+
+        if not _SEAL_WITNESS_RE.match(seal_witness):
+            failures.append(f"classification row has a malformed seal-witness: {seal_witness!r}")
+
+        witness_by_triple.setdefault(triple, set()).add(seal_witness)
+
+    for triple, witnesses in witness_by_triple.items():
+        if len(witnesses) > 1:
+            failures.append(
+                f"consult {triple!r}: seal-witness values disagree across rows: "
+                f"{sorted(witnesses)!r}"
+            )
+
+    classified_pairs: set[tuple[tuple[str, str, str], str]] = set()
+    for row in classification_rows:
+        triple = (
+            row[classification_index["task-slug"]],
+            row[classification_index["discipline"]],
+            row[classification_index["stage"]],
+        )
+        classified_pairs.add((triple, row[classification_index["challenge-id"]]))
+
+    post_boundary_pairs: set[tuple[tuple[str, str, str], str]] = set()
+    for row in ledger_rows:
+        timestamp = row[ledger_index["timestamp"]]
+        if not _TIMESTAMP_RE.match(timestamp):
+            failures.append(f"ledger row has a malformed timestamp: {timestamp!r}")
+            continue
+        if timestamp < boundary:
+            continue
+        triple = (
+            row[ledger_index["task-slug"]],
+            row[ledger_index["discipline"]],
+            row[ledger_index["stage"]],
+        )
+        post_boundary_pairs.add((triple, row[ledger_index["challenge-id"]]))
+
+    for triple, challenge_id in post_boundary_pairs:
+        if (triple, challenge_id) not in classified_pairs:
+            failures.append(
+                f"no CONSULT_PRIORS.md Challenge Classification row for {challenge_id!r} "
+                f"in post-boundary consult {triple!r}"
+            )
+
+    return failures
+
+
+def check_fragment_witness_agrees(fragment_text: str, seal_witness: str) -> str | None:
+    """Return a failure string unless the consultant fragment's
+    `**Round-0 HEAD:** <sha>` line equals `seal_witness` exactly (G5, the
+    live-window independence check -- the one datum in the consult the
+    convener did not author)."""
+    match = _ROUND0_HEAD_RE.search(fragment_text)
+    if match is None:
+        return "fragment carries no '**Round-0 HEAD:**' line"
+    fragment_sha = match.group(1)
+    if fragment_sha != seal_witness:
+        return (
+            f"fragment witness {fragment_sha!r} disagrees with the recorded "
+            f"seal-witness {seal_witness!r}"
+        )
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Canaries: the six checks above fail on known-bad inputs. Each bad input is
+# valid in every dimension except the one under test -- the ledger row is
+# eleven columns, the prior rows are seven, the classification rows are
+# eight, every timestamp is post-boundary, every sha is [0-9a-f]{7,40}.
+# ---------------------------------------------------------------------------
+
+
+def test_flags_a_post_boundary_consult_with_no_sealed_prior() -> None:
+    """Canary: a post-boundary ledger consult with zero matching Sealed
+    Priors rows is flagged -- the omission this gate exists to catch."""
+    ledger_row = (
+        "| 2026-08-01T12:00:00Z | task-a | statistician | architecture | CH-01 | "
+        "a claim | a decision | switch-now | dec-999 | opus | standard |"
+    )
+    ledger_table = f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n{ledger_row}\n"
+    priors_table = f"{_PRIOR_HEADER_ROW}\n{_PRIOR_SEPARATOR_ROW}\n"  # zero data rows
+
+    ledger_rows = parse_ledger_table_rows(ledger_table)
+    prior_rows = parse_prior_table_rows(priors_table)
+    failures = check_every_post_boundary_consult_has_a_sealed_prior(
+        ledger_rows, prior_rows, SEAL_BOUNDARY
+    )
+
+    assert len(failures) == 1, f"expected exactly one failure; got: {failures}"
+    assert "'task-a'" in failures[0]
+    assert "'statistician'" in failures[0]
+    assert "'architecture'" in failures[0]
+
+
+def test_flags_a_sealed_prior_whose_concern_cell_is_a_placeholder() -> None:
+    """Canary: substance over structure -- an empty, 'n/a', or 'TBD' concern
+    cell is flagged, not just an absent row."""
+    bad_rows = [
+        "| 2026-07-31T02:00:00Z | task-a | statistician | architecture | P-01 | lens |  |",
+        "| 2026-07-31T02:00:00Z | task-a | statistician | architecture | P-02 | lens | n/a |",
+        "| 2026-07-31T02:00:00Z | task-a | statistician | architecture | P-03 | lens | TBD |",
+    ]
+    priors_table = f"{_PRIOR_HEADER_ROW}\n{_PRIOR_SEPARATOR_ROW}\n" + "\n".join(bad_rows) + "\n"
+
+    prior_rows = parse_prior_table_rows(priors_table)
+    failures = check_every_post_boundary_consult_has_a_sealed_prior([], prior_rows, SEAL_BOUNDARY)
+
+    assert (
+        len(failures) == 3
+    ), f"expected exactly three failures (one per placeholder concern); got: {failures}"
+
+
+def test_flags_a_none_declaration_coexisting_with_listed_priors() -> None:
+    """Canary: G3 -- an explicit-empty NONE declaration cannot coexist with a
+    listed P-NN prior for the same triple."""
+    rows = [
+        "| 2026-07-31T02:00:00Z | task-a | statistician | architecture | P-01 | lens | "
+        "a real concern |",
+        "| 2026-07-31T02:01:00Z | task-a | statistician | architecture | NONE | lens | "
+        "pass surfaced nothing |",
+    ]
+    priors_table = f"{_PRIOR_HEADER_ROW}\n{_PRIOR_SEPARATOR_ROW}\n" + "\n".join(rows) + "\n"
+
+    prior_rows = parse_prior_table_rows(priors_table)
+    failures = check_every_post_boundary_consult_has_a_sealed_prior([], prior_rows, SEAL_BOUNDARY)
+
+    assert len(failures) == 1, f"expected exactly one failure; got: {failures}"
+    assert "NONE" in failures[0]
+
+
+def test_flags_a_sealed_prior_with_an_unrecognised_source_value() -> None:
+    """Canary: `source` must be `lens` or `prior` -- anything else is flagged."""
+    row = (
+        "| 2026-07-31T02:00:00Z | task-a | statistician | architecture | P-01 | "
+        "intuition | a real concern |"
+    )
+    priors_table = f"{_PRIOR_HEADER_ROW}\n{_PRIOR_SEPARATOR_ROW}\n{row}\n"
+
+    prior_rows = parse_prior_table_rows(priors_table)
+    failures = check_every_post_boundary_consult_has_a_sealed_prior([], prior_rows, SEAL_BOUNDARY)
+
+    assert len(failures) == 1, f"expected exactly one failure; got: {failures}"
+    assert "'intuition'" in failures[0]
+
+
+def test_flags_a_challenge_with_no_classification_row() -> None:
+    """Canary: a post-boundary challenge with zero classification rows is
+    flagged, naming the unclassified challenge-id."""
+    ledger_row = (
+        "| 2026-08-01T12:00:00Z | task-a | statistician | architecture | CH-01 | "
+        "a claim | a decision | switch-now | dec-999 | opus | standard |"
+    )
+    ledger_table = f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n{ledger_row}\n"
+    prior_row = (
+        "| 2026-07-31T02:00:00Z | task-a | statistician | architecture | P-01 | lens | "
+        "a real concern |"
+    )
+    priors_table = f"{_PRIOR_HEADER_ROW}\n{_PRIOR_SEPARATOR_ROW}\n{prior_row}\n"
+    classification_table = (
+        f"{_CLASSIFICATION_HEADER_ROW}\n{_CLASSIFICATION_SEPARATOR_ROW}\n"  # zero data rows
+    )
+
+    ledger_rows = parse_ledger_table_rows(ledger_table)
+    prior_rows = parse_prior_table_rows(priors_table)
+    classification_rows = parse_classification_table_rows(classification_table)
+    failures = check_every_challenge_is_classified(
+        ledger_rows, classification_rows, prior_rows, SEAL_BOUNDARY
+    )
+
+    assert len(failures) == 1, f"expected exactly one failure; got: {failures}"
+    assert "'CH-01'" in failures[0]
+
+
+def test_flags_a_matched_classification_naming_an_absent_prior() -> None:
+    """Canary: a `matched` classification's `matched-prior-id` must resolve
+    to a Sealed Priors row of the same triple."""
+    prior_row = (
+        "| 2026-07-31T02:00:00Z | task-a | statistician | architecture | P-01 | lens | "
+        "a real concern |"
+    )
+    priors_table = f"{_PRIOR_HEADER_ROW}\n{_PRIOR_SEPARATOR_ROW}\n{prior_row}\n"
+    classification_row = (
+        "| 2026-08-01T12:05:00Z | task-a | statistician | architecture | CH-01 | matched | "
+        "P-09 | 0123456789abcdef0123456789abcdef01234567 |"
+    )
+    classification_table = (
+        f"{_CLASSIFICATION_HEADER_ROW}\n{_CLASSIFICATION_SEPARATOR_ROW}\n{classification_row}\n"
+    )
+
+    prior_rows = parse_prior_table_rows(priors_table)
+    classification_rows = parse_classification_table_rows(classification_table)
+    failures = check_every_challenge_is_classified(
+        [], classification_rows, prior_rows, SEAL_BOUNDARY
+    )
+
+    assert len(failures) == 1, f"expected exactly one failure; got: {failures}"
+    assert "'P-09'" in failures[0]
+
+
+def test_flags_a_novel_classification_carrying_a_matched_prior_id() -> None:
+    """Canary: a `novel` classification must carry an empty `matched-prior-id`."""
+    prior_row = (
+        "| 2026-07-31T02:00:00Z | task-a | statistician | architecture | P-01 | lens | "
+        "a real concern |"
+    )
+    priors_table = f"{_PRIOR_HEADER_ROW}\n{_PRIOR_SEPARATOR_ROW}\n{prior_row}\n"
+    classification_row = (
+        "| 2026-08-01T12:05:00Z | task-a | statistician | architecture | CH-01 | novel | "
+        "P-01 | 0123456789abcdef0123456789abcdef01234567 |"
+    )
+    classification_table = (
+        f"{_CLASSIFICATION_HEADER_ROW}\n{_CLASSIFICATION_SEPARATOR_ROW}\n{classification_row}\n"
+    )
+
+    prior_rows = parse_prior_table_rows(priors_table)
+    classification_rows = parse_classification_table_rows(classification_table)
+    failures = check_every_challenge_is_classified(
+        [], classification_rows, prior_rows, SEAL_BOUNDARY
+    )
+
+    assert len(failures) == 1, f"expected exactly one failure; got: {failures}"
+
+
+def test_flags_seal_witness_values_disagreeing_within_one_consult() -> None:
+    """Canary: `seal-witness` must agree across every classification row of
+    one triple -- disagreement means the fragment was fabricated or the
+    triple keys collided."""
+    rows = [
+        "| 2026-08-01T12:05:00Z | task-a | statistician | architecture | CH-01 | novel | "
+        " | aaaaaaa |",
+        "| 2026-08-01T12:06:00Z | task-a | statistician | architecture | CH-02 | novel | "
+        " | bbbbbbb |",
+    ]
+    classification_table = (
+        f"{_CLASSIFICATION_HEADER_ROW}\n{_CLASSIFICATION_SEPARATOR_ROW}\n" + "\n".join(rows) + "\n"
+    )
+
+    classification_rows = parse_classification_table_rows(classification_table)
+    failures = check_every_challenge_is_classified([], classification_rows, [], SEAL_BOUNDARY)
+
+    assert len(failures) == 1, f"expected exactly one failure; got: {failures}"
+    assert "aaaaaaa" in failures[0]
+    assert "bbbbbbb" in failures[0]
+
+
+def test_flags_a_prior_row_with_an_unescaped_pipe_inflating_the_column_count() -> None:
+    """Canary: an unescaped pipe in the `concern` cell inflates the column
+    count past seven -- the same defect class as the ledger's eleven-column
+    check."""
+    bad_row = (
+        "| 2026-07-31T02:00:00Z | task-a | statistician | architecture | P-01 | lens | "
+        "a concern with an unescaped | pipe |"
+    )
+    table = f"{_PRIOR_HEADER_ROW}\n{_PRIOR_SEPARATOR_ROW}\n{bad_row}\n"
+    rows = parse_prior_table_rows(table)
+    failures = check_prior_row_has_seven_columns(rows)
+
+    assert len(failures) == 1, f"expected exactly one failure; got: {failures}"
+    assert "got 8" in failures[0], f"expected the row to report 8 cells; got: {failures}"
+
+
+def test_flags_a_classification_row_with_an_unescaped_pipe_inflating_the_column_count() -> None:
+    """Canary: an unescaped pipe inflates a classification row past eight cells.
+
+    Added by the orchestrator during verification, not by the plan: neutering
+    each of the six checks in turn showed that
+    `check_classification_row_has_eight_columns` was the one check whose
+    canaries did not exist -- zero tests went red when it was stubbed. The gate
+    specification listed the check but omitted its canary, and
+    `test_gate_canary_coverage.py` could not catch that because it asks whether
+    a *file* contains a canary, not whether each *check* has one.
+    """
+    bad_row = (
+        "| 2026-08-01T12:00:00Z | task-a | statistician | architecture | CH-01 | matched | "
+        "P-01 | 0123456789abcdef0123456789abcdef01234567 | trailing | cell |"
+    )
+    table = f"{_CLASSIFICATION_HEADER_ROW}\n{_CLASSIFICATION_SEPARATOR_ROW}\n{bad_row}\n"
+    rows = parse_classification_table_rows(table)
+    failures = check_classification_row_has_eight_columns(rows)
+
+    assert len(failures) == 1, f"expected exactly one failure; got: {failures}"
+    assert "got 10" in failures[0], f"expected the row to report 10 cells; got: {failures}"
+
+
+def test_flags_the_seal_boundary_header_missing_from_the_priors_file() -> None:
+    """Canary: a priors file with no `**Series begins**:` header line is
+    flagged -- the gate's file-absent-or-header-absent case must fail, not
+    pass silently."""
+    priors_text = (
+        f"# Consultation Prior Register\n\n{_PRIOR_HEADER_ROW}\n{_PRIOR_SEPARATOR_ROW}\n\n"
+        f"{_CLASSIFICATION_HEADER_ROW}\n{_CLASSIFICATION_SEPARATOR_ROW}\n"
+    )
+    result = check_seal_boundary_matches_gate_constant(priors_text)
+    assert result is not None, (
+        "check_seal_boundary_matches_gate_constant must flag a priors file with no "
+        "'**Series begins**:' header line; got None"
+    )
+
+
+def test_flags_a_fragment_witness_disagreeing_with_the_recorded_seal_witness() -> None:
+    """Canary: the consultant fragment's `**Round-0 HEAD:**` sha must equal
+    the recorded seal-witness exactly (G5, the live-window independence
+    check)."""
+    fragment_text = (
+        "**Discipline:** statistician\n**Round-0 HEAD:** deadbeefdeadbeefdeadbeefdeadbeefdeadbeef\n"
+    )
+    recorded_seal_witness = "0123456789abcdef0123456789abcdef01234567"
+
+    result = check_fragment_witness_agrees(fragment_text, recorded_seal_witness)
+
+    assert result is not None, (
+        "check_fragment_witness_agrees must flag a fragment witness that disagrees "
+        "with the recorded seal-witness; got None"
+    )
+    assert "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef" in result
+    assert "0123456789abcdef0123456789abcdef01234567" in result
+
+
+# ---------------------------------------------------------------------------
+# Non-firing controls: prove the gate does not over-fire.
+# ---------------------------------------------------------------------------
+
+
+def test_accepts_a_pre_boundary_consult_with_no_sealed_prior() -> None:
+    """Happy path: a pre-boundary ledger consult with zero matching Sealed
+    Priors rows is exempt -- the pre-adoption consults must not turn the
+    gate red. This is AC-01's mechanism, and it is why no skip-list is
+    needed."""
+    ledger_row = (
+        "| 2026-07-31T02:30:00Z | task-a | statistician | architecture | CH-01 | "
+        "a claim | a decision | switch-now | dec-309 | opus | high-stakes |"
+    )
+    ledger_table = f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n{ledger_row}\n"
+    priors_table = f"{_PRIOR_HEADER_ROW}\n{_PRIOR_SEPARATOR_ROW}\n"
+
+    ledger_rows = parse_ledger_table_rows(ledger_table)
+    prior_rows = parse_prior_table_rows(priors_table)
+    failures = check_every_post_boundary_consult_has_a_sealed_prior(
+        ledger_rows, prior_rows, SEAL_BOUNDARY
+    )
+    assert not failures, f"expected no failures for a pre-boundary consult; got: {failures}"
+
+
+def test_accepts_a_none_only_seal_as_a_valid_declaration() -> None:
+    """Happy path: a single NONE row with a substantive concern cell is a
+    valid seal, and a matching novel classification is accepted."""
+    ledger_row = (
+        "| 2026-08-01T12:00:00Z | task-a | statistician | architecture | CH-01 | "
+        "a claim | a decision | switch-now | dec-999 | opus | standard |"
+    )
+    ledger_table = f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n{ledger_row}\n"
+    prior_row = (
+        "| 2026-07-31T02:00:00Z | task-a | statistician | architecture | NONE | lens | "
+        "lens pass over the bound skill surfaced no concerns about the draft |"
+    )
+    priors_table = f"{_PRIOR_HEADER_ROW}\n{_PRIOR_SEPARATOR_ROW}\n{prior_row}\n"
+    classification_row = (
+        "| 2026-08-01T12:05:00Z | task-a | statistician | architecture | CH-01 | novel | "
+        " | 0123456789abcdef0123456789abcdef01234567 |"
+    )
+    classification_table = (
+        f"{_CLASSIFICATION_HEADER_ROW}\n{_CLASSIFICATION_SEPARATOR_ROW}\n{classification_row}\n"
+    )
+
+    ledger_rows = parse_ledger_table_rows(ledger_table)
+    prior_rows = parse_prior_table_rows(priors_table)
+    classification_rows = parse_classification_table_rows(classification_table)
+
+    prior_failures = check_every_post_boundary_consult_has_a_sealed_prior(
+        ledger_rows, prior_rows, SEAL_BOUNDARY
+    )
+    classification_failures = check_every_challenge_is_classified(
+        ledger_rows, classification_rows, prior_rows, SEAL_BOUNDARY
+    )
+    assert not prior_failures, f"expected no prior failures; got: {prior_failures}"
+    assert (
+        not classification_failures
+    ), f"expected no classification failures; got: {classification_failures}"
+
+
+def test_accepts_a_superseded_challenge_with_one_classification_row() -> None:
+    """Happy path: a Round-3 loop-back re-spawn's re-dispositioned challenge
+    (two ledger rows, same triple + challenge-id) still needs exactly one
+    classification row -- >=1 satisfies the gate, no double-counting."""
+    ledger_rows_text = [
+        "| 2026-08-01T12:00:00Z | task-a | statistician | architecture | CH-01 | "
+        "a claim | a decision | defer-with-rationale | dec-1 | opus | standard |",
+        "| 2026-08-01T14:00:00Z | task-a | statistician | architecture | CH-01 | "
+        "a claim | a decision | switch-now | dec-999 | opus | standard |",
+    ]
+    ledger_table = (
+        f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n" + "\n".join(ledger_rows_text) + "\n"
+    )
+    classification_row = (
+        "| 2026-08-01T14:05:00Z | task-a | statistician | architecture | CH-01 | novel | "
+        " | 0123456789abcdef0123456789abcdef01234567 |"
+    )
+    classification_table = (
+        f"{_CLASSIFICATION_HEADER_ROW}\n{_CLASSIFICATION_SEPARATOR_ROW}\n{classification_row}\n"
+    )
+
+    ledger_rows = parse_ledger_table_rows(ledger_table)
+    classification_rows = parse_classification_table_rows(classification_table)
+    failures = check_every_challenge_is_classified(
+        ledger_rows, classification_rows, [], SEAL_BOUNDARY
+    )
+    assert not failures, f"expected no failures for a superseded challenge; got: {failures}"
+
+
+# ---------------------------------------------------------------------------
+# Real-file tests -- stated separately from the canaries, on purpose.
+# ---------------------------------------------------------------------------
+
+
+def test_every_post_boundary_consult_in_the_real_ledger_has_a_sealed_prior(
+    project_root: Path,
+) -> None:
+    """The coverage gate, exercised against the shipped ledger and the real
+    .ai-state/CONSULT_PRIORS.md. Skips only when the priors file is absent
+    AND the ledger carries no post-boundary consult yet; fails when a
+    post-boundary consult exists and the file is absent."""
+    ledger_path = _require_file(
+        project_root / ".ai-state" / "CONSULT_LEDGER.md", "disposition ledger"
+    )
+    ledger_rows = parse_ledger_table_rows(ledger_path.read_text(encoding="utf-8"))
+
+    priors_path = project_root / ".ai-state" / "CONSULT_PRIORS.md"
+    priors_text = priors_path.read_text(encoding="utf-8") if priors_path.is_file() else ""
+    prior_rows = parse_prior_table_rows(priors_text) if priors_text else []
+
+    ledger_index = {field: pos for pos, field in enumerate(LEDGER_ROW_FIELDS)}
+    has_post_boundary_consult = any(
+        _TIMESTAMP_RE.match(row[ledger_index["timestamp"]])
+        and row[ledger_index["timestamp"]] >= SEAL_BOUNDARY
+        for row in ledger_rows
+    )
+    if not priors_path.is_file() and not has_post_boundary_consult:
+        pytest.skip("CONSULT_PRIORS.md absent and no post-boundary consult exists yet")
+
+    failures = check_every_post_boundary_consult_has_a_sealed_prior(
+        ledger_rows, prior_rows, SEAL_BOUNDARY
+    )
+    assert not failures, "Post-boundary consult(s) missing a sealed prior:\n  " + "\n  ".join(
+        failures
+    )
+
+
+def test_every_post_boundary_challenge_in_the_real_ledger_is_classified(
+    project_root: Path,
+) -> None:
+    """The classification-coverage gate, exercised against the shipped
+    ledger and the real .ai-state/CONSULT_PRIORS.md. Same skip/fail rule as
+    the sealed-prior coverage test above, over G4."""
+    ledger_path = _require_file(
+        project_root / ".ai-state" / "CONSULT_LEDGER.md", "disposition ledger"
+    )
+    ledger_rows = parse_ledger_table_rows(ledger_path.read_text(encoding="utf-8"))
+
+    priors_path = project_root / ".ai-state" / "CONSULT_PRIORS.md"
+    priors_text = priors_path.read_text(encoding="utf-8") if priors_path.is_file() else ""
+    prior_rows = parse_prior_table_rows(priors_text) if priors_text else []
+    classification_rows = parse_classification_table_rows(priors_text) if priors_text else []
+
+    ledger_index = {field: pos for pos, field in enumerate(LEDGER_ROW_FIELDS)}
+    has_post_boundary_consult = any(
+        _TIMESTAMP_RE.match(row[ledger_index["timestamp"]])
+        and row[ledger_index["timestamp"]] >= SEAL_BOUNDARY
+        for row in ledger_rows
+    )
+    if not priors_path.is_file() and not has_post_boundary_consult:
+        pytest.skip("CONSULT_PRIORS.md absent and no post-boundary consult exists yet")
+
+    failures = check_every_challenge_is_classified(
+        ledger_rows, classification_rows, prior_rows, SEAL_BOUNDARY
+    )
+    assert not failures, "Post-boundary challenge(s) missing a classification:\n  " + "\n  ".join(
+        failures
+    )
+
+
+def test_the_real_priors_series_boundary_matches_the_gate_constant(project_root: Path) -> None:
+    """The series-boundary invariant, exercised against the real, shipped
+    .ai-state/CONSULT_PRIORS.md (skips cleanly if the file does not exist yet)."""
+    priors_path = project_root / ".ai-state" / "CONSULT_PRIORS.md"
+    if not priors_path.is_file():
+        pytest.skip("CONSULT_PRIORS.md does not exist yet")
+    result = check_seal_boundary_matches_gate_constant(priors_path.read_text(encoding="utf-8"))
+    assert result is None, result
+
+
+def test_no_data_row_outside_the_priors_tables(project_root: Path) -> None:
+    """The real, shipped .ai-state/CONSULT_PRIORS.md carries no stray data
+    row outside either parsed table (skips cleanly if the file does not
+    exist yet). check_no_data_row_outside_table compares a whole-file count
+    of timestamp-shaped lines against the parsed rows, so passing the
+    concatenation of both tables' rows is correct for a two-table file --
+    this is td-079's trap, now guarded here too."""
+    priors_path = project_root / ".ai-state" / "CONSULT_PRIORS.md"
+    if not priors_path.is_file():
+        pytest.skip("CONSULT_PRIORS.md does not exist yet")
+    text = priors_path.read_text(encoding="utf-8")
+    prior_rows = parse_prior_table_rows(text)
+    classification_rows = parse_classification_table_rows(text)
+    result = check_no_data_row_outside_table(text, prior_rows + classification_rows)
+    assert result is None, result
+
+
+def test_every_real_prior_row_has_exactly_seven_columns(project_root: Path) -> None:
+    """The row-shape invariant, exercised against the real, shipped
+    .ai-state/CONSULT_PRIORS.md (skips cleanly if the file does not exist yet)."""
+    priors_path = project_root / ".ai-state" / "CONSULT_PRIORS.md"
+    if not priors_path.is_file():
+        pytest.skip("CONSULT_PRIORS.md does not exist yet")
+    rows = parse_prior_table_rows(priors_path.read_text(encoding="utf-8"))
+    failures = check_prior_row_has_seven_columns(rows)
+    assert not failures, "Sealed Priors row shape violations:\n  " + "\n  ".join(failures)
+
+
+def test_every_real_classification_row_has_exactly_eight_columns(project_root: Path) -> None:
+    """The row-shape invariant for the classification table, exercised
+    against the real, shipped .ai-state/CONSULT_PRIORS.md (skips cleanly if
+    the file does not exist yet)."""
+    priors_path = project_root / ".ai-state" / "CONSULT_PRIORS.md"
+    if not priors_path.is_file():
+        pytest.skip("CONSULT_PRIORS.md does not exist yet")
+    rows = parse_classification_table_rows(priors_path.read_text(encoding="utf-8"))
+    failures = check_classification_row_has_eight_columns(rows)
+    assert not failures, "Challenge Classification row shape violations:\n  " + "\n  ".join(
+        failures
+    )
+
+
+def _post_boundary_triples_from_real_ledger(project_root: Path) -> list[tuple[str, str, str]]:
+    """The distinct (task-slug, discipline, stage) triples in the real
+    ledger whose timestamp is >= SEAL_BOUNDARY. Shared by the two
+    git-dependent real-file tests below."""
+    ledger_path = _require_file(
+        project_root / ".ai-state" / "CONSULT_LEDGER.md", "disposition ledger"
+    )
+    ledger_rows = parse_ledger_table_rows(ledger_path.read_text(encoding="utf-8"))
+    ledger_index = {field: pos for pos, field in enumerate(LEDGER_ROW_FIELDS)}
+    triples: list[tuple[str, str, str]] = []
+    for row in ledger_rows:
+        timestamp = row[ledger_index["timestamp"]]
+        if not _TIMESTAMP_RE.match(timestamp) or timestamp < SEAL_BOUNDARY:
+            continue
+        triple = (
+            row[ledger_index["task-slug"]],
+            row[ledger_index["discipline"]],
+            row[ledger_index["stage"]],
+        )
+        if triple not in triples:
+            triples.append(triple)
+    return triples
+
+
+def test_the_witness_commit_contains_the_sealed_prior_rows(project_root: Path) -> None:
+    """For each post-boundary triple, resolve its recorded seal-witness sha
+    and assert `git show <sha>:.ai-state/CONSULT_PRIORS.md` contains that
+    triple's Sealed Priors row. Skips with a named reason -- naming the sha
+    and why -- when the sha does not resolve to a reachable commit (a
+    shallow clone, or a squash-merged branch)."""
+    triples = _post_boundary_triples_from_real_ledger(project_root)
+    if not triples:
+        pytest.skip("no post-boundary consult exists yet")
+
+    priors_path = project_root / ".ai-state" / "CONSULT_PRIORS.md"
+    if not priors_path.is_file():
+        pytest.skip("CONSULT_PRIORS.md does not exist yet")
+    classification_rows = parse_classification_table_rows(priors_path.read_text(encoding="utf-8"))
+    classification_index = {field: pos for pos, field in enumerate(CLASSIFICATION_ROW_FIELDS)}
+
+    checked_any = False
+    for triple in triples:
+        matching = [
+            row
+            for row in classification_rows
+            if (
+                row[classification_index["task-slug"]],
+                row[classification_index["discipline"]],
+                row[classification_index["stage"]],
+            )
+            == triple
+        ]
+        if not matching:
+            continue
+        seal_witness = matching[0][classification_index["seal-witness"]]
+
+        reachable = subprocess.run(
+            ["git", "cat-file", "-e", f"{seal_witness}^{{commit}}"],
+            cwd=project_root,
+            capture_output=True,
+            check=False,
+        )
+        if reachable.returncode != 0:
+            pytest.skip(
+                f"seal-witness {seal_witness!r} for {triple!r} does not resolve to a "
+                "reachable commit (shallow clone, or the branch was squash-merged)"
+            )
+
+        show = subprocess.run(
+            ["git", "show", f"{seal_witness}:.ai-state/CONSULT_PRIORS.md"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert (
+            show.returncode == 0
+        ), f"git show {seal_witness}:.ai-state/CONSULT_PRIORS.md failed: {show.stderr}"
+        task_slug, discipline, stage = triple
+        contains_triple = (
+            task_slug in show.stdout and discipline in show.stdout and stage in show.stdout
+        )
+        assert (
+            contains_triple
+        ), f"witness commit {seal_witness!r} does not contain a Sealed Priors row for {triple!r}"
+        checked_any = True
+
+    if not checked_any:
+        pytest.skip("no post-boundary triple has a recorded seal-witness yet")
+
+
+def test_the_live_fragment_witness_agrees_with_the_recorded_seal_witness(
+    project_root: Path,
+) -> None:
+    """For each post-boundary triple, if the consultant's ephemeral
+    .ai-work/<task-slug>/CONSULT_<discipline>.md fragment still exists and
+    carries a `**Round-0 HEAD:**` line, apply G5. Skips, naming the absent
+    fragment -- the fragment is deleted at pipeline cleanup, so this check
+    only bites in the live window."""
+    triples = _post_boundary_triples_from_real_ledger(project_root)
+    if not triples:
+        pytest.skip("no post-boundary consult exists yet")
+
+    priors_path = project_root / ".ai-state" / "CONSULT_PRIORS.md"
+    if not priors_path.is_file():
+        pytest.skip("CONSULT_PRIORS.md does not exist yet")
+    classification_rows = parse_classification_table_rows(priors_path.read_text(encoding="utf-8"))
+    classification_index = {field: pos for pos, field in enumerate(CLASSIFICATION_ROW_FIELDS)}
+
+    checked_any = False
+    for task_slug, discipline, stage in triples:
+        fragment_path = project_root / ".ai-work" / task_slug / f"CONSULT_{discipline}.md"
+        if not fragment_path.is_file():
+            pytest.skip(f"fragment {fragment_path} does not exist (past the live window)")
+        fragment_text = fragment_path.read_text(encoding="utf-8")
+        if "**Round-0 HEAD:**" not in fragment_text:
+            pytest.skip(f"fragment {fragment_path} carries no '**Round-0 HEAD:**' line")
+
+        matching = [
+            row
+            for row in classification_rows
+            if (
+                row[classification_index["task-slug"]],
+                row[classification_index["discipline"]],
+                row[classification_index["stage"]],
+            )
+            == (task_slug, discipline, stage)
+        ]
+        if not matching:
+            continue
+        seal_witness = matching[0][classification_index["seal-witness"]]
+        result = check_fragment_witness_agrees(fragment_text, seal_witness)
+        assert result is None, result
+        checked_any = True
+
+    if not checked_any:
+        pytest.skip("no post-boundary triple has a live fragment to check yet")

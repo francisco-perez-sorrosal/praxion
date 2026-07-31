@@ -1533,6 +1533,37 @@ class TestWidenedCrossReferenceScope:
         assert new in text
         assert old not in text
 
+    def test_rewrites_consult_priors(self, repo_root: Path) -> None:
+        """The sealed prior-list register cites the ADR that defines its schema,
+        so it must be in scope.
+
+        Regression: this is the **third** occurrence of the same defect the
+        sibling ledger and cost-series tests record. `CONSULT_LEDGER.md` was
+        added to the named-persistent-files list only after it left a dangling
+        draft id; `CONSULT_COSTS.md` was created later and inherited the
+        omission, leaving `dec-draft-6a94ce05` in a committed file after its
+        ADR finalized to `dec-308`. `CONSULT_PRIORS.md` would have repeated the
+        identical omission a third time had it not been added to the allowlist
+        in the same commit that created the file. The allowlist's computed
+        scope must be re-checked whenever a new `.ai-state/` file is given a
+        documented ADR reference.
+        """
+        old, new = "dec-draft-c0ffee33", "dec-310"
+        priors = repo_root / ".ai-state" / "CONSULT_PRIORS.md"
+        priors.parent.mkdir(parents=True, exist_ok=True)
+        priors.write_text(
+            f"<!-- Schema and rationale: {old}. -->\n"
+            "| ts | slug | statistician | architecture | P-01 | lens | a concern |\n",
+            encoding="utf-8",
+        )
+
+        modified = finalize.rewrite_cross_references(repo_root, old, new)
+
+        assert modified == 1
+        text = priors.read_text(encoding="utf-8")
+        assert new in text
+        assert old not in text
+
     def test_rewrites_spec_despite_separator_mismatch(self, repo_root: Path) -> None:
         """Spec filenames use underscores; task slugs are kebab-case.
 

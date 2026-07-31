@@ -891,6 +891,32 @@ the praxion users," this is a genuine gap along a *different* extensibility axis
 for **users**, not for Praxion. Deferred deliberately rather than resolved at planning stage, with the
 concrete path recorded — a project-local overlay consulted before the shipped registry.
 
+**Wave-2 update (2026-07-31): the spike was redesigned but not run.** `dec-305` designed the overlay;
+its load-bearing half — a project binding *its own* skill to a project-local discipline — stayed
+unproven, and a consult found the Wave-1 probe would not have licensed the decision because that probe
+used a **project-scope agent** while the consultant is a **plugin subagent**, so a PASS would not
+transfer. Wave 2 redesigned it. Four findings are recorded here so the design survives `.ai-work/`
+cleanup:
+
+1. **The gap is narrower than framed.** Plugin subagent → *plugin*-scope skill already works and is
+   verified in the installed cache. The single open cell is **plugin subagent × project-scope skill**.
+2. **The registry-union half is not gated at all.** A subagent inherits the session cwd, so reading a
+   project-local overlay file needs no new mechanism. Only `binds-to` naming a *project* skill is
+   unproven.
+3. **No release is required to run it.** `claude --plugin-dir ./my-plugin` loads a plugin directly
+   without installation, and `/plugin marketplace add ./my-marketplace` works from a local directory.
+   A throwaway plugin therefore yields a genuine plugin subagent at zero cost to Praxion's release
+   train — which removes the reason the spike kept being postponed.
+4. **The self-hosting trap is avoided structurally**, by running outside Praxion so no `i-am` copy
+   participates. Note the cache's `gitCommitSha` in `installed_plugins.json` is **wrong** here (a
+   `0.7.1`-era sha recorded against a `0.18.0` install), so any precondition check must `diff` trees,
+   never compare shas.
+
+Not run this wave: a spike executed poorly is worse than none — that is the entire lesson of the
+Wave-1 attempt this redesign replaces. It is ready to run and is the prerequisite for `td-064`, which
+the roster decision (`dec-draft-3d84b767`) made more load-bearing by naming `data-steward` as the
+discipline whose decision surface most plausibly lives in a managed project rather than in Praxion.
+
 ### 17.7 Step 1 spike outcome — mechanism 1 CONFIRMED after a two-round probe
 
 Run 2026-07-30. Step 1 was ordered first precisely so the binding assumption could be falsified

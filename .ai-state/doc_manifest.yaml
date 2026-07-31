@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-07-31T00:30:09Z'
+generated_at: '2026-07-31T04:02:01Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -139,7 +139,7 @@ surfaces:
   path: docs/claude-code-limitations.md
   type: markdown
   title: Known Claude Code Limitations
-  last_modified: '2026-05-22'
+  last_modified: '2026-07-30'
   renderer: default_markdown
 - id: docs-claude-ecosystem-learning-resources
   path: docs/claude-ecosystem-learning-resources.md
@@ -2392,6 +2392,24 @@ surfaces:
   title: 306-lens-vs-consultant-criterion.md
   last_modified: '2026-07-30'
   renderer: adr_card
+- id: ai-state-decisions-307-strip-inert-plugin-agent-frontmatter
+  path: .ai-state/decisions/307-strip-inert-plugin-agent-frontmatter.md
+  type: markdown
+  title: Strip inert plugin-subagent frontmatter fleet-wide; no compensating permissions.allow
+  last_modified: '2026-07-30'
+  renderer: adr_card
+- id: ai-state-decisions-308-consult-cost-series
+  path: .ai-state/decisions/308-consult-cost-series.md
+  type: markdown
+  title: Per-consult cost series lives in a sibling append-only side-record, not a twelfth ledger column
+  last_modified: '2026-07-30'
+  renderer: adr_card
+- id: ai-state-decisions-309-roster-ship-zero
+  path: .ai-state/decisions/309-roster-ship-zero.md
+  type: markdown
+  title: 309-roster-ship-zero.md
+  last_modified: '2026-07-30'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -2977,6 +2995,9 @@ groups:
   - ai-state-decisions-304-consult-expansion-criterion-revision
   - ai-state-decisions-305-project-local-discipline-registry-overlay
   - ai-state-decisions-306-lens-vs-consultant-criterion
+  - ai-state-decisions-307-strip-inert-plugin-agent-frontmatter
+  - ai-state-decisions-308-consult-cost-series
+  - ai-state-decisions-309-roster-ship-zero
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

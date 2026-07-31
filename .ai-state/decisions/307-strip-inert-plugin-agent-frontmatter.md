@@ -1,7 +1,7 @@
 ---
-id: dec-draft-5fbed7fd
+id: dec-307
 title: Strip inert plugin-subagent frontmatter fleet-wide; no compensating permissions.allow
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-30
 summary: Remove permissionMode/hooks/mcpServers from all 17 plugin-registered agents, guard against re-introduction, and decline any compensating session-wide permissions.allow grant in Praxion or onboarding.

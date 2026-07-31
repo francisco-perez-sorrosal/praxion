@@ -306,7 +306,7 @@ that calibrates the `fires-when` predicates that decide future convening.
    touches the ledger, so there is no write race under concurrent instances. The convener also appends **one
    row per consult** to the sibling `.ai-state/CONSULT_COSTS.md` at this same moment — grain differs (cost is a
    property of the consult, not of the challenge), which is why it is a sibling file rather than a twelfth
-   ledger column (`dec-draft-6a94ce05`).
+   ledger column (`dec-308`).
 5. **Round 3 — reconcile, then stop.** `switch-now` challenges land in the architecture and in the ADR's
    `## Disconfirmation` block / `dissent:` frontmatter — a statistician's objection becoming a *recorded falsifier*
    is exactly what that field is for. `defer-with-rationale` challenges carrying residual risk flow through the

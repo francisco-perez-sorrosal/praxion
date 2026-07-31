@@ -22,6 +22,7 @@ affected_reqs:
 dissent: The ledger measures the architect's own judgment of the consultant's value, and a removal-based-attribution study shows introspective LLM judges fail to faithfully approximate ablation ground truth — so a low dismiss rate may record an agreeable architect rather than a useful consultant, and shipping this particular instrument as the initiative's falsifier risks certifying the mechanism with a measurement the same literature says is unfaithful.
 re_affirmed_by:
   - dec-304
+  - dec-308
 ---
 
 ## Context

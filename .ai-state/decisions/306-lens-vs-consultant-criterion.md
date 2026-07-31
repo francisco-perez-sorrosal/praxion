@@ -17,6 +17,8 @@ affected_files:
   - skills/evidence-appraisal/SKILL.md
   - docs/multidisciplinary-identities-evidence.md
 dissent: The criterion is stated crisply but rests on a distinction that will blur in practice — "does the error surface through normal feedback" is itself a judgement call, and a motivated author can classify almost any domain either way to get the answer they want. Worse, it may be self-serving: it justifies exactly the one discipline already shipped and rules out the one a user proposed, which is the shape of a criterion reverse-engineered from a conclusion. A simpler and less gameable rule — no consultant for any domain that already owns a lens — would have reached the same outcome on performance without inventing a new axis, and would not have needed a second discipline to be selected in the same breath to demonstrate that the axis discriminates.
+re_affirmed_by:
+  - dec-309
 ---
 
 ## Context

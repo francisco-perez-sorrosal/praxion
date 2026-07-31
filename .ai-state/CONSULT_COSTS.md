@@ -6,7 +6,7 @@
      consult's CONSULT_LEDGER.md rows. The consultant never writes this file.
      Sibling of .ai-state/CONSULT_LEDGER.md, deliberately separate: the ledger's
      grain is one row per dispositioned challenge, and cost is a property of the
-     consult, not of the challenge. Schema and rationale: dec-draft-6a94ce05. -->
+     consult, not of the challenge. Schema and rationale: dec-308. -->
 
 **Schema**: 8 columns, one row per consult spawn. See Column Definitions below.
 

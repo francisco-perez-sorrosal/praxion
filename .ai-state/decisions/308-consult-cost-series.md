@@ -1,7 +1,7 @@
 ---
-id: dec-draft-6a94ce05
+id: dec-308
 title: Per-consult cost series lives in a sibling append-only side-record, not a twelfth ledger column
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-31
 summary: td-071 resolved by .ai-state/CONSULT_COSTS.md -- one row per consult (tokens + model + difficulty), single-writer convener, append-only, with a cross-file fitness gate that fails when a post-boundary consult has no cost row.

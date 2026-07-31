@@ -1505,6 +1505,34 @@ class TestWidenedCrossReferenceScope:
         assert new in text
         assert old not in text
 
+    def test_rewrites_consult_costs(self, repo_root: Path) -> None:
+        """The per-consult cost series cites the ADR that defines its schema, so
+        it must be in scope.
+
+        Regression: this is the second occurrence of the same defect the sibling
+        ledger test records. `CONSULT_LEDGER.md` was added to the named-persistent
+        -files list after it left a dangling draft id; `CONSULT_COSTS.md` was
+        created later and inherited the omission, leaving `dec-draft-6a94ce05` in
+        a committed file after its ADR finalized to `dec-308`. The allowlist's
+        computed scope must be re-checked whenever a new `.ai-state/` file is
+        given a documented ADR reference.
+        """
+        old, new = "dec-draft-c0ffee22", "dec-308"
+        costs = repo_root / ".ai-state" / "CONSULT_COSTS.md"
+        costs.parent.mkdir(parents=True, exist_ok=True)
+        costs.write_text(
+            f"<!-- Schema and rationale: {old}. -->\n"
+            "| ts | slug | statistician | architecture | 1000 | opus | standard | n |\n",
+            encoding="utf-8",
+        )
+
+        modified = finalize.rewrite_cross_references(repo_root, old, new)
+
+        assert modified == 1
+        text = costs.read_text(encoding="utf-8")
+        assert new in text
+        assert old not in text
+
     def test_rewrites_spec_despite_separator_mismatch(self, repo_root: Path) -> None:
         """Spec filenames use underscores; task slugs are kebab-case.
 

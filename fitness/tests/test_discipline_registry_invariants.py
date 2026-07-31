@@ -2025,7 +2025,6 @@ def check_witness_priors_equal_working_priors(
     witness_prior_rows: list[list[str]],
     working_prior_rows: list[list[str]],
     triple: tuple[str, str, str],
-    witness_commit_date: str | None = None,
 ) -> str | None:
     """G6. Assert **set equality** -- not containment -- between the sealed
     priors in the witness commit and those in the working file, for `triple`.
@@ -2050,7 +2049,30 @@ def check_witness_priors_equal_working_priors(
     set by the witness commit's own date preserves the legitimate re-seal path.
     """
     sealed = _sealed_prior_identities(witness_prior_rows, triple)
-    working = _sealed_prior_identities(working_prior_rows, triple, not_after=witness_commit_date)
+
+    # A legitimate later re-seal appends rows *after* everything the witness
+    # sealed, so the scope boundary is the witness set's own latest timestamp --
+    # not the git commit date. An earlier revision compared against
+    # `git show -s --format=%cI`, which emits the committer's LOCAL offset
+    # ("...-07:00") while these rows are UTC ("...Z"). String-comparing across
+    # two offset representations is meaningless: it read a row 17 minutes older
+    # than the commit as newer, exempted every sealed prior, and reported all
+    # eight as deleted on the first real run. Deriving the boundary from the
+    # rows keeps both sides in one representation and removes git from the
+    # comparison entirely.
+    prior_index = {field: pos for pos, field in enumerate(PRIOR_ROW_FIELDS)}
+    sealed_timestamps = [
+        row[prior_index["timestamp"]]
+        for row in witness_prior_rows
+        if (
+            row[prior_index["task-slug"]],
+            row[prior_index["discipline"]],
+            row[prior_index["stage"]],
+        )
+        == triple
+    ]
+    not_after = max(sealed_timestamps) if sealed_timestamps else None
+    working = _sealed_prior_identities(working_prior_rows, triple, not_after=not_after)
 
     added = {identity[0] for identity in working - sealed}
     removed = {identity[0] for identity in sealed - working}
@@ -2502,33 +2524,55 @@ def test_accepts_witness_and_working_priors_that_match_exactly() -> None:
     assert check_witness_priors_equal_working_priors(rows, list(rows), _G6_TRIPLE) is None
 
 
-def test_accepts_a_later_reseal_row_scoped_out_by_the_witness_commit_date() -> None:
-    """Non-firing control: a Round-3 re-seal appends rows *after* the witness
-    commit's own date, and those must not fail the equality. Without this
-    scoping the gate would forbid a legitimate path and be disabled within a
-    wave."""
+def test_accepts_a_later_reseal_row_scoped_out_by_the_witness_own_latest_timestamp() -> None:
+    """Non-firing control: a Round-3 re-seal appends rows later than anything
+    the witness sealed, and those must not fail the equality -- otherwise the
+    gate forbids a legitimate path and gets disabled within a wave.
+
+    The boundary is the witness set's OWN latest timestamp, not the git commit
+    date; see the regression canary below for why."""
     sealed = [_prior_row("P-01", "sealed", timestamp="2026-08-01T10:00:00Z")]
     working = sealed + [_prior_row("P-09", "re-seal", timestamp="2026-08-05T10:00:00Z")]
 
-    result = check_witness_priors_equal_working_priors(
-        sealed, working, _G6_TRIPLE, witness_commit_date="2026-08-01T12:00:00Z"
-    )
-
-    assert result is None, f"a post-witness re-seal row must be scoped out; got: {result}"
+    assert check_witness_priors_equal_working_priors(sealed, working, _G6_TRIPLE) is None
 
 
-def test_flags_an_unscoped_post_witness_row_when_no_commit_date_is_supplied() -> None:
-    """Canary guarding the scoping itself: without a witness commit date the
-    later row is *not* exempt. This keeps the exemption deliberate -- a caller
-    that forgets to pass the date gets the strict comparison, not a silent
-    pass."""
+def test_accepts_identical_sets_whose_rows_postdate_the_witness_commit() -> None:
+    """Regression canary for a real failure on this gate's first live run.
+
+    The scoping boundary was originally `git show -s --format=%cI`, which emits
+    the committer's LOCAL offset (`2026-07-30T22:42:14-07:00`) while these rows
+    are UTC (`2026-07-31T05:25:00Z`). Compared as strings, `31` sorts after
+    `30`, so a row seventeen minutes OLDER than the commit read as newer, every
+    sealed prior was exempted as a "later re-seal", and the gate reported all
+    eight as deleted from a file that was byte-identical.
+
+    The bug survived a canary because that canary supplied both dates in one
+    representation. It only appeared on real input, where one side comes from
+    git and the other from a human's keyboard. Sets that are equal must pass no
+    matter what any clock says."""
+    rows = [
+        _prior_row("P-01", "one", timestamp="2026-07-31T05:25:00Z"),
+        _prior_row("P-02", "two", timestamp="2026-07-31T05:25:00Z"),
+    ]
+
+    assert check_witness_priors_equal_working_priors(rows, list(rows), _G6_TRIPLE) is None
+
+
+def test_flags_a_backdated_prior_sharing_the_witness_latest_timestamp() -> None:
+    """Canary: the re-seal exemption must not become the cheat's escape hatch.
+
+    A convener appending a prior after the fact and *backdating* it to the
+    instant the real priors carry lands inside the scope boundary, so equality
+    still catches it. Only a row strictly later than everything sealed is
+    exempt -- which is what an honest re-seal produces."""
     sealed = [_prior_row("P-01", "sealed", timestamp="2026-08-01T10:00:00Z")]
-    working = sealed + [_prior_row("P-09", "re-seal", timestamp="2026-08-05T10:00:00Z")]
+    working = sealed + [_prior_row("P-02", "backdated", timestamp="2026-08-01T10:00:00Z")]
 
     result = check_witness_priors_equal_working_priors(sealed, working, _G6_TRIPLE)
 
-    assert result is not None, "without a witness commit date the strict comparison must apply"
-    assert "P-09" in result
+    assert result is not None, "a backdated prior inside the boundary must still fail"
+    assert "P-02" in result
 
 
 # ---------------------------------------------------------------------------
@@ -2823,22 +2867,10 @@ def test_the_witness_commit_contains_the_sealed_prior_rows(project_root: Path) -
         assert (
             show.returncode == 0
         ), f"git show {seal_witness}:.ai-state/CONSULT_PRIORS.md failed: {show.stderr}"
-        commit_date = subprocess.run(
-            ["git", "show", "-s", "--format=%cI", seal_witness],
-            cwd=project_root,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        witness_commit_date = commit_date.stdout.strip() if commit_date.returncode == 0 else None
-
         witness_prior_rows = parse_prior_table_rows(show.stdout)
         working_prior_rows = parse_prior_table_rows(priors_path.read_text(encoding="utf-8"))
         failure = check_witness_priors_equal_working_priors(
-            witness_prior_rows,
-            working_prior_rows,
-            triple,
-            witness_commit_date=witness_commit_date,
+            witness_prior_rows, working_prior_rows, triple
         )
         assert failure is None, f"witness commit {seal_witness!r}: {failure}"
         checked_any = True

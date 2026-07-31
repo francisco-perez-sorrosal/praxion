@@ -42,6 +42,13 @@ the first.
 
 | timestamp | task-slug | discipline | stage | challenge-id | classification | matched-prior-id | seal-witness | prompt-areas |
 |---|---|---|---|---|---|---|---|---|
+| 2026-07-31T06:40:00Z | td-081-sealed-prior | statistician | architecture | CH-01 | novel |  | cd128039e225aab9ec504542b42b673feb44feae | 7 |
+| 2026-07-31T06:40:00Z | td-081-sealed-prior | statistician | architecture | CH-02 | novel |  | cd128039e225aab9ec504542b42b673feb44feae | 7 |
+| 2026-07-31T06:40:00Z | td-081-sealed-prior | statistician | architecture | CH-03 | matched | P-01 | cd128039e225aab9ec504542b42b673feb44feae | 7 |
+| 2026-07-31T06:40:00Z | td-081-sealed-prior | statistician | architecture | CH-04 | matched | P-02 | cd128039e225aab9ec504542b42b673feb44feae | 7 |
+| 2026-07-31T06:40:00Z | td-081-sealed-prior | statistician | architecture | CH-05 | matched | P-06 | cd128039e225aab9ec504542b42b673feb44feae | 7 |
+| 2026-07-31T06:40:00Z | td-081-sealed-prior | statistician | architecture | CH-06 | novel |  | cd128039e225aab9ec504542b42b673feb44feae | 7 |
+| 2026-07-31T06:40:00Z | td-081-sealed-prior | statistician | architecture | CH-07 | novel |  | cd128039e225aab9ec504542b42b673feb44feae | 7 |
 
 ## Column Definitions
 

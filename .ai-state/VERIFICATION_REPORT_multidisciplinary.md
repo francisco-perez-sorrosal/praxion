@@ -85,7 +85,7 @@ inject P-02 at 2026-07-31T05:00:00Z       -> "present in the working file but no
 inject P-02 at 2026-07-31T07:00:00+02:00  -> None                                                      ACCEPTED
 ```
 
-`07:00+02:00` **is** `05:00Z`. The cheat `dec-draft-2c51b2f6` §Q2 names — a convener appending a
+`07:00+02:00` **is** `05:00Z`. The cheat the sealed-prior ADR (`td-081`) names — a convener appending a
 fabricated prior after reading the challenges — evaded the check entirely.
 
 `55ae665` did not fix this class; it **moved** it, from *git-date vs row-timestamp* to *row-timestamp vs
@@ -111,7 +111,7 @@ promises twice that *"omitting it fails `test_discipline_registry_invariants.py`
 
 The `fitness-functions` job had no `with:` block, so `fetch-depth` defaulted to `1`; the seal-witness
 commit was unreachable and the test skipped. `G5` additionally needs the `.ai-work/` fragment, which is
-gitignored and never present in CI. `dec-draft-2c51b2f6` claims the cheat is caught *"by a test the
+gitignored and never present in CI. The sealed-prior ADR (`td-081`) claims the cheat is caught *"by a test the
 convener runs at Round 2 **and by CI thereafter**"* — the second half was false.
 **Fixed** (`516669e`): `fetch-depth: 0`. G5 remains inherently local-window-only; the ADR must say so.
 

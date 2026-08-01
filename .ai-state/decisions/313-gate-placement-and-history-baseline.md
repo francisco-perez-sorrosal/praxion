@@ -1,7 +1,7 @@
 ---
-id: dec-draft-0466baf3
+id: dec-313
 title: Gate placement follows input kind, and the append-only baseline is the merge-base
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-31
 summary: State-reading gates live in scripts/ (unfiltered CI), history-reading gates live in fitness/ (fetch-depth 0); the CONSULT append-only baseline is the branch merge-base, and finalize stages what it wrote.

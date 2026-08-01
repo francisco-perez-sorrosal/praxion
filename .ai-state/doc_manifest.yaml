@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-07-31T19:54:48Z'
+generated_at: '2026-08-01T00:15:11Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -123,7 +123,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-07-30'
+  last_modified: '2026-07-31'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -2416,6 +2416,36 @@ surfaces:
   title: The convener seals a lens-run prior list before spawning a consultant, and the seal is tamper-evident rather than tamper-proof
   last_modified: '2026-07-31'
   renderer: adr_card
+- id: ai-state-decisions-311-defer-project-local-overlay-unit
+  path: .ai-state/decisions/311-defer-project-local-overlay-unit.md
+  type: markdown
+  title: Defer the project-local registry overlay unit; two of its premises are falsified
+  last_modified: '2026-07-31'
+  renderer: adr_card
+- id: ai-state-decisions-312-draft-id-citation-detector
+  path: .ai-state/decisions/312-draft-id-citation-detector.md
+  type: markdown
+  title: The draft-id detector is an exact pattern plus an explicit per-line exemption, not a heuristic
+  last_modified: '2026-07-31'
+  renderer: adr_card
+- id: ai-state-decisions-313-gate-placement-and-history-baseline
+  path: .ai-state/decisions/313-gate-placement-and-history-baseline.md
+  type: markdown
+  title: Gate placement follows input kind, and the append-only baseline is the merge-base
+  last_modified: '2026-07-31'
+  renderer: adr_card
+- id: ai-state-decisions-314-per-check-canary-coverage
+  path: .ai-state/decisions/314-per-check-canary-coverage.md
+  type: markdown
+  title: Canary coverage is enforced per check via call-graph matching, additively over the file-level rule
+  last_modified: '2026-07-31'
+  renderer: adr_card
+- id: ai-state-decisions-315-release-staleness-named-consumer
+  path: .ai-state/decisions/315-release-staleness-named-consumer.md
+  type: markdown
+  title: The release-staleness advisory names the release cut as its required reader
+  last_modified: '2026-07-31'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3011,6 +3041,11 @@ groups:
   - ai-state-decisions-308-consult-cost-series
   - ai-state-decisions-309-roster-ship-zero
   - ai-state-decisions-310-sealed-consult-prior
+  - ai-state-decisions-311-defer-project-local-overlay-unit
+  - ai-state-decisions-312-draft-id-citation-detector
+  - ai-state-decisions-313-gate-placement-and-history-baseline
+  - ai-state-decisions-314-per-check-canary-coverage
+  - ai-state-decisions-315-release-staleness-named-consumer
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

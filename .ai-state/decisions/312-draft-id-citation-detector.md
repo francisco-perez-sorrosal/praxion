@@ -1,7 +1,7 @@
 ---
-id: dec-draft-a8d0f148
+id: dec-312
 title: The draft-id detector is an exact pattern plus an explicit per-line exemption, not a heuristic
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-31
 summary: Enforce the draft-ADR-id prohibition with a literal pattern and the existing per-line ignore marker, remediating every live citation first; reject lexical-shape discrimination and path allowlists.

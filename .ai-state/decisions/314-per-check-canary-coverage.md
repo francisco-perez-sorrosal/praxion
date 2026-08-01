@@ -1,7 +1,7 @@
 ---
-id: dec-draft-f9172fe4
+id: dec-314
 title: Canary coverage is enforced per check via call-graph matching, additively over the file-level rule
-status: proposed
+status: accepted
 category: architectural
 date: 2026-07-31
 summary: The canary-coverage meta-test gains an AST pass requiring each module-level check_* function to be called by a canary-named test; the file-level rule is retained unchanged, and one check equals one named function.

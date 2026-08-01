@@ -1,7 +1,7 @@
 ---
-id: dec-draft-9dfe2245
+id: dec-315
 title: The release-staleness advisory names the release cut as its required reader
-status: proposed
+status: accepted
 category: implementation
 date: 2026-07-31
 summary: Satisfy gate-liveness clause 6 for check_release_staleness.py by naming its reader and decision point in the gate's own definition, wiring it into the release command, and correcting the document its output already contradicted.

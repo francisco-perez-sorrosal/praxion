@@ -174,7 +174,7 @@ equals `dec-<NNN>` and `status` is not `proposed`; its `--staged` mode reads ind
 the defect is invisible in the working tree at the moment it is created. Placement in
 `scripts/` rather than `fitness/` is deliberate — the root pytest job carries no `paths:`
 filter, so the gate fires on a pull request touching only `finalize_adrs.py`. See
-`dec-draft-0466baf3`.
+`dec-313`.
 
 ### Tech-Debt Ledger Flow
 

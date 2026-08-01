@@ -21,6 +21,8 @@ dissent: >
   rather than merely detected, and "assert unrepresentable over detect-after-the-fact"
   is the stronger general principle; collision-as-error is chosen only because the
   prefix taxes every user forever to prevent a rare, loud, rename-fixable event.
+re_affirmed_by:
+  - dec-311
 ---
 
 # Project-local discipline registry overlay with collision-as-error precedence

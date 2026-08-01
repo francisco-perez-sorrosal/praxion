@@ -425,6 +425,38 @@ def test_detects_paths_frontmatter_absent_when_not_declared() -> None:
 # ---------------------------------------------------------------------------
 
 
+def check_consultant_agent_file_exists(consultant_path: Path) -> str | None:
+    """Return a failure string if consultant_path does not exist.
+
+    Exactly one agent file must declare the discipline-consultant role.
+    """
+    if not consultant_path.is_file():
+        return (
+            f"expected exactly one agent file declaring the discipline-consultant "
+            f"role at {consultant_path}; file does not exist"
+        )
+    return None
+
+
+def check_no_per_discipline_agent_files(agents_dir: Path, discipline_names: list[str]) -> list[str]:
+    """Return a failure string per registry discipline that has grown its own
+    dedicated `agents/<discipline>.md` file.
+
+    A registry discipline must never grow its own dedicated agent file --
+    bindings resolve at runtime through the Skill tool, never a new agent.
+    This is a distinct defect class from `check_consultant_agent_file_exists`:
+    the consultant file existing says nothing about whether some *other*,
+    per-discipline agent file has also leaked into existence.
+    """
+    return [
+        f"a registry discipline must never grow its own dedicated agent file -- "
+        f"bindings resolve at runtime through the Skill tool, never a new agent; "
+        f"found: {agents_dir / f'{discipline}.md'}"
+        for discipline in discipline_names
+        if (agents_dir / f"{discipline}.md").is_file()
+    ]
+
+
 def test_exactly_one_agent_declares_the_consultant_role(project_root: Path) -> None:
     """Exactly one agent file declares the consultant role, and no registry
     discipline has grown its own dedicated `agents/<discipline>.md` file --
@@ -432,21 +464,32 @@ def test_exactly_one_agent_declares_the_consultant_role(project_root: Path) -> N
     registry has zero rows; meaningfully checked once the first discipline
     row lands."""
     consultant_path = project_root / "agents" / "discipline-consultant.md"
-    assert consultant_path.is_file(), (
-        f"expected exactly one agent file declaring the discipline-consultant "
-        f"role at {consultant_path}; file does not exist"
-    )
+    exists_failure = check_consultant_agent_file_exists(consultant_path)
+    assert exists_failure is None, exists_failure
 
-    leaked = [
-        project_root / "agents" / f"{discipline}.md"
-        for discipline in _registry_discipline_names(project_root)
-        if (project_root / "agents" / f"{discipline}.md").is_file()
-    ]
-    assert not leaked, (
-        "a registry discipline must never grow its own dedicated agent file -- "
-        f"bindings resolve at runtime through the Skill tool, never a new agent; "
-        f"found: {[str(p) for p in leaked]}"
+    leaked_failures = check_no_per_discipline_agent_files(
+        project_root / "agents", _registry_discipline_names(project_root)
     )
+    assert not leaked_failures, "\n  ".join(leaked_failures)
+
+
+def test_flags_missing_consultant_agent_file(tmp_path: Path) -> None:
+    """Canary: check_consultant_agent_file_exists flags an absent file."""
+    result = check_consultant_agent_file_exists(tmp_path / "discipline-consultant.md")
+    assert (
+        result is not None
+    ), "check_consultant_agent_file_exists must flag a missing consultant file"
+
+
+def test_flags_a_per_discipline_agent_file(tmp_path: Path) -> None:
+    """Canary: check_no_per_discipline_agent_files flags a discipline that has
+    grown its own dedicated agent file -- the exact leak the check exists to
+    catch."""
+    (tmp_path / "statistician.md").write_text("stub", encoding="utf-8")
+    failures = check_no_per_discipline_agent_files(tmp_path, ["statistician"])
+    assert (
+        failures
+    ), "check_no_per_discipline_agent_files must flag a leaked per-discipline agent file"
 
 
 def test_consultant_description_contains_no_registry_discipline_name(project_root: Path) -> None:
@@ -532,6 +575,21 @@ def test_no_always_loaded_surface_names_a_registry_discipline(project_root: Path
     )
 
 
+def check_consultant_skills_frontmatter_is_pinned(skills: object) -> str | None:
+    """Return a failure string if skills != ['multi-perspective-analysis'].
+
+    The discipline->knowledge binding resolves at runtime via the Skill tool,
+    so skills: is fixed forever at exactly one entry -- a new discipline costs
+    0 skills: growth.
+    """
+    if skills != ["multi-perspective-analysis"]:
+        return (
+            "consultant skills: frontmatter must equal exactly "
+            f"['multi-perspective-analysis']; got {skills!r}"
+        )
+    return None
+
+
 def test_consultant_skills_frontmatter_is_fixed_to_multi_perspective_analysis(
     project_root: Path,
 ) -> None:
@@ -543,10 +601,37 @@ def test_consultant_skills_frontmatter_is_fixed_to_multi_perspective_analysis(
     )
     frontmatter = _read_frontmatter(consultant_path.read_text(encoding="utf-8"))
     skills = frontmatter.get("skills")
-    assert skills == ["multi-perspective-analysis"], (
-        "consultant skills: frontmatter must equal exactly "
-        f"['multi-perspective-analysis']; got {skills!r}"
+    result = check_consultant_skills_frontmatter_is_pinned(skills)
+    assert result is None, result
+
+
+def test_flags_consultant_skills_frontmatter_drifted_from_pinned_value() -> None:
+    """Canary: check_consultant_skills_frontmatter_is_pinned flags a skills:
+    list that has grown beyond the pinned single entry."""
+    result = check_consultant_skills_frontmatter_is_pinned(
+        ["multi-perspective-analysis", "some-other-skill"]
     )
+    assert (
+        result is not None
+    ), "check_consultant_skills_frontmatter_is_pinned must flag skills: drift"
+
+
+def check_consultant_tools_include_skill_tool(tools: list[str]) -> str | None:
+    """Return a failure string if tools is empty or omits the exact tool name
+    'Skill' (confirmed by a prior runtime probe).
+
+    The consultant needs the Skill tool to resolve a discipline's binds-to
+    skill at runtime. The remainder of the tools: set is the implementer's
+    discretion -- not pinned here.
+    """
+    if not tools:
+        return f"consultant tools: frontmatter must be non-empty; got {tools!r}"
+    if "Skill" not in tools:
+        return (
+            "consultant tools: frontmatter must include the exact tool name 'Skill' "
+            f"(confirmed by a prior runtime probe); got {tools!r}"
+        )
+    return None
 
 
 def test_consultant_tools_frontmatter_includes_the_skill_tool(project_root: Path) -> None:
@@ -562,11 +647,17 @@ def test_consultant_tools_frontmatter_includes_the_skill_tool(project_root: Path
     frontmatter = _read_frontmatter(consultant_path.read_text(encoding="utf-8"))
     raw_tools = frontmatter.get("tools", "")
     tools = _split_comma_list(raw_tools) if isinstance(raw_tools, str) else list(raw_tools or [])
-    assert tools, f"consultant tools: frontmatter must be non-empty; got {raw_tools!r}"
-    assert "Skill" in tools, (
-        "consultant tools: frontmatter must include the exact tool name 'Skill' "
-        f"(confirmed by a prior runtime probe); got {tools!r}"
-    )
+    result = check_consultant_tools_include_skill_tool(tools)
+    assert result is None, result
+
+
+def test_flags_consultant_tools_frontmatter_missing_the_skill_tool() -> None:
+    """Canary: check_consultant_tools_include_skill_tool flags a tools: list
+    that omits the required 'Skill' entry."""
+    result = check_consultant_tools_include_skill_tool(["Read", "Write"])
+    assert (
+        result is not None
+    ), "check_consultant_tools_include_skill_tool must flag a tools: list missing 'Skill'"
 
 
 def test_registry_is_exactly_one_file_with_fully_populated_rows(project_root: Path) -> None:
@@ -582,6 +673,24 @@ def test_registry_is_exactly_one_file_with_fully_populated_rows(project_root: Pa
     rows = parse_registry_table_rows(registry_files[0].read_text(encoding="utf-8"))
     failures = check_registry_row_shape(rows)
     assert not failures, "Registry row shape violations:\n  " + "\n  ".join(failures)
+
+
+def check_plugin_agent_count_matches_agent_files(
+    registered_agent_count: int, agent_file_count: int, agent_file_names: list[str]
+) -> str | None:
+    """Return a failure string if plugin.json's agents array count disagrees
+    with agents/*.md's count (excluding README.md/CLAUDE.md).
+
+    plugin.json edits per discipline must stay at zero -- the same invariant
+    the ecosystem's own coherence audit checks separately.
+    """
+    if registered_agent_count != agent_file_count:
+        return (
+            f"plugin.json registers {registered_agent_count} agents but agents/ contains "
+            f"{agent_file_count} agent files (excluding README.md/CLAUDE.md): "
+            f"{sorted(agent_file_names)}"
+        )
+    return None
 
 
 def test_plugin_json_agents_count_matches_agents_directory(project_root: Path) -> None:
@@ -600,11 +709,19 @@ def test_plugin_json_agents_count_matches_agents_directory(project_root: Path) -
         if path.name not in {"README.md", "CLAUDE.md"}
     ]
 
-    assert len(registered_agents) == len(agent_files), (
-        f"plugin.json registers {len(registered_agents)} agents but agents/ contains "
-        f"{len(agent_files)} agent files (excluding README.md/CLAUDE.md): "
-        f"{sorted(path.name for path in agent_files)}"
+    result = check_plugin_agent_count_matches_agent_files(
+        len(registered_agents), len(agent_files), [path.name for path in agent_files]
     )
+    assert result is None, result
+
+
+def test_flags_plugin_json_agent_count_mismatch() -> None:
+    """Canary: check_plugin_agent_count_matches_agent_files flags a count
+    mismatch between plugin.json's agents array and agents/*.md."""
+    result = check_plugin_agent_count_matches_agent_files(3, 4, ["a.md", "b.md", "c.md", "d.md"])
+    assert (
+        result is not None
+    ), "check_plugin_agent_count_matches_agent_files must flag a count mismatch"
 
 
 def test_ledger_exists_given_the_registrys_current_row_count(project_root: Path) -> None:
@@ -916,6 +1033,37 @@ def test_counts_dismissed_and_distinct_consults_for_a_discipline() -> None:
     assert count_distinct_consults_for_discipline(ledger_text, "statistician") == 2
 
 
+def check_falsifier_recipe_counts_match(
+    total: int, dismissed: int, consults: int, naive: int
+) -> list[str]:
+    """Return a failure string per invariant violated among the disposition-
+    counter falsifier's four computed counts.
+
+    Asserts invariants rather than literal counts: the ledger is append-only
+    and grows with every consult, so pinning exact totals would make routine
+    data growth indistinguishable from a broken recipe.
+    """
+    failures: list[str] = []
+    if not total > 0:
+        failures.append(f"expected total > 0 (the shipped ledger carries rows); got {total}")
+    if not (0 <= dismissed <= total):
+        failures.append(
+            f"expected 0 <= dismissed <= total; got dismissed={dismissed}, total={total}"
+        )
+    if not (1 <= consults <= total):
+        failures.append(
+            "expected 1 <= consults <= total (challenges cluster within consults); "
+            f"got consults={consults}, total={total}"
+        )
+    if not naive >= total:
+        failures.append(
+            "the unanchored form must over-count or tie, never under-count -- "
+            "if it ever returns fewer rows than the anchored form, the anchoring "
+            f"regex has stopped matching real rows; got naive={naive}, total={total}"
+        )
+    return failures
+
+
 def test_ledger_falsifier_recipe_returns_correct_counts_on_the_real_ledger(
     project_root: Path,
 ) -> None:
@@ -938,14 +1086,16 @@ def test_ledger_falsifier_recipe_returns_correct_counts_on_the_real_ledger(
     consults = count_distinct_consults_for_discipline(ledger_text, "statistician")
     naive = count_rows_naive_substring_match(ledger_text, "statistician")
 
-    assert total > 0, "the shipped ledger carries statistician rows"
-    assert 0 <= dismissed <= total
-    assert 1 <= consults <= total, "challenges cluster within consults"
-    assert naive >= total, (
-        "the unanchored form must over-count or tie, never under-count -- "
-        "if it ever returns fewer rows than the anchored form, the anchoring "
-        "regex has stopped matching real rows"
-    )
+    failures = check_falsifier_recipe_counts_match(total, dismissed, consults, naive)
+    assert not failures, "\n  ".join(failures)
+
+
+def test_flags_falsifier_recipe_count_invariant_violation() -> None:
+    """Canary: check_falsifier_recipe_counts_match flags a naive count that
+    under-counts relative to the anchored total -- the exact regression the
+    anchoring regex exists to prevent."""
+    failures = check_falsifier_recipe_counts_match(total=3, dismissed=1, consults=2, naive=2)
+    assert failures, "check_falsifier_recipe_counts_match must flag naive < total"
 
 
 def count_distinct_consults_by_task_slug_only(ledger_text: str, discipline: str) -> int:
@@ -1550,6 +1700,14 @@ def check_no_data_row_outside_table(full_text: str, table_rows: list[list[str]])
     file" and "rows the table parser actually captured" means a row landed
     outside the parsed table -- invisible to every counting recipe above, but
     still rendering as a plausible stray table to a human reader.
+
+    Paired site: `fitness/tests/test_consult_append_only.py` guards the
+    neighbouring defect -- an existing row being edited or deleted rather than
+    misplaced. That gate's `extract_data_rows` is whole-file by design, so it
+    sees a stray row either way and does not depend on this check; the two
+    nonetheless partition one contract between them. Read and update both
+    whenever either one's scope changes, per the two-textual-sites
+    anti-pattern in `rules/swe/gate-liveness.md`.
     """
     total_shaped_lines = len(_TIMESTAMP_ROW_SHAPE_RE.findall(full_text))
     if total_shaped_lines != len(table_rows):

@@ -111,9 +111,7 @@ def agents_at(repo_root: Path, ref: str) -> set[str]:
     return {Path(entry).stem for entry in data.get("agents", [])}
 
 
-def _tree_names(
-    repo_root: Path, ref: str, prefix: str, pattern: re.Pattern[str]
-) -> set[str]:
+def _tree_names(repo_root: Path, ref: str, prefix: str, pattern: re.Pattern[str]) -> set[str]:
     """Names captured by `pattern` over files under `prefix` at `ref`."""
     output = _git(repo_root, "ls-tree", "-r", "--name-only", ref, "--", prefix)
     if output is None:
@@ -154,22 +152,14 @@ class Staleness:
         return self.total > 0
 
 
-def compute_staleness(
-    repo_root: Path, base_ref: str, head_ref: str = "HEAD"
-) -> Staleness:
+def compute_staleness(repo_root: Path, base_ref: str, head_ref: str = "HEAD") -> Staleness:
     """Artifacts registered at head_ref but absent at base_ref."""
     return Staleness(
         base_ref=base_ref,
         head_ref=head_ref,
-        new_agents=sorted(
-            agents_at(repo_root, head_ref) - agents_at(repo_root, base_ref)
-        ),
-        new_skills=sorted(
-            skills_at(repo_root, head_ref) - skills_at(repo_root, base_ref)
-        ),
-        new_commands=sorted(
-            commands_at(repo_root, head_ref) - commands_at(repo_root, base_ref)
-        ),
+        new_agents=sorted(agents_at(repo_root, head_ref) - agents_at(repo_root, base_ref)),
+        new_skills=sorted(skills_at(repo_root, head_ref) - skills_at(repo_root, base_ref)),
+        new_commands=sorted(commands_at(repo_root, head_ref) - commands_at(repo_root, base_ref)),
     )
 
 
@@ -264,9 +254,7 @@ def _run(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo_root).resolve() if args.repo_root else REPO_ROOT
     base_ref = args.base_ref or latest_release_tag(repo_root, args.head_ref)
     if base_ref is None:
-        logger.info(
-            "check_release_staleness: no v* release tag found; nothing to compare"
-        )
+        logger.info("check_release_staleness: no v* release tag found; nothing to compare")
         return 0
 
     staleness = compute_staleness(repo_root, base_ref, args.head_ref)

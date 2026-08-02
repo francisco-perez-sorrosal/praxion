@@ -116,6 +116,13 @@ EXCLUDED_PATH_FRAGMENTS = (
     "/test_fixtures/",
     "/__pycache__/",
     "/.git/",
+    # Sibling git worktrees. `.claude/worktrees/<name>/` holds a SEPARATE
+    # checkout of this same repository, usually at a different commit. Scanning
+    # it reports violations that are not in this checkout's tree, vanish when
+    # the worktree is removed, and never appear in CI (a fresh clone has no
+    # worktrees) — so the gate's result would depend on how many worktrees the
+    # operator happens to have open. Each worktree is scanned by its own run.
+    "/.claude/worktrees/",
     # Vendored dependency trees — never scan third-party library code.
     "/.venv/",
     "/venv/",

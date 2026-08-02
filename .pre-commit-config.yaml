@@ -30,13 +30,28 @@ repos:
     hooks:
       - id: gitleaks  # secret scanner — blocks committed credentials/tokens
 
-  # --- PYTHON (reads [tool.ruff] from pyproject.toml) --------------------------
+  # --- PYTHON (reads [tool.ruff] from the ROOT pyproject.toml) -----------------
+  # Scope: the root Python surface only. `eval/` and `task-chronograph-mcp/` are
+  # self-contained subpackages -- each carries its own pyproject.toml with its own
+  # [tool.ruff] block (target-version py313, vs the root's py311) and is gated by
+  # its own `uv run ruff format --check` + `ruff check` step in the test workflow's
+  # per-project matrix.
+  #
+  # Formatting them from here is not merely redundant, it is actively breaking:
+  # this hook runs a DIFFERENT ruff (pinned below) against a DIFFERENT
+  # target-version than the subpackage's own gate. The two disagree on assertion
+  # wrapping, so every commit touching a subpackage .py file would be reformatted
+  # here and then rejected by that subpackage's CI -- a loop no amount of
+  # re-staging can settle, because each side is correct by its own config.
+  # Each subpackage owns its formatting; this hook owns the root surface.
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.8.6
     hooks:
       - id: ruff
         args: [--fix]
+        exclude: ^(eval|task-chronograph-mcp)/
       - id: ruff-format
+        exclude: ^(eval|task-chronograph-mcp)/
 
   # --- PRAXION AUTHOR GATES (retired scripts/git-pre-commit-hook.sh Blocks A–E)-
   # repo:local hooks reproduce each block's exact (staged-file filter → checker →

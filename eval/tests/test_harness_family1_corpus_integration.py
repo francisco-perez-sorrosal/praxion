@@ -68,14 +68,14 @@ def test_dec020_affected_files_parses_to_nonempty_list() -> None:
     fm = parse(content)
 
     affected = fm.get("affected_files")
-    assert isinstance(
-        affected, list
-    ), f"affected_files should be a list; got {type(affected).__name__!r}: {affected!r}"
+    assert isinstance(affected, list), (
+        f"affected_files should be a list; got {type(affected).__name__!r}: {affected!r}"
+    )
     assert len(affected) >= 1, f"affected_files should have ≥1 item; got: {affected!r}"
     # Spot-check a known entry
-    assert any(
-        ".ai-state/ARCHITECTURE.md" in str(item) for item in affected
-    ), f".ai-state/ARCHITECTURE.md not found in affected_files: {affected!r}"
+    assert any(".ai-state/ARCHITECTURE.md" in str(item) for item in affected), (
+        f".ai-state/ARCHITECTURE.md not found in affected_files: {affected!r}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -97,9 +97,9 @@ def test_dec040_superseded_by_parses_to_finalized_id() -> None:
     fm = parse(content)
 
     superseded_by = fm.get("superseded_by")
-    assert (
-        superseded_by == _FINALIZED_ID
-    ), f"superseded_by should be {_FINALIZED_ID!r}; got {superseded_by!r}"
+    assert superseded_by == _FINALIZED_ID, (
+        f"superseded_by should be {_FINALIZED_ID!r}; got {superseded_by!r}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -120,13 +120,13 @@ def test_dec040_re_affirmed_by_parses_to_list_with_finalized_id() -> None:
     fm = parse(content)
 
     re_affirmed_by = fm.get("re_affirmed_by")
-    assert isinstance(
-        re_affirmed_by, list
-    ), f"re_affirmed_by should be a list; got {type(re_affirmed_by).__name__!r}: {re_affirmed_by!r}"
+    assert isinstance(re_affirmed_by, list), (
+        f"re_affirmed_by should be a list; got {type(re_affirmed_by).__name__!r}: {re_affirmed_by!r}"
+    )
     assert len(re_affirmed_by) >= 1, f"re_affirmed_by should have ≥1 item; got: {re_affirmed_by!r}"
-    assert (
-        _FINALIZED_ID in re_affirmed_by
-    ), f"{_FINALIZED_ID!r} not found in re_affirmed_by: {re_affirmed_by!r}"
+    assert _FINALIZED_ID in re_affirmed_by, (
+        f"{_FINALIZED_ID!r} not found in re_affirmed_by: {re_affirmed_by!r}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -202,9 +202,9 @@ def test_parser_handles_draft_id_in_re_affirmed_by_list() -> None:
     fm = parse(_SYNTHETIC_DRAFT_ID_ADR)
 
     re_affirmed_by = fm.get("re_affirmed_by")
-    assert isinstance(
-        re_affirmed_by, list
-    ), f"re_affirmed_by should be a list; got {type(re_affirmed_by).__name__!r}: {re_affirmed_by!r}"
+    assert isinstance(re_affirmed_by, list), (
+        f"re_affirmed_by should be a list; got {type(re_affirmed_by).__name__!r}: {re_affirmed_by!r}"
+    )
     assert "dec-draft-abcd1234" in re_affirmed_by, (  # id-citation-discipline:ignore
         f"'dec-draft-abcd1234' not found in re_affirmed_by: {re_affirmed_by!r}"  # id-citation-discipline:ignore
     )

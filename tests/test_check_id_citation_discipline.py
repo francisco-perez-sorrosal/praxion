@@ -213,6 +213,35 @@ def test_dec_draft_literal_under_exempt_path_is_not_flagged(tmp_path: Path, pref
     assert str(exempt_file.relative_to(tmp_path)) not in result.stdout
 
 
+def test_citation_inside_a_sibling_worktree_is_not_flagged(tmp_path: Path) -> None:
+    """A citation inside `.claude/worktrees/<name>/` is out of scope, while an
+    identical one in this checkout is still flagged.
+
+    A sibling worktree is a separate checkout of the same repository, usually at
+    a different commit. Scanning it makes the result depend on how many
+    worktrees the operator happens to have open — findings that are absent from
+    this tree, vanish when the worktree is removed, and never occur in CI, where
+    a fresh clone has none. The control file proves the exclusion is
+    path-scoped rather than a blanket suppression that would pass vacuously."""
+    worktree_file = tmp_path / ".claude" / "worktrees" / "other" / "scripts" / "mod.py"
+    worktree_file.parent.mkdir(parents=True)
+    worktree_file.write_text('EXAMPLE = "dec-draft-cafebabe"\n')
+
+    control_file = tmp_path / "scripts" / "mod.py"
+    control_file.parent.mkdir(parents=True)
+    control_file.write_text('EXAMPLE = "dec-draft-cafebabe"\n')
+
+    result = _run(["--repo-root", str(tmp_path)], cwd=tmp_path)
+
+    assert (
+        "[draft-adr-id]" in result.stdout
+    ), f"expected the control (in-checkout) citation to be flagged\n{result.stdout}"
+    assert str(control_file.relative_to(tmp_path)) in result.stdout
+    assert "worktrees" not in result.stdout, (
+        "a citation inside a sibling worktree must not be reported; got:\n" + result.stdout
+    )
+
+
 def test_finalized_dec_nnn_citation_is_not_flagged(tmp_path: Path) -> None:
     """A finalized `dec-NNN` citation — explicitly permitted by
     `rules/swe/id-citation-discipline.md`'s lifecycle table — is never

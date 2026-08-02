@@ -342,6 +342,17 @@ Composition per trigger: `post-merge` runs `reconcile_ai_state.py` (when `.ai-st
 
    **If `.git/hooks/pre-commit` already exists and is NOT a Praxion hook**, back it up to `.git/hooks/pre-commit.pre-praxion` and warn the user. Do not silently overwrite a non-Praxion hook.
 
+   **If it already exists and IS a Praxion hook, the hook BODY can still be stale.** Runtime `PLUGIN_ROOT` resolution keeps the *script paths* fresh; it does nothing for checks added to the hook after this project was onboarded. Those arrive only by editing the installed file. Apply a content-aware top-up, mirroring §Phase 8b.3's predicate style:
+
+   | Predicate | Action |
+   |---|---|
+   | Hook does NOT contain `check_ruff_pin_drift` | Insert the `PIN_CHECK` stanza (the two lines above the `CHECK=` assignment) and report `4: pre-commit hook topped up (ruff pin coherence)` |
+   | Hook already contains it | Skip with `4: pre-commit hook current` |
+
+   **Insert; do not regenerate.** §Phase 8b.3 *appends* a Block D fragment to this same file, so rewriting the hook wholesale would silently delete Block D from every project that installed the AaC tier. Add the missing stanza in place and leave everything else untouched.
+
+   When adding a future check to this hook, add its predicate row here in the same pass — otherwise already-onboarded projects never receive it, which is the defect this table exists to prevent.
+
 2. **Finalize hooks (post-merge, post-commit, post-checkout)** — symlink all three `.git/hooks/<name>` entries to the plugin's multiplexed dispatcher:
    ```bash
    for hook in post-merge post-commit post-checkout; do

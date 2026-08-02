@@ -1,3 +1,25 @@
+## v0.21.0 (2026-08-02)
+
+### Feat
+
+- **gates**: enforce the CONSULT ledgers' append-only contract
+- **gates**: enforce the draft-ADR-id prohibition in code
+
+### Fix
+
+- **tooling**: make the ruff version one decision instead of two
+- **ci**: decline cleanly on a fixer crash, and keep the decline countable
+- **ci**: stop root pre-commit formatting the self-contained subpackages
+- **release**: restore the named consumer, lost the same way
+- **release**: give the release-staleness advisory a named reader
+- **adr**: stage the promoted ADR's own frontmatter rewrite, and gate it
+- **state**: repair an append-only violation, close the last sentinel finding
+- **state**: promote dec-310's own frontmatter, and file the gate that would have caught it
+
+### Refactor
+
+- **gates**: make canary coverage mean per check, not per file
+
 ## v0.20.0 (2026-07-31)
 
 ### Feat

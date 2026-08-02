@@ -35,8 +35,25 @@ repos:
       - id: gitleaks  # secret scanner — blocks committed credentials/tokens
 
   # --- PYTHON (keep iff Python detected) --------------------------------------
+  # PIN COHERENCE — declare this SAME version as an exact dependency:
+  #
+  #     [dependency-groups]
+  #     dev = ["ruff==0.15.22"]        # must equal the rev below
+  #
+  # and bump both together, always. Two independently-versioned ruffs
+  # formatting the same files never converge: this hook reformats on commit,
+  # your local ruff reformats back, `git add` never captures a stable state,
+  # and the commit will not settle. The failure does not look like a version
+  # problem — it looks like a formatter that cannot make up its mind, and
+  # pre-commit's stash/restore around each failed attempt can silently revert
+  # uncommitted work while you retry.
+  #
+  # A floating constraint (`ruff>=`, or no declared dependency at all) does not
+  # protect you: it leaves the hook fighting a different version on every
+  # machine. `/onboard-project` installs a commit gate that enforces the
+  # equality; run `check_ruff_pin_drift.py` to verify it by hand.
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.6
+    rev: v0.15.22
     hooks:
       - id: ruff         # linter (reads [tool.ruff] from pyproject.toml)
         args: [--fix]

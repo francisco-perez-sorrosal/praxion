@@ -311,13 +311,26 @@ Composition per trigger: `post-merge` runs `reconcile_ai_state.py` (when `.ai-st
 1. **Pre-commit hook** — symlink `.git/hooks/pre-commit` to a *user-project-tailored* hook script. Praxion's own repo uses a `.pre-commit-config.yaml` (the `pre-commit` framework) for its author gates including the shipped-artifact-isolation check (Praxion-author-specific). For user projects, write a tailored hook directly into `.git/hooks/pre-commit` (executable) that runs only `check_id_citation_discipline.py`:
    ```bash
    #!/usr/bin/env bash
-   # Praxion id-citation-discipline check (installed by /onboard-project).
-   # Blocks commits that reference ephemeral pipeline ids (REQ-*, AC-*, Step N)
-   # in committed source code. Rationale: rules/swe/id-citation-discipline.md.
+   # Praxion commit gate (installed by /onboard-project).
+   #
+   # 1. ruff pin coherence — blocks when the ruff pinned in
+   #    .pre-commit-config.yaml differs from the one this project installs.
+   #    Two independently-versioned ruffs formatting the same files never
+   #    converge: the hook reformats on commit, you reformat back, and the
+   #    commit will not settle. Runs FIRST so the version mismatch is named
+   #    rather than presenting as a confusing reformat loop. No-ops on a repo
+   #    with no ruff hook. Rationale: rules/swe/vcs/git-conventions.md.
+   # 2. id-citation-discipline — blocks commits that reference ephemeral
+   #    pipeline ids (REQ-*, AC-*, Step N) in committed source code.
+   #    Rationale: rules/swe/id-citation-discipline.md.
    set -eo pipefail
    REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
    [ -z "$REPO_ROOT" ] && exit 0
    PLUGIN_ROOT="$(jq -r '.plugins["i-am@bit-agora"][0].installPath' "$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null)"
+
+   PIN_CHECK="${PLUGIN_ROOT}/scripts/check_ruff_pin_drift.py"
+   [ -f "$PIN_CHECK" ] && python3 "$PIN_CHECK" --repo-root "$REPO_ROOT"
+
    CHECK="${PLUGIN_ROOT}/scripts/check_id_citation_discipline.py"
    [ ! -f "$CHECK" ] && exit 0
    STAGED="$(git diff --cached --name-only --diff-filter=ACMR || true)"

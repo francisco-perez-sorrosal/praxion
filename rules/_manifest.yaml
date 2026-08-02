@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-07-31T21:42:41Z'
+generated_at: '2026-08-02T16:58:19Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
@@ -46,7 +46,7 @@ rules:
   load: always_on
   core: false
   install: hook-deliver
-  chars: 3164
+  chars: 4478
 - id: eval/eval-data-governance
   path: rules/eval/eval-data-governance.md
   load: path_scoped

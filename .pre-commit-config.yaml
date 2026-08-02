@@ -30,6 +30,25 @@ repos:
     hooks:
       - id: gitleaks  # secret scanner — blocks committed credentials/tokens
 
+  # --- PIN COHERENCE (must precede the formatter it protects) ------------------
+  # Placed BEFORE the ruff hooks deliberately. If the pinned and installed ruff
+  # disagree, the failure a developer sees is a commit that will not settle:
+  # the hook reformats, they reformat back, `git add` never captures a stable
+  # state, and pre-commit's stash/restore around each failed attempt can
+  # silently revert work. Reporting the version mismatch FIRST names the cause;
+  # letting ruff run first shows only the confusing symptom.
+  - repo: local
+    hooks:
+      - id: ruff-pin-drift
+        name: ruff pin coherence
+        entry: python3 scripts/check_ruff_pin_drift.py --repo-root .
+        language: system
+        # always_run: drift appears when someone upgrades their ruff, with no
+        # file staged to trigger a path filter. A `files:` pattern here would
+        # miss the most common way this breaks.
+        always_run: true
+        pass_filenames: false
+
   # --- PYTHON (reads [tool.ruff] from the ROOT pyproject.toml) -----------------
   # Scope: the root Python surface only. `eval/` and `task-chronograph-mcp/` are
   # self-contained subpackages -- each carries its own pyproject.toml with its own
@@ -45,7 +64,7 @@ repos:
   # re-staging can settle, because each side is correct by its own config.
   # Each subpackage owns its formatting; this hook owns the root surface.
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.6
+    rev: v0.15.22
     hooks:
       - id: ruff
         args: [--fix]

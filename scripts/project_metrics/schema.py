@@ -14,7 +14,7 @@ diffing, content-hash-based storage, golden-file tests) rely on this.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 # `CollectorResult` is re-exported from the protocol layer (collectors/base.py)
@@ -180,9 +180,9 @@ def to_json(report: Report) -> bytes:
     """
 
     payload = asdict(report)
-    return json.dumps(
-        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode("utf-8")
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode(
+        "utf-8"
+    )
 
 
 def aggregate_header_for_log() -> str:

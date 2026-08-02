@@ -10,9 +10,9 @@ Source of truth remains commands/*.md; run from repo root.
 
 from __future__ import annotations
 
-from pathlib import Path
 import re
 import sys
+from pathlib import Path
 
 
 def split_frontmatter(content: str) -> tuple[dict, str]:
@@ -73,8 +73,14 @@ def export_commands(repo_root: Path, out_dir: Path) -> None:
 
 
 def main() -> None:
-    repo_root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent.parent
-    out_dir = (Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else repo_root / ".cursor" / "commands")
+    repo_root = (
+        Path(sys.argv[1]).resolve()
+        if len(sys.argv) > 1
+        else Path(__file__).resolve().parent.parent.parent
+    )
+    out_dir = (
+        Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else repo_root / ".cursor" / "commands"
+    )
     export_commands(repo_root, out_dir)
 
 

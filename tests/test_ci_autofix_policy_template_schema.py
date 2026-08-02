@@ -214,21 +214,21 @@ def test_policy_template_parses_as_yaml_with_the_five_top_level_sections() -> No
 def test_policy_template_declares_the_safety_budget_and_tripwire_fields() -> None:
     parsed = _parsed_with_placeholders_stubbed(POLICY_TEMPLATE_FILE)
     safety = parsed["safety"]
-    assert (
-        "max_runs_per_day" in safety
-    ), "policy.safety.max_runs_per_day is the daily-run budget cap the hub reads"
-    assert (
-        "max_attempts_per_pr" in safety
-    ), "policy.safety.max_attempts_per_pr caps repeated-fix attempts on one PR"
+    assert "max_runs_per_day" in safety, (
+        "policy.safety.max_runs_per_day is the daily-run budget cap the hub reads"
+    )
+    assert "max_attempts_per_pr" in safety, (
+        "policy.safety.max_attempts_per_pr caps repeated-fix attempts on one PR"
+    )
     sensitive_paths = safety.get("sensitive_paths")
     assert isinstance(sensitive_paths, list), "policy.safety.sensitive_paths must be a list"
     assert sensitive_paths, (
         "policy.safety.sensitive_paths must be non-empty — the sensitive-path "
         "tripwire sources its watch list from here"
     )
-    assert (
-        "auto_commit_tiers" in safety
-    ), "policy.safety.auto_commit_tiers documents which fix categories may auto-commit"
+    assert "auto_commit_tiers" in safety, (
+        "policy.safety.auto_commit_tiers documents which fix categories may auto-commit"
+    )
 
 
 def test_policy_template_declares_main_branch_surface_as_a_valid_toggle() -> None:
@@ -243,9 +243,9 @@ def test_policy_template_declares_main_branch_surface_as_a_valid_toggle() -> Non
 def test_policy_template_reviewer_family_is_documented_as_never_claude() -> None:
     parsed = _parsed_with_placeholders_stubbed(POLICY_TEMPLATE_FILE)
     review = parsed["review"]
-    assert (
-        "reviewer_family" in review
-    ), "policy.review.reviewer_family selects the P2 cross-model reviewer"
+    assert "reviewer_family" in review, (
+        "policy.review.reviewer_family selects the P2 cross-model reviewer"
+    )
     assert review["reviewer_family"] != "claude", (
         "reviewer_family must never be 'claude' — the fixer already is claude, "
         "so the cross-model reviewer must come from a different model family"
@@ -260,9 +260,9 @@ def test_policy_template_reviewer_family_is_documented_as_never_claude() -> None
 def test_policy_template_declares_fixer_and_default_fixer_model() -> None:
     parsed = _parsed_with_placeholders_stubbed(POLICY_TEMPLATE_FILE)
     provider = parsed["provider"]
-    assert (
-        provider.get("fixer") == "claude"
-    ), "policy.provider.fixer must default to 'claude' — the only fixer wired in P1"
+    assert provider.get("fixer") == "claude", (
+        "policy.provider.fixer must default to 'claude' — the only fixer wired in P1"
+    )
     assert provider.get("fixer_model") == "opus", (
         "policy.provider.fixer_model must default to 'opus', replacing the P0 "
         "hardcoded --model opus literal"

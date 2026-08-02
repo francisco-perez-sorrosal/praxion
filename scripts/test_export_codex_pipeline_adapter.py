@@ -4,15 +4,14 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXPORTER_PATH = REPO_ROOT / "codex" / "config" / "export-codex-pipeline-adapter.py"
 
 
 def load_exporter():
-    spec = importlib.util.spec_from_file_location(
-        "export_codex_pipeline_adapter", EXPORTER_PATH
-    )
+    spec = importlib.util.spec_from_file_location("export_codex_pipeline_adapter", EXPORTER_PATH)
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -47,18 +46,14 @@ def test_export_pipeline_adapter_derives_metadata_from_canonical_rules(tmp_path:
         "Full",
         "Spike",
     ]
-    standard = next(
-        tier for tier in pipeline["process_tiers"] if tier["tier"] == "Standard"
-    )
+    standard = next(tier for tier in pipeline["process_tiers"] if tier["tier"] == "Standard")
     assert standard["codex_adapter"]["worktree"] == "dedicated_worktree"
     assert pipeline["pipeline"]["shared_document_root"] == ".ai-work/<task-slug>/"
     assert any(agent["agent"] == "verifier" for agent in pipeline["agents"])
 
     assert routing["source_path"].endswith("rules/swe/agent-model-routing.md")
     architect = next(
-        route
-        for route in routing["agent_routes"]
-        if route["agent"] == "systems-architect"
+        route for route in routing["agent_routes"] if route["agent"] == "systems-architect"
     )
     assert architect["canonical_alias"] == "opus"
     assert architect["codex_adapter"]["codex_tier"] == "high"
@@ -93,9 +88,7 @@ def test_export_pipeline_adapter_fails_when_canonical_table_changes(tmp_path: Pa
         encoding="utf-8",
     )
 
-    try:
+    with pytest.raises(
+        exporter.PipelineAdapterError, match="missing Codex process adapter for tier: Weird"
+    ):
         exporter.export_pipeline_adapter(repo_root, tmp_path / ".codex")
-    except exporter.PipelineAdapterError as exc:
-        assert "missing Codex process adapter for tier: Weird" in str(exc)
-    else:
-        raise AssertionError("expected PipelineAdapterError")

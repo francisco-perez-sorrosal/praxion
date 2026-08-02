@@ -144,6 +144,7 @@ def test_descriptor_dict_has_no_backend_field() -> None:
 
     # Also confirm the schema's invariance rule is explicitly stated in the document
     schema_text = SCHEMA_FILE.read_text(encoding="utf-8")
-    assert "NO" in schema_text and "backend" in schema_text, (
+    assert "NO" in schema_text, "Schema document does not include the 'NO backend' invariance rule"
+    assert "backend" in schema_text, (
         "Schema document does not include the 'NO backend' invariance rule"
     )

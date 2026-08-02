@@ -29,21 +29,17 @@ FIXTURES = REPO_ROOT / "tests" / "fixtures"
 
 WELLFORMED_PLAN = FIXTURES / "pre_refactor_plan_wellformed.md"
 MALFORMED_YAML_BODY = FIXTURES / "pre_refactor_yaml_malformed_braces.yaml"
-MISSING_LOOPBACK_PLAN = (
-    FIXTURES / "sentinel" / "pre_refactor_plan_malformed_missing_loopback.md"
-)
+MISSING_LOOPBACK_PLAN = FIXTURES / "sentinel" / "pre_refactor_plan_malformed_missing_loopback.md"
 
 
 def test_parses_wellformed_plan_into_bypass_and_loopback_lists():
     result = parser.parse(WELLFORMED_PLAN)
 
     assert set(result.keys()) == {"bypass", "loopback"}
-    assert isinstance(result["bypass"], list) and result["bypass"], (
-        "bypass list must be non-empty"
-    )
-    assert isinstance(result["loopback"], list) and result["loopback"], (
-        "loopback list must be non-empty"
-    )
+    assert isinstance(result["bypass"], list), "bypass list must be non-empty"
+    assert result["bypass"], "bypass list must be non-empty"
+    assert isinstance(result["loopback"], list), "loopback list must be non-empty"
+    assert result["loopback"], "loopback list must be non-empty"
     bypass_ids = {entry["id"] for entry in result["bypass"]}
     loopback_ids = {entry["id"] for entry in result["loopback"]}
     assert "behavior-preservation-tests-green" in bypass_ids

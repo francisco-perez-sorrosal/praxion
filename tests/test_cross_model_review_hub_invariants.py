@@ -153,18 +153,18 @@ def test_workflow_call_declares_policy_path_input_with_safe_default() -> None:
         "per-repo policy file location must be sourced through the "
         "interface, never hardcoded"
     )
-    assert (
-        inputs["policy_path"].get("default") == ".github/autofix-policy.yml"
-    ), "`policy_path` input must default to '.github/autofix-policy.yml'"
+    assert inputs["policy_path"].get("default") == ".github/autofix-policy.yml", (
+        "`policy_path` input must default to '.github/autofix-policy.yml'"
+    )
 
 
 def test_workflow_call_declares_required_cursor_api_key_secret() -> None:
     parsed = _parsed()
     workflow_call = _on_block(parsed)["workflow_call"]
     secrets_block = workflow_call.get("secrets", {}) or {}
-    assert (
-        "CURSOR_API_KEY" in secrets_block
-    ), "on.workflow_call.secrets must explicitly declare CURSOR_API_KEY"
+    assert "CURSOR_API_KEY" in secrets_block, (
+        "on.workflow_call.secrets must explicitly declare CURSOR_API_KEY"
+    )
     assert secrets_block["CURSOR_API_KEY"].get("required") is True, (
         "CURSOR_API_KEY must be declared `required: true` — a caller invoking "
         "the hub without this secret must fail loudly, not silently"
@@ -192,9 +192,9 @@ def test_never_references_track_progress() -> None:
 
 def test_never_triggers_on_pull_request_target() -> None:
     raw = _raw_text()
-    assert (
-        "pull_request_target" not in raw
-    ), "`pull_request_target` must never appear anywhere in the hub"
+    assert "pull_request_target" not in raw, (
+        "`pull_request_target` must never appear anywhere in the hub"
+    )
 
 
 def test_non_generativity_is_enforced_by_permission_scope_not_by_banning_force() -> None:
@@ -215,9 +215,9 @@ def test_non_generativity_is_enforced_by_permission_scope_not_by_banning_force()
     """
     parsed = _parsed()
     permissions = _job_permissions(parsed)
-    assert any(
-        perm == {"pull-requests": "write", "contents": "read"} for perm in permissions
-    ), "The review job must grant EXACTLY pull-requests:write + contents:read"
+    assert any(perm == {"pull-requests": "write", "contents": "read"} for perm in permissions), (
+        "The review job must grant EXACTLY pull-requests:write + contents:read"
+    )
     for perm in permissions:
         assert perm.get("contents") != "write", "No job may hold `contents: write`"
         assert "id-token" not in perm, "No job may hold `id-token`"
@@ -302,16 +302,16 @@ def test_no_git_write_or_pr_create_step_exists() -> None:
 
 def test_gate_decision_reads_cross_model_gate_policy_value() -> None:
     raw = _raw_text()
-    assert (
-        "cross_model_gate" in raw
-    ), "The gate decision must read `review.cross_model_gate` from the caller's policy"
+    assert "cross_model_gate" in raw, (
+        "The gate decision must read `review.cross_model_gate` from the caller's policy"
+    )
 
 
 def test_gate_decision_recognizes_both_agent_authored_branch_prefixes() -> None:
     raw = _raw_text()
-    assert (
-        "ci-autofix/" in raw
-    ), "The gate must recognize the ci-autofix/ branch prefix when scoping to agent-authored PRs"
+    assert "ci-autofix/" in raw, (
+        "The gate must recognize the ci-autofix/ branch prefix when scoping to agent-authored PRs"
+    )
     assert "issue-autofix/" in raw, (
         "The gate must recognize the issue-autofix/ branch prefix when "
         "scoping to agent-authored PRs"
@@ -440,19 +440,19 @@ def test_review_prompt_forbids_a_rewritten_fix() -> None:
         "The reviewer prompt must reference 'a rewritten fix' as the "
         "explicit thing it must never propose"
     )
-    assert re.search(
-        r"do not|never|not propose", raw
-    ), "The 'rewritten fix' reference must be an explicit negation, not merely descriptive text"
+    assert re.search(r"do not|never|not propose", raw), (
+        "The 'rewritten fix' reference must be an explicit negation, not merely descriptive text"
+    )
 
 
 def test_review_prompt_demands_a_structured_json_verdict() -> None:
     raw = _raw_text()
-    assert (
-        "verdict" in raw
-    ), "The reviewer prompt must demand a JSON verdict object with a `verdict` key"
-    assert (
-        "findings" in raw
-    ), "The reviewer prompt must demand a JSON verdict object with a `findings` key"
+    assert "verdict" in raw, (
+        "The reviewer prompt must demand a JSON verdict object with a `verdict` key"
+    )
+    assert "findings" in raw, (
+        "The reviewer prompt must demand a JSON verdict object with a `findings` key"
+    )
     assert "approve" in raw, (
         "The verdict's `approve` value must appear in the hub (prompt text "
         "and/or act-step branching)"
@@ -470,9 +470,9 @@ def test_review_prompt_demands_a_structured_json_verdict() -> None:
 
 def test_approve_verdict_applies_approved_and_reviewed_by_labels() -> None:
     raw = _raw_text()
-    assert (
-        "cross-model-review:approved" in raw
-    ), "An `approve` verdict must apply the `cross-model-review:approved` label"
+    assert "cross-model-review:approved" in raw, (
+        "An `approve` verdict must apply the `cross-model-review:approved` label"
+    )
     assert "reviewed-by:" in raw, (
         "Every verdict outcome must apply a `reviewed-by:<family>` label "
         "naming the reviewing model family (audit trail)"
@@ -481,15 +481,15 @@ def test_approve_verdict_applies_approved_and_reviewed_by_labels() -> None:
 
 def test_request_changes_verdict_applies_changes_requested_label_and_marks_draft() -> None:
     raw = _raw_text()
-    assert (
-        "cross-model-review:changes-requested" in raw
-    ), "A `request-changes` verdict must apply the `cross-model-review:changes-requested` label"
-    assert (
-        "gh pr ready" in raw
-    ), "A `request-changes` verdict must call `gh pr ready` to toggle draft state"
-    assert (
-        "--undo" in raw
-    ), "The draft toggle must use `--undo` (mark as draft), not the default (mark ready)"
+    assert "cross-model-review:changes-requested" in raw, (
+        "A `request-changes` verdict must apply the `cross-model-review:changes-requested` label"
+    )
+    assert "gh pr ready" in raw, (
+        "A `request-changes` verdict must call `gh pr ready` to toggle draft state"
+    )
+    assert "--undo" in raw, (
+        "The draft toggle must use `--undo` (mark as draft), not the default (mark ready)"
+    )
 
 
 def test_request_changes_never_closes_or_commits() -> None:
@@ -627,9 +627,9 @@ def test_prism_content_is_sanitized_before_the_reviewer_reads_it() -> None:
 
 def test_review_prompt_gains_a_prism_paragraph_referencing_tmp_prism_md() -> None:
     raw = _raw_text()
-    assert (
-        "tmp/prism.md" in raw
-    ), "REVIEW_PROMPT's env block must reference tmp/prism.md as a new DATA file for the reviewer"
+    assert "tmp/prism.md" in raw, (
+        "REVIEW_PROMPT's env block must reference tmp/prism.md as a new DATA file for the reviewer"
+    )
     assert _mentions_near(raw, "tmp/prism.md", "fit", window=800), (
         "The new prism paragraph must instruct the reviewer to judge "
         "fitness-to-this-project, in addition to correctness/minimality"
@@ -642,9 +642,9 @@ def test_verdict_json_schema_is_byte_unchanged_by_the_prism_retrofit() -> None:
     from the current file) and must keep passing after the retrofit lands.
     """
     raw = _raw_text()
-    assert (
-        VERDICT_SCHEMA_LINE in raw
-    ), f"The verdict JSON schema line must remain byte-identical: {VERDICT_SCHEMA_LINE!r}"
+    assert VERDICT_SCHEMA_LINE in raw, (
+        f"The verdict JSON schema line must remain byte-identical: {VERDICT_SCHEMA_LINE!r}"
+    )
 
 
 def test_policy_defaults_gain_a_project_prism_key() -> None:
@@ -653,9 +653,9 @@ def test_policy_defaults_gain_a_project_prism_key() -> None:
         "The 'Read review policy' step's Python DEFAULTS dict must gain a "
         "project_prism key alongside the four existing keys"
     )
-    assert _mentions_near(
-        raw, "project_prism", "CLAUDE.md"
-    ), "project_prism's safe default value must be CLAUDE.md"
+    assert _mentions_near(raw, "project_prism", "CLAUDE.md"), (
+        "project_prism's safe default value must be CLAUDE.md"
+    )
 
 
 def test_prism_off_or_absent_degrades_without_failure() -> None:

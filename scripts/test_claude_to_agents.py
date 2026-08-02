@@ -4,20 +4,14 @@ import importlib.util
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SCRIPT_PATH = (
-    REPO_ROOT
-    / "skills"
-    / "adapt-claude-to-agents"
-    / "scripts"
-    / "claude_to_agents.py"
-)
+SCRIPT_PATH = REPO_ROOT / "skills" / "adapt-claude-to-agents" / "scripts" / "claude_to_agents.py"
 
 
 def load_module():
     spec = importlib.util.spec_from_file_location("claude_to_agents", SCRIPT_PATH)
-    assert spec is not None and spec.loader is not None
+    assert spec is not None
+    assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)

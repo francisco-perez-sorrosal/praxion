@@ -3,7 +3,13 @@
 Exits 0 unconditionally -- must never block agent execution.
 """
 
-import hashlib, json, os, re, subprocess, sys, urllib.request  # noqa: E401
+import hashlib  # noqa: E401
+import json
+import os
+import re
+import subprocess
+import sys
+import urllib.request
 
 from _hook_utils import DISABLE_OBSERVABILITY, is_disabled
 
@@ -371,9 +377,7 @@ def _handle_pre_tool_use(data, sid, aid, proj):
         return [], []
     meta = {
         "input_summary": _summarize_tool_input(data),
-        "input_size_bytes": len(
-            _raw_tool_input_text(data).encode("utf-8", errors="replace")
-        ),
+        "input_size_bytes": len(_raw_tool_input_text(data).encode("utf-8", errors="replace")),
     }
     _enrich_mcp_meta(meta, tool_name)
     return [
@@ -420,9 +424,7 @@ def _handle_post_tool_use(data, sid, aid, proj):
                     "metadata": {
                         "artifact_type": "skill",
                         "artifact_name": skill_name,
-                        "args": tool_input.get("args", "")
-                        if isinstance(tool_input, dict)
-                        else "",
+                        "args": tool_input.get("args", "") if isinstance(tool_input, dict) else "",
                     },
                 }
             )
@@ -432,12 +434,8 @@ def _handle_post_tool_use(data, sid, aid, proj):
     meta = {
         "input_summary": _summarize_tool_input(data),
         "output_summary": _summarize_tool_output(data),
-        "input_size_bytes": len(
-            _raw_tool_input_text(data).encode("utf-8", errors="replace")
-        ),
-        "output_size_bytes": len(
-            _raw_tool_output_text(data).encode("utf-8", errors="replace")
-        ),
+        "input_size_bytes": len(_raw_tool_input_text(data).encode("utf-8", errors="replace")),
+        "output_size_bytes": len(_raw_tool_output_text(data).encode("utf-8", errors="replace")),
     }
     _enrich_mcp_meta(meta, tool_name)
 
@@ -505,24 +503,16 @@ def _handle_post_tool_use_failure(data, sid, aid, proj):
 
 
 _HOOK_DISPATCH = {
-    "SessionStart": lambda data, sid, aid, proj, git: _handle_session_start(
-        sid, proj, git
-    ),
+    "SessionStart": lambda data, sid, aid, proj, git: _handle_session_start(sid, proj, git),
     "Stop": lambda data, sid, aid, proj, git: _handle_stop(sid, proj, git),
     "SubagentStart": lambda data, sid, aid, proj, git: _handle_subagent_start(
         data, sid, aid, proj, git
     ),
-    "SubagentStop": lambda data, sid, aid, proj, git: _handle_subagent_stop(
+    "SubagentStop": lambda data, sid, aid, proj, git: _handle_subagent_stop(data, sid, aid, proj),
+    "PreToolUse": lambda data, sid, aid, proj, git: _handle_pre_tool_use(data, sid, aid, proj),
+    "PostToolUse": lambda data, sid, aid, proj, git: _handle_post_tool_use(data, sid, aid, proj),
+    "PostToolUseFailure": lambda data, sid, aid, proj, git: _handle_post_tool_use_failure(
         data, sid, aid, proj
-    ),
-    "PreToolUse": lambda data, sid, aid, proj, git: _handle_pre_tool_use(
-        data, sid, aid, proj
-    ),
-    "PostToolUse": lambda data, sid, aid, proj, git: _handle_post_tool_use(
-        data, sid, aid, proj
-    ),
-    "PostToolUseFailure": lambda data, sid, aid, proj, git: (
-        _handle_post_tool_use_failure(data, sid, aid, proj)
     ),
 }
 

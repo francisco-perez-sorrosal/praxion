@@ -67,9 +67,7 @@ def test_gate_unlocks_consecutive_levels() -> None:
     verdicts: list[dict[str, Any]] = []
     for level in (1, 2, 3):
         for i in range(5):
-            verdicts.append(
-                _verdict(f"l{level}-{i}", "style_validation", level, passed=True)
-            )
+            verdicts.append(_verdict(f"l{level}-{i}", "style_validation", level, passed=True))
     for i in range(5):
         verdicts.append(_verdict(f"l4-{i}", "style_validation", 4, passed=(i == 0)))
     assert score.compute_level(verdicts) == 3
@@ -91,9 +89,7 @@ def test_level_gate_blocks_progression_past_first_failure() -> None:
 
 def test_exactly_80_percent_meets_the_gate() -> None:
     # 4 of 5 = 80% — the gate is inclusive (>= 0.8).
-    verdicts = [
-        _verdict(f"l1-{i}", "style_validation", 1, passed=(i != 4)) for i in range(5)
-    ]
+    verdicts = [_verdict(f"l1-{i}", "style_validation", 1, passed=(i != 4)) for i in range(5)]
     assert score.compute_level(verdicts) == 1
 
 
@@ -237,9 +233,7 @@ def test_recompute_handles_mechanical_only_with_all_llm_none() -> None:
     data: dict[str, Any] = {
         "criteria": [
             _verdict("f1", "style_validation", 1, applicable=True, passed=True),
-            _verdict(
-                "naming", "style_validation", 3, applicable=True, passed=None, llm=True
-            ),
+            _verdict("naming", "style_validation", 3, applicable=True, passed=None, llm=True),
             _verdict("tq", "testing", 4, applicable=True, passed=None, llm=True),
             _verdict("rq", "documentation", 2, applicable=True, passed=None, llm=True),
             _verdict("daf", "documentation", 4, applicable=True, passed=None, llm=True),

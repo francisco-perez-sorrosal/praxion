@@ -125,9 +125,7 @@ def test_rendering_twice_with_same_inputs_produces_identical_output(tmp_path):
     first_content = out.read_text(encoding="utf-8")
     mod.render_claude_md(tmpl, out, values)
     second_content = out.read_text(encoding="utf-8")
-    assert first_content == second_content, (
-        "Second render should produce identical output"
-    )
+    assert first_content == second_content, "Second render should produce identical output"
 
 
 def test_template_content_preserved_outside_placeholders(tmp_path):
@@ -167,9 +165,7 @@ def test_residual_placeholder_logged_to_stderr_not_raised(tmp_path, capsys):
         {"USERNAME": "u", "EMAIL": "u@u.com", "GITHUB_URL": "https://github.com/u"},
     )
     captured = capsys.readouterr()
-    assert "{{CUSTOM_KEY}}" in captured.err, (
-        "Residual placeholder warning should appear on stderr"
-    )
+    assert "{{CUSTOM_KEY}}" in captured.err, "Residual placeholder warning should appear on stderr"
     # Output file must still be written (partial substitution is acceptable)
     assert out.exists()
 
@@ -223,9 +219,7 @@ def test_derives_username_from_git_email_local_part(tmp_path, monkeypatch):
                 args=[], returncode=0, stdout="frank@example.com\n", stderr=""
             )
         if "user.name" in key:
-            return subprocess.CompletedProcess(
-                args=[], returncode=0, stdout="Frank\n", stderr=""
-            )
+            return subprocess.CompletedProcess(args=[], returncode=0, stdout="Frank\n", stderr="")
         return subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="")
 
     monkeypatch.setattr(subprocess, "run", fake_git_config)

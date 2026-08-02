@@ -46,9 +46,9 @@ def test_explicit_extensionless_bash_with_violation_is_detected(tmp_path: Path) 
         cwd=tmp_path,
     )
 
-    assert (
-        result.returncode == 1
-    ), f"expected exit 1; got {result.returncode}\n{result.stdout}\n{result.stderr}"
+    assert result.returncode == 1, (
+        f"expected exit 1; got {result.returncode}\n{result.stdout}\n{result.stderr}"
+    )
     assert "step-ref" in result.stdout
     assert "Step 1" in result.stdout
 
@@ -154,9 +154,9 @@ def test_detects_draft_adr_id_citation(tmp_path: Path) -> None:
 
     result = _run(["--files", str(module), "--repo-root", str(tmp_path)], cwd=tmp_path)
 
-    assert (
-        result.returncode == 1
-    ), f"expected a draft-adr-id violation; got exit {result.returncode}\n{result.stdout}"
+    assert result.returncode == 1, (
+        f"expected a draft-adr-id violation; got exit {result.returncode}\n{result.stdout}"
+    )
     assert "[draft-adr-id]" in result.stdout
     assert "dec-draft-abcd1234" in result.stdout
 
@@ -181,9 +181,9 @@ def test_ignore_marker_suppresses_draft_adr_id_flag(tmp_path: Path) -> None:
         f"expected the unmarked citation to be flagged; got exit {result.returncode}\n"
         f"{result.stdout}"
     )
-    assert (
-        result.stdout.count("[draft-adr-id]") == 1
-    ), f"expected exactly one finding (the unmarked line only):\n{result.stdout}"
+    assert result.stdout.count("[draft-adr-id]") == 1, (
+        f"expected exactly one finding (the unmarked line only):\n{result.stdout}"
+    )
     assert "dec-draft-abcd1234" in result.stdout
     assert "dec-draft-deadbeef" not in result.stdout
 
@@ -206,9 +206,9 @@ def test_dec_draft_literal_under_exempt_path_is_not_flagged(tmp_path: Path, pref
 
     result = _run(["--repo-root", str(tmp_path)], cwd=tmp_path)
 
-    assert (
-        "[draft-adr-id]" in result.stdout
-    ), f"expected the control (non-exempt) file's citation to be flagged\n{result.stdout}"
+    assert "[draft-adr-id]" in result.stdout, (
+        f"expected the control (non-exempt) file's citation to be flagged\n{result.stdout}"
+    )
     assert str(control_file.relative_to(tmp_path)) in result.stdout
     assert str(exempt_file.relative_to(tmp_path)) not in result.stdout
 
@@ -233,9 +233,9 @@ def test_citation_inside_a_sibling_worktree_is_not_flagged(tmp_path: Path) -> No
 
     result = _run(["--repo-root", str(tmp_path)], cwd=tmp_path)
 
-    assert (
-        "[draft-adr-id]" in result.stdout
-    ), f"expected the control (in-checkout) citation to be flagged\n{result.stdout}"
+    assert "[draft-adr-id]" in result.stdout, (
+        f"expected the control (in-checkout) citation to be flagged\n{result.stdout}"
+    )
     assert str(control_file.relative_to(tmp_path)) in result.stdout
     assert "worktrees" not in result.stdout, (
         "a citation inside a sibling worktree must not be reported; got:\n" + result.stdout
@@ -256,9 +256,9 @@ def test_finalized_dec_nnn_citation_is_not_flagged(tmp_path: Path) -> None:
 
     result = _run(["--files", str(module), "--repo-root", str(tmp_path)], cwd=tmp_path)
 
-    assert (
-        result.returncode == 1
-    ), f"expected the draft citation to be flagged; got exit {result.returncode}\n{result.stdout}"
+    assert result.returncode == 1, (
+        f"expected the draft citation to be flagged; got exit {result.returncode}\n{result.stdout}"
+    )
     assert result.stdout.count("[draft-adr-id]") == 1
     assert "dec-draft-facade00" in result.stdout
     assert "dec-308" not in result.stdout

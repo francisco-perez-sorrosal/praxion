@@ -193,18 +193,18 @@ def test_workflow_call_declares_policy_path_input_with_safe_default() -> None:
         "on.workflow_call.inputs must declare `policy_path` — the caller's per-repo "
         "policy file location must be sourced through the interface, never hardcoded"
     )
-    assert (
-        inputs["policy_path"].get("default") == ".github/autofix-policy.yml"
-    ), "`policy_path` input must default to '.github/autofix-policy.yml'"
+    assert inputs["policy_path"].get("default") == ".github/autofix-policy.yml", (
+        "`policy_path` input must default to '.github/autofix-policy.yml'"
+    )
 
 
 def test_workflow_call_declares_required_oauth_secret() -> None:
     parsed = _parsed()
     workflow_call = _on_block(parsed)["workflow_call"]
     secrets_block = workflow_call.get("secrets", {}) or {}
-    assert (
-        "CLAUDE_CODE_OAUTH_TOKEN" in secrets_block
-    ), "on.workflow_call.secrets must declare CLAUDE_CODE_OAUTH_TOKEN"
+    assert "CLAUDE_CODE_OAUTH_TOKEN" in secrets_block, (
+        "on.workflow_call.secrets must declare CLAUDE_CODE_OAUTH_TOKEN"
+    )
     assert secrets_block["CLAUDE_CODE_OAUTH_TOKEN"].get("required") is True, (
         "CLAUDE_CODE_OAUTH_TOKEN must be declared `required: true` — a caller "
         "invoking the hub without this secret must fail loudly, not silently"
@@ -232,9 +232,9 @@ def test_never_references_track_progress() -> None:
 
 def test_never_triggers_on_pull_request_target() -> None:
     raw = _raw_text()
-    assert (
-        "pull_request_target" not in raw
-    ), "`pull_request_target` must never appear anywhere in the hub"
+    assert "pull_request_target" not in raw, (
+        "`pull_request_target` must never appear anywhere in the hub"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -277,9 +277,9 @@ def test_job_gates_on_failure_conclusion() -> None:
     jobs = parsed.get("jobs") or {}
     assert jobs, "Hub workflow must declare at least one job"
     conditions = [job.get("if") or "" for job in jobs.values()]
-    assert any(
-        "conclusion" in c and "failure" in c for c in conditions
-    ), "At least one job must gate on the failed run's `conclusion == 'failure'`"
+    assert any("conclusion" in c and "failure" in c for c in conditions), (
+        "At least one job must gate on the failed run's `conclusion == 'failure'`"
+    )
 
 
 def test_branch_gate_uses_default_branch_not_hardcoded_main() -> None:
@@ -289,9 +289,9 @@ def test_branch_gate_uses_default_branch_not_hardcoded_main() -> None:
         "generalizing the shipped workflow's hardcoded 'main' so the hub works on "
         "managed repos whose default branch is not 'main'"
     )
-    assert not re.search(
-        r"head_branch\s*==\s*['\"]main['\"]", raw
-    ), "The branch gate must not hardcode `head_branch == 'main'`"
+    assert not re.search(r"head_branch\s*==\s*['\"]main['\"]", raw), (
+        "The branch gate must not hardcode `head_branch == 'main'`"
+    )
 
 
 def test_dedup_step_skips_when_autofix_pr_already_open() -> None:
@@ -415,9 +415,9 @@ def test_plugin_dir_reaches_claude_args_only_through_the_policy_output() -> None
 
 def test_policy_read_step_exists() -> None:
     parsed = _parsed()
-    assert (
-        _policy_read_step(parsed) is not None
-    ), "Hub must contain a non-agent step that reads/parses the caller's autofix-policy.yml"
+    assert _policy_read_step(parsed) is not None, (
+        "Hub must contain a non-agent step that reads/parses the caller's autofix-policy.yml"
+    )
 
 
 def test_missing_or_malformed_policy_falls_back_to_a_safe_tripwire_default() -> None:
@@ -467,12 +467,12 @@ def test_existing_autofix_job_is_unchanged_by_the_new_surface_jobs() -> None:
     assert "autofix" in jobs, "The pre-existing `autofix` job must still exist"
     autofix_job = jobs["autofix"]
     condition = autofix_job.get("if") or ""
-    assert (
-        "head_branch == github.event.repository.default_branch" in condition
-    ), "The `autofix` job's branch gate must remain unchanged"
-    assert (
-        autofix_job.get("permissions", {}).get("contents") == "write"
-    ), "The `autofix` job's `contents: write` grant must remain unchanged"
+    assert "head_branch == github.event.repository.default_branch" in condition, (
+        "The `autofix` job's branch gate must remain unchanged"
+    )
+    assert autofix_job.get("permissions", {}).get("contents") == "write", (
+        "The `autofix` job's `contents: write` grant must remain unchanged"
+    )
     step_names = [step.get("name") for step in autofix_job.get("steps") or []]
     # The finalize/decline step was added later and deliberately, by a separate
     # decision from the surface-addition work this guard was written for: the
@@ -517,9 +517,9 @@ def test_classify_job_reads_the_caller_policy_in_a_non_agent_step() -> None:
     ]
     assert policy_steps, "classify must read the caller's autofix-policy.yml in a plain `run:` step"
     for step in policy_steps:
-        assert (
-            "uses" not in step
-        ), "The policy-read step in `classify` must be a non-agent `run:` step"
+        assert "uses" not in step, (
+            "The policy-read step in `classify` must be a non-agent `run:` step"
+        )
 
 
 def test_classify_job_distinguishes_same_repo_from_fork_by_repository_fields() -> None:
@@ -535,9 +535,9 @@ def test_classify_job_distinguishes_same_repo_from_fork_by_repository_fields() -
         "classify must inspect github.event.workflow_run.head_repository to "
         "distinguish same-repo PRs from fork PRs"
     )
-    assert re.search(
-        r"dependabot", job_run_text, re.IGNORECASE
-    ), "classify must distinguish the Dependabot actor from other same-repo PR authors"
+    assert re.search(r"dependabot", job_run_text, re.IGNORECASE), (
+        "classify must distinguish the Dependabot actor from other same-repo PR authors"
+    )
 
 
 def test_classify_job_emits_a_surface_output() -> None:
@@ -574,9 +574,9 @@ def test_autofix_same_repo_pr_agent_allowlist_excludes_branch_movement_and_push(
             "The fixer's allowlist must not grant `git checkout` — the PR "
             "head is positioned by a non-agent step, not the agent"
         )
-        assert (
-            "git branch" not in allowed_tools
-        ), "The fixer's allowlist must not grant `git branch`"
+        assert "git branch" not in allowed_tools, (
+            "The fixer's allowlist must not grant `git branch`"
+        )
         assert "git push" not in allowed_tools, (
             "The fixer's allowlist must not grant `git push` — pushing the "
             "fix commit is a non-agent step's responsibility"
@@ -589,9 +589,9 @@ def test_autofix_same_repo_pr_agent_allowlist_excludes_pr_merge() -> None:
     agent_steps = _agent_steps(job)
     assert agent_steps, "autofix-same-repo-pr must contain a claude-code-action fixer step"
     for step in agent_steps:
-        assert (
-            "gh pr merge" not in _claude_args(step)
-        ), "The fixer's allowlist must not grant `gh pr merge` — a human always owns the merge decision"
+        assert "gh pr merge" not in _claude_args(step), (
+            "The fixer's allowlist must not grant `gh pr merge` — a human always owns the merge decision"
+        )
 
 
 def test_autofix_same_repo_pr_allowlists_only_dependabot_bot() -> None:
@@ -605,12 +605,12 @@ def test_autofix_same_repo_pr_allowlists_only_dependabot_bot() -> None:
     assert agent_steps, "autofix-same-repo-pr must contain a claude-code-action fixer step"
     for step in agent_steps:
         allowed = str(step.get("with", {}).get("allowed_bots", ""))
-        assert (
-            "dependabot[bot]" in allowed
-        ), "The fixer must allowlist dependabot[bot] or the dependabot surface is DOA (agent never runs)"
-        assert (
-            allowed.strip() != "*"
-        ), "Never allow all bots ('*') on a public repo — the action warns against it"
+        assert "dependabot[bot]" in allowed, (
+            "The fixer must allowlist dependabot[bot] or the dependabot surface is DOA (agent never runs)"
+        )
+        assert allowed.strip() != "*", (
+            "Never allow all bots ('*') on a public repo — the action warns against it"
+        )
 
 
 def test_autofix_same_repo_pr_fetches_and_sanitizes_failure_logs_in_a_non_agent_step() -> None:
@@ -639,12 +639,12 @@ def test_autofix_same_repo_pr_prompt_frames_logs_as_untrusted_data() -> None:
     assert agent_steps, "autofix-same-repo-pr must contain a claude-code-action fixer step"
     for step in agent_steps:
         prompt = (step.get("with") or {}).get("prompt", "") or ""
-        assert re.search(
-            r"untrusted", prompt, re.IGNORECASE
-        ), "The fixer's own prompt must frame fetched CI log content as untrusted data"
-        assert re.search(
-            r"instruction", prompt, re.IGNORECASE
-        ), "The fixer's own prompt must distinguish log content from instructions"
+        assert re.search(r"untrusted", prompt, re.IGNORECASE), (
+            "The fixer's own prompt must frame fetched CI log content as untrusted data"
+        )
+        assert re.search(r"instruction", prompt, re.IGNORECASE), (
+            "The fixer's own prompt must distinguish log content from instructions"
+        )
 
 
 def test_autofix_same_repo_pr_gates_on_an_attempt_counter_commit_trailer() -> None:
@@ -682,9 +682,9 @@ def test_autofix_same_repo_pr_stamps_the_attempt_trailer_from_a_non_agent_step()
 def test_autofix_same_repo_pr_declines_idempotently_via_a_terminal_label() -> None:
     parsed = _parsed()
     job = _job(parsed, "autofix-same-repo-pr")
-    assert (
-        "autofix:declined" in _job_text(job)
-    ), "An `autofix:declined` label must gate re-arming the fixer (idempotency) on an already-declined PR"
+    assert "autofix:declined" in _job_text(job), (
+        "An `autofix:declined` label must gate re-arming the fixer (idempotency) on an already-declined PR"
+    )
 
 
 def test_autofix_same_repo_pr_pushes_without_force_to_the_pr_head_branch() -> None:
@@ -722,9 +722,9 @@ def test_autofix_same_repo_pr_includes_a_sensitive_path_tripwire_step() -> None:
 
 def test_autofix_fork_job_exists() -> None:
     parsed = _parsed()
-    assert "autofix-fork" in (
-        parsed.get("jobs") or {}
-    ), "An `autofix-fork` job must exist to post suggest-only patch comments on fork PR CI failures"
+    assert "autofix-fork" in (parsed.get("jobs") or {}), (
+        "An `autofix-fork` job must exist to post suggest-only patch comments on fork PR CI failures"
+    )
 
 
 def test_autofix_fork_job_grants_read_only_contents_permission() -> None:
@@ -744,21 +744,21 @@ def test_autofix_fork_agent_allowlist_grants_no_write_or_git_or_merge() -> None:
     assert agent_steps, "autofix-fork must contain a claude-code-action suggest-only step"
     for step in agent_steps:
         allowed_tools = _claude_args(step)
-        assert (
-            "Edit" not in allowed_tools
-        ), "The fork suggest-only fixer's allowlist must not grant `Edit`"
-        assert (
-            "Write" not in allowed_tools
-        ), "The fork suggest-only fixer's allowlist must not grant `Write`"
-        assert not re.search(
-            r"Bash\(git", allowed_tools
-        ), "The fork suggest-only fixer's allowlist must not grant any git subcommand — it never commits"
-        assert (
-            "gh pr merge" not in allowed_tools
-        ), "The fork suggest-only fixer's allowlist must not grant `gh pr merge`"
-        assert (
-            "gh pr comment" in allowed_tools
-        ), "The fork suggest-only fixer must be able to post a suggested-patch comment via `gh pr comment`"
+        assert "Edit" not in allowed_tools, (
+            "The fork suggest-only fixer's allowlist must not grant `Edit`"
+        )
+        assert "Write" not in allowed_tools, (
+            "The fork suggest-only fixer's allowlist must not grant `Write`"
+        )
+        assert not re.search(r"Bash\(git", allowed_tools), (
+            "The fork suggest-only fixer's allowlist must not grant any git subcommand — it never commits"
+        )
+        assert "gh pr merge" not in allowed_tools, (
+            "The fork suggest-only fixer's allowlist must not grant `gh pr merge`"
+        )
+        assert "gh pr comment" in allowed_tools, (
+            "The fork suggest-only fixer must be able to post a suggested-patch comment via `gh pr comment`"
+        )
 
 
 def test_autofix_fork_grants_no_bash_execution_scoped_to_the_isolated_checkout() -> None:
@@ -798,9 +798,9 @@ def test_autofix_fork_gates_on_the_daily_run_budget() -> None:
         "the fixer agent"
     )
     for step in budget_steps:
-        assert (
-            "uses" not in step
-        ), "The budget gate must be a non-agent `run:` step, evaluated before the fixer agent runs"
+        assert "uses" not in step, (
+            "The budget gate must be a non-agent `run:` step, evaluated before the fixer agent runs"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -896,25 +896,25 @@ def test_finalize_step_exists_as_a_non_agent_step_after_the_push_step() -> None:
     job = _job(parsed, "autofix-same-repo-pr")
     step_names = [step.get("name", "") for step in job.get("steps") or []]
     finalize_step = _finalize_step(job)
-    assert (
-        finalize_step is not None
-    ), "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    assert finalize_step is not None, (
+        "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    )
     assert "uses" not in finalize_step, "The finalize step must be a non-agent `run:` step"
     push_index = next(i for i, name in enumerate(step_names) if "push" in name.lower())
     tripwire_index = next(i for i, name in enumerate(step_names) if "sensitive" in name.lower())
     finalize_index = step_names.index(finalize_step.get("name", ""))
-    assert (
-        push_index < finalize_index < tripwire_index
-    ), "The finalize step must run after the push step and before the sensitive-path tripwire step"
+    assert push_index < finalize_index < tripwire_index, (
+        "The finalize step must run after the push step and before the sensitive-path tripwire step"
+    )
 
 
 def test_finalize_step_is_guarded_on_always_and_budget_proceed() -> None:
     parsed = _parsed()
     job = _job(parsed, "autofix-same-repo-pr")
     finalize_step = _finalize_step(job)
-    assert (
-        finalize_step is not None
-    ), "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    assert finalize_step is not None, (
+        "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    )
     condition = finalize_step.get("if") or ""
     assert "always()" in condition, (
         "The finalize step's `if:` must include `always()` so it still runs "
@@ -931,9 +931,9 @@ def test_finalize_step_declines_when_no_fix_commit_and_no_existing_label() -> No
     parsed = _parsed()
     job = _job(parsed, "autofix-same-repo-pr")
     finalize_step = _finalize_step(job)
-    assert (
-        finalize_step is not None
-    ), "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    assert finalize_step is not None, (
+        "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    )
     run = finalize_step.get("run") or ""
     assert "PRE_AGENT_HEAD" in run, (
         "The finalize step must compare current HEAD against a "
@@ -943,9 +943,9 @@ def test_finalize_step_declines_when_no_fix_commit_and_no_existing_label() -> No
         "The finalize step must read the PR's labels via `gh pr view ... "
         "--json labels` to check for an existing autofix:declined label"
     )
-    assert (
-        "gh pr comment" in run
-    ), "The no-fix/no-label branch must post a bounded root-cause comment via `gh pr comment`"
+    assert "gh pr comment" in run, (
+        "The no-fix/no-label branch must post a bounded root-cause comment via `gh pr comment`"
+    )
     assert re.search(r"gh pr edit.*--add-label.*autofix:declined", run), (
         "The no-fix/no-label branch must apply the `autofix:declined` label "
         "via `gh pr edit --add-label`"
@@ -960,9 +960,9 @@ def test_finalize_step_is_idempotent_noop_when_declined_label_already_present() 
     parsed = _parsed()
     job = _job(parsed, "autofix-same-repo-pr")
     finalize_step = _finalize_step(job)
-    assert (
-        finalize_step is not None
-    ), "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    assert finalize_step is not None, (
+        "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    )
     run = finalize_step.get("run") or ""
     assert run.count("gh pr comment") == 1, (
         "The finalize step must call `gh pr comment` exactly once — the "
@@ -981,13 +981,13 @@ def test_finalize_step_noops_when_a_fix_commit_was_produced() -> None:
     parsed = _parsed()
     job = _job(parsed, "autofix-same-repo-pr")
     finalize_step = _finalize_step(job)
-    assert (
-        finalize_step is not None
-    ), "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    assert finalize_step is not None, (
+        "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    )
     run = finalize_step.get("run") or ""
-    assert re.search(
-        r"git rev-parse HEAD", run
-    ), "The finalize step must read the current HEAD via `git rev-parse HEAD`"
+    assert re.search(r"git rev-parse HEAD", run), (
+        "The finalize step must read the current HEAD via `git rev-parse HEAD`"
+    )
     assert re.search(r"!=.{0,40}PRE_AGENT_HEAD|PRE_AGENT_HEAD.{0,40}!=", run, re.DOTALL), (
         "The finalize step must compare current HEAD against PRE_AGENT_HEAD "
         "and exit before reaching the decline branch when a fix commit exists"
@@ -998,13 +998,13 @@ def test_finalize_step_wires_fixer_outcome_and_pre_agent_head_via_env() -> None:
     parsed = _parsed()
     job = _job(parsed, "autofix-same-repo-pr")
     finalize_step = _finalize_step(job)
-    assert (
-        finalize_step is not None
-    ), "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    assert finalize_step is not None, (
+        "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    )
     env = finalize_step.get("env") or {}
-    assert "steps.fixer.outcome" in str(
-        env.get("FIXER_OUTCOME", "")
-    ), "The finalize step's `env:` must wire a FIXER_OUTCOME-shaped key from `steps.fixer.outcome`"
+    assert "steps.fixer.outcome" in str(env.get("FIXER_OUTCOME", "")), (
+        "The finalize step's `env:` must wire a FIXER_OUTCOME-shaped key from `steps.fixer.outcome`"
+    )
     assert "steps.setup.outputs.pre_agent_head" in str(env.get("PRE_AGENT_HEAD", "")), (
         "The finalize step's `env:` must wire a PRE_AGENT_HEAD-shaped key from "
         "`steps.setup.outputs.pre_agent_head`"
@@ -1015,9 +1015,9 @@ def test_finalize_step_fails_closed_on_a_gh_label_read_error() -> None:
     parsed = _parsed()
     job = _job(parsed, "autofix-same-repo-pr")
     finalize_step = _finalize_step(job)
-    assert (
-        finalize_step is not None
-    ), "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    assert finalize_step is not None, (
+        "autofix-same-repo-pr must contain a non-agent finalize/decline step"
+    )
     run = finalize_step.get("run") or ""
     assert re.search(r"gh pr view.*--json labels.*2>/dev/null", run) or re.search(
         r"if\s*!\s*declined=", run
@@ -1084,9 +1084,9 @@ def test_allowedtools_value_stays_a_single_physical_line_in_every_agent_step() -
     assert agent_steps, "Expected at least one claude-code-action step in the workflow"
     for step in agent_steps:
         value = _allowed_tools_value(step)
-        assert (
-            value is not None
-        ), f'Expected an --allowedTools "..." value in {step.get("name")!r}\'s claude_args'
+        assert value is not None, (
+            f'Expected an --allowedTools "..." value in {step.get("name")!r}\'s claude_args'
+        )
         assert "\n" not in value, (
             f"{step.get('name')!r}'s --allowedTools value must stay a single "
             "physical line — a wrapped allowlist is silently narrowed at runtime"
@@ -1189,17 +1189,17 @@ def test_install_js_deps_step_is_non_agent_and_uses_ignore_scripts() -> None:
     )
     install_step = install_steps[0]
     assert "uses" not in install_step, "The JS/TS install step must be a non-agent `run:` step"
-    assert "--ignore-scripts" in (
-        install_step.get("run") or ""
-    ), "The JS/TS install step must disable lifecycle scripts via --ignore-scripts"
+    assert "--ignore-scripts" in (install_step.get("run") or ""), (
+        "The JS/TS install step must disable lifecycle scripts via --ignore-scripts"
+    )
     condition = install_step.get("if") or ""
     assert "js_test_grant" in condition, (
         "The JS/TS install step must be guarded on "
         "needs.classify.outputs.js_test_grant being non-empty"
     )
-    assert (
-        "steps.budget.outputs.proceed" in condition
-    ), "The JS/TS install step must also be guarded on steps.budget.outputs.proceed == 'true'"
+    assert "steps.budget.outputs.proceed" in condition, (
+        "The JS/TS install step must also be guarded on steps.budget.outputs.proceed == 'true'"
+    )
 
 
 def test_fixer_allowlist_contains_no_install_command_for_js_test_runner() -> None:
@@ -1216,9 +1216,9 @@ def test_fixer_allowlist_contains_no_install_command_for_js_test_runner() -> Non
     allowed_tools = _claude_args(agent_steps[0])
     assert "npm ci" not in allowed_tools, "The fixer allowlist must never grant `npm ci`"
     assert "npm install" not in allowed_tools, "The fixer allowlist must never grant `npm install`"
-    assert (
-        "pnpm install" not in allowed_tools
-    ), "The fixer allowlist must never grant `pnpm install`"
+    assert "pnpm install" not in allowed_tools, (
+        "The fixer allowlist must never grant `pnpm install`"
+    )
 
 
 def test_allowedtools_value_stays_a_single_physical_line_after_js_test_grant_token_appended() -> (
@@ -1236,9 +1236,9 @@ def test_allowedtools_value_stays_a_single_physical_line_after_js_test_grant_tok
     agent_steps = _agent_steps(job)
     assert agent_steps, "autofix-same-repo-pr must contain a claude-code-action fixer step"
     value = _allowed_tools_value(agent_steps[0])
-    assert (
-        value is not None
-    ), 'Expected an --allowedTools "..." value in the fixer step\'s claude_args'
+    assert value is not None, (
+        'Expected an --allowedTools "..." value in the fixer step\'s claude_args'
+    )
     assert "\n" not in value, (
         "The fixer step's --allowedTools value must stay a single physical "
         "line even after the JS/TS test-runner grant token is appended"
@@ -1261,9 +1261,9 @@ def test_js_test_runner_off_leaves_the_same_repo_pr_allowlist_byte_identical_to_
     agent_steps = _agent_steps(job)
     assert agent_steps, "autofix-same-repo-pr must contain a claude-code-action fixer step"
     value = _allowed_tools_value(agent_steps[0])
-    assert (
-        value is not None
-    ), 'Expected an --allowedTools "..." value in the fixer step\'s claude_args'
+    assert value is not None, (
+        'Expected an --allowedTools "..." value in the fixer step\'s claude_args'
+    )
     assert value.startswith(BUG_A_BASELINE_ALLOWED_TOOLS), (
         "The Bug-A-only baseline tokens must remain the leading, unmodified "
         "prefix of --allowedTools — Bug B may only append a templated JS/TS "
@@ -1340,9 +1340,9 @@ def _run_classify_script(tmp_path: Path, *, policy: dict) -> dict[str, str]:
         text=True,
         check=False,
     )
-    assert (
-        result.returncode == 0
-    ), f"classify script exited {result.returncode}; stderr:\n{result.stderr}"
+    assert result.returncode == 0, (
+        f"classify script exited {result.returncode}; stderr:\n{result.stderr}"
+    )
     outputs: dict[str, str] = {}
     for line in result.stdout.splitlines():
         if "=" not in line:
@@ -1395,9 +1395,9 @@ def test_js_install_cmd_no_longer_derives_from_the_runner_enum_table() -> None:
     independently of the js_test_runner enum.
     """
     run = _classify_run_text(_parsed())
-    assert not re.search(
-        r"js_install_cmd\s*,\s*js_runner_cmd\s*=\s*JS_RUNNER_TABLE", run
-    ), "js_install_cmd must no longer be unpacked from the coupled JS_RUNNER_TABLE tuple"
+    assert not re.search(r"js_install_cmd\s*,\s*js_runner_cmd\s*=\s*JS_RUNNER_TABLE", run), (
+        "js_install_cmd must no longer be unpacked from the coupled JS_RUNNER_TABLE tuple"
+    )
 
 
 def test_js_install_cmd_is_selected_through_the_pm_install_table_not_interpolated() -> None:
@@ -1491,9 +1491,9 @@ def test_yarn_lockfile_under_the_project_dir_selects_a_yarn_install(tmp_path: Pa
         tmp_path,
         policy={"provider": {"js_test_runner": "vitest", "js_project_dir": "dashboard_app"}},
     )
-    assert "yarn install" in outputs.get(
-        "js_install_cmd", ""
-    ), f"Expected a yarn install command; got js_install_cmd={outputs.get('js_install_cmd')!r}"
+    assert "yarn install" in outputs.get("js_install_cmd", ""), (
+        f"Expected a yarn install command; got js_install_cmd={outputs.get('js_install_cmd')!r}"
+    )
 
 
 def test_package_lock_json_under_the_project_dir_selects_npm_ci(tmp_path: Path) -> None:
@@ -1509,9 +1509,9 @@ def test_package_lock_json_under_the_project_dir_selects_npm_ci(tmp_path: Path) 
         tmp_path,
         policy={"provider": {"js_test_runner": "vitest", "js_project_dir": "dashboard_app"}},
     )
-    assert (
-        "npm ci" in outputs.get("js_install_cmd", "")
-    ), f"Expected npm ci as the install command; got js_install_cmd={outputs.get('js_install_cmd')!r}"
+    assert "npm ci" in outputs.get("js_install_cmd", ""), (
+        f"Expected npm ci as the install command; got js_install_cmd={outputs.get('js_install_cmd')!r}"
+    )
 
 
 def test_pnpm_lockfile_takes_precedence_over_a_stale_package_lock_json(tmp_path: Path) -> None:
@@ -1661,9 +1661,9 @@ def test_install_step_still_appends_ignore_scripts_after_the_corepack_prefix() -
     install_step = _install_step(job)
     assert install_step is not None, "autofix-same-repo-pr must contain a JS/TS install step"
     run = install_step.get("run") or ""
-    assert run.rstrip().endswith(
-        "--ignore-scripts"
-    ), "The install step's run line must still end in --ignore-scripts"
+    assert run.rstrip().endswith("--ignore-scripts"), (
+        "The install step's run line must still end in --ignore-scripts"
+    )
 
 
 def test_no_new_third_party_action_provisions_pnpm_or_yarn() -> None:
@@ -1674,9 +1674,9 @@ def test_no_new_third_party_action_provisions_pnpm_or_yarn() -> None:
     """
     parsed = _parsed()
     refs = _uses_refs(parsed)
-    assert not any(
-        "pnpm/action-setup" in ref for ref in refs
-    ), "No pnpm/action-setup reference is expected — pnpm is provisioned via corepack"
+    assert not any("pnpm/action-setup" in ref for ref in refs), (
+        "No pnpm/action-setup reference is expected — pnpm is provisioned via corepack"
+    )
     assert not any("actions/setup-node" in ref for ref in refs), (
         "No actions/setup-node reference is expected — Node ships pre-installed "
         "on the runner; only corepack enable is needed"

@@ -25,8 +25,7 @@ DISPOSITION_TERMS = ("switch-now", "defer-with-rationale", "dismiss-with-rationa
 def test_disposition_vocabulary_file_exists():
     """The canonical vocabulary reference file must exist at the declared path."""
     assert VOCAB_FILE.exists(), (
-        f"Expected vocabulary file at {VOCAB_FILE}; "
-        "Vocabulary file not found or the path changed."
+        f"Expected vocabulary file at {VOCAB_FILE}; Vocabulary file not found or the path changed."
     )
 
 
@@ -58,9 +57,7 @@ def test_consuming_surfaces_section_present():
     assert "cis" in lower or "continuous improvement" in lower, (
         "Consuming surfaces section must reference CIS (Continuous Improvement Signals)"
     )
-    assert "rework" in lower, (
-        "Consuming surfaces section must reference the rework-loop surface"
-    )
+    assert "rework" in lower, "Consuming surfaces section must reference the rework-loop surface"
 
 
 def test_how_to_cite_section_present():

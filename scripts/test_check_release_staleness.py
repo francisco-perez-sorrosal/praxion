@@ -30,10 +30,9 @@ _SCRIPT_PATH = Path(__file__).resolve().parent / "check_release_staleness.py"
 
 
 def _load_module() -> Any:
-    spec = importlib.util.spec_from_file_location(
-        "check_release_staleness", _SCRIPT_PATH
-    )
-    assert spec is not None and spec.loader is not None
+    spec = importlib.util.spec_from_file_location("check_release_staleness", _SCRIPT_PATH)
+    assert spec is not None
+    assert spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod
     spec.loader.exec_module(mod)

@@ -540,8 +540,7 @@ class TestReportInstallToImprove:
         # install section.
         for available_name in ("git", "scc", "lizard", "pydeps"):
             assert available_name not in install_section, (
-                f"Available collector '{available_name}' leaked into "
-                "Install to improve."
+                f"Available collector '{available_name}' leaked into Install to improve."
             )
 
 
@@ -564,8 +563,7 @@ class TestReportTopNTable:
         normalized = section.lower()
         for col in ("path", "churn", "complexity", "score"):
             assert col in normalized, (
-                f"Top-N table missing '{col}' column. Plan line 417 "
-                "requires four-column shape."
+                f"Top-N table missing '{col}' column. Plan line 417 requires four-column shape."
             )
 
     def test_all_five_reference_rows_appear(self) -> None:
@@ -633,9 +631,7 @@ class TestReportTrendsBlock:
         # All three numeric-delta rows from the reference fixture must
         # appear in the section.
         for metric in ("sloc_total", "file_count", "churn_total_90d"):
-            assert metric in section, (
-                f"Delta row for '{metric}' missing from trends section."
-            )
+            assert metric in section, f"Delta row for '{metric}' missing from trends section."
 
     def test_first_run_mode_emits_first_run_sentinel_string(self) -> None:
         from scripts.project_metrics.report import render_markdown
@@ -667,7 +663,12 @@ class TestReportTrendsBlock:
 
         md = render_markdown(mismatch_report)
         section = _extract_section(md, "Trends")
-        assert "1.0.0" in section and "2.0.0" in section, (
+        assert "1.0.0" in section, (
+            "schema_mismatch rendering must name both the prior and "
+            "current schema versions so users understand why deltas "
+            "are deferred."
+        )
+        assert "2.0.0" in section, (
             "schema_mismatch rendering must name both the prior and "
             "current schema versions so users understand why deltas "
             "are deferred."
@@ -708,9 +709,7 @@ class TestReportPerCollectorDeepDive:
             # Match either '### <name>' or '### <Name>' — the renderer's
             # casing choice is intentionally not locked here because the
             # plan does not specify it.
-            pattern = re.compile(
-                rf"^###\s+{re.escape(name)}", re.IGNORECASE | re.MULTILINE
-            )
+            pattern = re.compile(rf"^###\s+{re.escape(name)}", re.IGNORECASE | re.MULTILINE)
             assert pattern.search(section), (
                 f"Deep Dive missing '### {name}' subsection. Every "
                 "registered collector must be named in the deep dive."
@@ -723,11 +722,7 @@ class TestReportPerCollectorDeepDive:
         section = _extract_section(md, "Per-collector Deep Dive")
         scc_start = section.lower().index("### scc")
         next_heading = section.find("### ", scc_start + 1)
-        scc_body = (
-            section[scc_start:next_heading]
-            if next_heading != -1
-            else section[scc_start:]
-        )
+        scc_body = section[scc_start:next_heading] if next_heading != -1 else section[scc_start:]
 
         assert "Top 3 languages by SLOC (of 3):" in scc_body, (
             "scc subsection must surface a 'Top N languages by SLOC' bullet "
@@ -737,9 +732,14 @@ class TestReportPerCollectorDeepDive:
         python_pos = scc_body.find("Python — 30 files, 900 SLOC")
         markdown_pos = scc_body.find("Markdown — 8 files, 250 SLOC")
         yaml_pos = scc_body.find("YAML — 4 files, 84 SLOC")
-        assert python_pos != -1 and markdown_pos != -1 and yaml_pos != -1, (
-            "scc subsection must list each language with '<Name> — "
-            "<files> files, <sloc> SLOC'."
+        assert python_pos != -1, (
+            "scc subsection must list each language with '<Name> — <files> files, <sloc> SLOC'."
+        )
+        assert markdown_pos != -1, (
+            "scc subsection must list each language with '<Name> — <files> files, <sloc> SLOC'."
+        )
+        assert yaml_pos != -1, (
+            "scc subsection must list each language with '<Name> — <files> files, <sloc> SLOC'."
         )
         assert python_pos < markdown_pos < yaml_pos, (
             "Languages in the scc summary must be sorted by SLOC "
@@ -796,8 +796,7 @@ class TestReportSkipMarkerLanguage:
         # Form: "_not applicable for this repository_" — no tool name
         # because there is no user action.
         assert "_not applicable for this repository_" in md, (
-            "NotApplicable skip marker must read exactly "
-            "'_not applicable for this repository_'."
+            "NotApplicable skip marker must read exactly '_not applicable for this repository_'."
         )
 
     def test_unavailable_skip_marker_never_used_for_not_applicable(self) -> None:

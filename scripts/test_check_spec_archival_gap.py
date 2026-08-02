@@ -188,6 +188,6 @@ def test_canary_known_gap_fixture_flags_gap() -> None:
         f"result={result!r}. "
         f"Fixture path: {_FIXTURE_ROOT}"
     )
-    assert (
-        result["recent_adr_count"] >= _K_ADRS
-    ), f"Expected ≥{_K_ADRS} qualifying ADRs in fixture, got {result['recent_adr_count']}"
+    assert result["recent_adr_count"] >= _K_ADRS, (
+        f"Expected ≥{_K_ADRS} qualifying ADRs in fixture, got {result['recent_adr_count']}"
+    )

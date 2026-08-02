@@ -192,9 +192,7 @@ def _git_ls_files_with_python() -> subprocess.CompletedProcess[str]:
     """Canned ``git ls-files`` stdout listing mixed Python + non-Python files."""
 
     return _make_completed_process(
-        stdout=(
-            "README.md\nsrc/app.py\nsrc/helpers.py\nsrc/util.py\ntests/test_app.py\n"
-        ),
+        stdout=("README.md\nsrc/app.py\nsrc/helpers.py\nsrc/util.py\ntests/test_app.py\n"),
         args=["git", "ls-files"],
     )
 
@@ -259,9 +257,7 @@ def _writing_side_effect(json_text: str) -> Any:
     def _side_effect(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
         cwd = kwargs.get("cwd")
         if cwd is not None:
-            (Path(cwd) / "complexipy-results.json").write_text(
-                json_text, encoding="utf-8"
-            )
+            (Path(cwd) / "complexipy-results.json").write_text(json_text, encoding="utf-8")
         argv = args[0] if args else kwargs.get("args") or []
         return _make_completed_process(stdout="", args=argv)
 
@@ -346,9 +342,7 @@ class TestComplexipyStaticMetadata:
 class TestComplexipyResolveAvailable:
     """``resolve()`` returns Available when uvx, complexipy, and .py files all present."""
 
-    def test_resolve_returns_available_with_parsed_version(
-        self, tmp_path: Path
-    ) -> None:
+    def test_resolve_returns_available_with_parsed_version(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.base import Available
         from scripts.project_metrics.collectors.complexipy_collector import (
             ComplexipyCollector,
@@ -445,8 +439,7 @@ class TestComplexipyResolveUnavailable:
             result = collector.resolve(_make_env())
 
         assert isinstance(result, Unavailable), (
-            f"Expected Unavailable when version probe fails; got "
-            f"{type(result).__name__}"
+            f"Expected Unavailable when version probe fails; got {type(result).__name__}"
         )
 
 
@@ -588,9 +581,7 @@ class TestComplexipyResolveTimeout:
             argv = args[0] if args else kwargs.get("args") or []
             if isinstance(argv, (list, tuple)) and argv and argv[0] == "git":
                 return _git_ls_files_with_python()
-            raise subprocess.TimeoutExpired(
-                cmd=["uvx", "complexipy", "--version"], timeout=120
-            )
+            raise subprocess.TimeoutExpired(cmd=["uvx", "complexipy", "--version"], timeout=120)
 
         with (
             patch(f"{target}.shutil.which", return_value="/usr/local/bin/uvx"),
@@ -599,16 +590,13 @@ class TestComplexipyResolveTimeout:
             result = collector.resolve(_make_env())
 
         assert isinstance(result, Unavailable), (
-            f"Expected Unavailable when first-run cache fill times out; got "
-            f"{type(result).__name__}"
+            f"Expected Unavailable when first-run cache fill times out; got {type(result).__name__}"
         )
         # Reason should hint at the timeout condition so the MD renderer can
         # disambiguate "not installed" vs "timed out during first-run fetch".
         combined_reason = result.reason.lower()
         assert (
-            "timeout" in combined_reason
-            or "timed out" in combined_reason
-            or "120" in result.reason
+            "timeout" in combined_reason or "timed out" in combined_reason or "120" in result.reason
         ), (
             "Expected Unavailable.reason to mention timeout / timed out / "
             f"120 seconds; got reason={result.reason!r}"
@@ -623,9 +611,7 @@ class TestComplexipyResolveTimeout:
 class TestComplexipyCollectSuccess:
     """``collect()`` parses complexipy JSON into per-file cognitive rollups."""
 
-    def test_collect_returns_ok_status_on_well_formed_json(
-        self, tmp_path: Path
-    ) -> None:
+    def test_collect_returns_ok_status_on_well_formed_json(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.complexipy_collector import (
             ComplexipyCollector,
         )
@@ -661,20 +647,16 @@ class TestComplexipyCollectSuccess:
         # does not pin the exact nesting key).
         data = result.data
         files_block = data.get("files") or {
-            k: v
-            for k, v in data.items()
-            if isinstance(v, dict) and "max_cognitive" in v
+            k: v for k, v in data.items() if isinstance(v, dict) and "max_cognitive" in v
         }
         assert files_block, (
-            f"Expected per-file rollup block in collector data; keys were "
-            f"{list(data.keys())}"
+            f"Expected per-file rollup block in collector data; keys were {list(data.keys())}"
         )
 
         # All three well-formed files must show up.
         for expected_file in _FILE_MAX_COGNITIVE:
             assert expected_file in files_block, (
-                f"Expected per-file entry for {expected_file!r}; got "
-                f"{list(files_block.keys())!r}"
+                f"Expected per-file entry for {expected_file!r}; got {list(files_block.keys())!r}"
             )
 
     def test_per_file_max_cognitive_matches_canned_json(self, tmp_path: Path) -> None:
@@ -692,9 +674,7 @@ class TestComplexipyCollectSuccess:
 
         data = result.data
         files_block = data.get("files") or {
-            k: v
-            for k, v in data.items()
-            if isinstance(v, dict) and "max_cognitive" in v
+            k: v for k, v in data.items() if isinstance(v, dict) and "max_cognitive" in v
         }
         for file_path, expected_max in _FILE_MAX_COGNITIVE.items():
             file_entry = files_block[file_path]
@@ -718,9 +698,7 @@ class TestComplexipyCollectSuccess:
 
         data = result.data
         files_block = data.get("files") or {
-            k: v
-            for k, v in data.items()
-            if isinstance(v, dict) and "max_cognitive" in v
+            k: v for k, v in data.items() if isinstance(v, dict) and "max_cognitive" in v
         }
         for file_path, expected_count in _FILE_FUNCTION_COUNT.items():
             file_entry = files_block[file_path]
@@ -729,9 +707,7 @@ class TestComplexipyCollectSuccess:
                 f"got function_count={file_entry['function_count']!r}"
             )
 
-    def test_per_file_cognitive_scores_list_matches_canned_json(
-        self, tmp_path: Path
-    ) -> None:
+    def test_per_file_cognitive_scores_list_matches_canned_json(self, tmp_path: Path) -> None:
         """Per-file ``cognitive_scores`` is a flat list of all the function scores.
 
         The aggregate p95 rollup is computed across *all* functions, not
@@ -754,9 +730,7 @@ class TestComplexipyCollectSuccess:
 
         data = result.data
         files_block = data.get("files") or {
-            k: v
-            for k, v in data.items()
-            if isinstance(v, dict) and "max_cognitive" in v
+            k: v for k, v in data.items() if isinstance(v, dict) and "max_cognitive" in v
         }
         expected_scores: dict[str, list[int]] = {
             "src/app.py": [3, 5, 7],
@@ -780,9 +754,7 @@ class TestComplexipyCollectSuccess:
 class TestComplexipyAggregateRollup:
     """Repo-wide p95 and the empty-repo null contract."""
 
-    def test_aggregate_cognitive_p95_falls_in_plausible_band(
-        self, tmp_path: Path
-    ) -> None:
+    def test_aggregate_cognitive_p95_falls_in_plausible_band(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.complexipy_collector import (
             ComplexipyCollector,
         )
@@ -810,9 +782,7 @@ class TestComplexipyAggregateRollup:
             f"[1, 2, 2, 3, 4, 5, 6, 7, 8]."
         )
 
-    def test_aggregate_total_function_count_matches_fixture(
-        self, tmp_path: Path
-    ) -> None:
+    def test_aggregate_total_function_count_matches_fixture(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.complexipy_collector import (
             ComplexipyCollector,
         )
@@ -832,9 +802,7 @@ class TestComplexipyAggregateRollup:
             f"3 files × [3, 4, 2] functions; got {total!r}"
         )
 
-    def test_aggregate_cognitive_p95_is_null_for_empty_project(
-        self, tmp_path: Path
-    ) -> None:
+    def test_aggregate_cognitive_p95_is_null_for_empty_project(self, tmp_path: Path) -> None:
         """When complexipy finds no functions, cognitive_p95 is null (not 0).
 
         A zero would be indistinguishable from "every function has cognitive

@@ -16,10 +16,9 @@ _SCRIPT_PATH = Path(__file__).resolve().parent / "check_shipped_artifact_isolati
 
 
 def _load_module() -> Any:
-    spec = importlib.util.spec_from_file_location(
-        "check_shipped_artifact_isolation", _SCRIPT_PATH
-    )
-    assert spec is not None and spec.loader is not None
+    spec = importlib.util.spec_from_file_location("check_shipped_artifact_isolation", _SCRIPT_PATH)
+    assert spec is not None
+    assert spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
     sys.modules["check_shipped_artifact_isolation"] = mod
     spec.loader.exec_module(mod)
@@ -98,9 +97,7 @@ def test_accepts_path_shape_placeholder(tmp_path: Path) -> None:
         "Decisions follow `.ai-state/decisions/<NNN>-<slug>.md` conventions.\n",
     )
     findings = scan_file(fixture)
-    assert findings == [], (
-        f"path-shape placeholders must not be flagged; got: {findings}"
-    )
+    assert findings == [], f"path-shape placeholders must not be flagged; got: {findings}"
 
 
 def test_accepts_clean_shipped_artifact(tmp_path: Path) -> None:

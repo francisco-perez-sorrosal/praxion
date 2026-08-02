@@ -15,10 +15,9 @@ MODULE_PATH = Path(__file__).parent / "worktree_guard.py"
 
 def _load_guard_module():
     """Load worktree_guard.py by path (hooks/ is not a package)."""
-    spec = importlib.util.spec_from_file_location(
-        "worktree_guard_under_test", MODULE_PATH
-    )
-    assert spec is not None and spec.loader is not None
+    spec = importlib.util.spec_from_file_location("worktree_guard_under_test", MODULE_PATH)
+    assert spec is not None
+    assert spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod
     spec.loader.exec_module(mod)
@@ -34,9 +33,7 @@ def main_repo(tmp_path: Path) -> Path:
     repo = tmp_path / "main"
     repo.mkdir()
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
-    subprocess.run(
-        ["git", "-C", str(repo), "config", "user.email", "t@example.com"], check=True
-    )
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "t@example.com"], check=True)
     subprocess.run(["git", "-C", str(repo), "config", "user.name", "test"], check=True)
     (repo / "README.md").write_text("seed\n", encoding="utf-8")
     subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
@@ -109,9 +106,7 @@ class TestGuardPassThrough:
         result = _run_hook(payload, linked_worktree)
         assert result.returncode == 0
 
-    def test_allows_write_outside_any_git_tree(
-        self, linked_worktree: Path, tmp_path: Path
-    ) -> None:
+    def test_allows_write_outside_any_git_tree(self, linked_worktree: Path, tmp_path: Path) -> None:
         non_git = tmp_path / "outside" / "config.json"
         non_git.parent.mkdir()
         payload = {
@@ -172,9 +167,7 @@ class TestGuardBlocks:
         assert "BLOCKED" in result.stderr
         assert "cross-worktree" in result.stderr
 
-    def test_blocks_edit_tool_same_semantics(
-        self, linked_worktree: Path, main_repo: Path
-    ) -> None:
+    def test_blocks_edit_tool_same_semantics(self, linked_worktree: Path, main_repo: Path) -> None:
         payload = {
             "tool_name": "Edit",
             "tool_input": {"file_path": str(main_repo / "README.md")},

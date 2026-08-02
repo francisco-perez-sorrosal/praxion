@@ -74,7 +74,7 @@ def _has_paths_frontmatter(content: str) -> bool:
     return False
 
 
-def _is_rule_README(path: Path) -> bool:
+def _is_rule_README(path: Path) -> bool:  # noqa: N802 — README is a filename, not a word — lowercasing it loses the distinction
     """README.md files in the rules directory are documentation, not rules.
 
     They are not symlinked into ~/.claude/rules/ by the installer, so they

@@ -100,9 +100,7 @@ def _make_bash_payload(command: str, cwd: str | None = None) -> dict:
 def test_gate_script_is_executable() -> None:
     """The shell gate must be executable or the hook silently no-ops."""
     assert GATE_SCRIPT.exists(), f"missing {GATE_SCRIPT}"
-    assert os.access(GATE_SCRIPT, os.X_OK), (
-        f"{GATE_SCRIPT} is not executable (chmod +x required)"
-    )
+    assert os.access(GATE_SCRIPT, os.X_OK), f"{GATE_SCRIPT} is not executable (chmod +x required)"
 
 
 # ---------------------------------------------------------------------------
@@ -124,9 +122,7 @@ def test_non_matching_command_exits_fast(command: str) -> None:
     """Non-cleanup commands exit 0 with empty stdout — Python never runs."""
     result = _run_gate(_make_bash_payload(command))
     assert result.returncode == 0, f"expected exit 0, got {result.returncode}"
-    assert result.stdout == "", (
-        f"expected empty stdout on fast-path, got: {result.stdout!r}"
-    )
+    assert result.stdout == "", f"expected empty stdout on fast-path, got: {result.stdout!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -165,8 +161,7 @@ def test_rm_ai_work_invokes_promote_learnings(
     result = _run_gate(_make_bash_payload(command, cwd=str(fixture_cwd_with_learnings)))
     assert result.returncode == 0
     assert PROMOTE_MARKER in result.stdout, (
-        f"expected {PROMOTE_MARKER!r} in stdout (Python was not invoked), "
-        f"got: {result.stdout!r}"
+        f"expected {PROMOTE_MARKER!r} in stdout (Python was not invoked), got: {result.stdout!r}"
     )
 
 

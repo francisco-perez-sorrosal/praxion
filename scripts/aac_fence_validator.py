@@ -21,7 +21,6 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-
 # ---------------------------------------------------------------------------
 # Public types
 # ---------------------------------------------------------------------------
@@ -132,8 +131,7 @@ def _check_generated_opener(attrs: dict[str, str], lineno: int) -> list[Finding]
                 severity=Severity.WARN,
                 code="validator-unable-to-verify-drift",
                 message=(
-                    f"aac:generated at line {lineno}: "
-                    "likec4 is unavailable; drift check skipped"
+                    f"aac:generated at line {lineno}: likec4 is unavailable; drift check skipped"
                 ),
                 line=lineno,
             )
@@ -149,10 +147,7 @@ def _check_authored_opener(attrs: dict[str, str], lineno: int) -> list[Finding]:
             Finding(
                 severity=Severity.FAIL,
                 code="missing-attribute",
-                message=(
-                    f"aac:authored at line {lineno} is missing "
-                    "required attribute 'owner='"
-                ),
+                message=(f"aac:authored at line {lineno} is missing required attribute 'owner='"),
                 line=lineno,
             )
         ]

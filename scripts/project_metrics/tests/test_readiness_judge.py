@@ -5,7 +5,7 @@ throughout. The tests pin:
 
 * ``detect_auth()`` precedence (API key wins over OAuth; neither → None),
 * the request shape (endpoint, headers, forced tool_choice, model, grounding),
-* ``JudgeUnavailable`` on no-auth and on transport error,
+* ``JudgeUnavailableError`` on no-auth and on transport error,
 * correct header selection per credential type (``x-api-key`` vs Bearer).
 
 The judge must never import the Anthropic SDK nor spawn a subprocess; a
@@ -23,7 +23,6 @@ from unittest.mock import patch
 import pytest
 
 from scripts.project_metrics.collectors.readiness import judge
-
 
 # ---------------------------------------------------------------------------
 # Helpers.
@@ -52,7 +51,7 @@ class _FakeResponse:
     def __init__(self, body: bytes) -> None:
         self._body = body
 
-    def __enter__(self) -> "_FakeResponse":
+    def __enter__(self) -> _FakeResponse:
         return self
 
     def __exit__(self, *exc: object) -> None:
@@ -147,9 +146,7 @@ def test_judge_criterion_uses_bearer_header_for_oauth(
     captured: dict[str, Any] = {}
 
     def _fake_urlopen(request: Any, timeout: int = 0) -> _FakeResponse:
-        captured["headers"] = {
-            k.lower(): v for k, v in dict(request.header_items()).items()
-        }
+        captured["headers"] = {k.lower(): v for k, v in dict(request.header_items()).items()}
         return _FakeResponse(_verdict_response(False, "missing setup section"))
 
     with patch("urllib.request.urlopen", _fake_urlopen):
@@ -180,7 +177,7 @@ def test_judge_criterion_grounds_on_prior_verdict(
 
 
 # ---------------------------------------------------------------------------
-# Failure modes → JudgeUnavailable.
+# Failure modes → JudgeUnavailableError.
 # ---------------------------------------------------------------------------
 
 
@@ -189,7 +186,7 @@ def test_judge_criterion_raises_when_no_auth(
 ) -> None:
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
-    with pytest.raises(judge.JudgeUnavailable):
+    with pytest.raises(judge.JudgeUnavailableError):
         judge.judge_criterion(_criterion(), "README content", None)
 
 
@@ -202,7 +199,7 @@ def test_judge_criterion_raises_on_urllib_error(
         raise urllib.error.URLError("connection refused")
 
     with patch("urllib.request.urlopen", _raising_urlopen):
-        with pytest.raises(judge.JudgeUnavailable):
+        with pytest.raises(judge.JudgeUnavailableError):
             judge.judge_criterion(_criterion(), "README content", None)
 
 
@@ -215,7 +212,7 @@ def test_judge_criterion_raises_on_unparseable_response(
         return _FakeResponse(b"not json at all")
 
     with patch("urllib.request.urlopen", _bad_urlopen):
-        with pytest.raises(judge.JudgeUnavailable):
+        with pytest.raises(judge.JudgeUnavailableError):
             judge.judge_criterion(_criterion(), "README content", None)
 
 
@@ -223,15 +220,13 @@ def test_judge_criterion_raises_when_no_verdict_tool_call(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    body = json.dumps(
-        {"content": [{"type": "text", "text": "I cannot decide"}]}
-    ).encode("utf-8")
+    body = json.dumps({"content": [{"type": "text", "text": "I cannot decide"}]}).encode("utf-8")
 
     def _textonly_urlopen(request: Any, timeout: int = 0) -> _FakeResponse:
         return _FakeResponse(body)
 
     with patch("urllib.request.urlopen", _textonly_urlopen):
-        with pytest.raises(judge.JudgeUnavailable):
+        with pytest.raises(judge.JudgeUnavailableError):
             judge.judge_criterion(_criterion(), "README content", None)
 
 
@@ -247,19 +242,13 @@ def test_judge_module_does_not_import_anthropic_sdk() -> None:
     sdk = "anthropic"
     forbidden_prefixes = (f"import {sdk}", f"from {sdk}")
     import_lines = [
-        line
-        for line in source.splitlines()
-        if line.strip().startswith(forbidden_prefixes)
+        line for line in source.splitlines() if line.strip().startswith(forbidden_prefixes)
     ]
-    assert import_lines == [], (
-        f"judge.py must not import the {sdk} SDK; found {import_lines!r}"
-    )
+    assert import_lines == [], f"judge.py must not import the {sdk} SDK; found {import_lines!r}"
 
 
 def test_judge_module_does_not_invoke_a_subprocess() -> None:
     source = Path(judge.__file__).read_text(encoding="utf-8")
     forbidden_call_tokens = ("subprocess.run", "subprocess.Popen", "os.system(")
     for token in forbidden_call_tokens:
-        assert token not in source, (
-            f"judge.py must not spawn a subprocess; found {token!r}"
-        )
+        assert token not in source, f"judge.py must not spawn a subprocess; found {token!r}"

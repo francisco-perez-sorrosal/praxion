@@ -163,9 +163,9 @@ def test_faithful_chain_passes(tmp_path: Path) -> None:
 
     # link-1: TASK_BRIEF present alongside SYSTEMS_PLAN — no P06 violation
     p06_findings = check_p06_task_brief.run_p06(tmp_path)
-    assert (
-        p06_findings == []
-    ), f"Expected no P06 findings for a faithful chain; got: {p06_findings!r}"
+    assert p06_findings == [], (
+        f"Expected no P06 findings for a faithful chain; got: {p06_findings!r}"
+    )
 
     # link-2: all dependents listed in traceability are in changed_files.
     # _DEP_PATH is derived from the same constant used in _write_traceability
@@ -177,9 +177,9 @@ def test_faithful_chain_passes(tmp_path: Path) -> None:
         None,
         _changed_files_override=changed_override,
     )
-    assert not any(
-        f.get("severity") == "important" for f in drift_findings
-    ), f"Expected no important drift finding for a faithful chain; got: {drift_findings!r}"
+    assert not any(f.get("severity") == "important" for f in drift_findings), (
+        f"Expected no important drift finding for a faithful chain; got: {drift_findings!r}"
+    )
 
     # link-3: SPEC body contains the Traceability section header and every req ID
     spec_text = artifacts["spec_path"].read_text(encoding="utf-8")
@@ -200,9 +200,9 @@ def test_faithful_chain_passes(tmp_path: Path) -> None:
 
     # link-4a: SPEC is fresh (same date as _NOW, no ADR cluster) — no gap
     gap_result = check_spec_archival_gap.detect_gap(tmp_path, now=_NOW)
-    assert (
-        gap_result["gap"] is False
-    ), f"Expected gap=False for a fresh SPEC with no ADR cluster; result: {gap_result!r}"
+    assert gap_result["gap"] is False, (
+        f"Expected gap=False for a fresh SPEC with no ADR cluster; result: {gap_result!r}"
+    )
 
     # link-4b: regenerate_specs_index writes an index listing the new SPEC.
     # Rebind module globals to tmp_path immediately before use (R3 mitigation).
@@ -210,9 +210,9 @@ def test_faithful_chain_passes(tmp_path: Path) -> None:
     specs = rsi_mod.collect_specs()
     index_content = rsi_mod.generate_index(specs)
     rsi_mod.INDEX_PATH.write_text(index_content, encoding="utf-8")
-    assert (
-        f"SPEC_{_SLUG}_{_SPEC_DATE}.md" in index_content
-    ), f"Generated index must list the new SPEC; index:\n{index_content}"
+    assert f"SPEC_{_SLUG}_{_SPEC_DATE}.md" in index_content, (
+        f"Generated index must list the new SPEC; index:\n{index_content}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -230,9 +230,9 @@ def test_link1_brief_missing_bites(tmp_path: Path) -> None:
 
     findings = check_p06_task_brief.run_p06(tmp_path)
     assert findings, "Expected P06 finding when TASK_BRIEF.md is absent; got empty list"
-    assert any(
-        f.get("check") == "P06" for f in findings
-    ), f"Expected at least one finding with check='P06'; got: {findings!r}"
+    assert any(f.get("check") == "P06" for f in findings), (
+        f"Expected at least one finding with check='P06'; got: {findings!r}"
+    )
 
 
 def test_link2_traceability_gap_bites(tmp_path: Path) -> None:
@@ -248,9 +248,9 @@ def test_link2_traceability_gap_bites(tmp_path: Path) -> None:
         None,
         _changed_files_override=["SYSTEMS_PLAN.md"],
     )
-    assert (
-        findings
-    ), "Expected drift finding when dependents not included in changed files; got empty list"
+    assert findings, (
+        "Expected drift finding when dependents not included in changed files; got empty list"
+    )
     important = [f for f in findings if f.get("severity") == "important"]
     assert important, f"Expected at least one important drift finding; got: {findings!r}"
 
@@ -272,12 +272,12 @@ def test_link3_spec_missing_req_bites(tmp_path: Path) -> None:
     # This assertion is itself the validator for link-3 — it passes when the
     # broken state is caught, and fails if the spec somehow still contains all
     # req IDs (which would mean the fixture setup failed).
-    assert not all(
-        r in spec_text for r in reqs
-    ), "REQ-flow assertion must catch the missing req ID in the SPEC body"
-    assert (
-        missing_req not in spec_text
-    ), f"Fixture setup error: {missing_req!r} still present after removal"
+    assert not all(r in spec_text for r in reqs), (
+        "REQ-flow assertion must catch the missing req ID in the SPEC body"
+    )
+    assert missing_req not in spec_text, (
+        f"Fixture setup error: {missing_req!r} still present after removal"
+    )
 
 
 def test_link4_stale_spec_gap_bites(tmp_path: Path) -> None:

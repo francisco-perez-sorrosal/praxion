@@ -25,9 +25,9 @@ def _body() -> str:
 def test_architecture_class_routes_to_architect() -> None:
     body = _body()
     # The command must document that architecture-class rows dispatch to systems-architect.
-    assert (
-        "systems-architect" in body
-    ), "commands/resume-rework.md must document dispatch to 'systems-architect'"
+    assert "systems-architect" in body, (
+        "commands/resume-rework.md must document dispatch to 'systems-architect'"
+    )
     assert re.search(
         r"(architecture.{0,80}systems.architect|systems.architect.{0,80}architecture)",
         body,

@@ -35,9 +35,9 @@ def _parse_headings(text: str) -> list[str]:
 
 class TestTemplateExists:
     def test_the_ecosystem_defect_template_file_exists(self) -> None:
-        assert (
-            TEMPLATE_PATH.exists()
-        ), f"expected the issue template at {TEMPLATE_PATH}, but it has not been created yet"
+        assert TEMPLATE_PATH.exists(), (
+            f"expected the issue template at {TEMPLATE_PATH}, but it has not been created yet"
+        )
 
 
 class TestTemplateHeadingsMatchTheRendererExactly:

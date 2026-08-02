@@ -108,9 +108,7 @@ def _nearest_existing_ancestor(path: Path) -> Path | None:
 
 def _target_git_root(target_abs: Path) -> Path | None:
     """Return the git toplevel containing ``target_abs``; None if not in a repo."""
-    probe_dir = (
-        target_abs if target_abs.is_dir() else _nearest_existing_ancestor(target_abs)
-    )
+    probe_dir = target_abs if target_abs.is_dir() else _nearest_existing_ancestor(target_abs)
     if probe_dir is None:
         return None
     toplevel = _git(probe_dir, "rev-parse", "--show-toplevel")

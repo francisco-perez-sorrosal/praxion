@@ -117,9 +117,9 @@ def test_reports_under_coverage_when_pipeline_merged_since_last_calibration(
     with pytest.raises(SystemExit) as exc:
         mod.main(["--repo-root", str(tmp_path), "--check"])
 
-    assert (
-        exc.value.code == 1
-    ), "Two feat: commits after calibration date must trigger under-coverage (exit 1)"
+    assert exc.value.code == 1, (
+        "Two feat: commits after calibration date must trigger under-coverage (exit 1)"
+    )
 
 
 def test_no_warning_when_log_is_current(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -140,9 +140,9 @@ def test_no_warning_when_log_is_current(tmp_path: Path, capsys: pytest.CaptureFi
     with pytest.raises(SystemExit) as exc:
         mod.main(["--repo-root", str(tmp_path), "--check"])
 
-    assert (
-        exc.value.code == 0
-    ), "Current calibration log (future timestamp) must not report under-coverage"
+    assert exc.value.code == 0, (
+        "Current calibration log (future timestamp) must not report under-coverage"
+    )
 
 
 def test_flags_docs_and_refactor_and_test_only_commits(
@@ -227,12 +227,12 @@ def test_runs_to_verdict_without_sentinel(
     # Structural: source must not import sentinel or invoke it as a subprocess.
     # (A docstring noting "called by sentinel CA03" is fine and expected.)
     source = _SCRIPT_PATH.read_text(encoding="utf-8")
-    assert (
-        "import sentinel" not in source
-    ), "check_calibration_coverage.py must not import sentinel as a module"
-    assert (
-        "agents/sentinel.md" not in source
-    ), "check_calibration_coverage.py must not subprocess-invoke agents/sentinel.md"
+    assert "import sentinel" not in source, (
+        "check_calibration_coverage.py must not import sentinel as a module"
+    )
+    assert "agents/sentinel.md" not in source, (
+        "check_calibration_coverage.py must not subprocess-invoke agents/sentinel.md"
+    )
 
 
 def test_flags_stale_calibration_log(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -259,9 +259,9 @@ def test_flags_stale_calibration_log(tmp_path: Path, capsys: pytest.CaptureFixtu
         "Known-lapsed calibration state (far-past date + 2 pipeline commits) "
         "must report covered=false"
     )
-    assert (
-        payload["uncalibrated_commits"] >= 2
-    ), "Must count at least 2 uncalibrated pipeline commits in the known-bad canary fixture"
+    assert payload["uncalibrated_commits"] >= 2, (
+        "Must count at least 2 uncalibrated pipeline commits in the known-bad canary fixture"
+    )
 
 
 def test_exits_zero_when_no_calibration_log_present(

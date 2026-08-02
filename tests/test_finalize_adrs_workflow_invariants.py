@@ -256,9 +256,9 @@ def test_no_skip_ci_workaround_is_present() -> None:
         "anti-recursion guarantee is structural, not something the workflow "
         "must engineer around"
     )
-    assert (
-        "[ci skip]" not in raw
-    ), "no `[ci skip]` workaround should be needed — same rationale as `[skip ci]`"
+    assert "[ci skip]" not in raw, (
+        "no `[ci skip]` workaround should be needed — same rationale as `[skip ci]`"
+    )
 
 
 # ---------------------------------------------------------------------------

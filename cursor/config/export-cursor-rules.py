@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Export rules/*.md to Cursor .cursor/rules/ with minimal frontmatter (description, alwaysApply). Repo files unchanged."""
 
-from pathlib import Path
-import re
 import sys
+from pathlib import Path
 
 
 def path_to_description(rel_path: str) -> str:
@@ -39,8 +38,12 @@ def export_rules(repo_root: Path, out_dir: Path) -> None:
 
 
 def main() -> None:
-    repo_root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent.parent
-    out_dir = (Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else repo_root / ".cursor" / "rules")
+    repo_root = (
+        Path(sys.argv[1]).resolve()
+        if len(sys.argv) > 1
+        else Path(__file__).resolve().parent.parent.parent
+    )
+    out_dir = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else repo_root / ".cursor" / "rules"
     export_rules(repo_root, out_dir)
 
 

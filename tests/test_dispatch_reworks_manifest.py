@@ -25,7 +25,6 @@ import subprocess
 import textwrap
 from pathlib import Path
 
-
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -124,14 +123,15 @@ def make_worktree_dir(name: str) -> Path:
 
 def test_bg_and_terminals_together_exits_misuse():
     """Passing --bg and --terminals together must exit 2 (misuse) immediately."""
-    result = run_script(
-        "--bg", "--terminals", "--dry-run", "--manifest", str(SAMPLE_MANIFEST)
-    )
+    result = run_script("--bg", "--terminals", "--dry-run", "--manifest", str(SAMPLE_MANIFEST))
     assert result.returncode == 2, (
         f"Expected exit 2 for --bg + --terminals, got {result.returncode}. "
         f"stderr: {result.stderr!r}"
     )
-    assert "--bg" in result.stderr and "--terminals" in result.stderr, (
+    assert "--bg" in result.stderr, (
+        "Error message should mention both flags. stderr: " + result.stderr
+    )
+    assert "--terminals" in result.stderr, (
         "Error message should mention both flags. stderr: " + result.stderr
     )
 
@@ -146,8 +146,7 @@ def test_nonexistent_manifest_path_exits_manifest_not_found(tmp_path):
     missing = tmp_path / "no_such_manifest.md"
     result = run_script("--dry-run", "--manifest", str(missing))
     assert result.returncode == 3, (
-        f"Expected exit 3 for missing manifest, got {result.returncode}. "
-        f"stderr: {result.stderr!r}"
+        f"Expected exit 3 for missing manifest, got {result.returncode}. stderr: {result.stderr!r}"
     )
 
 
@@ -171,12 +170,9 @@ def test_empty_manifest_file_exits_empty(tmp_path):
     empty.write_text("", encoding="utf-8")
     result = run_script("--dry-run", "--manifest", str(empty))
     assert result.returncode == 4, (
-        f"Expected exit 4 for empty manifest, got {result.returncode}. "
-        f"stderr: {result.stderr!r}"
+        f"Expected exit 4 for empty manifest, got {result.returncode}. stderr: {result.stderr!r}"
     )
-    assert result.stderr.strip(), (
-        "Expected a diagnostic message on stderr for empty manifest"
-    )
+    assert result.stderr.strip(), "Expected a diagnostic message on stderr for empty manifest"
 
 
 def test_manifest_with_no_json_blocks_exits_empty(tmp_path):
@@ -343,16 +339,12 @@ def test_bg_dry_run_line_format_contains_expected_fields(tmp_path):
         dispatch_lines = [
             ln for ln in result.stdout.splitlines() if ln.startswith("would dispatch:")
         ]
-        assert len(dispatch_lines) == 1, (
-            f"Expected 1 dispatch line, got {dispatch_lines!r}"
-        )
+        assert len(dispatch_lines) == 1, f"Expected 1 dispatch line, got {dispatch_lines!r}"
         line = dispatch_lines[0]
         assert "bg" in line, f"Mode 'bg' missing from line: {line!r}"
         assert name in line, f"Worktree name '{name}' missing from line: {line!r}"
         assert "claude --bg" in line, f"'claude --bg' missing from line: {line!r}"
-        assert '"/resume-rework"' in line, (
-            f"'/resume-rework' missing from line: {line!r}"
-        )
+        assert '"/resume-rework"' in line, f"'/resume-rework' missing from line: {line!r}"
         assert f'"rework: {name}"' in line, (
             f"'rework: {name}' missing from --name value in line: {line!r}"
         )
@@ -372,10 +364,8 @@ def test_bg_dry_run_row_order_matches_manifest_order(tmp_path):
         dispatch_lines = [
             ln for ln in result.stdout.splitlines() if ln.startswith("would dispatch:")
         ]
-        assert len(dispatch_lines) == 3, (
-            f"Expected 3 dispatch lines, got: {dispatch_lines!r}"
-        )
-        for expected_name, line in zip(names, dispatch_lines):
+        assert len(dispatch_lines) == 3, f"Expected 3 dispatch lines, got: {dispatch_lines!r}"
+        for expected_name, line in zip(names, dispatch_lines, strict=False):
             assert expected_name in line, (
                 f"Expected '{expected_name}' at this position; got: {line!r}"
             )
@@ -438,9 +428,7 @@ def test_terminals_dry_run_line_format_contains_claude_cli_url(tmp_path):
         dispatch_lines = [
             ln for ln in result.stdout.splitlines() if ln.startswith("would dispatch:")
         ]
-        assert len(dispatch_lines) == 1, (
-            f"Expected 1 dispatch line, got: {dispatch_lines!r}"
-        )
+        assert len(dispatch_lines) == 1, f"Expected 1 dispatch line, got: {dispatch_lines!r}"
         line = dispatch_lines[0]
         assert "terminals" in line, f"Mode 'terminals' missing: {line!r}"
         assert name in line, f"Worktree name '{name}' missing: {line!r}"
@@ -482,7 +470,7 @@ def test_terminals_dry_run_url_encodes_spaces_in_path(tmp_path):
             wt_dir.rmdir()
 
 
-def test_terminals_dry_run_encodes_resume_rework_as_percent2F(tmp_path):
+def test_terminals_dry_run_encodes_resume_rework_as_percent2F(tmp_path):  # noqa: N802 — 2F is hex; lowercasing would misname the byte being asserted
     """The /resume-rework query parameter must be encoded as %2Fresume-rework in the URL."""
     name = "fix-resume-enc"
     wt_dir = make_worktree_dir(name)
@@ -517,9 +505,7 @@ def test_missing_worktree_directory_warns_on_stderr_and_skips(tmp_path):
     # Use a name that definitely does NOT correspond to a real directory.
     name = "nonexistent-wt-for-test-xyzzy"
     wt_path = _MAIN_WORKTREE_ROOT / ".claude" / "worktrees" / name
-    assert not wt_path.exists(), (
-        f"Test pre-condition violated: {wt_path} unexpectedly exists"
-    )
+    assert not wt_path.exists(), f"Test pre-condition violated: {wt_path} unexpectedly exists"
     manifest = make_manifest(tmp_path, [{"worktree_name": name}])
     result = run_script("--bg", "--dry-run", "--manifest", str(manifest))
     # The single row is skipped → no valid worktrees → non-zero exit
@@ -527,9 +513,7 @@ def test_missing_worktree_directory_warns_on_stderr_and_skips(tmp_path):
         f"Expected non-zero exit when all worktrees are missing, got {result.returncode}"
     )
     # A warning mentioning the missing worktree must appear on stderr
-    assert name in result.stderr, (
-        f"Expected '{name}' in stderr warning. stderr: {result.stderr!r}"
-    )
+    assert name in result.stderr, f"Expected '{name}' in stderr warning. stderr: {result.stderr!r}"
 
 
 def test_partial_missing_worktrees_skips_missing_processes_valid(tmp_path):
@@ -550,8 +534,7 @@ def test_partial_missing_worktrees_skips_missing_processes_valid(tmp_path):
         )
         result = run_script("--bg", "--dry-run", "--manifest", str(manifest))
         assert result.returncode == 0, (
-            f"Expected exit 0 when at least one valid worktree exists. "
-            f"stderr: {result.stderr!r}"
+            f"Expected exit 0 when at least one valid worktree exists. stderr: {result.stderr!r}"
         )
         dispatch_lines = [
             ln for ln in result.stdout.splitlines() if ln.startswith("would dispatch:")
@@ -585,9 +568,7 @@ def test_sample_manifest_two_rows_bg_dry_run_exits_cleanly():
     exist in CI. It asserts the script parses the manifest without crashing.
     """
     result = run_script("--bg", "--dry-run", "--manifest", str(SAMPLE_MANIFEST))
-    assert "Traceback" not in result.stderr, (
-        f"Unexpected Python traceback: {result.stderr!r}"
-    )
+    assert "Traceback" not in result.stderr, f"Unexpected Python traceback: {result.stderr!r}"
     # Exit 0 (some rows dispatched) or exit 1 (all skipped because dirs absent) are valid.
     assert result.returncode in (0, 1), (
         f"Expected exit 0 or 1 for valid manifest, got {result.returncode}. "

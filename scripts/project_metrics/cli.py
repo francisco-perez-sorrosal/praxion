@@ -657,7 +657,7 @@ def enrich_readiness(report: Report, repo_root: Path, args: object) -> None:
       turns this into a :class:`SystemExit` BEFORE any report is written.
     * Auth present → judge each applicable LLM criterion (grounded on the prior
       report), merge the verdicts, set ``llm.status = "scored"``, and re-score.
-    * A :class:`judge.JudgeUnavailable` mid-flight degrades to ``llm_error``
+    * A :class:`judge.JudgeUnavailableError` mid-flight degrades to ``llm_error``
       unless ``--require-readiness-ai`` is set, in which case it re-raises.
     """
 
@@ -695,7 +695,7 @@ def enrich_readiness(report: Report, repo_root: Path, args: object) -> None:
             if verdict["passed"] is False and recommendation:
                 crit["remediation"] = recommendation
                 crit["remediation_source"] = "llm"
-    except judge.JudgeUnavailable:
+    except judge.JudgeUnavailableError:
         if getattr(args, "require_readiness_ai", False):
             raise
         _mark_llm_skipped(data, reason="llm_error")

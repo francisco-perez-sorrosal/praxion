@@ -199,14 +199,11 @@ def test_remind_adr_silent_for_non_architectural_file_when_flag_unset(
 
     stderr = capsys.readouterr().err
     assert "[adr-reminder]" not in stderr, (
-        "A non-architectural staged file must not trigger the ADR advisory. "
-        f"Got stderr: {stderr!r}"
+        f"A non-architectural staged file must not trigger the ADR advisory. Got stderr: {stderr!r}"
     )
 
 
-def test_remind_adr_silent_for_non_commit_command_when_flag_unset(
-    tmp_path, monkeypatch, capsys
-):
+def test_remind_adr_silent_for_non_commit_command_when_flag_unset(tmp_path, monkeypatch, capsys):
     """Baseline: flag unset, command is not `git commit` — hook is inert."""
     repo = _make_git_repo_with_staged_architectural_file(tmp_path)
     monkeypatch.chdir(repo)
@@ -253,9 +250,7 @@ def test_remind_adr_silent_for_staged_architectural_file_when_hackathon_on(
 # ===========================================================================
 
 
-def test_inject_framing_emits_context_for_non_trivial_prompt_when_flag_unset(
-    tmp_path, monkeypatch
-):
+def test_inject_framing_emits_context_for_non_trivial_prompt_when_flag_unset(tmp_path, monkeypatch):
     """Baseline: a non-trivial prompt in a Praxion project still gets framing."""
     (tmp_path / ".ai-state").mkdir()
     monkeypatch.chdir(tmp_path)
@@ -279,9 +274,7 @@ def test_inject_framing_emits_context_for_non_trivial_prompt_when_flag_unset(
     )
 
 
-def test_inject_framing_silent_for_non_praxion_project_when_flag_unset(
-    tmp_path, monkeypatch
-):
+def test_inject_framing_silent_for_non_praxion_project_when_flag_unset(tmp_path, monkeypatch):
     """Baseline: no .ai-state/ directory — the hook emits nothing."""
     monkeypatch.chdir(tmp_path)
     module = _load_hook("inject_process_framing")
@@ -300,9 +293,7 @@ def test_inject_framing_silent_for_non_praxion_project_when_flag_unset(
     )
 
 
-def test_inject_framing_silent_for_trivial_prompt_when_flag_unset(
-    tmp_path, monkeypatch
-):
+def test_inject_framing_silent_for_trivial_prompt_when_flag_unset(tmp_path, monkeypatch):
     """Baseline: a trivial prompt ('go') gets no framing — pre-hackathon behavior."""
     (tmp_path / ".ai-state").mkdir()
     monkeypatch.chdir(tmp_path)
@@ -310,14 +301,10 @@ def test_inject_framing_silent_for_trivial_prompt_when_flag_unset(
 
     raw = _run_hook_capture(module, _prompt_payload(prompt="go", cwd=str(tmp_path)))
 
-    assert _stdout_objects(raw) == [], (
-        f"A trivial prompt must not trigger framing. Got: {raw!r}"
-    )
+    assert _stdout_objects(raw) == [], f"A trivial prompt must not trigger framing. Got: {raw!r}"
 
 
-def test_inject_framing_no_consistency_warning_when_no_hackathon_block(
-    tmp_path, monkeypatch
-):
+def test_inject_framing_no_consistency_warning_when_no_hackathon_block(tmp_path, monkeypatch):
     """Flag unset and CLAUDE.md has no hackathon block — no advisory leaks out.
 
     This is the independence guarantee: a normal Praxion project (flag unset,
@@ -377,9 +364,11 @@ def test_inject_framing_emits_consistency_warning_when_block_present_flag_off(
 
     objects = _stdout_objects(raw)
     advisory_text = " ".join(obj.get("additionalContext", "") for obj in objects)
-    assert "PRAXION_HACKATHON_MODE" in advisory_text and (
-        "Hackathon Mode" in advisory_text
-    ), (
+    assert "PRAXION_HACKATHON_MODE" in advisory_text, (
+        "Flag OFF with a `## Hackathon Mode` block present must emit a "
+        f"consistency warning naming the env var. Got: {advisory_text!r}"
+    )
+    assert "Hackathon Mode" in advisory_text, (
         "Flag OFF with a `## Hackathon Mode` block present must emit a "
         f"consistency warning naming the env var. Got: {advisory_text!r}"
     )
@@ -442,10 +431,12 @@ def test_inject_framing_emits_test_discipline_reminder_when_block_present_flag_o
     )
 
     objects = _stdout_objects(raw)
-    advisory_text = " ".join(
-        obj.get("additionalContext", "") for obj in objects
-    ).lower()
-    assert "test discipline" in advisory_text and ("coverage" in advisory_text), (
+    advisory_text = " ".join(obj.get("additionalContext", "") for obj in objects).lower()
+    assert "test discipline" in advisory_text, (
+        "Flag OFF with the hackathon block present must emit the "
+        f"test-discipline / coverage-pass reminder. Got: {advisory_text!r}"
+    )
+    assert "coverage" in advisory_text, (
         "Flag OFF with the hackathon block present must emit the "
         f"test-discipline / coverage-pass reminder. Got: {advisory_text!r}"
     )
@@ -504,9 +495,7 @@ def _graduation_advisory_warranted(
     """
     if not hackathon_on:
         return False
-    return (
-        source_file_count > _SOURCE_FILE_THRESHOLD or commit_count > _COMMIT_THRESHOLD
-    )
+    return source_file_count > _SOURCE_FILE_THRESHOLD or commit_count > _COMMIT_THRESHOLD
 
 
 def _count_source_py_files(root: Path) -> int:
@@ -595,7 +584,8 @@ def test_small_hackathon_project_below_thresholds_warrants_no_advisory(tmp_path)
         ).stdout.strip()
     )
 
-    assert source_count == 1 and commit_count == 1
+    assert source_count == 1
+    assert commit_count == 1
     assert not _graduation_advisory_warranted(
         hackathon_on=True,
         source_file_count=source_count,

@@ -308,11 +308,7 @@ def validate_file(
     slug_cache[path] = (same_slugs, same_ambiguous)
     out: list[Finding] = []
     for link in extract_links(body):
-        out.extend(
-            validate_one_link(
-                link, path, repo_root, same_slugs, same_ambiguous, slug_cache
-            )
-        )
+        out.extend(validate_one_link(link, path, repo_root, same_slugs, same_ambiguous, slug_cache))
     return out
 
 
@@ -363,13 +359,9 @@ def compute_exit_code(findings: list[Finding]) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(
-        description="Validate intra-repo Markdown cross-references."
-    )
+    p = argparse.ArgumentParser(description="Validate intra-repo Markdown cross-references.")
     scope = p.add_mutually_exclusive_group(required=True)
-    scope.add_argument(
-        "--all", action="store_true", help="validate the default include set"
-    )
+    scope.add_argument("--all", action="store_true", help="validate the default include set")
     scope.add_argument("--file", type=Path, help="validate a single file")
     p.add_argument(
         "--format",

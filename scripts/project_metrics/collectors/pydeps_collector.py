@@ -77,14 +77,11 @@ _RESOLVE_TIMEOUT_SECONDS: float = 120.0
 _COLLECT_TIMEOUT_SECONDS: float = 60.0
 _LS_FILES_TIMEOUT_SECONDS: float = 30.0
 _FIRST_RUN_HINT: str = (
-    "project-metrics: resolving Tier 1 tools "
-    "(first-run uvx cache fill, may take up to 120s)"
+    "project-metrics: resolving Tier 1 tools (first-run uvx cache fill, may take up to 120s)"
 )
 _UVX_INSTALL_HINT: str = "install uv: https://docs.astral.sh/uv/"
 _UVX_NOT_FOUND_REASON: str = "uvx not found on PATH (pydeps requires uvx to resolve)"
-_NOT_APPLICABLE_REASON: str = (
-    "No importable Python packages detected — no __init__.py files found"
-)
+_NOT_APPLICABLE_REASON: str = "No importable Python packages detected — no __init__.py files found"
 _INIT_PY_FILENAME: str = "__init__.py"
 
 
@@ -104,9 +101,7 @@ class PydepsCollector(Collector):
         ``CollectionContext`` regardless of what the constructor received.
         """
 
-        self._configured_repo_root: Path | None = (
-            Path(repo_root) if repo_root is not None else None
-        )
+        self._configured_repo_root: Path | None = Path(repo_root) if repo_root is not None else None
 
     # ------------------------------------------------------------------ resolve
 
@@ -201,9 +196,7 @@ class PydepsCollector(Collector):
             return CollectorResult(
                 status="timeout",
                 data={},
-                issues=[
-                    f"uvx pydeps timed out after {int(_COLLECT_TIMEOUT_SECONDS)}s."
-                ],
+                issues=[f"uvx pydeps timed out after {int(_COLLECT_TIMEOUT_SECONDS)}s."],
             )
         except subprocess.CalledProcessError as exc:
             return CollectorResult(
@@ -345,9 +338,7 @@ def _parse_pydeps_json(raw_json: str) -> CollectorResult:
         return CollectorResult(
             status="error",
             data={},
-            issues=[
-                f"pydeps JSON root is not an object; got {type(payload).__name__}."
-            ],
+            issues=[f"pydeps JSON root is not an object; got {type(payload).__name__}."],
         )
 
     module_names: set[str] = set(payload.keys())
@@ -417,8 +408,8 @@ def _rollup_coupling_metrics(
     so ``(instability is None) == "undefined"`` is a surfacable sentinel.
     """
 
-    afferent: dict[str, int] = {name: 0 for name in module_names}
-    efferent: dict[str, int] = {name: 0 for name in module_names}
+    afferent: dict[str, int] = dict.fromkeys(module_names, 0)
+    efferent: dict[str, int] = dict.fromkeys(module_names, 0)
 
     for source, targets in graph.items():
         efferent[source] = len(targets)

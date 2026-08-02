@@ -626,9 +626,9 @@ class TestIdempotency:
         second_code = finalize_td.finalize_ledger(ledger_path, dry_run=False)
         assert second_code == 0
 
-        assert (
-            ledger_path.read_bytes() == after_first
-        ), "second run must be byte-equivalent -- finalize is not idempotent"
+        assert ledger_path.read_bytes() == after_first, (
+            "second run must be byte-equivalent -- finalize is not idempotent"
+        )
 
 
 # -- Dry-run ------------------------------------------------------------------
@@ -652,9 +652,9 @@ class TestDryRunDoesNotWrite:
         code = finalize_td.finalize_ledger(ledger_path, dry_run=True)
 
         assert code == 0
-        assert (
-            ledger_path.read_bytes() == original_bytes
-        ), "dry-run must not write -- ledger bytes drifted"
+        assert ledger_path.read_bytes() == original_bytes, (
+            "dry-run must not write -- ledger bytes drifted"
+        )
 
 
 # -- Malformed-row handling ---------------------------------------------------
@@ -682,9 +682,9 @@ class TestMalformedRowHandling:
 
         code = finalize_td.finalize_ledger(ledger_path, dry_run=False)
 
-        assert (
-            code == MALFORMED_EXIT_CODE
-        ), f"malformed row must trigger non-zero exit for manual intervention, got exit={code}"
+        assert code == MALFORMED_EXIT_CODE, (
+            f"malformed row must trigger non-zero exit for manual intervention, got exit={code}"
+        )
 
 
 # -- Id collision handling -----------------------------------------------------
@@ -711,9 +711,9 @@ class TestIdCollisionHandling:
 
         code = finalize_td.finalize_ledger(ledger_path, dry_run=False)
 
-        assert (
-            code == MALFORMED_EXIT_CODE
-        ), f"id collision must trigger non-zero exit for manual intervention, got exit={code}"
+        assert code == MALFORMED_EXIT_CODE, (
+            f"id collision must trigger non-zero exit for manual intervention, got exit={code}"
+        )
 
     def test_same_id_with_different_dedup_key_does_not_write(self, ledger_path: Path) -> None:
         """Refusal is loud, not silent -- the ledger is left byte-unchanged."""

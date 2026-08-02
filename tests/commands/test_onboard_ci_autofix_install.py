@@ -94,18 +94,18 @@ def test_ci_autofix_install_substep_is_documented() -> None:
 def test_installs_caller_and_policy_templates_into_dot_github() -> None:
     section = _sub_step_8e8_section()
     assert section, "Sub-step 8e.8 not documented yet"
-    assert (
-        "ci-autofix.yml.tmpl" in section
-    ), "Sub-step 8e.8 must read the caller template 'ci-autofix.yml.tmpl'"
-    assert (
-        "autofix-policy.yml.tmpl" in section
-    ), "Sub-step 8e.8 must read the policy template 'autofix-policy.yml.tmpl'"
-    assert (
-        ".github/workflows/ci-autofix.yml" in section
-    ), "Sub-step 8e.8 must write the caller to .github/workflows/ci-autofix.yml"
-    assert (
-        ".github/autofix-policy.yml" in section
-    ), "Sub-step 8e.8 must write the policy to .github/autofix-policy.yml"
+    assert "ci-autofix.yml.tmpl" in section, (
+        "Sub-step 8e.8 must read the caller template 'ci-autofix.yml.tmpl'"
+    )
+    assert "autofix-policy.yml.tmpl" in section, (
+        "Sub-step 8e.8 must read the policy template 'autofix-policy.yml.tmpl'"
+    )
+    assert ".github/workflows/ci-autofix.yml" in section, (
+        "Sub-step 8e.8 must write the caller to .github/workflows/ci-autofix.yml"
+    )
+    assert ".github/autofix-policy.yml" in section, (
+        "Sub-step 8e.8 must write the policy to .github/autofix-policy.yml"
+    )
 
 
 def test_skips_without_overwriting_when_caller_or_policy_already_exists() -> None:
@@ -114,15 +114,15 @@ def test_skips_without_overwriting_when_caller_or_policy_already_exists() -> Non
     predicate_match = re.search(r"\*\*Predicate\.?\*\*.*?(?=\n\*\*Action|\Z)", section, re.DOTALL)
     assert predicate_match, "Sub-step 8e.8 must document a Predicate (skip-if-exists guard)"
     predicate = predicate_match.group(0)
-    assert (
-        ".github/workflows/ci-autofix.yml" in predicate
-    ), "Predicate must check for an existing .github/workflows/ci-autofix.yml"
-    assert (
-        ".github/autofix-policy.yml" in predicate
-    ), "Predicate must check for an existing .github/autofix-policy.yml"
-    assert re.search(
-        r"skip", predicate, re.IGNORECASE
-    ), "Predicate must document skipping (never overwriting) when either file exists"
+    assert ".github/workflows/ci-autofix.yml" in predicate, (
+        "Predicate must check for an existing .github/workflows/ci-autofix.yml"
+    )
+    assert ".github/autofix-policy.yml" in predicate, (
+        "Predicate must check for an existing .github/autofix-policy.yml"
+    )
+    assert re.search(r"skip", predicate, re.IGNORECASE), (
+        "Predicate must document skipping (never overwriting) when either file exists"
+    )
 
 
 def test_records_install_in_onboard_manifest() -> None:
@@ -137,12 +137,12 @@ def test_records_install_in_onboard_manifest() -> None:
 def test_hub_sha_and_hub_owner_placeholders_resolved_to_real_values() -> None:
     section = _sub_step_8e8_section()
     assert section, "Sub-step 8e.8 not documented yet"
-    assert (
-        HUB_SHA_PLACEHOLDER in section
-    ), f"Sub-step 8e.8 must reference the '{HUB_SHA_PLACEHOLDER}' placeholder from the caller template"
-    assert (
-        HUB_OWNER_PLACEHOLDER in section
-    ), f"Sub-step 8e.8 must reference the '{HUB_OWNER_PLACEHOLDER}' placeholder from the caller template"
+    assert HUB_SHA_PLACEHOLDER in section, (
+        f"Sub-step 8e.8 must reference the '{HUB_SHA_PLACEHOLDER}' placeholder from the caller template"
+    )
+    assert HUB_OWNER_PLACEHOLDER in section, (
+        f"Sub-step 8e.8 must reference the '{HUB_OWNER_PLACEHOLDER}' placeholder from the caller template"
+    )
     # FM-1: the sub-step must document resolving HUB_SHA to a REAL commit SHA —
     # never leaving it as an unresolved placeholder or a mutable ref/tag/branch.
     assert re.search(r"real|actual|resolved|current", section, re.IGNORECASE), (
@@ -159,9 +159,9 @@ def test_hub_sha_and_hub_owner_placeholders_resolved_to_real_values() -> None:
 def test_prints_secret_setup_command_without_auto_running_it() -> None:
     section = _sub_step_8e8_section()
     assert section, "Sub-step 8e.8 not documented yet"
-    assert (
-        "gh secret set CLAUDE_CODE_OAUTH_TOKEN" in section
-    ), "Sub-step 8e.8 must document the exact 'gh secret set CLAUDE_CODE_OAUTH_TOKEN' command"
+    assert "gh secret set CLAUDE_CODE_OAUTH_TOKEN" in section, (
+        "Sub-step 8e.8 must document the exact 'gh secret set CLAUDE_CODE_OAUTH_TOKEN' command"
+    )
     assert re.search(r"\bprint\b", section, re.IGNORECASE), (
         "Sub-step 8e.8 must PRINT the secret-setup command, matching the "
         "print-not-inject convention used by sibling sub-steps (8e.3/8e.4)"
@@ -179,9 +179,9 @@ def test_prints_org_actions_allowlist_instruction() -> None:
         "Sub-step 8e.8 must print the org Actions-allowlist instruction using "
         "the OWNER/REPOSITORY/PATH/FILENAME@<ref> syntax (RESEARCH_FINDINGS.md Q4b)"
     )
-    assert re.search(
-        r"allow.?list", section, re.IGNORECASE
-    ), "Sub-step 8e.8 must name the org Actions-allowlist instruction explicitly"
+    assert re.search(r"allow.?list", section, re.IGNORECASE), (
+        "Sub-step 8e.8 must name the org Actions-allowlist instruction explicitly"
+    )
     assert re.search(r"one.?time", section, re.IGNORECASE), (
         "Sub-step 8e.8 must frame the allowlist instruction as a one-time, "
         "deliberate operator step (never auto-injected)"
@@ -249,9 +249,9 @@ def test_skips_without_overwriting_when_cross_model_caller_already_exists() -> N
 def test_prints_cursor_api_key_when_cross_model_caller_is_installed() -> None:
     section = _sub_step_8e8_section()
     assert section, "Sub-step 8e.8 not documented yet"
-    assert (
-        "gh secret set CURSOR_API_KEY" in section
-    ), "Sub-step 8e.8 must document the exact 'gh secret set CURSOR_API_KEY' command"
+    assert "gh secret set CURSOR_API_KEY" in section, (
+        "Sub-step 8e.8 must document the exact 'gh secret set CURSOR_API_KEY' command"
+    )
     assert not re.search(r"P2.{0,40}print only if", section, re.IGNORECASE | re.DOTALL), (
         "The CURSOR_API_KEY print must no longer be framed as a deferred "
         "'P2, print only if' aside — the cross-model caller is now actually "

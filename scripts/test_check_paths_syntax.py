@@ -17,7 +17,8 @@ _SCRIPT_PATH = Path(__file__).resolve().parent / "check_paths_syntax.py"
 
 def _load_module() -> Any:
     spec = importlib.util.spec_from_file_location("check_paths_syntax", _SCRIPT_PATH)
-    assert spec is not None and spec.loader is not None
+    assert spec is not None
+    assert spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
     sys.modules["check_paths_syntax"] = mod
     spec.loader.exec_module(mod)
@@ -34,9 +35,7 @@ def _write_rule(root: Path, name: str, frontmatter: str) -> Path:
     rules_dir = root / "rules"
     rules_dir.mkdir(parents=True, exist_ok=True)
     p = rules_dir / name
-    p.write_text(
-        f"---\n{frontmatter}\n---\n\n## Body\n\nSome content.\n", encoding="utf-8"
-    )
+    p.write_text(f"---\n{frontmatter}\n---\n\n## Body\n\nSome content.\n", encoding="utf-8")
     return p
 
 
@@ -58,9 +57,7 @@ def test_flags_multi_entry_block_list_as_at_risk(tmp_path: Path) -> None:
     )
     decl = classify(rule)
     assert decl is not None, "classify() must return a PathsDecl for this rule"
-    assert decl.form == SyntaxForm.BLOCK_LIST_MULTI, (
-        f"expected BLOCK_LIST_MULTI; got {decl.form}"
-    )
+    assert decl.form == SyntaxForm.BLOCK_LIST_MULTI, f"expected BLOCK_LIST_MULTI; got {decl.form}"
     assert decl.at_risk, "multi-entry block-list must be flagged at_risk"
 
 
@@ -74,9 +71,7 @@ def test_flags_three_entry_block_list_as_at_risk(tmp_path: Path) -> None:
     decl = classify(rule)
     assert decl is not None
     assert decl.at_risk, "three-entry block-list must be at_risk"
-    assert decl.suggested_inline is not None, (
-        "AT_RISK rule must have a suggested inline rewrite"
-    )
+    assert decl.suggested_inline is not None, "AT_RISK rule must have a suggested inline rewrite"
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +126,8 @@ def test_at_risk_rule_includes_suggested_inline_rewrite(tmp_path: Path) -> None:
         'paths:\n  - "tests/**"\n  - "test_*"\n',
     )
     decl = classify(rule)
-    assert decl is not None and decl.at_risk
+    assert decl is not None
+    assert decl.at_risk
     suggestion = decl.suggested_inline
     assert suggestion is not None
     assert suggestion.startswith("paths: [")

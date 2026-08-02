@@ -296,9 +296,9 @@ def test_report_log_header_row_has_required_columns() -> None:
             f"The report schema requires a '## Disposition Log' table with these columns."
         )
     # Also verify the log column names are recognized (schema contract check)
-    assert all(
-        col in EXPECTED_LOG_HEADER_COLUMNS for col in EXPECTED_LOG_HEADER_COLUMNS
-    ), "Internal test invariant: EXPECTED_LOG_HEADER_COLUMNS must be self-consistent"
+    assert all(col in EXPECTED_LOG_HEADER_COLUMNS for col in EXPECTED_LOG_HEADER_COLUMNS), (
+        "Internal test invariant: EXPECTED_LOG_HEADER_COLUMNS must be self-consistent"
+    )
 
 
 # ---------------------------------------------------------------------------

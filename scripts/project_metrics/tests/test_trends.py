@@ -35,7 +35,6 @@ from typing import Any
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Fixture helpers — minimal valid `Report` construction and on-disk prior
 # report serialization. Each helper is pure and does no I/O unless named
@@ -254,9 +253,7 @@ class TestTrendsSchemaMismatchMajor:
     strings and the prior filename so the UI can render a specific
     "deferred — schema changed from X to Y" banner."""
 
-    def test_major_version_bump_yields_schema_mismatch_status(
-        self, ai_state: Path
-    ) -> None:
+    def test_major_version_bump_yields_schema_mismatch_status(self, ai_state: Path) -> None:
         from scripts.project_metrics.trends import compute_trends
 
         _write_prior_report(
@@ -270,9 +267,7 @@ class TestTrendsSchemaMismatchMajor:
 
         assert trend.status == "schema_mismatch"
 
-    def test_major_version_bump_exposes_both_schema_strings(
-        self, ai_state: Path
-    ) -> None:
+    def test_major_version_bump_exposes_both_schema_strings(self, ai_state: Path) -> None:
         from scripts.project_metrics.trends import compute_trends
 
         _write_prior_report(
@@ -305,9 +300,7 @@ class TestTrendsSchemaMismatchMajor:
         assert trend.prior_report is not None
         assert Path(trend.prior_report).name == prior_path.name
 
-    def test_major_version_bump_produces_no_numeric_deltas(
-        self, ai_state: Path
-    ) -> None:
+    def test_major_version_bump_produces_no_numeric_deltas(self, ai_state: Path) -> None:
         from scripts.project_metrics.trends import compute_trends
 
         _write_prior_report(
@@ -325,9 +318,7 @@ class TestTrendsSchemaMismatchMajor:
             "cross-schema numeric comparisons are meaningless."
         )
 
-    def test_minor_version_bump_yields_schema_mismatch_status(
-        self, ai_state: Path
-    ) -> None:
+    def test_minor_version_bump_yields_schema_mismatch_status(self, ai_state: Path) -> None:
         """Per the schema-versioning policy, minor-version differences
         trigger schema_mismatch exactly as major-version differences do.
         The ADR's "additive-only amendment" policy applies to patch-level
@@ -361,9 +352,7 @@ class TestTrendsSchemaMatchPatch:
     major/minor level; patch bumps are reserved for non-structural fixes
     that preserve the aggregate shape."""
 
-    def test_patch_version_difference_does_not_yield_schema_mismatch(
-        self, ai_state: Path
-    ) -> None:
+    def test_patch_version_difference_does_not_yield_schema_mismatch(self, ai_state: Path) -> None:
         from scripts.project_metrics.trends import compute_trends
 
         _write_prior_report(
@@ -380,9 +369,7 @@ class TestTrendsSchemaMatchPatch:
             "contract -- deltas must be computed, not deferred."
         )
 
-    def test_patch_version_difference_produces_numeric_deltas(
-        self, ai_state: Path
-    ) -> None:
+    def test_patch_version_difference_produces_numeric_deltas(self, ai_state: Path) -> None:
         from scripts.project_metrics.trends import compute_trends
 
         _write_prior_report(
@@ -415,9 +402,7 @@ class TestTrendsSchemaMatchExact:
     These sentinels are contract: the UI distinguishes "0 delta" (a real
     measurement) from "no delta computable" (a null on one side)."""
 
-    def test_exact_match_yields_computed_or_nonmismatch_status(
-        self, ai_state: Path
-    ) -> None:
+    def test_exact_match_yields_computed_or_nonmismatch_status(self, ai_state: Path) -> None:
         from scripts.project_metrics.trends import compute_trends
 
         _write_prior_report(
@@ -450,13 +435,9 @@ class TestTrendsSchemaMatchExact:
 
         assert "sloc_total" in trend.deltas
         entry = trend.deltas["sloc_total"]
-        assert entry["delta"] == 200, (
-            f"sloc_total delta must be 1000 - 800 = 200, got {entry!r}"
-        )
+        assert entry["delta"] == 200, f"sloc_total delta must be 1000 - 800 = 200, got {entry!r}"
 
-    def test_exact_match_computes_delta_pct_when_prior_nonzero(
-        self, ai_state: Path
-    ) -> None:
+    def test_exact_match_computes_delta_pct_when_prior_nonzero(self, ai_state: Path) -> None:
         from scripts.project_metrics.trends import compute_trends
 
         _write_prior_report(
@@ -473,9 +454,7 @@ class TestTrendsSchemaMatchExact:
         # 200 / 800 = 0.25 exactly (binary-representable).
         assert entry["delta_pct"] == pytest.approx(0.25)
 
-    def test_exact_match_returns_null_delta_when_prior_field_is_null(
-        self, ai_state: Path
-    ) -> None:
+    def test_exact_match_returns_null_delta_when_prior_field_is_null(self, ai_state: Path) -> None:
         """If the prior side of the comparison is null, the plan mandates
         a ``{"delta": null, "reason": "null_input"}`` sentinel rather
         than fabricating a zero or omitting the key entirely."""
@@ -529,9 +508,7 @@ class TestTrendsNoPriorReadable:
     errored (which would break the run). The ``no_prior_readable`` status
     carries both the filename and a non-empty error message."""
 
-    def test_malformed_json_yields_no_prior_readable_status(
-        self, ai_state: Path
-    ) -> None:
+    def test_malformed_json_yields_no_prior_readable_status(self, ai_state: Path) -> None:
         from scripts.project_metrics.trends import compute_trends
 
         _write_prior_report(
@@ -560,9 +537,7 @@ class TestTrendsNoPriorReadable:
         assert trend.prior_report is not None
         assert Path(trend.prior_report).name == prior_path.name
 
-    def test_malformed_json_populates_nonempty_error_string(
-        self, ai_state: Path
-    ) -> None:
+    def test_malformed_json_populates_nonempty_error_string(self, ai_state: Path) -> None:
         from scripts.project_metrics.trends import compute_trends
 
         _write_prior_report(
@@ -580,9 +555,7 @@ class TestTrendsNoPriorReadable:
             "unexplained missing-deltas banner."
         )
 
-    def test_missing_required_keys_yields_no_prior_readable_status(
-        self, ai_state: Path
-    ) -> None:
+    def test_missing_required_keys_yields_no_prior_readable_status(self, ai_state: Path) -> None:
         """A JSON payload that parses but lacks the aggregate block (or
         schema_version) cannot be used as a prior for delta computation;
         it must be reported as unreadable rather than silently treated
@@ -632,9 +605,7 @@ class TestTrendsMostRecentPriorSelection:
     entirely (they are either the current run's own file, a future run,
     or a clock-skew anomaly; in any case they are not a valid prior)."""
 
-    def test_three_prior_files_selects_most_recent_among_them(
-        self, ai_state: Path
-    ) -> None:
+    def test_three_prior_files_selects_most_recent_among_them(self, ai_state: Path) -> None:
         """T1 < T2 < T3 all strictly before current; T3 must be selected."""
         from scripts.project_metrics.trends import compute_trends
 
@@ -751,9 +722,7 @@ class TestDeltaRecordsCarryCurrentAndPrior:
         assert record["prior"] == 1000
         assert record["delta"] == 234
 
-    def test_null_input_delta_carries_current_and_prior_too(
-        self, tmp_path: Path
-    ) -> None:
+    def test_null_input_delta_carries_current_and_prior_too(self, tmp_path: Path) -> None:
         """Even when delta is None (null on at least one side), the current
         and prior values must still be surfaced so the renderer can show the
         actual values — not just the sentinel."""

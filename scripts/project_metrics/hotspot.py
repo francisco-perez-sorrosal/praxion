@@ -272,9 +272,7 @@ def _gini(scores: list[float]) -> float:
     if total == 0:
         return 0.0
     n = len(sorted_scores)
-    weighted_sum = sum(
-        index * value for index, value in enumerate(sorted_scores, start=1)
-    )
+    weighted_sum = sum(index * value for index, value in enumerate(sorted_scores, start=1))
     numerator = 2.0 * weighted_sum - (n + 1) * total
     denominator = n * total
     return numerator / denominator

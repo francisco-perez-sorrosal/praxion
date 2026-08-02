@@ -57,10 +57,10 @@ def _assert_principle_shape(p: dict) -> None:
     assert isinstance(p["_coerced_severity"], bool), (
         f"_coerced_severity must be bool, got {type(p['_coerced_severity'])!r}"
     )
-    assert isinstance(p["id"], str) and p["id"], "id must be a non-empty string"
-    assert isinstance(p["statement"], str) and p["statement"], (
-        "statement must be a non-empty string"
-    )
+    assert isinstance(p["id"], str), "id must be a non-empty string"
+    assert p["id"], "id must be a non-empty string"
+    assert isinstance(p["statement"], str), "statement must be a non-empty string"
+    assert p["statement"], "statement must be a non-empty string"
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +86,8 @@ def test_valid_principles_file_returns_list_of_principle_dicts() -> None:
     assert blocking is not None, "Expected principle with id='no-raw-sql'"
     assert blocking["severity"] == "blocking"
     assert blocking["scope"] == "src/api/**"
-    assert blocking["rationale"] is not None and "query auditing" in blocking["rationale"]
+    assert blocking["rationale"] is not None
+    assert "query auditing" in blocking["rationale"]
     assert blocking["_coerced_severity"] is False
 
     advisory = next((p for p in principles if p["id"] == "public-fn-docstrings"), None)

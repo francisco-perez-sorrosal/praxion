@@ -35,8 +35,7 @@ def _body() -> str:
 
 def test_command_file_exists() -> None:
     assert COMMAND_FILE.exists(), (
-        f"commands/resume-rework.md not found at {COMMAND_FILE}. "
-        "The implementer must create it."
+        f"commands/resume-rework.md not found at {COMMAND_FILE}. The implementer must create it."
     )
 
 
@@ -45,9 +44,7 @@ def test_frontmatter_has_required_fields() -> None:
     assert "description:" in body, "frontmatter must have a 'description:' field"
     assert "allowed-tools:" in body, "frontmatter must have an 'allowed-tools:' field"
     assert "argument-hint:" in body, "frontmatter must have an 'argument-hint:' field"
-    assert "Agent" in body, (
-        "'Agent' must appear in 'allowed-tools' — the command spawns an agent"
-    )
+    assert "Agent" in body, "'Agent' must appear in 'allowed-tools' — the command spawns an agent"
 
 
 def test_help_block_present() -> None:
@@ -57,9 +54,7 @@ def test_help_block_present() -> None:
         "Body must contain a '## Help' or '## Help block' section documenting usage"
     )
     for code in (0, 1, 2, 3, 4, 5):
-        assert str(code) in body, (
-            f"Help block must document exit code {code} (0–5 range required)"
-        )
+        assert str(code) in body, f"Help block must document exit code {code} (0–5 range required)"
 
 
 def test_auto_discovery_section_documents_glob() -> None:
@@ -70,9 +65,7 @@ def test_auto_discovery_section_documents_glob() -> None:
     assert "VERIFIER_FINDINGS.md" in body, (
         "Auto-discovery section must reference VERIFIER_FINDINGS.md"
     )
-    assert ".ai-work/" in body, (
-        "Auto-discovery section must show the .ai-work/ glob path"
-    )
+    assert ".ai-work/" in body, "Auto-discovery section must show the .ai-work/ glob path"
     # exit 3 = none found, exit 2 = multiple found
     assert "exit 2" in body or "exit code 2" in body or "`2`" in body, (
         "Auto-discovery section must document exit code 2 (multiple candidates)"
@@ -101,9 +94,7 @@ def test_manifest_match_section_documents_stale_check() -> None:
     assert re.search(r"##\s+Manifest", body, re.IGNORECASE), (
         "Body must contain a '## Manifest match' section"
     )
-    assert "REWORK_MANIFEST.md" in body, (
-        "Manifest match section must reference REWORK_MANIFEST.md"
-    )
+    assert "REWORK_MANIFEST.md" in body, "Manifest match section must reference REWORK_MANIFEST.md"
     assert "rw-" in body, "Manifest match section must reference rw-<hash> rework IDs"
     assert "exit 4" in body or "exit code 4" in body or "`4`" in body, (
         "Manifest match section must document exit code 4 (stale findings)"
@@ -126,14 +117,11 @@ def test_dry_run_section_present() -> None:
     assert "--dry-run" in body, "Body must document '--dry-run' mode"
     assert re.search(r"##\s+.*dry.?run", body, re.IGNORECASE) or (
         "--dry-run" in body and "stdout" in body
-    ), (
-        "Dry-run documentation must describe: print dispatch plan to stdout, "
-        "no Agent spawn, exit 0"
-    )
+    ), "Dry-run documentation must describe: print dispatch plan to stdout, no Agent spawn, exit 0"
     # No spawn
-    assert re.search(
-        r"(no.+spawn|without.+spawn|does not spawn)", body, re.IGNORECASE
-    ), "Dry-run documentation must state that no agent is spawned"
+    assert re.search(r"(no.+spawn|without.+spawn|does not spawn)", body, re.IGNORECASE), (
+        "Dry-run documentation must state that no agent is spawned"
+    )
 
 
 def test_findings_override_section_present() -> None:
@@ -173,6 +161,5 @@ def test_json_output_section_present() -> None:
     # Dispatch plan JSON shape: required keys per INTERFACE_DESIGN.md
     for key in ("action", "rework_id", "target_agent", "task_slug"):
         assert f'"{key}"' in body or key in body, (
-            f"JSON output documentation must include the '{key}' field "
-            "in the dispatch plan shape"
+            f"JSON output documentation must include the '{key}' field in the dispatch plan shape"
         )

@@ -340,9 +340,9 @@ def test_never_references_track_progress() -> None:
 def test_every_uses_reference_is_sha_pinned() -> None:
     parsed = _parsed()
     refs = _uses_refs(parsed)
-    assert (
-        refs
-    ), "Workflow must contain at least one `uses:` step (checkout, setup-uv, the fixer agent)"
+    assert refs, (
+        "Workflow must contain at least one `uses:` step (checkout, setup-uv, the fixer agent)"
+    )
     for ref in refs:
         assert "@" in ref, f"`uses: {ref}` must pin a ref via '@<sha>'"
         pinned_ref = ref.rsplit("@", 1)[1]
@@ -357,9 +357,9 @@ def test_checkout_pin_matches_p1_exact_commit() -> None:
     refs = _uses_refs(parsed)
     matching = [ref for ref in refs if ref.startswith("actions/checkout@")]
     assert matching, "Expected an `actions/checkout` step"
-    assert any(
-        ref == f"actions/checkout@{CHECKOUT_SHA}" for ref in matching
-    ), f"actions/checkout must pin to P1's exact commit {CHECKOUT_SHA} (got {matching})"
+    assert any(ref == f"actions/checkout@{CHECKOUT_SHA}" for ref in matching), (
+        f"actions/checkout must pin to P1's exact commit {CHECKOUT_SHA} (got {matching})"
+    )
 
 
 def test_setup_uv_pin_matches_p1_exact_commit() -> None:
@@ -367,9 +367,9 @@ def test_setup_uv_pin_matches_p1_exact_commit() -> None:
     refs = _uses_refs(parsed)
     matching = [ref for ref in refs if ref.startswith("astral-sh/setup-uv@")]
     assert matching, "Expected an `astral-sh/setup-uv` step"
-    assert any(
-        ref == f"astral-sh/setup-uv@{SETUP_UV_SHA}" for ref in matching
-    ), f"astral-sh/setup-uv must pin to P1's exact commit {SETUP_UV_SHA} (got {matching})"
+    assert any(ref == f"astral-sh/setup-uv@{SETUP_UV_SHA}" for ref in matching), (
+        f"astral-sh/setup-uv must pin to P1's exact commit {SETUP_UV_SHA} (got {matching})"
+    )
 
 
 def test_claude_code_action_pin_matches_p1_exact_commit() -> None:
@@ -411,9 +411,9 @@ def test_idempotency_guard_checks_terminal_labels_or_open_pr() -> None:
         "(`triage:invalid`, `duplicate`, `needs-adr`) so re-applying "
         "`ecosystem-feedback` to an already-triaged issue is a no-op"
     )
-    assert (
-        "needs-adr" in raw
-    ), "The idempotency guard must also recognize the `needs-adr` terminal label"
+    assert "needs-adr" in raw, (
+        "The idempotency guard must also recognize the `needs-adr` terminal label"
+    )
     assert "issue-autofix/" in raw, (
         "The idempotency guard must also check for an already-open "
         "`issue-autofix/*` PR referencing the issue"
@@ -502,9 +502,9 @@ def test_template_validate_step_references_the_triage_module() -> None:
 
 def test_malformed_issue_gets_triage_invalid_label() -> None:
     raw = _raw_text()
-    assert (
-        "triage:invalid" in raw
-    ), "A malformed issue (missing required §5.2 sections) must be labeled `triage:invalid`"
+    assert "triage:invalid" in raw, (
+        "A malformed issue (missing required §5.2 sections) must be labeled `triage:invalid`"
+    )
 
 
 def test_duplicate_issue_gets_duplicate_label() -> None:
@@ -750,9 +750,9 @@ def test_prompt_names_the_deny_by_default_governance_surfaces() -> None:
             "that force a behavioral/architectural classification (never "
             "auto-fixed as mechanical)"
         )
-    assert re.search(
-        r"skill", combined, re.IGNORECASE
-    ), "The prompt must reference skills' `SKILL.md` core among the governance surfaces"
+    assert re.search(r"skill", combined, re.IGNORECASE), (
+        "The prompt must reference skills' `SKILL.md` core among the governance surfaces"
+    )
     assert re.search(r"behavioral contract", combined, re.IGNORECASE), (
         "The prompt must reference the behavioral contract among the "
         "governance surfaces that force escalation"
@@ -795,9 +795,9 @@ def test_sensitive_path_tripwire_targets_the_issue_autofix_branch_prefix() -> No
         if "sensitive" in (step.get("name") or "").lower()
         or "sensitive" in (step.get("run") or "").lower()
     ]
-    assert (
-        tripwire_steps
-    ), "A sensitive-path tripwire step must exist (see test_sensitive_path_tripwire_step_exists)"
+    assert tripwire_steps, (
+        "A sensitive-path tripwire step must exist (see test_sensitive_path_tripwire_step_exists)"
+    )
     assert any("issue-autofix/" in (step.get("run") or "") for step in tripwire_steps), (
         "The sensitive-path tripwire step must select PRs by this workflow's "
         "own `issue-autofix/*` branch prefix inside its OWN `run:` body — "
@@ -809,9 +809,9 @@ def test_sensitive_path_tripwire_targets_the_issue_autofix_branch_prefix() -> No
 def test_sensitive_path_tripwire_toggles_draft_via_gh_pr_ready_undo() -> None:
     raw = _raw_text()
     assert "gh pr ready" in raw, "The tripwire must call `gh pr ready` to toggle draft state"
-    assert (
-        "--undo" in raw
-    ), "The draft toggle must use `--undo` (mark as draft), not the default (mark ready)"
+    assert "--undo" in raw, (
+        "The draft toggle must use `--undo` (mark as draft), not the default (mark ready)"
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -46,9 +46,7 @@ def compute_trends(current: Report, reports_dir: Path) -> TrendBlock:
     current_timestamp = current.aggregate.timestamp
     current_schema = current.aggregate.schema_version
 
-    prior_path, prior_payload, load_error = _load_most_recent_prior(
-        reports_dir, current_timestamp
-    )
+    prior_path, prior_payload, load_error = _load_most_recent_prior(reports_dir, current_timestamp)
 
     if prior_path is None:
         return TrendBlock(status="first_run")
@@ -62,15 +60,11 @@ def compute_trends(current: Report, reports_dir: Path) -> TrendBlock:
     assert prior_payload is not None  # narrowing for type checkers
     prior_aggregate = prior_payload.get("aggregate")
     if not isinstance(prior_aggregate, dict):
-        return _unreadable(
-            prior_path, "prior report is missing required 'aggregate' block"
-        )
+        return _unreadable(prior_path, "prior report is missing required 'aggregate' block")
 
     prior_schema = prior_aggregate.get("schema_version")
     if not isinstance(prior_schema, str):
-        return _unreadable(
-            prior_path, "prior report is missing 'aggregate.schema_version'"
-        )
+        return _unreadable(prior_path, "prior report is missing 'aggregate.schema_version'")
 
     if _parse_major_minor(prior_schema) != _parse_major_minor(current_schema):
         return TrendBlock(
@@ -93,9 +87,7 @@ def compute_trends(current: Report, reports_dir: Path) -> TrendBlock:
 def _unreadable(prior_path: Path, error: str) -> TrendBlock:
     """Build a `no_prior_readable` TrendBlock for the given file + error."""
 
-    return TrendBlock(
-        status="no_prior_readable", prior_report=prior_path.name, error=error
-    )
+    return TrendBlock(status="no_prior_readable", prior_report=prior_path.name, error=error)
 
 
 def _load_most_recent_prior(
@@ -136,9 +128,7 @@ def _load_most_recent_prior(
 
         timestamp = _extract_timestamp(payload)
         if timestamp is None:
-            unreadable.append(
-                (candidate, "prior report is missing 'aggregate.timestamp'")
-            )
+            unreadable.append((candidate, "prior report is missing 'aggregate.timestamp'"))
             continue
 
         if timestamp >= current_timestamp:
@@ -198,9 +188,7 @@ def _parse_major_minor(version: str) -> tuple[int, int]:
     return (int(parts[0]), int(parts[1]))
 
 
-def _compute_deltas(
-    current_aggregate: Any, prior_aggregate: dict[str, Any]
-) -> dict[str, Any]:
+def _compute_deltas(current_aggregate: Any, prior_aggregate: dict[str, Any]) -> dict[str, Any]:
     """Return per-column deltas for every numeric aggregate column.
 
     Policy:

@@ -117,9 +117,9 @@ def _extract_block_section(content: str, section_heading: str) -> str:
     """
     escaped = re.escape(section_heading)
     match = re.search(rf"^{escaped}\b.*$", content, re.MULTILINE)
-    assert (
-        match is not None
-    ), f"Heading '{section_heading}' not found in content (first 200 chars: {content[:200]!r})"
+    assert match is not None, (
+        f"Heading '{section_heading}' not found in content (first 200 chars: {content[:200]!r})"
+    )
     start = match.start()
 
     # Find where the next canonical-block section heading begins (or EOF).
@@ -155,9 +155,9 @@ def _extract_fenced_content(content: str, section_heading: str) -> str:
 
     # Find the matching closing ``` (must be at line-start)
     fence_close = re.search(r"^```\s*$", section[content_start:], re.MULTILINE)
-    assert (
-        fence_close is not None
-    ), f"No closing ``` fence found after ```markdown in '{section_heading}' section."
+    assert fence_close is not None, (
+        f"No closing ``` fence found after ```markdown in '{section_heading}' section."
+    )
     content_end = content_start + fence_close.start()
 
     # Strip only the leading newline introduced by the fence opener line ending
@@ -199,9 +199,9 @@ def test_block_section_exists_in_onboard_project(slug: str, block_meta: dict) ->
     """Each canonical block section heading must exist in onboard-project.md."""
     content = _read_command_file(ONBOARD_PATH)
     heading = block_meta["section_heading"]
-    assert (
-        heading in content
-    ), f"'{heading}' not found in {ONBOARD_PATH.name}. The {slug} block section is missing."
+    assert heading in content, (
+        f"'{heading}' not found in {ONBOARD_PATH.name}. The {slug} block section is missing."
+    )
 
 
 @pytest.mark.parametrize(("slug", "block_meta"), BLOCKS.items())
@@ -209,9 +209,9 @@ def test_block_section_exists_in_new_project(slug: str, block_meta: dict) -> Non
     """Each canonical block section heading must exist in new-project.md."""
     content = _read_command_file(NEW_PROJECT_PATH)
     heading = block_meta["section_heading"]
-    assert (
-        heading in content
-    ), f"'{heading}' not found in {NEW_PROJECT_PATH.name}. The {slug} block section is missing."
+    assert heading in content, (
+        f"'{heading}' not found in {NEW_PROJECT_PATH.name}. The {slug} block section is missing."
+    )
 
 
 @pytest.mark.parametrize(("slug", "block_meta"), BLOCKS.items())
@@ -426,9 +426,9 @@ def test_praxion_process_block_appears_after_behavioral_contract_in_onboard_proj
     behavioral_contract_pos = content.find("## §Behavioral Contract Block")
     praxion_process_pos = content.find("## §Praxion Process Block")
 
-    assert (
-        behavioral_contract_pos != -1
-    ), "'## §Behavioral Contract Block' not found in onboard-project.md"
+    assert behavioral_contract_pos != -1, (
+        "'## §Behavioral Contract Block' not found in onboard-project.md"
+    )
     assert praxion_process_pos != -1, "'## §Praxion Process Block' not found in onboard-project.md"
     assert praxion_process_pos > behavioral_contract_pos, (
         "'## §Praxion Process Block' must appear after '## §Behavioral Contract Block'. "
@@ -580,9 +580,9 @@ def test_second_phase6_run_produces_no_duplicate_when_block_already_present(
         f"(expected 1 — idempotency predicate should have suppressed the second append)."
     )
 
-    assert (
-        after_first_run == after_second_run
-    ), "CLAUDE.md changed between first and second Phase 6 run — idempotency violated."
+    assert after_first_run == after_second_run, (
+        "CLAUDE.md changed between first and second Phase 6 run — idempotency violated."
+    )
 
 
 # ---------------------------------------------------------------------------

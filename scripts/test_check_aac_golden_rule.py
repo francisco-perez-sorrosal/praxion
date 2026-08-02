@@ -85,9 +85,7 @@ def _stage_file(repo: Path, relpath: str, content: str) -> None:
     target = repo / relpath
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding="utf-8")
-    subprocess.run(
-        ["git", "add", relpath], check=True, capture_output=True, cwd=str(repo)
-    )
+    subprocess.run(["git", "add", relpath], check=True, capture_output=True, cwd=str(repo))
 
 
 def _commit_file(repo: Path, relpath: str, content: str, msg: str = "init") -> str:
@@ -313,9 +311,7 @@ def test_no_staged_paths_at_all_exits_zero(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_likec4_disabled_env_does_not_fail(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_likec4_disabled_env_does_not_fail(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """With LIKEC4 disabled, the gate continues and returns the same path-pair decision."""
     monkeypatch.setenv("AAC_GOLDEN_RULE_VALIDATOR_LIKEC4", "disabled")
     repo = _make_repo(tmp_path)

@@ -140,9 +140,7 @@ def filter_path_dict(
     """
 
     return {
-        key: value
-        for key, value in mapping.items()
-        if not is_excluded_path(key, excluded=excluded)
+        key: value for key, value in mapping.items() if not is_excluded_path(key, excluded=excluded)
     }
 
 

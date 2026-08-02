@@ -137,9 +137,7 @@ def _build_minimal_repo() -> None:
     _init_repo(repo)
 
     readme_v1 = (
-        "# minimal_repo\n"
-        "Fixture repository for GitCollector tests.\n"
-        "Do not edit directly.\n"
+        "# minimal_repo\nFixture repository for GitCollector tests.\nDo not edit directly.\n"
     )
     # core.py snapshots — each step adjusts line count or swaps lines
     # precisely to hit the target numstat. See the table in
@@ -206,18 +204,14 @@ def _build_minimal_repo() -> None:
             "init: README",
             {"README.md": readme_v1},
         ),
-        _Commit(
-            *_ALICE, "2026-02-20T10:00:00+00:00", "feat: add core", {"core.py": core_c2}
-        ),
+        _Commit(*_ALICE, "2026-02-20T10:00:00+00:00", "feat: add core", {"core.py": core_c2}),
         _Commit(
             *_ALICE,
             "2026-02-25T10:00:00+00:00",
             "feat: add helpers",
             {"core.py": core_c3, "helpers.py": helpers_c3},
         ),
-        _Commit(
-            *_BOB, "2026-03-01T10:00:00+00:00", "refactor: core", {"core.py": core_c4}
-        ),
+        _Commit(*_BOB, "2026-03-01T10:00:00+00:00", "refactor: core", {"core.py": core_c4}),
         _Commit(
             *_ALICE,
             "2026-03-05T10:00:00+00:00",

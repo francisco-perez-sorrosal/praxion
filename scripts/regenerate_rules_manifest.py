@@ -26,9 +26,7 @@ REPO_ROOT = SCRIPT_DIR.parent
 RULES_DIR = REPO_ROOT / "rules"
 MANIFEST_PATH = RULES_DIR / "_manifest.yaml"
 
-DRIFT_MESSAGE = (
-    "Manifest drift detected. Run: python3 scripts/regenerate_rules_manifest.py"
-)
+DRIFT_MESSAGE = "Manifest drift detected. Run: python3 scripts/regenerate_rules_manifest.py"
 
 # Core rule IDs that MUST carry core: true in frontmatter.
 EXPECTED_CORE_IDS = frozenset(
@@ -126,9 +124,7 @@ def _validate_hook_deliver_coverage(records: list[dict[str, Any]]) -> list[str]:
     would fall through to the path-scoped section of the manifest and lose
     its stable injection position.
     """
-    declared = {
-        r["id"] for r in records if r.get("install") == "hook-deliver" and "id" in r
-    }
+    declared = {r["id"] for r in records if r.get("install") == "hook-deliver" and "id" in r}
     ordered = set(HOOK_DELIVER_ORDER)
     missing = declared - ordered
     if not missing:
@@ -199,9 +195,7 @@ def run_generate() -> int:
         return 1
     content = MANIFEST_HEADER + _render_doc(records, include_timestamp=True)
     MANIFEST_PATH.write_text(content, encoding="utf-8")
-    print(
-        f"Manifest written: {MANIFEST_PATH.relative_to(REPO_ROOT)} ({len(records)} rules)"
-    )
+    print(f"Manifest written: {MANIFEST_PATH.relative_to(REPO_ROOT)} ({len(records)} rules)")
     return 0
 
 
@@ -226,9 +220,7 @@ def run_check() -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description=__doc__.splitlines()[0] if __doc__ else ""
-    )
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else "")
     parser.add_argument(
         "--check",
         action="store_true",

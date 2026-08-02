@@ -344,20 +344,20 @@ class TestCliArgParsing:
             for p in patchers:
                 p.stop()
 
-        assert (
-            exit_code == 0
-        ), f"No-arg invocation must succeed using defaults (90/10); got exit {exit_code}."
+        assert exit_code == 0, (
+            f"No-arg invocation must succeed using defaults (90/10); got exit {exit_code}."
+        )
         # The runner should have been called with defaults.
-        assert (
-            mocks.runner_cls.return_value.run.called
-        ), "Runner.run must be invoked on the default path"
+        assert mocks.runner_cls.return_value.run.called, (
+            "Runner.run must be invoked on the default path"
+        )
         run_kwargs = mocks.runner_cls.return_value.run.call_args.kwargs
-        assert (
-            run_kwargs.get("window_days") == 90
-        ), f"Default window_days must be 90; got {run_kwargs.get('window_days')}"
-        assert (
-            run_kwargs.get("top_n") == 10
-        ), f"Default top_n must be 10; got {run_kwargs.get('top_n')}"
+        assert run_kwargs.get("window_days") == 90, (
+            f"Default window_days must be 90; got {run_kwargs.get('window_days')}"
+        )
+        assert run_kwargs.get("top_n") == 10, (
+            f"Default top_n must be 10; got {run_kwargs.get('top_n')}"
+        )
 
     def test_window_days_zero_is_rejected(self, tmp_path: Path) -> None:
         """window_days must be positive; argparse should reject 0 before I/O."""
@@ -430,9 +430,9 @@ class TestCliArgParsing:
             for p in patchers:
                 p.stop()
 
-        assert (
-            excinfo.value.code == 0
-        ), f"--help must exit 0 (argparse convention); got {excinfo.value.code}"
+        assert excinfo.value.code == 0, (
+            f"--help must exit 0 (argparse convention); got {excinfo.value.code}"
+        )
         captured = capsys.readouterr()
         # Help text is emitted to stdout by argparse; at minimum it names the
         # options documented in the plan.
@@ -495,9 +495,9 @@ class TestCliNoPartialWrites:
                 p.stop()
 
         after = _snapshot_dir(ai_state)
-        assert (
-            after == before
-        ), f"Invalid --top-n must not modify .ai-state/; before={before!r} after={after!r}"
+        assert after == before, (
+            f"Invalid --top-n must not modify .ai-state/; before={before!r} after={after!r}"
+        )
 
     def test_invalid_args_do_not_invoke_runner(self, tmp_path: Path) -> None:
         """Argparse rejection must short-circuit before the orchestration
@@ -517,12 +517,12 @@ class TestCliNoPartialWrites:
 
         # Runner class MUST NOT have been instantiated; if it was, the CLI
         # called into the orchestration layer despite a rejected arg.
-        assert (
-            not mocks.runner_cls.called
-        ), "Runner must not be constructed when argparse rejects input"
-        assert (
-            not mocks.append_log.called
-        ), "append_log must not be invoked when argparse rejects input"
+        assert not mocks.runner_cls.called, (
+            "Runner must not be constructed when argparse rejects input"
+        )
+        assert not mocks.append_log.called, (
+            "append_log must not be invoked when argparse rejects input"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -567,9 +567,9 @@ class TestCliHappyPath:
             f"Expected exactly 1 METRICS_REPORT_*.md; found {len(md_files)}: "
             f"{[str(p) for p in md_files]}"
         )
-        assert (
-            mocks.append_log.called
-        ), "append_log must be invoked on the happy path (third-file concern)"
+        assert mocks.append_log.called, (
+            "append_log must be invoked on the happy path (third-file concern)"
+        )
 
     def test_filename_includes_well_formed_timestamp(self, tmp_path: Path) -> None:
         """Filenames match YYYY-MM-DD_HH-MM-SS per the timestamp-formatting rule."""
@@ -650,12 +650,12 @@ class TestCliHappyPath:
         # All three expected filenames must appear in stdout; the CLI decides
         # the exact line format, but at minimum the three basenames must be
         # mentioned so a downstream command wrapper can read them.
-        assert (
-            "METRICS_REPORT_2026-04-23_18-45-00.json" in out
-        ), f"stdout must mention the JSON filename; got:\n{out!r}"
-        assert (
-            "METRICS_REPORT_2026-04-23_18-45-00.md" in out
-        ), f"stdout must mention the MD filename; got:\n{out!r}"
+        assert "METRICS_REPORT_2026-04-23_18-45-00.json" in out, (
+            f"stdout must mention the JSON filename; got:\n{out!r}"
+        )
+        assert "METRICS_REPORT_2026-04-23_18-45-00.md" in out, (
+            f"stdout must mention the MD filename; got:\n{out!r}"
+        )
         assert "METRICS_LOG.md" in out, f"stdout must mention METRICS_LOG.md; got:\n{out!r}"
 
 
@@ -699,13 +699,13 @@ class TestCliRepoRootValidation:
         # choice, but "not" + ("git" OR "repo") is a minimal content contract.
         err = capsys.readouterr().err.lower()
         assert "git" in err, f"stderr must mention git; got: {err!r}"
-        assert (
-            "not" in err or "repo" in err
-        ), f"stderr must mention repo-detection failure; got: {err!r}"
+        assert "not" in err or "repo" in err, (
+            f"stderr must mention repo-detection failure; got: {err!r}"
+        )
         # The Runner must NOT have been invoked if repo validation failed.
-        assert (
-            not mocks.runner_cls.called
-        ), "Runner must not be invoked when repo-root validation fails"
+        assert not mocks.runner_cls.called, (
+            "Runner must not be invoked when repo-root validation fails"
+        )
 
     def test_inside_git_repo_proceeds_to_runner(self, tmp_path: Path) -> None:
         """When git check succeeds, the CLI reaches the orchestration layer."""
@@ -723,15 +723,15 @@ class TestCliRepoRootValidation:
             for p in patchers:
                 p.stop()
 
-        assert (
-            exit_code == 0
-        ), f"CLI must proceed and exit 0 when git check succeeds; got {exit_code}"
-        assert (
-            mocks.subprocess_run.called
-        ), "git rev-parse --show-toplevel must be invoked on a valid run"
-        assert (
-            mocks.runner_cls.called
-        ), "Runner must be instantiated after successful repo-root check"
+        assert exit_code == 0, (
+            f"CLI must proceed and exit 0 when git check succeeds; got {exit_code}"
+        )
+        assert mocks.subprocess_run.called, (
+            "git rev-parse --show-toplevel must be invoked on a valid run"
+        )
+        assert mocks.runner_cls.called, (
+            "Runner must be instantiated after successful repo-root check"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -760,18 +760,18 @@ class TestCliOrchestration:
 
         # Each collaborator must have been called exactly once on the
         # happy path -- no re-entry, no no-ops.
-        assert (
-            mocks.runner_cls.return_value.run.call_count == 1
-        ), "Runner.run must be invoked exactly once per happy-path invocation"
-        assert (
-            mocks.compose_hotspots.call_count == 1
-        ), "compose_hotspots must be invoked exactly once per run"
-        assert (
-            mocks.compute_trends.call_count == 1
-        ), "compute_trends must be invoked exactly once per run"
-        assert (
-            mocks.render_markdown.call_count == 1
-        ), "render_markdown must be invoked exactly once per run"
+        assert mocks.runner_cls.return_value.run.call_count == 1, (
+            "Runner.run must be invoked exactly once per happy-path invocation"
+        )
+        assert mocks.compose_hotspots.call_count == 1, (
+            "compose_hotspots must be invoked exactly once per run"
+        )
+        assert mocks.compute_trends.call_count == 1, (
+            "compute_trends must be invoked exactly once per run"
+        )
+        assert mocks.render_markdown.call_count == 1, (
+            "render_markdown must be invoked exactly once per run"
+        )
         assert mocks.render_json.call_count == 1, "render_json must be invoked exactly once per run"
         assert mocks.append_log.call_count == 1, "append_log must be invoked exactly once per run"
 
@@ -861,22 +861,22 @@ class TestCliOrchestration:
         # Positional or keyword -- accept both.
         args_and_kwargs = list(call.args) + list(call.kwargs.values())
         md_filenames = [a for a in args_and_kwargs if isinstance(a, str) and a.endswith(".md")]
-        assert (
-            len(md_filenames) == 1
-        ), f"append_log must receive exactly one .md filename argument; got call_args={call!r}"
+        assert len(md_filenames) == 1, (
+            f"append_log must receive exactly one .md filename argument; got call_args={call!r}"
+        )
         md_name = md_filenames[0]
         # The filename passed should be the BASENAME (not a full path) so
         # the log row renders as a relative link, and it should match the
         # MD file actually written.
-        assert (
-            "/" not in md_name
-        ), f"append_log must receive the MD basename, not a full path; got {md_name!r}"
-        assert (
-            "\\" not in md_name
-        ), f"append_log must receive the MD basename, not a full path; got {md_name!r}"
-        assert md_name.startswith(
-            "METRICS_REPORT_"
-        ), f"append_log's MD filename must follow METRICS_REPORT_*.md; got {md_name!r}"
-        assert md_name.endswith(
-            ".md"
-        ), f"append_log's MD filename must follow METRICS_REPORT_*.md; got {md_name!r}"
+        assert "/" not in md_name, (
+            f"append_log must receive the MD basename, not a full path; got {md_name!r}"
+        )
+        assert "\\" not in md_name, (
+            f"append_log must receive the MD basename, not a full path; got {md_name!r}"
+        )
+        assert md_name.startswith("METRICS_REPORT_"), (
+            f"append_log's MD filename must follow METRICS_REPORT_*.md; got {md_name!r}"
+        )
+        assert md_name.endswith(".md"), (
+            f"append_log's MD filename must follow METRICS_REPORT_*.md; got {md_name!r}"
+        )

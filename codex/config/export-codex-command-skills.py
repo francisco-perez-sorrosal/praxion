@@ -7,7 +7,6 @@ import argparse
 import re
 from pathlib import Path
 
-
 FRONTMATTER_BOUNDARY = "---"
 SKIP_COMMAND_FILES = {"CLAUDE.md", "README.md"}
 

@@ -20,7 +20,6 @@ from pathlib import Path
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Fixtures / helpers.
 # ---------------------------------------------------------------------------
@@ -119,9 +118,7 @@ class TestCollectDeterminism:
     default 0.0), so two serializations of the ``data`` payload compare equal.
     """
 
-    def test_collect_data_is_byte_identical_across_two_calls(
-        self, populated_repo: Path
-    ) -> None:
+    def test_collect_data_is_byte_identical_across_two_calls(self, populated_repo: Path) -> None:
         from scripts.project_metrics.collectors.readiness_collector import (
             ReadinessCollector,
         )
@@ -139,9 +136,7 @@ class TestCollectDeterminism:
             "— any clock/random/ordering leakage breaks the determinism contract."
         )
 
-    def test_collect_duration_is_zero_for_determinism(
-        self, populated_repo: Path
-    ) -> None:
+    def test_collect_duration_is_zero_for_determinism(self, populated_repo: Path) -> None:
         from scripts.project_metrics.collectors.readiness_collector import (
             ReadinessCollector,
         )
@@ -187,9 +182,7 @@ class TestCollectLlmPending:
 
         assert result.data["llm"]["status"] == "pending"
 
-    def test_llm_block_has_null_model_and_grounded_on(
-        self, populated_repo: Path
-    ) -> None:
+    def test_llm_block_has_null_model_and_grounded_on(self, populated_repo: Path) -> None:
         from scripts.project_metrics.collectors.readiness_collector import (
             ReadinessCollector,
         )
@@ -200,9 +193,7 @@ class TestCollectLlmPending:
         assert llm["model"] is None
         assert llm["grounded_on"] is None
 
-    def test_llm_criteria_are_left_unscored_after_collect(
-        self, populated_repo: Path
-    ) -> None:
+    def test_llm_criteria_are_left_unscored_after_collect(self, populated_repo: Path) -> None:
         from scripts.project_metrics.collectors.readiness_collector import (
             ReadinessCollector,
         )

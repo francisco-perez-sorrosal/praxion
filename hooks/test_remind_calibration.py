@@ -164,12 +164,12 @@ def test_flags_lagging_calibration_log(tmp_path: Path) -> None:
         "a lagging calibration log with an unsuppressed pending commit must "
         "produce a stderr reminder"
     )
-    assert (
-        "calibration_log.md" in result.stderr
-    ), "the reminder must point at .ai-state/calibration_log.md"
-    assert (
-        "retrospective" in result.stderr.lower()
-    ), "the reminder must name the Retrospective cell as the micro-capture slot"
+    assert "calibration_log.md" in result.stderr, (
+        "the reminder must point at .ai-state/calibration_log.md"
+    )
+    assert "retrospective" in result.stderr.lower(), (
+        "the reminder must name the Retrospective cell as the micro-capture slot"
+    )
 
 
 def test_suppresses_reminder_inside_linked_worktree(tmp_path: Path) -> None:
@@ -238,9 +238,9 @@ def test_silent_when_calibration_log_absent(tmp_path: Path) -> None:
     result = _run_hook('git commit -m "feat: second commit, still no log"', repo)
 
     assert result.returncode == 0
-    assert (
-        result.stderr.strip() == ""
-    ), f"absent calibration_log.md must produce no output; got stderr={result.stderr!r}"
+    assert result.stderr.strip() == "", (
+        f"absent calibration_log.md must produce no output; got stderr={result.stderr!r}"
+    )
 
 
 def test_malformed_stdin_json_never_raises(tmp_path: Path) -> None:
@@ -256,9 +256,9 @@ def test_malformed_stdin_json_never_raises(tmp_path: Path) -> None:
     result = _run_hook_raw_stdin("not-json{{{", repo)
 
     assert result.returncode == 0, "malformed stdin must never cause a non-zero exit"
-    assert (
-        "Traceback" not in result.stderr
-    ), f"malformed stdin must not leak a Python traceback; got stderr={result.stderr!r}"
+    assert "Traceback" not in result.stderr, (
+        f"malformed stdin must not leak a Python traceback; got stderr={result.stderr!r}"
+    )
 
 
 def test_resolves_consumer_repo_root_via_git(tmp_path: Path) -> None:

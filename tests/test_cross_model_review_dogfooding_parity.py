@@ -211,9 +211,9 @@ def test_installed_caller_pins_the_hub_via_a_local_ref_while_the_template_uses_a
     """
     rendered_uses = _job(_rendered_template_parsed()).get("uses", "")
     actual_uses = _job(_installed_caller_parsed()).get("uses")
-    assert (
-        actual_uses is not None
-    ), "The installed caller's job must declare a `uses:` key before its ref shape can be checked"
+    assert actual_uses is not None, (
+        "The installed caller's job must declare a `uses:` key before its ref shape can be checked"
+    )
     assert actual_uses.startswith("./"), (
         "Praxion's installed caller must reference the review hub via a "
         f"same-repo local `uses: ./...` ref (never a cross-repo pin) — got {actual_uses!r}"
@@ -222,9 +222,9 @@ def test_installed_caller_pins_the_hub_via_a_local_ref_while_the_template_uses_a
         "The rendered template must keep the cross-repo pinned `uses:` form "
         f"(every managed caller's shape) — got {rendered_uses!r}"
     )
-    assert (
-        "@" in rendered_uses
-    ), f"The rendered template's `uses:` must be SHA-pinned via `@<ref>` — got {rendered_uses!r}"
+    assert "@" in rendered_uses, (
+        f"The rendered template's `uses:` must be SHA-pinned via `@<ref>` — got {rendered_uses!r}"
+    )
 
 
 def test_installed_callers_job_permissions_ceiling_matches_the_templates_inverted_privilege_block() -> (

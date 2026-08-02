@@ -228,9 +228,9 @@ def test_host_native_subagent_receives_preamble_in_praxion_project(
     assert result.stdout, "Expected updatedInput JSON on stdout"
     output = json.loads(result.stdout)
     updated_prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
-    assert updated_prompt.startswith(
-        PREAMBLE_MARKER
-    ), f"Preamble not prepended for {subagent_type!r}: {updated_prompt[:80]!r}"
+    assert updated_prompt.startswith(PREAMBLE_MARKER), (
+        f"Preamble not prepended for {subagent_type!r}: {updated_prompt[:80]!r}"
+    )
     assert _ORIGINAL_PROMPT in updated_prompt, "Original prompt must be preserved after preamble"
 
 
@@ -273,9 +273,9 @@ def test_preamble_length_is_compact(praxion_project: Path) -> None:
     prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
     # Extract only the prepended preamble (everything before the original prompt)
     preamble = prompt[: prompt.index(_ORIGINAL_PROMPT)]
-    assert (
-        len(preamble) <= 300
-    ), f"Preamble too long ({len(preamble)} chars, spec ~180+separator): {preamble!r}"
+    assert len(preamble) <= 300, (
+        f"Preamble too long ({len(preamble)} chars, spec ~180+separator): {preamble!r}"
+    )
 
 
 def test_output_preserves_subagent_type_unchanged(praxion_project: Path) -> None:
@@ -310,9 +310,9 @@ def test_output_preserves_description_and_other_tool_input_fields(
     assert result.returncode == 0, f"Hook exited non-zero: {result.stderr}"
     output = json.loads(result.stdout)
     returned = output["hookSpecificOutput"]["updatedInput"]
-    assert (
-        returned.get("description") == "probe task"
-    ), "description field dropped — host-native Agent spawns will fail schema validation"
+    assert returned.get("description") == "probe task", (
+        "description field dropped — host-native Agent spawns will fail schema validation"
+    )
     assert returned.get("model") == "sonnet", "model field dropped"
     assert returned.get("run_in_background") is True, "run_in_background field dropped"
     # And the prompt is still injected
@@ -376,9 +376,9 @@ def test_praxion_native_receives_preamble_when_opt_in_env_set(
     assert result.stdout, "Expected updatedInput JSON when opt-in env is set"
     output = json.loads(result.stdout)
     prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
-    assert prompt.startswith(
-        PREAMBLE_MARKER
-    ), f"Preamble not prepended for {subagent_type!r} with opt-in env set"
+    assert prompt.startswith(PREAMBLE_MARKER), (
+        f"Preamble not prepended for {subagent_type!r} with opt-in env set"
+    )
 
 
 def test_praxion_native_injection_opt_in_does_not_affect_host_native(
@@ -691,9 +691,9 @@ def test_injects_session_worktree_line_from_worktree_cwd(linked_worktree: Path) 
     output = json.loads(result.stdout)
     updated_prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
     assert SESSION_WORKTREE_MARKER in updated_prompt
-    assert (
-        str(linked_worktree.resolve()) in updated_prompt
-    ), "Briefing must name the absolute worktree root"
+    assert str(linked_worktree.resolve()) in updated_prompt, (
+        "Briefing must name the absolute worktree root"
+    )
     assert "absolute paths" in updated_prompt.lower()
     assert "never relative" in updated_prompt.lower() or "relative paths" in updated_prompt.lower()
     assert _ORIGINAL_PROMPT in updated_prompt, "Original prompt must be preserved"
@@ -711,9 +711,9 @@ def test_no_session_worktree_line_from_canonical_checkout_cwd(main_repo: Path) -
     result = _run_hook(payload)
 
     assert result.returncode == 0
-    assert (
-        result.stdout == ""
-    ), f"No injection expected from the main checkout; got: {result.stdout!r}"
+    assert result.stdout == "", (
+        f"No injection expected from the main checkout; got: {result.stdout!r}"
+    )
 
 
 def test_no_session_worktree_line_when_cwd_is_not_a_git_repo(tmp_path: Path) -> None:

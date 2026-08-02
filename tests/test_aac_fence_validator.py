@@ -83,16 +83,12 @@ def test_unbalanced_opener_fails(tmp_path):
     md = FIXTURES / "unbalanced_opener.md"
     result = validate(md)
 
-    assert result.verdict == "FAIL", (
-        f"Expected FAIL for unbalanced fence, got {result.verdict!r}"
-    )
+    assert result.verdict == "FAIL", f"Expected FAIL for unbalanced fence, got {result.verdict!r}"
     assert len(result.findings) >= 1
     fail_findings = [f for f in result.findings if f.severity == "FAIL"]
     assert fail_findings, "Expected at least one FAIL finding"
     codes = {f.code for f in fail_findings}
-    assert "unbalanced-fence" in codes, (
-        f"Expected finding code 'unbalanced-fence', got {codes!r}"
-    )
+    assert "unbalanced-fence" in codes, f"Expected finding code 'unbalanced-fence', got {codes!r}"
 
 
 # ===========================================================================
@@ -101,7 +97,7 @@ def test_unbalanced_opener_fails(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "fixture_name,description",
+    ("fixture_name", "description"),
     [
         ("missing_source_attr.md", "aac:generated without source= attribute"),
         ("missing_view_attr.md", "aac:generated without view= attribute"),
@@ -121,9 +117,7 @@ def test_missing_required_attribute_fails(fixture_name, description):
     md = FIXTURES / fixture_name
     result = validate(md)
 
-    assert result.verdict == "FAIL", (
-        f"{description}: expected FAIL, got {result.verdict!r}"
-    )
+    assert result.verdict == "FAIL", f"{description}: expected FAIL, got {result.verdict!r}"
     fail_findings = [f for f in result.findings if f.severity == "FAIL"]
     assert fail_findings, f"{description}: expected at least one FAIL finding"
     codes = {f.code for f in fail_findings}

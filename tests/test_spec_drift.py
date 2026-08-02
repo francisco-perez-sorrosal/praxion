@@ -48,9 +48,8 @@ def _assert_finding_shape(finding: dict, *, scope: str) -> None:
     assert isinstance(finding["stale_dependents"], list), (
         f"stale_dependents must be a list, got {type(finding['stale_dependents'])!r}"
     )
-    assert isinstance(finding["rationale"], str) and finding["rationale"], (
-        "rationale must be a non-empty string"
-    )
+    assert isinstance(finding["rationale"], str), "rationale must be a non-empty string"
+    assert finding["rationale"], "rationale must be a non-empty string"
     assert isinstance(finding["pointer"], str), "pointer must be a string"
 
 

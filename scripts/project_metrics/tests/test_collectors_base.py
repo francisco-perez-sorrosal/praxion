@@ -75,9 +75,7 @@ _NAMESPACE_SKIP_MARKER_REASON: str = "tool_unavailable"
 # three fields, no more. A fourth field here would silently change the
 # determinism contract (collector output must be reproducible given identical
 # context; a fourth field would widen that invariant).
-_COLLECTION_CONTEXT_FIELDS: frozenset[str] = frozenset(
-    {"repo_root", "window_days", "git_sha"}
-)
+_COLLECTION_CONTEXT_FIELDS: frozenset[str] = frozenset({"repo_root", "window_days", "git_sha"})
 
 
 # ---------------------------------------------------------------------------
@@ -232,8 +230,8 @@ class TestCollectorAbstractContract:
     def test_subclass_missing_resolve_cannot_instantiate(self) -> None:
         """A subclass that implements only `collect` but not `resolve` is still abstract."""
         from scripts.project_metrics.collectors.base import (
-            Collector,
             CollectionContext,
+            Collector,
             CollectorResult,
         )
 
@@ -279,8 +277,8 @@ class TestCollectorAbstractContract:
         """
         from scripts.project_metrics.collectors.base import (
             Available,
-            Collector,
             CollectionContext,
+            Collector,
             CollectorDescription,
             CollectorResult,
             ResolutionEnv,
@@ -373,8 +371,8 @@ class TestCollectDeterminism:
         """Same context in -> same JSON bytes out, on every call."""
         from scripts.project_metrics.collectors.base import (
             Available,
-            Collector,
             CollectionContext,
+            Collector,
             CollectorResult,
             ResolutionEnv,
         )
@@ -424,12 +422,12 @@ class TestCollectDeterminism:
         # schema module uses elsewhere.
         from dataclasses import asdict
 
-        first_bytes = json.dumps(
-            asdict(first), sort_keys=True, separators=(",", ":")
-        ).encode("utf-8")
-        second_bytes = json.dumps(
-            asdict(second), sort_keys=True, separators=(",", ":")
-        ).encode("utf-8")
+        first_bytes = json.dumps(asdict(first), sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
+        second_bytes = json.dumps(asdict(second), sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
 
         assert first_bytes == second_bytes, (
             "Two invocations of the same deterministic collector with the same "

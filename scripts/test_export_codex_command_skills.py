@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXPORTER_PATH = REPO_ROOT / "codex" / "config" / "export-codex-command-skills.py"
@@ -63,9 +64,7 @@ def test_parse_rejects_missing_description(tmp_path: Path):
     path = tmp_path / "bad.md"
     path.write_text("---\nargument-hint: [x]\n---\n\nBody\n", encoding="utf-8")
 
-    try:
+    with pytest.raises(
+        exporter.CommandParseError, match="missing required frontmatter key: description"
+    ):
         exporter.parse_frontmatter_command(path)
-    except exporter.CommandParseError as exc:
-        assert "missing required frontmatter key: description" in str(exc)
-    else:
-        raise AssertionError("expected CommandParseError")

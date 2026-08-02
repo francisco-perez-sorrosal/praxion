@@ -228,9 +228,9 @@ def test_installed_caller_pins_the_hub_via_a_local_ref_while_the_template_uses_a
         "The rendered template must keep the cross-repo pinned `uses:` form "
         f"(every managed caller's shape) — got {rendered_uses!r}"
     )
-    assert (
-        "@" in rendered_uses
-    ), f"The rendered template's `uses:` must be SHA-pinned via `@<ref>` — got {rendered_uses!r}"
+    assert "@" in rendered_uses, (
+        f"The rendered template's `uses:` must be SHA-pinned via `@<ref>` — got {rendered_uses!r}"
+    )
 
 
 def test_installed_callers_job_permissions_ceiling_matches_the_templates_least_privilege_block() -> (

@@ -256,9 +256,9 @@ class TestSccCollectorIdentity:
 
         # Soft dependency — absence degrades to the stdlib SLOC fallback
         # in GitCollector, not an abort.
-        assert (
-            SccCollector.required is _EXPECTED_REQUIRED
-        ), "SccCollector must be a soft dep (required=False); only GitCollector is the hard floor."
+        assert SccCollector.required is _EXPECTED_REQUIRED, (
+            "SccCollector must be a soft dep (required=False); only GitCollector is the hard floor."
+        )
 
     def test_describe_returns_valid_description(self) -> None:
         from scripts.project_metrics.collectors.base import CollectorDescription
@@ -301,9 +301,9 @@ class TestSccResolveAvailable:
         ):
             result = collector.resolve(env)
 
-        assert isinstance(
-            result, Available
-        ), f"Expected Available; got {type(result).__name__} (result={result!r})"
+        assert isinstance(result, Available), (
+            f"Expected Available; got {type(result).__name__} (result={result!r})"
+        )
 
     def test_available_version_is_parsed_from_stdout(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.base import Available, ResolutionEnv
@@ -329,9 +329,9 @@ class TestSccResolveAvailable:
         # GitCollector's _resolve_git_version). Tolerates either the raw
         # "3.7.0" or the raw stdout — the stable contract is that the
         # expected version substring is present.
-        assert (
-            _EXPECTED_SCC_VERSION in result.version
-        ), f"Version string must contain {_EXPECTED_SCC_VERSION!r}; got {result.version!r}"
+        assert _EXPECTED_SCC_VERSION in result.version, (
+            f"Version string must contain {_EXPECTED_SCC_VERSION!r}; got {result.version!r}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -370,9 +370,9 @@ class TestSccResolveUnavailable:
         ):
             result = collector.resolve(env)
 
-        assert isinstance(
-            result, Unavailable
-        ), f"Expected Unavailable when scc is absent; got {type(result).__name__}"
+        assert isinstance(result, Unavailable), (
+            f"Expected Unavailable when scc is absent; got {type(result).__name__}"
+        )
 
     def test_unavailable_carries_actionable_install_hint(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.base import (
@@ -394,9 +394,9 @@ class TestSccResolveUnavailable:
         # Install hint must be a non-empty string referencing scc — so the
         # MD renderer's "Install to improve" section has something to show.
         assert result.install_hint, "install_hint must be non-empty"
-        assert (
-            "scc" in result.install_hint.lower()
-        ), f"install_hint should name scc explicitly; got {result.install_hint!r}"
+        assert "scc" in result.install_hint.lower(), (
+            f"install_hint should name scc explicitly; got {result.install_hint!r}"
+        )
         # Reason must be a non-empty string describing what happened. The
         # exact wording is implementer's choice but must be informative.
         assert result.reason, "reason must be non-empty"
@@ -433,9 +433,9 @@ class TestSccResolveUnavailable:
         ):
             result = collector.resolve(env)
 
-        assert isinstance(
-            result, Unavailable
-        ), "FileNotFoundError during scc --version probe must map to Unavailable"
+        assert isinstance(result, Unavailable), (
+            "FileNotFoundError during scc --version probe must map to Unavailable"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -470,9 +470,9 @@ class TestSccResolveTimeout:
         ):
             result = collector.resolve(env)
 
-        assert isinstance(
-            result, Unavailable
-        ), "TimeoutExpired on scc --version must map to Unavailable, not raise"
+        assert isinstance(result, Unavailable), (
+            "TimeoutExpired on scc --version must map to Unavailable, not raise"
+        )
 
     def test_timeout_unavailable_reason_mentions_timeout(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.base import (
@@ -577,12 +577,12 @@ class TestSccCollectSuccess:
         # Accept either shape: {lang: {"sloc": N, "file_count": M}} or
         # {lang: N_sloc}. The stable contract is that Python and Markdown
         # both appear and carry the SLOC totals from SAMPLE_SCC_JSON.
-        assert (
-            "Python" in breakdown
-        ), f"language_breakdown must name 'Python'; keys={sorted(breakdown)}"
-        assert (
-            "Markdown" in breakdown
-        ), f"language_breakdown must name 'Markdown'; keys={sorted(breakdown)}"
+        assert "Python" in breakdown, (
+            f"language_breakdown must name 'Python'; keys={sorted(breakdown)}"
+        )
+        assert "Markdown" in breakdown, (
+            f"language_breakdown must name 'Markdown'; keys={sorted(breakdown)}"
+        )
 
     def test_collect_populates_per_file_sloc(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.base import CollectionContext
@@ -797,9 +797,9 @@ class TestSccPathFilterIntegration:
         ):
             SccCollector().collect(ctx)
 
-        assert (
-            "--exclude-dir" in captured["argv"]
-        ), "scc CLI must be invoked with --exclude-dir to skip ecosystem dirs"
+        assert "--exclude-dir" in captured["argv"], (
+            "scc CLI must be invoked with --exclude-dir to skip ecosystem dirs"
+        )
         idx = captured["argv"].index("--exclude-dir")
         csv = captured["argv"][idx + 1]
         assert ".ai-state" in csv.split(",")

@@ -416,9 +416,9 @@ def test_cross_boundary_canary_reconciler_sees_events_split_across_rotation(tmp_
 
     # Correlation must surface the agent_stop even though it lived in the active file
     tier2 = rps._correlate_agents([declared_file], rows)
-    assert (
-        tier2["agent_stop_seen"] is True
-    ), "agent_stop in active file must be visible after 2-file stitch"
+    assert tier2["agent_stop_seen"] is True, (
+        "agent_stop in active file must be visible after 2-file stitch"
+    )
 
 
 def test_read_wal_excludes_rows_older_than_window(tmp_path):
@@ -521,12 +521,12 @@ def test_read_wal_keeps_active_row_with_malformed_timestamp(tmp_path):
     rows = rps._read_wal(obs_path, max_age_days=7, now=_NOW)
 
     agent_ids_returned = {r.get("agent_id") for r in rows}
-    assert (
-        "agent-D" in agent_ids_returned
-    ), "active-file row with malformed timestamp must be retained unconditionally"
-    assert (
-        "agent-E" not in agent_ids_returned
-    ), "segment row with malformed timestamp must be pruned (parsed as epoch → outside window)"
+    assert "agent-D" in agent_ids_returned, (
+        "active-file row with malformed timestamp must be retained unconditionally"
+    )
+    assert "agent-E" not in agent_ids_returned, (
+        "segment row with malformed timestamp must be pruned (parsed as epoch → outside window)"
+    )
 
 
 if __name__ == "__main__":

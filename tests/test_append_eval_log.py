@@ -123,9 +123,9 @@ def test_first_write_creates_ledger_dir_with_canonical_header(tmp_path: Path) ->
 
     separator_cols = [c.strip() for c in lines[1].strip().strip("|").split("|")]
     assert len(separator_cols) == len(columns)
-    assert all(
-        set(cell) <= {"-"} and cell for cell in separator_cols
-    ), "separator row must be dashes only, one cell per column"
+    assert all(set(cell) <= {"-"} and cell for cell in separator_cols), (
+        "separator row must be dashes only, one cell per column"
+    )
 
     assert len(lines) == 3, "header + separator + exactly one data row on first write"
 

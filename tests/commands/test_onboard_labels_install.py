@@ -61,16 +61,16 @@ def test_skips_without_overwriting_when_manifest_or_caller_already_exists() -> N
     predicate_match = re.search(r"\*\*Predicate\.?\*\*.*?(?=\n\*\*Action|\Z)", section, re.DOTALL)
     assert predicate_match, "Sub-step 8e.9 must document a Predicate (skip-if-exists guard)"
     predicate = predicate_match.group(0)
-    assert (
-        ".github/labels.yml" in predicate
-    ), "Predicate must check for an existing .github/labels.yml"
+    assert ".github/labels.yml" in predicate, (
+        "Predicate must check for an existing .github/labels.yml"
+    )
     assert re.search(r"labels-reconcile\.yml", predicate), (
         "Predicate must also check for an existing reconciler caller "
         "(.github/workflows/labels-reconcile.yml)"
     )
-    assert re.search(
-        r"skip", predicate, re.IGNORECASE
-    ), "Predicate must document skipping when either file already exists"
+    assert re.search(r"skip", predicate, re.IGNORECASE), (
+        "Predicate must document skipping when either file already exists"
+    )
     assert re.search(r"never overwrit", section, re.IGNORECASE), (
         "Sub-step 8e.9 must explicitly state it never overwrites an existing "
         "manifest or caller installation, mirroring sub-step 8e.8's own "
@@ -92,9 +92,9 @@ def test_installs_manifest_and_caller_templates_into_dot_github() -> None:
         "Sub-step 8e.9's Action must read the caller template "
         "'claude/project-baseline/labels/labels-reconcile.yml.tmpl'"
     )
-    assert (
-        ".github/labels.yml" in action
-    ), "Sub-step 8e.9's Action must write the rendered manifest to .github/labels.yml"
+    assert ".github/labels.yml" in action, (
+        "Sub-step 8e.9's Action must write the rendered manifest to .github/labels.yml"
+    )
     assert ".github/workflows/labels-reconcile.yml" in action, (
         "Sub-step 8e.9's Action must write the rendered caller to "
         ".github/workflows/labels-reconcile.yml"

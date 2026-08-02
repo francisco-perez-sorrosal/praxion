@@ -22,13 +22,14 @@ import re
 import sys
 from pathlib import Path
 
+from _repo_root import is_plugin_cache_path
+from _repo_root import resolve_repo_root as _resolve_repo_root
+
 # Compiled pattern for Status short-form truncation.
 # Truncates at the first occurrence of " — " (em-dash with spaces), " (",
 # ";", or "," — whichever comes first — so only the leading token is kept.
 _STATUS_TRUNCATION_RE = re.compile(r"( — | \(|;|,).*$")
 
-from _repo_root import is_plugin_cache_path
-from _repo_root import resolve_repo_root as _resolve_repo_root
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SPECS_DIR = SCRIPT_DIR.parent / ".ai-state" / "specs"

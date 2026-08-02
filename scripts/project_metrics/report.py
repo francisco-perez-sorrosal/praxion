@@ -247,20 +247,14 @@ def _summarize_lizard(data: dict[str, Any]) -> list[str]:
             score = file_data.get("p95_ccn")
             if score is None:
                 score = file_data.get("max_ccn", 0)
-            scored.append(
-                (path, _fmt_score(score), int(file_data.get("function_count", 0)))
-            )
+            scored.append((path, _fmt_score(score), int(file_data.get("function_count", 0))))
         scored.sort(key=lambda triple: -triple[1])
         top = scored[:5]
         if top:
-            lines.append(
-                f"- Top {len(top)} most complex files by p95 CCN (of {len(files)}):"
-            )
+            lines.append(f"- Top {len(top)} most complex files by p95 CCN (of {len(files)}):")
             for path, score, fcount in top:
                 score_str = f"{score:.1f}" if score % 1 else f"{int(score)}"
-                lines.append(
-                    f"    - `{path}` — p95 CCN {score_str} ({fcount} functions)"
-                )
+                lines.append(f"    - `{path}` — p95 CCN {score_str} ({fcount} functions)")
     return lines
 
 
@@ -286,21 +280,16 @@ def _summarize_complexipy(data: dict[str, Any]) -> list[str]:
             score = file_data.get("p95_cognitive")
             if score is None:
                 score = file_data.get("max_cognitive", 0)
-            scored.append(
-                (path, _fmt_score(score), int(file_data.get("function_count", 0)))
-            )
+            scored.append((path, _fmt_score(score), int(file_data.get("function_count", 0))))
         scored.sort(key=lambda triple: -triple[1])
         top = scored[:5]
         if top:
             lines.append(
-                f"- Top {len(top)} most cognitively complex files "
-                f"(p95 cognitive, of {len(files)}):"
+                f"- Top {len(top)} most cognitively complex files (p95 cognitive, of {len(files)}):"
             )
             for path, score, fcount in top:
                 score_str = f"{score:.1f}" if score % 1 else f"{int(score)}"
-                lines.append(
-                    f"    - `{path}` — p95 cognitive {score_str} ({fcount} functions)"
-                )
+                lines.append(f"    - `{path}` — p95 cognitive {score_str} ({fcount} functions)")
     return lines
 
 
@@ -338,9 +327,7 @@ def _summarize_pydeps(data: dict[str, Any]) -> list[str]:
         coupling.sort(key=lambda quad: -quad[1])
         top = coupling[:5]
         if top:
-            lines.append(
-                f"- Top {len(top)} most-coupled modules by Ca + Ce (of {len(modules)}):"
-            )
+            lines.append(f"- Top {len(top)} most-coupled modules by Ca + Ce (of {len(modules)}):")
             for name, total, ca, ce in top:
                 lines.append(f"    - `{name}` — Ca {ca} + Ce {ce} = {int(total)}")
     return lines
@@ -372,9 +359,7 @@ def _summarize_scc(data: dict[str, Any]) -> list[str]:
         return lines
     lines.append(f"- Top {len(top)} languages by SLOC (of {len(breakdown)}):")
     for language, files, sloc in top:
-        lines.append(
-            f"    - {language} — {_fmt_int(files)} files, {_fmt_int(sloc)} SLOC"
-        )
+        lines.append(f"    - {language} — {_fmt_int(files)} files, {_fmt_int(sloc)} SLOC")
     return lines
 
 
@@ -922,9 +907,7 @@ def _extract_lizard_lang_p95(report: Report) -> dict[str, float]:
     return {}
 
 
-def _lookup_language_counts(
-    language: str, breakdown: dict[str, dict[str, int]]
-) -> tuple[str, str]:
+def _lookup_language_counts(language: str, breakdown: dict[str, dict[str, int]]) -> tuple[str, str]:
     entry = breakdown.get(language)
     if isinstance(entry, dict):
         files = _fmt_int(entry.get("file_count"))
@@ -989,6 +972,6 @@ def render_json(report: Report) -> bytes:
             f"{sorted(conflicts)}. Rename the collector(s) to avoid shadowing."
         )
     payload.update(collectors)
-    return json.dumps(
-        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode("utf-8")
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode(
+        "utf-8"
+    )

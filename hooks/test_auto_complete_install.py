@@ -52,8 +52,7 @@ def _load_module():
 
     if not _MODULE_PATH.exists():
         raise ImportError(
-            f"hooks/auto_complete_install.py does not exist — "
-            f"expected at {_MODULE_PATH}"
+            f"hooks/auto_complete_install.py does not exist — expected at {_MODULE_PATH}"
         )
     spec = importlib.util.spec_from_file_location("auto_complete_install", _MODULE_PATH)
     if spec is None or spec.loader is None:
@@ -68,7 +67,7 @@ def _load_module():
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture()
+@pytest.fixture
 def _clear_praxion_env(monkeypatch):
     """Each test starts with no PRAXION_* or HOME-interfering env vars set."""
     for key in (
@@ -78,7 +77,7 @@ def _clear_praxion_env(monkeypatch):
         monkeypatch.delenv(key, raising=False)
 
 
-@pytest.fixture()
+@pytest.fixture
 def fake_home(tmp_path):
     """Return a fake HOME directory with Praxion plugin cache structure pre-built."""
     home = tmp_path / "home"
@@ -89,19 +88,19 @@ def fake_home(tmp_path):
     return home
 
 
-@pytest.fixture()
+@pytest.fixture
 def plugin_cache_dir(fake_home):
     """Return the plugin cache directory path."""
     return fake_home / ".claude" / "plugins" / "cache" / "bit-agora" / "i-am"
 
 
-@pytest.fixture()
+@pytest.fixture
 def marker_path(fake_home):
     """Return the marker file path."""
     return fake_home / ".claude" / ".praxion-complete-installed"
 
 
-@pytest.fixture()
+@pytest.fixture
 def rules_sentinel(fake_home):
     """Create the sentinel rules file indicating completed install."""
     sentinel = fake_home / ".claude" / "rules" / "swe" / "agent-behavioral-contract.md"
@@ -109,7 +108,7 @@ def rules_sentinel(fake_home):
     return sentinel
 
 
-@pytest.fixture()
+@pytest.fixture
 def claude_md_symlink(fake_home, tmp_path):
     """Create ~/.claude/CLAUDE.md as a symlink targeting a real file (simulating a rendered template)."""
     target = tmp_path / "rendered_claude.md"
@@ -119,7 +118,7 @@ def claude_md_symlink(fake_home, tmp_path):
     return symlink
 
 
-@pytest.fixture()
+@pytest.fixture
 def minimal_session_payload():
     """Minimal SessionStart JSON payload for the hook."""
     return {
@@ -160,6 +159,7 @@ def _run_hook_subprocess(
 class TestFastSkipPath:
     """When all surfaces are present and marker is fresh, hook exits silently."""
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_marker_present_and_fresh_exits_zero(
         self,
         fake_home,
@@ -168,7 +168,6 @@ class TestFastSkipPath:
         rules_sentinel,
         claude_md_symlink,
         minimal_session_payload,
-        _clear_praxion_env,
     ):
         """Marker newer than plugin cache → fast-skip, exit 0."""
         # Arrange: marker is newer than plugin cache dir
@@ -186,10 +185,9 @@ class TestFastSkipPath:
         )
 
         # Assert
-        assert result.returncode == 0, (
-            f"Expected exit 0, got {result.returncode}: {result.stderr}"
-        )
+        assert result.returncode == 0, f"Expected exit 0, got {result.returncode}: {result.stderr}"
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_fast_skip_produces_no_stdout(
         self,
         fake_home,
@@ -198,7 +196,6 @@ class TestFastSkipPath:
         rules_sentinel,
         claude_md_symlink,
         minimal_session_payload,
-        _clear_praxion_env,
     ):
         """Fast-skip path must be silent on stdout."""
         plugin_cache_dir.touch()
@@ -215,10 +212,9 @@ class TestFastSkipPath:
         assert result.returncode == 0, (
             f"Precondition: hook must exit 0 before asserting stdout\nstderr: {result.stderr}"
         )
-        assert result.stdout == "", (
-            f"Fast-skip should produce no stdout, got: {result.stdout!r}"
-        )
+        assert result.stdout == "", f"Fast-skip should produce no stdout, got: {result.stdout!r}"
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_fast_skip_completes_under_50ms(
         self,
         fake_home,
@@ -227,7 +223,6 @@ class TestFastSkipPath:
         rules_sentinel,
         claude_md_symlink,
         minimal_session_payload,
-        _clear_praxion_env,
     ):
         """Fast-skip path wall-clock must be under 50ms overhead after Python startup."""
         plugin_cache_dir.touch()
@@ -243,17 +238,12 @@ class TestFastSkipPath:
         )
         elapsed_ms = (time.perf_counter() - start) * 1000
 
-        assert result.returncode == 0, (
-            f"Precondition: hook must exit 0\nstderr: {result.stderr}"
-        )
+        assert result.returncode == 0, f"Precondition: hook must exit 0\nstderr: {result.stderr}"
         # Python startup is ~30-50ms; total hook including startup < 500ms for CI
-        assert elapsed_ms < 500, (
-            f"Fast-skip path took {elapsed_ms:.1f}ms — expected < 500ms total"
-        )
+        assert elapsed_ms < 500, f"Fast-skip path took {elapsed_ms:.1f}ms — expected < 500ms total"
 
-    def test_disable_flag_exits_zero_regardless_of_state(
-        self, fake_home, minimal_session_payload, _clear_praxion_env
-    ):
+    @pytest.mark.usefixtures("_clear_praxion_env")
+    def test_disable_flag_exits_zero_regardless_of_state(self, fake_home, minimal_session_payload):
         """PRAXION_DISABLE_AUTO_COMPLETE=1 → exit 0 silently, no filesystem writes."""
         # Arrange: no surfaces exist at all
         result = _run_hook_subprocess(
@@ -265,6 +255,7 @@ class TestFastSkipPath:
         assert result.returncode == 0
         assert result.stdout == ""
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_all_surfaces_present_without_marker_writes_marker_and_exits_zero(
         self,
         fake_home,
@@ -273,7 +264,6 @@ class TestFastSkipPath:
         rules_sentinel,
         claude_md_symlink,
         minimal_session_payload,
-        _clear_praxion_env,
     ):
         """All surfaces present but no marker → write marker, exit 0, no install."""
         assert not marker_path.exists()
@@ -285,9 +275,7 @@ class TestFastSkipPath:
         )
 
         assert result.returncode == 0
-        assert marker_path.exists(), (
-            "Marker file should be written when all surfaces are present"
-        )
+        assert marker_path.exists(), "Marker file should be written when all surfaces are present"
 
 
 # ===========================================================================
@@ -298,13 +286,13 @@ class TestFastSkipPath:
 class TestMarkerRearm:
     """When marker is older than plugin cache directory mtime, hook re-runs."""
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_stale_marker_triggers_reinstall(
         self,
         fake_home,
         marker_path,
         plugin_cache_dir,
         minimal_session_payload,
-        _clear_praxion_env,
     ):
         """Marker present but older than plugin cache mtime → cold path runs (install triggers)."""
         # Arrange: marker is OLDER than plugin cache
@@ -324,6 +312,7 @@ class TestMarkerRearm:
         # Hook must still exit 0 (never blocks); it should attempt reinstall
         assert result.returncode == 0
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_fresh_marker_skips_even_after_plugin_update(
         self,
         fake_home,
@@ -332,7 +321,6 @@ class TestMarkerRearm:
         rules_sentinel,
         claude_md_symlink,
         minimal_session_payload,
-        _clear_praxion_env,
     ):
         """Marker mtime > plugin cache mtime → fast-skip even if plugin cache exists."""
         plugin_cache_dir.touch()
@@ -349,13 +337,13 @@ class TestMarkerRearm:
 
         assert result.returncode == 0
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_mtime_manipulation_via_utime(
         self,
         fake_home,
         marker_path,
         plugin_cache_dir,
         minimal_session_payload,
-        _clear_praxion_env,
     ):
         """Verify os.utime() correctly controls the stale-marker comparison used by the hook."""
         # This test documents the mtime-manipulation technique for the hook test suite
@@ -375,8 +363,9 @@ class TestMarkerRearm:
 class TestColdPathFreshInstall:
     """Cold path: no marker, surfaces missing → install runs, marker written."""
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_missing_claude_md_triggers_install(
-        self, fake_home, marker_path, minimal_session_payload, _clear_praxion_env
+        self, fake_home, marker_path, minimal_session_payload
     ):
         """No ~/.claude/CLAUDE.md → install runs, exit 0."""
         assert not (fake_home / ".claude" / "CLAUDE.md").exists()
@@ -390,18 +379,16 @@ class TestColdPathFreshInstall:
 
         assert result.returncode == 0
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_missing_rules_sentinel_triggers_install(
         self,
         fake_home,
         marker_path,
         claude_md_symlink,
         minimal_session_payload,
-        _clear_praxion_env,
     ):
         """CLAUDE.md present but rules sentinel missing → install triggered."""
-        sentinel = (
-            fake_home / ".claude" / "rules" / "swe" / "agent-behavioral-contract.md"
-        )
+        sentinel = fake_home / ".claude" / "rules" / "swe" / "agent-behavioral-contract.md"
         assert not sentinel.exists()
 
         result = _run_hook_subprocess(
@@ -412,13 +399,13 @@ class TestColdPathFreshInstall:
 
         assert result.returncode == 0
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_non_symlink_claude_md_triggers_install(
         self,
         fake_home,
         marker_path,
         rules_sentinel,
         minimal_session_payload,
-        _clear_praxion_env,
     ):
         """~/.claude/CLAUDE.md exists but is NOT a symlink → install triggered."""
         regular_file = fake_home / ".claude" / "CLAUDE.md"
@@ -433,8 +420,9 @@ class TestColdPathFreshInstall:
 
         assert result.returncode == 0
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_successful_install_writes_marker_file(
-        self, fake_home, marker_path, minimal_session_payload, _clear_praxion_env
+        self, fake_home, marker_path, minimal_session_payload
     ):
         """After successful cold-path install, marker file is written."""
         assert not marker_path.exists()
@@ -446,12 +434,11 @@ class TestColdPathFreshInstall:
         )
 
         assert result.returncode == 0
-        assert marker_path.exists(), (
-            "Marker file must be written after successful install"
-        )
+        assert marker_path.exists(), "Marker file must be written after successful install"
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_decline_writes_soft_decline_marker(
-        self, fake_home, marker_path, minimal_session_payload, _clear_praxion_env
+        self, fake_home, marker_path, minimal_session_payload
     ):
         """User decline in interactive mode writes soft-decline marker, not the completion marker."""
         # Simulate decline via "n\n" on stdin (not using PRAXION_AUTO_COMPLETE)
@@ -476,13 +463,13 @@ class TestColdPathFreshInstall:
 class TestFourEnvironmentCombinations:
     """All four git-config × interactivity combinations must exit 0."""
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_git_config_set_non_interactive_auto_complete(
         self,
         fake_home,
         marker_path,
         minimal_session_payload,
         monkeypatch,
-        _clear_praxion_env,
     ):
         """git config user.email set + non-interactive (PRAXION_AUTO_COMPLETE=1) → exit 0."""
         # Non-interactive: stdin.isatty() == False is simulated by subprocess piping + PRAXION_AUTO_COMPLETE
@@ -501,8 +488,9 @@ class TestFourEnvironmentCombinations:
             f"stderr: {result.stderr}"
         )
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_git_config_set_interactive_defaults_accepted(
-        self, fake_home, marker_path, minimal_session_payload, _clear_praxion_env
+        self, fake_home, marker_path, minimal_session_payload
     ):
         """git config user.email set + interactive shell → exit 0 (user accepted via PRAXION_AUTO_COMPLETE)."""
         result = _run_hook_subprocess(
@@ -515,8 +503,9 @@ class TestFourEnvironmentCombinations:
 
         assert result.returncode == 0
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_git_config_unset_non_interactive_uses_fallbacks(
-        self, fake_home, marker_path, minimal_session_payload, _clear_praxion_env
+        self, fake_home, marker_path, minimal_session_payload
     ):
         """git config user.email absent + non-interactive → fallback values used, exit 0."""
         # Ensure git config returns nothing — unset by using a no-op GIT_CONFIG_NOSYSTEM
@@ -526,21 +515,19 @@ class TestFourEnvironmentCombinations:
             env_extra={
                 "PRAXION_AUTO_COMPLETE": "1",
                 "GIT_CONFIG_NOSYSTEM": "1",
-                "HOME": str(
-                    fake_home
-                ),  # Explicit HOME to ensure no real ~/.gitconfig reads
+                "HOME": str(fake_home),  # Explicit HOME to ensure no real ~/.gitconfig reads
                 "XDG_CONFIG_HOME": str(fake_home / ".config"),
             },
         )
 
         # Even with no git config, install must complete and exit 0
         assert result.returncode == 0, (
-            f"Absent git config + non-interactive should still exit 0\n"
-            f"stderr: {result.stderr}"
+            f"Absent git config + non-interactive should still exit 0\nstderr: {result.stderr}"
         )
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_git_config_unset_interactive_uses_fallback_with_prompt(
-        self, fake_home, marker_path, minimal_session_payload, _clear_praxion_env
+        self, fake_home, marker_path, minimal_session_payload
     ):
         """git config unset + interactive → prompt shown with anon fallbacks, exits 0."""
         result = _run_hook_subprocess(
@@ -564,6 +551,7 @@ class TestFourEnvironmentCombinations:
 class TestIdempotency:
     """Second run with marker present must produce ZERO filesystem writes."""
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_second_run_is_no_op(
         self,
         fake_home,
@@ -572,7 +560,6 @@ class TestIdempotency:
         rules_sentinel,
         claude_md_symlink,
         minimal_session_payload,
-        _clear_praxion_env,
     ):
         """Second run with fresh marker → no filesystem changes (idempotency core contract)."""
         # Arrange: complete the first run
@@ -599,6 +586,7 @@ class TestIdempotency:
         new_files = files_after - files_before
         assert not new_files, f"Second run created unexpected new files: {new_files}"
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_second_run_produces_no_stdout(
         self,
         fake_home,
@@ -607,7 +595,6 @@ class TestIdempotency:
         rules_sentinel,
         claude_md_symlink,
         minimal_session_payload,
-        _clear_praxion_env,
     ):
         """Second run (fast-skip) must produce no stdout output."""
         plugin_cache_dir.touch()
@@ -621,13 +608,12 @@ class TestIdempotency:
             env_extra={"PRAXION_AUTO_COMPLETE": "1"},
         )
 
-        assert result.returncode == 0, (
-            f"Precondition: hook must exit 0\nstderr: {result.stderr}"
-        )
+        assert result.returncode == 0, f"Precondition: hook must exit 0\nstderr: {result.stderr}"
         assert result.stdout == "", (
             f"Idempotent second run must produce no stdout; got: {result.stdout!r}"
         )
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_no_reprompt_on_second_run(
         self,
         fake_home,
@@ -636,7 +622,6 @@ class TestIdempotency:
         rules_sentinel,
         claude_md_symlink,
         minimal_session_payload,
-        _clear_praxion_env,
     ):
         """Second run with fresh marker must not attempt to prompt the user (no re-renders)."""
         plugin_cache_dir.touch()
@@ -666,8 +651,9 @@ class TestIdempotency:
 class TestInteractiveAndTimeoutBranches:
     """Interactive prompt, 30s timeout-accept, and non-interactive branches."""
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_auto_complete_flag_bypasses_prompt(
-        self, fake_home, marker_path, minimal_session_payload, _clear_praxion_env
+        self, fake_home, marker_path, minimal_session_payload
     ):
         """PRAXION_AUTO_COMPLETE=1 → non-interactive install completes without prompting."""
         result = _run_hook_subprocess(
@@ -678,12 +664,12 @@ class TestInteractiveAndTimeoutBranches:
 
         assert result.returncode == 0
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_auto_complete_derives_username_from_git_email(
         self,
         fake_home,
         marker_path,
         minimal_session_payload,
-        _clear_praxion_env,
         tmp_path,
     ):
         """With PRAXION_AUTO_COMPLETE=1 and a known git email, USERNAME derives from email prefix."""
@@ -702,8 +688,9 @@ class TestInteractiveAndTimeoutBranches:
             f"Auto-complete with git email should succeed\nstderr: {result.stderr}"
         )
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_non_interactive_stdin_not_tty_uses_defaults(
-        self, fake_home, marker_path, minimal_session_payload, _clear_praxion_env
+        self, fake_home, marker_path, minimal_session_payload
     ):
         """Non-interactive session (stdin not a tty) + PRAXION_AUTO_COMPLETE=1 → uses defaults."""
         # subprocess.run with input= simulates stdin piped (not a tty)
@@ -722,8 +709,9 @@ class TestInteractiveAndTimeoutBranches:
 
         assert result.returncode == 0
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_timeout_branch_accepts_defaults_when_no_input(
-        self, fake_home, marker_path, minimal_session_payload, _clear_praxion_env
+        self, fake_home, marker_path, minimal_session_payload
     ):
         """When interactive timeout fires (30s), defaults are auto-accepted — hook exits 0."""
         # We cannot wait 30 real seconds in a test. Instead we verify the hook's
@@ -747,9 +735,8 @@ class TestInteractiveAndTimeoutBranches:
             f"(timeout-accept branch)\nstderr: {result.stderr}"
         )
 
-    def test_malformed_stdin_json_exits_zero(
-        self, fake_home, minimal_session_payload, _clear_praxion_env
-    ):
+    @pytest.mark.usefixtures("_clear_praxion_env")
+    def test_malformed_stdin_json_exits_zero(self, fake_home, minimal_session_payload):
         """Malformed stdin JSON → exit 0, no crash, no block."""
         result = subprocess.run(
             [sys.executable, str(_MODULE_PATH)],
@@ -777,9 +764,8 @@ class TestInteractiveAndTimeoutBranches:
 class TestErrorResilience:
     """Internal errors → exit 0, stderr message, no crash, no block."""
 
-    def test_empty_stdin_exits_zero(
-        self, fake_home, minimal_session_payload, _clear_praxion_env
-    ):
+    @pytest.mark.usefixtures("_clear_praxion_env")
+    def test_empty_stdin_exits_zero(self, fake_home, minimal_session_payload):
         """Empty stdin → exit 0 (hook must degrade gracefully)."""
         result = subprocess.run(
             [sys.executable, str(_MODULE_PATH)],
@@ -796,9 +782,8 @@ class TestErrorResilience:
 
         assert result.returncode == 0
 
-    def test_permission_error_on_home_exits_zero(
-        self, tmp_path, minimal_session_payload, _clear_praxion_env
-    ):
+    @pytest.mark.usefixtures("_clear_praxion_env")
+    def test_permission_error_on_home_exits_zero(self, tmp_path, minimal_session_payload):
         """Filesystem permission error during install → exit 0, error on stderr."""
         # Create a home dir without write permissions on .claude/
         home = tmp_path / "noperm_home"
@@ -821,8 +806,9 @@ class TestErrorResilience:
             # Restore write permission for cleanup
             claude_dir.chmod(0o755)
 
+    @pytest.mark.usefixtures("_clear_praxion_env")
     def test_missing_plugin_cache_dir_handled_gracefully(
-        self, fake_home, marker_path, minimal_session_payload, _clear_praxion_env
+        self, fake_home, marker_path, minimal_session_payload
     ):
         """Plugin cache directory absent → no crash (mtime comparison degrades gracefully)."""
         import shutil
@@ -839,9 +825,8 @@ class TestErrorResilience:
 
         assert result.returncode == 0
 
-    def test_exit_zero_is_unconditional_contract(
-        self, fake_home, minimal_session_payload, _clear_praxion_env
-    ):
+    @pytest.mark.usefixtures("_clear_praxion_env")
+    def test_exit_zero_is_unconditional_contract(self, fake_home, minimal_session_payload):
         """The hook's exit 0 contract holds regardless of internal state — never blocks session start."""
         # Stress test: no surfaces at all, no git config, no PRAXION_AUTO_COMPLETE
         completely_empty_home = fake_home.parent / "empty_home"
@@ -881,9 +866,7 @@ class TestModuleInterface:
     def _require_module(self):
         """Skip all tests in this class if the module doesn't exist yet."""
         if not _MODULE_PATH.exists():
-            pytest.skip(
-                "auto_complete_install.py not yet implemented (expected RED state)"
-            )
+            pytest.skip("auto_complete_install.py not yet implemented (expected RED state)")
 
     def test_module_is_importable(self):
         """The module can be imported without side effects."""
@@ -954,19 +937,13 @@ def _seed_manifest(rules_src: Path, hook_deliver_ids: list[str]) -> None:
     entries = []
     for rule_id in hook_deliver_ids:
         entries.append(
-            f"- id: {rule_id}\n"
-            f"  path: rules/{rule_id}.md\n"
-            f"  install: hook-deliver\n"
-            f"  core: false\n"
+            f"- id: {rule_id}\n  path: rules/{rule_id}.md\n  install: hook-deliver\n  core: false\n"
         )
     symlink_ids = ["swe/agent-behavioral-contract"]
     for rule_id in symlink_ids:
         if rule_id not in hook_deliver_ids:
             entries.append(
-                f"- id: {rule_id}\n"
-                f"  path: rules/{rule_id}.md\n"
-                f"  install: symlink\n"
-                f"  core: true\n"
+                f"- id: {rule_id}\n  path: rules/{rule_id}.md\n  install: symlink\n  core: true\n"
             )
     manifest_content = "version: 1\nrules:\n" + "".join(entries)
     (rules_src / "_manifest.yaml").write_text(manifest_content)
@@ -1095,9 +1072,7 @@ class TestLinkRulesFiltering:
         _link_rules(home)
 
         rules_dest = home / ".claude" / "rules"
-        assert not (rules_dest / "README.md").exists(), (
-            "README.md must never be symlinked"
-        )
+        assert not (rules_dest / "README.md").exists(), "README.md must never be symlinked"
         assert not (rules_dest / "swe" / "references" / "some-reference.md").exists(), (
             "Files under references/ must never be symlinked"
         )

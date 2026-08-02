@@ -74,9 +74,9 @@ def test_skips_without_overwriting_when_pending_already_exists() -> None:
     assert predicate_match, "PENDING.md sub-step must document a Predicate (skip-if-exists guard)"
     predicate = predicate_match.group(0)
     assert PENDING_PATH in predicate, "Predicate must check for an existing PENDING.md"
-    assert re.search(
-        r"skip", predicate, re.IGNORECASE
-    ), "Predicate must document skipping (never overwriting) when PENDING.md already exists"
+    assert re.search(r"skip", predicate, re.IGNORECASE), (
+        "Predicate must document skipping (never overwriting) when PENDING.md already exists"
+    )
 
 
 def test_writes_header_only_skeleton_content() -> None:
@@ -89,9 +89,9 @@ def test_writes_header_only_skeleton_content() -> None:
         "Action must write the header-only skeleton content "
         "(the '# Pending Praxion Feedback' heading)"
     )
-    assert (
-        "/report-praxion-issue" in following
-    ), "Skeleton content must reference /report-praxion-issue"
+    assert "/report-praxion-issue" in following, (
+        "Skeleton content must reference /report-praxion-issue"
+    )
 
 
 def test_records_install_in_onboard_manifest() -> None:

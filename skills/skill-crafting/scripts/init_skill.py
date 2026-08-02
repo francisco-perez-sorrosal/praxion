@@ -181,7 +181,7 @@ Documentation loaded on-demand to inform the agent's process and thinking.
 
 **Examples from other skills:**
 - Product management: `communication.md`, `context_building.md`
-- BigQuery: API reference documentation and query 
+- BigQuery: API reference documentation and query
 - Finance: Schema documentation, company policies
 
 ### assets/
@@ -228,24 +228,20 @@ def init_skill(skill_name: str, output_path: Path) -> int:
         return 1
 
     if len(skill_name) > 64:
-        print(f"Error: name exceeds 64 characters", file=sys.stderr)
+        print("Error: name exceeds 64 characters", file=sys.stderr)
         return 1
 
     # Create directory and SKILL.md
     skill_title = title_case(skill_name)
     skill_dir.mkdir(parents=True)
     skill_md = skill_dir / "SKILL.md"
-    skill_md.write_text(
-        SKILL_TEMPLATE.format(skill_name=skill_name, skill_title=skill_title)
-    )
+    skill_md.write_text(SKILL_TEMPLATE.format(skill_name=skill_name, skill_title=skill_title))
 
     # Create resource directories with example files
     scripts_dir = skill_dir / "scripts"
     scripts_dir.mkdir()
     example_script = scripts_dir / "example.py"
-    example_script.write_text(
-        EXAMPLE_SCRIPT.format(skill_name=skill_name)
-    )
+    example_script.write_text(EXAMPLE_SCRIPT.format(skill_name=skill_name))
     example_script.chmod(0o755)
 
     references_dir = skill_dir / "references"
@@ -259,10 +255,10 @@ def init_skill(skill_name: str, output_path: Path) -> int:
     (assets_dir / "example_asset.txt").write_text(EXAMPLE_ASSET)
 
     print(f"Created {skill_dir}/")
-    print(f"  SKILL.md              (edit frontmatter and body)")
-    print(f"  scripts/example.py    (replace or delete)")
-    print(f"  references/api_reference.md  (replace or delete)")
-    print(f"  assets/example_asset.txt     (replace or delete)")
+    print("  SKILL.md              (edit frontmatter and body)")
+    print("  scripts/example.py    (replace or delete)")
+    print("  references/api_reference.md  (replace or delete)")
+    print("  assets/example_asset.txt     (replace or delete)")
     print()
     print("Next steps:")
     print("  1. Complete the TODO items in SKILL.md")

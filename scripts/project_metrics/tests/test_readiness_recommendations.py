@@ -27,7 +27,6 @@ from scripts.project_metrics.collectors.readiness.criteria import (
 )
 from scripts.project_metrics.collectors.readiness_collector import ReadinessCollector
 
-
 # ---------------------------------------------------------------------------
 # Criteria content — every criterion must teach and advise.
 # ---------------------------------------------------------------------------
@@ -53,9 +52,7 @@ def test_pillar_docs_cover_all_pillars() -> None:
     assert set(PILLAR_DOCS) == expected
 
 
-@pytest.mark.parametrize(
-    "pillar_id", sorted(set(FACTORY_PILLARS) | {MANAGEABILITY_PILLAR})
-)
+@pytest.mark.parametrize("pillar_id", sorted(set(FACTORY_PILLARS) | {MANAGEABILITY_PILLAR}))
 def test_pillar_doc_is_non_empty(pillar_id: str) -> None:
     assert PILLAR_DOCS[pillar_id].strip()
 
@@ -71,8 +68,10 @@ def test_collector_embeds_educational_fields(tmp_path: Path) -> None:
     data = collector.collect(ctx).data
 
     for crit in data["criteria"]:
-        assert "explanation" in crit and crit["explanation"].strip()
-        assert "remediation" in crit and crit["remediation"].strip()
+        assert "explanation" in crit
+        assert crit["explanation"].strip()
+        assert "remediation" in crit
+        assert crit["remediation"].strip()
         assert crit["remediation_source"] == "static"
 
 

@@ -123,7 +123,7 @@ def test_table_round_trips_from_json():
     assert len(re_parsed) == len(original_blocks), (
         f"Round-trip changed row count: {len(original_blocks)} → {len(re_parsed)}"
     )
-    for orig, reparsed in zip(original_blocks, re_parsed):
+    for orig, reparsed in zip(original_blocks, re_parsed, strict=False):
         assert orig == reparsed, (
             f"Row round-trip mismatch:\n  original:  {orig}\n  re-parsed: {reparsed}"
         )
@@ -186,9 +186,7 @@ def test_row_id_stable_across_reruns():
 
     # Verify the specific hash formula from the ADR:
     # sha1(report_id + cluster_signature)[:8]
-    expected_hash = hashlib.sha1((report_id + cluster_signature).encode()).hexdigest()[
-        :8
-    ]
+    expected_hash = hashlib.sha1((report_id + cluster_signature).encode()).hexdigest()[:8]
     expected_id = f"rw-{expected_hash}"
     assert row_id_first == expected_id, (
         f"Row id {row_id_first!r} does not match expected sha1-based formula "

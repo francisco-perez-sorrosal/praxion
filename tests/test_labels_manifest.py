@@ -94,9 +94,9 @@ def test_manifest_declares_baseline_and_additional_as_top_level_list_blocks() ->
     manifest = _load_manifest()
 
     assert isinstance(manifest, dict), ".github/labels.yml must parse to a YAML mapping"
-    assert isinstance(
-        manifest.get("baseline"), list
-    ), "top-level `baseline:` key must be a list of label entries"
+    assert isinstance(manifest.get("baseline"), list), (
+        "top-level `baseline:` key must be a list of label entries"
+    )
     assert isinstance(manifest.get("additional"), list), (
         "top-level `additional:` key must be a list of label entries "
         "(empty on a fresh install, growable per-project)"
@@ -112,9 +112,9 @@ def test_every_baseline_entry_has_exactly_name_color_description_string_keys() -
             f"{REQUIRED_ENTRY_KEYS} — no more, no fewer"
         )
         for key in REQUIRED_ENTRY_KEYS:
-            assert isinstance(
-                entry[key], str
-            ), f"baseline entry {entry!r}'s {key!r} must be a string"
+            assert isinstance(entry[key], str), (
+                f"baseline entry {entry!r}'s {key!r} must be a string"
+            )
 
 
 def test_every_additional_entry_has_exactly_name_color_description_string_keys() -> None:
@@ -126,9 +126,9 @@ def test_every_additional_entry_has_exactly_name_color_description_string_keys()
             f"{REQUIRED_ENTRY_KEYS} — no more, no fewer"
         )
         for key in REQUIRED_ENTRY_KEYS:
-            assert isinstance(
-                entry[key], str
-            ), f"additional entry {entry!r}'s {key!r} must be a string"
+            assert isinstance(entry[key], str), (
+                f"additional entry {entry!r}'s {key!r} must be a string"
+            )
 
 
 def test_github_default_labels_are_absent_from_baseline_and_additional() -> None:
@@ -301,9 +301,9 @@ def test_main_writes_the_refreshed_manifest_back_to_the_project_manifest_path(
     after_parsed = yaml.safe_load(after)
     shipped = yaml.safe_load(_SHIPPED_TEMPLATE_TEXT)
     assert exit_code == 0, "main() must exit 0 on a successful refresh"
-    assert (
-        after_parsed["baseline"] == shipped["baseline"]
-    ), "main() must write the refreshed baseline: back to the project manifest path in place"
+    assert after_parsed["baseline"] == shipped["baseline"], (
+        "main() must write the refreshed baseline: back to the project manifest path in place"
+    )
     assert _PROJECT_ADDITIONAL_BLOCK_TEXT in after, (
         "main() must preserve the project's additional: block byte-for-byte "
         "when writing the refreshed manifest back to disk"

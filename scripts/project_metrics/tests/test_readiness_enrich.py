@@ -32,7 +32,6 @@ from scripts.project_metrics.collectors.readiness import judge
 from scripts.project_metrics.collectors.readiness_collector import ReadinessCollector
 from scripts.project_metrics.schema import AggregateBlock, Report
 
-
 # ---------------------------------------------------------------------------
 # Helpers.
 # ---------------------------------------------------------------------------
@@ -82,9 +81,7 @@ def _report_with_readiness(repo_root: Path) -> Report:
     )
 
 
-def _verdict_response(
-    passed: bool, rationale: str, recommendation: str | None = None
-) -> bytes:
+def _verdict_response(passed: bool, rationale: str, recommendation: str | None = None) -> bytes:
     """A Messages-API-shaped response body carrying a verdict tool call.
 
     When ``recommendation`` is supplied it is included in the tool input,
@@ -113,7 +110,7 @@ class _FakeResponse:
     def __init__(self, body: bytes) -> None:
         self._body = body
 
-    def __enter__(self) -> "_FakeResponse":
+    def __enter__(self) -> _FakeResponse:
         return self
 
     def __exit__(self, *exc: object) -> None:
@@ -171,9 +168,7 @@ class TestNoAuthDegrades:
         for crit in _llm_criteria(data):
             assert crit["passed"] is None
 
-    def test_no_auth_excludes_llm_criteria_from_denominators(
-        self, populated_repo: Path
-    ) -> None:
+    def test_no_auth_excludes_llm_criteria_from_denominators(self, populated_repo: Path) -> None:
         report = _report_with_readiness(populated_repo)
         with patch.object(judge, "detect_auth", return_value=None):
             enrich_readiness(report, populated_repo, _args())
@@ -202,25 +197,17 @@ class TestNoAuthDegrades:
 class TestRequireFlagHardFails:
     """The require flag turns a missing credential into a hard, pre-write fail."""
 
-    def test_require_flag_no_auth_raises_system_exit(
-        self, populated_repo: Path
-    ) -> None:
+    def test_require_flag_no_auth_raises_system_exit(self, populated_repo: Path) -> None:
         report = _report_with_readiness(populated_repo)
         with patch.object(judge, "detect_auth", return_value=None):
             with pytest.raises(SystemExit):
-                enrich_readiness(
-                    report, populated_repo, _args(require_readiness_ai=True)
-                )
+                enrich_readiness(report, populated_repo, _args(require_readiness_ai=True))
 
-    def test_require_flag_no_auth_does_not_mutate_llm_block(
-        self, populated_repo: Path
-    ) -> None:
+    def test_require_flag_no_auth_does_not_mutate_llm_block(self, populated_repo: Path) -> None:
         report = _report_with_readiness(populated_repo)
         with patch.object(judge, "detect_auth", return_value=None):
             with pytest.raises(SystemExit):
-                enrich_readiness(
-                    report, populated_repo, _args(require_readiness_ai=True)
-                )
+                enrich_readiness(report, populated_repo, _args(require_readiness_ai=True))
 
         # The block was never marked skipped — it still carries the collector's
         # pending placeholder, proving the raise happened before any mutation.
@@ -236,9 +223,7 @@ class TestRequireFlagHardFails:
 class TestMechanicalOnlyFlag:
     """The flag skips the LLM tier even when a credential is present."""
 
-    def test_mechanical_only_marks_skipped_even_with_auth(
-        self, populated_repo: Path
-    ) -> None:
+    def test_mechanical_only_marks_skipped_even_with_auth(self, populated_repo: Path) -> None:
         report = _report_with_readiness(populated_repo)
         with patch.object(judge, "detect_auth", return_value="api_key"):
             enrich_readiness(report, populated_repo, _args(mechanical_only=True))
@@ -335,9 +320,7 @@ class TestAuthPresentScores:
                 },
             },
         }
-        (reports_dir / prior_name).write_text(
-            json.dumps(prior_payload), encoding="utf-8"
-        )
+        (reports_dir / prior_name).write_text(json.dumps(prior_payload), encoding="utf-8")
 
         report = _report_with_readiness(populated_repo)
 
@@ -398,10 +381,8 @@ class TestJudgeErrorDegrades:
             raise OSError("connection reset")
 
         with patch("urllib.request.urlopen", _boom):
-            with pytest.raises(judge.JudgeUnavailable):
-                enrich_readiness(
-                    report, populated_repo, _args(require_readiness_ai=True)
-                )
+            with pytest.raises(judge.JudgeUnavailableError):
+                enrich_readiness(report, populated_repo, _args(require_readiness_ai=True))
 
 
 # ---------------------------------------------------------------------------
@@ -428,9 +409,7 @@ class TestRecommendationLayering:
             enrich_readiness(report, populated_repo, _args())
 
         data = report.collectors["readiness"].data
-        failing_llm = [
-            c for c in _llm_criteria(data) if c["applicable"] and c["passed"] is False
-        ]
+        failing_llm = [c for c in _llm_criteria(data) if c["applicable"] and c["passed"] is False]
         assert failing_llm, "expected at least one failing LLM criterion"
         for crit in failing_llm:
             assert crit["remediation"] == "Add an arch section"
@@ -458,9 +437,7 @@ class TestRecommendationLayering:
         report = _report_with_readiness(populated_repo)
 
         def _fake_urlopen(request: Any, timeout: int = 0) -> _FakeResponse:
-            return _FakeResponse(
-                _verdict_response(False, "thin", recommendation="LLM advice")
-            )
+            return _FakeResponse(_verdict_response(False, "thin", recommendation="LLM advice"))
 
         with patch("urllib.request.urlopen", _fake_urlopen):
             enrich_readiness(report, populated_repo, _args())

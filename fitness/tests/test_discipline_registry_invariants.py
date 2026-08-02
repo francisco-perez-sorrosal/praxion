@@ -476,9 +476,9 @@ def test_exactly_one_agent_declares_the_consultant_role(project_root: Path) -> N
 def test_flags_missing_consultant_agent_file(tmp_path: Path) -> None:
     """Canary: check_consultant_agent_file_exists flags an absent file."""
     result = check_consultant_agent_file_exists(tmp_path / "discipline-consultant.md")
-    assert (
-        result is not None
-    ), "check_consultant_agent_file_exists must flag a missing consultant file"
+    assert result is not None, (
+        "check_consultant_agent_file_exists must flag a missing consultant file"
+    )
 
 
 def test_flags_a_per_discipline_agent_file(tmp_path: Path) -> None:
@@ -487,9 +487,9 @@ def test_flags_a_per_discipline_agent_file(tmp_path: Path) -> None:
     catch."""
     (tmp_path / "statistician.md").write_text("stub", encoding="utf-8")
     failures = check_no_per_discipline_agent_files(tmp_path, ["statistician"])
-    assert (
-        failures
-    ), "check_no_per_discipline_agent_files must flag a leaked per-discipline agent file"
+    assert failures, (
+        "check_no_per_discipline_agent_files must flag a leaked per-discipline agent file"
+    )
 
 
 def test_consultant_description_contains_no_registry_discipline_name(project_root: Path) -> None:
@@ -500,9 +500,9 @@ def test_consultant_description_contains_no_registry_discipline_name(project_roo
     )
     frontmatter = _read_frontmatter(consultant_path.read_text(encoding="utf-8"))
     description = frontmatter.get("description", "")
-    assert isinstance(
-        description, str
-    ), f"consultant description: must be a string; got {description!r}"
+    assert isinstance(description, str), (
+        f"consultant description: must be a string; got {description!r}"
+    )
     assert description, "consultant description: frontmatter field must be non-empty"
 
     result = check_no_discipline_name_in_text(description, _registry_discipline_names(project_root))
@@ -523,9 +523,9 @@ def test_flags_a_registry_discipline_name_injected_into_the_real_description(
     )
     frontmatter = _read_frontmatter(consultant_path.read_text(encoding="utf-8"))
     real_description = frontmatter.get("description", "")
-    assert isinstance(
-        real_description, str
-    ), f"expected a string description; got {real_description!r}"
+    assert isinstance(real_description, str), (
+        f"expected a string description; got {real_description!r}"
+    )
     assert real_description, "expected a non-empty description to build the canary from"
 
     synthetic_discipline = "zzz-canary-discipline"
@@ -611,9 +611,9 @@ def test_flags_consultant_skills_frontmatter_drifted_from_pinned_value() -> None
     result = check_consultant_skills_frontmatter_is_pinned(
         ["multi-perspective-analysis", "some-other-skill"]
     )
-    assert (
-        result is not None
-    ), "check_consultant_skills_frontmatter_is_pinned must flag skills: drift"
+    assert result is not None, (
+        "check_consultant_skills_frontmatter_is_pinned must flag skills: drift"
+    )
 
 
 def check_consultant_tools_include_skill_tool(tools: list[str]) -> str | None:
@@ -655,9 +655,9 @@ def test_flags_consultant_tools_frontmatter_missing_the_skill_tool() -> None:
     """Canary: check_consultant_tools_include_skill_tool flags a tools: list
     that omits the required 'Skill' entry."""
     result = check_consultant_tools_include_skill_tool(["Read", "Write"])
-    assert (
-        result is not None
-    ), "check_consultant_tools_include_skill_tool must flag a tools: list missing 'Skill'"
+    assert result is not None, (
+        "check_consultant_tools_include_skill_tool must flag a tools: list missing 'Skill'"
+    )
 
 
 def test_registry_is_exactly_one_file_with_fully_populated_rows(project_root: Path) -> None:
@@ -719,9 +719,9 @@ def test_flags_plugin_json_agent_count_mismatch() -> None:
     """Canary: check_plugin_agent_count_matches_agent_files flags a count
     mismatch between plugin.json's agents array and agents/*.md."""
     result = check_plugin_agent_count_matches_agent_files(3, 4, ["a.md", "b.md", "c.md", "d.md"])
-    assert (
-        result is not None
-    ), "check_plugin_agent_count_matches_agent_files must flag a count mismatch"
+    assert result is not None, (
+        "check_plugin_agent_count_matches_agent_files must flag a count mismatch"
+    )
 
 
 def test_ledger_exists_given_the_registrys_current_row_count(project_root: Path) -> None:
@@ -1156,9 +1156,9 @@ def test_collapses_superseded_rows_to_the_latest_disposition_per_challenge() -> 
     ]
     ledger_text = f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n" + "\n".join(rows) + "\n"
 
-    assert (
-        count_ledger_rows_for_discipline(ledger_text, "statistician") == 3
-    ), "the raw row count is unchanged -- three rows were appended"
+    assert count_ledger_rows_for_discipline(ledger_text, "statistician") == 3, (
+        "the raw row count is unchanged -- three rows were appended"
+    )
     assert count_live_challenges_for_discipline(ledger_text, "statistician") == 2, (
         "the two CH-01 rows collapse to one live challenge (its latest "
         "disposition, switch-now), leaving 2 live challenges total"
@@ -1260,9 +1260,9 @@ def test_flags_text_missing_the_blocked_marker() -> None:
     `[BLOCKED]` marker, fails the fail-loud check."""
     text = "If the discipline cannot be resolved, the consultant stops and reports an error."
     result = check_documents_fail_loud_resolution(text)
-    assert (
-        result is not None
-    ), "check_documents_fail_loud_resolution must flag text with no '[BLOCKED]' marker; got None"
+    assert result is not None, (
+        "check_documents_fail_loud_resolution must flag text with no '[BLOCKED]' marker; got None"
+    )
 
 
 def test_flags_blocked_marker_not_tied_to_an_unresolvable_value() -> None:
@@ -1514,9 +1514,9 @@ def test_flags_a_cost_row_whose_tokens_cell_is_not_a_positive_integer() -> None:
         ledger_rows, cost_rows, SERIES_BOUNDARY
     )
 
-    assert (
-        len(failures) == 3
-    ), f"expected exactly three failures (one per bad tokens cell); got: {failures}"
+    assert len(failures) == 3, (
+        f"expected exactly three failures (one per bad tokens cell); got: {failures}"
+    )
 
 
 def test_flags_a_cost_row_whose_model_disagrees_with_the_ledger() -> None:
@@ -1612,9 +1612,9 @@ def test_accepts_a_consult_with_two_cost_rows_for_one_triple() -> None:
     failures = check_every_post_boundary_consult_has_a_cost_row(
         ledger_rows, cost_rows, SERIES_BOUNDARY
     )
-    assert (
-        not failures
-    ), f"expected no failures for two consistent cost rows on one triple; got: {failures}"
+    assert not failures, (
+        f"expected no failures for two consistent cost rows on one triple; got: {failures}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -2351,9 +2351,9 @@ def test_flags_a_sealed_prior_whose_concern_cell_is_a_placeholder() -> None:
     prior_rows = parse_prior_table_rows(priors_table)
     failures = check_every_post_boundary_consult_has_a_sealed_prior([], prior_rows, SEAL_BOUNDARY)
 
-    assert (
-        len(failures) == 3
-    ), f"expected exactly three failures (one per placeholder concern); got: {failures}"
+    assert len(failures) == 3, (
+        f"expected exactly three failures (one per placeholder concern); got: {failures}"
+    )
 
 
 def test_flags_a_none_declaration_coexisting_with_listed_priors() -> None:
@@ -2742,9 +2742,9 @@ def test_flags_a_sealed_prior_with_a_malformed_timestamp() -> None:
     prior_rows = parse_prior_table_rows(priors_table)
     failures = check_every_post_boundary_consult_has_a_sealed_prior([], prior_rows, SEAL_BOUNDARY)
 
-    assert any(
-        "malformed timestamp" in f for f in failures
-    ), f"G2 must flag a sealed prior whose timestamp is not ISO 8601 UTC; got {failures!r}"
+    assert any("malformed timestamp" in f for f in failures), (
+        f"G2 must flag a sealed prior whose timestamp is not ISO 8601 UTC; got {failures!r}"
+    )
 
 
 def test_flags_a_sealed_prior_missing_from_the_working_file() -> None:
@@ -2877,9 +2877,9 @@ def test_accepts_a_none_only_seal_as_a_valid_declaration() -> None:
         ledger_rows, classification_rows, prior_rows, SEAL_BOUNDARY
     )
     assert not prior_failures, f"expected no prior failures; got: {prior_failures}"
-    assert (
-        not classification_failures
-    ), f"expected no classification failures; got: {classification_failures}"
+    assert not classification_failures, (
+        f"expected no classification failures; got: {classification_failures}"
+    )
 
 
 def test_accepts_a_superseded_challenge_with_one_classification_row() -> None:
@@ -3109,9 +3109,9 @@ def test_the_witness_commit_contains_the_sealed_prior_rows(project_root: Path) -
             text=True,
             check=False,
         )
-        assert (
-            show.returncode == 0
-        ), f"git show {seal_witness}:.ai-state/CONSULT_PRIORS.md failed: {show.stderr}"
+        assert show.returncode == 0, (
+            f"git show {seal_witness}:.ai-state/CONSULT_PRIORS.md failed: {show.stderr}"
+        )
         witness_prior_rows = parse_prior_table_rows(show.stdout)
         working_prior_rows = parse_prior_table_rows(priors_path.read_text(encoding="utf-8"))
         failure = check_witness_priors_equal_working_priors(

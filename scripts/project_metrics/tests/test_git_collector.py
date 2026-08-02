@@ -115,9 +115,7 @@ _WINDOW_DAYS: int = 90
 _MINIMAL_REPO_COMMIT_COUNT: int = 10
 
 # From the collector-protocol ADR: resolution outcomes and statuses.
-_COLLECTOR_RESULT_STATUSES: frozenset[str] = frozenset(
-    {"ok", "partial", "error", "timeout"}
-)
+_COLLECTOR_RESULT_STATUSES: frozenset[str] = frozenset({"ok", "partial", "error", "timeout"})
 
 
 # ---------------------------------------------------------------------------
@@ -269,13 +267,9 @@ class TestGitCollectorResolve:
             result = collector.resolve(env)
         finally:
             os.chdir(original_cwd)
-        assert isinstance(result, Available), (
-            f"Expected Available; got {type(result).__name__}"
-        )
+        assert isinstance(result, Available), f"Expected Available; got {type(result).__name__}"
 
-    def test_resolve_returns_unavailable_outside_a_git_repo(
-        self, tmp_path: Path
-    ) -> None:
+    def test_resolve_returns_unavailable_outside_a_git_repo(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.base import (
             ResolutionEnv,
             Unavailable,
@@ -338,8 +332,7 @@ class TestGitCollectorEmptyRepo:
 
         result = GitCollector().collect(_make_context(empty_repo_path))
         assert result.status == "ok", (
-            f"Empty repo should produce status=ok, not {result.status!r}; "
-            f"issues={result.issues}"
+            f"Empty repo should produce status=ok, not {result.status!r}; issues={result.issues}"
         )
 
     def test_empty_repo_change_entropy_is_zero(
@@ -375,9 +368,7 @@ class TestGitCollectorEmptyRepo:
                 f"Empty repo should yield no coupled pairs; got {pairs['pairs']!r}"
             )
         else:
-            assert pairs in ({}, []), (
-                f"Empty repo should yield empty coupling; got {pairs!r}"
-            )
+            assert pairs in ({}, []), f"Empty repo should yield empty coupling; got {pairs!r}"
 
     def test_empty_repo_truck_factor_is_one(
         self,
@@ -428,8 +419,7 @@ class TestGitCollectorSingleAuthor:
         for file_path, per_file in ownership.items():
             top_pct = _extract_top_author_pct(per_file)
             assert top_pct == pytest.approx(1.0, abs=0.001), (
-                f"Single-author repo file {file_path!r} must have 100% ownership; "
-                f"got {top_pct}"
+                f"Single-author repo file {file_path!r} must have 100% ownership; got {top_pct}"
             )
 
 
@@ -549,8 +539,7 @@ class TestGitCollectorMultiAuthor:
         for file_path, expected_pct in _MINIMAL_REPO_TOP_AUTHOR_PCT.items():
             per_file = ownership.get(file_path)
             assert per_file is not None, (
-                f"ownership block must have entry for {file_path!r}; "
-                f"got keys {sorted(ownership)}"
+                f"ownership block must have entry for {file_path!r}; got keys {sorted(ownership)}"
             )
             actual_pct = _extract_top_author_pct(per_file)
             assert actual_pct == pytest.approx(expected_pct, abs=0.01), (
@@ -738,8 +727,7 @@ class TestGitCollectorBirdOwnership:
         assert core_owners is not None
         top_pct = _extract_top_author_pct(core_owners)
         assert top_pct == pytest.approx(0.80, abs=0.01), (
-            f"core.py top-author pct should be 0.80 (Alice 20 of 25 added "
-            f"lines); got {top_pct}"
+            f"core.py top-author pct should be 0.80 (Alice 20 of 25 added lines); got {top_pct}"
         )
 
     def test_readme_has_alice_as_sole_major_100pct(
@@ -962,9 +950,7 @@ def _json_safe(node: Any) -> Any:
 class TestMinimalRepoFixtureIntegrity:
     """Sanity asserts the fixture was built to spec. Not a collector test."""
 
-    def test_minimal_repo_has_exactly_ten_commits(
-        self, minimal_repo_path: Path
-    ) -> None:
+    def test_minimal_repo_has_exactly_ten_commits(self, minimal_repo_path: Path) -> None:
         result = subprocess.run(
             ["git", "-C", str(minimal_repo_path), "rev-list", "--count", "HEAD"],
             capture_output=True,
@@ -978,9 +964,7 @@ class TestMinimalRepoFixtureIntegrity:
             f"Rebuild the fixture."
         )
 
-    def test_minimal_repo_has_exactly_three_distinct_authors(
-        self, minimal_repo_path: Path
-    ) -> None:
+    def test_minimal_repo_has_exactly_three_distinct_authors(self, minimal_repo_path: Path) -> None:
         result = subprocess.run(
             ["git", "-C", str(minimal_repo_path), "log", "--pretty=format:%ae"],
             capture_output=True,

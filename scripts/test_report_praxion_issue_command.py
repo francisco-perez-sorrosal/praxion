@@ -124,9 +124,9 @@ def test_never_files_without_an_explicit_human_confirmation():
     _, body = _frontmatter_and_body()
     confirm_index = body.index("Shall I file this issue?")
     file_calls = [match.start() for match in re.finditer(r"gh issue create", body)]
-    assert (
-        len(file_calls) == 1
-    ), "gh issue create must appear exactly once (only after confirmation)"
+    assert len(file_calls) == 1, (
+        "gh issue create must appear exactly once (only after confirmation)"
+    )
     assert confirm_index < file_calls[0]
 
 

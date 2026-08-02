@@ -17,10 +17,9 @@ MODULE_PATH = Path(__file__).parent / "inject_worktree_banner.py"
 def _load_banner_module():
     """Load inject_worktree_banner.py by path (hooks/ is not a package)."""
     sys.path.insert(0, str(MODULE_PATH.parent))  # so `import _hook_utils` resolves
-    spec = importlib.util.spec_from_file_location(
-        "inject_worktree_banner_under_test", MODULE_PATH
-    )
-    assert spec is not None and spec.loader is not None
+    spec = importlib.util.spec_from_file_location("inject_worktree_banner_under_test", MODULE_PATH)
+    assert spec is not None
+    assert spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod
     spec.loader.exec_module(mod)
@@ -36,9 +35,7 @@ def main_repo(tmp_path: Path) -> Path:
     repo = tmp_path / "main"
     repo.mkdir()
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
-    subprocess.run(
-        ["git", "-C", str(repo), "config", "user.email", "t@example.com"], check=True
-    )
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "t@example.com"], check=True)
     subprocess.run(["git", "-C", str(repo), "config", "user.name", "test"], check=True)
     (repo / "README.md").write_text("seed\n", encoding="utf-8")
     subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
@@ -99,21 +96,15 @@ class TestBannerEmitted:
         assert "Worktree session" in context
         assert str(linked_worktree.resolve()) in context
 
-    def test_banner_names_main_checkout(
-        self, linked_worktree: Path, main_repo: Path
-    ) -> None:
+    def test_banner_names_main_checkout(self, linked_worktree: Path, main_repo: Path) -> None:
         result = _run_hook({"cwd": str(linked_worktree)}, linked_worktree)
         assert str(main_repo.resolve()) in _injected_context(result)
 
     def test_banner_references_lifecycle_doc(self, linked_worktree: Path) -> None:
-        context = _injected_context(
-            _run_hook({"cwd": str(linked_worktree)}, linked_worktree)
-        )
+        context = _injected_context(_run_hook({"cwd": str(linked_worktree)}, linked_worktree))
         assert "pipeline-worktree-lifecycle" in context
 
-    def test_falls_back_to_cwd_when_payload_lacks_cwd(
-        self, linked_worktree: Path
-    ) -> None:
+    def test_falls_back_to_cwd_when_payload_lacks_cwd(self, linked_worktree: Path) -> None:
         # No "cwd" key -- the hook should fall back to the process working dir.
         result = _run_hook({}, linked_worktree)
         assert result.returncode == 0
@@ -189,9 +180,7 @@ class TestBannerRendering:
 class TestReworkAffordance:
     """Banner must append a rework note iff VERIFIER_FINDINGS.md is present."""
 
-    def test_appends_rework_paragraph_when_findings_present(
-        self, tmp_path: Path
-    ) -> None:
+    def test_appends_rework_paragraph_when_findings_present(self, tmp_path: Path) -> None:
         # Arrange: a worktree root with a VERIFIER_FINDINGS.md under .ai-work/<slug>/
         findings = tmp_path / ".ai-work" / "fix-auth" / "VERIFIER_FINDINGS.md"
         findings.parent.mkdir(parents=True)
@@ -215,9 +204,7 @@ class TestReworkAffordance:
         assert "VERIFIER_FINDINGS.md" not in text
         assert "/resume-rework" not in text
 
-    def test_fail_open_on_glob_error(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_fail_open_on_glob_error(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Arrange: make Path.glob raise unconditionally
         original_glob = Path.glob
 

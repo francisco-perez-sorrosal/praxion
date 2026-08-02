@@ -61,9 +61,7 @@ squash_safety = _load_module()
 
 def _completed(stdout: str, returncode: int = 0) -> subprocess.CompletedProcess[str]:
     """Build a fake CompletedProcess for monkeypatched subprocess.run."""
-    return subprocess.CompletedProcess(
-        args=[], returncode=returncode, stdout=stdout, stderr=""
-    )
+    return subprocess.CompletedProcess(args=[], returncode=returncode, stdout=stdout, stderr="")
 
 
 def mock_git_router(
@@ -201,9 +199,7 @@ class TestMergeRegularDetection:
         captured = capsys.readouterr()
         combined_output = captured.out + captured.err
         # No warning block emitted -- detect by the WARNING marker the impl uses
-        assert "WARNING" not in combined_output.upper() or (
-            "ERASED" not in combined_output.upper()
-        )
+        assert "WARNING" not in combined_output.upper() or ("ERASED" not in combined_output.upper())
 
 
 # -- Single-parent commit triggers inspection -------------------------
@@ -337,8 +333,7 @@ class TestErasureDetection:
         name_hits = sum(1 for n in range(25) if f"{n:03d}-x.md" in combined)
         # Either none of them (count-only output) OR at most 20 (truncated list)
         assert name_hits == 0 or name_hits <= 20, (
-            f"warning listed {name_hits} filenames; must be 0 (count-only) "
-            "or <= 20 (truncated)"
+            f"warning listed {name_hits} filenames; must be 0 (count-only) or <= 20 (truncated)"
         )
 
     def test_warning_includes_recovery_steps(
@@ -371,9 +366,7 @@ class TestErasureDetection:
 
         # Recovery commands per ADR + prompt
         assert "reflog" in combined.lower(), "warning must mention `git reflog`"
-        assert "cherry-pick" in combined.lower(), (
-            "warning must mention `git cherry-pick`"
-        )
+        assert "cherry-pick" in combined.lower(), "warning must mention `git cherry-pick`"
         # Prevention path per ADR + prompt
         assert "rebase" in combined.lower(), (
             "warning must mention rebase-and-merge as the prevention path"

@@ -19,7 +19,6 @@ import configparser
 import re
 from pathlib import Path
 
-
 CITATION_REGEX = re.compile(r"dec-\d{3,}|CLAUDE\.md§[A-Z][A-Za-z ]+")
 WAIVER_REGEX = re.compile(r"#\s*fitness-waiver:\s*(\S+)\s+(.+)")
 
@@ -44,9 +43,7 @@ def check_file_citation(source: str, filename: str) -> str | None:
     if docstring is None:
         return f"{filename}: missing module docstring"
     if not CITATION_REGEX.search(docstring):
-        return (
-            f"{filename}: docstring lacks citation matching {CITATION_REGEX.pattern!r}"
-        )
+        return f"{filename}: docstring lacks citation matching {CITATION_REGEX.pattern!r}"
     return None
 
 
@@ -93,9 +90,7 @@ def test_every_waiver_has_anchor_and_reason(project_root: Path) -> None:
         if not root.exists():
             continue
         for source_file in root.rglob("*.py"):
-            for line_no, line in enumerate(
-                source_file.read_text().splitlines(), start=1
-            ):
+            for line_no, line in enumerate(source_file.read_text().splitlines(), start=1):
                 match = WAIVER_REGEX.search(line)
                 if match is None:
                     continue

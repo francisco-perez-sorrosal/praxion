@@ -71,8 +71,7 @@ __all__ = ["CoverageCollector"]
 # ---------------------------------------------------------------------------
 
 _COVERAGE_INSTALL_HINT_GENERIC: str = (
-    "generate a coverage report (coverage.xml or lcov.info) "
-    "before running /project-metrics"
+    "generate a coverage report (coverage.xml or lcov.info) before running /project-metrics"
 )
 _COVERAGE_INSTALL_HINT_REFRESH: str = (
     "run `/project-metrics --refresh-coverage` to invoke the project's "
@@ -117,9 +116,7 @@ class CoverageCollector(Collector):
         that accept an optional constructor-time repo root.
         """
 
-        self._configured_repo_root: Path | None = (
-            Path(repo_root) if repo_root is not None else None
-        )
+        self._configured_repo_root: Path | None = Path(repo_root) if repo_root is not None else None
 
     # ------------------------------------------------------------------ resolve
 
@@ -150,9 +147,7 @@ class CoverageCollector(Collector):
         version = "stale" if namespace_status == "stale" else "current"
         return Available(
             version=version,
-            details=_build_resolve_details(
-                namespace_status, artifact_path, artifact_format, extra
-            ),
+            details=_build_resolve_details(namespace_status, artifact_path, artifact_format, extra),
         )
 
     # ------------------------------------------------------------------ collect
@@ -184,9 +179,7 @@ class CoverageCollector(Collector):
                 issues=[f"coverage artifact parse failed: {exc!r}"],
             )
 
-        namespace_status, extra = _classify_staleness(
-            _check_staleness(repo_root, artifact_path)
-        )
+        namespace_status, extra = _classify_staleness(_check_staleness(repo_root, artifact_path))
         data: dict[str, Any] = {
             "status": namespace_status,
             "artifact_path": str(artifact_path),
@@ -414,9 +407,7 @@ def _parse_lcov(
     return overall, per_file
 
 
-def _build_per_file_entry(
-    lines_total: int, lines_covered: int
-) -> dict[str, float | int]:
+def _build_per_file_entry(lines_total: int, lines_covered: int) -> dict[str, float | int]:
     """Shape a per-file rollup entry consumed by both Cobertura and LCOV parsers."""
 
     line_pct = lines_covered / lines_total if lines_total > 0 else 0.0

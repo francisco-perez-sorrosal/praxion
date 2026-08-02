@@ -139,8 +139,7 @@ def build_pillars(
         # pillar's internal score (within one pillar the weight is uniform).
         pct, numerator, denominator = _pass_pct(pillar_verdicts)
         level_pass = [
-            _level_gate_met(pillar_verdicts, level)
-            for level in range(MIN_LEVEL, MAX_LEVEL + 1)
+            _level_gate_met(pillar_verdicts, level) for level in range(MIN_LEVEL, MAX_LEVEL + 1)
         ]
         weight = weights.get(pillar_id, 1.0) if weights is not None else 1.0
         pillars.append(
@@ -183,9 +182,7 @@ def _level_gate_met(
 # ---------------------------------------------------------------------------
 
 
-def compute_level(
-    verdicts: list[dict[str, Any]], weights: dict[str, float] | None = None
-) -> int:
+def compute_level(verdicts: list[dict[str, Any]], weights: dict[str, float] | None = None) -> int:
     """Compute the overall Factory level (1-5) over the eight pillars combined.
 
     The level is the highest ``L`` such that the 80% gate is met at every

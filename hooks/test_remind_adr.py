@@ -111,13 +111,13 @@ def test_flags_architectural_change_without_adr(tmp_path: Path) -> None:
     result = _run_hook('git commit -m "docs: add rule"', repo)
 
     assert result.returncode == 0, "the hook must always exit 0 (fail-open, advisory-only)"
-    assert (
-        result.stderr.strip() != ""
-    ), "an architectural file staged without an ADR must produce a stderr reminder"
+    assert result.stderr.strip() != "", (
+        "an architectural file staged without an ADR must produce a stderr reminder"
+    )
     assert "[adr-reminder]" in result.stderr
-    assert (
-        "rules/x.md" in result.stderr
-    ), f"the reminder must name the changed architectural file; got stderr={result.stderr!r}"
+    assert "rules/x.md" in result.stderr, (
+        f"the reminder must name the changed architectural file; got stderr={result.stderr!r}"
+    )
 
 
 def test_silent_when_adr_staged_alongside_architectural_change(tmp_path: Path) -> None:
@@ -155,6 +155,6 @@ def test_malformed_stdin_json_never_raises(tmp_path: Path) -> None:
     result = _run_hook_raw_stdin("not-json{{{", repo)
 
     assert result.returncode == 0, "malformed stdin must never cause a non-zero exit"
-    assert (
-        "Traceback" not in result.stderr
-    ), f"malformed stdin must not leak a Python traceback; got stderr={result.stderr!r}"
+    assert "Traceback" not in result.stderr, (
+        f"malformed stdin must not leak a Python traceback; got stderr={result.stderr!r}"
+    )

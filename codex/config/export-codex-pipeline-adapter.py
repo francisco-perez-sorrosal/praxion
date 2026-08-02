@@ -13,9 +13,7 @@ class PipelineAdapterError(ValueError):
     """Raised when canonical Praxion pipeline data cannot be exported."""
 
 
-TABLE_SEPARATOR_PATTERN = re.compile(
-    r"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$"
-)
+TABLE_SEPARATOR_PATTERN = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$")
 
 
 PROCESS_TIER_ADAPTER = {
@@ -130,9 +128,7 @@ def table_after_heading(text: str, heading: str) -> list[dict[str, str]]:
     if header_index is None:
         raise PipelineAdapterError(f"table not found after heading: {heading}")
 
-    headers = [
-        slug_header(cell) for cell in lines[header_index].strip().strip("|").split("|")
-    ]
+    headers = [slug_header(cell) for cell in lines[header_index].strip().strip("|").split("|")]
     rows: list[dict[str, str]] = []
     for line in lines[header_index + 2 :]:
         if not line.lstrip().startswith("|"):
@@ -156,9 +152,7 @@ def export_pipeline_semantics(repo_root: Path) -> dict[str, object]:
     for row in table_after_heading(coordination_text, "### Process Calibration"):
         tier = row["tier"]
         if tier not in PROCESS_TIER_ADAPTER:
-            raise PipelineAdapterError(
-                f"missing Codex process adapter for tier: {tier}"
-            )
+            raise PipelineAdapterError(f"missing Codex process adapter for tier: {tier}")
         tiers.append(
             {
                 "tier": tier,
@@ -197,9 +191,7 @@ def export_model_routing(repo_root: Path) -> dict[str, object]:
     for row in table_after_heading(model_text, "### Tier Table"):
         alias = row["alias"]
         if alias not in CODEX_MODEL_TIER_ADAPTER:
-            raise PipelineAdapterError(
-                f"missing Codex model adapter for alias: {alias}"
-            )
+            raise PipelineAdapterError(f"missing Codex model adapter for alias: {alias}")
         routes.append(
             {
                 "agent": row["agent"],
@@ -239,9 +231,7 @@ def export_pipeline_adapter(repo_root: Path, out_dir: Path) -> list[Path]:
     written: list[Path] = []
     for filename, payload in payloads.items():
         path = praxion_dir / filename
-        path.write_text(
-            json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         written.append(path)
     return written
 

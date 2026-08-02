@@ -13,11 +13,11 @@ Code session):
 
 * ``ANTHROPIC_API_KEY`` set → ``x-api-key`` header.
 * else ``CLAUDE_CODE_OAUTH_TOKEN`` set → ``Authorization: Bearer`` header.
-* else → :class:`JudgeUnavailable`.
+* else → :class:`JudgeUnavailableError`.
 
 The judge uses a forced ``tool_choice`` ("verdict" tool) so the model returns
 structured ``{passed: bool, rationale: str}`` rather than free text. Any
-no-auth, network, or parse failure raises :class:`JudgeUnavailable`; the
+no-auth, network, or parse failure raises :class:`JudgeUnavailableError`; the
 caller decides whether to degrade gracefully or hard-fail.
 
 Tokens are read at call time and used only in request headers — never logged,
@@ -34,13 +34,13 @@ from typing import Any
 
 __all__ = [
     "DEFAULT_MODEL",
-    "JudgeUnavailable",
+    "JudgeUnavailableError",
     "detect_auth",
     "judge_criterion",
 ]
 
 
-class JudgeUnavailable(RuntimeError):
+class JudgeUnavailableError(RuntimeError):
     """Raised when the LLM judge cannot run (no auth, network, or parse error)."""
 
 
@@ -106,7 +106,7 @@ def _auth_headers() -> dict[str, str]:
     """Build the auth + version headers for the detected credential.
 
     API keys go in ``x-api-key``; OAuth tokens go in ``Authorization: Bearer``.
-    Raises :class:`JudgeUnavailable` when neither credential is present.
+    Raises :class:`JudgeUnavailableError` when neither credential is present.
     """
 
     api_key = os.environ.get(_ENV_API_KEY)
@@ -123,7 +123,7 @@ def _auth_headers() -> dict[str, str]:
             "anthropic-version": _ANTHROPIC_VERSION,
             "content-type": "application/json",
         }
-    raise JudgeUnavailable(
+    raise JudgeUnavailableError(
         f"no Anthropic credential found ({_ENV_API_KEY} or {_ENV_OAUTH} must be set)"
     )
 
@@ -221,7 +221,7 @@ def judge_criterion(
 
     POSTs to the Anthropic Messages API via :func:`urllib.request.urlopen` with
     a forced verdict tool. Grounds on ``prior_verdict`` when supplied. Raises
-    :class:`JudgeUnavailable` on missing auth, any network/HTTP error, or a
+    :class:`JudgeUnavailableError` on missing auth, any network/HTTP error, or a
     response that does not carry a parseable verdict tool call.
     """
 
@@ -236,7 +236,7 @@ def judge_criterion(
         with urllib.request.urlopen(request, timeout=timeout_s) as response:
             raw = response.read()
     except (urllib.error.URLError, OSError, TimeoutError) as exc:
-        raise JudgeUnavailable(f"Anthropic Messages API request failed: {exc}") from exc
+        raise JudgeUnavailableError(f"Anthropic Messages API request failed: {exc}") from exc
 
     return _parse_verdict(raw)
 
@@ -246,18 +246,18 @@ def _parse_verdict(raw: bytes) -> dict[str, Any]:
 
     The forced tool_choice guarantees a ``tool_use`` content block named
     ``verdict``; this reads its ``input``. Any structural surprise (non-JSON,
-    missing block, wrong shape) raises :class:`JudgeUnavailable` so the caller
+    missing block, wrong shape) raises :class:`JudgeUnavailableError` so the caller
     treats it as a judge failure rather than a silent bad verdict.
     """
 
     try:
         document = json.loads(raw.decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise JudgeUnavailable(f"judge response was not valid JSON: {exc}") from exc
+        raise JudgeUnavailableError(f"judge response was not valid JSON: {exc}") from exc
 
     content = document.get("content")
     if not isinstance(content, list):
-        raise JudgeUnavailable("judge response missing a content list")
+        raise JudgeUnavailableError("judge response missing a content list")
 
     for block in content:
         if (
@@ -267,11 +267,11 @@ def _parse_verdict(raw: bytes) -> dict[str, Any]:
         ):
             verdict = block.get("input")
             if not isinstance(verdict, dict) or "passed" not in verdict:
-                raise JudgeUnavailable("verdict tool call carried no usable input")
+                raise JudgeUnavailableError("verdict tool call carried no usable input")
             return {
                 "passed": bool(verdict["passed"]),
                 "rationale": str(verdict.get("rationale", "")),
                 "recommendation": str(verdict.get("recommendation", "")),
             }
 
-    raise JudgeUnavailable("judge response contained no 'verdict' tool call")
+    raise JudgeUnavailableError("judge response contained no 'verdict' tool call")

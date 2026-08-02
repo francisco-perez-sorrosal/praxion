@@ -129,7 +129,7 @@ class TestPatternCoverage:
     """Each secret pattern type defined in SECRET_PATTERNS must be redacted."""
 
     @pytest.mark.parametrize(
-        "secret_input,description",
+        ("secret_input", "description"),
         [
             ("api_key=sk-abc123xyz", "key-value api_key"),
             ("API-KEY: some-secret-value", "header-style API-KEY"),
@@ -173,8 +173,7 @@ class TestPatternCoverage:
         """Each known secret pattern is replaced with [REDACTED]."""
         result = redact_secrets(secret_input)
         assert "[REDACTED]" in result, (
-            f"Expected secret pattern ({description}) to be redacted, "
-            f"but got: {result!r}"
+            f"Expected secret pattern ({description}) to be redacted, but got: {result!r}"
         )
         # The original secret value should not survive redaction.
         # Extract a distinctive substring from each secret to verify removal.
@@ -268,11 +267,7 @@ class TestMultipleSecrets:
         assert result.count("[REDACTED]") >= 2
 
     def test_three_secrets_all_redacted(self, redact_secrets):
-        text = (
-            "Config: token=secret123, "
-            "Bearer eyJhbGciOiJIUz.payload, "
-            "AKIAIOSFODNN7EXAMPLE"
-        )
+        text = "Config: token=secret123, Bearer eyJhbGciOiJIUz.payload, AKIAIOSFODNN7EXAMPLE"
         result = redact_secrets(text)
         assert "secret123" not in result
         assert "eyJhbGciOiJIUz" not in result

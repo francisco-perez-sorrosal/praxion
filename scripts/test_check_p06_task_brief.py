@@ -92,14 +92,14 @@ def test_canary_p06_fires_on_known_bad_input(tmp_path: Path) -> None:
     mod = _load_module()
     findings = mod.run_p06(tmp_path)
 
-    assert (
-        len(findings) >= 1
-    ), f"run_p06 must emit ≥1 P06 finding for the known-bad input, got: {findings!r}"
+    assert len(findings) >= 1, (
+        f"run_p06 must emit ≥1 P06 finding for the known-bad input, got: {findings!r}"
+    )
 
     p06_rows = [r for r in findings if r.get("check") == "P06" and r.get("severity") == "warn"]
-    assert (
-        len(p06_rows) >= 1
-    ), f"Expected ≥1 row with check='P06' severity='warn', got: {findings!r}"
+    assert len(p06_rows) >= 1, (
+        f"Expected ≥1 row with check='P06' severity='warn', got: {findings!r}"
+    )
 
 
 def test_canary_p06_fires_on_known_bad_input_json_mode(
@@ -115,9 +115,9 @@ def test_canary_p06_fires_on_known_bad_input_json_mode(
     payload = json.loads(capsys.readouterr().out)
     assert isinstance(payload, list), f"--json must return a JSON array, got: {payload!r}"
     p06_rows = [r for r in payload if r.get("check") == "P06" and r.get("severity") == "warn"]
-    assert (
-        len(p06_rows) >= 1
-    ), f"--json must include ≥1 P06 warn row for the known-bad input, got: {payload!r}"
+    assert len(p06_rows) >= 1, (
+        f"--json must include ≥1 P06 warn row for the known-bad input, got: {payload!r}"
+    )
 
 
 # -- No-false-positive control ------------------------------------------------
@@ -136,9 +136,9 @@ def test_no_false_positive_slug_with_both_files(tmp_path: Path) -> None:
     mod = _load_module()
     findings = mod.run_p06(tmp_path)
 
-    assert (
-        findings == []
-    ), f"run_p06 must return [] when TASK_BRIEF.md is present, got: {findings!r}"
+    assert findings == [], (
+        f"run_p06 must return [] when TASK_BRIEF.md is present, got: {findings!r}"
+    )
 
 
 def test_no_false_positive_ai_work_absent(tmp_path: Path) -> None:
@@ -168,9 +168,9 @@ def test_no_false_positive_slug_without_systems_plan(tmp_path: Path) -> None:
     mod = _load_module()
     findings = mod.run_p06(tmp_path)
 
-    assert (
-        findings == []
-    ), f"run_p06 must not flag a slug that lacks SYSTEMS_PLAN.md, got: {findings!r}"
+    assert findings == [], (
+        f"run_p06 must not flag a slug that lacks SYSTEMS_PLAN.md, got: {findings!r}"
+    )
 
 
 # -- Multiple slugs -----------------------------------------------------------
@@ -240,6 +240,6 @@ def test_plugin_cache_refusal(tmp_path: Path) -> None:
         with pytest.raises(SystemExit) as exc:
             mod.main(["--repo-root", str(tmp_path)])
 
-    assert (
-        exc.value.code == 2
-    ), "Plugin-cache path must exit 2 (refusal) to protect shared plugin state"
+    assert exc.value.code == 2, (
+        "Plugin-cache path must exit 2 (refusal) to protect shared plugin state"
+    )

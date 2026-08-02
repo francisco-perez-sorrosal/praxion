@@ -64,7 +64,12 @@ def test_checkpoint_digest_documents_conditional_omission() -> None:
     # "omitted" to tolerate minor wording variation.
     has_omit = "omit" in section.lower()
     has_findings_context = "findings" in section
-    assert has_omit and has_findings_context, (
+    assert has_omit, (
+        "The ### Spec Drift subsection of coordination-details.md must document "
+        "that the subsection is omitted when detect_drift returns no findings. "
+        f"'omit' found={has_omit}, 'findings' found={has_findings_context}."
+    )
+    assert has_findings_context, (
         "The ### Spec Drift subsection of coordination-details.md must document "
         "that the subsection is omitted when detect_drift returns no findings. "
         f"'omit' found={has_omit}, 'findings' found={has_findings_context}."
@@ -91,7 +96,12 @@ def test_checkpoint_digest_documents_bullet_format() -> None:
     # Match on stable tokens: severity placeholder marker and the literal "pointer:"
     has_severity_bracket = "[<severity>]" in text
     has_pointer_token = "pointer:" in text
-    assert has_severity_bracket and has_pointer_token, (
+    assert has_severity_bracket, (
+        "coordination-details.md must document the bullet format containing "
+        "'[<severity>]' and 'pointer:'. "
+        f"'[<severity>]' found={has_severity_bracket}, 'pointer:' found={has_pointer_token}."
+    )
+    assert has_pointer_token, (
         "coordination-details.md must document the bullet format containing "
         "'[<severity>]' and 'pointer:'. "
         f"'[<severity>]' found={has_severity_bracket}, 'pointer:' found={has_pointer_token}."

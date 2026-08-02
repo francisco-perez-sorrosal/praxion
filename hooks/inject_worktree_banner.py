@@ -49,8 +49,7 @@ DISABLE_FLAG = "PRAXION_DISABLE_WORKTREE_BANNER"
 SUBPROCESS_TIMEOUT_SECONDS = 3
 
 _LIFECYCLE_REF = (
-    "skills/software-planning/references/"
-    "coordination-details.md#pipeline-worktree-lifecycle"
+    "skills/software-planning/references/coordination-details.md#pipeline-worktree-lifecycle"
 )
 
 
@@ -108,9 +107,7 @@ def _build_banner(worktree_root: Path, main_root: Path | None) -> str:
     rework-affordance note when found (fail-open: any detection error is logged
     and the banner is returned without the note).
     """
-    canonical = (
-        f"`{main_root}`" if main_root else "the main checkout (run `git worktree list`)"
-    )
+    canonical = f"`{main_root}`" if main_root else "the main checkout (run `git worktree list`)"
     banner = (
         "## Worktree session (auto-injected)\n\n"
         f"⚠️ You are operating **inside a git worktree** at "

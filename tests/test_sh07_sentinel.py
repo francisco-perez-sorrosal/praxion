@@ -48,9 +48,9 @@ def _assert_sentinel_row(row: dict) -> None:
     assert "check" in row, f"sentinel row missing 'check' key: {row!r}"
     assert row["check"] == "SH07", f"expected check=SH07, got {row['check']!r}"
     assert "severity" in row, f"sentinel row missing 'severity' key: {row!r}"
-    assert (
-        row["severity"] in _VALID_SEVERITIES
-    ), f"severity must be one of {_VALID_SEVERITIES!r}, got {row['severity']!r}"
+    assert row["severity"] in _VALID_SEVERITIES, (
+        f"severity must be one of {_VALID_SEVERITIES!r}, got {row['severity']!r}"
+    )
     assert "message" in row, f"sentinel row missing 'message' key: {row!r}"
     assert isinstance(row["message"], str), "message must be a string"
     assert row["message"], "message must be non-empty"
@@ -79,9 +79,9 @@ def test_sh07_skips_when_no_specs_dir(tmp_path: Path) -> None:
 
     # Assert: no important or suggested findings (zero or one info-level skip row)
     important_or_suggested = [r for r in results if r.get("severity") in ("important", "suggested")]
-    assert (
-        not important_or_suggested
-    ), f"Expected zero important/suggested rows when specs/ absent, got: {important_or_suggested!r}"
+    assert not important_or_suggested, (
+        f"Expected zero important/suggested rows when specs/ absent, got: {important_or_suggested!r}"
+    )
     # Any emitted rows must still be valid sentinel rows
     for row in results:
         _assert_sentinel_row(row)

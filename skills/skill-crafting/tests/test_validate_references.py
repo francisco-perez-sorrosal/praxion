@@ -38,9 +38,7 @@ import pytest
 
 TESTS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = TESTS_DIR.parent.parent.parent  # .../praxion/
-VALIDATOR = (
-    REPO_ROOT / "skills" / "skill-crafting" / "scripts" / "validate_references.py"
-)
+VALIDATOR = REPO_ROOT / "skills" / "skill-crafting" / "scripts" / "validate_references.py"
 FIXTURES = TESTS_DIR / "fixtures" / "validate_references"
 
 
@@ -202,9 +200,7 @@ class TestIntraSkillLinks:
             file_suffix="skills/alpha/SKILL.md",
             target_contains="valid_target.md",
         )
-        assert matches == [], (
-            f"Valid intra-skill link should not be flagged; got {matches}"
-        )
+        assert matches == [], f"Valid intra-skill link should not be flagged; got {matches}"
 
 
 @skip_if_no_validator
@@ -230,9 +226,7 @@ class TestSiblingSkillLinks:
         matches = _findings_for(
             result, file_suffix="skills/alpha/SKILL.md", target_contains="beta/SKILL.md"
         )
-        assert matches == [], (
-            f"Valid sibling-skill link should not be flagged; got {matches}"
-        )
+        assert matches == [], f"Valid sibling-skill link should not be flagged; got {matches}"
 
 
 @skip_if_no_validator
@@ -260,9 +254,7 @@ class TestCrossArtifactLinks:
         broken = _findings_for(
             result, file_suffix="skills/alpha/SKILL.md", target_contains=broken_target
         )
-        assert broken, (
-            f"Expected FAIL for broken cross-artifact link into {artifact_label}/"
-        )
+        assert broken, f"Expected FAIL for broken cross-artifact link into {artifact_label}/"
         assert all(_level_of(f) == "FAIL" for f in broken)
 
     @pytest.mark.parametrize(
@@ -282,9 +274,7 @@ class TestCrossArtifactLinks:
         matches = _findings_for(
             result, file_suffix="skills/alpha/SKILL.md", target_contains=valid_target
         )
-        assert matches == [], (
-            f"Valid cross-artifact link {valid_target} flagged: {matches}"
-        )
+        assert matches == [], f"Valid cross-artifact link {valid_target} flagged: {matches}"
 
 
 @skip_if_no_validator
@@ -396,14 +386,10 @@ class TestCodeFileAllowlist:
             file_suffix="skills/alpha/SKILL.md",
             target_contains="scripts/missing.py",
         )
-        assert broken, (
-            "Expected FAIL for allowlisted code-file link with missing target"
-        )
+        assert broken, "Expected FAIL for allowlisted code-file link with missing target"
         assert all(_level_of(f) == "FAIL" for f in broken)
 
-    def test_valid_allowlisted_code_link_produces_no_finding(
-        self, tmp_path: Path
-    ) -> None:
+    def test_valid_allowlisted_code_link_produces_no_finding(self, tmp_path: Path) -> None:
         repo = _copy_fixture_repo(tmp_path)
         result = _run("--all", "--format", "json", repo_root=repo)
 
@@ -455,15 +441,11 @@ class TestIgnoreMechanisms:
             f"got {suppressed}"
         )
 
-    def test_frontmatter_off_suppresses_all_findings_in_file(
-        self, tmp_path: Path
-    ) -> None:
+    def test_frontmatter_off_suppresses_all_findings_in_file(self, tmp_path: Path) -> None:
         repo = _copy_fixture_repo(tmp_path)
         result = _run("--all", "--format", "json", repo_root=repo)
 
-        matches = _findings_for(
-            result, file_suffix="contexts/ignored_via_frontmatter.md"
-        )
+        matches = _findings_for(result, file_suffix="contexts/ignored_via_frontmatter.md")
         assert matches == [], (
             "Frontmatter `validate-references: off` must suppress every finding in the file; "
             f"got {matches}"
@@ -688,8 +670,7 @@ class TestSingleFileMode:
         # or relative form) -- no findings from other fixture files.
         for rf in reported_files:
             assert rf.endswith("skills/alpha/SKILL.md"), (
-                f"--file mode must only report findings from the target file; "
-                f"got {rf!r}"
+                f"--file mode must only report findings from the target file; got {rf!r}"
             )
 
 
@@ -711,9 +692,7 @@ def test_no_duplicate_findings_per_link(tmp_path: Path) -> None:
     seen: dict[tuple[str, Any, str], dict[str, Any]] = {}
     for f in _findings(result):
         key = (str(f.get("file", "")), f.get("line"), str(f.get("target", "")))
-        assert key not in seen, (
-            f"Duplicate finding for {key}:\n  first: {seen[key]}\n  dup: {f}"
-        )
+        assert key not in seen, f"Duplicate finding for {key}:\n  first: {seen[key]}\n  dup: {f}"
         seen[key] = f
 
 

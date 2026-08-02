@@ -45,9 +45,7 @@ def _load_module():
     Raises ImportError / ModuleNotFoundError when the module does not yet exist
     — that is the expected RED state during concurrent BDD/TDD execution.
     """
-    spec = importlib.util.spec_from_file_location(
-        "inject_process_framing", HOOK_SCRIPT_PATH
-    )
+    spec = importlib.util.spec_from_file_location("inject_process_framing", HOOK_SCRIPT_PATH)
     if spec is None or spec.loader is None:
         raise ImportError(
             f"Cannot load {HOOK_SCRIPT_PATH}. The production module does not yet exist."
@@ -124,8 +122,7 @@ def test_non_praxion_project_emits_no_framing(tmp_path, monkeypatch):
     )
     result = _run_hook(module, payload)
     assert result is None, (
-        "Hook must emit no output when .ai-state/ is absent (non-Praxion project). "
-        f"Got: {result}"
+        f"Hook must emit no output when .ai-state/ is absent (non-Praxion project). Got: {result}"
     )
 
 
@@ -217,14 +214,11 @@ def test_short_reply_without_question_mark_emits_no_framing(tmp_path, monkeypatc
     payload = _make_payload(prompt=short_prompt, cwd=str(tmp_path))
     result = _run_hook(module, payload)
     assert result is None, (
-        f"Short reply ({len(short_prompt)} chars, no '?') must not trigger framing. "
-        f"Got: {result}"
+        f"Short reply ({len(short_prompt)} chars, no '?') must not trigger framing. Got: {result}"
     )
 
 
-def test_prompt_at_60_chars_without_question_mark_emits_no_framing(
-    tmp_path, monkeypatch
-):
+def test_prompt_at_60_chars_without_question_mark_emits_no_framing(tmp_path, monkeypatch):
     """Boundary: prompt exactly 60 chars with no '?' still counts as short reply."""
     module = _load_module()
     ai_state = tmp_path / ".ai-state"
@@ -326,8 +320,7 @@ def test_injection_content_references_tier_selector(tmp_path, monkeypatch):
         kw in context_lower for kw in ("tier", "pipeline", "process", "praxion")
     )
     assert tier_selector_mentioned, (
-        "additionalContext must reference the tier selector or Praxion process. "
-        f"Got: {context!r}"
+        f"additionalContext must reference the tier selector or Praxion process. Got: {context!r}"
     )
 
 
@@ -414,12 +407,8 @@ def test_prompt_at_60_chars_with_question_mark_emits_framing(tmp_path, monkeypat
     assert "?" in boundary_prompt
     payload = _make_payload(prompt=boundary_prompt, cwd=str(tmp_path))
     result = _run_hook(module, payload)
-    assert result is not None, (
-        "Prompt at exactly 60 chars with '?' must trigger framing. Got None."
-    )
-    assert "additionalContext" in result, (
-        f"Expected additionalContext in output. Got: {result}"
-    )
+    assert result is not None, "Prompt at exactly 60 chars with '?' must trigger framing. Got None."
+    assert "additionalContext" in result, f"Expected additionalContext in output. Got: {result}"
 
 
 # ---------------------------------------------------------------------------

@@ -233,9 +233,9 @@ def test_check_file_returns_empty_when_block_matches_canonical(tmp_path: Path, s
     mod.SLUGS = (slug,)  # type: ignore[attr-defined]
 
     drifted = mod.check_file(onboard_path)
-    assert (
-        drifted == []
-    ), f"check_file should return [] for '{slug}' when block matches canonical. Got: {drifted}"
+    assert drifted == [], (
+        f"check_file should return [] for '{slug}' when block matches canonical. Got: {drifted}"
+    )
 
 
 @pytest.mark.parametrize("slug", ALL_BLOCK_SLUGS)
@@ -255,9 +255,9 @@ def test_check_file_returns_drift_entry_when_block_differs_from_canonical(
     mod.SLUGS = (slug,)  # type: ignore[attr-defined]
 
     drifted = mod.check_file(onboard_path)
-    assert (
-        len(drifted) == 1
-    ), f"check_file should return one drift entry for '{slug}'. Got: {drifted}"
+    assert len(drifted) == 1, (
+        f"check_file should return one drift entry for '{slug}'. Got: {drifted}"
+    )
     found_slug, diff_lines = drifted[0]
     assert found_slug == slug
     assert diff_lines, "Drift entry must include non-empty diff lines"
@@ -284,9 +284,9 @@ def test_check_file_includes_remediation_hint_in_printed_output(tmp_path: Path, 
     output = captured.out + captured.err
 
     assert exit_code == 1, f"run_check should return 1 on drift. Got {exit_code}"
-    assert (
-        "--write" in output
-    ), f"run_check output on drift must reference --write as remediation hint. Got:\n{output}"
+    assert "--write" in output, (
+        f"run_check output on drift must reference --write as remediation hint. Got:\n{output}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -313,9 +313,9 @@ def test_write_file_corrects_drifted_block_to_canonical(tmp_path: Path, slug: st
 
     # Verify the embedded content now matches canonical
     drifted_after = mod.check_file(onboard_path)
-    assert (
-        drifted_after == []
-    ), f"After write_file, check_file should return [] for '{slug}'. Got: {drifted_after}"
+    assert drifted_after == [], (
+        f"After write_file, check_file should return [] for '{slug}'. Got: {drifted_after}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -386,9 +386,9 @@ def test_write_file_dry_run_makes_no_file_changes(tmp_path: Path, slug: str) -> 
     mod.SLUGS = (slug,)  # type: ignore[attr-defined]
     mod.write_file(onboard_path, dry_run=True)
 
-    assert (
-        onboard_path.read_text(encoding="utf-8") == before
-    ), "write_file(dry_run=True) must not modify the file."
+    assert onboard_path.read_text(encoding="utf-8") == before, (
+        "write_file(dry_run=True) must not modify the file."
+    )
 
 
 def test_write_file_dry_run_returns_drifted_slugs_without_writing(
@@ -410,9 +410,9 @@ def test_write_file_dry_run_returns_drifted_slugs_without_writing(
     would_update = mod.write_file(onboard_path, dry_run=True)
 
     assert slug in would_update, f"dry_run should return drifted slug '{slug}'. Got: {would_update}"
-    assert (
-        onboard_path.read_text(encoding="utf-8") == before
-    ), "File must be unchanged after dry_run."
+    assert onboard_path.read_text(encoding="utf-8") == before, (
+        "File must be unchanged after dry_run."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -443,9 +443,9 @@ def test_check_file_exits_with_error_when_canonical_file_missing(
 
     with pytest.raises(SystemExit) as exc_info:
         mod.check_file(onboard_path)
-    assert (
-        exc_info.value.code == 2
-    ), f"Missing canonical file should cause SystemExit(2). Got: {exc_info.value.code}"
+    assert exc_info.value.code == 2, (
+        f"Missing canonical file should cause SystemExit(2). Got: {exc_info.value.code}"
+    )
 
 
 def test_write_file_exits_with_error_when_canonical_file_missing(
@@ -472,9 +472,9 @@ def test_write_file_exits_with_error_when_canonical_file_missing(
 
     with pytest.raises(SystemExit) as exc_info:
         mod.write_file(onboard_path, dry_run=False)
-    assert (
-        exc_info.value.code == 2
-    ), f"Missing canonical file should cause SystemExit(2). Got: {exc_info.value.code}"
+    assert exc_info.value.code == 2, (
+        f"Missing canonical file should cause SystemExit(2). Got: {exc_info.value.code}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -502,9 +502,9 @@ def test_write_then_check_always_exits_clean(tmp_path: Path) -> None:
 
     mod.write_file(onboard_path, dry_run=False)
     drifted = mod.check_file(onboard_path)
-    assert (
-        drifted == []
-    ), f"Round-trip failure: check_file returned drift after write_file. Drift: {drifted}"
+    assert drifted == [], (
+        f"Round-trip failure: check_file returned drift after write_file. Drift: {drifted}"
+    )
 
 
 def test_round_trip_preserves_fenced_content_byte_for_byte(tmp_path: Path) -> None:
@@ -628,9 +628,9 @@ def test_all_block_slugs_locate_their_canonical_source_comment(tmp_path: Path, s
 
     # Should not raise — all four slugs have canonical-source comments in fixture
     drifted = mod.check_file(onboard_path)
-    assert isinstance(
-        drifted, list
-    ), f"slug '{slug}': check_file should return a list, not raise. Got: {drifted}"
+    assert isinstance(drifted, list), (
+        f"slug '{slug}': check_file should return a list, not raise. Got: {drifted}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -736,9 +736,9 @@ def test_run_write_corrects_drift_and_check_passes(tmp_path: Path, capsys) -> No
     mod2.SLUGS = tuple(ALL_BLOCK_SLUGS)  # type: ignore[attr-defined]
 
     check_code = mod2.run_check()
-    assert (
-        check_code == 0
-    ), f"Round-trip failure: run_check returned non-zero after run_write. Got {check_code}."
+    assert check_code == 0, (
+        f"Round-trip failure: run_check returned non-zero after run_write. Got {check_code}."
+    )
 
 
 def test_run_dry_run_does_not_modify_files(tmp_path: Path, capsys) -> None:
@@ -770,12 +770,12 @@ def test_run_dry_run_does_not_modify_files(tmp_path: Path, capsys) -> None:
 
     exit_code = mod.run_dry_run()
     assert exit_code != 0, f"run_dry_run should exit non-zero on drift. Got {exit_code}."
-    assert (
-        onboard.read_text(encoding="utf-8") == before_onboard
-    ), "run_dry_run must not modify onboard-project.md"
-    assert (
-        new_proj.read_text(encoding="utf-8") == before_new_proj
-    ), "run_dry_run must not modify new-project.md"
+    assert onboard.read_text(encoding="utf-8") == before_onboard, (
+        "run_dry_run must not modify onboard-project.md"
+    )
+    assert new_proj.read_text(encoding="utf-8") == before_new_proj, (
+        "run_dry_run must not modify new-project.md"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -915,9 +915,9 @@ def test_write_history_manifest_maps_slug_to_current_and_deduped_ordered_history
         "whitespace-only third revision must collapse into the second entry, "
         f"not add a third. Got: {block_entry['history']}"
     )
-    assert (
-        block_entry["current"] == block_entry["history"][-1]
-    ), "current must equal the last (newest) history entry"
+    assert block_entry["current"] == block_entry["history"][-1], (
+        "current must equal the last (newest) history entry"
+    )
 
 
 def test_write_history_manifest_excludes_slugs_outside_refreshable_set(
@@ -1007,9 +1007,9 @@ def test_check_history_exits_nonzero_and_reports_drift_when_canonical_file_edite
         "--check-history must exit non-zero when a canonical file's live "
         "content diverges from the committed manifest's regeneration."
     )
-    assert (
-        slug in output
-    ), f"--check-history drift report must name the drifted slug '{slug}'. Got:\n{output}"
+    assert slug in output, (
+        f"--check-history drift report must name the drifted slug '{slug}'. Got:\n{output}"
+    )
 
 
 def test_write_history_produces_byte_identical_manifest_across_consecutive_runs(
@@ -1044,12 +1044,12 @@ def test_help_flag_lists_write_history_and_check_history_flags() -> None:
         capture_output=True,
         text=True,
     )
-    assert (
-        "--write-history" in result.stdout
-    ), f"--help output must document --write-history.\n{result.stdout}"
-    assert (
-        "--check-history" in result.stdout
-    ), f"--help output must document --check-history.\n{result.stdout}"
+    assert "--write-history" in result.stdout, (
+        f"--help output must document --write-history.\n{result.stdout}"
+    )
+    assert "--check-history" in result.stdout, (
+        f"--help output must document --check-history.\n{result.stdout}"
+    )
 
 
 def test_main_write_history_flag_invokes_generator_and_produces_manifest(
@@ -1066,9 +1066,9 @@ def test_main_write_history_flag_invokes_generator_and_produces_manifest(
     exit_code = mod.main(["--write-history"])
 
     assert exit_code == 0, f"main(['--write-history']) should return 0. Got {exit_code}."
-    assert _history_manifest_path(
-        canonical_dir
-    ).exists(), "main(['--write-history']) must produce the manifest file."
+    assert _history_manifest_path(canonical_dir).exists(), (
+        "main(['--write-history']) must produce the manifest file."
+    )
 
 
 def test_main_check_history_flag_returns_zero_when_manifest_up_to_date(

@@ -176,11 +176,7 @@ def _git_log_dispatcher(
 
     def _dispatch(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
         argv = args[0] if args else kwargs.get("args") or []
-        argv_str = (
-            " ".join(str(x) for x in argv)
-            if isinstance(argv, (list, tuple))
-            else str(argv)
-        )
+        argv_str = " ".join(str(x) for x in argv) if isinstance(argv, (list, tuple)) else str(argv)
         # Heuristic: path-scoped git log carries ``--`` or a filename
         # containing ``.xml`` / ``.info``. Either marker routes to the
         # artifact timestamp.
@@ -238,9 +234,7 @@ class TestCoverageStaticMetadata:
 class TestCoverageResolveNoArtifact:
     """resolve() returns Unavailable when neither coverage.xml nor lcov.info exists."""
 
-    def test_resolve_returns_unavailable_when_no_artifact_present(
-        self, tmp_path: Path
-    ) -> None:
+    def test_resolve_returns_unavailable_when_no_artifact_present(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.base import Unavailable
         from scripts.project_metrics.collectors.coverage_collector import (
             CoverageCollector,
@@ -251,13 +245,10 @@ class TestCoverageResolveNoArtifact:
         result = collector.resolve(_make_env())
 
         assert isinstance(result, Unavailable), (
-            f"Expected Unavailable when no coverage artifact exists; got "
-            f"{type(result).__name__}"
+            f"Expected Unavailable when no coverage artifact exists; got {type(result).__name__}"
         )
 
-    def test_no_artifact_unavailable_carries_actionable_install_hint(
-        self, tmp_path: Path
-    ) -> None:
+    def test_no_artifact_unavailable_carries_actionable_install_hint(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.base import Unavailable
         from scripts.project_metrics.collectors.coverage_collector import (
             CoverageCollector,
@@ -273,13 +264,10 @@ class TestCoverageResolveNoArtifact:
         # ``xml`` or ``lcov`` (format flexibility for v2 upgrades).
         hint_lower = result.install_hint.lower()
         assert "coverage" in hint_lower, (
-            f"Expected install hint to reference 'coverage'; got "
-            f"{result.install_hint!r}"
+            f"Expected install hint to reference 'coverage'; got {result.install_hint!r}"
         )
 
-    def test_no_artifact_reason_identifies_missing_artifact(
-        self, tmp_path: Path
-    ) -> None:
+    def test_no_artifact_reason_identifies_missing_artifact(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.base import Unavailable
         from scripts.project_metrics.collectors.coverage_collector import (
             CoverageCollector,
@@ -294,9 +282,7 @@ class TestCoverageResolveNoArtifact:
         # sufficient tokens.
         reason_lower = result.reason.lower()
         assert (
-            "artifact" in reason_lower
-            or "coverage.xml" in reason_lower
-            or "lcov" in reason_lower
+            "artifact" in reason_lower or "coverage.xml" in reason_lower or "lcov" in reason_lower
         ), f"Expected reason to identify the missing artifact; got {result.reason!r}"
 
 
@@ -333,13 +319,10 @@ class TestCoverageResolveCurrent:
             result = collector.resolve(_make_env())
 
         assert isinstance(result, Available), (
-            f"Expected Available when coverage.xml exists in repo_root; got "
-            f"{type(result).__name__}"
+            f"Expected Available when coverage.xml exists in repo_root; got {type(result).__name__}"
         )
 
-    def test_resolve_returns_available_when_lcov_artifact_present(
-        self, tmp_path: Path
-    ) -> None:
+    def test_resolve_returns_available_when_lcov_artifact_present(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.base import Available
         from scripts.project_metrics.collectors.coverage_collector import (
             CoverageCollector,
@@ -367,8 +350,7 @@ class TestCoverageResolveCurrent:
             result = collector.resolve(_make_env())
 
         assert isinstance(result, Available), (
-            f"Expected Available when lcov.info exists in repo_root; got "
-            f"{type(result).__name__}"
+            f"Expected Available when lcov.info exists in repo_root; got {type(result).__name__}"
         )
 
 
@@ -425,8 +407,7 @@ class TestCoverageResolveStale:
 
         line_pct = result.data.get("line_pct")
         assert line_pct is not None, (
-            f"Expected line_pct populated even when stale; got None. "
-            f"Data: {result.data!r}"
+            f"Expected line_pct populated even when stale; got None. Data: {result.data!r}"
         )
         assert abs(line_pct - _GOLDEN_LINE_PCT) < _GOLDEN_LINE_PCT_TOLERANCE, (
             f"Expected line_pct == {_GOLDEN_LINE_PCT} for the golden "
@@ -488,8 +469,7 @@ class TestCoverageCoberturaParse:
             f"Data keys: {list(result.data.keys())}"
         )
         assert abs(line_pct - _GOLDEN_LINE_PCT) < _GOLDEN_LINE_PCT_TOLERANCE, (
-            f"Expected line_pct == {_GOLDEN_LINE_PCT} (73/100 from fixture); "
-            f"got {line_pct!r}"
+            f"Expected line_pct == {_GOLDEN_LINE_PCT} (73/100 from fixture); got {line_pct!r}"
         )
 
     def test_cobertura_parse_populates_per_file_rollup(self) -> None:
@@ -508,14 +488,12 @@ class TestCoverageCoberturaParse:
 
         per_file = result.data.get("per_file")
         assert per_file is not None, (
-            f"Expected 'per_file' key populated; got None. Data keys: "
-            f"{list(result.data.keys())}"
+            f"Expected 'per_file' key populated; got None. Data keys: {list(result.data.keys())}"
         )
         # All three fixture files must surface.
         for expected_path in _GOLDEN_PER_FILE:
             assert expected_path in per_file, (
-                f"Expected per-file entry for {expected_path!r}; got keys "
-                f"{list(per_file.keys())!r}"
+                f"Expected per-file entry for {expected_path!r}; got keys {list(per_file.keys())!r}"
             )
 
     def test_cobertura_per_file_line_totals_match_fixture(self) -> None:
@@ -564,8 +542,7 @@ class TestCoverageCoberturaParse:
         # runs". Accept either the concrete string or a normalized form.
         fmt = result.data.get("artifact_format")
         assert fmt == "cobertura", (
-            f"Expected artifact_format == 'cobertura' when parsing coverage.xml; "
-            f"got {fmt!r}"
+            f"Expected artifact_format == 'cobertura' when parsing coverage.xml; got {fmt!r}"
         )
 
 
@@ -600,8 +577,7 @@ class TestCoverageLcovParse:
         line_pct = result.data.get("line_pct")
         assert line_pct is not None
         assert abs(line_pct - _GOLDEN_LINE_PCT) < _GOLDEN_LINE_PCT_TOLERANCE, (
-            f"Expected line_pct == {_GOLDEN_LINE_PCT} from LCOV fixture; "
-            f"got {line_pct!r}"
+            f"Expected line_pct == {_GOLDEN_LINE_PCT} from LCOV fixture; got {line_pct!r}"
         )
 
     def test_lcov_parse_populates_per_file_rollup(self, tmp_path: Path) -> None:
@@ -626,8 +602,7 @@ class TestCoverageLcovParse:
         per_file = result.data.get("per_file") or {}
         for path, golden in _GOLDEN_PER_FILE.items():
             assert path in per_file, (
-                f"Expected LCOV per-file entry for {path!r}; got keys "
-                f"{list(per_file.keys())!r}"
+                f"Expected LCOV per-file entry for {path!r}; got keys {list(per_file.keys())!r}"
             )
             entry = per_file[path]
             assert entry.get("lines_total") == golden["lines_total"], (
@@ -729,9 +704,7 @@ class TestCoverageNeverRunsTests:
             f"{_COLLECTOR_SOURCE_PATH}"
         )
 
-    def test_collector_source_audit_catches_obvious_violations(
-        self, tmp_path: Path
-    ) -> None:
+    def test_collector_source_audit_catches_obvious_violations(self, tmp_path: Path) -> None:
         """Sanity check for the audit itself -- verify the forbidden-token
         regex battery fires on text that should be rejected.
 
@@ -814,8 +787,7 @@ class TestCoverageContextAwareInstallHint:
         )
         hint = _choose_install_hint(tmp_path)
         assert "--refresh-coverage" in hint, (
-            f"Expected refresh-flag hint when pyproject has coverage config; "
-            f"got {hint!r}"
+            f"Expected refresh-flag hint when pyproject has coverage config; got {hint!r}"
         )
 
     def test_hint_falls_back_to_generic_when_no_pyproject(self, tmp_path: Path) -> None:

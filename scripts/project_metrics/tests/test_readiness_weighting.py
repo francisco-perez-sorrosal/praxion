@@ -45,9 +45,7 @@ def _verdict(
 def _write_config(repo_root: Path, payload: dict[str, Any]) -> None:
     ai_state = repo_root / ".ai-state"
     ai_state.mkdir(parents=True, exist_ok=True)
-    (ai_state / config.CONFIG_BASENAME).write_text(
-        json.dumps(payload), encoding="utf-8"
-    )
+    (ai_state / config.CONFIG_BASENAME).write_text(json.dumps(payload), encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -58,12 +56,10 @@ def _write_config(repo_root: Path, payload: dict[str, Any]) -> None:
 class TestLoadPillarWeights:
     def test_missing_file_returns_all_ones(self, tmp_path: Path) -> None:
         weights = config.load_pillar_weights(tmp_path)
-        assert weights == {p: 1.0 for p in FACTORY_PILLARS}
+        assert weights == dict.fromkeys(FACTORY_PILLARS, 1.0)
 
     def test_valid_config_applies_weights(self, tmp_path: Path) -> None:
-        _write_config(
-            tmp_path, {"pillar_weights": {"observability": 0, "security": 0.5}}
-        )
+        _write_config(tmp_path, {"pillar_weights": {"observability": 0, "security": 0.5}})
         weights = config.load_pillar_weights(tmp_path)
         assert weights["observability"] == 0.0
         assert weights["security"] == 0.5
@@ -85,13 +81,13 @@ class TestLoadPillarWeights:
     def test_unknown_pillar_is_ignored(self, tmp_path: Path) -> None:
         _write_config(tmp_path, {"pillar_weights": {"not_a_pillar": 0}})
         weights = config.load_pillar_weights(tmp_path)
-        assert weights == {p: 1.0 for p in FACTORY_PILLARS}
+        assert weights == dict.fromkeys(FACTORY_PILLARS, 1.0)
 
     def test_malformed_json_degrades_to_defaults(self, tmp_path: Path) -> None:
         ai_state = tmp_path / ".ai-state"
         ai_state.mkdir(parents=True)
         (ai_state / config.CONFIG_BASENAME).write_text("{not json", encoding="utf-8")
-        assert config.load_pillar_weights(tmp_path) == {p: 1.0 for p in FACTORY_PILLARS}
+        assert config.load_pillar_weights(tmp_path) == dict.fromkeys(FACTORY_PILLARS, 1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -105,7 +101,7 @@ class TestWeightedScoring:
             _verdict("a", "testing", 1, passed=True),
             _verdict("b", "observability", 1, passed=False),
         ]
-        uniform = {p: 1.0 for p in FACTORY_PILLARS}
+        uniform = dict.fromkeys(FACTORY_PILLARS, 1.0)
         plain, _, _ = score._pass_pct(verdicts)
         weighted, _, _ = score._pass_pct(verdicts, uniform)
         assert weighted == plain
@@ -115,7 +111,7 @@ class TestWeightedScoring:
             _verdict("a", "testing", 1, passed=True),
             _verdict("b", "observability", 1, passed=False),
         ]
-        weights = {p: 1.0 for p in FACTORY_PILLARS}
+        weights = dict.fromkeys(FACTORY_PILLARS, 1.0)
         weights["observability"] = 0.0
         weighted, _, _ = score._pass_pct(verdicts, weights)
         # The failing observability criterion drops out → 100% over what remains.
@@ -126,7 +122,7 @@ class TestWeightedScoring:
             _verdict("a", "testing", 1, passed=True),
             _verdict("b", "observability", 1, passed=False),
         ]
-        weights = {p: 1.0 for p in FACTORY_PILLARS}
+        weights = dict.fromkeys(FACTORY_PILLARS, 1.0)
         weights["observability"] = 0.0
         payload = score.score_with_weights(verdicts, weights)
         assert payload["pass_pct"] == 0.5  # canonical: 1 of 2
@@ -136,14 +132,14 @@ class TestWeightedScoring:
 
     def test_no_weighting_marks_inactive_and_equal_scores(self) -> None:
         verdicts = [_verdict("a", "testing", 1, passed=True)]
-        payload = score.score_with_weights(verdicts, {p: 1.0 for p in FACTORY_PILLARS})
+        payload = score.score_with_weights(verdicts, dict.fromkeys(FACTORY_PILLARS, 1.0))
         assert payload["weighting_active"] is False
         assert payload["adjusted_pass_pct"] == payload["pass_pct"]
         assert payload["adjusted_level"] == payload["level"]
 
     def test_build_pillars_carries_weight_and_excluded(self) -> None:
         verdicts = [_verdict("a", "observability", 1, passed=True)]
-        weights = {p: 1.0 for p in FACTORY_PILLARS}
+        weights = dict.fromkeys(FACTORY_PILLARS, 1.0)
         weights["observability"] = 0.0
         pillars = score.build_pillars(verdicts, weights)
         obs = next(p for p in pillars if p["id"] == "observability")
@@ -159,7 +155,7 @@ class TestWeightedScoring:
                 _verdict("b", "observability", 1, passed=False),
             ],
             "pillar_weights": {
-                **{p: 1.0 for p in FACTORY_PILLARS},
+                **dict.fromkeys(FACTORY_PILLARS, 1.0),
                 "observability": 0.0,
             },
         }
@@ -181,7 +177,8 @@ def test_collector_embeds_weighting_from_config(tmp_path: Path) -> None:
     data = collector.collect(ctx).data
     assert data["weighting_active"] is True
     assert data["pillar_weights"]["observability"] == 0.0
-    assert "adjusted_pass_pct" in data and "adjusted_level" in data
+    assert "adjusted_pass_pct" in data
+    assert "adjusted_level" in data
     obs = next(p for p in data["pillars"] if p["id"] == "observability")
     assert obs["excluded"] is True
 

@@ -190,9 +190,9 @@ def test_production_gate_kind_is_known() -> None:
     """Every artifact's production_gate names a kind in the allowed vocabulary."""
     for a in registry.ARTIFACTS:
         kind = a.production_gate.split(":")[0]
-        assert (
-            kind in registry._GATE_KINDS
-        ), f"{a.name}: production_gate kind {kind!r} not in _GATE_KINDS"
+        assert kind in registry._GATE_KINDS, (
+            f"{a.name}: production_gate kind {kind!r} not in _GATE_KINDS"
+        )
 
 
 def test_production_gate_ref_required_when_kind_demands_it() -> None:
@@ -222,18 +222,18 @@ def test_production_gate_ref_required_when_kind_demands_it() -> None:
 def test_cleanup_policy_is_known() -> None:
     """Every artifact's cleanup_policy is drawn from the allowed vocabulary."""
     for a in registry.ARTIFACTS:
-        assert (
-            a.cleanup_policy in registry._CLEANUP_POLICIES
-        ), f"{a.name}: cleanup_policy {a.cleanup_policy!r} not in _CLEANUP_POLICIES"
+        assert a.cleanup_policy in registry._CLEANUP_POLICIES, (
+            f"{a.name}: cleanup_policy {a.cleanup_policy!r} not in _CLEANUP_POLICIES"
+        )
 
 
 def test_detection_gate_kind_is_known() -> None:
     """Every artifact's detection_gate names a kind in the detection vocabulary."""
     for a in registry.ARTIFACTS:
         kind = a.detection_gate.split(":")[0]
-        assert (
-            kind in registry._DETECTION_GATE_KINDS
-        ), f"{a.name}: detection_gate kind {kind!r} not in _DETECTION_GATE_KINDS"
+        assert kind in registry._DETECTION_GATE_KINDS, (
+            f"{a.name}: detection_gate kind {kind!r} not in _DETECTION_GATE_KINDS"
+        )
 
 
 def test_detection_gate_ref_required_for_sentinel() -> None:
@@ -294,6 +294,6 @@ def test_canary_bogus_gate_kind_is_rejected() -> None:
     """
     bogus_gate = "bogus:x"
     kind = bogus_gate.split(":")[0]
-    assert (
-        kind not in registry._GATE_KINDS
-    ), f"'bogus' should never be a valid gate kind; _GATE_KINDS={registry._GATE_KINDS!r}"
+    assert kind not in registry._GATE_KINDS, (
+        f"'bogus' should never be a valid gate kind; _GATE_KINDS={registry._GATE_KINDS!r}"
+    )

@@ -351,9 +351,9 @@ def test_flags_gate_without_canary(tmp_path: Path) -> None:
     _make_gate_file(tmp_path, "scripts/check_no_canary.py", "# gate without test\n")
     # Deliberately do NOT create a sibling test
     missing = gates_without_canary(tmp_path)
-    assert any(
-        "check_no_canary.py" in m for m in missing
-    ), f"meta-test must flag a gate with no sibling test; got: {missing}"
+    assert any("check_no_canary.py" in m for m in missing), (
+        f"meta-test must flag a gate with no sibling test; got: {missing}"
+    )
 
 
 def test_flags_sibling_test_without_canary_function(tmp_path: Path) -> None:
@@ -365,9 +365,9 @@ def test_flags_sibling_test_without_canary_function(tmp_path: Path) -> None:
         "def test_accepts_valid_input():\n    assert True\n",
     )
     missing = gates_without_canary(tmp_path)
-    assert any(
-        "check_happy_only.py" in m for m in missing
-    ), f"meta-test must flag a gate whose sibling has only happy-path tests; got: {missing}"
+    assert any("check_happy_only.py" in m for m in missing), (
+        f"meta-test must flag a gate whose sibling has only happy-path tests; got: {missing}"
+    )
 
 
 def test_accepts_gate_with_valid_canary(tmp_path: Path) -> None:
@@ -379,9 +379,9 @@ def test_accepts_gate_with_valid_canary(tmp_path: Path) -> None:
         "def test_flags_bad_input():\n    assert True\n",
     )
     missing = gates_without_canary(tmp_path)
-    assert not any(
-        "check_good.py" in m for m in missing
-    ), f"meta-test must not flag a gate with a valid canary; got: {missing}"
+    assert not any("check_good.py" in m for m in missing), (
+        f"meta-test must not flag a gate with a valid canary; got: {missing}"
+    )
 
 
 def test_accepts_fitness_gate_with_canary(tmp_path: Path) -> None:
@@ -394,9 +394,9 @@ def test_accepts_fitness_gate_with_canary(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     missing = gates_without_canary(tmp_path)
-    assert not any(
-        "test_my_rule.py" in m for m in missing
-    ), f"fitness gate with canary must not be flagged; got: {missing}"
+    assert not any("test_my_rule.py" in m for m in missing), (
+        f"fitness gate with canary must not be flagged; got: {missing}"
+    )
 
 
 def test_flags_fitness_gate_without_canary(tmp_path: Path) -> None:
@@ -409,9 +409,9 @@ def test_flags_fitness_gate_without_canary(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     missing = gates_without_canary(tmp_path)
-    assert any(
-        "test_bare_rule.py" in m for m in missing
-    ), f"meta-test must flag a fitness gate with no canary; got: {missing}"
+    assert any("test_bare_rule.py" in m for m in missing), (
+        f"meta-test must flag a fitness gate with no canary; got: {missing}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -466,12 +466,12 @@ def test_flags_uncovered_check_in_a_file_that_already_has_canaries(tmp_path: Pat
 
     missing = checks_without_canary(tmp_path)
 
-    assert any(
-        "test_two_checks.py::check_uncovered" in m for m in missing
-    ), f"the uncalled check must be flagged; got: {missing}"
-    assert not any(
-        "check_covered" in m for m in missing
-    ), f"the called check must not be flagged; got: {missing}"
+    assert any("test_two_checks.py::check_uncovered" in m for m in missing), (
+        f"the uncalled check must be flagged; got: {missing}"
+    )
+    assert not any("check_covered" in m for m in missing), (
+        f"the called check must not be flagged; got: {missing}"
+    )
 
 
 def test_module_attribute_call_counts_as_covering_the_check(tmp_path: Path) -> None:
@@ -487,9 +487,9 @@ def test_module_attribute_call_counts_as_covering_the_check(tmp_path: Path) -> N
 
     missing = checks_without_canary(tmp_path)
 
-    assert not any(
-        "check_via_attribute" in m for m in missing
-    ), f"an attribute-call canary must count as coverage; got: {missing}"
+    assert not any("check_via_attribute" in m for m in missing), (
+        f"an attribute-call canary must count as coverage; got: {missing}"
+    )
 
 
 def test_gate_file_with_no_checks_is_left_to_the_file_level_rule(tmp_path: Path) -> None:
@@ -555,6 +555,6 @@ def test_non_canary_test_calling_a_check_does_not_count_as_coverage(tmp_path: Pa
 
     missing = checks_without_canary(tmp_path)
 
-    assert any(
-        "test_happy_caller.py::check_something" in m for m in missing
-    ), f"a check called only by a happy-path test must be flagged; got: {missing}"
+    assert any("test_happy_caller.py::check_something" in m for m in missing), (
+        f"a check called only by a happy-path test must be flagged; got: {missing}"
+    )

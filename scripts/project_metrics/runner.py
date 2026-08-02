@@ -34,16 +34,17 @@ from __future__ import annotations
 import subprocess
 import threading
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from scripts.project_metrics import schema
 from scripts.project_metrics.collectors.base import (
     Available,
-    Collector,
     CollectionContext,
+    Collector,
     CollectorResult,
     NotApplicable,
     ResolutionEnv,
@@ -321,12 +322,8 @@ class Runner:
                         f"Required collector {name!r} exceeded "
                         f"{self._default_timeout_seconds}s timeout"
                     )
-                tool_availability[name] = _build_timeout_record(
-                    self._default_timeout_seconds
-                )
-                collectors_map[name] = _build_namespace_error_marker(
-                    name, status="timeout"
-                )
+                tool_availability[name] = _build_timeout_record(self._default_timeout_seconds)
+                collectors_map[name] = _build_namespace_error_marker(name, status="timeout")
                 continue
             # outcome == "error"
             assert exc is not None

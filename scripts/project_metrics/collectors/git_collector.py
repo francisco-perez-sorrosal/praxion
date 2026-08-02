@@ -112,9 +112,7 @@ class GitCollector(Collector):
         always passed explicitly by the runner.
         """
 
-        self._configured_repo_root: Path | None = (
-            Path(repo_root) if repo_root is not None else None
-        )
+        self._configured_repo_root: Path | None = Path(repo_root) if repo_root is not None else None
 
     # ------------------------------------------------------------------ resolve
 
@@ -256,9 +254,7 @@ def _is_shallow_repository(repo_root: Path) -> bool:
     return completed.stdout.strip() == "true"
 
 
-def _run_git_log(
-    repo_root: Path, window_days: int, reference_time: datetime
-) -> list[_Commit]:
+def _run_git_log(repo_root: Path, window_days: int, reference_time: datetime) -> list[_Commit]:
     """Run ``git log`` with pinned formatting and return parsed commits.
 
     Format emits one block per commit in four lines followed by numstat
@@ -420,9 +416,7 @@ def _resolve_reference_time() -> datetime:
 # ---------------------------------------------------------------------------
 
 
-def _compute_churn_per_file(
-    commits: list[_Commit], churn_source: str
-) -> dict[str, int]:
+def _compute_churn_per_file(commits: list[_Commit], churn_source: str) -> dict[str, int]:
     """Sum per-file churn. Under the commit-count fallback, count commits instead of lines."""
 
     per_file: dict[str, int] = defaultdict(int)
@@ -447,9 +441,7 @@ def _compute_change_entropy(commits: list[_Commit]) -> float:
 
     total = 0.0
     for commit in commits:
-        lines_per_file = [
-            added + deleted for added, deleted in commit.file_changes.values()
-        ]
+        lines_per_file = [added + deleted for added, deleted in commit.file_changes.values()]
         commit_total = sum(lines_per_file)
         if commit_total <= 0:
             continue
@@ -482,15 +474,11 @@ def _compute_change_coupling(commits: list[_Commit]) -> dict[str, object]:
             for right in files[i + 1 :]:
                 pair_counts[(left, right)] += 1
     qualifying = [
-        (pair, count)
-        for pair, count in pair_counts.items()
-        if count >= _COUPLING_THRESHOLD
+        (pair, count) for pair, count in pair_counts.items() if count >= _COUPLING_THRESHOLD
     ]
     qualifying.sort(key=lambda item: (-item[1], item[0]))
     return {
-        "pairs": [
-            {"files": [pair[0], pair[1]], "count": count} for pair, count in qualifying
-        ],
+        "pairs": [{"files": [pair[0], pair[1]], "count": count} for pair, count in qualifying],
         "threshold": _COUPLING_THRESHOLD,
     }
 
@@ -566,8 +554,7 @@ def _compute_truck_factor(ownership: dict[str, dict[str, object]]) -> int:
         return 1
 
     file_majors: dict[str, set[str]] = {
-        path: set(_major_names(entry.get("major", [])))
-        for path, entry in ownership.items()
+        path: set(_major_names(entry.get("major", []))) for path, entry in ownership.items()
     }
 
     author_contribution: dict[str, float] = defaultdict(float)
@@ -581,16 +568,12 @@ def _compute_truck_factor(ownership: dict[str, dict[str, object]]) -> int:
         covered = sum(1 for majors in file_majors.values() if majors - removed)
         if covered / total_files < _TRUCK_FACTOR_COVERAGE_THRESHOLD:
             return len(removed)
-        remaining_authors = [
-            author for author in author_contribution if author not in removed
-        ]
+        remaining_authors = [author for author in author_contribution if author not in removed]
         if not remaining_authors:
             # No further authors to remove, but coverage still >= 50% —
             # return the count that fully uncovered the repo.
             return len(removed)
-        remaining_authors.sort(
-            key=lambda author: (-author_contribution[author], author)
-        )
+        remaining_authors.sort(key=lambda author: (-author_contribution[author], author))
         removed.add(remaining_authors[0])
 
 
@@ -612,9 +595,7 @@ def _major_names(value: object) -> list[str]:
     return [name for name, _pct in _major_pairs(value)]
 
 
-def _compute_age_days(
-    commits: list[_Commit], reference_time: datetime
-) -> dict[str, int]:
+def _compute_age_days(commits: list[_Commit], reference_time: datetime) -> dict[str, int]:
     """Days between each file's first commit and the reference clock.
 
     Both ends are floored to their UTC date so the result matches

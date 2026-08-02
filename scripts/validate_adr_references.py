@@ -37,11 +37,7 @@ def parse_affected_files(text: str) -> list[str]:
     fm = frontmatter.group(1)
     inline = re.search(r"^affected_files:\s*\[(.*?)\]\s*$", fm, re.MULTILINE)
     if inline:
-        return [
-            p.strip().strip('"').strip("'")
-            for p in inline.group(1).split(",")
-            if p.strip()
-        ]
+        return [p.strip().strip('"').strip("'") for p in inline.group(1).split(",") if p.strip()]
 
     block = re.search(r"^affected_files:\s*\n((?:\s+-\s.*\n)+)", fm, re.MULTILINE)
     if block:

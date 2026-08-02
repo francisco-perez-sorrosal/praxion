@@ -161,9 +161,7 @@ def _acquire_exclusive_lock(lock_path: Path) -> _ExclusiveLock:
 # -- Composition --------------------------------------------------------------
 
 
-def _compose_log_content(
-    *, existing: str, report: Report, report_md_relpath: str
-) -> str:
+def _compose_log_content(*, existing: str, report: Report, report_md_relpath: str) -> str:
     """Build the full new file content: header (if first run) + all rows + new row."""
     row = _render_data_row(report, report_md_relpath)
     if existing.strip() == "":

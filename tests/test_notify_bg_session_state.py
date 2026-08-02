@@ -22,6 +22,13 @@ from __future__ import annotations
 
 import io
 import json
+
+# ---------------------------------------------------------------------------
+# Module import
+# ---------------------------------------------------------------------------
+# The hook lives in hooks/ and imports _hook_utils from the same directory.
+# Add hooks/ to sys.path so both resolve at import time.
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -30,20 +37,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-# ---------------------------------------------------------------------------
-# Module import
-# ---------------------------------------------------------------------------
-
-# The hook lives in hooks/ and imports _hook_utils from the same directory.
-# Add hooks/ to sys.path so both resolve at import time.
-import os
-
 _HOOKS_DIR = os.path.join(os.path.dirname(__file__), "..", "hooks")
 if _HOOKS_DIR not in sys.path:
     sys.path.insert(0, _HOOKS_DIR)
 
 import notify_bg_session_state as _hook  # noqa: E402  (import after sys.path patch)
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -126,9 +124,7 @@ def test_marker_present_with_full_uuid_fires_notification(tmp_path):
     assert f"[rework: {slug}] completed" in args[-1], (
         f"Notification message must reference the slug from the marker. Got: {args[-1]!r}"
     )
-    assert "Praxion rework" in args[-1], (
-        f"Title must contain 'Praxion rework', got: {args[-1]!r}"
-    )
+    assert "Praxion rework" in args[-1], f"Title must contain 'Praxion rework', got: {args[-1]!r}"
 
 
 def test_marker_present_with_bare_short_id_fires_notification(tmp_path):
@@ -154,9 +150,7 @@ def test_marker_deleted_after_firing(tmp_path):
     payload = {"session_id": "deadbeef-1234-5678-9abc-def012345678"}
     _run_hook(payload, tmp_path)
 
-    assert not marker.exists(), (
-        "Marker file must be deleted after a successful notification fire"
-    )
+    assert not marker.exists(), "Marker file must be deleted after a successful notification fire"
 
 
 def test_marker_message_format_is_exact(tmp_path):
@@ -227,9 +221,7 @@ def test_missing_session_id_does_not_fire(tmp_path):
     """A payload with no session_id field must exit silently."""
     payload = {"hook_event_name": "Stop"}
     mock_run = _run_hook(payload, tmp_path)
-    assert not mock_run.called, (
-        "osascript must NOT be invoked when session_id is absent"
-    )
+    assert not mock_run.called, "osascript must NOT be invoked when session_id is absent"
 
 
 def test_empty_session_id_does_not_fire(tmp_path):
@@ -244,9 +236,7 @@ def test_markers_dir_missing_does_not_fire(tmp_path):
     nonexistent = tmp_path / "does-not-exist"
     payload = {"session_id": "abcdef01-2222-3333-4444-555555555555"}
     mock_run = _run_hook(payload, nonexistent)
-    assert not mock_run.called, (
-        "osascript must NOT be invoked when markers dir is absent"
-    )
+    assert not mock_run.called, "osascript must NOT be invoked when markers dir is absent"
 
 
 def test_marker_for_different_session_does_not_fire(tmp_path):
@@ -256,9 +246,7 @@ def test_marker_for_different_session_does_not_fire(tmp_path):
     payload = {"session_id": "22222222-aaaa-bbbb-cccc-dddddddddddd"}
     mock_run = _run_hook(payload, tmp_path)
 
-    assert not mock_run.called, (
-        "Marker for a different session_id must not trigger this hook fire"
-    )
+    assert not mock_run.called, "Marker for a different session_id must not trigger this hook fire"
     # The unrelated marker must remain untouched.
     assert (tmp_path / "11111111").exists(), (
         "Hook must not delete markers belonging to other sessions"
@@ -276,12 +264,8 @@ def test_disable_observability_suppresses_notification(tmp_path):
     _write_marker(tmp_path, short_id, "auth-fix")
 
     payload = {"session_id": "1ab69684-606b-444e-a71f-8cebfeb89290"}
-    mock_run = _run_hook(
-        payload, tmp_path, env_overrides={"PRAXION_DISABLE_OBSERVABILITY": "1"}
-    )
-    assert not mock_run.called, (
-        "osascript must NOT be invoked when PRAXION_DISABLE_OBSERVABILITY=1"
-    )
+    mock_run = _run_hook(payload, tmp_path, env_overrides={"PRAXION_DISABLE_OBSERVABILITY": "1"})
+    assert not mock_run.called, "osascript must NOT be invoked when PRAXION_DISABLE_OBSERVABILITY=1"
 
 
 @pytest.fixture(params=["true", "yes", "TRUE", "YES"])
@@ -407,7 +391,5 @@ def test_session_id_longer_than_short_id_uses_prefix(tmp_path):
     payload = {"session_id": "abcdef1234567890"}  # no dash, 16 chars
     mock_run = _run_hook(payload, tmp_path)
 
-    assert mock_run.called, (
-        "8-char prefix must be derived from a longer dash-free session_id"
-    )
+    assert mock_run.called, "8-char prefix must be derived from a longer dash-free session_id"
     assert "[rework: long-prefix-test] completed" in mock_run.call_args[0][0][-1]

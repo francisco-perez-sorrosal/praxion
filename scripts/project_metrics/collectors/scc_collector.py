@@ -87,9 +87,7 @@ class SccCollector(Collector):
         a repo root uniformly when one is known at wiring time.
         """
 
-        self._configured_repo_root: Path | None = (
-            Path(repo_root) if repo_root is not None else None
-        )
+        self._configured_repo_root: Path | None = Path(repo_root) if repo_root is not None else None
 
     # ------------------------------------------------------------------ resolve
 
@@ -131,9 +129,7 @@ class SccCollector(Collector):
             )
         except subprocess.TimeoutExpired:
             return Unavailable(
-                reason=(
-                    f"scc --version probe timed out after {_SCC_PROBE_TIMEOUT_SECONDS}s"
-                ),
+                reason=(f"scc --version probe timed out after {_SCC_PROBE_TIMEOUT_SECONDS}s"),
                 install_hint=_SCC_INSTALL_HINT,
             )
 
@@ -179,9 +175,7 @@ class SccCollector(Collector):
         except subprocess.TimeoutExpired:
             return CollectorResult(
                 status="timeout",
-                issues=[
-                    f"scc exceeded the {_SCC_COLLECT_TIMEOUT_SECONDS}s collect budget"
-                ],
+                issues=[f"scc exceeded the {_SCC_COLLECT_TIMEOUT_SECONDS}s collect budget"],
             )
         except (FileNotFoundError, subprocess.CalledProcessError) as exc:
             return CollectorResult(

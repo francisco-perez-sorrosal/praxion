@@ -266,11 +266,7 @@ def _subprocess_dispatcher(
 
     def _dispatch(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
         argv = args[0] if args else kwargs.get("args") or []
-        argv_str = (
-            " ".join(str(x) for x in argv)
-            if isinstance(argv, (list, tuple))
-            else str(argv)
-        )
+        argv_str = " ".join(str(x) for x in argv) if isinstance(argv, (list, tuple)) else str(argv)
 
         if "ls-files" in argv_str:
             if ls_files_side_effect is not None:
@@ -340,9 +336,7 @@ class TestPydepsStaticMetadata:
 class TestPydepsResolveAvailable:
     """``resolve()`` returns Available when uvx + pydeps version probe succeeds."""
 
-    def test_resolve_returns_available_when_uvx_and_pydeps_respond(
-        self, tmp_path: Path
-    ) -> None:
+    def test_resolve_returns_available_when_uvx_and_pydeps_respond(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.base import Available
         from scripts.project_metrics.collectors.pydeps_collector import (
             PydepsCollector,
@@ -433,8 +427,7 @@ class TestPydepsResolveUnavailable:
             result = collector.resolve(_make_env())
 
         assert isinstance(result, Unavailable), (
-            f"Expected Unavailable when pydeps --version fails; got "
-            f"{type(result).__name__}"
+            f"Expected Unavailable when pydeps --version fails; got {type(result).__name__}"
         )
 
     def test_resolve_returns_unavailable_when_version_probe_times_out(
@@ -536,9 +529,7 @@ class TestPydepsResolveNotApplicable:
         # tool is broken.
         reason_lower = result.reason.lower()
         assert (
-            "importable" in reason_lower
-            or "__init__" in reason_lower
-            or "package" in reason_lower
+            "importable" in reason_lower or "__init__" in reason_lower or "package" in reason_lower
         ), (
             "Expected NotApplicable reason to mention importable packages, "
             f"__init__.py, or 'package'; got {result.reason!r}"
@@ -553,9 +544,7 @@ class TestPydepsResolveNotApplicable:
 class TestPydepsCollectCyclic:
     """``collect()`` finds all non-trivial SCCs in the import graph."""
 
-    def test_collect_returns_ok_status_on_well_formed_cyclic_json(
-        self, tmp_path: Path
-    ) -> None:
+    def test_collect_returns_ok_status_on_well_formed_cyclic_json(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.pydeps_collector import (
             PydepsCollector,
         )
@@ -630,9 +619,7 @@ class TestPydepsCollectCyclic:
             f"Raw cyclic_sccs from collector: {cyclic_sccs!r}"
         )
 
-    def test_aggregate_cyclic_deps_equals_two_for_cyclic_fixture(
-        self, tmp_path: Path
-    ) -> None:
+    def test_aggregate_cyclic_deps_equals_two_for_cyclic_fixture(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.pydeps_collector import (
             PydepsCollector,
         )
@@ -684,8 +671,7 @@ class TestPydepsCollectAcyclic:
 
         cyclic_sccs = result.data.get("cyclic_sccs")
         assert cyclic_sccs == [], (
-            f"Expected empty cyclic_sccs on a tree-shaped dep graph; got "
-            f"{cyclic_sccs!r}"
+            f"Expected empty cyclic_sccs on a tree-shaped dep graph; got {cyclic_sccs!r}"
         )
 
     def test_tree_graph_aggregate_cyclic_deps_is_zero(self, tmp_path: Path) -> None:
@@ -747,9 +733,7 @@ class TestPydepsCollectAcyclic:
 class TestPydepsCouplingMetrics:
     """Per-module afferent/efferent/instability rollups match canned JSON."""
 
-    def test_modules_block_contains_every_module_from_fixture(
-        self, tmp_path: Path
-    ) -> None:
+    def test_modules_block_contains_every_module_from_fixture(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.pydeps_collector import (
             PydepsCollector,
         )
@@ -777,9 +761,7 @@ class TestPydepsCouplingMetrics:
                 f"{list(modules_block.keys())!r}"
             )
 
-    def test_module_a_efferent_coupling_counts_outgoing_imports(
-        self, tmp_path: Path
-    ) -> None:
+    def test_module_a_efferent_coupling_counts_outgoing_imports(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.pydeps_collector import (
             PydepsCollector,
         )
@@ -803,9 +785,7 @@ class TestPydepsCouplingMetrics:
             f"Full module entry: {module_a!r}"
         )
 
-    def test_module_a_afferent_coupling_counts_incoming_imports(
-        self, tmp_path: Path
-    ) -> None:
+    def test_module_a_afferent_coupling_counts_incoming_imports(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.pydeps_collector import (
             PydepsCollector,
         )
@@ -831,9 +811,7 @@ class TestPydepsCouplingMetrics:
             f"{module_a!r}"
         )
 
-    def test_module_a_instability_equals_ce_over_ca_plus_ce(
-        self, tmp_path: Path
-    ) -> None:
+    def test_module_a_instability_equals_ce_over_ca_plus_ce(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.pydeps_collector import (
             PydepsCollector,
         )
@@ -864,9 +842,7 @@ class TestPydepsCouplingMetrics:
         # is a computation bug regardless of how the fraction rolled out.
         assert 0.0 <= instability <= 1.0
 
-    def test_isolated_module_with_no_edges_has_instability_defined(
-        self, tmp_path: Path
-    ) -> None:
+    def test_isolated_module_with_no_edges_has_instability_defined(self, tmp_path: Path) -> None:
         """An unconnected module (Ca = Ce = 0) must not crash the instability rollup.
 
         Division by zero is the real hazard here. Common conventions pin the
@@ -942,9 +918,7 @@ class TestPydepsCollectTimeout:
     try/except is a safety net for bugs, not the primary error path.
     """
 
-    def test_collect_downgrades_on_timeout_rather_than_raising(
-        self, tmp_path: Path
-    ) -> None:
+    def test_collect_downgrades_on_timeout_rather_than_raising(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.pydeps_collector import (
             PydepsCollector,
         )

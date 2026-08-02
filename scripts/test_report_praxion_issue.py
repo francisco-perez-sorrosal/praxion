@@ -163,9 +163,9 @@ class TestCaptureAppendsAFingerprintedCandidate:
 
         assert exit_code == 0
         content = _pending_path(tmp_path).read_text()
-        assert re.search(
-            r"- fingerprint: [0-9a-f]{64}", content
-        ), "capture must write a full sha256 fingerprint line"
+        assert re.search(r"- fingerprint: [0-9a-f]{64}", content), (
+            "capture must write a full sha256 fingerprint line"
+        )
         assert "status: pending" in content
 
 
@@ -401,9 +401,9 @@ class TestPluginCacheSafeRootResolution:
             "the reporter must refuse rather than silently write into a "
             f"plugin-cache-shaped fallback location; stdout={result.stdout!r}"
         )
-        assert not (
-            plugin_root / ".ai-state"
-        ).exists(), "a refused run must not have written anything under the plugin cache"
+        assert not (plugin_root / ".ai-state").exists(), (
+            "a refused run must not have written anything under the plugin cache"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -468,7 +468,7 @@ class TestPlainFileInvocationBootstrapsItsOwnImportPath:
             env=clean_env,
         )
 
-        assert (
-            result.returncode == 0
-        ), f"`capture --help` must not require a git repo; stderr={result.stderr!r}"
+        assert result.returncode == 0, (
+            f"`capture --help` must not require a git repo; stderr={result.stderr!r}"
+        )
         assert "usage" in result.stdout.lower()

@@ -240,9 +240,9 @@ class TestSubsequentAppendOnly:
         header = aggregate_header_for_log()
         first_line = header.splitlines()[0]
         # The header's first line should appear exactly once in the file.
-        assert (
-            content.count(first_line) == 1
-        ), f"Header row must appear exactly once; found {content.count(first_line)} copies."
+        assert content.count(first_line) == 1, (
+            f"Header row must appear exactly once; found {content.count(first_line)} copies."
+        )
 
     def test_two_appends_preserve_row_order(self, tmp_path: Path) -> None:
         """Order is first-in / first-row after header -- timestamps are
@@ -300,9 +300,9 @@ class TestRowContent:
             "123.4",  # hotspot_top_score
             "0.75",  # hotspot_gini
         ):
-            assert (
-                value in data_row
-            ), f"Aggregate value {value!r} must appear in the data row: got {data_row!r}"
+            assert value in data_row, (
+                f"Aggregate value {value!r} must appear in the data row: got {data_row!r}"
+            )
 
     def test_row_cell_count_matches_columns_plus_report_file(self, tmp_path: Path) -> None:
         from scripts.project_metrics.logappend import append_log
@@ -334,9 +334,9 @@ class TestRowContent:
         lines = _read_log_lines(tmp_path)
         cells = _row_cells(lines[2])
         last_cell = cells[-1]
-        assert (
-            md_filename in last_cell
-        ), f"Final cell must reference the passed report_md_filename; got {last_cell!r}"
+        assert md_filename in last_cell, (
+            f"Final cell must reference the passed report_md_filename; got {last_cell!r}"
+        )
 
     def test_final_cell_renders_as_markdown_link(self, tmp_path: Path) -> None:
         """Per plan's File Format section, the report_file column is a
@@ -482,9 +482,9 @@ class TestAtomicWrite:
         # After the failed append, the log content must be byte-identical
         # to the pre-failure snapshot. No partial row, no tail corruption.
         post_failure_content = (tmp_path / "METRICS_LOG.md").read_text(encoding="utf-8")
-        assert (
-            post_failure_content == pristine_content
-        ), "Rename failure must leave METRICS_LOG.md unchanged; atomic-write contract violated."
+        assert post_failure_content == pristine_content, (
+            "Rename failure must leave METRICS_LOG.md unchanged; atomic-write contract violated."
+        )
 
     def test_rename_failure_leaves_no_temp_file_artifacts(self, tmp_path: Path) -> None:
         """A failed rename should clean up or never materialize temp
@@ -606,9 +606,9 @@ class TestFlockConcurrency:
         first = _build_report(timestamp="2026-04-23T10:00:00Z")
         append_log(first, tmp_path, "METRICS_REPORT_2026-04-23_10-00-00.md")
         header_plus_sep_plus_first_row = _read_log_lines(tmp_path)
-        assert (
-            len(header_plus_sep_plus_first_row) == 3
-        ), "Test-design precondition: seed must yield 3 non-empty lines."
+        assert len(header_plus_sep_plus_first_row) == 3, (
+            "Test-design precondition: seed must yield 3 non-empty lines."
+        )
 
         # Spawn two concurrent workers. Popen.wait() is blocking; we
         # start both before waiting so they really overlap.

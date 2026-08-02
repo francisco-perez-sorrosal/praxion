@@ -19,7 +19,10 @@ from pathlib import Path
 # Import validate_skill from sibling module
 SCRIPT_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPT_DIR))
-from validate import validate_skill
+# noqa E402: this import MUST follow the sys.path.insert above — the sibling
+# module is not importable until the script's own directory is on the path.
+# Hoisting it to the top would make the script fail to start.
+from validate import validate_skill  # noqa: E402
 
 
 def package_skill(skill_path: Path, output_dir: Path | None = None) -> int:

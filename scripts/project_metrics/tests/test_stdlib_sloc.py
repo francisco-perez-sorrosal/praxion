@@ -13,9 +13,7 @@ from pathlib import Path
 
 def _init_repo(root: Path) -> None:
     subprocess.run(["git", "init", "-q"], cwd=root, check=True)
-    subprocess.run(
-        ["git", "config", "user.email", "test@example.test"], cwd=root, check=True
-    )
+    subprocess.run(["git", "config", "user.email", "test@example.test"], cwd=root, check=True)
     subprocess.run(["git", "config", "user.name", "Test"], cwd=root, check=True)
 
 
@@ -25,9 +23,7 @@ def _commit_all(root: Path, message: str) -> None:
 
 
 class TestStdlibSlocCountsCommittedFiles:
-    def test_counts_non_blank_lines_in_tracked_python_file(
-        self, tmp_path: Path
-    ) -> None:
+    def test_counts_non_blank_lines_in_tracked_python_file(self, tmp_path: Path) -> None:
         from scripts.project_metrics._stdlib_sloc import compute_stdlib_sloc
 
         _init_repo(tmp_path)
@@ -44,9 +40,7 @@ class TestStdlibSlocCountsCommittedFiles:
         assert result["file_count"] == 1
         assert result["per_file_sloc"]["foo.py"] == 3
 
-    def test_counts_multiple_languages_and_reports_language_breakdown(
-        self, tmp_path: Path
-    ) -> None:
+    def test_counts_multiple_languages_and_reports_language_breakdown(self, tmp_path: Path) -> None:
         from scripts.project_metrics._stdlib_sloc import compute_stdlib_sloc
 
         _init_repo(tmp_path)
@@ -142,9 +136,7 @@ class TestStdlibSlocCountsCommittedFiles:
 
 
 class TestComposeAggregateUsesFallback:
-    def test_sloc_total_populated_from_fallback_when_scc_missing(
-        self, tmp_path: Path
-    ) -> None:
+    def test_sloc_total_populated_from_fallback_when_scc_missing(self, tmp_path: Path) -> None:
         from scripts.project_metrics.aggregate import compose_aggregate
         from scripts.project_metrics.schema import AggregateBlock, Report, TrendBlock
 

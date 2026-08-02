@@ -414,9 +414,9 @@ def test_flags_a_row_edited_in_place_mid_branch(tmp_path: Path) -> None:
     failures = check_consult_files_are_append_only(repo)
 
     assert failures, "an in-place row edit must be flagged; got no failures (the gate is inert)"
-    assert any(
-        "CH-02" in failure for failure in failures
-    ), f"the failure must name the rewritten row; got: {failures}"
+    assert any("CH-02" in failure for failure in failures), (
+        f"the failure must name the rewritten row; got: {failures}"
+    )
 
 
 def test_flags_a_row_deleted_since_the_baseline(tmp_path: Path) -> None:
@@ -428,9 +428,9 @@ def test_flags_a_row_deleted_since_the_baseline(tmp_path: Path) -> None:
     failures = check_consult_files_are_append_only(repo)
 
     assert failures, "a deleted row must be flagged; got no failures (the gate is inert)"
-    assert any(
-        "CH-02" in failure for failure in failures
-    ), f"the failure must name the deleted row; got: {failures}"
+    assert any("CH-02" in failure for failure in failures), (
+        f"the failure must name the deleted row; got: {failures}"
+    )
 
 
 def test_flags_an_uncommitted_in_place_edit_in_the_working_tree(tmp_path: Path) -> None:
@@ -450,9 +450,9 @@ def test_flags_rows_reordered_since_the_baseline() -> None:
     failures = check_rows_are_append_only([_ROW_A, _ROW_B], [_ROW_B, _ROW_A])
 
     assert failures, "reordered baseline rows must be flagged; got no failures"
-    assert any(
-        "moved out of its baseline order" in failure for failure in failures
-    ), f"the failure must name reordering as the cause; got: {failures}"
+    assert any("moved out of its baseline order" in failure for failure in failures), (
+        f"the failure must name reordering as the cause; got: {failures}"
+    )
 
 
 def test_flags_an_edit_to_a_row_that_sits_after_the_trailing_prose() -> None:

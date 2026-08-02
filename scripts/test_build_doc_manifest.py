@@ -222,9 +222,9 @@ def test_content_aware_write_skips_when_unchanged(tmp_path: Path) -> None:
     # Mutate a durable surface — write must now fire
     (tmp_path / "docs" / "y.md").write_text("# Doc Y\n")
     assert bdm.main(["--root", str(tmp_path)]) == 0
-    assert (
-        manifest_path.read_bytes() != first_bytes
-    ), "write did not fire after durable surface changed"
+    assert manifest_path.read_bytes() != first_bytes, (
+        "write did not fire after durable surface changed"
+    )
 
 
 def test_durable_surfaces_preserved_with_and_without_ai_work(tmp_path: Path) -> None:
@@ -264,9 +264,9 @@ def test_docs_indexed_when_root_lives_under_an_excluded_dir(tmp_path: Path) -> N
 
     manifest = bdm.build_manifest(root)
     doc_paths = [s["path"] for s in manifest["surfaces"] if s["path"].startswith("docs/")]
-    assert (
-        "docs/guide.md" in doc_paths
-    ), f"docs/ surface excluded when root is under an excluded dir; got {doc_paths}"
+    assert "docs/guide.md" in doc_paths, (
+        f"docs/ surface excluded when root is under an excluded dir; got {doc_paths}"
+    )
 
 
 # ---------------------------------------------------------------------------

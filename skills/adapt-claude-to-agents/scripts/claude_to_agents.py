@@ -8,12 +8,9 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*\S)\s*$")
 
-EXCLUDED_HEADING_PATTERNS = (
-    re.compile(r"known claude code limitations", re.IGNORECASE),
-)
+EXCLUDED_HEADING_PATTERNS = (re.compile(r"known claude code limitations", re.IGNORECASE),)
 
 EXCLUDED_LINE_PATTERNS = (
     re.compile(r"claude plugin install", re.IGNORECASE),
@@ -25,10 +22,8 @@ EXCLUDED_LINE_PATTERNS = (
 
 LINE_REPLACEMENTS = (
     (
-        "The operational infrastructure for the development philosophy in "
-        "`~/.claude/CLAUDE.md`.",
-        "The operational infrastructure for this project's shared development "
-        "philosophy.",
+        "The operational infrastructure for the development philosophy in `~/.claude/CLAUDE.md`.",
+        "The operational infrastructure for this project's shared development philosophy.",
     ),
     (
         "1. **CLAUDE.md** (this file) — Praxion-specific agent baseline",
@@ -96,7 +91,11 @@ def split_sections(text: str) -> list[Section]:
     for raw_line in text.splitlines():
         match = HEADING_RE.match(raw_line)
         if match is not None:
-            if current_level is not None and current_title is not None and current_heading is not None:
+            if (
+                current_level is not None
+                and current_title is not None
+                and current_heading is not None
+            ):
                 sections.append(
                     Section(
                         level=current_level,

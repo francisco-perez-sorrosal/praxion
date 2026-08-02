@@ -47,13 +47,12 @@ import pytest
 
 from scripts.project_metrics.collectors.base import CollectorResult
 from scripts.project_metrics.schema import (
+    SCHEMA_VERSION,
     AggregateBlock,
     Report,
     RunMetadata,
-    SCHEMA_VERSION,
     TrendBlock,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers — synthetic Report builders. Tests use these rather than hand-rolling
@@ -122,11 +121,7 @@ def _make_report(
     if lizard_max_ccn is not None:
         collectors["lizard"] = CollectorResult(
             status="ok",
-            data={
-                "files": {
-                    path: {"max_ccn": value} for path, value in lizard_max_ccn.items()
-                }
-            },
+            data={"files": {path: {"max_ccn": value} for path, value in lizard_max_ccn.items()}},
         )
     else:
         collectors["lizard"] = CollectorResult(

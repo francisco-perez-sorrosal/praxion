@@ -494,9 +494,9 @@ class TestSmokeRealSpecs:
             check=False,
         )
         assert result.returncode == 0, f"Generator failed: {result.stderr}"
-        assert (
-            str(spec_count) in result.stdout
-        ), f"Expected {spec_count} entries (one per SPEC_*.md); got: {result.stdout.strip()}"
+        assert str(spec_count) in result.stdout, (
+            f"Expected {spec_count} entries (one per SPEC_*.md); got: {result.stdout.strip()}"
+        )
 
     def test_generated_index_readable(self) -> None:
         """The written SPECS_INDEX.md is a well-formed markdown file."""

@@ -90,9 +90,7 @@ def _find_repeated_blocks(lines: list[str]) -> list[str]:
         block = tuple(stripped[start : start + MIN_BLOCK_LINES])
         # Skip blocks that are mostly empty or trivial
         non_empty = [
-            line
-            for line in block
-            if line and line not in ("", "pass", "return", "}", "]", ")")
+            line for line in block if line and line not in ("", "pass", "return", "}", "]", ")")
         ]
         if len(non_empty) < MIN_BLOCK_LINES - 1:
             continue
@@ -130,9 +128,7 @@ def _analyze_markdown(file_path: str) -> list[str]:
     for i, line in enumerate(lines):
         if line.startswith("#"):
             if current_header and len(current_content) >= MIN_BLOCK_LINES:
-                content_key = "\n".join(
-                    entry.strip() for entry in current_content if entry.strip()
-                )
+                content_key = "\n".join(entry.strip() for entry in current_content if entry.strip())
                 sections[content_key].append((current_header, current_start))
             current_header = line.strip()
             current_content = []
@@ -142,12 +138,10 @@ def _analyze_markdown(file_path: str) -> list[str]:
 
     # Flush last section
     if current_header and len(current_content) >= MIN_BLOCK_LINES:
-        content_key = "\n".join(
-            entry.strip() for entry in current_content if entry.strip()
-        )
+        content_key = "\n".join(entry.strip() for entry in current_content if entry.strip())
         sections[content_key].append((current_header, current_start))
 
-    for content, headers in sections.items():
+    for _content, headers in sections.items():
         if len(headers) > 1:
             locations = ", ".join(f'"{h}" (line {s})' for h, s in headers)
             findings.append(f"Duplicate section content under: {locations}")

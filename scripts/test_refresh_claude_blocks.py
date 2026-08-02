@@ -224,9 +224,9 @@ def test_main_refuses_when_repo_root_is_a_plugin_source_repo_without_override(
     output = captured.out + captured.err
 
     assert exit_code != 0, "refresh must refuse to run against a plugin-source repo root"
-    assert (
-        "PRAXION_ALLOW_SELF_ONBOARD" in output
-    ), f"the refusal message must name the override env var. Got:\n{output}"
+    assert "PRAXION_ALLOW_SELF_ONBOARD" in output, (
+        f"the refusal message must name the override env var. Got:\n{output}"
+    )
 
 
 def test_main_proceeds_when_self_onboard_override_env_var_is_set(
@@ -280,12 +280,12 @@ def test_check_exits_nonzero_when_the_only_eligible_block_is_not_current(
     mod = _load_module()
     exit_code = mod.main(["--check", "--repo-root", str(repo), "--manifest", str(manifest_path)])
 
-    assert (
-        exit_code != 0
-    ), f"--check must exit non-zero when the only eligible block is '{classification}'"
-    assert (repo / "CLAUDE.md").read_text(
-        encoding="utf-8"
-    ) == before, "--check must never mutate the target file"
+    assert exit_code != 0, (
+        f"--check must exit non-zero when the only eligible block is '{classification}'"
+    )
+    assert (repo / "CLAUDE.md").read_text(encoding="utf-8") == before, (
+        "--check must never mutate the target file"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -349,9 +349,9 @@ def test_never_classifies_a_slug_outside_the_refreshable_set_even_if_manifest_ca
     mod.main(["--json", "--repo-root", str(repo), "--manifest", str(manifest_path)])
 
     result = json.loads(capsys.readouterr().out)
-    assert (
-        "project-essentials" not in result
-    ), f"a non-eligible slug must never appear in the classification output. Got: {result}"
+    assert "project-essentials" not in result, (
+        f"a non-eligible slug must never appear in the classification output. Got: {result}"
+    )
     assert result == {"agent-pipeline": "current"}
 
 
@@ -387,9 +387,9 @@ def test_classifies_deterministically_on_first_occurrence_when_heading_is_duplic
         "classification must use the FIRST occurrence's body (current), never the "
         f"second (modified). Got: {first_result}"
     )
-    assert (
-        second_result == first_result
-    ), "classifying the same duplicate-heading target twice must be deterministic"
+    assert second_result == first_result, (
+        "classifying the same duplicate-heading target twice must be deterministic"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -813,9 +813,9 @@ def test_apply_refuses_when_repo_root_is_a_plugin_source_repo_without_override(
     after_bytes = (repo / "CLAUDE.md").read_bytes()
 
     assert exit_code != 0, "--apply must refuse to run against a plugin-source repo root"
-    assert (
-        "PRAXION_ALLOW_SELF_ONBOARD" in output
-    ), f"the refusal message must name the override env var. Got:\n{output}"
+    assert "PRAXION_ALLOW_SELF_ONBOARD" in output, (
+        f"the refusal message must name the override env var. Got:\n{output}"
+    )
     assert after_bytes == before_bytes, (
         "a refused --apply run must never mutate the target file, even though the "
         "fixture's block is genuinely stale and would otherwise have been replaced"
@@ -864,9 +864,9 @@ def test_apply_replaces_only_first_occurrence_when_heading_is_duplicated(
         "only the first occurrence's body may change; the second occurrence must be "
         f"byte-identical to its pre-apply text. Got:\n{after!r}"
     )
-    assert after.endswith(
-        second_occurrence
-    ), "the second occurrence must remain byte-untouched at the file's end"
+    assert after.endswith(second_occurrence), (
+        "the second occurrence must remain byte-untouched at the file's end"
+    )
     assert after.count("## Agent Pipeline") == 2, (
         "a pre-existing duplicate heading must stay a duplicate -- apply must never fuse "
         f"or further duplicate headings. Got:\n{after!r}"

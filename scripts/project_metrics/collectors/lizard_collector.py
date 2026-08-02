@@ -58,8 +58,7 @@ __all__ = ["LizardCollector"]
 _RESOLVE_TIMEOUT_SECONDS: float = 120.0
 _COLLECT_TIMEOUT_SECONDS: float = 60.0
 _FIRST_RUN_HINT: str = (
-    "project-metrics: resolving Tier 1 tools "
-    "(first-run uvx cache fill, may take up to 120s)"
+    "project-metrics: resolving Tier 1 tools (first-run uvx cache fill, may take up to 120s)"
 )
 _UVX_INSTALL_HINT: str = "install uv: https://docs.astral.sh/uv/"
 _UVX_NOT_FOUND_REASON: str = "uvx not found on PATH (lizard requires uvx to resolve)"
@@ -105,9 +104,7 @@ class LizardCollector(Collector):
         the repo root but the constructor signature is stable across collectors.
         """
 
-        self._configured_repo_root: Path | None = (
-            Path(repo_root) if repo_root is not None else None
-        )
+        self._configured_repo_root: Path | None = Path(repo_root) if repo_root is not None else None
 
     # ------------------------------------------------------------------ resolve
 
@@ -176,9 +173,7 @@ class LizardCollector(Collector):
             return CollectorResult(
                 status="timeout",
                 data={},
-                issues=[
-                    f"uvx lizard --xml timed out after {int(_COLLECT_TIMEOUT_SECONDS)}s."
-                ],
+                issues=[f"uvx lizard --xml timed out after {int(_COLLECT_TIMEOUT_SECONDS)}s."],
             )
         except subprocess.CalledProcessError as exc:
             return CollectorResult(
@@ -283,9 +278,7 @@ def _parse_item(
 
     name_attr = item.get("name")
     if name_attr is None:
-        return _ItemError(
-            "Skipped malformed function record: missing 'name' attribute."
-        )
+        return _ItemError("Skipped malformed function record: missing 'name' attribute.")
 
     location_match = _ITEM_NAME_LOCATION_RE.search(name_attr)
     if location_match is None:
@@ -298,8 +291,7 @@ def _parse_item(
     value_elements = item.findall("value")
     if len(value_elements) < 3:
         return _ItemError(
-            f"Skipped malformed function record: fewer than 3 <value> children "
-            f"in {file_path}."
+            f"Skipped malformed function record: fewer than 3 <value> children in {file_path}."
         )
 
     ccn_text = (value_elements[2].text or "").strip()
@@ -307,8 +299,7 @@ def _parse_item(
         ccn = int(ccn_text)
     except ValueError:
         return _ItemError(
-            f"Skipped malformed function record: non-numeric CCN {ccn_text!r} "
-            f"in {file_path}."
+            f"Skipped malformed function record: non-numeric CCN {ccn_text!r} in {file_path}."
         )
 
     return file_path, ccn

@@ -32,8 +32,8 @@ The four LLM criteria mirror the kodus ``--ai`` split:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from scripts.project_metrics.collectors.base import CollectionContext
 from scripts.project_metrics.collectors.readiness import checks
@@ -145,17 +145,11 @@ class Criterion:
                 f"[{_MIN_LEVEL}, {_MAX_LEVEL}]"
             )
         if self.scope not in ("repo", "app"):
-            raise ValueError(
-                f"Criterion {self.id!r} scope {self.scope!r} must be 'repo' or 'app'"
-            )
+            raise ValueError(f"Criterion {self.id!r} scope {self.scope!r} must be 'repo' or 'app'")
         if self.llm and self.check is not None:
-            raise ValueError(
-                f"LLM criterion {self.id!r} must not declare a mechanical check"
-            )
+            raise ValueError(f"LLM criterion {self.id!r} must not declare a mechanical check")
         if not self.llm and self.check is None:
-            raise ValueError(
-                f"Mechanical criterion {self.id!r} must declare a check function"
-            )
+            raise ValueError(f"Mechanical criterion {self.id!r} must declare a check function")
 
 
 def _mechanical(
@@ -559,8 +553,7 @@ CRITERIA: tuple[Criterion, ...] = (
             "before they ship."
         ),
         remediation=(
-            "Enable `.github/dependabot.yml` or add an audit step "
-            "(`pip-audit`, `npm audit`) to CI."
+            "Enable `.github/dependabot.yml` or add an audit step (`pip-audit`, `npm audit`) to CI."
         ),
     ),
     _mechanical(
@@ -590,8 +583,7 @@ CRITERIA: tuple[Criterion, ...] = (
             "is a baseline governance signal for any shared project."
         ),
         remediation=(
-            "Add a `LICENSE` file with an SPDX-recognized license appropriate to "
-            "the project."
+            "Add a `LICENSE` file with an SPDX-recognized license appropriate to the project."
         ),
     ),
     # --- Pillar 8: Code Quality -------------------------------------------

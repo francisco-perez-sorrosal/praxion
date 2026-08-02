@@ -95,9 +95,9 @@ def test_blocks_fast_path_for_git_commit_no_edit(tmp_path: Path) -> None:
     spy_hook = _write_delegation_spy(tmp_path)
     result = _run_gate(_make_bash_payload("git commit --no-edit"), hook=spy_hook)
     assert result.returncode == 0
-    assert (
-        DELEGATION_MARKER in result.stdout
-    ), "commit_gate.sh must delegate `git commit --no-edit` to Python"
+    assert DELEGATION_MARKER in result.stdout, (
+        "commit_gate.sh must delegate `git commit --no-edit` to Python"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -120,6 +120,6 @@ def test_non_commit_command_exits_fast(command: str, tmp_path: Path) -> None:
     spy_hook = _write_delegation_spy(tmp_path)
     result = _run_gate(_make_bash_payload(command), hook=spy_hook)
     assert result.returncode == 0, f"expected exit 0, got {result.returncode}"
-    assert (
-        DELEGATION_MARKER not in result.stdout
-    ), f"non-commit command {command!r} must not reach Python; stdout={result.stdout!r}"
+    assert DELEGATION_MARKER not in result.stdout, (
+        f"non-commit command {command!r} must not reach Python; stdout={result.stdout!r}"
+    )

@@ -54,7 +54,6 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Test-data builders -- mirror the structure in ``test_cli.py`` so a mocked
 # Runner returns a fully-populated Report object the downstream orchestration
@@ -250,9 +249,7 @@ class TestDefaultBehaviorUnchanged:
         try:
             for p in patchers:
                 p.start()
-            exit_code = _run_main(
-                ["--window-days", "90", "--top-n", "10"], ai_state, mocks
-            )
+            exit_code = _run_main(["--window-days", "90", "--top-n", "10"], ai_state, mocks)
         finally:
             for p in patchers:
                 p.stop()
@@ -319,9 +316,7 @@ class TestDefaultBehaviorUnchanged:
 class TestFlagInvokesRefreshBeforeRunner:
     """With ``--refresh-coverage`` and a succeeding helper, ordering is strict."""
 
-    def test_flag_present_invokes_refresh_helper_exactly_once(
-        self, tmp_path: Path
-    ) -> None:
+    def test_flag_present_invokes_refresh_helper_exactly_once(self, tmp_path: Path) -> None:
         ai_state = tmp_path / ".ai-state"
         ai_state.mkdir()
 
@@ -338,9 +333,7 @@ class TestFlagInvokesRefreshBeforeRunner:
             for p in patchers:
                 p.stop()
 
-        assert exit_code == 0, (
-            f"--refresh-coverage happy path must exit 0; got {exit_code}."
-        )
+        assert exit_code == 0, f"--refresh-coverage happy path must exit 0; got {exit_code}."
         assert mocks.refresh_coverage.call_count == 1, (
             "--refresh-coverage must invoke the refresh helper exactly once; "
             f"got {mocks.refresh_coverage.call_count} invocations."
@@ -389,8 +382,7 @@ class TestFlagInvokesRefreshBeforeRunner:
             f"sequence. Observed: {top_level!r}."
         )
         assert "Runner" in top_level, (
-            "Runner was never recorded in the ordered call sequence. "
-            f"Observed: {top_level!r}."
+            f"Runner was never recorded in the ordered call sequence. Observed: {top_level!r}."
         )
         refresh_index = top_level.index("refresh_coverage")
         runner_index = top_level.index("Runner")
@@ -401,9 +393,7 @@ class TestFlagInvokesRefreshBeforeRunner:
             f"refresh_coverage at index {refresh_index}, Runner at {runner_index}."
         )
 
-    def test_flag_present_passes_repo_root_to_refresh_helper(
-        self, tmp_path: Path
-    ) -> None:
+    def test_flag_present_passes_repo_root_to_refresh_helper(self, tmp_path: Path) -> None:
         """The helper receives the resolved repo root -- same Path the CLI derives
         for ``.ai-state/`` and hands to ``compute_trends``."""
         ai_state = tmp_path / ".ai-state"
@@ -449,9 +439,7 @@ class TestFlagInvokesRefreshBeforeRunner:
 class TestFlagFailureIsGracefullyDegraded:
     """Any exception from the helper is swallowed: warn + continue + exit 0."""
 
-    def test_helper_raises_generic_exception_still_exits_zero(
-        self, tmp_path: Path
-    ) -> None:
+    def test_helper_raises_generic_exception_still_exits_zero(self, tmp_path: Path) -> None:
         """The helper raises a generic ``RuntimeError`` (representative of
         "skill invocation failed" -- tool absent, non-zero exit, etc.). The
         CLI must catch, warn, and continue."""
@@ -459,9 +447,7 @@ class TestFlagFailureIsGracefullyDegraded:
         ai_state.mkdir()
 
         mocks, patchers = _install_cli_mocks(repo_root=tmp_path)
-        mocks.refresh_coverage.side_effect = RuntimeError(
-            "coverage target exited non-zero"
-        )
+        mocks.refresh_coverage.side_effect = RuntimeError("coverage target exited non-zero")
         try:
             for p in patchers:
                 p.start()
@@ -519,9 +505,7 @@ class TestFlagFailureIsGracefullyDegraded:
         ai_state.mkdir()
 
         mocks, patchers = _install_cli_mocks(repo_root=tmp_path)
-        mocks.refresh_coverage.side_effect = RuntimeError(
-            "no coverage target discoverable"
-        )
+        mocks.refresh_coverage.side_effect = RuntimeError("no coverage target discoverable")
         try:
             for p in patchers:
                 p.start()

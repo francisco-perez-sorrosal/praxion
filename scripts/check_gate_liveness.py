@@ -113,9 +113,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         for finding in findings:
             loc = f"{finding['file']}:{finding['line']}"
-            print(
-                f"[{finding['severity'].upper()}] {finding['check']} {loc} — {finding['why']}"
-            )
+            print(f"[{finding['severity'].upper()}] {finding['check']} {loc} — {finding['why']}")
         print(f"{len(findings)} gate-liveness finding(s)")
     return 1 if findings else 0
 

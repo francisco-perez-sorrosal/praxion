@@ -128,9 +128,9 @@ def test_hub_workflow_call_declares_manifest_path_input_with_safe_default() -> N
     manifest_path = inputs["manifest_path"]
     assert manifest_path.get("type") == "string", "`manifest_path` input must be type `string`"
     assert manifest_path.get("required") is False, "`manifest_path` input must be `required: false`"
-    assert (
-        manifest_path.get("default") == ".github/labels.yml"
-    ), "`manifest_path` input must default to '.github/labels.yml'"
+    assert manifest_path.get("default") == ".github/labels.yml", (
+        "`manifest_path` input must default to '.github/labels.yml'"
+    )
 
 
 def test_hub_workflow_call_declares_no_secrets_block() -> None:
@@ -207,12 +207,12 @@ def test_hub_every_gh_label_create_invocation_passes_force() -> None:
 
 def test_hub_reconcile_loop_concatenates_baseline_and_additional() -> None:
     raw = _raw_text(HUB_WORKFLOW_FILE)
-    assert re.search(
-        r'manifest\.get\(\s*["\']baseline["\']', raw
-    ), "The reconcile loop must read the manifest's `baseline:` block"
-    assert re.search(
-        r'manifest\.get\(\s*["\']additional["\']', raw
-    ), "The reconcile loop must read the manifest's `additional:` block"
+    assert re.search(r'manifest\.get\(\s*["\']baseline["\']', raw), (
+        "The reconcile loop must read the manifest's `baseline:` block"
+    )
+    assert re.search(r'manifest\.get\(\s*["\']additional["\']', raw), (
+        "The reconcile loop must read the manifest's `additional:` block"
+    )
     assert re.search(
         r'manifest\.get\(\s*["\']baseline["\'][^\n]*\+[^\n]*manifest\.get\(\s*["\']additional["\']',
         raw,
@@ -258,9 +258,9 @@ def test_caller_on_block_includes_push_scoped_to_the_manifest_path_on_main() -> 
 def test_caller_on_block_includes_workflow_dispatch() -> None:
     parsed = _parsed(CALLER_WORKFLOW_FILE)
     on_block = _on_block(parsed)
-    assert (
-        "workflow_dispatch" in on_block
-    ), "Caller must also support manual `workflow_dispatch` invocation"
+    assert "workflow_dispatch" in on_block, (
+        "Caller must also support manual `workflow_dispatch` invocation"
+    )
 
 
 # ---------------------------------------------------------------------------

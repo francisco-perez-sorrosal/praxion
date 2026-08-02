@@ -37,15 +37,13 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 try:
-    from aac_fence_validator import _GENERATED_PATTERN, _CLOSER_PATTERN
+    from aac_fence_validator import _CLOSER_PATTERN, _GENERATED_PATTERN
 except ImportError:
     _GENERATED_PATTERN = re.compile(r"<!--\s*aac:generated(.*?)-->")
     _CLOSER_PATTERN = re.compile(r"<!--\s*aac:end\s*-->")
 
 _ATTR_PATTERN = re.compile(r"(\w[\w-]*)=(\S+)")
-_DIAGRAM_OUTPUT_RE = re.compile(
-    r"^docs/diagrams/(?P<name>[^/]+)/(?P<view>[^/]+)\.(?:d2|svg)$"
-)
+_DIAGRAM_OUTPUT_RE = re.compile(r"^docs/diagrams/(?P<name>[^/]+)/(?P<view>[^/]+)\.(?:d2|svg)$")
 _ARCH_DOC_RE = re.compile(r"(?:^|/)(?:ARCHITECTURE\.md|docs/architecture\.md)$")
 _OVERRIDE_CODE_RE = re.compile(r"^\s*#\s*aac-override:\s+(\S.*)$")
 _OVERRIDE_HTML_RE = re.compile(r"<!--\s*aac-override:\s+(\S.*?)\s*-->")
@@ -195,9 +193,7 @@ def _parse_fence_regions(content: str) -> list[FenceRegion]:
         if open_region is not None:
             regions.append(open_region)  # unclosed fence
         attrs = dict(_ATTR_PATTERN.findall(m.group(1)))
-        open_region = FenceRegion(
-            source=attrs.get("source"), opener_line=lineno, closer_line=None
-        )
+        open_region = FenceRegion(source=attrs.get("source"), opener_line=lineno, closer_line=None)
     if open_region is not None:
         regions.append(open_region)
     return regions
@@ -235,9 +231,7 @@ def _parse_hunks(diff_lines: list[str]) -> list[DiffHunk]:
 # ---------------------------------------------------------------------------
 
 
-def _check_path_pair(
-    staged_paths: set[str], diff_by_path: dict[str, list[str]]
-) -> list[Finding]:
+def _check_path_pair(staged_paths: set[str], diff_by_path: dict[str, list[str]]) -> list[Finding]:
     """Return FAIL findings for diagram outputs staged without their .c4 source."""
     findings: list[Finding] = []
     for path in sorted(staged_paths):
@@ -251,11 +245,7 @@ def _check_path_pair(
         if _diff_lines_have_override(diff_lines):
             continue
         ext = Path(path).suffix
-        hint = (
-            "<!-- aac-override: <reason> -->"
-            if ext == ".svg"
-            else "# aac-override: <reason>"
-        )
+        hint = "<!-- aac-override: <reason> -->" if ext == ".svg" else "# aac-override: <reason>"
         findings.append(
             Finding(
                 severity="FAIL",
@@ -317,9 +307,7 @@ def _check_fence_interior(
     return findings
 
 
-def _inspect(
-    paths: set[str], diff_by_path: dict[str, list[str]], repo_root: Path
-) -> list[Finding]:
+def _inspect(paths: set[str], diff_by_path: dict[str, list[str]], repo_root: Path) -> list[Finding]:
     """Run both detection checks; return combined findings."""
     findings = _check_path_pair(paths, diff_by_path)
     findings.extend(_check_fence_interior(paths, diff_by_path, repo_root))
@@ -396,17 +384,13 @@ def run_audit(repo_root: Path, horizon: int, emit_json: bool) -> int:
 
     all_findings: list[Finding] = []
     for sha in commits:
-        _, paths_out = _run_git(
-            ["show", "--name-only", "--diff-filter=ACMR", "--format=", sha]
-        )
+        _, paths_out = _run_git(["show", "--name-only", "--diff-filter=ACMR", "--format=", sha])
         commit_paths = {ln.strip() for ln in paths_out.splitlines() if ln.strip()}
         relevant = [p for p in commit_paths if _is_relevant_path(p)]
         if not relevant:
             continue
         _, diff_out = _run_git(["show", sha, "-U0", "--", *relevant])
-        findings = _inspect(
-            commit_paths, _parse_diff_into_per_file(diff_out), repo_root
-        )
+        findings = _inspect(commit_paths, _parse_diff_into_per_file(diff_out), repo_root)
         for f in findings:
             f.commit = sha
             f.severity = "WARN"  # audit mode: sentinel decides escalation

@@ -57,9 +57,7 @@ class ReadinessCollector(Collector):
         collector. Falls back to the current working directory when unset.
         """
 
-        self._configured_repo_root: Path | None = (
-            Path(repo_root) if repo_root is not None else None
-        )
+        self._configured_repo_root: Path | None = Path(repo_root) if repo_root is not None else None
 
     def resolve(self, env: ResolutionEnv) -> ResolutionResult:
         """Always available — the collector reads only the filesystem."""

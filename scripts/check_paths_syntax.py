@@ -39,14 +39,14 @@ import json
 import re
 import sys
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RULES_DIR = REPO_ROOT / "rules"
 
 
-class SyntaxForm(str, Enum):
+class SyntaxForm(StrEnum):
     """Surface form used by a `paths:` declaration in YAML frontmatter."""
 
     INLINE_ARRAY = "inline-array"  # paths: ["**/*.py", "**/*.pyi"]
@@ -116,11 +116,7 @@ def classify(rule_path: Path) -> PathsDecl | None:
 
     if m := _BLOCK_PATHS_RE.search(fm):
         entries = tuple(_BLOCK_ENTRY_RE.findall(m.group(0)))
-        form = (
-            SyntaxForm.BLOCK_LIST_SINGLE
-            if len(entries) <= 1
-            else SyntaxForm.BLOCK_LIST_MULTI
-        )
+        form = SyntaxForm.BLOCK_LIST_SINGLE if len(entries) <= 1 else SyntaxForm.BLOCK_LIST_MULTI
         return PathsDecl(rule_path, form, entries)
 
     return PathsDecl(rule_path, SyntaxForm.UNKNOWN)
@@ -165,9 +161,7 @@ def _render_human(decls: list[PathsDecl]) -> str:
             lines.append(f"    {d.suggested_inline}")
     else:
         lines.append("")
-        lines.append(
-            "✅ All path-scoped rules use a reportedly-reliable `paths:` form."
-        )
+        lines.append("✅ All path-scoped rules use a reportedly-reliable `paths:` form.")
     return "\n".join(lines)
 
 

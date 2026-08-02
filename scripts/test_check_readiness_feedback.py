@@ -79,9 +79,9 @@ def test_canary_below_floor_level_2_bites(
     with pytest.raises(SystemExit) as exc:
         mod.main(["--repo-root", str(tmp_path), "--check"])
 
-    assert (
-        exc.value.code == 1
-    ), "adjusted_level=2 (< floor 3) must set below_threshold=true and --check must exit 1"
+    assert exc.value.code == 1, (
+        "adjusted_level=2 (< floor 3) must set below_threshold=true and --check must exit 1"
+    )
 
 
 def test_canary_json_output_below_threshold_true(
@@ -95,9 +95,9 @@ def test_canary_json_output_below_threshold_true(
         mod.main(["--repo-root", str(tmp_path), "--json"])
 
     payload = json.loads(capsys.readouterr().out)
-    assert (
-        payload["below_threshold"] is True
-    ), "adjusted_level=2 (< floor 3) must produce below_threshold: true in JSON output"
+    assert payload["below_threshold"] is True, (
+        "adjusted_level=2 (< floor 3) must produce below_threshold: true in JSON output"
+    )
     assert payload["adjusted_level"] == 2
     assert payload["threshold"] == 3
 
@@ -116,9 +116,9 @@ def test_no_false_positive_at_floor_level_3(
     with pytest.raises(SystemExit) as exc:
         mod.main(["--repo-root", str(tmp_path), "--check"])
 
-    assert (
-        exc.value.code == 0
-    ), "adjusted_level=3 (at floor) must not trigger below_threshold — no false positive"
+    assert exc.value.code == 0, (
+        "adjusted_level=3 (at floor) must not trigger below_threshold — no false positive"
+    )
 
 
 def test_no_false_positive_above_floor_level_4(
@@ -146,9 +146,9 @@ def test_substrate_absent_exits_zero(tmp_path: Path, capsys: pytest.CaptureFixtu
     with pytest.raises(SystemExit) as exc:
         mod.main(["--repo-root", str(tmp_path), "--check"])
 
-    assert (
-        exc.value.code == 0
-    ), "Absent metrics_reports/ must exit 0 (skip-with-INFO) — no substrate means no verdict"
+    assert exc.value.code == 0, (
+        "Absent metrics_reports/ must exit 0 (skip-with-INFO) — no substrate means no verdict"
+    )
 
 
 def test_substrate_absent_json_shows_null_level(
@@ -175,14 +175,14 @@ def test_mechanical_only_annotation_in_json(
         mod.main(["--repo-root", str(tmp_path), "--json"])
 
     payload = json.loads(capsys.readouterr().out)
-    assert (
-        payload["mechanical_only"] is True
-    ), "note='mechanical-only' must set mechanical_only=true in the JSON output"
+    assert payload["mechanical_only"] is True, (
+        "note='mechanical-only' must set mechanical_only=true in the JSON output"
+    )
     assert payload["note"] == "mechanical-only"
     # The details text must mention the mechanical-only annotation.
-    assert (
-        "mechanical-only" in payload["details"].lower() or "mechanical" in payload["details"]
-    ), "finding details must annotate the mechanical-only verdict"
+    assert "mechanical-only" in payload["details"].lower() or "mechanical" in payload["details"], (
+        "finding details must annotate the mechanical-only verdict"
+    )
 
 
 def test_mechanical_only_false_when_note_differs(
@@ -199,9 +199,9 @@ def test_mechanical_only_false_when_note_differs(
         mod.main(["--repo-root", str(tmp_path), "--json"])
 
     payload = json.loads(capsys.readouterr().out)
-    assert (
-        payload["mechanical_only"] is False
-    ), "note='some-other-note' (not 'mechanical-only') must leave mechanical_only=false"
+    assert payload["mechanical_only"] is False, (
+        "note='some-other-note' (not 'mechanical-only') must leave mechanical_only=false"
+    )
 
 
 def test_fallback_to_level_when_adjusted_level_absent(
@@ -219,9 +219,9 @@ def test_fallback_to_level_when_adjusted_level_absent(
     with pytest.raises(SystemExit) as exc:
         mod.main(["--repo-root", str(tmp_path), "--check"])
 
-    assert (
-        exc.value.code == 1
-    ), "Fallback to readiness.data.level=2 (< 3) must still trigger below_threshold"
+    assert exc.value.code == 1, (
+        "Fallback to readiness.data.level=2 (< 3) must still trigger below_threshold"
+    )
 
 
 def test_fallback_level_no_false_positive(
@@ -246,9 +246,9 @@ def test_plugin_cache_refusal(tmp_path: Path) -> None:
         with pytest.raises(SystemExit) as exc:
             mod.main(["--repo-root", str(tmp_path)])
 
-    assert (
-        exc.value.code == 2
-    ), "Plugin-cache path must exit 2 (refusal) to protect shared plugin state"
+    assert exc.value.code == 2, (
+        "Plugin-cache path must exit 2 (refusal) to protect shared plugin state"
+    )
 
 
 def test_latest_report_resolved_by_filename_sort(
@@ -278,9 +278,9 @@ def test_latest_report_resolved_by_filename_sort(
     with pytest.raises(SystemExit) as exc:
         mod.main(["--repo-root", str(tmp_path), "--check"])
 
-    assert (
-        exc.value.code == 0
-    ), "Must read the newest file (level=3) by filename sort, not the older file (level=2)"
+    assert exc.value.code == 0, (
+        "Must read the newest file (level=3) by filename sort, not the older file (level=2)"
+    )
 
 
 def test_flags_below_floor_readiness(tmp_path: Path) -> None:
@@ -298,8 +298,8 @@ def test_flags_below_floor_readiness(tmp_path: Path) -> None:
     mod = _load_module()
     verdict = mod.compute_readiness_verdict(tmp_path)
 
-    assert (
-        verdict["below_threshold"] is True
-    ), "adjusted_level=2 is below READINESS_FLOOR=3 — the gate must flag it as below_threshold"
+    assert verdict["below_threshold"] is True, (
+        "adjusted_level=2 is below READINESS_FLOOR=3 — the gate must flag it as below_threshold"
+    )
     assert verdict["adjusted_level"] == 2
     assert "below the production floor" in verdict["details"]

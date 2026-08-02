@@ -51,7 +51,7 @@ def load_pillar_weights(repo_root: Path) -> dict[str, float]:
     to a warning so the metrics run is not blocked.
     """
 
-    weights: dict[str, float] = {pillar: 1.0 for pillar in FACTORY_PILLARS}
+    weights: dict[str, float] = dict.fromkeys(FACTORY_PILLARS, 1.0)
     config_path = repo_root / _AI_STATE_DIRNAME / CONFIG_BASENAME
     if not config_path.is_file():
         return weights
@@ -60,8 +60,7 @@ def load_pillar_weights(repo_root: Path) -> dict[str, float]:
         raw = json.loads(config_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
         print(
-            f"warning: could not read {config_path} ({exc}); "
-            "ignoring readiness weights",
+            f"warning: could not read {config_path} ({exc}); ignoring readiness weights",
             file=sys.stderr,
         )
         return weights
@@ -80,15 +79,13 @@ def load_pillar_weights(repo_root: Path) -> dict[str, float]:
             continue
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             print(
-                f"warning: readiness weight for {pillar!r} is not a number "
-                f"({value!r}); using 1.0",
+                f"warning: readiness weight for {pillar!r} is not a number ({value!r}); using 1.0",
                 file=sys.stderr,
             )
             continue
         if value < 0:
             print(
-                f"warning: readiness weight for {pillar!r} is negative "
-                f"({value}); using 1.0",
+                f"warning: readiness weight for {pillar!r} is negative ({value}); using 1.0",
                 file=sys.stderr,
             )
             continue

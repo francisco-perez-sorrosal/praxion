@@ -85,9 +85,7 @@ def parse_frontmatter(raw: str) -> tuple[dict[str, str], list[str]]:
                 current_value_lines = []
             else:
                 current_value_lines = [value] if value else []
-        elif current_key is not None and (
-            line.startswith("  ") or line.startswith("\t")
-        ):
+        elif current_key is not None and (line.startswith("  ") or line.startswith("\t")):
             # Continuation line for current key
             current_value_lines.append(line.strip())
         elif line.strip() == "":
@@ -113,9 +111,7 @@ def validate_name(name: str, expected_dir: str) -> list[str]:
         )
 
     if name != expected_dir:
-        errors.append(
-            f"'name' ({name!r}) does not match directory name ({expected_dir!r})"
-        )
+        errors.append(f"'name' ({name!r}) does not match directory name ({expected_dir!r})")
 
     return errors
 
@@ -129,9 +125,7 @@ def validate_description(desc: str) -> list[str]:
         return errors
 
     if len(desc) > DESCRIPTION_MAX_LENGTH:
-        errors.append(
-            f"'description' exceeds {DESCRIPTION_MAX_LENGTH} chars (got {len(desc)})"
-        )
+        errors.append(f"'description' exceeds {DESCRIPTION_MAX_LENGTH} chars (got {len(desc)})")
 
     if re.search(r"[<>]", desc):
         errors.append("'description' must not contain angle brackets (< or >)")
@@ -142,9 +136,7 @@ def validate_description(desc: str) -> list[str]:
 def validate_compatibility(value: str) -> list[str]:
     """Validate the optional compatibility field."""
     if len(value) > COMPATIBILITY_MAX_LENGTH:
-        return [
-            f"'compatibility' exceeds {COMPATIBILITY_MAX_LENGTH} chars (got {len(value)})"
-        ]
+        return [f"'compatibility' exceeds {COMPATIBILITY_MAX_LENGTH} chars (got {len(value)})"]
     return []
 
 

@@ -118,9 +118,7 @@ def filter_to_shipped(files: list[Path], repo_root: Path) -> list[Path]:
     shipped_root_paths = [(repo_root / root).resolve() for root in SHIPPED_ROOTS]
     out: list[Path] = []
     for candidate in files:
-        abs_path = (
-            candidate if candidate.is_absolute() else (repo_root / candidate).resolve()
-        )
+        abs_path = candidate if candidate.is_absolute() else (repo_root / candidate).resolve()
         if abs_path.suffix != ".md" or not abs_path.is_file():
             continue
         if is_excluded(abs_path):
@@ -162,9 +160,7 @@ def format_findings(files: list[Path], repo_root: Path) -> tuple[int, list[str]]
 
 
 def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(
-        description=__doc__.splitlines()[0] if __doc__ else ""
-    )
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else "")
     parser.add_argument(
         "--repo-root",
         type=Path,
@@ -198,9 +194,7 @@ def main(argv: list[str]) -> int:
     print(f"\nscanned {len(files)} shipped file(s); {total} violation(s).")
     print("")
     print("Rule:          rules/swe/shipped-artifact-isolation.md")
-    print(
-        "Escape hatch:  add `<!-- shipped-artifact-isolation:ignore -->` on the same line"
-    )
+    print("Escape hatch:  add `<!-- shipped-artifact-isolation:ignore -->` on the same line")
     print("               when the reference is intentional (e.g., a migration note).")
     print("Test fixtures: files under **/tests/fixtures/** are already excluded.")
     return 1

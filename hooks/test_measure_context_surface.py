@@ -19,10 +19,9 @@ HOOK_SCRIPT_PATH = HOOKS_DIR / "measure_context_surface.py"
 
 def _load_module():
     """Load measure_context_surface.py as a module inside a test body."""
-    spec = importlib.util.spec_from_file_location(
-        "measure_context_surface", HOOK_SCRIPT_PATH
-    )
-    assert spec is not None and spec.loader is not None
+    spec = importlib.util.spec_from_file_location("measure_context_surface", HOOK_SCRIPT_PATH)
+    assert spec is not None
+    assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -103,9 +102,7 @@ class TestCollectAlwaysLoaded:
         # Total bytes equals the sum of records' bytes — sanity check.
         assert total == sum(r["bytes"] for r in records)
 
-    def test_plugin_tree_adds_hook_deliver_rules_and_dedups_symlinks(
-        self, tmp_path: Path
-    ):
+    def test_plugin_tree_adds_hook_deliver_rules_and_dedups_symlinks(self, tmp_path: Path):
         """Hook-deliver rules live only in the plugin tree and must be counted;
         a rule symlinked into the global dir must count exactly once."""
         m = _load_module()
@@ -129,9 +126,7 @@ class TestCollectAlwaysLoaded:
         global_md = tmp_path / "global_CLAUDE.md"
         global_md.write_text("# Global\n", encoding="utf-8")
 
-        total, records = m._collect_always_loaded(
-            project_md, global_md, rules_dir, plugin_rules
-        )
+        total, records = m._collect_always_loaded(project_md, global_md, rules_dir, plugin_rules)
 
         rule_paths = [r["path"] for r in records if r["type"] == "rule"]
         # hook-deliver rule is reachable only via the plugin tree
@@ -146,9 +141,7 @@ class TestCollectAlwaysLoaded:
         missing_global = tmp_path / "also-missing.md"
         missing_rules = tmp_path / "no-rules-dir"
 
-        total, records = m._collect_always_loaded(
-            missing_project, missing_global, missing_rules
-        )
+        total, records = m._collect_always_loaded(missing_project, missing_global, missing_rules)
 
         assert total == 0
         assert records == []
@@ -219,9 +212,7 @@ class TestMainEntry:
         assert "Always-loaded surface" in observation["summary"]
         assert any("CLAUDE.md" in p for p in observation["file_paths"])
 
-    def test_skips_when_ai_state_missing(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_skips_when_ai_state_missing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         m = _load_module()
         # No .ai-state/ created.
         payload = {
@@ -234,9 +225,7 @@ class TestMainEntry:
         # Nothing written.
         assert not (tmp_path / ".ai-state" / "observations.jsonl").exists()
 
-    def test_skips_non_session_start_events(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_skips_non_session_start_events(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         m = _load_module()
         ai_state = tmp_path / ".ai-state"
         ai_state.mkdir()
@@ -249,9 +238,7 @@ class TestMainEntry:
         m.main()
         assert not (ai_state / "observations.jsonl").exists()
 
-    def test_disabled_by_observability_flag(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_disabled_by_observability_flag(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         m = _load_module()
         ai_state = tmp_path / ".ai-state"
         ai_state.mkdir()
@@ -265,9 +252,7 @@ class TestMainEntry:
         m.main()
         assert not (ai_state / "observations.jsonl").exists()
 
-    def test_malformed_stdin_does_not_crash(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_malformed_stdin_does_not_crash(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         m = _load_module()
         monkeypatch.setattr(sys, "stdin", _StringIO("not-json{"))
         m.main()  # No raise = pass.

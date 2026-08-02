@@ -97,9 +97,9 @@ def _job(parsed: dict) -> dict:
     """
     jobs = _jobs(parsed)
     assert jobs, "Intake gate workflow must declare at least one job"
-    assert (
-        len(jobs) == 1
-    ), f"Expected exactly one job in the intake gate workflow, found {len(jobs)}: {sorted(jobs)}"
+    assert len(jobs) == 1, (
+        f"Expected exactly one job in the intake gate workflow, found {len(jobs)}: {sorted(jobs)}"
+    )
     return next(iter(jobs.values()))
 
 
@@ -167,9 +167,9 @@ def test_on_block_declares_direct_issues_trigger_with_opened_and_labeled_types()
         "Intake gate must be a direct `on: issues` workflow — it has no "
         "fleet consumer in v1 and must never be a `workflow_call` hub"
     )
-    assert (
-        "workflow_call" not in on_block
-    ), "Intake gate is Praxion-only in v1 — it must never declare `workflow_call`"
+    assert "workflow_call" not in on_block, (
+        "Intake gate is Praxion-only in v1 — it must never declare `workflow_call`"
+    )
     issues_block = on_block["issues"] or {}
     types = issues_block.get("types") or []
     assert "opened" in types, "`on.issues.types` must include `opened`"
@@ -200,12 +200,12 @@ def test_job_if_predicate_gates_only_on_the_two_stable_labels() -> None:
     if_expr = job.get("if") or ""
     assert if_expr, "The intake gate's job must declare an `if:` predicate"
     assert "auto-filed" in if_expr, "The job's `if:` must check for the `auto-filed` label"
-    assert (
-        "from-managed-project" in if_expr
-    ), "The job's `if:` must check for the `from-managed-project` label"
-    assert (
-        "&&" in if_expr
-    ), "The two label checks must be joined by `&&` — both must hold for the job to run"
+    assert "from-managed-project" in if_expr, (
+        "The job's `if:` must check for the `from-managed-project` label"
+    )
+    assert "&&" in if_expr, (
+        "The two label checks must be joined by `&&` — both must hold for the job to run"
+    )
     assert "vars." not in if_expr, (
         "The job's `if:` must never reference a `vars.*` Actions Variable — "
         "there is zero precedent for this elsewhere in the repo, and the "
@@ -312,9 +312,9 @@ def test_never_opens_a_pr_or_writes_code() -> None:
     )
     assert "git push" not in raw, "The intake gate must never run `git push`"
     assert "git commit" not in raw, "The intake gate must never run `git commit`"
-    assert (
-        "git checkout -b" not in raw
-    ), "The intake gate must never run `git checkout -b` — it creates no branch"
+    assert "git checkout -b" not in raw, (
+        "The intake gate must never run `git checkout -b` — it creates no branch"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -377,9 +377,9 @@ def test_fail_open_owner_step_is_gated_on_always_and_converges_to_unavailable() 
         "model of the configured family) must converge on the "
         "`intake-assessment:unavailable` label"
     )
-    assert (
-        "gh issue comment" in raw
-    ), "The owner step must post exactly one `gh issue comment` regardless of outcome"
+    assert "gh issue comment" in raw, (
+        "The owner step must post exactly one `gh issue comment` regardless of outcome"
+    )
 
 
 def test_no_failure_path_exits_non_zero() -> None:
@@ -460,9 +460,9 @@ def test_checkout_and_setup_uv_pin_the_same_commits_used_repo_wide() -> None:
 
 def test_never_triggers_on_pull_request_target() -> None:
     raw = _raw_text()
-    assert (
-        "pull_request_target" not in raw
-    ), "`pull_request_target` must never appear anywhere in the intake gate"
+    assert "pull_request_target" not in raw, (
+        "`pull_request_target` must never appear anywhere in the intake gate"
+    )
 
 
 def test_never_references_track_progress() -> None:
@@ -492,9 +492,9 @@ def test_non_agent_fetch_issue_as_data_step_exists_before_the_cursor_invocation(
         "writing it to a `tmp/issue*` file for the agent to read as DATA — "
         "never an agent action, never interpolated directly into a prompt"
     )
-    assert (
-        invoke_idx is not None
-    ), "Expected a Cursor CLI invocation step (`agent -p ...`) somewhere in the job"
+    assert invoke_idx is not None, (
+        "Expected a Cursor CLI invocation step (`agent -p ...`) somewhere in the job"
+    )
     assert fetch_idx < invoke_idx, (
         "The non-agent issue-fetch step must run BEFORE the Cursor "
         "invocation — the model reads the issue as an already-written file, "
@@ -509,9 +509,9 @@ def test_non_agent_fetch_issue_as_data_step_exists_before_the_cursor_invocation(
 
 def test_cursor_invocation_mirrors_the_reused_review_hub_mechanics() -> None:
     raw = _raw_text()
-    assert (
-        "--output-format json" in raw
-    ), "The Cursor invocation must request `--output-format json`"
+    assert "--output-format json" in raw, (
+        "The Cursor invocation must request `--output-format json`"
+    )
     assert "--force" in raw, (
         "The Cursor invocation must pass `--force` to bypass the "
         "workspace-trust prompt in the TTY-less CI runner"

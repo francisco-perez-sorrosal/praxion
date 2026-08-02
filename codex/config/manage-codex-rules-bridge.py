@@ -9,7 +9,6 @@ import json
 import re
 from pathlib import Path
 
-
 PRAXION_HOOK_STATUS_PREFIX = "Praxion:"
 STATE_DIR = Path(".codex/praxion")
 STATE_FILE = STATE_DIR / "config_state.json"
@@ -21,9 +20,7 @@ LEGACY_HOOKS_FEATURE_KEY = "codex_hooks"
 
 def load_rules_bridge_exporter(repo_root: Path):
     exporter_path = repo_root / "codex" / "config" / "export-codex-rules-bridge.py"
-    spec = importlib.util.spec_from_file_location(
-        "export_codex_rules_bridge", exporter_path
-    )
+    spec = importlib.util.spec_from_file_location("export_codex_rules_bridge", exporter_path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Unable to load exporter from {exporter_path}")
     module = importlib.util.module_from_spec(spec)
@@ -39,9 +36,7 @@ def load_expected_hooks(repo_root: Path, project_root: Path) -> dict[str, list[d
         for group in groups:
             for hook in group.get("hooks", []):
                 command = str(hook.get("command", ""))
-                hook["command"] = command.replace(
-                    "__PRAXION_PROJECT_ROOT__", project_root_str
-                )
+                hook["command"] = command.replace("__PRAXION_PROJECT_ROOT__", project_root_str)
     return hooks
 
 
@@ -49,10 +44,7 @@ def is_praxion_managed_group(group: dict) -> bool:
     for hook in group.get("hooks", []):
         status = str(hook.get("statusMessage", ""))
         command = str(hook.get("command", ""))
-        if (
-            status.startswith(PRAXION_HOOK_STATUS_PREFIX)
-            or "/.codex/hooks/praxion-" in command
-        ):
+        if status.startswith(PRAXION_HOOK_STATUS_PREFIX) or "/.codex/hooks/praxion-" in command:
             return True
     return False
 
@@ -67,14 +59,10 @@ def load_json(path: Path) -> dict:
 
 def dump_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def install_hooks_json(
-    project_root: Path, expected_hooks: dict[str, list[dict]]
-) -> None:
+def install_hooks_json(project_root: Path, expected_hooks: dict[str, list[dict]]) -> None:
     hooks_path = project_root / HOOKS_FILE
     if hooks_path.exists():
         payload = load_json(hooks_path)
@@ -84,9 +72,7 @@ def install_hooks_json(
     hooks = payload.setdefault("hooks", {})
     for event_name, groups in expected_hooks.items():
         existing_groups = [
-            group
-            for group in hooks.get(event_name, [])
-            if not is_praxion_managed_group(group)
+            group for group in hooks.get(event_name, []) if not is_praxion_managed_group(group)
         ]
         existing_groups.extend(groups)
         hooks[event_name] = existing_groups
@@ -127,30 +113,22 @@ def check_hooks_json(
 
     for event_name, expected_groups in expected_hooks.items():
         actual_groups = [
-            group
-            for group in hooks.get(event_name, [])
-            if is_praxion_managed_group(group)
+            group for group in hooks.get(event_name, []) if is_praxion_managed_group(group)
         ]
         actual_norm = {normalize_group(group) for group in actual_groups}
         expected_norm = {normalize_group(group) for group in expected_groups}
         missing = expected_norm - actual_norm
         stale = actual_norm - expected_norm
         for _group in missing:
-            problems.append(
-                f"Codex hooks missing Praxion registration for {event_name}"
-            )
+            problems.append(f"Codex hooks missing Praxion registration for {event_name}")
         for _group in stale:
-            problems.append(
-                f"Unexpected stale Praxion hook registration for {event_name}"
-            )
+            problems.append(f"Unexpected stale Praxion hook registration for {event_name}")
 
     extra_events = set(hooks) - set(expected_hooks)
     for event_name in extra_events:
         for group in hooks.get(event_name, []):
             if is_praxion_managed_group(group):
-                problems.append(
-                    f"Unexpected stale Praxion hook registration for {event_name}"
-                )
+                problems.append(f"Unexpected stale Praxion hook registration for {event_name}")
                 break
 
     return not problems, problems
@@ -203,9 +181,7 @@ def install_config(project_root: Path) -> None:
             line_index = find_feature_line(lines, start + 1, end, HOOKS_FEATURE_KEY)
             if line_index is not None:
                 original_hooks_value = "true" in lines[line_index]
-            legacy_line_index = find_feature_line(
-                lines, start + 1, end, LEGACY_HOOKS_FEATURE_KEY
-            )
+            legacy_line_index = find_feature_line(lines, start + 1, end, LEGACY_HOOKS_FEATURE_KEY)
             if legacy_line_index is not None:
                 original_legacy_value = "true" in lines[legacy_line_index]
         state = {
@@ -223,9 +199,7 @@ def install_config(project_root: Path) -> None:
             new_text += "\n\n"
         new_text += f"[features]\n{HOOKS_FEATURE_KEY} = true\n"
     else:
-        legacy_line_index = find_feature_line(
-            lines, start + 1, end, LEGACY_HOOKS_FEATURE_KEY
-        )
+        legacy_line_index = find_feature_line(lines, start + 1, end, LEGACY_HOOKS_FEATURE_KEY)
         if legacy_line_index is not None:
             del lines[legacy_line_index]
             if legacy_line_index < end:
@@ -267,9 +241,7 @@ def uninstall_config(project_root: Path) -> None:
                 else:
                     lines[line_index] = f"{HOOKS_FEATURE_KEY} = {restored}"
 
-            legacy_line_index = find_feature_line(
-                lines, start + 1, end, LEGACY_HOOKS_FEATURE_KEY
-            )
+            legacy_line_index = find_feature_line(lines, start + 1, end, LEGACY_HOOKS_FEATURE_KEY)
             if original_legacy_value is None:
                 if legacy_line_index is not None:
                     del lines[legacy_line_index]
@@ -280,13 +252,9 @@ def uninstall_config(project_root: Path) -> None:
                     lines.insert(start + 1, f"{LEGACY_HOOKS_FEATURE_KEY} = {restored}")
                     end += 1
                 else:
-                    lines[legacy_line_index] = (
-                        f"{LEGACY_HOOKS_FEATURE_KEY} = {restored}"
-                    )
+                    lines[legacy_line_index] = f"{LEGACY_HOOKS_FEATURE_KEY} = {restored}"
 
-            feature_has_content = any(
-                lines[index].strip() for index in range(start + 1, end)
-            )
+            feature_has_content = any(lines[index].strip() for index in range(start + 1, end))
             if not feature_has_content:
                 del lines[start:end]
 
@@ -322,9 +290,7 @@ def check_config(project_root: Path) -> tuple[bool, list[str]]:
         return False, ["Codex config missing hooks = true"]
     if "true" not in lines[line_index]:
         return False, ["Codex config has stale hooks setting"]
-    legacy_line_index = find_feature_line(
-        lines, start + 1, end, LEGACY_HOOKS_FEATURE_KEY
-    )
+    legacy_line_index = find_feature_line(lines, start + 1, end, LEGACY_HOOKS_FEATURE_KEY)
     if legacy_line_index is not None:
         return False, ["Codex config still contains deprecated codex_hooks setting"]
     return True, []
@@ -334,9 +300,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", required=True, type=Path)
     parser.add_argument("--project-root", required=True, type=Path)
-    parser.add_argument(
-        "--mode", choices={"install", "check", "uninstall"}, required=True
-    )
+    parser.add_argument("--mode", choices={"install", "check", "uninstall"}, required=True)
     args = parser.parse_args()
 
     repo_root = args.repo_root.resolve()

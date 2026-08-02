@@ -132,7 +132,7 @@ def _patched_module(monkeypatch, rules_dir: Path, manifest_path: Path):
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture()
+@pytest.fixture
 def minimal_rules_tree(tmp_path: Path) -> tuple[Path, Path]:
     """Build a synthetic rules/ tree with the 5 required core rules.
 
@@ -149,20 +149,15 @@ def minimal_rules_tree(tmp_path: Path) -> tuple[Path, Path]:
             # swe/ core rules
             "swe": {
                 "adr-conventions.md": _CORE_FRONTMATTER + "## ADR Conventions\n",
-                "agent-behavioral-contract.md": _CORE_FRONTMATTER
-                + "## Behavioral Contract\n",
-                "agent-intermediate-documents.md": _CORE_FRONTMATTER
-                + "## Intermediate Docs\n",
+                "agent-behavioral-contract.md": _CORE_FRONTMATTER + "## Behavioral Contract\n",
+                "agent-intermediate-documents.md": _CORE_FRONTMATTER + "## Intermediate Docs\n",
                 "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER
                 + "## Coordination Protocol\n",
                 # Hook-delivered blacklistable rules
-                "memory-protocol.md": _HOOK_DELIVER_FRONTMATTER
-                + "## Memory Protocol\n",
-                "agent-model-routing.md": _HOOK_DELIVER_FRONTMATTER
-                + "## Model Routing\n",
+                "memory-protocol.md": _HOOK_DELIVER_FRONTMATTER + "## Memory Protocol\n",
+                "agent-model-routing.md": _HOOK_DELIVER_FRONTMATTER + "## Model Routing\n",
                 "vcs": {
-                    "git-conventions.md": _HOOK_DELIVER_FRONTMATTER
-                    + "## Git Conventions\n",
+                    "git-conventions.md": _HOOK_DELIVER_FRONTMATTER + "## Git Conventions\n",
                 },
             },
         },
@@ -190,10 +185,8 @@ def test_manifest_schema_contains_expected_fields_per_rule(
             "swe": {
                 "adr-conventions.md": _CORE_FRONTMATTER + "## ADR\n",
                 "agent-behavioral-contract.md": _CORE_FRONTMATTER + "## Contract\n",
-                "agent-intermediate-documents.md": _CORE_FRONTMATTER
-                + "## IntermediateDocs\n",
-                "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER
-                + "## CoordProtocol\n",
+                "agent-intermediate-documents.md": _CORE_FRONTMATTER + "## IntermediateDocs\n",
+                "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER + "## CoordProtocol\n",
                 "memory-protocol.md": _HOOK_DELIVER_FRONTMATTER + "## Memory\n",
                 "agent-model-routing.md": _HOOK_DELIVER_FRONTMATTER + "## Routing\n",
                 "vcs": {
@@ -220,9 +213,7 @@ def test_manifest_schema_contains_expected_fields_per_rule(
         assert "core" in rule, f"Missing 'core' in rule: {rule}"
         assert "install" in rule, f"Missing 'install' in rule: {rule}"
         assert "chars" in rule, f"Missing 'chars' in rule: {rule}"
-        assert isinstance(rule["chars"], int), (
-            f"'chars' must be int, got {type(rule['chars'])}"
-        )
+        assert isinstance(rule["chars"], int), f"'chars' must be int, got {type(rule['chars'])}"
 
 
 # ---------------------------------------------------------------------------
@@ -239,9 +230,7 @@ def test_stale_manifest_check_mode_exits_nonzero_with_drift_message(
     rules_dir, manifest_path = minimal_rules_tree
 
     # Write a stale manifest (wrong content).
-    manifest_path.write_text(
-        "version: 1\nrules: []\ncategories: {}\n", encoding="utf-8"
-    )
+    manifest_path.write_text("version: 1\nrules: []\ncategories: {}\n", encoding="utf-8")
 
     mod = _patched_module(monkeypatch, rules_dir, manifest_path)
     exit_code = mod.run_check()
@@ -250,8 +239,7 @@ def test_stale_manifest_check_mode_exits_nonzero_with_drift_message(
     captured = capsys.readouterr()
     combined = captured.out + captured.err
     assert "Manifest drift" in combined, (
-        f"Expected 'Manifest drift' in output. Got stdout={captured.out!r} "
-        f"stderr={captured.err!r}"
+        f"Expected 'Manifest drift' in output. Got stdout={captured.out!r} stderr={captured.err!r}"
     )
 
 
@@ -300,10 +288,8 @@ def test_rule_without_core_frontmatter_defaults_to_core_false(
             "swe": {
                 "adr-conventions.md": _CORE_FRONTMATTER + "## ADR\n",
                 "agent-behavioral-contract.md": _CORE_FRONTMATTER + "## Contract\n",
-                "agent-intermediate-documents.md": _CORE_FRONTMATTER
-                + "## IntermediateDocs\n",
-                "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER
-                + "## CoordProtocol\n",
+                "agent-intermediate-documents.md": _CORE_FRONTMATTER + "## IntermediateDocs\n",
+                "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER + "## CoordProtocol\n",
                 "memory-protocol.md": _HOOK_DELIVER_FRONTMATTER + "## Memory\n",
                 "agent-model-routing.md": _HOOK_DELIVER_FRONTMATTER + "## Routing\n",
                 # Rule with path-scoped frontmatter only — no core: field.
@@ -321,13 +307,10 @@ def test_rule_without_core_frontmatter_defaults_to_core_false(
     assert exit_code == 0, "Generator crashed on rule with no core: field"
     manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
 
-    coding_style = next(
-        (r for r in manifest["rules"] if r["id"] == "swe/coding-style"), None
-    )
+    coding_style = next((r for r in manifest["rules"] if r["id"] == "swe/coding-style"), None)
     assert coding_style is not None, "swe/coding-style rule not found in manifest"
     assert coding_style["core"] is False, (
-        f"Expected core: false for rule without core: frontmatter, "
-        f"got {coding_style['core']!r}"
+        f"Expected core: false for rule without core: frontmatter, got {coding_style['core']!r}"
     )
 
 
@@ -358,8 +341,7 @@ def test_core_rule_missing_core_true_frontmatter_causes_exit_1(
                     "---\ncore: false\nload: always_on\ninstall: symlink\n---\n"
                     "## Intermediate Docs\n"
                 ),
-                "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER
-                + "## CoordProtocol\n",
+                "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER + "## CoordProtocol\n",
                 "memory-protocol.md": _HOOK_DELIVER_FRONTMATTER + "## Memory\n",
                 "agent-model-routing.md": _HOOK_DELIVER_FRONTMATTER + "## Routing\n",
                 "vcs": {
@@ -378,9 +360,7 @@ def test_core_rule_missing_core_true_frontmatter_causes_exit_1(
     assert "ERROR" in combined, (
         f"Expected ERROR in output. stdout={captured.out!r} stderr={captured.err!r}"
     )
-    assert "core: true" in combined, (
-        f'Expected "core: true" in error message. Got: {combined!r}'
-    )
+    assert "core: true" in combined, f'Expected "core: true" in error message. Got: {combined!r}'
     assert "agent-intermediate-documents" in combined, (
         f"Expected offending rule path in error. Got: {combined!r}"
     )
@@ -391,7 +371,7 @@ def test_core_rule_missing_core_true_frontmatter_causes_exit_1(
 # ---------------------------------------------------------------------------
 
 
-def test_root_level_claude_md_produces_id_CLAUDE(
+def test_root_level_claude_md_produces_id_CLAUDE(  # noqa: N802 — CLAUDE is the literal id under test, cased as it appears
     monkeypatch: pytest.MonkeyPatch,
     minimal_rules_tree: tuple[Path, Path],
 ) -> None:
@@ -405,9 +385,7 @@ def test_root_level_claude_md_produces_id_CLAUDE(
     manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
     rule_ids = [r["id"] for r in manifest["rules"]]
 
-    assert "CLAUDE" in rule_ids, (
-        f"Expected ID 'CLAUDE' in manifest. Found IDs: {rule_ids}"
-    )
+    assert "CLAUDE" in rule_ids, f"Expected ID 'CLAUDE' in manifest. Found IDs: {rule_ids}"
     assert "swe/CLAUDE" not in rule_ids, (
         f"ID 'swe/CLAUDE' should not appear in manifest. Found IDs: {rule_ids}"
     )
@@ -435,10 +413,8 @@ def test_merged_frontmatter_codex_and_core_produces_hook_deliver(
             "swe": {
                 "adr-conventions.md": _CORE_FRONTMATTER + "## ADR\n",
                 "agent-behavioral-contract.md": _CORE_FRONTMATTER + "## Contract\n",
-                "agent-intermediate-documents.md": _CORE_FRONTMATTER
-                + "## IntermediateDocs\n",
-                "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER
-                + "## CoordProtocol\n",
+                "agent-intermediate-documents.md": _CORE_FRONTMATTER + "## IntermediateDocs\n",
+                "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER + "## CoordProtocol\n",
                 # memory-protocol with merged codex: + core: frontmatter
                 "memory-protocol.md": _MERGED_FRONTMATTER + "## Memory Protocol\n",
                 "agent-model-routing.md": _HOOK_DELIVER_FRONTMATTER + "## Routing\n",
@@ -454,16 +430,13 @@ def test_merged_frontmatter_codex_and_core_produces_hook_deliver(
     assert exit_code == 0, "Generator failed"
 
     manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-    memory_rule = next(
-        (r for r in manifest["rules"] if r["id"] == "swe/memory-protocol"), None
-    )
+    memory_rule = next((r for r in manifest["rules"] if r["id"] == "swe/memory-protocol"), None)
     assert memory_rule is not None, "swe/memory-protocol rule not found in manifest"
     assert memory_rule["core"] is False, (
         f"Expected core: false for memory-protocol, got {memory_rule['core']!r}"
     )
     assert memory_rule["install"] == "hook-deliver", (
-        f"Expected install: hook-deliver for memory-protocol, "
-        f"got {memory_rule['install']!r}"
+        f"Expected install: hook-deliver for memory-protocol, got {memory_rule['install']!r}"
     )
 
 
@@ -494,10 +467,8 @@ def test_hook_deliver_rule_missing_from_order_list_fails_generation(
             "swe": {
                 "adr-conventions.md": _CORE_FRONTMATTER + "## ADR\n",
                 "agent-behavioral-contract.md": _CORE_FRONTMATTER + "## Contract\n",
-                "agent-intermediate-documents.md": _CORE_FRONTMATTER
-                + "## IntermediateDocs\n",
-                "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER
-                + "## CoordProtocol\n",
+                "agent-intermediate-documents.md": _CORE_FRONTMATTER + "## IntermediateDocs\n",
+                "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER + "## CoordProtocol\n",
                 "memory-protocol.md": _HOOK_DELIVER_FRONTMATTER + "## Memory\n",
                 "agent-model-routing.md": _HOOK_DELIVER_FRONTMATTER + "## Routing\n",
                 "vcs": {
@@ -533,8 +504,7 @@ def test_no_categories_block_in_generated_manifest(
 
     text = manifest_path.read_text(encoding="utf-8")
     assert "categories:" not in text, (
-        "The dead `categories:` block must be removed from the manifest."
-        f" Manifest body:\n{text}"
+        f"The dead `categories:` block must be removed from the manifest. Manifest body:\n{text}"
     )
     # Sanity: confirm the parsed dict has no such key either.
     parsed = yaml.safe_load(text)

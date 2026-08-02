@@ -16,10 +16,9 @@ _SCRIPT_PATH = Path(__file__).resolve().parent / "validate_adr_references.py"
 
 
 def _load_module() -> Any:
-    spec = importlib.util.spec_from_file_location(
-        "validate_adr_references", _SCRIPT_PATH
-    )
-    assert spec is not None and spec.loader is not None
+    spec = importlib.util.spec_from_file_location("validate_adr_references", _SCRIPT_PATH)
+    assert spec is not None
+    assert spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
     sys.modules["validate_adr_references"] = mod
     spec.loader.exec_module(mod)
@@ -48,9 +47,7 @@ def _write_adr(decisions_dir: Path, name: str, affected_files: list[str]) -> Pat
     return p
 
 
-def _write_adr_inline(
-    decisions_dir: Path, name: str, affected_files: list[str]
-) -> Path:
+def _write_adr_inline(decisions_dir: Path, name: str, affected_files: list[str]) -> Path:
     """Write a minimal ADR with affected_files as inline list frontmatter."""
     inline = "[" + ", ".join(f'"{p}"' for p in affected_files) + "]"
     text = (
@@ -166,6 +163,4 @@ def test_accepts_adr_with_no_affected_files(tmp_path: Path) -> None:
         _mod.REPO_ROOT = orig_repo_root
         _mod.ADR_DIR = orig_adr_dir
 
-    assert rc == 0, (
-        f"validator must return 0 when there are no references to check; got {rc}"
-    )
+    assert rc == 0, f"validator must return 0 when there are no references to check; got {rc}"

@@ -10,7 +10,6 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-
 STATE_VERSION = 1
 CONFIG_DIR_NAME = ".codex"
 CONFIG_FILE_NAME = "config.toml"
@@ -42,9 +41,7 @@ def load_json(path: Path) -> dict:
 
 def dump_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def load_plugin_mcp_servers(repo_root: Path) -> dict[str, ServerConfig]:
@@ -157,9 +154,7 @@ def parse_table_sections(text: str) -> list[TableSection]:
         match = TABLE_HEADER_RE.match(line)
         if match is None:
             continue
-        sections.append(
-            TableSection(start_line=index, parts=split_toml_dotted_key(match.group(1)))
-        )
+        sections.append(TableSection(start_line=index, parts=split_toml_dotted_key(match.group(1))))
     return sections
 
 
@@ -177,15 +172,13 @@ def normalize_config_text(text: str) -> str:
     return stripped + "\n"
 
 
-def remove_server_blocks(
-    text: str, server_names: set[str]
-) -> tuple[str, dict[str, str | None]]:
+def remove_server_blocks(text: str, server_names: set[str]) -> tuple[str, dict[str, str | None]]:
     if not text:
-        return "", {name: None for name in server_names}
+        return "", dict.fromkeys(server_names)
 
     lines = text.splitlines(keepends=True)
     sections = parse_table_sections(text)
-    removed: dict[str, str | None] = {name: None for name in server_names}
+    removed: dict[str, str | None] = dict.fromkeys(server_names)
     keep_ranges: list[tuple[int, int]] = []
     cursor = 0
     index = 0
@@ -205,9 +198,7 @@ def remove_server_blocks(
             end_index += 1
 
         start_line = section.start_line
-        end_line = (
-            sections[end_index].start_line if end_index < len(sections) else len(lines)
-        )
+        end_line = sections[end_index].start_line if end_index < len(sections) else len(lines)
         keep_ranges.append((cursor, start_line))
         if removed[server_name] is None:
             removed[server_name] = "".join(lines[start_line:end_line]).rstrip() + "\n"
@@ -257,9 +248,7 @@ def ensure_valid_toml(text: str, path: Path) -> dict:
         return {}
     try:
         return tomllib.loads(text)
-    except (
-        tomllib.TOMLDecodeError
-    ) as exc:  # pragma: no cover - parse details vary by Python
+    except tomllib.TOMLDecodeError as exc:  # pragma: no cover - parse details vary by Python
         raise RuntimeError(f"Invalid Codex config TOML at {path}: {exc}") from exc
 
 
@@ -309,9 +298,7 @@ def install(repo_root: Path, project_root: Path) -> None:
     if state is None:
         state = {
             "version": STATE_VERSION,
-            "original_blocks": {
-                name: removed_blocks.get(name) for name in server_order
-            },
+            "original_blocks": {name: removed_blocks.get(name) for name in server_order},
             "project_root": project_root.as_posix(),
             "repo_root": repo_root.as_posix(),
         }
@@ -340,12 +327,10 @@ def uninstall(repo_root: Path, project_root: Path) -> None:
     ensure_valid_toml(current_text, config_path(project_root))
 
     original_blocks = state.get("original_blocks", {})
-    server_names = set(str(name) for name in original_blocks)
+    server_names = {str(name) for name in original_blocks}
     server_names.update(load_plugin_mcp_servers(repo_root))
     cleaned_text, _removed_blocks = remove_server_blocks(current_text, server_names)
-    restored_blocks = [
-        original_blocks[name] for name in original_blocks if original_blocks[name]
-    ]
+    restored_blocks = [original_blocks[name] for name in original_blocks if original_blocks[name]]
     write_config_text(project_root, append_server_blocks(cleaned_text, restored_blocks))
     unlink_state(project_root)
 
@@ -379,9 +364,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", required=True, type=Path)
     parser.add_argument("--project-root", required=True, type=Path)
-    parser.add_argument(
-        "--mode", choices={"install", "check", "uninstall"}, required=True
-    )
+    parser.add_argument("--mode", choices={"install", "check", "uninstall"}, required=True)
     args = parser.parse_args()
 
     repo_root = args.repo_root.resolve()

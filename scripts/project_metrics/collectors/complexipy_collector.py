@@ -61,13 +61,10 @@ __all__ = ["ComplexipyCollector"]
 _RESOLVE_TIMEOUT_SECONDS: float = 120.0
 _COLLECT_TIMEOUT_SECONDS: float = 60.0
 _FIRST_RUN_HINT: str = (
-    "project-metrics: resolving Tier 1 tools "
-    "(first-run uvx cache fill, may take up to 120s)"
+    "project-metrics: resolving Tier 1 tools (first-run uvx cache fill, may take up to 120s)"
 )
 _UVX_INSTALL_HINT: str = "install uv: https://docs.astral.sh/uv/"
-_UVX_NOT_FOUND_REASON: str = (
-    "uvx not found on PATH (complexipy requires uvx to resolve)"
-)
+_UVX_NOT_FOUND_REASON: str = "uvx not found on PATH (complexipy requires uvx to resolve)"
 _NOT_APPLICABLE_REASON: str = "No Python source files detected in repository"
 _COMPLEXIPY_LANGUAGES: frozenset[str] = frozenset({"python"})
 
@@ -89,9 +86,7 @@ class ComplexipyCollector(Collector):
         which makes ``subprocess.run`` operate in the current working directory.
         """
 
-        self._configured_repo_root: Path | None = (
-            Path(repo_root) if repo_root is not None else None
-        )
+        self._configured_repo_root: Path | None = Path(repo_root) if repo_root is not None else None
 
     # ------------------------------------------------------------------ resolve
 
@@ -136,9 +131,7 @@ class ComplexipyCollector(Collector):
             )
         except subprocess.CalledProcessError as exc:
             return Unavailable(
-                reason=(
-                    f"uvx complexipy --version exited with status {exc.returncode}"
-                ),
+                reason=(f"uvx complexipy --version exited with status {exc.returncode}"),
                 install_hint=_UVX_INSTALL_HINT,
             )
 
@@ -227,9 +220,7 @@ class ComplexipyCollector(Collector):
                 return CollectorResult(
                     status="error",
                     data={},
-                    issues=[
-                        f"failed to read complexipy results file {results_file}: {exc!r}"
-                    ],
+                    issues=[f"failed to read complexipy results file {results_file}: {exc!r}"],
                 )
 
             return _parse_complexipy_json(results_text)
@@ -306,8 +297,7 @@ def _parse_complexipy_json(json_text: str) -> CollectorResult:
             status="error",
             data={},
             issues=[
-                "complexipy JSON root is not a list of records; got "
-                f"{type(records).__name__}."
+                f"complexipy JSON root is not a list of records; got {type(records).__name__}."
             ],
         )
 
@@ -372,8 +362,7 @@ def _parse_record(record: Any) -> tuple[str, int] | _RecordError:
 
     if not isinstance(record, dict):
         return _RecordError(
-            "Skipped malformed complexipy record: expected object, got "
-            f"{type(record).__name__}."
+            f"Skipped malformed complexipy record: expected object, got {type(record).__name__}."
         )
 
     # Path: prefer ``path`` (modern) then ``file`` (legacy) then

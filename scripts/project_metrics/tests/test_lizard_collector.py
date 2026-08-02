@@ -347,8 +347,7 @@ class TestLizardResolveTimeout:
             result = collector.resolve(_make_env())
 
         assert isinstance(result, Unavailable), (
-            f"Expected Unavailable when first-run cache fill times out; got "
-            f"{type(result).__name__}"
+            f"Expected Unavailable when first-run cache fill times out; got {type(result).__name__}"
         )
         # Reason should hint at the timeout condition so the MD renderer can
         # disambiguate "not installed" vs "timed out during first-run fetch".
@@ -384,8 +383,7 @@ class TestLizardResolveTimeout:
         # all satisfy the contract.
         captured = capsys.readouterr().err.lower()
         assert any(
-            phrase in captured
-            for phrase in ("first-run", "first-time", "cache fill", "cache-fill")
+            phrase in captured for phrase in ("first-run", "first-time", "cache fill", "cache-fill")
         ), (
             "Expected a user-visible first-run hint on stderr during resolve(); "
             f"captured stderr was: {captured!r}"
@@ -449,8 +447,7 @@ class TestLizardCollectSuccess:
             k: v for k, v in data.items() if isinstance(v, dict) and "max_ccn" in v
         }
         assert files_block, (
-            f"Expected per-file rollup block in collector data; keys were "
-            f"{list(data.keys())}"
+            f"Expected per-file rollup block in collector data; keys were {list(data.keys())}"
         )
 
         # All three well-formed files must show up.
@@ -707,9 +704,7 @@ class TestLizardSkipMarker:
 class TestLizardCollectTimeout:
     """A TimeoutExpired during collect() downgrades cleanly, never raises uncaught."""
 
-    def test_collect_downgrades_on_timeout_rather_than_raising(
-        self, tmp_path: Path
-    ) -> None:
+    def test_collect_downgrades_on_timeout_rather_than_raising(self, tmp_path: Path) -> None:
         from scripts.project_metrics.collectors.lizard_collector import (
             LizardCollector,
         )
@@ -718,9 +713,7 @@ class TestLizardCollectTimeout:
         target = "scripts.project_metrics.collectors.lizard_collector"
         with patch(
             f"{target}.subprocess.run",
-            side_effect=subprocess.TimeoutExpired(
-                cmd=["uvx", "lizard", "--xml"], timeout=120
-            ),
+            side_effect=subprocess.TimeoutExpired(cmd=["uvx", "lizard", "--xml"], timeout=120),
         ):
             # Per the collector-protocol ADR: collect() must downgrade
             # analysis-level errors to status='error'/'timeout' rather than
@@ -752,9 +745,7 @@ def test_subprocess_run_is_called_with_xml_flag(tmp_path: Path) -> None:
 
     collector = LizardCollector()
     target = "scripts.project_metrics.collectors.lizard_collector"
-    mock_run = MagicMock(
-        return_value=_make_completed_process(stdout=_SAMPLE_LIZARD_XML)
-    )
+    mock_run = MagicMock(return_value=_make_completed_process(stdout=_SAMPLE_LIZARD_XML))
     with patch(f"{target}.subprocess.run", mock_run):
         collector.collect(_make_context(tmp_path))
 
@@ -829,6 +820,7 @@ class TestLizardPathFilterIntegration:
 
     def test_collect_invokes_lizard_with_exclude_flags(self) -> None:
         from unittest.mock import patch
+
         from scripts.project_metrics.collectors.lizard_collector import LizardCollector
 
         ctx = SimpleNamespace(repo_root="/tmp/fake", window_days=90, git_sha="x" * 40)

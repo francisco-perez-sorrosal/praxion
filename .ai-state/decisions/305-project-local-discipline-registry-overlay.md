@@ -73,6 +73,33 @@ the two name sets, row-shape validity of overlay rows (reusing the existing shap
 extension of the always-loaded-surface scan to the union of names. Both files are parsed by the one
 existing table parser, so "a valid row" cannot drift between them.
 
+> **Correction — 2026-07-31. The paragraph immediately above is factually wrong in two ways.**
+> Recorded in place because leaving a false mechanism claim unmarked inside an `accepted`
+> decision misleads every future reader at exactly the moment they are deciding how to build it.
+>
+> 1. **"Both files are parsed by the one existing table parser"** holds for the *fitness-test
+>    enforcement* layer only. **Neither runtime read is mechanical** — the convener before spawn
+>    and the consultant after spawn both resolve a `Discipline:` value by LLM interpretation of
+>    the markdown table. The only Python parser (`parse_registry_table_rows`) lives in the
+>    fitness suite and is never invoked by any resolution path. So union-and-collision semantics
+>    cannot be enforced by a shared parser at runtime; they would ship as prose at multiple
+>    sites, which is itself the "a convention lives at two+ textual sites" anti-pattern in
+>    `rules/swe/gate-liveness.md`.
+> 2. **"Enforcement is three additive fitness assertions"** describes assertions that **never
+>    reach a managed project.** `/onboard-project`'s AaC scaffold installs only a starter and a
+>    meta-citation test; it does not ship the registry-invariants suite. The overlay would
+>    therefore deliver *resolution* with zero *validation* to the deployment it exists to serve
+>    — a consumer with no producer, inside this ADR's own enforcement design.
+>
+> **The decision itself is unaffected and still stands**: an optional project-owned overlay,
+> resolved as the *union* of the two tables, with a key present in both a hard `[BLOCKED]` error
+> rather than a precedence rule, and absence silent and free. Options A–F were re-read against
+> these facts and none of their rejections weakens.
+>
+> **Implementation is deferred**, together with the fitness-rooting fix and the originating
+> extensibility gap, by `dec-311` — which also states the three conditions a future supersession
+> must supply. Do not build from this paragraph.
+
 ## Considered Options
 
 ### Option A — Overlay overrides the shipped row of the same name (rejected)

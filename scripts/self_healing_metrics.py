@@ -60,6 +60,10 @@ FIX_BRANCH_PREFIXES = ("ci-autofix/", "issue-autofix/")
 
 RUN_JSON_FIELDS = "databaseId,status,conclusion,event,headBranch,createdAt,updatedAt,displayTitle"
 PR_JSON_FIELDS = "number,headRefName,state,createdAt,updatedAt,mergedAt,closedAt,labels"
+# Issues carry the decline record for the default-branch surface, which has no
+# PR to label. Narrower than PR_JSON_FIELDS -- there is no head branch or merge
+# state to read.
+ISSUE_JSON_FIELDS = "number,title,state,createdAt,updatedAt,closedAt,labels"
 
 
 # --------------------------------------------------------------------------- #
@@ -118,6 +122,28 @@ def fetch_raw(errors: list[str], *, limit: int = 200) -> dict[str, Any]:
         ],
         errors,
     )
+    # The default-branch autofix surface has no PR to label -- it reacts to a
+    # workflow_run failure -- so it records a decline as a labelled ISSUE.
+    # Counting only `declined_prs` would leave that surface's declines
+    # invisible, and would understate declines exactly as the surface's
+    # `continue-on-error` (added alongside this query) removes them from
+    # `autofix_failures`. The two changes have to land together or the
+    # failure-rate series silently improves while the fixer degrades.
+    declined_issues = _run_gh(
+        [
+            "issue",
+            "list",
+            "--label",
+            DECLINED_LABEL,
+            "--state",
+            "all",
+            "--limit",
+            str(limit),
+            "--json",
+            ISSUE_JSON_FIELDS,
+        ],
+        errors,
+    )
     all_prs = _run_gh(
         ["pr", "list", "--state", "all", "--limit", str(limit), "--json", PR_JSON_FIELDS],
         errors,
@@ -127,6 +153,7 @@ def fetch_raw(errors: list[str], *, limit: int = 200) -> dict[str, Any]:
         "gate_runs": _runs_for(GATE_WORKFLOW, errors, limit),
         "issue_autofix_runs": _runs_for(ISSUE_AUTOFIX_WORKFLOW, errors, limit),
         "declined_prs": declined if isinstance(declined, list) else [],
+        "declined_issues": declined_issues if isinstance(declined_issues, list) else [],
         "all_prs": all_prs if isinstance(all_prs, list) else [],
     }
 
@@ -207,6 +234,9 @@ def compute_metrics(raw: dict[str, Any], *, window_days: int, now: datetime) -> 
     gate_runs = [r for r in raw["gate_runs"] if _in_window(r.get("createdAt"), since)]
     issue_runs = [r for r in raw["issue_autofix_runs"] if _in_window(r.get("createdAt"), since)]
     declined = [p for p in raw["declined_prs"] if _in_window(p.get("createdAt"), since)]
+    declined_issues = [
+        i for i in raw.get("declined_issues", []) if _in_window(i.get("createdAt"), since)
+    ]
     fix_prs = _fix_prs(raw["all_prs"], since)
 
     autofix_attempts = _attempts(autofix_runs)
@@ -257,7 +287,14 @@ def compute_metrics(raw: dict[str, Any], *, window_days: int, now: datetime) -> 
             "issue_autofix_runs_total": len(issue_runs),
             "issue_autofix_attempts": len(issue_attempts),
             "issue_autofix_runs_by_conclusion": _tally_conclusions(issue_runs),
-            "declines_total": len(declined),
+            # Split by surface, then summed. The PR-labelled series is the
+            # PR/dependabot surfaces; the issue-labelled series is the
+            # default-branch surface, whose fixer crash now exits green and
+            # so no longer lands in `autofix_failures`. Reading the total
+            # alone would hide a shift between the two.
+            "declines_prs": len(declined),
+            "declines_issues": len(declined_issues),
+            "declines_total": len(declined) + len(declined_issues),
             "fix_prs_opened": fix_prs_opened,
             "fix_prs_merged": fix_prs_merged,
             "fix_success_rate": fix_success_rate,
@@ -350,6 +387,8 @@ def render_md(metrics: dict, provenance: dict) -> str:
         f"| CI autofix runs (total, incl. skips) | {_fmt(fs['autofix_runs_total'])} |",
         f"| Issue autofix attempts (non-skipped) | {_fmt(fs['issue_autofix_attempts'])} |",
         f"| Declines (`autofix:declined`) | {_fmt(fs['declines_total'])} |",
+        f"| — on PRs (PR + dependabot surfaces) | {_fmt(fs['declines_prs'])} |",
+        f"| — as issues (default-branch surface) | {_fmt(fs['declines_issues'])} |",
         f"| Fix PRs opened (new-branch) | {_fmt(fs['fix_prs_opened'])} |",
         f"| Fix PRs merged (new-branch) | {_fmt(fs['fix_prs_merged'])} |",
         f"| Fix success rate (new-branch) | {_fmt(fs['fix_success_rate'])} |",

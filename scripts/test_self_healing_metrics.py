@@ -227,6 +227,57 @@ def test_declines_counted_within_window():
     assert m["fix_success"]["declines_total"] == 1
 
 
+def test_default_branch_decline_issues_are_counted():
+    """A decline recorded as a labelled ISSUE counts toward declines.
+
+    The default-branch autofix surface has no PR to label, so it records a
+    decline as an issue. That surface's fixer crash now exits green via
+    `continue-on-error`, which removes it from `autofix_failures` — if the
+    issue were not counted here, a degrading fixer would look like an
+    improving one. The in-window PR decline is the control: it proves the
+    totals are summed across both surfaces rather than one replacing the
+    other, and the out-of-window issue proves the window filter still applies.
+    """
+    raw = {
+        "autofix_runs": [],
+        "gate_runs": [],
+        "issue_autofix_runs": [],
+        "declined_prs": [_pr("dependabot/x", "2026-07-26T00:00:00Z")],
+        "declined_issues": [
+            {
+                "number": 1,
+                "title": "CI autofix declined: run 111",
+                "createdAt": "2026-07-26T00:00:00Z",
+            },
+            {
+                "number": 2,
+                "title": "CI autofix declined: run 222",
+                "createdAt": "2026-01-01T00:00:00Z",
+            },
+        ],
+        "all_prs": [],
+    }
+    fs = shm.compute_metrics(raw, window_days=90, now=NOW)["fix_success"]
+    assert fs["declines_prs"] == 1, "the PR-surface control must still be counted"
+    assert fs["declines_issues"] == 1, "the out-of-window decline issue must be filtered"
+    assert fs["declines_total"] == 2, "totals must sum both surfaces, not replace one"
+
+
+def test_declines_absent_issue_key_degrades_to_zero():
+    """A payload predating the issue query counts zero issue declines rather
+    than raising — an older snapshot must stay readable."""
+    raw = {
+        "autofix_runs": [],
+        "gate_runs": [],
+        "issue_autofix_runs": [],
+        "declined_prs": [_pr("dependabot/x", "2026-07-26T00:00:00Z")],
+        "all_prs": [],
+    }
+    fs = shm.compute_metrics(raw, window_days=90, now=NOW)["fix_success"]
+    assert fs["declines_issues"] == 0
+    assert fs["declines_total"] == 1
+
+
 def test_time_to_green_median_from_merged_fix_prs():
     raw = {
         "autofix_runs": [],

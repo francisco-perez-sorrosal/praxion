@@ -243,7 +243,20 @@ jobs:
           echo "[ci-autofix] wrote $(wc -l < tmp/ci-failure.log) sanitized log lines"
 
       - name: Diagnose failure and open a fix PR
+        id: fixer
         if: steps.dedup.outputs.open_autofix == '0'
+        # continue-on-error: an agent crash (turn-budget exhaustion is the
+        # observed case) must not fail this job. The underlying CI failure is
+        # already red and is the real signal; a second red on top says
+        # "autofix is broken" when the truth is "autofix could not finish",
+        # and it trains readers to ignore the colour. The finalize step below
+        # converts the crash into an idempotent, COUNTABLE decline instead.
+        #
+        # `steps.fixer.outcome` still records the real pre-continue-on-error
+        # result ('failure' on a crash), which finalize reads. This mirrors the
+        # dependabot fixer's already-audited handling of the same terminal
+        # state -- the asymmetry between the two surfaces was accidental.
+        continue-on-error: true
         # SHA-pinned: this job holds contents:write + pull-requests:write +
         # id-token:write. A mutable tag here would let a compromised tag push
         # run arbitrary code with those grants. Matches the SHA discipline
@@ -294,6 +307,68 @@ jobs:
             --model ${{ steps.policy.outputs.fixer_model }}
             --max-turns 60
             --allowedTools "Read,Glob,Grep,Edit,Write,Bash(git checkout:*),Bash(git add:*),Bash(git commit:*),Bash(git branch:*),Bash(git status:*),Bash(git diff:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(find:*),Bash(git log:*),Bash(git show:*),Bash(gh pr create:*),Bash(gh pr list:*),Bash(gh issue create:*),Bash(gh run view:*)"
+
+      - name: Finalize terminal state (decline if the fixer crashed)
+        # Converts a fixer crash into an idempotent, COUNTABLE decline: an
+        # issue carrying `autofix:declined`, then a clean `exit 0`.
+        # `always()` is required because `continue-on-error` leaves this step's
+        # own default `success()` condition unmet on the crash path.
+        #
+        # WHY THE TRIGGER IS NARROWER THAN THE DEPENDABOT SIBLING'S. That
+        # surface also declines on an ambiguous clean exit, because it can read
+        # HEAD movement to tell "produced a fix" from "did nothing". This
+        # surface cannot: a clean exit legitimately means an opened PR, an
+        # opened flake issue, or a considered no-op, and they are not cheaply
+        # distinguishable after the fact. Declining on all three would
+        # manufacture declines out of correct behaviour, so only an ABNORMAL
+        # exit (`outcome == 'failure'`) is treated as a decline here. A clean
+        # exit that quietly did nothing is a separate gap, deliberately not
+        # papered over with a guess.
+        #
+        # The issue is the durable record because this surface has no PR to
+        # label -- it reacts to a default-branch CI failure. `autofix:declined`
+        # is the same label the dependabot surface applies to its PRs and is
+        # reconciled from `.github/labels.yml`, so one query counts both.
+        id: finalize
+        if: always() && steps.dedup.outputs.open_autofix == '0' && steps.fixer.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          set -euo pipefail
+          title="CI autofix declined: run ${RUN_ID}"
+
+          # If the agent opened a fix PR before crashing, the fix exists and
+          # this is not a decline.
+          if ! pr=$(gh pr list --state open --json number,headRefName \
+              --jq '[.[] | select(.headRefName | startswith("ci-autofix/"))][0].number' 2>/dev/null); then
+            echo "::warning::Could not list PRs (gh error); failing closed — skipping finalize."
+            exit 0
+          fi
+          if [ -n "${pr}" ]; then
+            echo "[ci-autofix] PR #${pr} was opened before the crash — not a decline"
+            exit 0
+          fi
+
+          # Idempotency: one decline issue per failed run, keyed on the run id
+          # in the title. Fail CLOSED on a gh error rather than risk a
+          # duplicate issue on a run whose state we cannot verify.
+          if ! existing=$(gh issue list --state all --label "autofix:declined" \
+              --search "${title} in:title" --json title \
+              --jq "[.[] | select(.title == \"${title}\")] | length" 2>/dev/null); then
+            echo "::warning::Could not search issues (gh error); failing closed — skipping finalize."
+            exit 0
+          fi
+          if [ "${existing}" != "0" ]; then
+            echo "[ci-autofix] a decline issue already exists for run ${RUN_ID} — idempotent no-op"
+            exit 0
+          fi
+
+          gh issue create --title "${title}" --label "autofix:declined" \
+            --body "$(printf 'CI Autofix declined.\n\nThe fixer agent exited abnormally (turn-budget exhaustion is the common cause) while diagnosing a failure on the default branch, and produced no pull request. Declining further automated attempts for this run; a human should take over.\n\nFailed run: %s\n\nThis issue is the durable, countable record of the decline — the autofix job itself exits green so it does not mask the underlying CI failure, which is the real signal.' "${RUN_URL}")" \
+            || echo "::warning::Could not create the decline issue — does the autofix:declined label exist? (reconciled from .github/labels.yml)"
+          exit 0
 
       - name: Flag sensitive-path changes for review
         # Tripwire: autofix is allowed to change CI/automation surfaces

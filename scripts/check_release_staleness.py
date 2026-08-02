@@ -20,6 +20,21 @@ Artifact sources (mirroring `.claude-plugin/plugin.json`):
   - skills:   `skills/<name>/SKILL.md`
   - commands: `commands/<name>.md` (excluding README.md)
 
+## Named consumer
+
+This advisory is correct and deliberately non-blocking (see the rationale above) --
+but a correct-and-advisory gate is only useful if something reads its output before
+a human claim is made that the gate could contradict. The named reader is the
+release cut (`commands/release.md`): before that process declares a release
+complete, it runs this check for the tag being cut and records the verdict.
+
+Nothing else is a substitute for that read. The failure mode this exists to catch:
+a committed document asserting an artifact "MERGED ... NOT YET RELEASED" for an
+artifact this check would report as *present* at the named tag -- i.e. the
+document's claim is stale and this check's own output already contradicts it.
+That is not hypothetical; it is the exact defect this diagnostic was written to
+surface, once, before a named reader existed to keep it from recurring.
+
 Invocation:
 
     check_release_staleness.py                 # compare HEAD vs latest v* tag
@@ -220,6 +235,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description=(
             "Advisory: list plugin artifacts added since the last release tag, "
             "invisible to marketplace installs until a release is cut."
+        ),
+        epilog=(
+            "Named consumer: commands/release.md runs this check for the tag "
+            "being cut and records its verdict before declaring a release "
+            "complete -- see the module docstring's '## Named consumer' section."
         ),
     )
     parser.add_argument(

@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-02T17:18:00Z'
+generated_at: '2026-08-02T17:25:28Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -530,7 +530,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-08-01'
+  last_modified: '2026-08-02'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -2456,7 +2456,7 @@ surfaces:
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-07-31'
+  last_modified: '2026-08-02'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md

@@ -1,3 +1,9 @@
+## v0.21.1 (2026-08-02)
+
+### Fix
+
+- **onboard**: top up a stale pre-commit hook body on re-run
+
 ## v0.21.0 (2026-08-02)
 
 ### Feat

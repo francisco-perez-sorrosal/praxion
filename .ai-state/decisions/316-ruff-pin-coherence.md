@@ -1,7 +1,7 @@
 ---
-id: dec-draft-da7971e3
+id: dec-316
 title: The formatter version is one decision, enforced, not two conventions
-status: proposed
+status: accepted
 category: architectural
 date: 2026-08-02
 summary: Praxion and its managed projects pin ruff exactly in both pyproject and pre-commit, coupled by a blocking drift gate, because an unpinned local side makes the hook fight a different version on every machine.

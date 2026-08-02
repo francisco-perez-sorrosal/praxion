@@ -474,6 +474,12 @@ def test_existing_autofix_job_is_unchanged_by_the_new_surface_jobs() -> None:
         autofix_job.get("permissions", {}).get("contents") == "write"
     ), "The `autofix` job's `contents: write` grant must remain unchanged"
     step_names = [step.get("name") for step in autofix_job.get("steps") or []]
+    # The finalize/decline step was added later and deliberately, by a separate
+    # decision from the surface-addition work this guard was written for: the
+    # agent step now carries `continue-on-error`, so a turn-budget crash no
+    # longer fails the job, and finalize converts that crash into a countable
+    # decline. The guard's purpose is unchanged — it still pins the sequence so
+    # a future surface addition cannot silently perturb this job.
     assert step_names == [
         "Checkout caller repo's default branch",
         "Set up uv (manages Python 3.13)",
@@ -482,6 +488,7 @@ def test_existing_autofix_job_is_unchanged_by_the_new_surface_jobs() -> None:
         "Skip if an autofix PR is already open",
         "Fetch failure logs (non-agent, untrusted output)",
         "Diagnose failure and open a fix PR",
+        "Finalize terminal state (decline if the fixer crashed)",
         "Flag sensitive-path changes for review",
     ], "The `autofix` job's step sequence must remain byte-identical"
 
@@ -1022,22 +1029,38 @@ def test_finalize_step_fails_closed_on_a_gh_label_read_error() -> None:
     )
 
 
-def test_finalize_step_is_scoped_to_autofix_same_repo_pr_only() -> None:
-    """Bug A's finalize/decline step must never appear in the pre-existing
-    `autofix` (main-branch) job or the `autofix-fork` (suggest-only) job —
-    those surfaces are byte-unchanged by this fix. Expected GREEN on first
-    run (the finalize step does not exist anywhere in the file yet); stays
-    GREEN once Bug A lands, since the step is scoped to
-    `autofix-same-repo-pr` only — a preventive regression guard, not a
-    TDD-red assertion.
+def test_finalize_step_is_scoped_to_the_fixing_surfaces() -> None:
+    """The finalize/decline step belongs only to surfaces that actually
+    attempt a fix, and must never appear on `autofix-fork`.
+
+    Originally this guard excluded the main-branch `autofix` job too, because
+    the change it was written for deliberately left that job untouched. That
+    scope has since been widened by a separate, deliberate decision: the
+    `autofix` job's agent step gained `continue-on-error`, so a turn-budget
+    crash no longer fails the job, and it needs the same finalize step to
+    convert that crash into a countable decline. Without one, the crash would
+    vanish from both the run-conclusion failure count and the decline count —
+    a fixer degrading while every metric improved.
+
+    `autofix-fork` stays excluded on a structural ground, not a scoping one:
+    it holds `contents: read`, cannot push, and is suggest-only. It produces
+    no fix, so it has no terminal fix state to decline, and a decline record
+    there would count an event that never had a chance to occur.
     """
     parsed = _parsed()
-    assert (
-        _finalize_step(_job(parsed, "autofix")) is None
-    ), "The `autofix` job must never gain the finalize/decline step — it is byte-unchanged by Bug A"
-    assert _finalize_step(_job(parsed, "autofix-fork")) is None, (
-        "The `autofix-fork` job must never gain the finalize/decline step — "
-        "it is byte-unchanged by Bug A"
+    for job_name in ("autofix", "autofix-same-repo-pr"):
+        assert _finalize_step(_job(parsed, job_name)) is not None, (
+            f"The `{job_name}` job must carry the finalize/decline step — its agent runs under "
+            "continue-on-error, so without finalize a crash is silently uncounted"
+        )
+    fork = _job(parsed, "autofix-fork")
+    assert _finalize_step(fork) is None, (
+        "The `autofix-fork` job must never gain the finalize/decline step — it is suggest-only "
+        "(contents: read) and produces no fix, so it has no terminal fix state to decline"
+    )
+    assert (fork.get("permissions") or {}).get("contents") == "read", (
+        "The `autofix-fork` exclusion above rests on the job being suggest-only; if it ever "
+        "gains write access that reasoning no longer holds and the exclusion must be revisited"
     )
 
 

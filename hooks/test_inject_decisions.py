@@ -198,3 +198,137 @@ class TestOutputBuilder:
         out = decisions._build_adr_output(rows, budget=decisions.ADR_SOFT_CAP)
         assert len(out) <= decisions.ADR_SOFT_CAP
         assert "more decisions" in out
+
+
+def _row(id_: str, title: str, date: str, tags: str) -> dict:
+    """Build an index row dict for ranking tests."""
+    return {
+        "id": id_,
+        "title": title,
+        "status": "accepted",
+        "category": "architectural",
+        "date": date,
+        "tags": tags,
+        "summary": "s",
+    }
+
+
+class TestSessionTokens:
+    """Topical tokens derived from the session's git context."""
+
+    def test_tokenizes_path_dropping_extensions_and_noise(self) -> None:
+        tokens = decisions._tokenize("scripts/finalize_adrs.py")
+        assert "finalize" in tokens
+        assert "adrs" in tokens
+        assert "py" not in tokens
+
+    def test_drops_short_and_numeric_fragments(self) -> None:
+        assert decisions._tokenize("a/bc/123/observability") == {"observability"}
+
+    def test_domain_directories_survive_as_topical_signal(self) -> None:
+        """`skills` is a real ADR tag, so editing under skills/ is evidence."""
+        assert "skills" in decisions._tokenize("skills/refactoring/SKILL.md")
+
+    def test_no_git_repo_yields_no_tokens(self, tmp_path: Path) -> None:
+        assert decisions._session_tokens(tmp_path) == {}
+
+
+class TestTermMatching:
+    """Containment matching stands in for a stemmer."""
+
+    def test_plural_path_token_matches_singular_tag(self) -> None:
+        assert decisions._terms_match("adrs", "adr")
+
+    def test_token_matches_compound_tag(self) -> None:
+        assert decisions._terms_match("finalize", "adr-finalize")
+
+    def test_three_char_token_does_not_match_by_containment(self) -> None:
+        """Three-char tags are real (adr, api, mcp); containment stays >=4 so
+        `adr` cannot match `quadrant`."""
+        assert not decisions._terms_match("api", "rapid")
+        assert not decisions._terms_match("adr", "quadrant")
+
+    def test_short_stem_is_not_depluralized(self) -> None:
+        """`css` must not collapse to `cs` and start matching unrelated terms."""
+        assert decisions._singular("css") == "css"
+        assert decisions._singular("rules") == "rule"
+
+
+class TestRelevanceRanking:
+    """Relevance outranks recency; absent signal preserves recency exactly."""
+
+    def test_relevant_older_decision_outranks_irrelevant_newer_one(self) -> None:
+        rows = [
+            _row("dec-001", "ADR finalize scope", "2026-01-01", "adr, finalize"),
+            _row("dec-050", "Dashboard charting", "2026-06-01", "dashboard, charts"),
+        ]
+        out = decisions._build_adr_output(
+            rows, budget=decisions.ADR_SOFT_CAP, tokens={"finalize": 3, "adrs": 3}
+        )
+        assert out.index("dec-001") < out.index("dec-050")
+
+    def test_without_tokens_ranking_is_pure_recency(self) -> None:
+        """No session signal must reproduce the previous behavior exactly."""
+        rows = [
+            _row("dec-001", "ADR finalize scope", "2026-01-01", "adr, finalize"),
+            _row("dec-050", "Dashboard charting", "2026-06-01", "dashboard, charts"),
+        ]
+        out = decisions._build_adr_output(rows, budget=decisions.ADR_SOFT_CAP, tokens={})
+        assert out.index("dec-050") < out.index("dec-001")
+
+    def test_recency_breaks_ties_among_equally_relevant_rows(self) -> None:
+        rows = [
+            _row("dec-001", "ADR scope", "2026-01-01", "adr"),
+            _row("dec-050", "ADR index", "2026-06-01", "adr"),
+        ]
+        out = decisions._build_adr_output(rows, budget=decisions.ADR_SOFT_CAP, tokens={"adr": 3})
+        assert out.index("dec-050") < out.index("dec-001")
+
+    def test_relevance_counts_distinct_tokens_not_repeats(self) -> None:
+        """Breadth of overlap, weighted -- one repeated term cannot dominate."""
+        row = _row("dec-001", "adr adr adr adr", "2026-01-01", "adr, adr, adr")
+        assert decisions._relevance(row, {"adr": 3}) == 3
+
+
+class TestSignalWeighting:
+    """Signal proximity decides, so mechanical history cannot outvote the task."""
+
+    def test_worktree_outweighs_history(self) -> None:
+        current = _row("dec-001", "Decision injection ranking", "2026-01-01", "hooks, inject")
+        adjacent = _row("dec-050", "Onboarding plugin manifest", "2026-06-01", "onboard, plugin")
+        tokens = {
+            "inject": decisions._WEIGHT_WORKTREE,
+            "onboard": decisions._WEIGHT_HISTORY,
+            "plugin": decisions._WEIGHT_HISTORY,
+        }
+        out = decisions._build_adr_output(
+            [current, adjacent], budget=decisions.ADR_SOFT_CAP, tokens=tokens
+        )
+        assert out.index("dec-001") < out.index("dec-050")
+
+    def test_mechanical_commit_is_excluded_from_history(self, tmp_path: Path) -> None:
+        """A release bump touches most of the repo; its tokens describe nothing.
+
+        Regression guard for the observed failure: a version-bump commit
+        flooded the token set and surfaced onboarding decisions during
+        ADR-finalize work.
+        """
+        subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+        subprocess.run(["git", "config", "user.email", "t@t.t"], cwd=tmp_path, check=True)
+        subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+        for i in range(decisions._MAX_COMMIT_FILES + 5):
+            (tmp_path / f"mechanical{i}.py").write_text("x", encoding="utf-8")
+        subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True)
+        subprocess.run(["git", "commit", "-qm", "bump"], cwd=tmp_path, check=True)
+
+        assert decisions._recent_commit_paths(tmp_path) == []
+
+    def test_focused_commit_is_kept(self, tmp_path: Path) -> None:
+        subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+        subprocess.run(["git", "config", "user.email", "t@t.t"], cwd=tmp_path, check=True)
+        subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+        (tmp_path / "observability.py").write_text("x", encoding="utf-8")
+        subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True)
+        subprocess.run(["git", "commit", "-qm", "feat"], cwd=tmp_path, check=True)
+
+        assert decisions._recent_commit_paths(tmp_path) == [["observability.py"]]

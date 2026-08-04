@@ -75,6 +75,17 @@ _INVENTORY_ROW = re.compile(r"^\|\s*`([^`]+)`[^|]*\|\s*([a-z-]+)\s*\|")
 # Below this, the table format has changed and the parse is not trustworthy.
 _MIN_INVENTORY_ROWS = 8
 
+# A decision at a terminal status no longer constrains work, so its references
+# are history rather than a live index and their decay is expected, not
+# actionable. Skipping these is the exclusion DH01 already specifies ("no
+# supersedes/superseded_by link between them") -- the supersession protocol
+# flips status at the same moment it writes the field, so status subsumes the
+# link check. `retired` is listed ahead of the status existing: it is the
+# terminal state B2 introduces, and omitting it would make every retired
+# decision start emitting decay findings the day it lands.
+_TERMINAL_STATUSES = frozenset({"superseded", "rejected", "retired"})
+_STATUS = re.compile(r"^status:\s*(\S+)", re.MULTILINE)
+
 _GIT_TIMEOUT = 30
 
 
@@ -252,11 +263,17 @@ def classify(repo_root: Path) -> dict:
         title = (re.search(r"^title:\s*(.+)$", text, re.MULTILINE) or [None, ""])[1]
         summary = (re.search(r"^summary:\s*(.+)$", text, re.MULTILINE) or [None, ""])[1]
         if _REMOVAL_INTENT.search(f"{title} {summary}"):
-            removers.append((adr.name, date, set(parse_affected_files(text))))
+            paths = set(parse_affected_files(text))
+            gone = {p for p in paths if not (repo_root / p).exists()}
+            removers.append((adr.name, date, paths, gone))
 
-    findings, scanned = [], 0
+    findings, scanned, skipped_terminal = [], 0, []
     for adr in adrs:
         text = adr.read_text(encoding="utf-8")
+        status = (_STATUS.search(text) or [None, ""])[1].strip().strip("\"'")
+        if status in _TERMINAL_STATUSES:
+            skipped_terminal.append(adr.name)
+            continue
         for ref in parse_affected_files(text):
             scanned += 1
             if (repo_root / ref).exists():
@@ -279,6 +296,7 @@ def classify(repo_root: Path) -> dict:
         "adrs": len(adrs),
         "findings": findings,
         "withheld": withheld,
+        "skipped_terminal": skipped_terminal,
         "summary": _summarize(findings),
     }
 
@@ -299,7 +317,7 @@ def _classify_one(adr_name, ref, deletions, renames, lazy_shapes, removers, have
 
     deleted_on = _deletion_date(ref, deletions)
     if deleted_on:
-        owners = [(n, d) for n, d, paths in removers if _covers(paths, ref)]
+        owners = [(n, d) for n, d, paths, gone in removers if _covers(paths, gone, ref)]
         if any(n == adr_name for n, _ in owners):
             return "removed-by-self", "none", f"this decision removed it ({deleted_on})"
         if owners:
@@ -323,13 +341,27 @@ def _classify_one(adr_name, ref, deletions, renames, lazy_shapes, removers, have
     return "vanished", "retire-candidate", "absent, with no deletion recorded"
 
 
-def _covers(paths: set[str], ref: str) -> bool:
+def _covers(paths: set[str], gone: set[str], ref: str) -> bool:
     """Does a removal-intent decision's `affected_files` account for `ref`?
 
-    A decision that removed a directory may cite the directory itself, the
-    files inside it, or both -- all three are the same claim of ownership.
+    Containment runs both ways and both directions occur. A decision may cite
+    the directory it deleted, or the files inside it, or both -- all the same
+    claim of ownership. Matching only downward loses the commoner shape, since
+    a removal ADR names the directory it deleted: the memory-subsystem removal
+    cites `memory-mcp/` and never `memory-mcp/pyproject.toml`, so ownership of
+    that file fell instead to a decision that merely listed it and happened to
+    carry a removal verb in its title.
+
+    The upward direction is bounded to *`gone`* -- cited paths that no longer
+    resolve. An ancestor that still exists was not removed, so its citer cannot
+    own a later deletion beneath it; without the bound, the decision that
+    *created* `dashboard_app/` would claim every file ever deleted from it.
     """
-    return ref in paths or any(p.startswith(_as_prefix(ref)) for p in paths)
+    return (
+        ref in paths
+        or any(p.startswith(_as_prefix(ref)) for p in paths)
+        or any(ref.startswith(_as_prefix(p)) for p in gone)
+    )
 
 
 def _date_distance(a: str, b: str) -> int:
@@ -373,7 +405,13 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(report, indent=2))
         return 0
 
-    print(f"scanned {report['scanned_references']} references across {report['adrs']} ADRs")
+    scanned_adrs = report["adrs"] - len(report["skipped_terminal"])
+    print(f"scanned {report['scanned_references']} references across {scanned_adrs} ADRs")
+    if report["skipped_terminal"]:
+        print(
+            f"  skipped {len(report['skipped_terminal'])} at a terminal status "
+            f"(decay on a decision that no longer constrains work is expected)"
+        )
     for reason in report["withheld"]:
         print(f"  WITHHELD -- {reason}")
     for cls, n in report["summary"].items():

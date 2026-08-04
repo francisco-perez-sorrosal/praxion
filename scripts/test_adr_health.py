@@ -224,6 +224,60 @@ def test_canary_moved_directory_is_renamed_not_removed(repo: Path) -> None:
     assert "new_dir/" in finding["detail"]
 
 
+def test_canary_remover_citing_the_parent_directory_owns_the_deletion(repo: Path) -> None:
+    """The live regression: the remover names the directory, not the files in it.
+
+    The memory-subsystem removal cites `memory-mcp/` and never
+    `memory-mcp/pyproject.toml`, so ownership of that file fell to a decision
+    that merely listed it and happened to carry a removal verb in its title.
+    """
+    pkg = repo / "subsystem"
+    pkg.mkdir()
+    (pkg / "config.toml").write_text("x", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "add")
+    _git(repo, "rm", "-qr", "subsystem")
+    _git(repo, "commit", "-qm", "remove")
+    _adr(repo, 1, title="Use the subsystem", date="2026-01-01", files=["subsystem/config.toml"])
+    _adr(repo, 2, title="Remove the subsystem", date="2026-02-01", files=["subsystem/"])
+    finding = next(f for f in adr_health.classify(repo)["findings"] if f["adr"] == "001-slug.md")
+    assert finding["decay_class"] == "removed-by-later"
+    assert "002-slug.md" in finding["detail"]
+
+
+def test_surviving_directory_does_not_claim_deletions_beneath_it(repo: Path) -> None:
+    """The decision that *created* a tree must not own every later deletion in it."""
+    app = repo / "app"
+    app.mkdir()
+    (app / "keep.py").write_text("x", encoding="utf-8")
+    (app / "drop.py").write_text("x", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "add")
+    _git(repo, "rm", "-q", "app/drop.py")
+    _git(repo, "commit", "-qm", "drop one file")
+    _adr(repo, 1, title="Some decision", date="2026-01-01", files=["app/drop.py"])
+    _adr(repo, 2, title="Replace the app runtime", date="2026-02-01", files=["app/"])
+    finding = next(f for f in adr_health.classify(repo)["findings"] if f["path"] == "app/drop.py")
+    assert finding["decay_class"] == "vanished"
+
+
+def test_canary_terminal_status_decisions_are_skipped(repo: Path) -> None:
+    """A superseded decision no longer constrains work; its decay is history.
+
+    This is the exclusion the dimension already specifies -- flag only pairs
+    with no supersession link between them. The protocol flips `status` at the
+    same moment it writes the field, so status subsumes the link check.
+    """
+    path = _adr(repo, 1, title="Some decision", files=["never_existed.py"])
+    path.write_text(
+        path.read_text(encoding="utf-8").replace("status: accepted", "status: superseded"),
+        encoding="utf-8",
+    )
+    report = adr_health.classify(repo)
+    assert report["findings"] == []
+    assert report["skipped_terminal"] == ["001-slug.md"]
+
+
 def test_directory_that_never_existed_is_still_vanished(repo: Path) -> None:
     """Prefix matching must not manufacture a removal for an empty subtree."""
     _adr(repo, 1, title="Some decision", files=["never_existed/"])

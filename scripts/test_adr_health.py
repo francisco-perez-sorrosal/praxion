@@ -278,6 +278,49 @@ def test_canary_terminal_status_decisions_are_skipped(repo: Path) -> None:
     assert report["skipped_terminal"] == ["001-slug.md"]
 
 
+def _retire(path: Path, by: str = "dec-999") -> None:
+    """Flip a fixture ADR to the terminal retired status."""
+    path.write_text(
+        path.read_text(encoding="utf-8").replace(
+            "status: accepted", f"status: retired\nretired_by:\n  - {by}"
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_canary_retired_decision_whose_subject_returned_is_a_reopen_candidate(repo: Path) -> None:
+    """Retirement is reversible: architecture that comes back finds its reasoning waiting."""
+    (repo / "revived.py").write_text("x", encoding="utf-8")
+    _retire(_adr(repo, 1, title="Some decision", files=["revived.py"]))
+    report = adr_health.classify(repo)
+    assert report["reopen_candidates"] == [{"adr": "001-slug.md", "paths_returned": ["revived.py"]}]
+
+
+def test_retired_decision_whose_subject_is_still_gone_is_not_a_reopen_candidate(
+    repo: Path,
+) -> None:
+    """Retirement is the normal resting state -- it must not nag."""
+    _retire(_adr(repo, 1, title="Some decision", files=["still_gone.py"]))
+    report = adr_health.classify(repo)
+    assert report["reopen_candidates"] == []
+    assert report["skipped_terminal"] == ["001-slug.md"]
+
+
+def test_superseded_decision_is_not_probed_for_reopen(repo: Path) -> None:
+    """Only `retired` re-opens: a superseded decision was replaced, not orphaned.
+
+    Its replacement still stands, so a resolving path says nothing about
+    whether the old answer should return.
+    """
+    (repo / "present.py").write_text("x", encoding="utf-8")
+    path = _adr(repo, 1, title="Some decision", files=["present.py"])
+    path.write_text(
+        path.read_text(encoding="utf-8").replace("status: accepted", "status: superseded"),
+        encoding="utf-8",
+    )
+    assert adr_health.classify(repo)["reopen_candidates"] == []
+
+
 def test_directory_that_never_existed_is_still_vanished(repo: Path) -> None:
     """Prefix matching must not manufacture a removal for an empty subtree."""
     _adr(repo, 1, title="Some decision", files=["never_existed/"])

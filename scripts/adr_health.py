@@ -33,6 +33,12 @@ Both oracles can fail silently and would then mislabel everything as `vanished`
 unavailable its dependent classes are **withheld with a named reason** rather
 than defaulted (`--json` reports them under `withheld`).
 
+Decisions at a terminal status are excluded: their references are history, not
+a live index. `retired` ones are still probed in the other direction -- when a
+retired decision's paths resolve again its subject has returned, and it is
+offered as a **re-open candidate** so architecture that comes back finds its
+prior reasoning waiting instead of being re-litigated from zero.
+
 Invoked by the sentinel's DH dimension (`--json`); also runnable standalone.
 Exit code is always 0 -- this reports, it does not gate.
 
@@ -267,12 +273,16 @@ def classify(repo_root: Path) -> dict:
             gone = {p for p in paths if not (repo_root / p).exists()}
             removers.append((adr.name, date, paths, gone))
 
-    findings, scanned, skipped_terminal = [], 0, []
+    findings, scanned, skipped_terminal, reopen = [], 0, [], []
     for adr in adrs:
         text = adr.read_text(encoding="utf-8")
         status = (_STATUS.search(text) or [None, ""])[1].strip().strip("\"'")
         if status in _TERMINAL_STATUSES:
             skipped_terminal.append(adr.name)
+            if status == "retired":
+                returned = [r for r in parse_affected_files(text) if (repo_root / r).exists()]
+                if returned:
+                    reopen.append({"adr": adr.name, "paths_returned": sorted(returned)})
             continue
         for ref in parse_affected_files(text):
             scanned += 1
@@ -297,6 +307,7 @@ def classify(repo_root: Path) -> dict:
         "findings": findings,
         "withheld": withheld,
         "skipped_terminal": skipped_terminal,
+        "reopen_candidates": reopen,
         "summary": _summarize(findings),
     }
 
@@ -414,6 +425,12 @@ def main(argv: list[str] | None = None) -> int:
         )
     for reason in report["withheld"]:
         print(f"  WITHHELD -- {reason}")
+    for candidate in report["reopen_candidates"]:
+        print(
+            f"  RE-OPEN? {candidate['adr']} is retired, but "
+            f"{len(candidate['paths_returned'])} of its paths resolve again: "
+            f"{', '.join(candidate['paths_returned'][:3])}"
+        )
     for cls, n in report["summary"].items():
         print(f"  {cls:20} {n:4}")
     for f in report["findings"]:

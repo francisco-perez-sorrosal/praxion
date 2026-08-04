@@ -1,7 +1,9 @@
 ---
 id: dec-131
 title: Pipeline Dashboard — sequential data layer before parallel page steps
-status: accepted
+status: retired
+retired_by:
+  - dec-134
 category: implementation
 date: 2026-05-07
 summary: Data layer (discovery, parsers, cache) must complete before any page step begins; pages themselves are fully parallel.
@@ -57,3 +59,11 @@ All steps run in strict sequence.
 **Positive**: Integration checkpoint (Step 13) validates real data flows, not mock contracts. No mock/real divergence risk. Each page's test-engineer writes tests using the same fixture shapes the real data layer produces.
 
 **Negative**: Data layer must complete before Phase 5 parallelism begins. Estimated 3–5 sessions for data layer (3 paired steps with checkpoints); acceptable given the parallelism gain in Phase 5.
+
+## Prior Decision
+
+Retired by `dec-134`, which replaced the Streamlit dashboard runtime with the Next.js app. This decision was a step-ordering constraint over a specific set of Streamlit modules — a data layer of `discovery`/`parsers`/`cache` feeding six page modules. That module structure no longer exists, and `dec-134` proposed no ordering of its own; it changed what was being built rather than the sequence in which to build it.
+
+Sibling dashboard decisions from the same pipeline were **not** retired, because their substance outlived the runtime: the per-project sha256 port derivation, the bash-ctl process model, the dedicated dashboard home, and the 15-second poll default with its environment override all survive in the Next.js implementation, and `dec-134` explicitly names them as preserved. Only the build-ordering constraint was specific to the runtime that went away.
+
+This decision matters again if a dashboard rewrite reintroduces a shared data layer that page modules depend on — the reasoning (integrate against real data flows rather than mock contracts) is not Streamlit-specific.

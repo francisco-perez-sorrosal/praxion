@@ -46,7 +46,7 @@ The frontmatter schema is shared between draft and finalized ADRs. Only the `id`
 |-------|------|----------|-------------|
 | `id` | string | Yes | `dec-draft-<8-char-hash>` in drafts; `dec-NNN` after finalize |
 | `title` | string | Yes | Short decision title |
-| `status` | string | Yes | `proposed` / `accepted` / `superseded` / `rejected` / `re-affirmation` |
+| `status` | string | Yes | `proposed` / `accepted` / `superseded` / `rejected` / `re-affirmation` / `retired` |
 | `category` | string | Yes | `architectural` / `behavioral` / `implementation` / `configuration` |
 | `date` | string | Yes | ISO 8601 date (`YYYY-MM-DD`) |
 | `summary` | string | Yes | One-line description for index and scanning |
@@ -61,6 +61,7 @@ The frontmatter schema is shared between draft and finalized ADRs. Only the `id`
 | `superseded_by` | string | No | id of replacing decision |
 | `re_affirms` | string | No | id of prior decision this ADR re-affirms without superseding |
 | `re_affirmed_by` | list | No | ids of later ADRs that re-affirmed this decision |
+| `retired_by` | list | When `retired` | ids of the decisions whose action removed this one's subject. A **list**, because one removal commonly strands several decisions and `superseded_by` (a string) cannot express that |
 | `dissent:` | string | No | Machine-queryable companion to the `## Disconfirmation` body block; one-line strongest objection to the chosen option. Required when `category: architectural`. |
 
 **Body sections** (after frontmatter):
@@ -79,6 +80,10 @@ When a new ADR supersedes an existing one: set `supersedes`/`superseded_by` cros
 ### Re-affirmation Protocol
 
 When a new ADR re-affirms an existing one *without* superseding it (a re-opening was considered and rejected for lack of new evidence): set `status: re-affirmation` + `re_affirms`, append `<new-id>` to the old ADR's `re_affirmed_by` (the old ADR stays `accepted`, no `superseded_by`), and add a `## Prior Decision` section naming the evidence a future supersession would require. Use only when a prior decision is challenged, re-examined, and found still correct — not routine acknowledgment. Full step sequence: [`adr-authoring-protocols.md` § Re-affirmation Protocol](../../skills/software-planning/references/adr-authoring-protocols.md#re-affirmation-protocol).
+
+### Retirement Protocol
+
+When a later decision's action **removed this decision's subject** rather than answering its question differently: set `status: retired` + `retired_by: [<ids>]`, and add a `## Prior Decision` section naming what was removed and by which decision. The removing decisions are **not** modified — they made no claim about this one. Retired records are preserved, never deleted, and **re-open** (back to `accepted`, `retired_by` cleared) if the subject returns. Use only when the question itself is gone; a decision answered differently is a supersession. Full step sequence and the supersession-vs-retirement test: [`adr-authoring-protocols.md` § Retirement Protocol](../../skills/software-planning/references/adr-authoring-protocols.md#retirement-protocol).
 
 ### Finalize Protocol
 

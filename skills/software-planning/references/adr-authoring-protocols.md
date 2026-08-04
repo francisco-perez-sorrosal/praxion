@@ -81,6 +81,32 @@ When a new ADR re-affirms a prior one without superseding it (a re-opening was c
 
 Re-affirmation is stronger than silent concurrence (it forces a public record of the re-opening) and gentler than supersession (the prior decision is untouched). Use it when a prior decision is challenged, re-examined, and found still correct — not as a routine acknowledgment.
 
+## Retirement Protocol
+
+When a later decision's action removed this decision's **subject**, rather than answering its question differently:
+
+1. Set `status: retired` on the **old** ADR.
+2. Set `retired_by: [<id>, ...]` on the old ADR — a **list**, because one removal routinely strands several decisions.
+3. **Do not** modify the removing decisions. They answered a different question and made no claim about this one; nothing is written on their side.
+4. Add a `## Prior Decision` section to the old ADR naming what was removed, by which decision, and what would have to return for the decision to matter again.
+5. `DECISIONS_INDEX.md` regenerates automatically at finalize — do not manually invoke.
+
+### The supersession-vs-retirement test
+
+Ask what a reader could compare. **Supersession** answers the *same question differently*, so the two answers sit side by side and the reader sees a choice that changed. **Retirement** abolishes the question, so there is no second answer to compare against.
+
+A commit-gate decision that placed a check in "Block D, not Block C" of a bespoke hook script is retired, not superseded, by the decision that replaced that script with a hook framework: the replacement does not choose a different block, it eliminates blocks. Recording that as supersession would assert a deliberation that never happened — the later decision never weighed the block placement at all.
+
+Retirement also exists because supersession **cannot express** the common case. `supersedes` and `superseded_by` are single-valued, so a 1:1 relation. One removal typically strands several decisions at once — a subsystem deletion can orphan five — and the reciprocal `supersedes` half is then unwritable, since the remover would need to name all of them in a field that holds one id. `retired_by` is a list for exactly this reason.
+
+### Re-open
+
+A retired decision is preserved, never deleted. If its subject returns — a removed path reappears, a retired component is rebuilt — flip `status` back to `accepted` and clear `retired_by`, keeping the record's full history including its retirement. Architecture that comes back finds its prior reasoning waiting rather than being re-litigated from zero. (Precedent: the tech-debt reconciler already re-opens a terminal row whose `dedup_key` recurs.)
+
+### Why retirement is a status, not a directory
+
+Terminal records stay in `.ai-state/decisions/`. Moving them into a subdirectory would break the path-form links that persistent documents are required to use, and would silently narrow every consumer that globs the decisions directory flat — including the next-`NNN` scan in `finalize_adrs.py`, which iterates files and skips subdirectories, and would therefore reissue an archived record's id the first time a recent decision is retired. The lifecycle separation the archive was meant to provide is delivered by `status` plus index filtering, with no file movement and no dangling links.
+
 ## Finalize at Merge-to-Main
 
 At merge-to-main, the post-merge finalize step promotes drafts in `.ai-state/decisions/drafts/` to finalized `<NNN>-<slug>.md` records. The protocol is **idempotent** (running twice on the same state is a no-op), so duplicated invocations from the post-merge hook + `/merge-worktree` command are safe. Agents do not run finalize manually.

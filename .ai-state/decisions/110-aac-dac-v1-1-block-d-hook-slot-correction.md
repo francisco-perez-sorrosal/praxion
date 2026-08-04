@@ -1,7 +1,9 @@
 ---
 id: dec-110
 title: golden-rule hook placement in Block D, not Block C
-status: accepted
+status: retired
+retired_by:
+  - dec-246
 category: implementation
 date: 2026-05-01
 summary: "Block C in git-pre-commit-hook.sh is already occupied by diagram regeneration; the golden-rule enforcement check lands in Block D. SYSTEMS_PLAN.md's 'Block C' reference was a codebase-drift error corrected at planning time."
@@ -75,3 +77,7 @@ Merge the golden-rule check into the existing Block C.
 ## Prior Decision
 
 This ADR re-affirms `dec-108`. The golden-rule enforcement design is correct; only the block label is corrected. The systemic cause (architect did not re-read the hook file after v1 landed) is noted so future architects can add "read hook file to verify block labels" to the AaC-related planning checklist.
+
+**Retired by `dec-246`**, which replaced the bespoke `scripts/git-pre-commit-hook.sh` with the pre-commit framework. This decision's entire content is *which lettered block of that script* the golden-rule check occupies. The framework has no blocks, so `dec-246` did not choose a different slot — it abolished the concept of a slot. That is retirement rather than supersession: `dec-246` never weighed Block C against Block D, and a reader has no two answers to compare.
+
+The enforcement it was correcting the placement of survives: `check_aac_golden_rule.py` runs as the `aac-golden-rule` pre-commit hook. Only the placement question died. This decision matters again only if ordered blocks return to the commit gate.

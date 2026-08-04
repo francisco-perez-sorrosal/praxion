@@ -1,7 +1,9 @@
 ---
 id: dec-026
 title: Derive session_count from observations.jsonl instead of a counter in memory.json
-status: accepted
+status: retired
+retired_by:
+  - dec-225
 category: implementation
 date: 2026-04-12
 summary: metrics() computes session count by counting distinct session_id in observations.jsonl; schema.session_count field deprecated, not schema-bumped
@@ -96,3 +98,11 @@ Count distinct `session_id` values in `observations.jsonl` on demand.
 - `rules/swe/memory-protocol.md` describes the derivation (for agents reasoning about memory metrics).
 - `test_observations.py` gets test cases covering missing file, empty file, distinct sessions, duplicate session IDs, missing `session_id` field, and malformed JSONL lines — each returning the expected count.
 - `test_metrics.py` gets an end-to-end assertion that the `metrics()` tool returns the derived count.
+
+## Prior Decision
+
+Retired by `dec-225`, which removed the in-house curated-memory subsystem. This decision chose between two ways of counting sessions — a stored counter in `memory.json` versus derivation from `observations.jsonl` — and `dec-225` deleted `memory.json`, the Memory MCP server, and the `metrics()` tool that read either one. Both sides of the comparison are gone, so the question no longer has an answer to give rather than a different answer.
+
+`dec-225` is not a supersession: it made no claim about how session counts should be derived, and preserved `observations.jsonl` for observability without adopting or rejecting this decision's reasoning.
+
+For this decision to matter again, a component would have to report a session count derived from stored state. Should that return, the reasoning here still holds — a counter incremented only from a code path nothing calls will drift from reality, and derivation from the append-only log will not.

@@ -800,6 +800,93 @@ class TestFinalizeCrossReferences:
         # Untouched: the draft id literal still present, no dec-088 injected.
         assert fixture.read_text(encoding="utf-8") == original
 
+    def test_system_deployment_refs_rewritten(self, repo_root: Path) -> None:
+        """.ai-state/SYSTEM_DEPLOYMENT.md is in the rewrite scope.
+
+        It is a permanent architectural artifact carrying an ADR reference
+        table, but was absent from the allowlist -- so its citations dangled
+        the moment finalize ran.
+        """
+        draft = make_draft(repo_root, "20260419-1810", "alice", "main", "deploy-decision")
+        draft_id = f"dec-draft-{_draft_hash(draft.name)}"
+
+        deployment_doc = repo_root / ".ai-state" / "SYSTEM_DEPLOYMENT.md"
+        deployment_doc.write_text(
+            f"# Deployment\n\n| {draft_id} | process model | ctl + launchd |\n",
+            encoding="utf-8",
+        )
+
+        finalize.promote_draft(draft, 55, repo_root)
+        finalize.rewrite_cross_references(repo_root, draft_id, "dec-055")
+
+        content = deployment_doc.read_text(encoding="utf-8")
+        assert "dec-055" in content
+        assert draft_id not in content
+
+
+# -- Allowlist-gap detection ---------------------------------------------------
+
+
+class TestDetectUnrewrittenIds:
+    """The rewrite allowlist fails silently by construction; this closes it."""
+
+    def test_canary_detector_bites_on_file_outside_the_allowlist(self, repo_root: Path) -> None:
+        """Proof the detector bites: an id surviving in an unlisted file is reported.
+
+        Reproduces the historical defect shape -- a permanent `.ai-state/`
+        artifact holds a draft id, the rewrite scope does not cover it, and the
+        run still reports success.
+        """
+        draft = make_draft(repo_root, "20260419-1810", "alice", "main", "gap-decision")
+        draft_id = f"dec-draft-{_draft_hash(draft.name)}"
+
+        unlisted = repo_root / ".ai-state" / "calibration_log.md"
+        unlisted.write_text(f"| task | authored {draft_id} |\n", encoding="utf-8")
+
+        finalize.promote_draft(draft, 66, repo_root)
+        finalize.rewrite_cross_references(repo_root, draft_id, "dec-066")
+        survivors = finalize.detect_unrewritten_ids(repo_root, [draft_id])
+
+        assert survivors == [(unlisted, draft_id)]
+
+    def test_reports_nothing_when_every_citation_was_rewritten(self, repo_root: Path) -> None:
+        """A fully-covered rewrite produces no findings."""
+        draft = make_draft(repo_root, "20260419-1810", "alice", "main", "covered-decision")
+        draft_id = f"dec-draft-{_draft_hash(draft.name)}"
+
+        design_doc = repo_root / ".ai-state" / "DESIGN.md"
+        design_doc.write_text(f"# Architecture\n\nSee {draft_id}.\n", encoding="utf-8")
+
+        finalize.promote_draft(draft, 67, repo_root)
+        finalize.rewrite_cross_references(repo_root, draft_id, "dec-067")
+
+        assert finalize.detect_unrewritten_ids(repo_root, [draft_id]) == []
+
+    def test_placeholder_shape_is_not_a_finding(self, repo_root: Path) -> None:
+        """Matching concrete ids, not the `dec-draft-<hash>` shape.
+
+        Teaching material and test fixtures legitimately carry the placeholder
+        form; flagging those would make the detector unusable.
+        """
+        draft = make_draft(repo_root, "20260419-1810", "alice", "main", "shape-decision")
+        draft_id = f"dec-draft-{_draft_hash(draft.name)}"
+
+        teaching = repo_root / "docs" / "adr-guide.md"
+        teaching.parent.mkdir(parents=True)
+        teaching.write_text(
+            "Drafts carry `id: dec-draft-<hash>` until finalize runs.\n",
+            encoding="utf-8",
+        )
+
+        finalize.promote_draft(draft, 68, repo_root)
+        finalize.rewrite_cross_references(repo_root, draft_id, "dec-068")
+
+        assert finalize.detect_unrewritten_ids(repo_root, [draft_id]) == []
+
+    def test_no_promoted_ids_scans_nothing(self, repo_root: Path) -> None:
+        """An empty promotion set short-circuits -- a dry run costs no I/O."""
+        assert finalize.detect_unrewritten_ids(repo_root, []) == []
+
 
 # -- Idempotence --------------------------------------------------------------
 

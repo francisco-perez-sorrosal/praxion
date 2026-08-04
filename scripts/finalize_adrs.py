@@ -767,9 +767,10 @@ def rewrite_cross_references(repo_root: Path, old_id: str, new_id: str) -> int:
     - All files under `.ai-state/decisions/` (both drafts/ and finalized).
     - `.ai-state/DESIGN.md`, `.ai-state/TECH_DEBT_LEDGER.md`,
       `.ai-state/TECH_DEBT_RESOLVED.md`, `.ai-state/CONSULT_LEDGER.md`,
-      `.ai-state/CONSULT_COSTS.md`, `.ai-state/CONSULT_PRIORS.md`, and a
-      project-root `ROADMAP.md` -- named persistent files that cite the ADR a
-      decision/debt/disposition row resolved.
+      `.ai-state/CONSULT_COSTS.md`, `.ai-state/CONSULT_PRIORS.md`,
+      `.ai-state/SYSTEM_DEPLOYMENT.md`, and a project-root `ROADMAP.md` --
+      named persistent files that cite the ADR a decision/debt/disposition
+      row resolved.
     - Every markdown file under `docs/` (subsumes `docs/architecture.md`):
       design notes and integration docs cite ADR ids outside `.ai-state/`.
     - All `.ai-work/*/LEARNINGS.md`.
@@ -795,6 +796,37 @@ def rewrite_cross_references(repo_root: Path, old_id: str, new_id: str) -> int:
     return modified
 
 
+def detect_unrewritten_ids(repo_root: Path, promoted_ids: list[str]) -> list[tuple[Path, str]]:
+    """Find promoted draft ids that survived the rewrite, outside the allowlist.
+
+    `rewrite_cross_references` walks a bounded allowlist, and a file outside it
+    is indistinguishable from a file with no matches -- the allowlist fails
+    silently by construction, so a citation in an unlisted file dangles while
+    the run still reports success. This detector closes that failure class
+    rather than its instances: it re-scans a deliberately wider net (every
+    markdown file under `.ai-state/` and `docs/`) for the concrete ids just
+    promoted. Matching concrete ids rather than the `dec-draft-<hash>` shape
+    keeps teaching placeholders and test fixtures from registering as findings.
+
+    Read-only. Returns (path, surviving_id) pairs for the caller to report.
+    """
+    if not promoted_ids:
+        return []
+    survivors: list[tuple[Path, str]] = []
+    for scan_root in (repo_root / ".ai-state", repo_root / "docs"):
+        if not scan_root.is_dir():
+            continue
+        for entry in sorted(scan_root.rglob("*.md")):
+            if not entry.is_file():
+                continue
+            try:
+                text = entry.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            survivors.extend((entry, i) for i in promoted_ids if i in text)
+    return survivors
+
+
 def _cross_reference_targets(repo_root: Path) -> Iterator[Path]:
     """Yield every file whose `dec-draft-<hash>` references must be rewritten."""
     decisions = repo_root / ".ai-state" / "decisions"
@@ -815,6 +847,7 @@ def _cross_reference_targets(repo_root: Path) -> Iterator[Path]:
         repo_root / ".ai-state" / "CONSULT_LEDGER.md",
         repo_root / ".ai-state" / "CONSULT_COSTS.md",
         repo_root / ".ai-state" / "CONSULT_PRIORS.md",
+        repo_root / ".ai-state" / "SYSTEM_DEPLOYMENT.md",
         repo_root / "ROADMAP.md",
     ):
         if persistent_doc.is_file():
@@ -1146,6 +1179,17 @@ def _run(mode: str, branch: str | None, dry_run: bool) -> int:
             )
         total_rewrites += count
     logger.info("finalize_adrs: %d cross-reference file(s) rewritten", total_rewrites)
+
+    # Allowlist-gap detection. Without this, a citation living in a file the
+    # rewrite scope does not cover dangles silently while the run reports
+    # success -- the only prior detection was grepping for the id by hand.
+    for path, old_id in detect_unrewritten_ids(REPO_ROOT, [p.old_id for p in plans]):
+        logger.warning(
+            "finalize_adrs: %s still cites %s -- outside the rewrite scope; "
+            "add it to _cross_reference_targets()",
+            path.relative_to(REPO_ROOT),
+            old_id,
+        )
 
     # Self-heal re_affirms/re_affirmed_by reciprocity (dec-070/DL06).
     backfilled = backfill_re_affirmed_by(DECISIONS_DIR, plans)

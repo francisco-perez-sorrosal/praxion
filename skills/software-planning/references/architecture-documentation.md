@@ -15,6 +15,8 @@ The developer guide is derived from the architect doc — it is a code-verified 
 
 Both documents use the same 8 sections (Overview, System Context, Components, Interfaces, Data Flow, Dependencies, Constraints, Decisions). The differences are in framing and content policy:
 
+**Section 3 is two-tier in both documents.** `### 3a. Structural components` holds one row per `component` element in the LikeC4 model, capped at the 10-12 nodes the L1 diagram allows; `### 3b. Capabilities` holds cross-cutting features and loops composed from those blocks, which own no single directory and no model element. The tiers exist because a merged table grows with every shipped feature until it silently contradicts the diagram above it and can no longer be reconciled against the model. Checks that read *components* — `TEST_TOPOLOGY.md`'s `subsystems`, sentinel TT01/TT06, AC06 — resolve against 3a only.
+
 | Dimension | `.ai-state/DESIGN.md` | `docs/architecture.md` |
 |-----------|----------------------------|------------------------|
 | **Primary audience** | Architects designing/extending the system | Developers navigating the codebase |
@@ -59,7 +61,7 @@ Skip creation for trivially simple projects (single module, no external dependen
 If `.ai-state/DESIGN.md` does not exist, the implementer skips — the systems-architect creates it.
 
 **Validation:** The **verifier** checks design coherence during Phase 8:
-- Components referenced in Data Flow (Section 5) appear in Components (Section 3)
+- Components referenced in Data Flow (Section 5) appear in Section 3 (either tier — §3a structural components or §3b capabilities)
 - Status column is present with valid values
 - Every inline `dec-NNN` reference (anywhere in the document) resolves to a finalized ADR file under `.ai-state/decisions/` or a draft under `.ai-state/decisions/drafts/`
 - Section 8 contains a pointer to `DECISIONS_INDEX.md` — does not embed an ADR summary table
@@ -96,7 +98,7 @@ If `docs/architecture.md` does not exist, the implementer skips — the systems-
 **Maintenance:** The **doc-engineer** maintains the developer guide at pipeline checkpoints by verifying content against the filesystem (code-verified accuracy). This is independent of the implementer's step 7.7 — it's a periodic freshness check.
 
 **Validation:** The **verifier** checks code accuracy during Phase 9:
-- Every component name in Section 3 matches an actual module/directory name on disk
+- Every component name in Section 3a matches an actual module/directory name on disk. §3b capabilities are cross-cutting and own no single directory, so this check does not apply to them
 - Every file path in the component table resolves to an existing file
 - No Planned/Designed items present
 - "Last verified" date is within the pipeline's timeframe
@@ -106,7 +108,7 @@ Skip Phase 9 if `docs/architecture.md` does not exist.
 
 **Auditing:** The **sentinel** checks code accuracy with five checks:
 - **AC05**: `docs/architecture.md` exists when `.ai-state/DESIGN.md` exists
-- **AC06**: Every component name in Section 3 matches an actual module/directory name on disk
+- **AC06**: Every component name in Section **3a** matches an actual module/directory name on disk (§3b capabilities are exempt — they name no single directory)
 - **AC07**: Every file path in the component table resolves to an existing file
 - **AC08**: No Status column or Planned/Designed items present
 - **AC09**: Cross-consistency — every component in `docs/architecture.md` also appears in `.ai-state/DESIGN.md` (subset relationship)

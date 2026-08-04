@@ -46,8 +46,10 @@ subsystems:
   - <subsystem-name>
 # required, 1 or more entries
 # Each entry must resolve to a component with "Status: Built" in
-# .ai-state/DESIGN.md §3 (Components). The binding is checked by
-# sentinel TT01. Use the component's canonical name from that table exactly.
+# .ai-state/DESIGN.md §3a (Structural components) -- NOT §3b, whose
+# capabilities are cross-cutting and make no sound test-group boundary.
+# The binding is checked by sentinel TT01. Use the component's canonical
+# name from that table exactly.
 
 tier: <unit | integration | contract | e2e>
 # required
@@ -119,7 +121,7 @@ notes: <free-form short prose>
 |-------|-------|-------|
 | `id` | Trunk | Kebab-case. Leaf may derive an additional form (e.g., snake_case for markers). |
 | `title` | Trunk | Human label; no tooling concepts. |
-| `subsystems` | Trunk | Forward reference into `.ai-state/DESIGN.md` §3 — language-neutral. |
+| `subsystems` | Trunk | Forward reference into `.ai-state/DESIGN.md` **§3a** (structural components only) — language-neutral. |
 | `tier` | Trunk | Unit / integration / contract / e2e vocabulary is universal. |
 | `selectors` — structure | Trunk | The list shape and the `{strategy, arg}` envelope are trunk-owned. |
 | `selectors` — strategy values | Leaf | The set of valid `strategy` identifiers is per-language via Registry 1. |
@@ -297,7 +299,7 @@ The `Tests:` field in `IMPLEMENTATION_PLAN.md` and `WIP.md` is optional at the s
 
 Refresh is triggered by one of three events:
 
-1. **First-time creation**: the user runs `/refresh-topology --init` to scaffold the initial topology from `.ai-state/DESIGN.md` §3 Built components, spawning the systems-architect (Subsystems table) and test-engineer (per-group YAML blocks). `integration_boundaries` populate lazily during subsequent normal pipelines.
+1. **First-time creation**: the user runs `/refresh-topology --init` to scaffold the initial topology from `.ai-state/DESIGN.md` §3a Built structural components, spawning the systems-architect (Subsystems table) and test-engineer (per-group YAML blocks). `integration_boundaries` populate lazily during subsequent normal pipelines.
 2. **Human-initiated drift reconciliation**: the user runs `/refresh-topology` (no flag) to reconcile an existing topology against the current `DESIGN.md` components and open `topology-drift` ledger rows.
 3. **Sentinel-triggered**: sentinel TT03 accumulates 3 or more open `topology-drift` ledger rows and emits a WARN with "Run `/refresh-topology` — 3+ topology-drift items accumulated."
 
@@ -312,7 +314,7 @@ The test-topology protocol is **opt-in**. A project that has not yet run `/refre
 **Two-factor gate.** Adoption becomes advisable when a project has grown large enough that splitting tests into logical groups would yield a meaningful speedup. The advisory fires when **all three** of the following signals are simultaneously crossed:
 
 1. **Full-suite wall-clock runtime ≥ 90 seconds** — the suite is slow enough that a scoped inner loop would save meaningful developer time.
-2. **Built components in `.ai-state/DESIGN.md` §3 ≥ 4** — the architecture has enough distinct subsystems that group boundaries would be non-trivial (fewer than 4 components would produce groups that recapitulate the whole project).
+2. **Built structural components in `.ai-state/DESIGN.md` §3a ≥ 4** — the architecture has enough distinct subsystems that group boundaries would be non-trivial (fewer than 4 components would produce groups that recapitulate the whole project).
 3. **Total test count ≥ 200** — the test corpus is large enough that a scoped run would execute significantly fewer tests than the full suite.
 
 These thresholds are calibratable guesses — reasonable starting points, not empirically derived constants. If your project's suite is expensive at 60 seconds, or its architecture warrants groups at 3 components, adjust the thresholds before the advisory ever fires. The right threshold is the one that reflects your project's reality, not this document's defaults.

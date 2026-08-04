@@ -118,11 +118,29 @@ views {
 
 <!-- aac:generated source=docs/diagrams/architecture/src/architecture.c4 view=components last-regen=YYYY-MM-DD -->
 
+<!-- TWO-TIER SECTION. 3a holds structural building blocks -- one row per `component`
+     element in the LikeC4 model above, capped at the 10-12 nodes noted for the L1 diagram.
+     3b holds capabilities: cross-cutting features and loops COMPOSED FROM those blocks,
+     owning no single directory and no model element.
+     Keep them apart from the first row. A single merged table grows without bound as
+     features land, until the table silently contradicts the diagram above it -- and
+     nothing can be reconciled against the model any more. Consumers that read
+     *components* (TEST_TOPOLOGY.md `subsystems`, sentinel TT01/TT06, AC06) resolve
+     against 3a only. -->
+
+### 3a. Structural components
+
 | Component | Responsibility | Key Files |
 |-----------|---------------|-----------|
 | [Component A] | [What it does] | `src/component_a/` |
 | [Component B] | [What it does] | `src/component_b/` |
 | [Component C] | [What it does] | `src/component_c/` |
+
+### 3b. Capabilities
+
+| Capability | Responsibility | Key Files |
+|-----------|---------------|-----------|
+| [Capability A] | [Cross-cutting feature composed from the components above] | `src/a/`, `src/b/` |
 
 <!-- aac:end -->
 

@@ -23,7 +23,7 @@ affected_files:
   - claude/canonical-blocks/behavioral-contract.md
   - claude/canonical-blocks/praxion-process.md
   - scripts/sync_canonical_blocks.py
-  - scripts/git-pre-commit-hook.sh
+  - .pre-commit-config.yaml
   - commands/onboard-project.md
   - commands/new-project.md
   - hooks/test_onboard_praxion_block.py

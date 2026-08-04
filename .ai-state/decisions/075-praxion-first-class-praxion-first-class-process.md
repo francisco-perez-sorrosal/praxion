@@ -13,7 +13,6 @@ affected_files:
   - hooks/inject_subagent_context.py
   - hooks/inject_process_framing.py
   - hooks/hooks.json
-  - hooks/inject_memory.py
   - commands/onboard-project.md
   - commands/new-project.md
   - skills/hook-crafting/references/output-patterns.md

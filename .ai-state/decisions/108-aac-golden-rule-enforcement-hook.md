@@ -11,7 +11,7 @@ agent_type: systems-architect
 pipeline_tier: standard
 affected_files:
   - scripts/check_aac_golden_rule.py
-  - scripts/git-pre-commit-hook.sh
+  - .pre-commit-config.yaml
   - rules/writing/aac-dac-conventions.md
   - agents/sentinel.md
 re_affirms: dec-106

@@ -10,8 +10,7 @@ made_by: agent
 agent_type: systems-architect
 pipeline_tier: full
 affected_files:
-  - streamlit_app/config.py
-  - streamlit_app/pages/workshops.py
+  - dashboard_app/src/lib/config.ts
 affected_reqs: [REQ-05]
 ---
 

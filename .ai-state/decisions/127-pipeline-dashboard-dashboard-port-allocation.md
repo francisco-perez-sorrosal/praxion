@@ -11,7 +11,6 @@ agent_type: systems-architect
 pipeline_tier: full
 affected_files:
   - scripts/praxion-dashboard
-  - streamlit_app/launcher.py
 affected_reqs: [REQ-01]
 ---
 

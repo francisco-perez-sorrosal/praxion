@@ -11,7 +11,7 @@ agent_type: systems-architect
 pipeline_tier: full
 affected_files:
   - CLAUDE.md
-  - streamlit_app/
+  - dashboard_app/
 affected_reqs: [REQ-11]
 ---
 

@@ -15,8 +15,6 @@ affected_files:
   - agents/sentinel.md
   - rules/swe/agent-intermediate-documents.md
   - .github/workflows/test.yml
-  - memory-mcp/pyproject.toml
-  - memory-mcp/tests/
 ---
 
 ## Context

@@ -19,7 +19,6 @@ affected_files:
   - claude/canonical-blocks/obsidian-integration.md
   - commands/onboard-project.md
   - commands/new-project.md
-  - commands/onboard-project-obsidian.md
   - new_project.sh
   - docs/obsidian-shape-b.md
 ---

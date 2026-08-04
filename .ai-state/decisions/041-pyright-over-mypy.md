@@ -10,7 +10,6 @@ made_by: agent
 agent_type: systems-architect
 pipeline_tier: standard
 affected_files:
-  - memory-mcp/pyproject.toml
   - task-chronograph-mcp/pyproject.toml
   - .github/workflows/test.yml
 affected_reqs:

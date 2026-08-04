@@ -1,7 +1,7 @@
 ---
-id: dec-draft-5bcdc6fe
+id: dec-317
 title: Retirement is a status carrying a removal list, not an archive directory
-status: proposed
+status: accepted
 category: architectural
 date: 2026-08-04
 summary: 'A decision whose subject was removed gets the retired status plus a `retired_by` list naming the removing decisions; terminal records stay in place and the lifecycle split is delivered by status and index filtering rather than by moving files into an archive subdirectory.'

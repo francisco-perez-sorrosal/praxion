@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-04T20:59:08Z'
+generated_at: '2026-08-04T22:58:57Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -702,7 +702,7 @@ surfaces:
   path: .ai-state/decisions/024-ci-test-pipeline.md
   type: markdown
   title: CI test pipeline via GitHub Actions matrix over MCP servers
-  last_modified: '2026-04-12'
+  last_modified: '2026-08-04'
   renderer: adr_card
 - id: ai-state-decisions-025-memory-hygiene-rules
   path: .ai-state/decisions/025-memory-hygiene-rules.md
@@ -714,7 +714,7 @@ surfaces:
   path: .ai-state/decisions/026-session-count-from-observations.md
   type: markdown
   title: Derive session_count from observations.jsonl instead of a counter in memory.json
-  last_modified: '2026-04-12'
+  last_modified: '2026-08-04'
   renderer: adr_card
 - id: ai-state-decisions-027-principles-embedding-strategy
   path: .ai-state/decisions/027-principles-embedding-strategy.md
@@ -804,7 +804,7 @@ surfaces:
   path: .ai-state/decisions/041-pyright-over-mypy.md
   type: markdown
   title: pyright over mypy for MCP server type checking
-  last_modified: '2026-04-12'
+  last_modified: '2026-08-04'
   renderer: adr_card
 - id: ai-state-decisions-042-scripts-filter-combined-predicate
   path: .ai-state/decisions/042-scripts-filter-combined-predicate.md
@@ -1008,7 +1008,7 @@ surfaces:
   path: .ai-state/decisions/075-praxion-first-class-praxion-first-class-process.md
   type: markdown
   title: "Praxion-as-First-Class \u2014 process-driven development with universal rule-inheritance"
-  last_modified: '2026-07-15'
+  last_modified: '2026-08-04'
   renderer: adr_card
 - id: ai-state-decisions-076-agent-model-routing-routing-dimensionality-1d-defer-2d
   path: .ai-state/decisions/076-agent-model-routing-routing-dimensionality-1d-defer-2d.md
@@ -1050,7 +1050,7 @@ surfaces:
   path: .ai-state/decisions/082-extract-canonical-blocks-build-time-canonical-block-sync.md
   type: markdown
   title: Build-time canonical-block sync over runtime bash injection
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-04'
   renderer: adr_card
 - id: ai-state-decisions-083-separate-test-scopes-integration-vs-unit
   path: .ai-state/decisions/083-separate-test-scopes-integration-vs-unit.md
@@ -1080,7 +1080,7 @@ surfaces:
   path: .ai-state/decisions/087-pilot-strategy-trunk-only-then-defer-behavioral-pilot.md
   type: markdown
   title: "Pilot strategy \u2014 trunk-only at this pipeline; defer behavioral pilot to first consumer project"
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-04'
   renderer: adr_card
 - id: ai-state-decisions-088-runtime-envelope-opt-in-policy
   path: .ai-state/decisions/088-runtime-envelope-opt-in-policy.md
@@ -1206,7 +1206,7 @@ surfaces:
   path: .ai-state/decisions/108-aac-golden-rule-enforcement-hook.md
   type: markdown
   title: Golden-rule enforcement at commit time via standalone script invoked from pre-commit hook
-  last_modified: '2026-07-15'
+  last_modified: '2026-08-04'
   renderer: adr_card
 - id: ai-state-decisions-109-aac-likec4-querying-skill
   path: .ai-state/decisions/109-aac-likec4-querying-skill.md
@@ -1218,7 +1218,7 @@ surfaces:
   path: .ai-state/decisions/110-aac-dac-v1-1-block-d-hook-slot-correction.md
   type: markdown
   title: golden-rule hook placement in Block D, not Block C
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-04'
   renderer: adr_card
 - id: ai-state-decisions-111-req-arch-element-traceability
   path: .ai-state/decisions/111-req-arch-element-traceability.md
@@ -1284,7 +1284,7 @@ surfaces:
   path: .ai-state/decisions/121-pipeline-dashboard-dashboard-claudemd-placement.md
   type: markdown
   title: "Pipeline Dashboard CLAUDE.md placement \u2014 Working Here mention, no philosophical block"
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-04'
   renderer: adr_card
 - id: ai-state-decisions-122-pipeline-dashboard-dashboard-cross-platform-scope
   path: .ai-state/decisions/122-pipeline-dashboard-dashboard-cross-platform-scope.md
@@ -1296,7 +1296,7 @@ surfaces:
   path: .ai-state/decisions/123-pipeline-dashboard-dashboard-dependency-isolation.md
   type: markdown
   title: "Pipeline Dashboard dependency isolation \u2014 dedicated ~/.praxion-dashboard/venv/"
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-04'
   renderer: adr_card
 - id: ai-state-decisions-124-pipeline-dashboard-dashboard-frontmatter-parsing
   path: .ai-state/decisions/124-pipeline-dashboard-dashboard-frontmatter-parsing.md
@@ -1314,19 +1314,19 @@ surfaces:
   path: .ai-state/decisions/126-pipeline-dashboard-dashboard-poll-interval.md
   type: markdown
   title: "Pipeline Dashboard auto-refresh interval \u2014 15s default, env-overridable"
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-04'
   renderer: adr_card
 - id: ai-state-decisions-127-pipeline-dashboard-dashboard-port-allocation
   path: .ai-state/decisions/127-pipeline-dashboard-dashboard-port-allocation.md
   type: markdown
   title: "Pipeline Dashboard port allocation \u2014 sha256 per-project derivation"
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-04'
   renderer: adr_card
 - id: ai-state-decisions-128-pipeline-dashboard-dashboard-process-model
   path: .ai-state/decisions/128-pipeline-dashboard-dashboard-process-model.md
   type: markdown
   title: "Pipeline Dashboard process model \u2014 bash ctl + macOS launchd, not MCP-bound"
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-04'
   renderer: adr_card
 - id: ai-state-decisions-129-pipeline-dashboard-dashboard-supersede-metrics-viewer
   path: .ai-state/decisions/129-pipeline-dashboard-dashboard-supersede-metrics-viewer.md
@@ -1344,7 +1344,7 @@ surfaces:
   path: .ai-state/decisions/131-dashboard-sequential-data-then-parallel-pages.md
   type: markdown
   title: "Pipeline Dashboard \u2014 sequential data layer before parallel page steps"
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-04'
   renderer: adr_card
 - id: ai-state-decisions-132-rename-architecture-to-design
   path: .ai-state/decisions/132-rename-architecture-to-design.md
@@ -1746,7 +1746,7 @@ surfaces:
   path: .ai-state/decisions/198-shape-b-default-on.md
   type: markdown
   title: Adopt Obsidian Shape B as default-on integration for Praxion-managed projects
-  last_modified: '2026-07-15'
+  last_modified: '2026-08-04'
   renderer: adr_card
 - id: ai-state-decisions-199-obsidian-skills-marketplace-install
   path: .ai-state/decisions/199-obsidian-skills-marketplace-install.md
@@ -2456,11 +2456,17 @@ surfaces:
   title: The formatter version is one decision, enforced, not two conventions
   last_modified: '2026-08-02'
   renderer: adr_card
+- id: ai-state-decisions-317-retirement-is-a-status-carrying-a-remova
+  path: .ai-state/decisions/317-retirement-is-a-status-carrying-a-remova.md
+  type: markdown
+  title: Retirement is a status carrying a removal list, not an archive directory
+  last_modified: '2026-08-04'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-08-02'
+  last_modified: '2026-08-04'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3051,6 +3057,7 @@ groups:
   - ai-state-decisions-314-per-check-canary-coverage
   - ai-state-decisions-315-release-staleness-named-consumer
   - ai-state-decisions-316-ruff-pin-coherence
+  - ai-state-decisions-317-retirement-is-a-status-carrying-a-remova
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

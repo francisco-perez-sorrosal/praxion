@@ -146,6 +146,50 @@ def build_rename_index(repo_root: Path) -> dict[str, str]:
     return resolved
 
 
+def _as_prefix(ref: str) -> str:
+    """The subtree a reference names, whether or not its author typed a slash."""
+    return ref if ref.endswith("/") else ref + "/"
+
+
+def _deletion_date(ref: str, deletions: dict[str, str]) -> str | None:
+    """Newest deletion date for `ref`, resolving a directory by its subtree.
+
+    Git names files, never directories, so a directory-shaped reference can
+    never be an exact key in either index. Matching exact keys only sends every
+    such reference to `vanished` -- inverting the truth on precisely the
+    "remove X" decisions this classifier exists to protect.
+    """
+    exact = deletions.get(ref)
+    if exact:
+        return exact
+    prefix = _as_prefix(ref)
+    under = [date for path, date in deletions.items() if path.startswith(prefix)]
+    return max(under) if under else None
+
+
+def _rename_target(ref: str, renames: dict[str, str]) -> str | None:
+    """Rename target for `ref`, resolving a wholesale directory move.
+
+    The deletion index is built with `--no-renames`, so a moved file also
+    appears there as a deletion -- renames must be consulted first or a move
+    reads as a removal. That ordering only holds for directories if a directory
+    move is detectable, which it is when every rename beneath the prefix lands
+    under one new prefix. A scattered move yields no single target and falls
+    through to the deletion path, which is the honest answer.
+    """
+    exact = renames.get(ref)
+    if exact:
+        return exact
+    prefix = _as_prefix(ref)
+    targets = set()
+    for old, new in renames.items():
+        if not old.startswith(prefix):
+            continue
+        tail = old[len(prefix) :]
+        targets.add(new[: -len(tail)] if tail and new.endswith(tail) else new)
+    return targets.pop() if len(targets) == 1 else None
+
+
 # -- Lifecycle oracle ---------------------------------------------------------
 
 
@@ -249,12 +293,13 @@ def _classify_one(adr_name, ref, deletions, renames, lazy_shapes, removers, have
         return "lazy-artifact", "none", "artifact-inventory declares absence expected"
     if not have_history:
         return "unclassified", "none", "history unavailable; cause not determined"
-    if ref in renames:
-        return "renamed", "update-path", f"renamed to {renames[ref]}"
+    renamed_to = _rename_target(ref, renames)
+    if renamed_to:
+        return "renamed", "update-path", f"renamed to {renamed_to}"
 
-    deleted_on = deletions.get(ref)
+    deleted_on = _deletion_date(ref, deletions)
     if deleted_on:
-        owners = [(n, d) for n, d, paths in removers if ref in paths]
+        owners = [(n, d) for n, d, paths in removers if _covers(paths, ref)]
         if any(n == adr_name for n, _ in owners):
             return "removed-by-self", "none", f"this decision removed it ({deleted_on})"
         if owners:
@@ -276,6 +321,15 @@ def _classify_one(adr_name, ref, deletions, renames, lazy_shapes, removers, have
             return "removed-by-later", "link-supersession", detail
         return "vanished", "retire-candidate", f"deleted {deleted_on}, no owning decision found"
     return "vanished", "retire-candidate", "absent, with no deletion recorded"
+
+
+def _covers(paths: set[str], ref: str) -> bool:
+    """Does a removal-intent decision's `affected_files` account for `ref`?
+
+    A decision that removed a directory may cite the directory itself, the
+    files inside it, or both -- all three are the same claim of ownership.
+    """
+    return ref in paths or any(p.startswith(_as_prefix(ref)) for p in paths)
 
 
 def _date_distance(a: str, b: str) -> int:

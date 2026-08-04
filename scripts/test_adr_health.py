@@ -151,6 +151,85 @@ def test_canary_removed_by_later_yields_a_supersession_link(repo: Path) -> None:
     assert findings["002-slug.md"]["decay_class"] == "removed-by-self"
 
 
+# -- Directory-shaped references ----------------------------------------------
+#
+# Git names files, never directories, so a directory reference is never a key in
+# the deletion or rename index. Every canary above uses a file-shaped path, and
+# that shared assumption -- not any one class -- is what let directory
+# references fall through to `vanished` on the live corpus, mislabelling five
+# "remove X" decisions as retirement candidates and losing one supersession
+# edge. These canaries vary the shape, holding each class fixed.
+
+
+def test_canary_removed_directory_is_the_decision_working_not_a_candidate(repo: Path) -> None:
+    """The live regression: `dec-225` -> `skills/memory/` read as `retire-candidate`."""
+    subsystem = repo / "subsystem"
+    subsystem.mkdir()
+    (subsystem / "a.py").write_text("x", encoding="utf-8")
+    (subsystem / "b.py").write_text("x", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "add")
+    _git(repo, "rm", "-qr", "subsystem")
+    _git(repo, "commit", "-qm", "remove")
+    _adr(repo, 1, title="Remove the subsystem", files=["subsystem/"])
+    finding = next(f for f in adr_health.classify(repo)["findings"] if f["path"] == "subsystem/")
+    assert finding["decay_class"] == "removed-by-self"
+    assert finding["disposition"] == "none"
+
+
+def test_canary_directory_removed_by_later_yields_a_supersession_link(repo: Path) -> None:
+    """The lost edge: a directory another decision deleted still owes a link."""
+    app = repo / "old_app"
+    app.mkdir()
+    (app / "main.py").write_text("x", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "add")
+    _git(repo, "rm", "-qr", "old_app")
+    _git(repo, "commit", "-qm", "remove")
+    _adr(repo, 1, title="Build the old app", date="2026-01-01", files=["old_app/"])
+    _adr(repo, 2, title="Replace the old app", date="2026-02-01", files=["old_app/"])
+    findings = {f["adr"]: f for f in adr_health.classify(repo)["findings"]}
+    assert findings["001-slug.md"]["decay_class"] == "removed-by-later"
+    assert findings["001-slug.md"]["disposition"] == "link-supersession"
+    assert "002-slug.md" in findings["001-slug.md"]["detail"]
+
+
+def test_canary_directory_reference_without_a_trailing_slash_still_resolves(repo: Path) -> None:
+    """Authors omit the slash; the subtree is the evidence, not the punctuation."""
+    pkg = repo / "pkg"
+    pkg.mkdir()
+    (pkg / "mod.py").write_text("x", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "add")
+    _git(repo, "rm", "-qr", "pkg")
+    _git(repo, "commit", "-qm", "remove")
+    _adr(repo, 1, title="Drop the package", files=["pkg"])
+    assert _classes(adr_health.classify(repo))["pkg"] == "removed-by-self"
+
+
+def test_canary_moved_directory_is_renamed_not_removed(repo: Path) -> None:
+    """`--no-renames` puts a move in the deletion index too; renames must win."""
+    src = repo / "old_dir"
+    src.mkdir()
+    (src / "a.py").write_text("x" * 200, encoding="utf-8")
+    (src / "b.py").write_text("y" * 200, encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "add")
+    _git(repo, "mv", "old_dir", "new_dir")
+    _git(repo, "commit", "-qm", "move")
+    _adr(repo, 1, title="Some decision", files=["old_dir/"])
+    finding = next(f for f in adr_health.classify(repo)["findings"] if f["path"] == "old_dir/")
+    assert finding["decay_class"] == "renamed"
+    assert finding["disposition"] == "update-path"
+    assert "new_dir/" in finding["detail"]
+
+
+def test_directory_that_never_existed_is_still_vanished(repo: Path) -> None:
+    """Prefix matching must not manufacture a removal for an empty subtree."""
+    _adr(repo, 1, title="Some decision", files=["never_existed/"])
+    assert _classes(adr_health.classify(repo))["never_existed/"] == "vanished"
+
+
 def test_vanished_is_the_residual_not_the_default(repo: Path) -> None:
     _adr(repo, 1, title="Some decision", files=["never_existed.py"])
     finding = next(

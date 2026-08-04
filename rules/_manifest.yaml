@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-08-02T16:58:19Z'
+generated_at: '2026-08-04T20:02:11Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
@@ -203,7 +203,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 2713
+  chars: 3442
   paths:
   - rules/**
   - skills/**

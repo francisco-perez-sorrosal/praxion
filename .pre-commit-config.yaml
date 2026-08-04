@@ -130,8 +130,11 @@ repos:
       # rules/ changes.
       - id: rules-manifest-drift
         name: Rules-manifest drift
-        entry: python3 scripts/regenerate_rules_manifest.py --check
-        language: system
+        entry: python scripts/regenerate_rules_manifest.py --check
+        # language: python (not system) -- this script imports PyYAML, and the
+        # ambient python3 is not guaranteed to have the project's declared deps.
+        language: python
+        additional_dependencies: ['pyyaml']
         files: '^rules/(_manifest\.yaml|.*\.md)$'
         pass_filenames: false
 
@@ -140,8 +143,10 @@ repos:
       # same-basename .md sibling carrying share_out: true.
       - id: html-authorship-boundary
         name: HTML authorship boundary
-        entry: python3 scripts/check_html_authorship.py --repo-root . --files
-        language: system
+        entry: python scripts/check_html_authorship.py --repo-root . --files
+        # language: python (not system) -- imports PyYAML; see rules-manifest-drift.
+        language: python
+        additional_dependencies: ['pyyaml']
         files: '\.html$'
         pass_filenames: true
 

@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-04T18:29:31Z'
+generated_at: '2026-08-04T19:55:00Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -123,7 +123,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-07-31'
+  last_modified: '2026-08-04'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -526,7 +526,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-08-02'
+  last_modified: '2026-08-04'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved

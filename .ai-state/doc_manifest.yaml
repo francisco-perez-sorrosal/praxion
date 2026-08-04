@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-04T19:55:00Z'
+generated_at: '2026-08-04T20:59:08Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -2468,18 +2468,6 @@ surfaces:
   title: Idea Ledger
   last_modified: '2026-06-27'
   renderer: idea_grid
-- id: ai-state-sentinel-reports-sentinel-report-2026-05-24-01-52-04
-  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-05-24_01-52-04.md
-  type: markdown
-  title: Sentinel Report
-  last_modified: '2026-05-23'
-  renderer: default_markdown
-- id: ai-state-sentinel-reports-sentinel-report-2026-05-25-21-11-42
-  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-05-25_21-11-42.md
-  type: markdown
-  title: Sentinel Report
-  last_modified: '2026-05-25'
-  renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-06-02-14-04-03
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-06-02_14-04-03.md
   type: markdown
@@ -2533,6 +2521,12 @@ surfaces:
   type: markdown
   title: Sentinel Report
   last_modified: '2026-07-31'
+  renderer: default_markdown
+- id: ai-state-sentinel-reports-sentinel-report-2026-08-04-13-35-55
+  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-04_13-35-55.md
+  type: markdown
+  title: Sentinel Report
+  last_modified: '2026-08-04'
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-06-11-08-38-15
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-11_08-38-15.json
@@ -3079,8 +3073,6 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-07-16-06-44-58
   - ai-state-metrics-reports-metrics-report-2026-07-29-22-11-31
   - ai-state-metrics-reports-metrics-report-2026-07-29-22-11-31
-  - ai-state-sentinel-reports-sentinel-report-2026-05-24-01-52-04
-  - ai-state-sentinel-reports-sentinel-report-2026-05-25-21-11-42
   - ai-state-sentinel-reports-sentinel-report-2026-06-02-14-04-03
   - ai-state-sentinel-reports-sentinel-report-2026-06-11-01-06-26
   - ai-state-sentinel-reports-sentinel-report-2026-06-11-01-25-30
@@ -3090,6 +3082,7 @@ groups:
   - ai-state-sentinel-reports-sentinel-report-2026-07-29-15-11-15
   - ai-state-sentinel-reports-sentinel-report-2026-07-30-11-03-40
   - ai-state-sentinel-reports-sentinel-report-2026-07-31-11-52-24
+  - ai-state-sentinel-reports-sentinel-report-2026-08-04-13-35-55
   - ai-state-specs-spec-agent-model-routing-2026-04-25
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30

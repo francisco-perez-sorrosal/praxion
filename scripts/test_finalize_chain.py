@@ -14,6 +14,7 @@ the library and stubbing the script-runner plus the repo-state predicates.
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -215,3 +216,69 @@ def test_finalize_chain_run_on_main_resolves_repo_root_when_omitted(tmp_path: Pa
     ]
 
     assert fired == ["finalize_tech_debt_ledger"]
+
+
+# ---------------------------------------------------------------------------
+# Interpreter resolution
+#
+# A bare `python3` is not necessarily an interpreter holding the project's
+# declared dependencies. When it is not, any chain script needing a third-party
+# package fails, the chain degrades to a non-blocking warning, and the state
+# that script maintains drifts silently.
+# ---------------------------------------------------------------------------
+
+
+def _resolve_python(*, repo_root: str, env: dict[str, str] | None = None) -> str:
+    """Source the chain and return the interpreter it would use."""
+    snippet = f"""
+        source {CHAIN_PATH}
+        _finalize_chain_repo_root() {{ echo {repo_root!r}; }}
+        _finalize_chain_python
+    """
+    result = subprocess.run(
+        ["bash", "-c", snippet],
+        capture_output=True,
+        text=True,
+        check=True,
+        env={**os.environ, **(env or {})},
+    )
+    return result.stdout.strip()
+
+
+def _make_venv(root: Path) -> Path:
+    """Create an executable stub at <root>/.venv/bin/python."""
+    python = root / ".venv" / "bin" / "python"
+    python.parent.mkdir(parents=True)
+    python.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    python.chmod(0o755)
+    return python
+
+
+def test_project_venv_is_preferred_over_ambient_python(tmp_path: Path) -> None:
+    """The regression: the ambient python3 lacked a declared dependency."""
+    python = _make_venv(tmp_path)
+    assert _resolve_python(repo_root=str(tmp_path)) == str(python)
+
+
+def test_explicit_override_outranks_the_project_venv(tmp_path: Path) -> None:
+    _make_venv(tmp_path)
+    override = tmp_path / "override-python"
+    override.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    override.chmod(0o755)
+    resolved = _resolve_python(repo_root=str(tmp_path), env={"PRAXION_PYTHON": str(override)})
+    assert resolved == str(override)
+
+
+def test_falls_back_to_ambient_python_without_a_venv(tmp_path: Path) -> None:
+    """Consumer projects have no venv; stdlib-only finalizers must still run."""
+    resolved = _resolve_python(repo_root=str(tmp_path))
+    assert resolved.endswith("python3")
+
+
+def test_unusable_override_falls_through_rather_than_breaking(tmp_path: Path) -> None:
+    """A stale PRAXION_PYTHON must not strand the chain."""
+    python = _make_venv(tmp_path)
+    resolved = _resolve_python(
+        repo_root=str(tmp_path), env={"PRAXION_PYTHON": str(tmp_path / "gone")}
+    )
+    assert resolved == str(python)

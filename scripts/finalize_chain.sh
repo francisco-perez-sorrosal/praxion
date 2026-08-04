@@ -103,16 +103,47 @@ _finalize_chain_state_was_touched() {
 # FINALIZE_CHAIN_STRICT is set (non-empty), propagate the script's exit code
 # instead — for server-side callers (e.g. CI) that must fail loud.
 # Args: <label> <absolute-script-path> [extra-args...]
+# Resolve the interpreter that runs chain scripts.
+#
+# A bare `python3` is whatever the ambient shell exposes, which is not
+# necessarily an interpreter holding the project's declared dependencies. Under
+# a pyenv shim it can be an unrelated build entirely, silently stranding any
+# chain script that needs a third-party package: observed on Praxion itself,
+# where `build_doc_manifest.py` requires PyYAML (declared in pyproject.toml and
+# present in .venv) but the shim resolved to a 3.14 alpha without it -- so the
+# committed manifest went stale while every commit printed a non-blocking
+# warning that read as noise.
+#
+# Order: explicit override, the project's own virtualenv, then the ambient
+# interpreter. The last keeps stdlib-only chain scripts (finalize_adrs,
+# finalize_tech_debt_ledger) working in consumer projects that have no venv --
+# so this strictly widens what runs and never narrows it.
+_finalize_chain_python() {
+    local repo_root
+    if [ -n "${PRAXION_PYTHON:-}" ] && [ -x "${PRAXION_PYTHON}" ]; then
+        printf '%s\n' "${PRAXION_PYTHON}"
+        return 0
+    fi
+    repo_root="$(_finalize_chain_repo_root)"
+    if [ -n "$repo_root" ] && [ -x "${repo_root}/.venv/bin/python" ]; then
+        printf '%s\n' "${repo_root}/.venv/bin/python"
+        return 0
+    fi
+    command -v python3 2>/dev/null
+}
+
 _finalize_chain_run_script() {
     local label="$1"; shift
     local script="$1"; shift
+    local python
     [ -f "$script" ] || return 0
-    command -v python3 >/dev/null 2>&1 || return 0
+    python="$(_finalize_chain_python)"
+    [ -n "$python" ] || return 0
     if [ -n "${FINALIZE_CHAIN_STRICT:-}" ]; then
-        python3 "$script" "$@"
+        "$python" "$script" "$@"
         return $?
     fi
-    python3 "$script" "$@" 2>&1 || \
+    "$python" "$script" "$@" 2>&1 || \
         echo "${label}: warned (non-blocking) — inspect output above"
 }
 

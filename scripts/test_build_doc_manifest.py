@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import build_doc_manifest as bdm
@@ -353,3 +354,45 @@ def test_untracked_surface_falls_back_to_mtime(committed_project: Path) -> None:
     surfaces = {s["id"]: s for s in bdm.build_manifest(committed_project)["surfaces"]}
     assert "docs-draft" in surfaces, "an untracked surface must still be listed"
     assert surfaces["docs-draft"]["last_modified"], "fallback produced no date"
+
+
+# ---------------------------------------------------------------------------
+# Missing-dependency guard
+#
+# This script runs inside the finalize hook chain, which reports a failing
+# script as a non-blocking warning. A raw ModuleNotFoundError traceback there
+# reads as a crash and gets ignored as noise -- which is how a stale committed
+# manifest survived undetected across commits.
+# ---------------------------------------------------------------------------
+
+
+def _run_without_yaml() -> subprocess.CompletedProcess:
+    """Execute the script with `yaml` made unimportable, deterministically.
+
+    Blanking the entry in sys.modules raises ImportError on import, which is
+    why the guard catches ImportError rather than ModuleNotFoundError -- a
+    broken install deserves the same actionable message as an absent one.
+    """
+    code = (
+        "import sys; sys.modules['yaml'] = None; import runpy; "
+        f"runpy.run_path({str(Path(bdm.__file__))!r}, run_name='__main__')"
+    )
+    return subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)
+
+
+def test_missing_pyyaml_exits_nonzero_instead_of_raising() -> None:
+    assert _run_without_yaml().returncode != 0
+
+
+def test_missing_pyyaml_message_names_the_interpreter_and_the_fix() -> None:
+    stderr = _run_without_yaml().stderr
+    assert "PyYAML" in stderr
+    assert "PRAXION_PYTHON" in stderr, "must name the override the chain honors"
+    assert ".venv" in stderr, "must name where the chain looks first"
+
+
+def test_missing_pyyaml_message_names_the_consequence() -> None:
+    """A warning nobody can act on is the failure mode being fixed."""
+    stderr = _run_without_yaml().stderr
+    assert "doc_manifest.yaml" in stderr
+    assert "F11" in stderr, "must point at the check that catches the drift"

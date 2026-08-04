@@ -39,7 +39,22 @@ from functools import cache
 from pathlib import Path
 from typing import Any
 
-import yaml
+try:
+    import yaml
+except ImportError:
+    # This runs inside the finalize hook chain, where a raw traceback reads as
+    # a crash and gets ignored as noise -- which is how a stale committed
+    # manifest survived undetected. Name the interpreter actually in use, since
+    # the usual cause is the chain resolving one that lacks the project's
+    # declared dependencies rather than PyYAML being genuinely uninstalled.
+    sys.exit(
+        f"build_doc_manifest: PyYAML is not importable under {sys.executable}.\n"
+        "  The finalize chain resolves, in order: $PRAXION_PYTHON, "
+        "<repo>/.venv/bin/python, then the ambient python3.\n"
+        "  Fix by creating the project venv, installing pyyaml into the "
+        "interpreter above, or pointing PRAXION_PYTHON at one that has it.\n"
+        "  Until then .ai-state/doc_manifest.yaml will drift (sentinel F11 warns on this)."
+    )
 
 SCHEMA_VERSION = 2  # v2: dropped on-demandable `summary` + redundant `frontmatter` embeds
 GENERATOR_VERSION = "praxion-0.7.0"

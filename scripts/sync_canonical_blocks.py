@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sync canonical-block files with embedded blocks in command files.
+r"""Sync canonical-block files with embedded blocks in command files.
 
 Canonical content blocks live in ``claude/canonical-blocks/<slug>.md`` and
 are embedded verbatim into one or more consumer command files.  Each embedded

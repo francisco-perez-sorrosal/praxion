@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-02T17:55:50Z'
+generated_at: '2026-08-04T18:29:31Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -495,7 +495,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-07-31'
+  last_modified: '2026-08-04'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -512,11 +512,15 @@ surfaces:
   path: .ai-state/SYSTEM_DEPLOYMENT.md
   type: markdown
   title: System Deployment
-  last_modified: '2026-06-24'
+  last_modified: '2026-08-04'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-116-ai-training-results-schema-owner
   - ai-state-decisions-118-ai-training-tiered-backend-strategy
+  - ai-state-decisions-122-pipeline-dashboard-dashboard-cross-platform-scope
+  - ai-state-decisions-123-pipeline-dashboard-dashboard-dependency-isolation
+  - ai-state-decisions-127-pipeline-dashboard-dashboard-port-allocation
+  - ai-state-decisions-128-pipeline-dashboard-dashboard-process-model
   - ai-state-decisions-225-remove-in-house-memory-subsystem
 - id: ai-state-tech-debt-ledger
   path: .ai-state/TECH_DEBT_LEDGER.md

@@ -2,7 +2,7 @@
 name: sentinel
 description: >
   Read-only ecosystem quality auditor that scans all context artifacts (skills,
-  agents, rules, commands, CLAUDE.md, plugin.json) across ten dimensions: eight
+  agents, rules, commands, CLAUDE.md, plugin.json) across eleven dimensions: eight
   per-artifact (completeness, consistency, freshness, spec compliance,
   cross-reference integrity, token efficiency, pipeline discipline, spec health),
   a code-health dimension sampling implementation files for systemic duplication,
@@ -323,6 +323,37 @@ Conditional activation: skip GL02 with a GL-dimension INFO note when `scripts/ch
 
 GL03 is the sentinel auditing its own bite — when it flags one of its own checks, propose the substance assertion that would fix it.
 
+### Decision Health (DH)
+
+Audits whether the decision corpus still *anchors* to the system it describes. Every other dimension
+asks whether an artifact is well-formed or well-connected; DH asks whether a recorded decision's
+subject still exists, and — when it does not — **why**, because the cause determines the fix and only
+one of seven causes means "retire".
+
+Delegated to `scripts/adr_health.py --json` (a state+history question a regex cannot answer). The
+detector is **advisory by construction**: it emits candidates, never edits an ADR, never changes a
+`status`, and exits 0 even with findings. A decision can be correct and silent forever, so automatic
+demotion would destroy exactly the constraints that work without being spoken.
+
+Conditional activation: skip with a DH-dimension INFO note when `scripts/adr_health.py` or
+`.ai-state/decisions/` is absent (substrate trigger, TT idiom — never WARN/FAIL on substrate
+absence).
+
+**Read `withheld` before reading `findings`.** A non-empty `withheld` means an oracle was
+unavailable (shallow clone; unparseable lifecycle table) and the dependent classes were suppressed
+rather than defaulted. Findings are still valid, but the `vanished` count is *not* comparable to a
+full run — report the withheld reasons alongside any DH conclusion rather than treating the run as
+complete.
+
+| ID | Tp | Rule | Pass |
+|----|----|------|------|
+| DH01 | A | Decisions whose subject was removed by a *later* decision carry a supersession link | Run `python3 scripts/adr_health.py --json`. Each `removed-by-later` finding is a **WARN**: the corpus records a decision whose subject another decision deleted, with no `supersedes`/`superseded_by` link between them. The disposition is to confirm which candidate actually removed it and record the link — this reconstructs decision-graph edges that exist in reality but were never written, and is the honest explanation for a low supersession rate. Golden bad-case: an ADR listing an `affected_files` path that a later removal-intent ADR deleted, where neither ADR references the other |
+| DH02 | A | Reference decay is repaired, not left to accumulate | From the same JSON, each `renamed`, `placeholder-shape`, or `out-of-repo` finding is a **WARN** with disposition `fix-entry`/`update-path` — the ADR's `affected_files` no longer describes reality and the repair is mechanical. `lazy-artifact` and `removed-by-self` are explicitly **not findings**: the first is an artifact the inventory declares expected-absent, the second is the decision working as intended. Golden bad-case: an ADR pointing at a path that was renamed, still resolving to nothing |
+| DH03 | L | Retirement candidates are dispositioned, not accumulated | For each `vanished` finding (subject absent, no owning removal decision), judge whether the decision still constrains anything. INFO-level advisory listing candidates for human disposition; never propose a status change directly, and never treat the count as a backlog to clear — `vanished` is the residual after every repair class, and a decision may be correct though its example files are gone |
+
+DH01 is the dimension's highest-value output: it *adds* edges to the decision graph rather than
+pruning nodes from it.
+
 ### Self-Verification (V)
 
 The sentinel includes itself in the audit.
@@ -396,7 +427,7 @@ Guidelines:
 3. Record PASS/WARN/FAIL for each check with evidence
 4. Target: **~15-20 turns total** for all auto checks (not 50+)
 
-When `.ai-state/specs/` exists with spec files, include SH01-SH02 and SH08 (auto) in this pass; SH08 runs `python3 scripts/check_spec_archival_gap.py --json` (flag **Important** when `gap: true`). When `.ai-state/calibration_log.md` exists, include CA01 and CA03 (auto) in this pass; CA03 runs `python3 scripts/check_calibration_coverage.py --json` (flag **Important** when `covered: false`). When `.ai-work/` is present, run `python3 scripts/check_p06_task_brief.py --json`; WARN per row returned (P06 — TASK_BRIEF.md absent for a Standard/Full slug; a file-existence check, no LLM required); also check P07 inline (per `<slug>/`: **P07** — `INTERFACE_DESIGN.md`/`TRANSACTIONS_DESIGN.md` carrying a non-empty `## Architecture Challenges` with no recorded disposition, **or** `CONSULT_<discipline>.md` carrying a `### CH-NN` entry whose `**Disposition:**` field is empty or still the convener placeholder → WARN); and include P08 (auto): `python3 scripts/clean_work_safety.py --json` (advisory when `summary.stale_safe ≥ 3`; skip when absent or below threshold). When `scripts/check_aac_golden_rule.py` exists, include EC07 (auto) in this pass: `python3 scripts/check_aac_golden_rule.py --mode=audit --json`. When ≥1 architecture markdown file exists (AC10 substrate trigger), include AC10 in this pass: `python3 scripts/aac_fence_validator.py <file>` per in-scope architecture markdown; skip with AC-dimension INFO note when substrate absent. When `scripts/check_gate_liveness.py` exists (GL substrate trigger), include GL02 (auto) in this pass: `python3 scripts/check_gate_liveness.py --json`; skip with a GL-dimension INFO note when absent. GL01 and GL03 are LLM-judgment checks — run them in Pass 2. When `.ai-state/metrics_reports/` is present, include RD01 (auto) in this pass: `python3 scripts/check_readiness_feedback.py --json` (flag **Important** when `below_threshold: true`; annotate when `mechanical_only: true`; skip with an RD-dimension INFO note when absent).
+When `.ai-state/specs/` exists with spec files, include SH01-SH02 and SH08 (auto) in this pass; SH08 runs `python3 scripts/check_spec_archival_gap.py --json` (flag **Important** when `gap: true`). When `.ai-state/calibration_log.md` exists, include CA01 and CA03 (auto) in this pass; CA03 runs `python3 scripts/check_calibration_coverage.py --json` (flag **Important** when `covered: false`). When `.ai-work/` is present, run `python3 scripts/check_p06_task_brief.py --json`; WARN per row returned (P06 — TASK_BRIEF.md absent for a Standard/Full slug; a file-existence check, no LLM required); also check P07 inline (per `<slug>/`: **P07** — `INTERFACE_DESIGN.md`/`TRANSACTIONS_DESIGN.md` carrying a non-empty `## Architecture Challenges` with no recorded disposition, **or** `CONSULT_<discipline>.md` carrying a `### CH-NN` entry whose `**Disposition:**` field is empty or still the convener placeholder → WARN); and include P08 (auto): `python3 scripts/clean_work_safety.py --json` (advisory when `summary.stale_safe ≥ 3`; skip when absent or below threshold). When `scripts/check_aac_golden_rule.py` exists, include EC07 (auto) in this pass: `python3 scripts/check_aac_golden_rule.py --mode=audit --json`. When ≥1 architecture markdown file exists (AC10 substrate trigger), include AC10 in this pass: `python3 scripts/aac_fence_validator.py <file>` per in-scope architecture markdown; skip with AC-dimension INFO note when substrate absent. When `scripts/check_gate_liveness.py` exists (GL substrate trigger), include GL02 (auto) in this pass: `python3 scripts/check_gate_liveness.py --json`; skip with a GL-dimension INFO note when absent. GL01 and GL03 are LLM-judgment checks — run them in Pass 2. When `.ai-state/decisions/` and `scripts/adr_health.py` both exist (DH substrate trigger), include DH01 and DH02 (auto) in this pass: `python3 scripts/adr_health.py --json`; read `withheld` first and report any suppressed classes alongside the findings; skip with a DH-dimension INFO note when either is absent. DH03 is LLM judgment — run it in Pass 2. When `.ai-state/metrics_reports/` is present, include RD01 (auto) in this pass: `python3 scripts/check_readiness_feedback.py --json` (flag **Important** when `below_threshold: true`; annotate when `mechanical_only: true`; skip with an RD-dimension INFO note when absent).
 
 This pass is deterministic and fast. Complete it fully before starting Pass 2.
 

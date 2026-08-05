@@ -46,8 +46,13 @@ from pathlib import Path
 # Single source for the keyword alternation: the source-scanning form (file level) and the
 # function-name form (check level) must never drift apart.
 _CANARY_KEYWORDS = (
-    "reject|flag|fail|block|deny|denie|detect|nonzero|violation|invalid|missing|empty|bad"
+    "canary|reject|flag|fail|block|deny|denie|detect|nonzero|violation|invalid|missing|empty|bad"
 )
+# `canary` leads the alternation because it is the convention the codebase
+# actually follows: 42 tests use a `test_canary_*` prefix, and before it was
+# listed only 16 of them matched a prescribed keyword. The other 26 were
+# invisible here, so the meta-test's coverage claim read stronger than it was —
+# a naming convention enforced by a vocabulary the code had already outgrown.
 
 # The keyword may appear anywhere in the test name — the recipe uses the `*_rejects_*`
 # form, so `test_full_scan_finds_violation` counts as a canary, not only
@@ -192,8 +197,35 @@ def _coverage_scope(gate: Path, root: Path) -> list[Path]:
     return list(seen)
 
 
+# A script the sentinel dispatches is a gate whatever it is called. Derived from
+# the agent definition rather than listed here, so the set maintains itself.
+_SENTINEL_DISPATCH = re.compile(r"\bpython3?\s+(scripts/[A-Za-z0-9_]+\.py)")
+
+
+def _delegated_gates(root: Path) -> list[Path]:
+    """Scripts the sentinel delegates a check to, whatever their filename shape.
+
+    The glob below keys on the `check_`/`validate_` naming convention, which
+    silently excluded `scripts/adr_health.py` — a detector the sentinel routes
+    four checks to (DH01/DH02/DH04/DH05) and a shipped command delegates its
+    whole gather phase to. It was in fact well canaried, but nothing enforced
+    that, so the meta-test's documented scope ("the full gate set") was wider
+    than its computed scope (a filename pattern). That is this rule's own
+    scope-fidelity clause turned on itself.
+
+    Deriving the set from the agent definition rather than an allowlist means
+    the next oddly-named detector is covered the moment it is wired, instead of
+    when someone remembers to add it here.
+    """
+    definition = root / "agents" / "sentinel.md"
+    if not definition.is_file():
+        return []
+    named = set(_SENTINEL_DISPATCH.findall(definition.read_text(encoding="utf-8")))
+    return [p for rel in sorted(named) if (p := root / rel).is_file()]
+
+
 def _script_gates(root: Path, skip_stems: frozenset[str] = _SKIP_GATE_STEMS) -> list[Path]:
-    """All scripts/check_*.py and scripts/validate_*.py, excluding test_ files and skipped gates."""
+    """Gate scripts: the check_*/validate_* naming shape, plus anything the sentinel dispatches."""
     scripts = root / "scripts"
     gates: list[Path] = []
     for pattern in ("check_*.py", "validate_*.py"):
@@ -203,7 +235,10 @@ def _script_gates(root: Path, skip_stems: frozenset[str] = _SKIP_GATE_STEMS) -> 
             if p.stem in skip_stems:
                 continue
             gates.append(p)
-    return gates
+    for p in _delegated_gates(root):
+        if p.stem not in skip_stems and p not in gates:
+            gates.append(p)
+    return sorted(set(gates))
 
 
 def _hook_gates(root: Path, skip_stems: frozenset[str] = _SKIP_GATE_STEMS) -> list[Path]:

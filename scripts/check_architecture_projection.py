@@ -42,6 +42,7 @@ authority, prose is authored); CLAUDE.md§Context Engineering.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import re
 import sys
@@ -53,6 +54,11 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 _MODEL = Path("docs/diagrams/architecture/src/architecture.c4")
 _DESIGN = Path(".ai-state/DESIGN.md")
+# The shipped-block registry, read from the tree under inspection. Both this and
+# the two paths above resolve against `repo_root`, so every authority the check
+# compares comes from the same tree.
+_REGISTRY = Path("scripts/sync_canonical_blocks.py")
+_REGISTRY_SYMBOL = "BLOCKS"
 
 # `name = kind "Title"` -- the only element-declaration form LikeC4 uses here.
 _ELEMENT = re.compile(
@@ -158,24 +164,51 @@ def parse_canonical_block_rows(text: str) -> list[str]:
     return slugs
 
 
-def canonical_block_slugs() -> tuple[str, ...] | None:
-    """The shipped-block registry, or None when it cannot be read.
+def canonical_block_slugs(repo_root: Path) -> tuple[str, ...] | None:
+    """The shipped-block registry for *repo_root*, or None when it cannot be read.
 
-    None means *withhold*, never *empty*: reporting "no blocks ship" because an
-    import failed would turn a tooling problem into a claim that the entire
-    published contract is undocumented.
+    Read by parsing rather than importing, for two reasons. It resolves against
+    `repo_root` like every other input, so `--repo-root` relocates *both*
+    authorities instead of silently reconciling one tree's design doc against
+    another tree's registry -- a wrong answer that looks like a clean run. And
+    parsing executes nothing, so a checker can never be made to run code from
+    the tree it is inspecting.
+
+    None means *withhold*, never *empty*: reporting "no blocks ship" because the
+    registry could not be read would turn a tooling problem into a claim that
+    the entire published contract is undocumented. A non-literal key withholds
+    for the same reason -- a partial read is a wrong answer, not a smaller one.
     """
     try:
-        from sync_canonical_blocks import BLOCKS
-    except Exception:
+        tree = ast.parse((repo_root / _REGISTRY).read_text(encoding="utf-8"))
+    except (OSError, SyntaxError, ValueError):
         return None
-    return tuple(BLOCKS)
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.AnnAssign):
+            named = isinstance(node.target, ast.Name) and node.target.id == _REGISTRY_SYMBOL
+        elif isinstance(node, ast.Assign):
+            named = any(
+                isinstance(target, ast.Name) and target.id == _REGISTRY_SYMBOL
+                for target in node.targets
+            )
+        else:
+            continue
+        if not named or not isinstance(node.value, ast.Dict):
+            continue
+        slugs = [
+            key.value
+            for key in node.value.keys
+            if isinstance(key, ast.Constant) and isinstance(key.value, str)
+        ]
+        return tuple(slugs) if len(slugs) == len(node.value.keys) else None
+    return None
 
 
 # -- Reconciliation -----------------------------------------------------------
 
 
-def reconcile(repo_root: Path, *, block_slugs: tuple[str, ...] | None = _AUTO) -> dict:
+def check_projection(repo_root: Path, *, block_slugs: tuple[str, ...] | None = _AUTO) -> dict:
     model_path, design_path = repo_root / _MODEL, repo_root / _DESIGN
     if not model_path.is_file() or not design_path.is_file():
         return {
@@ -236,7 +269,7 @@ def reconcile(repo_root: Path, *, block_slugs: tuple[str, ...] | None = _AUTO) -
     # registry is the authority; the table is a projection of it, and without
     # this a block added tomorrow leaves the contract silently undocumented.
     withheld = []
-    slugs = canonical_block_slugs() if block_slugs is _AUTO else block_slugs
+    slugs = canonical_block_slugs(repo_root) if block_slugs is _AUTO else block_slugs
     if slugs is None:
         withheld.append("canonical-block rows: the shipped-block registry could not be read")
     else:
@@ -278,7 +311,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo-root", help="repository root (defaults to git discovery)")
     args = parser.parse_args(argv)
 
-    report = reconcile(resolve_repo_root(args.repo_root, script_dir=SCRIPT_DIR))
+    report = check_projection(resolve_repo_root(args.repo_root, script_dir=SCRIPT_DIR))
 
     if args.json:
         print(json.dumps(report, indent=2))

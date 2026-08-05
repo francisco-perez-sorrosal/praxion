@@ -73,7 +73,7 @@ ALL_THREE = (
 
 def test_model_and_section_agree(repo: Path) -> None:
     _write_rows(repo, ALL_THREE)
-    report = cap.reconcile(repo, block_slugs=())
+    report = cap.check_projection(repo, block_slugs=())
     assert report["findings"] == []
     assert (report["elements"], report["rows"]) == (3, 3)
 
@@ -84,7 +84,7 @@ def test_canary_model_element_with_no_row(repo: Path) -> None:
         repo,
         "| Skills | `knowledge.skills` | r | Built | f |\n| Rules | `knowledge.rules` | r | Built | f |\n",
     )
-    report = cap.reconcile(repo, block_slugs=())
+    report = cap.check_projection(repo, block_slugs=())
     assert _kinds(report) == {"element-without-row"}
     assert report["findings"][0]["subject"] == "tooling.scripts"
 
@@ -92,7 +92,7 @@ def test_canary_model_element_with_no_row(repo: Path) -> None:
 def test_canary_row_naming_no_element(repo: Path) -> None:
     """The live shape: a documented component carrying zero structural enforcement."""
     _write_rows(repo, ALL_THREE + "| Dashboard |  | r | Built | f |\n")
-    report = cap.reconcile(repo, block_slugs=())
+    report = cap.check_projection(repo, block_slugs=())
     assert _kinds(report) == {"row-without-element"}
     assert report["findings"][0]["subject"] == "Dashboard"
 
@@ -100,7 +100,7 @@ def test_canary_row_naming_no_element(repo: Path) -> None:
 def test_canary_row_naming_an_element_that_does_not_exist(repo: Path) -> None:
     """Catches a rename on the model side that the doc did not follow."""
     _write_rows(repo, ALL_THREE + "| Ghost | `tooling.ghost` | r | Built | f |\n")
-    report = cap.reconcile(repo, block_slugs=())
+    report = cap.check_projection(repo, block_slugs=())
     assert _kinds(report) == {"unknown-element"}
     assert "tooling.ghost" in report["findings"][0]["detail"]
 
@@ -108,7 +108,7 @@ def test_canary_row_naming_an_element_that_does_not_exist(repo: Path) -> None:
 def test_canary_row_for_a_layer_container_is_rejected(repo: Path) -> None:
     """Layers group components; giving one a row double-counts its children."""
     _write_rows(repo, ALL_THREE + "| Knowledge Layer | `knowledge` | r | Built | f |\n")
-    report = cap.reconcile(repo, block_slugs=())
+    report = cap.check_projection(repo, block_slugs=())
     assert _kinds(report) == {"not-structural"}
 
 
@@ -125,7 +125,7 @@ def test_a_component_whose_children_are_all_agents_is_structural(repo: Path) -> 
         encoding="utf-8",
     )
     _write_rows(repo, ALL_THREE)
-    assert cap.reconcile(repo, block_slugs=())["findings"] == []
+    assert cap.check_projection(repo, block_slugs=())["findings"] == []
 
 
 # -- The published half -------------------------------------------------------
@@ -144,13 +144,13 @@ def _with_section_4(repo: Path, block_rows: str) -> None:
 
 def test_documented_blocks_matching_the_registry_agree(repo: Path) -> None:
     _with_section_4(repo, "| Canonical block: `alpha` | Markdown |\n")
-    assert cap.reconcile(repo, block_slugs=("alpha",))["findings"] == []
+    assert cap.check_projection(repo, block_slugs=("alpha",))["findings"] == []
 
 
 def test_canary_shipped_block_missing_from_the_interfaces_table(repo: Path) -> None:
     """A block reaching N projects with nothing documenting it."""
     _with_section_4(repo, "| Canonical block: `alpha` | Markdown |\n")
-    report = cap.reconcile(repo, block_slugs=("alpha", "beta"))
+    report = cap.check_projection(repo, block_slugs=("alpha", "beta"))
     assert _kinds(report) == {"block-without-row"}
     assert report["findings"][0]["subject"] == "beta"
 
@@ -160,7 +160,7 @@ def test_canary_interfaces_table_documents_a_block_that_does_not_ship(repo: Path
     _with_section_4(
         repo, "| Canonical block: `alpha` | Markdown |\n| Canonical block: `ghost` | M |\n"
     )
-    report = cap.reconcile(repo, block_slugs=("alpha",))
+    report = cap.check_projection(repo, block_slugs=("alpha",))
     assert _kinds(report) == {"row-without-block"}
     assert report["findings"][0]["subject"] == "ghost"
 
@@ -174,7 +174,7 @@ def test_canary_unreadable_registry_withholds_rather_than_claiming_nothing_ships
     invert the finding, which is the worst way for this check to fail.
     """
     _with_section_4(repo, "| Canonical block: `alpha` | Markdown |\n")
-    report = cap.reconcile(repo, block_slugs=None)
+    report = cap.check_projection(repo, block_slugs=None)
     assert report["findings"] == []
     assert any("registry could not be read" in w for w in report["withheld"])
 
@@ -182,7 +182,7 @@ def test_canary_unreadable_registry_withholds_rather_than_claiming_nothing_ships
 def test_absent_substrate_skips_rather_than_failing(repo: Path) -> None:
     """A project with no model must not be reported as fully drifted."""
     (repo / cap._MODEL).unlink()
-    report = cap.reconcile(repo, block_slugs=())
+    report = cap.check_projection(repo, block_slugs=())
     assert report["findings"] == []
     assert "substrate absent" in report["skipped"]
 
@@ -190,14 +190,14 @@ def test_absent_substrate_skips_rather_than_failing(repo: Path) -> None:
 def test_exit_code_is_nonzero_only_when_findings_exist(repo: Path) -> None:
     """It doubles as a commit gate, so the exit code is the contract.
 
-    Run through the CLI, which resolves the real shipped-block registry rather
-    than an injected one -- so section 4 is built from that registry here. That
-    keeps the fixture honest as blocks are added or retired, and exercises the
-    registry lookup the in-process tests deliberately bypass.
+    Run through the CLI, which resolves the shipped-block registry rather than
+    an injected one -- so section 4 is built from that registry here. Copying
+    the real registry in keeps the fixture honest as blocks are added or
+    retired, and exercises the registry lookup the in-process tests bypass.
     """
     script = str(Path(cap.__file__))
     rows = "".join(
-        f"| Canonical block: `{slug}` | Markdown |\n" for slug in cap.canonical_block_slugs()
+        f"| Canonical block: `{slug}` | Markdown |\n" for slug in _install_registry(repo)
     )
     section_4 = "\n## 4. Interfaces\n\n| Interface | Type |\n|---|---|\n" + rows
 
@@ -215,9 +215,56 @@ def test_exit_code_is_nonzero_only_when_findings_exist(repo: Path) -> None:
     assert (clean.returncode, dirty.returncode) == (0, 1), clean.stdout + dirty.stdout
 
 
+def _install_registry(repo: Path) -> tuple[str, ...]:
+    """Copy this repo's real shipped-block registry into *repo*; return its slugs.
+
+    The checker resolves the registry from the tree under inspection, so an
+    end-to-end run needs one there. Copying the real file rather than writing a
+    synthetic one keeps the fixture honest as blocks are added or retired.
+    """
+    source = Path(cap.__file__).parent / cap._REGISTRY.name
+    target = repo / cap._REGISTRY
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    slugs = cap.canonical_block_slugs(repo)
+    assert slugs, "precondition: the copied registry must parse"
+    return slugs
+
+
+def test_the_registry_is_read_from_the_tree_under_inspection(repo: Path) -> None:
+    """`--repo-root` must relocate every authority, not just some of them.
+
+    Reading the registry from the running copy while reading the design doc from
+    `--repo-root` reconciles one tree's document against another tree's shipped
+    contract -- a wrong answer that presents as a clean run.
+    """
+    registry = repo / cap._REGISTRY
+    registry.parent.mkdir(parents=True, exist_ok=True)
+    registry.write_text('BLOCKS = {"only-in-this-tree": 1}\n', encoding="utf-8")
+
+    assert cap.canonical_block_slugs(repo) == ("only-in-this-tree",)
+
+
+def test_canary_a_registry_with_a_computed_key_withholds_rather_than_part_reading(
+    repo: Path,
+) -> None:
+    """A partial read is a wrong answer, not a smaller one, so it must withhold.
+
+    Returning the literal keys and dropping the computed one would report every
+    undropped block as documented and the dropped one as never shipped -- the
+    same inversion an unreadable registry would cause, but harder to notice
+    because most of the answer is right.
+    """
+    registry = repo / cap._REGISTRY
+    registry.parent.mkdir(parents=True, exist_ok=True)
+    registry.write_text('COMPUTED = "b"\nBLOCKS = {"a": 1, COMPUTED: 2}\n', encoding="utf-8")
+
+    assert cap.canonical_block_slugs(repo) is None
+
+
 def test_never_edits_either_side(repo: Path) -> None:
     """Reports drift; resolving it is a human judgment about which side is right."""
     _write_rows(repo, "| Skills | `knowledge.skills` | r | Built | f |\n")
     before = ((repo / cap._MODEL).read_bytes(), (repo / cap._DESIGN).read_bytes())
-    cap.reconcile(repo, block_slugs=())
+    cap.check_projection(repo, block_slugs=())
     assert ((repo / cap._MODEL).read_bytes(), (repo / cap._DESIGN).read_bytes()) == before

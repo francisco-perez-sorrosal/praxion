@@ -1,16 +1,30 @@
 #!/usr/bin/env python3
-"""Gate Liveness detector — GL02 (forbidden-pattern-contradiction).
+"""Gate Liveness detector — the mechanically decidable clauses.
 
 Cites: rules/swe/gate-liveness.md — a gate is a claim that it catches a defect
 class and must be proven to bite. This detector is itself a gate, so it ships with
-a canary (scripts/test_check_gate_liveness.py).
+canaries (scripts/test_check_gate_liveness.py).
 
-Scope: GL02 only. The companion check GL01 (orphaned-consumer) was prototyped here
-but moved to the sentinel's Pass-2 LLM judgment — "is this section produced
-anywhere?" is a semantic question a regex answers with too many false positives,
-whereas a dead grep (a scan for a pattern another rule forbids in the scanned
-location) is a hard, mechanically-detectable contradiction. Use the proof that
-matches the gate (D0 in the gate-liveness ADR).
+Three checks, routed to three sentinel dimensions from one `--json` run:
+
+    forbidden-pattern  GL02  a scan for a pattern another rule forbids there,
+                             so it can never match
+    uninvoked-gate     GL04  a gate nothing calls
+    ambient-import     GL05  a gate something calls with an interpreter that
+                             cannot load it
+
+The last two are the two halves of the same clause — *existence is not
+operation*. A gate must run at all, and it must run in the environment it
+guards; each failure is invisible from the gate's own passing tests.
+
+GL01 (orphaned-consumer) was prototyped here but moved to the sentinel's Pass-2
+LLM judgment — "is this section produced anywhere?" is a semantic question a
+regex answers with too many false positives, whereas a dead grep is a hard,
+mechanically-detectable contradiction. Use the proof that matches the gate.
+
+Stdlib-only, which this file has a specific reason to stay: it is itself
+invoked through the ambient interpreter, so a third-party import here would make
+it the first finding of its own `ambient-import` check.
 
 Invoked by the sentinel's GL dimension (`--json`); also runnable standalone.
 Exit code: 1 when findings exist, 0 when clean — so it doubles as a commit gate.
@@ -20,6 +34,7 @@ Honors an inline `gate-liveness:ignore` escape for deliberate references.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import re
 import sys
@@ -154,9 +169,158 @@ def check_uninvoked_gate(root: Path) -> list[dict]:
     return findings
 
 
+# Surfaces where a script runs under the *ambient* interpreter: an agent or
+# command instructs a model to type `python3 <script>` into a shell, and nothing
+# between the instruction and the process declares which interpreter that is.
+#
+# Everything else is excluded because it resolves its own interpreter and so
+# cannot exhibit this failure: hooks and shell scripts go through
+# `$PRAXION_PYTHON` -> `<repo>/.venv/bin/python` -> ambient; CI workflows install
+# the project environment first; and `.pre-commit-config.yaml` names its
+# interpreter in the `language:` key (`python` for a hook needing third-party
+# packages, `system` for a stdlib-only one) -- a distinction this repo already
+# draws correctly. Documented scope and computed scope are the same two globs,
+# per the rule's own scope-fidelity clause.
+_AMBIENT_INVOCATION_GLOBS = ("agents/*.md", "commands/*.md")
+_AMBIENT_INVOCATION = re.compile(r"\bpython3?\s+(scripts/[A-Za-z0-9_]+\.py)")
+_MISSING_MODULE_ERRORS = frozenset(
+    {"ImportError", "ModuleNotFoundError", "Exception", "BaseException"}
+)
+_STDLIB = frozenset(sys.stdlib_module_names)
+
+
+def _handles_missing_module(handler: ast.ExceptHandler) -> bool:
+    """True when this `except` clause would catch an absent package."""
+    if handler.type is None:  # bare `except:` catches everything
+        return True
+    caught = handler.type.elts if isinstance(handler.type, ast.Tuple) else [handler.type]
+    return any(isinstance(node, ast.Name) and node.id in _MISSING_MODULE_ERRORS for node in caught)
+
+
+def _guarded_imports(tree: ast.Module) -> set[int]:
+    """Ids of import nodes inside a `try` that handles a missing package.
+
+    A guarded import is not a liveness defect: the script has already decided
+    what to do when the package is absent, which is this repo's documented
+    remedy -- name the interpreter actually in use and say how to fix it --
+    rather than a bare traceback a reader discards as noise.
+
+    Only the `try` body is guarded, never the handler's. An import written in an
+    `except ImportError` clause is a *fallback*, and a fallback can fail exactly
+    like the import it replaces; nothing catches it. That is the shape of the
+    live instance this check was written against.
+    """
+    guarded: set[int] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Try) and any(map(_handles_missing_module, node.handlers)):
+            for statement in node.body:
+                for inner in ast.walk(statement):
+                    if isinstance(inner, ast.Import | ast.ImportFrom):
+                        guarded.add(id(inner))
+    return guarded
+
+
+def _local_module(module: str, entry: Path, root: Path) -> Path | None:
+    """Resolve a dotted module name to a file in this repo, or None."""
+    relative = Path(*module.split("."))
+    for base in (entry.parent, root):
+        for candidate in (base / relative.with_suffix(".py"), base / relative / "__init__.py"):
+            if candidate.is_file():
+                return candidate
+    return None
+
+
+def _third_party_imports(entry: Path, root: Path, seen: set[Path] | None = None) -> set[str]:
+    """Packages `entry` needs that an interpreter may not have, following siblings.
+
+    Transitive by necessity. The instance that motivated this check imported
+    only stdlib plus one sibling module, and the third-party dependency lived in
+    that sibling -- a direct-imports-only scan reports it clean, which is the
+    scope-fidelity failure the rule warns about one clause earlier.
+
+    An unparseable file yields nothing: this judges what it can read, and
+    guessing from a failed parse would invent findings.
+    """
+    seen = set() if seen is None else seen
+    if entry in seen or not entry.is_file():
+        return set()
+    seen.add(entry)
+    try:
+        tree = ast.parse(entry.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError, ValueError):
+        return set()
+
+    guarded = _guarded_imports(tree)
+    needed: set[str] = set()
+    for node in ast.walk(tree):
+        if id(node) in guarded:
+            continue
+        if isinstance(node, ast.Import):
+            modules = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and not node.level:
+            modules = [node.module or ""]
+        else:
+            continue  # relative imports stay inside a package that ships together
+        for module in filter(None, modules):
+            local = _local_module(module, entry, root)
+            if local is not None:
+                needed |= _third_party_imports(local, root, seen)
+            elif module.split(".")[0] not in _STDLIB:
+                needed.add(module.split(".")[0])
+    return needed
+
+
+def check_ambient_import(root: Path) -> list[dict]:
+    """GL05: a gate invoked through the ambient interpreter must be loadable by it.
+
+    GL04 asks whether anything calls the gate. This asks the other half of the
+    same clause: given that something calls it, can the interpreter it is called
+    with actually load it? A bare `python3` is whatever the shell resolves --
+    under a version manager's shim, routinely a build holding none of the
+    project's declared dependencies. The gate then dies on import, and its own
+    tests never reveal it because they run under the project interpreter.
+
+    Reported once per script rather than once per call site: the fix belongs in
+    one place, and a script named by several agents would otherwise produce a
+    row per mention.
+    """
+    sites = [p for glob in _AMBIENT_INVOCATION_GLOBS for p in sorted(root.glob(glob))]
+    first_use: dict[str, tuple[str, int]] = {}
+    for site in sites:
+        for lineno, line in enumerate(site.read_text(errors="ignore").splitlines(), start=1):
+            if _IGNORE in line:
+                continue
+            for match in _AMBIENT_INVOCATION.finditer(line):
+                first_use.setdefault(match.group(1), (str(site.relative_to(root)), lineno))
+
+    findings: list[dict] = []
+    for target, (caller, lineno) in sorted(first_use.items()):
+        needed = _third_party_imports(root / target, root)
+        if not needed:
+            continue
+        packages = ", ".join(sorted(needed))
+        findings.append(
+            {
+                "check": "ambient-import",
+                "severity": "fail",
+                "file": target,
+                "line": 1,
+                "evidence": f"{caller}:{lineno} runs `python3 {target}` — needs {packages}",
+                "why": (
+                    f"invoked through the ambient interpreter, which is not "
+                    f"guaranteed to have {packages}; the gate dies on import and "
+                    f"catches nothing. Guard the import with a remedy message, "
+                    f"drop the dependency, or resolve an interpreter that has it"
+                ),
+            }
+        )
+    return findings
+
+
 _CHECKS = {
     "forbidden-pattern": check_forbidden_pattern,
     "uninvoked-gate": check_uninvoked_gate,
+    "ambient-import": check_ambient_import,
 }
 
 

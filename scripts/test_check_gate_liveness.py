@@ -1,8 +1,12 @@
-"""Canary for the Gate Liveness detector (GL02 forbidden-pattern-contradiction).
+"""Canaries for the Gate Liveness detector (GL02, GL04, GL05).
 
 Cites: rules/swe/gate-liveness.md — a CODE gate ships a canary proving it fails on
 a known-bad input, not merely passes on the current good state. These tests feed
 the detector deliberately bad fixtures and assert it flags them.
+
+Each canary is paired with an inverse guard, because this detector's failure mode
+runs both ways: missing a real orphan is a silent false all-clear, and flagging a
+correctly wired gate would make the whole dimension untrustworthy on first use.
 """
 
 from __future__ import annotations
@@ -94,6 +98,97 @@ def test_a_gate_imported_by_a_sibling_script_is_not_flagged(tmp_path: Path) -> N
     _write(tmp_path, "scripts/validate_thing.py", "# a library-style gate\n")
     _write(tmp_path, "scripts/detector.py", "from validate_thing import parse\n")
     assert gl.check_uninvoked_gate(tmp_path) == []
+
+
+# -- GL05: ambient-import ------------------------------------------------------
+
+
+def _invokes(root: Path, target: str) -> None:
+    """An agent instructing a model to run `target` through the ambient shell."""
+    _write(root, "agents/auditor.md", f"Run `python3 {target} --json` and emit its rows.\n")
+
+
+def test_canary_flags_a_gate_the_ambient_interpreter_cannot_load(tmp_path: Path) -> None:
+    """A gate that dies on import catches nothing, and its own tests never say so."""
+    _write(tmp_path, "scripts/check_thing.py", "import yaml\n")
+    _invokes(tmp_path, "scripts/check_thing.py")
+    findings = gl.check_ambient_import(tmp_path)
+    assert [f["file"] for f in findings] == ["scripts/check_thing.py"]
+    assert "yaml" in findings[0]["evidence"]
+
+
+def test_canary_flags_a_third_party_import_reached_through_a_sibling(tmp_path: Path) -> None:
+    """The live shape: the invoked script is clean and its sibling is not.
+
+    A direct-imports-only scan reports this clean, which is how the real
+    instance survived a line-by-line reading of the invoked script.
+    """
+    _write(tmp_path, "scripts/check_wrapper.py", "from spec_lib import detect\n")
+    _write(tmp_path, "scripts/spec_lib.py", "import yaml\n\n\ndef detect():\n    return []\n")
+    _invokes(tmp_path, "scripts/check_wrapper.py")
+    findings = gl.check_ambient_import(tmp_path)
+    assert [f["file"] for f in findings] == ["scripts/check_wrapper.py"]
+    assert "yaml" in findings[0]["evidence"]
+
+
+def test_canary_a_fallback_import_in_the_handler_is_still_checked(tmp_path: Path) -> None:
+    """An `except ImportError` fallback is not a guard — it can fail identically.
+
+    Pins the live instance's exact shape: a dual-mode import where the handler
+    branch is what actually runs standalone. Treating the whole `try` as guarded
+    would excuse precisely the file that motivated this check.
+    """
+    _write(
+        tmp_path,
+        "scripts/check_wrapper.py",
+        "try:\n"
+        "    from scripts.spec_lib import detect\n"
+        "except ModuleNotFoundError:\n"
+        "    from spec_lib import detect\n",
+    )
+    _write(tmp_path, "scripts/spec_lib.py", "import yaml\n\n\ndef detect():\n    return []\n")
+    _invokes(tmp_path, "scripts/check_wrapper.py")
+    assert [f["file"] for f in gl.check_ambient_import(tmp_path)] == ["scripts/check_wrapper.py"]
+
+
+def test_a_stdlib_only_gate_is_not_flagged(tmp_path: Path) -> None:
+    """The inverse guard — the shape almost every live gate already has."""
+    _write(tmp_path, "scripts/check_thing.py", "import json\nfrom pathlib import Path\n")
+    _invokes(tmp_path, "scripts/check_thing.py")
+    assert gl.check_ambient_import(tmp_path) == []
+
+
+def test_a_guarded_import_is_not_flagged(tmp_path: Path) -> None:
+    """Handling the absence is the documented remedy, not a defect."""
+    _write(
+        tmp_path,
+        "scripts/check_thing.py",
+        "try:\n    import yaml\nexcept ImportError:\n    yaml = None\n",
+    )
+    _invokes(tmp_path, "scripts/check_thing.py")
+    assert gl.check_ambient_import(tmp_path) == []
+
+
+def test_a_sibling_module_is_not_mistaken_for_a_package(tmp_path: Path) -> None:
+    """First-party modules ship with the gate, so they are always loadable."""
+    _write(tmp_path, "scripts/check_thing.py", "from _repo_root import resolve\n")
+    _write(tmp_path, "scripts/_repo_root.py", "def resolve():\n    return None\n")
+    _invokes(tmp_path, "scripts/check_thing.py")
+    assert gl.check_ambient_import(tmp_path) == []
+
+
+def test_an_invocation_that_resolves_its_own_interpreter_is_out_of_scope(
+    tmp_path: Path,
+) -> None:
+    """Documented scope is agent and command prose; hooks resolve an interpreter.
+
+    Scope fidelity runs both ways. This asserts the computed scope is no *wider*
+    than the documented one, so the check cannot quietly start reporting call
+    sites whose hazard its own scope note disclaims.
+    """
+    _write(tmp_path, "scripts/check_thing.py", "import yaml\n")
+    _write(tmp_path, "hooks/run.sh", "python3 scripts/check_thing.py\n")
+    assert gl.check_ambient_import(tmp_path) == []
 
 
 def test_cli_exits_nonzero_on_findings(tmp_path: Path) -> None:

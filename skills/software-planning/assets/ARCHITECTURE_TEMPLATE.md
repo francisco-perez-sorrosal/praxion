@@ -68,7 +68,11 @@ views {
 
 ## 3. Components
 
-<!-- L1 diagram: major building blocks and their relationships. Max 10-12 nodes.
+<!-- L1 diagram: major building blocks and their relationships. Max 10-12 nodes
+     WHEN RENDERED IN MERMAID, whose auto-layout degrades past that. A LikeC4 or
+     D2 model is exempt from any flat node cap (rules/writing/diagram-conventions.md):
+     it manages complexity through nesting and per-view scoping rather than a count,
+     so a model that outgrows 12 elements should gain structure, not lose elements.
      Use subgraphs for logical boundaries (layers, bounded contexts).
      Dual ownership: systems-architect writes the skeleton, implementer fills as-built details.
      Solid arrows for direct dependencies, dotted for async/event-based.
@@ -123,7 +127,9 @@ views {
 <!-- aac:generated source=docs/diagrams/architecture/src/architecture.c4 view=components last-regen=YYYY-MM-DD -->
 
 <!-- TWO-TIER SECTION. 3a holds structural building blocks -- one row per `component`
-     element in the LikeC4 model above, capped at the 10-12 nodes noted for the L1 diagram.
+     element in the LikeC4 model above. Population follows the model, not a node
+     budget: the 10-12 cap above is a Mermaid rendering limit, and a LikeC4 model is
+     exempt from it, so the row count is however many `component` elements exist.
      3b holds capabilities: cross-cutting features and loops COMPOSED FROM those blocks,
      owning no single directory and no model element.
      Keep them apart from the first row. A single merged table grows without bound as

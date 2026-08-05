@@ -66,7 +66,20 @@ The most valuable half, and not statically decidable: nothing in the source tree
 
 ## Consequences
 
-**Positive.** The commonest cause of inert enforcement gains both a name and a mechanical detector. The check found a live instance on its first run: a sentinel-formatting wrapper whose docstring names the dimension that invokes it, where that dimension imports a different module directly — so the wrapper had never executed, and because it had never executed, nobody had discovered it is also broken. That is the class compounding on itself, and it is now a ledger row rather than a silence.
+**Positive.** The commonest cause of inert enforcement gains both a name and a mechanical detector. The check found a live instance on its first run: a sentinel-formatting wrapper whose docstring names the dimension that invokes it, where that dimension imported a different module directly — so the wrapper had never executed.
+
+> **Correction (2026-08-05), recorded rather than edited away.** This section first claimed the
+> wrapper was *also broken*. It is not: it runs clean under the project interpreter and its tests
+> pass. It fails only under the ambient interpreter, because its dependency needs a package the
+> shim lacks — the interpreter-resolution instance already listed in the Context table, not a
+> second defect. The wrong claim came from running it once, under the wrong interpreter, and
+> generalising — which is worth preserving as a caution: this class is diagnosed by *how* you
+> ran something, so a single failing invocation is not evidence of a broken gate.
+>
+> Investigating the fix then found the cause was **two-layered**: the dimension both named the
+> wrong invocation *and* was itself absent from the auto-dispatch list, so it never ran at all.
+> Fixing only the first layer would have left the gate uninvoked while appearing resolved —
+> the class hiding one instance behind another. Both are fixed; the detector now reports clean.
 
 **Negative.** The rule is now seven clauses, and length erodes attention. The invocation-site list is a heuristic that will need extending as new invocation surfaces appear, and each extension is a chance to under-cover. And the clause's most valuable half remains unmechanised, so the strongest instances still depend on someone noticing an anomaly.
 

@@ -20,6 +20,7 @@ Reusable slash commands for AI coding assistants. Each `.md` file becomes a `/co
 | `/manage-readme` | Create or refine README.md files |
 | `/check-experiment` | Poll an in-flight or report a completed ML training experiment |
 | `/dashboard` | Launch the Praxion pipeline dashboard for the current project |
+| `/decisions` | Disposition decision-health findings — repairs as grouped approvals, retirement candidates one at a time, never in bulk |
 | `/decontaminate-ids` | Detect and remediate REQ/AC/step citations in the current project's source code |
 | `/merge-worktree` | Merge a worktree branch back into current branch |
 | `/new-project` | Scaffold a greenfield Claude-ready Python project and onboard it to Praxion |

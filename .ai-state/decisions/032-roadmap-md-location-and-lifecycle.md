@@ -1,6 +1,6 @@
 ---
 id: dec-032
-title: `ROADMAP.md` at project root as a living document with preserved Decision Log
+title: '`ROADMAP.md` at project root as a living document with preserved Decision Log'
 status: superseded
 category: architectural
 date: 2026-04-12

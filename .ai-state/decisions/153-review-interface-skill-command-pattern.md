@@ -1,6 +1,6 @@
 ---
 id: dec-153
-title: `/review-interface` spawns the `interface-designer` agent in standalone mode — extending the Skill+Command family with a separate-context-window rule
+title: '`/review-interface` spawns the `interface-designer` agent in standalone mode — extending the Skill+Command family with a separate-context-window rule'
 status: accepted
 category: architectural
 date: 2026-05-12

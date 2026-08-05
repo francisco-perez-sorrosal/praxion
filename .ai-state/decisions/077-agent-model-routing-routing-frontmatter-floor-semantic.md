@@ -4,7 +4,7 @@ title: Frontmatter `model:` is a capability floor; rule table is authoritative
 status: accepted
 category: architectural
 date: 2026-04-25
-summary: The 3 existing `model: opus` pins stay as capability floors (minimum tier); the rule table may route up via layer-2, never below
+summary: 'The 3 existing `model: opus` pins stay as capability floors (minimum tier); the rule table may route up via layer-2, never below'
 tags: [model-routing, frontmatter, floor-semantic, agent-crafting, convention]
 made_by: agent
 agent_type: systems-architect

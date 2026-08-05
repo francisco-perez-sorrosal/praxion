@@ -21,7 +21,7 @@ affected_files:
   - scripts/refresh_labels_baseline.py
   - scripts/upgrade_project_pins.sh
 re_affirms: dec-281
-dissent: A self-contained copied reconciler would carry ZERO cross-repo trust surface — no managed caller ever executes Praxion-controlled code, so a compromised hub commit cannot fan out `issues: write` across the whole fleet at once; for logic this trivial and stable, the hub's propagation benefit may never be exercised while its supply-chain surface is real from day one.
+dissent: 'A self-contained copied reconciler would carry ZERO cross-repo trust surface — no managed caller ever executes Praxion-controlled code, so a compromised hub commit cannot fan out `issues: write` across the whole fleet at once; for logic this trivial and stable, the hub''s propagation benefit may never be exercised while its supply-chain surface is real from day one.'
 ---
 
 ## Context

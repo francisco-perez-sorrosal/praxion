@@ -1,10 +1,10 @@
 ---
 id: dec-168
-title: Frontmatter `core: true` is the single source of truth for non-disableability
+title: 'Frontmatter `core: true` is the single source of truth for non-disableability'
 status: accepted
 category: behavioral
 date: 2026-05-13
-summary: A rule's `core: true` frontmatter is the canonical declaration of non-disableability; the generated manifest derives from it; the SessionStart hook refuses to suppress any rule marked core, emitting a stderr warning on attempted disable.
+summary: 'A rule''s `core: true` frontmatter is the canonical declaration of non-disableability; the generated manifest derives from it; the SessionStart hook refuses to suppress any rule marked core, emitting a stderr warning on attempted disable.'
 tags: [rules, core-protection, frontmatter, hook, invariant]
 made_by: agent
 agent_type: systems-architect

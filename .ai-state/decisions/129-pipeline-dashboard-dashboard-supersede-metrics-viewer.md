@@ -5,7 +5,7 @@ status: superseded
 superseded_by: dec-145
 category: architectural
 date: 2026-05-07
-summary: The Streamlit dashboard supersedes the static metrics-viewer.html.tmpl with a soft deprecation: both ship for one release cycle with a banner in the static viewer pointing to praxion-dashboard; hard removal in next-after-next release.
+summary: 'The Streamlit dashboard supersedes the static metrics-viewer.html.tmpl with a soft deprecation: both ship for one release cycle with a banner in the static viewer pointing to praxion-dashboard; hard removal in next-after-next release.'
 tags: [dashboard, metrics-viewer, deprecation, supersession, onboard-project]
 made_by: agent
 agent_type: systems-architect

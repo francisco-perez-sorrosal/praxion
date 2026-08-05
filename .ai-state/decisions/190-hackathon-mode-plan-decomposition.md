@@ -4,7 +4,7 @@ title: Hackathon mode — implementation plan decomposition decisions
 status: accepted
 category: implementation
 date: 2026-05-15
-summary: Three implementation-planner decisions for the hackathon-mode Standard-tier pipeline: (1) 18 ACs as sufficient acceptance basis without a formal behavioral spec; (2) canonical block before BLOCKS registration before consumer embeds ordering; (3) Phase 5b renumbering as its own dedicated step.
+summary: 'Three implementation-planner decisions for the hackathon-mode Standard-tier pipeline: (1) 18 ACs as sufficient acceptance basis without a formal behavioral spec; (2) canonical block before BLOCKS registration before consumer embeds ordering; (3) Phase 5b renumbering as its own dedicated step.'
 tags: [hackathon-mode, implementation-planning, sdd-triage, step-ordering, canonical-blocks]
 made_by: agent
 agent_type: implementation-planner

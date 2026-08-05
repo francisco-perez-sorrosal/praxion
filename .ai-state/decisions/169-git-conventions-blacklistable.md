@@ -4,7 +4,7 @@ title: Classify `vcs/git-conventions.md` as blacklistable; relocate behavioral-c
 status: accepted
 category: behavioral
 date: 2026-05-13
-summary: `rules/swe/vcs/git-conventions.md` is project-policy (commit message format, staging discipline) and is reclassified as blacklistable; the one behavioral-contract clause it carries ("no AI authorship") is relocated to a core always-loaded surface before this blacklisting takes effect.
+summary: '`rules/swe/vcs/git-conventions.md` is project-policy (commit message format, staging discipline) and is reclassified as blacklistable; the one behavioral-contract clause it carries ("no AI authorship") is relocated to a core always-loaded surface before this blacklisting takes effect.'
 tags: [rules, git-conventions, core, blacklistable, behavioral-contract]
 made_by: agent
 agent_type: systems-architect

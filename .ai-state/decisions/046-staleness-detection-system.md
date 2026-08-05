@@ -4,7 +4,7 @@ title: Staleness detection via per-section markers, frontmatter catalog, paths-s
 status: accepted
 category: behavioral
 date: 2026-04-16
-summary: Adopt `<!-- last-verified: YYYY-MM-DD -->` marker at h3 granularity (h2 fallback) with an in-frontmatter `staleness_sensitive_sections:` catalog; add sentinel F07/F08/F09 checks; new paths-scoped rule at `rules/swe/staleness-policy.md`; gated `/refresh-skill` command; default threshold 120 days
+summary: 'Adopt `<!-- last-verified: YYYY-MM-DD -->` marker at h3 granularity (h2 fallback) with an in-frontmatter `staleness_sensitive_sections:` catalog; add sentinel F07/F08/F09 checks; new paths-scoped rule at `rules/swe/staleness-policy.md`; gated `/refresh-skill` command; default threshold 120 days'
 tags: [staleness, sentinel, skills, rules, commands, freshness]
 made_by: agent
 agent_type: systems-architect

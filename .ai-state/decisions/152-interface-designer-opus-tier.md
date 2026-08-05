@@ -1,6 +1,6 @@
 ---
 id: dec-152
-title: `interface-designer` runs at opus tier (capability floor)
+title: '`interface-designer` runs at opus tier (capability floor)'
 status: accepted
 category: architectural
 date: 2026-05-12

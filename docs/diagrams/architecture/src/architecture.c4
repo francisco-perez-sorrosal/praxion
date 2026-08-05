@@ -99,15 +99,18 @@ model {
         architect        = agent "Systems Architect" { description "Trade-off analysis; CIS disposition; rework first-stop" }
         interface_des    = agent "Interface Designer" { description "Interface-layer peer sub-architect" }
         transactions_arch = agent "Agentic Transactions Architect" { description "Transaction-domain shadow sub-architect (payments/trading); challenge loop" }
+        discipline_consultant = agent "Discipline Consultant" { description "Gated adversarial peer sub-architect, parameterized per spawn; challenges only, decides nothing" }
         context_eng      = agent "Context Engineer" { description "Context artifact domain expert (shadow)" }
         planner          = agent "Implementation Planner" { description "Step decomposition; supervises step execution" }
         implementer      = agent "Implementer"      { description "Executes implementation steps" }
         test_engineer    = agent "Test Engineer"    { description "Test design and execution" }
         doc_engineer     = agent "Doc Engineer"     { description "Documentation quality" }
+        cicd_engineer    = agent "CI/CD Engineer"   { description "Pipeline design, GitHub Actions, deployment automation" }
         verifier         = agent "Verifier"         { description "Acceptance + rework manifest emitter (Phase 12.5)" }
         sentinel         = agent "Sentinel"         { description "Read-only ecosystem auditor (independent)" }
         arch_validator   = agent "Architect Validator" { description "Per-PR DSL <-> code <-> ADR triangle check" }
         skill_genesis    = agent "Skill Genesis"    { description "Learning triage; artifact proposal" }
+        roadmap_cartographer = agent "Roadmap Cartographer" { description "Project-level audit-to-roadmap through a project-derived lens set (on-demand)" }
       }
 
       hooks    = component "Hooks"          { description "Lifecycle enforcement (worktree_guard, inject_worktree_banner, send_event)" }
@@ -159,15 +162,18 @@ model {
     orchestration.orchestrator -> orchestration.pipeline.architect     "dispatches"
     orchestration.orchestrator -> orchestration.pipeline.interface_des "dispatches"
     orchestration.orchestrator -> orchestration.pipeline.transactions_arch "dispatches (shadow)"
+    orchestration.orchestrator -> orchestration.pipeline.discipline_consultant "dispatches (gated, one discipline per spawn)"
     orchestration.orchestrator -> orchestration.pipeline.context_eng   "dispatches (shadow)"
     orchestration.orchestrator -> orchestration.pipeline.planner       "dispatches"
     orchestration.orchestrator -> orchestration.pipeline.implementer   "dispatches"
     orchestration.orchestrator -> orchestration.pipeline.test_engineer "dispatches"
     orchestration.orchestrator -> orchestration.pipeline.doc_engineer  "dispatches"
+    orchestration.orchestrator -> orchestration.pipeline.cicd_engineer "dispatches"
     orchestration.orchestrator -> orchestration.pipeline.verifier      "dispatches"
     orchestration.orchestrator -> orchestration.pipeline.sentinel      "dispatches (independent)"
     orchestration.orchestrator -> orchestration.pipeline.arch_validator "dispatches (per-PR)"
     orchestration.orchestrator -> orchestration.pipeline.skill_genesis "dispatches (post-pipeline)"
+    orchestration.orchestrator -> orchestration.pipeline.roadmap_cartographer "dispatches (on-demand)"
 
     // Forward pipeline — agent reads/writes against pipeline documents
     orchestration.pipeline.promethean -> orchestration.doc_idea        "writes" { #forward }

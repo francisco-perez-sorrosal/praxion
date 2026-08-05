@@ -161,13 +161,21 @@ Element(s). Absent `architectural_elements:` for a REQ is not a FAIL — it sign
 The sentinel's AC dimension audits the substrate periodically:
 
 - **AC10** — fence integrity: `aac:generated`/`aac:authored`/`aac:end` balance and required attributes.
-- **AC11** — model↔markdown agreement: components named in `.ai-state/DESIGN.md` correspond to LikeC4 elements.
 - **AC12** — traceability orphans: REQs with no element claiming them; elements citing nonexistent REQs.
 - **AC13** — design-doc projection: every structural LikeC4 component has a `.ai-state/DESIGN.md` §3a row, and
   every row names an element that exists — bound by element **id**, not title, because the two legitimately
-  differ. Deterministic, where AC11 is LLM judgment over names. Its second half (§4's canonical-block rows
-  against the shipped-block registry) is a shipped-contract check rather than an AaC one, and is out of scope
-  for this document.
+  differ. Deterministic. Its second half (§4's canonical-block rows against the shipped-block registry) is a
+  shipped-contract check rather than an AaC one, and is out of scope for this document.
+
+**AC11 is retired.** It was the original model↔markdown check: an LLM-judged symmetric diff of element *titles*
+against component names in the architecture markdown. Two things made it inoperative. Its structural filter was
+specified as `metadata.published` on the element, which no model has ever carried — so it diffed *every* element
+kind and reported external actors, pipeline-document nodes and agent nodes as orphans, none of which §3a
+documents by contract. And title matching is the binding §3a explicitly rejects: a row reads "Agent runtime /
+Pipeline" where its element reads "Agent Pipeline", so titles both miss real drift and invent false drift on a
+rename. AC13 answers the same question by element id against an explicit column, derives the structural filter
+from the model's own shape (no child component) instead of absent metadata, and covers the published half AC11
+could not see. Do not re-add a title-matching model↔markdown check.
 
 Each check activates only when its substrate is present, mirroring the TT-dimension's conditional-activation
 idiom. AC12 fires only after at least one feature has populated both sides of the convention — until then it
@@ -197,7 +205,7 @@ The loop:
    `architect-validator --mode=pre-merge`).
 5. **The architect-validator** sweeps its three-section report. FAILs become `TECH_DEBT_LEDGER` rows
    (`class: drift`) that accumulate as tracked debt visible to the next planning cycle.
-6. **Periodically**, the sentinel's AC10–AC13 checks catch drift that landed via PRs outside the
+6. **Periodically**, the sentinel's AC10/AC12/AC13 checks catch drift that landed via PRs outside the
    architectural-touch slice gate: stripped fences, model↔markdown disagreements, traceability orphans,
    components the design doc and the model no longer agree on.
 7. **The loop closes** when the planning cycle consumes the ledger. Drift findings become inputs to the next
@@ -225,11 +233,11 @@ regions into established documents requires deliberate author review.
 and a commented-out fence example seeded into `.ai-state/DESIGN.md` when present.
 
 **What is global** (no per-project install): the SDD skill's traceability convention, the fence validator
-and golden-rule scripts (canonical in the plugin path), the sentinel agent's AC10–AC13 audit, and the
+and golden-rule scripts (canonical in the plugin path), the sentinel agent's AC10/AC12/AC13 audit, and the
 architect-validator agent (dec-113).
 
 > [!NOTE]
-> AC10–AC13 and the architect-validator activate conditionally on substrate presence. A project with no `.c4`
+> AC10/AC12/AC13 and the architect-validator activate conditionally on substrate presence. A project with no `.c4`
 > files and no fenced `.ai-state/DESIGN.md` gets INFO notes, not false positives.
 
 ## See Also

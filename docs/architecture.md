@@ -153,8 +153,8 @@ Architectural decisions are recorded as ADRs in [`.ai-state/decisions/`](../.ai-
 ## 9. Test Topology
 
 <!-- Developer-facing navigation guide. Components named in this section have been verified
-     against the codebase. Items marked Planned are not on disk and will be created by
-     consumer projects, not Praxion.
+     against the codebase. Rows whose Status names a per-project opt-in are not on disk
+     here — consumer projects create them, Praxion does not.
      For design rationale and ADR cross-references, see .ai-state/DESIGN.md §9.
      Last verified against code: 2026-05-19. -->
 
@@ -167,7 +167,7 @@ The test-topology subsystem lets each implementation step run only the tests cov
 | Read the language-agnostic schema | `skills/testing-strategy/references/test-topology.md` | Built |
 | Read the Python-specific tooling concretization | `skills/testing-strategy/references/python-testing.md` (test-topology section) | Built |
 | Read the growth-trigger policy and `--init` path | `skills/testing-strategy/references/test-topology.md` §"Growth-Trigger Policy" | Built (M2) |
-| See whether your project has populated its topology | `.ai-state/TEST_TOPOLOGY.md` (per-project) | Planned (no Praxion population by design) |
+| See whether your project has populated its topology | `.ai-state/TEST_TOPOLOGY.md` (per-project) | Opt-in per project — Praxion deliberately does not populate its own |
 | Read the sentinel checks for topology health | `agents/sentinel.md` `### Test Topology (TT)` (TT01–TT06) | Built |
 | See the debt class for topology drift | `rules/swe/agent-intermediate-documents.md` (`class` enum) | Built (`topology-drift`) |
 | Add a Tests: field to a step in your IMPLEMENTATION_PLAN.md | `skills/software-planning/SKILL.md` step schema | Built |

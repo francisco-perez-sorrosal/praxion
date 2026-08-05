@@ -79,7 +79,7 @@ Outputs use path prefixes to signal lifecycle: `.ai-work/<slug>/` = ephemeral (d
 
 When delegating to an agent, the main agent **must** include the per-agent deliverables in the prompt. The subagent's system prompt contains full instructions, but the main agent's prompt determines priority and scope.
 
-The full per-agent checklists for systems-architect, implementation-planner, implementer, and verifier — including conditional clauses (`if deployment in scope`, `if structural`, `if tests`) — are the authoritative source at [`coordination-details.md § Delegation Checklists`](../../skills/software-planning/references/coordination-details.md#delegation-checklists). Sentinel `EC06` validates that the condensed block in `claude/config/CLAUDE.md` stays byte-equivalent with that section. When `REWORK_MANIFEST.md` is produced, the main agent is responsible for spawning rework worktrees before invoking cleanup.
+The full per-agent checklists for systems-architect, implementation-planner, implementer, and verifier — including conditional clauses (`if deployment in scope`, `if structural`, `if tests`) — are the authoritative source at [`coordination-details.md § Delegation Checklists`](../../skills/software-planning/references/coordination-details.md#delegation-checklists). Sentinel `EC06` validates that the condensed block in `claude/config/CLAUDE.md` stays **in sync with** that section — a semantic, outputs-only comparison (the block is *condensed*, so it is by construction not byte-equivalent); `coordination-details.md` is authoritative on what "in sync" requires. When `REWORK_MANIFEST.md` is produced, the main agent is responsible for spawning rework worktrees before invoking cleanup.
 
 ### Proactive Agent Usage
 

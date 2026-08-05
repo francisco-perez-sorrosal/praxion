@@ -3,14 +3,14 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-08-05T04:26:54Z'
+generated_at: '2026-08-05T17:34:27Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
   load: always_on
   core: true
   install: symlink
-  chars: 2865
+  chars: 2774
 - id: swe/adr-conventions
   path: rules/swe/adr-conventions.md
   load: always_on
@@ -34,7 +34,7 @@ rules:
   load: always_on
   core: true
   install: symlink
-  chars: 26216
+  chars: 26394
 - id: swe/agent-model-routing
   path: rules/swe/agent-model-routing.md
   load: always_on

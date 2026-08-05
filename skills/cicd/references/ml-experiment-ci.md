@@ -3,7 +3,7 @@
 CI patterns for ML training projects: eval-gated PRs, checkpoint artifacts, baseline diffing,
 cost gating. Back to [../SKILL.md](../SKILL.md).
 
-<!-- last-verified: 2026-05-03 -->
+<!-- last-verified: 2026-08-05 -->
 
 ML experiment CI differs from application CI in one fundamental way: the "pass" condition is a
 **metric threshold**, not a binary test result. A PR that trains worse models should not merge,
@@ -79,7 +79,14 @@ Upload the best checkpoint as a CI artifact for post-run inspection and registry
 `checkpoints[].path` for the checkpoint with the best `val_bpb`. Pass it as a step
 output from the eval step.
 
-**Storage backends (v2):** For checkpoints too large for GitHub artifacts (>2 GB), upload
+**Storage backends (v2):** GitHub does not document a universal per-artifact size cap. What
+it documents is **artifact storage quota per plan** — Free **500 MB**, Pro **1 GB**, Team
+**2 GB**, Enterprise Cloud **50 GB**. So the ceiling is plan-dependent, and on Free or Pro a
+single checkpoint often exceeds the entire quota. (An earlier version of this file said
+">2 GB", which conflated the Team-tier *account storage quota* with a per-artifact limit and
+under-warned the two most common plans.)
+
+Treat an external registry as the default for anything but the smallest checkpoints: upload
 to W&B model registry (`wandb artifact put`) or MLflow model registry instead of GitHub
 artifacts. Reference path in `TRAINING_RESULTS.md` `checkpoints[].path` stays the same
 regardless of backend.

@@ -597,7 +597,7 @@ jobs:
 ```
 
 ## Railway Deploy
-<!-- last-verified: 2026-07-02 -->
+<!-- last-verified: 2026-08-05 -->
 
 Railway ships no first-party GitHub Action — the official pattern is the CLI container image plus a project-scoped `RAILWAY_TOKEN` secret. Prefer Railway's built-in GitHub autodeploy with "Wait for CI" (holds the deploy until checks pass) when the repo is linked; deploy from Actions only when the pipeline must own the deploy step (monorepo carve-outs, promotion after gates).
 

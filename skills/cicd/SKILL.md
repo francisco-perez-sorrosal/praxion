@@ -184,19 +184,31 @@ Cache limit: 10 GB per repository. Artifacts default retention: 90 days (configu
 3. **Organization secrets** (lowest) -- shared across repos with policy-based access
 
 ### Security Hardening
-<!-- last-verified: 2026-05-25 -->
+<!-- last-verified: 2026-08-05 -->
 
 | Practice | Implementation |
 | --- | --- |
 | **Pin actions to SHA** | `uses: actions/checkout@<full-sha>` -- tags can be tampered (CVE-2025-30066) |
 | **Least-privilege token** | `permissions: {}` at workflow level, add only what's needed |
 | **OIDC for cloud auth** | `id-token: write` + provider configuration -- no long-lived credentials |
-| **Restrict pull_request_target** | Runs with write permissions on forked PRs -- use with extreme caution |
+| **Restrict pull_request_target** | Runs with write permissions on forked PRs. **`actions/checkout` now refuses fork-PR checkout here by default** (v7.0.0, 2026-06-18; backported to v6.1.0 and v5.1.0, enforced 2026-07-20). Escape hatch: `allow-unsafe-pr-checkout: true` -- treat it as a code-review red flag |
 | **Set short timeouts** | `timeout-minutes: 30` on jobs |
 | **Disable persist-credentials** | `persist-credentials: false` in `actions/checkout` unless needed |
 
+**SHA pinning and this protection are in tension — know which side you are on.** Workflows on
+floating major tags received the fork-PR block automatically; **SHA-pinned workflows did
+not** and must upgrade manually. That is the cost of pinning: reproducibility bought at the
+price of automatic security backports. Keep Dependabot updating your pinned SHAs, or the
+guidance in row 1 quietly defeats row 4.
+
+Two org-level reinforcements worth knowing, both predating this table: **immutable releases**
+(GA 2025-10-28) make new release tags undeletable and unmovable — the structural fix for the
+CVE-2025-30066 tag-tampering class — and **Actions policy** supports blocking actions and
+requiring SHA pinning at org/enterprise scope (2025-08-15), enforcing row 1 mechanically
+rather than by review.
+
 ### Supply Chain Security
-<!-- last-verified: 2026-05-25 -->
+<!-- last-verified: 2026-08-05 -->
 
 - **SLSA framework**: Build provenance via `actions/attest-build-provenance`
 - **Artifact attestations**: Cryptographically link artifacts to build metadata (Sigstore)
@@ -256,7 +268,7 @@ GitHub Actions provides built-in usage and performance metrics on all plans (sin
 - **[Performance Architecture](../performance-architecture/SKILL.md)** -- performance regression detection patterns to incorporate in CI pipelines
 
 ## Essential Marketplace Actions
-<!-- last-verified: 2026-05-25 -->
+<!-- last-verified: 2026-08-05 -->
 
 | Category | Action | Purpose |
 | --- | --- | --- |
@@ -269,7 +281,7 @@ GitHub Actions provides built-in usage and performance metrics on all plans (sin
 | Security | `step-security/harden-runner` | Runner hardening |
 | Filtering | `dorny/paths-filter` | Job-level path filtering |
 | Release | `softprops/action-gh-release` | GitHub release creation |
-| Linting | `rhysd/actionlint` | Workflow YAML validation |
+| Linting | `rhysd/actionlint` (**not a marketplace action**) | Workflow YAML validation. Ships no `action.yml` — it is a Go CLI distributed as prebuilt binaries, an official Docker image, and a download script. Run it via `docker://rhysd/actionlint`, the install script, or pre-commit |
 | Debugging | `mxschmitt/action-tmate` | SSH into runner |
 
 ## Resources

@@ -943,6 +943,21 @@ def _render_run_metadata(report: Report) -> str:
     lines.append(f"- Wall clock: {meta.wall_clock_seconds:.2f}s")
     lines.append(f"- Window days: {meta.window_days}")
     lines.append(f"- Top-N: {meta.top_n}")
+    # Provenance — what state this report describes, as distinct from how the
+    # run was configured. Rendered even when absent, and labelled as such: a
+    # reader must be able to tell "no provenance recorded" from "current",
+    # because a report that omits its subject reads as current by default.
+    # `generated_at` is deliberately not repeated here — the document header
+    # already carries it. The commit does not appear anywhere else, and it is
+    # the field a consumer needs to measure staleness in commits rather than
+    # in days.
+    lines.append(f"- Commit: {meta.commit or _NULL_CELL}")
+    if meta.dirty:
+        lines.append("- Working tree: **dirty** (describes no single commit)")
+    elif meta.dirty is False:
+        lines.append("- Working tree: clean")
+    else:
+        lines.append(f"- Working tree: {_NULL_CELL}")
     lines.append("")
     return "\n".join(lines)
 

@@ -62,6 +62,7 @@ _AI_STATE_DIRNAME = ".ai-state"
 _REPORTS_SUBDIR_NAME = "metrics_reports"
 _REPORT_BASENAME_PREFIX = "METRICS_REPORT_"
 _TIMESTAMP_FORMAT = "%Y-%m-%d_%H-%M-%S"
+_GIT_PROVENANCE_TIMEOUT_SECONDS = 10.0
 _METRICS_LOG_BASENAME = "METRICS_LOG.md"
 
 _DEFAULT_WINDOW_DAYS = 90
@@ -528,14 +529,56 @@ def _run_pipeline(args: argparse.Namespace, repo_root: Path, ai_state_dir: Path)
     report = compose_aggregate(report, repo_root=repo_root)
     report = compose_hotspots(report)
     trend_block = compute_trends(report, ai_state_dir / _REPORTS_SUBDIR_NAME)
+    head_commit, tree_dirty = _resolve_git_provenance(repo_root)
     run_metadata = RunMetadata(
         command_version="1.0.0",
         python_version=sys.version.split(" ", 1)[0],
         wall_clock_seconds=time.monotonic() - run_start,
         window_days=args.window_days,
         top_n=args.top_n,
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        commit=head_commit,
+        dirty=tree_dirty,
     )
     return dataclasses.replace(report, trends=trend_block, run_metadata=run_metadata)
+
+
+def _resolve_git_provenance(repo_root: Path) -> tuple[str | None, bool | None]:
+    """Return ``(head_sha, tree_is_dirty)`` for the tree being analysed.
+
+    Both values are ``None`` when git cannot answer. That is deliberate: a
+    consumer must be able to distinguish "this report describes commit X" from
+    "this report does not say what it describes", and silently substituting a
+    placeholder would collapse the two. ``GitCollector`` is ``required``, so in
+    practice a metrics run that got this far has a working tree — the `None`
+    path exists for robustness, not as an expected outcome.
+
+    A dirty tree means the report describes a state that no commit captures, so
+    ``commit`` alone would overstate reproducibility; consumers should treat
+    ``dirty: true`` as "anchored near X, not at X".
+    """
+
+    def _git(*argv: str) -> str | None:
+        try:
+            completed = subprocess.run(
+                ["git", *argv],
+                cwd=str(repo_root),
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=_GIT_PROVENANCE_TIMEOUT_SECONDS,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+        if completed.returncode != 0:
+            return None
+        return completed.stdout
+
+    head = _git("rev-parse", "HEAD")
+    if head is None:
+        return None, None
+    status = _git("status", "--porcelain")
+    return head.strip() or None, (status.strip() != "" if status is not None else None)
 
 
 # ---------------------------------------------------------------------------

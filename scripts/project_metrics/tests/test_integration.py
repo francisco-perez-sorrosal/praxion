@@ -45,6 +45,7 @@ import os
 import shutil
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -52,14 +53,15 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from scripts.project_metrics.cli import main
-from scripts.project_metrics.schema import AGGREGATE_COLUMNS
+from scripts.project_metrics.schema import AGGREGATE_COLUMNS, SCHEMA_VERSION
 
 _FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
-# Frozen golden contracts (mirror the storage-schema ADR). The readiness
-# feature bumped SCHEMA_VERSION (now 1.2.0) but MUST NOT touch the aggregate
-# column set nor the METRICS_LOG.md header — these guards fail loudly on drift.
+# Frozen golden contracts (mirror the storage-schema ADR). SCHEMA_VERSION has
+# been bumped by later features (readiness, then run provenance), but no bump
+# may touch the aggregate column set nor the METRICS_LOG.md header — these
+# guards fail loudly on drift.
 _GOLDEN_AGGREGATE_COLUMNS: tuple[str, ...] = (
     "schema_version",
     "timestamp",
@@ -442,7 +444,7 @@ def test_full_pipeline_embeds_readiness_block_with_llm_skipped(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A full run with no auth credential embeds a well-formed ``readiness``
-    block at the JSON root: schema bumped to 1.2.0, the LLM tier skipped
+    block at the JSON root: the current schema stamped, the LLM tier skipped
     offline, and an integer level in the 1-5 band."""
 
     repo_copy = _copy_fixture("minimal_repo", tmp_path)
@@ -457,9 +459,12 @@ def test_full_pipeline_embeds_readiness_block_with_llm_skipped(
     ai_state = repo_copy / ".ai-state"
     payload = _read_report_json(ai_state)
 
-    assert payload.get("schema_version") == "1.2.0", (
-        "The readiness recommendations feature bumps schema_version to 1.2.0; "
-        f"got {payload.get('schema_version')!r}"
+    # Assert the report stamps the *current* schema rather than re-pinning a
+    # literal here: the exact-version tripwire lives in test_schema.py, and
+    # duplicating it couples this readiness test to unrelated patch bumps.
+    assert payload.get("schema_version") == SCHEMA_VERSION, (
+        "The report must stamp the current SCHEMA_VERSION; "
+        f"got {payload.get('schema_version')!r}, expected {SCHEMA_VERSION!r}"
     )
 
     assert "readiness" in payload, (
@@ -555,3 +560,58 @@ def test_judge_credentials_never_reach_a_test_environment() -> None:
 
     assert "ANTHROPIC_API_KEY" not in os.environ
     assert "CLAUDE_CODE_OAUTH_TOKEN" not in os.environ
+
+
+# ---------------------------------------------------------------------------
+# Scenario 7 — run provenance, and the consumer it exists to enable.
+# ---------------------------------------------------------------------------
+
+
+def test_full_pipeline_records_provenance_usable_by_the_freshness_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A real run stamps what state it describes, and that stamp is consumable.
+
+    Provenance is not decoration: without `run_metadata.commit` a consumer
+    cannot measure staleness in commits, and `check_metrics_freshness` is
+    forced to withhold. This asserts the producer→consumer wiring end to end —
+    the report records a resolvable commit, and the checker returns a real
+    verdict rather than `withheld` on it.
+    """
+
+    repo_copy = _copy_fixture("minimal_repo", tmp_path)
+    monkeypatch.chdir(repo_copy)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+
+    assert main(["--window-days", "30", "--top-n", "5"]) == 0
+
+    payload = _read_report_json(repo_copy / ".ai-state")
+    meta = payload["run_metadata"]
+
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=str(repo_copy),
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+
+    assert meta.get("commit") == head, (
+        "run_metadata.commit must record the analysed HEAD; "
+        f"got {meta.get('commit')!r}, expected {head!r}"
+    )
+    assert isinstance(meta.get("dirty"), bool), "dirty must be a resolved boolean"
+    generated_at = meta.get("generated_at")
+    assert generated_at, "run_metadata.generated_at must be present"
+    datetime.fromisoformat(generated_at)  # raises if not ISO 8601
+
+    # The payoff: the freshness checker can now answer instead of withholding.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from check_metrics_freshness import evaluate_freshness
+
+    verdict = evaluate_freshness(repo_copy, reports_dir=repo_copy / ".ai-state" / "metrics_reports")
+    assert verdict["status"] != "withheld", (
+        f"a report carrying provenance must yield a real verdict, not a withheld one; got {verdict}"
+    )
+    assert verdict["commits_since"] == 0, "a report taken at HEAD is zero commits behind"

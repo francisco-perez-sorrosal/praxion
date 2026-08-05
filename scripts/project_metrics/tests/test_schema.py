@@ -122,10 +122,28 @@ class TestSchemaVersionConstant:
     """The SCHEMA_VERSION constant is the pinned release identifier consumed
     by METRICS_LOG.md rows and the schema-mismatch delta policy."""
 
-    def test_schema_version_constant_is_1_2_0(self) -> None:
+    def test_schema_version_constant_is_pinned(self) -> None:
+        """Tripwire: an unintended bump should fail loudly, not drift silently."""
+
         from scripts.project_metrics.schema import SCHEMA_VERSION
 
-        assert SCHEMA_VERSION == "1.2.0"
+        assert SCHEMA_VERSION == "1.2.1"
+
+    def test_additive_bumps_preserve_trend_compatibility(self) -> None:
+        """Additive field changes must stay inside the 1.2 major.minor line.
+
+        `trends.compute_trends` marks a prior report `schema_mismatch` when its
+        major.minor differs, which suppresses every numeric delta. An additive
+        change that breaks no reader must therefore be a *patch* bump: a minor
+        bump would sever trend continuity against every prior report for no
+        compatibility reason. This asserts the property, not the number, so it
+        keeps biting after the next patch.
+        """
+
+        from scripts.project_metrics.schema import SCHEMA_VERSION
+        from scripts.project_metrics.trends import _parse_major_minor
+
+        assert _parse_major_minor(SCHEMA_VERSION) == (1, 2)
 
     def test_schema_version_is_string(self) -> None:
         from scripts.project_metrics.schema import SCHEMA_VERSION

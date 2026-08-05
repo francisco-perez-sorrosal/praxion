@@ -39,7 +39,12 @@ __all__ = [
 ]
 
 
-SCHEMA_VERSION = "1.2.0"
+# Patch bump, deliberately: `RunMetadata` gained three additive, optional
+# provenance fields. Trend computation compares only major.minor (see
+# `trends._parse_major_minor`), so a minor bump would mark every prior report
+# `schema_mismatch` and sever trend continuity for an additive change that
+# breaks no reader. The frozen aggregate-column contract is untouched.
+SCHEMA_VERSION = "1.2.1"
 
 
 # Frozen aggregate-block column order — matches the schema ADR row-by-row.
@@ -117,13 +122,37 @@ class ToolAvailability:
 
 @dataclass(frozen=True)
 class RunMetadata:
-    """Execution context for one /project-metrics invocation."""
+    """Execution context for one /project-metrics invocation.
+
+    Two groups of fields, and the distinction matters to consumers:
+
+    * *Configuration* — ``window_days``, ``top_n``, ``command_version``,
+      ``python_version``, ``wall_clock_seconds``: how the run was set up and
+      how long it took.
+    * *Provenance* — ``generated_at``, ``commit``, ``dirty``: **what state of
+      the repository this report describes.**
+
+    Without provenance a report is not self-describing: a consumer holding the
+    JSON cannot tell when it was produced or which commit it analysed, and so
+    cannot tell whether it still describes current ``HEAD``. That gap is not
+    theoretical — a hotspot finding is invalidated by a *commit*, not by the
+    passage of time, so a consumer gating on age alone will act on a report
+    whose subject a merge already resolved.
+
+    All three provenance fields default to ``None`` so reports written before
+    they existed still deserialize. A consumer that finds them absent must
+    **withhold** its freshness judgement rather than assume the report is
+    current — absent provenance and fresh provenance are not the same claim.
+    """
 
     command_version: str
     python_version: str
     wall_clock_seconds: float
     window_days: int
     top_n: int
+    generated_at: str | None = None
+    commit: str | None = None
+    dirty: bool | None = None
 
 
 @dataclass(frozen=True)

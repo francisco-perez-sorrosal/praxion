@@ -9,7 +9,7 @@ the generic [MCP Server Development](../SKILL.md) skill. Back to [SKILL.md](../S
 
 ## Table of Contents
 
-- [SDK Landscape](#sdk-landscape)
+- [SDK Landscape (Python)](#sdk-landscape-python)
 - [Quickstart](#quickstart)
 - [Core Primitives -- Python Implementation](#core-primitives----python-implementation)
   - [Tools](#tools)
@@ -32,22 +32,29 @@ the generic [MCP Server Development](../SKILL.md) skill. Back to [SKILL.md](../S
 - [Common Pitfalls -- Python-Specific](#common-pitfalls----python-specific)
 - [Further Reading](#further-reading)
 
-## SDK Landscape
-<!-- last-verified: 2026-05-25 -->
+## SDK Landscape (Python)
+<!-- last-verified: 2026-08-05 -->
 
 Two options for building MCP servers in Python:
 
 | Option | Package | When to Use |
 |--------|---------|-------------|
-| **Official SDK** | `mcp[cli]` | Default choice. Bundled FastMCP at `mcp.server.fastmcp` |
+| **Official SDK** | `mcp[cli]` | Default choice. v2 ships `MCPServer`; v1.x bundles FastMCP at `mcp.server.fastmcp` |
 | **FastMCP standalone** | `fastmcp` | Need composition, proxying, or advanced features beyond the SDK |
+
+**`mcp` v2.0.0 shipped 2026-07-28 and is the current stable line**, released alongside the
+2026-07-28 MCP specification. v1.x is now the legacy line — still supported, still fine to
+stay on, but no longer "current".
 
 **Version pinning** (production):
 ```toml
-# Official SDK v1.x (current; latest 1.27.x — recommended for production)
+# Official SDK v2 — current stable line
+dependencies = ["mcp[cli]>=2,<3"]
+
+# Official SDK v1.x — legacy line, still receiving critical fixes
 dependencies = ["mcp[cli]>=1.25,<2"]
 
-# FastMCP standalone v3 (current stable line; latest 3.3.x)
+# FastMCP standalone v3 (current stable line)
 dependencies = ["fastmcp>=3,<4"]
 ```
 
@@ -57,27 +64,75 @@ The SDK requires **Python 3.10+**. Target **3.13+** for new projects.
 
 | SDK | Version | Status |
 |-----|---------|--------|
-| `mcp` | v1.x | **Production recommended** (latest 1.27.x). Pin `>=1.25,<2` |
-| `mcp` | v2 | In development; not yet released on PyPI |
-| `fastmcp` | v3.x | **Current stable** (latest 3.3.x). Pin `>=3,<4` |
+| `mcp` | v2.x | **Current stable** (latest 2.0.0, 2026-07-28). Pin `>=2,<3` |
+| `mcp` | v1.x | **Legacy, still supported** (latest 1.29.0). Critical bug fixes and security patches on the v1.x branch. Pin `>=1.25,<2` |
+| `fastmcp` | v3.x | **Current stable** (latest 3.4.x). Pin `>=3,<4` |
 | `fastmcp` | v2.x | Legacy/maintenance — prior stable line |
 
-The official `mcp` v1.x will receive bug fixes and security updates for 6+ months after v2 ships.
+Upstream commits only to "critical bug fixes and security patches" for v1.x, with no stated
+end date. Treat v1.x as a supported destination for existing servers and v2 as the target for
+new ones — but plan the migration rather than assuming the window is open-ended.
+
+**Choosing a line:** new server → v2. Existing v1 server that works → stay, migrate
+deliberately. Depending on a library that pins `mcp<2` → stay until it moves.
 
 **v1 vs v2 key differences:**
 
 | Aspect | v1.x | v2 |
 |--------|------|-----|
-| High-level API | `FastMCP` at `mcp.server.fastmcp` | `MCPServer` at `mcp.server.mcpserver` |
+| High-level API | `FastMCP` at `mcp.server.fastmcp` | `MCPServer` at `mcp.server` |
+| Client | — | `Client` at `mcp` |
 | Structured output | Not built-in | Native Pydantic, TypedDict, dataclass |
 | Transports | stdio, SSE | stdio, Streamable HTTP |
 | Elicitation | Not available | Form mode and URL mode |
+
+Full v1.x guidance — pinning rationale, the `mcp.server.fastmcp` API, and the migration
+path — lives in [references/v1-legacy.md](../references/v1-legacy.md), loaded on demand.
+
+### v2 Quickstart
+
+```python
+from mcp.server import MCPServer
+
+mcp = MCPServer("Demo")
+
+
+@mcp.tool()
+def add(a: int, b: int) -> int:
+    """Add two numbers."""
+    return a + b
+
+
+@mcp.resource("greeting://{name}")
+def greeting(name: str) -> str:
+    """Greet someone by name."""
+    return f"Hello, {name}!"
+```
+
+v2 also ships an in-process client, useful for testing a server without a transport:
+
+```python
+import asyncio
+
+from mcp import Client
+
+from server import mcp
+
+
+async def main() -> None:
+    async with Client(mcp) as client:
+        result = await client.call_tool("add", {"a": 1, "b": 2})
+        print(result.structured_content)  # {'result': 3}
+
+
+asyncio.run(main())
+```
 
 **FastMCP standalone history:**
 
 - **FastMCP 1.0** -- incorporated into the official SDK in 2024 (as `mcp.server.fastmcp`)
 - **FastMCP 2.x** -- prior stable standalone line, extended beyond the SDK
-- **FastMCP 3.x** -- current stable (latest 3.3.x); adds providers, transforms, hot reload, background tasks
+- **FastMCP 3.x** -- current stable (latest 3.4.x); adds providers, transforms, hot reload, background tasks
 
 Migration from SDK-bundled to standalone is often just changing the import:
 ```python
@@ -89,10 +144,16 @@ from fastmcp import FastMCP
 
 ## Quickstart
 
+> **API line: v1.x** (`mcp.server.fastmcp`). Every example from here down targets the v1 API,
+> which remains supported — see [SDK Landscape (Python)](#sdk-landscape-python) for the
+> support policy and [references/v1-legacy.md](../references/v1-legacy.md) for the v2
+> migration. On v2, `FastMCP` becomes `MCPServer` from `mcp.server`; the `@mcp.tool()`,
+> `@mcp.resource()`, and `@mcp.prompt()` decorators keep their shape.
+
 ```bash
 uv init --package mcp-server-demo
 cd mcp-server-demo
-uv add "mcp[cli]"
+uv add "mcp[cli]>=1.25,<2"      # v1 line; use >=2,<3 for v2
 ```
 
 ```python

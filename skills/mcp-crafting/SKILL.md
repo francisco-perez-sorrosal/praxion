@@ -17,8 +17,9 @@ staleness_sensitive_sections:
   - "Bundles (.mcpb) -- Packaging for Distribution"
   - "Code Execution with MCP (Emerging)"
   - "Resources"
-  - "SDK Landscape"
-  - "SDK v2 Alpha Note"
+  - "SDK Landscape (Python)"
+  - "SDK Landscape (TypeScript)"
+  - "SDK v2 Migration Note"
 staleness_threshold_days: 60
 ---
 
@@ -51,9 +52,13 @@ For MCP connector API features (calling MCP servers from the Messages API), cons
 - [Resources](#resources)
 
 ## Before You Build: Do You Need MCP?
-<!-- last-verified: 2026-05-25 -->
+<!-- last-verified: 2026-08-05 -->
 
-MCP is not free. Each connected server injects its tool schemas into context at session start — commonly thousands of tokens before the user says anything — and a larger tool surface measurably *degrades* tool-selection accuracy (the model picks wrong among look-alikes). A single broad query has been measured at ~30× more tokens through an MCP server than through the equivalent CLI.
+MCP is not free — but the cost model changed, and the old framing overstates it. **Claude Code now defers MCP tools by default**: tool search is on, schemas are not loaded upfront, and only the tools Claude actually uses enter context. Upfront injection survives as a fallback for specific configurations (non-first-party `ANTHROPIC_BASE_URL`, some hosted-model platforms), and `ENABLE_TOOL_SEARCH=auto` loads tools upfront only when they fit within 10% of the context window.
+
+What survives is subtler and still real: a larger tool surface degrades tool-selection accuracy (the model picks wrong among look-alikes), deferred tools still cost a search round-trip, and any server marked `alwaysLoad: true` opts back into paying upfront on every session.
+
+Widely-circulated "MCP costs ~30× more tokens than a CLI" figures come from third-party benchmarks measuring the *upfront-loading* configuration that is no longer Claude Code's default. Treat the multiplier as unsourced for current defaults — the direction of the advice below holds regardless, but the magnitude does not transfer.
 
 So, in order:
 
@@ -128,14 +133,18 @@ For prompt-body authoring patterns (few-shot examples, chain-of-thought, structu
 See language context for SDK-specific decorator syntax and code examples.
 
 ## Transports
-<!-- last-verified: 2026-05-25 -->
+<!-- last-verified: 2026-08-05 -->
 
 | Transport | Use Case |
 |-----------|----------|
 | **stdio** | Local development, Claude Desktop |
 | **Streamable HTTP** | Production, remote clients |
 
-SSE is deprecated — use streamable HTTP for all new HTTP-based servers. Remote HTTP servers standardize on **OAuth 2.1** for auth (handled in-browser on first use for hosted servers); always use HTTPS, never hardcode tokens. Tools **lazy-load** — the connection opens on first use, not at registration.
+SSE is not merely deprecated — as of the **2026-07-28** spec revision it is absent from the standard binding list entirely, surviving only *inside* Streamable HTTP as a request-scoped stream. Use Streamable HTTP for all new HTTP-based servers. Remote HTTP servers standardize on **OAuth 2.1** for auth (servers must also implement OAuth 2.0 Protected Resource Metadata, RFC 9728); stdio servers should take credentials from the environment instead. Always use HTTPS, never hardcode tokens.
+
+Claude Code additionally accepts a `type: "ws"` server entry with `wss://` URLs — a custom transport in spec terms, not a standard binding.
+
+**Tool *definitions* are deferred, not connections.** Tool search defers schemas until needed; that is a separate mechanism from when a server process starts or a connection opens. Do not design assuming the connection itself is lazy.
 
 See language context for transport configuration code.
 
@@ -210,7 +219,7 @@ Connect to a running server or launch one directly. The Inspector lets you invok
 See language context for in-memory / programmatic testing patterns.
 
 ## Bundles (.mcpb) -- Packaging for Distribution
-<!-- last-verified: 2026-05-25 -->
+<!-- last-verified: 2026-08-05 -->
 
 MCP Bundles are ZIP archives (`.mcpb` extension) containing a server and a `manifest.json`. They enable one-click installation in Claude Desktop (double-click, drag-and-drop, or Developer menu). Formerly called DXT (Desktop Extensions).
 
@@ -220,26 +229,38 @@ MCP Bundles are ZIP archives (`.mcpb` extension) containing a server and a `mani
 
 Every bundle requires a `manifest.json` with at minimum:
 
-    Manifest fields (required):
-      manifest_version: string -- currently "0.4"
+    Manifest fields (required by every schema version):
       name: string -- unique identifier (lowercase, hyphens)
       version: string -- semver
       description: string -- what the server does
+      author: { name, url, email }     -- REQUIRED, not optional
       server:
         type: string -- one of: node, uv, python, binary
         entry_point: string -- path to server entry file
+        mcp_config: object -- REQUIRED inside server
 
     Manifest fields (optional):
-      author: { name, url, email }
+      manifest_version: string -- expected in practice; not in the schema's required array
       user_config: object -- declares user-configurable fields
-      mcp_config: object -- environment variables for the server
+
+**`author` and `server.mcp_config` are required**, and appear in the `required` array of
+every schema version from v0.1 through v0.4. Omitting either fails validation.
+
+**`manifest_version` is contested upstream — do not assert "0.4" unconditionally.** The
+`mcpb-manifest-latest.schema.json` alias pins `const: "0.3"` and its `server.type` enum
+*excludes* `uv`; a separate `mcpb-manifest-v0.4.schema.json` pins `"0.4"` and includes `uv`,
+and `MANIFEST.md` documents the UV runtime as "v0.4+" while its own header still reads
+"Current version: 0.3". A bundle declaring `"manifest_version": "0.4"` with `"type": "uv"`
+is valid under the v0.4 schema and **invalid under the `latest` alias**.
+
+Run `mcpb validate` rather than reasoning about which schema you will be checked against.
 
 ### Server Types
 
 | Type     | When to Use                                                            |
 | -------- | ---------------------------------------------------------------------- |
 | `node`   | **Recommended** -- ships with Claude Desktop, zero install friction    |
-| `uv`     | Python servers -- host manages Python/deps via uv (experimental)       |
+| `uv`     | Python servers -- host manages Python/deps via uv (manifest v0.4+)     |
 | `python` | Python with pre-bundled deps -- limited portability for compiled pkgs  |
 | `binary` | Pre-compiled executables                                               |
 
@@ -267,18 +288,20 @@ Reference via `${user_config.api_key}` in `mcp_config.env`.
 ```bash
 npm install -g @anthropic-ai/mcpb
 mcpb init                   # Generate manifest.json interactively
+mcpb validate               # Check manifest.json against the schema — run before packing
 mcpb pack                   # Package into .mcpb file
+mcpb sign                   # Sign the bundle
 mcpb pack examples/hello-world-uv  # Pack a specific directory
 ```
 
 See [references/resources.md](references/resources.md) for the full manifest specification, bundle directory structures, and advanced examples. See language context for language-specific bundle patterns.
 
 ## Code Execution with MCP (Emerging)
-<!-- last-verified: 2026-05-25 -->
+<!-- last-verified: 2026-08-05 -->
 
-A 2026 pattern (Anthropic, [Code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp)): instead of loading every tool's schema and orchestrating call-by-call, the agent **writes code that imports and calls tools** in a sandbox, handling intermediate results at the edge. Reported up to **~98% token reduction** (150k → 2k on a Drive→Salesforce workflow); the win scales with tool count. Four complementary levers: schema compression, **search-first tool discovery** (an optional `search_tools` endpoint loads defs on demand), response filtering, and code-based execution.
+A 2026 pattern (Anthropic, [Code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp)): instead of loading every tool's schema and orchestrating call-by-call, the agent **writes code that imports and calls tools** in a sandbox, handling intermediate results at the edge. Reported up to **~98% token reduction** (150k → 2k on a Drive→Salesforce workflow, stated as a 98.7% saving); the win scales with tool count. The article's named techniques are: **progressive disclosure** (tools presented as a filesystem, plus an optional `search_tools`), **context-efficient tool results**, **control-flow improvements**, **privacy-preserving tokenization**, and **state persistence / reusable skills**.
 
-For Praxion this is **forward-looking**, not a hard requirement — it needs a sandboxed code-execution environment. When authoring an MCP server today, design tools so they compose cleanly in code (clear types, deterministic returns, idempotency via a `request_id`), so the server is ready if/when code-execution mode is available in the target harness.
+For Praxion this needs a sandboxed code-execution environment. Note the "(Emerging)" framing is partly overtaken: Claude Code ships tool search on by default, and the sibling [`claude-ecosystem`](../claude-ecosystem/SKILL.md) skill already lists code execution and programmatic tool calling as GA. When authoring an MCP server today, design tools so they compose cleanly in code (clear types, deterministic returns, idempotency via a `request_id`), so the server is ready if/when code-execution mode is available in the target harness.
 
 ## Common Pitfalls
 
@@ -291,7 +314,7 @@ For Praxion this is **forward-looking**, not a hard requirement — it needs a s
 See language context for language-specific pitfalls.
 
 ## Resources
-<!-- last-verified: 2026-05-25 -->
+<!-- last-verified: 2026-08-05 -->
 
 - [MCP Specification](https://modelcontextprotocol.io/specification) -- official protocol spec (versioned by date; verify the current dated version)
 - [Writing effective tools for AI agents](https://www.anthropic.com/engineering/writing-tools-for-agents) -- Anthropic-official tool-design guidance (2025-09-11)

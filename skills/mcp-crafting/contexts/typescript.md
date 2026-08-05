@@ -9,7 +9,7 @@ the generic [MCP Server Development](../SKILL.md) skill. Back to [SKILL.md](../S
 
 ## Table of Contents
 
-- [SDK Landscape](#sdk-landscape)
+- [SDK Landscape (TypeScript)](#sdk-landscape-typescript)
 - [Quickstart](#quickstart)
 - [Core Primitives -- TypeScript Implementation](#core-primitives----typescript-implementation)
   - [Tools](#tools)
@@ -26,29 +26,46 @@ the generic [MCP Server Development](../SKILL.md) skill. Back to [SKILL.md](../S
 - [Client Integration -- TypeScript Examples](#client-integration----typescript-examples)
 - [Project Structure](#project-structure)
 - [Zod Version Note](#zod-version-note)
-- [SDK v2 Alpha Note](#sdk-v2-alpha-note)
+- [SDK v2 Migration Note](#sdk-v2-migration-note)
 - [Common Pitfalls -- TypeScript-Specific](#common-pitfalls----typescript-specific)
 - [Further Reading](#further-reading)
 
-## SDK Landscape
-<!-- last-verified: 2026-05-25 -->
+## SDK Landscape (TypeScript)
+<!-- last-verified: 2026-08-05 -->
 
 Two options for building MCP servers in TypeScript:
 
 | Option | Package | When to Use |
 |--------|---------|-------------|
-| **Official SDK** | `@modelcontextprotocol/sdk` | Default choice — Anthropic-endorsed, stable v1.x |
+| **Official SDK v2** | `@modelcontextprotocol/server` + `/client` | Default for new servers — current stable line |
+| **Official SDK v1** | `@modelcontextprotocol/sdk` | Legacy monolithic package; still supported |
 | **FastMCP (TS port)** | `fastmcp` | Community port; decorator-style API; simpler for small servers |
+
+**v2 went stable on 2026-07-27 under new package names.** There is no 2.x release under the
+`@modelcontextprotocol/sdk` name at all — the v2 line split into per-role packages, so
+"upgrade to v2" means changing package names, not bumping a range.
 
 **Version pinning** (production):
 ```json
 {
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1",
-    "zod": "^3"
+    "@modelcontextprotocol/server": "^2",
+    "zod": "^4"
   }
 }
 ```
+
+```json
+{
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1",
+    "zod": "^3.25 || ^4"
+  }
+}
+```
+
+The v1 SDK accepts `zod@^3.25 || ^4.0` — pinning `"zod": "^3"` is over-restrictive and
+needlessly forces the v3/v4 split described in [Zod Version Note](#zod-version-note).
 
 The SDK requires **Node 18+**. Target **Node 22 LTS** for new projects (see [node-prj-mgmt](../../node-prj-mgmt/SKILL.md)).
 
@@ -56,13 +73,24 @@ The SDK requires **Node 18+**. Target **Node 22 LTS** for new projects (see [nod
 
 | SDK | Version | Status |
 |-----|---------|--------|
-| `@modelcontextprotocol/sdk` | v1.x | **Production recommended** (latest 1.29.x) |
-| `@modelcontextprotocol/sdk` | v2.x alpha | Alpha (sub-package split) — see [SDK v2 Alpha Note](#sdk-v2-alpha-note) |
-| `fastmcp` | v2.x | Stable community alternative |
+| `@modelcontextprotocol/server`, `/client` | v2.x | **Current stable** (2.0.0, 2026-07-27) |
+| `@modelcontextprotocol/node`, `/express`, `/hono`, `/fastify` | v2.x | Optional transport + framework adapters (2.0.0) |
+| `@modelcontextprotocol/sdk` | v1.x | **Legacy, still supported** (latest 1.30.0). Bug fixes and security updates for **at least 6 months after v2's release** (i.e. through ~2027-01) |
+| `fastmcp` | v4.x | Stable community alternative (latest 4.12.x) |
+
+Full v1.x guidance and the v1→v2 migration path live in
+[references/v1-legacy.md](../references/v1-legacy.md), loaded on demand.
 
 ---
 
 ## Quickstart
+
+> **API line: v1.x** (`@modelcontextprotocol/sdk`). Every example from here down targets the
+> v1 API, which remains supported for at least 6 months past v2's 2026-07-27 release — see
+> [SDK Landscape (TypeScript)](#sdk-landscape-typescript) and
+> [references/v1-legacy.md](../references/v1-legacy.md). On v2 the imports move to
+> `@modelcontextprotocol/server` and lose the `.js` suffix; see
+> [SDK v2 Migration Note](#sdk-v2-migration-note) for a v2 quickstart.
 
 ```bash
 mkdir mcp-server-demo && cd mcp-server-demo
@@ -455,33 +483,71 @@ For pnpm setup, volta pinning, and workspace configuration, see
 
 ## Zod Version Note
 
-**Cross-skill version split**: MCP TS SDK stable uses Zod v3; OpenAI Agents SDK JS
-requires Zod v4. If your project uses both, see
+**Cross-skill version split** — and it is narrower than it looks. The MCP TS SDK **v1**
+accepts `zod@^3.25 || ^4.0`, so it does not by itself force Zod v3; a project hits the split
+only when something pins `zod@^3` (a pin this skill previously recommended, now corrected).
+OpenAI Agents SDK JS requires Zod v4.
+
+Two ways out, in order of preference:
+
+1. **Move to SDK v2**, which supports Standard Schema (Zod v4, Valibot, ArkType) and drops
+   the coupling entirely — see [SDK v2 Migration Note](#sdk-v2-migration-note).
+2. **Stay on v1 and widen the pin** to `"zod": "^3.25 || ^4"` so a single v4 copy resolves.
+
+If you genuinely need two Zod copies to coexist, see
 [`node-prj-mgmt/contexts/typescript.md` § Zod v3/v4 coexistence](../../node-prj-mgmt/contexts/typescript.md)
 for the canonical `pnpm overrides` fix.
 
 ---
 
-## SDK v2 Alpha Note
-<!-- last-verified: 2026-05-25 -->
+## SDK v2 Migration Note
+<!-- last-verified: 2026-08-05 -->
 
-**v2 is still pre-stable (sub-package split).** As of 2026-05 the npm `latest`
-tag is `@modelcontextprotocol/sdk` **1.29.x** — v2 has not gone stable. The v2
-alpha line ships as separate packages:
+**v2 is the stable release line** as of 2026-07-27, released alongside the 2026-07-28 MCP
+specification. It ships as separate packages rather than one monolith:
 
-- `@modelcontextprotocol/server` — core server
-- `@modelcontextprotocol/node` — Node.js transport adapters
+- `@modelcontextprotocol/server` — build MCP servers
+- `@modelcontextprotocol/client` — build MCP clients
+- `@modelcontextprotocol/node` — Node.js adapters
 - `@modelcontextprotocol/express` / `hono` / `fastify` — framework adapters
 
-v2 adds Standard Schema support (Zod v4, Valibot, ArkType), which will resolve
-the Zod v3/v4 cross-skill version split naturally.
+v2 supports **Standard Schema** — Zod v4, Valibot, ArkType, or any compatible library — which
+dissolves the Zod v3/v4 split that constrains v1.
 
-**Praxion will promote v2 patterns when v2 reaches stable AND at least one
-Praxion-managed TS project successfully uses v2 in production.** Trigger-based,
-not calendar-based — this section will be updated when both conditions hold.
+### v2 quickstart
 
-**Until then, use v1.x** (`@modelcontextprotocol/sdk` monolithic package) for all
-production servers.
+```typescript
+import { McpServer } from '@modelcontextprotocol/server';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
+import * as z from 'zod/v4';
+
+const server = new McpServer({ name: 'greeting-server', version: '1.0.0' });
+
+server.registerTool(
+    'greet',
+    {
+        description: 'Greet someone by name',
+        inputSchema: z.object({ name: z.string() })
+    },
+    async ({ name }) => ({
+        content: [{ type: 'text', text: `Hello, ${name}!` }]
+    })
+);
+```
+
+Note stdio is imported from the `@modelcontextprotocol/server/stdio` subpath, not from a
+separate transport package.
+
+### Praxion adoption posture
+
+The previous promotion trigger — *v2 reaches stable **AND** at least one Praxion-managed TS
+project uses v2 in production* — has **half fired**. Condition 1 is met; condition 2 is a
+Praxion-internal gate that has not yet been satisfied.
+
+So: **v2 for new servers**, and existing v1 servers migrate deliberately rather than
+reflexively. What changed is the justification — "v1 because v2 isn't stable" is no longer a
+true statement, and any decision to stay on v1 needs a current reason (a pinned dependency, a
+migration cost, an unported adapter), not that one.
 
 ---
 

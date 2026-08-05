@@ -63,6 +63,39 @@ def test_excludes_pattern_defining_files(tmp_path: Path) -> None:
     assert gl.check_forbidden_pattern(tmp_path) == []
 
 
+def test_flags_a_gate_script_nothing_invokes(tmp_path: Path) -> None:
+    """A canary: a gate written, tested, and called by nothing.
+
+    The live instance this was written against had a docstring naming the
+    dimension that invoked it, and that dimension called a different module
+    entirely -- so the file had never executed, which is also why nobody had
+    noticed it could not.
+    """
+    _write(tmp_path, "scripts/check_orphan.py", "# a gate nothing calls\n")
+    _write(tmp_path, "scripts/test_check_orphan.py", "import check_orphan\n")
+    findings = gl.check_uninvoked_gate(tmp_path)
+    assert [f["file"] for f in findings] == ["scripts/check_orphan.py"]
+    assert findings[0]["check"] == "uninvoked-gate"
+
+
+def test_a_gate_invoked_from_pre_commit_is_not_flagged(tmp_path: Path) -> None:
+    """The inverse guard: a wired gate must stay silent."""
+    _write(tmp_path, "scripts/check_wired.py", "# a gate\n")
+    _write(tmp_path, ".pre-commit-config.yaml", "entry: python3 scripts/check_wired.py\n")
+    assert gl.check_uninvoked_gate(tmp_path) == []
+
+
+def test_a_gate_imported_by_a_sibling_script_is_not_flagged(tmp_path: Path) -> None:
+    """One gate driving another is a real invocation, and it names the module stem.
+
+    Matching only the filename reports these as orphans -- the false positive
+    that would have condemned a gate this project had just finished wiring.
+    """
+    _write(tmp_path, "scripts/validate_thing.py", "# a library-style gate\n")
+    _write(tmp_path, "scripts/detector.py", "from validate_thing import parse\n")
+    assert gl.check_uninvoked_gate(tmp_path) == []
+
+
 def test_cli_exits_nonzero_on_findings(tmp_path: Path) -> None:
     """A canary for the exit-code gate contract: bad input → exit 1."""
     _write(tmp_path, "agents/planner.md", "scan test files for req33_ patterns.")

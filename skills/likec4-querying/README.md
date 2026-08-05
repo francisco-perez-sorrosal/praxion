@@ -21,8 +21,8 @@ patterns.
 
 ## Skill Contents
 
-- `SKILL.md` — decision rubric (MCP vs. direct read), MCP tool quick reference (13 tools), common pitfalls
-- `references/mcp-tool-recipes.md` — full input shapes and worked examples for all 13 MCP tools
+- `SKILL.md` — decision rubric (MCP vs. direct read), MCP tool quick reference (18 tools), common pitfalls
+- `references/mcp-tool-recipes.md` — full input shapes and worked examples for all 18 MCP tools
 
 ## Quick Start
 

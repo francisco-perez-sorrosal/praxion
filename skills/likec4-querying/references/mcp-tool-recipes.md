@@ -163,13 +163,18 @@ Response excerpt:
 ### `find-relationship-paths`
 
 **Use case**: Use when every chain of relationships between two elements is needed.
-The BFS traversal can fan out widely — always set `maxDepth` (4–6) in large models.
+The traversal is already bounded — `maxDepth` defaults to **3** and the server **caps it at
+5**, and results are limited to 100 paths. Lower it for tighter scoping; you cannot raise it
+past 5. Rejects a call where source equals target.
 
 **Input shape**:
 ```json
 { "sourceId": "string", "targetId": "string",
-  "maxDepth": "optional integer", "maxNodes": "optional integer", "project": "optional" }
+  "maxDepth": "optional integer (default 3, min 1, max 5)",
+  "includeIndirect": "optional boolean (default false)", "project": "optional" }
 ```
+
+`includeIndirect: true` also follows implied relationships through nested elements.
 
 **Worked example** — Invocation:
 `{ "sourceId": "auth.service", "targetId": "notifications.service", "maxDepth": 4 }`
@@ -311,3 +316,117 @@ Response excerpt:
   { "id": "payments.service", "tags": ["grpc", "pci"]      }
 ]
 ```
+
+### `query-by-tag-pattern`
+
+**Use case**: Match tags by **shape** rather than by exact value — the complement to
+`query-by-tags`. Use it for structured tag taxonomies where the convention encodes meaning in
+the name (`schedule_daily`, `schedule_hourly`; `asil_b`, `asil_d`). `query-by-tags` needs the
+exact tags up front; this one does not.
+
+**Input shape**:
+```json
+{ "pattern": "string", "matchMode": "optional prefix|contains|suffix", "project": "optional" }
+```
+
+**Worked example** — Invocation:
+`{ "pattern": "schedule_", "matchMode": "prefix" }`
+
+Response excerpt:
+```json
+[
+  { "id": "batch.nightly", "tags": ["schedule_daily"]  },
+  { "id": "batch.rollup",  "tags": ["schedule_hourly"] }
+]
+```
+
+## Bulk and Comparison
+
+### `batch-read-elements`
+
+**Use case**: Fetch full details for a **known set** of element ids in one round-trip. This is
+the cheap middle ground between `read-element` (one call per element) and
+`read-project-summary` (the entire model). Prefer it whenever you already have the ids.
+
+**Input shape**:
+```json
+{ "ids": "string[] (max 50)", "project": "optional" }
+```
+
+**Worked example** — Invocation:
+`{ "ids": ["auth.service", "payments.service", "shop.frontend"] }`
+
+Returns the same per-element shape as `read-element`, one entry per requested id. Requesting
+more than 50 ids is an error, not a silent truncation — chunk the list yourself.
+
+### `element-diff`
+
+**Use case**: Compare two elements side by side — properties, tags, metadata, and
+relationships. Useful when two components are meant to be symmetric (two adapters, two
+regions) and you need to find where they diverged.
+
+**Input shape**:
+```json
+{ "element1Id": "string", "element2Id": "string", "project": "optional" }
+```
+
+**Worked example** — Invocation:
+`{ "element1Id": "eu.payments", "element2Id": "us.payments" }`
+
+Response reports matching and differing fields, so an asymmetry (a tag on one side only, an
+extra outgoing relationship) surfaces without reading both elements in full.
+
+### `subgraph-summary`
+
+**Use case**: Survey **everything beneath a parent element** in one call. Returns each
+descendant with its depth, tags, metadata, and relationship counts — the tool's own
+description notes it is "much more efficient than calling `read-element` for each descendant
+individually."
+
+**Input shape**:
+```json
+{ "elementId": "string", "maxDepth": "optional (default 10, max 20)",
+  "metadataKeys": "optional string[]", "project": "optional" }
+```
+
+**Worked example** — Invocation:
+`{ "elementId": "shop", "maxDepth": 2, "metadataKeys": ["code_module"] }`
+
+Response excerpt:
+```json
+{
+  "root": { "id": "shop", "kind": "system", "title": "Shop", "childCount": 3 },
+  "descendants": [
+    { "id": "shop.frontend", "depth": 1, "tags": ["web"],
+      "metadata": { "code_module": "web/" },
+      "childCount": 0, "incomingCount": 1, "outgoingCount": 2 }
+  ],
+  "totalDescendants": 7,
+  "truncated": false,
+  "truncatedByDepth": true
+}
+```
+
+Descendants come back breadth-first (`depth: 1` = direct child). Watch both truncation flags:
+`truncated` means the 200-descendant cap was hit, `truncatedByDepth` means deeper elements
+exist beyond `maxDepth`. Use `metadataKeys` to keep the response small.
+
+## Layout (not read-only)
+
+### `apply-semantic-layout`
+
+**Use case**: Apply an LLM-driven semantic layout to a **view**. This is the one tool in the
+catalog that is **not read-only** — it drives an MCP `sampling/createMessage` request and
+saves a snapshot, returning `reasoning` and `snapshotUri`. It operates on a view, not on
+`.c4` source text, so it is not a way to edit the model DSL.
+
+**Input shape**:
+```json
+{ "viewId": "string", "projectId": "optional" }
+```
+
+**Worked example** — Invocation:
+`{ "viewId": "shop-context" }`
+
+Treat it like any other write: confirm the view id first, and do not call it speculatively in
+a read-only exploration pass.

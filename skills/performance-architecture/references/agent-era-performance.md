@@ -16,7 +16,7 @@ Reframe "always-loaded context" as a **fixed cost** and "on-demand context" as a
 **The basis-dependent measurement gotcha.** A token budget claim is only as good as the basis it was measured against -- *which files are actually loaded, for whom, in what state*. Two failure modes:
 
 1. **Wrong basis** -- measuring against a stale file list (a rule that was deleted, a skill that got merged) silently under- or over-counts. Re-measure the basis before trusting a cached figure; don't reuse a number from a prior session without re-deriving it.
-2. **Ceiling adjacency** -- when a budget is already near its ceiling (e.g., a 25,000-token always-loaded budget sitting at 95%+ utilization), even a one-line addition can tip the total over. At that point, the marginal cost of *any* new always-loaded content dominates the decision -- prefer a cross-reference to existing content over restating it, and do the arithmetic (`wc -c` / ~3.6-4.0 chars per token) before deciding placement, not after.
+2. **Ceiling adjacency** -- when a budget is already near its ceiling (e.g., a 25,000-token always-loaded budget sitting at 95%+ utilization), even a one-line addition can tip the total over. At that point, the marginal cost of *any* new always-loaded content dominates the decision -- prefer a cross-reference to existing content over restating it, and take the measurement (`scripts/measure_token_budget.py`) before deciding placement, not after. Do not estimate from a chars-per-token divisor: measured against a real tokenizer, the divisors in common circulation err by 5-8% in both directions, which is enough to invert a near-ceiling verdict.
 
 The `rule-crafting` skill's "Why the Always-Loaded Budget Exists" and `skill-crafting`'s progressive-disclosure sections carry the mechanics of *how* to measure and stay under budget in this ecosystem -- this file only establishes that token budget is a capacity constraint in the same sense as connection-pool size or queue depth, subject to the same measure-before-optimize discipline.
 
@@ -55,7 +55,7 @@ A performance budget that is never measured is an assertion, not a budget. State
 
 | Quantity | How it's observed | Recoverable after the fact? |
 | --- | --- | --- |
-| Token budget (always-loaded) | `wc -c` over the always-loaded file set, divided by ~3.6-4.0 chars/token | Yes -- static files, re-measurable anytime |
+| Token budget (always-loaded) | `scripts/measure_token_budget.py` — real tokenizer, file set encoded in the script | Yes -- static files, re-measurable anytime |
 | Context-window efficiency | Harder to measure directly; proxy via task success rate as irrelevant content grows, or manual review of what a session actually referenced | Partially -- requires session transcripts |
 | Spawn cost per agent | Wall-clock + token cost captured at spawn time (harness telemetry, `PROGRESS.md` timestamps) | **No, unless captured at the time** -- post-hoc reconstruction from logs is unreliable once the session ends |
 | Pipeline wall-clock | Timestamp delta between pipeline start and terminal marker, cross-referenced against `PROGRESS.md` phase transitions | Yes, if phase-transition timestamps were logged; no, if they weren't |

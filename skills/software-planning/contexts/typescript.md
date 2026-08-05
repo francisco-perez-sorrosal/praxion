@@ -135,8 +135,7 @@ outside a `paths:`-scoped rule or a satellite reference file), measure the token
 before committing:
 
 ```bash
-wc -c skills/<skill-name>/SKILL.md
-# estimate: bytes / 3.6 (conservative) or / 4.0 (realistic)
+python3 scripts/measure_token_budget.py        # real tokenizer; file set encoded in the script
 ```
 
 The always-loaded surface budget is **25,000 tokens**. Prefer satellite reference files

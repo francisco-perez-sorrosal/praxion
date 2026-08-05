@@ -54,7 +54,7 @@ Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.m
 
 ## Critical conventions
 
-- **Token budget**: always-loaded content (CLAUDE.md files + always-on rules) stays under **25,000 tokens** (~87,500 chars); measure with `wc -c` before adding. Full protocol — attention-share principle, skills-vs-rules placement — in `rules/CLAUDE.md`.
+- **Token budget**: always-loaded content (CLAUDE.md files + always-on rules) stays under **25,000 tokens**; measure with `scripts/measure_token_budget.py` before adding — never by hand, and never from a chars-per-token divisor. Full protocol — attention-share principle, skills-vs-rules placement — in `rules/CLAUDE.md`.
 - **Never modify `~/.claude/plugins/cache/`** — edit source files here; installed copies overwrite on reinstall.
 - **No AI authorship** in commit messages — see `rules/swe/vcs/git-conventions.md`.
 - **Build output to `/dev/null`**, temp files in `tmp/` (gitignored), debug prints prefixed `# DEBUG:` for grep-removal.

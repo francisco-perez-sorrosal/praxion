@@ -24,6 +24,9 @@ def test_starter_invariant_holds(project_root: Path, import_linter_cfg: Path) ->
         capture_output=True,
         text=True,
         check=False,
+        # praxion_evals is a root package but lives in a sibling project the
+        # root environment does not install; see the header of the cfg.
+        env={**__import__("os").environ, "PYTHONPATH": "eval/src"},
     )
     # exit 0 = all contracts KEPT; non-zero = at least one BROKEN or config error
     assert result.returncode == 0, (

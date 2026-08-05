@@ -21,6 +21,9 @@ Praxion: {
 Arize_phoenix: {
   label: "Arize Phoenix"
 }
+Anthropic_api: {
+  label: "Anthropic API"
+}
 
 Developer -> Praxion: "develops"
 Claude_code -> Praxion: "executes agents"
@@ -28,3 +31,4 @@ Claude_desktop -> Praxion: "loads skills"
 Cursor -> Praxion: "loads rules"
 Praxion -> Arize_phoenix: "streams via OTLP"
 Github -> Praxion: "hosts"
+Praxion -> Anthropic_api: "judges via the JudgeClient adapter"

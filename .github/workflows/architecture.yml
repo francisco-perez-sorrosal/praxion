@@ -202,6 +202,12 @@ jobs:
         run: uv run pytest fitness/tests/ -q
 
       - name: Import-linter boundary check
+        # praxion_evals is a root package living in a sibling project this
+        # environment does not install; the graph builder parses rather than
+        # executes, so the source tree only needs to be findable. Omitting this
+        # fails loudly rather than dropping the contract. See the cfg header.
+        env:
+          PYTHONPATH: eval/src
         run: uv run lint-imports --config fitness/import-linter.cfg --no-cache
 
   # ---------------------------------------------------------------------------

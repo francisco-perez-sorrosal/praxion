@@ -83,7 +83,7 @@ Preferred via the `likec4` MCP tools. Use these tools in this order:
 
 ### Code import graph
 
-Run `uv run lint-imports --config fitness/import-linter.cfg --no-cache` and capture stdout. This refreshes the resolved import set from `fitness/import-linter.cfg`. Parse the contract output to extract the declared module boundaries.
+Run `PYTHONPATH=eval/src uv run lint-imports --config fitness/import-linter.cfg --no-cache` and capture stdout. This refreshes the resolved import set from `fitness/import-linter.cfg`. Parse the contract output to extract the declared module boundaries.
 
 ### ADR set
 
@@ -120,7 +120,7 @@ If no file matches: emit `no architectural-touch slice detected; skipping` and e
 ### Phase 2 — Inputs assembly
 
 1. Query `list-projects` via the LikeC4 MCP (or fallback to `find docs/diagrams -name '*.c4'`)
-2. Run `uv run lint-imports --config fitness/import-linter.cfg --no-cache` to refresh the import graph
+2. Run `PYTHONPATH=eval/src uv run lint-imports --config fitness/import-linter.cfg --no-cache` to refresh the import graph. The `PYTHONPATH` is required — one root package lives in a sibling project this environment does not install, and omitting it fails loudly rather than silently dropping that contract (rationale in the cfg header)
 3. Read `.ai-state/decisions/DECISIONS_INDEX.md`
 4. In `--mode=pre-merge`: run `git diff --name-only $BASE..HEAD` filtered to `.ai-state/decisions/` to collect ADRs touched in this PR
 5. Identify architecture markdown files in scope: `**/DESIGN.md` and `docs/architecture.md`

@@ -70,6 +70,7 @@ model {
   cursor         = external "Cursor"
   arize_phoenix  = external "Arize Phoenix"
   github         = external "GitHub"
+  anthropic_api  = external "Anthropic API"
 
   // ── Praxion System ───────────────────────────────────────────────────────
   praxion = system "Praxion" {
@@ -253,6 +254,11 @@ model {
     tooling.dashboard   -> orchestration.aiwork  "reads in-flight pipeline docs (read-only)"
     tooling.evals       -> persistence.aistate   "reads completed artifacts (read-only)"
   }
+
+  // The eval framework's only outbound boundary, and the one the fitness suite
+  // guards: judge calls leave through a single adapter that owns the auth seam.
+  // An import contract fails the build if family code reaches the SDK directly.
+  praxion.tooling.evals -> anthropic_api "judges via the JudgeClient adapter"
 
   // ── Cross-boundary Relationships ─────────────────────────────────────────
   praxion.persistence.chronograph -> arize_phoenix "streams via OTLP"

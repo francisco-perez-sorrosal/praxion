@@ -1,7 +1,7 @@
 ---
-id: dec-draft-f7278c22
+id: dec-318
 title: Architectural means the inventory changed, not that the trade-off was hard
-status: proposed
+status: accepted
 category: architectural
 date: 2026-08-05
 summary: 'Replace the unfalsifiable "significant trade-off" definition with a two-part test — a decision is architectural iff it changes the component inventory or a boundary between components, or it changes a published contract — and ship a measurement of the resulting category mix rather than a gate the test cannot support.'

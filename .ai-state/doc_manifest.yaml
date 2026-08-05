@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-05T00:19:24Z'
+generated_at: '2026-08-05T00:49:50Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -2462,6 +2462,12 @@ surfaces:
   title: Retirement is a status carrying a removal list, not an archive directory
   last_modified: '2026-08-04'
   renderer: adr_card
+- id: ai-state-decisions-318-architectural-means-the-inventory-change
+  path: .ai-state/decisions/318-architectural-means-the-inventory-change.md
+  type: markdown
+  title: Architectural means the inventory changed, not that the trade-off was hard
+  last_modified: '2026-08-04'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3058,6 +3064,7 @@ groups:
   - ai-state-decisions-315-release-staleness-named-consumer
   - ai-state-decisions-316-ruff-pin-coherence
   - ai-state-decisions-317-retirement-is-a-status-carrying-a-remova
+  - ai-state-decisions-318-architectural-means-the-inventory-change
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

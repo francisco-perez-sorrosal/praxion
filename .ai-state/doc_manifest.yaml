@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-05T04:27:01Z'
+generated_at: '2026-08-05T04:34:06Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -1302,7 +1302,7 @@ surfaces:
   path: .ai-state/decisions/124-pipeline-dashboard-dashboard-frontmatter-parsing.md
   type: markdown
   title: "Pipeline Dashboard frontmatter parsing \u2014 stdlib re + pyyaml, no python-frontmatter"
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-04'
   renderer: adr_card
 - id: ai-state-decisions-125-pipeline-dashboard-dashboard-mermaid-strategy
   path: .ai-state/decisions/125-pipeline-dashboard-dashboard-mermaid-strategy.md

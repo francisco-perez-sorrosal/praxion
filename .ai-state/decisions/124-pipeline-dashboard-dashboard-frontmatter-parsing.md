@@ -1,7 +1,9 @@
 ---
 id: dec-124
 title: Pipeline Dashboard frontmatter parsing — stdlib re + pyyaml, no python-frontmatter
-status: accepted
+status: retired
+retired_by:
+  - dec-134
 category: implementation
 date: 2026-05-07
 summary: Use stdlib re + pyyaml (already a Streamlit transitive dep) for YAML frontmatter; rejecting the python-frontmatter library to match existing in-repo style and avoid a new external dep on a hot codepath.
@@ -74,3 +76,13 @@ def parse_frontmatter(text: str) -> tuple[dict, str]:
 **Negative**: A future need for richer frontmatter handling (TOML, multi-doc YAML streams) would re-open this decision. Acceptable: Praxion's frontmatter is uniformly YAML, has been since the convention took effect, and the ADR conventions rule pins this format.
 
 **Risks accepted**: Slightly more parser code to test; mitigated by colocating tests with `data/parsers.py`.
+
+## Prior Decision
+
+Retired by `dec-134`, which replaced the Streamlit runtime. This decision's subject was a specific six-line function in a Python module that no longer exists, so the question it answered — how *that* parser reads frontmatter — went away with it.
+
+**The successor made the opposite call, and this is the record of that.** The Next.js dashboard parses frontmatter with `gray-matter`, a dedicated library, adopted alongside the rewrite; `dashboard_app/src/server/parsers/content.ts` imports it directly and imports `yaml` separately for other parsing. That is precisely the trade rejected here — a dedicated frontmatter dependency added on top of an available YAML one.
+
+It is recorded here rather than as its own decision because the reasoning above does not transfer: the argument was that `pyyaml` was already a transitive dependency and a frontmatter library would be a *new* one, and TypeScript offers no equivalent already-present path. A library choice inside a single component, in a different language, under different premises, changes neither the component inventory nor a published contract, so it is implementation rather than a decision the corpus needs to carry.
+
+This decision matters again only if a component parses frontmatter in Python with a YAML library already on hand — at which point the reasoning still holds: a six-line regex is cheaper than a dependency.

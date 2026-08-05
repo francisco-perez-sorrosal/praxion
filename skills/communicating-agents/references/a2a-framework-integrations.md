@@ -4,17 +4,25 @@ Integration patterns for exposing framework-built agents via A2A. Load alongside
 
 ## Integration Landscape
 
-| Framework | Integration Type | Effort | Notes |
+Verified 2026-08-05 against first-party source trees and vendor documentation. Rows marked
+**unverified** were asserted by an earlier revision without a checkable basis -- treat them as
+open questions, not as facts.
+
+| Framework | Integration Type | Effort | Basis |
 |-----------|-----------------|--------|-------|
-| Google ADK | Native | Minimal | Built-in A2A server and client |
-| Pydantic AI | One-liner | Minimal | `agent.to_a2a()` |
-| LangGraph | Platform feature | Low | A2A endpoint via LangSmith/Agent Server |
-| CrewAI | Adapter | Low | A2A adapter wraps crews |
-| Semantic Kernel | Plugin | Medium | A2A plugin for .NET agents |
-| AutoGen / MS Agent Framework | Connector | Medium | A2A connector |
-| LlamaIndex | Integration | Medium | A2A agent integration |
-| AWS Bedrock AgentCore | Native deployment | Low | Deploy as A2A-compatible service |
-| Google Cloud Run / Vertex AI | Native deployment | Low | Deploy as A2A-compatible service |
+| Google ADK | Native | Minimal | First-party `google.adk.a2a` module (`google/adk-python`) |
+| CrewAI | First-party module | Low | `crewai.a2a` -- wrapper, auth, types, templates |
+| Semantic Kernel | Agent type | Medium | `dotnet/src/Agents/A2A/` (.NET) and `agent_framework.a2a.A2AAgent` (Python) |
+| AWS Bedrock AgentCore | Deployment target | Low | AgentCore Runtime lists A2A among supported protocols |
+| Pydantic AI | **Moved out** | Low | `to_a2a()` removed in v2; use the standalone `fasta2a` package |
+| LangGraph | **None found** | — | No `a2a` module; its platform docs expose agents over MCP, not A2A |
+| AutoGen | **None found** | — | No `a2a` module in `microsoft/autogen`; A2A absent from its docs |
+| LlamaIndex | *unverified* | — | Not checked against upstream |
+| Google Cloud Run / Vertex AI | *unverified* | — | Not checked against upstream |
+
+Bridging LangGraph or AutoGen to A2A today means writing the adapter yourself against
+`a2a-sdk` -- wrap the framework's entrypoint in an `AgentExecutor` and serve it with the
+routes shown in [contexts/a2a-python.md](../contexts/a2a-python.md).
 
 ## Google ADK (Agent Development Kit)
 
@@ -64,25 +72,21 @@ The `a2a-samples` repo includes several ADK examples:
 
 ## LangGraph
 
-A2A endpoint available through LangSmith Platform / Agent Server.
+**No first-party A2A integration exists.** An earlier revision of this file claimed LangGraph
+agents "deployed via LangSmith get A2A endpoints automatically" -- that is not supported by
+any upstream source. `langchain-ai/langgraph` contains no `a2a` module, and the LangGraph
+Platform documentation describes exposing agents as **MCP** tools over Streamable HTTP, never
+A2A. LangSmith is the observability and deployment product, not an A2A gateway.
 
-### Exposing a LangGraph Agent
+### Exposing a LangGraph agent anyway
 
-```python
-# LangGraph agents deployed via LangSmith get A2A endpoints automatically
-# Configure in the LangSmith dashboard or via deployment config
+Write the adapter yourself: implement an `AgentExecutor` whose `execute()` invokes your
+compiled graph, then serve it with `create_jsonrpc_routes`. The graph's streaming events map
+onto `TaskUpdater.update_status(...)` calls.
 
-# The platform handles:
-# - Agent Card generation from graph metadata
-# - JSON-RPC endpoint
-# - Task lifecycle management
-# - Streaming support
-```
-
-### Sample
-
-- **Currency Agent** -- LangGraph-based agent in `a2a-samples`
-- **Pizza Agent** -- order processing with LangGraph
+The `a2a-samples` repo does ship LangGraph-based sample agents (e.g. a currency agent), which
+demonstrate exactly this hand-written pattern -- they are samples built *on* `a2a-sdk`, not
+evidence of framework-native support.
 
 ## CrewAI
 
@@ -113,62 +117,64 @@ crew = Crew(
 
 ## Pydantic AI
 
-Direct A2A conversion with `to_a2a()`.
+A2A support was **spun out of Pydantic AI** into the standalone
+[`fasta2a`](https://github.com/pydantic/fasta2a) package. `Agent.to_a2a()` still works in
+Pydantic AI 1.x but emits a deprecation warning, and it is **removed in v2** -- which has
+shipped, so on a current install the method does not exist.
+
+```bash
+pip install 'fasta2a[pydantic-ai]'   # or: uv add 'fasta2a[pydantic-ai]'
+```
 
 ```python
 from pydantic_ai import Agent
+from fasta2a.pydantic_ai import agent_to_a2a
 
-agent = Agent(
-    "openai:gpt-4o",
-    system_prompt="You are a helpful assistant.",
-)
-
-# One-liner: expose as A2A server
-a2a_app = agent.to_a2a()
+agent = Agent("openai:gpt-5.5")
+app = agent_to_a2a(agent)
 
 # Run with uvicorn
 import uvicorn
-uvicorn.run(a2a_app, host="0.0.0.0", port=8000)
+uvicorn.run(app, host="0.0.0.0", port=8000)
 ```
 
-The `to_a2a()` method automatically:
-- Generates an Agent Card from agent metadata
-- Maps Pydantic AI tools to A2A skills
-- Handles task lifecycle and streaming
+`agent_to_a2a()` keeps the previous conveniences -- Agent Card generated from agent metadata,
+Pydantic AI tools mapped to A2A skills, task lifecycle and streaming handled.
+
+**Migrating:** replace `agent.to_a2a()` with `agent_to_a2a(agent)` and add the `fasta2a`
+dependency. There is no compatibility shim in Pydantic AI v2.
 
 ## Semantic Kernel
 
-A2A plugin for .NET-based agents.
+A2A arrives as an **agent type**, not a plugin. There is no `A2APlugin` class -- the .NET
+tree ships `A2AAgent`, `A2AHostAgent`, `A2AAgentThread`, and `A2AAgentExtensions` under
+`dotnet/src/Agents/A2A/`, and Python exposes `agent_framework.a2a.A2AAgent`.
 
-```csharp
-// Register A2A agent as a Semantic Kernel plugin
-var a2aPlugin = new A2APlugin(
-    agentCardUrl: "https://remote-agent.example.com/.well-known/agent-card.json"
-);
+The two directions:
 
-kernel.Plugins.Add(a2aPlugin);
-// Agent skills appear as kernel functions
-```
+- **Consume** a remote A2A agent -- construct an `A2AAgent` from a URL, `AgentCard`, or an
+  existing A2A client; it converts framework `ChatMessage`s to A2A messages and back.
+- **Expose** a Semantic Kernel agent over A2A -- use `A2AHostAgent`.
 
-## AutoGen / Microsoft Agent Framework
+Check the current constructor overloads against
+[`dotnet/src/Agents/A2A/`](https://github.com/microsoft/semantic-kernel/tree/main/dotnet/src/Agents/A2A)
+or the Python `agent_framework` API reference before writing against them -- the surface is
+moving as Semantic Kernel folds into Microsoft Agent Framework.
 
-A2A connector enables AutoGen agents to participate in A2A networks.
+## AutoGen
 
-```python
-# AutoGen agents can be wrapped as A2A servers
-# and can call remote A2A agents as tools
-# See a2a-samples/autogen for examples
-```
+**No first-party A2A integration exists.** An earlier revision claimed an "A2A connector".
+`microsoft/autogen` contains no `a2a` module, and A2A is absent from AutoGen's documentation.
+
+Note the distinction from Semantic Kernel above: Microsoft ships A2A support in **Semantic
+Kernel / Microsoft Agent Framework**, not in AutoGen. If you need A2A from an AutoGen agent,
+either bridge through Agent Framework or write an `AgentExecutor` adapter directly.
 
 ## LlamaIndex
 
-A2A integration for LlamaIndex agents.
-
-```python
-# LlamaIndex provides A2A integration
-# allowing agents to discover and call A2A services
-# See a2a-samples/llamaindex for examples
-```
+*Unverified.* An earlier revision asserted "A2A integration for LlamaIndex agents" with no
+checkable basis. Not investigated in the 2026-08-05 pass -- verify against upstream before
+relying on it.
 
 ## AWS Bedrock AgentCore
 
@@ -182,10 +188,12 @@ Deploy agents as A2A-compatible services on AWS infrastructure.
 
 ### FastA2A (Pydantic team)
 
-Lightweight A2A server framework built on FastAPI.
+No longer a "community alternative" -- `fasta2a` is where Pydantic AI's own A2A support now
+lives (see [Pydantic AI](#pydantic-ai) above). The distribution and import name is
+`fasta2a`, not `fast_a2a`.
 
 ```python
-from fast_a2a import FastA2A
+from fasta2a import FastA2A
 
 app = FastA2A(
     name="my-agent",

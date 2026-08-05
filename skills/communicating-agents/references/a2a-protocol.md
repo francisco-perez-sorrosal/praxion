@@ -2,7 +2,7 @@
 
 Complete protocol reference for the A2A (Agent2Agent) specification. Load alongside the [Communicating Agents](../SKILL.md) skill.
 
-- **Current version**: v0.3.0 (July 30, 2025)
+- **Current version**: v1.0.1 (2026-05-28); v1.0.0 shipped 2026-03-12
 - **Governance**: Linux Foundation, 150+ supporting organizations
 - **Spec**: [a2a-protocol.org/latest/specification/](https://a2a-protocol.org/latest/specification/)
 - **Repo**: [github.com/a2aproject/A2A](https://github.com/a2aproject/A2A)
@@ -21,8 +21,9 @@ Defines 11 operations independent of transport.
 
 Maps operations to transport protocols:
 - **JSON-RPC 2.0** -- primary binding over HTTP
-- **gRPC** -- added in v0.3 for high-throughput scenarios
+- **gRPC** -- for high-throughput scenarios
 - **HTTP+JSON/REST** -- simplified REST-style access
+- **Custom protocol bindings** -- added in v1.0; the spec's worked example is WebSocket
 
 ## Data Model
 
@@ -50,22 +51,26 @@ Stateful work unit -- the central object in A2A interactions.
 ### TaskState (Lifecycle)
 
 ```
-created --> working --> completed
-                   \--> failed
-                   \--> canceled
-                   \--> rejected
-                   \--> input_required
-                   \--> auth_required
+submitted --> working --> completed
+                     \--> failed
+                     \--> canceled
+                     \--> rejected
+                     \--> input_required
+                     \--> auth_required
 ```
+
+The proto enum is `TaskState`, whose members carry a `TASK_STATE_` prefix
+(`TASK_STATE_SUBMITTED`, `TASK_STATE_WORKING`, …) plus a zero-value
+`TASK_STATE_UNSPECIFIED`. There is **no `created` state**.
 
 | State | Description |
 |-------|-------------|
-| `created` | Task received, not yet processing |
+| `submitted` | Task received, not yet processing (initial state) |
 | `working` | Actively processing |
 | `completed` | Successfully finished |
 | `failed` | Encountered an error |
-| `canceled` | Canceled by client request |
-| `rejected` | Server refused the task |
+| `canceled` | Canceled by client request (note the single-`l` spelling; v1.0 standardized it) |
+| `rejected` | Server refused the task -- terminal, and may be entered at task creation |
 | `input_required` | Awaiting additional user input |
 | `auth_required` | Awaiting authentication/authorization |
 
@@ -83,16 +88,23 @@ Single communication turn between actors.
 
 ### Part
 
-Content container using a union (oneof) pattern:
+A single `Part` message carrying a `oneof content`. v1.0 removed the per-variant message
+types (`TextPart`, `DataPart`, …) **and** the `kind` discriminator -- there is one `Part`
+type whose populated field selects the variant.
 
-| Variant | Fields | Description |
-|---------|--------|-------------|
-| `TextPart` | `text: string` | Plain text content |
-| `DataPart` | `data: object` | Structured JSON data |
-| `RawPart` | `bytes: bytes` | Raw binary content |
-| `UrlPart` | `url: string` | URI reference |
+| `content` field | Proto type | Description |
+|---|---|---|
+| `text` | `string` | Plain text content |
+| `raw` | `bytes` | Raw binary content (base64 in JSON serialization) |
+| `url` | `string` | URI pointing at the file's content |
+| `data` | `google.protobuf.Value` | Structured JSON (object, array, string, number, bool, null) |
 
-**Common fields** (all variants): `mediaType` (optional MIME type), `filename` (optional), `metadata` (optional key-value pairs).
+**Common fields** (outside the oneof): `metadata` (`google.protobuf.Struct`), `filename`,
+`media_type` -- the last available for all part types, not just files.
+
+In generated code the oneof surfaces idiomatically: Python builds parts through the
+`a2a.helpers` constructors (`new_text_part`, `new_data_part`, …), while the TypeScript SDK
+uses a ts-proto tagged union, `{ content: { $case: 'text', value: '...' } }`.
 
 ### Artifact
 
@@ -245,7 +257,7 @@ For closed networks or development:
 ### Request/Response (Polling)
 
 1. Client sends `SendMessage`
-2. Server returns Task with `created` or `working` state
+2. Server returns Task with `submitted` or `working` state
 3. Client polls `GetTask` until terminal state
 
 Best for: simple request-response, batch processing, clients that cannot maintain persistent connections.
@@ -283,7 +295,9 @@ Best for: very long-running tasks, fire-and-forget patterns, mobile/serverless c
 
 ### Security Requirements
 
-- TLS 1.2+ required for all production deployments
+- Production deployments **MUST** use encrypted communication (HTTPS for HTTP bindings, TLS
+  for gRPC); implementations **SHOULD** use TLS 1.3+ and disable SSLv3/TLS 1.0/TLS 1.1. There
+  is no normative "TLS 1.2+" floor -- the MUST is on encryption, the version is a SHOULD
 - Agents maintain opacity -- they do not expose internal architecture
 - Credentials passed via HTTP headers (never in URLs for sensitive tokens)
 - Agent Cards declare required auth schemes -- clients must satisfy them before calling
@@ -297,31 +311,42 @@ A2A uses JSON-RPC 2.0 over HTTP as the primary protocol binding.
 ```json
 {
   "jsonrpc": "2.0",
-  "method": "message/send",
+  "id": "req-1",
+  "method": "SendMessage",
   "params": {
     "message": {
-      "role": "user",
+      "role": "ROLE_USER",
       "parts": [{"text": "Hello"}]
     }
-  },
-  "id": "req-1"
+  }
 }
 ```
 
-**Method names:**
+`params` carries the operation's request message (here `SendMessageRequest`). Because `Part`
+is a protobuf `oneof`, its JSON form sets the selected field directly -- `{"text": "Hello"}`,
+with no `kind` tag. Enum values serialize as their proto names (`ROLE_USER`, `ROLE_AGENT`).
+
+**Method names.** v1.0 dropped the v0.3 slash-and-namespace form (`message/send`,
+`tasks/get`, `agent/authenticatedExtendedCard`). The JSON-RPC `method` is now simply the
+abstract operation's name:
 
 | Operation | JSON-RPC Method |
 |-----------|-----------------|
-| SendMessage | `message/send` |
-| SendStreamingMessage | `message/stream` |
-| GetTask | `tasks/get` |
-| ListTasks | `tasks/list` |
-| CancelTask | `tasks/cancel` |
-| SubscribeToTask | `tasks/subscribe` |
-| SetPushNotificationConfig | `tasks/pushNotificationConfig/set` |
-| GetPushNotificationConfig | `tasks/pushNotificationConfig/get` |
-| DeletePushNotificationConfig | `tasks/pushNotificationConfig/delete` |
-| GetExtendedAgentCard | `agent/authenticatedExtendedCard` |
+| SendMessage | `SendMessage` |
+| SendStreamingMessage | `SendStreamingMessage` |
+| GetTask | `GetTask` |
+| ListTasks | `ListTasks` |
+| CancelTask | `CancelTask` |
+| SubscribeToTask | `SubscribeToTask` |
+| CreateTaskPushNotificationConfig | `CreateTaskPushNotificationConfig` |
+| GetTaskPushNotificationConfig | `GetTaskPushNotificationConfig` |
+| ListTaskPushNotificationConfigs | `ListTaskPushNotificationConfigs` |
+| DeleteTaskPushNotificationConfig | `DeleteTaskPushNotificationConfig` |
+| GetExtendedAgentCard | `GetExtendedAgentCard` |
+
+Note the push-notification config operations were also **pluralized and renamed** in v1.0:
+the v0.3 `Set`/`Get`/`Delete` trio became a four-RPC CRUD set with `Create` replacing `Set`
+and a new `List`. A v0.3-era client calling `tasks/pushNotificationConfig/set` will fail.
 
 ## Resources
 

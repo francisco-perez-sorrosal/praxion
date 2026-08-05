@@ -1,7 +1,7 @@
 ---
-id: dec-draft-bd04b168
+id: dec-323
 title: Retire sentinel AC11 as subsumed by AC13
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-08-05
 summary: 'Retire AC11 (model↔markdown agreement by title) from the sentinel AC dimension. Its designed structural filter never had a substrate, its primary MCP path is unreachable from the sentinel tool grant, and AC13 answers the same question by element id plus a published half AC11 could not see. AC10 and AC12 clauses of the superseded decision are re-affirmed.'

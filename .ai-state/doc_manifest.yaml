@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-05T22:21:09Z'
+generated_at: '2026-08-05T22:49:44Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -495,7 +495,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-08-04'
+  last_modified: '2026-08-05'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -1230,7 +1230,7 @@ surfaces:
   path: .ai-state/decisions/112-aac-dac-traceability-sentinel-ac-traceability-checks.md
   type: markdown
   title: "Sentinel AC-dimension extension \u2014 three conditional-activation checks for fence integrity, model\u2194markdown agreement, and traceability orphans"
-  last_modified: '2026-05-01'
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-113-aac-dac-onboarding-aac-onboarding-tier
   path: .ai-state/decisions/113-aac-dac-onboarding-aac-onboarding-tier.md
@@ -2492,6 +2492,12 @@ surfaces:
   title: A metrics report records what it describes, and freshness is measured in commits
   last_modified: '2026-08-05'
   renderer: adr_card
+- id: ai-state-decisions-323-retire-sentinel-ac11-as-subsumed-by-ac13
+  path: .ai-state/decisions/323-retire-sentinel-ac11-as-subsumed-by-ac13.md
+  type: markdown
+  title: Retire sentinel AC11 as subsumed by AC13
+  last_modified: '2026-08-05'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3105,6 +3111,7 @@ groups:
   - ai-state-decisions-320-ambient-interpreter-gate-liveness
   - ai-state-decisions-321-withheld-must-withhold-its-residual
   - ai-state-decisions-322-metrics-freshness-in-commits
+  - ai-state-decisions-323-retire-sentinel-ac11-as-subsumed-by-ac13
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

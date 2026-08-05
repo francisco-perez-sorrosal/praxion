@@ -81,6 +81,83 @@ When a new ADR re-affirms a prior one without superseding it (a re-opening was c
 
 Re-affirmation is stronger than silent concurrence (it forces a public record of the re-opening) and gentler than supersession (the prior decision is untouched). Use it when a prior decision is challenged, re-examined, and found still correct — not as a routine acknowledgment.
 
+## The `architectural` Test
+
+The canonical statement lives in `rules/swe/adr-conventions.md`. This section carries the worked
+examples, the evidence that produced the test, and the measurement that calibrates it.
+
+### Why the obvious test does not work
+
+The natural formulation — *architectural iff it constrains an element of the architecture model* —
+was measured against the corpus and failed in both readings.
+
+Read as **"touches a component"**, it bounds nothing: the structural components tile essentially
+the whole repository, so every decision touches one. Read as **"edits the model"**, fewer than 1%
+of decisions tagged architectural qualified — which would mean the project made two architectural
+decisions in four months.
+
+The cause is a **granularity mismatch**, not indiscipline. ADRs decide at the level of *capability
+composition* — should this be a skill, an agent, a command, or a hook; where does one agent's remit
+end; should this abstraction exist. The model describes *structural containment* — which boxes hold
+which. Those are different layers, and binding one to the other assumes a correspondence that is
+not there. A test built on it would demote an explicit agent-boundary decision while promoting
+nothing of comparable weight.
+
+### Worked examples
+
+Architectural — each names a component that changed:
+
+| Decision shape | What changed |
+|---|---|
+| "prevent duplication via existing agents, **not a new dedicated agent**" | inventory (a component deliberately not added) |
+| "ship this capability as **agent + skill + command**" | inventory + composition across families |
+| "the boundary between **these two agents**" | responsibility ownership |
+| "introduce a **pluggable backend abstraction**" | a boundary added |
+| "replace the bespoke gate with **the framework**" | a mechanism replaced wholesale |
+
+Not architectural — consequential, but nothing in the inventory moved:
+
+| Decision shape | True category |
+|---|---|
+| review cadence for a dependency upgrade | `behavioral` |
+| the deliberation method used when writing ADRs | `behavioral` |
+| which label arms a human-in-the-loop gate | `behavioral` |
+| a new page inside an existing surface | `implementation` |
+
+### Applying it
+
+Ask the falsifier first: **name the component added, removed, or whose responsibility moved.** If
+the answer is a sentence about why the choice was hard rather than a component name, the decision
+is not architectural — record it at its true category, where it stays searchable and costs the
+reader nothing.
+
+The published half is exact and needs no judgment: `affected_files` touching a canonical block, a
+shipped template, or an onboard-contract phase is architectural by definition, because the blast
+radius is every managed project.
+
+### What is and is not mechanised
+
+The published half is checkable from `affected_files`. **The inventory half is not** — "did the
+component inventory change" is not derivable from a path list, and a gate claiming to check it
+would be blind to its own subject.
+
+What ships instead is a **measurement**, not a gate: `adr_health.py` reports the category mix
+across the corpus and across a recent window, and the sentinel surfaces the recent architectural
+share. The signal is *movement* against the share recorded when the test was adopted, not an
+absolute threshold — inventing a threshold would be a number with no evidence behind it.
+
+**Adoption baseline, measured the day the test landed:** `architectural` held **72% of the corpus
+(227/317)** and **84% of the most recent 50 decisions**. The recent window being *higher* than the
+corpus is the finding that justifies the change — under the previous definition the category was
+not merely broad, it was widening. Those two numbers are the reference points; a later run showing
+the recent share below 84% is the test working, and a run at or above it is the test being ignored.
+
+### No retroactive migration
+
+The test binds new decisions only. Bulk-retagging the existing corpus would corrupt more than it
+fixed, because most historical records need human judgment to categorise correctly. The corpus as
+it stands is legible evidence of what the previous definition permitted, which is worth keeping.
+
 ## Retirement Protocol
 
 When a later decision's action removed this decision's **subject**, rather than answering its question differently:

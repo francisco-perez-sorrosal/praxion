@@ -64,6 +64,19 @@ The frontmatter schema is shared between draft and finalized ADRs. Only the `id`
 | `retired_by` | list | When `retired` | ids of the decisions whose action removed this one's subject. A **list**, because one removal commonly strands several decisions and `superseded_by` (a string) cannot express that |
 | `dissent:` | string | No | Machine-queryable companion to the `## Disconfirmation` body block; one-line strongest objection to the chosen option. Required when `category: architectural`. |
 
+#### What makes a decision `architectural`
+
+A decision is `architectural` **iff it changes what exists or what connects**:
+
+- **internal** — it adds, removes, merges, or splits a component in any artifact family (skill, agent, rule, command, hook, script, MCP server, package, service); moves a responsibility from one component to another; or introduces or removes a boundary or abstraction between them.
+- **published** — it changes a canonical block, a shipped template, or an onboard-contract phase.
+
+If the component inventory and its boundaries are unchanged once the decision lands, it is **not** architectural — *however consequential the trade-off*.
+
+**Falsifier — name the component added, removed, or whose responsibility moved.** If no such name exists, the category is wrong: process, policy, deliberation method, and features inside one component are `behavioral`, `implementation`, or `configuration`.
+
+Source of truth for this test; other sites point here rather than restate it. Worked examples, evidence, and the measurement that calibrates it: [`adr-authoring-protocols.md` § The `architectural` Test](../../skills/software-planning/references/adr-authoring-protocols.md#the-architectural-test).
+
 **Body sections** (after frontmatter):
 
 1. **Context** -- what prompted the decision (problem, constraint, opportunity)
@@ -95,7 +108,7 @@ For the full step sequence (draft detection, NNN assignment, file rename + front
 
 | Agent | When | Scope | Destination |
 |-------|------|-------|-------------|
-| systems-architect | Phase 4 (trade-off analysis) | Significant trade-offs: system boundaries, data model, technology selection, security | `.ai-state/decisions/drafts/` (fragment) |
+| systems-architect | Phase 4 (trade-off analysis) | Decisions meeting the [`architectural` test](#what-makes-a-decision-architectural) — inventory, boundary, or published contract; lesser trade-offs are recorded at their true category | `.ai-state/decisions/drafts/` (fragment) |
 | implementation-planner | Step decomposition | Decisions affecting step ordering, module structure, approach | `.ai-state/decisions/drafts/` (fragment) |
 | interface-designer | Phase 4 (trade-off analysis) | Interface-layer decisions: UI framework / API paradigm / MCP tool decomposition / error format / pagination / component-pattern selection | `.ai-state/decisions/drafts/` (fragment) |
 | orchestrator | Direct/Lightweight tier, no pipeline agent spawned | Any decision worth preserving during an interactive session | `.ai-state/decisions/drafts/` (fragment; preferred) |

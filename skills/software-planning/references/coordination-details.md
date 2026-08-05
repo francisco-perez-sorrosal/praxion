@@ -13,7 +13,7 @@ This is the **authoritative source of truth** for per-agent delegation deliverab
 
 **systems-architect** — always include in prompt:
 - "Produce `SYSTEMS_PLAN.md` at `.ai-work/<task-slug>/`"
-- "Create ADRs in `.ai-state/decisions/` for significant trade-offs"
+- "Create ADRs in `.ai-state/decisions/`, categorized by the `architectural` test in `rules/swe/adr-conventions.md` — not by how significant the trade-off felt"
 - "Create or update `.ai-state/DESIGN.md` (architect-facing design target)"
 - "Create or update `docs/architecture.md` (developer-facing navigation guide, Built components only)"
 - If deployment is in scope: "Create or update `.ai-state/SYSTEM_DEPLOYMENT.md`"

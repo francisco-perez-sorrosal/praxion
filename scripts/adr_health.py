@@ -91,6 +91,12 @@ _MIN_INVENTORY_ROWS = 8
 # decision start emitting decay findings the day it lands.
 _TERMINAL_STATUSES = frozenset({"superseded", "rejected", "retired"})
 _STATUS = re.compile(r"^status:\s*(\S+)", re.MULTILINE)
+_CATEGORY = re.compile(r"^category:\s*(\S+)", re.MULTILINE)
+
+# Decisions are ordered by id, so the tail is the most recently authored. A
+# window, because a corpus-wide share barely moves as new decisions land and so
+# cannot show whether an authoring rule is working.
+_RECENT_WINDOW = 50
 
 _GIT_TIMEOUT = 30
 
@@ -262,12 +268,13 @@ def classify(repo_root: Path) -> dict:
 
     # Removal-intent ADRs, so a deletion can be attributed to the decision that
     # caused it rather than to whichever decision merely mentioned the path.
-    removers = []
+    removers, categories = [], []
     for adr in adrs:
         text = adr.read_text(encoding="utf-8")
         date = (re.search(r"^date:\s*(\S+)", text, re.MULTILINE) or [None, ""])[1]
         title = (re.search(r"^title:\s*(.+)$", text, re.MULTILINE) or [None, ""])[1]
         summary = (re.search(r"^summary:\s*(.+)$", text, re.MULTILINE) or [None, ""])[1]
+        categories.append((_CATEGORY.search(text) or [None, ""])[1].strip().strip("\"'"))
         if _REMOVAL_INTENT.search(f"{title} {summary}"):
             paths = set(parse_affected_files(text))
             gone = {p for p in paths if not (repo_root / p).exists()}
@@ -308,7 +315,34 @@ def classify(repo_root: Path) -> dict:
         "withheld": withheld,
         "skipped_terminal": skipped_terminal,
         "reopen_candidates": reopen,
+        "category_mix": _category_mix(categories),
         "summary": _summarize(findings),
+    }
+
+
+def _category_mix(categories: list[str]) -> dict:
+    """Corpus and recent-window category counts, plus the architectural share.
+
+    A measurement, not a gate. Whether a decision changed the component
+    inventory is not derivable from its frontmatter, so the `architectural`
+    test cannot be checked here -- but its *effect* can be watched. The signal
+    is movement in the recent share, not an absolute threshold: a threshold
+    would be a number with no evidence behind it.
+    """
+    recent = categories[-_RECENT_WINDOW:]
+
+    def counts(values: list[str]) -> dict[str, int]:
+        out: dict[str, int] = {}
+        for value in values:
+            out[value or "unset"] = out.get(value or "unset", 0) + 1
+        return dict(sorted(out.items()))
+
+    share = recent.count("architectural") / len(recent) if recent else 0.0
+    return {
+        "corpus": counts(categories),
+        "recent": counts(recent),
+        "recent_window": len(recent),
+        "architectural_share_recent": round(share, 3),
     }
 
 
@@ -425,6 +459,13 @@ def main(argv: list[str] | None = None) -> int:
         )
     for reason in report["withheld"]:
         print(f"  WITHHELD -- {reason}")
+    mix = report["category_mix"]
+    print(
+        f"  architectural: {mix['architectural_share_recent']:.0%} of the last "
+        f"{mix['recent_window']} decisions ({mix['recent'].get('architectural', 0)}/"
+        f"{mix['recent_window']}); corpus {mix['corpus'].get('architectural', 0)}/"
+        f"{sum(mix['corpus'].values())}"
+    )
     for candidate in report["reopen_candidates"]:
         print(
             f"  RE-OPEN? {candidate['adr']} is retired, but "

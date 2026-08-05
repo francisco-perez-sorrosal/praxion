@@ -248,7 +248,7 @@ Small decisions don't need this format. Reserve it for choices that affect:
 - Performance vs. maintainability trade-offs
 - Security model decisions
 
-**Persist decisions:** After documenting trade-off decisions in `### Decisions` of `SYSTEMS_PLAN.md`, persist each significant trade-off in two places:
+**Persist decisions:** After documenting trade-off decisions in `### Decisions` of `SYSTEMS_PLAN.md`, persist each in two places. **Categorize by the test in `rules/swe/adr-conventions.md` § What makes a decision `architectural`, not by how hard the trade-off was** — a decision is architectural only when it changes what exists or what connects (a component added, removed, merged, split, or a responsibility moved), or when it changes a published contract. If you cannot name the component that changed, the decision is real but its category is `behavioral`, `implementation`, or `configuration`. Do not restate the test here; that rule owns it.
 
 1. **LEARNINGS.md** — record in `### Decisions Made` using the structured format: `**[systems-architect] [Decision title] (dec-draft-<hash>)**: [What was decided]. **Why**: [rationale]. **Alternatives**: [what was considered and rejected].` Use the draft id from step 2 below — finalize rewrites it to `dec-NNN` at merge-to-main. This ensures architect decisions flow through the existing archival pipeline and are not lost when ephemeral documents are deleted. Also record any **load-bearing assumption** (one that, if wrong, would invalidate the design) under `### Assumptions & Constraints Taken` as you make it — the orchestrator harvests this section to compose phase-transition and pre-verification checkpoints, so it must be populated during work, not reconstructed at the end.
 

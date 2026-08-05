@@ -321,6 +321,42 @@ def test_superseded_decision_is_not_probed_for_reopen(repo: Path) -> None:
     assert adr_health.classify(repo)["reopen_candidates"] == []
 
 
+def test_category_mix_reports_corpus_and_recent_window(repo: Path) -> None:
+    """A measurement, not a gate -- the recent window is what shows movement."""
+    for n in range(1, 5):
+        path = _adr(repo, n, files=["present.py"])
+        if n > 2:
+            path.write_text(
+                path.read_text(encoding="utf-8").replace(
+                    "category: architectural", "category: implementation"
+                ),
+                encoding="utf-8",
+            )
+    (repo / "present.py").write_text("x", encoding="utf-8")
+    mix = adr_health.classify(repo)["category_mix"]
+    assert mix["corpus"] == {"architectural": 2, "implementation": 2}
+    assert mix["architectural_share_recent"] == 0.5
+
+
+def test_category_mix_counts_terminal_decisions_too(repo: Path) -> None:
+    """Categorisation is an authoring question, so retiring one cannot flatter the ratio.
+
+    The decay classes deliberately skip terminal records; this measurement must
+    not, or the share could be improved by retiring decisions rather than by
+    categorising new ones correctly.
+    """
+    _adr(repo, 1, files=["present.py"])
+    path = _adr(repo, 2, files=["present.py"])
+    path.write_text(
+        path.read_text(encoding="utf-8").replace("status: accepted", "status: superseded"),
+        encoding="utf-8",
+    )
+    (repo / "present.py").write_text("x", encoding="utf-8")
+    report = adr_health.classify(repo)
+    assert report["skipped_terminal"] == ["002-slug.md"]
+    assert report["category_mix"]["corpus"] == {"architectural": 2}
+
+
 def test_directory_that_never_existed_is_still_vanished(repo: Path) -> None:
     """Prefix matching must not manufacture a removal for an empty subtree."""
     _adr(repo, 1, title="Some decision", files=["never_existed/"])

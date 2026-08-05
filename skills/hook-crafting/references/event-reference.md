@@ -159,13 +159,22 @@ Every event receives these fields on stdin:
 A handler with an `args` array runs **exec form** — no shell, no string interpolation, so no injection risk. Prefer it with `${...}` path placeholders. Omitting `args` (a bare `command` string) runs **shell form** — full shell features, but you own the quoting/escaping. Use exec form for anything touching untrusted input.
 
 ## Known Bugs
-<!-- last-verified: 2026-05-25 -->
+<!-- last-verified: 2026-08-05 -->
 
 Re-verify before relying on these — hook bugs get fixed (and regress) across Claude Code releases.
 
-| Issue | Behavior | Status / Workaround |
-|-------|----------|---------------------|
-| #24327 | PreToolUse exit 2 makes Claude go idle instead of acting on the stderr feedback | **Still open (2026-05)** — intermittent, correlated with v2.1.32+/Opus 4.6. Verify the block worked; phrase stderr as actionable feedback |
-| #26923 | PreToolUse exit 2 does not block Agent/Task tool calls | Verify; agent may launch despite block |
-| #13744 | PreToolUse exit 2 doesn't block Write/Edit | Historical; verify with current version |
-| #37210 | `permissionDecision: "deny"` ignored for Edit | Verify; possible permission bypass on Edit |
+**No open hook defects are currently tracked here.** All four issues this table previously
+carried are closed. They are kept below with their dispositions rather than deleted, because
+"we checked and it's fixed" is different information from "we never looked" — and because one
+of them was never a bug at all.
+
+| Issue | Behavior | Disposition (verified 2026-08-05) |
+|-------|----------|-----------------------------------|
+| #24327 | PreToolUse exit 2 makes Claude go idle instead of acting on stderr feedback | **Closed 2026-02-22** (completed). Root cause was a race condition when **parallel** hooks fire — not a version or model correlation. Reporter's workaround: wrap multiple hooks so they fire once |
+| #26923 | PreToolUse exit 2 does not block Agent/Task tool calls | **Closed 2026-04-18** (completed) — **fixed in v2.1.90**. PreToolUse hooks exiting 2 with JSON on stdout now correctly block the tool call, including the Task tool |
+| #13744 | PreToolUse exit 2 doesn't block Write/Edit | **Closed 2025-12-15** as a duplicate of #3514, itself closed `not_planned` (2026-02-28). Not an open tracked defect |
+| #37210 | `permissionDecision: "deny"` ignored for Edit | **Closed 2026-03-21** (not planned) — **never a Claude Code bug**. The reporter's hook exited 2, and JSON output is only processed on exit 0, so the decision was discarded. Promoted to a correctness rule in [SKILL.md § Gotchas](../SKILL.md#gotchas) |
+
+The #24327 lesson is worth keeping even though the issue closed: **parallel hooks on the same
+event can race.** If several hooks are registered for one event and behavior is intermittent,
+collapse them behind a single dispatching hook before assuming a platform defect.

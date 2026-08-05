@@ -295,3 +295,51 @@ def test_no_specs_dir_returns_empty_list_for_archived_scope(tmp_path: Path) -> N
 
     # Assert
     assert findings == [], f"Expected empty list when .ai-state/specs/ is absent; got: {findings!r}"
+
+
+# ---------------------------------------------------------------------------
+# Test: the module loads, and reports, under an interpreter without PyYAML
+# ---------------------------------------------------------------------------
+
+
+def test_module_imports_without_pyyaml_present() -> None:
+    """Importing this module must not require PyYAML.
+
+    The sentinel invokes the spec-drift wrapper with a bare `python3`, which
+    under a version manager's shim is routinely an interpreter holding none of
+    the project's declared dependencies. A module-scope `import yaml` made the
+    whole gate die on import — to pay for a dependency only the in-flight scope
+    reaches, and the sentinel walks the archived one.
+    """
+    import ast
+
+    source = (Path(__file__).parents[1] / "scripts" / "spec_drift.py").read_text(encoding="utf-8")
+    module_level = [n for n in ast.parse(source).body if isinstance(n, ast.Import | ast.ImportFrom)]
+    names = {
+        a.name.split(".")[0] for n in module_level if isinstance(n, ast.Import) for a in n.names
+    }
+    names |= {(n.module or "").split(".")[0] for n in module_level if isinstance(n, ast.ImportFrom)}
+
+    assert "yaml" not in names, "PyYAML must be imported on demand, never at module scope"
+
+
+def test_missing_pyyaml_raises_rather_than_reporting_no_drift(tmp_path: Path, monkeypatch) -> None:
+    """A detector that cannot read its input must not report a clean result.
+
+    Returning `{}` here is indistinguishable from "this file declares no
+    requirements", so the caller reports zero drift for a reason that has
+    nothing to do with the code under test — green while not looking.
+    """
+    import pytest
+
+    from scripts import spec_drift
+
+    def _unavailable():
+        raise RuntimeError("PyYAML is not importable under /usr/bin/python3")
+
+    monkeypatch.setattr(spec_drift, "_require_yaml", _unavailable)
+    traceability = tmp_path / "traceability.yml"
+    traceability.write_text("requirements: {}\n", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="PyYAML"):
+        spec_drift._load_traceability(traceability)

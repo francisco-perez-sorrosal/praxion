@@ -42,10 +42,9 @@ Three layers:
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 from typing import Any
-
-import yaml
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -285,8 +284,43 @@ def _detect_archived(
 # ---------------------------------------------------------------------------
 
 
+def _require_yaml():
+    """Return the YAML module, or raise naming the interpreter that lacks it.
+
+    Imported on demand rather than at module scope so this module stays
+    *importable* under an interpreter without PyYAML. Only the in-flight scope
+    reaches it; the archived scope -- the one the sentinel's spec-drift check
+    actually walks -- never does. A module-level import therefore made the whole
+    gate unloadable to pay for a dependency that run never uses, and the gate
+    died on import under the bare `python3` its own call site prescribes.
+
+    The message names `sys.executable` because the usual cause is an invocation
+    resolving an interpreter that lacks the project's declared dependencies,
+    not PyYAML being genuinely uninstalled -- the same diagnosis, in the same
+    words, that the finalize chain and the doc-manifest builder already print.
+    """
+    try:
+        import yaml
+    except ImportError as exc:
+        raise RuntimeError(
+            f"spec-drift needs PyYAML to read traceability data, and "
+            f"{sys.executable} does not have it. Run under the project "
+            f"interpreter (<repo>/.venv/bin/python), point $PRAXION_PYTHON at "
+            f"one that has it, or install pyyaml into the interpreter above."
+        ) from exc
+    return yaml
+
+
 def _load_traceability(path: Path) -> dict[str, Any]:
-    """Load and return the traceability.yml as a dict; return {} on error."""
+    """Load and return the traceability.yml as a dict; return {} on a parse error.
+
+    A missing PyYAML raises rather than degrading to `{}`. `{}` is
+    indistinguishable from "this file declares no requirements", so swallowing
+    the import error would make a drift detector report *clean* precisely when
+    it could not read its own input -- green while not looking, and the same
+    shape of defect as a withheld class re-emitted as a finding.
+    """
+    yaml = _require_yaml()
     try:
         content = path.read_text(encoding="utf-8")
         data = yaml.safe_load(content)

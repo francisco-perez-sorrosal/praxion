@@ -9,11 +9,17 @@ Praxion: {
     Installers: {
       label: "Installers"
     }
-    Scripts: {
-      label: "Scripts"
-    }
     Versioning: {
       label: "Versioning"
+    }
+    Dashboard: {
+      label: "Pipeline Dashboard"
+    }
+    Evals: {
+      label: "Eval Framework"
+    }
+    Scripts: {
+      label: "Scripts"
     }
   }
   Knowledge: {
@@ -105,6 +111,9 @@ Praxion.Tooling.Installers -> Praxion.Knowledge.Agents: "deploys"
 Praxion.Orchestration.Orchestrator -> Praxion.Tooling.Scripts: "spawns rework worktree per row \n(EnterWorktree)"
 Praxion.Tooling.Scripts -> Praxion.Persistence.Adrs: "finalize_adrs.py promotes drafts to \ndec-NNN"
 Praxion.Tooling.Scripts -> Praxion.Persistence.Tdl: "finalize_tech_debt_ledger.py reconciles"
+Praxion.Tooling.Dashboard -> Praxion.Orchestration.Aiwork: "reads in-flight pipeline docs \n(read-only)"
+Praxion.Tooling.Dashboard -> Praxion.Persistence.Aistate: "reads (read-only)"
+Praxion.Tooling.Evals -> Praxion.Persistence.Aistate: "reads completed artifacts (read-only)"
 Developer -> Praxion: "develops"
 Claude_code -> Praxion: "executes agents"
 Claude_desktop -> Praxion: "loads skills"

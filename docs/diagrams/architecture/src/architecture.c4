@@ -141,6 +141,8 @@ model {
       installers = component "Installers"   { description "3 targets" }
       scripts    = component "Scripts"      { description "Worktrees, merge, Phoenix, finalize" }
       versioning = component "Versioning"   { description "Commitizen" }
+      dashboard  = component "Pipeline Dashboard" { description "Next.js runtime, own process + sha256-derived port; read-only over project state" }
+      evals      = component "Eval Framework"     { description "Out-of-band quality measurement over completed artifacts" }
     }
 
     // ── Intra-system Relationships ──────────────────────────────────────────
@@ -244,6 +246,12 @@ model {
     tooling.installers  -> knowledge.agents   "deploys"
     tooling.scripts     -> persistence.adrs   "finalize_adrs.py promotes drafts to dec-NNN"
     tooling.scripts     -> persistence.tdl    "finalize_tech_debt_ledger.py reconciles"
+
+    // Both read completed state and never mutate it -- the read-only property is
+    // the architectural claim, so the edges are one-directional by design.
+    tooling.dashboard   -> persistence.aistate   "reads (read-only)"
+    tooling.dashboard   -> orchestration.aiwork  "reads in-flight pipeline docs (read-only)"
+    tooling.evals       -> persistence.aistate   "reads completed artifacts (read-only)"
   }
 
   // ── Cross-boundary Relationships ─────────────────────────────────────────
@@ -279,7 +287,8 @@ views {
       praxion.orchestration.pipeline, praxion.orchestration.hooks, praxion.orchestration.aiwork, praxion.orchestration.orchestrator,
       praxion.persistence.chronograph, praxion.persistence.aistate,
       praxion.persistence.adrs, praxion.persistence.tdl,
-      praxion.tooling.installers, praxion.tooling.scripts, praxion.tooling.versioning
+      praxion.tooling.installers, praxion.tooling.scripts, praxion.tooling.versioning,
+      praxion.tooling.dashboard, praxion.tooling.evals
   }
 
   // L2 — Agent Pipeline (forward shape only).

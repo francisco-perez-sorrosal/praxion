@@ -126,6 +126,17 @@ repos:
         files: '^(docs/diagrams/|.*\.c4$|.*ARCHITECTURE\.md$|docs/architecture\.md$)'
         pass_filenames: false
 
+      # Architecture projection — the LikeC4 model and DESIGN.md section 3a must
+      # project the same component set. Fires when either side is staged, since
+      # drift is created by editing one without the other. Stdlib-only, so
+      # language: system is safe here.
+      - id: architecture-projection
+        name: Architecture projection (model <-> DESIGN.md 3a)
+        entry: python3 scripts/check_architecture_projection.py
+        language: system
+        files: '(\.c4|^\.ai-state/DESIGN\.md)$'
+        pass_filenames: false
+
       # Block E — rules-manifest drift. --check (no write); fires on staged
       # rules/ changes.
       - id: rules-manifest-drift

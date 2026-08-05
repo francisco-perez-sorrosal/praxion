@@ -31,6 +31,11 @@ unavailable and whole decay classes were suppressed rather than guessed. Say so 
 do not present a class-count summary as if it were complete — a suppressed class reads as
 "nothing to do here", which is the one wrong conclusion.
 
+Findings in the `unclassified` class are the suppressed members: the detector could not
+determine their cause, so it proposes nothing for them. Report them with the withheld note and
+**never** work them as candidates. Their presence also means the retirement list is shorter than
+it would otherwise be — a shorter list here is missing evidence, not a healthier corpus.
+
 If there are no findings, say so and stop. Re-running after a clean pass is a no-op.
 
 ### 2. Order the work — repairs first, retirement last

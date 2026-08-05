@@ -69,8 +69,38 @@ def repo(tmp_path: Path) -> Path:
     return tmp_path
 
 
+@pytest.fixture
+def plugin_inventory_absent(tmp_path: Path, monkeypatch) -> None:
+    """Remove the plugin-relative half of the lifecycle-oracle lookup.
+
+    The oracle resolves from the project root first and the plugin's own tree
+    second, so a test exercising oracle-*un*availability has to remove both.
+    Without this the fallback finds this repository's real table, the oracle is
+    available after all, and the test silently stops testing what it is named
+    for -- passing for a reason unrelated to its assertion.
+    """
+    empty = tmp_path / "no-plugin"
+    (empty / "scripts").mkdir(parents=True)
+    monkeypatch.setattr(adr_health, "SCRIPT_DIR", empty / "scripts")
+
+
+def _inventory(path: Path, *, lazy_artifact: str) -> None:
+    """Write a lifecycle table declaring one artifact's absence expected."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = "\n".join(f"| `filler{i}.md` | active | w | n |" for i in range(10))
+    path.write_text(
+        "| Artifact | State | Writer | Notes |\n|---|---|---|---|\n"
+        f"{rows}\n| `{lazy_artifact}` | threshold-lazy | architect | n |\n",
+        encoding="utf-8",
+    )
+
+
 def _classes(report):
     return {f["path"]: f["decay_class"] for f in report["findings"]}
+
+
+def _dispositions(report):
+    return {f["path"]: f["disposition"] for f in report["findings"]}
 
 
 # -- Non-history classes -------------------------------------------------------
@@ -93,14 +123,7 @@ def test_canary_lazy_artifact_absence_is_expected(repo: Path) -> None:
     This is the class the user's own objection identified: Praxion has no
     deployments, managed projects do -- absence downstream proves nothing.
     """
-    inv = repo / adr_health._INVENTORY
-    inv.parent.mkdir(parents=True, exist_ok=True)
-    rows = "\n".join(f"| `filler{i}.md` | active | w | n |" for i in range(10))
-    inv.write_text(
-        "| Artifact | State | Writer | Notes |\n|---|---|---|---|\n"
-        f"{rows}\n| `.ai-state/TEST_TOPOLOGY.md` | threshold-lazy | architect | n |\n",
-        encoding="utf-8",
-    )
+    _inventory(repo / adr_health._INVENTORY, lazy_artifact=".ai-state/TEST_TOPOLOGY.md")
     _adr(repo, 1, files=[".ai-state/TEST_TOPOLOGY.md"])
     assert _classes(adr_health.classify(repo))[".ai-state/TEST_TOPOLOGY.md"] == "lazy-artifact"
 
@@ -383,15 +406,80 @@ def test_canary_missing_history_withholds_rather_than_defaulting(tmp_path: Path)
     assert any("history unavailable" in w for w in report["withheld"])
 
 
-def test_canary_unparseable_inventory_withholds_the_lazy_class(repo: Path) -> None:
-    """A lifecycle-table format change must not silently retire lazy artifacts."""
+def test_canary_unparseable_inventory_withholds_the_lazy_class(
+    repo: Path, plugin_inventory_absent: None
+) -> None:
+    """A lifecycle-table format change must not silently retire lazy artifacts.
+
+    Asserts the *disposition*, not merely that the class changed. Asserting only
+    `!= "lazy-artifact"` passes the instant the finding becomes
+    `vanished`/`retire-candidate` -- which is the defect this canary is named
+    for, not the fix. A canary that cannot fail on the behaviour in its own
+    docstring is indistinguishable from no canary.
+    """
     inv = repo / adr_health._INVENTORY
     inv.parent.mkdir(parents=True, exist_ok=True)
     inv.write_text("the table format changed and no rows parse\n", encoding="utf-8")
     _adr(repo, 1, files=[".ai-state/TEST_TOPOLOGY.md"])
     report = adr_health.classify(repo)
     assert any("could not parse" in w for w in report["withheld"])
-    assert _classes(report)[".ai-state/TEST_TOPOLOGY.md"] != "lazy-artifact"
+    assert _classes(report)[".ai-state/TEST_TOPOLOGY.md"] == "unclassified"
+    assert _dispositions(report)[".ai-state/TEST_TOPOLOGY.md"] == "none"
+
+
+def test_canary_a_withheld_class_never_re_emerges_as_a_retirement_candidate(
+    repo: Path, plugin_inventory_absent: None
+) -> None:
+    """Withheld has to mean withheld, for the whole report.
+
+    Suppressing a class in `withheld` while re-emitting its members under
+    `retire-candidate` -- the one disposition that removes a decision's standing
+    -- warns the reader in exactly the wrong direction. Stated as an invariant
+    over every finding rather than one path, because the leak was in the shared
+    residual and a per-path assertion would miss the next one.
+    """
+    inv = repo / adr_health._INVENTORY
+    inv.parent.mkdir(parents=True, exist_ok=True)
+    inv.write_text("no rows parse\n", encoding="utf-8")
+    _adr(repo, 1, files=[".ai-state/TEST_TOPOLOGY.md", "never-existed.py"])
+    report = adr_health.classify(repo)
+    assert report["withheld"], "precondition: the oracle must be unavailable"
+    assert [f for f in report["findings"] if f["disposition"] == "retire-candidate"] == []
+
+
+def test_lifecycle_oracle_resolves_from_the_plugin_when_the_project_has_none(
+    repo: Path, tmp_path: Path, monkeypatch
+) -> None:
+    """The oracle is plugin reference data, so it must resolve from the plugin.
+
+    No onboarding phase writes the lifecycle table into a managed project.
+    Resolving it from the project root alone left this oracle permanently
+    unavailable for every project except this repository -- the one environment
+    where that is invisible.
+    """
+    plugin = tmp_path / "plugin"
+    _inventory(plugin / adr_health._INVENTORY, lazy_artifact=".ai-state/TEST_TOPOLOGY.md")
+    monkeypatch.setattr(adr_health, "SCRIPT_DIR", plugin / "scripts")
+    _adr(repo, 1, files=[".ai-state/TEST_TOPOLOGY.md"])
+
+    report = adr_health.classify(repo)
+
+    assert report["withheld"] == []
+    assert _classes(report)[".ai-state/TEST_TOPOLOGY.md"] == "lazy-artifact"
+
+
+def test_a_project_table_wins_over_the_plugin_copy(repo: Path, tmp_path: Path, monkeypatch) -> None:
+    """The inverse guard: the fallback must not override a project's own table."""
+    plugin = tmp_path / "plugin"
+    _inventory(plugin / adr_health._INVENTORY, lazy_artifact="plugin-only.md")
+    monkeypatch.setattr(adr_health, "SCRIPT_DIR", plugin / "scripts")
+    _inventory(repo / adr_health._INVENTORY, lazy_artifact="project-only.md")
+    _adr(repo, 1, files=["project-only.md", "plugin-only.md"])
+
+    classes = _classes(adr_health.classify(repo))
+
+    assert classes["project-only.md"] == "lazy-artifact"
+    assert classes["plugin-only.md"] != "lazy-artifact"
 
 
 def test_shallow_clone_is_treated_as_no_history(repo: Path, monkeypatch) -> None:

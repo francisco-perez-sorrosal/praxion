@@ -33,6 +33,12 @@ Both oracles can fail silently and would then mislabel everything as `vanished`
 unavailable its dependent classes are **withheld with a named reason** rather
 than defaulted (`--json` reports them under `withheld`).
 
+`vanished` is itself a dependent class. It does not mean "nothing matched"; it
+means every repair class was *tried* and none matched, which is only true when
+every oracle answered. So an unavailable oracle withholds the residual too, as
+`unclassified` -- otherwise the report would suppress a class in `withheld`
+while re-emitting its members under the one disposition that retires a decision.
+
 Decisions at a terminal status are excluded: their references are history, not
 a live index. `retired` ones are still probed in the other direction -- when a
 retired decision's paths resolve again its subject has returned, and it is
@@ -97,6 +103,13 @@ _CATEGORY = re.compile(r"^category:\s*(\S+)", re.MULTILINE)
 # window, because a corpus-wide share barely moves as new decisions land and so
 # cannot show whether an authoring rule is working.
 _RECENT_WINDOW = 50
+
+# The decision that adopted the falsifiable `architectural` test. Everything at
+# or below it was categorised under the older "significant trade-off" reading
+# and was deliberately not migrated, so it cannot evidence the new rule either
+# way -- including it is how a fixed window ends up measuring history instead of
+# behaviour.
+_ADOPTION_ID = 318
 
 _GIT_TIMEOUT = 30
 
@@ -216,22 +229,43 @@ def _rename_target(ref: str, renames: dict[str, str]) -> str | None:
 # -- Lifecycle oracle ---------------------------------------------------------
 
 
+def _inventory_candidates(repo_root: Path) -> list[Path]:
+    """Where the lifecycle table may live, nearest authority first.
+
+    The decision corpus is *consumer state* and resolves from `repo_root`. The
+    lifecycle table is *plugin reference data*: it declares what each shipped
+    artifact's absence means, and no onboarding phase writes it into a managed
+    project. Resolving it from `repo_root` alone therefore left the oracle
+    permanently unavailable everywhere except this repository -- the single
+    environment in which that failure is invisible.
+
+    This is the mirror image of `_repo_root`'s warning against `__file__`, not a
+    violation of it: that guards consumer state, which must never resolve to the
+    plugin; this is plugin-owned data, which must. `SCRIPT_DIR.parent` is the
+    plugin root for an installed copy and this repository for a checkout, so
+    self-hosting keeps resolving the same file it always did. A project that
+    ships its own table still wins, because `repo_root` is tried first.
+    """
+    return [repo_root / _INVENTORY, SCRIPT_DIR.parent / _INVENTORY]
+
+
 def load_expected_absent_shapes(repo_root: Path) -> list[str] | None:
     """Artifact shapes whose absence the inventory declares expected.
 
-    Returns None when the table cannot be parsed -- the caller then withholds
-    the `lazy-artifact` class rather than misreporting those artifacts as
-    vanished.
+    Returns None when no candidate table parses -- the caller then withholds the
+    `lazy-artifact` class *and the residual that depends on it*, rather than
+    misreporting those artifacts as vanished.
     """
-    path = repo_root / _INVENTORY
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        return None
-    rows = [m.groups() for line in text.splitlines() if (m := _INVENTORY_ROW.match(line))]
-    if len(rows) < _MIN_INVENTORY_ROWS:
-        return None
-    return [shape for shape, state in rows if state in _EXPECTED_ABSENT_STATES]
+    for path in _inventory_candidates(repo_root):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        rows = [m.groups() for line in text.splitlines() if (m := _INVENTORY_ROW.match(line))]
+        if len(rows) < _MIN_INVENTORY_ROWS:
+            continue
+        return [shape for shape, state in rows if state in _EXPECTED_ABSENT_STATES]
+    return None
 
 
 def _matches_shape(path: str, shape: str) -> bool:
@@ -262,19 +296,21 @@ def classify(repo_root: Path) -> dict:
         )
     if lazy_shapes is None:
         withheld.append(
-            f"lazy-artifact: could not parse {_INVENTORY} (fewer than "
-            f"{_MIN_INVENTORY_ROWS} lifecycle rows) -- withheld, not defaulted"
+            f"lazy-artifact, and the `vanished` residual that depends on it: could not "
+            f"parse {_INVENTORY} under either the project root or the plugin (needs "
+            f"{_MIN_INVENTORY_ROWS}+ lifecycle rows) -- withheld, not defaulted"
         )
 
     # Removal-intent ADRs, so a deletion can be attributed to the decision that
     # caused it rather than to whichever decision merely mentioned the path.
-    removers, categories = [], []
+    removers, categories, adr_ids = [], [], []
     for adr in adrs:
         text = adr.read_text(encoding="utf-8")
         date = (re.search(r"^date:\s*(\S+)", text, re.MULTILINE) or [None, ""])[1]
         title = (re.search(r"^title:\s*(.+)$", text, re.MULTILINE) or [None, ""])[1]
         summary = (re.search(r"^summary:\s*(.+)$", text, re.MULTILINE) or [None, ""])[1]
         categories.append((_CATEGORY.search(text) or [None, ""])[1].strip().strip("\"'"))
+        adr_ids.append(int(m.group(1)) if (m := re.match(r"(\d+)", adr.name)) else 0)
         if _REMOVAL_INTENT.search(f"{title} {summary}"):
             paths = set(parse_affected_files(text))
             gone = {p for p in paths if not (repo_root / p).exists()}
@@ -315,12 +351,12 @@ def classify(repo_root: Path) -> dict:
         "withheld": withheld,
         "skipped_terminal": skipped_terminal,
         "reopen_candidates": reopen,
-        "category_mix": _category_mix(categories),
+        "category_mix": _category_mix(categories, adr_ids),
         "summary": _summarize(findings),
     }
 
 
-def _category_mix(categories: list[str]) -> dict:
+def _category_mix(categories: list[str], ids: list[int] | None = None) -> dict:
     """Corpus and recent-window category counts, plus the architectural share.
 
     A measurement, not a gate. Whether a decision changed the component
@@ -328,6 +364,16 @@ def _category_mix(categories: list[str]) -> dict:
     test cannot be checked here -- but its *effect* can be watched. The signal
     is movement in the recent share, not an absolute threshold: a threshold
     would be a number with no evidence behind it.
+
+    `post_adoption` exists because the recent window cannot yet measure what it
+    is read for. The falsifiable test was adopted with no retroactive migration,
+    so a fixed 50-decision window is dominated by records authored under the
+    *old* rule -- and will read "the test is being ignored" for roughly fifty
+    more decisions no matter how authors behave. Reporting the share over
+    decisions authored *since* adoption separates the question "is the test
+    working?" from "how much pre-adoption history is still in frame?". Early on
+    the post-adoption count is small and the share is noisy; `n` is reported
+    alongside it so a reader can see when it becomes worth believing.
     """
     recent = categories[-_RECENT_WINDOW:]
 
@@ -338,12 +384,23 @@ def _category_mix(categories: list[str]) -> dict:
         return dict(sorted(out.items()))
 
     share = recent.count("architectural") / len(recent) if recent else 0.0
-    return {
+    mix = {
         "corpus": counts(categories),
         "recent": counts(recent),
         "recent_window": len(recent),
         "architectural_share_recent": round(share, 3),
     }
+    if ids is not None:
+        since = [c for n, c in zip(ids, categories, strict=False) if n > _ADOPTION_ID]
+        mix["post_adoption"] = {
+            "since_decision": _ADOPTION_ID,
+            "n": len(since),
+            "counts": counts(since),
+            "architectural_share": (
+                round(since.count("architectural") / len(since), 3) if since else None
+            ),
+        }
+    return mix
 
 
 def _classify_one(adr_name, ref, deletions, renames, lazy_shapes, removers, have_history):
@@ -382,8 +439,34 @@ def _classify_one(adr_name, ref, deletions, renames, lazy_shapes, removers, have
                 f"{', '.join(ranked)} -- confirm which, then record the link"
             )
             return "removed-by-later", "link-supersession", detail
-        return "vanished", "retire-candidate", f"deleted {deleted_on}, no owning decision found"
-    return "vanished", "retire-candidate", "absent, with no deletion recorded"
+        return _residual(f"deleted {deleted_on}, no owning decision found", lazy_shapes)
+    return _residual("absent, with no deletion recorded", lazy_shapes)
+
+
+def _residual(detail: str, lazy_shapes: list[str] | None) -> tuple[str, str, str]:
+    """The class left once no repair class applied.
+
+    `vanished` asserts something stronger than "nothing matched": it asserts
+    every repair class was *tried*, which holds only when every oracle answered.
+    With the lifecycle table unavailable, an artifact whose absence that table
+    declares expected is indistinguishable from one that genuinely vanished, so
+    the honest answer is `unclassified` -- the same answer the history oracle
+    already gives when it cannot determine a cause.
+
+    Withholding a class must withhold its members too. Reporting them under
+    `retire-candidate` -- the one disposition that removes a decision's standing
+    -- while `withheld` says the class was suppressed points the reader in
+    precisely the wrong direction, and is the inversion this classifier exists
+    to prevent.
+    """
+    if lazy_shapes is None:
+        return (
+            "unclassified",
+            "none",
+            f"{detail}; lifecycle oracle unavailable, so an artifact whose "
+            "absence is declared expected cannot be ruled out",
+        )
+    return "vanished", "retire-candidate", detail
 
 
 def _covers(paths: set[str], gone: set[str], ref: str) -> bool:

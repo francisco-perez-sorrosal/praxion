@@ -75,7 +75,7 @@ Provider (common core — all six verbs required):
 ---
 
 ## TransactionError Grammar
-<!-- last-verified: 2026-06-02 -->
+<!-- last-verified: 2026-08-05 -->
 
 A **closed** set of error codes. Every provider raises only errors from this set; no
 provider-specific additions are permitted at the grammar level. Rail-specific or

@@ -1,18 +1,24 @@
 # Robinhood Trading Provider
 
 v1 plugin shape for the Robinhood Agentic Trading provider — MCP transport (HTTP),
-equities only, **no sandbox**.
+**long equities and options**, **no sandbox**.
 Back-link: [../SKILL.md](../SKILL.md)
 
-> **State of knowledge (verified 2026-06-02 against Robinhood's official support docs).**
-> The connection surface is now public: the MCP endpoint URL, the HTTP transport, the
-> connect command, and the desktop-only onboarding/auth flow are documented (below).
-> What is **still not published**: the exact MCP **tool names/schemas**, the **order-type
-> enum**, **rate limits**, and the OAuth/token internals. The concrete way to resolve
+> **State of knowledge (verified 2026-08-05 against Robinhood's official support docs).**
+> The connection surface is public: the MCP endpoint URL, the HTTP transport, the connect
+> command, and the desktop-only onboarding/auth flow are all documented (below). **Tool
+> *names* are published** — roughly 50 of them across six categories, up from the 10 recorded
+> at the previous verification, with **options trading now live**.
+> What is **still not published**: the MCP **tool input schemas / parameter names**, the
+> **order-type enum**, **rate limits**, and the OAuth/token internals. The way to resolve
 > those is **operational, not documentary** — connect an MCP client to the live endpoint
 > and **introspect its tool list** (`tools/list`), then read the linked order-types doc.
 > Re-run `chub_search({ query: "robinhood trading" })` via `external-api-docs` before
 > coding in case curated docs have since appeared.
+>
+> **This surface moves fast** — 10 → ~50 tools plus a whole asset class in ~64 days. A
+> 60-day staleness threshold does not track it. Treat any tool inventory here as a snapshot
+> and introspect before relying on it.
 
 ---
 
@@ -24,7 +30,7 @@ Back-link: [../SKILL.md](../SKILL.md)
 | **Status** | Beta — launched 2026-05-27; staged rollout via email invite; Gold members prioritized |
 | **Transport kind** | `mcp-client` over **HTTP** (streamable HTTP MCP) |
 | **MCP endpoint** | `https://agent.robinhood.com/mcp/trading` |
-| **Asset class (v1 beta)** | **Long equities only** — no shorts, options, crypto, or futures in v1 beta |
+| **Asset class** | **Long equities and options** — options shipped since the v1-beta notes; still no shorts, crypto, or futures. Verbatim: "You currently can use your agent to place long equities and options orders" |
 | **`supports_sandbox`** | **`false`** — no paper-trading or testnet environment (confirmed absent) |
 | **Geographic scope** | US-only (implied); desktop required for onboarding |
 | **Access gate** | Primary individual investing account in good standing; up to 10 self-directed individual accounts incl. the Agentic account; email-invite rollout |
@@ -32,7 +38,7 @@ Back-link: [../SKILL.md](../SKILL.md)
 
 ---
 
-## Connection & Onboarding (verified 2026-06-02)
+## Connection & Onboarding (verified 2026-08-05)
 
 The MCP endpoint **is** the integration surface — there is no REST SDK for the agentic flow.
 
@@ -80,32 +86,71 @@ Higher-level alternative for agent loops: OpenAI Agents SDK `MCPServerStreamable
 
 ---
 
-## Tool Surface (10 official MCP tools, confirmed 2026-06-02)
-<!-- last-verified: 2026-06-02 -->
+## Tool Surface (~50 official MCP tools, verified 2026-08-05)
+<!-- last-verified: 2026-08-05 -->
 
-The Robinhood Trading MCP exposes exactly these 10 tools (names verbatim from the official support article "Trading with your agent"). Tool **input schemas / parameter names / order-type enum** are still not published and require live `tools/list` introspection.
+> **This section previously documented 10 tools and stated that `place_equity_order` was the
+> only write-side placement tool. Both were wrong.** The surface grew roughly 5× and
+> **options trading is live** — `place_option_order` is a second capital-moving placement
+> tool. Any spend-gating design derived from the 10-tool list is incomplete.
 
-| Tool name | Category | Notes |
+Names verbatim from the official support article
+["Trading with your agent"](https://robinhood.com/us/en/support/articles/trading-with-your-agent/).
+Two independent transcriptions on 2026-08-05 enumerated **50 tools across six categories**
+(5 + 12 + 9 + 8 + 10 + 6). Note the article's own prose per-category counts sum to 45 — an
+upstream inconsistency between its narrative and its lists.
+
+**Do not treat any count here as authoritative.** The surface moved 10 → ~50 in about 64
+days. Resolve it operationally with a live `tools/list` before relying on it; input schemas,
+parameter names, and the order-type enum remain unpublished and require introspection anyway.
+
+### Write-side tools — the ones that matter for gating
+
+Classify by **what a call can cost you**, not by read-vs-write:
+
+| Tool | Class | Notes |
 |---|---|---|
-| `get_accounts` | Read | All Robinhood accounts (ALL accounts, not just the Agentic one) |
-| `get_portfolio` | Read | Portfolio value by asset class + buying power |
-| `get_equity_positions` | Read | Open positions: quantity, cost basis |
-| `get_equity_quotes` | Read | Real-time quotes; up to 20 symbols per call |
-| `get_equity_orders` | Read | Order status + history — use to poll after placement |
-| `get_equity_tradability` | Read | Symbol tradability + fractional share eligibility |
-| `review_equity_order` | Simulate | **Simulate** order; returns pre-trade warnings — the canonical HITL gate primitive |
-| `place_equity_order` | Write | Execute the equity order — the **only** write-side placement tool |
-| `cancel_equity_order` | Write | Cancel an open order |
-| `search` | Read | Find company names or ticker symbols |
+| `place_equity_order` | **Capital-moving** | Executes an equity order |
+| `place_option_order` | **Capital-moving** | Executes an options order — **new; absent from the old 10-tool list** |
+| `cancel_equity_order` | **Capital-moving** | Cancels an open equity order |
+| `cancel_option_order` | **Capital-moving** | Cancels an open options order |
+| `review_equity_order` | Simulate | Pre-trade warnings — the equities HITL gate primitive |
+| `review_option_order` | Simulate | Pre-trade warnings — the options HITL gate primitive |
+| `create_watchlist`, `update_watchlist`, `follow_watchlist`, `unfollow_watchlist`, `add_to_watchlist`, `remove_from_watchlist`, `add_option_to_watchlist`, `remove_option_from_watchlist` | **State-mutating, non-capital** | Change account state; move no money |
+| `create_scan`, `run_scan`, `update_scan_filters`, `update_scan_config` | **State-mutating, non-capital** | Change account state; move no money |
 
-**Summary:** 8 read/simulate tools, 1 place tool, 1 cancel tool.
+The non-capital mutators are the category the old model had no room for: they are not reads,
+so an allow-list built as "everything that isn't a `place_*`" silently authorizes them.
 
-**Canonical two-step HITL gate:** always call `review_equity_order` first → surface returned warnings to the human → only call `place_equity_order` after explicit human approval. This is the tool-level implementation of the `authorize()` → `execute()` contract verbs.
+### Categories
+
+| Category (verbatim) | Contents |
+|---|---|
+| Account, portfolio, and other tools | `get_accounts`, `get_portfolio`, `get_realized_pnl`, `get_pnl_trade_history`, `search` |
+| Watchlist tools | the 8 mutators above plus `get_watchlists`, `get_watchlist_items`, `get_option_watchlist`, `get_popular_watchlists` |
+| Market data tools | `get_equity_historicals`, `get_equity_fundamentals`, `get_financials`, `get_equity_price_book`, `get_equity_technical_indicators`, `get_earnings_results`, `get_earnings_calendar`, `get_indexes`, `get_index_quotes` |
+| Equities tools | `get_equity_positions`, `get_equity_tax_lots`, `get_equity_quotes`, `get_equity_orders`, `get_equity_tradability`, `review_equity_order`, `place_equity_order`, `cancel_equity_order` |
+| Options tools | `get_option_level_upgrade_info`, `get_option_historicals`, `get_option_chains`, `get_option_instruments`, `get_option_quotes`, `get_option_positions`, `get_option_orders`, `review_option_order`, `place_option_order`, `cancel_option_order` |
+| Scanner tool calls | `get_scans`, `get_scanner_filter_specs`, `create_scan`, `run_scan`, `update_scan_filters`, `update_scan_config` |
+
+Every tool from the original 10 still exists under the same name — nothing was removed.
+
+**Canonical two-step HITL gate — now one pair per asset class:**
+
+- Equities: `review_equity_order` → human approval → `place_equity_order`
+- Options: `review_option_order` → human approval → `place_option_order`
+
+Both are the tool-level implementation of the `authorize()` → `execute()` contract verbs. A
+gate that covers only the equities pair leaves options placement ungated.
+
+**Crypto is not in the tool surface.** Press coverage has reported crypto agentic trading;
+the primary source lists no crypto *trading* tool (crypto appears only in watchlist tools)
+and says only "we'll be adding support for more assets soon." Do not encode crypto support.
 
 ---
 
 ## Claude Code Integration
-<!-- last-verified: 2026-06-02 -->
+<!-- last-verified: 2026-08-05 -->
 
 ### Scope Guidance
 
@@ -113,11 +158,23 @@ Use **`local` scope (default)** for Robinhood — the OAuth grant is personal an
 
 ### Permission Block (`settings.json`)
 
-Configure Claude Code permissions to auto-allow the 8 read/simulate tools and require explicit human approval for the 2 write tools. This enforces HITL at the transport layer — **defense in depth complementary to the agent-loop gate**:
+**State the policy as a rule, not as an enumeration.** With ~50 tools and a surface that grew
+5× in two months, any hand-listed allow-list is stale on arrival. The rule that survives
+expansion:
+
+> Every `place_*` and `cancel_*` tool goes in `ask`. Everything else may be allowed — but
+> re-check new `create_*` / `update_*` / `run_*` tools before adding them, because those
+> mutate account state even though they move no capital.
 
 ```json
 {
   "permissions": {
+    "ask": [
+      "mcp__robinhood-trading__place_equity_order",
+      "mcp__robinhood-trading__place_option_order",
+      "mcp__robinhood-trading__cancel_equity_order",
+      "mcp__robinhood-trading__cancel_option_order"
+    ],
     "allow": [
       "mcp__robinhood-trading__get_accounts",
       "mcp__robinhood-trading__get_portfolio",
@@ -126,26 +183,34 @@ Configure Claude Code permissions to auto-allow the 8 read/simulate tools and re
       "mcp__robinhood-trading__get_equity_orders",
       "mcp__robinhood-trading__get_equity_tradability",
       "mcp__robinhood-trading__review_equity_order",
+      "mcp__robinhood-trading__review_option_order",
       "mcp__robinhood-trading__search"
-    ],
-    "ask": [
-      "mcp__robinhood-trading__place_equity_order",
-      "mcp__robinhood-trading__cancel_equity_order"
     ]
   }
 }
 ```
 
-Rule evaluation order: `deny` → `ask` → `allow`. Deny rules win unconditionally.
+Rule evaluation order: `deny` → `ask` → `allow`. Deny rules win unconditionally, and a
+matching `ask` prompts even when a more specific `allow` also matches — so listing the four
+capital-moving tools under `ask` holds regardless of what else is allowed.
+
+**An unlisted tool is safe by default but the block is not self-documenting.** Claude Code
+prompts for any tool matching no rule, so an omitted `place_option_order` would still ask —
+the failure direction is safe. The hazard is a wildcard: `mcp__robinhood-trading__get_*` in
+`allow` reads as harmless but pairs badly with a surface where new mutators keep appearing.
+If you wildcard anything, keep the four `ask` entries explicit.
+
+The maximum-caution alternative — `ask` on `mcp__robinhood-trading__*` — is now considerably
+more attractive than it was at 10 tools.
 
 **Maximum-caution alternative** (PoC / testing — asks on every call):
 ```json
 { "permissions": { "ask": ["mcp__robinhood-trading__*"] } }
 ```
 
-### `alwaysLoad: true` — Load All 10 Tools at Session Start
+### `alwaysLoad: true` — Load the Whole Tool Surface at Session Start
 
-By default, Claude Code uses Tool Search: MCP tools are deferred and loaded on demand. For a trading agent, this deferral adds latency at the moment of order placement. Add `alwaysLoad: true` in `.mcp.json` to load all 10 Robinhood tools into context at session start:
+By default, Claude Code uses Tool Search: MCP tools are deferred and loaded on demand. For a trading agent, this deferral adds latency at the moment of order placement. Adding `alwaysLoad: true` in `.mcp.json` loads the Robinhood tools into context at session start:
 
 ```json
 {
@@ -159,7 +224,25 @@ By default, Claude Code uses Tool Search: MCP tools are deferred and loaded on d
 }
 ```
 
-**Requires Claude Code v2.1.121+.** The tradeoff: 10 tool schemas consume context tokens at every session; with only 10 tools this is acceptable.
+**Requires Claude Code v2.1.121+.**
+
+**The cost judgment that justified this has expired.** It read "10 tool schemas consume
+context tokens at every session; with only 10 tools this is acceptable." At ~50 tools that is
+roughly 5× the cost, and it now cuts against the docs' own guidance: use `alwaysLoad` "for a
+small number of tools that Claude needs on every turn, since each upfront tool consumes
+context that would otherwise be available for your conversation." Fifty schemas is not a
+small number.
+
+Two further properties to weigh, both against the latency argument that motivates it:
+
+- **`alwaysLoad: true` blocks startup until the server connects**, capped at the standard
+  5-second connect timeout. For a trading agent that is a real availability trade, not just a
+  token cost — you are trading order-placement latency for session-start latency.
+- Per-tool always-loading (`"anthropic/alwaysLoad": true` in a tool's `_meta`) is
+  **server-side**, so a Robinhood consumer cannot select a subset. The choice is all-or-defer.
+
+Given that, prefer the default (deferred) unless you have measured the placement latency and
+found it unacceptable.
 
 > **Safe to commit:** this `.mcp.json` block is **token-free** (URL + `alwaysLoad` only) — Robinhood's OAuth token lives in the keychain, not here — so sharing it leaks nothing. This does not contradict the `local`-scope default above: that default is about the per-user OAuth grant, not about hiding a secret.
 
@@ -205,7 +288,14 @@ This is the most important correction from the live docs. The trade-preview gate
 
 ## Core Verbs — Robinhood Implementation Shape
 
-All six contract verbs are required. Tool names are now confirmed (2026-06-02); input schemas/params still require live `tools/list` introspection.
+All six contract verbs are required. Tool names verified 2026-08-05; input schemas/params still require live `tools/list` introspection.
+
+**This table maps the equities path.** Options are live and follow the same shape with the
+parallel tool family — substitute `get_option_quotes` → `review_option_order` →
+`place_option_order` → `get_option_orders`, with `cancel_option_order` for cancels and
+`get_option_chains` / `get_option_instruments` for contract discovery. Note
+`get_option_level_upgrade_info` has no equities analogue: options trading requires an
+approval level on the account, so check it before assuming an options order can be placed.
 
 | Contract verb | Robinhood MCP tool(s) | Notes |
 |---|---|---|
@@ -220,7 +310,10 @@ All six contract verbs are required. Tool names are now confirmed (2026-06-02); 
 | *(discovery)* | `search` | Find company name → ticker symbol |
 | *(cancel)* | `cancel_equity_order` | Cancel an open order |
 
-**Canonical two-step pattern:** `review_equity_order` (simulate, surface warnings) → human approval → `place_equity_order` (execute). Never call `place_equity_order` without first calling `review_equity_order` and obtaining explicit human approval.
+**Canonical two-step pattern:** `review_*_order` (simulate, surface warnings) → human approval
+→ `place_*_order` (execute). Never call a `place_*` tool without first calling its matching
+`review_*` tool and obtaining explicit human approval. This holds per asset class: the
+equities pair does not gate options, and vice versa.
 
 **Venue detail defaults (until verified against the live surface):**
 ```python
@@ -235,11 +328,17 @@ VenueDetail(
 ---
 
 ## Volatile Specifics
-<!-- last-verified: 2026-06-02 -->
+<!-- last-verified: 2026-08-05 -->
 
-**Now known (verified 2026-06-02):** MCP endpoint URL, HTTP transport, connect command, desktop-only onboarding/auth flow, read/write access scope, no-sandbox, eligibility, HITL-is-not-system-enforced. Reflected above.
+**Now known (verified 2026-08-05):** MCP endpoint URL, HTTP transport, connect command, desktop-only onboarding/auth flow, read/write access scope, no-sandbox, eligibility, HITL-is-not-system-enforced. Reflected above.
 
-**Now confirmed (2026-06-02):** MCP tool names (all 10 — see "Tool Surface" section above).
+**Now confirmed (2026-08-05):** MCP tool names — **~50 tools across six categories**, not the
+10 previously recorded. See "Tool Surface" above.
+
+> **Note which claims rotted.** Both of the *positive* assertions in this section went stale
+> ("all 10 tools", "options on roadmap") while **every** "still undocumented" row below held.
+> Negative claims about this surface are cheap and durable; positive ones decay fast. Weight
+> re-verification effort accordingly.
 
 **Still undocumented — resolve operationally (introspect the live MCP server) before coding:**
 
@@ -251,7 +350,8 @@ VenueDetail(
 | **OAuth scopes / token format** | Onboarding handles it; internals opaque | Inspect the client's stored MCP credential post-onboarding |
 | **HITL triggering conditions** | User-configured, not system-enforced | Enforce `human_gate` in your own loop; do not depend on Robinhood |
 | **Extended-hours trading** | Not documented in beta | Default `market_hours: "regular"`; verify |
-| **Options / crypto support** | Long equities only in v1 beta; options on roadmap | Verify before expanding beyond long equities |
+| **Options support** | **Shipped** — "You currently can use your agent to place long equities and options orders" | Gate `place_option_order` exactly as you gate `place_equity_order` |
+| **Crypto support** | **Not in the tool surface.** Primary source lists no crypto trading tool; "we'll be adding support for more assets soon". Press reports of crypto agentic trading are not primary-confirmed | Do not encode crypto support; re-check the support article directly |
 
 ---
 

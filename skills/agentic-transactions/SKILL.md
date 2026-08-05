@@ -99,12 +99,18 @@ the core:
 | `OrderLifecycle` | `list_orders()`, `cancel()`, `replace()` — trading-only |
 
 ### Provider Transport Strategies
-<!-- last-verified: 2026-06-02 -->
+<!-- last-verified: 2026-08-05 -->
 
 Transport is the most consequential pluggability axis. Two strategies:
 
 - **MCP-client** — the agent calls the provider's own MCP server. Robinhood is MCP-only;
-  Alpaca, Visa, PayPal, Stripe, Nevermined also ship MCP servers. No REST SDK needed.
+  Alpaca and Stripe ship first-party MCP servers (both actively maintained). Three carry
+  caveats worth knowing before you plan around them: **Visa**'s `visa/mcp` is framed largely
+  as developer-integration tooling for Visa APIs rather than a settlement transport;
+  **PayPal**'s `paypal/paypal-mcp-server` has been dormant since 2025-10 and active work
+  moved to `paypal/AI-Toolkit`; **Nevermined** ships a library for *monetizing* MCP servers
+  (`mcp-payments-library`), not a first-party provider MCP server — grouping it with the
+  others implies a parity that does not exist. No REST SDK needed for the MCP-client path.
 - **HTTP/SDK-client** — direct REST or language SDK call. Alpaca REST + `alpaca-py`,
   IBKR `ibapi`, Stripe Python SDK. Suitable when the provider has a mature SDK and no
   MCP server, or when the SDK offers capabilities the MCP server does not.
@@ -165,7 +171,7 @@ Load these skills alongside `agentic-transactions` as the task requires:
 **Curated reference docs (fetch via `external-api-docs` at use time):** Context Hub carries the *plumbing* — `mcp/package` (the official Python MCP **client** over Streamable HTTP + OAuth — this is the Robinhood transport: `ClientSession` → `initialize()` → `list_tools()` → `call_tool()`), `fastmcp/package` (higher-level MCP client/server), and `stripe/package` (Python Stripe SDK, for a future Stripe payment provider). The novel protocols (x402, AP2, Nevermined, Coinbase AgentKit) and the brokers (Robinhood, Alpaca) are **not** in Context Hub — fetch those from the live web and introspect the provider's MCP server directly.
 
 ### Robinhood Provider Specifics
-<!-- last-verified: 2026-06-02 -->
+<!-- last-verified: 2026-08-05 -->
 
 When the target provider is Robinhood: load `references/robinhood.md` immediately.
 Key pre-flight facts:
@@ -173,9 +179,21 @@ Key pre-flight facts:
 - `supports_sandbox: false` — every test iteration runs against the live brokerage.
   A capital-segregated agentic account and a HITL approval interceptor are **mandatory**
   guardrails, not optional.
-- Auth scopes, order types, rate limits, and MCP endpoint URL are **undocumented as of
-  2026-06-02** — always re-fetch via `external-api-docs` before implementing.
+- **Options trading is live.** The agent can place *long equities and options* orders, so
+  there are **two** capital-moving placement tools (`place_equity_order`,
+  `place_option_order`) and two cancels. A HITL gate covering only the equities pair leaves
+  options placement ungated.
+- **The tool surface is ~50 tools, not 10**, and grew ~5× in about two months. Resolve it via
+  a live `tools/list` rather than trusting any documented count — including this one.
+- Auth scopes, order types, and rate limits remain **undocumented** — re-fetch via
+  `external-api-docs` before implementing. (The **MCP endpoint URL is documented**:
+  `https://agent.robinhood.com/mcp/trading`. An earlier revision listed it as undocumented,
+  contradicting this skill's own `references/robinhood.md` at the same verification date.)
 - Robinhood's agentic surface is MCP-only (no REST SDK for agentic flows).
+- HITL is **not system-enforced** on Robinhood's side: "if you've asked your agent to take
+  action without asking your approval, it can place trades without your confirmation," and
+  "Robinhood does not control, supervise, monitor, recommend, or audit these AI agents." The
+  gate must be yours.
 
 See `references/robinhood.md` for the full plugin shape, HITL wiring, and budget mandate
 requirements.

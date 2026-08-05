@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-05T05:12:58Z'
+generated_at: '2026-08-05T17:38:04Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -43,7 +43,7 @@ surfaces:
   path: CLAUDE.md
   type: markdown
   title: Praxion
-  last_modified: '2026-06-29'
+  last_modified: '2026-08-05'
   renderer: default_markdown
   surfaces_referenced:
   - docs-claude-code-limitations
@@ -96,7 +96,7 @@ surfaces:
   path: docs/aac-dac.md
   type: markdown
   title: Architecture-as-Code + Documentation-as-Code
-  last_modified: '2026-06-24'
+  last_modified: '2026-08-05'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -123,7 +123,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-08-04'
+  last_modified: '2026-08-05'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -749,8 +749,8 @@ surfaces:
 - id: ai-state-decisions-032-roadmap-md-location-and-lifecycle
   path: .ai-state/decisions/032-roadmap-md-location-and-lifecycle.md
   type: markdown
-  title: 032-roadmap-md-location-and-lifecycle.md
-  last_modified: '2026-04-29'
+  title: '`ROADMAP.md` at project root as a living document with preserved Decision Log'
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-033-six-dimension-lens-placement
   path: .ai-state/decisions/033-six-dimension-lens-placement.md
@@ -833,8 +833,8 @@ surfaces:
 - id: ai-state-decisions-046-staleness-detection-system
   path: .ai-state/decisions/046-staleness-detection-system.md
   type: markdown
-  title: 046-staleness-detection-system.md
-  last_modified: '2026-04-16'
+  title: Staleness detection via per-section markers, frontmatter catalog, paths-scoped rule
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-047-cross-reference-validator
   path: .ai-state/decisions/047-cross-reference-validator.md
@@ -899,8 +899,8 @@ surfaces:
 - id: ai-state-decisions-057-concurrency-collab-research-unified-worktree-home
   path: .ai-state/decisions/057-concurrency-collab-research-unified-worktree-home.md
   type: markdown
-  title: 057-concurrency-collab-research-unified-worktree-home.md
-  last_modified: '2026-05-08'
+  title: Unified Worktree Home on `.claude/worktrees/`
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-058-concurrency-collab-research-pr-conventions-rule
   path: .ai-state/decisions/058-concurrency-collab-research-pr-conventions-rule.md
@@ -1019,8 +1019,8 @@ surfaces:
 - id: ai-state-decisions-077-agent-model-routing-routing-frontmatter-floor-semantic
   path: .ai-state/decisions/077-agent-model-routing-routing-frontmatter-floor-semantic.md
   type: markdown
-  title: 077-agent-model-routing-routing-frontmatter-floor-semantic.md
-  last_modified: '2026-04-27'
+  title: Frontmatter `model:` is a capability floor; rule table is authoritative
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-078-agent-model-routing-routing-mechanism-hybrid
   path: .ai-state/decisions/078-agent-model-routing-routing-mechanism-hybrid.md
@@ -1223,8 +1223,8 @@ surfaces:
 - id: ai-state-decisions-111-req-arch-element-traceability
   path: .ai-state/decisions/111-req-arch-element-traceability.md
   type: markdown
-  title: 111-req-arch-element-traceability.md
-  last_modified: '2026-07-15'
+  title: "Bidirectional REQ\u2194architectural-element traceability convention"
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-112-aac-dac-traceability-sentinel-ac-traceability-checks
   path: .ai-state/decisions/112-aac-dac-traceability-sentinel-ac-traceability-checks.md
@@ -1331,8 +1331,8 @@ surfaces:
 - id: ai-state-decisions-129-pipeline-dashboard-dashboard-supersede-metrics-viewer
   path: .ai-state/decisions/129-pipeline-dashboard-dashboard-supersede-metrics-viewer.md
   type: markdown
-  title: 129-pipeline-dashboard-dashboard-supersede-metrics-viewer.md
-  last_modified: '2026-05-12'
+  title: "Pipeline Dashboard supersedes metrics-viewer.html.tmpl \u2014 soft deprecation"
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-130-pipeline-dashboard-dashboard-visualization-stack
   path: .ai-state/decisions/130-pipeline-dashboard-dashboard-visualization-stack.md
@@ -1469,14 +1469,14 @@ surfaces:
 - id: ai-state-decisions-152-interface-designer-opus-tier
   path: .ai-state/decisions/152-interface-designer-opus-tier.md
   type: markdown
-  title: 152-interface-designer-opus-tier.md
-  last_modified: '2026-05-12'
+  title: '`interface-designer` runs at opus tier (capability floor)'
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-153-review-interface-skill-command-pattern
   path: .ai-state/decisions/153-review-interface-skill-command-pattern.md
   type: markdown
-  title: 153-review-interface-skill-command-pattern.md
-  last_modified: '2026-05-12'
+  title: "`/review-interface` spawns the `interface-designer` agent in standalone mode \u2014 extending the Skill+Command family with a separate-context-window rule"
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-154-specialist-sub-architects-active-advocates
   path: .ai-state/decisions/154-specialist-sub-architects-active-advocates.md
@@ -1565,14 +1565,14 @@ surfaces:
 - id: ai-state-decisions-168-core-frontmatter-single-source-of-truth
   path: .ai-state/decisions/168-core-frontmatter-single-source-of-truth.md
   type: markdown
-  title: 168-core-frontmatter-single-source-of-truth.md
-  last_modified: '2026-05-13'
+  title: 'Frontmatter `core: true` is the single source of truth for non-disableability'
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-169-git-conventions-blacklistable
   path: .ai-state/decisions/169-git-conventions-blacklistable.md
   type: markdown
-  title: 169-git-conventions-blacklistable.md
-  last_modified: '2026-05-13'
+  title: Classify `vcs/git-conventions.md` as blacklistable; relocate behavioral-contract clauses to core
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-170-auto-complete-install-per-file-refactor
   path: .ai-state/decisions/170-auto-complete-install-per-file-refactor.md
@@ -1697,8 +1697,8 @@ surfaces:
 - id: ai-state-decisions-190-hackathon-mode-plan-decomposition
   path: .ai-state/decisions/190-hackathon-mode-plan-decomposition.md
   type: markdown
-  title: 190-hackathon-mode-plan-decomposition.md
-  last_modified: '2026-05-15'
+  title: "Hackathon mode \u2014 implementation plan decomposition decisions"
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-191-conversation-discipline
   path: .ai-state/decisions/191-conversation-discipline.md
@@ -1901,8 +1901,8 @@ surfaces:
 - id: ai-state-decisions-224-nebius-neocloud-nebius-direct-adapter
   path: .ai-state/decisions/224-nebius-neocloud-nebius-direct-adapter.md
   type: markdown
-  title: "ADR \u2014 Nebius as a direct dispatch adapter and an inference target"
-  last_modified: '2026-06-05'
+  title: Nebius integrated as the first v2 direct dispatch adapter plus a managed/self-hosted inference target
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-225-remove-in-house-memory-subsystem
   path: .ai-state/decisions/225-remove-in-house-memory-subsystem.md
@@ -2321,8 +2321,8 @@ surfaces:
 - id: ai-state-decisions-294-label-taxonomy-manifest
   path: .ai-state/decisions/294-label-taxonomy-manifest.md
   type: markdown
-  title: 294-label-taxonomy-manifest.md
-  last_modified: '2026-07-29'
+  title: Project-owned label-taxonomy manifest + additive-only reconciler (resolves
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-295-label-taxonomy-manifest-html-authorship-ephemeral-exception
   path: .ai-state/decisions/295-label-taxonomy-manifest-html-authorship-ephemeral-exception.md
@@ -2474,6 +2474,18 @@ surfaces:
   title: A gate that exists is not a gate that runs
   last_modified: '2026-08-04'
   renderer: adr_card
+- id: ai-state-decisions-320-ambient-interpreter-gate-liveness
+  path: .ai-state/decisions/320-ambient-interpreter-gate-liveness.md
+  type: markdown
+  title: Mechanise the interpreter half of "existence is not operation"
+  last_modified: '2026-08-05'
+  renderer: adr_card
+- id: ai-state-decisions-321-withheld-must-withhold-its-residual
+  path: .ai-state/decisions/321-withheld-must-withhold-its-residual.md
+  type: markdown
+  title: A withheld class withholds its residual, and a plugin-owned oracle resolves from the plugin
+  last_modified: '2026-08-05'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -2486,18 +2498,6 @@ surfaces:
   title: Idea Ledger
   last_modified: '2026-06-27'
   renderer: idea_grid
-- id: ai-state-sentinel-reports-sentinel-report-2026-06-02-14-04-03
-  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-06-02_14-04-03.md
-  type: markdown
-  title: Sentinel Report
-  last_modified: '2026-06-02'
-  renderer: default_markdown
-- id: ai-state-sentinel-reports-sentinel-report-2026-06-11-01-06-26
-  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-06-11_01-06-26.md
-  type: markdown
-  title: Sentinel Report
-  last_modified: '2026-06-11'
-  renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-06-11-01-25-30
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-06-11_01-25-30.md
   type: markdown
@@ -2545,6 +2545,18 @@ surfaces:
   type: markdown
   title: Sentinel Report
   last_modified: '2026-08-04'
+  renderer: default_markdown
+- id: ai-state-sentinel-reports-sentinel-report-2026-08-05-00-14-32
+  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-05_00-14-32.md
+  type: markdown
+  title: Sentinel Report
+  last_modified: '2026-08-05'
+  renderer: default_markdown
+- id: ai-state-sentinel-reports-sentinel-report-2026-08-05-09-52-51
+  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-05_09-52-51.md
+  type: markdown
+  title: Sentinel Report
+  last_modified: '2026-08-05'
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-06-11-08-38-15
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-11_08-38-15.json
@@ -3072,6 +3084,8 @@ groups:
   - ai-state-decisions-317-retirement-is-a-status-carrying-a-remova
   - ai-state-decisions-318-architectural-means-the-inventory-change
   - ai-state-decisions-319-a-gate-that-exists-is-not-a-gate-that-ru
+  - ai-state-decisions-320-ambient-interpreter-gate-liveness
+  - ai-state-decisions-321-withheld-must-withhold-its-residual
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -3094,8 +3108,6 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-07-16-06-44-58
   - ai-state-metrics-reports-metrics-report-2026-07-29-22-11-31
   - ai-state-metrics-reports-metrics-report-2026-07-29-22-11-31
-  - ai-state-sentinel-reports-sentinel-report-2026-06-02-14-04-03
-  - ai-state-sentinel-reports-sentinel-report-2026-06-11-01-06-26
   - ai-state-sentinel-reports-sentinel-report-2026-06-11-01-25-30
   - ai-state-sentinel-reports-sentinel-report-2026-06-17-11-21-44
   - ai-state-sentinel-reports-sentinel-report-2026-06-20-13-34-25
@@ -3104,6 +3116,8 @@ groups:
   - ai-state-sentinel-reports-sentinel-report-2026-07-30-11-03-40
   - ai-state-sentinel-reports-sentinel-report-2026-07-31-11-52-24
   - ai-state-sentinel-reports-sentinel-report-2026-08-04-13-35-55
+  - ai-state-sentinel-reports-sentinel-report-2026-08-05-00-14-32
+  - ai-state-sentinel-reports-sentinel-report-2026-08-05-09-52-51
   - ai-state-specs-spec-agent-model-routing-2026-04-25
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30

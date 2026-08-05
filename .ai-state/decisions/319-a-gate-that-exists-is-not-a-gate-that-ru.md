@@ -16,6 +16,8 @@ affected_files:
   - scripts/check_gate_liveness.py
   - scripts/test_check_gate_liveness.py
   - agents/sentinel.md
+re_affirmed_by:
+  - dec-320
 ---
 
 ## Context

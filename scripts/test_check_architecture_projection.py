@@ -1,14 +1,21 @@
-"""Tests for check_architecture_projection.py -- the model <-> section-3a reconciler.
+"""Tests for check_architecture_projection.py -- DESIGN.md against its two authorities.
 
 Cites: rules/swe/gate-liveness.md -- a CODE gate ships a canary proving it bites
 on a known-bad input, not merely that it passes on the current good state.
 
-The canaries here are drawn from real drift. All four shapes below existed
+The structural canaries are drawn from real drift. All four shapes existed
 simultaneously in this repository and went unnoticed for months, because the
 two descriptions had no mechanical binding: a model element with no row, a row
 naming no element, over-granular modelling, and a row pointing at an element
 that does not exist. The gate was written against that live known-bad state and
 reproduced all four before any of them was fixed.
+
+The published-half canaries guard a larger blast radius. A canonical block is
+installed into every managed project's own CLAUDE.md, so a block shipping with
+no row means N repositories carry content this project does not record. The
+withholding canary matters most there: an unreadable registry must withhold,
+never report that nothing ships, because the empty reading inverts every
+finding at once.
 """
 
 from __future__ import annotations
@@ -66,7 +73,7 @@ ALL_THREE = (
 
 def test_model_and_section_agree(repo: Path) -> None:
     _write_rows(repo, ALL_THREE)
-    report = cap.reconcile(repo)
+    report = cap.reconcile(repo, block_slugs=())
     assert report["findings"] == []
     assert (report["elements"], report["rows"]) == (3, 3)
 
@@ -77,7 +84,7 @@ def test_canary_model_element_with_no_row(repo: Path) -> None:
         repo,
         "| Skills | `knowledge.skills` | r | Built | f |\n| Rules | `knowledge.rules` | r | Built | f |\n",
     )
-    report = cap.reconcile(repo)
+    report = cap.reconcile(repo, block_slugs=())
     assert _kinds(report) == {"element-without-row"}
     assert report["findings"][0]["subject"] == "tooling.scripts"
 
@@ -85,7 +92,7 @@ def test_canary_model_element_with_no_row(repo: Path) -> None:
 def test_canary_row_naming_no_element(repo: Path) -> None:
     """The live shape: a documented component carrying zero structural enforcement."""
     _write_rows(repo, ALL_THREE + "| Dashboard |  | r | Built | f |\n")
-    report = cap.reconcile(repo)
+    report = cap.reconcile(repo, block_slugs=())
     assert _kinds(report) == {"row-without-element"}
     assert report["findings"][0]["subject"] == "Dashboard"
 
@@ -93,7 +100,7 @@ def test_canary_row_naming_no_element(repo: Path) -> None:
 def test_canary_row_naming_an_element_that_does_not_exist(repo: Path) -> None:
     """Catches a rename on the model side that the doc did not follow."""
     _write_rows(repo, ALL_THREE + "| Ghost | `tooling.ghost` | r | Built | f |\n")
-    report = cap.reconcile(repo)
+    report = cap.reconcile(repo, block_slugs=())
     assert _kinds(report) == {"unknown-element"}
     assert "tooling.ghost" in report["findings"][0]["detail"]
 
@@ -101,7 +108,7 @@ def test_canary_row_naming_an_element_that_does_not_exist(repo: Path) -> None:
 def test_canary_row_for_a_layer_container_is_rejected(repo: Path) -> None:
     """Layers group components; giving one a row double-counts its children."""
     _write_rows(repo, ALL_THREE + "| Knowledge Layer | `knowledge` | r | Built | f |\n")
-    report = cap.reconcile(repo)
+    report = cap.reconcile(repo, block_slugs=())
     assert _kinds(report) == {"not-structural"}
 
 
@@ -118,34 +125,99 @@ def test_a_component_whose_children_are_all_agents_is_structural(repo: Path) -> 
         encoding="utf-8",
     )
     _write_rows(repo, ALL_THREE)
-    assert cap.reconcile(repo)["findings"] == []
+    assert cap.reconcile(repo, block_slugs=())["findings"] == []
+
+
+# -- The published half -------------------------------------------------------
+#
+# Section 4 documents the blocks installed into every managed project's own
+# CLAUDE.md. Those rows carry the highest blast radius in the repo, and the
+# shipped-block registry is their authority.
+
+
+def _with_section_4(repo: Path, block_rows: str) -> None:
+    (repo / cap._DESIGN).write_text(
+        _design(ALL_THREE) + "\n## 4. Interfaces\n\n| Interface | Type |\n|---|---|\n" + block_rows,
+        encoding="utf-8",
+    )
+
+
+def test_documented_blocks_matching_the_registry_agree(repo: Path) -> None:
+    _with_section_4(repo, "| Canonical block: `alpha` | Markdown |\n")
+    assert cap.reconcile(repo, block_slugs=("alpha",))["findings"] == []
+
+
+def test_canary_shipped_block_missing_from_the_interfaces_table(repo: Path) -> None:
+    """A block reaching N projects with nothing documenting it."""
+    _with_section_4(repo, "| Canonical block: `alpha` | Markdown |\n")
+    report = cap.reconcile(repo, block_slugs=("alpha", "beta"))
+    assert _kinds(report) == {"block-without-row"}
+    assert report["findings"][0]["subject"] == "beta"
+
+
+def test_canary_interfaces_table_documents_a_block_that_does_not_ship(repo: Path) -> None:
+    """The mirror: a retired block still advertised as part of the contract."""
+    _with_section_4(
+        repo, "| Canonical block: `alpha` | Markdown |\n| Canonical block: `ghost` | M |\n"
+    )
+    report = cap.reconcile(repo, block_slugs=("alpha",))
+    assert _kinds(report) == {"row-without-block"}
+    assert report["findings"][0]["subject"] == "ghost"
+
+
+def test_canary_unreadable_registry_withholds_rather_than_claiming_nothing_ships(
+    repo: Path,
+) -> None:
+    """Withhold, never default -- an import failure must not read as "no contract".
+
+    Reporting an empty registry would flag every documented block as bogus and
+    invert the finding, which is the worst way for this check to fail.
+    """
+    _with_section_4(repo, "| Canonical block: `alpha` | Markdown |\n")
+    report = cap.reconcile(repo, block_slugs=None)
+    assert report["findings"] == []
+    assert any("registry could not be read" in w for w in report["withheld"])
 
 
 def test_absent_substrate_skips_rather_than_failing(repo: Path) -> None:
     """A project with no model must not be reported as fully drifted."""
     (repo / cap._MODEL).unlink()
-    report = cap.reconcile(repo)
+    report = cap.reconcile(repo, block_slugs=())
     assert report["findings"] == []
     assert "substrate absent" in report["skipped"]
 
 
 def test_exit_code_is_nonzero_only_when_findings_exist(repo: Path) -> None:
-    """It doubles as a commit gate, so the exit code is the contract."""
+    """It doubles as a commit gate, so the exit code is the contract.
+
+    Run through the CLI, which resolves the real shipped-block registry rather
+    than an injected one -- so section 4 is built from that registry here. That
+    keeps the fixture honest as blocks are added or retired, and exercises the
+    registry lookup the in-process tests deliberately bypass.
+    """
     script = str(Path(cap.__file__))
-    _write_rows(repo, ALL_THREE)
+    rows = "".join(
+        f"| Canonical block: `{slug}` | Markdown |\n" for slug in cap.canonical_block_slugs()
+    )
+    section_4 = "\n## 4. Interfaces\n\n| Interface | Type |\n|---|---|\n" + rows
+
+    (repo / cap._DESIGN).write_text(_design(ALL_THREE) + section_4, encoding="utf-8")
     clean = subprocess.run(
         [sys.executable, script, "--repo-root", str(repo)], capture_output=True, check=False
     )
-    _write_rows(repo, ALL_THREE + "| Ghost | `tooling.ghost` | r | Built | f |\n")
+    (repo / cap._DESIGN).write_text(
+        _design(ALL_THREE + "| Ghost | `tooling.ghost` | r | Built | f |\n") + section_4,
+        encoding="utf-8",
+    )
     dirty = subprocess.run(
         [sys.executable, script, "--repo-root", str(repo)], capture_output=True, check=False
     )
-    assert (clean.returncode, dirty.returncode) == (0, 1)
+    assert (clean.returncode, dirty.returncode) == (0, 1), clean.stdout + dirty.stdout
 
 
 def test_never_edits_either_side(repo: Path) -> None:
     """Reports drift; resolving it is a human judgment about which side is right."""
     _write_rows(repo, "| Skills | `knowledge.skills` | r | Built | f |\n")
     before = ((repo / cap._MODEL).read_bytes(), (repo / cap._DESIGN).read_bytes())
-    cap.reconcile(repo)
+    cap.reconcile(repo, block_slugs=())
     assert ((repo / cap._MODEL).read_bytes(), (repo / cap._DESIGN).read_bytes()) == before

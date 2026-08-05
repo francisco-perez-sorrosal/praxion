@@ -24,6 +24,14 @@ doc rather than hiding it in a script.
 row; a component whose only children are agents or documents is still
 structural and does get one.
 
+A second reconciliation covers the *published* half. The Interfaces section
+documents the canonical blocks installed into every managed project's own
+`CLAUDE.md`, where the shipped-block registry is the authority and the table
+is a projection of it. Those rows carry the highest blast radius in the repo
+-- a break costs N repositories rather than this one -- so a block shipping
+undocumented, or a documented block the registry does not declare, is drift on
+the same footing as a missing component row.
+
 Exit 1 when findings exist, so this doubles as a commit gate. Reports; never
 edits either side.
 
@@ -54,6 +62,13 @@ _ELEMENT = re.compile(
 )
 _SECTION_3A = re.compile(r"^###\s*3a\b")
 _SECTION_NEXT = re.compile(r"^###?\s")
+_SECTION_4 = re.compile(r"^##\s*4\.\s")
+_BLOCK_ROW = re.compile(r"^\|\s*Canonical block:\s*`([a-z0-9-]+)`\s*\|")
+
+# Distinct from both None (registry unreadable -> withhold) and () (registry
+# read, no blocks ship). Overloading the empty tuple for "look it up" would make
+# a caller asking about an empty registry silently trigger a live import.
+_AUTO: tuple[str, ...] = ("\0auto",)
 
 
 # -- Model side ---------------------------------------------------------------
@@ -127,22 +142,54 @@ def parse_section_3a(text: str) -> list[dict[str, str]]:
     return rows
 
 
+def parse_canonical_block_rows(text: str) -> list[str]:
+    """Slugs the Interfaces section claims are shipped canonical blocks."""
+    lines = text.splitlines()
+    try:
+        start = next(i for i, line in enumerate(lines) if _SECTION_4.match(line))
+    except StopIteration:
+        return []
+    slugs = []
+    for line in lines[start + 1 :]:
+        if line.startswith("## "):
+            break
+        if match := _BLOCK_ROW.match(line):
+            slugs.append(match.group(1))
+    return slugs
+
+
+def canonical_block_slugs() -> tuple[str, ...] | None:
+    """The shipped-block registry, or None when it cannot be read.
+
+    None means *withhold*, never *empty*: reporting "no blocks ship" because an
+    import failed would turn a tooling problem into a claim that the entire
+    published contract is undocumented.
+    """
+    try:
+        from sync_canonical_blocks import BLOCKS
+    except Exception:
+        return None
+    return tuple(BLOCKS)
+
+
 # -- Reconciliation -----------------------------------------------------------
 
 
-def reconcile(repo_root: Path) -> dict:
+def reconcile(repo_root: Path, *, block_slugs: tuple[str, ...] | None = _AUTO) -> dict:
     model_path, design_path = repo_root / _MODEL, repo_root / _DESIGN
     if not model_path.is_file() or not design_path.is_file():
         return {
             "findings": [],
             "skipped": f"substrate absent ({_MODEL} or {_DESIGN})",
+            "withheld": [],
             "rows": 0,
             "elements": 0,
         }
 
+    design_text = design_path.read_text(encoding="utf-8")
     elements = parse_model(model_path.read_text(encoding="utf-8"))
     structural = structural_components(elements)
-    rows = parse_section_3a(design_path.read_text(encoding="utf-8"))
+    rows = parse_section_3a(design_text)
 
     findings = []
     claimed = set()
@@ -184,9 +231,37 @@ def reconcile(repo_root: Path) -> dict:
             }
         )
 
+    # Section 4 carries the published half of the architecture -- the blocks
+    # installed into every managed project's own CLAUDE.md. The shipped-block
+    # registry is the authority; the table is a projection of it, and without
+    # this a block added tomorrow leaves the contract silently undocumented.
+    withheld = []
+    slugs = canonical_block_slugs() if block_slugs is _AUTO else block_slugs
+    if slugs is None:
+        withheld.append("canonical-block rows: the shipped-block registry could not be read")
+    else:
+        documented = parse_canonical_block_rows(design_text)
+        for slug in sorted(set(slugs) - set(documented)):
+            findings.append(
+                {
+                    "kind": "block-without-row",
+                    "subject": slug,
+                    "detail": "ships to managed projects but section 4 does not document it",
+                }
+            )
+        for slug in sorted(set(documented) - set(slugs)):
+            findings.append(
+                {
+                    "kind": "row-without-block",
+                    "subject": slug,
+                    "detail": "documented as shipped, but the registry declares no such block",
+                }
+            )
+
     return {
         "findings": findings,
         "skipped": None,
+        "withheld": withheld,
         "rows": len(rows),
         "elements": len(structural),
     }
@@ -214,6 +289,8 @@ def main(argv: list[str] | None = None) -> int:
             f"{report['elements']} structural component(s) in the model, "
             f"{report['rows']} row(s) in section 3a"
         )
+        for reason in report["withheld"]:
+            print(f"  WITHHELD -- {reason}")
         for finding in report["findings"]:
             print(f"  {finding['kind']}: {finding['subject']}\n    {finding['detail']}")
         if not report["findings"]:

@@ -126,15 +126,17 @@ repos:
         files: '^(docs/diagrams/|.*\.c4$|.*ARCHITECTURE\.md$|docs/architecture\.md$)'
         pass_filenames: false
 
-      # Architecture projection — the LikeC4 model and DESIGN.md section 3a must
-      # project the same component set. Fires when either side is staged, since
-      # drift is created by editing one without the other. Stdlib-only, so
-      # language: system is safe here.
+      # Architecture projection — DESIGN.md must project both authorities: the
+      # LikeC4 model (section 3a components) and the shipped-block registry
+      # (section 4 canonical blocks). Fires on any of the three, since drift is
+      # created by editing one without the others — adding a canonical block
+      # touches neither the model nor DESIGN.md, so that path must be in scope
+      # or the gate is blind to it. Stdlib-only, so language: system is safe.
       - id: architecture-projection
-        name: Architecture projection (model <-> DESIGN.md 3a)
+        name: Architecture projection (model + shipped blocks <-> DESIGN.md)
         entry: python3 scripts/check_architecture_projection.py
         language: system
-        files: '(\.c4|^\.ai-state/DESIGN\.md)$'
+        files: '(\.c4$|^\.ai-state/DESIGN\.md$|^claude/canonical-blocks/|^scripts/sync_canonical_blocks\.py$)'
         pass_filenames: false
 
       # Block E — rules-manifest drift. --check (no write); fires on staged

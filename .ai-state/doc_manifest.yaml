@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-05T21:30:00Z'
+generated_at: '2026-08-05T22:21:09Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -2618,6 +2618,12 @@ surfaces:
   title: METRICS_REPORT_2026-07-29_22-11-31.json
   last_modified: '2026-07-29'
   renderer: metrics_view
+- id: ai-state-metrics-reports-metrics-report-2026-08-05-22-03-40
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-08-05_22-03-40.json
+  type: json
+  title: METRICS_REPORT_2026-08-05_22-03-40.json
+  last_modified: '2026-08-05'
+  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-06-11-08-38-15
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-11_08-38-15.md
   type: markdown
@@ -2671,6 +2677,12 @@ surfaces:
   type: markdown
   title: Project Metrics Report
   last_modified: '2026-07-29'
+  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-08-05-22-03-40
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-08-05_22-03-40.md
+  type: markdown
+  title: Project Metrics Report
+  last_modified: '2026-08-05'
   renderer: default_markdown
 - id: ai-state-specs-spec-agent-model-routing-2026-04-25
   path: .ai-state/specs/SPEC_agent-model-routing_2026-04-25.md
@@ -3115,6 +3127,8 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-07-16-06-44-58
   - ai-state-metrics-reports-metrics-report-2026-07-29-22-11-31
   - ai-state-metrics-reports-metrics-report-2026-07-29-22-11-31
+  - ai-state-metrics-reports-metrics-report-2026-08-05-22-03-40
+  - ai-state-metrics-reports-metrics-report-2026-08-05-22-03-40
   - ai-state-sentinel-reports-sentinel-report-2026-06-11-01-25-30
   - ai-state-sentinel-reports-sentinel-report-2026-06-17-11-21-44
   - ai-state-sentinel-reports-sentinel-report-2026-06-20-13-34-25

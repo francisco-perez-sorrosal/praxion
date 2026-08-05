@@ -1,7 +1,7 @@
 ---
-id: dec-draft-8847eb8d
+id: dec-319
 title: A gate that exists is not a gate that runs
-status: proposed
+status: accepted
 category: architectural
 date: 2026-08-05
 summary: 'Add a seventh gate-liveness clause covering enforcement that never executes where it is deployed, and a mechanical uninvoked-gate check, because the six existing clauses all presume the gate ran and ask only whether it ran correctly.'

@@ -101,6 +101,17 @@ _TOOL_INSTALL_BLURB: dict[str, str] = {
 
 
 # ---------------------------------------------------------------------------
+# How many lowest-covered files the coverage deep-dive lists before it
+# truncates. Larger than the top-5 the other summarizers use because this
+# list is read against a floor rather than skimmed for highlights: every
+# module below the floor that the cap drops is a finding nobody can file.
+# The cap is never applied silently — see ``_summarize_coverage``.
+# ---------------------------------------------------------------------------
+
+_COVERAGE_PER_FILE_CAP = 10
+
+
+# ---------------------------------------------------------------------------
 # Deep-Dive per-collector label/format map. For each collector, the map
 # enumerates the data-dict keys we surface and the human-readable label +
 # formatting we apply. Keys absent from the collector's data dict are
@@ -444,12 +455,75 @@ def _summarize_readiness(data: dict[str, Any]) -> list[str]:
     return lines
 
 
+def _summarize_coverage(data: dict[str, Any]) -> list[str]:
+    """Lowest-covered files, ascending — the bottom of the distribution.
+
+    The ``line_pct`` bullet above is an aggregate, and an aggregate is
+    structurally blind to one badly-tested module inside a healthy repository
+    — precisely the failure a *per-module* coverage floor exists to catch.
+    This project's own report is the worked example: 85.02% overall, nine files
+    under 70%, the worst at 42.86%. Rendering only the aggregate let that read
+    as a clean bill of health, and left the sentinel's per-module coverage
+    check with no per-module input to read.
+
+    The cap is **disclosed, never implied**. The header states shown-of-total,
+    and a truncated list names the coverage every omitted file clears, so a
+    reader holding a floor at or below that bound knows the list is exhaustive
+    for that floor, and a reader holding a higher one is told plainly to read
+    the JSON. A silent top-N would reintroduce the same false all-clear in a
+    smaller font: the reader could not tell "no further offenders" from
+    "offenders not shown".
+
+    The floor itself is deliberately *not* encoded here. It is the consumer's
+    parameter (the sentinel defaults to 70%), and duplicating it in the
+    renderer would create a second site to drift.
+    """
+
+    per_file = data.get("per_file")
+    if not isinstance(per_file, dict) or not per_file:
+        return []
+
+    ranked: list[tuple[float, str, Any, Any]] = []
+    for path, entry in per_file.items():
+        if not isinstance(entry, dict):
+            continue
+        pct = entry.get("line_pct")
+        if not isinstance(pct, (int, float)) or isinstance(pct, bool):
+            continue
+        ranked.append((float(pct), str(path), entry.get("lines_covered"), entry.get("lines_total")))
+    if not ranked:
+        return []
+
+    # Path breaks ties so equally-covered files order deterministically.
+    ranked.sort(key=lambda row: (row[0], row[1]))
+    shown = ranked[:_COVERAGE_PER_FILE_CAP]
+    omitted = len(ranked) - len(shown)
+
+    scope = f"all {len(ranked)}" if omitted == 0 else f"{len(shown)} of {len(ranked)}"
+    lines = [f"- Lowest-covered files ({scope}, worst first):"]
+    for pct, path, covered, total in shown:
+        detail = ""
+        if isinstance(covered, int) and isinstance(total, int):
+            detail = f" ({covered}/{total} lines)"
+        lines.append(f"    - `{path}` — {_fmt_pct(pct)}{detail}")
+
+    if omitted:
+        bound = _fmt_pct(ranked[len(shown)][0])
+        lines.append(
+            f"- The {omitted} files not listed are all at or above {bound} line coverage "
+            f"— a floor at or below {bound} is fully covered by this list; a higher floor "
+            f"must read `coverage.per_file` in the JSON sibling."
+        )
+    return lines
+
+
 _DEEP_DIVE_SUMMARIZERS: dict[str, Any] = {
     "git": _summarize_git,
     "scc": _summarize_scc,
     "lizard": _summarize_lizard,
     "complexipy": _summarize_complexipy,
     "pydeps": _summarize_pydeps,
+    "coverage": _summarize_coverage,
     "readiness": _summarize_readiness,
 }
 

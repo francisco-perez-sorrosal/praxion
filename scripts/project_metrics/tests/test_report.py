@@ -824,12 +824,36 @@ class TestReportSkipMarkerLanguage:
 # ---------------------------------------------------------------------------
 
 
-def _report_with_coverage(fraction: float) -> Any:
+def _per_file_entry(lines_covered: int, lines_total: int) -> dict[str, Any]:
+    """Build one per-file coverage entry exactly as the collector emits it.
+
+    Mirrors ``coverage_collector._build_per_file_entry``: ``line_pct`` is the
+    *derived* covered/total ratio rounded to 6 places, never an independently
+    chosen number. Deriving it here is deliberate — a fixture free to state a
+    ``line_pct`` its own line counts contradict can endorse a payload no parser
+    could produce, which is how a renderer bug once survived a green golden.
+    """
+    line_pct = lines_covered / lines_total if lines_total > 0 else 0.0
+    return {
+        "line_pct": round(line_pct, 6),
+        "lines_total": lines_total,
+        "lines_covered": lines_covered,
+    }
+
+
+def _report_with_coverage(
+    fraction: float,
+    per_file: dict[str, dict[str, Any]] | None = None,
+) -> Any:
     """Reference report with coverage available and ``line_pct`` populated.
 
     The reference fixture deliberately leaves coverage ``not_applicable``, so
     every percentage render site was untested until this helper existed — which
     is precisely how a 100x understatement shipped and stayed shipped.
+
+    ``per_file`` populates the per-module map the collector always emits
+    alongside the aggregate. It defaults to empty rather than absent so callers
+    that only care about the aggregate keep their previous payload shape.
     """
     from dataclasses import replace
 
@@ -844,6 +868,7 @@ def _report_with_coverage(fraction: float) -> Any:
             "line_pct": fraction,
             "artifact_format": "cobertura",
             "artifact_path": "coverage.xml",
+            "per_file": per_file or {},
         },
     )
     availability = dict(report.tool_availability)
@@ -906,6 +931,97 @@ class TestCoverageRendersAsAPercentage:
         assert "Line coverage is 100.00%." in md, (
             "The upper bound of the fraction domain must render as 100.00%, "
             "not 1.00% — the boundary that makes the scale error unmistakable."
+        )
+
+
+class TestCoverageSurfacesPerModuleDetail:
+    """The coverage deep-dive must expose the *bottom* of the distribution.
+
+    A single aggregate number is structurally blind to the one failure a
+    per-module coverage floor exists to catch: a badly-tested module hiding
+    inside a healthy repository. This project's own report is the worked
+    example — 85.02% overall, with nine files under 70% and the worst at
+    42.86%. Rendering only the aggregate lets that read as a clean bill of
+    health.
+
+    The cap on the list is disclosed rather than implied. A bounded list that
+    looks complete is the same false all-clear as the aggregate-only section,
+    just harder to notice.
+    """
+
+    @staticmethod
+    def _ascending_files(count: int) -> dict[str, dict[str, Any]]:
+        """``count`` files at 0%, 1%, 2%, … line coverage, worst-named first.
+
+        Names are zero-padded so lexical order matches coverage order, making
+        any ordering assertion below unambiguous about which property failed.
+        """
+        return {f"src/mod_{index:02d}.py": _per_file_entry(index, 100) for index in range(count)}
+
+    def test_deep_dive_names_each_low_covered_file_with_its_percentage(self) -> None:
+        from scripts.project_metrics.report import render_markdown
+
+        md = render_markdown(
+            _report_with_coverage(
+                0.8502,
+                {"hooks/_hook_utils.py": _per_file_entry(12, 28)},
+            )
+        )
+        section = _extract_section(md, "Per-collector Deep Dive")
+        line = _line_containing(section, "hooks/_hook_utils.py")
+        assert "42.86%" in line, (
+            "A module under the floor must be named in the MD with its own "
+            "percentage. The sentinel's coverage check reads this surface and "
+            "files one ledger row per module below the floor; with only the "
+            f"aggregate rendered it can never file one. Got: {line!r}"
+        )
+
+    def test_low_covered_files_are_listed_worst_first(self) -> None:
+        from scripts.project_metrics.report import render_markdown
+
+        md = render_markdown(_report_with_coverage(0.8502, self._ascending_files(3)))
+        section = _extract_section(md, "Per-collector Deep Dive")
+        assert section.index("src/mod_00.py") < section.index("src/mod_02.py"), (
+            "Files must be listed ascending by coverage so a capped list keeps "
+            "the worst offenders. Descending or arbitrary order would drop "
+            "exactly the modules the floor exists to catch."
+        )
+
+    def test_a_complete_per_file_list_says_it_omitted_nothing(self) -> None:
+        from scripts.project_metrics.report import render_markdown
+
+        md = render_markdown(_report_with_coverage(0.8502, self._ascending_files(3)))
+        section = _extract_section(md, "Per-collector Deep Dive")
+        header = _line_containing(section, "Lowest-covered files")
+        assert "all 3" in header, (
+            "When nothing is omitted the header must say so outright. A reader "
+            "who cannot tell a complete list from a truncated one must treat "
+            f"every list as truncated. Got: {header!r}"
+        )
+
+    def test_a_truncated_per_file_list_discloses_the_omitted_count(self) -> None:
+        from scripts.project_metrics.report import render_markdown
+
+        md = render_markdown(_report_with_coverage(0.8502, self._ascending_files(15)))
+        section = _extract_section(md, "Per-collector Deep Dive")
+        header = _line_containing(section, "Lowest-covered files")
+        assert "10 of 15" in header, (
+            "A cap must be stated in the rendered output, never implied. An "
+            "undisclosed top-N is itself a scope-fidelity defect: the reader "
+            f"cannot distinguish 'no more offenders' from 'not shown'. Got: {header!r}"
+        )
+
+    def test_a_truncated_list_states_the_bound_every_omitted_file_clears(self) -> None:
+        from scripts.project_metrics.report import render_markdown
+
+        md = render_markdown(_report_with_coverage(0.8502, self._ascending_files(15)))
+        section = _extract_section(md, "Per-collector Deep Dive")
+        bound = _line_containing(section, "not listed")
+        assert "10.00%" in bound, (
+            "The truncated list must name the coverage every omitted file "
+            "clears (here the 11th-worst file, at 10.00%). That single number "
+            "is what lets a reader holding a floor decide whether this list is "
+            f"exhaustive for that floor without opening the JSON. Got: {bound!r}"
         )
 
 

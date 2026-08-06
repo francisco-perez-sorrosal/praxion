@@ -193,6 +193,7 @@ The default §Flow runs end-to-end without pause. To let users *learn* the model
 .env
 .env.*
 .env.local
+tmp/
 ```
 
 **Why each line:**
@@ -206,6 +207,7 @@ The default §Flow runs end-to-end without pause. To let users *learn* the model
 | `.claude/settings.local.json` | Per-machine Claude settings | Machine-specific |
 | `.claude/worktrees/` | Worktree home for `EnterWorktree` | Each branch's own checkout |
 | `.env`, `.env.*`, `.env.local` | Secrets | Never commit secrets |
+| `tmp/` | Scratch working files | The always-loaded conventions direct every writer here ("temp files in `tmp/`"), so the protection has to exist — otherwise the instruction hands out a path one `git add -A` away from being committed |
 
 **Separately:** if `.gitignore` *excludes* `.ai-state/` (line `.ai-state/` or `.ai-state` with no glob suffix), warn:
 

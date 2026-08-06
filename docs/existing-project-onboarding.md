@@ -51,7 +51,7 @@ If `AskUserQuestion` is unavailable (headless invocation, tool error), the gates
 | Phase | Action | Files / settings touched | Idempotent |
 |-------|--------|--------------------------|-----------|
 | 0 | **Pre-flight** — diagnostic only | none (prints report) | n/a |
-| 1 | **`.gitignore` hygiene** — append the canonical 10-line AI-assistants block | `.gitignore` | yes (header detection) |
+| 1 | **`.gitignore` hygiene** — append the canonical AI-assistants block | `.gitignore` | yes (header detection) |
 | 2 | **`.ai-state/` skeleton** — create `decisions/drafts/`, `DECISIONS_INDEX.md`, `TECH_DEBT_LEDGER.md`, `calibration_log.md` | `.ai-state/` (4 entries) | yes (per-file existence check) |
 | 3 | **`.gitattributes` + merge drivers** — append entries; register Python merge drivers via `git config`; clean up retired drivers from older versions | `.gitattributes`, `.git/config` | yes (line + git config check; **version-aware** — a stale `/i-am/<old-version>/` driver path is re-registered) |
 | 4 | **Git hooks** — install pre-commit (id-citation discipline) + the three finalize hooks (post-merge, post-commit, post-checkout) | `.git/hooks/pre-commit`, `.git/hooks/{post-merge,post-commit,post-checkout}` | yes (symlink target check; **version-aware** — a finalize-hook symlink pinned to a stale `/i-am/<old-version>/` path is re-pointed, not skipped) |
@@ -67,7 +67,7 @@ The command never auto-commits. After Phase 9, `git status` shows every file mod
 
 ## What gets created
 
-### Phase 1 — `.gitignore` (canonical 10-line block)
+### Phase 1 — `.gitignore` (canonical block)
 
 ```gitignore
 # AI assistants
@@ -75,12 +75,13 @@ The command never auto-commits. After Phase 9, `git status` shows every file mod
 .ai-state/*.lock
 .ai-state/**/*.lock
 .ai-state/*.backup.json
-.ai-state/*.pre-forget.json
+.ai-state/observations.jsonl.1
 .claude/settings.local.json
 .claude/worktrees/
 .env
 .env.*
 .env.local
+tmp/
 ```
 
 **Why each line:**
@@ -90,9 +91,11 @@ The command never auto-commits. After Phase 9, `git status` shows every file mod
 | `.ai-work/` | Ephemeral pipeline scratch (per-task slug); deleted at pipeline end |
 | `.ai-state/*.lock`, `.ai-state/**/*.lock` | Advisory file locks taken by `finalize_adrs.py`, merge drivers — runtime-only |
 | `.ai-state/*.backup.json` | Snapshots taken before destructive `.ai-state/` ops; local recovery only |
+| `.ai-state/observations.jsonl.1` | Local WAL rotation archive — rows are already in git history before rotation moves them |
 | `.claude/settings.local.json` | Per-machine Claude settings — never committed |
 | `.claude/worktrees/` | Worktree home for `EnterWorktree`; each branch's own checkout |
 | `.env`, `.env.*`, `.env.local` | Secrets — never commit |
+| `tmp/` | Scratch working files — the always-loaded conventions send every writer here, so the ignore has to exist |
 
 If your `.gitignore` excludes `.ai-state/` (the directory itself), the command warns: `.ai-state/` holds persistent project intelligence (ADRs, idea ledger, sentinel reports, tech-debt ledger) and should be committed. You can keep the exclusion if you have a strong reason — the command notes the choice in Phase 8's summary.
 

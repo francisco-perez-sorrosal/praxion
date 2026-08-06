@@ -184,12 +184,12 @@ cat > .gitignore <<'EOF'
 .ai-state/**/*.lock
 .ai-state/*.backup.json
 .ai-state/observations.jsonl.1
-.ai-state/*.pre-forget.json
 .claude/settings.local.json
 .claude/worktrees/
 .env
 .env.*
 .env.local
+tmp/
 EOF
 
 # Open the project in the user's chosen surface so they can watch .ai-work/

@@ -188,12 +188,13 @@ t7_happy_path_full_scaffold() {
 .ai-state/*.lock
 .ai-state/**/*.lock
 .ai-state/*.backup.json
-.ai-state/*.pre-forget.json
+.ai-state/observations.jsonl.1
 .claude/settings.local.json
 .claude/worktrees/
 .env
 .env.*
 .env.local
+tmp/
 EOF
     run_script "$s" test-app "$s/target"
     project_dir="$s/target/test-app"

@@ -8,7 +8,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 _SCRIPT_PATH = Path(__file__).resolve().parent / "reconcile_ai_state.py"
+_LIVE_DECISIONS_DIR = Path(__file__).resolve().parent.parent / ".ai-state" / "decisions"
 
 
 def _load_module():
@@ -21,6 +24,43 @@ def _load_module():
 
 
 reconcile = _load_module()
+
+
+def _live_decisions_fingerprint() -> list[tuple[str, int, int]]:
+    """Name, size and mtime of every file in the *live* .ai-state/decisions/."""
+    if not _LIVE_DECISIONS_DIR.is_dir():
+        return []
+    return sorted(
+        (path.name, path.stat().st_size, path.stat().st_mtime_ns)
+        for path in _LIVE_DECISIONS_DIR.iterdir()
+        if path.is_file()
+    )
+
+
+@pytest.fixture(autouse=True)
+def _live_repository_is_never_mutated():
+    """Fail any test in this module that writes into the live repository.
+
+    `main()` rebinds its own path constants through `apply_repo_root()`, so a
+    test that monkeypatches DECISIONS_DIR but leaves the resolver to find the
+    real repo has those patches silently overwritten and regenerates the
+    *committed* .ai-state/decisions/DECISIONS_INDEX.md. A single run hides it:
+    the index regenerates byte-identically until an unrelated ADR-shaped file
+    appears in the directory, at which point every subsequent run appends a
+    bogus row. Comparing mtime as well as size is deliberate -- a byte-identical
+    rewrite is still a write to the live tree, and it is the only tell available
+    before the damage becomes visible.
+
+    Snapshot-and-compare converts that silent mutation into an immediate,
+    named failure for any future test that reintroduces it.
+    """
+    before = _live_decisions_fingerprint()
+    yield
+    assert _live_decisions_fingerprint() == before, (
+        f"this test mutated the live {_LIVE_DECISIONS_DIR}. Point the code under "
+        "test at a tmp_path tree: main() calls apply_repo_root(), which overwrites "
+        "monkeypatched path constants, so pass --repo-root <tmp_path> in argv."
+    )
 
 
 def _make_completed_process(
@@ -532,14 +572,23 @@ class TestMain:
 
     def test_main_post_merge_skips_observations(self, tmp_path: Path, capsys, monkeypatch):
         """--post-merge skips observations reconciliation path."""
-        obs = tmp_path / "observations.jsonl"
+        ai_state = tmp_path / ".ai-state"
+        ai_state.mkdir()
+        obs = ai_state / "observations.jsonl"
         obs.write_text("")
 
         monkeypatch.setattr(reconcile, "OBSERVATIONS_PATH", obs)
-        monkeypatch.setattr(reconcile, "DECISIONS_DIR", tmp_path / "decisions")
+        monkeypatch.setattr(reconcile, "DECISIONS_DIR", ai_state / "decisions")
         monkeypatch.setattr(reconcile, "has_drafts_directory_changed_in_merge", lambda: False)
         monkeypatch.setattr(reconcile, "git", lambda *args: _make_completed_process(0))
-        monkeypatch.setattr(sys, "argv", ["reconcile_ai_state.py", "--post-merge"])
+        # --repo-root anchors main()'s own apply_repo_root() on the tmp tree.
+        # Without it the resolver finds the live checkout and rebinds the path
+        # constants injected above, regenerating the committed DECISIONS_INDEX.md.
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["reconcile_ai_state.py", "--post-merge", "--repo-root", str(tmp_path)],
+        )
         reconcile.main()
         out = capsys.readouterr().out
         # observations.jsonl conflict handling is skipped in --post-merge mode
@@ -547,7 +596,9 @@ class TestMain:
 
     def test_main_processes_clean_observations_file(self, tmp_path: Path, capsys, monkeypatch):
         """main() reports no conflicts for a clean observations.jsonl file."""
-        obs = tmp_path / "observations.jsonl"
+        ai_state = tmp_path / ".ai-state"
+        ai_state.mkdir()
+        obs = ai_state / "observations.jsonl"
         obs.write_text(
             json.dumps(
                 {
@@ -561,10 +612,14 @@ class TestMain:
         )
 
         monkeypatch.setattr(reconcile, "OBSERVATIONS_PATH", obs)
-        monkeypatch.setattr(reconcile, "DECISIONS_DIR", tmp_path / "decisions")
+        monkeypatch.setattr(reconcile, "DECISIONS_DIR", ai_state / "decisions")
         monkeypatch.setattr(reconcile, "has_drafts_directory_changed_in_merge", lambda: False)
         monkeypatch.setattr(reconcile, "git", lambda *args: _make_completed_process(0))
-        monkeypatch.setattr(sys, "argv", ["reconcile_ai_state.py"])
+        # --repo-root anchors main()'s own apply_repo_root() on the tmp tree.
+        # Without it the resolver finds the live checkout and rebinds the path
+        # constants injected above, so this test asserted on the live repo's
+        # observations.jsonl and regenerated the committed DECISIONS_INDEX.md.
+        monkeypatch.setattr(sys, "argv", ["reconcile_ai_state.py", "--repo-root", str(tmp_path)])
         reconcile.main()
         out = capsys.readouterr().out
         assert "observations.jsonl: no conflicts" in out

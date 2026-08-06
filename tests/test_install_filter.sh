@@ -423,6 +423,101 @@ else
 fi
 
 # -----------------------------------------------------------------------------
+# Test 10: the sweep works without a usable python3 on PATH
+# -----------------------------------------------------------------------------
+# Canary for the defect this suite was red on: the manifest reader used to be
+# Python + PyYAML, so on any machine whose `python3` lacked PyYAML the sweep
+# silently pruned nothing while link_rules simultaneously linked every rule —
+# leaving hook-deliver rules permanently symlinked into ~/.claude/rules/.
+# Nothing about that failure was visible from the installer's output. Driving
+# the sweep with a `python3` that always fails proves the reader no longer
+# depends on one.
+start_test "test_sweep_stale_rule_symlinks_needs_no_python"
+
+BROKEN_PY_DIR="${TMPDIR}/broken_python_bin"
+mkdir -p "$BROKEN_PY_DIR"
+for py_name in python3 python; do
+    printf '#!/bin/sh\nexit 1\n' > "${BROKEN_PY_DIR}/${py_name}"
+    chmod +x "${BROKEN_PY_DIR}/${py_name}"
+done
+
+NOPY_SRC="${TMPDIR}/nopy_src"
+NOPY_TGT="${TMPDIR}/nopy_tgt"
+mkdir -p "${NOPY_SRC}/swe" "${NOPY_TGT}/swe"
+printf '# keep\n'  > "${NOPY_SRC}/CLAUDE.md"
+printf '# stale\n' > "${NOPY_SRC}/swe/hook-delivered.md"
+cat > "${NOPY_SRC}/_manifest.yaml" <<'YAMLEOF'
+version: 1
+rules:
+  - id: CLAUDE
+    path: rules/CLAUDE.md
+    install: symlink
+    core: true
+  - id: swe/hook-delivered
+    path: rules/swe/hook-delivered.md
+    install: hook-deliver
+    core: false
+YAMLEOF
+ln -sf "${NOPY_SRC}/CLAUDE.md"             "${NOPY_TGT}/CLAUDE.md"
+ln -sf "${NOPY_SRC}/swe/hook-delivered.md" "${NOPY_TGT}/swe/hook-delivered.md"
+
+( PATH="${BROKEN_PY_DIR}:${PATH}" \
+  bash -c "source '${REPO_ROOT}/lib/install_shared.sh'
+           sweep_stale_rule_symlinks '${NOPY_SRC}' '${NOPY_TGT}'" )
+
+if [ -L "${NOPY_TGT}/CLAUDE.md" ]; then
+    pass "no usable python3 → install:symlink rule still kept"
+else
+    fail "no usable python3 → live symlink was wrongly removed"
+fi
+
+if [ -L "${NOPY_TGT}/swe/hook-delivered.md" ]; then
+    fail "no usable python3 → sweep silently pruned nothing (PyYAML-dependency regression)"
+else
+    pass "no usable python3 → stale hook-deliver symlink still pruned"
+fi
+
+# -----------------------------------------------------------------------------
+# Test 11: manifest_rule_paths agrees with the real repo manifest
+# -----------------------------------------------------------------------------
+# Scope fidelity: tests 7-10 drive hand-written fixtures. This one drives the
+# actual rules/_manifest.yaml — a machine-generated file whose indentation and
+# field order differ from the fixtures — and cross-checks the parser against an
+# independent grep-based count, so schema drift in the generator surfaces here
+# rather than as a silently under-populated whitelist at install time.
+start_test "test_manifest_rule_paths_matches_real_manifest"
+
+REAL_MANIFEST="${REPO_ROOT}/rules/_manifest.yaml"
+
+for install_type in symlink hook-deliver; do
+    parsed_count="$(manifest_rule_paths "$REAL_MANIFEST" "$install_type" | wc -l | tr -d ' ')"
+    grep_count="$(grep -c "^[[:space:]]*install:[[:space:]]*${install_type}\$" \
+        "$REAL_MANIFEST" | tr -d ' ')"
+    if [ "$parsed_count" -eq "$grep_count" ] && [ "$parsed_count" -gt 0 ]; then
+        pass "real manifest: '${install_type}' count matches independent grep (${parsed_count})"
+    else
+        fail "real manifest: '${install_type}' parsed=${parsed_count} but grep found ${grep_count}"
+    fi
+done
+
+# Every emitted path must be rules-dir-relative (no leading 'rules/') and
+# resolve to a file on disk — the form both callers compare against.
+BAD_PATHS=""
+while IFS= read -r parsed_path; do
+    case "$parsed_path" in
+        rules/*) BAD_PATHS="${BAD_PATHS} ${parsed_path}(not-relative)" ;;
+    esac
+    [ -f "${REPO_ROOT}/rules/${parsed_path}" ] || \
+        BAD_PATHS="${BAD_PATHS} ${parsed_path}(missing)"
+done < <(manifest_rule_paths "$REAL_MANIFEST" symlink)
+
+if [ -z "$BAD_PATHS" ]; then
+    pass "real manifest: every parsed path is rules-relative and exists on disk"
+else
+    fail "real manifest: bad parsed paths —${BAD_PATHS}"
+fi
+
+# -----------------------------------------------------------------------------
 # Summary
 # -----------------------------------------------------------------------------
 printf "\n---\n"

@@ -5,13 +5,19 @@
 # path matches `\.c4$`. Self-discovers staged *.c4 sources; skips gracefully when
 # likec4/d2 binaries are absent.
 #
+# Layout contract:
+#   Sources live at  <root>/diagrams/<name>/src/<name>.c4
+#   Renders land at  <root>/diagrams/<name>/rendered/<view>.{d2,svg}
+#   `likec4 gen` takes the workspace *directory*, so the source's parent is the
+#   workspace and rendered/ is that workspace's sibling. Both are committed.
+#
 # Behavior:
 #   1. Detects staged *.c4 files under any diagrams/ subdirectory.
 #   2. If none are staged, exits 0 immediately (no-op).
 #   3. Gracefully skips (exit 0, stderr warning) when likec4 or d2 are missing.
-#   4. For each staged <name>.c4 model:
-#        a. Runs `likec4 gen <fmt> <name>.c4 -o <name>/` for each configured format.
-#        b. For d2 format: runs `d2 <name>/<view>.d2 <name>/<view>.svg` for each view.
+#   4. For each staged <name>/src/<name>.c4 model:
+#        a. Runs `likec4 gen <fmt> <name>/src -o <name>/rendered/` per format.
+#        b. For d2: runs `d2 <name>/rendered/<view>.d2 <name>/rendered/<view>.svg`.
 #        c. Stages all generated artifacts with `git add`.
 #   5. On render failure: prints failing command + stderr and exits 1.
 #   6. Exits 0 on success.

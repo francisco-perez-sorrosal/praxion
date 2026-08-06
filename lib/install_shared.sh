@@ -14,6 +14,61 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 fi
 
 # =============================================================================
+# Rules manifest reading
+# =============================================================================
+
+# Emit the rules-dir-relative path of every manifest rule whose `install:`
+# value equals $2, one per line.
+#
+# Implemented in awk rather than Python-plus-PyYAML on purpose. The installer
+# runs on whatever `python3` a user happens to have first on PATH, and that
+# interpreter frequently lacks PyYAML (a pyenv shim, a bare system python, a
+# fresh machine). Both callers below previously degraded *silently* on the
+# resulting ImportError, and their fallbacks compounded rather than cancelled:
+# link_rules fell back to "link every rule" while sweep_stale_rule_symlinks
+# fell back to "remove nothing", so a hook-deliver rule got symlinked into
+# ~/.claude/rules/ and then never swept — loading unconditionally in every
+# session and defeating the per-project blacklist. awk is POSIX, present
+# everywhere a shell installer can run, and needs no packages.
+#
+# _manifest.yaml is machine-generated (scripts/regenerate_rules_manifest.py)
+# with a fixed flat schema: a `rules:` sequence of mappings holding plain
+# scalars. This parser covers exactly that shape, at any indentation level.
+# tests/test_install_filter.sh drives it against the real manifest and
+# cross-checks the result with an independent grep, so generator schema drift
+# fails there rather than as a silently short whitelist at install time.
+#
+# Arguments:
+#   $1 — manifest_file: absolute path to rules/_manifest.yaml
+#   $2 — install_type:  the `install:` value to select (symlink | hook-deliver)
+#
+# Returns non-zero (emitting nothing) when the manifest is absent.
+manifest_rule_paths() {
+    local manifest_file="$1" install_type="$2"
+    [ -f "$manifest_file" ] || return 1
+
+    awk -v want="$install_type" '
+        function _value(line) {
+            sub(/^[^:]*:[[:space:]]*/, "", line)
+            gsub(/^["\047]|["\047]$/, "", line)
+            sub(/[[:space:]]+$/, "", line)
+            return line
+        }
+        function _flush() {
+            if (path ~ /^rules\// && install == want) print substr(path, 7)
+            path = ""; install = ""
+        }
+        /^[[:space:]]*rules:[[:space:]]*$/ { in_rules = 1; next }
+        in_rules && /^[^[:space:]#-]/ { _flush(); in_rules = 0 }
+        !in_rules { next }
+        /^[[:space:]]*-[[:space:]]/ { _flush(); sub(/^[[:space:]]*-[[:space:]]*/, "") }
+        /^[[:space:]]*path:[[:space:]]/ { path = _value($0); next }
+        /^[[:space:]]*install:[[:space:]]/ { install = _value($0); next }
+        END { _flush() }
+    ' "$manifest_file"
+}
+
+# =============================================================================
 # Rules linking
 # =============================================================================
 
@@ -61,25 +116,12 @@ link_rules() {
     # load them unconditionally and defeat the per-project blacklist mechanism.
     local hook_deliver_paths=""
     local manifest_file="${rules_source_dir}/_manifest.yaml"
-    if [ -f "$manifest_file" ]; then
-        # `|| hook_deliver_paths=""` bypasses `set -e` when python exits
-        # non-zero (e.g. PyYAML missing) — falling back to "link all rules"
-        # is the documented safe default; without it the script terminates
-        # silently because `var=$(cmd)` propagates the failure under set -e.
-        hook_deliver_paths=$(python3 - "$manifest_file" <<'PYEOF' 2>/dev/null
-import sys
-try:
-    import yaml
-    with open(sys.argv[1]) as f:
-        m = yaml.safe_load(f)
-    for r in m.get("rules", []):
-        if r.get("install") == "hook-deliver":
-            print(r["path"])
-except Exception as e:
-    sys.stderr.write(f"[link_rules] manifest parse failed: {e}; linking all rules\n")
-PYEOF
-        ) || hook_deliver_paths=""
-    fi
+    # `|| hook_deliver_paths=""` bypasses `set -e` when the manifest is absent —
+    # falling back to "link all rules" is the documented safe default; without
+    # it the script terminates silently because `var=$(cmd)` propagates the
+    # failure under set -e.
+    hook_deliver_paths=$(manifest_rule_paths "$manifest_file" hook-deliver) \
+        || hook_deliver_paths=""
 
     LINK_RULES_COUNT=0
     while IFS= read -r rule_file; do
@@ -92,11 +134,9 @@ PYEOF
         # Reference files are skill/rule support material, not rules themselves
         [[ "$rel_path" == */references/* ]] && continue
         # Skip hook-deliver rules — delivered by inject_rules.py at session start
-        if [ -n "$hook_deliver_paths" ]; then
-            local rule_repo_path="rules/${rel_path}"
-            if echo "$hook_deliver_paths" | grep -qxF "$rule_repo_path"; then
-                continue
-            fi
+        if [ -n "$hook_deliver_paths" ] && \
+           echo "$hook_deliver_paths" | grep -qxF "$rel_path"; then
+            continue
         fi
 
         [ "$rel_dir" != "." ] && mkdir -p "${rules_target_dir}/${rel_dir}"
@@ -133,24 +173,13 @@ sweep_stale_rule_symlinks() {
     # `|| rc=$?` is the canonical set-e-safe pattern: a plain `var=$(cmd)`
     # would terminate the script before `rc=$?` could capture the exit
     # code, defeating the fail-safe bail-out a few lines below.
-    keep_paths=$(python3 - "$manifest_file" <<'PYEOF' 2>/dev/null
-import sys
-try:
-    import yaml
-    with open(sys.argv[1]) as f:
-        m = yaml.safe_load(f) or {}
-    for r in m.get("rules", []):
-        if r.get("install") == "symlink":
-            p = r.get("path", "")
-            if p.startswith("rules/"):
-                print(p[len("rules/"):])
-except Exception:
-    sys.exit(1)
-PYEOF
-) || rc=$?
-    # Fail-safe: a parse error must NOT trigger an empty whitelist (which
-    # would delete every Praxion-managed symlink). Bail out instead.
-    if [ "$rc" -ne 0 ]; then
+    keep_paths=$(manifest_rule_paths "$manifest_file" symlink) || rc=$?
+    # Fail-safe: never derive an empty whitelist from a manifest we could not
+    # read, because an empty whitelist deletes every Praxion-managed symlink.
+    # An empty result means the manifest was unreadable, truncated, or its
+    # schema drifted — all indistinguishable from "no rule is install:symlink",
+    # a state that never occurs in a healthy manifest. Bail out either way.
+    if [ "$rc" -ne 0 ] || [ -z "$keep_paths" ]; then
         return 0
     fi
 
@@ -165,7 +194,9 @@ PYEOF
             *) continue ;;
         esac
         # Keep if the rule is still in the manifest as install: symlink.
-        if [ -n "$keep_paths" ] && echo "$keep_paths" | grep -qxF "$rel_to_source"; then
+        # keep_paths is guaranteed non-empty — the bail-out above returned
+        # already if it were.
+        if echo "$keep_paths" | grep -qxF "$rel_to_source"; then
             continue
         fi
         rm "$link"

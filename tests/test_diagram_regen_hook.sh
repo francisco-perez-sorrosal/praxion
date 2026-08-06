@@ -8,6 +8,9 @@
 #   T4: likec4 present + DSL invalid → exit 0 (LikeC4 lenient) + ERROR in stderr  [requires likec4+d2]
 #   T5: Both binaries present + DSL valid → exit 0, .d2 and .svg staged  [requires likec4+d2]
 #
+# Fixtures are staged in the repository's real diagram layout —
+# docs/diagrams/<name>/src/<name>.c4 in, docs/diagrams/<name>/rendered/ out.
+#
 # Test framework: plain bash with pass/fail helpers — matches the project's existing
 # test pattern (tests/new_project_test.sh, tests/test_install_filter.sh). Bats is
 # not installed in this project's test infrastructure.
@@ -45,13 +48,23 @@ skip() { SKIP_COUNT=$((SKIP_COUNT + 1)); printf '[SKIP] %s\n' "$1"; }
 # ---------------------------------------------------------------------------
 
 # Build an isolated sandbox with a minimal git repo + fake staged index.
+#
+# The staged .c4 is laid out in the repository's real diagram convention —
+# docs/diagrams/<name>/src/<name>.c4, with renders expected alongside at
+# docs/diagrams/<name>/rendered/. `likec4 gen` consumes the workspace
+# *directory*, so the source's parent directory is what the hook passes and
+# rendered/ is that workspace's sibling. Staging the fixture flat at
+# docs/diagrams/<name>.c4 instead would make the hook resolve its output to
+# docs/rendered/ — a path no diagram in this repository uses.
+#
 # Usage: make_sandbox [<path_to_c4_file_to_stage>]
-# Globals set: SANDBOX, SANDBOX_GIT_DIR, SANDBOX_WORKTREE
+# Globals set: SANDBOX, SANDBOX_GIT_DIR, SANDBOX_WORKTREE, SANDBOX_RENDER_DIR
 make_sandbox() {
     local staged_c4="${1:-}"
     SANDBOX="$(mktemp -d "${WORK_ROOT}/sandbox.XXXXXX")"
     SANDBOX_WORKTREE="${SANDBOX}/repo"
     SANDBOX_GIT_DIR="${SANDBOX_WORKTREE}/.git"
+    SANDBOX_RENDER_DIR=""
 
     mkdir -p "${SANDBOX_WORKTREE}/docs/diagrams"
 
@@ -66,8 +79,13 @@ make_sandbox() {
     git -C "${SANDBOX_WORKTREE}" commit -q -m "init"
 
     if [ -n "${staged_c4}" ]; then
-        # Place the file at the expected diagrams path and stage it.
-        local dest="${SANDBOX_WORKTREE}/docs/diagrams/$(basename "${staged_c4}")"
+        local name
+        name="$(basename "${staged_c4}" .c4)"
+        local diagram_dir="${SANDBOX_WORKTREE}/docs/diagrams/${name}"
+        SANDBOX_RENDER_DIR="${diagram_dir}/rendered"
+
+        mkdir -p "${diagram_dir}/src"
+        local dest="${diagram_dir}/src/${name}.c4"
         cp "${staged_c4}" "${dest}"
         git -C "${SANDBOX_WORKTREE}" add "${dest}"
     fi
@@ -213,6 +231,10 @@ t4_invalid_dsl_silently_completes() {
 # ---------------------------------------------------------------------------
 # T5: Both binaries present + DSL valid → exit 0, artifacts staged
 #     Skipped when either likec4 or d2 is not installed.
+#
+# The expected render directory is derived from the fixture's own name
+# (docs/diagrams/<name>/rendered/), never read back from the hook's output, so
+# a change to where the hook writes fails here instead of passing vacuously.
 # ---------------------------------------------------------------------------
 
 t5_happy_path_artifacts_staged() {
@@ -237,8 +259,8 @@ t5_happy_path_artifacts_staged() {
         return
     fi
 
-    # Verify .d2 and .svg artifacts exist in the output directory.
-    local out_dir="${SANDBOX_WORKTREE}/docs/diagrams/minimal"
+    # Verify .d2 and .svg artifacts exist in the committed render directory.
+    local out_dir="${SANDBOX_RENDER_DIR}"
     local d2_count svg_count
     d2_count="$(find "${out_dir}" -maxdepth 1 -name '*.d2' 2>/dev/null | wc -l | tr -d ' ')"
     svg_count="$(find "${out_dir}" -maxdepth 1 -name '*.svg' 2>/dev/null | wc -l | tr -d ' ')"

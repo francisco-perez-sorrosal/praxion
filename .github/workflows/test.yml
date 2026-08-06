@@ -96,6 +96,23 @@ jobs:
         # (pre-mortem finding from the efficacy-measurement pipeline).
         run: uv run --frozen pytest hooks/ -q --no-cov
 
+      - name: Shell test suites
+        # `tests/*.sh` are bash suites that pytest cannot collect, so nothing
+        # ran them and nothing reported them red. `new_project_test.sh` T7
+        # asserts the canonical .gitignore block byte-for-byte and sat failing
+        # while the block drifted three ways across its four mirror sites --
+        # the gate worked, nothing listened.
+        #
+        # Enumerated explicitly rather than globbed: `test_install_filter.sh`
+        # and `test_diagram_regen_hook.sh` are currently red for unrelated,
+        # pre-existing reasons (see td-125), and a glob would either ship a red
+        # CI or tempt someone to delete the job. Add each back here as it goes
+        # green -- an explicit list makes the remaining gap visible instead of
+        # hiding it behind a wildcard that quietly covers nothing.
+        run: |
+          bash tests/new_project_test.sh
+          bash tests/test_finalize_chain.sh
+
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1

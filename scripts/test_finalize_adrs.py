@@ -1751,6 +1751,143 @@ class TestFinalizeReAffirmedByBackfill:
         assert target_content.count("dec-061") == 1
 
 
+# -- Malformed back-link targets must not abort the run -----------------------
+
+
+def _recording_run(calls: list[list[str]]) -> Any:
+    """Return a subprocess.run stand-in that records each argv it was given."""
+
+    def _fake_run(*args: Any, **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0] if args else []
+        calls.append([str(part) for part in argv])
+        return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+    return _fake_run
+
+
+def _index_was_regenerated(calls: list[list[str]]) -> bool:
+    """True when the index-regeneration subprocess was reached."""
+    return any(any("regenerate_adr_index.py" in part for part in argv) for argv in calls)
+
+
+class TestBackfillAgainstMalformedTargets:
+    """A malformed target ADR costs its own back-link, never the whole run.
+
+    Back-link self-healing is the last step before index regeneration, and it
+    runs after promotion and cross-reference rewriting have already written to
+    disk. An exception here therefore leaves the corpus advanced and
+    DECISIONS_INDEX.md stale -- and the finalize hook is non-blocking, so the
+    damage lands in a user's repository without a failed command to notice.
+    Each test asserts the run completed *and* reached index regeneration.
+    """
+
+    def test_scalar_re_affirmed_by_is_coerced_to_a_list(
+        self, repo_root: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A bare `re_affirmed_by: dec-NNN` scalar becomes a two-item list.
+
+        The convention specifies a list, so the scalar is malformed -- but its
+        meaning is unambiguous and adding the new id requires a list either
+        way, so the edge is written rather than dropped.
+        """
+        target = make_finalized(
+            repo_root, 70, "scalar-back-link", frontmatter_extra={"re_affirmed_by": "dec-055"}
+        )
+        make_draft(
+            repo_root,
+            "20260419-1810",
+            "alice",
+            "main",
+            "re-affirmer",
+            frontmatter_extra={"re_affirms": "dec-070"},
+        )
+        calls: list[list[str]] = []
+        monkeypatch.setattr(finalize.subprocess, "run", _recording_run(calls))
+
+        exit_code = _invoke_main(monkeypatch, ["--all", "--repo-root", str(repo_root)])
+
+        assert exit_code == 0
+        assert "re_affirmed_by: [dec-055, dec-071]" in target.read_text(encoding="utf-8")
+        assert _index_was_regenerated(calls), calls
+
+    def test_truncated_frontmatter_target_is_skipped_not_raised(
+        self, repo_root: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """An ADR whose frontmatter was never closed loses only its back-link."""
+        target = repo_root / ".ai-state" / "decisions" / "080-truncated.md"
+        original = "---\nid: dec-080\ntitle: Truncated\nstatus: accepted\n"
+        target.write_text(original, encoding="utf-8")
+        make_draft(
+            repo_root,
+            "20260419-1810",
+            "alice",
+            "main",
+            "re-affirmer",
+            frontmatter_extra={"re_affirms": "dec-080"},
+        )
+        calls: list[list[str]] = []
+        monkeypatch.setattr(finalize.subprocess, "run", _recording_run(calls))
+
+        exit_code = _invoke_main(monkeypatch, ["--all", "--repo-root", str(repo_root)])
+
+        assert exit_code == 0
+        assert target.read_text(encoding="utf-8") == original
+        assert _index_was_regenerated(calls), calls
+
+    def test_unreadable_re_affirmed_by_value_is_left_alone(
+        self, repo_root: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A value that is neither a list nor an id is never rewritten blind."""
+        target = make_finalized(
+            repo_root, 90, "unreadable", frontmatter_extra={"re_affirmed_by": "{who knows}"}
+        )
+        original = target.read_text(encoding="utf-8")
+        make_draft(
+            repo_root,
+            "20260419-1810",
+            "alice",
+            "main",
+            "re-affirmer",
+            frontmatter_extra={"re_affirms": "dec-090"},
+        )
+        calls: list[list[str]] = []
+        monkeypatch.setattr(finalize.subprocess, "run", _recording_run(calls))
+
+        exit_code = _invoke_main(monkeypatch, ["--all", "--repo-root", str(repo_root)])
+
+        assert exit_code == 0
+        assert target.read_text(encoding="utf-8") == original
+        assert _index_was_regenerated(calls), calls
+
+    def test_body_rule_in_a_file_without_frontmatter_is_not_an_insert_point(
+        self, repo_root: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """No opening `---` means no frontmatter -- not "insert above the first rule".
+
+        A `---` in the body is a horizontal rule; treating it as the
+        frontmatter terminator writes YAML into prose.
+        """
+        target = repo_root / ".ai-state" / "decisions" / "100-no-frontmatter.md"
+        original = "# Heading\n\nProse above a horizontal rule.\n\n---\n\nProse below.\n"
+        target.write_text(original, encoding="utf-8")
+        make_draft(
+            repo_root,
+            "20260419-1810",
+            "alice",
+            "main",
+            "re-affirmer",
+            frontmatter_extra={"re_affirms": "dec-100"},
+        )
+        calls: list[list[str]] = []
+        monkeypatch.setattr(finalize.subprocess, "run", _recording_run(calls))
+
+        exit_code = _invoke_main(monkeypatch, ["--all", "--repo-root", str(repo_root)])
+
+        assert exit_code == 0
+        assert target.read_text(encoding="utf-8") == original
+        assert _index_was_regenerated(calls), calls
+
+
 # -- Rename staging: index must carry the rewritten frontmatter ---------------
 
 

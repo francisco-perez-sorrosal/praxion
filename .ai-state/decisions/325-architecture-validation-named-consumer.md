@@ -1,7 +1,7 @@
 ---
-id: dec-draft-6b06b641
+id: dec-325
 title: Name the verifier as the required reader of ARCHITECTURE_VALIDATION.md
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-08-06
 summary: The architect-validator's non-FAIL findings get a named consumer (the verifier, via its existing specialist-artifact review) rather than being routed to the debt ledger or the artifact being retired.

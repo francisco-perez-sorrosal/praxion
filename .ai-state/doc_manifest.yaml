@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-06T16:37:24Z'
+generated_at: '2026-08-06T23:08:54Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -307,7 +307,7 @@ surfaces:
   path: docs/existing-project-onboarding.md
   type: markdown
   title: Existing-Project Onboarding
-  last_modified: '2026-08-05'
+  last_modified: '2026-08-06'
   diataxis: tutorial
   audience: developer
   renderer: tutorial_shell
@@ -2504,6 +2504,24 @@ surfaces:
   title: P07's consult clause is correct; the missing producer was in the always-loaded tier
   last_modified: '2026-08-05'
   renderer: adr_card
+- id: ai-state-decisions-325-architecture-validation-named-consumer
+  path: .ai-state/decisions/325-architecture-validation-named-consumer.md
+  type: markdown
+  title: Name the verifier as the required reader of ARCHITECTURE_VALIDATION.md
+  last_modified: '2026-08-06'
+  renderer: adr_card
+- id: ai-state-decisions-326-pre-merge-validator-verdict-gate
+  path: .ai-state/decisions/326-pre-merge-validator-verdict-gate.md
+  type: markdown
+  title: Keep pre-merge architect-validator write-free and give its verdict a transport and a gate
+  last_modified: '2026-08-06'
+  renderer: adr_card
+- id: ai-state-decisions-327-gate-identity-by-invocation-and-verdict-reach
+  path: .ai-state/decisions/327-gate-identity-by-invocation-and-verdict-reach.md
+  type: markdown
+  title: Identify gates by invocation shape; mechanise verdict-reach on one surface only
+  last_modified: '2026-08-06'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3119,6 +3137,9 @@ groups:
   - ai-state-decisions-322-metrics-freshness-in-commits
   - ai-state-decisions-323-retire-sentinel-ac11-as-subsumed-by-ac13
   - ai-state-decisions-324-p07-consult-clause-is-correct
+  - ai-state-decisions-325-architecture-validation-named-consumer
+  - ai-state-decisions-326-pre-merge-validator-verdict-gate
+  - ai-state-decisions-327-gate-identity-by-invocation-and-verdict-reach
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

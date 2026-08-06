@@ -1,7 +1,7 @@
 ---
-id: dec-draft-472a772b
+id: dec-326
 title: Keep pre-merge architect-validator write-free and give its verdict a transport and a gate
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-08-06
 summary: The pre-merge validator stays without Write; its report gets a real transport (--json-schema structured output) and a real reader (a render-and-gate step that publishes the report and fails the job on a FAIL verdict).
@@ -39,7 +39,7 @@ reporting `FAIL` produced a green check. Two of the workflow's three jobs are ge
 this one was Opus spend with an unread result — indistinguishable from not running it, which is
 precisely the gate-liveness clause **Existence is not operation**.
 
-An adjacent decision (`dec-draft-6b06b641`) had already made the agent definition *honest* about
+An adjacent decision (`dec-325`) had already made the agent definition *honest* about
 the missing `Write`, naming the CI job and the PR review surface as the pre-merge readers. This
 decision is what makes that naming true; it does not replace it.
 
@@ -93,7 +93,7 @@ Keep `--mode=pre-merge` write-free, and build the two things that were actually 
 ### Option C — Keep write-free and mode-aware, and stop there
 
 - **Pro** — the smallest possible change; the agent definition is already honest after
-  `dec-draft-6b06b641`.
+  `dec-325`.
 - **Con** — leaves a *named* consumer that does not exist. Naming a reader that reads nothing is
   the exact failure the gate-liveness clause is about, one step more deceptive than naming none.
 - **Con** — leaves the prompt instructing an impossible action, burning turns and misdescribing the

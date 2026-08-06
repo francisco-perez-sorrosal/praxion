@@ -1,7 +1,7 @@
 ---
-id: dec-draft-92ea775e
+id: dec-327
 title: Identify gates by invocation shape; mechanise verdict-reach on one surface only
-status: proposed
+status: accepted
 category: implementation
 date: 2026-08-06
 summary: Gate-set discovery keys on what runs a script, not what it is named; the discarded-verdict check ships for hook registrations alone, the two wider formulations having measured a 100% false-positive rate.

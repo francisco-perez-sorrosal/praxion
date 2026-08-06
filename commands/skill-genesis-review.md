@@ -11,24 +11,33 @@ each disposition in the report's `## Disposition Log` section, and surfaces dele
 handoffs for skill/rule/claude.md proposals. Re-running this command on a fully-reviewed
 report is a no-op.
 
-## Flags
+## Arguments
+
+`$ARGUMENTS` carries optional flags. When it is empty, auto-discover the report per step 1.
+When it is non-empty, parse both flags below; surface an unrecognised flag rather than dropping
+it, since a dropped `--report` silently dispositions proposals in a different report than the
+one the user named.
 
 | Flag | Description |
 |------|-------------|
 | `--report <path>` | Override auto-discovery; use this specific report file. |
 | `--show-completed` | Include fully-dispositioned reports in the discovery scan (default: skip completed). |
 
+Both flags choose **which report** this pass works — they are read once, at discovery, and never
+re-read afterwards. A pass that paginates over many proposals stays on the report it selected.
+
 ## Process
 
 ### 1. Report discovery
 
-If `--report <path>` is given, use that file directly (exit with an error if not found).
+If `$ARGUMENTS` supplied `--report <path>`, use that file directly (exit with an error if not
+found — never fall back to auto-discovery, which would disposition a report the user did not name).
 
 Otherwise, scan `.ai-state/skill_genesis_reports/SKILL_GENESIS_REPORT_*.md` and pick the
 most recent file whose frontmatter `review_status` is `pending` or `partial`. Sort by
 filename descending (timestamps sort lexicographically, so newest file = highest filename).
 
-If `--show-completed` is set, include `review_status: complete` files in the scan.
+If `$ARGUMENTS` supplied `--show-completed`, include `review_status: complete` files in the scan.
 
 **No pending reports found**: if the scan finds no unreviewed reports, exit with:
 

@@ -36,6 +36,19 @@ EXIT CODES
   3   reconcile error (no WIP.md for the slug, bad slug, plugin-cache path)
 ```
 
+## Arguments
+
+`$ARGUMENTS` holds the invocation. Parse it as: the first non-flag token is the **task slug**
+(required), plus the optional `--dry-run` and `--base-ref <ref>` documented above.
+
+- **Non-empty** — the slug names the pipeline to reconcile: `<worktree_root>/.ai-work/<slug>/`.
+  Both flags apply to the pass as a whole, not to individual steps — `--dry-run` suppresses every
+  action across every step, and `--base-ref` is the diff base for every step's Tier-1 evidence.
+  Never mix the modes: a partially-applied dry run is worse than either.
+- **Empty (no slug)** — do not guess and do not run the reconciler. Recovering the wrong pipeline
+  writes to five audit surfaces under a slug the user never named. List the slugs under
+  `<worktree_root>/.ai-work/` that have a `WIP.md`, ask for one, and exit 3.
+
 ## Why this exists
 
 A subagent hard-truncated at its context ceiling can finish real work but die
@@ -49,7 +62,8 @@ the behavioral gate.
 
 ## Procedure
 
-1. **Resolve roots.** `worktree_root = git rev-parse --show-toplevel`. The slug's
+1. **Resolve the slug and roots.** Parse the slug and flags out of `$ARGUMENTS` per
+   **Arguments** above. `worktree_root = git rev-parse --show-toplevel`. The slug's
    pipeline lives at `<worktree_root>/.ai-work/<slug>/`.
 2. **Reconcile (read-only).** Run the reconciler. It is installed on `PATH` by
    `install_claude.sh` (linked into `~/.local/bin/`); in the Praxion self-host
@@ -131,6 +145,13 @@ spawning any agent, or writing any audit surface.
 ```
 Cannot resume: no WIP.md at .ai-work/<slug>/WIP.md under this worktree.
 To fix: confirm the task slug, or run from the worktree holding the pipeline.
+```
+
+**Exit 3 — no slug given:**
+```
+Cannot resume: no task slug. Pipelines with a WIP.md under this worktree:
+  <slug>  (<N> steps, last modified <date>)
+To fix: re-run as /resume-pipeline <task-slug>.
 ```
 
 **Exit 2 — ambiguous steps surfaced:**

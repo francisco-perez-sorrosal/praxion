@@ -10,21 +10,35 @@ user approves. The detector emits candidates and never edits a decision record; 
 is the bridge that turns a candidate into a change, and every change needs an explicit
 approval.
 
-## Flags
+## Arguments
+
+`$ARGUMENTS` carries optional flags. When it is empty, work every finding the detector reports,
+in the order below. When it is non-empty, parse the two flags below and **honour both** —
+an unrecognised flag is an error to surface, not something to drop silently, because a dropped
+`--limit` turns a deliberately narrow first pass into a full sweep the user never asked for.
 
 | Flag | Description |
 |------|-------------|
-| `--class <decay-class>` | Work only one decay class (e.g. the rename class). Passed straight through to the detector. |
-| `--limit <n>` | Stop after `n` records dispositioned. Useful for a first pass over a large corpus. |
+| `--class <decay-class>` | Work only one decay class (e.g. the rename class). Forward it verbatim to the detector, which takes the same flag. |
+| `--limit <n>` | Stop after `n` records are dispositioned. **This command enforces it — the detector has no such flag.** Useful for a first pass over a large corpus. |
+
+`--limit` counts records across the whole pass, not per class, and the count runs in the working
+order below — so a limit reached during the repair classes means retirement candidates are never
+raised at all. That is the safe direction and is intended: the classes whose disposition is
+mechanical get exhausted before the class whose disposition is a judgment is ever opened.
 
 ## Process
 
 ### 1. Gather
 
-Run `adr_health.py --json` from the project root. The Praxion installer links it onto
-`PATH`, which is what lets this command work in a managed project; if it is not found, fall
-back to `python3 scripts/adr_health.py --json` from a Praxion checkout and mention that the
-installer has not been run.
+Run `adr_health.py --json` from the project root, appending `--class <decay-class>` when the
+arguments supplied one. The Praxion installer links it onto `PATH`, which is what lets this
+command work in a managed project; if it is not found, fall back to
+`python3 scripts/adr_health.py --json` from a Praxion checkout and mention that the installer
+has not been run.
+
+Under `--class`, say which class was scoped to when reporting. A single-class run is not a
+picture of the corpus, and a count from it must never be presented as one.
 
 **Read `withheld` before reading anything else.** A non-empty `withheld` means an oracle was
 unavailable and whole decay classes were suppressed rather than guessed. Say so up front, and
@@ -105,6 +119,10 @@ before restoring the record — a path can reappear for unrelated reasons.
 Apply only what was approved, one record at a time. After each batch, state what changed and
 what remains. Close by re-running the detector so the user sees the new counts — the finding
 count going down is the only evidence the dispositions actually landed.
+
+When `--limit` was given, stop as soon as that many records are dispositioned and say plainly
+that the pass stopped at the limit rather than at the end of the work — otherwise the remaining
+findings read as a clean corpus. Re-running picks up where this pass stopped.
 
 Do not commit. Leave the working tree for the user to review.
 

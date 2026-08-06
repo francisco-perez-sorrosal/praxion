@@ -1,7 +1,7 @@
 ---
-id: dec-draft-259cd344
+id: dec-324
 title: P07's consult clause is correct; the missing producer was in the always-loaded tier
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-08-06
 summary: 'Sentinel P07 was reported as a consumer with no producer, reading a fragment field nothing writes. Three documents require the write-back and all predate the violating consults; the two always-loaded surfaces omit it, which is why the convener wrote ledger rows and skipped the fragment. Keep P07, widen it to count an absent field as undispositioned, and state both Round-2 obligations in the summary tier.'

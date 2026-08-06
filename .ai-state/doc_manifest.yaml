@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-05T22:49:44Z'
+generated_at: '2026-08-06T00:30:03Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -2498,6 +2498,12 @@ surfaces:
   title: Retire sentinel AC11 as subsumed by AC13
   last_modified: '2026-08-05'
   renderer: adr_card
+- id: ai-state-decisions-324-p07-consult-clause-is-correct
+  path: .ai-state/decisions/324-p07-consult-clause-is-correct.md
+  type: markdown
+  title: P07's consult clause is correct; the missing producer was in the always-loaded tier
+  last_modified: '2026-08-05'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3112,6 +3118,7 @@ groups:
   - ai-state-decisions-321-withheld-must-withhold-its-residual
   - ai-state-decisions-322-metrics-freshness-in-commits
   - ai-state-decisions-323-retire-sentinel-ac11-as-subsumed-by-ac13
+  - ai-state-decisions-324-p07-consult-clause-is-correct
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

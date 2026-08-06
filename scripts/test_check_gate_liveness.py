@@ -67,6 +67,73 @@ def test_excludes_pattern_defining_files(tmp_path: Path) -> None:
     assert gl.check_forbidden_pattern(tmp_path) == []
 
 
+# The bad-case GL02's own definition promises it catches. Kept as one literal so
+# the doc and the canary cannot drift apart: if this stops firing, the sentence
+# telling a reader the gate bites has become false.
+_GOLDEN_BAD_CASE = "a checkpoint that searches test names for req33_ prefixes"
+
+
+def test_canary_the_documented_golden_bad_case_fires(tmp_path: Path) -> None:
+    """A gate nobody has seen fail is indistinguishable from no gate.
+
+    GL02 is documented with a golden bad-case — "a checkpoint that searches test
+    names for a REQ-id prefix the citation rule bans". Feeding that sentence back
+    to the detector is the whole proof-it-bites, and it did not fire: the verb was
+    written inflected ("searches"), and only the bare stem was matched.
+    """
+    _write(tmp_path, "agents/planner.md", _GOLDEN_BAD_CASE)
+    findings = gl.check_forbidden_pattern(tmp_path)
+    assert findings, f"GL02's documented golden bad-case must fire: {_GOLDEN_BAD_CASE!r}"
+    assert findings[0]["check"] == "forbidden-pattern"
+
+
+def test_canary_inflected_scan_verbs_are_not_invisible(tmp_path: Path) -> None:
+    """Prose writes the directive inflected; matching only bare stems misses it."""
+    for verb in ("scan", "scans", "scanned", "greps", "searches", "searching", "matched"):
+        _write(tmp_path, "agents/planner.md", f"the checkpoint {verb} test files for req33_ names")
+        assert gl.check_forbidden_pattern(tmp_path), f"inflected verb {verb!r} must still fire"
+
+
+def test_a_bare_look_without_for_is_not_a_scan_directive(tmp_path: Path) -> None:
+    """Inverse guard: widening the verbs must not make every mention of a REQ a hit."""
+    _write(tmp_path, "agents/planner.md", "Reviewers look at the test plan; req33_ is legacy.")
+    assert gl.check_forbidden_pattern(tmp_path) == []
+
+
+def _findings_under(parent: Path) -> list[dict]:
+    """Write one identical bad corpus under ``parent`` and scan it."""
+    root = parent / "repo"
+    _write(root, "rules/dead.md", _GOLDEN_BAD_CASE)
+    _write(root, "rules/swe/id-citation-discipline.md", "Never scan test code for req33_.")
+    return gl.check_forbidden_pattern(root)
+
+
+def test_canary_findings_are_invariant_under_relocation(tmp_path: Path) -> None:
+    """Identical bytes at identical repo-relative paths must yield identical findings.
+
+    The exclusion list was matched against the *absolute* path, so a checkout whose
+    directory name happened to contain an exclusion substring silently excluded
+    every file in the repository — the detector reported clean and exited 0 on a
+    corpus it flags anywhere else. A managed project's path differs by definition,
+    so the verdict was a property of the disk, not of the code under scan.
+    """
+    neutral = _findings_under(tmp_path / "neutral")
+    poisoned = _findings_under(tmp_path / "gate-liveness")
+
+    assert neutral, "precondition: the corpus must be flagged at a neutral path"
+    assert [f["file"] for f in poisoned] == [f["file"] for f in neutral], (
+        "relocation changed the verdict — exclusions are matching the absolute path"
+    )
+
+
+def test_exclusions_still_apply_by_repo_relative_path(tmp_path: Path) -> None:
+    """Inverse guard: the defining rule stays excluded, poisoned parent or not."""
+    findings = _findings_under(tmp_path / "gate-liveness")
+    assert [f["file"] for f in findings] == ["rules/dead.md"], (
+        "the pattern-defining rule must remain excluded by its repo-relative path"
+    )
+
+
 def test_flags_a_gate_script_nothing_invokes(tmp_path: Path) -> None:
     """A canary: a gate written, tested, and called by nothing.
 

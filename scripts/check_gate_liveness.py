@@ -41,8 +41,12 @@ import sys
 from pathlib import Path
 
 # Files that legitimately *describe* forbidden patterns as teaching material
-# (the defining rules, this detector's own docs/tests). Path-substring excluded so
-# the detector never flags its own vocabulary.
+# (the defining rules, this detector's own docs/tests). Matched against the
+# **repo-relative** path, never an absolute one: an absolute match makes the
+# verdict a function of where the checkout happens to sit on disk, so identical
+# bytes at identical repository positions yield a finding under one clone path
+# and silence under another — and a managed project's path differs by
+# definition. A canary pins the relocation invariant.
 _EXCLUDE_SUBSTRINGS = (
     "gate-liveness",
     "gate-canaries",
@@ -55,7 +59,18 @@ _SCAN_DIRS = ("agents", "rules", "skills", "commands")
 
 # A grep/scan directive that targets a pattern id-citation-discipline forbids in
 # test/code. Canonical dead-grep shape: "scan test files for req{NN}_".
-_SCAN_VERB = re.compile(r"\b(grep|scan|search|match|look for)\b", re.IGNORECASE)
+#
+# Inflected forms are matched because prose writes the directive both ways: a
+# checklist says "scan test files for req33_" and the row documenting it says
+# "a checkpoint that *searches* test names for req33_". Bare-stem-only matching
+# saw the first and missed the second, so the documented bad-case a reader is
+# told the gate catches went uncaught. `look` still requires its `for`, since
+# the bare verb carries no scanning sense.
+_SCAN_VERB = re.compile(
+    r"\b(?:grep|scan|search|match)(?:s|es|ed|ing|ned|ning|ped|ping)?\b"
+    r"|\blook(?:s|ed|ing)?\s+for\b",
+    re.IGNORECASE,
+)
 _TESTCODE = re.compile(r"\b(test|tests|code|source)\b|\.py|\.ts", re.IGNORECASE)
 _FORBIDDEN_LITERALS = re.compile(
     r"req\{NN\}_|req\\d\+_|req\d+_|REQ-\d|AC-\d"  # id-citation-discipline:ignore
@@ -68,7 +83,8 @@ def _iter_files(root: Path):
         if not base.exists():
             continue
         for path in sorted(base.rglob("*.md")):
-            if any(sub in str(path) for sub in _EXCLUDE_SUBSTRINGS):
+            relative = path.relative_to(root).as_posix()
+            if any(sub in relative for sub in _EXCLUDE_SUBSTRINGS):
                 continue
             yield path
 

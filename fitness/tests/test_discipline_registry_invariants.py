@@ -3034,14 +3034,13 @@ def test_every_real_classification_row_has_exactly_nine_columns(project_root: Pa
     )
 
 
-def _post_boundary_triples_from_real_ledger(project_root: Path) -> list[tuple[str, str, str]]:
-    """The distinct (task-slug, discipline, stage) triples in the real
-    ledger whose timestamp is >= SEAL_BOUNDARY. Shared by the two
-    git-dependent real-file tests below."""
-    ledger_path = _require_file(
-        project_root / ".ai-state" / "CONSULT_LEDGER.md", "disposition ledger"
-    )
-    ledger_rows = parse_ledger_table_rows(ledger_path.read_text(encoding="utf-8"))
+def _post_boundary_triples(ledger_text: str) -> list[tuple[str, str, str]]:
+    """The distinct (task-slug, discipline, stage) triples in `ledger_text`
+    whose timestamp is >= SEAL_BOUNDARY, in first-seen order.
+
+    Pure over the ledger's text, per this file's split of assertion logic from
+    file reading -- the caller does the reading."""
+    ledger_rows = parse_ledger_table_rows(ledger_text)
     ledger_index = {field: pos for pos, field in enumerate(LEDGER_ROW_FIELDS)}
     triples: list[tuple[str, str, str]] = []
     for row in ledger_rows:
@@ -3058,83 +3057,127 @@ def _post_boundary_triples_from_real_ledger(project_root: Path) -> list[tuple[st
     return triples
 
 
-def test_the_witness_commit_contains_the_sealed_prior_rows(project_root: Path) -> None:
-    """For each post-boundary triple, resolve its recorded seal-witness sha
+# Parametrisation source for the two git-dependent real-file tests below.
+# Resolved at *collection* time -- parametrize needs the triples before any
+# fixture exists -- so it must agree with conftest.py's `project_root` fixture.
+# Both derive the repo root as this directory's grandparent.
+_COLLECTION_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
+
+def _post_boundary_triple_params() -> list[object]:
+    """One pytest param per post-boundary triple, so each triple is its own test.
+
+    Why parametrize rather than one test looping over the triples: `pytest.skip`
+    raises, so a skip taken inside a `for triple in triples` body unwinds the
+    *whole* test function and silences every remaining triple's assertions. The
+    suite then reports green having checked one triple and abandoned the rest --
+    a pass carrying far less information than it appears to. One test per triple
+    scopes a skip to the triple that earned it, and leaves the siblings
+    independently collected, run and reported. (This is also what
+    rules/swe/testing-conventions.md 'No Logic in Tests' asks for: no `for` loop
+    asserting over a collection -- use the framework's parametrize mechanism.)
+
+    Deliberately total: an absent or unreadable ledger yields the sentinel param
+    rather than a collection error that would take the whole module down. The
+    ledger's existence is separately gated by the coverage tests above, which
+    fail loudly via `_require_file`.
+    """
+    ledger_path = _COLLECTION_PROJECT_ROOT / ".ai-state" / "CONSULT_LEDGER.md"
+    try:
+        triples = (
+            _post_boundary_triples(ledger_path.read_text(encoding="utf-8"))
+            if ledger_path.is_file()
+            else []
+        )
+    except OSError:
+        triples = []
+    if not triples:
+        return [pytest.param(None, id="no-post-boundary-consult")]
+    return [pytest.param(triple, id=f"{triple[0]}-{triple[1]}-{triple[2]}") for triple in triples]
+
+
+@pytest.mark.parametrize("triple", _post_boundary_triple_params())
+def test_the_witness_commit_contains_the_sealed_prior_rows(
+    project_root: Path, triple: tuple[str, str, str] | None
+) -> None:
+    """For this post-boundary triple, resolve its recorded seal-witness sha
     and assert `git show <sha>:.ai-state/CONSULT_PRIORS.md` contains that
     triple's Sealed Priors row. Skips with a named reason -- naming the sha
     and why -- when the sha does not resolve to a reachable commit (a
-    shallow clone, or a squash-merged branch)."""
-    triples = _post_boundary_triples_from_real_ledger(project_root)
-    if not triples:
+    shallow clone, or a squash-merged branch).
+
+    One triple per test case: a skip here retires only its own triple, never
+    a sibling's assertions."""
+    if triple is None:
         pytest.skip("no post-boundary consult exists yet")
 
     priors_path = project_root / ".ai-state" / "CONSULT_PRIORS.md"
     if not priors_path.is_file():
         pytest.skip("CONSULT_PRIORS.md does not exist yet")
-    classification_rows = parse_classification_table_rows(priors_path.read_text(encoding="utf-8"))
+    priors_text = priors_path.read_text(encoding="utf-8")
+    classification_rows = parse_classification_table_rows(priors_text)
     classification_index = {field: pos for pos, field in enumerate(CLASSIFICATION_ROW_FIELDS)}
 
-    checked_any = False
-    for triple in triples:
-        matching = [
-            row
-            for row in classification_rows
-            if (
-                row[classification_index["task-slug"]],
-                row[classification_index["discipline"]],
-                row[classification_index["stage"]],
-            )
-            == triple
-        ]
-        if not matching:
-            continue
-        seal_witness = matching[0][classification_index["seal-witness"]]
-
-        reachable = subprocess.run(
-            ["git", "cat-file", "-e", f"{seal_witness}^{{commit}}"],
-            cwd=project_root,
-            capture_output=True,
-            check=False,
+    matching = [
+        row
+        for row in classification_rows
+        if (
+            row[classification_index["task-slug"]],
+            row[classification_index["discipline"]],
+            row[classification_index["stage"]],
         )
-        if reachable.returncode != 0:
-            pytest.skip(
-                f"seal-witness {seal_witness!r} for {triple!r} does not resolve to a "
-                "reachable commit (shallow clone, or the branch was squash-merged)"
-            )
+        == triple
+    ]
+    if not matching:
+        pytest.skip(f"{triple!r} has no recorded seal-witness yet")
+    seal_witness = matching[0][classification_index["seal-witness"]]
 
-        show = subprocess.run(
-            ["git", "show", f"{seal_witness}:.ai-state/CONSULT_PRIORS.md"],
-            cwd=project_root,
-            capture_output=True,
-            text=True,
-            check=False,
+    reachable = subprocess.run(
+        ["git", "cat-file", "-e", f"{seal_witness}^{{commit}}"],
+        cwd=project_root,
+        capture_output=True,
+        check=False,
+    )
+    if reachable.returncode != 0:
+        pytest.skip(
+            f"seal-witness {seal_witness!r} for {triple!r} does not resolve to a "
+            "reachable commit (shallow clone, or the branch was squash-merged)"
         )
-        assert show.returncode == 0, (
-            f"git show {seal_witness}:.ai-state/CONSULT_PRIORS.md failed: {show.stderr}"
-        )
-        witness_prior_rows = parse_prior_table_rows(show.stdout)
-        working_prior_rows = parse_prior_table_rows(priors_path.read_text(encoding="utf-8"))
-        failure = check_witness_priors_equal_working_priors(
-            witness_prior_rows, working_prior_rows, triple
-        )
-        assert failure is None, f"witness commit {seal_witness!r}: {failure}"
-        checked_any = True
 
-    if not checked_any:
-        pytest.skip("no post-boundary triple has a recorded seal-witness yet")
+    show = subprocess.run(
+        ["git", "show", f"{seal_witness}:.ai-state/CONSULT_PRIORS.md"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert show.returncode == 0, (
+        f"git show {seal_witness}:.ai-state/CONSULT_PRIORS.md failed: {show.stderr}"
+    )
+    witness_prior_rows = parse_prior_table_rows(show.stdout)
+    working_prior_rows = parse_prior_table_rows(priors_text)
+    failure = check_witness_priors_equal_working_priors(
+        witness_prior_rows, working_prior_rows, triple
+    )
+    assert failure is None, f"witness commit {seal_witness!r}: {failure}"
 
 
+@pytest.mark.parametrize("triple", _post_boundary_triple_params())
 def test_the_live_fragment_witness_agrees_with_the_recorded_seal_witness(
-    project_root: Path,
+    project_root: Path, triple: tuple[str, str, str] | None
 ) -> None:
-    """For each post-boundary triple, if the consultant's ephemeral
+    """For this post-boundary triple, if the consultant's ephemeral
     .ai-work/<task-slug>/CONSULT_<discipline>.md fragment still exists and
     carries a `**Round-0 HEAD:**` line, apply G5. Skips, naming the absent
     fragment -- the fragment is deleted at pipeline cleanup, so this check
-    only bites in the live window."""
-    triples = _post_boundary_triples_from_real_ledger(project_root)
-    if not triples:
+    only bites in the live window.
+
+    One triple per test case: the fragment for one triple being past its live
+    window must not retire the check for a triple whose fragment is still
+    present -- the exact silencing this test shipped with."""
+    if triple is None:
         pytest.skip("no post-boundary consult exists yet")
+    task_slug, discipline, stage = triple
 
     priors_path = project_root / ".ai-state" / "CONSULT_PRIORS.md"
     if not priors_path.is_file():
@@ -3142,31 +3185,25 @@ def test_the_live_fragment_witness_agrees_with_the_recorded_seal_witness(
     classification_rows = parse_classification_table_rows(priors_path.read_text(encoding="utf-8"))
     classification_index = {field: pos for pos, field in enumerate(CLASSIFICATION_ROW_FIELDS)}
 
-    checked_any = False
-    for task_slug, discipline, stage in triples:
-        fragment_path = project_root / ".ai-work" / task_slug / f"CONSULT_{discipline}.md"
-        if not fragment_path.is_file():
-            pytest.skip(f"fragment {fragment_path} does not exist (past the live window)")
-        fragment_text = fragment_path.read_text(encoding="utf-8")
-        if "**Round-0 HEAD:**" not in fragment_text:
-            pytest.skip(f"fragment {fragment_path} carries no '**Round-0 HEAD:**' line")
+    fragment_path = project_root / ".ai-work" / task_slug / f"CONSULT_{discipline}.md"
+    if not fragment_path.is_file():
+        pytest.skip(f"fragment {fragment_path} does not exist (past the live window)")
+    fragment_text = fragment_path.read_text(encoding="utf-8")
+    if "**Round-0 HEAD:**" not in fragment_text:
+        pytest.skip(f"fragment {fragment_path} carries no '**Round-0 HEAD:**' line")
 
-        matching = [
-            row
-            for row in classification_rows
-            if (
-                row[classification_index["task-slug"]],
-                row[classification_index["discipline"]],
-                row[classification_index["stage"]],
-            )
-            == (task_slug, discipline, stage)
-        ]
-        if not matching:
-            continue
-        seal_witness = matching[0][classification_index["seal-witness"]]
-        result = check_fragment_witness_agrees(fragment_text, seal_witness)
-        assert result is None, result
-        checked_any = True
-
-    if not checked_any:
-        pytest.skip("no post-boundary triple has a live fragment to check yet")
+    matching = [
+        row
+        for row in classification_rows
+        if (
+            row[classification_index["task-slug"]],
+            row[classification_index["discipline"]],
+            row[classification_index["stage"]],
+        )
+        == (task_slug, discipline, stage)
+    ]
+    if not matching:
+        pytest.skip(f"{triple!r} has no recorded seal-witness yet")
+    seal_witness = matching[0][classification_index["seal-witness"]]
+    result = check_fragment_witness_agrees(fragment_text, seal_witness)
+    assert result is None, result

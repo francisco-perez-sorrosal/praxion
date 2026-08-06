@@ -108,6 +108,27 @@ repos:
         files: '^(claude/canonical-blocks/.*\.(md|json)|scripts/(sync_canonical_blocks|canonical_block_identity)\.py)$'
         pass_filenames: false
 
+      # Block B3 — shipped-template mirror sync. Same defect class as Block B
+      # on a different surface: `claude/aac-templates/fitness-conftest.py.tmpl`
+      # is copied verbatim into every managed project by /onboard-project Phase
+      # 8b.2, and this repo carries the installed counterpart as its dogfooding
+      # instance. Nothing but this gate keeps the two equal. Sibling of
+      # canonical-block-sync rather than merged into it — one concern per hook,
+      # and the two registries have no overlap.
+      #
+      # `files:` MUST list BOTH halves of every pair: drift is created by
+      # editing either side, and a pattern covering only the template would be
+      # blind to the far more common motion (someone improves the live fitness
+      # conftest and never opens the template). A test asserts this pattern
+      # matches every registered path, so adding a mirror row without widening
+      # the pattern fails rather than silently shipping an ungated pair.
+      - id: template-mirror-sync
+        name: Shipped-template mirror sync
+        entry: python3 scripts/check_template_mirrors.py --check
+        language: system
+        files: '^(fitness/tests/conftest\.py|claude/aac-templates/fitness-conftest\.py\.tmpl)$'
+        pass_filenames: false
+
       # Block C — diagram regeneration. Self-discovers staged .c4; skips when
       # likec4/d2 are absent.
       - id: diagram-regen

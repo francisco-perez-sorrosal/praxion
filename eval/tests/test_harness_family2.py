@@ -2,7 +2,7 @@
 
 Tests cover the BC-section presence check, six BC tag scans, four LLM-judged
 behavior checks (with FakeJudgeClient), the SKIP path when the section is
-absent, and the AC-7 lint guard.
+absent, and the no-direct-SDK-import lint guard.
 
 All production imports are deferred inside each test body so pytest collection
 succeeds before the family module exists (RED-state handshake).
@@ -578,7 +578,7 @@ def test_report_writer_includes_family2_calibration_note(tmp_path: Path):
 
 
 # ---------------------------------------------------------------------------
-# AC-7 lint guard: family2 module must not import SDKs directly
+# Lint guard: family2 module must not import SDKs directly
 # ---------------------------------------------------------------------------
 
 

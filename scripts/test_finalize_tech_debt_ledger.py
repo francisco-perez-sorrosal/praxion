@@ -25,9 +25,8 @@ collection with ``FileNotFoundError``. The failing surface IS the test
 contract the implementer must satisfy.
 
 Policy choices documented as module-level constants below (separator, malformed-row
-handling) mirror the authoritative schema in the rule file; when the rule is silent,
-the plan (``.ai-work/tech-debt-integration/IMPLEMENTATION_PLAN.md`` Step 3-test) is the
-secondary source.
+handling) mirror the authoritative schema in the rule file; where the rule is silent,
+the constant carries the chosen policy verbatim so this file is self-contained.
 """
 
 from __future__ import annotations
@@ -53,9 +52,9 @@ NOTES_SEPARATOR = " // "
 # Policy: status precedence on collapse. Source: rule line 157.
 STATUS_PRECEDENCE = ("resolved", "in-flight", "open", "wontfix")
 
-# Policy: malformed-row handling. Source: IMPLEMENTATION_PLAN.md Step 3-test --
-# "Malformed table row -> script logs error, skips that row, exits 1
-# (manual intervention)." Rule file is silent; plan is the secondary source.
+# Policy: malformed-row handling -- "Malformed table row -> script logs error,
+# skips that row, exits 1 (manual intervention)." The rule file is silent on this
+# case, so the policy is stated here rather than cited.
 MALFORMED_EXIT_CODE = 1
 
 _SCRIPT_PATH = Path(__file__).resolve().parent / "finalize_tech_debt_ledger.py"
@@ -663,12 +662,11 @@ class TestDryRunDoesNotWrite:
 class TestMalformedRowHandling:
     """Malformed rows trigger a non-zero exit for manual intervention.
 
-    Policy source: ``IMPLEMENTATION_PLAN.md`` Step 3-test -- "Malformed table
-    row -> script logs error, skips that row, exits 1 (manual intervention)."
-    The rule file is silent; the plan is the secondary source. Implementer
-    may choose whether to leave malformed rows in place (preferred for
-    safety) or drop them; this test asserts only on exit code, not on
-    post-mutation content.
+    Policy -- "Malformed table row -> script logs error, skips that row, exits 1
+    (manual intervention)." The rule file is silent on this case, so the policy
+    is stated here rather than cited. The script may leave malformed rows in
+    place (preferred for safety) or drop them; this test asserts only on the
+    exit code, not on post-mutation content.
     """
 
     def test_row_with_wrong_column_count_triggers_manual_intervention_exit(

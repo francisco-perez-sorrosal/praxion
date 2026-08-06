@@ -2828,8 +2828,8 @@ def test_flags_a_backdated_prior_sharing_the_witness_latest_timestamp() -> None:
 def test_accepts_a_pre_boundary_consult_with_no_sealed_prior() -> None:
     """Happy path: a pre-boundary ledger consult with zero matching Sealed
     Priors rows is exempt -- the pre-adoption consults must not turn the
-    gate red. This is AC-01's mechanism, and it is why no skip-list is
-    needed."""
+    gate red. The exemption falls out of the boundary rule itself, which is
+    why no skip-list is needed."""
     ledger_row = (
         "| 2026-07-31T02:30:00Z | task-a | statistician | architecture | CH-01 | "
         "a claim | a decision | switch-now | dec-309 | opus | high-stakes |"

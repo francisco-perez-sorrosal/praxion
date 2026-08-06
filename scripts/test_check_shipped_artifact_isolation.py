@@ -77,11 +77,13 @@ def test_flags_decision_path_in_shipped_file(tmp_path: Path) -> None:
 
 
 def test_flags_spec_tied_req_id_in_shipped_file(tmp_path: Path) -> None:
-    """A shipped file citing REQ-AUTH-01 (spec-tied) is flagged as req-spec-tied."""
+    """A shipped file citing a spec-tied requirement id is flagged as req-spec-tied."""
     fixture = _write(
         tmp_path,
         "agents/my_agent.md",
-        "This agent satisfies REQ-AUTH-01.\n",
+        # The literal id is the input under test — the gate must recognise this
+        # exact shape, so it cannot be paraphrased away.
+        "This agent satisfies REQ-AUTH-01.\n",  # id-citation-discipline:ignore
     )
     findings = scan_file(fixture)
     assert findings, "gate must flag a spec-tied REQ-* identifier in a shipped artifact"

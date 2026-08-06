@@ -102,13 +102,23 @@ def test_test_results_required_when_tests_ran(tmp_path: Path):
     assert by_name["TEST_RESULTS.md"].required is True
 
 
+# The two plan bodies below are the positive and negative inputs to the SDD-activation
+# predicate, which keys off a numbered requirement *heading* and deliberately ignores a
+# bare mention in prose. The literal shape is the grammar under test, written into a
+# tmp_path plan built in-process — neither body names an entry in any real spec.
+_PLAN_WITH_REQ_HEADING = (
+    "## Requirements\n### REQ-01: Login works\n"  # id-citation-discipline:ignore
+)
+_PLAN_WITH_REQ_IN_PROSE = (
+    "A config task. No `REQ-NN` block is warranted.\n"  # id-citation-discipline:ignore
+)
+
+
 def test_traceability_required_when_sdd_active(tmp_path: Path):
     slug = "demo"
     task_dir = tmp_path / ".ai-work" / slug
     task_dir.mkdir(parents=True)
-    (task_dir / "SYSTEMS_PLAN.md").write_text(
-        "## Requirements\n### REQ-01: Login works\n", encoding="utf-8"
-    )
+    (task_dir / "SYSTEMS_PLAN.md").write_text(_PLAN_WITH_REQ_HEADING, encoding="utf-8")
     by_name = {
         Path(v.path).name: v for v in scan_task_manifest(tmp_path, slug, PipelineTier.STANDARD)
     }
@@ -116,13 +126,11 @@ def test_traceability_required_when_sdd_active(tmp_path: Path):
 
 
 def test_config_task_prose_req_does_not_activate_sdd(tmp_path: Path):
-    """A plan that only mentions REQ-NN in prose is not SDD-active (the l3-readiness-config case)."""
+    """A plan mentioning a requirement id only in prose is not SDD-active."""
     slug = "demo"
     task_dir = tmp_path / ".ai-work" / slug
     task_dir.mkdir(parents=True)
-    (task_dir / "SYSTEMS_PLAN.md").write_text(
-        "This is a config task. No `REQ-NN` block is warranted.\n", encoding="utf-8"
-    )
+    (task_dir / "SYSTEMS_PLAN.md").write_text(_PLAN_WITH_REQ_IN_PROSE, encoding="utf-8")
     by_name = {
         Path(v.path).name: v for v in scan_task_manifest(tmp_path, slug, PipelineTier.STANDARD)
     }

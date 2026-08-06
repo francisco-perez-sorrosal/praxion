@@ -9,7 +9,7 @@ Finding dict contract
 {
     "kind": "stale-dependent" | "orphaned-edge" | "untracked-req",
     "scope": str,               # passed-through scope string
-    "req": str,                 # e.g. "REQ-01"
+    "req": str,                 # requirement id, verbatim as the spec writes it
     "source_changed": bool,     # whether the spec source appeared in the diff
     "stale_dependents": list[str],
     "severity": "important" | "suggested",
@@ -409,7 +409,7 @@ def _pending_dependents_from_wip(wip_path: Path) -> set[str]:
 
 
 def _extract_reqs_from_spec_delta(spec_delta_path: Path) -> set[str]:
-    """Extract REQ-NN identifiers from SPEC_DELTA.md."""
+    """Extract requirement identifiers from SPEC_DELTA.md."""
     try:
         content = spec_delta_path.read_text(encoding="utf-8")
     except OSError:

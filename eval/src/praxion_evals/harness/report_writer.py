@@ -145,7 +145,7 @@ def _render_report(report: Report, timestamp: str) -> str:
         )
     lines.append("")
 
-    # Calibration Notes (required by AC-6)
+    # Calibration Notes — every report carries them so a reader can weigh the verdicts
     lines.append(_CALIBRATION_NOTES)
 
     return "\n".join(lines)

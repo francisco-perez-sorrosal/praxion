@@ -140,7 +140,7 @@ def _capture_audit_json(repo: Path, horizon: int = 10, capsys: Any = None) -> li
 
 
 # ---------------------------------------------------------------------------
-# AC-1: path-pair detection (diagram output staged without its .c4 source)
+# Path-pair detection (diagram output staged without its .c4 source)
 # ---------------------------------------------------------------------------
 
 
@@ -229,7 +229,7 @@ def test_architecture_md_hunk_outside_any_fence_passes(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# AC-1: finding message contains the relevant path
+# Finding message contains the relevant path
 # ---------------------------------------------------------------------------
 
 
@@ -243,7 +243,7 @@ def test_d2_violation_finding_contains_path(tmp_path: Path, capsys: Any) -> None
 
 
 # ---------------------------------------------------------------------------
-# AC-2: override syntax
+# Override syntax
 # ---------------------------------------------------------------------------
 
 
@@ -289,7 +289,7 @@ def test_override_on_previous_added_line_passes(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# AC-3: no-op when no relevant paths are staged
+# No-op when no relevant paths are staged
 # ---------------------------------------------------------------------------
 
 
@@ -307,7 +307,7 @@ def test_no_staged_paths_at_all_exits_zero(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# AC-4: graceful degradation when AAC_GOLDEN_RULE_VALIDATOR_LIKEC4=disabled
+# Graceful degradation when AAC_GOLDEN_RULE_VALIDATOR_LIKEC4=disabled
 # ---------------------------------------------------------------------------
 
 
@@ -332,7 +332,7 @@ def test_likec4_disabled_gate_still_enforces_path_pair(
 
 
 # ---------------------------------------------------------------------------
-# AC-5: audit mode for sentinel
+# Audit mode for sentinel
 # ---------------------------------------------------------------------------
 
 

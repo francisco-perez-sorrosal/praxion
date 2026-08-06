@@ -20,8 +20,9 @@ from pathlib import Path
 
 from praxion_evals.harness.schemas import TaskArtifactVerdict
 
-# A `### REQ-NN` heading (SDD behavioral spec), not the substring "REQ" in prose —
-# so a config/infra plan that merely mentions "no REQ-NN block" does not count as SDD-active.
+# A numbered requirement *heading* (the SDD behavioral-spec shape), not a bare mention
+# of one in prose — so a config/infra plan that merely says it warrants no requirement
+# block does not count as SDD-active.
 _REQ_HEADING_RE = re.compile(r"(?m)^#{1,6}\s*REQ-\d")
 
 
@@ -64,7 +65,7 @@ def _tests_ran(task_dir: Path) -> bool:
 
 
 def _sdd_active(task_dir: Path) -> bool:
-    """The pipeline is SDD-tracked — its SYSTEMS_PLAN carries `### REQ-NN` headings."""
+    """The pipeline is SDD-tracked — its SYSTEMS_PLAN carries numbered requirement headings."""
     plan = task_dir / "SYSTEMS_PLAN.md"
     if not plan.exists():
         return False

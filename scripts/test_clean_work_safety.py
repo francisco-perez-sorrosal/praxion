@@ -39,6 +39,12 @@ def _load_module() -> Any:
 
 cws = _load_module()
 
+# The scanner recognises a requirement-bearing plan by matching the literal id
+# prefix in the file's text, so this fixture must carry a real id for the
+# spec-archive warning to fire at all. Paraphrasing it would silently disarm
+# every test below that depends on that branch.
+REQ_BEARING_PLAN = "## Acceptance\n- REQ-01: login works\n"  # id-citation-discipline:ignore
+
 
 # -- Helpers ------------------------------------------------------------------
 
@@ -79,7 +85,7 @@ def test_empty_task_dir_is_safe(tmp_path: Path) -> None:
 
 def test_completed_wip_all_checked_is_not_blocked(tmp_path: Path) -> None:
     ai_work = tmp_path / ".ai-work"
-    _make_task(ai_work, "done", {"WIP.md": "# WIP\n- [x] Step 1\n- [x] Step 2\n"})
+    _make_task(ai_work, "done", {"WIP.md": "# WIP\n- [x] Draft schema\n- [x] Wire consumer\n"})
     verdict = _classify(ai_work, "done")
     assert verdict.classification == "SAFE"
 
@@ -97,7 +103,7 @@ def test_open_rework_manifest_blocks(tmp_path: Path) -> None:
 
 def test_active_wip_unchecked_step_blocks(tmp_path: Path) -> None:
     ai_work = tmp_path / ".ai-work"
-    _make_task(ai_work, "in-flight", {"WIP.md": "# WIP\n- [x] Step 1\n- [ ] Step 2\n"})
+    _make_task(ai_work, "in-flight", {"WIP.md": "# WIP\n- [x] Draft schema\n- [ ] Wire consumer\n"})
     verdict = _classify(ai_work, "in-flight")
     assert verdict.classification == "BLOCK"
     assert "active-pipeline" in _codes(verdict)
@@ -156,13 +162,13 @@ def test_verification_warning_suppressed_by_learnings_marker(tmp_path: Path) -> 
 
 def test_traceability_warns(tmp_path: Path) -> None:
     ai_work = tmp_path / ".ai-work"
-    _make_task(ai_work, "feat", {"traceability.yml": "REQ-01: [test_x]\n"})
+    _make_task(ai_work, "feat", {"traceability.yml": "some-req: [test_x]\n"})
     assert "unarchived-traceability" in _codes(_classify(ai_work, "feat"))
 
 
 def test_systems_plan_req_warns_when_no_traceability(tmp_path: Path) -> None:
     ai_work = tmp_path / ".ai-work"
-    _make_task(ai_work, "feat", {"SYSTEMS_PLAN.md": "## Acceptance\n- REQ-01: login works\n"})
+    _make_task(ai_work, "feat", {"SYSTEMS_PLAN.md": REQ_BEARING_PLAN})
     assert "unarchived-spec" in _codes(_classify(ai_work, "feat"))
 
 
@@ -178,7 +184,7 @@ def test_traceability_supersedes_spec_reason(tmp_path: Path) -> None:
     _make_task(
         ai_work,
         "feat",
-        {"traceability.yml": "REQ-01: []\n", "SYSTEMS_PLAN.md": "- REQ-01\n"},
+        {"traceability.yml": "some-req: []\n", "SYSTEMS_PLAN.md": REQ_BEARING_PLAN},
     )
     codes = _codes(_classify(ai_work, "feat"))
     assert "unarchived-traceability" in codes

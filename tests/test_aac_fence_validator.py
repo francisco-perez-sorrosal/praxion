@@ -2,10 +2,10 @@
 
 This file encodes the behavioral contract the fence validator must satisfy,
 derived from the decision points in dec-098.  Production code does not exist
-yet; these tests are expected to fail with ModuleNotFoundError until Step 1.4
-(the implementer's concurrent step) lands.
+yet; these tests are expected to fail with ModuleNotFoundError until the
+validator module lands.
 
-=== Public API contract (Step 1.4 implementer: please adopt this shape) ===
+=== Public API contract (the validator must adopt this shape) ===
 
     from scripts.aac_fence_validator import validate, ValidationResult, Finding, Severity
 

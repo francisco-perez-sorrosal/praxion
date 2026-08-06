@@ -13,7 +13,7 @@ const WIP_BODY = `
 
 ## Current Step
 
-Step 3 of 5: Wire the reconciler into CI
+Wire the reconciler into CI
 
 ## Status
 
@@ -21,11 +21,11 @@ Step 3 of 5: Wire the reconciler into CI
 
 ## Progress
 
-- [x] Step 1: Scaffold the manifest schema
-- [x] Step 2: Write the reconciler
-- [ ] Step 3: Wire the reconciler into CI
-- [ ] Step 4: Document the manifest
-- [ ] Step 5: Ship
+- [x] 1. Scaffold the manifest schema
+- [x] 2. Write the reconciler
+- [ ] 3. Wire the reconciler into CI
+- [ ] 4. Document the manifest
+- [ ] 5. Ship
 
 ## Next Action
 
@@ -127,8 +127,11 @@ describe("composeHandoffPrompt", () => {
     expect(prompt).toContain(
       "**Goal**: Give each project an owned label taxonomy manifest so labels stop drifting between repos."
     );
+    // "Step N of M complete." is the composer's own progress copy (see
+    // src/server/view-models/handoff-prompt.ts), asserted verbatim so a wording
+    // change is caught. It is generated output, not a citation to a plan document.
     expect(prompt).toContain(
-      "**Where it stands**: Step 2 of 5 complete. Current step: Step 3 of 5: Wire the reconciler into CI ([IN-PROGRESS] - writing the reconciler tests)."
+      "**Where it stands**: Step 2 of 5 complete. Current step: Wire the reconciler into CI ([IN-PROGRESS] - writing the reconciler tests)." // id-citation-discipline:ignore
     );
     expect(prompt).toContain("**Constraints already decided**");
     expect(prompt).toContain("Manifest format");

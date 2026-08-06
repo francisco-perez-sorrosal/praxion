@@ -282,8 +282,9 @@ ARTIFACTS: tuple[Artifact, ...] = (
         description="Test-run evidence handoff to the verifier.",
     ),
     Artifact(
-        # eval: conditionally required — gated by `_sdd_active` (a `### REQ-NN` heading
-        # in SYSTEMS_PLAN), so a config/infra pipeline with no REQ block is not penalised.
+        # eval: conditionally required — gated by `_sdd_active` (a requirement-id
+        # heading in SYSTEMS_PLAN), so a config/infra pipeline with no requirements
+        # block is not penalised.
         "traceability.yml",
         "ai-work",
         "ephemeral",

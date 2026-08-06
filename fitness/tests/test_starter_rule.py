@@ -6,9 +6,8 @@ pre-commit and post-merge execution contexts is a structural smell that this
 invariant prevents).
 
 This test runs the import-linter contract `check-scripts-precondition-boundary` declared
-in `fitness/import-linter.cfg` and asserts it KEEPS (passes). The implementer of
-Step 2.3 replaces the placeholder contract with this real invariant contract; this
-test verifies the wiring holds end-to-end.
+in `fitness/import-linter.cfg` and asserts it KEEPS (passes) — the real invariant contract
+replaced the scaffold's placeholder, and this test verifies the wiring holds end-to-end.
 """
 
 import subprocess

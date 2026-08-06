@@ -10,7 +10,7 @@ pre-existing version-pinned surfaces only — it does not yet resolve a hub SHA,
 forward `--hub-sha`, degrade gracefully when `gh` is unavailable, or surface
 the `CURSOR_API_KEY` setup print. All tests below are expected to FAIL until
 the implementer wires this in, per the command-layer SHA-resolution design
-(see the ADR `upgrade-caller-sha-rewrite` and `SYSTEMS_PLAN.md` REQ-11/REQ-14).
+(see the ADR `upgrade-caller-sha-rewrite`).
 """
 
 from __future__ import annotations

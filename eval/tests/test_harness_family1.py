@@ -100,13 +100,13 @@ _SPEC_WITH_MATRIX = textwrap.dedent("""\
 
     ## Acceptance Criteria
 
-    - AC-1: The system does something.
+    - The system does something.
 
     ## Traceability Matrix
 
-    | AC | Implementing artifact | Verification |
-    |----|----------------------|--------------|
-    | AC-1 | module/file.py | pytest |
+    | Criterion | Implementing artifact | Verification |
+    |-----------|----------------------|--------------|
+    | The system does something | module/file.py | pytest |
 """)
 
 _SPEC_WITHOUT_MATRIX = textwrap.dedent("""\
@@ -114,7 +114,7 @@ _SPEC_WITHOUT_MATRIX = textwrap.dedent("""\
 
     ## Acceptance Criteria
 
-    - AC-1: The system does something else.
+    - The system does something else.
 
     No traceability section here.
 """)
@@ -696,20 +696,28 @@ def test_spec_without_traceability_matrix_fails():
 # affected_reqs resolvability checks
 # ---------------------------------------------------------------------------
 
+# Invented requirement ids used as *parser input* to the resolvability check,
+# which resolves an ADR's `affected_reqs` values by substring-matching them
+# against archived SPEC text. The literal shape is the grammar under test, and
+# these values are interpolated into simulated documents built in-memory here —
+# they name no entry in any real spec, so there is nothing to dangle.
+_RESOLVABLE_REQ_ID = "REQ-10"  # id-citation-discipline:ignore
+_UNRESOLVABLE_REQ_ID = "REQ-999"  # id-citation-discipline:ignore
+
 
 def test_affected_reqs_found_in_spec_passes():
     """An ADR's affected_reqs entry that appears in a SPEC produces a PASS result."""
-    adr_with_reqs = textwrap.dedent("""\
+    adr_with_reqs = textwrap.dedent(f"""\
         ---
         id: dec-002
         title: ADR with populated affected_reqs
         status: accepted
         category: architectural
         date: "2026-01-01"
-        summary: Has REQ-10 in affected_reqs
+        summary: Cites a requirement id that an archived SPEC resolves
         tags: [test]
         made_by: agent
-        affected_reqs: ["REQ-10"]
+        affected_reqs: ["{_RESOLVABLE_REQ_ID}"]
         ---
 
         ## Context
@@ -730,18 +738,18 @@ def test_affected_reqs_found_in_spec_passes():
 
         Good outcome.
     """)
-    spec_with_req = textwrap.dedent("""\
+    spec_with_req = textwrap.dedent(f"""\
         # SPEC: Observability
 
         ## Acceptance Criteria
 
-        - REQ-10: The system emits telemetry.
+        - {_RESOLVABLE_REQ_ID}: The system emits telemetry.
 
         ## Traceability Matrix
 
-        | AC | Implementing artifact | Verification |
-        |----|----------------------|--------------|
-        | REQ-10 | hooks/telemetry.py | manual |
+        | Criterion | Implementing artifact | Verification |
+        |-----------|----------------------|--------------|
+        | The system emits telemetry | hooks/telemetry.py | manual |
     """)
     from praxion_evals.harness.families.family1_pipeline_fidelity import (
         Family1PipelineOutcomeFidelity,
@@ -767,17 +775,17 @@ def test_affected_reqs_found_in_spec_passes():
 
 def test_affected_reqs_not_in_any_spec_warns():
     """An ADR's affected_reqs entry absent from all SPECs produces a WARN (not FAIL)."""
-    adr_with_missing_req = textwrap.dedent("""\
+    adr_with_missing_req = textwrap.dedent(f"""\
         ---
         id: dec-002
         title: ADR with unresolvable affected_reqs
         status: accepted
         category: architectural
         date: "2026-01-01"
-        summary: Has REQ-999 which appears in no SPEC
+        summary: Cites a requirement id that appears in no archived SPEC
         tags: [test]
         made_by: agent
-        affected_reqs: ["REQ-999"]
+        affected_reqs: ["{_UNRESOLVABLE_REQ_ID}"]
         ---
 
         ## Context
@@ -1071,7 +1079,7 @@ def test_report_writer_output_contains_calibration_notes_section(tmp_path: Path)
 
     content = Path(written_path).read_text(encoding="utf-8")
     assert "## Calibration Notes" in content, (
-        "Report must contain a '## Calibration Notes' section per AC-6"
+        "Every written report must carry a '## Calibration Notes' section"
     )
 
 
@@ -1106,15 +1114,15 @@ def test_report_writer_log_appends_row_to_log_file(tmp_path: Path):
 
 
 # ---------------------------------------------------------------------------
-# AC-7 lint guard: family1 module must not import SDKs
+# Lint guard: family1 module must not import SDKs
 # ---------------------------------------------------------------------------
 
 
 def test_family1_module_source_contains_no_direct_sdk_imports():
     """Family1 source file must not contain direct claude_agent_sdk or anthropic imports.
 
-    This is the behavioral encoding of AC-7: family code calls JudgeClient.judge()
-    only; SDK imports belong exclusively in harness/judge_client.py.
+    Family code reaches the model only through JudgeClient.judge(); SDK imports
+    belong exclusively in harness/judge_client.py.
     """
     import importlib
     import importlib.util

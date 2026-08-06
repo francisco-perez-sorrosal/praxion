@@ -155,6 +155,15 @@ Beta task
     expect(parsed.progress[1]).toMatchObject({ checked: false, stepId: "2" });
   });
 
+  // `Step <id>:` is the checklist grammar parseWipBody strips out of WIP.md — the
+  // literal prefix is the parser's input, not a citation to a plan document. Held
+  // outside the template literal below so the marker lands on code rather than
+  // inside the fixture data the assertion checks.
+  const STEP_PREFIXED_PROGRESS = [
+    "- [x] Step 1.1: Scaffold", // id-citation-discipline:ignore
+    "- [ ] Step 1.2: Draft failing tests" // id-citation-discipline:ignore
+  ].join("\n");
+
   it("still parses the original Step X.Y: format unchanged", () => {
     const parsed = parseWipBody(`
 ## Current Step
@@ -167,8 +176,7 @@ Draft failing tests
 
 ## Progress
 
-- [x] Step 1.1: Scaffold
-- [ ] Step 1.2: Draft failing tests
+${STEP_PREFIXED_PROGRESS}
 `);
 
     expect(parsed.progress).toEqual([

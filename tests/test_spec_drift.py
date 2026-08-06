@@ -177,7 +177,7 @@ def test_untracked_req_emits_important_finding(tmp_path: Path) -> None:
     """A REQ added by SPEC_DELTA with no traceability edge emits untracked-req/important."""
     from scripts.spec_drift import detect_drift  # deferred import for RED handshake
 
-    # Arrange: traceability.yml has no entry for REQ-04; SPEC_DELTA adds REQ-04.
+    # Arrange: SPEC_DELTA adds a requirement that traceability.yml has no entry for.
     task_dir = tmp_path / ".ai-work" / "my-task"
     task_dir.mkdir(parents=True)
     traceability = FIXTURES / "traceability_untracked_req.yml"
@@ -198,7 +198,8 @@ def test_untracked_req_emits_important_finding(tmp_path: Path) -> None:
     # Assert
     untracked = [f for f in findings if f["kind"] == "untracked-req"]
     assert untracked, (
-        f"Expected at least one untracked-req finding for REQ-04 absent from traceability.yml; "
+        f"Expected at least one untracked-req finding for the requirement absent "
+        f"from traceability.yml; "
         f"got: {findings!r}"
     )
     for finding in untracked:
@@ -209,7 +210,7 @@ def test_untracked_req_emits_important_finding(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test: suppressed-later-step — false-positive guard (AC-7)
+# Test: suppressed-later-step — false-positive guard
 # ---------------------------------------------------------------------------
 
 

@@ -1,6 +1,6 @@
 """Tests for scripts/principles_loader.py — tolerant YAML loader for per-project principles.
 
-Assumed public API (Step 3's implementer must satisfy this contract):
+Assumed public API (the loader must satisfy this contract):
 
     load_principles(principles_yaml_path: Path) -> list[dict]
         Reads .ai-state/principles.yaml tolerantly.

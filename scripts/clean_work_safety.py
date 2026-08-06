@@ -63,8 +63,9 @@ STALE_DAYS = 14
 # An unchecked GitHub-flavoured task box anywhere in WIP.md means the pipeline
 # still has work to do — the strongest "do not delete" signal.
 UNCHECKED_STEP_RE = re.compile(r"^\s*[-*]\s+\[ \]", re.MULTILINE)
-# REQ ids in SYSTEMS_PLAN.md take the form REQ-01 or REQ-AUTH-01; the char class
-# after the hyphen (uppercase/digit) avoids matching prose like "REQ-uirements".
+# A requirement id in SYSTEMS_PLAN.md is the prefix below followed by an
+# uppercase-or-digit run (a bare number, or a domain segment then a number); that
+# char class after the hyphen is what avoids matching prose like "REQ-uirements".
 REQ_ID_RE = re.compile(r"\bREQ-[A-Z0-9]")
 CONSUMED_RE = re.compile(r"\[CONSUMED\]")
 # The marker the verifier/operator adds to LEARNINGS.md after folding a

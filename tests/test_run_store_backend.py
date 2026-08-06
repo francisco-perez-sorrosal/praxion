@@ -66,7 +66,7 @@ def test_schema_file_is_present() -> None:
     """Schema file must exist before any convention can be asserted."""
     assert SCHEMA_FILE.exists(), (
         f"run-ledger-schema.md not found at {SCHEMA_FILE}; "
-        "Step 1 must land before these convention tests are meaningful"
+        "the schema document must land before these convention tests are meaningful"
     )
 
 

@@ -21,7 +21,7 @@ detector logic (covered by tests/test_spec_drift.py).
 #       Orphaned-edge findings from detect_drift are filtered out (deferred to SH01/SH04).
 #       \"\"\"
 #
-# Step 6 implementer must:
+# The wrapper must:
 #   1. Create scripts/check_spec_drift.py with a run_sh07(repo_root: Path) callable.
 #   2. When .ai-state/specs/ is absent, return [] or a single info-severity row.
 #   3. For each non-orphaned-edge finding from detect_drift, emit a sentinel row
@@ -42,6 +42,12 @@ from unittest.mock import patch
 # ---------------------------------------------------------------------------
 
 _VALID_SEVERITIES = {"info", "important", "suggested"}
+
+# A detector finding's `req` field holds the plan's requirement id verbatim, and
+# run_sh07 interpolates that value straight into its sentinel message. The canned
+# findings below keep the real id shape so the message assertions exercise the
+# production format rather than an invented one.
+_FIXTURE_REQ_ID = "REQ-01"  # id-citation-discipline:ignore
 
 
 def _assert_sentinel_row(row: dict) -> None:
@@ -106,12 +112,12 @@ def test_sh07_surfaces_findings_from_detector(tmp_path: Path) -> None:
     canned_finding = {
         "kind": "stale-dependent",
         "scope": "archived:SPEC_my-feature_2026-01-01.md",
-        "req": "REQ-01",
+        "req": _FIXTURE_REQ_ID,
         "source_changed": "skills/auth.md",
         "stale_dependents": ["tests/test_auth.py"],
         "severity": "important",
         "pointer": ".ai-state/specs/SPEC_my-feature_2026-01-01.md",
-        "rationale": "REQ-01 clause changed; tests/test_auth.py not updated",
+        "rationale": f"{_FIXTURE_REQ_ID} clause changed; tests/test_auth.py not updated",
     }
 
     from scripts.check_spec_drift import run_sh07  # deferred import: RED trigger
@@ -129,8 +135,8 @@ def test_sh07_surfaces_findings_from_detector(tmp_path: Path) -> None:
         _assert_sentinel_row(row)
     # The row must mention the REQ or the finding pointer so the operator can navigate
     combined_messages = " ".join(r["message"] for r in important_rows)
-    assert "REQ-01" in combined_messages or "SPEC_my-feature" in combined_messages, (
-        f"Sentinel row message should reference the finding's REQ or SPEC pointer; "
+    assert _FIXTURE_REQ_ID in combined_messages or "SPEC_my-feature" in combined_messages, (
+        f"Sentinel row message should reference the finding's requirement or SPEC pointer; "
         f"got messages: {combined_messages!r}"
     )
 
@@ -155,7 +161,7 @@ def test_sh07_defers_orphaned_edge_to_sh01(tmp_path: Path) -> None:
     orphaned_finding = {
         "kind": "orphaned-edge",
         "scope": "archived:SPEC_other-feature_2026-02-01.md",
-        "req": "REQ-05",
+        "req": _FIXTURE_REQ_ID,
         "source_changed": "",
         "stale_dependents": ["tests/test_deleted.py"],
         "severity": "important",

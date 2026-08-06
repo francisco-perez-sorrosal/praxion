@@ -10,6 +10,7 @@ disposition is **repair**, not retirement:
     out-of-repo         `~/...` -- outside the repository        -> fix the entry
     lazy-artifact       absence is declared expected             -> nothing
     renamed             the subject moved                        -> update the path
+    renamed-by-self     this decision renamed it                 -> nothing; it worked
     removed-by-self     this decision deleted it                 -> nothing; it worked
     removed-by-later    another decision deleted it              -> link the supersession
     vanished            no successor found                       -> retirement candidate
@@ -415,6 +416,36 @@ def _classify_one(adr_name, ref, deletions, renames, lazy_shapes, removers, have
         return "unclassified", "none", "history unavailable; cause not determined"
     renamed_to = _rename_target(ref, renames)
     if renamed_to:
+        # Mirror of `removed-by-self`, and needed for the same reason: the
+        # decision that *performed* a rename cites the old path because that is
+        # the path it decided about. Reporting "update the path" there asks the
+        # record to erase its own subject -- `132-rename-architecture-to-design`
+        # flagged for `.ai-state/ARCHITECTURE.md` is the decision working, not
+        # decaying. `removers` is already the right index: `_REMOVAL_INTENT`
+        # matches `rename` among its verbs, so no second scan is needed -- this
+        # branch simply returned before ever consulting it.
+        #
+        # Intent alone is too weak here, and unlike `removed-by-later` this
+        # verdict *silences* a finding rather than ranking candidates for a
+        # human, so a false positive hides a genuinely stale path. `036` matches
+        # on "**Replac**e hardcoded SPIRIT lens" and `096` on "live-file
+        # **migrat**ions"; neither has anything to do with renaming
+        # `ARCHITECTURE.md`. The discriminating evidence is that a decision
+        # which renamed X to Y also *touched* Y, so Y appears in its own
+        # `affected_files` -- true for `132`, false for both impostors. A
+        # decision that renamed without listing the target falls through to
+        # `renamed`/`update-path`, which is the safe direction: repair, never
+        # silence.
+        own = next(
+            (
+                paths
+                for name, _, paths, gone in removers
+                if name == adr_name and _covers(paths, gone, ref)
+            ),
+            None,
+        )
+        if own is not None and renamed_to in own:
+            return "renamed-by-self", "none", f"this decision renamed it to {renamed_to}"
         return "renamed", "update-path", f"renamed to {renamed_to}"
 
     deleted_on = _deletion_date(ref, deletions)

@@ -157,6 +157,54 @@ def test_canary_removed_by_self_is_the_decision_working(repo: Path) -> None:
     assert finding["disposition"] == "none"
 
 
+def test_canary_renamed_by_self_is_the_decision_working(repo: Path) -> None:
+    """The decision that performed a rename cites the old path by design."""
+    (repo / "ARCHITECTURE.md").write_text("x", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "add")
+    _git(repo, "mv", "ARCHITECTURE.md", "DESIGN.md")
+    _git(repo, "commit", "-qm", "rename")
+    _adr(
+        repo,
+        1,
+        title="Rename ARCHITECTURE.md to DESIGN.md",
+        files=["ARCHITECTURE.md", "DESIGN.md"],
+    )
+    finding = next(
+        f for f in adr_health.classify(repo)["findings"] if f["path"] == "ARCHITECTURE.md"
+    )
+    assert finding["decay_class"] == "renamed-by-self"
+    assert finding["disposition"] == "none"
+
+
+def test_rename_intent_without_citing_the_target_stays_repairable(repo: Path) -> None:
+    """Intent alone must not silence a finding.
+
+    `_REMOVAL_INTENT` matches verbs like `replac` and `migrat`, so decisions
+    with nothing to do with a rename land in the same index. Two real ones did.
+    The discriminating evidence is whether the decision names the rename
+    *target* among its own `affected_files`; without it the finding must stay
+    `renamed`/`update-path`, because this verdict silences rather than ranks.
+    """
+    (repo / "ARCHITECTURE.md").write_text("x", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "add")
+    _git(repo, "mv", "ARCHITECTURE.md", "DESIGN.md")
+    _git(repo, "commit", "-qm", "rename")
+    _adr(
+        repo,
+        1,
+        title="Replace the hardcoded lens set",
+        summary="migrate the derivation methodology",
+        files=["ARCHITECTURE.md"],
+    )
+    finding = next(
+        f for f in adr_health.classify(repo)["findings"] if f["path"] == "ARCHITECTURE.md"
+    )
+    assert finding["decay_class"] == "renamed"
+    assert finding["disposition"] == "update-path"
+
+
 def test_canary_removed_by_later_yields_a_supersession_link(repo: Path) -> None:
     """The highest-value class: an edge that exists in reality but was never recorded."""
     (repo / "subsystem.py").write_text("x", encoding="utf-8")

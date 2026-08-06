@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-06T00:30:03Z'
+generated_at: '2026-08-06T05:32:03Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -684,7 +684,7 @@ surfaces:
   path: .ai-state/decisions/021-dual-audience-architecture-docs.md
   type: markdown
   title: Dual-audience architecture documentation
-  last_modified: '2026-07-15'
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-022-coordination-detail-extraction
   path: .ai-state/decisions/022-coordination-detail-extraction.md
@@ -774,13 +774,13 @@ surfaces:
   path: .ai-state/decisions/036-lens-framework-project-derived.md
   type: markdown
   title: Lens framework is project-derived; SPIRIT is an exemplar, not the canonical default
-  last_modified: '2026-04-12'
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-037-opportunities-forward-lines
   path: .ai-state/decisions/037-opportunities-forward-lines.md
   type: markdown
   title: Opportunities (Forward Lines) as a first-class roadmap section; Motivation field generalization
-  last_modified: '2026-04-12'
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-038-test-results-md-artifact
   path: .ai-state/decisions/038-test-results-md-artifact.md
@@ -816,7 +816,7 @@ surfaces:
   path: .ai-state/decisions/043-behavioral-contract-layer.md
   type: markdown
   title: Introduce a four-behavior Agent Behavioral Contract as a first-class operational pillar
-  last_modified: '2026-04-13'
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-044-coding-style-path-scoping
   path: .ai-state/decisions/044-coding-style-path-scoping.md
@@ -876,19 +876,19 @@ surfaces:
   path: .ai-state/decisions/053-prompt-over-template-greenfield-scaffold.md
   type: markdown
   title: Prompt-over-template discipline for greenfield project scaffolding
-  last_modified: '2026-04-17'
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-054-separate-new-cc-project-from-install
   path: .ai-state/decisions/054-separate-new-cc-project-from-install.md
   type: markdown
   title: Separate new_cc_project.sh from install.sh
-  last_modified: '2026-04-17'
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-055-hybrid-bash-slash-command-orchestration
   path: .ai-state/decisions/055-hybrid-bash-slash-command-orchestration.md
   type: markdown
   title: Hybrid bash + slash-command orchestration for greenfield onboarding (Option C)
-  last_modified: '2026-04-17'
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-056-concurrency-collab-research-fragment-adr-naming
   path: .ai-state/decisions/056-concurrency-collab-research-fragment-adr-naming.md
@@ -930,7 +930,7 @@ surfaces:
   path: .ai-state/decisions/062-metrics-storage-schema.md
   type: markdown
   title: "Metrics storage schema \u2014 JSON canonical + MD derived + append-only METRICS_LOG.md"
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-063-collector-protocol
   path: .ai-state/decisions/063-collector-protocol.md
@@ -984,7 +984,7 @@ surfaces:
   path: .ai-state/decisions/071-ledger-living-artifact.md
   type: markdown
   title: Tech-debt ledger as a living artifact in `.ai-state/`
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-072-tech-debt-integration-tech-debt-producer-integration
   path: .ai-state/decisions/072-tech-debt-integration-tech-debt-producer-integration.md
@@ -1128,19 +1128,19 @@ surfaces:
   path: .ai-state/decisions/095-toolchain-likec4-d2.md
   type: markdown
   title: LikeC4 + D2 chosen as C4-architectural diagramming toolchain
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-096-structurizr-d2-diagrams-step-ordering-constraint
   path: .ai-state/decisions/096-structurizr-d2-diagrams-step-ordering-constraint.md
   type: markdown
   title: "Step ordering constraint \u2014 rule update must commit before any .c4/.d2 file"
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-097-aac-dac-cornerstone-framing
   path: .ai-state/decisions/097-aac-dac-cornerstone-framing.md
   type: markdown
   title: AaC+DaC cornerstone framed as clauses under existing principles, not a new top-level principle
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-098-aac-fence-contract
   path: .ai-state/decisions/098-aac-fence-contract.md
@@ -1908,7 +1908,7 @@ surfaces:
   path: .ai-state/decisions/225-remove-in-house-memory-subsystem.md
   type: markdown
   title: Remove the in-house curated-memory subsystem (blank slate for sandbook)
-  last_modified: '2026-07-15'
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-226-api-doc-reference-tiering
   path: .ai-state/decisions/226-api-doc-reference-tiering.md
@@ -1986,7 +1986,7 @@ surfaces:
   path: .ai-state/decisions/238-spec-drift-detect-not-regenerate.md
   type: markdown
   title: "Proactive spec\u2194artifact drift \u2014 detect-and-surface, NOT auto-regenerate"
-  last_modified: '2026-07-15'
+  last_modified: '2026-08-05'
   renderer: adr_card
 - id: ai-state-decisions-239-where-it-lives
   path: .ai-state/decisions/239-where-it-lives.md
@@ -2576,6 +2576,12 @@ surfaces:
   title: Sentinel Report
   last_modified: '2026-08-05'
   renderer: default_markdown
+- id: ai-state-sentinel-reports-sentinel-report-2026-08-05-21-27-47
+  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-05_21-27-47.md
+  type: markdown
+  title: Sentinel Report
+  last_modified: '2026-08-05'
+  renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-06-11-08-38-15
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-11_08-38-15.json
   type: json
@@ -3153,6 +3159,7 @@ groups:
   - ai-state-sentinel-reports-sentinel-report-2026-08-04-13-35-55
   - ai-state-sentinel-reports-sentinel-report-2026-08-05-00-14-32
   - ai-state-sentinel-reports-sentinel-report-2026-08-05-09-52-51
+  - ai-state-sentinel-reports-sentinel-report-2026-08-05-21-27-47
   - ai-state-specs-spec-agent-model-routing-2026-04-25
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30

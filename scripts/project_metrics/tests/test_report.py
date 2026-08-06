@@ -314,19 +314,25 @@ def _reference_trends() -> Any:
         prior_report="METRICS_REPORT_2026-04-22_12-00-00.json",
         prior_schema="1.0.0",
         current_schema="1.0.0",
+        # ``delta_pct`` is what ``trends._compute_deltas`` actually emits:
+        # ``delta / prior``, a ratio in the same units as coverage's line-rate.
+        # This fixture previously carried pre-scaled percentages (2.83 for a
+        # 2.83% move), which no producer ever emits — so it agreed with a
+        # renderer that appended "%" without scaling, and the pair of them
+        # hid the 100x understatement from every test in this file.
         deltas={
             "sloc_total": {
                 "current": 1234,
                 "prior": 1200,
                 "delta": 34,
-                "delta_pct": 2.83,
+                "delta_pct": 34 / 1200,
             },
-            "file_count": {"current": 42, "prior": 40, "delta": 2, "delta_pct": 5.00},
+            "file_count": {"current": 42, "prior": 40, "delta": 2, "delta_pct": 2 / 40},
             "churn_total_90d": {
                 "current": 567,
                 "prior": 500,
                 "delta": 67,
-                "delta_pct": 13.40,
+                "delta_pct": 67 / 500,
             },
             # Null-input delta: current and prior both None, so the row
             # renders em-dashes in every numeric column.
@@ -816,6 +822,91 @@ class TestReportSkipMarkerLanguage:
 # ---------------------------------------------------------------------------
 # Aggregate summary — the 16-column table plus the narrative paragraph.
 # ---------------------------------------------------------------------------
+
+
+def _report_with_coverage(fraction: float) -> Any:
+    """Reference report with coverage available and ``line_pct`` populated.
+
+    The reference fixture deliberately leaves coverage ``not_applicable``, so
+    every percentage render site was untested until this helper existed — which
+    is precisely how a 100x understatement shipped and stayed shipped.
+    """
+    from dataclasses import replace
+
+    from scripts.project_metrics.schema import CollectorResult, ToolAvailability
+
+    report = _build_reference_report()
+    aggregate = replace(report.aggregate, coverage_line_pct=fraction)
+    collectors = dict(report.collectors)
+    collectors["coverage"] = CollectorResult(
+        status="ok",
+        data={
+            "line_pct": fraction,
+            "artifact_format": "cobertura",
+            "artifact_path": "coverage.xml",
+        },
+    )
+    availability = dict(report.tool_availability)
+    availability["coverage"] = ToolAvailability(status="available", version="7.13.5")
+    return replace(
+        report,
+        aggregate=aggregate,
+        collectors=collectors,
+        tool_availability=availability,
+    )
+
+
+class TestCoverageRendersAsAPercentage:
+    """Every ``%``-suffixed site must scale the fraction its producer emits.
+
+    Coverage parsers store Cobertura's ``line-rate`` verbatim — a fraction in
+    [0, 1] — and ``trends`` computes ``delta / prior``. Suffixing "%" without
+    multiplying by 100 rendered 85.02% coverage as "0.85%". These tests pin
+    each render site against the true reading, so the next site added cannot
+    quietly reintroduce the scale error.
+    """
+
+    def test_narrative_preamble_scales_the_coverage_fraction(self) -> None:
+        from scripts.project_metrics.report import render_markdown
+
+        md = render_markdown(_report_with_coverage(0.8502))
+        assert "Line coverage is 85.02%." in md, (
+            "Narrative preamble must render the [0,1] line-rate as a percentage; "
+            f"got: {_line_containing(md, 'Line coverage is')!r}"
+        )
+
+    def test_deep_dive_coverage_bullet_scales_the_fraction(self) -> None:
+        from scripts.project_metrics.report import render_markdown
+
+        md = render_markdown(_report_with_coverage(0.8502))
+        section = _extract_section(md, "Per-collector Deep Dive")
+        bullet = _line_containing(section, "Line coverage:")
+        assert bullet.strip() == "- Line coverage: 85.02%", (
+            "The coverage deep-dive bullet is what the sentinel's coverage "
+            "dimension reads against the project floor. An unscaled 0.85 there "
+            f"files a tech-debt row against an 85%-covered repository; got: {bullet!r}"
+        )
+
+    def test_trends_delta_pct_column_scales_the_ratio(self) -> None:
+        from scripts.project_metrics.report import render_markdown
+
+        md = render_markdown(_build_reference_report())
+        section = _extract_section(md, "Trends")
+        # sloc_total moved 1200 -> 1234; delta_pct is 34/1200 == 0.02833…
+        row = _line_containing(section, "sloc_total")
+        assert "2.83%" in row, (
+            "Delta % column must scale the delta/prior ratio; an unscaled "
+            f"'0.03%' understates a 2.83% move by 100x. Got: {row!r}"
+        )
+
+    def test_a_fully_covered_repository_reads_as_one_hundred_percent(self) -> None:
+        from scripts.project_metrics.report import render_markdown
+
+        md = render_markdown(_report_with_coverage(1.0))
+        assert "Line coverage is 100.00%." in md, (
+            "The upper bound of the fraction domain must render as 100.00%, "
+            "not 1.00% — the boundary that makes the scale error unmistakable."
+        )
 
 
 class TestReportAggregateSummary:

@@ -127,6 +127,25 @@ def _fmt_float_raw(value: Any) -> str:
     return str(value)
 
 
+def _fmt_pct(value: Any) -> str:
+    """Render a ``[0.0, 1.0]`` fraction as a percentage, scaling included.
+
+    Every producer of a ``*_pct`` field in this package emits a *fraction*:
+    the Cobertura/LCOV parsers store ``line-rate`` verbatim, and the trends
+    module computes ``delta / prior``. Appending ``%`` to that fraction
+    understates by 100x — 0.8502 rendered as "0.85%" rather than "85.02%".
+    That is not merely cosmetic: the sentinel's coverage dimension reads this
+    Markdown against a 70% floor, so an 85%-covered repository files
+    tech-debt rows for being catastrophically untested.
+
+    The scaling lives in the formatter, not at each call site, so a new render
+    site cannot reintroduce the bug by forgetting it.
+    """
+    if value is None:
+        return _NULL_CELL
+    return f"{float(value) * 100:.2f}%"
+
+
 # Per-collector deep-dive rendering. Each entry is (key, label, formatter).
 # Keys must match what the collector actually emits in ``data`` -- the
 # renderer silently skips absent keys, so a typo here means the row never
@@ -154,7 +173,10 @@ _DEEP_DIVE_LAYOUT: dict[str, tuple[tuple[str, str, Any], ...]] = {
     "complexipy": (),
     "pydeps": (),
     "coverage": (
-        ("line_pct", "Line coverage", _fmt_float_2),
+        # The sentinel's coverage dimension reads *this* bullet, not the
+        # narrative preamble, when deciding whether a project is under its
+        # coverage floor — so the fraction must be scaled here too.
+        ("line_pct", "Line coverage", _fmt_pct),
         ("artifact_format", "Artifact format", _fmt_float_raw),
         ("artifact_path", "Artifact path", _fmt_float_raw),
     ),
@@ -603,7 +625,7 @@ def _render_aggregate_paragraph(report: Report) -> str:
     coverage_sentence = (
         "Coverage is not computed."
         if coverage is None
-        else f"Line coverage is {_fmt_float_2(coverage)}%."
+        else f"Line coverage is {_fmt_pct(coverage)}."
     )
     return (
         f"The repository carries {sloc} SLOC across {files} files in "
@@ -710,9 +732,8 @@ def _fmt_delta_cell(value: Any) -> str:
 
 
 def _fmt_delta_pct_cell(value: Any) -> str:
-    if value is None:
-        return _NULL_CELL
-    return f"{float(value):.2f}%"
+    # ``delta_pct`` arrives as ``delta / prior`` — a ratio, not a percentage.
+    return _fmt_pct(value)
 
 
 # ---------------------------------------------------------------------------

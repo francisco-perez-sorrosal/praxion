@@ -179,12 +179,12 @@ Key pre-flight facts:
 - `supports_sandbox: false` — every test iteration runs against the live brokerage.
   A capital-segregated agentic account and a HITL approval interceptor are **mandatory**
   guardrails, not optional.
-- **Options trading is live.** The agent can place *long equities and options* orders, so
-  there are **two** capital-moving placement tools (`place_equity_order`,
-  `place_option_order`) and two cancels. A HITL gate covering only the equities pair leaves
-  options placement ungated.
-- **The tool surface is ~50 tools, not 10**, and grew ~5× in about two months. Resolve it via
-  a live `tools/list` rather than trusting any documented count — including this one.
+- **Gate capital-moving tools by name pattern, never by enumeration.** `place_*_order` and
+  `cancel_*_order` are capital-moving; `review_*_order` is the HITL primitive. Options
+  trading went live *after* a gate was written around equities alone, leaving real-money
+  placement ungated — a pattern gate covers the next asset class on the day it ships.
+- **The tool surface is large and fast-moving** — it grew ~5× in about two months, and this
+  skill deliberately states no count. Resolve it via a live `tools/list`.
 - Auth scopes, order types, and rate limits remain **undocumented** — re-fetch via
   `external-api-docs` before implementing. (The **MCP endpoint URL is documented**:
   `https://agent.robinhood.com/mcp/trading`. An earlier revision listed it as undocumented,

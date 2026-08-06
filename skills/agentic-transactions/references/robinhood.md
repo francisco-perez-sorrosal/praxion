@@ -7,8 +7,8 @@ Back-link: [../SKILL.md](../SKILL.md)
 > **State of knowledge (verified 2026-08-05 against Robinhood's official support docs).**
 > The connection surface is public: the MCP endpoint URL, the HTTP transport, the connect
 > command, and the desktop-only onboarding/auth flow are all documented (below). **Tool
-> *names* are published** — roughly 50 of them across six categories, up from the 10 recorded
-> at the previous verification, with **options trading now live**.
+> *names* are published** — but this document deliberately states no count, because the one it
+> stated last time was wrong within the re-verification window. **Options trading is live.**
 > What is **still not published**: the MCP **tool input schemas / parameter names**, the
 > **order-type enum**, **rate limits**, and the OAuth/token internals. The way to resolve
 > those is **operational, not documentary** — connect an MCP client to the live endpoint
@@ -16,9 +16,11 @@ Back-link: [../SKILL.md](../SKILL.md)
 > Re-run `chub_search({ query: "robinhood trading" })` via `external-api-docs` before
 > coding in case curated docs have since appeared.
 >
-> **This surface moves fast** — 10 → ~50 tools plus a whole asset class in ~64 days. A
-> 60-day staleness threshold does not track it. Treat any tool inventory here as a snapshot
-> and introspect before relying on it.
+> **This surface moves fast** — 10 → ~50 tools plus a whole asset class in ~64 days. No
+> re-verification cadence tracks that: the surface moved *inside* the 60-day threshold meant
+> to catch it. So this document asserts no inventory at all — it gives you a classification
+> rule and tells you to introspect. Shortening the threshold would have been the comfortable
+> fix and would have changed nothing.
 
 ---
 
@@ -63,7 +65,7 @@ claude mcp add --transport http robinhood-trading https://agent.robinhood.com/mc
 claude mcp add --transport http --scope local robinhood-trading https://agent.robinhood.com/mcp/trading
 ```
 
-**First step for any implementer:** after `mcp add`, run an MCP `tools/list` against the endpoint to enumerate the actual tool **input schemas** and parameter names. Tool names are now confirmed (see "Tool Surface" below), but schemas still require live introspection. Cross-check against the community reference implementation [`Open-Agent-Tools/open-stocks-mcp`](https://github.com/Open-Agent-Tools/open-stocks-mcp) (multi-broker Robinhood/Schwab MCP) for shape, but verify against the live first-party endpoint.
+**First step for any implementer:** after `mcp add`, run an MCP `tools/list` against the endpoint to enumerate the actual tool **input schemas** and parameter names. That one call gives you both the names and the schemas; this document classifies what it returns rather than listing it (see "Tool Surface" below). Cross-check against the community reference implementation [`Open-Agent-Tools/open-stocks-mcp`](https://github.com/Open-Agent-Tools/open-stocks-mcp) (multi-broker Robinhood/Schwab MCP) for shape, but verify against the live first-party endpoint.
 
 **ADVANCED / standalone path** (official `mcp` Python SDK, `pip install mcp>=1.26.0`, Python ≥3.10; Streamable HTTP is the current transport — do not copy older HTTP+SSE examples). Use this when driving the Robinhood MCP outside of Claude Code (e.g. a headless agent loop). The `token` here comes from the OAuth flow — Robinhood exposes no documented static API-key/bearer path for the first-party endpoint yet:
 ```python
@@ -86,66 +88,64 @@ Higher-level alternative for agent loops: OpenAI Agents SDK `MCPServerStreamable
 
 ---
 
-## Tool Surface (~50 official MCP tools, verified 2026-08-05)
+## Tool Surface — classification, not inventory
 <!-- last-verified: 2026-08-05 -->
 
-> **This section previously documented 10 tools and stated that `place_equity_order` was the
-> only write-side placement tool. Both were wrong.** The surface grew roughly 5× and
-> **options trading is live** — `place_option_order` is a second capital-moving placement
-> tool. Any spend-gating design derived from the 10-tool list is incomplete.
+> **This section deliberately does not enumerate the tool surface.** It once listed 10 tools
+> and named `place_equity_order` as the only write-side placement tool. In about 64 days the
+> surface grew roughly 5× and options trading shipped, making `place_option_order` a second
+> capital-moving tool outside every gate derived from that list. An inventory of a beta
+> vendor surface is wrong faster than any re-verification cadence can catch, and it is not
+> even actionable on its own: input schemas, parameter names and the order-type enum are
+> unpublished, so **you must introspect the live server regardless**.
 
-Names verbatim from the official support article
-["Trading with your agent"](https://robinhood.com/us/en/support/articles/trading-with-your-agent/).
-Two independent transcriptions on 2026-08-05 enumerated **50 tools across six categories**
-(5 + 12 + 9 + 8 + 10 + 6). Note the article's own prose per-category counts sum to 45 — an
-upstream inconsistency between its narrative and its lists.
+**Resolve the surface operationally — `tools/list` against the live endpoint after `mcp add`.**
+That is the only authoritative answer, and it is current by construction.
 
-**Do not treat any count here as authoritative.** The surface moved 10 → ~50 in about 64
-days. Resolve it operationally with a live `tools/list` before relying on it; input schemas,
-parameter names, and the order-type enum remain unpublished and require introspection anyway.
+What this document keeps instead is the part that does not rot: **how to classify whatever
+`tools/list` returns.** A classification is a rule for sorting, so a tool added tomorrow is
+sorted by it rather than falsifying it. When this surface last moved, every negative claim
+here held and every positive enumeration went stale — that asymmetry is the reason for the
+split.
 
-### Write-side tools — the ones that matter for gating
+### The classification — apply it to whatever `tools/list` returns
 
-Classify by **what a call can cost you**, not by read-vs-write:
+Sort by **what a call can cost you**, not by read-vs-write. Robinhood's naming has been
+consistent across every surface change so far, so the class is derivable from the name:
 
-| Tool | Class | Notes |
+| Name pattern | Class | Gate |
 |---|---|---|
-| `place_equity_order` | **Capital-moving** | Executes an equity order |
-| `place_option_order` | **Capital-moving** | Executes an options order — **new; absent from the old 10-tool list** |
-| `cancel_equity_order` | **Capital-moving** | Cancels an open equity order |
-| `cancel_option_order` | **Capital-moving** | Cancels an open options order |
-| `review_equity_order` | Simulate | Pre-trade warnings — the equities HITL gate primitive |
-| `review_option_order` | Simulate | Pre-trade warnings — the options HITL gate primitive |
-| `create_watchlist`, `update_watchlist`, `follow_watchlist`, `unfollow_watchlist`, `add_to_watchlist`, `remove_from_watchlist`, `add_option_to_watchlist`, `remove_option_from_watchlist` | **State-mutating, non-capital** | Change account state; move no money |
-| `create_scan`, `run_scan`, `update_scan_filters`, `update_scan_config` | **State-mutating, non-capital** | Change account state; move no money |
+| `place_<asset>_order` | **Capital-moving** — executes | Requires human approval. Never callable directly by the agent loop |
+| `cancel_<asset>_order` | **Capital-moving** — changes execution outcome | Requires human approval; leaving an order open or cancelling it are both money decisions |
+| `review_<asset>_order` | **Simulate** — pre-trade warnings | The HITL gate primitive. Safe to call unattended; it is what you show the human |
+| `get_*`, `search` | Read | Unrestricted |
+| any other mutating verb (`create_*`, `update_*`, `add_*`, `remove_*`, `follow_*`, `unfollow_*`, `run_*`) | **State-mutating, non-capital** | Allow deliberately, not by default — see below |
 
-The non-capital mutators are the category the old model had no room for: they are not reads,
-so an allow-list built as "everything that isn't a `place_*`" silently authorizes them.
+**Gate on the pattern, never on an enumerated pair.** This is the lesson the options launch
+taught at cost: a gate written as "`place_equity_order` and `place_option_order`" is correct
+until the next asset class ships, and then it is silently incomplete — the failure mode is
+real money moving through an ungated path, and nothing in the system announces it. A gate
+written against `place_*_order` covers the next asset class on the day it appears. Same for
+`cancel_*_order` and `review_*_order`.
 
-### Categories
+**The canonical two-step HITL gate**, stated the durable way:
 
-| Category (verbatim) | Contents |
-|---|---|
-| Account, portfolio, and other tools | `get_accounts`, `get_portfolio`, `get_realized_pnl`, `get_pnl_trade_history`, `search` |
-| Watchlist tools | the 8 mutators above plus `get_watchlists`, `get_watchlist_items`, `get_option_watchlist`, `get_popular_watchlists` |
-| Market data tools | `get_equity_historicals`, `get_equity_fundamentals`, `get_financials`, `get_equity_price_book`, `get_equity_technical_indicators`, `get_earnings_results`, `get_earnings_calendar`, `get_indexes`, `get_index_quotes` |
-| Equities tools | `get_equity_positions`, `get_equity_tax_lots`, `get_equity_quotes`, `get_equity_orders`, `get_equity_tradability`, `review_equity_order`, `place_equity_order`, `cancel_equity_order` |
-| Options tools | `get_option_level_upgrade_info`, `get_option_historicals`, `get_option_chains`, `get_option_instruments`, `get_option_quotes`, `get_option_positions`, `get_option_orders`, `review_option_order`, `place_option_order`, `cancel_option_order` |
-| Scanner tool calls | `get_scans`, `get_scanner_filter_specs`, `create_scan`, `run_scan`, `update_scan_filters`, `update_scan_config` |
+> `review_<asset>_order` → human approval → `place_<asset>_order`, for **every** `<asset>`
+> the live surface exposes — enumerate `<asset>` from `tools/list` at wiring time, not from
+> this document.
 
-Every tool from the original 10 still exists under the same name — nothing was removed.
+That pair is the tool-level implementation of the `authorize()` → `execute()` contract verbs.
 
-**Canonical two-step HITL gate — now one pair per asset class:**
+**The non-capital mutators are the class most allow-lists miss.** They are not reads, so a
+rule built as "everything that isn't a `place_*`" silently authorizes them. They move no
+money, but they change account state the user did not ask the agent to touch.
 
-- Equities: `review_equity_order` → human approval → `place_equity_order`
-- Options: `review_option_order` → human approval → `place_option_order`
-
-Both are the tool-level implementation of the `authorize()` → `execute()` contract verbs. A
-gate that covers only the equities pair leaves options placement ungated.
-
-**Crypto is not in the tool surface.** Press coverage has reported crypto agentic trading;
-the primary source lists no crypto *trading* tool (crypto appears only in watchlist tools)
-and says only "we'll be adding support for more assets soon." Do not encode crypto support.
+**Crypto is not in the tool surface** (as of the last verification). Press coverage has
+reported crypto agentic trading; the primary source lists no crypto *trading* tool — crypto
+appears only in watchlist tools — and says only "we'll be adding support for more assets
+soon." Do not encode crypto support. Note that this is a **negative** claim, the durable
+kind: if it ever becomes false, a `place_crypto_order` will appear in `tools/list` and the
+pattern gate above will already cover it.
 
 ---
 
@@ -158,8 +158,8 @@ Use **`local` scope (default)** for Robinhood — the OAuth grant is personal an
 
 ### Permission Block (`settings.json`)
 
-**State the policy as a rule, not as an enumeration.** With ~50 tools and a surface that grew
-5× in two months, any hand-listed allow-list is stale on arrival. The rule that survives
+**State the policy as a rule, not as an enumeration.** On a surface that grew 5× in two
+months, any hand-listed allow-list is stale on arrival. The rule that survives
 expansion:
 
 > Every `place_*` and `cancel_*` tool goes in `ask`. Everything else may be allowed — but
@@ -227,8 +227,8 @@ By default, Claude Code uses Tool Search: MCP tools are deferred and loaded on d
 **Requires Claude Code v2.1.121+.**
 
 **The cost judgment that justified this has expired.** It read "10 tool schemas consume
-context tokens at every session; with only 10 tools this is acceptable." At ~50 tools that is
-roughly 5× the cost, and it now cuts against the docs' own guidance: use `alwaysLoad` "for a
+context tokens at every session; with only 10 tools this is acceptable." After a 5× expansion
+that is roughly 5× the cost, and it now cuts against the docs' own guidance: use `alwaysLoad` "for a
 small number of tools that Claude needs on every turn, since each upfront tool consumes
 context that would otherwise be available for your conversation." Fifty schemas is not a
 small number.
@@ -332,13 +332,17 @@ VenueDetail(
 
 **Now known (verified 2026-08-05):** MCP endpoint URL, HTTP transport, connect command, desktop-only onboarding/auth flow, read/write access scope, no-sandbox, eligibility, HITL-is-not-system-enforced. Reflected above.
 
-**Now confirmed (2026-08-05):** MCP tool names — **~50 tools across six categories**, not the
-10 previously recorded. See "Tool Surface" above.
+**No longer asserted here:** the tool inventory. It was recorded as 10 tools, was ~50 about
+64 days later, and is now resolved operationally via `tools/list` — see "Tool Surface" above
+for the classification that replaced it.
 
-> **Note which claims rotted.** Both of the *positive* assertions in this section went stale
-> ("all 10 tools", "options on roadmap") while **every** "still undocumented" row below held.
-> Negative claims about this surface are cheap and durable; positive ones decay fast. Weight
-> re-verification effort accordingly.
+> **Note which claims rotted, and why this document is shaped the way it is.** Both *positive*
+> assertions in this section went stale ("all 10 tools", "options on roadmap") while **every**
+> "still undocumented" row below held. Negative claims about this surface are cheap and
+> durable; positive enumerations decay fast and cannot be rescued by a shorter re-verification
+> cadence — the surface moved inside the threshold that was supposed to catch it. The response
+> was to stop asserting the decaying thing rather than to re-verify it more often: keep the
+> negative claims, keep the classification rule, and derive the inventory at wiring time.
 
 **Still undocumented — resolve operationally (introspect the live MCP server) before coding:**
 
@@ -350,7 +354,7 @@ VenueDetail(
 | **OAuth scopes / token format** | Onboarding handles it; internals opaque | Inspect the client's stored MCP credential post-onboarding |
 | **HITL triggering conditions** | User-configured, not system-enforced | Enforce `human_gate` in your own loop; do not depend on Robinhood |
 | **Extended-hours trading** | Not documented in beta | Default `market_hours: "regular"`; verify |
-| **Options support** | **Shipped** — "You currently can use your agent to place long equities and options orders" | Gate `place_option_order` exactly as you gate `place_equity_order` |
+| **Asset classes** | Equities and long options shipped; "we'll be adding support for more assets soon" | Do not enumerate. Gate `place_*_order` / `cancel_*_order` by pattern so the next asset class is covered on arrival — this row is expected to go stale and is designed not to matter when it does |
 | **Crypto support** | **Not in the tool surface.** Primary source lists no crypto trading tool; "we'll be adding support for more assets soon". Press reports of crypto agentic trading are not primary-confirmed | Do not encode crypto support; re-check the support article directly |
 
 ---

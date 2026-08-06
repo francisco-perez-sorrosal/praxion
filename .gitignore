@@ -49,6 +49,11 @@ coverage.xml
 # Agent intermediate documents
 .ai-work/
 
+# Scratch. CLAUDE.md's always-loaded Critical Conventions direct every writer
+# here ("temp files in `tmp/`"), so the protection has to exist or the
+# instruction hands out a path one `git add -A` away from being committed.
+tmp/
+
 # Runtime ephemeral files (concurrency locks, transient backups)
 .ai-state/*.lock
 .ai-state/**/*.lock

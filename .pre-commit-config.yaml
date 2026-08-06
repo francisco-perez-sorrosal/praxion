@@ -184,6 +184,32 @@ repos:
         files: '\.html$'
         pass_filenames: true
 
+      # Block B4 — .ai-state/ ledger schema. Same defect class as Block B on a
+      # third surface, and the one with no parser at all: `.ai-state/` is a data
+      # format with a specification (the schema references) and no code that
+      # reads it. Every writer is an agent following prose, so the only feedback
+      # was whether a downstream reader happened to notice — which is how 49
+      # rows drifted their `dedup_key`, seven wrote a slug into a hex column, a
+      # `||` in a notes cell split a row into 16 fields, and a row landed past
+      # the trailing prose section where every counting recipe is blind to it.
+      #
+      # Whole-repo `--check` rather than `--files`: the tech-debt pair shares one
+      # `dedup_key` namespace ACROSS its two files, so a uniqueness violation is
+      # only visible when both are read. A per-file invocation would be blind to
+      # exactly the collision that erases a `td-NNN` at the next finalize run.
+      #
+      # `files:` MUST list every path in the script's LEDGERS registry — a test
+      # asserts that, so registering a sixth ledger without widening this pattern
+      # fails rather than silently shipping an ungated file. Working-tree read
+      # (no `--staged`): unlike the ADR gate below, no tooling here stages a blob
+      # that differs from the tree.
+      - id: state-ledger-schema
+        name: .ai-state/ ledger schema
+        entry: python3 scripts/check_state_ledgers.py --check --repo-root .
+        language: system
+        files: '^\.ai-state/(TECH_DEBT_(LEDGER|RESOLVED)|CONSULT_(LEDGER|COSTS|PRIORS))\.md$'
+        pass_filenames: false
+
       # Block G — ADR frontmatter promotion (td-103). Self-scans the staged
       # git index under .ai-state/decisions/ via --staged, so it catches a
       # finalize_adrs.py staging defect at the commit that would ship it,

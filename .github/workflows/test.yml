@@ -292,6 +292,33 @@ jobs:
       - name: Repo-wide id-citation scan
         run: python3 scripts/check_id_citation_discipline.py
 
+  state-ledger-schema:
+    # Hard gate, repo-wide -- the same shape as the two jobs above, for the same
+    # reason. `.pre-commit-config.yaml` runs this checker only when a ledger file
+    # is STAGED, while the schema it enforces governs the files at all times. A
+    # tree can therefore accumulate ledger defects indefinitely so long as no
+    # commit happens to stage one -- and it did: 49 rows drifted their
+    # `dedup_key`, seven wrote a slug into a hex column, and a row landed past
+    # the trailing prose section, every commit green throughout.
+    #
+    # BLOCKING, and the tree being clean is what makes that cheap: the check
+    # exits 0 over all five ledgers today, so this costs nothing until someone
+    # regresses it. The five surviving `dedup-collision-blocked` rows are
+    # deliberately ADVISORY inside the checker -- they are unrepairable by
+    # construction (recomputing either key would let the next finalize run
+    # collapse two distinct findings and erase a `td-NNN`), and a gate nobody
+    # can satisfy is a gate that gets disabled. Their named reader is the
+    # tech-debt row filed against the formula's granularity.
+    name: State ledger schema
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Validate .ai-state/ ledgers
+        run: python3 scripts/check_state_ledgers.py --check
+
   release-staleness:
     # Advisory (never blocks): after a merge lands on main, report agents /
     # skills / commands added since the last v* release tag -- they are

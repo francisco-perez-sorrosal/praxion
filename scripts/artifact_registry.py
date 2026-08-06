@@ -161,6 +161,27 @@ ARTIFACTS: tuple[Artifact, ...] = (
         cleanup_policy="delete",
         description="Transactions-architect's mandate/settlement/HITL decisions.",
     ),
+    # The only variable-named artifact in the set: one fragment per convened
+    # discipline, so a slug can hold several. `dashboard` and `snapshot` are
+    # false because both consumers match exact filenames (a TS string list and
+    # `task_dir / doc_name`), not because the fragment is uninteresting to
+    # either -- wiring it in needs glob support on the consumer side, which is
+    # a change to them and not to this registry.
+    Artifact(
+        "CONSULT_<discipline>.md",
+        "ai-work",
+        "ephemeral",
+        "specialist",
+        production_gate="producer:discipline-consultant",
+        detection_gate="sentinel:P07",  # undispositioned-challenge detection
+        cleanup_policy="delete",
+        description=(
+            "Discipline consultant's per-challenge falsifiable objections; the convener "
+            "adjudicates each in place and mirrors it to CONSULT_LEDGER.md. Cleanup is "
+            "`delete` because that is what clean_work_safety.py actually classifies it as "
+            "-- the ledger is the durable half of the pair."
+        ),
+    ),
     Artifact(
         "SYSTEMS_PLAN.md",
         "ai-work",

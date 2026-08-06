@@ -1,3 +1,81 @@
+## v0.22.0 (2026-08-06)
+
+### Feat
+
+- **gates**: identify gates by invocation, gate the verdict
+- **gate**: parse and validate .ai-state/ ledgers
+- gate shipped-template drift against its mirror
+- **sentinel**: TD06 measures metrics staleness in commits
+- **metrics**: record what state a report describes
+- **gates**: flag a gate the ambient interpreter cannot load
+- **scripts**: measure the always-loaded token budget
+- **gates**: name the class where enforcement never runs, and detect half of it
+- **commands**: disposition decision-health findings without inviting a purge
+- **fitness**: enforce the judge seam the eval package states three times
+- **adr**: architectural means the inventory changed, not that it was hard
+- **arch**: name the shipped contract as an interface, and reconcile it
+- **arch**: reconcile the design doc's components against the model
+- **adr**: offer a retired decision back when its subject returns
+- **adr**: retire decisions whose subject was removed, with a removal list
+- **adr**: classify reference decay by cause, with a sentinel consumer
+- **hooks**: rank injected decisions by session relevance, not recency
+
+### Fix
+
+- **state**: backfill 44 non-conforming dedup_key values
+- make the Block D predicate read the same both ways
+- give the pre-merge architecture gate a reader
+- **install**: drop PyYAML from the rules manifest reader
+- give the coverage floor check per-module input
+- survive malformed ADRs in the back-link writer
+- decontaminate id citations across the repo
+- state GL02's golden bad-case concretely
+- name a reader for ARCHITECTURE_VALIDATION.md
+- table all 17 agents in the permission baseline
+- bind the arguments three commands declare
+- scaffold consult ledgers and allow baseline
+- match gate exclusions on repo-relative paths
+- render coverage fractions as percentages
+- honour /co's message argument; sweep dec-225 residue
+- **hooks**: let the id-citation gate's verdict actually block a commit
+- **sentinel**: make the audit instrument survive its own turn limit
+- **scripts**: give each report series its own retention budget
+- **onboarding**: ship tmp/ in the .gitignore block; resync its four sites
+- gitignore tmp/, making the always-loaded convention true
+- **state**: refute td-122; file its root cause as td-123
+- **decisions**: type supersedes as string | list
+- **decisions**: repair decayed affected_files entries
+- **adr-health**: classify a rename the decision itself performed
+- **registry**: register the consult fragment
+- **sentinel**: substance clauses, log row order, template markers
+- **sentinel**: P07's consult clause is correct; fix the producer tier
+- **skills**: note checkout fork-PR default and artifact quotas
+- **skills**: correct Robinhood surface and HITL gating
+- **skills**: document all 18 LikeC4 MCP tools
+- **skills**: correct hook event and blocking semantics
+- **skills**: mark MCP SDK v2 as the stable line
+- **skills**: correct A2A guidance to protocol v1.0.1
+- **sentinel**: repair the definitions that contradicted or fired on health
+- **spec-drift**: import PyYAML on demand so the gate loads at all
+- **adr**: withhold the vanished residual with its oracle
+- **adr**: quote the frontmatter a real YAML parser rejects
+- **rules**: single-source the budget basis; correct the EC06 claim
+- **sentinel,template**: wire the orphaned spec-drift gate; scope the node cap
+- **adr**: retire the frontmatter-parsing decision, and record the reversal in it
+- **adr**: repair the reference index where the decision outlived its file
+- **adr**: attribute removals to the decision that named the directory
+- **adr**: resolve directory-shaped references against the git indexes
+- **rules**: correct the exemption rationale; let its gate actually run
+- **scripts**: resolve the chain interpreter from the project, not the shell
+- **adr**: close the dangling draft-id class at finalize
+
+### Refactor
+
+- split finalize_adrs by responsibility
+- **scripts**: extract the duplicated CLI logging scaffold
+- **sentinel**: retire AC11 as subsumed by AC13
+- **design**: split section 3 into structural components and capabilities
+
 ## v0.21.1 (2026-08-02)
 
 ### Fix

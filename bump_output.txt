@@ -1,4 +1,4 @@
-bump: version 0.21.0 → 0.21.1
-tag to create: v0.21.1
-increment detected: PATCH
+bump: version 0.21.1 → 0.22.0
+tag to create: v0.22.0
+increment detected: MINOR
 

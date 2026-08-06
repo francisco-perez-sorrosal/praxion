@@ -208,7 +208,7 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/commit_gate.sh ${CLAUDE_PLUGIN_ROOT}/scripts/check_id_citation_discipline.py",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/commit_gate.sh --blocking ${CLAUDE_PLUGIN_ROOT}/scripts/check_id_citation_discipline.py",
             "timeout": 20,
             "async": false
           }

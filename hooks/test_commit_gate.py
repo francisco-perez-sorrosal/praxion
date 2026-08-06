@@ -33,18 +33,27 @@ def _write_delegation_spy(tmp_path: Path) -> Path:
     return spy
 
 
+def _write_exiting_spy(tmp_path: Path, code: int) -> Path:
+    """Write a Python stub that exits with `code` after draining stdin."""
+    spy = tmp_path / f"exit_{code}_hook.py"
+    spy.write_text(f"import sys\nsys.stdin.read()\nsys.exit({code})\n", encoding="utf-8")
+    return spy
+
+
 def _run_gate(
     payload: dict,
     *,
     hook: Path | None = None,
     env: dict[str, str] | None = None,
+    blocking: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     """Invoke commit_gate.sh with a JSON payload on stdin."""
     real_hook = str(hook) if hook else str(HOOKS_DIR / "check_id_citation_discipline.py")
     merged_env = dict(os.environ)
     merged_env.update(env or {})
+    argv = [str(GATE_SCRIPT)] + (["--blocking"] if blocking else []) + [real_hook]
     return subprocess.run(
-        [str(GATE_SCRIPT), real_hook],
+        argv,
         input=json.dumps(payload),
         capture_output=True,
         text=True,
@@ -123,3 +132,79 @@ def test_non_commit_command_exits_fast(command: str, tmp_path: Path) -> None:
     assert DELEGATION_MARKER not in result.stdout, (
         f"non-commit command {command!r} must not reach Python; stdout={result.stdout!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# PreToolUse exit-code translation (--blocking)
+# ---------------------------------------------------------------------------
+
+
+def test_blocking_translates_findings_exit_into_pretooluse_block(tmp_path: Path) -> None:
+    """A gate reporting findings (1) must reach Claude Code as a block (2).
+
+    PreToolUse treats *only* exit 2 as "block this tool call"; every other
+    non-zero is a non-blocking error the model never sees. Praxion's check_*
+    scripts use the POSIX-natural 1-on-findings, so without this translation a
+    gate detects a violation perfectly and has its verdict discarded --
+    check_id_citation_discipline.py did exactly that while the rule it enforces
+    called it "the primary enforcement layer".
+    """
+    result = _run_gate(
+        _make_bash_payload("git commit -m 'x'"),
+        hook=_write_exiting_spy(tmp_path, 1),
+        blocking=True,
+    )
+    assert result.returncode == 2
+
+
+def test_without_blocking_a_findings_exit_passes_through(tmp_path: Path) -> None:
+    """Reminders must not block, so the translation is opt-in per invocation.
+
+    remind_adr.py and remind_calibration.py are wrapped by the same gate and
+    exit 0 normally -- but a Python traceback also exits 1, the same code a gate
+    uses for findings. A blanket translation would turn any crashing reminder
+    into a commit blocker.
+    """
+    result = _run_gate(
+        _make_bash_payload("git commit -m 'x'"),
+        hook=_write_exiting_spy(tmp_path, 1),
+    )
+    assert result.returncode == 1
+
+
+def test_blocking_leaves_clean_and_error_codes_unchanged(tmp_path: Path) -> None:
+    """Only the findings code is translated; 0 and 2 pass through untouched."""
+    clean = _run_gate(
+        _make_bash_payload("git commit -m 'x'"),
+        hook=_write_exiting_spy(tmp_path, 0),
+        blocking=True,
+    )
+    script_error = _run_gate(
+        _make_bash_payload("git commit -m 'x'"),
+        hook=_write_exiting_spy(tmp_path, 2),
+        blocking=True,
+    )
+    assert clean.returncode == 0
+    assert script_error.returncode == 2
+
+
+def test_id_citation_gate_is_wired_as_blocking() -> None:
+    """The mechanism is useless unwired -- pin the declaration, not just the code.
+
+    This is the half a unit test cannot reach: commit_gate.sh can translate
+    correctly forever while hooks.json invokes it without the flag.
+    """
+    raw = json.loads((HOOKS_DIR / "hooks.json").read_text(encoding="utf-8"))
+    # Events nest under a top-level "hooks" key; reading the top level directly
+    # yields an empty list and a vacuously passing test.
+    hooks_json = raw["hooks"]
+    commands = [
+        h["command"]
+        for group in hooks_json.get("PreToolUse", [])
+        for h in group.get("hooks", [])
+        if "command" in h
+    ]
+    id_citation = [c for c in commands if "check_id_citation_discipline.py" in c]
+    assert id_citation, "the id-citation gate is not wired into PreToolUse at all"
+    for command in id_citation:
+        assert "--blocking" in command, f"gate invoked without --blocking: {command}"

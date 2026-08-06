@@ -605,7 +605,7 @@ Other §Flow steps (1–7, 9, 11–13) are not idempotent in the strict sense be
 - **`/onboard-project` Phase 8b (AaC scaffolding)** — when AaC was not opted out of (the default), all five sub-step predicates hit (`fitness/` exists, Block D is present, `architecture.yml` exists, fence markers are in `.ai-state/DESIGN.md`, `docs/diagrams/.gitkeep` exists). The `/onboard-project --with-aac` path becomes a clean no-op.
 - **`/onboard-project` Phase 8d (Obsidian integration)** — when Obsidian was not opted out of (the default), all sub-step predicates hit (`.gitignore` Obsidian block present, `obsidian@obsidian-skills` plugin installed at user scope, `.obsidian/app.json` link-safety keys pinned, `## Obsidian Integration` block in `CLAUDE.md`, `permissions.deny` entries present). `/onboard-project`'s Phase 8d becomes a complete no-op.
 
-The other phases of `/onboard-project` (1, 2, 3, 4, 5, 7, 9) apply the surfaces this command does not — git hooks, merge drivers, `.ai-state/` skeleton (`DECISIONS_INDEX.md`, `TECH_DEBT_LEDGER.md`, `calibration_log.md`), `.gitattributes`, `.claude/settings.json` toggles, companion CLI advisories, and the verification handoff.
+The other phases of `/onboard-project` (1, 2, 3, 4, 5, 7, 9) apply the surfaces this command does not — git hooks, merge drivers, the full `.ai-state/` skeleton (enumerated in `/onboard-project` §Phase 2, which is the only place that list lives), `.gitattributes`, `.claude/settings.json` toggles and permissions, companion CLI advisories, and the verification handoff.
 
 ## Test gate
 

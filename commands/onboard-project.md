@@ -15,7 +15,7 @@ Onboard the **current existing** project to work cleanly with the Praxion plugin
 5. §Phase 2 — `.ai-state/` skeleton
 6. §Phase 3 — `.gitattributes` + merge driver registration
 7. §Phase 4 — Git hooks (pre-commit + post-merge + post-commit + post-checkout)
-8. §Phase 5 — `.claude/settings.json` toggles
+8. §Phase 5 — `.claude/settings.json` toggles + `permissions.allow` baseline
 9. §Phase 5b — Hackathon mode gate: write six artifacts when enabled (opt-in, default-skip)
 10. §Phase 6 — `CLAUDE.md` Praxion blocks (idempotent append)
 11. §Phase 7 — Companion CLIs (advisory only)
@@ -87,10 +87,10 @@ Execute these phases in order. Each phase honors §Idempotency Predicates — re
 |-------|--------|----------------------------------|
 | 0.5 | **(conditional — only when `CLAUDE.md` is absent)** Bootstrap a `CLAUDE.md` so the block-append phases have a target: prefer `/init`, else generate an init-equivalent `CLAUDE.md` inline from the codebase | `test -e CLAUDE.md` (present → skip the entire phase, no gate, no write) |
 | 1 | Append AI-assistants block to `.gitignore` | Block detected by `# AI assistants` header line |
-| 2 | Create `.ai-state/` skeleton (4 files) | Each file's existence checked individually |
+| 2 | Create the `.ai-state/` skeleton (files enumerated in §Phase 2) | Each file's existence checked individually |
 | 3 | Append `.gitattributes` entries + register merge drivers via `git config`; clean up retired drivers | Entries detected by exact-line match; drivers detected via `git config --get`; **version-aware** — a `/i-am/` driver pinned to a non-live path is re-registered, not skipped |
 | 4 | Symlink pre-commit + the three finalize hooks (post-merge, post-commit, post-checkout) (skip if `skip-phase-4` flag) | Symlinks detected via `readlink`; **version-aware** — a finalize-hook target pinned to a non-live `/i-am/<version>/` path is re-pointed, not skipped (pre-commit is runtime-resolving, never stale) |
-| 5 | Write `.claude/settings.json` with chosen `PRAXION_DISABLE_*` flags | Existing keys preserved unless user explicitly chooses to override |
+| 5 | Write `.claude/settings.json`: chosen `PRAXION_DISABLE_*` flags (5a) + the `permissions.allow` baseline (5b) | Evaluated per sub-step, never phase-wide (see §Phase 5); existing keys preserved unless the user explicitly overrides |
 | 5b | Hackathon mode gate: write six artifacts when enabled | `PRAXION_HACKATHON_MODE=1` present in `.claude/settings.json` env (skip if already set); or user picks `Skip — keep full ceremony` (default) at Gate 5b |
 | 6 | Refresh Agent Pipeline + Compaction Guidance + Behavioral Contract + Praxion Process blocks via `refresh_claude_blocks.py --apply`, then append the Project Essentials block, to `CLAUDE.md` (+ `## Hackathon Mode` when Phase 5b enabled it) | `refresh_claude_blocks.py`'s own absent/current/stale/modified classification for the four core blocks (no heading-check); `## Working in this project` heading detection for Project Essentials |
 | 7 | Print companion-CLI install commands (advisory) | None — purely informational |
@@ -217,7 +217,7 @@ If the user agrees, remove that line. If they decline, proceed without changing 
 
 ## §Phase 2 — `.ai-state/` skeleton
 
-**Canonical schemas.** TECH_DEBT_LEDGER schema (14 row fields + structural `dedup_key`), producer/consumer contracts, and dedup semantics: [`skills/software-planning/references/tech-debt-ledger.md`](../skills/software-planning/references/tech-debt-ledger.md) (summary + pointer in `rules/swe/agent-intermediate-documents.md` § `TECH_DEBT_LEDGER.md`). DECISIONS_INDEX format and calibration_log format: `rules/swe/agent-intermediate-documents.md`. The skeletons below are header-only seeds — agents populate rows over time per the canonical contracts. ADR fragment naming and lifecycle live in `rules/swe/adr-conventions.md`.
+**Canonical schemas.** TECH_DEBT_LEDGER schema (14 row fields + structural `dedup_key`), producer/consumer contracts, and dedup semantics: [`skills/software-planning/references/tech-debt-ledger.md`](../skills/software-planning/references/tech-debt-ledger.md) (summary + pointer in `rules/swe/agent-intermediate-documents.md` § `TECH_DEBT_LEDGER.md`). DECISIONS_INDEX format and calibration_log format: `rules/swe/agent-intermediate-documents.md`. The skeletons below are header-only seeds — agents populate rows over time per the canonical contracts. ADR fragment naming and lifecycle live in `rules/swe/adr-conventions.md`. The three `CONSULT_*.md` skeletons are the one exception to *brief*: the convening instructions cite `<file> § Column Definitions` as the schema, so each file **is** its own schema anchor and must ship with that section complete rather than pointing elsewhere.
 
 **Predicate.** Each file's existence is checked individually. Existing files are never overwritten.
 
@@ -268,6 +268,106 @@ If the user agrees, remove that line. If they decline, proceed without changing 
   # Pending Praxion Feedback
 
   Candidate ecosystem-defect reports awaiting `/report-praxion-issue`. This file is git-committed and mechanically sanitized at capture time.
+  ```
+
+- **The three consult ledgers** — `.ai-state/CONSULT_LEDGER.md`, `.ai-state/CONSULT_COSTS.md`, `.ai-state/CONSULT_PRIORS.md`.
+
+  **Why these ship.** The discipline-consult mechanism's *producer* is plugin-global: `agents/discipline-consultant.md`, `commands/consult.md`, and the convening rules all install with the plugin, so any managed project can convene a consult on day one. Its convener is then instructed to append rows to these three files, and to read their `## Column Definitions` as the schema. Without the skeletons the producer ships and the consumer does not — the convener is told to append to files that do not exist, and the schema pointer in its own instructions dangles. These are the entire per-project install footprint for the mechanism; nothing else is copied.
+
+  **Predicate (skip if present).** Each file is checked individually with `test -e`. An existing file is never overwritten — it already holds committed observations, and these ledgers are append-only.
+
+  **Action.** For each of the three missing files, write the skeleton below verbatim. Header-only — **never seed an example row.** These files are read as data series; a fabricated row is indistinguishable from an observation and permanently contaminates every count computed over them.
+
+  `.ai-state/CONSULT_LEDGER.md`:
+  ```markdown
+  # Consultation Disposition Ledger
+
+  Append-only. One row per dispositioned discipline-consultant challenge. **Single writer: the convener** — the party that spawned the consultant (the systems-architect in pipeline mode, the orchestrator under `/consult`). The consultant never writes this file; it authors only its own `CONSULT_<discipline>.md` fragment.
+
+  **Append new rows as the last row of the data table below — never after the `## Column Definitions` section.** No row is ever edited or deleted. A disposition revisited later is appended as a new row; both remain part of the record.
+
+  | timestamp | task-slug | discipline | stage | challenge-id | claim | decision-at-stake | disposition | rationale-ref | model | difficulty |
+  |---|---|---|---|---|---|---|---|---|---|---|
+
+  ## Column Definitions
+
+  - **timestamp** — ISO 8601 UTC of the disposition, `YYYY-MM-DDTHH:MM:SSZ`.
+  - **task-slug** / **discipline** / **stage** — the consult's identity triple, and the join key to the two sibling ledgers. `(task-slug, discipline)` alone is not unique: one discipline may attach at two stages within a single task, and those are two independent consults.
+  - **challenge-id** — the `### CH-NN` id from the consultant's `CONSULT_<discipline>.md` fragment.
+  - **claim** — the challenge's one-line falsifiable claim. Escape any literal `|` as `\|`.
+  - **decision-at-stake** — the decision that claim would change, copied from the challenge's own field.
+  - **disposition** — exactly one of `switch-now` | `defer-with-rationale` | `dismiss-with-rationale`.
+  - **rationale-ref** — where the disposition's reasoning lives. **The target must be durable**: an ADR id, a tech-debt row, or a section of a committed document — **never** a path under `.ai-work/`, which is deleted at pipeline cleanup and would leave the reasoning unrecoverable while the row still *looks* recorded. Each disposition has a durable home: `switch-now` → the ADR or committed section it changed; `defer-with-rationale` → a tech-debt row when residual risk remains, else the plan section stating the deferral and its trigger; `dismiss-with-rationale` → a `wontfix` tech-debt row when the reasoning is worth keeping. The dismissal case is the one most often skipped and the one that costs most — why an objection does not apply *here* is exactly the constraint a later agent would otherwise re-derive from scratch.
+  - **model** — the model tier that ran the consult.
+  - **difficulty** — the difficulty hint used: `routine` | `standard` | `high-stakes`.
+  ```
+
+  `.ai-state/CONSULT_COSTS.md`:
+  ```markdown
+  # Consultation Cost Series
+
+  Append-only. One row per consult spawn, written at disposition time alongside that consult's `CONSULT_LEDGER.md` rows. **Single writer: the convener.** Kept separate from the ledger because the ledger's grain is one row per challenge, and cost is a property of the consult.
+
+  **Append new rows as the last row of the data table below — never after the `## Column Definitions` section.** No row is ever edited or deleted. A consult re-spawned on a loop-back appends a *second* row for the same triple rather than mutating the first; aggregation sums rows per triple.
+
+  | timestamp | task-slug | discipline | stage | tokens | model | difficulty | notes |
+  |---|---|---|---|---|---|---|---|
+
+  ## Column Definitions
+
+  - **timestamp** — ISO 8601 UTC; matches this consult's `CONSULT_LEDGER.md` rows.
+  - **task-slug** / **discipline** / **stage** — the join key to `CONSULT_LEDGER.md`; the triple is the consult's identity.
+  - **tokens** — the aggregate subagent token count the harness surfaces to the convener at that consult's completion. Digits only, no separators. A **raw observation**, never a derived or price-weighted figure.
+  - **model** — the tier that actually ran the consult. Load-bearing: tokens without a tier cannot be re-priced, and an all-`opus` numerator over a mixed-tier denominator is a biased comparison. Must equal the `model` on this consult's ledger rows.
+  - **difficulty** — `routine` | `standard` | `high-stakes`. Must equal the `difficulty` on this consult's ledger rows.
+  - **notes** — free text: provenance, loop-back increments, anything a later reader needs. Escape any literal `|` as `\|`.
+
+  **No `cost_usd` column.** A dollar figure decays with every price change and would inject a derivation into a file of raw observations. `tokens` + `model` is durable and re-priceable in a single pass.
+
+  **Not recorded here.** A spawn that never became a consult (blocked at discipline resolution) produces no cost row — folding a resolution failure into the cost distribution would contaminate it.
+  ```
+
+  `.ai-state/CONSULT_PRIORS.md`:
+  ```markdown
+  # Consultation Prior Register
+
+  Append-only, two tables written at two moments. **Single writer: the convener.** The consultant never writes this file and never reads it — it is the convener's compressed statement of the concerns it already held about the very draft the consultant's independent first round is kept away from, which is what makes "did the consult surface anything new?" answerable at all.
+
+  `## Sealed Priors` is written **and committed before the spawn** — the seal is the commit, not the working-tree write. `## Challenge Classification` is written at disposition time, alongside that consult's `CONSULT_LEDGER.md` rows.
+
+  **Append new rows as the last row of the table they belong to — never after a prose section.** No row is ever edited or deleted.
+
+  ## Sealed Priors
+
+  | timestamp | task-slug | discipline | stage | prior-id | source | concern |
+  |---|---|---|---|---|---|---|
+
+  ## Challenge Classification
+
+  | timestamp | task-slug | discipline | stage | challenge-id | classification | matched-prior-id | seal-witness | prompt-areas |
+  |---|---|---|---|---|---|---|---|---|
+
+  ## Column Definitions
+
+  **`## Sealed Priors`** — written before the spawn:
+
+  - **timestamp** — ISO 8601 UTC of the seal write; must be *earlier* than this consult's ledger rows.
+  - **task-slug** / **discipline** / **stage** — the consult's identity triple; the join key to the sibling ledgers.
+  - **prior-id** — `P-01`, `P-02`, … unique within the triple. The reserved value `NONE` is the explicit empty declaration; when present it must be the only row for the triple.
+  - **source** — `lens` (surfaced by the pass over the discipline's bound skill) | `prior` (already held before that pass). Recording provenance costs one column and lets a later reader separate what the lens found from what the convener knew anyway.
+  - **concern** — one line naming the element of the draft and the property at issue, not the topic — specific enough that a reader can judge whether a given challenge is the same concern. **One concern = one `challenge-obligations` clause of the bound skill, failing at one identified site**: two sites failing one clause are two rows; one site failing two clauses is two rows. Escape any literal `|` as `\|`.
+
+  **`## Challenge Classification`** — written at disposition:
+
+  - **timestamp** — matches this consult's `CONSULT_LEDGER.md` rows.
+  - **task-slug** / **discipline** / **stage** — the same triple.
+  - **challenge-id** — the `### CH-NN` id; the same value the ledger row carries.
+  - **classification** — `novel` | `matched`. `matched` means the sealed list already held this concern.
+  - **matched-prior-id** — the `P-NN` when `matched`; **empty** when `novel`. Must resolve to a `Sealed Priors` row of the same triple.
+  - **seal-witness** — the consultant's `**Round-0 HEAD:**` sha, transcribed verbatim.
+  - **prompt-areas** — how many attack areas the spawn prompt explicitly enumerated; `0` when it named none. The convener writes both the spawn prompt and the sealed list, and prompt specificity moves the novelty rate without touching either — so the series records it to stratify on it rather than be silently confounded by it.
+
+  The two enums are deliberately **disjoint** (`{lens, prior}` vs `{novel, matched}`) so a `grep` can tell the two tables apart on a single cell match, with no parser.
   ```
 
 Do NOT create `.ai-state/observations.jsonl` — that is written on first use by the observability hook. Pre-creating it confuses the semantic merge driver.
@@ -369,11 +469,15 @@ Composition per trigger: `post-merge` runs `reconcile_ai_state.py` (when `.ai-st
 
    `chmod +x` is implicit on a symlink target that is already executable.
 
-## §Phase 5 — `.claude/settings.json` toggles
+## §Phase 5 — `.claude/settings.json` toggles + `permissions.allow` baseline
 
 The Praxion plugin auto-fires hooks on `SessionStart`, `Stop`, `SubagentStart`, `SubagentStop`, `PreToolUse`, `PostToolUse`, `PreCompact`. Some are heavyweight: observability ships events to a localhost Phoenix instance. Users opt out via a `PRAXION_DISABLE_*` env var in `.claude/settings.json`.
 
-**Predicate.** Read `.claude/settings.json` if it exists. If `PRAXION_DISABLE_OBSERVABILITY` is already set (any value), skip the phase but report current value in Phase 8. If the file exists but the key is missing, merge it in using the user's choice below; never overwrite a key the user has already set.
+This phase owns `.claude/settings.json`. It has two independently-predicated sub-steps: the observability **toggle** (5a) and the **`permissions.allow` baseline** (5b). Evaluate each predicate separately — a project onboarded by an older version already carries the toggle, and a phase-level skip would strand it without the permissions baseline forever.
+
+### Sub-step 5a — observability toggle
+
+**Predicate.** Read `.claude/settings.json` if it exists. If `PRAXION_DISABLE_OBSERVABILITY` is already set (any value), skip **this sub-step** (not the phase — 5b still runs) but report the current value in Phase 9. If the file exists but the key is missing, merge it in using the user's choice below; never overwrite a key the user has already set.
 
 **Gate 5 — toggle picker.** Use `AskUserQuestion` with `multiSelect: true`, header `"Praxion features"`, question `"Should the observability hook be ENABLED in this project? It ships Claude Code events to a localhost Phoenix instance — useful for trace inspection but requires Phoenix to be running. Leave unchecked to disable."`, and this option:
 
@@ -400,6 +504,39 @@ Checked option writes `PRAXION_DISABLE_OBSERVABILITY` to `"0"`.
 ```
 
 If `.claude/settings.json` already exists with other keys (e.g., `permissions`, `model`), merge `env` non-destructively — preserve all existing top-level keys and pre-existing `env.*` entries.
+
+### Sub-step 5b — `permissions.allow` baseline
+
+**Why this sub-step exists.** A spawned subagent has no way to answer an interactive permission prompt. When one fires, the subagent's tool call is simply denied — and the pipeline stalls mid-run, with a failure that reads like a path or sandbox problem rather than a missing permission. The main session never sees it, because the orchestrator *can* answer the prompt. The baseline below pre-approves the one call that provably hits this, so a managed project's first pipeline does not fail on a prompt nobody can answer.
+
+**Predicate.** A subset check, so a project onboarded under an older (smaller) entry set gains the missing entries on re-run:
+```bash
+jq -e --argjson req '["Write(.ai-work/**)"]' \
+  '($req - (.permissions.allow // [])) | length == 0' \
+  .claude/settings.json 2>/dev/null
+```
+If exit 0 (no required entry missing): skip with notice `5b: skipped (permissions.allow baseline already present)`.
+
+**Action.** Read `.claude/settings.json` (create `{"permissions":{}}` if absent) and merge `permissions.allow` non-destructively:
+- Preserve all existing top-level keys.
+- Preserve the existing `permissions.deny` array (§Phase 8d sub-step 8d.5b writes it and preserves `allow` reciprocally, so the two compose in either order).
+- Never remove or rewrite an entry the user added. `unique` dedupes, so the merge is idempotent.
+
+```bash
+jq '.permissions.allow = ((.permissions.allow // []) + ["Write(.ai-work/**)"] | unique)' \
+  .claude/settings.json > .claude/settings.json.tmp && \
+  mv .claude/settings.json.tmp .claude/settings.json
+```
+
+**Why each entry:**
+
+| Entry | What it pre-approves | Why |
+|-------|----------------------|-----|
+| `Write(.ai-work/**)` | Subagent writes into the ephemeral pipeline scratch tree | Every pipeline agent writes its artifact here (`SYSTEMS_PLAN.md`, `WIP.md`, `VERIFICATION_REPORT.md`, …). Denied, the agent has no fallback and the stage is lost. The path is gitignored and deleted at pipeline cleanup, so the grant covers nothing durable and nothing shipped. |
+
+**Why the list is one entry.** Each entry is a standing grant the user is never asked about again, so the bar is a denial that is both *observed* and *unanswerable-by-design*. Only `Write(.ai-work/**)` clears it. Writes to `.ai-state/` are committed project intelligence and should stay promptable; `Bash(...)` grants are never installed on a user's behalf; and `Edit` under `.ai-work/` has not been observed to fail, so pre-approving it would be a guess. Extend this list when a real denial is observed and the entry can be justified in one line — never in anticipation.
+
+Print: `5b: permissions.allow baseline written to .claude/settings.json`.
 
 ### Optional: Rule Blacklist Configuration
 
@@ -1106,10 +1243,10 @@ Print: `8e.9: .github/labels.yml + .github/workflows/labels-reconcile.yml instal
    Onboarding complete. Changes:
      Phase 0.5: CLAUDE.md bootstrapped (/init | inline-generated | minimal stub) — or omitted when CLAUDE.md was already present
      Phase 1: .gitignore (appended 10 lines, AI-assistants block)
-     Phase 2: .ai-state/ skeleton (4 new entries)
+     Phase 2: .ai-state/ skeleton (list the entries actually created this run)
      Phase 3: .gitattributes (appended 1 line), git config (1 merge driver registered)
      Phase 4: .git/hooks/pre-commit (new), .git/hooks/{post-merge,post-commit,post-checkout} (symlinks)
-     Phase 5: .claude/settings.json (PRAXION_DISABLE_OBSERVABILITY env var)
+     Phase 5: .claude/settings.json (PRAXION_DISABLE_OBSERVABILITY env var; permissions.allow baseline) — or 'skipped' per sub-step
      Phase 6: CLAUDE.md (appended Agent Pipeline + Compaction + Behavioral Contract + Praxion Process + Working-in-this-project blocks)
      Phase 7: companion CLIs — chub missing (install: ...), scc missing (install: ...)
      Phase 8: architecture baseline produced — .ai-state/DESIGN.md + docs/architecture.md (+ N ADR draft(s))
@@ -1149,11 +1286,12 @@ Print: `8e.9: .github/labels.yml + .github/workflows/labels-reconcile.yml instal
          "policy": ".github/autofix-policy.yml",
          "hub_sha": "<resolved 40-hex hub commit SHA>"
        },
-       "praxion_feedback": ".ai-state/praxion_feedback/PENDING.md"
+       "praxion_feedback": ".ai-state/praxion_feedback/PENDING.md",
+       "consult_ledgers": [".ai-state/CONSULT_LEDGER.md", ".ai-state/CONSULT_COSTS.md", ".ai-state/CONSULT_PRIORS.md"]
      }
    }
    ```
-   List only artifacts actually installed this run (omit hooks if Phase 4 was skipped; omit `ci_autofix` if Phase 8e was skipped or its caller/policy predicate already hit; omit `praxion_feedback` if Phase 2's predicate already hit — the ledger pre-existed). If the plugin version could not be captured at pre-flight (skip-phase-4 flag), write `"onboarded_with_version": "unknown"` and emit a one-line note. Add `.ai-state/.praxion-onboard.json` to the staged set.
+   List only artifacts actually installed this run (omit hooks if Phase 4 was skipped; omit `ci_autofix` if Phase 8e was skipped or its caller/policy predicate already hit; omit `praxion_feedback` and any `consult_ledgers` entry whose Phase 2 predicate already hit — those files pre-existed). If the plugin version could not be captured at pre-flight (skip-phase-4 flag), write `"onboarded_with_version": "unknown"` and emit a one-line note. Add `.ai-state/.praxion-onboard.json` to the staged set.
 
 4. **Stage modified files**: run `git add` with the explicit list of files this command touched (built up through phases 1–6, plus `.ai-state/.praxion-onboard.json`). Do NOT run `git add -A`. Do NOT commit. The user reviews staging and decides.
 
@@ -1458,10 +1596,10 @@ This block is installed into the user project's `CLAUDE.md` by Phase 8d sub-step
 | Phase | Predicate (skip if true) |
 |-------|--------------------------|
 | 1 | `grep -q '^# AI assistants$' .gitignore` |
-| 2 | Per-file: `test -e .ai-state/<file>` for each of the four targets — skip files individually |
+| 2 | Per-file: `test -e .ai-state/<file>` for every target listed in §Phase 2 — skip files individually, never as a phase |
 | 3 | `grep -qF '.ai-state/observations.jsonl merge=observations-jsonl' .gitattributes` AND `git config --get merge.observations-jsonl.driver` returns a value containing `i-am` |
 | 4 | `readlink .git/hooks/pre-commit` resolves to a Praxion-shipped file (or the file is a script containing `check_id_citation_discipline`) AND each of `readlink .git/hooks/{post-merge,post-commit,post-checkout}` resolves to a path containing `/i-am/` (target ending in `git-finalize-hook.sh`, or the legacy `git-post-merge-hook.sh` for the post-merge slot only) |
-| 5 | `PRAXION_DISABLE_OBSERVABILITY` key present under `.env` in `.claude/settings.json` (any value) |
+| 5 | Per-sub-step, never phase-level: 5a — `PRAXION_DISABLE_OBSERVABILITY` key present under `.env` in `.claude/settings.json` (any value); 5b — every required allow entry present (subset check: `jq -e --argjson req '[...]' '($req - (.permissions.allow // [])) \| length == 0' .claude/settings.json`) |
 | 5b | Entire phase: `PRAXION_HACKATHON_MODE=1` present under `.env` in `.claude/settings.json`; or user picks `Skip — keep full ceremony` at Gate 5b. Per-artifact: 5b.1 — `PRAXION_HACKATHON_MODE` key present in `.claude/settings.json` env; 5b.2 — `grep -q '^## Hackathon Mode$' CLAUDE.md`; 5b.3 — `grep -q 'hackathon' .claude/praxion-rules.yaml 2>/dev/null`; 5b.4 — `test -f scripts/praxion-hackathon`; 5b.5 — `test -f .claude/hackathon-directive.md`; 5b.6 — `test -f .claude/hackathon-settings.json` |
 | 6 | `refresh_claude_blocks.py`'s own absent/current/stale/modified classification for the four core blocks (`## Agent Pipeline`, `## Compaction Guidance`, `## Behavioral Contract`, `## Praxion Process` — no heading-check predicate); `grep -q '^## Working in this project$' CLAUDE.md` for the Project Essentials block (plus `## Hackathon Mode` if Phase 5b was enabled) |
 | 7 | None — phase 7 is advisory and always runs |

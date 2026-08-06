@@ -15,7 +15,7 @@ affected_files:
   - skills/roadmap-synthesis/SKILL.md
   - agents/roadmap-cartographer.md
   - commands/roadmap.md
-  - .ai-state/ARCHITECTURE.md
+  - .ai-state/DESIGN.md
 ---
 
 ## Context

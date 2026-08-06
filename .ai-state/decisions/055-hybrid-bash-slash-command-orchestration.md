@@ -14,8 +14,8 @@ made_by: user
 agent_type: systems-architect
 pipeline_tier: standard
 affected_files:
-  - new_cc_project.sh
-  - commands/new-cc-project.md
+  - new_project.sh
+  - commands/new-project.md
 affected_reqs:
   - REQ-ONBOARD-01
   - REQ-ONBOARD-02

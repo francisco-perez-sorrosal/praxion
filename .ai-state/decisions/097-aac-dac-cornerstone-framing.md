@@ -10,7 +10,7 @@ made_by: agent
 agent_type: systems-architect
 pipeline_tier: standard
 affected_files:
-  - ~/.claude/CLAUDE.md
+  - claude/config/CLAUDE.md
 ---
 
 ## Context

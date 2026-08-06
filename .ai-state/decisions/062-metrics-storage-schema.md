@@ -16,9 +16,8 @@ affected_files:
   - scripts/project_metrics/trends.py
   - scripts/project_metrics/logappend.py
   - docs/metrics/README.md
-  - .ai-state/METRICS_REPORT_*.json
-  - .ai-state/METRICS_REPORT_*.md
-  - .ai-state/METRICS_LOG.md
+  - .ai-state/metrics_reports/
+  - .ai-state/metrics_reports/METRICS_LOG.md
 ---
 
 ## Context

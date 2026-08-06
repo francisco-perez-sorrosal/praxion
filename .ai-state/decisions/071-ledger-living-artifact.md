@@ -12,7 +12,7 @@ pipeline_tier: standard
 affected_files:
   - .ai-state/TECH_DEBT_LEDGER.md
   - rules/swe/agent-intermediate-documents.md
-  - .ai-state/ARCHITECTURE.md
+  - .ai-state/DESIGN.md
   - skills/software-planning/references/document-templates.md
 ---
 

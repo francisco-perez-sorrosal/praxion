@@ -14,7 +14,7 @@ affected_files:
   - skills/software-planning/references/behavioral-contract.md
   - skills/software-planning/SKILL.md
   - skills/code-review/references/report-template.md
-  - ~/.claude/CLAUDE.md
+  - claude/config/CLAUDE.md
   - claude/config/CLAUDE.md
   - CLAUDE.md
   - README.md
@@ -28,7 +28,7 @@ affected_files:
   - agents/doc-engineer.md
   - agents/sentinel.md
   - agents/cicd-engineer.md
-  - .ai-state/ARCHITECTURE.md
+  - .ai-state/DESIGN.md
 affected_reqs: [REQ-BC-1, REQ-BC-2, REQ-BC-3, REQ-BC-4, REQ-BC-5, REQ-BC-6, REQ-BC-7]
 ---
 

@@ -13,8 +13,8 @@ affected_files:
   - rules/writing/diagram-conventions.md
   - scripts/diagram-regen-hook.sh
   - scripts/git-pre-commit-hook.sh
-  - docs/diagrams/architecture.c4
-  - .ai-state/ARCHITECTURE.md
+  - docs/diagrams/architecture/src/architecture.c4
+  - .ai-state/DESIGN.md
   - docs/architecture.md
 ---
 

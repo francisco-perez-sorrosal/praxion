@@ -14,7 +14,7 @@ affected_files:
   - skills/software-planning/assets/ARCHITECTURE_TEMPLATE.md
   - skills/doc-management/assets/ARCHITECTURE_GUIDE_TEMPLATE.md
   - docs/architecture.md
-  - .ai-state/ARCHITECTURE.md
+  - .ai-state/DESIGN.md
   - skills/doc-management/references/diagram-conventions.md
   - commands/onboard-project.md
   - agents/systems-architect.md

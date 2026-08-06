@@ -14,6 +14,8 @@ affected_files:
   - .ai-work/<slug>/traceability.yml
   - .ai-state/specs/
   - agents/sentinel.md
+  - scripts/spec_drift.py
+  - scripts/check_spec_drift.py
 dissent: "If drift is rare in practice and verifier/sentinel already catch it acceptably, even a detection-only check is ceremony for change that won't come."
 re_affirmed_by:
   - dec-239

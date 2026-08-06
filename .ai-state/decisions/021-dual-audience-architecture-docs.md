@@ -10,7 +10,7 @@ made_by: agent
 agent_type: systems-architect
 pipeline_tier: standard
 affected_files:
-  - .ai-state/ARCHITECTURE.md
+  - .ai-state/DESIGN.md
   - docs/architecture.md
   - skills/software-planning/assets/ARCHITECTURE_TEMPLATE.md
   - skills/software-planning/references/architecture-documentation.md

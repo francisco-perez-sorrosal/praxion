@@ -213,10 +213,14 @@ jobs:
   # ---------------------------------------------------------------------------
   # Job 3: dsl-validate
   #
-  # Two-phase: (a) mechanical AaC fence validator runs first (fast-fail before
+  # Three-phase: (a) mechanical AaC fence validator runs first (fast-fail before
   # API spend), then (b) architect-validator agent in --mode=pre-merge via
   # claude-code-action for structural reasoning (model↔code drift, ADR↔model
-  # drift, generated-region drift).
+  # drift, generated-region drift), then (c) a render-and-gate step that is the
+  # named reader of (b)'s verdict — it publishes the report to the job summary
+  # and is what actually fails the job on a FAIL verdict. The agent has no shell
+  # and cannot set an exit code, so without (c) this job is advisory in practice
+  # however the validator votes.
   #
   # AAC_FENCE_VALIDATOR_LIKEC4=disabled: the fence validator's likec4-dependent
   # path is skipped in CI where likec4 is not installed; fence balance and
@@ -260,6 +264,7 @@ jobs:
             | xargs -r -I {} python3 scripts/aac_fence_validator.py {}
 
       - name: Architect-validator pre-merge sweep
+        id: validator
         # Fixed 2026-07-22 (dec-draft-0d0e21b7): the agent's documented pre-merge
         # protocol runs `uv run lint-imports` and `python3 scripts/aac_fence_validator.py`
         # and prefers the likec4 MCP (absent in CI). With those commands denied by a
@@ -267,6 +272,21 @@ jobs:
         # failed CLOSED with no verdict (it flaked on main too, on doc-heavy PRs). The
         # allowlist below now matches the protocol, the turn budget is raised, and the
         # likec4 binary is disabled so the agent takes its documented no-likec4 fallback.
+        #
+        # No `Write` is granted, and that is deliberate rather than an oversight. A
+        # report written here dies with the runner: pre-merge has no task slug, no step
+        # uploads the file, and nothing reads it back. `--json-schema` gives the same
+        # report a transport that outlives the step —
+        # `steps.validator.outputs.structured_output` — which the gate step below
+        # renders into the job summary and acts on. The schema mirrors the report
+        # structure documented in agents/architect-validator.md (three sections, the
+        # finding fields, three verdicts); the two must be changed together.
+        #
+        # continue-on-error: an exhausted quota surfaces as either a non-zero exit or
+        # an exit-0 run with empty output, and the action also errors when the model
+        # returns nothing schema-conforming. None of those is structural drift, so none
+        # may redden the PR — the gate step distinguishes "no verdict" from "FAIL".
+        continue-on-error: true
         env:
           AAC_FENCE_VALIDATOR_LIKEC4: disabled
         uses: anthropics/claude-code-action@v1
@@ -285,8 +305,11 @@ jobs:
                generated-region drift, fence validity
             4. For changes to .ai-state/decisions/**, verify ADR cross-references
                are consistent with the model
-            5. Report findings as structured output; fail (exit non-zero) only
-               on CRITICAL or HIGH severity issues that indicate structural drift
+            5. Return the report as JSON matching the supplied schema: the
+               overall verdict, a one-paragraph summary, and one entry per
+               finding. You have no shell and no exit mechanism here, so do not
+               try to fail the job yourself — this job gates on your `verdict`
+               field, and a `FAIL` verdict is what blocks the merge.
 
             SCOPE: Only files changed in this PR. Do not re-audit unchanged files.
             CONFIDENCE: HIGH findings only. Do not report stylistic issues.
@@ -295,3 +318,68 @@ jobs:
             --model opus
             --max-turns 30
             --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(find:*),Bash(uv run lint-imports:*),Bash(python scripts/aac_fence_validator.py:*),Bash(python3 scripts/aac_fence_validator.py:*)"
+            --json-schema '{"type":"object","required":["verdict","summary","findings"],"properties":{"verdict":{"type":"string","enum":["PASS","PASS_WITH_WARNINGS","FAIL"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"object","required":["severity","code","detail"],"properties":{"severity":{"type":"string","enum":["FAIL","WARN","PASS","INFO"]},"section":{"type":"string","enum":["model-to-code","adr-to-model","generated-region"]},"code":{"type":"string"},"location":{"type":"string"},"detail":{"type":"string"},"suggested_action":{"type":"string"}}}}}}'
+
+      # The named reader for the validator's findings, and the only thing in this
+      # job that can turn one into a red check. Without it the agent's report has no
+      # consumer at all: nothing reads structured_output, nothing comments on the PR,
+      # and the agent cannot set an exit code (its allowlist grants no shell) — so the
+      # job would stay green whatever the validator found, which is indistinguishable
+      # from not running it.
+      #
+      # No PR comment and no `pull-requests: write`: the job summary is reachable from
+      # the PR's own check list, and a red check with a rendered summary is already in
+      # front of the reviewer. Escalating the token's write scope on a workflow that
+      # loads the plugin and runs Opus would buy prominence at a real cost.
+      #
+      # GOLDEN BAD CASE for the gate below — runnable as-is:
+      #   echo '{"verdict":"FAIL"}'               | jq -e '.verdict != "FAIL"'  # exit 1
+      #   echo '{"verdict":"PASS_WITH_WARNINGS"}' | jq -e '.verdict != "FAIL"'  # exit 0
+      # Unparseable JSON also exits non-zero: a gate fails closed on garbage. The one
+      # case it deliberately does NOT block on is an *empty* output, handled above the
+      # gate as a loud advisory — that means the check never ran, not that it passed.
+      - name: Render verdict and gate on structural drift
+        env:
+          VALIDATOR_OUTPUT: ${{ steps.validator.outputs.structured_output }}
+        run: |
+          if [ -z "${VALIDATOR_OUTPUT}" ]; then
+            {
+              echo "## :warning: Architecture validation did not run (advisory)"
+              echo
+              echo "The architect-validator returned no verdict — an exhausted subscription"
+              echo "quota, or claude-code-action declining this PR. The mechanical jobs in"
+              echo "this workflow still gated it, but the **structural check did not happen**."
+              echo "This step does not block the PR on infrastructure failure."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::architect-validator returned no verdict; structural validation was skipped for this PR"
+            exit 0
+          fi
+
+          printf '%s' "${VALIDATOR_OUTPUT}" > architecture-validation.json
+
+          jq -r '
+            "# Architecture Validation Report",
+            "",
+            "**Verdict:** \(.verdict)",
+            "",
+            "\(.summary)",
+            "",
+            "## Findings",
+            "",
+            if (.findings | length) == 0 then "None reported."
+            else (.findings[] |
+              "### [\(.severity)] `\(.code)`",
+              (if .section then "**Section:** \(.section)" else empty end),
+              (if .location then "**Location:** `\(.location)`" else empty end),
+              "",
+              "\(.detail)",
+              (if .suggested_action then "\n**Suggested action:** \(.suggested_action)" else empty end),
+              "")
+            end
+          ' architecture-validation.json >> "$GITHUB_STEP_SUMMARY" \
+            || echo "_Validator output was not renderable as the expected report shape._" >> "$GITHUB_STEP_SUMMARY"
+
+          if ! printf '%s' "${VALIDATOR_OUTPUT}" | jq -e '.verdict != "FAIL"' > /dev/null 2>&1; then
+            echo "::error::Architecture validation verdict is FAIL — structural drift detected. See the job summary for the findings."
+            exit 1
+          fi

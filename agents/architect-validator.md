@@ -2,8 +2,9 @@
 name: architect-validator
 description: >
   Pre-merge and on-demand structural validator that checks the code↔DSL↔ADR
-  triangle for consistency. Two modes: --mode=pre-merge (CI gate, exits non-zero
-  on any FAIL) and --mode=on-demand (always reports, never blocks). Produces
+  triangle for consistency. Two modes: --mode=pre-merge (CI gate — emits a FAIL
+  verdict the harness blocks the merge on) and --mode=on-demand (always reports,
+  never blocks). Produces
   ARCHITECTURE_VALIDATION.md covering Model→Code, ADR→Model, and generated-region
   drift, appending a TECH_DEBT_LEDGER row per FAIL. Use when reviewing PRs that
   touch architectural surfaces (DSL files, DESIGN.md, ADRs, fitness
@@ -48,7 +49,7 @@ Triggers on PRs touching any of these paths:
 - `.ai-state/decisions/**`
 - `fitness/**`
 
-Exits non-zero on any FAIL finding so the CI harness can use it as a blocking gate. A `cicd-engineer` authors the GitHub Actions workflow that invokes this mode — the validator performs the reasoning; the harness manages the gate logic.
+Emits **FAIL** as the overall verdict on any FAIL finding; the harness maps that verdict to a non-zero exit and blocks the merge. You have no exit code of your own — an agent cannot set one, and a pre-merge allowlist grants no shell to try — so the verdict field *is* your half of the gate. A `cicd-engineer` authors the CI workflow that invokes this mode: the validator performs the reasoning; the harness owns the transport and the gate logic.
 
 ### `--mode=on-demand` (local validation)
 
@@ -180,13 +181,13 @@ If no architecture markdown files exist: emit one INFO note `no fenced markdown 
 
 Write `.ai-work/<task-slug>/ARCHITECTURE_VALIDATION.md` (see Output section for structure).
 
-**When the harness grants no `Write`** — the usual case for a `--mode=pre-merge` CI invocation, which also has no task slug — emit the same report content as structured output instead. Do not treat this as a failure and do not skip the verdict: in that mode the report *is* the output, and the CI job is its reader (see Consumers).
+**When the harness grants no `Write`** — the usual case for a `--mode=pre-merge` CI invocation, which also has no task slug — emit the same report content as structured output instead. Do not treat this as a failure and do not skip the verdict: in that mode the report *is* the output, and the invoking job is its reader (see Consumers). If the harness supplies an output schema, return the report serialized to it — same three sections, same finding fields, same verdict, JSON in place of markdown. Do not write the file anyway on a CI runner: nothing uploads it and the filesystem is destroyed with the job, so the write would only cost turns.
 
 For each FAIL finding, append a row to `.ai-state/TECH_DEBT_LEDGER.md` per [`skills/software-planning/references/tech-debt-ledger.md`](../skills/software-planning/references/tech-debt-ledger.md) § Schema and § Producer overlays → **architect-validator**.
 
-**Exit behavior**:
-- `--mode=pre-merge`: exit 1 if overall verdict is FAIL; exit 0 otherwise
-- `--mode=on-demand`: exit 0 always
+**Verdict-to-gate mapping** — you emit the verdict; the invoking harness owns the exit code:
+- `--mode=pre-merge`: a **FAIL** verdict is the harness's signal to fail the job and block the merge. `PASS` and `PASS_WITH_WARNINGS` let it through.
+- `--mode=on-demand`: the verdict is advisory; nothing blocks.
 
 ## Output: ARCHITECTURE_VALIDATION.md
 
@@ -239,7 +240,14 @@ else — the WARNs, the PASS summaries, the overall verdict — lives only here,
 | Mode | Required reader | Decision point |
 |------|-----------------|----------------|
 | pipeline / `--mode=on-demand` | **verifier** — reads this file in its Specialist Design Review step when it is present under the task slug | Unresolved structural findings are carried into `VERIFICATION_REPORT.md`, which survives to the pipeline's verification gate and is harvested into `LEARNINGS.md` before cleanup |
-| `--mode=pre-merge` | the **invoking CI job** and the PR review surface | The exit code gates the merge; the report body is what tells a reviewer *why*, and is the only account of the WARNs the exit code deliberately does not block on |
+| `--mode=pre-merge` | the **invoking job's render-and-gate step** — it reads your structured output, publishes the report where the PR's own check links to it, and fails the job on a `FAIL` verdict | The verdict decides the merge; the published report body is what tells a reviewer *why*, and is the only account of the WARNs the verdict deliberately does not block on |
+
+**A pre-merge harness owes you both halves.** Granting no `Write` is correct — a file on a CI
+runner has no reader and no lifetime. But the harness must then *read* the structured output and
+gate on the verdict, or the run produces nothing at all: no file, no reader, no red check, just
+spend. A harness that neither writes nor reads is the failure this table exists to prevent, and it
+looks identical to a passing check from the outside. If you are asked to author or review one,
+that is the first thing to confirm.
 
 Absence of this report is **not** a finding for any reader. This agent is not a standard pipeline
 stage, so most runs legitimately produce none — treat a missing report as "the validator did not
@@ -274,4 +282,4 @@ At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS
 - **Do not run the full sentinel scan.** The sentinel covers all artifacts periodically; this agent covers architectural-touch slices per-PR.
 - **Every finding must be traceable.** Reference a specific LikeC4 element id, ADR frontmatter field, or fence attribute.
 - **Turn budget awareness.** Reserve the last 5 turns for Phase 7 (report write + ledger rows). At 80% budget: skip LLM-intensive Phase 3 edge enumeration, emit a WARN (`turn-budget-reached`), and proceed to verdict.
-- **Partial output on failure.** Write `.ai-work/<task-slug>/ARCHITECTURE_VALIDATION.md` with a `[PARTIAL]` header if you cannot complete all phases. A partial report is better than no report.
+- **Partial output on failure.** Emit the report with a `[PARTIAL]` header if you cannot complete all phases — as `.ai-work/<task-slug>/ARCHITECTURE_VALIDATION.md` where you have `Write`, as structured output where you do not. A partial report is better than no report; silence leaves the reader unable to tell a clean run from a run that never happened.

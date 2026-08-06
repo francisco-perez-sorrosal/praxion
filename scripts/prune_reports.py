@@ -42,15 +42,29 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 DEFAULT_KEEP = 10
 
-# Report families pruned by this script (relative to repo root). Each is a
-# directory of timestamped per-run reports plus an append-only *_LOG.md index.
+# Report families pruned by this script, as (directory, filename prefix) pairs
+# relative to repo root. Each family is a timestamped per-run report series plus
+# an append-only *_LOG.md index.
+#
+# A family is (directory, prefix) rather than a directory alone because one
+# directory legitimately hosts two independent series: `.ai-state/metrics_reports/`
+# carries both the code-health `METRICS_REPORT_*` triple and the self-healing
+# `SELF_HEALING_REPORT_*` triple, namespaces `self_healing_metrics.py` and
+# `scripts/CLAUDE.md` both declare "deliberately distinct to avoid schema
+# collision". Matching on a bare `_REPORT_` token collapsed them into one
+# retention pool, so every self-healing run silently evicted a metrics run and
+# vice versa, interleaved by timestamp. That is not hypothetical: it deleted
+# `METRICS_REPORT_2026-06-11_08-38-15.{json,md}` twice, once on 2026-08-05 and
+# again on 2026-08-06, while reporting `kept 10` — a count correct for the mixed
+# pool and wrong for either real series.
 _REPORT_FAMILIES = (
-    ".ai-state/metrics_reports",
-    ".ai-state/sentinel_reports",
+    (".ai-state/metrics_reports", "METRICS"),
+    (".ai-state/metrics_reports", "SELF_HEALING"),
+    (".ai-state/sentinel_reports", "SENTINEL"),
 )
 
-# A report file carries this marker and a sortable timestamp; the LOG index and
-# lock files carry neither, so they are structurally exempt from pruning.
+# A report file carries `<PREFIX>_REPORT_` and a sortable timestamp; the LOG
+# index and lock files carry neither, so they are structurally exempt.
 _REPORT_MARKER = "_REPORT_"
 _TIMESTAMP_RE = re.compile(r"\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}")
 
@@ -66,15 +80,18 @@ def _timestamp_of(name: str) -> str | None:
     return match.group(0) if match else None
 
 
-def _report_runs(family_dir: Path) -> dict[str, list[Path]]:
+def _report_runs(family_dir: Path, prefix: str) -> dict[str, list[Path]]:
     """Map each run timestamp to its report files (e.g. a `.md` + `.json` pair).
 
-    Only files carrying the ``_REPORT_`` marker and a timestamp count; the
-    ``*_LOG.md`` index and ``.lock`` files are excluded by construction.
+    Only files whose name starts with ``<prefix>_REPORT_`` and carries a
+    timestamp count; the ``*_LOG.md`` index and ``.lock`` files are excluded by
+    construction, and a *sibling series* in the same directory is excluded by
+    the prefix — which is the whole point of carrying one.
     """
+    marker = f"{prefix}{_REPORT_MARKER}"
     runs: dict[str, list[Path]] = {}
     for path in family_dir.iterdir():
-        if not path.is_file() or _REPORT_MARKER not in path.name:
+        if not path.is_file() or not path.name.startswith(marker):
             continue
         ts = _timestamp_of(path.name)
         if ts is None:
@@ -86,12 +103,17 @@ def _report_runs(family_dir: Path) -> dict[str, list[Path]]:
 # -- Pruning ------------------------------------------------------------------
 
 
-def prune_family(family_dir: Path, keep: int, dry_run: bool) -> dict[str, object]:
-    """Keep the ``keep`` newest runs in ``family_dir``; prune older run files."""
-    if not family_dir.is_dir():
-        return {"family": family_dir.name, "present": False, "kept": 0, "pruned": []}
+def prune_family(family_dir: Path, prefix: str, keep: int, dry_run: bool) -> dict[str, object]:
+    """Keep the ``keep`` newest ``<prefix>_REPORT_`` runs; prune older run files.
 
-    runs = _report_runs(family_dir)
+    ``family`` is labelled ``<dir>:<prefix>`` because two families can share a
+    directory, and a bare directory name would report them as one.
+    """
+    label = f"{family_dir.name}:{prefix}"
+    if not family_dir.is_dir():
+        return {"family": label, "present": False, "kept": 0, "pruned": []}
+
+    runs = _report_runs(family_dir, prefix)
     # Newest-first by timestamp string (the fixed-width format sorts lexically).
     ordered = sorted(runs, reverse=True)
     prune_timestamps = ordered[keep:]
@@ -104,7 +126,7 @@ def prune_family(family_dir: Path, keep: int, dry_run: bool) -> dict[str, object
                 path.unlink()
 
     return {
-        "family": family_dir.name,
+        "family": label,
         "present": True,
         "kept": min(len(ordered), keep),
         "pruned": sorted(pruned),
@@ -113,7 +135,9 @@ def prune_family(family_dir: Path, keep: int, dry_run: bool) -> dict[str, object
 
 def prune_all(repo_root: Path, keep: int, dry_run: bool) -> dict[str, object]:
     """Prune every configured report family under ``repo_root``."""
-    families = [prune_family(repo_root / rel, keep, dry_run) for rel in _REPORT_FAMILIES]
+    families = [
+        prune_family(repo_root / rel, prefix, keep, dry_run) for rel, prefix in _REPORT_FAMILIES
+    ]
     total_pruned = sum(len(f["pruned"]) for f in families)  # type: ignore[arg-type]
     return {
         "keep": keep,

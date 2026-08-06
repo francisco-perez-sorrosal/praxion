@@ -55,6 +55,59 @@ def _make_sentinel(root: Path, timestamps: list[str]) -> Path:
     return d
 
 
+def test_sibling_series_in_one_directory_have_independent_retention(tmp_path: Path) -> None:
+    """Two report series sharing a directory must not evict each other.
+
+    `.ai-state/metrics_reports/` legitimately hosts two deliberately-distinct
+    namespaces: the code-health `METRICS_REPORT_*` triple and the self-healing
+    `SELF_HEALING_REPORT_*` triple. Grouping on a bare `_REPORT_` token pooled
+    them, so each self-healing run silently consumed a metrics retention slot.
+    Every prior fixture put one prefix per directory, which is exactly why no
+    test could see it — the bug deleted real committed reports twice before a
+    fixture existed that could fail on it.
+    """
+    mod = _load_module()
+    d = _make_metrics(tmp_path, _TIMESTAMPS)  # 5 METRICS runs
+    # One self-healing run, timestamped mid-series so a pooled sort interleaves it.
+    (d / "SELF_HEALING_REPORT_2026-03-15_00-00-00.md").write_text("md\n")
+    (d / "SELF_HEALING_REPORT_2026-03-15_00-00-00.json").write_text("{}\n")
+
+    mod.prune_all(tmp_path, keep=5, dry_run=False)
+
+    # All 5 metrics runs survive: the self-healing run must not have taken a slot.
+    assert len(list(d.glob("METRICS_REPORT_*.md"))) == 5
+    # And the self-healing run survives on its own budget, not as a metrics leftover.
+    assert (d / "SELF_HEALING_REPORT_2026-03-15_00-00-00.md").exists()
+    assert (d / "SELF_HEALING_REPORT_2026-03-15_00-00-00.json").exists()
+
+
+def test_canary_pooled_retention_would_evict_a_sibling_series(tmp_path: Path) -> None:
+    """Proof the guard above bites: under a pooled marker, a metrics run dies.
+
+    Reconstructs the historical defect directly rather than trusting the fixed
+    code — `_report_runs` is called with the bare `_REPORT_` marker the buggy
+    version used, and the oldest metrics run lands in the prune set.
+    """
+    mod = _load_module()
+    d = _make_metrics(tmp_path, _TIMESTAMPS)  # 5 METRICS runs
+    (d / "SELF_HEALING_REPORT_2026-03-15_00-00-00.md").write_text("md\n")
+
+    # The historical grouping: any file *containing* `_REPORT_`, keyed by timestamp.
+    pooled: set[str] = {
+        ts
+        for p in d.iterdir()
+        if p.is_file() and "_REPORT_" in p.name and (ts := mod._timestamp_of(p.name))
+    }
+    scoped = mod._report_runs(d, "METRICS")
+
+    assert len(pooled) == 6, "pooled grouping must see both series as one"
+    assert len(scoped) == 5, "prefixed grouping must see only its own series"
+    # With keep=5 the pooled set overflows by exactly one — the oldest metrics run,
+    # which is the file the live defect deleted twice.
+    assert sorted(pooled, reverse=True)[5:] == ["2026-01-01_00-00-00"]
+    assert "2026-01-01_00-00-00" in scoped, "prefixed grouping keeps it inside budget"
+
+
 def test_keeps_newest_n_prunes_older(tmp_path: Path) -> None:
     mod = _load_module()
     d = _make_sentinel(tmp_path, _TIMESTAMPS)  # 5 runs

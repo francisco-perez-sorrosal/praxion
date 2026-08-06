@@ -180,6 +180,8 @@ If no architecture markdown files exist: emit one INFO note `no fenced markdown 
 
 Write `.ai-work/<task-slug>/ARCHITECTURE_VALIDATION.md` (see Output section for structure).
 
+**When the harness grants no `Write`** — the usual case for a `--mode=pre-merge` CI invocation, which also has no task slug — emit the same report content as structured output instead. Do not treat this as a failure and do not skip the verdict: in that mode the report *is* the output, and the CI job is its reader (see Consumers).
+
 For each FAIL finding, append a row to `.ai-state/TECH_DEBT_LEDGER.md` per [`skills/software-planning/references/tech-debt-ledger.md`](../skills/software-planning/references/tech-debt-ledger.md) § Schema and § Producer overlays → **architect-validator**.
 
 **Exit behavior**:
@@ -227,6 +229,25 @@ Each finding entry:
 ```
 
 WARNs use `### [WARN]`; confirmed checks use `### [PASS]` (summarized, not one entry per element).
+
+## Consumers
+
+Only the FAIL findings leave this report on their own, as `TECH_DEBT_LEDGER` rows. Everything
+else — the WARNs, the PASS summaries, the overall verdict — lives only here, and
+`.ai-work/<task-slug>/` is deleted at pipeline cleanup. So each mode names its reader:
+
+| Mode | Required reader | Decision point |
+|------|-----------------|----------------|
+| pipeline / `--mode=on-demand` | **verifier** — reads this file in its Specialist Design Review step when it is present under the task slug | Unresolved structural findings are carried into `VERIFICATION_REPORT.md`, which survives to the pipeline's verification gate and is harvested into `LEARNINGS.md` before cleanup |
+| `--mode=pre-merge` | the **invoking CI job** and the PR review surface | The exit code gates the merge; the report body is what tells a reviewer *why*, and is the only account of the WARNs the exit code deliberately does not block on |
+
+Absence of this report is **not** a finding for any reader. This agent is not a standard pipeline
+stage, so most runs legitimately produce none — treat a missing report as "the validator did not
+run here", never as a failed check.
+
+Anything that must outlive `.ai-work/` still goes to the ledger. That boundary does not move: the
+named readers above are what give the non-blocking findings a decision point *before* cleanup,
+not a second durable store.
 
 ## Edge Cases
 

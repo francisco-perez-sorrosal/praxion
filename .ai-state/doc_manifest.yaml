@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-06T05:32:03Z'
+generated_at: '2026-08-06T06:45:33Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -307,7 +307,7 @@ surfaces:
   path: docs/existing-project-onboarding.md
   type: markdown
   title: Existing-Project Onboarding
-  last_modified: '2026-07-16'
+  last_modified: '2026-08-05'
   diataxis: tutorial
   audience: developer
   renderer: tutorial_shell

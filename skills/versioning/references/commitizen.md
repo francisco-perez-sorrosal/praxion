@@ -29,8 +29,8 @@ name = "cz_conventional_commits"
 version = "0.0.1"
 version_files = [
     ".claude-plugin/plugin.json:version",
-    "memory-mcp/pyproject.toml:version",
     "task-chronograph-mcp/pyproject.toml:version",
+    "eval/pyproject.toml:version",
 ]
 tag_format = "v$version"
 update_changelog_on_bump = true
@@ -54,7 +54,7 @@ Commitizen uses **line-by-line substring matching**, not full parsing. The `:sea
 
 ```toml
 # pyproject.toml entry:
-# "memory-mcp/pyproject.toml:version"
+# "task-chronograph-mcp/pyproject.toml:version"
 #
 # Matches the line:
 #   version = "0.0.1"

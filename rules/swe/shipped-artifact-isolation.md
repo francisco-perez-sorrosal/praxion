@@ -22,7 +22,7 @@ Shipped artifacts — the contents of `rules/`, `skills/`, `agents/`, `commands/
 
 ### Praxion-internal files are exempt
 
-`ROADMAP.md`, `CHANGELOG.md`, `README*.md`, `docs/`, `memory-mcp/`, `task-chronograph-mcp/`, `eval/`, `hooks/`, `scripts/`, `install_*.sh`, `tests/`, `.github/` — these are Praxion's own narrative and internal implementation. Their content is **never injected into an agent's context window**: they are read by someone browsing this repo's source, or executed as code, so a concrete `dec-NNN` in them resolves for every reader who can see it. The isolation rule does not apply to them.
+`ROADMAP.md`, `CHANGELOG.md`, `README*.md`, `docs/`, `task-chronograph-mcp/`, `eval/`, `hooks/`, `scripts/`, `install_*.sh`, `tests/`, `.github/` — these are Praxion's own narrative and internal implementation. Their content is **never injected into an agent's context window**: they are read by someone browsing this repo's source, or executed as code, so a concrete `dec-NNN` in them resolves for every reader who can see it. The isolation rule does not apply to them.
 
 **This exemption is about context injection, not about delivery.** Several exempt paths *are* shipped: `install_claude.sh` symlinks `scripts/*` onto `~/.local/bin`, `/onboard-project` Phase 4 symlinks the user's `.git/hooks/*` at `scripts/git-finalize-hook.sh`, `hooks/` registers as plugin lifecycle hooks, and `task-chronograph-mcp/` ships as an MCP server. They are exempt because their text never lands in a downstream context window — not because they stay behind. Do not reuse this list as a "what reaches managed projects" boundary; it answers a different question and gets `hooks/` and `scripts/` backwards.
 

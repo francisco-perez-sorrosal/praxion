@@ -13,7 +13,6 @@ pipeline_tier: full
 affected_files:
   - skills/agentic-transactions/SKILL.md
 affected_reqs: [REQ-04, REQ-05]
-re_affirms: ""
 ---
 
 ## Context

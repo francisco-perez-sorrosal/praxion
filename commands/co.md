@@ -7,6 +7,8 @@ disable-model-invocation: true
 
 Create a commit for the current staged changes (or all changes if nothing is staged). If changes clearly mix more than one target (e.g. fix + feature, docs + refactor), perform multiple commits—one per logical task—instead of a single mixed commit.
 
+**Optional message argument.** When `$ARGUMENTS` is non-empty, treat it as the user's stated intent for this commit: let it drive the type, subject and body rather than copying it verbatim, and still meet the conventions below (imperative subject, under 50 characters, type prefix, no AI authorship). When it is empty, derive the message from the diff as usual. When the changes split into multiple commits, the argument describes the *set* — apply it to the commit it actually fits and message the others from their own diffs.
+
 ## Process
 
 <!-- canonical-source: claude/canonical-blocks/commit-process.md -->

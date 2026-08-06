@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-08-06T00:28:51Z'
+generated_at: '2026-08-06T05:31:24Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
@@ -16,7 +16,7 @@ rules:
   load: always_on
   core: true
   install: symlink
-  chars: 14549
+  chars: 14711
 - id: swe/agent-behavioral-contract
   path: rules/swe/agent-behavioral-contract.md
   load: always_on

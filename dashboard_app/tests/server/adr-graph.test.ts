@@ -9,6 +9,24 @@ import {
 // ─── buildAdrGraph tests ──────────────────────────────────────────────────────
 
 describe("buildAdrGraph", () => {
+  it("keeps every target when one decision supersedes several", () => {
+    // The scalar form under-recorded 2 of dec-225's 3 backward edges: it
+    // replaced three memory decisions and the graph drew one.
+    const graph = buildAdrGraph([
+      {
+        data: {
+          id: "dec-225",
+          title: "Remove the in-house memory subsystem",
+          status: "accepted",
+          supersedes: ["dec-009", "dec-025", "dec-039"]
+        },
+        slug: "225-remove-memory"
+      }
+    ]);
+
+    expect(graph[0]?.supersedes).toEqual(["dec-009", "dec-025", "dec-039"]);
+  });
+
   it("extracts supersedes and re_affirms links from a 3-ADR fixture", () => {
     const records = [
       {
@@ -45,7 +63,7 @@ describe("buildAdrGraph", () => {
     expect(graph).toHaveLength(3);
 
     const node003 = graph.find((n) => n.id === "dec-003");
-    expect(node003?.supersedes).toBe("dec-002");
+    expect(node003?.supersedes).toEqual(["dec-002"]);
     expect(node003?.title).toBe("New runtime decision");
     expect(node003?.status).toBe("accepted");
 
@@ -155,7 +173,7 @@ describe("buildAdrGraph", () => {
 
     const graph = buildAdrGraph(records);
     expect(graph[0]?.id).toBe("dec-draft-a1b2c3d4"); // id-citation-discipline:ignore
-    expect(graph[0]?.supersedes).toBe("dec-draft-e5f6a7b8"); // id-citation-discipline:ignore
+    expect(graph[0]?.supersedes).toEqual(["dec-draft-e5f6a7b8"]); // id-citation-discipline:ignore
   });
 });
 
@@ -176,7 +194,7 @@ describe("computeLayers (longest-path layering)", () => {
   it("places the superseded node one layer deeper than its superseder", () => {
     // dec-003 supersedes dec-002 → dec-002 should be at layer 1
     const nodes = [
-      { id: "dec-003", title: "New", status: "accepted", supersedes: "dec-002" },
+      { id: "dec-003", title: "New", status: "accepted", supersedes: ["dec-002"] },
       { id: "dec-002", title: "Old", status: "superseded" }
     ];
 
@@ -187,8 +205,8 @@ describe("computeLayers (longest-path layering)", () => {
 
   it("computes depth correctly for a chain of length 3", () => {
     const nodes = [
-      { id: "c", title: "Newest", status: "accepted", supersedes: "b" },
-      { id: "b", title: "Middle", status: "superseded", supersedes: "a" },
+      { id: "c", title: "Newest", status: "accepted", supersedes: ["b"] },
+      { id: "b", title: "Middle", status: "superseded", supersedes: ["a"] },
       { id: "a", title: "Oldest", status: "superseded" }
     ];
 
@@ -200,7 +218,7 @@ describe("computeLayers (longest-path layering)", () => {
 
   it("ignores supersedes references to ids not in the node list", () => {
     const nodes = [
-      { id: "x", title: "External ref", status: "accepted", supersedes: "dec-external" }
+      { id: "x", title: "External ref", status: "accepted", supersedes: ["dec-external"] }
     ];
 
     const layers = computeLayers(nodes);
@@ -232,7 +250,7 @@ describe("assignCoordinates", () => {
 
   it("assigns different y positions to nodes in different layers", () => {
     const nodes = [
-      { id: "newer", title: "Newer", status: "accepted", supersedes: "older" },
+      { id: "newer", title: "Newer", status: "accepted", supersedes: ["older"] },
       { id: "older", title: "Older", status: "superseded" }
     ];
     const layers = computeLayers(nodes);

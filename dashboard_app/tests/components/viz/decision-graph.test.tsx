@@ -38,7 +38,7 @@ function twoLinkedNodes(): AdrGraphNode[] {
       id: "dec-002",
       title: "Replace Postgres with SQLite",
       status: "accepted",
-      supersedes: "dec-001"
+      supersedes: ["dec-001"]
     }
   ];
 }

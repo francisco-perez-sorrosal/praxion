@@ -57,7 +57,7 @@ The frontmatter schema is shared between draft and finalized ADRs. Only the `id`
 | `pipeline_tier` | string | No | `direct` / `lightweight` / `standard` / `full` / `spike` — the 5-tier calibration value (process weight actually used), never an execution-mode label ("no agent fan-out" notes belong in the calibration-log `Source` prose) |
 | `affected_files` | list | No | Paths impacted by the decision |
 | `affected_reqs` | list | No | REQ IDs linked to the decision |
-| `supersedes` | string | No | id of prior decision |
+| `supersedes` | string \| list | No | id(s) of the prior decision(s) this one replaces. A **list** when one decision replaces several — same reason `retired_by` is a list: a scalar silently under-records the rest |
 | `superseded_by` | string | No | id of replacing decision |
 | `re_affirms` | string | No | id of prior decision this ADR re-affirms without superseding |
 | `re_affirmed_by` | list | No | ids of later ADRs that re-affirmed this decision |

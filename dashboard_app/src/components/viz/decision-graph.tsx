@@ -57,16 +57,6 @@ export function computeLayers(nodes: AdrGraphNode[]): Map<string, number> {
   const layers = new Map<string, number>();
   const idSet = new Set(nodes.map((n) => n.id));
 
-  // Build predecessor map: for each node, which nodes point TO it via supersedes
-  const predecessorOf = new Map<string, string[]>();
-  for (const node of nodes) {
-    if (node.supersedes && idSet.has(node.supersedes)) {
-      const list = predecessorOf.get(node.supersedes) ?? [];
-      list.push(node.id);
-      predecessorOf.set(node.supersedes, list);
-    }
-  }
-
   // BFS-based longest path: iterate until stable
   for (const node of nodes) {
     layers.set(node.id, 0);
@@ -78,11 +68,12 @@ export function computeLayers(nodes: AdrGraphNode[]): Map<string, number> {
     changed = false;
     for (const node of nodes) {
       const nodeLayer = layers.get(node.id) ?? 0;
-      if (node.supersedes && idSet.has(node.supersedes)) {
-        const targetLayer = layers.get(node.supersedes) ?? 0;
+      for (const target of node.supersedes ?? []) {
+        if (!idSet.has(target)) continue;
+        const targetLayer = layers.get(target) ?? 0;
         const desired = nodeLayer + 1;
         if (desired > targetLayer) {
-          layers.set(node.supersedes, desired);
+          layers.set(target, desired);
           changed = true;
         }
       }
@@ -144,8 +135,10 @@ function extractEdges(nodes: AdrGraphNode[]): GraphEdge[] {
   const edges: GraphEdge[] = [];
 
   for (const node of nodes) {
-    if (node.supersedes && idSet.has(node.supersedes)) {
-      edges.push({ sourceId: node.id, targetId: node.supersedes, kind: "supersedes" });
+    for (const target of node.supersedes ?? []) {
+      if (idSet.has(target)) {
+        edges.push({ sourceId: node.id, targetId: target, kind: "supersedes" });
+      }
     }
     if (node.re_affirms && idSet.has(node.re_affirms)) {
       edges.push({ sourceId: node.id, targetId: node.re_affirms, kind: "re_affirms" });
@@ -174,7 +167,7 @@ function statusToVar(status: string): string {
 
 function hasAnyEdge(node: AdrGraphNode): boolean {
   return (
-    node.supersedes !== undefined ||
+    (node.supersedes !== undefined && node.supersedes.length > 0) ||
     node.superseded_by !== undefined ||
     node.re_affirms !== undefined ||
     (node.re_affirmed_by !== undefined && node.re_affirmed_by.length > 0)

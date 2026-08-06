@@ -8,7 +8,7 @@ export type AdrGraphNode = {
   readonly id: string;
   readonly title: string;
   readonly status: string;
-  readonly supersedes?: string;
+  readonly supersedes?: readonly string[];
   readonly superseded_by?: string;
   readonly re_affirms?: string;
   readonly re_affirmed_by?: string[];
@@ -26,6 +26,20 @@ function asStringArray(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const filtered = value.filter((v): v is string => typeof v === "string");
   return filtered.length > 0 ? filtered : undefined;
+}
+
+/**
+ * Normalizes a scalar-or-list id field to a list.
+ *
+ * `supersedes` is typed `string | list`: one decision commonly replaces
+ * several, and a scalar cannot say so. Reading it with `asString` silently
+ * dropped every edge of a multi-target supersession — the graph rendered
+ * dec-225 as replacing one decision when it replaced three.
+ */
+function asIdList(value: unknown): string[] | undefined {
+  const single = asString(value);
+  if (single !== undefined) return [single];
+  return asStringArray(value);
 }
 
 function resolveId(data: Record<string, unknown>, slug: string | undefined): string {
@@ -52,7 +66,7 @@ export function buildAdrGraph(adrs: AdrRecord[]): AdrGraphNode[] {
     const id = resolveId(data, slug);
     const title = asString(data["title"]) ?? id;
     const status = asString(data["status"]) ?? "proposed";
-    const supersedes = asString(data["supersedes"]);
+    const supersedes = asIdList(data["supersedes"]);
     const superseded_by = asString(data["superseded_by"]);
     const re_affirms = asString(data["re_affirms"]);
     const re_affirmed_by = asStringArray(data["re_affirmed_by"]);

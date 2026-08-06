@@ -8,7 +8,7 @@ summary: Delete Praxion's curated-memory engine (memory.json, the Memory MCP ser
 tags: [memory, removal, observability, sandbook, architecture, hooks]
 made_by: user
 pipeline_tier: full
-supersedes: dec-009
+supersedes: [dec-009, dec-025, dec-039]
 affected_files:
   - memory-mcp/
   - hooks/inject_memory.py

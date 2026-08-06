@@ -25,7 +25,7 @@ function stepsToNodes(items: WorkshopProgressItem[]): AdrGraphNode[] {
       id: item.stepId,
       status,
       title: item.label,
-      supersedes: prevItem?.stepId,
+      supersedes: prevItem === undefined ? undefined : [prevItem.stepId],
       superseded_by: nextItem?.stepId
     };
   });

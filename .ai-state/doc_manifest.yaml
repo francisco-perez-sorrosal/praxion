@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-06T16:13:26Z'
+generated_at: '2026-08-06T16:18:16Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -526,7 +526,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-08-05'
+  last_modified: '2026-08-06'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -2576,6 +2576,12 @@ surfaces:
   title: "Sentinel Report \u2014 2026-08-06_08-49-10"
   last_modified: '2026-08-06'
   renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-06-11-08-38-15
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-11_08-38-15.json
+  type: json
+  title: METRICS_REPORT_2026-06-11_08-38-15.json
+  last_modified: '2026-06-11'
+  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-06-18-23-41-03
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-18_23-41-03.json
   type: json
@@ -2630,6 +2636,12 @@ surfaces:
   title: METRICS_REPORT_2026-08-05_22-03-40.json
   last_modified: '2026-08-05'
   renderer: metrics_view
+- id: ai-state-metrics-reports-metrics-report-2026-06-11-08-38-15
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-11_08-38-15.md
+  type: markdown
+  title: Project Metrics Report
+  last_modified: '2026-06-11'
+  renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-06-18-23-41-03
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-18_23-41-03.md
   type: markdown
@@ -3111,6 +3123,8 @@ groups:
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
   - ai-state-landscape-watchlist
+  - ai-state-metrics-reports-metrics-report-2026-06-11-08-38-15
+  - ai-state-metrics-reports-metrics-report-2026-06-11-08-38-15
   - ai-state-metrics-reports-metrics-report-2026-06-18-23-41-03
   - ai-state-metrics-reports-metrics-report-2026-06-18-23-41-03
   - ai-state-metrics-reports-metrics-report-2026-06-20-20-40-35

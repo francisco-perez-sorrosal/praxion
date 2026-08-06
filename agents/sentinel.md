@@ -57,7 +57,7 @@ Convention: Each check has a unique ID, type (A=auto, L=llm), a rule, and a pass
 | C01 | A | Every skill dir has `SKILL.md` | `Glob skills/*/SKILL.md` count = `Glob skills/*/` dir count |
 | C02 | A | Every `SKILL.md` has `description` in frontmatter | `Grep ^description:` in YAML block of each SKILL.md |
 | C03 | A | Every agent `.md` has `name`, `description`, `tools` in frontmatter | Grep each field in YAML block of each `agents/*.md` |
-| C04 | A | Every command has a `description` field or header comment | Read each command file, check for description |
+| C04 | A | Every command has a non-empty `description` field or header comment | Read each command file; `description` (or header comment) must be present **and carry non-placeholder text** — an empty one passes a presence check while telling a reader nothing. Whether it is *accurate* is C02/S01's judgment; this guarantees there is something for them to judge |
 | C05 | A | `plugin.json` lists all agents by file path | Agent count in plugin.json = file count in `agents/*.md` (excl. README) |
 | C06 | L | Skill descriptions enable activation | Could Claude load this skill based on description alone? Vague = fail |
 | C07 | L | Agent descriptions enable delegation | Could Claude select the right agent based on description alone? Overlap/thin = fail |
@@ -87,7 +87,7 @@ Convention: Each check has a unique ID, type (A=auto, L=llm), a rule, and a pass
 | F06 | L | Deployment doc service list matches compose.yaml | Service names and ports in deployment doc consistent with actual compose files |
 | F07 | A | Cataloged section missing marker | WARN when a skill declares `staleness_sensitive_sections` but a listed section's heading has no `<!-- last-verified: -->` comment on the line below it. Resolve each cataloged heading by searching `SKILL.md` first, then the skill's `references/*.md` and `contexts/*.md` — a section legitimately lives in a reference/context file under progressive disclosure, and a marker found there is a PASS |
 | F08 | A | Marker age > threshold | WARN when a section's marker is dated more than `staleness_threshold_days` ago (default 120); escalates to FAIL beyond 2× threshold (~240 days by default). The marker is located by the same `SKILL.md` → `references/` → `contexts/` search as F07 |
-| F09 | A | Marker invalid format / future-dated | FAIL when marker syntax does not match the spec OR the date is in the future |
+| F09 | A | Marker invalid format / future-dated | FAIL when marker syntax does not match the spec OR the date is in the future. **One exclusion, deliberately narrow:** a marker whose date is the literal token `[YYYY-MM-DD]` **and** which sits in an `_`-prefixed blank-slate template under `references/` is a template placeholder, not a marker — it names no date, cannot age, and is excluded from F07, F08 and from the skill's marker count. Any other unparseable date is still a FAIL. The exclusion keys on the placeholder token and the `_` filename convention *together* precisely so a typo'd date can never be mistaken for a template |
 | F10 | A | Git hook source matches installed copy | For every `scripts/git-*-hook.sh`, the installed counterpart under `.git/hooks/<name>` must exist and `diff -q` clean. Drift = WARN with a pointer to run `install_claude.sh` (or `install_claude.sh --hooks-only` when available). Missing installed copy = WARN when source file is executable (`-f && -x`). Skip when no `scripts/git-*-hook.sh` files exist. Prevents the regression class where a pipeline modifies a hook body but the user's `.git/hooks/` retains pre-pipeline behavior — silently invalidating the hook's intended guarantees |
 | F11 | A | `doc_manifest.yaml` is fresh vs the surfaces it indexes | Conditional on `.ai-state/doc_manifest.yaml` present (it is *generated*, never hand-edited, by `scripts/build_doc_manifest.py`). Compare its `generated_at` against the most recent commit touching its indexed surfaces, **excluding the commit that last touched the manifest itself** — `git log -1 --format=%H -- .ai-state/doc_manifest.yaml` gives that sha; take the newest `git log --format='%H %cI' -- docs/ .ai-state/` entry whose sha differs from it. The exclusion is load-bearing, not a nicety: the builder stamps `generated_at` *before* the commit that carries the regenerated manifest, and that same commit routinely also touches `docs/`, so a naive comparison WARNs on the steady state after every finalize-hook run — a gate that fires on correct behaviour carries no signal. **WARN (never block)** when `generated_at` predates that commit: the builder was not re-run, so the dashboard's navigation lags the current docs/state until `python3 scripts/build_doc_manifest.py` runs. Skip when the manifest is absent. Golden bad-case: a `doc_manifest.yaml` whose `generated_at` is older than a later commit that added or renamed a `docs/` page. |
 
@@ -110,7 +110,7 @@ Convention: Each check has a unique ID, type (A=auto, L=llm), a rule, and a pass
 | ID | Tp | Rule | Pass |
 |----|----|------|------|
 | X01 | A | plugin.json agent paths resolve | Every path in agents array resolves to an existing `.md` file |
-| X02 | A | plugin.json skill/command dirs contain files | `skills/` has skill dirs; `commands/` has command files |
+| X02 | A | plugin.json skill/command dirs contain loadable artifacts | `skills/` has skill dirs **each holding a `SKILL.md`**; `commands/` has command files **that are non-empty**. A registered directory containing nothing loadable is the failure this catches — the directory existing is not evidence it ships anything |
 | X03 | A | CLAUDE.md `## Structure` dirs exist | Every dir in Structure section exists on filesystem |
 | X04 | L | Idea ledger implemented ideas reference real artifacts | Implemented ideas correspond to artifacts that exist |
 | X05 | A | Agent coordination protocol table matches `agents/` | Agent names in Available Agents table match agent files 1:1 |
@@ -259,7 +259,7 @@ Audit the four-behavior contract's single-source-of-truth architecture. Drift be
 
 | ID | Tp | Rule | Pass |
 |----|----|------|------|
-| BC01 | A | Rule exists and is always-loaded | `rules/swe/agent-behavioral-contract.md` exists and has no `paths:` YAML frontmatter |
+| BC01 | A | Rule exists, is always-loaded, and states the whole contract | `rules/swe/agent-behavioral-contract.md` exists, has no `paths:` YAML frontmatter, **and names all four behaviors** — Surface Assumptions, Register Objection, Stay Surgical, Simplicity First. A file that still loads unconditionally but has quietly lost one behavior is the harder failure, and an existence check cannot see it |
 | BC02 | L | Four canonical behaviors appear in canonical order in both CLAUDE.md anchors | `~/.claude/CLAUDE.md` (when readable) and project `CLAUDE.md` both name **Surface Assumptions → Register Objection → Stay Surgical → Simplicity First** in this order with identical spelling |
 | BC03 | A | Each of the 14 contract-bound agents references the rule | Grep `rules/swe/agent-behavioral-contract.md` across `agents/*.md` returns exactly the 14 agents that write, plan, or review code (researcher, systems-architect, implementation-planner, context-engineer, implementer, test-engineer, verifier, doc-engineer, sentinel, cicd-engineer, interface-designer, architect-validator, agentic-transactions-architect, discipline-consultant) |
 | BC04 | A | Tag vocabulary subsection exists with all 6 canonical tags | `skills/code-review/references/report-template.md` contains `### Behavioral Contract Findings` with `[UNSURFACED-ASSUMPTION]`, `[MISSING-OBJECTION]`, `[NON-SURGICAL]`, `[SCOPE-CREEP]`, `[BLOAT]`, `[DEAD-CODE-UNREMOVED]` |
@@ -289,7 +289,7 @@ Conditional activation: skip AC01-AC04 checks when `.ai-state/DESIGN.md` does no
 | AC02 | L | Component names in `.ai-state/DESIGN.md` are internally consistent and account for existing modules | Component names in Section 3 are internally consistent (every component in Data Flow appears in Components table); abstract names are allowed |
 | AC03 | A | File paths in `.ai-state/DESIGN.md` are illustrative | WARN if >50% of file paths in component table do not resolve to existing files; PASS otherwise |
 | AC04 | A | Inline `dec-NNN` references in `.ai-state/DESIGN.md` and `docs/architecture.md` resolve | Every `dec-NNN` mentioned anywhere in either document resolves to a finalized `.ai-state/decisions/<NNN>-*.md` file. Section 8 is a stable pointer to `DECISIONS_INDEX.md`, not an inline table — pointer presence is sufficient |
-| AC05 | A | `docs/architecture.md` exists when `.ai-state/DESIGN.md` exists | `docs/architecture.md` exists |
+| AC05 | A | `docs/architecture.md` exists and is non-empty when `.ai-state/DESIGN.md` exists | `docs/architecture.md` exists **and has content**. Its substance is delegated to AC06–AC09 (component names resolve to modules, file paths resolve, no Status column, subset of the design doc) — stated here because an empty file satisfies a bare existence check and the delegation is otherwise invisible at this row |
 | AC06 | A | Every component name in developer guide matches actual module | Component names in `docs/architecture.md` Section 3 match `Glob` of module names |
 | AC07 | A | File paths in developer guide resolve | Every file path in `docs/architecture.md` component table points to existing file |
 | AC08 | L | No Status column or Planned items in developer guide | `docs/architecture.md` has no Status column and no Planned/Designed items |
@@ -596,7 +596,7 @@ After writing the report, append an entry to `.ai-state/sentinel_reports/SENTINE
 ```markdown
 | Timestamp | Health Grade | Artifacts | Findings (C/I/S) | Ecosystem Coherence | Report File |
 |-----------|-------------|-------------|-----------|-------------------|---------------------|
-| YYYY-MM-DD HH:MM:SS | SENTINEL_REPORT_YYYY-MM-DD_HH-MM-SS.md | B | 31 | 0/2/5 | A |
+| YYYY-MM-DD HH:MM:SS | B | 31 | 0/2/5 | A | SENTINEL_REPORT_YYYY-MM-DD_HH-MM-SS.md |
 ```
 
 Where C/I/S = Critical/Important/Suggested finding counts, Ecosystem Coherence = the system-level composite grade (distinct from per-artifact coherence in the scorecard). The Report File column links each log entry to the specific report file (sibling of `SENTINEL_LOG.md` in `.ai-state/sentinel_reports/`).

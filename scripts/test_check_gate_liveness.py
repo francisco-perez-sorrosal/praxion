@@ -11,6 +11,7 @@ correctly wired gate would make the whole dimension untrustworthy on first use.
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -256,6 +257,153 @@ def test_an_invocation_that_resolves_its_own_interpreter_is_out_of_scope(
     _write(tmp_path, "scripts/check_thing.py", "import yaml\n")
     _write(tmp_path, "hooks/run.sh", "python3 scripts/check_thing.py\n")
     assert gl.check_ambient_import(tmp_path) == []
+
+
+# -- GL04 (cont.): hook guards and gates belong to the same inventory ---------
+
+
+def test_canary_flags_a_hook_guard_no_registration_names(tmp_path: Path) -> None:
+    """A hook guard nothing registers is as inert as an uninvoked script gate.
+
+    Hook gates were outside this inventory only because `hooks/` is excluded from
+    `ambient-import` — two different scopes (candidate gates vs. call sites) that
+    one exclusion was standing in for.
+    """
+    _write(tmp_path, "hooks/policy_guard.py", "# a guard nothing registers\n")
+    _write(tmp_path, "hooks/hooks.json", '{"hooks": {}}\n')
+    findings = gl.check_uninvoked_gate(tmp_path)
+    assert [f["file"] for f in findings] == ["hooks/policy_guard.py"]
+    assert findings[0]["check"] == "uninvoked-gate"
+
+
+def test_a_hook_guard_named_in_the_registrations_is_not_flagged(tmp_path: Path) -> None:
+    """Inverse guard: a registered guard is wired, and must stay silent."""
+    _write(tmp_path, "hooks/policy_guard.py", "# a guard\n")
+    _write(
+        tmp_path,
+        "hooks/hooks.json",
+        '{"hooks": {"PreToolUse": [{"hooks": [{"command": "python3 hooks/policy_guard.py"}]}]}}\n',
+    )
+    assert gl.check_uninvoked_gate(tmp_path) == []
+
+
+def test_canary_a_shell_gate_is_not_excused_by_its_own_python_test(tmp_path: Path) -> None:
+    """A `.sh` gate's test is `test_<stem>.py`, so the filename form matched nothing.
+
+    The exclusion that keeps a gate's own tests from counting as invocation was
+    built as `test_{gate.name}` — `test_audit_gate.sh` for a shell gate, which no
+    file is ever called. The real test file therefore read as a live call site and
+    excused the orphan it was written for.
+    """
+    _write(tmp_path, "hooks/audit_gate.sh", "# a shell gate nothing registers\n")
+    _write(tmp_path, "hooks/test_audit_gate.py", "import subprocess  # runs audit_gate.sh\n")
+    findings = gl.check_uninvoked_gate(tmp_path)
+    assert [f["file"] for f in findings] == ["hooks/audit_gate.sh"]
+
+
+# -- discarded-verdict: is the gate's verdict read? ----------------------------
+
+_EXITS_ON_FINDINGS = "import sys\n\nif findings:\n    sys.exit(1)\n"
+
+
+def _registers(root: Path, command: str, event: str = "PreToolUse") -> None:
+    """Write a hooks.json registering `command` under `event`."""
+    _write(
+        root,
+        "hooks/hooks.json",
+        json.dumps({"hooks": {event: [{"matcher": "", "hooks": [{"command": command}]}]}}),
+    )
+
+
+def test_canary_flags_a_hook_whose_findings_exit_cannot_block(tmp_path: Path) -> None:
+    """A canary: a gate detects perfectly and its verdict is thrown away.
+
+    Claude Code blocks on exit 2 and on nothing else, so a gate returning the
+    POSIX-natural 1-on-findings through a bare registration is computed and
+    discarded. This is the live shape `hooks/commit_gate.sh` was written against.
+    """
+    _write(tmp_path, "hooks/policy_gate.py", _EXITS_ON_FINDINGS)
+    _registers(tmp_path, "python3 hooks/policy_gate.py")
+    findings = gl.check_discarded_verdict(tmp_path)
+    assert [f["file"] for f in findings] == ["hooks/policy_gate.py"]
+    assert findings[0]["check"] == "discarded-verdict"
+
+
+def test_canary_a_findings_exit_reached_through_main_is_still_detected(tmp_path: Path) -> None:
+    """`sys.exit(main())` over a `main()` returning 1 is this repo's dominant gate shape.
+
+    A literals-only scan sees no exit code at all here and reports the gate as
+    carrying no verdict — a silent pass precisely where the check must bite.
+    """
+    _write(
+        tmp_path,
+        "hooks/policy_gate.py",
+        "import sys\n\n\ndef main():\n    return 1\n\n\nsys.exit(main())\n",
+    )
+    _registers(tmp_path, "python3 hooks/policy_gate.py")
+    assert [f["file"] for f in gl.check_discarded_verdict(tmp_path)] == ["hooks/policy_gate.py"]
+
+
+def test_a_gate_routed_through_the_blocking_adapter_is_not_flagged(tmp_path: Path) -> None:
+    """Inverse guard: `--blocking` translates 1 -> 2, so the verdict does reach a decision."""
+    _write(tmp_path, "scripts/check_policy.py", _EXITS_ON_FINDINGS)
+    _registers(tmp_path, "hooks/commit_gate.sh --blocking scripts/check_policy.py")
+    assert gl.check_discarded_verdict(tmp_path) == []
+
+
+def test_a_hook_that_exits_two_directly_is_not_flagged(tmp_path: Path) -> None:
+    """Inverse guard: exiting 2 itself needs no adapter."""
+    _write(tmp_path, "hooks/policy_guard.py", "import sys\n\nif denied:\n    sys.exit(2)\n")
+    _registers(tmp_path, "python3 hooks/policy_guard.py")
+    assert gl.check_discarded_verdict(tmp_path) == []
+
+
+def test_a_deliberately_advisory_reminder_is_not_flagged(tmp_path: Path) -> None:
+    """The inverse guard that decides whether this check is usable at all.
+
+    Advisory hooks are the majority of every registration file, and flagging them
+    would make the check fire on correct code. It stays silent because such a hook
+    has no findings exit to discard — a property of the code, not an exemption
+    carved for it, so the silence cannot rot as the hook set grows.
+    """
+    _write(tmp_path, "hooks/remind_thing.py", "print('consider recording a decision')\n")
+    _registers(tmp_path, "python3 hooks/remind_thing.py")
+    assert gl.check_discarded_verdict(tmp_path) == []
+
+
+def test_a_registration_on_an_event_with_no_blocking_path_is_out_of_scope(tmp_path: Path) -> None:
+    """Scope fidelity, the narrowing direction: no remedy exists, so no finding.
+
+    `SessionStart` has no blocking exit code at all. Reporting a findings exit
+    there would name a defect the author cannot fix, which trains a reader to
+    ignore every row the check emits.
+    """
+    _write(tmp_path, "hooks/policy_gate.py", _EXITS_ON_FINDINGS)
+    _registers(tmp_path, "python3 hooks/policy_gate.py", event="SessionStart")
+    assert gl.check_discarded_verdict(tmp_path) == []
+
+
+def test_a_repository_with_no_hook_registrations_yields_nothing(tmp_path: Path) -> None:
+    """A managed project has no hooks.json; absence is not a finding."""
+    _write(tmp_path, "scripts/check_policy.py", _EXITS_ON_FINDINGS)
+    assert gl.check_discarded_verdict(tmp_path) == []
+
+
+def test_the_live_repo_discards_no_gate_verdict() -> None:
+    """The named consumer for `discarded-verdict`, per the rule's clause 6.
+
+    A gate that computes a verdict no document, check, or decision point is named
+    to read is the defect this whole check exists to catch — so shipping it with
+    only fixture tests would make it the next instance of its own finding. This
+    assertion is that reader: it runs against the real repository on every root
+    suite run, and a discarded verdict reddens it.
+    """
+    repo_root = Path(__file__).resolve().parents[1]
+    findings = gl.check_discarded_verdict(repo_root)
+    assert findings == [], (
+        "a registered gate's findings exit cannot reach a decision:\n"
+        + "\n".join(f"  - {f['file']}: {f['why']}" for f in findings)
+    )
 
 
 def test_cli_exits_nonzero_on_findings(tmp_path: Path) -> None:

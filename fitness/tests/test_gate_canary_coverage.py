@@ -24,7 +24,9 @@ driven as `gl.check_forbidden_pattern(...)`, and a bare-name-only matcher report
 false violation.
 
 Gate set scanned:
-  - scripts/check_*.py and scripts/validate_*.py  → sibling test_<name>.py in scripts/
+  - scripts/check_*.py, scripts/validate_*.py, anything the sentinel dispatches, and
+    any Python script a `.pre-commit-config.yaml` `entry:` runs (gates identified by
+    invocation shape, not filename prefix) → sibling test_<name>.py in scripts/
   - hooks/*_gate.py, hooks/*_guard.py, hooks/*_gate.sh → sibling test_<name>.py in hooks/
   - fitness/tests/test_*.py (except self and pure helpers) → contain their own
     negative-case test named to match the canary regex
@@ -224,8 +226,46 @@ def _delegated_gates(root: Path) -> list[Path]:
     return [p for rel in sorted(named) if (p := root / rel).is_file()]
 
 
+# A gate is what some surface RUNS with its exit code load-bearing, not what a
+# filename prefix claims. `scripts/sync_canonical_blocks.py --check` blocks a
+# commit exactly like the `check_*` scripts beside it in the same config, but its
+# `sync_*` name placed it outside every glob here — so neither its invocation nor
+# its canary coverage was ever asserted, and a naming convention had become a
+# scope boundary by accident. Renaming the script would relocate that boundary,
+# not remove it; deriving the set from invocation sites removes it.
+_PRECOMMIT_ENTRY = re.compile(r"^\s*entry:\s*(.+)$", re.M)
+_ENTRY_SCRIPT = re.compile(r"(?:scripts|hooks)/[A-Za-z0-9_.-]+\.py")
+
+
+def _invoked_gates(root: Path) -> list[Path]:
+    """Python gates named in a `.pre-commit-config.yaml` `entry:` — gates by invocation shape.
+
+    Restricted to `.py` on a *stated* ground rather than an accidental one, which is
+    the whole difference from the prefix boundary this replaces: coverage here is
+    graded by the `def test_*` canary contract, and the repo's one shell gate
+    (`scripts/diagram-regen-hook.sh`) carries its canary as `tests/test_diagram_regen_hook.sh`,
+    written in `tN_*()` shell functions that contract cannot read. Naming that
+    residual keeps it a known boundary rather than a silent one.
+    """
+    config = root / ".pre-commit-config.yaml"
+    try:
+        text = config.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    named = {
+        rel for entry in _PRECOMMIT_ENTRY.findall(text) for rel in _ENTRY_SCRIPT.findall(entry)
+    }
+    return [p for rel in sorted(named) if (p := root / rel).is_file()]
+
+
 def _script_gates(root: Path, skip_stems: frozenset[str] = _SKIP_GATE_STEMS) -> list[Path]:
-    """Gate scripts: the check_*/validate_* naming shape, plus anything the sentinel dispatches."""
+    """Gate scripts: the check_*/validate_* naming shape, plus what the repo actually runs.
+
+    Three discovery routes, unioned: the filename shape, whatever the sentinel
+    dispatches, and whatever `.pre-commit-config.yaml` invokes. The last two exist
+    because the first is a convention, and a convention silently excludes every
+    gate that does not follow it.
+    """
     scripts = root / "scripts"
     gates: list[Path] = []
     for pattern in ("check_*.py", "validate_*.py"):
@@ -235,7 +275,7 @@ def _script_gates(root: Path, skip_stems: frozenset[str] = _SKIP_GATE_STEMS) -> 
             if p.stem in skip_stems:
                 continue
             gates.append(p)
-    for p in _delegated_gates(root):
+    for p in _delegated_gates(root) + _invoked_gates(root):
         if p.stem not in skip_stems and p not in gates:
             gates.append(p)
     return sorted(set(gates))
@@ -574,6 +614,74 @@ def test_declared_checks_ignores_nested_helpers_and_non_check_names(tmp_path: Pa
     )
 
     assert declared_checks(gate) == ["check_top_level", "validate_top_level"]
+
+
+# ---------------------------------------------------------------------------
+# Gates by invocation shape: a pre-commit entry is a gate whatever it is named
+# ---------------------------------------------------------------------------
+
+_PRECOMMIT = """repos:
+  - repo: local
+    hooks:
+      - id: sync-blocks
+        entry: python3 scripts/{name} --check
+        language: system
+"""
+
+
+def test_flags_an_invoked_gate_whose_name_lacks_the_check_prefix(tmp_path: Path) -> None:
+    """Canary: a real pre-commit gate named `sync_*` owes a canary like any other.
+
+    The `check_`/`validate_` prefix is a convention, and keying the gate set on it
+    made the convention a scope boundary: a script whose `--check` mode blocks a
+    commit sat outside every glob, so nothing ever asserted it could bite.
+    """
+    _make_gate_file(tmp_path, "scripts/sync_thing.py", "# a real gate, misnamed for this test\n")
+    (tmp_path / ".pre-commit-config.yaml").write_text(
+        _PRECOMMIT.format(name="sync_thing.py"), encoding="utf-8"
+    )
+    missing = gates_without_canary(tmp_path)
+    assert any("sync_thing.py" in m for m in missing), (
+        f"a gate discovered by invocation shape must owe a canary; got: {missing}"
+    )
+
+
+def test_an_invoked_gate_with_a_canary_is_not_flagged(tmp_path: Path) -> None:
+    """Inverse guard: widening the gate set must not manufacture work on covered gates.
+
+    Both live instances (`sync_canonical_blocks.py`, `regenerate_rules_manifest.py`)
+    were already canaried — nothing had *asserted* it. Firing on them would have
+    made the widening a cost with no finding.
+    """
+    _make_gate_file(tmp_path, "scripts/sync_thing.py", "# a real gate\n")
+    _make_gate_file(
+        tmp_path,
+        "scripts/test_sync_thing.py",
+        "def test_flags_bad_input():\n    assert True\n",
+    )
+    (tmp_path / ".pre-commit-config.yaml").write_text(
+        _PRECOMMIT.format(name="sync_thing.py"), encoding="utf-8"
+    )
+    missing = gates_without_canary(tmp_path)
+    assert not any("sync_thing.py" in m for m in missing), (
+        f"an invoked gate with a canary must not be flagged; got: {missing}"
+    )
+
+
+def test_a_script_merely_mentioned_in_the_config_is_not_a_gate(tmp_path: Path) -> None:
+    """Inverse guard: only an `entry:` invokes. A `files:` pattern or a comment does not.
+
+    Widening the discovery route to any script *named* anywhere in the config would
+    sweep in the paths a hook is merely scoped to, which are inputs, not gates.
+    """
+    _make_gate_file(tmp_path, "scripts/helper_thing.py", "# not a gate\n")
+    (tmp_path / ".pre-commit-config.yaml").write_text(
+        "repos:\n  - repo: local\n    hooks:\n      - id: x\n"
+        "        entry: python3 scripts/check_x.py\n"
+        "        files: '^scripts/helper_thing\\.py$'\n",
+        encoding="utf-8",
+    )
+    assert not any("helper_thing.py" in m for m in gates_without_canary(tmp_path))
 
 
 def test_non_canary_test_calling_a_check_does_not_count_as_coverage(tmp_path: Path) -> None:

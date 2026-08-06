@@ -11,7 +11,7 @@ paths:
 
 ## Gate Liveness
 
-A *gate* is any mechanism whose purpose is to detect or prevent a defect class — a `check_*`/`validate_*` script, a fitness test or import-linter contract, a hook guard/gate, a sentinel check, a verifier phase, a planner or agent checkpoint, or any "verify/ensure/check X" instruction.
+A *gate* is any mechanism whose purpose is to detect or prevent a defect class — identified by **what runs it with its exit code load-bearing, not by what it is named**: anything a hook, a pre-commit config, or a workflow invokes to decide, plus fitness tests and import-linter contracts, hook guards/gates, sentinel checks, verifier phases, planner or agent checkpoints, and any "verify/ensure/check X" instruction. A `check_*`/`validate_*` prefix is a convention; treat it as the boundary and every gate that does not follow it falls silently out of scope — including its own canary coverage.
 
 A gate is a **claim** that it catches its defect class. Like every claim in this codebase, it must be paired with a verification path (the "pair every claim with a verification path" practice). **A gate must be proven to bite** — proven to *fail* on a known-bad input, not merely to pass on the current good state. A gate nobody has seen fail is indistinguishable from no gate at all.
 
@@ -55,4 +55,4 @@ Did I diff the gate's *documented* scope against its *actual* computed scope —
 
 Did I name the consumer and the decision point this gate's output must reach — not just confirm the gate computes or reports correctly and leave its output for a human to independently re-derive, contradict, or ignore?
 
-Did I watch it run in the environment it guards — not just in mine? Name what invokes it, and confirm the installed copy is the one I edited. `check_gate_liveness.py --check uninvoked-gate` answers the first half mechanically; the second half is a question only a deployed run can answer.
+Did I watch it run in the environment it guards — not just in mine? Name what invokes it, name where its verdict lands, and confirm the installed copy is the one I edited. `check_gate_liveness.py --check uninvoked-gate` and `--check discarded-verdict` answer the first two mechanically — the latter for the case where the surface a gate is registered on cannot transmit the exit code it returns; the third is a question only a deployed run can answer.

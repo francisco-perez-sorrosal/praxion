@@ -1353,10 +1353,18 @@ def _make_fake_plugin(plugin_dir: Path) -> Path:
     plugin_scripts = plugin_dir / "scripts"
     plugin_scripts.mkdir(parents=True)
     src_dir = Path(__file__).resolve().parent
-    # _repo_root.py is the shared resolver imported by both scripts; it must
-    # ship alongside them (it lives in scripts/ in the plugin), so the fake
-    # plugin layout mirrors that.
-    for name in ("finalize_adrs.py", "regenerate_adr_index.py", "_repo_root.py"):
+    # _repo_root.py and _script_cli.py are shared siblings imported by these
+    # scripts; both must ship alongside them (they live in scripts/ in the
+    # plugin), so the fake plugin layout mirrors that. Adding a sibling import
+    # to a hook-chain script without adding it here fails exactly this test --
+    # which is the point: a consumer checkout gets the whole scripts/ dir, and
+    # this fixture is the only place that proves the dependency set is closed.
+    for name in (
+        "finalize_adrs.py",
+        "regenerate_adr_index.py",
+        "_repo_root.py",
+        "_script_cli.py",
+    ):
         shutil.copy2(src_dir / name, plugin_scripts / name)
     (plugin_dir / ".ai-state" / "decisions" / "drafts").mkdir(parents=True)
     return plugin_scripts / "finalize_adrs.py"

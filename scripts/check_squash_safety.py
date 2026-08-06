@@ -38,6 +38,7 @@ import sys
 from pathlib import Path
 
 from _repo_root import resolve_repo_root as _resolve_repo_root
+from _script_cli import configure_logging
 
 # -- Constants ----------------------------------------------------------------
 
@@ -206,15 +207,6 @@ def emit_warning(erased: list[str]) -> None:
 # -- Orchestration ------------------------------------------------------------
 
 
-def _configure_logging(verbose: bool) -> None:
-    level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format="%(levelname)s: %(message)s",
-        stream=sys.stderr,
-    )
-
-
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="check_squash_safety",
@@ -285,7 +277,7 @@ def _run(since: str | None) -> int:
 def main(argv: list[str] | None = None) -> None:
     """CLI entry point. Never raises; logs errors and exits 0."""
     args = _parse_args(argv)
-    _configure_logging(args.verbose)
+    configure_logging(args.verbose)
     apply_repo_root(resolve_repo_root(args.repo_root))
     try:
         code = _run(args.since)

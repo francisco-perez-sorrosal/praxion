@@ -46,6 +46,7 @@ from pathlib import Path
 
 from _repo_root import is_plugin_cache_path
 from _repo_root import resolve_repo_root as _resolve_repo_root
+from _script_cli import configure_logging
 
 # -- Constants ----------------------------------------------------------------
 
@@ -571,15 +572,6 @@ def finalize_ledger(ledger_path: Path = LEDGER_PATH, dry_run: bool = False) -> i
 # -- CLI ----------------------------------------------------------------------
 
 
-def _configure_logging(verbose: bool) -> None:
-    level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format="%(levelname)s: %(message)s",
-        stream=sys.stderr,
-    )
-
-
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="finalize_tech_debt_ledger",
@@ -625,7 +617,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> None:
     """CLI entry point. Never raises; logs errors and exits with a code."""
     args = _parse_args(argv)
-    _configure_logging(args.verbose)
+    configure_logging(args.verbose)
     root = resolve_repo_root(args.repo_root)
     if is_plugin_cache_path(root):
         logger.error(

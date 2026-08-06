@@ -35,6 +35,7 @@ from pathlib import Path
 
 from _repo_root import is_plugin_cache_path
 from _repo_root import resolve_repo_root as _resolve_repo_root
+from _script_cli import configure_logging
 
 # -- Constants ----------------------------------------------------------------
 
@@ -1022,15 +1023,6 @@ def acquire_lock(lock_path: Path) -> Iterator[None]:
 # -- Orchestration ------------------------------------------------------------
 
 
-def _configure_logging(verbose: bool) -> None:
-    level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format="%(levelname)s: %(message)s",
-        stream=sys.stderr,
-    )
-
-
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="finalize_adrs",
@@ -1206,7 +1198,7 @@ def _run(mode: str, branch: str | None, dry_run: bool) -> int:
 def main(argv: list[str] | None = None) -> None:
     """CLI entry point. Never raises; logs errors and exits with a code."""
     args = _parse_args(argv)
-    _configure_logging(args.verbose)
+    configure_logging(args.verbose)
     mode, branch = _resolve_mode(args)
     root = resolve_repo_root(args.repo_root)
     if is_plugin_cache_path(root):

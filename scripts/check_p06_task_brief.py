@@ -33,6 +33,7 @@ import sys
 from pathlib import Path
 
 from _repo_root import is_plugin_cache_path, resolve_repo_root
+from _script_cli import configure_logging
 
 # -- Constants ----------------------------------------------------------------
 
@@ -126,14 +127,6 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _configure_logging(verbose: bool) -> None:
-    logging.basicConfig(
-        level=logging.DEBUG if verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-        stream=sys.stderr,
-    )
-
-
 def _format_human(findings: list[dict]) -> str:
     if not findings:
         return "check_p06_task_brief: no P06 violations found."
@@ -165,7 +158,7 @@ def _run(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> None:
     args = _parse_args(argv)
-    _configure_logging(args.verbose)
+    configure_logging(args.verbose)
     try:
         code = _run(args)
     except OSError as exc:

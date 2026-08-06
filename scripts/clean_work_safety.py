@@ -50,6 +50,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from _repo_root import resolve_repo_root as _resolve_repo_root
+from _script_cli import configure_logging
 from artifact_registry import cleanup_policy_for
 
 # -- Constants ----------------------------------------------------------------
@@ -339,14 +340,6 @@ def resolve_ai_work_root(repo_root: Path, override: str | None) -> Path:
     return repo_root / AI_WORK_DIRNAME
 
 
-def _configure_logging(verbose: bool) -> None:
-    logging.basicConfig(
-        level=logging.DEBUG if verbose else logging.INFO,
-        format="%(levelname)s: %(message)s",
-        stream=sys.stderr,
-    )
-
-
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="clean_work_safety",
@@ -396,7 +389,7 @@ def _run(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> None:
     args = _parse_args(argv)
-    _configure_logging(args.verbose)
+    configure_logging(args.verbose)
     try:
         code = _run(args)
     except OSError as exc:

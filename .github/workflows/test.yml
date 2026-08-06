@@ -58,15 +58,31 @@ jobs:
 
   test-root:
     # Strict since 2026-07-16 after one observed green report-only run
-    # (ROADMAP item 1.1). Gates the root pytest corpus (tests/ + scripts/)
-    # — the automation substrate (finalize chain, hooks, sync gates,
+    # (ROADMAP item 1.1). Gates the root pytest corpus (tests/ + scripts/ +
+    # hooks/) — the automation substrate (finalize chain, hooks, sync gates,
     # project-metrics) that previously ran in no CI job at all.
     # Python 3.11 = the root requires-python floor, so the gate proves the
     # contract, not just the maintainer's local interpreter.
     # The coverage floor lives HERE, not in pyproject [tool.coverage.report]:
     # a global fail_under would break scoped inner-loop runs (a single test
-    # file measures only its own slice). 80 sits just under the observed
-    # full-suite in-CI baseline (82.1%, run of 2026-07-16).
+    # file measures only its own slice).
+    #
+    # The floor is derived, not chosen: it sits a couple of points under the
+    # observed full-suite baseline for whatever set is measured. It moved
+    # 80 -> 77 on 2026-08-06 when `hooks` joined `testpaths`, and the reason
+    # matters -- nothing got worse. The measured SET widened by 1132 statements
+    # of hook code that no run had ever measured, and that code is ~54% covered,
+    # so the aggregate fell 82.9% -> 79.0% while the previously-measured slice
+    # stayed byte-identical at 85.5% over the same 9739 statements. Re-deriving
+    # the floor from the new baseline is the same rule applied to a new number,
+    # not a threshold lowered to silence a complaint.
+    #
+    # RATCHET: raise this back toward 80 as the hook suites grow. The drag is
+    # concentrated and nameable -- worktree_guard.py 21%, inject_subagent_context.py
+    # 25%, send_event.py 33%, auto_complete_install.py 38%. Those are real gaps
+    # that were merely invisible before; two long-standing tech-debt rows filed
+    # against *understated* hook modules were the false positives, and they are
+    # gone.
     name: Test root suite
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -87,14 +103,23 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
-      - name: Pytest (tests/ + scripts/)
-        run: uv run --frozen pytest --cov-fail-under=80
+      - name: Assert jq is present
+        # tests/consumer_layout/ has 9 tests guarded by skipif(jq absent), and
+        # tests/test_architecture_gate_canary.py executes the architecture
+        # workflow's real jq gate. GitHub runners ship jq today, so all of them
+        # run -- but a skip is silent, and a runner image that dropped jq would
+        # retire ten executable checks behind a green tick. Assert the
+        # precondition so the tier cannot stop running without saying so.
+        run: command -v jq
 
-      - name: Pytest (hooks/)
-        # testpaths deliberately excludes hooks/, so the WAL-emitter suite
-        # must be invoked explicitly or its regressions ship CI-green
-        # (pre-mortem finding from the efficacy-measurement pipeline).
-        run: uv run --frozen pytest hooks/ -q --no-cov
+      - name: Pytest (tests/ + scripts/ + hooks/)
+        # One measured run over all three paths -- `hooks` is in `testpaths` as
+        # of 2026-08-06, which retired the separate `pytest hooks/ --no-cov`
+        # step that used to sit here. That step ran the hook suites but threw
+        # their coverage away, so the canonical measurement reported hook
+        # modules understated or not at all. See the pyproject `testpaths`
+        # comment for why the fix had to live there rather than in this file.
+        run: uv run --frozen pytest --cov-fail-under=77
 
       - name: Shell test suites
         # `tests/*.sh` are bash suites that pytest cannot collect, so nothing
@@ -103,15 +128,48 @@ jobs:
         # while the block drifted three ways across its four mirror sites --
         # the gate worked, nothing listened.
         #
-        # Enumerated explicitly rather than globbed: `test_install_filter.sh`
-        # and `test_diagram_regen_hook.sh` are currently red for unrelated,
-        # pre-existing reasons (see td-125), and a glob would either ship a red
-        # CI or tempt someone to delete the job. Add each back here as it goes
-        # green -- an explicit list makes the remaining gap visible instead of
-        # hiding it behind a wildcard that quietly covers nothing.
+        # GLOBBED, not enumerated -- reversed 2026-08-06 with the premise that
+        # justified the enumeration. That premise was narrow and explicit: two
+        # suites were red for unrelated pre-existing causes, so a wildcard would
+        # have shipped a red CI. Both are green now, all four run clean, and the
+        # exception is gone. What survives is the argument the other way: an
+        # explicit list silently drops the FIFTH suite someone adds, which is the
+        # identical "the gate exists, nothing invokes it" defect that left this
+        # entire tier unrun for months. A list has to be remembered; a wildcard
+        # does not.
+        #
+        # The wildcard's own failure mode -- matching nothing and passing
+        # vacuously -- is closed below rather than accepted: the count is
+        # asserted non-zero, and every discovered suite is echoed so the run log
+        # names what actually executed. A glob that can report "I covered
+        # nothing" out loud is not the object the enumeration was protecting
+        # against.
+        #
+        # `test_diagram_regen_hook.sh` needs likec4 + d2 for T4/T5 and neither is
+        # installed here. That is deliberate, not an oversight: the suite's own
+        # skip guards keep T1-T3 (the graceful-degradation contract) executing,
+        # and the real render path T4/T5 covers is already gated for real by
+        # architecture.yml's regenerate-and-diff job, which installs both pinned
+        # binaries and diffs the output. Installing them twice would buy a
+        # duplicate. The skips are surfaced as annotations below so this stays a
+        # stated boundary rather than a silent one.
         run: |
-          bash tests/new_project_test.sh
-          bash tests/test_finalize_chain.sh
+          set -eo pipefail
+          shopt -s nullglob
+          suites=(tests/*.sh)
+          if [ "${#suites[@]}" -eq 0 ]; then
+            echo "::error::No tests/*.sh matched -- the shell test tier ran nothing."
+            exit 1
+          fi
+          echo "Discovered ${#suites[@]} shell suite(s): ${suites[*]}"
+          logdir="$(mktemp -d)"
+          for suite in "${suites[@]}"; do
+            echo "::group::${suite}"
+            bash "${suite}" 2>&1 | tee "${logdir}/${suite##*/}.log"
+            echo "::endgroup::"
+          done
+          grep -h '^\[SKIP\]' "${logdir}"/*.log 2>/dev/null \
+            | sed 's/^/::notice::shell suite skip: /' || true
 
       - name: Upload coverage artifact
         if: always()
@@ -202,6 +260,38 @@ jobs:
       - name: Shipped-artifact isolation check
         run: python3 scripts/check_shipped_artifact_isolation.py
 
+  id-citation-discipline:
+    # Hard gate, repo-wide -- the inbound counterpart to the job above, and a
+    # separate job on purpose: folding it into "Shipped artifact isolation"
+    # would make that check's name describe half of what it enforces.
+    #
+    # `hooks/commit_gate.sh` already runs this checker, but with `--files` over
+    # STAGED paths only, while rules/swe/id-citation-discipline.md documents it
+    # as policing the repository. A tree can therefore accumulate citation debt
+    # indefinitely so long as no single commit stages a violating file -- and it
+    # did, reaching 65 violations across 22 files with every commit green. This
+    # job runs the checker's default repo-wide mode so the documented scope and
+    # the enforced scope are finally the same set.
+    #
+    # BLOCKING, not advisory, and the tree being clean is what makes that cheap:
+    # the full-repo scan exits 0 over 815 files today, so this costs nothing
+    # until someone regresses it. The case for advisory -- "a PR that
+    # legitimately needs a fixture literal would be stopped" -- does not survive
+    # the escape hatch: `id-citation-discipline:ignore` on the offending line is
+    # a one-token, reviewable, self-documenting opt-out, and being made to write
+    # it deliberately is the entire point. An advisory verdict here would
+    # reproduce the exact defect the job exists to close: a correct computation
+    # that no decision has to act on.
+    name: ID citation discipline (repo-wide)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Repo-wide id-citation scan
+        run: python3 scripts/check_id_citation_discipline.py
+
   release-staleness:
     # Advisory (never blocks): after a merge lands on main, report agents /
     # skills / commands added since the last v* release tag -- they are
@@ -224,9 +314,24 @@ jobs:
 
   calibration-coverage:
     # Advisory (never blocks): after a merge lands on main, report when
-    # Standard/Full pipeline work has landed since the newest calibration_log.md
-    # row -- the unenforced-producer gap R4 detects. Push-only: noisy on PRs,
-    # meaningful post-merge. Mirrors the release-staleness advisory pattern.
+    # task-completing commits have landed since the newest calibration_log.md
+    # row -- the unenforced-producer gap. Push-only: noisy on PRs, meaningful
+    # post-merge.
+    #
+    # NAMED READERS (gate-liveness clause 6), so this verdict reaches a decision
+    # instead of a log: sentinel's calibration-coverage check runs the same
+    # script with --json and files an Important finding when `covered: false`,
+    # and hooks/remind_calibration.py reuses its compute_coverage() in-process to
+    # nudge at commit time. One counting function, three surfaces. This job is
+    # the third, not an orphaned value.
+    #
+    # This comment used to end "Mirrors the release-staleness advisory pattern",
+    # and that sentence -- not the job -- generated a named-consumer debt row
+    # against it. The two jobs share a SHAPE (push-only, continue-on-error) and
+    # not a defect: release-staleness needed a reader named for it because it had
+    # none anywhere, and got one at the release cut. This checker shipped with
+    # two. Shape-matching is not defect-matching, and a comment that invites the
+    # inference costs a real audit cycle to disprove.
     name: Calibration coverage (advisory)
     if: github.event_name == 'push'
     runs-on: ubuntu-latest

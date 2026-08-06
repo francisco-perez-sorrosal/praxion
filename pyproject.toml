@@ -83,7 +83,22 @@ dev = [
 # coverage, which the session-level combine step cannot merge with the
 # parent's branch-mode data (INTERNALERROR coverage.exceptions.DataError).
 addopts = "--cov --cov-config=pyproject.toml --cov-report=xml --cov-report=term-missing"
-testpaths = ["tests", "scripts"]
+# `hooks` joined `tests`/`scripts` on 2026-08-06. It was previously excluded and
+# invoked as a separate `pytest hooks/ --no-cov` CI step, which made the canonical
+# coverage measurement blind to all 41 hook modules: only the handful that
+# `tests/`+`scripts/` happened to import appeared at all, and those appeared
+# UNDERSTATED because their own suites never ran in the measured process
+# (`_hook_utils.py` reported 42.9% against a true 100%; `inject_process_framing.py`
+# 65.8% against 89.9%). Understated modules are read back by the metrics report's
+# per-module rollup and filed as tech-debt rows, so the exclusion manufactured
+# debt findings against well-tested code.
+#
+# Fixing this in CI alone would not have worked. The coverage artifact the metrics
+# report consumes is produced by the project's canonical coverage target -- which
+# is discovered from THIS pytest-cov config and runs wherever the report is
+# generated, usually a developer's machine. The measurement has to be correct in
+# the default invocation or it is not correct where it is read.
+testpaths = ["tests", "scripts", "hooks"]
 markers = [
     "slow: marks tests that invoke real pip/venv operations (deselect with -m 'not slow')",
 ]

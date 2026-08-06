@@ -6,6 +6,14 @@ fragments, assigns the next sequential `<NNN>`, renames each file, rewrites
 its `id:` frontmatter, and propagates the old `dec-draft-<hash>` -> `dec-NNN`
 rewrite across a bounded set of cross-reference locations.
 
+This module owns the repo-root state, git plumbing, draft detection, NNN
+assignment, promotion, locking, and the CLI. Three siblings own the pieces
+that need none of that state: `finalize_adrs_fragments` (filename -> identity
+fields), `finalize_adrs_crossrefs` (bounded citation rewrite + allowlist-gap
+detection), and `finalize_adrs_backlinks` (`re_affirmed_by` reciprocity). All
+three ship alongside this file in the plugin's `scripts/` directory and are
+imported as siblings, exactly like `_repo_root` and `_script_cli`.
+
 Invocation modes:
 
     finalize_adrs.py                       # --merged (default)
@@ -36,6 +44,10 @@ from pathlib import Path
 from _repo_root import is_plugin_cache_path
 from _repo_root import resolve_repo_root as _resolve_repo_root
 from _script_cli import configure_logging
+from finalize_adrs_backlinks import backfill_re_affirmed_by
+from finalize_adrs_crossrefs import detect_unrewritten_ids, rewrite_cross_references
+from finalize_adrs_fragments import FRAGMENT_ADR_PATTERN
+from finalize_adrs_fragments import parse_fragment_filename as _parse_fragment_filename
 
 # -- Constants ----------------------------------------------------------------
 
@@ -47,16 +59,8 @@ LOCK_PATH = DRAFTS_DIR / ".finalize.lock"
 REGEN_SCRIPT = SCRIPT_DIR / "regenerate_adr_index.py"
 
 FINALIZED_ADR_PATTERN = re.compile(r"^(\d{3})-.+\.md$")
-FRAGMENT_ADR_PATTERN = re.compile(r"^(?P<ts>\d{8}-\d{4})-(?P<rest>[a-z0-9-]+)\.md$")
 FRONTMATTER_ID_PATTERN = re.compile(r"^(id:\s*)(dec-draft-[0-9a-f]{8})\s*$", re.MULTILINE)
 FRONTMATTER_STATUS_PROPOSED_PATTERN = re.compile(r"^(status:\s*)proposed\s*$", re.MULTILINE)
-# Optional `branch:` field in fragment frontmatter — when present, the value
-# is the authoritative branch name written by the creating agent, immune to
-# the single-fragment hyphenated-branch ambiguity the filename heuristic
-# stumbles on (td-017). The value matches the same `[a-z0-9-]+` sanitize
-# alphabet used to build the filename's branch slug.
-FRONTMATTER_BRANCH_PATTERN = re.compile(r"""^branch:\s*["']?([a-z0-9-]+)["']?\s*$""", re.MULTILINE)
-TIMESTAMP_FORMAT = "%Y%m%d-%H%M"
 
 logger = logging.getLogger("finalize_adrs")
 
@@ -86,295 +90,18 @@ class DraftPlan:
 def parse_fragment_filename(path: Path) -> tuple[datetime, str, str, str]:
     """Extract (timestamp, user, branch, slug) from a fragment ADR filename.
 
-    Filename shape: `<YYYYMMDD-HHMM>-<user>-<branch>-<slug>.md` where user,
-    branch, and slug are each sanitized to `[a-z0-9-]`. Because all three can
-    contain hyphens, pure-filename parsing is ambiguous. The parser resolves
-    the user/branch/slug boundaries in order of decreasing confidence:
-
-    1. **Frontmatter `branch:` token-run strip (td-052 fix, extends
-       td-017)**: when the fragment carries an explicit `branch:` value,
-       search `rest`'s dash-delimited tokens for a contiguous run matching
-       the branch's own tokens (requiring at least one token before it for
-       the user, and at least one after for the slug) and strip it --
-       *independent* of whether the current git user matches the filename's
-       user segment. This is what makes the frontmatter branch authoritative
-       even when the filename's user slug is itself hyphenated (e.g. a
-       legal-name-derived slug like `francisco-perez-sorrosal` recorded at
-       fragment-creation time, diverging from the git-config-derived
-       `user_hint` computed at finalize time). The original td-017 fix only
-       consulted the frontmatter branch *after* an exact user-hint prefix
-       match, so a hyphenated-user mismatch skipped it entirely and fell
-       through to the ambiguous heuristic below. Falls through to the tiers
-       below when the branch value doesn't appear as a clean token run
-       (e.g. stale frontmatter after a since-renamed branch) or the field
-       is absent.
-    2. Exact match against `git config user.*` + `git rev-parse HEAD`. The
-       happy path when `finalize` runs on the branch that created the draft.
-    3. Sibling-prefix discovery: scan fragments sharing `path.parent` for a
-       common `<user>-<branch>-` prefix. Pipeline-authored drafts arrive in
-       batches sharing user+branch, so the longest common dash-aligned
-       prefix is the branch. Handles the post-merge case where git hints
-       are stale (branch is `main`, not the authoring branch).
-    4. Heuristic fallback: user = first token, branch = second token, slug
-       = remainder. Ambiguous when user or branch themselves contain
-       hyphens; logs a warning so the caller knows the parse is best-effort.
+    Binds `finalize_adrs_fragments.parse_fragment_filename` to this module's
+    git context. The parser resolves the ambiguous `<user>-<branch>-<slug>`
+    split on its own; only this module knows which checkout the identity
+    hints must be read from, so it supplies them.
 
     Raises ValueError if the filename does not match the fragment pattern.
     """
-    match = FRAGMENT_ADR_PATTERN.match(path.name)
-    if not match:
-        raise ValueError(f"malformed fragment filename: {path.name}")
-
-    timestamp = datetime.strptime(match.group("ts"), TIMESTAMP_FORMAT)
-    rest = match.group("rest")
-    tokens = rest.split("-")
-    if len(tokens) < 3:
-        raise ValueError(f"fragment filename too short (need user-branch-slug): {path.name}")
-
-    # Tier 1: authoritative branch from frontmatter, if present. Takes
-    # precedence over the current-git-branch hint -- and over user-hint
-    # matching (td-052) -- because it is the value the creating agent
-    # recorded at fragment-write time, immune to drift when finalize runs
-    # post-merge on `main` or under a different git identity.
-    branch_from_frontmatter = _read_draft_branch(path)
-
-    user_slug_hint = _current_git_user_slug()
-    branch_slug_hint = branch_from_frontmatter or _current_git_branch_slug()
-
-    user, branch, slug = _split_user_branch_slug(
-        rest,
-        user_slug_hint,
-        branch_slug_hint,
-        siblings_dir=path.parent,
-        self_name=path.name,
-        branch_from_frontmatter=branch_from_frontmatter,
+    return _parse_fragment_filename(
+        path,
+        user_slug_hint=_current_git_user_slug,
+        branch_slug_hint=_current_git_branch_slug,
     )
-    return timestamp, user, branch, slug
-
-
-def _read_draft_branch(path: Path) -> str | None:
-    """Return the optional `branch:` value from a fragment's frontmatter.
-
-    Returns None if the field is absent (older fragments predating td-017),
-    if the file is unreadable, or if the value does not match the sanitize
-    alphabet. The fall-through to filename-heuristic parsing preserves the
-    pre-td-017 behavior for those cases.
-    """
-    try:
-        content = path.read_text(encoding="utf-8")
-    except OSError:
-        return None
-    match = FRONTMATTER_BRANCH_PATTERN.search(content)
-    if match is None:
-        return None
-    return match.group(1)
-
-
-def _split_user_branch_slug(
-    rest: str,
-    user_hint: str | None,
-    branch_hint: str | None,
-    siblings_dir: Path | None = None,
-    self_name: str | None = None,
-    branch_from_frontmatter: str | None = None,
-) -> tuple[str, str, str]:
-    """Split `<user>-<branch>-<slug>` using hints and sibling discovery.
-
-    Priority order:
-        0. Frontmatter `branch:` token-run strip (td-052) -- when present,
-           strip its dash-token run from `rest` first, independent of
-           user-hint matching. Immune to hyphenated user slugs that defeat
-           the prefix-match tiers below.
-        1. Both git hints match a prefix of `rest` -- consume exactly.
-        2. Sibling-prefix discovery -- scan other fragments in
-           `siblings_dir` for a common `<user>-<branch>-` prefix.
-        3. Heuristic fallback -- user=first, branch=second, slug=rest
-           (imperfect for multi-hyphen branches but deterministic).
-    """
-    if branch_from_frontmatter:
-        stripped = _strip_branch_token_run(rest, branch_from_frontmatter)
-        if stripped is not None:
-            user, slug = stripped
-            return user, branch_from_frontmatter, slug
-
-    if user_hint and rest.startswith(user_hint + "-"):
-        after_user = rest[len(user_hint) + 1 :]
-        if branch_hint and after_user.startswith(branch_hint + "-"):
-            slug = after_user[len(branch_hint) + 1 :]
-            return user_hint, branch_hint, slug
-
-        # User hint matched but branch hint did not. Try sibling-prefix
-        # discovery before falling back to the first-token heuristic.
-        discovered = _discover_branch_from_siblings(rest, user_hint, siblings_dir, self_name)
-        if discovered is not None:
-            branch, slug = discovered
-            return user_hint, branch, slug
-
-        # Last-resort heuristic: branch = first token after user, slug = rest.
-        tokens = after_user.split("-", 1)
-        if len(tokens) < 2:
-            raise ValueError(f"cannot extract slug from fragment tail: {rest}")
-        logger.warning(
-            "finalize_adrs: parse_fragment_filename: no sibling drafts to "
-            "disambiguate branch from slug in %r; assuming branch=%r. Pass "
-            "--branch explicitly or populate drafts/ to resolve.",
-            rest,
-            tokens[0],
-        )
-        return user_hint, tokens[0], tokens[1]
-
-    # Sibling-prefix discovery without git user hint -- useful when finalize
-    # runs outside a git config context (e.g., CI without user.email set).
-    sibling_parse = _parse_via_siblings(rest, siblings_dir, self_name)
-    if sibling_parse is not None:
-        return sibling_parse
-
-    # Heuristic fallback: user=first, branch=second, slug=rest.
-    tokens = rest.split("-", 2)
-    if len(tokens) < 3:
-        raise ValueError(f"fragment tail too short to split: {rest}")
-    return tokens[0], tokens[1], tokens[2]
-
-
-def _strip_branch_token_run(rest: str, branch: str) -> tuple[str, str] | None:
-    """Strip the branch's dash-tokens from `rest` as a contiguous run.
-
-    Splits both `rest` and `branch` into dash-delimited tokens and searches
-    (left to right) for the first position where `branch`'s tokens appear as
-    a contiguous run in `rest`'s tokens, requiring at least one token before
-    the run (the user) and at least one after (the slug). Returns
-    (user, slug), each rejoined with dashes, on a match; None when the
-    branch value does not appear as a clean token run -- e.g. stale
-    frontmatter left over after the authoring branch was renamed -- so the
-    caller falls through to the heuristics below.
-    """
-    tokens = rest.split("-")
-    branch_tokens = branch.split("-")
-    run_len = len(branch_tokens)
-    last_start = len(tokens) - run_len - 1
-    for start in range(1, last_start + 1):
-        if tokens[start : start + run_len] == branch_tokens:
-            return "-".join(tokens[:start]), "-".join(tokens[start + run_len :])
-    return None
-
-
-def _discover_branch_from_siblings(
-    rest: str,
-    user_hint: str,
-    siblings_dir: Path | None,
-    self_name: str | None,
-) -> tuple[str, str] | None:
-    """Discover branch+slug via dash-aligned LCP across sibling fragments.
-
-    Given user_hint matches `rest`, examine other fragments in `siblings_dir`
-    whose names also begin with the same user prefix. The longest common
-    dash-aligned prefix *after* `<user>-` across the batch is the branch.
-
-    Returns (branch, slug) when a common prefix is discovered; None
-    otherwise (no siblings, no agreement, or degenerate common prefix).
-    """
-    if siblings_dir is None or not siblings_dir.is_dir():
-        return None
-
-    peer_tails = _collect_peer_tails(siblings_dir, user_hint, self_name)
-    if not peer_tails:
-        return None
-
-    after_user = rest[len(user_hint) + 1 :]
-    common_branch = _dash_aligned_common_prefix([after_user, *peer_tails])
-    if not common_branch:
-        return None
-
-    slug = after_user[len(common_branch) + 1 :]
-    if not slug:
-        return None
-    return common_branch, slug
-
-
-def _parse_via_siblings(
-    rest: str, siblings_dir: Path | None, self_name: str | None
-) -> tuple[str, str, str] | None:
-    """Parse user+branch+slug by LCP across siblings when no user_hint is set.
-
-    Pipeline drafts share a `<user>-<branch>-` prefix across the batch. When
-    we cannot rely on git config, the LCP itself carries that prefix. We
-    split the discovered prefix at the first dash boundary to recover user
-    and branch: the first dash-segment is the user, the remainder is the
-    branch.
-    """
-    if siblings_dir is None or not siblings_dir.is_dir():
-        return None
-
-    peer_rests = _collect_peer_rests(siblings_dir, self_name)
-    if not peer_rests:
-        return None
-
-    common = _dash_aligned_common_prefix([rest, *peer_rests])
-    if not common:
-        return None
-    parts = common.split("-", 1)
-    if len(parts) < 2:
-        return None
-    user, branch = parts[0], parts[1]
-    slug = rest[len(common) + 1 :]
-    if not user or not branch or not slug:
-        return None
-    return user, branch, slug
-
-
-def _collect_peer_tails(siblings_dir: Path, user_hint: str, self_name: str | None) -> list[str]:
-    """Return the `<branch>-<slug>` tails of peer fragments sharing user_hint."""
-    tails: list[str] = []
-    prefix = user_hint + "-"
-    for entry in siblings_dir.iterdir():
-        if not entry.is_file():
-            continue
-        if self_name is not None and entry.name == self_name:
-            continue
-        match = FRAGMENT_ADR_PATTERN.match(entry.name)
-        if match is None:
-            continue
-        peer_rest = match.group("rest")
-        if not peer_rest.startswith(prefix):
-            continue
-        tails.append(peer_rest[len(prefix) :])
-    return tails
-
-
-def _collect_peer_rests(siblings_dir: Path, self_name: str | None) -> list[str]:
-    """Return the `<user>-<branch>-<slug>` rests of peer fragments."""
-    rests: list[str] = []
-    for entry in siblings_dir.iterdir():
-        if not entry.is_file():
-            continue
-        if self_name is not None and entry.name == self_name:
-            continue
-        match = FRAGMENT_ADR_PATTERN.match(entry.name)
-        if match is None:
-            continue
-        rests.append(match.group("rest"))
-    return rests
-
-
-def _dash_aligned_common_prefix(strings: list[str]) -> str:
-    """Return the longest dash-aligned common prefix across `strings`.
-
-    Dash-aligned means the prefix must end just before a `-` in every
-    input -- we never split a token mid-word. Returns an empty string
-    when the inputs share no dash-aligned prefix.
-    """
-    if not strings:
-        return ""
-    shortest = min(strings, key=len)
-    last_dash = -1
-    for i, ch in enumerate(shortest):
-        if any(i >= len(s) or s[i] != ch for s in strings):
-            break
-        if ch == "-":
-            last_dash = i
-    if last_dash < 0:
-        return ""
-    return shortest[:last_dash]
 
 
 def _current_git_user_slug() -> str | None:
@@ -756,247 +483,6 @@ def _stage_path(path: Path, repo_root: Path) -> None:
             path,
             result.stderr.strip(),
         )
-
-
-# -- Cross-reference rewrite --------------------------------------------------
-
-
-def rewrite_cross_references(repo_root: Path, old_id: str, new_id: str) -> int:
-    """Rewrite every occurrence of `old_id` to `new_id` in bounded locations.
-
-    Bounded scope:
-    - All files under `.ai-state/decisions/` (both drafts/ and finalized).
-    - `.ai-state/DESIGN.md`, `.ai-state/TECH_DEBT_LEDGER.md`,
-      `.ai-state/TECH_DEBT_RESOLVED.md`, `.ai-state/CONSULT_LEDGER.md`,
-      `.ai-state/CONSULT_COSTS.md`, `.ai-state/CONSULT_PRIORS.md`,
-      `.ai-state/SYSTEM_DEPLOYMENT.md`, and a project-root `ROADMAP.md` --
-      named persistent files that cite the ADR a decision/debt/disposition
-      row resolved.
-    - Every markdown file under `docs/` (subsumes `docs/architecture.md`):
-      design notes and integration docs cite ADR ids outside `.ai-state/`.
-    - All `.ai-work/*/LEARNINGS.md`.
-    - All `.ai-work/*/SYSTEMS_PLAN.md` and `.ai-work/*/IMPLEMENTATION_PLAN.md`.
-    - `.ai-state/specs/SPEC_*.md` files matching any active pipeline task slug.
-      Matching is separator-insensitive: spec filenames conventionally use
-      underscores (`SPEC_auth_flow_YYYY-MM-DD.md`) while task slugs are
-      kebab-case (`auth-flow`), so a literal substring test never matches.
-
-    `scripts/` is deliberately excluded: id-citation-discipline forbids
-    `dec-draft-<hash>` in committed code, so the only scripts carrying a
-    concrete draft id are test fixtures that must not be rewritten.
-
-    The scope is still an explicit allowlist of named files and bounded
-    subtrees -- never an arbitrary whole-repo sweep.
-
-    Returns the number of files modified.
-    """
-    modified = 0
-    for target in _cross_reference_targets(repo_root):
-        if _rewrite_in_file(target, old_id, new_id):
-            modified += 1
-    return modified
-
-
-def detect_unrewritten_ids(repo_root: Path, promoted_ids: list[str]) -> list[tuple[Path, str]]:
-    """Find promoted draft ids that survived the rewrite, outside the allowlist.
-
-    `rewrite_cross_references` walks a bounded allowlist, and a file outside it
-    is indistinguishable from a file with no matches -- the allowlist fails
-    silently by construction, so a citation in an unlisted file dangles while
-    the run still reports success. This detector closes that failure class
-    rather than its instances: it re-scans a deliberately wider net (every
-    markdown file under `.ai-state/` and `docs/`) for the concrete ids just
-    promoted. Matching concrete ids rather than the `dec-draft-<hash>` shape
-    keeps teaching placeholders and test fixtures from registering as findings.
-
-    Read-only. Returns (path, surviving_id) pairs for the caller to report.
-    """
-    if not promoted_ids:
-        return []
-    survivors: list[tuple[Path, str]] = []
-    for scan_root in (repo_root / ".ai-state", repo_root / "docs"):
-        if not scan_root.is_dir():
-            continue
-        for entry in sorted(scan_root.rglob("*.md")):
-            if not entry.is_file():
-                continue
-            try:
-                text = entry.read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError):
-                continue
-            survivors.extend((entry, i) for i in promoted_ids if i in text)
-    return survivors
-
-
-def _cross_reference_targets(repo_root: Path) -> Iterator[Path]:
-    """Yield every file whose `dec-draft-<hash>` references must be rewritten."""
-    decisions = repo_root / ".ai-state" / "decisions"
-    if decisions.is_dir():
-        for entry in decisions.rglob("*.md"):
-            if entry.is_file():
-                yield entry
-
-    # Named persistent files that legitimately cite ADR ids: the design target,
-    # both tech-debt ledgers (rows reference the ADR that resolved them), the
-    # consult disposition ledger (its `rationale-ref` column is documented to
-    # hold `dec-NNN` or, pre-finalize, `dec-draft-<hash>`), plus a project-root
-    # ROADMAP.md when present.
-    for persistent_doc in (
-        repo_root / ".ai-state" / "DESIGN.md",
-        repo_root / ".ai-state" / "TECH_DEBT_LEDGER.md",
-        repo_root / ".ai-state" / "TECH_DEBT_RESOLVED.md",
-        repo_root / ".ai-state" / "CONSULT_LEDGER.md",
-        repo_root / ".ai-state" / "CONSULT_COSTS.md",
-        repo_root / ".ai-state" / "CONSULT_PRIORS.md",
-        repo_root / ".ai-state" / "SYSTEM_DEPLOYMENT.md",
-        repo_root / "ROADMAP.md",
-    ):
-        if persistent_doc.is_file():
-            yield persistent_doc
-
-    # Bounded docs/ sweep: every markdown file under docs/ (subsumes the
-    # developer architecture guide). Consumer projects cite ADR ids from
-    # design notes and integration docs that live outside .ai-state/; without
-    # this sweep those references dangle the moment finalize runs.
-    docs_dir = repo_root / "docs"
-    if docs_dir.is_dir():
-        for entry in docs_dir.rglob("*.md"):
-            if entry.is_file():
-                yield entry
-
-    ai_work = repo_root / ".ai-work"
-    if ai_work.is_dir():
-        for subdir in ai_work.iterdir():
-            if not subdir.is_dir():
-                continue
-            for filename in (
-                "LEARNINGS.md",
-                "SYSTEMS_PLAN.md",
-                "IMPLEMENTATION_PLAN.md",
-            ):
-                candidate = subdir / filename
-                if candidate.is_file():
-                    yield candidate
-
-    # NOTE: scripts/ is intentionally NOT swept. id-citation-discipline forbids
-    # `dec-draft-<hash>` in committed code, so no production script legitimately
-    # carries a draft id to rewrite; the only `scripts/` files that contain a
-    # concrete draft id are test fixtures that use it as data (and must be left
-    # untouched). Sweeping scripts/ was all-risk (corrupting a fixture on a hash
-    # collision), no-benefit, and contradicted the documented bounded scope,
-    # which never listed scripts/.
-
-    specs = repo_root / ".ai-state" / "specs"
-    task_slugs = _active_task_slugs(repo_root)
-    if specs.is_dir() and task_slugs:
-        # Spec filenames conventionally use underscores while task slugs are
-        # kebab-case, so compare with both separators normalized to `-`.
-        normalized_slugs = {slug.replace("_", "-") for slug in task_slugs}
-        for entry in specs.glob("SPEC_*.md"):
-            normalized_name = entry.name.replace("_", "-")
-            if any(slug in normalized_name for slug in normalized_slugs):
-                yield entry
-
-
-def _active_task_slugs(repo_root: Path) -> set[str]:
-    """Return task slugs derived from `.ai-work/` subdirectory names."""
-    ai_work = repo_root / ".ai-work"
-    if not ai_work.is_dir():
-        return set()
-    return {child.name for child in ai_work.iterdir() if child.is_dir()}
-
-
-def _rewrite_in_file(path: Path, old_id: str, new_id: str) -> bool:
-    """Rewrite `old_id` -> `new_id` in `path`; return True if the file changed."""
-    try:
-        content = path.read_text(encoding="utf-8")
-    except OSError as exc:
-        logger.warning("cannot read %s: %s", path, exc)
-        return False
-    if old_id not in content:
-        return False
-    rewritten = content.replace(old_id, new_id)
-    path.write_text(rewritten, encoding="utf-8")
-    logger.debug("rewrote %s -> %s in %s", old_id, new_id, path)
-    return True
-
-
-# -- Re-affirmation back-link backfill -----------------------------------------
-
-FRONTMATTER_RE_AFFIRMS_PATTERN = re.compile(r"^re_affirms:\s*(dec-\d+)\s*$", re.MULTILINE)
-_REAFFIRMED_BY_FIELD_PATTERN = re.compile(r"^re_affirmed_by:\s*(.*)$")
-_REAFFIRMED_BY_INLINE_PATTERN = re.compile(r"^\[(.*)\]$")
-_REAFFIRMED_BY_ITEM_PATTERN = re.compile(r"^\s*-\s*(dec-\d+)\s*$")
-
-
-def backfill_re_affirmed_by(decisions_dir: Path, plans: list[DraftPlan]) -> int:
-    """Self-heal the reciprocal `re_affirmed_by` back-link (dec-070/DL06).
-
-    For every newly finalized ADR whose frontmatter names `re_affirms:
-    dec-NNN`, ensures the target ADR's `re_affirmed_by` list contains the new
-    id -- backfilling it when missing. Returns the number of backfills.
-    """
-    backfilled = 0
-    for plan in plans:
-        match = FRONTMATTER_RE_AFFIRMS_PATTERN.search(plan.new_path.read_text(encoding="utf-8"))
-        if match is None:
-            continue
-        target_id = match.group(1)
-        candidates = list(decisions_dir.glob(f"{target_id.removeprefix('dec-')}-*.md"))
-        if len(candidates) != 1:
-            logger.warning(
-                "finalize_adrs: %s re_affirms %s but target ADR not found; skipping backfill",
-                plan.new_id,
-                target_id,
-            )
-            continue
-        if _ensure_re_affirmed_by_link(candidates[0], plan.new_id):
-            backfilled += 1
-            logger.info("backfilled re_affirmed_by: %s -> %s", target_id, plan.new_id)
-    return backfilled
-
-
-def _ensure_re_affirmed_by_link(path: Path, new_id: str) -> bool:
-    """Ensure `path`'s frontmatter `re_affirmed_by` list contains `new_id`.
-
-    Creates the field (block-list style) if absent; appends without
-    duplicating if present, in either block-list or inline-list style.
-    Returns True if the file was modified.
-    """
-    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
-    end_idx = next(i for i in range(1, len(lines)) if lines[i].rstrip("\n") == "---")
-    field_idx = next(
-        (i for i in range(1, end_idx) if _REAFFIRMED_BY_FIELD_PATTERN.match(lines[i])), None
-    )
-
-    if field_idx is None:
-        lines[end_idx:end_idx] = ["re_affirmed_by:\n", f"  - {new_id}\n"]
-        path.write_text("".join(lines), encoding="utf-8")
-        return True
-
-    inline_value = _REAFFIRMED_BY_FIELD_PATTERN.match(lines[field_idx]).group(1).strip()
-    if inline_value:
-        inline_match = _REAFFIRMED_BY_INLINE_PATTERN.match(inline_value)
-        items = [x.strip() for x in inline_match.group(1).split(",") if x.strip()]
-        if new_id in items:
-            return False
-        lines[field_idx] = f"re_affirmed_by: [{', '.join([*items, new_id])}]\n"
-        path.write_text("".join(lines), encoding="utf-8")
-        return True
-
-    block_end = field_idx + 1
-    existing = []
-    while block_end < end_idx:
-        item_match = _REAFFIRMED_BY_ITEM_PATTERN.match(lines[block_end])
-        if not item_match:
-            break
-        existing.append(item_match.group(1))
-        block_end += 1
-    if new_id in existing:
-        return False
-    lines.insert(block_end, f"  - {new_id}\n")
-    path.write_text("".join(lines), encoding="utf-8")
-    return True
 
 
 # -- Concurrency --------------------------------------------------------------

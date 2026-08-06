@@ -34,6 +34,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import finalize_adrs_fragments
 import pytest
 
 _SCRIPT_PATH = Path(__file__).resolve().parent / "finalize_adrs.py"
@@ -441,9 +442,9 @@ class TestParseFragmentBranchFromFrontmatter:
         assert slug == "auth"
 
     def test_unreadable_file_falls_back_gracefully(self, tmp_path: Path) -> None:
-        """`_read_draft_branch` on a non-existent path returns None, never
+        """`read_draft_branch` on a non-existent path returns None, never
         raises — the caller falls through to filename-based heuristics."""
-        result = finalize._read_draft_branch(tmp_path / "does-not-exist.md")
+        result = finalize_adrs_fragments.read_draft_branch(tmp_path / "does-not-exist.md")
         assert result is None
 
     def _mock_mismatched_git_hints(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1361,6 +1362,9 @@ def _make_fake_plugin(plugin_dir: Path) -> Path:
     # this fixture is the only place that proves the dependency set is closed.
     for name in (
         "finalize_adrs.py",
+        "finalize_adrs_backlinks.py",
+        "finalize_adrs_crossrefs.py",
+        "finalize_adrs_fragments.py",
         "regenerate_adr_index.py",
         "_repo_root.py",
         "_script_cli.py",

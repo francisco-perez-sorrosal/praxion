@@ -38,23 +38,25 @@ The capability is invoked on demand when a 5-dimension activation formula fires:
 
 ## Traceability Matrix
 
-| REQ-DDL | Satisfying artifact(s) | Kind |
-|---|---|---|
-| REQ-DDL-01 | `agents/systems-architect.md` Phase 7 pointer + `skills/software-planning/references/design-synthesis.md` §When to Activate | Runtime (pointer enables compliance) |
-| REQ-DDL-02 | `skills/software-planning/references/design-synthesis.md` §When to Activate (honest-uncertainty gate) | Runtime |
-| REQ-DDL-03 | `agents/systems-architect.md` Phase 9 pointer + `skills/software-planning/references/design-synthesis.md` §Lens Catalog | Runtime |
-| REQ-DDL-04 | `skills/software-planning/references/design-synthesis.md` §Convergence Signals + `skills/spec-driven-development/SKILL.md` §Convergence via REQ-ID Stability | Runtime |
-| REQ-DDL-05 | `agents/researcher.md` Phase 4 pointer + `skills/software-planning/references/design-synthesis.md` §S2 Research | Runtime |
-| REQ-DDL-06 | `agents/promethean.md` Phase 5 pointer + `skills/software-planning/references/design-synthesis.md` §S1 Ideation | Runtime |
-| REQ-DDL-07 | `skills/refactoring/SKILL.md` cross-link + `skills/software-planning/references/design-synthesis.md` §S5 Refactoring | Runtime |
-| REQ-DDL-08 | `skills/software-planning/references/design-synthesis.md` §Lens Catalog (pointer-only) + §Anti-Patterns | Implementation-time |
-| REQ-DDL-09 | `skills/software-planning/references/design-synthesis.md` §Convergence Signals + §Anti-Patterns | Implementation-time |
-| REQ-DDL-10 | Measured post-merge: always-loaded surface unchanged at ~47,001 chars / ~13,429 tokens | Implementation-time |
-| REQ-DDL-11 | `skills/software-planning/SKILL.md` satellite-list bullet for design-synthesis.md | Implementation-time |
-| REQ-DDL-12 | `skills/spec-driven-development/SKILL.md` §Convergence via REQ-ID Stability (new section) | Implementation-time |
-| REQ-DDL-13 | `.ai-state/decisions/051-pre-impl-design-synthesis.md` (frontmatter + body verified) | Implementation-time |
-| REQ-DDL-14 | `skills/software-planning/references/design-synthesis.md` §Logging obligation (REQ-DDL-14) | Runtime |
-| REQ-DDL-15 | `skills/software-planning/references/design-synthesis.md` §ADR obligation (REQ-DDL-15) + architect Phase 7 pointer | Runtime |
+**Verification column added retroactively 2026-08-07.** As shipped, this matrix carried only `REQ-DDL | Satisfying artifact(s) | Kind` — `Kind` records *when* a requirement applies, and nothing recorded *what verifies it*. The omission was invisible to sentinel SH04, whose scan for `UNTESTED` markers cannot match a matrix that has no verification column to hold one. Cells cite greps, scripts, and sentinel check IDs rather than REQ-tagged tests for two reasons: `rules/swe/id-citation-discipline.md` forbids REQ IDs in code, and this feature's `VERIFICATION_REPORT.md` was ephemeral (see Research Lineage). Ten of the fifteen requirements have no mechanical gate — nine are prose-and-pointer obligations discharged per pipeline, and REQ-DDL-08 is judgmental; their cells state `no test — <reason>` explicitly rather than leave a blank. Greps and paths below were re-run against HEAD on 2026-08-07. Nothing else in this spec was altered.
+
+| REQ-DDL | Satisfying artifact(s) | Kind | Test reference |
+|---|---|---|---|
+| REQ-DDL-01 | `agents/systems-architect.md` Phase 7 pointer + `skills/software-planning/references/design-synthesis.md` §When to Activate | Runtime (pointer enables compliance) | `grep -c 'design-synthesis.md#when-to-activate' agents/systems-architect.md` → 2 (Phase 7 + Phase 9); no test — the architect's read is unobservable, only the pointer is checkable |
+| REQ-DDL-02 | `skills/software-planning/references/design-synthesis.md` §When to Activate (honest-uncertainty gate) | Runtime | `grep -c 'honest-uncertainty gate' skills/software-planning/references/design-synthesis.md` → 3; no test — option count lives in per-pipeline ADR bodies, which no gate reads |
+| REQ-DDL-03 | `agents/systems-architect.md` Phase 9 pointer + `skills/software-planning/references/design-synthesis.md` §Lens Catalog | Runtime | `grep -c 'design-synthesis.md#lens-catalog' agents/systems-architect.md` → 1; no test — lens application is per-pipeline prose |
+| REQ-DDL-04 | `skills/software-planning/references/design-synthesis.md` §Convergence Signals + `skills/spec-driven-development/SKILL.md` §Convergence via REQ-ID Stability | Runtime | no test — no gate reads an ADR body for a REQ-ID-stability record; the defining section is covered by REQ-DDL-12's check |
+| REQ-DDL-05 | `agents/researcher.md` Phase 4 pointer + `skills/software-planning/references/design-synthesis.md` §S2 Research | Runtime | `grep -c 'design-synthesis.md#s2-research' agents/researcher.md` → 1; no test — the re-run trigger fires per pipeline |
+| REQ-DDL-06 | `agents/promethean.md` Phase 5 pointer + `skills/software-planning/references/design-synthesis.md` §S1 Ideation | Runtime | `grep -c 'design-synthesis.md#s1-ideation' agents/promethean.md` → 1; no test — the three-lens pass runs per ideation session |
+| REQ-DDL-07 | `skills/refactoring/SKILL.md` cross-link + `skills/software-planning/references/design-synthesis.md` §S5 Refactoring | Runtime | `grep -c 'design-synthesis.md#s5-refactoring' skills/refactoring/SKILL.md` → 1; no test — four-pillar scoring is per-refactor judgment |
+| REQ-DDL-08 | `skills/software-planning/references/design-synthesis.md` §Lens Catalog (pointer-only) + §Anti-Patterns | Implementation-time | All 6 Lens Catalog target paths resolve on disk; no test — invented-lens drift is judgmental, guarded by sentinel T06 (redundancy) |
+| REQ-DDL-09 | `skills/software-planning/references/design-synthesis.md` §Convergence Signals + §Anti-Patterns | Implementation-time | `grep -c 'LLM-as-judge confidence scalars' skills/software-planning/references/design-synthesis.md` → 3 (§Convergence Signals intro + Prohibited para + §Anti-Patterns) |
+| REQ-DDL-10 | Measured post-merge: always-loaded surface unchanged at ~47,001 chars / ~13,429 tokens | Implementation-time | `scripts/test_measure_token_budget.py::test_canary_an_over_budget_corpus_exits_nonzero`; sentinel T02 runs `python3 scripts/measure_token_budget.py --json` (a ceiling guard, not a delta guard — it cannot reproduce the one-time 2026-04-17 measurement) |
+| REQ-DDL-11 | `skills/software-planning/SKILL.md` satellite-list bullet for design-synthesis.md | Implementation-time | `grep -c 'references/design-synthesis.md' skills/software-planning/SKILL.md` → 1 |
+| REQ-DDL-12 | `skills/spec-driven-development/SKILL.md` §Convergence via REQ-ID Stability (new section) | Implementation-time | `grep -c '^## Convergence via REQ-ID Stability' skills/spec-driven-development/SKILL.md` → 1 |
+| REQ-DDL-13 | `.ai-state/decisions/051-pre-impl-design-synthesis.md` (frontmatter + body verified) | Implementation-time | `tests/test_adr_frontmatter_parseable.py::test_every_finalized_adr_frontmatter_parses` (globs `.ai-state/decisions/[0-9]*.md`); sentinel DL02/DL03; `python3 scripts/adr_health.py --json` for reference decay |
+| REQ-DDL-14 | `skills/software-planning/references/design-synthesis.md` §Logging obligation (REQ-DDL-14) | Runtime | no test — the per-activation row schema is unenforced; `scripts/check_calibration_coverage.py` (sentinel CA03) checks only that the log stays current |
+| REQ-DDL-15 | `skills/software-planning/references/design-synthesis.md` §ADR obligation (REQ-DDL-15) + architect Phase 7 pointer | Runtime | no test — no gate reads an ADR body for the `Activation:` line (`grep -rn 'Activation:' scripts/ tests/` → 0 hits) |
 
 ## Key Decisions
 

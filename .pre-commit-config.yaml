@@ -21,7 +21,16 @@ repos:
         # Generated project-intelligence artifacts under .ai-state/ are
         # intentionally large (full per-file metrics + readiness payloads) and
         # committed by convention; the guard targets accidental source blobs.
-        exclude: '^\.ai-state/(metrics_reports|sentinel_reports)/.*\.(json|md)$'
+        #
+        # The alternation must track new report families -- it is an enumeration,
+        # so a family this list has not heard of is silently in scope rather than
+        # silently out of it. That fails in the safe direction (a real blob is
+        # still caught), but it surfaces as a confusing block on a legitimate
+        # artifact. `praxion_eval_reports` was added 2026-08-07 when the first
+        # full LLM-tier /eval-praxion run produced a 696 KB report: 1,343 checks
+        # each carrying its own judge rationale. Same class as the two families
+        # already listed, and the same reason.
+        exclude: '^\.ai-state/(metrics_reports|sentinel_reports|praxion_eval_reports)/.*\.(json|md)$'
       - id: check-merge-conflict
       - id: detect-private-key
         # `secret-patterns.md` is a catalog of what secrets *look like*, for a

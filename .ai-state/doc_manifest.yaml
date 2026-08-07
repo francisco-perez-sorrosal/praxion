@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-07T20:50:54Z'
+generated_at: '2026-08-07T23:23:46Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -2548,6 +2548,18 @@ surfaces:
   title: Retire P01 and P02 rather than await a substrate that cannot answer them
   last_modified: '2026-08-07'
   renderer: adr_card
+- id: ai-state-decisions-331-finalize-scope-idea-ledgers
+  path: .ai-state/decisions/331-finalize-scope-idea-ledgers.md
+  type: markdown
+  title: Widen the finalize rewrite allowlist to cover `.ai-state/idea_ledgers/`, rather than forbid draft-id citations there
+  last_modified: '2026-08-07'
+  renderer: adr_card
+- id: ai-state-decisions-332-task-brief-obligation-enforced-by-a-non
+  path: .ai-state/decisions/332-task-brief-obligation-enforced-by-a-non.md
+  type: markdown
+  title: TASK_BRIEF obligation enforced by a non-blocking spawn-time advisory, not a gate
+  last_modified: '2026-08-07'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -2558,14 +2570,8 @@ surfaces:
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
   type: markdown
   title: Idea Ledger
-  last_modified: '2026-06-27'
+  last_modified: '2026-08-07'
   renderer: idea_grid
-- id: ai-state-sentinel-reports-sentinel-report-2026-07-15-21-32-25
-  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-07-15_21-32-25.md
-  type: markdown
-  title: Sentinel Report
-  last_modified: '2026-07-15'
-  renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-07-29-15-11-15
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-07-29_15-11-15.md
   type: markdown
@@ -2616,6 +2622,12 @@ surfaces:
   renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-08-06-22-09-15
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-06_22-09-15.md
+  type: markdown
+  title: Sentinel Report
+  last_modified: '2026-08-07'
+  renderer: default_markdown
+- id: ai-state-sentinel-reports-sentinel-report-2026-08-07-14-00-50
+  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-07_14-00-50.md
   type: markdown
   title: Sentinel Report
   last_modified: '2026-08-07'
@@ -2750,7 +2762,7 @@ surfaces:
   path: .ai-state/specs/SPEC_design-dialectic_2026-04-17.md
   type: markdown
   title: 'SPEC: Pre-Implementation Design-Synthesis Capability (H1-wide)'
-  last_modified: '2026-04-16'
+  last_modified: '2026-08-07'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-050-always-loaded-budget-revision
@@ -3169,6 +3181,8 @@ groups:
   - ai-state-decisions-328-derive-the-sentinel-t03-ceiling-from-its
   - ai-state-decisions-329-specify-mcp-dependent-checks-against-bas
   - ai-state-decisions-330-retire-p01-and-p02-rather-than-await-a-s
+  - ai-state-decisions-331-finalize-scope-idea-ledgers
+  - ai-state-decisions-332-task-brief-obligation-enforced-by-a-non
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -3193,7 +3207,6 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-08-05-22-03-40
   - ai-state-metrics-reports-metrics-report-2026-08-07-07-41-41
   - ai-state-metrics-reports-metrics-report-2026-08-07-07-41-41
-  - ai-state-sentinel-reports-sentinel-report-2026-07-15-21-32-25
   - ai-state-sentinel-reports-sentinel-report-2026-07-29-15-11-15
   - ai-state-sentinel-reports-sentinel-report-2026-07-30-11-03-40
   - ai-state-sentinel-reports-sentinel-report-2026-07-31-11-52-24
@@ -3203,6 +3216,7 @@ groups:
   - ai-state-sentinel-reports-sentinel-report-2026-08-05-21-27-47
   - ai-state-sentinel-reports-sentinel-report-2026-08-06-08-49-10
   - ai-state-sentinel-reports-sentinel-report-2026-08-06-22-09-15
+  - ai-state-sentinel-reports-sentinel-report-2026-08-07-14-00-50
   - ai-state-specs-spec-agent-model-routing-2026-04-25
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30

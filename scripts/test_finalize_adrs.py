@@ -1664,6 +1664,37 @@ class TestWidenedCrossReferenceScope:
         assert new in text
         assert old not in text
 
+    def test_rewrites_idea_ledger_and_leaves_unlisted_file_untouched(self, repo_root: Path) -> None:
+        """`.ai-state/idea_ledgers/*.md` is in scope; an unlisted sibling is not.
+
+        Regression: an idea is promoted to the ledger during the very pipeline
+        that authored its grounding ADRs, so the entry legitimately cites
+        `dec-draft-<hash>` -- and every finalize stranded those citations,
+        because the allowlist never yielded the subtree while the allowlist-gap
+        detector already scanned it. The rewriter and the detector disagreed
+        about their own scope.
+
+        The second assertion pins the other half of the contract: the scope is
+        widened by exactly one bounded subtree, never into a repo sweep. A test
+        proving only that the new path is walked cannot detect that regression.
+        """
+        old, new = "dec-draft-1dea1e46", "dec-221"  # id-citation-discipline:ignore
+        ledger = repo_root / ".ai-state" / "idea_ledgers" / "IDEA_LEDGER.md"
+        ledger.parent.mkdir(parents=True, exist_ok=True)
+        ledger.write_text(f"- Grounded in {old}; see the cluster above.\n", encoding="utf-8")
+
+        unlisted = repo_root / ".ai-state" / "calibration_log.md"
+        unlisted_original = f"| some-task | standard | authored {old} |\n"
+        unlisted.write_text(unlisted_original, encoding="utf-8")
+
+        modified = finalize.rewrite_cross_references(repo_root, old, new)
+
+        assert modified == 1
+        ledger_text = ledger.read_text(encoding="utf-8")
+        assert new in ledger_text
+        assert old not in ledger_text
+        assert unlisted.read_text(encoding="utf-8") == unlisted_original
+
     def test_rewrites_spec_despite_separator_mismatch(self, repo_root: Path) -> None:
         """Spec filenames use underscores; task slugs are kebab-case.
 

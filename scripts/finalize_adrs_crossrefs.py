@@ -33,6 +33,9 @@ def rewrite_cross_references(repo_root: Path, old_id: str, new_id: str) -> int:
       row resolved.
     - Every markdown file under `docs/` (subsumes `docs/architecture.md`):
       design notes and integration docs cite ADR ids outside `.ai-state/`.
+    - `.ai-state/idea_ledgers/*.md`: idea entries ground their clusters in the
+      ADRs that motivated them, cited as draft ids while the pipeline that
+      authored those drafts is still in flight.
     - All `.ai-work/*/LEARNINGS.md`.
     - All `.ai-work/*/SYSTEMS_PLAN.md` and `.ai-work/*/IMPLEMENTATION_PLAN.md`.
     - `.ai-state/specs/SPEC_*.md` files matching any active pipeline task slug.
@@ -120,6 +123,17 @@ def _cross_reference_targets(repo_root: Path) -> Iterator[Path]:
     docs_dir = repo_root / "docs"
     if docs_dir.is_dir():
         for entry in docs_dir.rglob("*.md"):
+            if entry.is_file():
+                yield entry
+
+    # Idea ledgers cite the ADRs that motivated a cluster, and the citation is
+    # authored mid-pipeline when only the draft id exists -- the case
+    # adr-conventions explicitly sanctions. The allowlist-gap detector already
+    # scans this subtree; without the sweep the rewriter disagrees with the
+    # detector and every finalize strands those citations.
+    idea_ledgers = repo_root / ".ai-state" / "idea_ledgers"
+    if idea_ledgers.is_dir():
+        for entry in idea_ledgers.glob("*.md"):
             if entry.is_file():
                 yield entry
 

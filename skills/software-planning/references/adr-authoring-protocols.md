@@ -200,11 +200,12 @@ The full step sequence:
    | Location | Surface to rewrite |
    |----------|-------------------|
    | `.ai-state/decisions/**/*.md` | Frontmatter `supersedes` / `superseded_by` / `re_affirms` / `re_affirmed_by`; inline body references (`[dec-draft-<hash>]` or bare). Both drafts and finalized records. |
-   | `.ai-state/DESIGN.md`, `.ai-state/TECH_DEBT_LEDGER.md`, `.ai-state/TECH_DEBT_RESOLVED.md`, `.ai-state/CONSULT_LEDGER.md`, project-root `ROADMAP.md` | All occurrences — persistent files that cite the ADR a decision, debt, or consult-disposition row resolved |
+   | `.ai-state/DESIGN.md`, `.ai-state/TECH_DEBT_LEDGER.md`, `.ai-state/TECH_DEBT_RESOLVED.md`, `.ai-state/CONSULT_LEDGER.md`, `.ai-state/CONSULT_COSTS.md`, `.ai-state/CONSULT_PRIORS.md`, `.ai-state/SYSTEM_DEPLOYMENT.md`, project-root `ROADMAP.md` | All occurrences — persistent files that cite the ADR a decision, debt, or consult-disposition row resolved |
    | `docs/**/*.md` | All occurrences — design notes and integration docs cite ADR ids outside `.ai-state/` (subsumes `docs/architecture.md`) |
+   | `.ai-state/idea_ledgers/*.md` | All occurrences — an idea entry grounds its cluster in the ADRs that motivated it, cited as a draft id while the authoring pipeline is still in flight |
    | `.ai-work/*/LEARNINGS.md` | All occurrences |
    | `.ai-work/*/SYSTEMS_PLAN.md`, `.ai-work/*/IMPLEMENTATION_PLAN.md` | All occurrences |
-   | `.ai-state/specs/SPEC_<name>_YYYY-MM-DD.md` | Files matching the current pipeline's task slug |
+   | `.ai-state/specs/SPEC_<name>_YYYY-MM-DD.md` | Files whose name matches **any** active task slug (every `.ai-work/<task-slug>/` directory present, not only the current pipeline's). Matching normalizes `_` to `-` on both sides, since spec filenames use underscores while task slugs are kebab-case |
 5. **Index regeneration.** After all drafts in the batch promote, `DECISIONS_INDEX.md` regenerates to reflect the new finalized records. Drafts are excluded from the index by construction; the index lists only finalized `<NNN>-<slug>.md` files.
 
 **Concurrency safety.** Finalize acquires an advisory file lock before any writes so concurrent post-merge hook invocations serialize cleanly. Exit codes: `0` for success or no-op; non-zero only when manual intervention is needed (e.g., an unresolvable filename collision). The protocol deliberately avoids rewriting arbitrary repository text; the bounded walk scope is the contract.

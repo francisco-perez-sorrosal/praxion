@@ -21,6 +21,7 @@ is a Register Objection trigger per the BDD/TDD protocol.
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import subprocess
@@ -1119,3 +1120,655 @@ class TestLinkRulesFiltering:
 def _snapshot_home_files(home: Path) -> set[Path]:
     """Return a set of all files currently under `home`."""
     return {p for p in home.rglob("*") if p.is_file()}
+
+
+# ===========================================================================
+# Group 10: In-process drive of the install primitives.
+#
+# The subprocess groups above pin the hook's runtime shape -- a real
+# interpreter, a real exit code, a real stdin. They cannot observe *what the
+# install actually did to the filesystem*, nor substitute the boundaries
+# (signals, PyYAML, git) whose failure modes this hook is built to absorb.
+#
+# Every test here fakes HOME first. `_home()` reads os.environ["HOME"]
+# specifically so this is possible; without it these tests would symlink into
+# the operator's real ~/.claude.
+# ===========================================================================
+
+
+def _fake_home_module(monkeypatch, home: Path):
+    """Point the module under test at a throwaway HOME and return it."""
+    monkeypatch.setenv("HOME", str(home))
+    return _load_module()
+
+
+class TestHomeResolution:
+    def test_uses_the_home_environment_variable(self, tmp_path, monkeypatch):
+        module = _fake_home_module(monkeypatch, tmp_path)
+
+        assert module._home() == tmp_path
+
+    def test_falls_back_to_the_platform_home_when_unset(self, monkeypatch):
+        module = _load_module()
+        monkeypatch.delenv("HOME", raising=False)
+
+        # Path.home() consults pwd on some platforms; the fallback must still
+        # produce a usable directory rather than an empty path.
+        assert module._home() == Path.home()
+
+
+class TestInstallFreshnessPredicate:
+    """The marker is only trusted while it is newer than the plugin cache."""
+
+    def test_absent_marker_means_the_install_has_not_run(self, fake_home, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+
+        assert module._is_install_complete(fake_home) is False
+
+    def test_marker_newer_than_the_plugin_cache_is_trusted(
+        self, fake_home, plugin_cache_dir, marker_path, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        marker_path.write_text("")
+        os.utime(plugin_cache_dir, (1_000_000, 1_000_000))
+        os.utime(marker_path, (2_000_000, 2_000_000))
+
+        assert module._is_install_complete(fake_home) is True
+
+    def test_a_plugin_update_rearms_the_install(
+        self, fake_home, plugin_cache_dir, marker_path, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        marker_path.write_text("")
+        # The update touched the cache after the marker was written: the
+        # surfaces the marker vouches for may now be stale.
+        os.utime(marker_path, (1_000_000, 1_000_000))
+        os.utime(plugin_cache_dir, (2_000_000, 2_000_000))
+
+        assert module._is_install_complete(fake_home) is False
+
+    def test_a_marker_with_no_plugin_cache_to_compare_against_is_not_trusted(
+        self, tmp_path, monkeypatch
+    ):
+        home = tmp_path / "home"
+        (home / ".claude").mkdir(parents=True)
+        module = _fake_home_module(monkeypatch, home)
+        (home / ".claude" / ".praxion-complete-installed").write_text("")
+
+        # No cache directory: the freshness comparison is impossible, so the
+        # safe answer is "incomplete" (attempt the install) rather than "done".
+        assert module._is_install_complete(home) is False
+
+
+class TestSurfacePresence:
+    def test_symlinked_claude_md_plus_rules_sentinel_counts_as_installed(
+        self, fake_home, claude_md_symlink, rules_sentinel, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+
+        assert module._surfaces_present(fake_home) is True
+
+    def test_a_regular_claude_md_is_not_an_installed_surface(
+        self, fake_home, rules_sentinel, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        # A hand-authored ~/.claude/CLAUDE.md is a real file, not a plugin
+        # symlink. Treating it as installed would leave the operator's own
+        # file permanently mistaken for a rendered one.
+        (fake_home / ".claude" / "CLAUDE.md").write_text("# my own notes\n")
+
+        assert module._surfaces_present(fake_home) is False
+
+    def test_missing_rules_sentinel_is_not_an_installed_surface(
+        self, fake_home, claude_md_symlink, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+
+        assert module._surfaces_present(fake_home) is False
+
+
+class TestMarkerWriting:
+    def test_completion_marker_is_created_with_its_parent_directory(self, tmp_path, monkeypatch):
+        home = tmp_path / "home"
+        module = _fake_home_module(monkeypatch, home)
+
+        module._write_marker(home)
+
+        assert (home / ".claude" / ".praxion-complete-installed").exists()
+
+    def test_decline_marker_is_a_distinct_file(self, tmp_path, monkeypatch):
+        home = tmp_path / "home"
+        module = _fake_home_module(monkeypatch, home)
+
+        module._write_decline_marker(home)
+
+        assert (home / ".claude" / ".praxion-install-declined").exists()
+        assert not (home / ".claude" / ".praxion-complete-installed").exists()
+
+
+def _seed_template(plugin_cache: Path, body: str = "user={{USERNAME}} mail={{EMAIL}}\n") -> Path:
+    """Place a CLAUDE.md template where the plugin cache expects it."""
+    template = plugin_cache / "claude" / "config" / "CLAUDE.md.tmpl"
+    template.parent.mkdir(parents=True, exist_ok=True)
+    template.write_text(body, encoding="utf-8")
+    return template
+
+
+_VALUES = {
+    "USERNAME": "@someone",
+    "EMAIL": "someone@example.com",
+    "GITHUB_URL": "https://github.com/someone",
+}
+
+
+class TestClaudeMdRendering:
+    def test_renders_the_template_and_links_it_into_the_claude_directory(
+        self, fake_home, plugin_cache_dir, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        _seed_template(plugin_cache_dir)
+
+        module._render_claude_md(fake_home, _VALUES)
+
+        link = fake_home / ".claude" / "CLAUDE.md"
+        assert link.is_symlink(), "CLAUDE.md must be a symlink so plugin updates propagate"
+        assert link.read_text(encoding="utf-8") == "user=@someone mail=someone@example.com\n"
+
+    def test_replaces_a_previously_rendered_symlink(
+        self, fake_home, plugin_cache_dir, tmp_path, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        _seed_template(plugin_cache_dir)
+        stale_target = tmp_path / "stale.md"
+        stale_target.write_text("stale\n", encoding="utf-8")
+        (fake_home / ".claude" / "CLAUDE.md").symlink_to(stale_target)
+
+        module._render_claude_md(fake_home, _VALUES)
+
+        assert (fake_home / ".claude" / "CLAUDE.md").read_text(encoding="utf-8").startswith("user=")
+
+    def test_replaces_a_regular_file_left_at_the_link_path(
+        self, fake_home, plugin_cache_dir, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        _seed_template(plugin_cache_dir)
+        (fake_home / ".claude" / "CLAUDE.md").write_text("hand written\n", encoding="utf-8")
+
+        module._render_claude_md(fake_home, _VALUES)
+
+        assert (fake_home / ".claude" / "CLAUDE.md").is_symlink()
+
+    def test_a_missing_template_surfaces_rather_than_silently_producing_nothing(
+        self, fake_home, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+
+        # `_render_claude_md` documents that it raises; `_perform_install` is
+        # the layer that decides to swallow. Losing the raise here would make
+        # a broken plugin cache indistinguishable from a good one.
+        with pytest.raises(FileNotFoundError):
+            module._render_claude_md(fake_home, _VALUES)
+
+
+class TestManifestParsing:
+    def test_absent_manifest_signals_fall_back_to_linking_everything(self, tmp_path, monkeypatch):
+        module = _load_module()
+
+        assert module._load_hook_deliver_set(tmp_path) is None
+
+    @pytest.mark.parametrize(
+        ("body", "reason"),
+        [
+            ("- just\n- a\n- list\n", "not a mapping"),
+            ("other_key: 1\n", "no rules key"),
+            ("rules: [unclosed\n", "unparseable"),
+        ],
+    )
+    def test_an_unusable_manifest_signals_fall_back_rather_than_an_empty_set(
+        self, tmp_path, body, reason
+    ):
+        module = _load_module()
+        (tmp_path / "_manifest.yaml").write_text(body, encoding="utf-8")
+
+        # An empty frozenset would mean "nothing is hook-delivered" and silently
+        # link every rule; None means "cannot tell", which is the honest answer.
+        assert module._load_hook_deliver_set(tmp_path) is None, reason
+
+    def test_collects_hook_delivered_paths_relative_to_the_rules_directory(self, tmp_path):
+        module = _load_module()
+        (tmp_path / "_manifest.yaml").write_text(
+            "rules:\n"
+            "  - path: rules/swe/agent-model-routing.md\n"
+            "    install: hook-deliver\n"
+            "  - path: rules/swe/coding-style.md\n"
+            "    install: symlink\n"
+            "  - path: elsewhere/outside.md\n"
+            "    install: hook-deliver\n",
+            encoding="utf-8",
+        )
+
+        hook_deliver = module._load_hook_deliver_set(tmp_path)
+
+        # Only the rules/-rooted hook-deliver entry survives, stripped of the
+        # prefix so it can be compared against a path relative to rules_src.
+        assert hook_deliver == frozenset({Path("swe/agent-model-routing.md")})
+
+
+def _seed_rule_tree(plugin_cache: Path) -> Path:
+    """Build a rules/ tree covering every filter `_link_rules` applies."""
+    rules_src = plugin_cache / "rules"
+    (rules_src / "swe").mkdir(parents=True)
+    (rules_src / "swe" / "coding-style.md").write_text("style\n", encoding="utf-8")
+    (rules_src / "swe" / "agent-model-routing.md").write_text("routing\n", encoding="utf-8")
+    (rules_src / "README.md").write_text("catalog\n", encoding="utf-8")
+    (rules_src / "swe" / "references").mkdir()
+    (rules_src / "swe" / "references" / "deep-dive.md").write_text("deep\n", encoding="utf-8")
+    return rules_src
+
+
+class TestRuleLinking:
+    def test_absent_rules_directory_is_a_no_op(self, fake_home, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+
+        module._link_rules(fake_home)
+
+        assert not (fake_home / ".claude" / "rules" / "swe" / "coding-style.md").exists()
+
+    def test_links_rule_files_and_skips_the_non_rules(
+        self, fake_home, plugin_cache_dir, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        _seed_rule_tree(plugin_cache_dir)
+
+        module._link_rules(fake_home)
+
+        dest = fake_home / ".claude" / "rules"
+        assert (dest / "swe" / "coding-style.md").is_symlink()
+        assert not (dest / "README.md").exists(), "catalogs are not rules"
+        assert not (dest / "swe" / "references" / "deep-dive.md").exists(), (
+            "reference material is loaded on demand, never injected as a rule"
+        )
+
+    def test_hook_delivered_rules_are_not_symlinked(self, fake_home, plugin_cache_dir, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+        rules_src = _seed_rule_tree(plugin_cache_dir)
+        (rules_src / "_manifest.yaml").write_text(
+            "rules:\n  - path: rules/swe/agent-model-routing.md\n    install: hook-deliver\n",
+            encoding="utf-8",
+        )
+
+        module._link_rules(fake_home)
+
+        dest = fake_home / ".claude" / "rules"
+        # Symlinking it would defeat the blacklist: the rule would load
+        # unconditionally *and* be injected at session start.
+        assert not (dest / "swe" / "agent-model-routing.md").exists()
+        assert (dest / "swe" / "coding-style.md").is_symlink()
+
+    def test_a_rule_that_became_hook_delivered_has_its_stale_symlink_removed(
+        self, fake_home, plugin_cache_dir, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        rules_src = _seed_rule_tree(plugin_cache_dir)
+        (rules_src / "_manifest.yaml").write_text(
+            "rules:\n  - path: rules/swe/agent-model-routing.md\n    install: hook-deliver\n",
+            encoding="utf-8",
+        )
+        stale = fake_home / ".claude" / "rules" / "swe" / "agent-model-routing.md"
+        stale.parent.mkdir(parents=True, exist_ok=True)
+        stale.symlink_to(rules_src / "swe" / "agent-model-routing.md")
+
+        module._link_rules(fake_home)
+
+        assert not stale.is_symlink(), "a re-install must clean up the previous install's link"
+
+    def test_relinking_replaces_an_existing_symlink(
+        self, fake_home, plugin_cache_dir, tmp_path, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        rules_src = _seed_rule_tree(plugin_cache_dir)
+        outdated_target = tmp_path / "outdated.md"
+        outdated_target.write_text("outdated\n", encoding="utf-8")
+        dest = fake_home / ".claude" / "rules" / "swe" / "coding-style.md"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.symlink_to(outdated_target)
+
+        module._link_rules(fake_home)
+
+        assert dest.resolve() == (rules_src / "swe" / "coding-style.md").resolve()
+
+
+def _seed_script(scripts_src: Path, name: str, executable: bool = True) -> Path:
+    scripts_src.mkdir(parents=True, exist_ok=True)
+    script = scripts_src / name
+    script.write_text("#!/bin/sh\n", encoding="utf-8")
+    if executable:
+        script.chmod(0o755)
+    else:
+        script.chmod(0o644)
+    return script
+
+
+class TestScriptLinking:
+    def test_absent_scripts_directory_is_a_no_op(self, fake_home, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+
+        module._link_scripts(fake_home)
+
+        assert list((fake_home / ".local" / "bin").iterdir()) == []
+
+    def test_links_executable_scripts_onto_the_path(self, fake_home, plugin_cache_dir, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+        _seed_script(plugin_cache_dir / "scripts", "praxion-dashboard")
+
+        module._link_scripts(fake_home)
+
+        assert (fake_home / ".local" / "bin" / "praxion-dashboard").is_symlink()
+
+    @pytest.mark.parametrize(
+        ("name", "executable", "reason"),
+        [
+            ("helper.py", False, "not executable -- not a user-facing entry point"),
+            ("merge_driver_observations.py", True, "git invokes merge drivers, not the operator"),
+            ("post-merge-hook.sh", True, "git invokes hooks, not the operator"),
+        ],
+    )
+    def test_non_operator_facing_files_stay_off_the_path(
+        self, fake_home, plugin_cache_dir, monkeypatch, name, executable, reason
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        _seed_script(plugin_cache_dir / "scripts", name, executable=executable)
+
+        module._link_scripts(fake_home)
+
+        assert not (fake_home / ".local" / "bin" / name).exists(), reason
+
+    def test_relinking_replaces_an_existing_symlink(
+        self, fake_home, plugin_cache_dir, tmp_path, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        script = _seed_script(plugin_cache_dir / "scripts", "praxion-dashboard")
+        outdated = tmp_path / "outdated-dashboard"
+        outdated.write_text("#!/bin/sh\n", encoding="utf-8")
+        dest = fake_home / ".local" / "bin" / "praxion-dashboard"
+        dest.symlink_to(outdated)
+
+        module._link_scripts(fake_home)
+
+        assert dest.resolve() == script.resolve()
+
+
+class TestFullInstallSequence:
+    def test_runs_every_install_step(self, fake_home, plugin_cache_dir, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+        _seed_template(plugin_cache_dir)
+        _seed_rule_tree(plugin_cache_dir)
+        _seed_script(plugin_cache_dir / "scripts", "praxion-dashboard")
+
+        module._run_install(fake_home, _VALUES)
+
+        assert (fake_home / ".claude" / "CLAUDE.md").is_symlink()
+        assert (fake_home / ".claude" / "rules" / "swe" / "coding-style.md").is_symlink()
+        assert (fake_home / ".local" / "bin" / "praxion-dashboard").is_symlink()
+
+
+class TestOperatorPrompt:
+    @pytest.mark.parametrize("answer", ["n\n", "no\n", "N\n", "  No  \n"])
+    def test_an_explicit_refusal_declines_the_install(self, answer, monkeypatch):
+        module = _load_module()
+        monkeypatch.setattr(sys, "stdin", io.StringIO(answer))
+
+        assert module._prompt_with_timeout(_VALUES) is False
+
+    @pytest.mark.parametrize("answer", ["y\n", "\n", "yes\n", "anything else\n"])
+    def test_anything_other_than_a_refusal_proceeds(self, answer, monkeypatch):
+        module = _load_module()
+        monkeypatch.setattr(sys, "stdin", io.StringIO(answer))
+
+        assert module._prompt_with_timeout(_VALUES) is True
+
+    def test_the_prompt_shows_the_values_that_will_be_written(self, monkeypatch, capsys):
+        module = _load_module()
+        monkeypatch.setattr(sys, "stdin", io.StringIO("\n"))
+
+        module._prompt_with_timeout(_VALUES)
+
+        prompt = capsys.readouterr().err
+        assert "@someone" in prompt
+        assert "someone@example.com" in prompt
+
+    def test_unreadable_stdin_is_treated_as_consent(self, monkeypatch):
+        module = _load_module()
+
+        class _Unreadable:
+            def readline(self) -> str:
+                raise OSError("stdin is not readable")
+
+        monkeypatch.setattr(sys, "stdin", _Unreadable())
+
+        # A piped or headless session cannot answer; blocking it would wedge
+        # session start, which this hook must never do.
+        assert module._prompt_with_timeout(_VALUES) is True
+
+    def test_a_platform_without_alarm_signals_still_proceeds(self, monkeypatch):
+        module = _load_module()
+
+        def _no_alarm(*args: object, **kwargs: object):
+            raise ValueError("signal only works in main thread")
+
+        monkeypatch.setattr(module.signal, "signal", _no_alarm)
+
+        assert module._prompt_with_timeout(_VALUES) is True
+
+
+class TestAutoCompleteMode:
+    @pytest.mark.parametrize("value", ["1", "true", "TRUE", "yes", "Yes"])
+    def test_recognised_opt_in_values_skip_the_prompt(self, value, monkeypatch):
+        module = _load_module()
+        monkeypatch.setenv("PRAXION_AUTO_COMPLETE", value)
+
+        assert module._resolve_mode() is True
+
+    @pytest.mark.parametrize("value", ["0", "false", "no", "", "maybe"])
+    def test_everything_else_leaves_the_prompt_in_place(self, value, monkeypatch):
+        module = _load_module()
+        monkeypatch.setenv("PRAXION_AUTO_COMPLETE", value)
+
+        assert module._resolve_mode() is False
+
+
+class TestPerformInstall:
+    def test_auto_complete_installs_and_records_completion(
+        self, fake_home, plugin_cache_dir, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        _seed_template(plugin_cache_dir)
+
+        module._perform_install(fake_home, _VALUES, auto_complete=True)
+
+        assert (fake_home / ".claude" / "CLAUDE.md").is_symlink()
+        assert (fake_home / ".claude" / ".praxion-complete-installed").exists()
+
+    def test_a_refusal_records_the_decline_and_installs_nothing(
+        self, fake_home, plugin_cache_dir, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        _seed_template(plugin_cache_dir)
+        monkeypatch.setattr(sys, "stdin", io.StringIO("n\n"))
+
+        module._perform_install(fake_home, _VALUES, auto_complete=False)
+
+        assert (fake_home / ".claude" / ".praxion-install-declined").exists()
+        assert not (fake_home / ".claude" / ".praxion-complete-installed").exists()
+        assert not (fake_home / ".claude" / "CLAUDE.md").exists()
+
+    def test_a_failed_install_still_records_completion(self, fake_home, monkeypatch, capsys):
+        module = _fake_home_module(monkeypatch, fake_home)
+        # No template seeded: `_render_claude_md` raises FileNotFoundError.
+
+        module._perform_install(fake_home, _VALUES, auto_complete=True)
+
+        # Deliberate: without the marker the hook would retry the same failing
+        # install on every single session start.
+        assert (fake_home / ".claude" / ".praxion-complete-installed").exists()
+        assert "Auto-install complete" in capsys.readouterr().err
+
+    def test_a_prompt_that_cannot_run_is_treated_as_consent(
+        self, fake_home, plugin_cache_dir, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        _seed_template(plugin_cache_dir)
+
+        def _explodes(_values: dict) -> bool:
+            raise RuntimeError("terminal is gone")
+
+        monkeypatch.setattr(module, "_prompt_with_timeout", _explodes)
+
+        module._perform_install(fake_home, _VALUES, auto_complete=False)
+
+        assert (fake_home / ".claude" / ".praxion-complete-installed").exists()
+
+
+class TestRunFlow:
+    """`_run` is the whole decision tree: which guard wins, and in what order."""
+
+    def test_the_kill_switch_stops_everything(self, fake_home, plugin_cache_dir, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+        _seed_template(plugin_cache_dir)
+        monkeypatch.setenv("PRAXION_DISABLE_AUTO_COMPLETE", "1")
+        monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
+
+        module._run()
+
+        assert not (fake_home / ".claude" / ".praxion-complete-installed").exists()
+        assert not (fake_home / ".claude" / "CLAUDE.md").exists()
+
+    def test_a_fresh_marker_short_circuits_the_install(
+        self, fake_home, plugin_cache_dir, marker_path, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        _seed_template(plugin_cache_dir)
+        marker_path.write_text("")
+        os.utime(plugin_cache_dir, (1_000_000, 1_000_000))
+        os.utime(marker_path, (2_000_000, 2_000_000))
+        monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
+
+        module._run()
+
+        assert not (fake_home / ".claude" / "CLAUDE.md").exists()
+
+    def test_already_installed_surfaces_only_record_the_marker(
+        self, fake_home, claude_md_symlink, rules_sentinel, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
+        original = claude_md_symlink.resolve()
+
+        module._run()
+
+        assert (fake_home / ".claude" / ".praxion-complete-installed").exists()
+        # A clone-install's surfaces must not be re-pointed at the plugin cache.
+        assert claude_md_symlink.resolve() == original
+
+    def test_a_cold_start_performs_the_install(self, fake_home, plugin_cache_dir, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+        _seed_template(plugin_cache_dir)
+        monkeypatch.setenv("PRAXION_AUTO_COMPLETE", "1")
+        monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
+
+        module._run()
+
+        assert (fake_home / ".claude" / "CLAUDE.md").is_symlink()
+        assert (fake_home / ".claude" / ".praxion-complete-installed").exists()
+
+    def test_undiscoverable_git_identity_falls_back_to_anonymous_defaults(
+        self, fake_home, plugin_cache_dir, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        _seed_template(plugin_cache_dir)
+        monkeypatch.setenv("PRAXION_AUTO_COMPLETE", "1")
+        monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
+
+        def _no_identity() -> dict:
+            raise OSError("git not on PATH")
+
+        monkeypatch.setattr(module._render_mod, "derive_defaults", _no_identity)
+
+        module._run()
+
+        rendered = (fake_home / ".claude" / "CLAUDE.md").read_text(encoding="utf-8")
+        assert "@anon" in rendered
+        assert "anon@unknown" in rendered
+
+
+class TestHookNeverRaisesIntoTheHarness:
+    def test_an_unhandled_failure_below_main_is_swallowed(self, monkeypatch):
+        module = _load_module()
+
+        def _explodes() -> None:
+            raise RuntimeError("catastrophic install failure")
+
+        monkeypatch.setattr(module, "_run", _explodes)
+
+        module.main()  # must not raise -- SessionStart would otherwise be blocked
+
+
+class TestUnwritableMarkerIsAbsorbed:
+    """Marker bookkeeping is best-effort -- it must never become the blocker.
+
+    Each case makes the marker genuinely unwritable rather than patching the
+    writer, so the swallow being tested is the production one.
+    """
+
+    def test_an_unwritable_completion_marker_does_not_surface(self, tmp_path, monkeypatch):
+        home = tmp_path / "home"
+        home.mkdir()
+        (home / ".claude").write_text("not a directory\n", encoding="utf-8")
+        module = _fake_home_module(monkeypatch, home)
+
+        module._perform_install(home, _VALUES, auto_complete=True)
+
+    def test_an_unwritable_decline_marker_does_not_surface(self, tmp_path, monkeypatch):
+        home = tmp_path / "home"
+        home.mkdir()
+        (home / ".claude").write_text("not a directory\n", encoding="utf-8")
+        module = _fake_home_module(monkeypatch, home)
+        monkeypatch.setattr(sys, "stdin", io.StringIO("n\n"))
+
+        module._perform_install(home, _VALUES, auto_complete=False)
+
+    def test_installed_surfaces_with_an_unwritable_marker_do_not_surface(
+        self,
+        fake_home,
+        plugin_cache_dir,
+        claude_md_symlink,
+        rules_sentinel,
+        marker_path,
+        monkeypatch,
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        marker_path.mkdir()  # a directory where the marker file belongs
+        # Age it behind the cache so the freshness guard does not short-circuit
+        # before the surfaces-present branch this test is aiming at.
+        os.utime(marker_path, (1_000_000, 1_000_000))
+        os.utime(plugin_cache_dir, (2_000_000, 2_000_000))
+        monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
+
+        module._run()
+
+    def test_a_run_whose_stdin_cannot_be_read_still_installs(
+        self, fake_home, plugin_cache_dir, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        _seed_template(plugin_cache_dir)
+        monkeypatch.setenv("PRAXION_AUTO_COMPLETE", "1")
+
+        class _Unreadable:
+            def read(self) -> str:
+                raise OSError("stdin is closed")
+
+        monkeypatch.setattr(sys, "stdin", _Unreadable())
+
+        module._run()
+
+        assert (fake_home / ".claude" / "CLAUDE.md").is_symlink()

@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import os
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 MODULE_PATH = Path(__file__).parent / "inject_decisions.py"
 
@@ -332,3 +335,394 @@ class TestSignalWeighting:
         subprocess.run(["git", "commit", "-qm", "feat"], cwd=tmp_path, check=True)
 
         assert decisions._recent_commit_paths(tmp_path) == [["observability.py"]]
+
+
+# ---------------------------------------------------------------------------
+# In-process drive of the index reader, the table parser, and main().
+#
+# The subprocess tests above pin the hook's runtime shape; the parser they
+# exercise is the widest untested surface in the module, and it is the one
+# thing standing between a hand-edited DECISIONS_INDEX.md and injected
+# nonsense.
+# ---------------------------------------------------------------------------
+
+
+def _drive_main(payload_text: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Run `main()` in-process with `payload_text` standing in for stdin."""
+    monkeypatch.setattr(sys, "stdin", io.StringIO(payload_text))
+    decisions.main()
+
+
+def _index_path(cwd: Path) -> Path:
+    return cwd / ".ai-state" / "decisions" / "DECISIONS_INDEX.md"
+
+
+class TestIndexReading:
+    def test_returns_the_text_of_a_populated_index(self, tmp_path: Path) -> None:
+        _write_index(
+            tmp_path, "| dec-001 | T | accepted | architectural | 2026-01-01 | adr | s |\n"
+        )
+
+        content = decisions._read_decisions_index(_index_path(tmp_path))
+
+        assert content is not None
+        assert "dec-001" in content
+
+    def test_absent_index_reads_as_nothing_to_inject(self, tmp_path: Path) -> None:
+        assert decisions._read_decisions_index(_index_path(tmp_path)) is None
+
+    def test_whitespace_only_index_reads_as_nothing_to_inject(self, tmp_path: Path) -> None:
+        index = _index_path(tmp_path)
+        index.parent.mkdir(parents=True)
+        index.write_text("   \n\n\t\n", encoding="utf-8")
+
+        assert decisions._read_decisions_index(index) is None
+
+    def test_an_unreadable_index_degrades_instead_of_raising(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_index(tmp_path, "| dec-001 | T | accepted | a | 2026-01-01 | adr | s |\n")
+
+        def _unreadable(*args: object, **kwargs: object) -> str:
+            raise OSError("permission denied")
+
+        monkeypatch.setattr(Path, "read_text", _unreadable)
+
+        assert decisions._read_decisions_index(_index_path(tmp_path)) is None
+
+
+class TestIndexParsing:
+    """The markdown table parser: what becomes an injectable row, and what does not."""
+
+    def test_parses_every_column_of_a_well_formed_row(self) -> None:
+        content = _INDEX_HEADER + (
+            "| dec-042 | Adopt uv | accepted | architectural | 2026-03-04 | tooling, uv | Faster |\n"
+        )
+
+        rows = decisions._parse_index_rows(content)
+
+        assert rows == [
+            {
+                "id": "dec-042",
+                "title": "Adopt uv",
+                "status": "accepted",
+                "category": "architectural",
+                "date": "2026-03-04",
+                "tags": "tooling, uv",
+                "summary": "Faster",
+            }
+        ]
+
+    @pytest.mark.parametrize("status", ["accepted", "proposed", "ACCEPTED", "Proposed"])
+    def test_live_decisions_are_injectable_whatever_the_status_casing(self, status: str) -> None:
+        content = _INDEX_HEADER + f"| dec-001 | T | {status} | a | 2026-01-01 | adr | s |\n"
+
+        assert len(decisions._parse_index_rows(content)) == 1
+
+    @pytest.mark.parametrize("status", ["superseded", "rejected", "retired", "re-affirmation"])
+    def test_settled_decisions_are_not_injected_as_live_constraints(self, status: str) -> None:
+        # Injecting a superseded decision would present a reversed constraint
+        # to every agent as though it still held.
+        content = _INDEX_HEADER + f"| dec-001 | T | {status} | a | 2026-01-01 | adr | s |\n"
+
+        assert decisions._parse_index_rows(content) == []
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            "Some prose paragraph above the table.",
+            "",
+            "   ",
+            "| dec-001 | T | accepted |",
+            "| dec-001 | T | accepted | a | 2026-01-01 | adr |",
+        ],
+        ids=["prose", "blank", "whitespace", "three-columns", "six-columns"],
+    )
+    def test_lines_that_are_not_complete_rows_are_skipped(self, line: str) -> None:
+        assert decisions._parse_index_rows(_INDEX_HEADER + line + "\n") == []
+
+    def test_the_header_and_separator_never_become_decisions(self) -> None:
+        # The header alone must yield nothing -- otherwise "ID"/"Title" would
+        # be injected as a decision on every session start.
+        assert decisions._parse_index_rows(_INDEX_HEADER) == []
+
+    def test_keeps_the_live_rows_of_a_mixed_index(self) -> None:
+        content = _INDEX_HEADER + (
+            "| dec-001 | Old | superseded | a | 2026-01-01 | adr | s |\n"
+            "| dec-002 | New | accepted | a | 2026-02-01 | adr | s |\n"
+            "not a table row at all\n"
+            "| dec-003 | Draft | proposed | a | 2026-03-01 | adr | s |\n"
+        )
+
+        assert [row["id"] for row in decisions._parse_index_rows(content)] == ["dec-002", "dec-003"]
+
+
+class TestGitSignalDegradation:
+    def test_a_missing_git_binary_yields_no_signal_rather_than_a_crash(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def _no_git(*args: object, **kwargs: object):
+            raise OSError("git: command not found")
+
+        monkeypatch.setattr(decisions.subprocess, "run", _no_git)
+
+        assert decisions._git_lines(tmp_path, "status", "--porcelain") == []
+
+    def test_a_hung_git_call_yields_no_signal(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def _hangs(*args: object, **kwargs: object):
+            raise subprocess.TimeoutExpired(cmd="git", timeout=1)
+
+        monkeypatch.setattr(decisions.subprocess, "run", _hangs)
+
+        assert decisions._git_lines(tmp_path, "log") == []
+
+
+class TestOutputBudgetFloor:
+    def test_a_single_row_too_large_for_the_budget_injects_nothing(self) -> None:
+        # Rather than emitting a header with an empty body, the builder yields
+        # nothing at all so `main()` can stay silent.
+        oversized = _row("dec-001", "T" * 500, "2026-01-01", "adr")
+
+        assert decisions._build_adr_output([oversized], budget=100) == ""
+
+    def test_no_rows_injects_nothing(self) -> None:
+        assert decisions._build_adr_output([], budget=4000) == ""
+
+
+class TestEmittedEnvelope:
+    def test_context_is_wrapped_in_the_session_start_hook_envelope(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        decisions._emit_additional_context("hello")
+
+        parsed = json.loads(capsys.readouterr().out)
+        assert parsed["hookSpecificOutput"]["hookEventName"] == "SessionStart"
+        assert parsed["hookSpecificOutput"]["additionalContext"] == "hello"
+
+
+class TestMainInProcess:
+    def test_injects_the_decisions_of_a_populated_index(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        _write_index(
+            tmp_path, "| dec-042 | Adopt uv | accepted | a | 2026-03-04 | tooling | Faster |\n"
+        )
+
+        _drive_main(json.dumps({"cwd": str(tmp_path)}), monkeypatch)
+
+        context = json.loads(capsys.readouterr().out)["hookSpecificOutput"]["additionalContext"]
+        assert context.startswith(decisions._ADR_HEADER)
+        assert "dec-042" in context
+
+    def test_stays_silent_when_the_project_has_no_index(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        _drive_main(json.dumps({"cwd": str(tmp_path)}), monkeypatch)
+
+        assert capsys.readouterr().out == ""
+
+    def test_stays_silent_when_no_row_is_injectable(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        _write_index(tmp_path, "| dec-001 | Old | superseded | a | 2026-01-01 | adr | s |\n")
+
+        _drive_main(json.dumps({"cwd": str(tmp_path)}), monkeypatch)
+
+        assert capsys.readouterr().out == ""
+
+    def test_kill_switch_suppresses_injection(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        _write_index(tmp_path, "| dec-042 | Adopt uv | accepted | a | 2026-03-04 | tooling | s |\n")
+        monkeypatch.setenv(decisions.DISABLE_FLAG, "1")
+
+        _drive_main(json.dumps({"cwd": str(tmp_path)}), monkeypatch)
+
+        assert capsys.readouterr().out == ""
+
+    def test_falls_back_to_the_process_directory_when_the_payload_omits_cwd(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        _write_index(tmp_path, "| dec-042 | Adopt uv | accepted | a | 2026-03-04 | tooling | s |\n")
+        monkeypatch.chdir(tmp_path)
+
+        _drive_main("{}", monkeypatch)
+
+        assert "dec-042" in capsys.readouterr().out
+
+    def test_unparseable_payload_still_resolves_from_the_process_directory(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        _write_index(tmp_path, "| dec-042 | Adopt uv | accepted | a | 2026-03-04 | tooling | s |\n")
+        monkeypatch.chdir(tmp_path)
+
+        _drive_main("<<not json>>", monkeypatch)
+
+        assert "dec-042" in capsys.readouterr().out
+
+
+@pytest.fixture
+def signalled_repo(tmp_path: Path) -> Path:
+    """A repo carrying all three ranking signals, each with distinct tokens.
+
+    history -> `billing/invoicing.py` (committed)
+    branch  -> `feature/telemetry-relay`
+    worktree-> `warehouse/shipment.py` (uncommitted)
+
+    Keeping the token sets disjoint is what makes the weights readable: a
+    token appearing in two signals takes the higher weight, which would hide
+    a mis-weighted signal behind a correctly weighted one.
+    """
+    repo = tmp_path / "signalled"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "t@example.com"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "test"], check=True)
+
+    committed = repo / "billing" / "invoicing.py"
+    committed.parent.mkdir()
+    committed.write_text("x\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "seed"], check=True)
+
+    subprocess.run(
+        ["git", "-C", str(repo), "checkout", "-q", "-b", "feature/telemetry-relay"], check=True
+    )
+
+    dirty = repo / "warehouse" / "shipment.py"
+    dirty.parent.mkdir()
+    dirty.write_text("y\n", encoding="utf-8")
+    return repo
+
+
+class TestSessionSignalWeighting:
+    """What the session is editing outranks what it is merely adjacent to."""
+
+    def test_working_tree_outranks_branch_which_outranks_history(
+        self, signalled_repo: Path
+    ) -> None:
+        tokens = decisions._session_tokens(signalled_repo)
+
+        assert tokens["warehouse"] == decisions._WEIGHT_WORKTREE
+        assert tokens["telemetry"] == decisions._WEIGHT_BRANCH
+        assert tokens["billing"] == decisions._WEIGHT_HISTORY
+        assert tokens["warehouse"] > tokens["telemetry"] > tokens["billing"]
+
+    def test_default_branch_name_contributes_no_topical_signal(self, main_repo_on_main: Path):
+        tokens = decisions._session_tokens(main_repo_on_main)
+
+        # "main"/"master"/"HEAD" describe no topic; treating them as one would
+        # score every decision tagged `main` on every default-branch session.
+        assert "main" not in tokens
+        assert "master" not in tokens
+
+    def test_a_mechanical_commit_does_not_flood_the_token_set(self, tmp_path: Path) -> None:
+        # The documented failure this filter exists to prevent: a wide
+        # release-bump commit contributes more tokens than every real commit
+        # combined, and outvotes the handful describing the actual task.
+        repo = tmp_path / "bulk"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", str(repo)], check=True)
+        subprocess.run(["git", "-C", str(repo), "config", "user.email", "t@e.com"], check=True)
+        subprocess.run(["git", "-C", str(repo), "config", "user.name", "t"], check=True)
+        bulk_dir = repo / "vendored"
+        bulk_dir.mkdir()
+        for index in range(decisions._MAX_COMMIT_FILES + 5):
+            (bulk_dir / f"module{index}.py").write_text("x\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+        subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "bulk"], check=True)
+
+        tokens = decisions._session_tokens(repo)
+
+        assert "vendored" not in tokens
+
+    def test_a_focused_commit_of_the_same_shape_does_contribute(self, tmp_path: Path) -> None:
+        # The inverse of the filter above: proves it discriminates by breadth
+        # rather than suppressing history wholesale.
+        repo = tmp_path / "focused"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", str(repo)], check=True)
+        subprocess.run(["git", "-C", str(repo), "config", "user.email", "t@e.com"], check=True)
+        subprocess.run(["git", "-C", str(repo), "config", "user.name", "t"], check=True)
+        focused_dir = repo / "vendored"
+        focused_dir.mkdir()
+        for index in range(3):
+            (focused_dir / f"module{index}.py").write_text("x\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+        subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "focused"], check=True)
+
+        assert decisions._session_tokens(repo)["vendored"] == decisions._WEIGHT_HISTORY
+
+
+@pytest.fixture
+def main_repo_on_main(tmp_path: Path) -> Path:
+    """A clean repo sitting on the default branch -- the common session shape."""
+    repo = tmp_path / "onmain"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "t@example.com"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "test"], check=True)
+    (repo / "README.md").write_text("seed\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "init"], check=True)
+    return repo
+
+
+class TestUnreadableStdin:
+    def test_a_hook_whose_stdin_cannot_be_read_still_injects_from_the_process_directory(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        _write_index(tmp_path, "| dec-042 | Adopt uv | accepted | a | 2026-03-04 | tooling | s |\n")
+        monkeypatch.chdir(tmp_path)
+
+        class _Unreadable:
+            def read(self) -> str:
+                raise OSError("stdin is closed")
+
+        monkeypatch.setattr(sys, "stdin", _Unreadable())
+
+        decisions.main()
+
+        assert "dec-042" in capsys.readouterr().out
+
+
+class TestOversizedIndexRow:
+    def test_a_row_too_large_for_the_budget_yields_silence_not_a_bare_header(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        # A header with nothing under it is worse than no injection: it spends
+        # context to tell the agent that decisions exist without naming one.
+        huge_title = "T" * (decisions.ADR_SOFT_CAP + 100)
+        _write_index(
+            tmp_path, f"| dec-001 | {huge_title} | accepted | a | 2026-01-01 | adr | s |\n"
+        )
+
+        _drive_main(json.dumps({"cwd": str(tmp_path)}), monkeypatch)
+
+        assert capsys.readouterr().out == ""

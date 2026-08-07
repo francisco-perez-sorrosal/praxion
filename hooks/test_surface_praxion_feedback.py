@@ -10,6 +10,7 @@ exit-0 no-op so a global SessionStart hook can never slow or wedge a session.
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import os
 import subprocess
@@ -204,3 +205,201 @@ class TestFailsSafe:
         pending.write_text("\x00### not a real block\n``unterminated fence", encoding="utf-8")
         result = _run_hook(consumer_repo)
         assert result.returncode == 0
+
+
+# ---------------------------------------------------------------------------
+# In-process drive of the resolution layer and main().
+#
+# The subprocess tests above pin the hook's runtime shape. These reach the
+# parts a subprocess cannot observe: which root each mechanism resolves from,
+# and that a hostile payload cannot move the caller's working directory.
+#
+# `_honor_payload_cwd` really does chdir, so every test that can reach it
+# takes `monkeypatch.chdir` first -- monkeypatch records the directory at that
+# moment and restores it at teardown regardless of what the hook did meanwhile.
+# ---------------------------------------------------------------------------
+
+
+def _drive_main(payload_text: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Run `main()` in-process with `payload_text` standing in for stdin."""
+    monkeypatch.setattr(sys, "stdin", io.StringIO(payload_text))
+    surface.main()
+
+
+class TestPluginRootResolution:
+    def test_plugin_root_is_added_when_absent(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        plugin_root = str(MODULE_PATH.resolve().parent.parent)
+        # Swap in a path list without the plugin root. Replacing the attribute
+        # (rather than mutating the list) lets monkeypatch restore the original
+        # list object wholesale at teardown.
+        monkeypatch.setattr(sys, "path", [p for p in sys.path if p != plugin_root])
+        assert plugin_root not in sys.path
+
+        surface._ensure_plugin_root_on_path()
+
+        assert plugin_root in sys.path
+
+    def test_repeated_calls_do_not_grow_the_path(self) -> None:
+        # This runs on every session start; an unguarded insert would make
+        # sys.path grow without bound across a long-lived process.
+        surface._ensure_plugin_root_on_path()
+        plugin_root = str(MODULE_PATH.resolve().parent.parent)
+        before = sys.path.count(plugin_root)
+
+        surface._ensure_plugin_root_on_path()
+
+        assert sys.path.count(plugin_root) == before
+
+
+class TestPayloadCwdHandling:
+    def test_honors_a_valid_directory_from_the_payload(
+        self, consumer_repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+
+        surface._honor_payload_cwd(json.dumps({"cwd": str(consumer_repo)}))
+
+        assert Path.cwd().resolve() == consumer_repo.resolve()
+
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "not-json",
+            "[]",
+            "null",
+            '"a bare string"',
+            "",
+            "   ",
+        ],
+    )
+    def test_a_payload_it_cannot_read_leaves_the_directory_alone(
+        self, raw: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+
+        surface._honor_payload_cwd(raw)
+
+        assert Path.cwd().resolve() == tmp_path.resolve()
+
+    def test_a_cwd_that_does_not_exist_leaves_the_directory_alone(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+
+        surface._honor_payload_cwd(json.dumps({"cwd": str(tmp_path / "gone")}))
+
+        assert Path.cwd().resolve() == tmp_path.resolve()
+
+    def test_a_directory_it_cannot_enter_is_not_fatal(
+        self, consumer_repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The directory passes `is_dir()` but the chdir itself fails (permissions,
+        # a racing unlink, a dead network mount). A SessionStart hook cannot let
+        # that surface.
+        monkeypatch.chdir(tmp_path)
+
+        def _refuse(_target: object) -> None:
+            raise OSError("permission denied")
+
+        monkeypatch.setattr(surface.os, "chdir", _refuse)
+
+        surface._honor_payload_cwd(json.dumps({"cwd": str(consumer_repo)}))
+
+        assert Path.cwd().resolve() == tmp_path.resolve()
+
+
+class TestPendingLedgerResolution:
+    def test_resolves_the_ledger_under_the_managed_project_root(
+        self, consumer_repo: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(consumer_repo)
+
+        pending = surface._pending_md_path()
+
+        assert pending is not None
+        # Resolved from git, not from __file__ -- the hook runs out of the
+        # plugin cache, so a __file__-derived root would name the plugin.
+        assert pending.resolve() == (consumer_repo / _PENDING_REL).resolve()
+
+    def test_outside_a_repository_there_is_no_ledger_to_read(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+
+        assert surface._pending_md_path() is None
+
+    def test_absent_ledger_yields_no_candidates(self, consumer_repo: Path) -> None:
+        assert surface._pending_candidates(consumer_repo / _PENDING_REL) == []
+
+    def test_seeded_ledger_yields_its_pending_candidate(self, consumer_repo: Path) -> None:
+        fingerprint = _seed_candidate(consumer_repo, artifact="scripts/foo.py")
+
+        candidates = surface._pending_candidates(consumer_repo / _PENDING_REL)
+
+        assert [c["fingerprint"] for c in candidates] == [fingerprint]
+
+
+class TestEmittedEnvelope:
+    def test_context_is_wrapped_in_the_session_start_hook_envelope(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        surface._emit("hello")
+
+        parsed = json.loads(capsys.readouterr().out)
+        assert parsed["hookSpecificOutput"]["hookEventName"] == "SessionStart"
+        assert parsed["hookSpecificOutput"]["additionalContext"] == "hello"
+
+
+class TestMainInProcess:
+    def test_advises_when_the_project_has_a_pending_candidate(
+        self,
+        consumer_repo: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        monkeypatch.chdir(consumer_repo)
+        _seed_candidate(consumer_repo, artifact="hooks/bar.py", category="hooks")
+
+        _drive_main(json.dumps({"cwd": str(consumer_repo)}), monkeypatch)
+
+        context = json.loads(capsys.readouterr().out)["hookSpecificOutput"]["additionalContext"]
+        assert "/report-praxion-issue" in context
+        assert "hooks/bar.py" in context
+
+    def test_stays_silent_when_nothing_is_pending(
+        self,
+        consumer_repo: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        monkeypatch.chdir(consumer_repo)
+
+        _drive_main(json.dumps({"cwd": str(consumer_repo)}), monkeypatch)
+
+        assert capsys.readouterr().out == ""
+
+    def test_stays_silent_outside_a_managed_project(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+
+        _drive_main(json.dumps({"cwd": str(tmp_path)}), monkeypatch)
+
+        assert capsys.readouterr().out == ""
+
+    def test_kill_switch_suppresses_the_advisory_before_any_work(
+        self,
+        consumer_repo: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        monkeypatch.chdir(consumer_repo)
+        _seed_candidate(consumer_repo, artifact="scripts/foo.py")
+        monkeypatch.setenv(surface.DISABLE_FLAG, "1")
+
+        _drive_main(json.dumps({"cwd": str(consumer_repo)}), monkeypatch)
+
+        assert capsys.readouterr().out == ""

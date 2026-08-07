@@ -19,7 +19,7 @@ affected_files:
   - agents/implementer.md
   - .ai-state/observations.jsonl
 affected_reqs: [REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-06, REQ-07, REQ-08]
-re_affirmed_by: [dec-250, dec-draft-71566337]
+re_affirmed_by: [dec-250, dec-330]
 dissent: A pure-prevention design (restructure the implementer loop so the durable WIP write is atomic and early) would eliminate the truncation gap at its source and need no reconciliation reader at all — it loses here only because no agent-authored write is trustworthy under a hard mid-turn token cut, so prevention shrinks the gap but cannot close it.
 ---
 

@@ -11,9 +11,9 @@ pipeline_tier: direct
 affected_files:
   - agents/sentinel.md
   - agents/verifier.md
-superseded_by: dec-draft-5b6f18d3
+superseded_by: dec-328
 re_affirmed_by:
-  - dec-draft-5b6f18d3
+  - dec-328
 ---
 
 ## Context

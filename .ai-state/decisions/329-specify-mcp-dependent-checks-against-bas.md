@@ -1,7 +1,7 @@
 ---
-id: dec-draft-2d56468e
+id: dec-329
 title: Specify MCP-dependent checks against Bash-reachable readers
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-08-06
 summary: Where a check or agent procedure names an MCP tool no agent in the fleet can reach, specify the Bash-reachable reader instead and delete the finding code that could only ever report the unreachability.
@@ -67,7 +67,7 @@ Concretely:
 
 **Neutral, and worth stating plainly.** The AC12 rewrite immediately tripped GL02's `forbidden-pattern` detector, because stating the golden bad-case concretely (`req_ids = "REQ-99"`) puts a `REQ-NN` literal, a scan verb, and a code target on one line. This is the same collision GL02's *own* catalog row has, and it was resolved the same way: a `gate-liveness:ignore` marker carrying the rationale. The literal is correct authoring — `gate-liveness.md` requires golden bad-cases be concrete, since an abstract paraphrase cannot make a check fire. `id-citation-discipline` exempts `agents/`, and `req_ids` in `.c4` metadata is the sanctioned convention, so the grep can match and the gate is not dead.
 
-**Resolved separately, in the same session.** P01–P05's substrate problem is a different defect wearing the same clothes: their reader *is* reachable by the orchestrator, but the Chronograph surface carries no history, so the checks measure an in-flight session that is trivially clean. That called for a different remedy than the one here — not a reachable reader, but a substrate with a past — and it is recorded in `dec-draft-71566337`, which retires P01/P02 as unanswerable-in-principle and re-specifies P03/P04 against the `observations.jsonl` WAL. The two decisions share a diagnosis (*a check specified against something that cannot answer it*) and differ in cure, which is why they are separate records rather than one.
+**Resolved separately, in the same session.** P01–P05's substrate problem is a different defect wearing the same clothes: their reader *is* reachable by the orchestrator, but the Chronograph surface carries no history, so the checks measure an in-flight session that is trivially clean. That called for a different remedy than the one here — not a reachable reader, but a substrate with a past — and it is recorded in `dec-330`, which retires P01/P02 as unanswerable-in-principle and re-specifies P03/P04 against the `observations.jsonl` WAL. The two decisions share a diagnosis (*a check specified against something that cannot answer it*) and differ in cure, which is why they are separate records rather than one.
 
 ## Prior Decision
 

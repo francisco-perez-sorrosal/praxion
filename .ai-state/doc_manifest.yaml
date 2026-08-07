@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-06T23:55:25Z'
+generated_at: '2026-08-07T07:26:01Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -96,7 +96,7 @@ surfaces:
   path: docs/aac-dac.md
   type: markdown
   title: Architecture-as-Code + Documentation-as-Code
-  last_modified: '2026-08-05'
+  last_modified: '2026-08-07'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -123,7 +123,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-08-05'
+  last_modified: '2026-08-07'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -495,7 +495,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-08-05'
+  last_modified: '2026-08-07'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -526,7 +526,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-08-06'
+  last_modified: '2026-08-07'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -540,7 +540,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-08-06'
+  last_modified: '2026-08-07'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -954,7 +954,7 @@ surfaces:
   path: .ai-state/decisions/066-project-metrics-planning-conventions.md
   type: markdown
   title: "/project-metrics planning conventions \u2014 Full-tier escalation, test placement, committed fixture repo"
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-067-dispatcher-renderer-split
   path: .ai-state/decisions/067-dispatcher-renderer-split.md
@@ -996,7 +996,7 @@ surfaces:
   path: .ai-state/decisions/073-unified-phase-plan.md
   type: markdown
   title: "Praxion-first-class \u2014 unified four-phase implementation plan"
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-074-praxion-first-class-install-completeness-auto-first-session
   path: .ai-state/decisions/074-praxion-first-class-install-completeness-auto-first-session.md
@@ -1170,7 +1170,7 @@ surfaces:
   path: .ai-state/decisions/102-planner-decomposition-decisions.md
   type: markdown
   title: "AaC+DaC v1 implementation decomposition \u2014 two-worktree split at Phase 3/4 boundary"
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-103-tech-debt-source-enum-widening
   path: .ai-state/decisions/103-tech-debt-source-enum-widening.md
@@ -1182,13 +1182,13 @@ surfaces:
   path: .ai-state/decisions/104-aac-dac-foundation-aac-dac-foundation-worktree1-decompositi.md
   type: markdown
   title: "AaC+DaC Worktree 1 decomposition \u2014 fitness tests in separate invocation, import-linter in dev group"
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-105-aac-dac-wireup-w2-agent-intermediate-docs-verify-only
   path: .ai-state/decisions/105-aac-dac-wireup-w2-agent-intermediate-docs-verify-only.md
   type: markdown
   title: "W2 agent-intermediate-documents \u2014 verify-only; no further edit needed"
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-106-aac-architecture-ci-pipeline
   path: .ai-state/decisions/106-aac-architecture-ci-pipeline.md
@@ -1218,7 +1218,7 @@ surfaces:
   path: .ai-state/decisions/110-aac-dac-v1-1-block-d-hook-slot-correction.md
   type: markdown
   title: golden-rule hook placement in Block D, not Block C
-  last_modified: '2026-08-04'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-111-req-arch-element-traceability
   path: .ai-state/decisions/111-req-arch-element-traceability.md
@@ -1278,7 +1278,7 @@ surfaces:
   path: .ai-state/decisions/120-ai-training-onramp-step-ordering-for-ml-training-onramp.md
   type: markdown
   title: "ML training onramp step ordering \u2014 skills-first, no test-engineer pairing"
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-121-pipeline-dashboard-dashboard-claudemd-placement
   path: .ai-state/decisions/121-pipeline-dashboard-dashboard-claudemd-placement.md
@@ -1776,7 +1776,7 @@ surfaces:
   path: .ai-state/decisions/203-sentinel-t03-threshold-exception.md
   type: markdown
   title: Recalibrate T03 with a line-count exception for the gate-encoding agents (sentinel + verifier)
-  last_modified: '2026-05-23'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-204-praxion-self-eval-framework
   path: .ai-state/decisions/204-praxion-self-eval-framework.md
@@ -1986,7 +1986,7 @@ surfaces:
   path: .ai-state/decisions/238-spec-drift-detect-not-regenerate.md
   type: markdown
   title: "Proactive spec\u2194artifact drift \u2014 detect-and-surface, NOT auto-regenerate"
-  last_modified: '2026-08-05'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-239-where-it-lives
   path: .ai-state/decisions/239-where-it-lives.md
@@ -2046,7 +2046,7 @@ surfaces:
   path: .ai-state/decisions/248-observations-wal-recovery-reconciliation.md
   type: markdown
   title: observations.jsonl as recovery WAL + deterministic reconciliation + auto-resume-with-audit; WIP.md demoted to a verified cache
-  last_modified: '2026-06-26'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-249-taskbrief-floor-standard-full
   path: .ai-state/decisions/249-taskbrief-floor-standard-full.md
@@ -2496,7 +2496,7 @@ surfaces:
   path: .ai-state/decisions/323-retire-sentinel-ac11-as-subsumed-by-ac13.md
   type: markdown
   title: Retire sentinel AC11 as subsumed by AC13
-  last_modified: '2026-08-05'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-324-p07-consult-clause-is-correct
   path: .ai-state/decisions/324-p07-consult-clause-is-correct.md
@@ -2522,6 +2522,24 @@ surfaces:
   title: Identify gates by invocation shape; mechanise verdict-reach on one surface only
   last_modified: '2026-08-06'
   renderer: adr_card
+- id: ai-state-decisions-328-derive-the-sentinel-t03-ceiling-from-its
+  path: .ai-state/decisions/328-derive-the-sentinel-t03-ceiling-from-its.md
+  type: markdown
+  title: Derive the sentinel T03 ceiling from its own check catalog span
+  last_modified: '2026-08-07'
+  renderer: adr_card
+- id: ai-state-decisions-329-specify-mcp-dependent-checks-against-bas
+  path: .ai-state/decisions/329-specify-mcp-dependent-checks-against-bas.md
+  type: markdown
+  title: Specify MCP-dependent checks against Bash-reachable readers
+  last_modified: '2026-08-07'
+  renderer: adr_card
+- id: ai-state-decisions-330-retire-p01-and-p02-rather-than-await-a-s
+  path: .ai-state/decisions/330-retire-p01-and-p02-rather-than-await-a-s.md
+  type: markdown
+  title: Retire P01 and P02 rather than await a substrate that cannot answer them
+  last_modified: '2026-08-07'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -2534,12 +2552,6 @@ surfaces:
   title: Idea Ledger
   last_modified: '2026-06-27'
   renderer: idea_grid
-- id: ai-state-sentinel-reports-sentinel-report-2026-06-20-13-34-25
-  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-06-20_13-34-25.md
-  type: markdown
-  title: Sentinel Report
-  last_modified: '2026-06-20'
-  renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-07-15-21-32-25
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-07-15_21-32-25.md
   type: markdown
@@ -2593,6 +2605,12 @@ surfaces:
   type: markdown
   title: "Sentinel Report \u2014 2026-08-06_08-49-10"
   last_modified: '2026-08-06'
+  renderer: default_markdown
+- id: ai-state-sentinel-reports-sentinel-report-2026-08-06-22-09-15
+  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-06_22-09-15.md
+  type: markdown
+  title: Sentinel Report
+  last_modified: '2026-08-07'
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-06-11-08-38-15
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-11_08-38-15.json
@@ -2733,7 +2751,7 @@ surfaces:
   path: .ai-state/specs/SPEC_diagrams_2026-04-30.md
   type: markdown
   title: 'SPEC: LikeC4 + D2 Dual-Toolchain Diagram Convention'
-  last_modified: '2026-06-20'
+  last_modified: '2026-08-07'
   renderer: default_markdown
 - id: ai-state-specs-spec-multi-language-support-2026-05-11
   path: .ai-state/specs/SPEC_multi-language-support_2026-05-11.md
@@ -2765,7 +2783,7 @@ surfaces:
   path: .ai-state/specs/SPEC_project-metrics_2026-04-23.md
   type: markdown
   title: "SPEC: `/project-metrics` Command \u2014 Project Complexity/Health Metrics"
-  last_modified: '2026-05-23'
+  last_modified: '2026-08-07'
   renderer: default_markdown
 groups:
 - id: tutorial
@@ -3140,6 +3158,9 @@ groups:
   - ai-state-decisions-325-architecture-validation-named-consumer
   - ai-state-decisions-326-pre-merge-validator-verdict-gate
   - ai-state-decisions-327-gate-identity-by-invocation-and-verdict-reach
+  - ai-state-decisions-328-derive-the-sentinel-t03-ceiling-from-its
+  - ai-state-decisions-329-specify-mcp-dependent-checks-against-bas
+  - ai-state-decisions-330-retire-p01-and-p02-rather-than-await-a-s
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -3164,7 +3185,6 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-07-29-22-11-31
   - ai-state-metrics-reports-metrics-report-2026-08-05-22-03-40
   - ai-state-metrics-reports-metrics-report-2026-08-05-22-03-40
-  - ai-state-sentinel-reports-sentinel-report-2026-06-20-13-34-25
   - ai-state-sentinel-reports-sentinel-report-2026-07-15-21-32-25
   - ai-state-sentinel-reports-sentinel-report-2026-07-29-15-11-15
   - ai-state-sentinel-reports-sentinel-report-2026-07-30-11-03-40
@@ -3174,6 +3194,7 @@ groups:
   - ai-state-sentinel-reports-sentinel-report-2026-08-05-09-52-51
   - ai-state-sentinel-reports-sentinel-report-2026-08-05-21-27-47
   - ai-state-sentinel-reports-sentinel-report-2026-08-06-08-49-10
+  - ai-state-sentinel-reports-sentinel-report-2026-08-06-22-09-15
   - ai-state-specs-spec-agent-model-routing-2026-04-25
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30

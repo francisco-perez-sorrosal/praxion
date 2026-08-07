@@ -1,7 +1,7 @@
 ---
-id: dec-draft-71566337
+id: dec-330
 title: Retire P01 and P02 rather than await a substrate that cannot answer them
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-08-07
 summary: Retire sentinel checks P01 (delegation depth) and P02 (delegation-result pairing) permanently; re-specify P03 and P04 against the observations.jsonl WAL; scope the P-dimension preamble to the checks that actually read an event stream.

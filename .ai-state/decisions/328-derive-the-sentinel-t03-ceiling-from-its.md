@@ -1,7 +1,7 @@
 ---
-id: dec-draft-5b6f18d3
+id: dec-328
 title: Derive the sentinel T03 ceiling from its own check catalog span
-status: proposed
+status: accepted
 category: configuration
 date: 2026-08-06
 summary: Replace the sentinel's fixed T03 warn 550 / fail 700 exception with warn S+300 / fail S+400, where S is the measured line span of its own Check Catalog; the verifier keeps the fixed thresholds.

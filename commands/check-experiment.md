@@ -11,7 +11,7 @@ description: >
   actionable next-step suggestion. Use after /run-experiment to monitor an
   in-flight run, to review a completed run's results, or to compare a run against
   acceptance criteria before invoking the verifier.
-argument-hint: [<run_tag>] [--task-slug <slug>]
+argument-hint: "[<run_tag>] [--task-slug <slug>]"
 allowed-tools: [Read, Bash, Glob]
 ---
 

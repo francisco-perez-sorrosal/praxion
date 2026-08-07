@@ -41,6 +41,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from _git_runner import GitUnavailableError, git_output, run_git
 from _repo_root import is_plugin_cache_path
 from _repo_root import resolve_repo_root as _resolve_repo_root
 from _script_cli import configure_logging
@@ -134,20 +135,14 @@ def _sanitize(raw: str, max_len: int = 40) -> str:
 
 
 def _git(*args: str) -> str | None:
-    """Run `git <args>` and return stdout stripped; None on failure."""
-    try:
-        result = subprocess.run(
-            ["git", *args],
-            capture_output=True,
-            text=True,
-            cwd=REPO_ROOT,
-            check=False,
-        )
-    except FileNotFoundError:
-        return None
-    if result.returncode != 0:
-        return None
-    return result.stdout.strip() or None
+    """Run `git <args>` and return stdout stripped; None on failure.
+
+    Reads the module-level `REPO_ROOT` at call time, so `_apply_repo_root`'s
+    rebind still takes effect. Every call this module makes runs on the
+    blocking post-merge hook path, which is why the bounded `git_output` is
+    load-bearing here rather than merely tidy.
+    """
+    return git_output(REPO_ROOT, *args)
 
 
 def _is_git_worktree() -> bool:
@@ -443,20 +438,18 @@ def _rename(src: Path, dst: Path, repo_root: Path) -> None:
     meaningless.
     """
     if _is_git_worktree():
-        result = subprocess.run(
-            ["git", "mv", str(src), str(dst)],
-            capture_output=True,
-            text=True,
-            cwd=repo_root,
-            check=False,
-        )
-        if result.returncode == 0:
-            _stage_path(dst, repo_root)
-            return
-        logger.debug(
-            "git mv failed (%s); falling back to Path.rename",
-            result.stderr.strip(),
-        )
+        try:
+            result = run_git(repo_root, "mv", str(src), str(dst))
+        except GitUnavailableError as exc:
+            logger.debug("%s; falling back to Path.rename", exc)
+        else:
+            if result.returncode == 0:
+                _stage_path(dst, repo_root)
+                return
+            logger.debug(
+                "git mv failed (%s); falling back to Path.rename",
+                result.stderr.strip(),
+            )
     src.rename(dst)
 
 
@@ -469,20 +462,20 @@ def _stage_path(path: Path, repo_root: Path) -> None:
     path. A failure is logged at warning level so the resulting stale-index
     state is visible rather than silent.
     """
-    result = subprocess.run(
-        ["git", "add", "--", str(path)],
-        capture_output=True,
-        text=True,
-        cwd=repo_root,
-        check=False,
+    try:
+        result = run_git(repo_root, "add", "--", str(path))
+    except GitUnavailableError as exc:
+        detail = str(exc)
+    else:
+        if result.returncode == 0:
+            return
+        detail = result.stderr.strip()
+    logger.warning(
+        "git add failed for %s (%s); the promoted ADR is renamed but its "
+        "frontmatter rewrite is left unstaged",
+        path,
+        detail,
     )
-    if result.returncode != 0:
-        logger.warning(
-            "git add failed for %s (%s); the promoted ADR is renamed but its "
-            "frontmatter rewrite is left unstaged",
-            path,
-            result.stderr.strip(),
-        )
 
 
 # -- Concurrency --------------------------------------------------------------

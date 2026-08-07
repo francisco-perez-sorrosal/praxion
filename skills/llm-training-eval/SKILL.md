@@ -148,6 +148,30 @@ verdict:
 reads this during the pipeline); archived to `.ai-state/training_runs/<run-tag>.md` only when
 the run is "kept" (opt-in via `/run-experiment` prompt). Discarded runs have no archive.
 
+## Verifier Evaluation Procedure
+
+The verifier evaluates metric-threshold acceptance criteria in Phase 3a. Two metric sources
+share one classification; `rules/ml/eval-driven-verification.md` declares the source priority
+(`TRAINING_RESULTS.md` wins when both are present; both absent → WARN).
+
+**`TRAINING_RESULTS.md` path (primary).** Evaluation steps, field layout, and the finding
+output format live in
+→ [references/training-results-schema.md](references/training-results-schema.md) §
+"Verifier Consumption (Phase 3a)".
+
+**`EVAL_RESULTS.md` path (fallback — `TRAINING_RESULTS.md` absent, `EVAL_RESULTS.md` present):**
+
+1. Read `primary_metric` and `held_out_delta` from the `EVAL_RESULTS.md` YAML frontmatter.
+2. Parse each metric-threshold criterion from `SYSTEMS_PLAN.md` acceptance criteria.
+3. Compare the recorded value against the threshold. Direction follows the operator in the
+   criterion — accuracy-style metrics use `>` (higher is better), loss metrics use `<`.
+4. Apply the tolerance band declared as `± <tolerance>` in the criterion.
+5. Classify per the [PASS/FAIL/WARN table](#passfailwarn-classification) above, then emit:
+   `[PASS|FAIL|WARN] AC-N: primary_metric=<recorded> vs threshold=<declared>`
+
+`EVAL_RESULTS.md` field semantics (`primary_metric`, `held_out_delta`) are documented in
+`skills/agent-evals/references/run-ledger-schema.md` § Field Constraints.
+
 ## Eval Harness
 
 <!-- last-verified: 2026-05-03 -->

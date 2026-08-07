@@ -1,6 +1,6 @@
 ---
 description: File a well-formed bug report on an upstream open-source project
-argument-hint: <owner/repo> [description or context]
+argument-hint: "<owner/repo> [description or context]"
 allowed-tools: [Bash(gh:*), Bash(curl:*), Read, Grep, Glob, AskUserQuestion]
 disable-model-invocation: true
 ---

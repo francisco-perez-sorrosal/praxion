@@ -27,10 +27,11 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from _git_runner import GitUnavailableError, run_git
 
 # ---------------------------------------------------------------------------
 # Regex constants — reuse aac_fence_validator patterns when importable.
@@ -99,18 +100,18 @@ def _is_likec4_available() -> bool:
 
 
 def _run_git(args: list[str]) -> tuple[int, str]:
-    """Run a git subcommand; return (returncode, stdout). Never raises."""
+    """Run a git subcommand in the process cwd; return (returncode, stdout).
+
+    Never raises: this gate runs inside `pre-commit`, where an unrunnable git
+    must degrade to "no staged changes seen" rather than surfacing a traceback
+    over the commit the developer is trying to make. `(2, "")` is that sentinel
+    -- the shape every call site here already expects.
+    """
     try:
-        result = subprocess.run(
-            ["git", *args],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-        return result.returncode, result.stdout
-    except (FileNotFoundError, OSError):
+        result = run_git(Path.cwd(), *args)
+    except GitUnavailableError:
         return 2, ""
+    return result.returncode, result.stdout
 
 
 def _parse_diff_into_per_file(diff_output: str) -> dict[str, list[str]]:

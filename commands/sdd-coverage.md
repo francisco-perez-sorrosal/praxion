@@ -1,6 +1,6 @@
 ---
 description: Report spec-to-test and spec-to-code coverage for REQ IDs
-argument-hint: [spec-path]
+argument-hint: "[spec-path]"
 allowed-tools: [Read, Glob]
 ---
 

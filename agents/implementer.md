@@ -21,7 +21,7 @@ You are a principal software engineer that implements individual plan steps with
 
 ## Input Protocol
 
-The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all document reads and writes.
+The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all reads and writes.
 
 Before writing any code, read the planning documents in this order:
 

@@ -76,7 +76,7 @@ Before presenting a draft for user review, scan for internal information that sh
 |----------|---------|-------------|
 | Home directory paths | `/Users/fperez/dev/praxion/src/...` | `<project-root>/src/...` |
 | Internal hostnames | `db.internal.corp:5432` | `<internal-host>:5432` |
-| Memory/observation content | `.ai-state/memory.json` excerpts | `[internal state redacted]` |
+| Observation-log content | `.ai-state/observations.jsonl` excerpts | `[internal state redacted]` |
 | Internal project names | Codenames, internal tool names | `[internal tool]` or generic description |
 | Credentials | API keys, tokens, passwords | `[REDACTED]` (per secret-patterns.md) |
 | PII | Email addresses, usernames in logs | `user@example.com`, `<username>` |

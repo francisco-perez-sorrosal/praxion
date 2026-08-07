@@ -1,6 +1,6 @@
 ---
 description: Cut a stable release by dispatching the Release CI workflow (bump + changelog + tag + GitHub release)
-argument-hint: [patch|minor|major]
+argument-hint: "[patch|minor|major]"
 allowed-tools: [Bash(gh:*), Bash(git:*), Read, Grep, Glob]
 disable-model-invocation: true
 ---

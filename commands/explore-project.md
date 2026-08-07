@@ -1,6 +1,6 @@
 ---
 description: Explore and understand an unfamiliar project's architecture, patterns, and workflow
-argument-hint: [guide|<focus-area>]
+argument-hint: "[guide|<focus-area>]"
 allowed-tools: [Read, Glob, Grep, Bash(git:*), Bash(wc:*), Bash(find:*)]
 ---
 

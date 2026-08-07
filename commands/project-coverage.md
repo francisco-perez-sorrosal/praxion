@@ -1,6 +1,5 @@
 ---
 description: Run the project's canonical coverage target and render a terminal summary using the test-coverage skill
-argument-hint: ""
 allowed-tools: [Bash, Read, Grep, Glob]
 ---
 

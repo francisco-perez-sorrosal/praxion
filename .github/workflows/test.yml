@@ -77,12 +77,19 @@ jobs:
     # the floor from the new baseline is the same rule applied to a new number,
     # not a threshold lowered to silence a complaint.
     #
-    # RATCHET: raise this back toward 80 as the hook suites grow. The drag is
-    # concentrated and nameable -- worktree_guard.py 21%, inject_subagent_context.py
-    # 25%, send_event.py 33%, auto_complete_install.py 38%. Those are real gaps
-    # that were merely invisible before; two long-standing tech-debt rows filed
-    # against *understated* hook modules were the false positives, and they are
-    # gone.
+    # RATCHET EXERCISED 2026-08-06: 77 -> 80. The drag named below was
+    # concentrated and nameable, and three of its four members are now closed:
+    # worktree_guard.py 21% -> 98.9%, inject_subagent_context.py 25% -> 100%,
+    # send_event.py 33% -> 96.3%. Measured full-suite baseline after that work
+    # is 82.08% over 11,677 statements (2,878 passed), so 80 is the same
+    # "couple of points under the observed baseline" rule applied to the new
+    # number -- not a target picked to look better. This restores the floor the
+    # `hooks` widening had lowered, closing the second of td-132's two
+    # obligations (the first being the hook suites themselves).
+    #
+    # REMAINING DRAG: auto_complete_install.py is still 38.1%. It is the last
+    # member of the original list and the reason this went to 80 rather than
+    # 82 -- the margin absorbs it. Raise toward 82 when it is covered.
     name: Test root suite
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -119,7 +126,7 @@ jobs:
         # their coverage away, so the canonical measurement reported hook
         # modules understated or not at all. See the pyproject `testpaths`
         # comment for why the fix had to live there rather than in this file.
-        run: uv run --frozen pytest --cov-fail-under=77
+        run: uv run --frozen pytest --cov-fail-under=80
 
       - name: Shell test suites
         # `tests/*.sh` are bash suites that pytest cannot collect, so nothing

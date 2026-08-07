@@ -1,6 +1,6 @@
 ---
 description: Convene a discipline consultant to challenge a target artifact
-argument-hint: <discipline> [--on <artifact>]
+argument-hint: "<discipline> [--on <artifact>]"
 allowed-tools: [Bash, Read, Write, Edit, Grep, Glob, Task, Skill]
 ---
 

@@ -1368,6 +1368,7 @@ def _make_fake_plugin(plugin_dir: Path) -> Path:
         "regenerate_adr_index.py",
         "_repo_root.py",
         "_script_cli.py",
+        "_git_runner.py",
     ):
         shutil.copy2(src_dir / name, plugin_scripts / name)
     (plugin_dir / ".ai-state" / "decisions" / "drafts").mkdir(parents=True)

@@ -1254,3 +1254,75 @@ def _replace_trends(report: Any, new_trends: Any) -> Any:
     from dataclasses import replace
 
     return replace(report, trends=new_trends)
+
+
+# ---------------------------------------------------------------------------
+# Pydeps scope fidelity -- the rendered zero must carry its denominator.
+#
+# `Non-trivial cyclic SCCs: 0` printed alone reads as a repository-wide
+# all-clear. When the import graph covered a fraction of the tree, that is a
+# false all-clear on exactly the defect the metric exists to surface.
+# ---------------------------------------------------------------------------
+
+
+def _report_with_pydeps_coverage() -> Any:
+    """Reference report whose pydeps namespace carries a coverage block."""
+    from scripts.project_metrics.schema import AggregateBlock, CollectorResult, Report
+
+    collectors = dict(_reference_collectors())
+    collectors["pydeps"] = CollectorResult(
+        status="ok",
+        data={
+            "modules": {},
+            "cyclic_sccs": [],
+            "aggregate": {
+                "cyclic_deps": 0,
+                "total_modules": 139,
+                "package_roots": ["scripts", "tests"],
+                "repo_python_files": 338,
+                "analyzed_python_files": 272,
+                "python_file_coverage_pct": 80.5,
+            },
+        },
+    )
+    return Report(
+        schema_version="1.0.0",
+        aggregate=AggregateBlock(**_reference_aggregate_kwargs()),
+        tool_availability=_reference_tool_availability(),
+        collectors=collectors,
+        hotspots=_reference_hotspots(),
+        trends=_reference_trends(),
+        run_metadata=_reference_run_metadata(),
+    )
+
+
+class TestPydepsCoverageIsRenderedBesideTheCycleCount:
+    """The analysed-vs-repository denominator appears in the markdown."""
+
+    def test_markdown_states_analyzed_and_repository_file_counts(self) -> None:
+        from scripts.project_metrics.report import render_markdown
+
+        md = render_markdown(_report_with_pydeps_coverage())
+
+        assert "272 of 338 tracked Python files (80.5%)" in md, (
+            "Expected the pydeps section to publish its coverage denominator "
+            "so the cycle count reads as a bounded claim rather than a "
+            "repository-wide all-clear."
+        )
+
+    def test_markdown_names_the_analyzed_package_roots(self) -> None:
+        from scripts.project_metrics.report import render_markdown
+
+        md = render_markdown(_report_with_pydeps_coverage())
+
+        assert "Package roots analyzed: `scripts`, `tests`" in md
+
+    def test_markdown_omits_coverage_line_when_the_collector_reports_none(self) -> None:
+        from scripts.project_metrics.report import render_markdown
+
+        md = render_markdown(_build_reference_report())
+
+        assert "Import-graph coverage" not in md, (
+            "A collector payload with no coverage block must render without "
+            "the line rather than with a fabricated or zeroed denominator."
+        )

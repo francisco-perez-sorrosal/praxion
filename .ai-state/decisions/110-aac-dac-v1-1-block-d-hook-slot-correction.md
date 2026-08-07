@@ -13,7 +13,6 @@ agent_type: implementation-planner
 pipeline_tier: standard
 affected_files:
   - scripts/git-pre-commit-hook.sh
-  - .ai-work/aac-dac-v1-1/IMPLEMENTATION_PLAN.md
 supersedes:
 re_affirms: dec-108
 ---

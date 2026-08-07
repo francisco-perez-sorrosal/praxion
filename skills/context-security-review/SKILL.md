@@ -127,7 +127,7 @@ Accidental or intentional exposure of secrets, credentials, or sensitive data th
 **Examples:**
 - API keys hardcoded in source files or configuration
 - `.env` files committed to the repository
-- Secrets in memory storage (`.ai-state/memory.json`) committed to git
+- Secrets captured into the committed observation log (`.ai-state/observations.jsonl`) — Praxion has no curated memory store; the in-house memory subsystem has been removed
 - Sensitive information in ADR files committed to `.ai-state/decisions/`
 
 **What to look for:**

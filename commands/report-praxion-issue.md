@@ -1,6 +1,6 @@
 ---
 description: File a Praxion-origin ecosystem-defect issue on the Praxion repo from a captured healing-sidecar candidate, with a human confirmation gate before every filing
-argument-hint: [fingerprint]
+argument-hint: "[fingerprint]"
 allowed-tools: [Bash(gh:*), Bash(python3:*), Bash(uv run:*), Read, Grep, Glob, AskUserQuestion]
 disable-model-invocation: true
 ---

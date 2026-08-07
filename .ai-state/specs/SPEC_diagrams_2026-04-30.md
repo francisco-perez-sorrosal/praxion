@@ -76,7 +76,7 @@ Replaced the Mermaid-only diagram convention with a dual-toolchain policy: LikeC
 
 ### REQ-DIAGRAM-12
 **When** a developer or agent wants to author `.c4` files interactively
-**the system** provides a project-root `.mcp.json` with a `@likec4/mcp` entry wired to `docs/diagrams/`
+**the system** provides a project-root `.mcp.json`[^mcp-json-removed] with a `@likec4/mcp` entry wired to `docs/diagrams/`
 **so that** Claude Code and compatible MCP clients load LikeC4's 18 tools automatically.
 
 ### REQ-DIAGRAM-13
@@ -94,12 +94,12 @@ Replaced the Mermaid-only diagram convention with a dual-toolchain policy: LikeC
 | REQ-DIAGRAM-04 | `docs/architecture.md`, `docs/diagrams/architecture/src/architecture.c4`, `docs/diagrams/architecture/rendered/components.d2`, `docs/diagrams/architecture/rendered/components.svg` | VERIFICATION_REPORT §2 (grep-cE '^\`\`\`mermaid' → 0) |
 | REQ-DIAGRAM-05 | `.ai-state/DESIGN.md`, `docs/diagrams/architecture/src/architecture.c4`, `docs/diagrams/architecture/rendered/context.svg`, `docs/diagrams/architecture/rendered/components.svg` | VERIFICATION_REPORT §2 (2 SVG refs in §2+§3) |
 | REQ-DIAGRAM-06 | `docs/diagrams/architecture/src/architecture.c4`, `docs/diagrams/architecture/rendered/{context,components,index}.{d2,svg}` | VERIFICATION_REPORT §2 (ls -la, mtime ≥ source mtime within 60s) |
-| REQ-DIAGRAM-07 | `scripts/diagram-regen-hook.sh`, `scripts/git-pre-commit-hook.sh` (Block C) | `tests/test_diagram_regen_hook.sh` (T1–T5); VERIFICATION_REPORT §4 (4 PASS / 0 FAIL) |
+| REQ-DIAGRAM-07 | `scripts/diagram-regen-hook.sh`, `scripts/git-pre-commit-hook.sh` (Block C)[^precommit-hook-removed] | `tests/test_diagram_regen_hook.sh` (T1–T5); VERIFICATION_REPORT §4 (4 PASS / 0 FAIL) |
 | REQ-DIAGRAM-08 | `skills/doc-management/references/diagram-conventions.md` §Integration with LikeC4 + D2 | VERIFICATION_REPORT §2 (grep -c 'LikeC4' → 5) |
 | REQ-DIAGRAM-09 | `commands/onboard-project.md` Phase 0 + Phase 8 | VERIFICATION_REPORT §2 (grep -ic 'likec4' → 4) |
 | REQ-DIAGRAM-10 | (all 7 migrated files) | VERIFICATION_REPORT §2 (28 blocks post-pipeline; 7 removed; baseline 35 not 27 per inventory gap) |
 | REQ-DIAGRAM-11 | `rules/writing/diagram-conventions.md` (dual-toolchain opening) | VERIFICATION_REPORT §2 (by construction — no live sentinel run) |
-| REQ-DIAGRAM-12 | `.mcp.json` | VERIFICATION_REPORT §2 (`python3 -m json.tool` exits 0; grep '@likec4/mcp' → 1) |
+| REQ-DIAGRAM-12 | `.mcp.json`[^mcp-json-removed] | VERIFICATION_REPORT §2 (`python3 -m json.tool` exits 0; grep '@likec4/mcp' → 1) |
 | REQ-DIAGRAM-13 | `docs/architecture-diagrams.md`, `README_DEV.md` (cross-link) | VERIFICATION_REPORT §2 (WARN: README_DEV.md has link-out not literal command) |
 
 ## Decisions Made
@@ -168,3 +168,13 @@ Four ADRs were authored by the systems-architect and implementation-planner. Dra
 **Total planning documents**: SYSTEMS_PLAN, IMPLEMENTATION_PLAN, WIP, LEARNINGS, 4 × RESEARCH_FINDINGS, TEST_RESULTS, traceability_implementer.yml, VERIFICATION_REPORT, PROGRESS
 
 **One iteration cycle**: Step 5 underwent R1 (nested layer grouping), R2 (differentiated L0/L1 views with 6 external actors), and R4 (active-voice edge labels) after the first render aesthetic review. The final `docs/diagrams/architecture.c4` model produces a 22,189-byte context SVG (9 rects) and 43,299-byte components SVG (21 rects).
+
+---
+
+## Post-Archive Annotations
+
+The spec body above is frozen as shipped on 2026-04-30. The notes below were added later to keep the record navigable after two of its implementing files were removed; the requirement and traceability text itself is unchanged.
+
+[^mcp-json-removed]: **Removed 2026-05-14** (commit `c531fed`, no ADR). `.mcp.json` held a single `@likec4/mcp` entry; that entry moved into the `mcpServers` block of `.claude-plugin/plugin.json`, making the plugin manifest the one source of truth for Praxion-shipped MCP servers. The capability REQ-DIAGRAM-12 specifies still ships — plugin installers now pick it up without a project-root `.mcp.json`.
+
+[^precommit-hook-removed]: **Removed 2026-06-20** (commit `1f4639c`, `dec-246`). The bespoke `scripts/git-pre-commit-hook.sh` was replaced by `.pre-commit-config.yaml`, where its five author blocks became `repo: local` hooks alongside `ruff` and `gitleaks`. Block C's diagram regeneration still runs from there, invoking `scripts/diagram-regen-hook.sh`, which is unchanged and still present.

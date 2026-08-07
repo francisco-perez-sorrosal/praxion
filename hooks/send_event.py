@@ -188,6 +188,14 @@ def _parse_last_progress_line(content):
     }
 
 
+UNKNOWN_AGENT_ID = "unknown-agent"
+
+SOURCE_PAYLOAD = "payload"
+SOURCE_DESCRIPTION_FALLBACK = "description-fallback"
+SOURCE_AGENT_ID_FALLBACK = "agent-id-fallback"
+SOURCE_UNRESOLVED = "unresolved"
+
+
 def _agent_label(data):
     """Best available human-readable label for the agent in this hook payload."""
     agent_type = data.get("agent_type", "")
@@ -197,7 +205,41 @@ def _agent_label(data):
     description = data.get("description", "")
     if description:
         return description[:50]
-    return data.get("agent_id", "") or "unknown-agent"
+    return data.get("agent_id", "") or UNKNOWN_AGENT_ID
+
+
+def _agent_type_source(data):
+    """Report where this payload's agent label came from.
+
+    The relay's ``agent_type`` dimension has always fallen back through
+    description -> agent_id -> a sentinel, so a chronograph consumer could not
+    tell a harness-supplied agent type from a task description or a raw id
+    wearing the same field. This records the provenance alongside it. The
+    fallback *chain* is deliberately left intact -- it is the shipped contract
+    the relay's span factory and its test suite are written against; what was
+    missing was the ability to tell the cases apart.
+    """
+    if str(data.get("agent_type") or "").strip():
+        return SOURCE_PAYLOAD
+    if str(data.get("description") or "").strip():
+        return SOURCE_DESCRIPTION_FALLBACK
+    if str(data.get("agent_id") or "").strip():
+        return SOURCE_AGENT_ID_FALLBACK
+    return SOURCE_UNRESOLVED
+
+
+def _resolve_agent_id(data):
+    """Return a non-empty agent identifier for a subagent lifecycle event.
+
+    Falls back to the session id (the main agent's own identifier) and finally
+    to an explicit sentinel, so a lifecycle event is never emitted with an
+    unusable empty ``agent_id``.
+    """
+    agent_id = str(data.get("agent_id") or "").strip()
+    if agent_id:
+        return agent_id
+    session_id = str(data.get("session_id") or "").strip()
+    return session_id or UNKNOWN_AGENT_ID
 
 
 def _truncate(text, max_bytes=4096):
@@ -323,11 +365,11 @@ def _handle_subagent_start(data, sid, aid, proj, git):
         "event_type": "agent_start",
         "agent_type": agent or label,
         "session_id": sid,
-        "agent_id": aid,
+        "agent_id": _resolve_agent_id(data),
         "parent_session_id": sid,
         "message": f"Agent {label} started",
         "project_dir": proj,
-        "metadata": {"git": git},
+        "metadata": {"git": git, "agent_type_source": _agent_type_source(data)},
     }
     if task_slug:
         event["metadata"]["task_slug"] = task_slug
@@ -348,14 +390,15 @@ def _handle_subagent_stop(data, sid, aid, proj):
         "event_type": "agent_stop",
         "agent_type": agent or label,
         "session_id": sid,
-        "agent_id": aid,
+        "agent_id": _resolve_agent_id(data),
         "parent_session_id": sid,
         "message": f"Agent {label} stopped",
         "project_dir": proj,
+        "metadata": {"agent_type_source": _agent_type_source(data)},
     }
     transcript = data.get("agent_transcript_path", "")
     if transcript:
-        event["metadata"] = {"agent_transcript_path": transcript}
+        event["metadata"]["agent_transcript_path"] = transcript
     interaction = {
         "source": aid or agent or label,
         "target": "main_agent",

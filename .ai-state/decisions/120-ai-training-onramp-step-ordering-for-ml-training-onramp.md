@@ -10,8 +10,11 @@ made_by: agent
 agent_type: implementation-planner
 pipeline_tier: standard
 affected_files:
-  - .ai-work/ai-training-onramp/IMPLEMENTATION_PLAN.md
-  - .ai-work/ai-training-onramp/WIP.md
+  - skills/ml-training/
+  - skills/llm-training-eval/
+  - skills/neo-cloud-abstraction/
+  - commands/run-experiment.md
+  - commands/onboard-project.md
 affected_reqs: []
 re_affirms: dec-117
 ---

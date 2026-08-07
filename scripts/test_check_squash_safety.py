@@ -89,7 +89,11 @@ def mock_git_router(
         stdout = router(args_list)
         return _completed(stdout)
 
-    monkeypatch.setattr(squash_safety.subprocess, "run", _fake_run)
+    # Patch `subprocess.run` on the stdlib module itself, not through the
+    # script's own binding: the script now issues its git calls through the
+    # shared `_git_runner` sibling, so reaching for `squash_safety.subprocess`
+    # would target a name the script no longer imports.
+    monkeypatch.setattr(subprocess, "run", _fake_run)
 
 
 def _invoke_main(monkeypatch: pytest.MonkeyPatch, argv: list[str]) -> int:

@@ -1,6 +1,6 @@
 ---
 description: List orphan Claude Code auto-memory directories for worktrees and prompt for cleanup
-argument-hint: [--dry-run]
+argument-hint: "[--dry-run]"
 allowed-tools: [Bash(ls:*), Bash(du:*), Bash(rm:*), Bash(git:*), Bash(basename:*), Read, AskUserQuestion]
 disable-model-invocation: true
 ---

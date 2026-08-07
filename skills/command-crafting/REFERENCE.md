@@ -16,7 +16,7 @@ Extended examples, patterns, and organization strategies. Loaded on-demand from 
 ```markdown
 ---
 allowed-tools: [Bash(git add:*), Bash(git status:*), Bash(git commit:*)]
-argument-hint: [message]
+argument-hint: "[message]"
 description: Create git commit with descriptive message
 ---
 
@@ -41,7 +41,7 @@ Follow conventional commits format:
 
 ```markdown
 ---
-argument-hint: [file-path] [focus-area]
+argument-hint: "[file-path] [focus-area]"
 description: Review file focusing on specific area
 allowed-tools: [Read, Grep]
 ---
@@ -61,7 +61,7 @@ Provide actionable recommendations.
 
 ```markdown
 ---
-argument-hint: [project-name] [optional-tool]
+argument-hint: "[project-name] [optional-tool]"
 description: Create new project with specified tool
 ---
 
@@ -94,7 +94,7 @@ Generate descriptive test names for this scenario:
 ---
 allowed-tools: [Bash(git:*)]
 description: Create feature branch from main
-argument-hint: [branch-name]
+argument-hint: "[branch-name]"
 ---
 
 !`git checkout main`
@@ -144,7 +144,7 @@ mkdir -p .claude/commands
 cat > .claude/commands/my-command.md << 'EOF'
 ---
 description: My custom command
-argument-hint: [input]
+argument-hint: "[input]"
 ---
 
 Process $ARGUMENTS according to project standards.
@@ -160,7 +160,7 @@ EOF
 cat > .claude/commands/commit.md << 'EOF'
 ---
 allowed-tools: [Bash(git add:*), Bash(git status:*), Bash(git commit:*)]
-argument-hint: [message]
+argument-hint: "[message]"
 description: Create descriptive git commit
 ---
 
@@ -178,7 +178,7 @@ EOF
 cat > .claude/commands/review.md << 'EOF'
 ---
 allowed-tools: [Read, Grep]
-argument-hint: [file-path]
+argument-hint: "[file-path]"
 description: Review file for issues
 ---
 

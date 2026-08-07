@@ -55,7 +55,7 @@ Detect whether you were launched interactively or as a background/non-interactiv
 
 ## Input Contract
 
-The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Read these at start:
+The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all reads and writes. Read these at start:
 
 - Project root: `CLAUDE.md`, `AGENTS.md`, `README.md`, primary manifest (`pyproject.toml`, `package.json`, `Cargo.toml`, `go.mod`)
 - Ecosystem: `Glob skills/*/SKILL.md`, `Glob agents/*.md`, `Glob rules/**/*.md`, `Glob commands/*`, `Glob hooks/*`, `.claude-plugin/plugin.json`

@@ -1,6 +1,6 @@
 ---
 description: Auto-detect test framework and run tests
-argument-hint: [path|all]
+argument-hint: "[path|all]"
 allowed-tools: [Bash, Read, Grep, Glob]
 ---
 

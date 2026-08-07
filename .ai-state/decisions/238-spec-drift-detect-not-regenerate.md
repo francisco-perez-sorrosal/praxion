@@ -11,7 +11,6 @@ agent_type: systems-architect
 branch: main
 pipeline_tier: standard
 affected_files:
-  - .ai-work/<slug>/traceability.yml
   - .ai-state/specs/
   - agents/sentinel.md
   - scripts/spec_drift.py

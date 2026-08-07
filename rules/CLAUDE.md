@@ -12,8 +12,7 @@ Contextual domain knowledge files loaded automatically based on relevance. Rules
 
 - Organized hierarchically by domain: `swe/` for software engineering, `writing/` for documentation, `ml/` for ML/AI training
 - Further nesting for related rules (e.g., `swe/vcs/` for version control)
-- Each rule is a `.md` file — rules without frontmatter load unconditionally at session start
-- Add `paths:` YAML frontmatter to scope a rule to specific file patterns (loaded only when matching files are accessed)
+- Each rule is a `.md` file — `paths:` YAML frontmatter scopes it to specific file patterns (loaded only when a matching file is read); without `paths:` it always loads at session start
   - Path-scoped rules inject **on Read, not Write/Edit** — an agent creating a new file without first reading a matching sibling misses that file type's conventions. Mitigated by a "read a sibling first" instruction in the `implementer`/`doc-engineer`/`test-engineer` prompts; symptom and full mitigation in `skills/rule-crafting/SKILL.md`.
 
 ## Token Budget

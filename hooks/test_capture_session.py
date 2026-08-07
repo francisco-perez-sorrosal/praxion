@@ -97,12 +97,41 @@ def unnameable_lifecycle_rows(rows: list[dict]) -> list[dict]:
     return findings
 
 
+def unpaired_stop_rows(rows: list[dict]) -> list[dict]:
+    """Detector: stop rows the emitter could not pair with an observed start.
+
+    Reads the emitter's own `start_correlation` verdict instead of re-deriving
+    the pairing by scanning the whole file, which is the point of the field:
+    the reader can separate "no start row was observed" from "unpaired, cause
+    unknown" without a second pass and without inferring anything.
+    """
+    return [
+        row
+        for row in rows
+        if row.get("event_type") == "agent_stop"
+        and row.get("start_correlation") == "unobserved-start"
+    ]
+
+
 def _stop_payload(cwd: Path, **overrides: object) -> dict:
     payload: dict = {
         "hook_event_name": "SubagentStop",
         "session_id": "sess-1",
         "agent_id": "agent-orphan",
         "agent_type": "",  # present-but-empty: the measured harness shape
+        "cwd": str(cwd),
+    }
+    payload.update(overrides)
+    return payload
+
+
+def _start_payload(cwd: Path, **overrides: object) -> dict:
+    payload: dict = {
+        "hook_event_name": "SubagentStart",
+        "session_id": "sess-1",
+        "agent_id": "agent-orphan",
+        "agent_type": "i-am:implementer",
+        "description": "Task slug: important-findings-remediation",
         "cwd": str(cwd),
     }
     payload.update(overrides)
@@ -290,7 +319,7 @@ class TestWalBackfill:
                 _wal_row(agent_type="i-am:implementer", agent_id="agent-1"),
             ],
         )
-        assert module.lookup_agent_type(obs_path, "agent-1") == "i-am:implementer"
+        assert module.lookup_prior_agent(obs_path, "agent-1")[0] == "i-am:implementer"
 
     def test_backfill_ignores_rows_for_other_agents(self, project: Path) -> None:
         module = _load_module()
@@ -298,7 +327,7 @@ class TestWalBackfill:
             project / ".ai-state" / "observations.jsonl",
             [_wal_row(agent_type="i-am:researcher", agent_id="somebody-else")],
         )
-        assert module.lookup_agent_type(obs_path, "agent-1") == ""
+        assert module.lookup_prior_agent(obs_path, "agent-1")[0] == ""
 
     def test_backfill_ignores_prior_unknown_sentinels(self, project: Path) -> None:
         """An earlier `unknown` is not evidence — it must not propagate."""
@@ -307,7 +336,7 @@ class TestWalBackfill:
             project / ".ai-state" / "observations.jsonl",
             [_wal_row(agent_type="unknown", agent_id="agent-1")],
         )
-        assert module.lookup_agent_type(obs_path, "agent-1") == ""
+        assert module.lookup_prior_agent(obs_path, "agent-1")[0] == ""
 
     def test_backfill_survives_a_torn_line_from_a_concurrent_append(self, project: Path) -> None:
         module = _load_module()
@@ -317,7 +346,7 @@ class TestWalBackfill:
         )
         with open(obs_path, "a", encoding="utf-8") as handle:
             handle.write('{"agent_id": "agent-1", "agent_ty')  # torn mid-write
-        assert module.lookup_agent_type(obs_path, "agent-1") == "i-am:verifier"
+        assert module.lookup_prior_agent(obs_path, "agent-1")[0] == "i-am:verifier"
 
     def test_backfill_skips_non_object_rows(self, project: Path) -> None:
         module = _load_module()
@@ -329,11 +358,11 @@ class TestWalBackfill:
             + "\n",
             encoding="utf-8",
         )
-        assert module.lookup_agent_type(obs_path, "agent-1") == "i-am:sentinel"
+        assert module.lookup_prior_agent(obs_path, "agent-1")[0] == "i-am:sentinel"
 
     def test_backfill_returns_empty_for_a_missing_wal(self, tmp_path: Path) -> None:
         module = _load_module()
-        assert module.lookup_agent_type(tmp_path / "nope.jsonl", "agent-1") == ""
+        assert module.lookup_prior_agent(tmp_path / "nope.jsonl", "agent-1")[0] == ""
 
     def test_backfill_returns_empty_without_an_agent_id(self, project: Path) -> None:
         module = _load_module()
@@ -341,11 +370,11 @@ class TestWalBackfill:
             project / ".ai-state" / "observations.jsonl",
             [_wal_row(agent_id="agent-1")],
         )
-        assert module.lookup_agent_type(obs_path, "") == ""
+        assert module.lookup_prior_agent(obs_path, "")[0] == ""
 
     def test_backfill_returns_empty_without_a_wal_path(self) -> None:
         module = _load_module()
-        assert module.lookup_agent_type(None, "agent-1") == ""
+        assert module.lookup_prior_agent(None, "agent-1")[0] == ""
 
     def test_tail_window_drops_the_record_it_cut_in_half(self, project: Path) -> None:
         """A window starting mid-file must not parse the fragment it split.
@@ -376,6 +405,226 @@ class TestWalBackfill:
             [_wal_row(agent_id="a"), _wal_row(agent_id="b")],
         )
         assert len(module._tail_lines(obs_path, max_bytes=1_000_000)) == 2
+
+
+# ---------------------------------------------------------------------------
+# Start/stop correlation — a stop says whether its start was ever observed
+# ---------------------------------------------------------------------------
+
+
+class TestStartStopCorrelation:
+    def test_start_and_stop_driven_through_main_share_one_agent_id(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """CANARY: the measured defect, reproduced end to end through main().
+
+        The stop payload is the known-bad shape found 144 times in the live WAL
+        — `agent_type` present-but-empty, no `description` — arriving after a
+        real `SubagentStart` for the same harness `agent_id`. The two rows must
+        pair: same `agent_id`, the stop marked `paired`, and the agent named by
+        backfill rather than left as a sentinel.
+
+        Minting an id on the stop side (a fresh uuid, a hash of the payload, a
+        timestamp) breaks the first assertion; dropping the correlation verdict
+        breaks the second.
+        """
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+
+        _run_main(module, _start_payload(project), monkeypatch)
+        _run_main(module, _stop_payload(project), monkeypatch)
+
+        start, stop = _read_wal(obs_path)
+        assert start["event_type"] == "agent_start"
+        assert stop["event_type"] == "agent_stop"
+        assert stop["agent_id"] == start["agent_id"] == "agent-orphan"
+        assert stop["start_correlation"] == module.CORRELATION_PAIRED
+        assert stop["agent_type"] == "i-am:implementer"
+
+    def test_stop_without_a_start_row_is_marked_unobserved_not_paired(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """CANARY: the residue that is unresolvable by construction.
+
+        No `agent_start` was ever delivered, so no stop can reconstruct one.
+        The row must say so rather than claim a pairing it cannot support — and
+        it must still carry the harness `agent_id` verbatim, because the id was
+        never the broken half.
+        """
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+        _write_wal(obs_path, [])
+
+        _run_main(module, _stop_payload(project), monkeypatch)
+
+        emitted = _read_wal(obs_path)[-1]
+        assert emitted["start_correlation"] == module.CORRELATION_UNOBSERVED_START
+        assert emitted["agent_id"] == "agent-orphan"
+        assert emitted["agent_id"] != emitted["session_id"], "the id must not be a session fallback"
+
+    def test_a_tool_use_row_alone_does_not_witness_a_start(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """CANARY: the four measured stops whose agent ran but never started.
+
+        Their `agent_id` carries `tool_use` rows and no `agent_start`. A
+        `tool_use` row names the agent — enough for backfill — but does not
+        witness its spawn, so the pairing must stay unobserved while the type
+        still resolves. Widening the pairing to any matching row silently turns
+        those four into false pairings.
+        """
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+        _write_wal(obs_path, [_wal_row(agent_type="i-am:doc-engineer", agent_id="agent-orphan")])
+
+        _run_main(module, _stop_payload(project), monkeypatch)
+
+        emitted = _read_wal(obs_path)[-1]
+        assert emitted["start_correlation"] == module.CORRELATION_UNOBSERVED_START
+        assert emitted["agent_type"] == "i-am:doc-engineer"
+        assert emitted["agent_type_source"] == module.SOURCE_WAL_BACKFILL
+
+    def test_detector_flags_the_unpaired_stop(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """CANARY: the WAL-level detector fires on the known-bad fragment."""
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+        _write_wal(obs_path, [])
+
+        _run_main(module, _stop_payload(project), monkeypatch)
+
+        findings = unpaired_stop_rows(_read_wal(obs_path))
+        assert len(findings) == 1
+        assert findings[0]["agent_id"] == "agent-orphan"
+
+    def test_detector_stays_silent_on_a_paired_stop(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """INVERSE GUARD: a stop whose start was observed produces no finding."""
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+
+        _run_main(module, _start_payload(project), monkeypatch)
+        _run_main(module, _stop_payload(project, agent_type="i-am:implementer"), monkeypatch)
+
+        assert unpaired_stop_rows(_read_wal(obs_path)) == []
+
+    def test_a_stop_without_a_harness_id_never_correlates_against_the_session(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """CANARY: the session's own rows must not stand in for a subagent's.
+
+        A stop that arrives with no `agent_id` gets the session id in its
+        `agent_id` field so the row stays usable — but the session's rows belong
+        to the main agent. Correlating on that fallback would backfill the
+        subagent's type as `main` and pair its stop against the session's
+        history: two fabricated answers from one substitution.
+        """
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+        _write_wal(obs_path, [_wal_row(agent_type="main", agent_id="sess-1")])
+
+        _run_main(
+            module,
+            {"hook_event_name": "SubagentStop", "session_id": "sess-1", "cwd": str(project)},
+            monkeypatch,
+        )
+
+        emitted = _read_wal(obs_path)[-1]
+        assert emitted["agent_id"] == "sess-1", "the row still needs a usable id"
+        assert emitted["agent_type"] != module.MAIN_AGENT_TYPE
+        assert emitted["agent_type_source"] == module.SOURCE_UNRESOLVED
+        assert emitted["start_correlation"] == module.CORRELATION_UNOBSERVED_START
+
+    def test_a_start_for_another_agent_does_not_pair(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A sibling's start must not satisfy this stop — the concurrency trap."""
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+        _write_wal(
+            obs_path,
+            [_wal_row(event_type="agent_start", agent_id="a-different-agent")],
+        )
+
+        _run_main(module, _stop_payload(project), monkeypatch)
+
+        assert _read_wal(obs_path)[-1]["start_correlation"] == module.CORRELATION_UNOBSERVED_START
+
+    def test_a_start_that_scrolled_past_the_window_reads_as_unobserved(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The verdict is window-bounded, and says non-observation, not absence."""
+        module = _load_module()
+        monkeypatch.setattr(module, "BACKFILL_TAIL_BYTES", 1)
+        obs_path = project / ".ai-state" / "observations.jsonl"
+        _write_wal(obs_path, [_wal_row(event_type="agent_start", agent_id="agent-orphan")])
+
+        _run_main(module, _stop_payload(project), monkeypatch)
+
+        assert _read_wal(obs_path)[-1]["start_correlation"] == module.CORRELATION_UNOBSERVED_START
+
+    @pytest.mark.parametrize(
+        "hook_event",
+        ["SessionStart", "Stop", "SubagentStart"],
+    )
+    def test_rows_with_nothing_to_pair_are_marked_not_applicable(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch, hook_event: str
+    ) -> None:
+        """A start row *is* the start; a session row has no spawn."""
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+
+        _run_main(
+            module,
+            {"hook_event_name": hook_event, "agent_id": "agent-1", "cwd": str(project)},
+            monkeypatch,
+        )
+
+        assert _read_wal(obs_path)[-1]["start_correlation"] == module.CORRELATION_NOT_APPLICABLE
+
+    def test_correlation_is_reported_for_every_lifecycle_row(self, project: Path) -> None:
+        """No row leaves the emitter without a verdict a reader can act on."""
+        module = _load_module()
+        for event_type in ("session_start", "session_stop", "agent_start", "agent_stop"):
+            row = module.build_observation({"agent_id": "a-1", "cwd": str(project)}, event_type)
+            assert row["start_correlation"] in {
+                module.CORRELATION_PAIRED,
+                module.CORRELATION_UNOBSERVED_START,
+                module.CORRELATION_NOT_APPLICABLE,
+            }
+
+
+class TestPriorAgentLookup:
+    def test_lookup_reports_an_observed_start(self, project: Path) -> None:
+        module = _load_module()
+        obs_path = _write_wal(
+            project / ".ai-state" / "observations.jsonl",
+            [_wal_row(event_type="agent_start", agent_type="i-am:verifier", agent_id="agent-1")],
+        )
+        assert module.lookup_prior_agent(obs_path, "agent-1") == ("i-am:verifier", True)
+
+    def test_lookup_reports_no_start_when_only_tool_rows_exist(self, project: Path) -> None:
+        module = _load_module()
+        obs_path = _write_wal(
+            project / ".ai-state" / "observations.jsonl",
+            [_wal_row(agent_type="i-am:verifier", agent_id="agent-1")],
+        )
+        assert module.lookup_prior_agent(obs_path, "agent-1") == ("i-am:verifier", False)
+
+    def test_lookup_pairs_a_start_whose_own_type_is_unusable(self, project: Path) -> None:
+        """Pairing keys on the id; an unnameable start still witnesses the spawn."""
+        module = _load_module()
+        obs_path = _write_wal(
+            project / ".ai-state" / "observations.jsonl",
+            [_wal_row(event_type="agent_start", agent_type="unknown", agent_id="agent-1")],
+        )
+        assert module.lookup_prior_agent(obs_path, "agent-1") == ("", True)
+
+    def test_lookup_without_a_wal_path_reports_nothing_observed(self) -> None:
+        module = _load_module()
+        assert module.lookup_prior_agent(None, "agent-1") == ("", False)
 
 
 # ---------------------------------------------------------------------------
@@ -501,6 +750,7 @@ class TestObservationEnvelope:
             "outcome",
             "classification",
             "agent_type_source",
+            "start_correlation",
         }
         assert row["project"] == project.name
         assert row["tool_name"] is None

@@ -13,7 +13,6 @@ re_affirms: dec-101
 affected_files:
   - fitness/tests/
   - pyproject.toml
-  - .ai-work/aac-dac-foundation/IMPLEMENTATION_PLAN.md
 ---
 
 ## Context

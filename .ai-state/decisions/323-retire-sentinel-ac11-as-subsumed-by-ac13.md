@@ -16,6 +16,8 @@ re_affirms: dec-112
 affected_files:
   - agents/sentinel.md
   - docs/aac-dac.md
+re_affirmed_by:
+  - dec-draft-2d56468e
 ---
 
 ## Context

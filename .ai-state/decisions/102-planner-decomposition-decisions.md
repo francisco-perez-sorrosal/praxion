@@ -10,8 +10,7 @@ made_by: agent
 agent_type: implementation-planner
 pipeline_tier: standard
 affected_files:
-  - .ai-work/aac-dac-philosophy/IMPLEMENTATION_PLAN.md
-  - .ai-work/aac-dac-philosophy/WIP.md
+  - agents/architect-validator.md
 ---
 
 ## Context

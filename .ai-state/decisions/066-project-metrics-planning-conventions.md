@@ -10,7 +10,7 @@ made_by: agent
 agent_type: implementation-planner
 pipeline_tier: full
 affected_files:
-  - .ai-work/project-metrics/IMPLEMENTATION_PLAN.md
+  - .ai-state/specs/SPEC_project-metrics_2026-04-23.md
   - scripts/project_metrics/tests/
   - scripts/project_metrics/tests/fixtures/minimal_repo/
 re_affirms: dec-063

@@ -10,7 +10,6 @@ made_by: agent
 agent_type: implementation-planner
 pipeline_tier: standard
 affected_files:
-  - .ai-work/praxion-first-class/IMPLEMENTATION_PLAN.md
   - hooks/inject_subagent_context.py
   - hooks/inject_process_framing.py
   - hooks/auto_complete_install.py

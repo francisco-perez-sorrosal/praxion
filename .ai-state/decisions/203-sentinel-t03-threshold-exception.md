@@ -1,7 +1,7 @@
 ---
 id: dec-203
 title: Recalibrate T03 with a line-count exception for the gate-encoding agents (sentinel + verifier)
-status: accepted
+status: superseded
 category: architectural
 date: 2026-05-23
 summary: Give the two gate-encoding agents (agents/sentinel.md, agents/verifier.md) a higher T03 threshold (warn 550 / fail 700) because their size is substantially intrinsic — sentinel's ~260-line Check Catalog and verifier's comprehensive Process plus its deliberately tested-in-place rework-spawn contract; all other agents keep warn 300 / fail 500.
@@ -11,6 +11,9 @@ pipeline_tier: direct
 affected_files:
   - agents/sentinel.md
   - agents/verifier.md
+superseded_by: dec-draft-5b6f18d3
+re_affirmed_by:
+  - dec-draft-5b6f18d3
 ---
 
 ## Context

@@ -12,7 +12,6 @@ pipeline_tier: standard
 re_affirms: dec-103
 affected_files:
   - rules/swe/agent-intermediate-documents.md
-  - .ai-work/aac-dac-wireup/IMPLEMENTATION_PLAN.md
 ---
 
 ## Context

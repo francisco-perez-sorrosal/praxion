@@ -8,7 +8,7 @@
 
 ## Feature Summary
 
-Adds a user-invoked `/project-metrics` slash command that computes a curated set of project complexity / health metrics on any Praxion-onboarded repository. Each invocation produces a timestamped artifact triple: a canonical JSON payload, a derived human-readable MD rendering, and a row appended to `.ai-state/METRICS_LOG.md`. The command degrades gracefully per-collector when optional tooling is unavailable, with only `git` + Python 3.11+ stdlib as the hard floor. The aggregate column contract is frozen on v1.0.0 so `METRICS_LOG.md` remains a stable time series; additive schema changes bump minor version, breaking changes require a superseding ADR and fork a `METRICS_LOG_v2.md`.
+Adds a user-invoked `/project-metrics` slash command that computes a curated set of project complexity / health metrics on any Praxion-onboarded repository. Each invocation produces a timestamped artifact triple: a canonical JSON payload, a derived human-readable MD rendering, and a row appended to `.ai-state/metrics_reports/METRICS_LOG.md`. The command degrades gracefully per-collector when optional tooling is unavailable, with only `git` + Python 3.11+ stdlib as the hard floor. The aggregate column contract is frozen on v1.0.0 so `METRICS_LOG.md` remains a stable time series; additive schema changes bump minor version, breaking changes require a superseding ADR and fork a `METRICS_LOG_v2.md`.
 
 V1 scope: Tier 0 (git + stdlib; optional `scc` enrichment) + Tier 1 Python (`lizard`, `complexipy`, `pydeps`, `coverage.py` artifact read). TS / Go / Rust collectors deferred to v2 via the same protocol. No HTML UI in v1; `docs/metrics/README.md` ships as a complete JSON schema reference so static HTML (Path A), local server (Path B), or Datasette/Grafana (Path C) consumers can be written against the frozen contract without reading the implementation.
 
@@ -18,7 +18,7 @@ The 12 acceptance criteria in `SYSTEMS_PLAN.md` expand into 16 REQs below. One-t
 
 ### Command surface
 
-- **REQ-PM-01** — `/project-metrics` is registered as a Claude Code slash command, appears under `commands/`, and runs end-to-end on the Praxion repo itself, producing a `.ai-state/METRICS_REPORT_*.json` + `.md` artifact pair and appending a new row to `.ai-state/METRICS_LOG.md`. *(AC1)*
+- **REQ-PM-01** — `/project-metrics` is registered as a Claude Code slash command, appears under `commands/`, and runs end-to-end on the Praxion repo itself, producing a `.ai-state/metrics_reports/METRICS_REPORT_*.json` + `.md` artifact pair and appending a new row to `.ai-state/metrics_reports/METRICS_LOG.md`. *(AC1)*
 - **REQ-PM-02** — The command completes successfully on a minimal fixture repository that has only `git` and Python 3.11 stdlib available — no `uv`/`uvx`, no `scc`, no `npx`, no third-party packages — producing an artifact triple with Tier 0 data and skip markers for every unavailable collector. *(AC2)*
 - **REQ-PM-03** — The command accepts `--window-days <N>` (default 90) and `--top-n <N>` (default 10); invalid values (non-integer, negative, zero) produce a clear error message on stderr and exit non-zero without writing any artifact file (no partial writes). *(AC9)*
 - **REQ-PM-04** — The Python package is importable under stdlib alone (`python -c "import scripts.project_metrics"` succeeds with no third-party installs); all optional tooling (`lizard`, `complexipy`, `pydeps`) is invoked via subprocess, never `import`-ed. *(AC10)*

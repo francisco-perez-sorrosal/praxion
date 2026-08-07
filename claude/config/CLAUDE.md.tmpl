@@ -76,11 +76,11 @@ Compliance is not politeness — it is the entry condition for trust. Canonical 
 
 **Learn, recall, apply.** Knowledge captured but never consulted is wasted.
 
-- **Learn** — notice and persist. Capture corrections immediately. Write discoveries as they happen. Store cross-cutting insights in persistent memory.
-- **Recall** — at session start, load previous context. Before tackling a problem, search for relevant past insights. Past you may have already solved it.
-- **Apply** — let recalled learnings shape your approach. Act on patterns and pitfalls surfaced by memory. Feed the next cycle: "What do I wish I'd known at the start?"
+- **Learn** — notice and persist. Capture corrections immediately. Write discoveries as they happen. Promote cross-cutting insights to the durable store.
+- **Recall** — at session start, load previous context. Before tackling a problem, look for relevant past insights. Past you may have already solved it.
+- **Apply** — let recalled learnings shape your approach. Act on the patterns and pitfalls that surface. Feed the next cycle: "What do I wish I'd known at the start?"
 
-Two complementary systems serve this loop: ephemeral pipeline documents (`LEARNINGS.md`) for in-flight knowledge, and persistent memory (Memory MCP) for cross-session intelligence. The mechanics of each belong in their respective rules and agent definitions, not here.
+Two complementary layers serve this loop: ephemeral pipeline documents (`LEARNINGS.md`) for in-flight knowledge, and a **durable store** for cross-session intelligence. Which store is a per-project fact — a configured memory backend, a harness-provided memory directory, or else the committed record itself (ADRs, `.ai-state/`, docs). Establish which exists before reaching for it: calling a memory tool that was never registered spends a turn and returns nothing. The mechanics belong in their respective rules and agent definitions, not here.
 
 ## The Ecosystem as Philosophy's Implementation
 
@@ -91,8 +91,8 @@ This agent operates within the `i-am` plugin ecosystem. The toolbox exists to op
 | **Context engineering** | Skills — right domain knowledge loaded on demand via progressive disclosure |
 | **Understand, Plan, Verify** | Agent pipeline — ideation through verification, each agent owning one phase |
 | **Conventions and consistency** | Rules — coding style, git hygiene, coordination protocols enforced automatically |
-| **Learning loop** | Memory MCP + LEARNINGS.md — persistent knowledge across sessions, ephemeral within pipelines |
-| **Frequent workflows** | Commands — commits, worktrees, scaffolding, memory management as repeatable actions |
+| **Learning loop** | Durable store + LEARNINGS.md — persistent knowledge across sessions, ephemeral within pipelines |
+| **Frequent workflows** | Commands — commits, worktrees, scaffolding, state hygiene as repeatable actions |
 | **Structural beauty** | All of the above — the ecosystem's own structure should exemplify its principles |
 
 The ecosystem is auto-discovered. Components are never enumerated in always-loaded context — the assistant finds them via filesystem scanning. This is itself a design principle: avoid maintaining two sources of truth.

@@ -311,9 +311,13 @@ When approved:
 | Phase 2.5 = `no-refactor` | Full document (all sections) | Not written |
 | Phase 2.5 = `fold-into-Prerequisites` | Full document; preparatory work in § Codebase Readiness § Prerequisites | Not written |
 | Phase 2.5 = `emit-PRE_REFACTOR_PLAN` | Full document; § Codebase Readiness § Pre-Refactor Assessment records outcome + rationale + `td-NNN` rows flipped | Written to `.ai-work/<task-slug>/PRE_REFACTOR_PLAN.md` with all 8 sections per the schema in Phase 2.5 |
-| Phase 2.5 = `rescope-and-restart` | Assessment outcome only (no Architecture, no Decisions, no Risk Assessment); one-line user-facing escalation | Not written |
-| Mode = `baseline-audit` | Not written (architect produces `.ai-state/DESIGN.md` + `docs/architecture.md` only) | Not written |
-| Mode = `post-refactor-adaptation` | Updated against refactored codebase (Components / Data Flow / Interfaces re-read); no new `## Pre-Refactor Assessment` (Phase 2.5 skipped) | Existing artifact receives `[CONSUMED]` marker line; not re-written |
+| Phase 2.5 = `rescope-and-restart` | Assessment outcome only — `## Goal` + `## Codebase Readiness § Pre-Refactor Assessment`, no Architecture / Decisions / Risk Assessment; one-line user-facing escalation | Not written |
+| Mode = `baseline-audit` | **Never written.** This mode produces `.ai-state/DESIGN.md` + `docs/architecture.md` and nothing else — writing a `SYSTEMS_PLAN.md` here is a defect, not a judgment call | Not written |
+| Mode = `post-refactor-adaptation` | Same required sections; updated against refactored codebase (Components / Data Flow / Interfaces re-read); no new `## Pre-Refactor Assessment` (Phase 2.5 skipped) | Existing artifact receives `[CONSUMED]` marker line; not re-written |
+
+**Required `##` sections — in every mode and outcome that writes the document** (the two `rescope-and-restart` / `baseline-audit` exceptions are the rows above, nowhere else). The template below is a **schema, not a suggestion**: `## Goal`, `## Tech Stack`, `## Acceptance Criteria`, `## Architecture`, `## Codebase Readiness`, and `## Risk Assessment` are mandatory and must appear **verbatim**, because downstream consumers (implementation-planner, verifier, sentinel `P05`) locate content by grepping the heading text rather than by reading. Two more are conditional on a phase outcome: `## Behavioral Specification` (medium/large tasks — Phase 1 step 6) and `## Stakeholder Review` (Tier 2 only — Phase 9). Renaming or renumbering a required heading (`## 1. Design constraints`, `## 2. Structure`) is a contract breach **even when the content is complete** — a consumer greps `## Acceptance Criteria`, finds nothing, and reports the document empty. A required section with nothing to say still gets its heading plus an explicit one-liner (`_No structural issues found._`); the heading is never dropped.
+
+**The schema binds the path, not the author.** Anything written to `.ai-work/<task-slug>/SYSTEMS_PLAN.md` carries these headings — including a plan the orchestrator authors directly without spawning this agent. Paired site: `agents/CLAUDE.md § Architect Invocation Modes` states *whether* each mode writes the document; this section owns *which sections it carries*. Update both in the same commit.
 
 Write `SYSTEMS_PLAN.md`:
 
@@ -379,7 +383,7 @@ Write `SYSTEMS_PLAN.md`:
 
 ### Section Guidelines
 
-- **Omit sections that don't apply.** A simple feature doesn't need a data flow diagram.
+- **Omit `###` sub-sections that don't apply — never a required `##` heading.** A simple feature doesn't need a `### Data Flow` diagram; it still carries `## Architecture`.
 - **Be concrete.** "Add a new module" is less useful than "Add `src/auth/oauth.py` implementing the OAuth2 callback handler."
 - **Reference RESEARCH_FINDINGS.md** for supporting evidence rather than duplicating content.
 

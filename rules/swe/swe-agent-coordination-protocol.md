@@ -49,18 +49,18 @@ Two hooks reinforce this boundary: `inject_worktree_banner.py` (SessionStart) an
 
 ### Available Agents
 
-Outputs use path prefixes to signal lifecycle: `.ai-work/<slug>/` = ephemeral (deleted after pipeline), `.ai-state/` = permanent (committed to git).
+Outputs use path prefixes to signal lifecycle: `.ai-work/<slug>/` = ephemeral (deleted after pipeline), `.ai-state/` = permanent (committed to git). Rows reading → are enumerated once, under [Delegation Checklists](#delegation-checklists).
 
 | Agent | Purpose | Output | Bg Safe |
 |-------|---------|--------|---------|
 | `promethean` | Feature-level ideation from project state | `.ai-work/<slug>/IDEA_PROPOSAL.md`, `.ai-state/idea_ledgers/IDEA_LEDGER_*.md` | No |
 | `researcher` | Codebase exploration, external docs, comparative analysis | `.ai-work/<slug>/RESEARCH_FINDINGS.md` | Yes |
-| `systems-architect` | Trade-off analysis, system design | `.ai-work/<slug>/SYSTEMS_PLAN.md`, `.ai-state/decisions/` (ADRs), `.ai-state/DESIGN.md`^1, `docs/architecture.md`^1 | Yes |
-| `implementation-planner` | Step decomposition, execution supervision | `.ai-work/<slug>/IMPLEMENTATION_PLAN.md`, `.ai-work/<slug>/WIP.md`, `.ai-work/<slug>/LEARNINGS.md` | Yes |
+| `systems-architect` | Trade-off analysis, system design | → Delegation Checklists | Yes |
+| `implementation-planner` | Step decomposition, execution supervision | → Delegation Checklists | Yes |
 | `context-engineer` | Context artifact domain expert; any pipeline stage | Audit report + artifact changes, `.ai-work/<slug>/CONTEXT_REVIEW.md` (shadowing) | Yes |
-| `implementer` | Executes implementation steps with self-review | Code changes + `.ai-work/<slug>/WIP.md` update + `.ai-work/<slug>/TEST_RESULTS.md` (when step runs tests) | Yes |
+| `implementer` | Executes implementation steps with self-review | → Delegation Checklists | Yes |
 | `test-engineer` | Dedicated testing: complex test design, test suite refactoring, testing infrastructure | Test code + `.ai-work/<slug>/WIP.md` update + `.ai-work/<slug>/TEST_RESULTS.md` (canonical when paired with implementer on tests) | Yes |
-| `verifier` | Post-implementation review against acceptance criteria | `.ai-work/<slug>/VERIFICATION_REPORT.md` | Yes |
+| `verifier` | Post-implementation review against acceptance criteria | → Delegation Checklists | Yes |
 | `doc-engineer` | Documentation quality (READMEs, catalogs, changelogs, developer architecture guide) | Doc report or file fixes | Yes |
 | `sentinel` | Read-only ecosystem auditor (independent, not a pipeline stage) | `.ai-state/sentinel_reports/SENTINEL_REPORT_*.md`, `.ai-state/sentinel_reports/SENTINEL_LOG.md` | Yes |
 | `architect-validator` | Per-PR / on-demand structural validator for the code↔DSL↔ADR triangle | `.ai-work/<task-slug>/ARCHITECTURE_VALIDATION.md`, `.ai-state/TECH_DEBT_LEDGER.md` rows on FAIL | Yes |
@@ -71,15 +71,15 @@ Outputs use path prefixes to signal lifecycle: `.ai-work/<slug>/` = ephemeral (d
 | `agentic-transactions-architect` | Transaction-domain expert and shadow + on-demand sub-architect for managed projects implementing agentic payments or agentic trading; shadows researcher and systems-architect stages when a task involves transaction / payment / trading / brokerage / mandate / settlement / HITL context; makes provider-contract and HITL spend-gating decisions; writes ADR fragments for load-bearing calls | `.ai-work/<slug>/TRANSACTIONS_DESIGN.md` + ADR fragments in `.ai-state/decisions/drafts/` | Yes |
 | `discipline-consultant` | Discipline-parameterized adversarial consultant; gated peer sub-architect spawned with a `Discipline: <name>` directive resolved against the roster in `skills/multi-perspective-analysis/references/discipline-registry.md`. Reads sources in isolation, then challenges the draft. Challenges only — decides nothing, writes no ADRs, no code | `.ai-work/<slug>/CONSULT_<discipline>.md`; convener appends `.ai-state/CONSULT_LEDGER.md` rows | Yes |
 
-**Conditional output footnotes:** ^1 For Standard/Full tier pipelines — always create both architecture docs unless the project is trivially simple (single module, no external dependencies).
-
 ### Delegation Checklists
 
 <!-- Anchor preserved for cross-rule links; canonical content lives in coordination-details.md -->
 
 When delegating to an agent, the main agent **must** include the per-agent deliverables in the prompt. The subagent's system prompt contains full instructions, but the main agent's prompt determines priority and scope.
 
-The full per-agent checklists for systems-architect, implementation-planner, implementer, and verifier — including conditional clauses (`if deployment in scope`, `if structural`, `if tests`) — are the authoritative source at [`coordination-details.md § Delegation Checklists`](../../skills/software-planning/references/coordination-details.md#delegation-checklists). Sentinel `EC06` validates that the condensed block in `claude/config/CLAUDE.md` stays **in sync with** that section — a semantic, outputs-only comparison (the block is *condensed*, so it is by construction not byte-equivalent); `coordination-details.md` is authoritative on what "in sync" requires. When `REWORK_MANIFEST.md` is produced, the main agent is responsible for spawning rework worktrees before invoking cleanup.
+When the orchestrator authors a pipeline artifact itself rather than spawning its owning agent — legitimate at any tier — the document contract still binds: **the schema binds the path, not the author**. Write that agent's canonical section skeleton, or pick a filename it does not own.
+
+The full per-agent checklists for systems-architect, implementation-planner, implementer, and verifier — including conditional clauses (`if deployment in scope`, `if structural`, `if tests`) — are authoritative at [`coordination-details.md § Delegation Checklists`](../../skills/software-planning/references/coordination-details.md#delegation-checklists); the condensed reminder in `claude/config/CLAUDE.md` is held in sync with it by sentinel `EC06`. When `REWORK_MANIFEST.md` is produced, the main agent is responsible for spawning rework worktrees before invoking cleanup.
 
 ### Proactive Agent Usage
 

@@ -32,6 +32,8 @@ The `systems-architect` agent supports three invocation modes, signaled by an ex
 | `baseline-audit` | `/onboard-project` Phase 8; `/new-project` greenfield invokes the same agent with full feature scope at gate 4b of the seed pipeline (baseline-audit is the existing-project counterpart) | SKIP (no feature → no pre-refactor) | `.ai-state/DESIGN.md` + `docs/architecture.md`; NO `SYSTEMS_PLAN.md`, NO `PRE_REFACTOR_PLAN.md` |
 | `post-refactor-adaptation` | Orchestrator re-invocation after a pre-refactor mini-pipeline completes AND a `PRE_REFACTOR_PLAN.md` exists under the task slug's `.ai-work/<task-slug>/` | SKIP (recursion guard — prevents a second mini-pipeline) | Updated `SYSTEMS_PLAN.md` (re-read Components / Data Flow / Interfaces against the refactored code); `[CONSUMED]` marker appended to the existing `PRE_REFACTOR_PLAN.md` |
 
+**Paired site — update both in the same commit.** The `Output` column above is authoritative on *whether* a mode writes a `SYSTEMS_PLAN.md`; `agents/systems-architect.md § Phase 10` is the single source of truth for *which `##` sections that document must carry*. Neither restates the other. **The section schema binds the path, not the author**: anything written to `.ai-work/<task-slug>/SYSTEMS_PLAN.md` uses those headings, including a plan the orchestrator authors directly in a no-fan-out run where the architect is never spawned. A bespoke schema under the canonical filename is a silent handoff failure — downstream consumers grep for the headings and report the document empty.
+
 ### Anti-instructions per mode
 
 **`baseline-audit`**: no `SYSTEMS_PLAN.md`, no `PRE_REFACTOR_PLAN.md`, no Phase 2.5, no invented components (every diagram node + table row must be code-verified), no L2 detail, no source edits.

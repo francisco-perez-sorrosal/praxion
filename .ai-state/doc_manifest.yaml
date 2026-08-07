@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-07T20:43:35Z'
+generated_at: '2026-08-07T20:50:54Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -860,19 +860,19 @@ surfaces:
   path: .ai-state/decisions/049-reaffirm-dec022-coord-cohort.md
   type: markdown
   title: Re-affirm dec-022 and ship symmetry + lightweight-tier + tier-template cohort
-  last_modified: '2026-04-16'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-050-always-loaded-budget-revision
   path: .ai-state/decisions/050-always-loaded-budget-revision.md
   type: markdown
   title: Raise always-loaded budget to 25,000 tokens and reframe as attention-relevance guardrail
-  last_modified: '2026-04-16'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-051-pre-impl-design-synthesis
   path: .ai-state/decisions/051-pre-impl-design-synthesis.md
   type: markdown
   title: Pre-implementation design-synthesis capability (H1-wide)
-  last_modified: '2026-04-16'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-052-telemetry-span-model-v2
   path: .ai-state/decisions/052-telemetry-span-model-v2.md
@@ -932,7 +932,7 @@ surfaces:
   path: .ai-state/decisions/061-concurrency-collab-research-finalize-protocol.md
   type: markdown
   title: ADR Finalize Protocol -- draft to NNN at merge-to-main
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-062-metrics-storage-schema
   path: .ai-state/decisions/062-metrics-storage-schema.md
@@ -1064,7 +1064,7 @@ surfaces:
   path: .ai-state/decisions/083-separate-test-scopes-integration-vs-unit.md
   type: markdown
   title: "Separate test scopes for canonical-blocks refactor \u2014 integration vs. unit"
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-084-integration-checkpoint-scope
   path: .ai-state/decisions/084-integration-checkpoint-scope.md
@@ -1358,7 +1358,7 @@ surfaces:
   path: .ai-state/decisions/132-rename-architecture-to-design.md
   type: markdown
   title: "Rename .ai-state/ARCHITECTURE.md to .ai-state/DESIGN.md for Di\xE1taxis clarity"
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-133-drop-dev-prereleases
   path: .ai-state/decisions/133-drop-dev-prereleases.md
@@ -1580,25 +1580,25 @@ surfaces:
   path: .ai-state/decisions/169-git-conventions-blacklistable.md
   type: markdown
   title: Classify `vcs/git-conventions.md` as blacklistable; relocate behavioral-contract clauses to core
-  last_modified: '2026-08-05'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-170-auto-complete-install-per-file-refactor
   path: .ai-state/decisions/170-auto-complete-install-per-file-refactor.md
   type: markdown
   title: Refactor auto_complete_install.py _link_rules() to per-file symlinking
-  last_modified: '2026-05-13'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-171-no-ai-authorship-to-behavioral-contract
   path: .ai-state/decisions/171-no-ai-authorship-to-behavioral-contract.md
   type: markdown
   title: Relocate "No AI authorship" clause to agent-behavioral-contract.md
-  last_modified: '2026-05-13'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-172-schema-gt-1-fail-open
   path: .ai-state/decisions/172-schema-gt-1-fail-open.md
   type: markdown
   title: inject_rules.py schema version > 1 behavior is fail-open
-  last_modified: '2026-05-13'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-173-verifier-rework-loop-resume-rework-arg-shape
   path: .ai-state/decisions/173-verifier-rework-loop-resume-rework-arg-shape.md
@@ -1892,19 +1892,19 @@ surfaces:
   path: .ai-state/decisions/221-unified-out-of-tree-storage-model.md
   type: markdown
   title: Unified out-of-tree run-storage model for experiment/eval-bearing projects
-  last_modified: '2026-06-05'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-222-wave0-schema-first-step-ordering
   path: .ai-state/decisions/222-wave0-schema-first-step-ordering.md
   type: markdown
   title: "Wave 0 step ordering \u2014 schema first, backend section as parallel extension"
-  last_modified: '2026-06-05'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-223-wave1-dashboard-scope
   path: .ai-state/decisions/223-wave1-dashboard-scope.md
   type: markdown
   title: "Wave 1 Dashboard Eval Panel \u2014 Kept in Wave 1"
-  last_modified: '2026-06-05'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-224-nebius-neocloud-nebius-direct-adapter
   path: .ai-state/decisions/224-nebius-neocloud-nebius-direct-adapter.md
@@ -2234,7 +2234,7 @@ surfaces:
   path: .ai-state/decisions/278-defer-onboarding-install.md
   type: markdown
   title: "P2 build scope excludes onboard-project.md/new-project.md install wiring \u2014 fleet rollout deferred to a follow-on pass"
-  last_modified: '2026-07-24'
+  last_modified: '2026-08-07'
   renderer: adr_card
 - id: ai-state-decisions-279-hitl-gated-healing-sidecar
   path: .ai-state/decisions/279-hitl-gated-healing-sidecar.md

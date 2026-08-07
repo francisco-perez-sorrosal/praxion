@@ -36,7 +36,6 @@ affected_files:
   - claude/config/CLAUDE.md.tmpl
   - eval/src/praxion_evals/behavioral/artifact_manifest.py
   - streamlit_app/data/discovery.py
-supersedes: null
 re_affirms: dec-021
 ---
 

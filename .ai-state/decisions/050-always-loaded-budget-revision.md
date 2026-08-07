@@ -15,9 +15,6 @@ affected_files:
   - ROADMAP.md
   - agents/sentinel.md
 affected_reqs: []
-supersedes:
-superseded_by:
-re_affirms:
 ---
 
 ## Context

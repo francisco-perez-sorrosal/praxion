@@ -15,8 +15,6 @@ affected_files:
   - tests/test_run_store_backend.py
   - rules/eval/eval-data-governance.md
   - rules/swe/agent-intermediate-documents.md
-re_affirms:
-supersedes:
 ---
 
 ## Context

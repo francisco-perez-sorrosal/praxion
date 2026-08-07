@@ -49,6 +49,24 @@ user-visible eval leaderboard in a single wave, accepting the longer, mixed Mark
 TypeScript review. The behavioral-contract Register-Objection was honored (the planner stated
 the conflict with a reason); the user made the final call.
 
+## Decision
+
+Keep the dashboard eval panel **in Wave 1** as Step 12, built as a paired
+implementer + test-engineer step with vitest coverage.
+
+This is a **user decision, made 2026-06-06, overriding the implementation-planner's
+recommendation to defer to Wave 1.5.** The planner's objection is preserved in the
+Context above and its reasoning in Option B below; it was registered with a reason
+(asymmetric step size, blocking Wave 2 on the Next.js build, and a mixed
+Markdown + TypeScript review) and the user accepted those costs to ship a
+user-visible eval leaderboard in a single wave.
+
+*(Section added 2026-08-07: the decision was already recorded in this record's
+`summary` frontmatter, in the "Override on record" paragraph above, and in the
+"CHOSEN by user" marker on Option B — but the `## Decision` heading the ADR body
+schema requires was absent, so a mechanical section check could not see it. This
+restates what the record already said; no decision was reconstructed.)*
+
 ## Considered Options
 
 ### Option A: Keep in Wave 1 (CHOSEN by user)

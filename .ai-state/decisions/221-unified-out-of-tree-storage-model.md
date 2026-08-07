@@ -14,8 +14,6 @@ affected_files:
   - skills/agent-evals/references/run-ledger-schema.md
   - rules/swe/agent-intermediate-documents.md
   - commands/onboard-project.md
-re_affirms:
-supersedes:
 related: [dec-220, dec-217, dec-218, dec-219, dec-216]
 ---
 

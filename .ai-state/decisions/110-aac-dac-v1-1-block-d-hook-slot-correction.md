@@ -13,7 +13,6 @@ agent_type: implementation-planner
 pipeline_tier: standard
 affected_files:
   - scripts/git-pre-commit-hook.sh
-supersedes:
 re_affirms: dec-108
 ---
 

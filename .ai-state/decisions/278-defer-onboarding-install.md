@@ -14,10 +14,6 @@ affected_files:
   - commands/onboard-project.md
   - commands/new-project.md
 affected_reqs: [REQ-12]
-supersedes:
-superseded_by:
-re_affirms:
-re_affirmed_by:
 dissent: "SYSTEMS_PLAN.md's own Architecture > Components > Modified table lists commands/onboard-project.md + commands/new-project.md as in-scope artifacts (annotated '(P1-for-fleet, sequenced by planner)'), so deferring them is a real scope narrowing relative to the architect's own component inventory, not merely a reading of ambiguous text — accepted because the dispatching task brief's explicit deliverables list and AC1–AC13 both omit any onboarding-install acceptance criterion, and the Prerequisites section itself states fleet rollout 'additionally waits on P1's onboarding phase; Praxion dogfooding does not,' i.e. building and fleet-adopting are already framed as separable."
 ---
 

@@ -33,9 +33,6 @@ affected_reqs:
   - REQ-DDL-13
   - REQ-DDL-14
   - REQ-DDL-15
-supersedes:
-superseded_by:
-re_affirms:
 ---
 
 ## Context

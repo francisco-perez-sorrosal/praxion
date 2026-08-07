@@ -17,8 +17,6 @@ affected_files:
   - skills/skill-crafting/tests/test_validate_references.py
   - .ai-state/memory.json
 affected_reqs: []
-supersedes:
-superseded_by:
 re_affirms: dec-022
 ---
 

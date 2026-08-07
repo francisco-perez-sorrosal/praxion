@@ -20,7 +20,6 @@ affected_files:
   - "commands/merge-worktree.md"
   - "rules/swe/adr-conventions.md"
   - "agents/sentinel.md"
-supersedes: null
 ---
 
 ## Context

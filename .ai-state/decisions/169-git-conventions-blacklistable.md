@@ -18,7 +18,6 @@ affected_files:
 affected_reqs:
   - REQ-02
   - REQ-04
-re_affirms: null
 ---
 
 ## Context

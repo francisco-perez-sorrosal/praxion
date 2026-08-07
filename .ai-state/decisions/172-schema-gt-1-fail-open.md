@@ -16,8 +16,6 @@ affected_files:
 affected_reqs:
   - REQ-01
   - REQ-07
-re_affirms: null
-supersedes: null
 ---
 
 ## Context

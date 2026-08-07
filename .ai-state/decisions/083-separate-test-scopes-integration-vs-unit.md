@@ -17,8 +17,6 @@ affected_files:
   - hooks/test_onboard_praxion_block.py
   - scripts/test_sync_canonical_blocks.py
   - scripts/sync_canonical_blocks.py
-re_affirms:
-supersedes:
 ---
 
 ## Context

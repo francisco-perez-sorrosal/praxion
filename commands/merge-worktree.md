@@ -1,6 +1,6 @@
 ---
 description: Merge a worktree branch back into current branch
-argument-hint: [branch-name]
+argument-hint: "[branch-name]"
 allowed-tools: [Bash(git:*), Bash(python*), Bash(test:*), Read, Grep]
 disable-model-invocation: true
 ---

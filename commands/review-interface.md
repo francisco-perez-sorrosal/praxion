@@ -1,6 +1,6 @@
 ---
 description: Run an interface design review on a file, PR, branch, or named surface
-argument-hint: [PR-number|branch|file|surface]
+argument-hint: "[PR-number|branch|file|surface]"
 allowed-tools: [Bash, Read, Grep, Glob, Task]
 ---
 

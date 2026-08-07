@@ -189,6 +189,22 @@ This budget *is* the attention budget: the always-loaded surface competes with e
 
 Use `##` (h2) as the top-level heading — rules are injected into a larger context, so h1 would conflict with the surrounding document structure.
 
+### Frontmatter Fields
+
+Claude Code reads exactly one rule frontmatter key, `paths`. Praxion's canonical rules (`rules/**/*.md`, shipped via the plugin) carry four more, read by its installer, SessionStart hook, and Codex bridge — project-local rules in `.claude/rules/` do not need them. All are optional, and `scripts/regenerate_rules_manifest.py` copies them into the generated `rules/_manifest.yaml`, which is what those consumers actually read: regenerate after changing any of them.
+
+| Field | Values (default) | Meaning — and the consumer that reads it |
+|---|---|---|
+| `paths` | list of globs (absent) | **Claude Code native.** Scopes auto-loading to matching files; absent means the rule always loads. Read by the Claude Code runtime; `scripts/check_paths_syntax.py` flags at-risk list forms |
+| `core` | `true` / `false` (`false`) | `true` = non-disableable. `hooks/inject_rules.py` strips core IDs out of a project's `.claude/praxion-rules.yaml` disable list and warns on stderr; `regenerate_rules_manifest.py` errors if a rule in its `EXPECTED_CORE_IDS` set lacks it |
+| `load` | `always_on` / `path_scoped` (`path_scoped`) | **Descriptive only** — copied into the manifest, but no installer, hook, or runtime path branches on it. Actual loading is decided by `paths` (runtime) and `install` (delivery). Keep it consistent with `paths` so the manifest reads true |
+| `install` | `symlink` / `hook-deliver` (`symlink`) | Delivery channel. `symlink` → `link_rules()` in `lib/install_shared.sh` links the file into `~/.claude/rules/`. `hook-deliver` → the installer skips it and `hooks/inject_rules.py` injects it at SessionStart, where a project blacklist can suppress it. Every `hook-deliver` rule must also appear in `HOOK_DELIVER_ORDER` in `regenerate_rules_manifest.py` |
+| `codex` | nested `portability` / `load` (absent) | Codex-export classification only, read by `codex/config/export-codex-rules-bridge.py` — see [Automatic Codex Classification](#automatic-codex-classification) |
+
+**Nested `codex.load` is not the top-level `load`.** Different keys, different consumers, different value sets — `codex.load` also accepts `exclude` and `auto`, and any value other than `exclude` requires `codex.portability: portable`. The nesting is the only thing keeping them apart; never flatten one into the other.
+
+Defaults make partial frontmatter legal: a rule may carry `paths` alone. The `load: always_on` + `install: hook-deliver` pairing is what makes an always-loaded rule project-disableable.
+
 ### Basic Rule
 
 ```markdown
@@ -200,7 +216,7 @@ Use `##` (h2) as the top-level heading — rules are injected into a larger cont
 - Foreign keys must be indexed
 ```
 
-No frontmatter needed for rules that should load whenever their domain is relevant.
+No frontmatter needed when the rule should load in every session.
 
 ### Path-Specific Rule
 

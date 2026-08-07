@@ -26,7 +26,7 @@ Work through these phases in order. Complete each phase before moving to the nex
 
 ### Phase 1 -- Scope & Context (1/7)
 
-The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for reads.
+The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all reads and writes.
 
 Determine the analysis scope:
 

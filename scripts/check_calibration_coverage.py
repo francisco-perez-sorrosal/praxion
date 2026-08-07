@@ -33,10 +33,10 @@ import argparse
 import json
 import logging
 import re
-import subprocess
 import sys
 from pathlib import Path
 
+from _git_runner import git_output
 from _repo_root import is_plugin_cache_path, resolve_repo_root
 from _script_cli import configure_logging
 
@@ -84,20 +84,7 @@ logger = logging.getLogger("check_calibration_coverage")
 
 def _git(repo_root: Path, *args: str) -> str | None:
     """Run `git <args>` in repo_root; return stripped stdout, None on failure."""
-    try:
-        result = subprocess.run(
-            ["git", *args],
-            capture_output=True,
-            text=True,
-            cwd=repo_root,
-            check=False,
-        )
-    except FileNotFoundError:
-        return None
-    if result.returncode != 0:
-        logger.debug("git %s failed (rc=%s)", " ".join(args), result.returncode)
-        return None
-    return result.stdout.strip() or None
+    return git_output(repo_root, *args, logger=logger)
 
 
 def _pipeline_commits_since(repo_root: Path, since: str) -> int:

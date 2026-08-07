@@ -1,6 +1,6 @@
 ---
 description: Refresh version-sensitive sections of a skill against current upstream documentation
-argument-hint: <skill-name>
+argument-hint: "<skill-name>"
 allowed-tools: [Read, Edit, Write, Grep, Glob, AskUserQuestion]
 disable-model-invocation: true
 ---

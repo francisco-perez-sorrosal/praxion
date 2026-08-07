@@ -24,7 +24,7 @@ Work through these phases in order. Complete each phase before moving to the nex
 
 ### Phase 1 -- Context Gathering (1/6)
 
-The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all document reads and writes.
+The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all reads and writes.
 
 Before making changes, gather context:
 

@@ -33,10 +33,10 @@ from __future__ import annotations
 
 import argparse
 import logging
-import subprocess
 import sys
 from pathlib import Path
 
+from _git_runner import git_output
 from _repo_root import resolve_repo_root as _resolve_repo_root
 from _script_cli import configure_logging
 
@@ -65,26 +65,12 @@ def apply_repo_root(root: Path) -> None:
 
 
 def _git(*args: str) -> str | None:
-    """Run `git <args>` and return stdout stripped; None on failure."""
-    try:
-        result = subprocess.run(
-            ["git", *args],
-            capture_output=True,
-            text=True,
-            cwd=REPO_ROOT,
-            check=False,
-        )
-    except FileNotFoundError:
-        return None
-    if result.returncode != 0:
-        logger.debug(
-            "git %s failed (rc=%s): %s",
-            " ".join(args),
-            result.returncode,
-            result.stderr.strip(),
-        )
-        return None
-    return result.stdout.strip() or None
+    """Run `git <args>` and return stdout stripped; None on failure.
+
+    Reads the module-level `REPO_ROOT` at call time so `apply_repo_root`'s
+    rebind still takes effect.
+    """
+    return git_output(REPO_ROOT, *args, logger=logger)
 
 
 def _is_git_worktree() -> bool:

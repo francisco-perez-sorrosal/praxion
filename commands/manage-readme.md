@@ -1,6 +1,6 @@
 ---
 description: Create or refine README.md files with precision-first technical writing style
-argument-hint: [file-paths...]
+argument-hint: "[file-paths...]"
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash(find:*)]
 ---
 

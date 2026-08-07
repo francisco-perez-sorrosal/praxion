@@ -23,6 +23,8 @@ Guide for creating effective, reusable slash commands.
 **Satellite files** (loaded on-demand):
 - [../skill-crafting/references/context-engineering-foundations.md](../skill-crafting/references/context-engineering-foundations.md) -- the shared "why" (a command/skill description costs listing budget every session)
 - [../skill-crafting/SKILL.md](../skill-crafting/SKILL.md) -- since commands are skills, skill-crafting holds the shared mechanics (full frontmatter superset, progressive disclosure, lifecycle)
+- [references/arguments-and-context.md](references/arguments-and-context.md) -- worked examples for `$ARGUMENTS`/positional args, bang-prefixed bash, `@` file references, input testing
+- [references/runtime-and-permissions.md](references/runtime-and-permissions.md) -- discovery/live-reload timing, `Skill(...)` permission rules, debugging a command that does not appear or does not parse
 - [REFERENCE.md](REFERENCE.md) -- command patterns, full examples, organization strategies
 - [../skill-crafting/references/artifact-naming.md](../skill-crafting/references/artifact-naming.md) -- naming conventions for all artifact types
 
@@ -71,7 +73,7 @@ Guide for creating effective, reusable slash commands.
 ```markdown
 ---
 description: Brief description shown in /help
-argument-hint: [expected] [arguments]
+argument-hint: "[expected] [arguments]"
 allowed-tools: [Bash(git:*), Read, Grep]
 model: haiku
 ---
@@ -87,97 +89,57 @@ All frontmatter is optional. Because command files are skills, they accept the *
 |-------|---------|---------|
 | `description` | Shown in `/help`; used by Claude to decide auto-invocation | "Create a git commit" |
 | `allowed-tools` | Pre-approve tools (no permission prompt while active) | `Bash(git:*), Read, Grep` |
-| `argument-hint` | Show expected arguments in autocomplete | `[message]` or `[pr-number] [priority]` |
+| `argument-hint` | Show expected arguments in autocomplete; **always quote** (see [below](#argument-hint-and-the-no-argument-case)) | `"[message]"` or `"[pr-number] [priority]"` |
 | `model` | Model while active (`haiku`/`sonnet`/`opus`/`inherit`) | `haiku` |
 | `disable-model-invocation` | `true` = only the user can invoke; keeps the description out of model context | `true` |
 | `user-invocable` | `false` = hide from the `/` menu (background knowledge only) | `false` |
 
 > `allowed-tools` **does not restrict** — it pre-approves. Every tool stays callable, governed by your permission settings. Use deny rules in `/permissions` to actually block a tool.
 
-## Argument Handling
+### Description Length and Its Consumer
 
-### All Arguments (`$ARGUMENTS`)
+**Who reads a command's `description` depends entirely on `disable-model-invocation`** — and the two cases want opposite lengths.
 
-Captures all arguments as a single string:
+| | `disable-model-invocation` absent / `false` | `disable-model-invocation: true` |
+|---|---|---|
+| **Consumers** | The model (always-loaded listing) **+** `/help` **+** autocomplete | `/help` **+** autocomplete only — the description *leaves model context* |
+| **Trigger terms** | Load-bearing — the description is the sole auto-invocation mechanism | Inert — no model will ever match against them |
+| **Cost** | Charged to the always-loaded listing budget every session | None |
+| **Target length** | As long as it needs to be to carry the trigger vocabulary, up to the 1,536-char `description` + `when_to_use` listing cap | **One line** |
 
-```markdown
----
-argument-hint: [issue-details]
-description: Fix issue with provided details
----
+Two consequences worth internalizing:
 
-Fix issue: $ARGUMENTS
+- **Do not truncate a model-invocable command's description** to satisfy a style guideline. Its trigger terms are the only thing that makes the command discoverable; shortening it degrades activation silently and you will not see the regression. "The body carries the detail" is false here — the body is read *after* invocation, and the description is what decides whether invocation happens.
+- **Do not write a long description on a `disable-model-invocation: true` command.** Every consumer is a single-line UI surface, so the overflow is displayed to nobody and read by nobody. Writing an explicit `Activation terms: …` list into such a description is the sharpest version of this mistake: it addresses a reader that the same frontmatter has just disconnected. Put the detail in the body, where the user who typed `/name` will actually see it.
 
-Follow our coding standards and write tests.
-```
+**A long `description` is also a parse hazard.** A folded block scalar (`description: >`) that runs 10+ lines pushes every later key below the eye-line, which is where malformed values survive review. Frontmatter that fails to parse registers *no* `description` and *no* `allowed-tools`, and nothing announces it — grepping for field presence succeeds on a file the YAML loader rejects. If a description must be long, keep it a quoted single-line string, and validate with a real parser (see [Debugging](references/runtime-and-permissions.md#debugging)).
 
-**Usage**: `/fix-issue 123 high-priority database`
-**Result**: `$ARGUMENTS` = `"123 high-priority database"`
+### `argument-hint` and the No-Argument Case
 
-### Positional Arguments (`$1`, `$2`, etc.)
+`argument-hint` exists for exactly one purpose: telling a user what to type after `/name`. It has no model-facing role.
 
-Access specific arguments by position:
+- **A command that takes no arguments must omit the key entirely.** Neither `argument-hint: ""` nor a bare `argument-hint:` (which YAML reads as null) is acceptable — both occupy the field while conveying nothing, and they are not even consistent with each other, so no convention can be inferred from them. Absence is the correct signal for "takes no arguments."
+- **A command that takes arguments must list all of them**, including flags. If the body documents `--dry-run`, the hint says `--dry-run`. A hint that omits half the accepted flags is worse than none, because it reads as exhaustive.
+- **Always quote the value — it is a string, never a list.** Write `argument-hint: "[message]"`, not `argument-hint: [message]`. This is a type rule, not a style preference: `[...]` is conventional CLI usage notation meaning *optional*, but YAML reads a leading `[` as a **flow sequence**, so the unquoted form silently loads as the list `['message']` while the quoted form loads as the string `[message]`. A corpus mixing the two hands its readers two different types for one field. The divergence is invisible until it bites, because the two reader classes disagree: a line-regex frontmatter reader (the kind used by exporters that strip frontmatter for another assistant) coerces every value to a string and shows `[message]` either way, while a real YAML parser returns a list for one and a string for the other. Same file, same field, two types.
 
-```markdown
----
-argument-hint: [pr-number] [priority] [assignee]
-description: Review pull request
----
+  Quote **unconditionally**, not just when the value starts with `[`. A hint like `<skill-name>` or `<discipline> [--on <artifact>]` happens to parse as a string only because it does not *begin* with a bracket — reorder it and it becomes a list, or worse. The worse case is the real one: a multi-group hint such as `argument-hint: [<run_tag>] [--task-slug <slug>]` is *two* flow sequences on one line, which no YAML parser accepts. The whole frontmatter block then fails to load, taking `description` and `allowed-tools` with it, and a command whose frontmatter does not load cannot register the description that is its only model-invocation mechanism. Quoting is the single habit that forecloses the entire class.
 
-Review PR #$1 with priority $2 and assign to $3.
+## Arguments and Dynamic Context
 
-Focus on:
-- Security vulnerabilities
-- Performance issues
-- Code style violations
-```
+Four substitution mechanisms are available in a command body:
 
-**Usage**: `/review-pr 456 high alice`
-**Result**: `$1="456"`, `$2="high"`, `$3="alice"`
+| Mechanism | Syntax | Yields |
+|---|---|---|
+| All arguments | `$ARGUMENTS` | Everything the user typed after `/name`, as one string |
+| Positional | `$1`, `$2`, … | Individual whitespace-separated arguments |
+| Bash execution | ``!`git status` `` | Live command output, interpolated before the body renders |
+| File reference | `@path/to/file` | That file's contents (legacy form — prefer the bang form for new work) |
 
-## Advanced Features
+Every bang-prefixed command needs matching `allowed-tools` coverage, or the user is prompted
+before the body renders. `$ARGUMENTS` may be empty — handle the bare `/command` invocation
+explicitly rather than proceeding on nothing.
 
-### Bash Command Execution
-
-Use `!` prefix to execute bash commands before the command runs:
-
-```markdown
----
-allowed-tools: Bash(git:*), Bash(find:*)
----
-
-## Current Status
-
-!`git status`
-
-## Recent Changes
-
-!`git log --oneline -5`
-
-## Modified Files
-
-!`git diff --name-only`
-
-Review the above changes and create a commit message.
-```
-
-### File References
-
-Use `@` prefix to include file contents (a command-file feature carried over from the legacy form; the merged skills docs emphasize bang-prefixed command injection and `${CLAUDE_SKILL_DIR}` instead — prefer the bang form for new work):
-
-```markdown
----
-allowed-tools: Read
----
-
-Review @src/components/Button.tsx for accessibility issues.
-
-Compare:
-- Old: @src/old-version.js
-- New: @src/new-version.js
-
-Provide a summary of changes.
-```
+--> Worked examples for each mechanism, plus the input-testing checklist: [references/arguments-and-context.md](references/arguments-and-context.md).
 
 ## Command Files vs Skill Directories
 <!-- last-verified: 2026-05-25 -->
@@ -195,9 +157,9 @@ Since the merge, this is **not** "commands vs skills" (one system) but a choice 
 
 ## Best Practices
 
-- **Clear descriptions**: Be specific -- "Review code for security vulnerabilities" not "Helps with code"
+- **Clear descriptions**: Be specific -- "Review code for security vulnerabilities" not "Helps with code". Length is not a style choice; it follows from who consumes the description (see [Description Length and Its Consumer](#description-length-and-its-consumer))
 - **Always declare `allowed-tools`**: Without it, Claude prompts for permission every time
-- **Use `argument-hint`**: Show users what arguments are expected
+- **Use `argument-hint` when there are arguments, omit it when there are none**: never leave it empty (see [`argument-hint` and the No-Argument Case](#argument-hint-and-the-no-argument-case))
 - **Provide context via `!` commands**: Include git status, project structure, recent changes
 - **Test with various inputs**: no arguments, one argument, multiple, special characters
 - **Don't duplicate rule content**: Commands define *process* (what to do); rules provide *knowledge* (conventions, constraints). If a relevant rule exists, Claude loads it automatically when the command runs — don't inline that knowledge in the command body
@@ -210,54 +172,18 @@ Since the merge, this is **not** "commands vs skills" (one system) but a choice 
 - **Name conflicts** -- project commands override personal ones with the same name; use subdirectories
 - **Overloaded commands** -- slash commands work best for focused tasks; use Skills for complex workflows
 - **Untested arguments** -- `$ARGUMENTS` might be empty; test and handle missing values gracefully
+- **Empty `argument-hint`** -- a hint of `""` or a bare `argument-hint:` (YAML null) occupies the field while telling the user nothing; omit the key entirely for a no-argument command
+- **A long `description` on a command the model cannot invoke** -- see [Description Length and Its Consumer](#description-length-and-its-consumer)
 - **Inlining rule knowledge** -- if conventions or constraints already exist in a rule file, don't copy them into the command; rules load automatically by semantic relevance when the command executes
-- **Discovery timing differs by location** — see [Discovery and Live Reload](#discovery-and-live-reload).
+- **Discovery timing differs by location** — see [Discovery and Live Reload](references/runtime-and-permissions.md#discovery-and-live-reload).
 
-## Discovery and Live Reload
-<!-- last-verified: 2026-05-25 -->
+## Runtime and Debugging
 
-Discovery timing depends on *where* the command/skill lives:
+Three runtime concerns live in [references/runtime-and-permissions.md](references/runtime-and-permissions.md) — consult it when a command misbehaves rather than when authoring one:
 
-- **Project / personal locations** (`.claude/skills/`, `~/.claude/skills/`, and `.claude/commands/` files) have **live change detection** — edits, adds, and removals take effect within the session, no restart. Creating a *new top-level* skills directory that did not exist at session start still requires a restart (so it can be watched).
-- **Plugin components** (Praxion's `commands/`, `agents/`) are scanned once at session start and cached for the session. A command added mid-session — or installed via `bash install.sh` against a running session — is invisible until a fresh session. Symptom: `/my-new-command` reports "unknown command" despite a valid file at the right path. There is no plugin hot-reload — restart the session.
-
-(Subagents always require a restart on disk edits; the `/agents` interface takes effect immediately.)
-
-## Permission Management
-<!-- last-verified: 2026-05-25 -->
-
-Since commands are skills, Claude's invocation access is governed by `Skill(...)` permission rules (the older `SlashCommand:/name:*` form predates the merge):
-
-```text
-# In /permissions
-Skill(co)          # allow exactly /co
-Skill(review-pr *) # allow /review-pr with any arguments
-Skill(deploy *)    # (as a deny rule) block /deploy
-Skill              # (as a deny rule) Claude can invoke no skills/commands
-```
-
-To stop Claude from auto-invoking a *specific* command (e.g. a side-effecting one), set its frontmatter instead — this also removes its description from model context:
-
-```markdown
----
-disable-model-invocation: true
----
-```
-
-## Debugging
-
-```bash
-# List all commands
-ls -R .claude/commands/
-ls -R ~/.claude/commands/
-
-# View command content
-cat .claude/commands/my-command.md
-```
-
-Within Claude Code, the `Read` and `Glob` tools can also inspect command files directly.
-
-Verify: proper `---` delimiters, valid YAML, correct field names, expected argument substitution.
+- [Discovery and Live Reload](references/runtime-and-permissions.md#discovery-and-live-reload) — project/personal files hot-reload; **plugin commands are cached at session start**, so a newly installed command is invisible until a restart.
+- [Permission Management](references/runtime-and-permissions.md#permission-management) — invocation is governed by `Skill(...)` rules since the merge, not the legacy `SlashCommand:/name:*` form.
+- [Debugging](references/runtime-and-permissions.md#debugging) — inspecting command files, and why unparseable frontmatter fails silently.
 
 ## Creation Workflow
 

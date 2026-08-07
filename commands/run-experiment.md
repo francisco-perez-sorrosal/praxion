@@ -1,18 +1,6 @@
 ---
-description: >
-  Dispatch an ML training experiment using the project's configured backend (local
-  subprocess, SkyPilot, RunPod direct, or Nebius direct). Reads the training_job_descriptor from
-  the active WIP.md step, validates the compute budget is declared before dispatch,
-  invokes the matching backend lifecycle operations, streams metrics to the configured
-  experiment tracker (from program.md's tracker: declaration, or MLflow by default),
-  writes TRAINING_RESULTS.md at .ai-work/<task-slug>/ on completion, and offers
-  opt-in archival to .ai-state/training_runs/<run-tag>.md when the run is kept.
-  Supports operational modes A (co-located owned GPU), B (co-located rented GPU box),
-  and C (separated cloud via SkyPilot, RunPod direct, or Nebius direct). The same
-  training_job_descriptor dispatches without modification in all three modes —
-  only the backend configuration varies. Use when starting a training run,
-  re-dispatching a failed run, or initiating an autonomous experiment loop (autoresearch is one such loop pattern).
-argument-hint: [--descriptor <path>] [--task-slug <slug>]
+description: "Dispatch an ML training experiment to the configured backend (local, SkyPilot, RunPod, or Nebius), validate the compute budget, stream metrics, and write TRAINING_RESULTS.md."
+argument-hint: "[--descriptor <path>] [--task-slug <slug>]"
 allowed-tools: [Read, Write, Edit, Bash, Glob, AskUserQuestion]
 disable-model-invocation: true
 ---
@@ -22,6 +10,12 @@ Dispatch a training experiment, validate the compute budget, stream metrics, and
 backend operations, [llm-training-eval](../skills/llm-training-eval/SKILL.md) results schema,
 [experiment-tracking](../skills/experiment-tracking/SKILL.md) metric streaming, and
 [gpu-budget-conventions](../rules/ml/gpu-budget-conventions.md) enforcement in one workflow.
+
+Covers operational modes **A** (co-located owned GPU), **B** (co-located rented GPU box), and
+**C** (separated cloud via SkyPilot, RunPod direct, or Nebius direct). The same
+`training_job_descriptor` dispatches without modification in all three modes — only the backend
+configuration varies. Use when starting a training run, re-dispatching a failed run, or
+initiating an autonomous experiment loop.
 
 ## Arguments
 

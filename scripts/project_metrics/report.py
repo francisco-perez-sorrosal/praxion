@@ -326,6 +326,30 @@ def _summarize_complexipy(data: dict[str, Any]) -> list[str]:
     return lines
 
 
+def _pydeps_coverage_line(aggregate: dict[str, Any]) -> str | None:
+    """Render the analysed-vs-repository denominator that bounds ``cyclic_deps``.
+
+    Without it, ``Non-trivial cyclic SCCs: 0`` reads as a repo-wide all-clear
+    even when the import graph covered a fraction of the tree. pydeps cannot
+    see directories of loose modules (no ``__init__.py``), so some shortfall is
+    expected — stating it is what keeps the zero a bounded claim.
+    """
+
+    analyzed = aggregate.get("analyzed_python_files")
+    total = aggregate.get("repo_python_files")
+    if not isinstance(analyzed, int) or not isinstance(total, int) or total <= 0:
+        return None
+    pct = aggregate.get("python_file_coverage_pct")
+    pct_str = f"{pct}%" if isinstance(pct, (int, float)) else "n/a"
+    roots = aggregate.get("package_roots")
+    root_count = len(roots) if isinstance(roots, list) else 0
+    return (
+        f"- Import-graph coverage: {_fmt_int(analyzed)} of {_fmt_int(total)} "
+        f"tracked Python files ({pct_str}) across {root_count} package "
+        f"root{'' if root_count == 1 else 's'}"
+    )
+
+
 def _summarize_pydeps(data: dict[str, Any]) -> list[str]:
     """Highlights for pydeps's import-graph rollup."""
 
@@ -338,6 +362,12 @@ def _summarize_pydeps(data: dict[str, Any]) -> list[str]:
         ):
             if key in aggregate and aggregate[key] is not None:
                 lines.append(f"- {label}: {formatter(aggregate[key])}")
+        coverage_line = _pydeps_coverage_line(aggregate)
+        if coverage_line is not None:
+            lines.append(coverage_line)
+            roots = aggregate.get("package_roots")
+            if isinstance(roots, list) and roots:
+                lines.append("- Package roots analyzed: " + ", ".join(f"`{r}`" for r in roots))
     cyclic_sccs = data.get("cyclic_sccs")
     if isinstance(cyclic_sccs, list) and cyclic_sccs:
         lines.append(f"- Cyclic SCCs detected ({len(cyclic_sccs)}):")

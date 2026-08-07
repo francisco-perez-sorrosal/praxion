@@ -53,6 +53,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from _git_runner import run_git
 from _repo_root import resolve_repo_root as _resolve_repo_root
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -106,9 +107,16 @@ def _default_mode_entries(repo_root: Path) -> list[tuple[str, str]]:
 
 
 def _git(repo_root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", *args], cwd=repo_root, capture_output=True, text=True, check=False
-    )
+    """Run `git <args>`, returning the `CompletedProcess` whatever the exit code.
+
+    Deliberately *not* the swallowing `git_output` variant: this is a gate, and
+    collapsing "git could not run" into the same `None` as "git exited
+    non-zero" would let an unavailable git report a false all-clear. The
+    `GitUnavailableError` this may raise is an `OSError`, so it lands in
+    ``main``'s existing handler and exits 2 (script error) -- which is what a
+    missing binary already did, and is now also what a hang does.
+    """
+    return run_git(repo_root, *args)
 
 
 def _staged_mode_entries(repo_root: Path) -> list[tuple[str, str]]:

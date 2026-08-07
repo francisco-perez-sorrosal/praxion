@@ -1032,3 +1032,327 @@ def test_worktree_lines_preserve_other_tool_input_fields(linked_worktree: Path) 
     assert updated["description"] == "implement step 3"
     assert updated["model"] == "sonnet"
     assert updated["run_in_background"] is True
+
+
+# ---------------------------------------------------------------------------
+# Group 14: In-process unit coverage of the three segment gates
+#
+# Every group above drives the hook as a subprocess, which is the right shape
+# for the stdin/stdout contract but cannot force the branch-level failure modes
+# that matter here: git timing out, git missing, `--show-toplevel` answering
+# when the dir probes did not, the per-session stat cache actually caching.
+# These tests call the functions directly. Each `_load_module()` gets a fresh
+# module object, so the module-level `_session_cache` never leaks between tests.
+# ---------------------------------------------------------------------------
+
+
+def _drive_main(payload: object, monkeypatch, raw: str | None = None) -> str:
+    """Run main() in-process with the payload on stdin; return stdout."""
+    import io
+
+    module = _load_module()
+    stdin = raw if raw is not None else json.dumps(payload)
+    monkeypatch.setattr(sys, "stdin", io.StringIO(stdin))
+    module.main()
+    return ""
+
+
+class TestAiStateGateAndCache:
+    def test_directory_with_ai_state_is_recognized(self, praxion_project: Path) -> None:
+        module = _load_module()
+        assert module._has_ai_state(str(praxion_project), "s1") is True
+
+    def test_directory_without_ai_state_is_rejected(self, non_praxion_project: Path) -> None:
+        module = _load_module()
+        assert module._has_ai_state(str(non_praxion_project), "s1") is False
+
+    def test_second_lookup_for_the_same_session_reuses_the_cached_answer(
+        self, praxion_project: Path
+    ) -> None:
+        """Dense fan-out must not re-stat the filesystem once per spawn."""
+        module = _load_module()
+        assert module._has_ai_state(str(praxion_project), "sess-cache") is True
+
+        # Removing the directory would flip the real answer; the cache must win.
+        (praxion_project / ".ai-state").rmdir()
+        assert module._has_ai_state(str(praxion_project), "sess-cache") is True
+        assert module._has_ai_state(str(praxion_project), "different-session") is False
+
+    @pytest.mark.parametrize(
+        ("subagent_type", "expected"),
+        [("i-am:researcher", True), ("Explore", False), ("general-purpose", False), ("", False)],
+    )
+    def test_praxion_native_detection(self, subagent_type: str, expected: bool) -> None:
+        module = _load_module()
+        assert module._is_praxion_native(subagent_type) is expected
+
+
+class TestPreambleSegmentGates:
+    def test_host_native_agent_in_a_praxion_project_gets_the_preamble(
+        self, praxion_project: Path
+    ) -> None:
+        module = _load_module()
+        assert module._preamble_segment("Explore", str(praxion_project), "s1") == module._PREAMBLE
+
+    def test_disable_flag_suppresses_the_preamble(self, praxion_project: Path, monkeypatch) -> None:
+        monkeypatch.setenv("PRAXION_DISABLE_SUBAGENT_INJECT", "1")
+        module = _load_module()
+        assert module._preamble_segment("Explore", str(praxion_project), "s1") == ""
+
+    def test_empty_cwd_suppresses_the_preamble(self) -> None:
+        module = _load_module()
+        assert module._preamble_segment("Explore", "", "s1") == ""
+
+    def test_missing_ai_state_suppresses_the_preamble(self, non_praxion_project: Path) -> None:
+        module = _load_module()
+        assert module._preamble_segment("Explore", str(non_praxion_project), "s1") == ""
+
+    def test_praxion_native_agent_is_skipped_by_default(self, praxion_project: Path) -> None:
+        module = _load_module()
+        assert module._preamble_segment("i-am:researcher", str(praxion_project), "s1") == ""
+
+    @pytest.mark.parametrize("flag_value", ["1", "true", "YES"])
+    def test_praxion_native_opt_in_restores_the_preamble(
+        self, praxion_project: Path, monkeypatch, flag_value: str
+    ) -> None:
+        monkeypatch.setenv("PRAXION_INJECT_NATIVE_SUBAGENTS", flag_value)
+        module = _load_module()
+        assert module._preamble_segment("i-am:researcher", str(praxion_project), "s1") != ""
+
+    def test_praxion_native_opt_in_ignores_a_non_truthy_value(
+        self, praxion_project: Path, monkeypatch
+    ) -> None:
+        monkeypatch.setenv("PRAXION_INJECT_NATIVE_SUBAGENTS", "maybe")
+        module = _load_module()
+        assert module._preamble_segment("i-am:researcher", str(praxion_project), "s1") == ""
+
+
+class TestGitProbe:
+    def test_successful_probe_returns_stripped_stdout(self, main_repo: Path) -> None:
+        module = _load_module()
+        assert module._git(main_repo, "rev-parse", "--abbrev-ref", "HEAD")
+
+    def test_non_zero_exit_returns_none(self, tmp_path: Path) -> None:
+        module = _load_module()
+        plain = tmp_path / "plain"
+        plain.mkdir()
+        assert module._git(plain, "rev-parse", "--show-toplevel") is None
+
+    def test_empty_stdout_returns_none(self, main_repo: Path) -> None:
+        module = _load_module()
+        assert module._git(main_repo, "config", "--get", "praxion.absent.key") is None
+
+    def test_timeout_returns_none(self, monkeypatch) -> None:
+        module = _load_module()
+
+        def _timeout(*_a, **_k):
+            raise subprocess.TimeoutExpired(cmd="git", timeout=3)
+
+        monkeypatch.setattr(module.subprocess, "run", _timeout)
+        assert module._git(Path("/tmp"), "rev-parse") is None
+
+    def test_missing_git_binary_returns_none(self, monkeypatch) -> None:
+        module = _load_module()
+
+        def _missing(*_a, **_k):
+            raise OSError("no git")
+
+        monkeypatch.setattr(module.subprocess, "run", _missing)
+        assert module._git(Path("/tmp"), "rev-parse") is None
+
+
+class TestLinkedWorktreeDetection:
+    def test_linked_worktree_resolves_to_its_root(self, linked_worktree: Path) -> None:
+        module = _load_module()
+        assert module._linked_worktree_root(linked_worktree) == linked_worktree.resolve()
+
+    def test_main_checkout_has_no_boundary_to_brief(self, main_repo: Path) -> None:
+        module = _load_module()
+        assert module._linked_worktree_root(main_repo) is None
+
+    def test_non_git_directory_fails_open_to_no_briefing(self, tmp_path: Path) -> None:
+        module = _load_module()
+        assert module._linked_worktree_root(tmp_path) is None
+
+    def test_unresolvable_toplevel_fails_open(self, linked_worktree: Path, monkeypatch) -> None:
+        module = _load_module()
+        real_git = module._git
+
+        def _no_toplevel(cwd, *args):
+            if args[:2] == ("rev-parse", "--show-toplevel"):
+                return None
+            return real_git(cwd, *args)
+
+        monkeypatch.setattr(module, "_git", _no_toplevel)
+        assert module._linked_worktree_root(linked_worktree) is None
+
+
+class TestBriefedRootDetection:
+    def test_named_worktree_differing_from_cwd_is_returned(self) -> None:
+        module = _load_module()
+        named = "/Users/x/proj/.claude/worktrees/feature-a"
+        assert module._briefed_worktree_root(f"Target: {named}", "/Users/x/proj") == named
+
+    def test_trailing_slash_is_normalized_away(self) -> None:
+        module = _load_module()
+        named = "/Users/x/proj/.claude/worktrees/feature-a"
+        assert module._briefed_worktree_root(f"Target: {named}/", "/Users/x/proj") == named
+
+    def test_the_sessions_own_root_is_not_a_mismatch(self) -> None:
+        module = _load_module()
+        named = "/Users/x/proj/.claude/worktrees/feature-a"
+        assert module._briefed_worktree_root(f"Target: {named}", named) is None
+
+    def test_a_cwd_inside_the_named_root_is_not_a_mismatch(self) -> None:
+        module = _load_module()
+        named = "/Users/x/proj/.claude/worktrees/feature-a"
+        assert module._briefed_worktree_root(f"Target: {named}", f"{named}/src") is None
+
+    def test_prompt_naming_no_worktree_yields_none(self) -> None:
+        module = _load_module()
+        assert module._briefed_worktree_root("Just do the thing.", "/Users/x/proj") is None
+
+    def test_capture_stops_at_the_worktree_name(self) -> None:
+        """A file path under the worktree must not sweep extra segments into
+        the captured root."""
+        module = _load_module()
+        prompt = "Edit /Users/x/proj/.claude/worktrees/feature-a/src/mod.py now"
+        assert (
+            module._briefed_worktree_root(prompt, "/Users/x/proj")
+            == "/Users/x/proj/.claude/worktrees/feature-a"
+        )
+
+
+class TestWorktreeSegmentComposition:
+    def test_disable_flag_suppresses_both_worktree_lines(
+        self, linked_worktree: Path, monkeypatch
+    ) -> None:
+        monkeypatch.setenv("PRAXION_DISABLE_WORKTREE_PATH_BRIEFING", "1")
+        module = _load_module()
+        assert module._worktree_segments(str(linked_worktree), "anything") == []
+
+    def test_empty_cwd_suppresses_both_worktree_lines(self) -> None:
+        module = _load_module()
+        assert module._worktree_segments("", "anything") == []
+
+    def test_session_line_only_inside_a_worktree_with_an_ordinary_prompt(
+        self, linked_worktree: Path
+    ) -> None:
+        module = _load_module()
+        segments = module._worktree_segments(str(linked_worktree), "do the thing")
+        assert len(segments) == 1
+        assert SESSION_WORKTREE_MARKER in segments[0]
+
+    def test_both_lines_when_a_worktree_session_names_a_different_worktree(
+        self, linked_worktree: Path
+    ) -> None:
+        module = _load_module()
+        other = "/Users/x/proj/.claude/worktrees/other"
+        segments = module._worktree_segments(str(linked_worktree), f"target {other}")
+        assert [SESSION_WORKTREE_MARKER in s for s in segments].count(True) == 1
+        assert [BRIEFED_ROOT_MARKER in s for s in segments].count(True) == 1
+
+    def test_no_segments_for_a_plain_non_git_directory(self, tmp_path: Path) -> None:
+        module = _load_module()
+        assert module._worktree_segments(str(tmp_path), "do the thing") == []
+
+
+class TestEmission:
+    def test_segments_are_prepended_as_separate_paragraphs(self, capsys) -> None:
+        module = _load_module()
+        module._emit_updated_input(
+            {"subagent_type": "Explore", "description": "probe"}, "ORIGINAL", ["A", "B"]
+        )
+        output = json.loads(capsys.readouterr().out)
+        assert output["hookSpecificOutput"]["updatedInput"]["prompt"] == "A\n\nB\n\nORIGINAL"
+
+    def test_emission_preserves_every_original_tool_input_field(self, capsys) -> None:
+        module = _load_module()
+        module._emit_updated_input(
+            {"subagent_type": "Explore", "description": "probe", "model": "sonnet"}, "P", ["A"]
+        )
+        updated = json.loads(capsys.readouterr().out)["hookSpecificOutput"]["updatedInput"]
+        assert updated["description"] == "probe"
+        assert updated["model"] == "sonnet"
+
+    def test_permission_decision_is_allow(self, capsys) -> None:
+        module = _load_module()
+        module._emit_updated_input({"subagent_type": "Explore"}, "P", ["A"])
+        output = json.loads(capsys.readouterr().out)
+        assert output["hookSpecificOutput"]["permissionDecision"] == "allow"
+
+
+class TestProcessAndMainInProcess:
+    def test_non_agent_tool_emits_nothing(self, capsys, praxion_project: Path) -> None:
+        module = _load_module()
+        module._process({"tool_name": "Bash", "cwd": str(praxion_project)})
+        assert capsys.readouterr().out == ""
+
+    def test_non_dict_tool_input_emits_nothing(self, capsys) -> None:
+        module = _load_module()
+        module._process({"tool_name": "Agent", "tool_input": "oops", "cwd": "/tmp"})
+        assert capsys.readouterr().out == ""
+
+    def test_no_applicable_segment_emits_nothing(self, capsys, non_praxion_project: Path) -> None:
+        module = _load_module()
+        module._process(
+            {
+                "tool_name": "Agent",
+                "tool_input": {"subagent_type": "i-am:implementer", "prompt": "go"},
+                "cwd": str(non_praxion_project),
+                "session_id": "s1",
+            }
+        )
+        assert capsys.readouterr().out == ""
+
+    def test_applicable_segments_are_composed_into_one_emission(
+        self, capsys, praxion_linked_worktree: Path
+    ) -> None:
+        """The composition path end to end: preamble + session-worktree line,
+        one updatedInput, original prompt last."""
+        module = _load_module()
+        module._process(
+            {
+                "tool_name": "Agent",
+                "tool_input": {"subagent_type": "Explore", "prompt": "ORIGINAL"},
+                "cwd": str(praxion_linked_worktree),
+                "session_id": "s1",
+            }
+        )
+        prompt = json.loads(capsys.readouterr().out)["hookSpecificOutput"]["updatedInput"]["prompt"]
+        assert prompt.startswith(PREAMBLE_MARKER)
+        assert SESSION_WORKTREE_MARKER in prompt
+        assert prompt.endswith("ORIGINAL")
+
+    def test_main_emits_for_an_applicable_payload(self, capsys, monkeypatch, praxion_project: Path):
+        _drive_main(
+            {
+                "tool_name": "Agent",
+                "tool_input": {"subagent_type": "Explore", "prompt": "ORIGINAL"},
+                "cwd": str(praxion_project),
+                "session_id": "s1",
+            },
+            monkeypatch,
+        )
+        assert PREAMBLE_MARKER in capsys.readouterr().out
+
+    def test_malformed_stdin_emits_nothing(self, capsys, monkeypatch) -> None:
+        _drive_main(None, monkeypatch, raw="{{{ not json")
+        assert capsys.readouterr().out == ""
+
+    def test_an_internal_error_is_swallowed_so_the_spawn_is_never_blocked(
+        self, capsys, monkeypatch
+    ) -> None:
+        import io
+
+        module = _load_module()
+
+        def _boom(_payload):
+            raise RuntimeError("kaboom")
+
+        monkeypatch.setattr(module, "_process", _boom)
+        monkeypatch.setattr(sys, "stdin", io.StringIO('{"tool_name": "Agent"}'))
+
+        module.main()  # must not raise
+
+        assert capsys.readouterr().out == ""

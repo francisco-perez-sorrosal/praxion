@@ -1002,3 +1002,273 @@ def test_collect_invokes_pydeps_with_show_deps_and_no_output_flags(
         "not exist in current pydeps and causes a hard error). Calls: "
         f"{mock_run.call_args_list!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Scope fidelity -- the analysed slice must match the claim the metric makes.
+#
+# The regression these tests exist to prevent: `cyclic_deps == 0` reported as a
+# repository-wide all-clear while the import graph covered a single package
+# (11 modules against 324 Python files) and, worse, carried almost no edges at
+# all -- a zero that no possible cycle could have disturbed.
+# ---------------------------------------------------------------------------
+
+
+# A repo with several independent package trees, one src-layout sub-project,
+# and a sub-project whose test package collides on namespace with the top-level
+# `tests` package.
+_GIT_LS_FILES_MULTI_ROOT: str = (
+    "\n".join(
+        [
+            "README.md",
+            "hooks/loose_hook.py",
+            "scripts/loose_script.py",
+            "scripts/project_metrics/__init__.py",
+            "scripts/project_metrics/report.py",
+            "scripts/project_metrics/collectors/__init__.py",
+            "scripts/project_metrics/collectors/base.py",
+            "tests/__init__.py",
+            "tests/test_one.py",
+            "sub-project/src/subpkg/__init__.py",
+            "sub-project/src/subpkg/core.py",
+            "sub-project/tests/__init__.py",
+            "sub-project/tests/test_sub.py",
+        ]
+    )
+    + "\n"
+)
+
+# Two disjoint single-module graphs, one per root, so a merge is observable.
+_PAYLOAD_BY_ROOT: dict[str, dict[str, dict[str, Any]]] = {
+    "scripts": {
+        "__main__": {"name": "__main__", "imports": ["scripts.project_metrics"]},
+        "scripts.project_metrics": {"name": "scripts.project_metrics", "imports": []},
+    },
+    "tests": {
+        "__main__": {"name": "__main__", "imports": ["tests.test_one"]},
+        "tests.test_one": {"name": "tests.test_one", "imports": []},
+    },
+    "sub-project/src/subpkg": {
+        "__main__": {"name": "__main__", "imports": ["subpkg.core"]},
+        "subpkg.core": {"name": "subpkg.core", "imports": []},
+    },
+}
+
+# A package whose __init__ re-exports its own submodules -- the ordinary way to
+# give a package a public surface. pydeps additionally records the ancestor
+# edges the language implies (`pkg.leaf` binds `pkg`), so a naive reading turns
+# every such package into a reported cycle.
+_PAYLOAD_PACKAGE_REEXPORT: dict[str, dict[str, Any]] = {
+    "pkg": {"name": "pkg", "imports": ["pkg.leaf", "pkg.other"]},
+    "pkg.leaf": {"name": "pkg.leaf", "imports": ["pkg"]},
+    "pkg.other": {"name": "pkg.other", "imports": ["pkg", "pkg.leaf"]},
+}
+
+
+def _pydeps_target_of(argv: Any) -> str | None:
+    """Return the positional target of a ``uvx pydeps <target> ...`` argv."""
+
+    if not isinstance(argv, (list, tuple)):
+        return None
+    parts = [str(item) for item in argv]
+    if len(parts) < 3 or parts[0] != "uvx" or parts[1] != "pydeps":
+        return None
+    return parts[2]
+
+
+def _per_root_dispatcher(
+    ls_files_stdout: str = _GIT_LS_FILES_MULTI_ROOT,
+    payload_by_root: dict[str, dict[str, dict[str, Any]]] | None = None,
+) -> Any:
+    """Dispatch ``subprocess.run`` returning a distinct pydeps graph per root."""
+
+    payloads = payload_by_root if payload_by_root is not None else _PAYLOAD_BY_ROOT
+
+    def _dispatch(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0] if args else kwargs.get("args") or []
+        argv_str = " ".join(str(x) for x in argv) if isinstance(argv, (list, tuple)) else str(argv)
+        if "ls-files" in argv_str:
+            return _make_completed_process(stdout=ls_files_stdout, argv=list(argv))
+        if "--version" in argv_str:
+            return _make_completed_process(stdout="3.0.7\n", argv=list(argv))
+        target = _pydeps_target_of(argv)
+        return _make_completed_process(
+            stdout=json.dumps(payloads.get(target or "", {})),
+            argv=list(argv),
+        )
+
+    return _dispatch
+
+
+def _collect_with(dispatcher: Any, tmp_path: Path) -> Any:
+    """Run ``collect()`` against a patched subprocess boundary."""
+
+    from scripts.project_metrics.collectors.pydeps_collector import PydepsCollector
+
+    target = "scripts.project_metrics.collectors.pydeps_collector"
+    with patch(f"{target}.subprocess.run", side_effect=dispatcher):
+        return PydepsCollector().collect(_make_context(tmp_path))
+
+
+class TestPydepsAnalyzesEveryImportRoot:
+    """One package root cannot represent a repo with several package trees."""
+
+    def test_every_discovered_root_is_handed_to_pydeps(self, tmp_path: Path) -> None:
+        from scripts.project_metrics.collectors.pydeps_collector import PydepsCollector
+
+        target = "scripts.project_metrics.collectors.pydeps_collector"
+        mock_run = MagicMock(side_effect=_per_root_dispatcher())
+        with patch(f"{target}.subprocess.run", mock_run):
+            PydepsCollector().collect(_make_context(tmp_path))
+
+        targets = {
+            _pydeps_target_of(call.args[0] if call.args else call.kwargs.get("args", []))
+            for call in mock_run.call_args_list
+        }
+        targets.discard(None)
+        assert targets == {"scripts", "tests", "sub-project/src/subpkg"}, (
+            "Expected pydeps to be invoked once per import root. 'scripts' is "
+            "the depth-1 import root of scripts/project_metrics; the src-layout "
+            "package must stay the target because pydeps cannot see it from 'sub-project'. "
+            f"Got: {sorted(t for t in targets if t)}"
+        )
+
+    def test_modules_from_separate_roots_land_in_one_graph(self, tmp_path: Path) -> None:
+        result = _collect_with(_per_root_dispatcher(), tmp_path)
+
+        modules = result.data.get("modules") or {}
+        assert {"scripts.project_metrics", "tests.test_one", "subpkg.core"} <= set(modules), (
+            "Expected every analysed root's modules to merge into a single "
+            f"graph; got module names {sorted(modules)}"
+        )
+
+    def test_synthetic_entry_node_is_not_reported_as_a_module(self, tmp_path: Path) -> None:
+        result = _collect_with(_per_root_dispatcher(), tmp_path)
+
+        modules = result.data.get("modules") or {}
+        assert "__main__" not in modules, (
+            "pydeps synthesises a bare '__main__' entry node per invocation "
+            "that claims to import everything it reached. Keeping it inflates "
+            "every module's afferent coupling and collides across roots. "
+            f"Got module names {sorted(modules)}"
+        )
+
+    def test_root_whose_namespace_collides_is_reported_not_silently_merged(
+        self, tmp_path: Path
+    ) -> None:
+        result = _collect_with(_per_root_dispatcher(), tmp_path)
+
+        joined_issues = " ".join(result.issues)
+        assert "sub-project/tests" in joined_issues, (
+            "'sub-project/tests' emits the same 'tests' namespace as the top-level "
+            "'tests' package; merging them would misattribute one project's "
+            f"modules to the other. Expected an issue naming it; got {result.issues!r}"
+        )
+
+
+class TestPydepsTraversalIsUnlimited:
+    """pydeps' default bacon limit truncates the graph into near-edgelessness."""
+
+    def test_collect_disables_the_bacon_limit(self, tmp_path: Path) -> None:
+        from scripts.project_metrics.collectors.pydeps_collector import PydepsCollector
+
+        target = "scripts.project_metrics.collectors.pydeps_collector"
+        mock_run = MagicMock(side_effect=_per_root_dispatcher())
+        with patch(f"{target}.subprocess.run", mock_run):
+            PydepsCollector().collect(_make_context(tmp_path))
+
+        bacon_limits = [
+            list(call.args[0])[list(call.args[0]).index("--max-bacon") + 1]
+            for call in mock_run.call_args_list
+            if call.args and "--max-bacon" in list(call.args[0])
+        ]
+        assert set(bacon_limits) == {"0"}, (
+            "Every pydeps invocation must pass --max-bacon 0. The tool's "
+            "default of 2 truncates traversal so far that the emitted graph "
+            "carries almost no module-to-module edges, making SCC detection "
+            f"structurally unable to report a cycle. Got {bacon_limits!r}"
+        )
+
+
+class TestPydepsExcludesLanguageImpliedEdges:
+    """A package with a public surface is not a cyclic dependency."""
+
+    def test_package_reexporting_its_submodules_reports_no_cycle(self, tmp_path: Path) -> None:
+        result = _collect_with(
+            _per_root_dispatcher(
+                ls_files_stdout=_GIT_LS_FILES_WITH_INIT,
+                payload_by_root={"pkg": _PAYLOAD_PACKAGE_REEXPORT},
+            ),
+            tmp_path,
+        )
+
+        assert result.data["cyclic_sccs"] == [], (
+            "`import pkg.leaf` binds `pkg` too, so pydeps records the ancestor "
+            "edge `pkg.leaf -> pkg`. Combined with an __init__ that re-exports "
+            "its submodules, that fabricates a cycle in every well-formed "
+            f"package. Got SCCs {result.data['cyclic_sccs']!r}"
+        )
+
+    def test_genuine_sibling_cycle_is_still_detected(self, tmp_path: Path) -> None:
+        result = _collect_with(
+            _per_root_dispatcher(
+                ls_files_stdout=_GIT_LS_FILES_WITH_INIT,
+                payload_by_root={"pkg": _SAMPLE_PYDEPS_JSON_CYCLIC},
+            ),
+            tmp_path,
+        )
+
+        actual = frozenset(frozenset(scc) for scc in result.data["cyclic_sccs"])
+        assert actual == _EXPECTED_CYCLIC_SCCS, (
+            "Suppressing ancestor-package edges must not suppress real "
+            f"module-to-module cycles. Got {actual!r}"
+        )
+
+
+class TestPydepsPublishesItsCoverageDenominator:
+    """A zero cycle count is only meaningful against a stated scope."""
+
+    def test_aggregate_reports_analyzed_and_repository_python_file_counts(
+        self, tmp_path: Path
+    ) -> None:
+        result = _collect_with(_per_root_dispatcher(), tmp_path)
+
+        aggregate = result.data["aggregate"]
+        # 9 .py files sit under the three analysed roots; the two under
+        # sub-project/tests/ belong to the shadowed root, and hooks/loose_hook.py
+        # is outside every package root.
+        assert aggregate["analyzed_python_files"] == 9
+        assert aggregate["repo_python_files"] == 12
+
+    def test_aggregate_reports_the_coverage_percentage(self, tmp_path: Path) -> None:
+        result = _collect_with(_per_root_dispatcher(), tmp_path)
+
+        assert result.data["aggregate"]["python_file_coverage_pct"] == 75.0, (
+            "The coverage percentage is what stops `cyclic_deps: 0` reading as "
+            "a repository-wide all-clear; 9 of 12 tracked Python files is 75%."
+        )
+
+    def test_aggregate_names_the_roots_that_were_analyzed(self, tmp_path: Path) -> None:
+        result = _collect_with(_per_root_dispatcher(), tmp_path)
+
+        assert result.data["aggregate"]["package_roots"] == [
+            "scripts",
+            "tests",
+            "sub-project/src/subpkg",
+        ]
+
+    def test_shadowed_root_is_excluded_from_the_analyzed_count(self, tmp_path: Path) -> None:
+        result = _collect_with(_per_root_dispatcher(), tmp_path)
+
+        assert "sub-project/tests" not in result.data["aggregate"]["package_roots"], (
+            "A root excluded by a namespace collision must not inflate the "
+            "coverage denominator's numerator -- its modules were never merged."
+        )
+
+    def test_failed_root_downgrades_status_to_partial(self, tmp_path: Path) -> None:
+        result = _collect_with(_per_root_dispatcher(), tmp_path)
+
+        assert result.status == "partial", (
+            "When some roots are analysed and others are not, the run is "
+            f"partial by definition; got status={result.status!r}"
+        )

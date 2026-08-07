@@ -58,7 +58,7 @@ The four statically-injected skills (`software-planning`, `code-review`, `refact
 
 ## Input Protocol
 
-The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all document reads and writes.
+The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all reads and writes.
 
 Before writing any test code, read the planning documents in this order:
 

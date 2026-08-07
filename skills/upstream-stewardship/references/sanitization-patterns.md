@@ -21,8 +21,9 @@ After replacing the home prefix, further sanitize project-specific paths:
 | Pattern | Detects | Replacement |
 |---------|---------|-------------|
 | Known project root (e.g., `~/dev/praxion/`) | Internal project paths | `<project-root>/` |
-| `.ai-state/memory.json` content | Memory system excerpts | `[internal state redacted]` |
 | `.ai-state/observations.jsonl` content | Observation log excerpts | `[internal observations redacted]` |
+
+Praxion carries no curated cross-session memory store — the in-house memory subsystem (`memory-mcp`, `.ai-state/memory.json`, `remember()`/`recall()`) has been removed, so there is no memory artifact to sanitize. `observations.jsonl` is the surviving internal-state log.
 
 ### Internal Hostnames and IPs
 

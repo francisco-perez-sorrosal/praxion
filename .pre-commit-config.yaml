@@ -24,6 +24,13 @@ repos:
         exclude: '^\.ai-state/(metrics_reports|sentinel_reports)/.*\.(json|md)$'
       - id: check-merge-conflict
       - id: detect-private-key
+        # `secret-patterns.md` is a catalog of what secrets *look like*, for a
+        # skill whose subject is sanitizing them before an upstream report. Its
+        # PEM header sits in a fenced "Before" example whose body is the literal
+        # ellipsis `MIIEowIBAAKCAQEA... (multiple lines)` -- a shape, not a key.
+        # The pattern predates this exclusion and only surfaced when the file was
+        # first staged since the hook was added; gitleaks scans it clean.
+        exclude: '^skills/upstream-stewardship/references/secret-patterns\.md$'
 
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.21.2
@@ -208,6 +215,77 @@ repos:
         entry: python3 scripts/check_state_ledgers.py --check --repo-root .
         language: system
         files: '^\.ai-state/(TECH_DEBT_(LEDGER|RESOLVED)|CONSULT_(LEDGER|COSTS|PRIORS))\.md$'
+        pass_filenames: false
+
+      # Block B5 — artifact frontmatter must LOAD, not merely contain the right
+      # words. The sentinel's C04/S01/S02 grep for field presence, and a grep
+      # for `description:` succeeds on a file no YAML parser can read: two
+      # commands shipped an unquoted `argument-hint: [<a>] [--b <c>]` (two flow
+      # sequences on one line), their whole frontmatter block unloadable, every
+      # presence-grep green throughout. A command whose frontmatter does not
+      # load cannot register its `description` — the sole model-invocation
+      # mechanism. This is the parser those greps stand in for.
+      #
+      # Whole-repo `--repo-root .` rather than `--files`: the scan is ~150 small
+      # files, and a per-file invocation would go blind the moment an artifact
+      # is repaired in one commit and regressed in another.
+      #
+      # `language: python` + additional_dependencies (not `system`) — the gate
+      # needs a REAL parser, and the ambient python3 on a developer machine is
+      # not guaranteed to hold PyYAML (gate-liveness GL05: a gate that dies on
+      # import is indistinguishable from no gate). Same disposition as
+      # rules-manifest-drift and html-authorship-boundary above. The script
+      # additionally guards the import and raises naming `sys.executable`, so a
+      # bare `python3` run fails loudly instead of reporting clean.
+      #
+      # `files:` MUST cover every surface the script scans — a test asserts the
+      # pattern matches every scanned path, so widening SCAN_GLOBS without
+      # widening this pattern fails rather than silently shipping a blind gate.
+      - id: artifact-frontmatter-parse
+        name: Artifact frontmatter parses
+        entry: python scripts/check_frontmatter_parses.py --repo-root .
+        language: python
+        additional_dependencies: ['pyyaml']
+        files: '^(commands/[^/]+\.md|agents/[^/]+\.md|skills/[^/]+/SKILL\.md|rules/.*\.md)$'
+        pass_filenames: false
+
+      # Block B6 — replicated agent prose blocks. Same defect class as Block B
+      # on a fourth surface, and the one where the usual remedy is unavailable:
+      # the task-slug scoping paragraph is inlined into FIFTEEN agent
+      # definitions and cannot be extracted (agents inherit neither rules nor
+      # CLAUDE.md, and agent-crafting forbids runtime reference files for
+      # plugin-distributed agents — the Read resolves against the consumer's
+      # cwd, not the plugin cache, and fails silently). It had already forked
+      # into four textually distinct tails, each arrived at by a separate edit
+      # to a separate file, none visible from any other. Nothing was looking.
+      #
+      # The source of truth is the constant inside the checker; the fifteen
+      # sites are compared to it byte-for-byte. Deliberately NOT a
+      # claude/canonical-block: those are `## Heading` sections shipped into
+      # managed projects' CLAUDE.md behind `canonical-source` fences and
+      # governed by the BLOCKS registry, which nothing keys off a directory
+      # listing — an unregistered file there is invisible to every mechanism
+      # that owns the directory.
+      #
+      # Whole-repo `--repo-root .` rather than `--files`: agreement is a
+      # property of the SET, so a per-file invocation is blind to exactly the
+      # case that matters (one site edited, fourteen left behind).
+      #
+      # `language: system` — stdlib-only by design. The gate is named in prose
+      # and runs under the ambient interpreter, so a third-party import here
+      # would make it the first finding of `check_gate_liveness.py --check
+      # ambient-import`.
+      #
+      # `files:` MUST cover the scanned glob AND the checker itself: the
+      # canonical text lives inside the script, so editing the source of truth
+      # has to re-run the comparison against all fifteen sites. A test asserts
+      # both halves, so widening SCAN_GLOB without widening this pattern fails
+      # rather than silently shipping a blind gate.
+      - id: agent-shared-blocks
+        name: Agent shared-block agreement
+        entry: python3 scripts/check_agent_shared_blocks.py --repo-root .
+        language: system
+        files: '^(agents/[^/]+\.md|scripts/check_agent_shared_blocks\.py)$'
         pass_filenames: false
 
       # Block G — ADR frontmatter promotion (td-103). Self-scans the staged

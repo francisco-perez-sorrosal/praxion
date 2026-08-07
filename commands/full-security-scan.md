@@ -1,6 +1,5 @@
 ---
 description: Run a full-project security audit against all security-critical paths
-argument-hint:
 allowed-tools: [Read, Glob, Grep, Bash(git:*), Bash(find:*)]
 ---
 

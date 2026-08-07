@@ -3,14 +3,14 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-08-06T22:51:58Z'
+generated_at: '2026-08-07T06:44:38Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
   load: always_on
   core: true
   install: symlink
-  chars: 2774
+  chars: 2745
 - id: swe/adr-conventions
   path: rules/swe/adr-conventions.md
   load: always_on
@@ -63,7 +63,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 3451
+  chars: 2366
   paths:
   - program.md
   - runs/**

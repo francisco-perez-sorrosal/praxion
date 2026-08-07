@@ -152,7 +152,9 @@ Path-filter triggers keep the pipeline off non-architectural PRs. The mechanical
 The behavior↔structure gap closes through a bidirectional convention: LikeC4 elements declare which
 behavioral requirements they implement via `metadata.req_ids = "REQ-01, REQ-03"`; archived SPECs declare
 which architectural elements implement their requirements via `architectural_elements: [auth.service, ...]`
-in frontmatter. The LikeC4 MCP's `query-by-metadata` tool supports the indexed lookup on both sides.
+in frontmatter. The two sides are read by different means, and no single tool spans both: the element side from
+the `.c4` sources (by grep, or via the LikeC4 MCP's `query-by-metadata` for a caller that holds the grant), the
+spec side by parsing SPEC frontmatter.
 
 The verifier renders a four-column traceability matrix: Requirement, Test(s), Implementation, Architectural
 Element(s). Absent `architectural_elements:` for a REQ is not a FAIL — it signals "not yet mapped," not
@@ -161,7 +163,8 @@ Element(s). Absent `architectural_elements:` for a REQ is not a FAIL — it sign
 The sentinel's AC dimension audits the substrate periodically:
 
 - **AC10** — fence integrity: `aac:generated`/`aac:authored`/`aac:end` balance and required attributes.
-- **AC12** — traceability orphans: REQs with no element claiming them; elements citing nonexistent REQs.
+- **AC12** — traceability orphans: REQs with no element claiming them; elements citing nonexistent REQs. Reads the
+  element side by grepping the `.c4` source, not through the MCP — see the reachability precondition below.
 - **AC13** — design-doc projection: every structural LikeC4 component has a `.ai-state/DESIGN.md` §3a row, and
   every row names an element that exists — bound by element **id**, not title, because the two legitimately
   differ. Deterministic. Its second half (§4's canonical-block rows against the shipped-block registry) is a
@@ -180,6 +183,21 @@ could not see. Do not re-add a title-matching model↔markdown check.
 Each check activates only when its substrate is present, mirroring the TT-dimension's conditional-activation
 idiom. AC12 fires only after at least one feature has populated both sides of the convention — until then it
 emits an INFO note and exits (dec-112).
+
+**Substrate presence is necessary but not sufficient — the reader must also be reachable.** `query-by-metadata`
+is an MCP tool, and no agent in the fleet holds a LikeC4 MCP grant: the sentinel runs on
+`Read, Glob, Grep, Bash, Write`. AC12 therefore reads the element side by grepping the `.c4` source for
+`req_ids` — the fallback dec-112 already sanctioned, promoted from contingency to specification — while the MCP
+query stands as the indexed equivalent for a caller that does hold the grant. Documenting only the substrate
+precondition would leave the check to fail on an input it cannot fetch the day someone populates `req_ids`, and
+would let its skip note read as *nothing to check here* while it is in fact grant-blocked. A skip must name
+which precondition failed: unpopulated convention and unreachable reader have different remedies.
+
+**A copy-paste example for both sides lives at `claude/aac-templates/likec4-req-ids.c4.frag` — reference
+material, not part of the installed contract.** No phase installs it: the fragment does not compile standalone,
+and the AaC tier scaffolds an empty `docs/diagrams/`, so at install time there is no model to attach `req_ids`
+to. Apply it by hand. The convention itself is global and needs no per-project install — see
+[Adopting It](#adopting-it).
 
 > **Paired site.** This list is the AaC-relevant *subset* of the AC-dimension table in `agents/sentinel.md`
 > (AC01–AC09 are deliberately out of scope here). Adding or retiring an AaC-relevant AC check means updating
@@ -234,7 +252,8 @@ and a commented-out fence example seeded into `.ai-state/DESIGN.md` when present
 
 **What is global** (no per-project install): the SDD skill's traceability convention, the fence validator
 and golden-rule scripts (canonical in the plugin path), the sentinel agent's AC10/AC12/AC13 audit, and the
-architect-validator agent (dec-113).
+architect-validator agent (dec-113). The `likec4-req-ids.c4.frag` traceability example sits on this side of the
+line too — it ships in the plugin payload as reference material and is copied by hand, never installed.
 
 > [!NOTE]
 > AC10/AC12/AC13 and the architect-validator activate conditionally on substrate presence. A project with no `.c4`

@@ -70,17 +70,15 @@ The two modes share identical Phase 1-7 reasoning. Only exit behavior on FAIL di
 
 ### LikeC4 DSL
 
-Preferred via the `likec4` MCP tools. Use these tools in this order:
+**Read the `.c4` sources directly. This is the only route reachable from your tool grant** (`Read, Glob, Grep, Bash, Write`), so treat it as the primary path, not a fallback:
 
-1. `list-projects` — discover available projects
-2. `read-project-summary` — all elements, views, deployment nodes
-3. `read-element` — full element details for Model→Code drift checks
-4. `find-relationships` — direct and indirect relationships for import-graph cross-check
-5. `query-by-metadata` — look up elements by `affected_files` or code-module references
-6. `query-by-tags` — boolean tag filtering (allOf/anyOf/noneOf)
+1. `find docs/diagrams -name '*.c4'` (Bash) — discover the model files
+2. `Read` each file — elements, views, deployment nodes, and relationships are plain text
+3. `Grep` the model for targeted lookups — `metadata` keys (`code_module`, `affected_files`, `req_ids`) for the Model→Code and ADR→Model checks, `tags` for tag filtering
 
-**Fallback**: when `list-projects` errors or returns empty, fall back to direct `.c4` file reads:
-`find docs/diagrams -name '*.c4'`. Emit one WARN per affected check: `validator-unable-to-query-likec4-mcp`.
+A LikeC4 model is a small set of source files; reading them whole is cheap and needs no query layer.
+
+**The `likec4` MCP route is not available to you.** The server is registered at *plugin* scope, but your `tools:` allowlist admits no MCP tool, and a plugin-distributed agent's frontmatter cannot add one (`mcpServers:` is ignored for plugin agents). Do not attempt `list-projects`, `read-project-summary`, `read-element`, `find-relationships`, `query-by-metadata`, or `query-by-tags` — they are not callable here, and a WARN reporting their absence would fire on 100% of runs forever rather than signalling anything. If a future grant makes them reachable, they are an optimization over the file reads above, never a prerequisite.
 
 ### Code import graph
 
@@ -120,7 +118,7 @@ If no file matches: emit `no architectural-touch slice detected; skipping` and e
 
 ### Phase 2 — Inputs assembly
 
-1. Query `list-projects` via the LikeC4 MCP (or fallback to `find docs/diagrams -name '*.c4'`)
+1. Discover the LikeC4 model with `find docs/diagrams -name '*.c4'`, then `Read` each file returned
 2. Run `PYTHONPATH=eval/src uv run lint-imports --config fitness/import-linter.cfg --no-cache` to refresh the import graph. The `PYTHONPATH` is required — one root package lives in a sibling project this environment does not install, and omitting it fails loudly rather than silently dropping that contract (rationale in the cfg header)
 3. Read `.ai-state/decisions/DECISIONS_INDEX.md`
 4. In `--mode=pre-merge`: run `git diff --name-only $BASE..HEAD` filtered to `.ai-state/decisions/` to collect ADRs touched in this PR
@@ -132,7 +130,7 @@ Surface any missing inputs as WARNs before proceeding (e.g., no `fitness/import-
 
 For each LikeC4 element that declares a `metadata.code_module` (or equivalent code reference):
 
-1. Extract the declared module name from the LikeC4 element via `read-element`
+1. Extract the declared module name from the element's `metadata` block in the `.c4` source
 2. Check whether the module appears in the resolved import graph from Phase 2
 3. For each declared relationship between two elements, verify the corresponding import edge exists in the code graph
 
@@ -142,7 +140,7 @@ For each LikeC4 element that declares a `metadata.code_module` (or equivalent co
 
 **Suppression**: elements or edges tagged `dynamic` (via LikeC4 `metadata.dynamic = true` or `tags: [dynamic]`) suppress Model→Code findings. This handles plugin-loader and dispatch patterns that are correct but unresolvable via static import analysis.
 
-**No LikeC4 model present**: if no `.c4` files exist and the MCP returns empty, emit one WARN: `no LikeC4 model present — Model→Code drift check skipped`. This is the expected state for projects that have not yet adopted LikeC4.
+**No LikeC4 model present**: if `find docs/diagrams -name '*.c4'` returns nothing, emit one WARN: `no LikeC4 model present — Model→Code drift check skipped`. This is the expected state for projects that have not yet adopted LikeC4.
 
 ### Phase 4 — ADR→Model drift
 
@@ -259,7 +257,7 @@ not a second durable store.
 
 ## Edge Cases
 
-- **LikeC4 MCP unavailable**: fall back to direct `.c4` reads via `find docs/diagrams -name '*.c4'`; emit one WARN (`validator-unable-to-query-likec4-mcp`) per affected check. Continue with structural analysis of raw `.c4` file content.
+- **`.c4` files present but unreadable or malformed**: emit one WARN (`likec4-model-unreadable`) naming the file, and continue structural analysis with whatever elements you could extract. A model that will not parse is a modelling defect, not a code↔model drift finding — do not FAIL on it.
 - **No `.c4` files in repo**: Phases 3 and 4 each emit one WARN (`no LikeC4 model present`) and continue. This is the bootstrap state for projects that have not yet adopted LikeC4; it is not a FAIL.
 - **`dynamic` metadata tag**: LikeC4 elements or edges with `metadata.dynamic = true` (or `tags: [dynamic]`) suppress Model→Code findings. Plugin-loader and dispatch patterns are intentionally unresolvable via static import analysis; the tag is the explicit opt-out.
 - **No `fitness/import-linter.cfg`**: Phase 3's import-graph source is unavailable; emit one WARN (`import-linter-config-not-found`) and skip edge cross-checks. ADR→Model and Generated-region drift continue unaffected.

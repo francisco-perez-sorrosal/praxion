@@ -1,14 +1,20 @@
-"""Tests for secret redaction in hooks/send_event.py.
+"""Tests for hooks/send_event.py -- the Chronograph relay hook.
 
-Verifies that the hook redacts common secret patterns (API keys, tokens,
-bearer credentials, AWS/GitHub/Slack identifiers) from tool input and output
-before transmission to the observability relay.
+Scope note: `task-chronograph-mcp/tests/test_hook_script.py` owns the
+`_build_events` event-shape contract (that suite is the relay consumer's, and
+it runs in its own CI job). These tests deliberately do *not* re-derive it.
+What lives here is the surface that suite does not reach -- port derivation and
+worktree resolution, git context capture, the POST failure path, `main()`'s
+end-to-end wiring, secret redaction, and the agent-provenance metadata -- plus
+the pieces of event assembly that carry that provenance.
 """
 
 from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -81,18 +87,21 @@ def classify_mcp_tool():
 
 
 class TestMcpToolClassification:
-    """Praxion MCP tool names are classified across supported adapter shapes."""
+    """Praxion MCP tool names are classified across supported adapter shapes.
+
+    `task-chronograph` is the only Praxion MCP server that exists. The in-house
+    `memory` server was removed by dec-225, so it is exercised below strictly as
+    a *historical* name: the classifier still recognizes it because replayed and
+    archived event streams predating that removal carry it, and an unclassified
+    row there would silently lose its server attribution. Nothing live emits it.
+    """
 
     @pytest.mark.parametrize(
         ("tool_name", "expected"),
         [
             (
-                "mcp__plugin_i-am_memory__remember",
-                ("memory", "remember"),
-            ),
-            (
-                "mcp__memory__remember",
-                ("memory", "remember"),
+                "mcp__plugin_i-am_task-chronograph__report_interaction",
+                ("task-chronograph", "report_interaction"),
             ),
             (
                 "mcp__task_chronograph__report_interaction",
@@ -104,19 +113,35 @@ class TestMcpToolClassification:
             ),
         ],
         ids=[
-            "claude_plugin_memory",
-            "codex_memory",
-            "codex_task_chronograph_underscore",
-            "codex_task_chronograph_hyphen",
+            "claude_plugin_chronograph",
+            "codex_chronograph_underscore",
+            "codex_chronograph_hyphen",
         ],
     )
     def test_praxion_mcp_tool_names_classify(self, classify_mcp_tool, tool_name, expected):
         """Praxion MCP tools return their server and tool components."""
         assert classify_mcp_tool(tool_name) == expected
 
+    def test_retired_memory_server_name_still_classifies_for_historical_streams(
+        self, classify_mcp_tool
+    ):
+        """dec-225 removed the memory server; archived streams still name it."""
+        assert classify_mcp_tool("mcp__plugin_i-am_memory__remember") == ("memory", "remember")
+
+    def test_plugin_prefixed_name_without_a_tool_segment_yields_an_empty_tool(
+        self, classify_mcp_tool
+    ):
+        assert classify_mcp_tool("mcp__plugin_i-am_task-chronograph") == ("task-chronograph", "")
+
     def test_non_praxion_mcp_tool_is_ignored(self, classify_mcp_tool):
         """Non-Praxion MCP tools do not get classified as Praxion events."""
         assert classify_mcp_tool("mcp__github__get_pull_request") is None
+
+    def test_plain_tool_name_is_not_mcp(self, classify_mcp_tool):
+        assert classify_mcp_tool("Write") is None
+
+    def test_malformed_mcp_name_without_a_tool_segment_is_ignored(self, classify_mcp_tool):
+        assert classify_mcp_tool("mcp__task-chronograph") is None
 
 
 # ---------------------------------------------------------------------------
@@ -390,3 +415,514 @@ class TestSummarizeIntegration:
         data = {"tool_input": {"file_path": "/project/src/main.py"}}
         result = summarize_tool_input(data)
         assert "file_path=/project/src/main.py" in result
+
+
+# ---------------------------------------------------------------------------
+# Fixtures for the process-level surfaces (port, git context, main)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def hook():
+    """The loaded send_event module."""
+    assert _module is not None
+    return _module
+
+
+@pytest.fixture
+def main_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "main"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "t@example.com"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "test"], check=True)
+    (repo / "README.md").write_text("seed\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "init"], check=True)
+    return repo
+
+
+@pytest.fixture
+def linked_worktree(main_repo: Path, tmp_path: Path) -> Path:
+    wt = tmp_path / "linked"
+    subprocess.run(
+        ["git", "-C", str(main_repo), "worktree", "add", "-q", str(wt), "-b", "feature"],
+        check=True,
+    )
+    return wt
+
+
+# ---------------------------------------------------------------------------
+# Port derivation -- must agree with the server, and be worktree-stable
+# ---------------------------------------------------------------------------
+
+
+class TestPortDerivation:
+    def test_same_project_dir_always_derives_the_same_port(self, hook):
+        assert hook._derive_port("/a/b/c") == hook._derive_port("/a/b/c")
+
+    def test_different_project_dirs_derive_different_ports(self, hook):
+        assert hook._derive_port("/a/b/c") != hook._derive_port("/a/b/d")
+
+    def test_derived_port_stays_inside_the_declared_range(self, hook):
+        port = hook._derive_port("/some/project")
+        assert hook.DEFAULT_PORT <= port < hook.DEFAULT_PORT + hook.PORT_RANGE_SIZE
+
+    def test_empty_project_dir_uses_the_default_port(self, hook):
+        assert hook._derive_port("") == hook.DEFAULT_PORT
+
+    def test_relative_and_absolute_forms_of_one_path_agree(self, hook, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        assert hook._derive_port(".") == hook._derive_port(str(tmp_path))
+
+
+class TestProjectRootResolution:
+    def test_regular_checkout_resolves_to_itself(self, hook, main_repo: Path):
+        assert Path(hook._resolve_project_root(str(main_repo))).resolve() == main_repo.resolve()
+
+    def test_worktree_resolves_to_the_main_repo_so_the_port_matches(
+        self, hook, main_repo: Path, linked_worktree: Path
+    ):
+        """A worktree session must POST to the same chronograph instance as the
+        canonical checkout -- otherwise its spans land in a second server."""
+        resolved = Path(hook._resolve_project_root(str(linked_worktree))).resolve()
+        assert resolved == main_repo.resolve()
+        assert hook._derive_port(str(resolved)) == hook._derive_port(str(main_repo))
+
+    def test_non_git_directory_falls_back_to_the_given_path(self, hook, tmp_path: Path):
+        plain = tmp_path / "plain"
+        plain.mkdir()
+        assert hook._resolve_project_root(str(plain)) == str(plain)
+
+    def test_empty_cwd_is_returned_unchanged(self, hook):
+        assert hook._resolve_project_root("") == ""
+
+    def test_missing_git_binary_falls_back_to_the_given_path(self, hook, monkeypatch, tmp_path):
+        def _missing(*_a, **_k):
+            raise FileNotFoundError("git")
+
+        monkeypatch.setattr(hook.subprocess, "check_output", _missing)
+        assert hook._resolve_project_root(str(tmp_path)) == str(tmp_path)
+
+
+# ---------------------------------------------------------------------------
+# Git context capture -- fail-open, worktree-aware
+# ---------------------------------------------------------------------------
+
+
+class TestGitContext:
+    def test_main_checkout_reports_branch_toplevel_and_not_a_worktree(self, hook, main_repo: Path):
+        context = hook._git_context(str(main_repo))
+        assert context["git_branch"]
+        assert Path(context["git_toplevel"]).resolve() == main_repo.resolve()
+        assert context["is_worktree"] is False
+        assert "worktree_name" not in context
+
+    def test_linked_worktree_is_flagged_and_named(self, hook, linked_worktree: Path):
+        context = hook._git_context(str(linked_worktree))
+        assert context["is_worktree"] is True
+        assert context["worktree_name"] == linked_worktree.name
+
+    def test_non_git_directory_yields_an_empty_context(self, hook, tmp_path: Path):
+        plain = tmp_path / "plain"
+        plain.mkdir()
+        assert hook._git_context(str(plain)) == {}
+
+    def test_empty_cwd_yields_an_empty_context(self, hook):
+        assert hook._git_context("") == {}
+
+
+# ---------------------------------------------------------------------------
+# Agent provenance -- a relay consumer must be able to tell a real agent_type
+# from a fallback label wearing the same field
+# ---------------------------------------------------------------------------
+
+
+class TestAgentProvenance:
+    def test_supplied_agent_type_is_marked_as_coming_from_the_payload(self, hook):
+        assert hook._agent_type_source({"agent_type": "i-am:researcher"}) == hook.SOURCE_PAYLOAD
+
+    def test_description_fallback_is_named_as_such(self, hook):
+        assert (
+            hook._agent_type_source({"agent_type": "", "description": "Audit hooks"})
+            == hook.SOURCE_DESCRIPTION_FALLBACK
+        )
+
+    def test_agent_id_fallback_is_named_as_such(self, hook):
+        assert hook._agent_type_source({"agent_id": "abc123"}) == hook.SOURCE_AGENT_ID_FALLBACK
+
+    def test_nothing_available_is_reported_as_unresolved(self, hook):
+        assert hook._agent_type_source({}) == hook.SOURCE_UNRESOLVED
+
+    def test_whitespace_only_agent_type_is_not_treated_as_supplied(self, hook):
+        assert hook._agent_type_source({"agent_type": "   "}) != hook.SOURCE_PAYLOAD
+
+    def test_subagent_stop_carries_the_provenance_marker(self, hook):
+        events, _ = hook._build_events(
+            {
+                "hook_event_name": "SubagentStop",
+                "session_id": "s1",
+                "agent_id": "a1",
+                "agent_type": "",
+            }
+        )
+        assert events[0]["metadata"]["agent_type_source"] == hook.SOURCE_AGENT_ID_FALLBACK
+
+    def test_subagent_stop_keeps_the_transcript_path_alongside_the_provenance(self, hook):
+        events, _ = hook._build_events(
+            {
+                "hook_event_name": "SubagentStop",
+                "session_id": "s1",
+                "agent_id": "a1",
+                "agent_type": "i-am:verifier",
+                "agent_transcript_path": "/tmp/t.md",
+            }
+        )
+        metadata = events[0]["metadata"]
+        assert metadata["agent_transcript_path"] == "/tmp/t.md"
+        assert metadata["agent_type_source"] == hook.SOURCE_PAYLOAD
+
+    def test_subagent_start_carries_the_provenance_marker(self, hook):
+        events, _ = hook._build_events(
+            {"hook_event_name": "SubagentStart", "session_id": "s1", "agent_type": "i-am:sentinel"}
+        )
+        assert events[0]["metadata"]["agent_type_source"] == hook.SOURCE_PAYLOAD
+
+    @pytest.mark.parametrize("hook_event", ["SubagentStart", "SubagentStop"])
+    def test_lifecycle_events_never_carry_an_empty_agent_id(self, hook, hook_event):
+        """A lifecycle span keyed on "" cannot be correlated with anything."""
+        events, _ = hook._build_events({"hook_event_name": hook_event, "session_id": "s1"})
+        assert events[0]["agent_id"] == "s1"
+
+    @pytest.mark.parametrize("hook_event", ["SubagentStart", "SubagentStop"])
+    def test_lifecycle_events_with_no_identifier_at_all_use_the_sentinel(self, hook, hook_event):
+        events, _ = hook._build_events({"hook_event_name": hook_event})
+        assert events[0]["agent_id"] == hook.UNKNOWN_AGENT_ID
+
+
+class TestAgentLabel:
+    def test_agent_type_wins(self, hook):
+        assert hook._agent_label({"agent_type": "i-am:researcher"}) == "i-am:researcher"
+
+    def test_description_is_preferred_over_the_uuid_like_agent_id(self, hook):
+        assert hook._agent_label({"description": "Audit", "agent_id": "abc"}) == "Audit"
+
+    def test_long_description_is_truncated_to_fifty_characters(self, hook):
+        assert len(hook._agent_label({"description": "x" * 200})) == 50
+
+    def test_agent_id_is_the_last_real_option(self, hook):
+        assert hook._agent_label({"agent_id": "abc123"}) == "abc123"
+
+    def test_empty_payload_yields_the_sentinel(self, hook):
+        assert hook._agent_label({}) == hook.UNKNOWN_AGENT_ID
+
+
+# ---------------------------------------------------------------------------
+# PROGRESS.md parsing
+# ---------------------------------------------------------------------------
+
+
+class TestProgressLineParsing:
+    def test_full_phase_line_is_parsed_into_its_components(self, hook):
+        content = "[2026-08-06T12:00:00Z] [implementer] Phase 3/8: build -- wired the emitter #x"
+        parsed = hook._parse_last_progress_line(content)
+        assert parsed == {
+            "agent_type": "implementer",
+            "phase": 3,
+            "total_phases": 8,
+            "phase_name": "build",
+            "message": "wired the emitter",
+        }
+
+    def test_line_without_a_phase_clause_parses_with_zero_phases(self, hook):
+        parsed = hook._parse_last_progress_line("[ts] [verifier] finished the review")
+        assert parsed["agent_type"] == "verifier"
+        assert parsed["phase"] == 0
+        assert parsed["total_phases"] == 0
+        assert parsed["phase_name"] == ""
+
+    def test_only_the_last_non_empty_line_is_parsed(self, hook):
+        content = "[t] [a] first\n\n[t] [b] second\n\n"
+        assert hook._parse_last_progress_line(content)["agent_type"] == "b"
+
+    def test_empty_content_yields_none(self, hook):
+        assert hook._parse_last_progress_line("   \n\n") is None
+
+    def test_unparseable_last_line_yields_none(self, hook):
+        assert hook._parse_last_progress_line("no brackets here") is None
+
+    def test_progress_write_emits_a_phase_transition_event(self, hook):
+        events, _ = hook._build_events(
+            {
+                "hook_event_name": "PostToolUse",
+                "session_id": "s1",
+                "tool_name": "Write",
+                "tool_input": {
+                    "file_path": "/p/.ai-work/slug/PROGRESS.md",
+                    "content": "[t] [test-engineer] Phase 4/8: verify -- suite green",
+                },
+            }
+        )
+        transitions = [e for e in events if e["event_type"] == "phase_transition"]
+        assert len(transitions) == 1
+        assert transitions[0]["phase"] == 4
+        assert transitions[0]["phase_name"] == "verify"
+
+    def test_progress_write_with_unparseable_content_emits_no_transition(self, hook):
+        events, _ = hook._build_events(
+            {
+                "hook_event_name": "PostToolUse",
+                "session_id": "s1",
+                "tool_name": "Write",
+                "tool_input": {"file_path": "/p/PROGRESS.md", "content": "garbage"},
+            }
+        )
+        assert all(e["event_type"] != "phase_transition" for e in events)
+
+    def test_progress_edit_reads_the_new_string_field(self, hook):
+        content = hook._extract_progress_content({"new_string": "[t] [a] Phase 1/2: x -- y"})
+        assert content.startswith("[t]")
+
+    def test_non_dict_tool_input_yields_no_progress_content(self, hook):
+        assert hook._extract_progress_content("a string") == ""
+
+
+# ---------------------------------------------------------------------------
+# Size accounting and truncation
+# ---------------------------------------------------------------------------
+
+
+class TestSizeAccounting:
+    def test_short_text_is_not_truncated(self, hook):
+        assert hook._truncate("short") == "short"
+
+    def test_empty_text_becomes_an_empty_string(self, hook):
+        assert hook._truncate(None) == ""
+
+    def test_oversized_text_is_cut_and_marked(self, hook):
+        result = hook._truncate("y" * 5000, max_bytes=100)
+        assert result.endswith("...")
+        assert len(result) == 103
+
+    def test_string_tool_input_is_returned_verbatim(self, hook):
+        assert hook._raw_tool_input_text({"tool_input": "raw command"}) == "raw command"
+
+    def test_known_input_keys_are_joined(self, hook):
+        text = hook._raw_tool_input_text({"tool_input": {"file_path": "/a", "command": "ls"}})
+        assert "file_path=/a" in text
+        assert "command=ls" in text
+
+    def test_unknown_input_keys_fall_back_to_json(self, hook):
+        assert hook._raw_tool_input_text({"tool_input": {"zzz": 1}}) == '{"zzz": 1}'
+
+    def test_dict_tool_output_is_serialized(self, hook):
+        assert hook._raw_tool_output_text({"tool_response": {"ok": True}}) == '{"ok": true}'
+
+    def test_absent_tool_output_is_an_empty_string(self, hook):
+        assert hook._raw_tool_output_text({}) == ""
+
+    def test_legacy_tool_output_key_is_read(self, hook):
+        assert hook._raw_tool_output_text({"tool_output": "done"}) == "done"
+
+    def test_recorded_sizes_reflect_the_untruncated_input(self, hook):
+        """Truncation must not shrink the size signal span analytics rely on."""
+        events, _ = hook._build_events(
+            {
+                "hook_event_name": "PostToolUse",
+                "session_id": "s1",
+                "tool_name": "Bash",
+                "tool_input": {"command": "z" * 9000},
+                "tool_response": "w" * 9000,
+            }
+        )
+        metadata = events[0]["metadata"]
+        assert metadata["input_size_bytes"] > 9000
+        assert metadata["output_size_bytes"] == 9000
+        assert len(metadata["input_summary"]) < 9000
+
+
+class TestProjectDir:
+    def test_payload_cwd_wins(self, hook, monkeypatch):
+        monkeypatch.setenv("CLAUDE_PROJECT_DIR", "/from/env")
+        assert hook._project_dir({"cwd": "/from/payload"}) == "/from/payload"
+
+    def test_environment_is_the_fallback(self, hook, monkeypatch):
+        monkeypatch.setenv("CLAUDE_PROJECT_DIR", "/from/env")
+        assert hook._project_dir({}) == "/from/env"
+
+    def test_neither_available_yields_an_empty_string(self, hook, monkeypatch):
+        monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+        assert hook._project_dir({}) == ""
+
+
+class TestTaskSlugExtraction:
+    def test_slug_is_extracted_from_free_text(self, hook):
+        assert hook._extract_task_slug("blah\n\nTask slug: auth-flow\nmore") == "auth-flow"
+
+    def test_absent_slug_yields_an_empty_string(self, hook):
+        assert hook._extract_task_slug("no slug here") == ""
+
+    def test_empty_description_yields_an_empty_string(self, hook):
+        assert hook._extract_task_slug("") == ""
+
+
+# ---------------------------------------------------------------------------
+# POST transport -- must never raise into the hook
+# ---------------------------------------------------------------------------
+
+
+class TestPostTransport:
+    def test_successful_post_sends_json_to_the_derived_port(self, hook, monkeypatch):
+        sent = {}
+
+        def _fake_urlopen(req, timeout=None):
+            sent["url"] = req.full_url
+            sent["body"] = json.loads(req.data.decode())
+            sent["content_type"] = req.headers.get("Content-type")
+            return None
+
+        monkeypatch.setattr(hook.urllib.request, "urlopen", _fake_urlopen)
+        hook._post(9123, "/api/events", {"event_type": "tool_use"})
+
+        assert sent["url"] == "http://localhost:9123/api/events"
+        assert sent["body"] == {"event_type": "tool_use"}
+        assert sent["content_type"] == "application/json"
+
+    def test_unreachable_relay_is_logged_and_swallowed(self, hook, monkeypatch, capsys):
+        """A dead chronograph must never surface as a hook failure."""
+
+        def _refused(_req, timeout=None):
+            raise OSError("connection refused")
+
+        monkeypatch.setattr(hook.urllib.request, "urlopen", _refused)
+        hook._post(9123, "/api/events", {})
+
+        assert "chronograph: POST /api/events to :9123 failed" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------------------
+# main() -- end-to-end wiring
+# ---------------------------------------------------------------------------
+
+
+def _drive_main(hook, payload, monkeypatch, raw: str | None = None):
+    """Run main() in-process, capturing everything it would POST."""
+    posted: list[tuple[int, str, dict]] = []
+    monkeypatch.setattr(hook, "_post", lambda port, path, body: posted.append((port, path, body)))
+    monkeypatch.setattr(
+        sys, "stdin", __import__("io").StringIO(raw if raw is not None else json.dumps(payload))
+    )
+    hook.main()
+    return posted
+
+
+class TestMainWiring:
+    def test_observability_opt_out_posts_nothing(self, hook, monkeypatch):
+        monkeypatch.setenv("PRAXION_DISABLE_OBSERVABILITY", "1")
+        assert _drive_main(hook, {"hook_event_name": "SessionStart"}, monkeypatch) == []
+
+    def test_malformed_stdin_posts_nothing_and_does_not_raise(self, hook, monkeypatch):
+        monkeypatch.delenv("PRAXION_DISABLE_OBSERVABILITY", raising=False)
+        assert _drive_main(hook, None, monkeypatch, raw="{{{ not json") == []
+
+    def test_unknown_hook_event_posts_nothing(self, hook, monkeypatch):
+        monkeypatch.delenv("PRAXION_DISABLE_OBSERVABILITY", raising=False)
+        assert _drive_main(hook, {"hook_event_name": "Nonesuch"}, monkeypatch) == []
+
+    def test_explicit_port_env_overrides_the_derived_port(self, hook, monkeypatch):
+        monkeypatch.delenv("PRAXION_DISABLE_OBSERVABILITY", raising=False)
+        monkeypatch.setenv("CHRONOGRAPH_PORT", "9999")
+        posted = _drive_main(
+            hook, {"hook_event_name": "SessionStart", "session_id": "s1"}, monkeypatch
+        )
+        assert [p for p, _, _ in posted] == [9999]
+
+    def test_events_and_interactions_go_to_their_own_endpoints(self, hook, monkeypatch):
+        monkeypatch.delenv("PRAXION_DISABLE_OBSERVABILITY", raising=False)
+        monkeypatch.setenv("CHRONOGRAPH_PORT", "9999")
+        posted = _drive_main(
+            hook,
+            {
+                "hook_event_name": "SubagentStart",
+                "session_id": "s1",
+                "agent_id": "a1",
+                "agent_type": "i-am:researcher",
+            },
+            monkeypatch,
+        )
+        paths = [path for _, path, _ in posted]
+        assert paths == ["/api/events", "/api/interactions"]
+
+    def test_every_event_is_tagged_with_the_hook_that_produced_it(self, hook, monkeypatch):
+        monkeypatch.delenv("PRAXION_DISABLE_OBSERVABILITY", raising=False)
+        monkeypatch.setenv("CHRONOGRAPH_PORT", "9999")
+        posted = _drive_main(
+            hook,
+            {
+                "hook_event_name": "PostToolUse",
+                "session_id": "s1",
+                "tool_name": "Write",
+                "tool_use_id": "t1",
+                "tool_input": {"file_path": "/p/x.py"},
+            },
+            monkeypatch,
+        )
+        assert posted[0][2]["metadata"]["hook_event"] == "PostToolUse"
+
+    def test_an_internal_failure_is_reported_and_swallowed(self, hook, monkeypatch, capsys):
+        """Exit 0 unconditionally -- the hook must never block agent execution."""
+        monkeypatch.delenv("PRAXION_DISABLE_OBSERVABILITY", raising=False)
+        monkeypatch.delenv("CHRONOGRAPH_PORT", raising=False)
+
+        def _boom(_data):
+            raise RuntimeError("kaboom")
+
+        monkeypatch.setattr(hook, "_build_events", _boom)
+        monkeypatch.setattr(sys, "stdin", __import__("io").StringIO('{"hook_event_name": "Stop"}'))
+
+        hook.main()
+
+        assert "kaboom" in capsys.readouterr().err
+
+
+class TestPreToolUseSpans:
+    def test_pre_tool_use_without_a_correlation_id_opens_no_span(self, hook):
+        """No tool_use_id means Pre/Post cannot be paired; PostToolUse emits an
+        instant span instead of leaving a dangling one open."""
+        events, _ = hook._build_events(
+            {"hook_event_name": "PreToolUse", "session_id": "s1", "tool_name": "Write"}
+        )
+        assert events == []
+
+    def test_pre_tool_use_with_a_correlation_id_opens_a_tool_start(self, hook):
+        events, _ = hook._build_events(
+            {
+                "hook_event_name": "PreToolUse",
+                "session_id": "s1",
+                "tool_name": "Write",
+                "tool_use_id": "t1",
+                "tool_input": {"file_path": "/p/x.py"},
+            }
+        )
+        assert events[0]["event_type"] == "tool_start"
+        assert events[0]["metadata"]["input_size_bytes"] > 0
+
+
+class TestFailureEvents:
+    def test_dict_error_payload_is_serialized_into_the_message(self, hook):
+        events, _ = hook._build_events(
+            {
+                "hook_event_name": "PostToolUseFailure",
+                "session_id": "s1",
+                "tool_name": "Bash",
+                "error": {"code": 1, "reason": "boom"},
+            }
+        )
+        assert events[0]["event_type"] == "error"
+        assert "boom" in events[0]["message"]
+
+    def test_absent_error_field_gets_a_default_message(self, hook):
+        events, _ = hook._build_events(
+            {"hook_event_name": "PostToolUseFailure", "session_id": "s1", "tool_name": "Bash"}
+        )
+        assert events[0]["message"] == "Tool call failed"

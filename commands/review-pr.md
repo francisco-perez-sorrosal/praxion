@@ -1,6 +1,6 @@
 ---
 description: Code review a pull request
-argument-hint: [PR-number|branch|diff-target]
+argument-hint: "[PR-number|branch|diff-target]"
 allowed-tools: [Bash, Read, Grep, Glob]
 ---
 

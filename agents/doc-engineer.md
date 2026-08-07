@@ -25,7 +25,7 @@ You operate in two modes: **audit mode** (assess and report) and **fix mode** (a
 
 ## Process
 
-The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all document reads and writes.
+The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all reads and writes.
 
 Work through these phases in order. Complete each phase before moving to the next.
 

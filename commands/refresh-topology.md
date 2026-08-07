@@ -1,13 +1,6 @@
 ---
-description: >
-  Create or refresh the project's test-group topology for scoped test execution.
-  Run with --init to scaffold a new topology from DESIGN.md §3 Built components
-  (spawns systems-architect + test-engineer), or without flags to reconcile drift
-  in an existing topology (spawns implementation-planner). Use when setting up
-  test segregation for the first time, when topology groups need refresh after
-  architecture changes, or when the sentinel or systems-architect flags topology
-  readiness. Activation terms: topology, test groups, segregation, refresh, init.
-argument-hint: [--init]
+description: "Create or refresh the project's test-group topology for scoped test execution — --init scaffolds a new one, no flag reconciles drift in an existing one."
+argument-hint: "[--init]"
 allowed-tools: [Read, Glob, Grep, Task, AskUserQuestion]
 disable-model-invocation: true
 ---
@@ -16,6 +9,10 @@ Create or refresh the project's test-group topology. Determine the mode from `$A
 
 - **`--init`** — first-time topology creation
 - *(no flag)* — drift-response refresh of an existing topology
+
+Reach for this when setting up test segregation for the first time, when topology groups need a
+refresh after architecture changes, or when the sentinel or systems-architect flags topology
+readiness.
 
 ---
 

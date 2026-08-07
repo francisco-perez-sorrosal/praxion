@@ -23,7 +23,9 @@ You can also trigger it explicitly by asking about slash commands or referencing
 
 | File | Purpose |
 |------|---------|
-| `SKILL.md` | Core reference: structure, frontmatter, arguments, features, best practices |
+| `SKILL.md` | Core: structure, frontmatter (incl. description length and `argument-hint` semantics), substitution mechanisms, best practices |
+| `references/arguments-and-context.md` | Worked examples: `$ARGUMENTS`/positional args, bang-prefixed bash, `@` file references, input-testing checklist |
+| `references/runtime-and-permissions.md` | Discovery and live-reload timing, `Skill(...)` permission rules, debugging (incl. silent frontmatter parse failures) |
 | `REFERENCE.md` | Extended examples: command patterns, real-world recipes, organization strategies |
 | `README.md` | This file — overview and testing guide |
 
@@ -85,10 +87,11 @@ claude
 
 After creating or modifying commands, verify:
 
-- [ ] YAML frontmatter parses correctly (no tabs, proper `---` delimiters)
-- [ ] `description` is specific and action-oriented
+- [ ] YAML frontmatter parses under a real loader, not a field-presence grep (no tabs, proper `---` delimiters, quoted values that start with `[`/`{`/`>`/`|` or contain `: `)
+- [ ] `description` is specific and action-oriented, and its length matches its consumer (one line when `disable-model-invocation: true`)
 - [ ] `allowed-tools` is declared (avoids permission prompts)
-- [ ] `argument-hint` matches expected usage
+- [ ] `argument-hint` lists every accepted argument and flag — or is absent entirely when the command takes none (never `""`)
+- [ ] `argument-hint` is **quoted unconditionally** — unquoted `[foo]` loads as a YAML *list*, not a string, and unquoted `[a] [b]` fails to parse at all
 - [ ] Command activates when invoked with `/command-name`
 - [ ] Arguments substitute correctly (`$ARGUMENTS`, `$1`, `$2`)
 - [ ] Bash `!` commands and file `@` references resolve properly

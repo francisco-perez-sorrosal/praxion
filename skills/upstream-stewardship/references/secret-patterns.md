@@ -66,11 +66,12 @@ Praxion-specific patterns that should not appear in upstream issues.
 
 | Pattern | Example | Sanitized Form |
 |---------|---------|----------------|
-| `.ai-state/` content | Memory entries, observations | `[internal state redacted]` |
+| `.ai-state/` content | Observations, ADRs, ledgers | `[internal state redacted]` |
 | `.ai-work/` content | Pipeline intermediates | `[internal workflow redacted]` |
 | Agent prompts | System prompt excerpts | `[agent prompt redacted]` |
-| Memory MCP data | `remember()` call content | `[internal memory redacted]` |
 | Plugin cache paths | `~/.claude/plugins/cache/...` | `<plugin-cache>/...` |
+
+Praxion carries no curated cross-session memory store — the in-house memory subsystem (`memory-mcp`, `.ai-state/memory.json`, `remember()`/`recall()`) has been removed, so no memory-tool payload can appear in a draft. Internal state now surfaces through `.ai-state/` artifacts, covered by the first row above.
 
 ## Sanitization Workflow
 

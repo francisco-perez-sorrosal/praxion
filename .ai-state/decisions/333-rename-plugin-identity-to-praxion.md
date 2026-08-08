@@ -1,7 +1,7 @@
 ---
-id: dec-draft-92fca7f1
+id: dec-333
 title: Rename the Claude Code plugin identity from `i-am` to `praxion`
-status: proposed
+status: accepted
 category: architectural
 date: 2026-08-07
 summary: Rename the plugin and marketplace entry from `i-am` to `praxion`, changing every namespaced artifact reference, to resolve a verified name collision with the `.i-am` dotfiles skill and align the sole surface that still disagrees with the project's name.

@@ -1,6 +1,6 @@
 # Commands
 
-Slash commands invocable during interactive sessions. Each `.md` file becomes a `/command-name` (or `/i-am:command-name` when namespaced by the plugin).
+Slash commands invocable during interactive sessions. Each `.md` file becomes a `/command-name` (or `/praxion:command-name` when namespaced by the plugin).
 
 ## Conventions
 

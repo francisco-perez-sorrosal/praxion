@@ -67,7 +67,7 @@ Wrapped in a `hooks` object, uses `${CLAUDE_PLUGIN_ROOT}`:
 }
 ```
 
-**`${CLAUDE_PLUGIN_ROOT}`** resolves to the plugin's cache root (e.g., `~/.claude/plugins/cache/bit-agora/i-am/0.0.1/`), NOT to `.claude-plugin/`. Reference scripts as `${CLAUDE_PLUGIN_ROOT}/hooks/script.py`.
+**`${CLAUDE_PLUGIN_ROOT}`** resolves to the plugin's cache root (e.g., `~/.claude/plugins/cache/bit-agora/praxion/0.0.1/`), NOT to `.claude-plugin/`. Reference scripts as `${CLAUDE_PLUGIN_ROOT}/hooks/script.py`.
 
 ## Single Registration Authority
 

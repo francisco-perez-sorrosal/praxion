@@ -31,7 +31,7 @@ You can also trigger it explicitly by asking about creating agents or referencin
 
 ## Current Agents in This Repository
 
-Agents live in `agents/` (this repo) or `.claude/agents/` (consumer projects). Install as a plugin via `claude plugin install i-am@bit-agora`.
+Agents live in `agents/` (this repo) or `.claude/agents/` (consumer projects). Install as a plugin via `claude plugin install praxion@bit-agora`.
 
 | Agent | Purpose |
 |-------|---------|

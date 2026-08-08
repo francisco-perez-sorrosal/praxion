@@ -279,7 +279,7 @@ class TestRelayWiring:
             "/api/events",
             json={
                 "event_type": "agent_start",
-                "agent_type": "i-am:researcher",
+                "agent_type": "praxion:researcher",
                 "agent_id": "agent-r1",
                 "session_id": "sess-001",
                 "parent_session_id": "parent-001",
@@ -288,7 +288,7 @@ class TestRelayWiring:
         assert resp.status_code == 201
         mock.start_agent.assert_called_once()
         args, kwargs = mock.start_agent.call_args
-        assert args[:4] == ("agent-r1", "i-am:researcher", "sess-001", "parent-001")
+        assert args[:4] == ("agent-r1", "praxion:researcher", "sess-001", "parent-001")
 
     async def test_agent_stop_routes_to_relay(self, relay_client):
         client, mock = relay_client

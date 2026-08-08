@@ -77,7 +77,7 @@ def _log(msg: str) -> None:
 
 
 def _normalize_stage(subagent_type: str) -> str:
-    """Strip a plugin namespace prefix (`i-am:researcher` -> `researcher`)."""
+    """Strip a plugin namespace prefix (`praxion:researcher` -> `researcher`)."""
     return subagent_type.split(":")[-1].strip()
 
 

@@ -8,7 +8,7 @@ synthetic managed project, asserting on observable end state rather than
 internals.
 
 Key cases:
-  - stale /i-am/<old>/ pins are re-pointed to the live path
+  - stale /praxion/<old>/ pins are re-pointed to the live path
   - --check reports drift (exit 1) and mutates nothing
   - a second apply is idempotent (no further changes, --check exits 0)
   - a retired merge driver is unset and dropped from .gitattributes + manifest
@@ -71,8 +71,8 @@ def project(tmp_path: Path) -> dict:
     subprocess.run(["git", "-C", str(repo), "config", "user.email", "t@t.t"], check=True)
     subprocess.run(["git", "-C", str(repo), "config", "user.name", "t"], check=True)
 
-    live = repo / "cache" / "i-am" / "0.9.0"
-    stale = repo / "cache" / "i-am" / "0.8.0"
+    live = repo / "cache" / "praxion" / "0.9.0"
+    stale = repo / "cache" / "praxion" / "0.8.0"
     (live / "scripts").mkdir(parents=True)
     (stale / "scripts").mkdir(parents=True)
     (live / "scripts" / "git-finalize-hook.sh").write_text("#!/usr/bin/env bash\n")
@@ -101,7 +101,7 @@ def project(tmp_path: Path) -> dict:
     (repo / ".ai-state" / ".praxion-onboard.json").write_text(
         json.dumps(
             {
-                "plugin": "i-am@bit-agora",
+                "plugin": "praxion@bit-agora",
                 "onboarded_with_version": "0.8.0",
                 "onboarded_at": "2026-01-01T00:00:00Z",
                 "scope": "user",
@@ -284,7 +284,7 @@ def test_dry_run_mutates_nothing(project):
 
 
 def test_dev_self_host_symlink_left_untouched(project):
-    """A finalize hook that resolves to a real file outside the /i-am/ cache is
+    """A finalize hook that resolves to a real file outside the /praxion/ cache is
     a dev/self-host install and must not be re-pointed."""
     repo, live = project["repo"], project["live"]
     dev = repo / "devtree" / "scripts"
@@ -310,7 +310,7 @@ def test_non_praxion_driver_not_overwritten(project):
 def test_refuses_non_onboarded_project(tmp_path: Path):
     repo = tmp_path / "bare"
     (repo / ".git").mkdir(parents=True)
-    live = tmp_path / "cache" / "i-am" / "0.9.0" / "scripts"
+    live = tmp_path / "cache" / "praxion" / "0.9.0" / "scripts"
     live.mkdir(parents=True)
     r = _run(repo, live.parent)
     assert r.returncode == 1

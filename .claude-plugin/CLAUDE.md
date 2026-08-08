@@ -1,6 +1,6 @@
 # Plugin Configuration
 
-Plugin infrastructure for the `i-am` Claude Code plugin. Contains the manifest and schema documentation.
+Plugin infrastructure for the `praxion` Claude Code plugin. Contains the manifest and schema documentation.
 
 ## Key Files
 

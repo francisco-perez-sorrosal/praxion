@@ -81,7 +81,7 @@ Both types are traced with the same fidelity. Filter by `praxion.trace_type` to 
 
 Each agent span carries `praxion.agent_origin`:
 
-- **`praxion`** -- a Praxion pipeline agent (i-am:researcher, i-am:implementer, etc.)
+- **`praxion`** -- a Praxion pipeline agent (praxion:researcher, praxion:implementer, etc.)
 - **`claude-code`** -- a native Claude Code agent (general-purpose, Explore, Plan, etc.)
 
 ## Self-Monitoring

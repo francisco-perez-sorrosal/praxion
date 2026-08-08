@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Praxion — Claude Code / Claude Desktop installer
 #
-# Installs personal config, rules, and the i-am plugin into Claude Code or
+# Installs personal config, rules, and the praxion plugin into Claude Code or
 # configures MCP servers for Claude Desktop. Invoked by install.sh for code|desktop.
 #
 # Usage:
@@ -20,7 +20,7 @@ CLAUDE_CONFIG_DIR="${SCRIPT_DIR}/claude/config"
 # Shared linking helpers (rules linking used by both Claude and Cursor installers)
 # shellcheck source=lib/install_shared.sh
 source "${SCRIPT_DIR}/lib/install_shared.sh"
-PLUGIN_NAME="i-am"
+PLUGIN_NAME="praxion"
 MARKETPLACE_NAME="bit-agora"
 MARKETPLACE_SOURCE="francisco-perez-sorrosal/bit-agora"
 PLUGIN_CACHE_DIR="${HOME}/.claude/plugins/cache/${MARKETPLACE_NAME}/${PLUGIN_NAME}"
@@ -452,7 +452,7 @@ marketplace_is_registered() {
 
 # Returns 0 if plugin was installed, 1 if skipped.
 prompt_plugin_install() {
-    header "Step 3 — i-am Plugin"
+    header "Step 3 — praxion Plugin"
     cat <<EOF
 
   ${B}[1] Install plugin (recommended)${R}
@@ -521,7 +521,7 @@ complete_install_from_plugin() {
     header "Praxion Complete Install"
 
     printf "\n  This finishes the Praxion setup for marketplace-only installs.\n"
-    printf "  You already ran 'claude plugin install i-am@bit-agora'. That installed\n"
+    printf "  You already ran 'claude plugin install praxion@bit-agora'. That installed\n"
     printf "  the plugin body (skills, commands, agents, hooks, MCP servers). This\n"
     printf "  command adds the surfaces the plugin mechanism does not cover natively:\n"
     printf "    • Rules (auto-loaded by Claude Code — shape agent behavior globally)\n"
@@ -598,7 +598,7 @@ complete_uninstall_from_plugin() {
 
     printf "\n  This removes the rules and script symlinks installed by\n"
     printf "  '--complete-install'. The plugin body stays installed — use\n"
-    printf "  'claude plugin uninstall i-am' to remove it separately.\n\n"
+    printf "  'claude plugin uninstall praxion' to remove it separately.\n\n"
     printf "  You will be prompted before each removal.\n\n"
 
     # ---- Rules symlinks ----
@@ -681,7 +681,7 @@ PYEOF
 
     printf "\n"
     info "Praxion complete uninstall done"
-    step "Plugin body still installed — run 'claude plugin uninstall i-am' to remove it"
+    step "Plugin body still installed — run 'claude plugin uninstall praxion' to remove it"
 }
 
 # =============================================================================
@@ -714,7 +714,7 @@ PYEOF
 DEV_LINK_SOURCE_DIR="${PRAXION_DEV_LINK_SOURCE_DIR:-$SCRIPT_DIR}"
 DEV_LINK_SURFACES=(hooks scripts commands)
 
-# Resolves the pinned i-am install path + version from the plugin registry —
+# Resolves the pinned praxion install path + version from the plugin registry —
 # same registry and lookup shape as scripts/upgrade_project_pins.sh's
 # resolve_plugin() (prefers a user-scope entry, falls back to the first
 # match). Sets DEV_LINK_INSTALL_PATH and DEV_LINK_VERSION, or fail()s with an
@@ -1406,7 +1406,7 @@ dry_run_claude_code() {
     header "Claude Code — Dry run"
     local plugin_json="${SCRIPT_DIR}/.claude-plugin/plugin.json"
     if [ -f "$plugin_json" ]; then
-        printf "\n  ${B}Plugin:${R} i-am v%s\n\n" "$(jq -r .version "$plugin_json" 2>/dev/null || echo "?")"
+        printf "\n  ${B}Plugin:${R} praxion v%s\n\n" "$(jq -r .version "$plugin_json" 2>/dev/null || echo "?")"
     fi
     printf "  ${B}Personal identifiers:${R}\n"
     if [ -f "$PERSONAL_INFO_ENV" ]; then

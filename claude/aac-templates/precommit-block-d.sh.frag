@@ -44,7 +44,7 @@ except Exception:
 
     # Skip-gracefully guard: if plugin root not found, exit 0 (non-blocking)
     if [ -z "$PLUGIN_ROOT" ]; then
-        echo "info: i-am plugin not found in installed_plugins.json — skipping Block D golden-rule gate"
+        echo "info: praxion plugin not found in installed_plugins.json — skipping Block D golden-rule gate"
     else
         AAC_SCRIPT="${PLUGIN_ROOT}/scripts/check_aac_golden_rule.py"
         if [ ! -f "$AAC_SCRIPT" ]; then

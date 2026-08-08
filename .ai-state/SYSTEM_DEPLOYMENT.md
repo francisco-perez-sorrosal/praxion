@@ -11,7 +11,7 @@
 | Attribute | Value |
 |-----------|-------|
 | **System** | Praxion |
-| **Primary runtime** | Claude Code plugin (npm package `i-am@bit-agora`) plus secondary targets for Claude Desktop and Cursor; one bundled long-lived service — the pipeline dashboard (`dashboard_app/`, a Next.js App Router app) |
+| **Primary runtime** | Claude Code plugin (npm package `praxion@bit-agora`) plus secondary targets for Claude Desktop and Cursor; one bundled long-lived service — the pipeline dashboard (`dashboard_app/`, a Next.js App Router app) |
 | **Deployment level** | Plugin distribution (npm + git clone) + per-project install scripts + lifecycle hooks + a user-scoped dashboard runtime under `~/.praxion-dashboard/` |
 | **Last verified** | 2026-06-24 by doc-engineer (dec-225 deployment-state reconciliation); prior: 2026-05-13 by systems-architect (doc-arch-sync — pipeline-dashboard rows brought current with the Next.js runtime) |
 
@@ -103,7 +103,7 @@ Praxion has no production/staging/dev split. It runs identically on every develo
 
 Praxion deployment is plugin distribution. Two paths:
 
-1. **Marketplace install**: `claude plugin install i-am@bit-agora` (npm-backed)
+1. **Marketplace install**: `claude plugin install praxion@bit-agora` (npm-backed)
 2. **Clone + install script**: `git clone <repo> && ./install.sh code` (developer / contributor path)
 
 Per-project onboarding via `/onboard-project` (existing project) or `/new-project` (greenfield) is post-install configuration, not deployment per se.
@@ -196,7 +196,7 @@ Pre-existing dec-NNN entries continue to live in `DECISIONS_INDEX.md`; this sect
 | Task | Command |
 |---|---|
 | Install plugin (clone path) | `./install.sh code` |
-| Install plugin (marketplace) | `claude plugin install i-am@bit-agora` |
+| Install plugin (marketplace) | `claude plugin install praxion@bit-agora` |
 | Onboard existing project | `/onboard-project` |
 | Scaffold greenfield project | `/new-project` |
 | Run experiment (taught) | `/run-experiment` (designed; available after ai-training-onramp lands) |

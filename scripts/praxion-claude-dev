@@ -2,12 +2,12 @@
 # Launch Claude Code with the Praxion working tree as the plugin source.
 #
 # Use this when developing on Praxion itself. The working-tree copy of the
-# i-am plugin is loaded via --plugin-dir, and a session-scoped --settings
-# overlay disables the marketplace-installed copy (i-am@bit-agora) for this
+# praxion plugin is loaded via --plugin-dir, and a session-scoped --settings
+# overlay disables the marketplace-installed copy (praxion@bit-agora) for this
 # session only.
 #
 # Why the overlay? Without it, the user-settings line
-# `"i-am@bit-agora": true` in `enabledPlugins` force-enables the marketplace
+# `"praxion@bit-agora": true` in `enabledPlugins` force-enables the marketplace
 # copy alongside the working tree. Per Claude Code docs, force-enables
 # override --plugin-dir's shadowing, so /context loads both copies and
 # doubles skill/agent/command tokens. The overlay flips that one entry to
@@ -41,9 +41,9 @@ if [ ! -f "$praxion_root/.claude-plugin/plugin.json" ]; then
 fi
 
 # Build a session-scoped settings overlay that disables the marketplace
-# i-am@bit-agora install. Start from the user's current settings so all
+# praxion@bit-agora install. Start from the user's current settings so all
 # other enabledPlugins entries remain intact for the session, then flip
-# just the i-am entry to false. Deterministic temp path — overwritten on
+# just the praxion entry to false. Deterministic temp path — overwritten on
 # each launch; no cleanup trap needed since `exec` replaces this shell.
 overlay_file="${TMPDIR:-/tmp}/praxion-claude-dev-settings-overlay.json"
 python3 - "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json" "$overlay_file" <<'PY'
@@ -56,7 +56,7 @@ if os.path.isfile(src):
             data = json.load(f)
     except (OSError, json.JSONDecodeError):
         data = {}
-data.setdefault("enabledPlugins", {})["i-am@bit-agora"] = False
+data.setdefault("enabledPlugins", {})["praxion@bit-agora"] = False
 with open(dst, "w") as f:
     json.dump(data, f)
 PY

@@ -22,7 +22,7 @@ Every event receives these fields on stdin:
   "permission_mode": "default|plan|acceptEdits|auto|dontAsk|bypassPermissions",
   "hook_event_name": "EventName",
   "agent_id": "optional — present in subagent context",
-  "agent_type": "optional — e.g. i-am:researcher"
+  "agent_type": "optional — e.g. praxion:researcher"
 }
 ```
 

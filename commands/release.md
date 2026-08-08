@@ -19,7 +19,7 @@ Cut a stable release. Praxion's release is a **manual CI workflow** (`.github/wo
 5. **Dispatch the workflow**: `gh workflow run release.yml --ref main -f increment=<auto|patch|minor|major>`
 6. **Watch to completion**: find the run (`gh run list --workflow=release.yml --limit 1`) and `gh run watch <run-id> --exit-status`. If it fails, report the failing step and stop.
 7. **Report results**: the new version + tag, and the GitHub release URL (`gh release view "v<version>" --json url,tagName,name`). Confirm the tag includes its own `CHANGELOG.md` entry.
-8. **Marketplace note**: if consumers install via the marketplace, remind the user the marketplace entry / cache may need refreshing (`claude plugin marketplace update`, then `claude plugin update i-am`) to serve the new version.
+8. **Marketplace note**: if consumers install via the marketplace, remind the user the marketplace entry / cache may need refreshing (`claude plugin marketplace update`, then `claude plugin update praxion`) to serve the new version.
 
 ## Notes
 

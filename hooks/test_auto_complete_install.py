@@ -83,7 +83,7 @@ def fake_home(tmp_path):
     """Return a fake HOME directory with Praxion plugin cache structure pre-built."""
     home = tmp_path / "home"
     (home / ".claude").mkdir(parents=True)
-    (home / ".claude" / "plugins" / "cache" / "bit-agora" / "i-am").mkdir(parents=True)
+    (home / ".claude" / "plugins" / "cache" / "bit-agora" / "praxion").mkdir(parents=True)
     (home / ".claude" / "rules" / "swe").mkdir(parents=True)
     (home / ".local" / "bin").mkdir(parents=True)
     return home
@@ -92,7 +92,7 @@ def fake_home(tmp_path):
 @pytest.fixture
 def plugin_cache_dir(fake_home):
     """Return the plugin cache directory path."""
-    return fake_home / ".claude" / "plugins" / "cache" / "bit-agora" / "i-am"
+    return fake_home / ".claude" / "plugins" / "cache" / "bit-agora" / "praxion"
 
 
 @pytest.fixture
@@ -916,7 +916,7 @@ class TestModuleInterface:
 
 def _make_plugin_cache(tmp_path: Path) -> Path:
     """Build a minimal plugin cache with a rules/ directory. Returns the cache path."""
-    cache = tmp_path / "home" / ".claude" / "plugins" / "cache" / "bit-agora" / "i-am"
+    cache = tmp_path / "home" / ".claude" / "plugins" / "cache" / "bit-agora" / "praxion"
     cache.mkdir(parents=True)
     return cache
 

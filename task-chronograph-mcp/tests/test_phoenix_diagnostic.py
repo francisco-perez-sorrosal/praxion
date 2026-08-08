@@ -144,7 +144,7 @@ class TestPhoenixDiagnostic:
 
         # Full lifecycle
         relay.start_session(session_id, "")
-        relay.start_agent("agent-r1", "i-am:researcher", session_id, session_id)
+        relay.start_agent("agent-r1", "praxion:researcher", session_id, session_id)
         relay.record_tool("agent-r1", "Read", "file_path=/src/main.py", "200 lines")
         relay.record_tool("agent-r1", "Bash", "command=pytest", "3 passed")
         relay.end_agent("agent-r1", "Research complete")
@@ -225,7 +225,7 @@ class TestPhoenixDiagnostic:
         # --- Session 1 ---
         sid1 = f"sess1-{uuid.uuid4().hex[:8]}"
         relay.start_session(sid1, project_dir)
-        relay.start_agent("agent-a1", "i-am:researcher", sid1, sid1)
+        relay.start_agent("agent-a1", "praxion:researcher", sid1, sid1)
         relay.record_tool("agent-a1", "Read", "file=a.py", "ok")
         relay.end_agent("agent-a1", "done")
         relay.end_session(sid1)
@@ -233,7 +233,7 @@ class TestPhoenixDiagnostic:
         # --- Session 2 (new Claude Code session, same chronograph process) ---
         sid2 = f"sess2-{uuid.uuid4().hex[:8]}"
         relay.start_session(sid2, project_dir)
-        relay.start_agent("agent-b1", "i-am:implementer", sid2, sid2)
+        relay.start_agent("agent-b1", "praxion:implementer", sid2, sid2)
         relay.record_tool("agent-b1", "Edit", "file=b.py", "edited")
         relay.end_agent("agent-b1", "done")
         relay.end_session(sid2)

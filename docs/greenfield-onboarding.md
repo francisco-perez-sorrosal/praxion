@@ -27,7 +27,7 @@ For the design rationale, see [Design decision](#design-decision). For the slash
 ## Prereqs
 
 - `claude` binary on PATH — install Claude Code from `https://claude.com/product/claude-code`
-- `i-am` plugin installed in the user-scope plugin registry — one-time `./install.sh code` from this Praxion checkout
+- `praxion` plugin installed in the user-scope plugin registry — one-time `./install.sh code` from this Praxion checkout
 - `git` on PATH
 - `uv` (optional, recommended) — install with `curl -LsSf https://astral.sh/uv/install.sh | sh`. If absent, the test gate is skipped with a one-line install hint; the rest of the flow still works.
 
@@ -187,7 +187,7 @@ The bash script uses distinct exit codes for each prereq failure so you can diag
 |---------|-------|-----|
 | Exit `2`, "Usage:" or "invalid project name" on stderr | Missing `<project-name>` arg, or name fails the `^[A-Za-z0-9][A-Za-z0-9._-]*$` regex | Pass `<project-name>` as the first positional; use letters/digits/`._-` only (cannot start with `.` or `-`) |
 | Exit `3`, "'claude' binary not found in PATH" | Claude Code is not installed | Install Claude Code: `https://claude.com/product/claude-code`, then re-run |
-| Exit `4`, "the 'i-am' plugin is not installed" | `~/.claude/plugins/installed_plugins.json` does not contain `i-am@bit-agora` | Run `./install.sh code` from this Praxion checkout once, then re-run |
+| Exit `4`, "the 'praxion' plugin is not installed" | `~/.claude/plugins/installed_plugins.json` does not contain `praxion@bit-agora` | Run `./install.sh code` from this Praxion checkout once, then re-run |
 | Exit `5`, "'git' not found in PATH" | `git` is not installed | Install git from your package manager (`brew install git`, `apt install git`, etc.) |
 | Exit `6`, "already exists and is not empty" | `<target-dir>/<project-name>` is a non-empty path | Pick a different name, pass a different `[target-dir]`, or remove the existing directory |
 | Claude session starts but `/new-project` is not found | Plugin registered but command files are not symlinked into the active config | Re-run `./install.sh --relink code` to refresh plugin command links |
@@ -206,4 +206,4 @@ Full rationale, considered options, and trade-offs: [`dec-053` — Prompt-over-t
 - **Default app is Python only** (`uv` + `claude-agent-sdk` + FastAPI). No JS/TS or other-language variants in the default branch.
 - **Custom-app branch tailors only L1 + L2** of the lesson ladder; L3–L7 stay generic Praxion-ecosystem lessons. Tailored count is fixed at 2 regardless of ladder size (5–7 total).
 - **Bash test (`tests/new_project_test.sh`) is single-file**, runnable as `bash tests/new_project_test.sh`. Not yet wired into a `Makefile` target or CI.
-- **Plugin install is user-scope only.** The script checks `~/.claude/plugins/installed_plugins.json` for `i-am@bit-agora`; project-scope plugin install is not auto-detected. Re-run `./install.sh code` once per workstation.
+- **Plugin install is user-scope only.** The script checks `~/.claude/plugins/installed_plugins.json` for `praxion@bit-agora`; project-scope plugin install is not auto-detected. Re-run `./install.sh code` once per workstation.

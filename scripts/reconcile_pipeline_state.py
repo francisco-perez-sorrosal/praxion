@@ -48,9 +48,9 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 # research / doc / context agents touch files for other reasons.
 STEP_EXECUTING_AGENT_TYPES = frozenset(
     {
-        "i-am:implementer",
-        "i-am:test-engineer",
-        "i-am:implementation-planner",
+        "praxion:implementer",
+        "praxion:test-engineer",
+        "praxion:implementation-planner",
         "implementer",
         "test-engineer",
         "implementation-planner",

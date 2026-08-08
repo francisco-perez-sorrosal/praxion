@@ -50,11 +50,11 @@ Reusable slash commands for AI coding assistants. Each `.md` file becomes a `/co
 | `/skill-genesis-review` | Disposition pending proposals from a skill-genesis report — batch multi-select presentation, append-only disposition log, surface delegation handoffs |
 | `/star-repo` | Star the Praxion repo on GitHub |
 | `/test` | Auto-detect test framework and run tests |
-| `/upgrade-project` | Re-point this project's version-pinned Praxion surfaces (git hooks, merge driver) to the live plugin install after an i-am plugin upgrade |
+| `/upgrade-project` | Re-point this project's version-pinned Praxion surfaces (git hooks, merge driver) to the live plugin install after a praxion plugin upgrade |
 
 ## How Commands Work
 
-- **Claude Code**: Loaded from plugin `commands/`, `.claude/commands/` (project), or `~/.claude/commands/` (personal). Invoke with `/` (plugin commands may be namespaced, e.g. `/i-am:co`).
+- **Claude Code**: Loaded from plugin `commands/`, `.claude/commands/` (project), or `~/.claude/commands/` (personal). Invoke with `/` (plugin commands may be namespaced, e.g. `/praxion:co`).
 - **Cursor**: Exported to `.cursor/commands/` or `~/.cursor/commands/` by `./install.sh cursor` (frontmatter stripped). Invoke with `/`.
 - **Codex**: Exported to `.agents/skills/praxion-command-<name>/SKILL.md` by `./install.sh codex`. Invoke by asking Codex to run the Praxion command, e.g. `run /co with message ...`; the wrapper reads the canonical `commands/<name>.md` file before acting.
 

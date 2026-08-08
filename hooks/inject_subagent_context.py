@@ -5,7 +5,7 @@ prompt additions ahead of the original prompt, emitting at most ONE
 updatedInput per spawn (dec-266, resolving td-049 and td-051):
 
   1. Praxion preamble -- prepended for host-native agents (Explore, Plan,
-     general-purpose) launched from a Praxion-managed project; i-am:* agents
+     general-purpose) launched from a Praxion-managed project; praxion:* agents
      are skipped by default (gate (d) below applies to the preamble ONLY).
   2. Session-worktree line -- when the spawning session's `--git-dir` differs
      from `--git-common-dir` (a linked worktree), for ALL agent types. This
@@ -24,7 +24,7 @@ chains multiple updatedInput emissions across matching hooks (vs. dropping
 all but one) was an unverified assumption (td-049). Consolidating into a
 single emitter makes that question structurally moot.
 
-When none of the three conditions hold (e.g. an i-am agent with no worktree
+When none of the three conditions hold (e.g. a praxion agent with no worktree
 context, a canonical session with no worktree-naming prompt), the hook emits
 nothing -- preserving the original gate contract of each concern.
 
@@ -32,7 +32,7 @@ Fast-skip conditions (exit 0, no stdout, strictly empty):
   (a) tool_name is not "Agent"
   (b) tool_input is not a JSON object
   (c) [preamble only] cwd has no .ai-state/ directory (non-Praxion project)
-  (d) [preamble only] subagent_type matches i-am:* AND
+  (d) [preamble only] subagent_type matches praxion:* AND
       PRAXION_INJECT_NATIVE_SUBAGENTS is not set
   (e) [preamble only] PRAXION_DISABLE_SUBAGENT_INJECT=1 is set
   (f) [worktree lines only] PRAXION_DISABLE_WORKTREE_PATH_BRIEFING=1 is set
@@ -106,8 +106,8 @@ def _has_ai_state(cwd: str, session_id: str) -> bool:
 
 
 def _is_praxion_native(subagent_type: str) -> bool:
-    """Return True for Praxion-native agents (i-am:* prefix)."""
-    return subagent_type.startswith("i-am:")
+    """Return True for Praxion-native agents (praxion:* prefix)."""
+    return subagent_type.startswith("praxion:")
 
 
 def _preamble_segment(subagent_type: str, cwd: str, session_id: str) -> str:

@@ -5,7 +5,7 @@
 # T1: no args -> usage on stderr, exit 2
 # T2: security -- invalid project name -> exit 2, no mkdir
 # T3: missing claude -> exit 3, message mentions claude
-# T4: missing i-am plugin record -> exit 4
+# T4: missing praxion plugin record -> exit 4
 # T5: missing git -> exit 5
 # T6: target exists & non-empty -> exit 6, no mutation
 # T7: happy path -- scaffold + pre-flight + exec claude
@@ -47,7 +47,7 @@ pass() { PASS_COUNT=$((PASS_COUNT + 1)); printf '[PASS] %s\n' "$1"; }
 fail() { FAIL_COUNT=$((FAIL_COUNT + 1)); printf '[FAIL] %s\n' "$1" >&2; }
 
 # Build a per-test sandbox: stub-bin holding `claude` (and optionally `git`)
-# plus a plugins file claiming i-am is installed. Returns sandbox dir on stdout.
+# plus a plugins file claiming praxion is installed. Returns sandbox dir on stdout.
 make_sandbox() {
     local sandbox stub_log
     sandbox="$(mktemp -d "$WORK_ROOT/sandbox.XXXXXX")"
@@ -79,7 +79,7 @@ EOF
     if command -v git >/dev/null 2>&1; then
         ln -s "$(command -v git)" "$sandbox/bin/git"
     fi
-    printf '{"i-am@bit-agora": {"version": "test"}}\n' \
+    printf '{"praxion@bit-agora": {"version": "test"}}\n' \
         > "$sandbox/home/.claude/plugins/installed_plugins.json"
     printf '%s\n' "$sandbox"
 }
@@ -145,7 +145,7 @@ t4_missing_plugin_exit_4() {
     rm -f "$s/home/.claude/plugins/installed_plugins.json"
     run_script "$s" my-app "$s/target"
     if [ "$LAST_EXIT" -eq 4 ]; then
-        pass "T4: missing i-am plugin record exits 4"
+        pass "T4: missing praxion plugin record exits 4"
     else
         fail "T4: expected exit=4; got exit=$LAST_EXIT, stderr=$(cat "$LAST_ERR")"
     fi

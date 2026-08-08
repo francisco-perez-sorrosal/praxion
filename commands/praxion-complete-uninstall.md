@@ -4,23 +4,23 @@ allowed-tools: [Bash]
 disable-model-invocation: true
 ---
 
-Remove the system-level symlinks and MCP entry that `/praxion-complete-install` created. The plugin body stays installed — run `claude plugin uninstall i-am` separately if you want to remove it too.
+Remove the system-level symlinks and MCP entry that `/praxion-complete-install` created. The plugin body stays installed — run `claude plugin uninstall praxion` separately if you want to remove it too.
 
 ## Procedure
 
-1. **Resolve the plugin root.** Use `CLAUDE_PLUGIN_ROOT` if set; otherwise locate `~/.claude/plugins/cache/bit-agora/i-am/*/`.
+1. **Resolve the plugin root.** Use `CLAUDE_PLUGIN_ROOT` if set; otherwise locate `~/.claude/plugins/cache/bit-agora/praxion/*/`.
 
 2. **Invoke the installer's complete-uninstall mode:**
 
    ```bash
-   "${CLAUDE_PLUGIN_ROOT:-$(ls -d ~/.claude/plugins/cache/bit-agora/i-am/*/ 2>/dev/null | head -1)}/install.sh" code --complete-uninstall
+   "${CLAUDE_PLUGIN_ROOT:-$(ls -d ~/.claude/plugins/cache/bit-agora/praxion/*/ 2>/dev/null | head -1)}/install.sh" code --complete-uninstall
    ```
 
    If the plugin is not installed, report: *"Praxion plugin not found — nothing to uninstall."*
 
 3. **Relay the installer's interactive prompts.** The installer asks the user for consent separately on each removal (rules, scripts, context-hub MCP). Do not suppress or auto-answer — each prompt represents a filesystem deletion the user should approve.
 
-4. **Summarize the outcome**: how many rule symlinks were removed, how many script symlinks, and whether the MCP entry was removed. Remind the user that the plugin body itself is untouched and requires `claude plugin uninstall i-am` to fully remove.
+4. **Summarize the outcome**: how many rule symlinks were removed, how many script symlinks, and whether the MCP entry was removed. Remind the user that the plugin body itself is untouched and requires `claude plugin uninstall praxion` to fully remove.
 
 ## Safety
 

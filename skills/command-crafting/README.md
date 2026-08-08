@@ -31,7 +31,7 @@ You can also trigger it explicitly by asking about slash commands or referencing
 
 ## Existing Commands in This Repository
 
-Commands live in `commands/` (this repo) or `.claude/commands/` (consumer projects). Install as a plugin via `claude plugin install i-am@bit-agora`.
+Commands live in `commands/` (this repo) or `.claude/commands/` (consumer projects). Install as a plugin via `claude plugin install praxion@bit-agora`.
 
 | Command | Description |
 |---------|-------------|

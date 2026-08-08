@@ -107,7 +107,7 @@ class TestBuildEventsSubagentStart:
     def test_subagent_start_produces_event_and_interaction(self, build_events):
         payload = {
             "hook_event_name": "SubagentStart",
-            "agent_type": "i-am:researcher",
+            "agent_type": "praxion:researcher",
             "session_id": "sess-001",
             "agent_id": "agent-001",
         }
@@ -115,7 +115,7 @@ class TestBuildEventsSubagentStart:
         assert len(events) == 1
         event = events[0]
         assert event["event_type"] == "agent_start"
-        assert event["agent_type"] == "i-am:researcher"
+        assert event["agent_type"] == "praxion:researcher"
         assert event["session_id"] == "sess-001"
         assert event["agent_id"] == "agent-001"
         assert event["parent_session_id"] == "sess-001"
@@ -154,11 +154,11 @@ class TestBuildEventsSubagentStart:
     def test_subagent_start_interaction_uses_agent_type_when_no_id(self, build_events):
         payload = {
             "hook_event_name": "SubagentStart",
-            "agent_type": "i-am:researcher",
+            "agent_type": "praxion:researcher",
             "session_id": "sess-001",
         }
         events, interactions = build_events(payload)
-        assert interactions[0]["target"] == "i-am:researcher"
+        assert interactions[0]["target"] == "praxion:researcher"
 
 
 # ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ class TestBuildEventsSubagentStop:
     def test_subagent_stop_produces_event_and_interaction(self, build_events):
         payload = {
             "hook_event_name": "SubagentStop",
-            "agent_type": "i-am:researcher",
+            "agent_type": "praxion:researcher",
             "session_id": "sess-001",
             "agent_id": "agent-001",
             "agent_transcript_path": "/tmp/transcript.md",
@@ -179,7 +179,7 @@ class TestBuildEventsSubagentStop:
         assert len(events) == 1
         event = events[0]
         assert event["event_type"] == "agent_stop"
-        assert event["agent_type"] == "i-am:researcher"
+        assert event["agent_type"] == "praxion:researcher"
         assert event["parent_session_id"] == "sess-001"
         assert "stopped" in event["message"]
         assert event["metadata"]["agent_transcript_path"] == "/tmp/transcript.md"
@@ -193,7 +193,7 @@ class TestBuildEventsSubagentStop:
     def test_subagent_stop_without_transcript(self, build_events):
         payload = {
             "hook_event_name": "SubagentStop",
-            "agent_type": "i-am:architect",
+            "agent_type": "praxion:architect",
             "session_id": "sess-002",
         }
         events, interactions = build_events(payload)
@@ -709,7 +709,7 @@ class TestMcpToolClassification:
         payload = {
             "hook_event_name": "PostToolUse",
             "session_id": "sess-001",
-            "tool_name": "mcp__plugin_i-am_memory__remember",
+            "tool_name": "mcp__plugin_praxion_memory__remember",
             "tool_input": {"key": "test"},
         }
         events, _ = build_events(payload)
@@ -733,7 +733,7 @@ class TestMcpToolClassification:
         payload = {
             "hook_event_name": "PostToolUse",
             "session_id": "sess-001",
-            "tool_name": "mcp__plugin_i-am_task-chronograph__get_pipeline_status",
+            "tool_name": "mcp__plugin_praxion_task-chronograph__get_pipeline_status",
             "tool_input": {},
         }
         events, _ = build_events(payload)
@@ -921,7 +921,7 @@ class TestBuildEventsPreToolUse:
         payload = {
             "hook_event_name": "PreToolUse",
             "session_id": "sess-200",
-            "tool_name": "mcp__plugin_i-am_memory__remember",
+            "tool_name": "mcp__plugin_praxion_memory__remember",
             "tool_use_id": "toolu_mcp",
             "tool_input": {"category": "learnings"},
         }

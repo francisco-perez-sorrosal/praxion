@@ -61,7 +61,7 @@ def _write_plugin(repo: Path, agents: list[str]) -> None:
     manifest = repo / ".claude-plugin" / "plugin.json"
     manifest.parent.mkdir(parents=True, exist_ok=True)
     manifest.write_text(
-        json.dumps({"name": "i-am", "agents": [f"./agents/{a}.md" for a in agents]})
+        json.dumps({"name": "praxion", "agents": [f"./agents/{a}.md" for a in agents]})
     )
 
 

@@ -284,7 +284,7 @@ def _project_dir(data):
     return data.get("cwd", "") or os.environ.get("CLAUDE_PROJECT_DIR", "")
 
 
-_MCP_PRAXION_PREFIX = "mcp__plugin_i-am_"
+_MCP_PRAXION_PREFIX = "mcp__plugin_praxion_"
 _MCP_SERVER_PREFIX = "mcp__"
 _PRAXION_MCP_SERVERS = frozenset({"memory", "task-chronograph", "task_chronograph"})
 
@@ -295,10 +295,10 @@ def _classify_mcp_tool(tool_name):
     Returns (server, tool) tuple, or None if not a Praxion MCP tool.
 
     Claude Code MCP tool names use ``__`` as the primary delimiter, but
-    the plugin name (``i-am``) and server name are joined with ``_`` inside
+    the plugin name (``praxion``) and server name are joined with ``_`` inside
     the second segment. Actual format:
-        mcp__plugin_i-am_<server>__<tool>
-    Split on ``__`` gives: ``['mcp', 'plugin_i-am_<server>', '<tool>']``
+        mcp__plugin_praxion_<server>__<tool>
+    Split on ``__`` gives: ``['mcp', 'plugin_praxion_<server>', '<tool>']``
     We strip the known prefix to get ``<server>__<tool>``, then split once.
     """
     if not tool_name.startswith(_MCP_PRAXION_PREFIX):

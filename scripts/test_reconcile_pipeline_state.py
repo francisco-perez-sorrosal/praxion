@@ -138,7 +138,7 @@ def test_partial_localizes_remainder(tmp_path):
         None,
         _changed_files_override=["src/a.py"],  # a done, b not
         _wal_rows_override=[
-            _wal_write("ag1", "i-am:implementer", "/repo/src/a.py", "2026-06-22T19:00:00Z"),
+            _wal_write("ag1", "praxion:implementer", "/repo/src/a.py", "2026-06-22T19:00:00Z"),
             _wal_stop("ag1"),
         ],
         _test_status_override="green",
@@ -198,7 +198,7 @@ def test_in_flight_when_changed_but_no_stop(tmp_path):
         None,
         _changed_files_override=["src/a.py"],
         _wal_rows_override=[
-            _wal_write("ag1", "i-am:implementer", "/repo/src/a.py", "2026-06-22T19:00:00Z"),
+            _wal_write("ag1", "praxion:implementer", "/repo/src/a.py", "2026-06-22T19:00:00Z"),
         ],  # tool_use but NO agent_stop
         _test_status_override="absent",
     )
@@ -389,13 +389,13 @@ def test_cross_boundary_canary_reconciler_sees_events_split_across_rotation(tmp_
         {
             "event_type": "agent_start",
             "agent_id": "agent-A",
-            "agent_type": "i-am:implementer",
+            "agent_type": "praxion:implementer",
             "timestamp": _WITHIN_WINDOW_TS,
         },
         {
             "event_type": "tool_use",
             "agent_id": "agent-A",
-            "agent_type": "i-am:implementer",
+            "agent_type": "praxion:implementer",
             "file_paths": [f"/repo/{declared_file}"],
             "timestamp": _WITHIN_WINDOW_TS,
         },
@@ -481,7 +481,7 @@ def test_canary_single_file_read_misses_current_session_events_after_rotation(tm
     seg_row = {
         "event_type": "tool_use",
         "agent_id": "agent-C",
-        "agent_type": "i-am:implementer",
+        "agent_type": "praxion:implementer",
         "timestamp": _WITHIN_WINDOW_TS,
     }
     seg_path.write_text(json.dumps(seg_row) + "\n", encoding="utf-8")

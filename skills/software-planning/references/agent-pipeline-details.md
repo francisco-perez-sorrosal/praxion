@@ -196,7 +196,7 @@ A subagent's full output lives in its `.ai-work/<task-slug>/` artifact. Its **re
 
 **Orchestrator reciprocal.** When delegating, ask for the artifact + a summary — never instruct an agent to "return X in full" or "paste the complete report." Read an artifact only when a decision depends on its detail. This is the `Return contract` row in the coordination protocol's pipeline rules, and the reciprocal of the delegation-deliverables rule in the philosophy.
 
-**Reach.** Praxion-native (`i-am:*`) agents carry a conformant `## Output` block in their definition (concise summary + pointer to the artifact). Host-native agents (`Explore`, `Plan`, `general-purpose`) receive the contract via the `inject_subagent_context.py` spawn preamble, since they have no definition block and do not load the always-on rules.
+**Reach.** Praxion-native (`praxion:*`) agents carry a conformant `## Output` block in their definition (concise summary + pointer to the artifact). Host-native agents (`Explore`, `Plan`, `general-purpose`) receive the contract via the `inject_subagent_context.py` spawn preamble, since they have no definition block and do not load the always-on rules.
 
 ### Completion handshake (truncation detection)
 

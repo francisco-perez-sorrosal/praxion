@@ -6,8 +6,8 @@
 # ---------------
 # /onboard-project installs git hooks and a merge driver that reference the
 # plugin's scripts/ by absolute path (the versioned plugin-cache install path,
-# e.g. ~/.claude/plugins/cache/i-am/<version>/scripts/git-finalize-hook.sh).
-# When the i-am plugin is upgraded, the cache moves to a new <version>/ path and
+# e.g. ~/.claude/plugins/cache/praxion/<version>/scripts/git-finalize-hook.sh).
+# When the praxion plugin is upgraded, the cache moves to a new <version>/ path and
 # the old one is garbage-collected, leaving the per-project pins dangling. The
 # onboard predicates that re-point them are themselves shipped by the plugin, so
 # a project onboarded by an *older* Praxion cannot self-heal until the *newer*
@@ -57,7 +57,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-PLUGIN_KEY="i-am@bit-agora"
+PLUGIN_KEY="praxion@bit-agora"
 EXPECTED_DRIVERS=("observations-jsonl")
 FINALIZE_HOOKS=("post-merge" "post-commit" "post-checkout")
 LEGACY_HOOK_BASENAME="git-post-merge-hook.sh"
@@ -343,10 +343,10 @@ for h in "${FINALIZE_HOOKS[@]}"; do
         action="repoint"            # dangling symlink (stale cache GC'd)
     elif [ -n "$target" ] && [ "$(basename "$target")" = "$LEGACY_HOOK_BASENAME" ]; then
         action="repoint"            # legacy single-trigger hook name
-    elif [ -n "$target" ] && case "$target" in */i-am/*) true;; *) false;; esac; then
+    elif [ -n "$target" ] && case "$target" in */praxion/*) true;; *) false;; esac; then
         action="repoint"            # version-pinned to a non-live cache path
     elif [ -L "$hp" ] && [ "$(basename "$target")" = "git-finalize-hook.sh" ]; then
-        # Resolves to a real finalize hook outside the /i-am/ cache — a dev /
+        # Resolves to a real finalize hook outside the /praxion/ cache — a dev /
         # self-host install (Praxion's own tree). Not stale; leave it.
         info "$h: skip (dev/self-host symlink → $target)"
         continue
@@ -387,7 +387,7 @@ elif [ -z "$cur_driver" ]; then
     else
         info "not registered and no .gitattributes mapping → nothing to do"
     fi
-elif case "$cur_driver" in */i-am/*) true;; *) false;; esac; then
+elif case "$cur_driver" in */praxion/*) true;; *) false;; esac; then
     note_change; info "stale ($cur_driver) → re-register"
     mutating && git -C "$REPO_ROOT" config merge.observations-jsonl.driver "$LIVE_DRIVER"
 else
@@ -406,10 +406,10 @@ if [ -f "$MANIFEST" ] && command -v jq >/dev/null 2>&1; then
         keep=0
         for e in "${EXPECTED_DRIVERS[@]}"; do [ "$d" = "$e" ] && keep=1; done
         [ "$keep" -eq 1 ] && continue
-        # Only remove Praxion-managed drivers: value contains /i-am/ or merge_driver_.
+        # Only remove Praxion-managed drivers: value contains /praxion/ or merge_driver_.
         dval="$(git -C "$REPO_ROOT" config --get "merge.$d.driver" 2>/dev/null || true)"
         case "$dval" in
-            */i-am/*|*merge_driver_*) ;;
+            */praxion/*|*merge_driver_*) ;;
             "") ;;  # already unset; the .gitattributes line may still need removal
             *) info "$d: driver value not Praxion-managed ('$dval') → skip"; continue ;;
         esac

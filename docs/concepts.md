@@ -39,7 +39,7 @@ Skills use **progressive disclosure**: metadata loads at activation time, full c
 
 ### Commands
 
-Slash commands for frequent workflows. Invoke with `/<name>` (or `/i-am:<name>` in Claude Code plugin mode). Commands are user-initiated actions that automate repetitive tasks.
+Slash commands for frequent workflows. Invoke with `/<name>` (or `/praxion:<name>` in Claude Code plugin mode). Commands are user-initiated actions that automate repetitive tasks.
 
 **Examples:** `/co` (create a commit following project conventions), `/create-worktree` (set up an isolated git worktree), `/onboard-project` (set up a new project for the ecosystem).
 

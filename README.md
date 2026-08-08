@@ -117,7 +117,7 @@ Reusable knowledge modules loaded automatically based on context. See [skills/RE
 
 ### Commands
 
-39 slash commands invoked with `/<name>` (`/i-am:<name>` in Claude Code plugin mode). Frequently used:
+39 slash commands invoked with `/<name>` (`/praxion:<name>` in Claude Code plugin mode). Frequently used:
 
 - `/co`, `/cop` — create a commit (and push)
 - `/create-worktree`, `/merge-worktree` — git worktree lifecycle
@@ -204,13 +204,13 @@ The main entry point is `install.sh`, which routes to `install_claude.sh` (Claud
 | ---- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
 | 1    | Personal config (CLAUDE.md, userPreferences.txt, settings.local.json) to `~/.claude/`                                     | No — always installed  |
 | 2    | Rules to `~/.claude/rules/` (auto-loaded when relevant)                                                                   | No — always installed  |
-| 3    | i-am plugin via [bit-agora](https://github.com/francisco-perez-sorrosal/bit-agora) marketplace (scope: user or project)   | Yes — recommended      |
+| 3    | praxion plugin via [bit-agora](https://github.com/francisco-perez-sorrosal/bit-agora) marketplace (scope: user or project)   | Yes — recommended      |
 | 4    | Task Chronograph hooks (agent lifecycle observability)                                                                    | Yes — recommended      |
 | 5    | CLI scripts (`praxion-parallel` — multi-session terminal launcher) to `~/.local/bin/`                                      | No — always installed  |
 | 6    | External API docs ([context-hub](https://github.com/andrewyng/context-hub) MCP — curated docs for 600+ libraries)         | Yes — recommended      |
 | 7    | Phoenix observability daemon (persistent trace backend at `http://localhost:6006`)                                        | Yes — recommended      |
 
-When installed as a plugin, commands are namespaced: `/co` becomes `/i-am:co`.
+When installed as a plugin, commands are namespaced: `/co` becomes `/praxion:co`.
 
 > [!TIP]
 > Developing on Praxion itself? After the standard install, use `praxion-claude-dev` (placed at `~/.local/bin/`) to launch a session that loads the plugin from your working tree — edits to skills, commands, agents, and hooks are live. See [README_DEV.md](README_DEV.md#session-scoped-local-testing).
@@ -220,14 +220,14 @@ When installed as a plugin, commands are namespaced: `/co` becomes `/i-am:co`.
 
 ```bash
 claude plugin marketplace add francisco-perez-sorrosal/bit-agora
-claude plugin install i-am@bit-agora --scope user
+claude plugin install praxion@bit-agora --scope user
 ```
 
 Praxion auto-completes setup on the first Claude Code session — rules are symlinked to `~/.claude/rules/`, CLI scripts to `~/.local/bin/`, no manual step required. `claude plugin install` fetches the full repo at the marketplace-pinned tag into `~/.claude/plugins/cache/`; auto-completion symlinks from that cache without cloning or network access.
 
-**After plugin updates** — `claude plugin update i-am` leaves existing symlinks pointing at the old version. Start a fresh session (auto-completion refreshes them) or run `/praxion-complete-install`.
+**After plugin updates** — `claude plugin update praxion` leaves existing symlinks pointing at the old version. Start a fresh session (auto-completion refreshes them) or run `/praxion-complete-install`.
 
-**Uninstall order** — run `/praxion-complete-uninstall` **first**, then `claude plugin uninstall i-am`. The reverse order leaves dangling symlinks (still cleanable by `/praxion-complete-uninstall`).
+**Uninstall order** — run `/praxion-complete-uninstall` **first**, then `claude plugin uninstall praxion`. The reverse order leaves dangling symlinks (still cleanable by `/praxion-complete-uninstall`).
 
 To reconfigure personal settings or recover from corruption, `/praxion-complete-install` is idempotent and prompts before each system-level change.
 

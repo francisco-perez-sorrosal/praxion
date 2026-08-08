@@ -100,7 +100,7 @@ class TestMcpToolClassification:
         ("tool_name", "expected"),
         [
             (
-                "mcp__plugin_i-am_task-chronograph__report_interaction",
+                "mcp__plugin_praxion_task-chronograph__report_interaction",
                 ("task-chronograph", "report_interaction"),
             ),
             (
@@ -126,12 +126,12 @@ class TestMcpToolClassification:
         self, classify_mcp_tool
     ):
         """dec-225 removed the memory server; archived streams still name it."""
-        assert classify_mcp_tool("mcp__plugin_i-am_memory__remember") == ("memory", "remember")
+        assert classify_mcp_tool("mcp__plugin_praxion_memory__remember") == ("memory", "remember")
 
     def test_plugin_prefixed_name_without_a_tool_segment_yields_an_empty_tool(
         self, classify_mcp_tool
     ):
-        assert classify_mcp_tool("mcp__plugin_i-am_task-chronograph") == ("task-chronograph", "")
+        assert classify_mcp_tool("mcp__plugin_praxion_task-chronograph") == ("task-chronograph", "")
 
     def test_non_praxion_mcp_tool_is_ignored(self, classify_mcp_tool):
         """Non-Praxion MCP tools do not get classified as Praxion events."""
@@ -540,7 +540,7 @@ class TestGitContext:
 
 class TestAgentProvenance:
     def test_supplied_agent_type_is_marked_as_coming_from_the_payload(self, hook):
-        assert hook._agent_type_source({"agent_type": "i-am:researcher"}) == hook.SOURCE_PAYLOAD
+        assert hook._agent_type_source({"agent_type": "praxion:researcher"}) == hook.SOURCE_PAYLOAD
 
     def test_description_fallback_is_named_as_such(self, hook):
         assert (
@@ -574,7 +574,7 @@ class TestAgentProvenance:
                 "hook_event_name": "SubagentStop",
                 "session_id": "s1",
                 "agent_id": "a1",
-                "agent_type": "i-am:verifier",
+                "agent_type": "praxion:verifier",
                 "agent_transcript_path": "/tmp/t.md",
             }
         )
@@ -584,7 +584,11 @@ class TestAgentProvenance:
 
     def test_subagent_start_carries_the_provenance_marker(self, hook):
         events, _ = hook._build_events(
-            {"hook_event_name": "SubagentStart", "session_id": "s1", "agent_type": "i-am:sentinel"}
+            {
+                "hook_event_name": "SubagentStart",
+                "session_id": "s1",
+                "agent_type": "praxion:sentinel",
+            }
         )
         assert events[0]["metadata"]["agent_type_source"] == hook.SOURCE_PAYLOAD
 
@@ -602,7 +606,7 @@ class TestAgentProvenance:
 
 class TestAgentLabel:
     def test_agent_type_wins(self, hook):
-        assert hook._agent_label({"agent_type": "i-am:researcher"}) == "i-am:researcher"
+        assert hook._agent_label({"agent_type": "praxion:researcher"}) == "praxion:researcher"
 
     def test_description_is_preferred_over_the_uuid_like_agent_id(self, hook):
         assert hook._agent_label({"description": "Audit", "agent_id": "abc"}) == "Audit"
@@ -846,7 +850,7 @@ class TestMainWiring:
                 "hook_event_name": "SubagentStart",
                 "session_id": "s1",
                 "agent_id": "a1",
-                "agent_type": "i-am:researcher",
+                "agent_type": "praxion:researcher",
             },
             monkeypatch,
         )

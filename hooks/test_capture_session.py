@@ -51,7 +51,7 @@ def _wal_row(**overrides: object) -> dict:
     row: dict = {
         "timestamp": "2026-08-06T18:00:00+00:00",
         "session_id": "sess-1",
-        "agent_type": "i-am:implementer",
+        "agent_type": "praxion:implementer",
         "agent_id": "agent-1",
         "project": "praxion",
         "event_type": "tool_use",
@@ -130,7 +130,7 @@ def _start_payload(cwd: Path, **overrides: object) -> dict:
         "hook_event_name": "SubagentStart",
         "session_id": "sess-1",
         "agent_id": "agent-orphan",
-        "agent_type": "i-am:implementer",
+        "agent_type": "praxion:implementer",
         "description": "Task slug: important-findings-remediation",
         "cwd": str(cwd),
     }
@@ -224,7 +224,7 @@ class TestOrphanedStopIsDetected:
         obs_path = project / ".ai-state" / "observations.jsonl"
         _write_wal(obs_path, [])
 
-        _run_main(module, _stop_payload(project, agent_type="i-am:verifier"), monkeypatch)
+        _run_main(module, _stop_payload(project, agent_type="praxion:verifier"), monkeypatch)
 
         assert unnameable_lifecycle_rows(_read_wal(obs_path)) == []
 
@@ -278,7 +278,7 @@ class TestWalBackfill:
             [
                 _wal_row(
                     event_type="agent_start",
-                    agent_type="i-am:test-engineer",
+                    agent_type="praxion:test-engineer",
                     agent_id="agent-orphan",
                 )
             ],
@@ -287,7 +287,7 @@ class TestWalBackfill:
         _run_main(module, _stop_payload(project), monkeypatch)
 
         emitted = _read_wal(obs_path)[-1]
-        assert emitted["agent_type"] == "i-am:test-engineer"
+        assert emitted["agent_type"] == "praxion:test-engineer"
         assert emitted["agent_type_source"] == module.SOURCE_WAL_BACKFILL
 
     def test_blank_stop_recovers_agent_type_from_a_tool_use_row(
@@ -303,29 +303,29 @@ class TestWalBackfill:
         obs_path = project / ".ai-state" / "observations.jsonl"
         _write_wal(
             obs_path,
-            [_wal_row(agent_type="i-am:doc-engineer", agent_id="agent-orphan")],
+            [_wal_row(agent_type="praxion:doc-engineer", agent_id="agent-orphan")],
         )
 
         _run_main(module, _stop_payload(project), monkeypatch)
 
-        assert _read_wal(obs_path)[-1]["agent_type"] == "i-am:doc-engineer"
+        assert _read_wal(obs_path)[-1]["agent_type"] == "praxion:doc-engineer"
 
     def test_backfill_uses_the_most_recent_matching_row(self, project: Path) -> None:
         module = _load_module()
         obs_path = _write_wal(
             project / ".ai-state" / "observations.jsonl",
             [
-                _wal_row(agent_type="i-am:researcher", agent_id="agent-1"),
-                _wal_row(agent_type="i-am:implementer", agent_id="agent-1"),
+                _wal_row(agent_type="praxion:researcher", agent_id="agent-1"),
+                _wal_row(agent_type="praxion:implementer", agent_id="agent-1"),
             ],
         )
-        assert module.lookup_prior_agent(obs_path, "agent-1")[0] == "i-am:implementer"
+        assert module.lookup_prior_agent(obs_path, "agent-1")[0] == "praxion:implementer"
 
     def test_backfill_ignores_rows_for_other_agents(self, project: Path) -> None:
         module = _load_module()
         obs_path = _write_wal(
             project / ".ai-state" / "observations.jsonl",
-            [_wal_row(agent_type="i-am:researcher", agent_id="somebody-else")],
+            [_wal_row(agent_type="praxion:researcher", agent_id="somebody-else")],
         )
         assert module.lookup_prior_agent(obs_path, "agent-1")[0] == ""
 
@@ -342,11 +342,11 @@ class TestWalBackfill:
         module = _load_module()
         obs_path = _write_wal(
             project / ".ai-state" / "observations.jsonl",
-            [_wal_row(agent_type="i-am:verifier", agent_id="agent-1")],
+            [_wal_row(agent_type="praxion:verifier", agent_id="agent-1")],
         )
         with open(obs_path, "a", encoding="utf-8") as handle:
             handle.write('{"agent_id": "agent-1", "agent_ty')  # torn mid-write
-        assert module.lookup_prior_agent(obs_path, "agent-1")[0] == "i-am:verifier"
+        assert module.lookup_prior_agent(obs_path, "agent-1")[0] == "praxion:verifier"
 
     def test_backfill_skips_non_object_rows(self, project: Path) -> None:
         module = _load_module()
@@ -354,11 +354,11 @@ class TestWalBackfill:
         obs_path.parent.mkdir(parents=True, exist_ok=True)
         obs_path.write_text(
             '["not", "a", "row"]\n\n'
-            + json.dumps(_wal_row(agent_type="i-am:sentinel", agent_id="agent-1"))
+            + json.dumps(_wal_row(agent_type="praxion:sentinel", agent_id="agent-1"))
             + "\n",
             encoding="utf-8",
         )
-        assert module.lookup_prior_agent(obs_path, "agent-1")[0] == "i-am:sentinel"
+        assert module.lookup_prior_agent(obs_path, "agent-1")[0] == "praxion:sentinel"
 
     def test_backfill_returns_empty_for_a_missing_wal(self, tmp_path: Path) -> None:
         module = _load_module()
@@ -386,8 +386,8 @@ class TestWalBackfill:
         obs_path = _write_wal(
             project / ".ai-state" / "observations.jsonl",
             [
-                _wal_row(agent_type="i-am:researcher", agent_id="agent-1"),
-                _wal_row(agent_type="i-am:implementer", agent_id="agent-1"),
+                _wal_row(agent_type="praxion:researcher", agent_id="agent-1"),
+                _wal_row(agent_type="praxion:implementer", agent_id="agent-1"),
             ],
         )
         whole = obs_path.read_text(encoding="utf-8")
@@ -396,7 +396,7 @@ class TestWalBackfill:
         lines = module._tail_lines(obs_path, max_bytes=window)
 
         assert len(lines) == 1
-        assert json.loads(lines[0])["agent_type"] == "i-am:implementer"
+        assert json.loads(lines[0])["agent_type"] == "praxion:implementer"
 
     def test_tail_window_larger_than_the_file_keeps_every_line(self, project: Path) -> None:
         module = _load_module()
@@ -439,7 +439,7 @@ class TestStartStopCorrelation:
         assert stop["event_type"] == "agent_stop"
         assert stop["agent_id"] == start["agent_id"] == "agent-orphan"
         assert stop["start_correlation"] == module.CORRELATION_PAIRED
-        assert stop["agent_type"] == "i-am:implementer"
+        assert stop["agent_type"] == "praxion:implementer"
 
     def test_stop_without_a_start_row_is_marked_unobserved_not_paired(
         self, project: Path, monkeypatch: pytest.MonkeyPatch
@@ -475,13 +475,13 @@ class TestStartStopCorrelation:
         """
         module = _load_module()
         obs_path = project / ".ai-state" / "observations.jsonl"
-        _write_wal(obs_path, [_wal_row(agent_type="i-am:doc-engineer", agent_id="agent-orphan")])
+        _write_wal(obs_path, [_wal_row(agent_type="praxion:doc-engineer", agent_id="agent-orphan")])
 
         _run_main(module, _stop_payload(project), monkeypatch)
 
         emitted = _read_wal(obs_path)[-1]
         assert emitted["start_correlation"] == module.CORRELATION_UNOBSERVED_START
-        assert emitted["agent_type"] == "i-am:doc-engineer"
+        assert emitted["agent_type"] == "praxion:doc-engineer"
         assert emitted["agent_type_source"] == module.SOURCE_WAL_BACKFILL
 
     def test_detector_flags_the_unpaired_stop(
@@ -506,7 +506,7 @@ class TestStartStopCorrelation:
         obs_path = project / ".ai-state" / "observations.jsonl"
 
         _run_main(module, _start_payload(project), monkeypatch)
-        _run_main(module, _stop_payload(project, agent_type="i-am:implementer"), monkeypatch)
+        _run_main(module, _stop_payload(project, agent_type="praxion:implementer"), monkeypatch)
 
         assert unpaired_stop_rows(_read_wal(obs_path)) == []
 
@@ -601,17 +601,17 @@ class TestPriorAgentLookup:
         module = _load_module()
         obs_path = _write_wal(
             project / ".ai-state" / "observations.jsonl",
-            [_wal_row(event_type="agent_start", agent_type="i-am:verifier", agent_id="agent-1")],
+            [_wal_row(event_type="agent_start", agent_type="praxion:verifier", agent_id="agent-1")],
         )
-        assert module.lookup_prior_agent(obs_path, "agent-1") == ("i-am:verifier", True)
+        assert module.lookup_prior_agent(obs_path, "agent-1") == ("praxion:verifier", True)
 
     def test_lookup_reports_no_start_when_only_tool_rows_exist(self, project: Path) -> None:
         module = _load_module()
         obs_path = _write_wal(
             project / ".ai-state" / "observations.jsonl",
-            [_wal_row(agent_type="i-am:verifier", agent_id="agent-1")],
+            [_wal_row(agent_type="praxion:verifier", agent_id="agent-1")],
         )
-        assert module.lookup_prior_agent(obs_path, "agent-1") == ("i-am:verifier", False)
+        assert module.lookup_prior_agent(obs_path, "agent-1") == ("praxion:verifier", False)
 
     def test_lookup_pairs_a_start_whose_own_type_is_unusable(self, project: Path) -> None:
         """Pairing keys on the id; an unnameable start still witnesses the spawn."""
@@ -636,14 +636,16 @@ class TestAgentTypeResolution:
     def test_supplied_agent_type_is_used_verbatim_and_marked_as_payload(self) -> None:
         module = _load_module()
         agent_type, source = module.resolve_agent_type(
-            {"agent_type": "i-am:verifier"}, "agent_stop"
+            {"agent_type": "praxion:verifier"}, "agent_stop"
         )
-        assert (agent_type, source) == ("i-am:verifier", module.SOURCE_PAYLOAD)
+        assert (agent_type, source) == ("praxion:verifier", module.SOURCE_PAYLOAD)
 
     def test_supplied_agent_type_is_stripped_of_surrounding_whitespace(self) -> None:
         module = _load_module()
-        agent_type, _ = module.resolve_agent_type({"agent_type": "  i-am:verifier "}, "agent_stop")
-        assert agent_type == "i-am:verifier"
+        agent_type, _ = module.resolve_agent_type(
+            {"agent_type": "  praxion:verifier "}, "agent_stop"
+        )
+        assert agent_type == "praxion:verifier"
 
     @pytest.mark.parametrize("event_type", ["session_start", "session_stop"])
     def test_session_rows_resolve_to_main_with_a_named_source(self, event_type: str) -> None:
@@ -706,8 +708,8 @@ class TestSummary:
 
     def test_agent_summary_falls_back_to_the_resolved_agent_type(self) -> None:
         module = _load_module()
-        assert module.build_summary("agent_stop", {}, "i-am:sentinel") == (
-            "Agent completed: i-am:sentinel"
+        assert module.build_summary("agent_stop", {}, "praxion:sentinel") == (
+            "Agent completed: praxion:sentinel"
         )
 
     def test_agent_summary_truncates_a_long_description(self) -> None:
@@ -732,7 +734,7 @@ class TestObservationEnvelope:
             {
                 "session_id": "sess-1",
                 "agent_id": "agent-1",
-                "agent_type": "i-am:implementer",
+                "agent_type": "praxion:implementer",
                 "cwd": str(project),
             },
             "agent_start",
@@ -780,8 +782,8 @@ class TestMainContract:
         module = _load_module()
         obs_path = project / ".ai-state" / "observations.jsonl"
 
-        _run_main(module, _stop_payload(project, agent_type="i-am:verifier"), monkeypatch)
-        _run_main(module, _stop_payload(project, agent_type="i-am:verifier"), monkeypatch)
+        _run_main(module, _stop_payload(project, agent_type="praxion:verifier"), monkeypatch)
+        _run_main(module, _stop_payload(project, agent_type="praxion:verifier"), monkeypatch)
 
         assert len(_read_wal(obs_path)) == 2
 

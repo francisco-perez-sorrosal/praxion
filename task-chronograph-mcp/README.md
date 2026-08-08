@@ -36,7 +36,7 @@ Claude Code Hooks (stdlib, <100ms)
 
 ## Quick Start
 
-The `i-am` plugin auto-registers the MCP server. Phoenix is installed separately:
+The `praxion` plugin auto-registers the MCP server. Phoenix is installed separately:
 
 ```bash
 phoenix-ctl install          # Install Phoenix daemon (~300MB)

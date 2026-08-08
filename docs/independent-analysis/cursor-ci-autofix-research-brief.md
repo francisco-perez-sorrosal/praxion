@@ -1,6 +1,6 @@
 # Research Brief — Autonomous CI/PR Failure Remediation via the Cursor Agent (installable across Praxion + managed projects)
 
-> Paste this whole brief as the task for a fresh Praxion research session. Recommended invocation: `/deep-research` with this brief as the argument, or spawn the `i-am:researcher` agent (escalate to the contested-evidence Opus mode — this has ≥3 plausible architectures with conflicting trade-offs). Honor Praxion's reputable-sources-over-hype discipline throughout.
+> Paste this whole brief as the task for a fresh Praxion research session. Recommended invocation: `/deep-research` with this brief as the argument, or spawn the `praxion:researcher` agent (escalate to the contested-evidence Opus mode — this has ≥3 plausible architectures with conflicting trade-offs). Honor Praxion's reputable-sources-over-hype discipline throughout.
 
 ## 1. Mission
 

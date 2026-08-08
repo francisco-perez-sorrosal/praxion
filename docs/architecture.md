@@ -177,7 +177,7 @@ The test-topology subsystem lets each implementation step run only the tests cov
 
 ### 9.2 Activation status in Praxion
 
-Praxion ships the schema, conventions, agent wiring, and the `/refresh-topology` command, but does **not** populate `.ai-state/TEST_TOPOLOGY.md` for itself — Praxion's ~35 s test fleet is below the growth-trigger thresholds, and the behavioral pilot is deliberately deferred to the first consumer project that crosses the gate. A consumer project that adopts the i-am plugin and grows past the thresholds runs `/refresh-topology --init` to create its topology.
+Praxion ships the schema, conventions, agent wiring, and the `/refresh-topology` command, but does **not** populate `.ai-state/TEST_TOPOLOGY.md` for itself — Praxion's ~35 s test fleet is below the growth-trigger thresholds, and the behavioral pilot is deliberately deferred to the first consumer project that crosses the gate. A consumer project that adopts the praxion plugin and grows past the thresholds runs `/refresh-topology --init` to create its topology.
 
 For Praxion development today, this means:
 

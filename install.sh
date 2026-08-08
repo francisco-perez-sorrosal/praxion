@@ -348,7 +348,7 @@ EOF
   Components:
     • Personal config  (CLAUDE.md, userPreferences.txt)
     • Rules            (auto-loaded by Claude)
-    • i-am plugin      (skills, commands, agents)
+    • praxion plugin      (skills, commands, agents)
     • Chronograph hooks (agent lifecycle observability)
     • CLI scripts       (praxion-parallel — multi-session terminal launcher)
     • context-hub MCP   (chub-mcp — native agent tool access)
@@ -420,7 +420,7 @@ Usage: $(basename "$0") [code|desktop|cursor [path]|codex path] [--check] [--dry
   --relink     Re-symlink config, rules, and scripts (no prompts)
   --complete-install
                Marketplace-only users: finish a 'claude plugin install
-               i-am@bit-agora' by symlinking rules, CLI scripts, and
+               praxion@bit-agora' by symlinking rules, CLI scripts, and
                (optionally) context-hub MCP — the surfaces the plugin
                mechanism does not cover natively. Prompts before each
                system-level change. Reachable via /praxion-complete-install
@@ -429,7 +429,7 @@ Usage: $(basename "$0") [code|desktop|cursor [path]|codex path] [--check] [--dry
                Reverse of --complete-install: remove the rule/script
                symlinks that point at the plugin cache, and optionally
                remove context-hub MCP. Plugin body is preserved — run
-               'claude plugin uninstall i-am' separately to remove it.
+               'claude plugin uninstall praxion' separately to remove it.
                Only valid with 'code'.
   --dev-link   Symlink the pinned plugin cache's hooks/, scripts/, and
                commands/ back to this working tree's own copies, so local

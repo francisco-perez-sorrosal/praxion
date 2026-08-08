@@ -293,7 +293,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            Load the i-am:architect-validator agent. Run in --mode=pre-merge
+            Load the praxion:architect-validator agent. Run in --mode=pre-merge
             for PR #${{ github.event.pull_request.number }} on ${{ github.repository }}.
 
             Steps:

@@ -54,7 +54,7 @@ def _run(home: Path, source_dir: Path | None, *args: str) -> subprocess.Complete
 
 
 def _cache_dir(home: Path, version: str = "0.12.0") -> Path:
-    return home / ".claude" / "plugins" / "cache" / "bit-agora" / "i-am" / version
+    return home / ".claude" / "plugins" / "cache" / "bit-agora" / "praxion" / version
 
 
 def _write_registry(home: Path, install_path: Path, version: str = "0.12.0") -> None:
@@ -64,7 +64,7 @@ def _write_registry(home: Path, install_path: Path, version: str = "0.12.0") -> 
         json.dumps(
             {
                 "plugins": {
-                    "i-am@bit-agora": [
+                    "praxion@bit-agora": [
                         {
                             "scope": "user",
                             "installPath": str(install_path),
@@ -79,7 +79,7 @@ def _write_registry(home: Path, install_path: Path, version: str = "0.12.0") -> 
 
 @pytest.fixture
 def env(tmp_path: Path) -> dict:
-    """A synthetic HOME with a pinned i-am install + a synthetic source tree."""
+    """A synthetic HOME with a pinned praxion install + a synthetic source tree."""
     home = tmp_path / "home"
     cache = _cache_dir(home)
     for surface in ("hooks", "scripts", "commands"):

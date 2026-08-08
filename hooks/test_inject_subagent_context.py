@@ -5,15 +5,15 @@ Behavioral specification:
 
 - Host-native subagents (Explore, Plan, general-purpose) receive a compact Praxion
   preamble prepended to their prompt when launched from a Praxion-managed project.
-- Praxion-native subagents (i-am:*) are skipped by default for the PREAMBLE ONLY
+- Praxion-native subagents (praxion:*) are skipped by default for the PREAMBLE ONLY
   (they already encode the behavioral contract in their system prompts).
 - Praxion-native subagents receive the preamble when PRAXION_INJECT_NATIVE_SUBAGENTS=1.
 - Projects without a .ai-state/ directory receive no preamble (not a Praxion project) —
   this gate is scoped to the preamble only.
 - PRAXION_DISABLE_SUBAGENT_INJECT=1 disables the preamble in any project.
 - A session inside a *linked* git worktree (`--git-dir` != `--git-common-dir`) gets a
-  session-worktree briefing line prepended for EVERY subagent type, i-am:* included —
-  no .ai-state/ requirement, no i-am skip.
+  session-worktree briefing line prepended for EVERY subagent type, praxion:* included —
+  no .ai-state/ requirement, no praxion skip.
 - A prompt that names an absolute `.claude/worktrees/<name>` path differing from the
   session's own cwd gets a briefed-root line prepended for EVERY subagent type — pure
   text regex, no filesystem walk, no git call.
@@ -336,17 +336,17 @@ def test_output_hook_event_name_is_pretooluse(praxion_project: Path) -> None:
 @pytest.mark.parametrize(
     "subagent_type",
     [
-        "i-am:researcher",
-        "i-am:implementer",
-        "i-am:test-engineer",
-        "i-am:systems-architect",
-        "i-am:verifier",
+        "praxion:researcher",
+        "praxion:implementer",
+        "praxion:test-engineer",
+        "praxion:systems-architect",
+        "praxion:verifier",
     ],
 )
 def test_praxion_native_subagent_skipped_by_default(
     subagent_type: str, praxion_project: Path
 ) -> None:
-    """Praxion-native agents (i-am:*) produce no injection by default (no
+    """Praxion-native agents (praxion:*) produce no injection by default (no
     preamble; not a worktree session; prompt names no worktree)."""
     payload = _pretooluse_payload(subagent_type=subagent_type, cwd=str(praxion_project))
     result = _run_hook(payload)
@@ -364,11 +364,11 @@ def test_praxion_native_subagent_skipped_by_default(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("subagent_type", ["i-am:researcher", "i-am:implementer"])
+@pytest.mark.parametrize("subagent_type", ["praxion:researcher", "praxion:implementer"])
 def test_praxion_native_receives_preamble_when_opt_in_env_set(
     subagent_type: str, praxion_project: Path
 ) -> None:
-    """With PRAXION_INJECT_NATIVE_SUBAGENTS=1, i-am:* agents also get the preamble."""
+    """With PRAXION_INJECT_NATIVE_SUBAGENTS=1, praxion:* agents also get the preamble."""
     payload = _pretooluse_payload(subagent_type=subagent_type, cwd=str(praxion_project))
     result = _run_hook(payload, env_extra={"PRAXION_INJECT_NATIVE_SUBAGENTS": "1"})
 
@@ -402,7 +402,7 @@ def test_praxion_native_injection_opt_in_does_not_affect_host_native(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("subagent_type", ["Explore", "Plan", "i-am:researcher"])
+@pytest.mark.parametrize("subagent_type", ["Explore", "Plan", "praxion:researcher"])
 def test_no_injection_when_ai_state_absent(subagent_type: str, non_praxion_project: Path) -> None:
     """No injection occurs for any subagent type when .ai-state/ is absent and
     the cwd is not a git repo (none-apply composition case)."""
@@ -441,7 +441,7 @@ def test_injection_disabled_when_opt_out_env_set(subagent_type: str, praxion_pro
 
 def test_opt_out_also_suppresses_native_opt_in(praxion_project: Path) -> None:
     """PRAXION_DISABLE_SUBAGENT_INJECT takes precedence over PRAXION_INJECT_NATIVE_SUBAGENTS."""
-    payload = _pretooluse_payload(subagent_type="i-am:researcher", cwd=str(praxion_project))
+    payload = _pretooluse_payload(subagent_type="praxion:researcher", cwd=str(praxion_project))
     result = _run_hook(
         payload,
         env_extra={
@@ -458,7 +458,7 @@ def test_disable_preamble_flag_does_not_suppress_worktree_line(
 ) -> None:
     """PRAXION_DISABLE_SUBAGENT_INJECT is scoped to the preamble only — the
     session-worktree line still fires inside a linked worktree."""
-    payload = _pretooluse_payload(subagent_type="i-am:implementer", cwd=str(linked_worktree))
+    payload = _pretooluse_payload(subagent_type="praxion:implementer", cwd=str(linked_worktree))
     result = _run_hook(payload, env_extra={"PRAXION_DISABLE_SUBAGENT_INJECT": "1"})
 
     assert result.returncode == 0
@@ -683,7 +683,7 @@ def test_injects_session_worktree_line_from_worktree_cwd(linked_worktree: Path) 
     None), stdout would stay empty and this test would fail — proving the gate
     is not a no-op that only ever passes on the current (non-firing) state.
     """
-    payload = _pretooluse_payload(subagent_type="i-am:implementer", cwd=str(linked_worktree))
+    payload = _pretooluse_payload(subagent_type="praxion:implementer", cwd=str(linked_worktree))
     result = _run_hook(payload)
 
     assert result.returncode == 0, f"Hook exited non-zero: {result.stderr}"
@@ -707,7 +707,7 @@ def test_no_session_worktree_line_from_canonical_checkout_cwd(main_repo: Path) -
     only variable is cwd (linked worktree vs main checkout). This rules out a
     hook that fires unconditionally regardless of worktree state.
     """
-    payload = _pretooluse_payload(subagent_type="i-am:implementer", cwd=str(main_repo))
+    payload = _pretooluse_payload(subagent_type="praxion:implementer", cwd=str(main_repo))
     result = _run_hook(payload)
 
     assert result.returncode == 0
@@ -720,7 +720,7 @@ def test_no_session_worktree_line_when_cwd_is_not_a_git_repo(tmp_path: Path) -> 
     """A non-git cwd has no worktree boundary — no injection, fail-open."""
     non_git = tmp_path / "not-a-repo"
     non_git.mkdir()
-    payload = _pretooluse_payload(subagent_type="i-am:implementer", cwd=str(non_git))
+    payload = _pretooluse_payload(subagent_type="praxion:implementer", cwd=str(non_git))
     result = _run_hook(payload)
 
     assert result.returncode == 0
@@ -729,12 +729,12 @@ def test_no_session_worktree_line_when_cwd_is_not_a_git_repo(tmp_path: Path) -> 
 
 @pytest.mark.parametrize(
     "subagent_type",
-    ["i-am:implementer", "i-am:systems-architect", "Explore", "Plan", "general-purpose"],
+    ["praxion:implementer", "praxion:systems-architect", "Explore", "Plan", "general-purpose"],
 )
 def test_session_worktree_line_injects_for_every_subagent_type(
     subagent_type: str, linked_worktree: Path
 ) -> None:
-    """Unlike the preamble's gate (d), i-am:* agents are NOT skipped for the
+    """Unlike the preamble's gate (d), praxion:* agents are NOT skipped for the
     session-worktree line: they are the common case in worktree pipelines
     (EnterWorktree is a Standard/Full requirement), so excluding them would
     leave the most frequent spawn path unmitigated.
@@ -750,7 +750,7 @@ def test_session_worktree_line_injects_for_every_subagent_type(
 
 
 def test_disable_worktree_flag_suppresses_session_worktree_line(linked_worktree: Path) -> None:
-    payload = _pretooluse_payload(subagent_type="i-am:implementer", cwd=str(linked_worktree))
+    payload = _pretooluse_payload(subagent_type="praxion:implementer", cwd=str(linked_worktree))
     result = _run_hook(payload, env_extra={"PRAXION_DISABLE_WORKTREE_PATH_BRIEFING": "1"})
     assert result.returncode == 0
     assert result.stdout == ""
@@ -777,7 +777,7 @@ def test_injects_briefed_root_line_when_canonical_session_names_a_worktree(
     """
     named_worktree = "/Users/example/project/.claude/worktrees/other-feature"
     payload = _pretooluse_payload(
-        subagent_type="i-am:doc-engineer",
+        subagent_type="praxion:doc-engineer",
         prompt=_prompt_that_names(named_worktree),
         cwd=str(main_repo),
     )
@@ -796,7 +796,7 @@ def test_injects_briefed_root_line_when_canonical_session_names_a_worktree(
 def test_no_briefed_root_line_when_prompt_names_no_worktree(main_repo: Path) -> None:
     """Suppression case: a canonical session with an ordinary prompt (no
     worktree path named) gets no briefed-root line."""
-    payload = _pretooluse_payload(subagent_type="i-am:implementer", cwd=str(main_repo))
+    payload = _pretooluse_payload(subagent_type="praxion:implementer", cwd=str(main_repo))
     result = _run_hook(payload)
     assert result.returncode == 0
     assert result.stdout == ""
@@ -810,7 +810,7 @@ def test_no_briefed_root_line_when_prompt_names_the_sessions_own_root(
     session-worktree line — only one line fires."""
     own_root = str(linked_worktree.resolve())
     payload = _pretooluse_payload(
-        subagent_type="i-am:implementer",
+        subagent_type="praxion:implementer",
         prompt=_prompt_that_names(own_root),
         cwd=str(linked_worktree),
     )
@@ -831,7 +831,7 @@ def test_no_briefed_root_line_when_prompt_names_a_subpath_of_sessions_own_root(
     the bare root) is still recognized as 'already there' — no duplicate line."""
     sub_path = f"{linked_worktree.resolve()}/src/module.py"
     payload = _pretooluse_payload(
-        subagent_type="i-am:implementer",
+        subagent_type="praxion:implementer",
         prompt=_prompt_that_names(str(linked_worktree.resolve()), note=f"Edit {sub_path}."),
         cwd=str(linked_worktree),
     )
@@ -844,12 +844,12 @@ def test_no_briefed_root_line_when_prompt_names_a_subpath_of_sessions_own_root(
 
 @pytest.mark.parametrize(
     "subagent_type",
-    ["i-am:implementer", "i-am:doc-engineer", "Explore", "Plan", "general-purpose"],
+    ["praxion:implementer", "praxion:doc-engineer", "Explore", "Plan", "general-purpose"],
 )
 def test_briefed_root_line_injects_for_every_subagent_type(
     subagent_type: str, main_repo: Path
 ) -> None:
-    """No i-am:* skip for the briefed-root line either — symmetric with the
+    """No praxion:* skip for the briefed-root line either — symmetric with the
     session-worktree line's all-agent-types contract."""
     named_worktree = "/Users/example/project/.claude/worktrees/other-feature"
     payload = _pretooluse_payload(
@@ -867,7 +867,7 @@ def test_briefed_root_line_injects_for_every_subagent_type(
 def test_disable_worktree_flag_suppresses_briefed_root_line(main_repo: Path) -> None:
     named_worktree = "/Users/example/project/.claude/worktrees/other-feature"
     payload = _pretooluse_payload(
-        subagent_type="i-am:implementer",
+        subagent_type="praxion:implementer",
         prompt=_prompt_that_names(named_worktree),
         cwd=str(main_repo),
     )
@@ -884,7 +884,7 @@ def test_briefed_root_and_session_worktree_lines_both_fire_on_worktree_mismatch(
     mismatch reinforcement for the named target."""
     other_worktree = "/Users/example/project/.claude/worktrees/other-feature"
     payload = _pretooluse_payload(
-        subagent_type="i-am:implementer",
+        subagent_type="praxion:implementer",
         prompt=_prompt_that_names(other_worktree),
         cwd=str(linked_worktree),
     )
@@ -920,10 +920,10 @@ def test_composition_preamble_only(praxion_project: Path) -> None:
 def test_composition_session_worktree_line_only_no_preamble_for_iam_agent(
     linked_worktree: Path,
 ) -> None:
-    """i-am agent in a worktree session (no .ai-state/, not opted in): the
-    session-worktree line fires, but the preamble does NOT — i-am:* agents
+    """praxion agent in a worktree session (no .ai-state/, not opted in): the
+    session-worktree line fires, but the preamble does NOT — praxion:* agents
     are skipped by default and this worktree has no .ai-state/ either way."""
-    payload = _pretooluse_payload(subagent_type="i-am:implementer", cwd=str(linked_worktree))
+    payload = _pretooluse_payload(subagent_type="praxion:implementer", cwd=str(linked_worktree))
     result = _run_hook(payload)
     assert result.returncode == 0
     output = json.loads(result.stdout)
@@ -989,9 +989,9 @@ def test_composition_preamble_plus_briefed_root_line(praxion_main_repo: Path) ->
 
 
 def test_composition_none_apply_yields_no_output(non_praxion_project: Path) -> None:
-    """Non-Praxion, non-git cwd, i-am agent, ordinary prompt: none of the
+    """Non-Praxion, non-git cwd, praxion agent, ordinary prompt: none of the
     three conditions hold — the hook emits nothing at all."""
-    payload = _pretooluse_payload(subagent_type="i-am:implementer", cwd=str(non_praxion_project))
+    payload = _pretooluse_payload(subagent_type="praxion:implementer", cwd=str(non_praxion_project))
     result = _run_hook(payload)
     assert result.returncode == 0
     assert result.stdout == ""
@@ -1006,7 +1006,7 @@ def test_updated_input_is_the_tool_input_object_directly(linked_worktree: Path) 
     """Harness contract: updatedInput's value IS the replacement tool-input
     params object directly — never wrapped in an envelope key such as
     {"tool_input": ...}."""
-    payload = _pretooluse_payload(subagent_type="i-am:implementer", cwd=str(linked_worktree))
+    payload = _pretooluse_payload(subagent_type="praxion:implementer", cwd=str(linked_worktree))
     result = _run_hook(payload)
     assert result.returncode == 0
     output = json.loads(result.stdout)
@@ -1020,7 +1020,7 @@ def test_worktree_lines_preserve_other_tool_input_fields(linked_worktree: Path) 
     """description/model/run_in_background must survive the worktree-line
     injection untouched — the same field-preservation contract as the
     preamble path."""
-    payload = _pretooluse_payload(subagent_type="i-am:implementer", cwd=str(linked_worktree))
+    payload = _pretooluse_payload(subagent_type="praxion:implementer", cwd=str(linked_worktree))
     payload["tool_input"]["description"] = "implement step 3"
     payload["tool_input"]["model"] = "sonnet"
     payload["tool_input"]["run_in_background"] = True
@@ -1080,7 +1080,7 @@ class TestAiStateGateAndCache:
 
     @pytest.mark.parametrize(
         ("subagent_type", "expected"),
-        [("i-am:researcher", True), ("Explore", False), ("general-purpose", False), ("", False)],
+        [("praxion:researcher", True), ("Explore", False), ("general-purpose", False), ("", False)],
     )
     def test_praxion_native_detection(self, subagent_type: str, expected: bool) -> None:
         module = _load_module()
@@ -1109,7 +1109,7 @@ class TestPreambleSegmentGates:
 
     def test_praxion_native_agent_is_skipped_by_default(self, praxion_project: Path) -> None:
         module = _load_module()
-        assert module._preamble_segment("i-am:researcher", str(praxion_project), "s1") == ""
+        assert module._preamble_segment("praxion:researcher", str(praxion_project), "s1") == ""
 
     @pytest.mark.parametrize("flag_value", ["1", "true", "YES"])
     def test_praxion_native_opt_in_restores_the_preamble(
@@ -1117,14 +1117,14 @@ class TestPreambleSegmentGates:
     ) -> None:
         monkeypatch.setenv("PRAXION_INJECT_NATIVE_SUBAGENTS", flag_value)
         module = _load_module()
-        assert module._preamble_segment("i-am:researcher", str(praxion_project), "s1") != ""
+        assert module._preamble_segment("praxion:researcher", str(praxion_project), "s1") != ""
 
     def test_praxion_native_opt_in_ignores_a_non_truthy_value(
         self, praxion_project: Path, monkeypatch
     ) -> None:
         monkeypatch.setenv("PRAXION_INJECT_NATIVE_SUBAGENTS", "maybe")
         module = _load_module()
-        assert module._preamble_segment("i-am:researcher", str(praxion_project), "s1") == ""
+        assert module._preamble_segment("praxion:researcher", str(praxion_project), "s1") == ""
 
 
 class TestGitProbe:
@@ -1298,7 +1298,7 @@ class TestProcessAndMainInProcess:
         module._process(
             {
                 "tool_name": "Agent",
-                "tool_input": {"subagent_type": "i-am:implementer", "prompt": "go"},
+                "tool_input": {"subagent_type": "praxion:implementer", "prompt": "go"},
                 "cwd": str(non_praxion_project),
                 "session_id": "s1",
             }

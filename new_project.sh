@@ -56,7 +56,7 @@ readonly EXIT_TARGET_EXISTS=6
 
 readonly NAME_REGEX='^[A-Za-z0-9][A-Za-z0-9._-]*$'
 readonly PLUGIN_FILE="${HOME}/.claude/plugins/installed_plugins.json"
-readonly PLUGIN_KEY='i-am@bit-agora'
+readonly PLUGIN_KEY='praxion@bit-agora'
 
 usage() {
     printf 'Usage: new_project.sh <project-name> [target-dir]\n' >&2
@@ -143,10 +143,10 @@ EOF
     exit "$EXIT_NO_CLAUDE"
 fi
 
-# Prereq: i-am plugin recorded in user-scope plugin registry.
+# Prereq: praxion plugin recorded in user-scope plugin registry.
 if [ ! -f "$PLUGIN_FILE" ] || ! grep -q "$PLUGIN_KEY" "$PLUGIN_FILE"; then
     cat >&2 <<EOF
-Error: the 'i-am' plugin is not installed in your Claude Code user scope.
+Error: the 'praxion' plugin is not installed in your Claude Code user scope.
 Run './install.sh code' from the Praxion repo, then re-run this script.
 (Checked: ${PLUGIN_FILE} for '${PLUGIN_KEY}'.)
 EOF

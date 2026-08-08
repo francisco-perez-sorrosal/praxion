@@ -149,7 +149,7 @@ Procedure — digest curation, acknowledgement shape, rollback routing, degraded
 
 Use an agent when the task benefits from a separate context window (large scope, multiple phases, structured output). Work directly for quick lookups, single changes, one-step edits. Per-agent Claude model tier is governed by [`agent-model-routing.md`](agent-model-routing.md).
 
-**Shipped-Explore fallback.** If `Agent(subagent_type="Explore", ...)` fails before producing output (harness error, orphaned-tool-start, no agent-start event), don't retry the same input — its tokens are already spent. Fall back to `i-am:researcher` for substantive code surveys (returns a structured `RESEARCH_FINDINGS.md`) or to direct `find`/`grep` via Bash for narrow lookups. Many-skill / many-MCP environments are especially prone to this.
+**Shipped-Explore fallback.** If `Agent(subagent_type="Explore", ...)` fails before producing output (harness error, orphaned-tool-start, no agent-start event), don't retry the same input — its tokens are already spent. Fall back to `praxion:researcher` for substantive code surveys (returns a structured `RESEARCH_FINDINGS.md`) or to direct `find`/`grep` via Bash for narrow lookups. Many-skill / many-MCP environments are especially prone to this.
 
 ### Delegation Depth
 

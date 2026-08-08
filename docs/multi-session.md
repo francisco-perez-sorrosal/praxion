@@ -120,7 +120,7 @@ Note: `name`, `system_prompt` per session are optional when `agent` is present. 
 Agents are discovered at runtime in this order; the first directory with `*.md` files wins:
 
 1. `<project>/agents/` — working on Praxion itself (or any project shipping its own agents).
-2. `~/.claude/plugins/cache/i-am/agents/` — marketplace install.
+2. `~/.claude/plugins/cache/praxion/agents/` — marketplace install.
 3. `~/dev/praxion/agents/` — dev install via `praxion-claude-dev`.
 
 If none are found, a hardcoded fallback of 15 well-known Praxion agents is used so the dropdown is never empty.

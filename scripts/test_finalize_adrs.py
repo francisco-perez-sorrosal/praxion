@@ -1529,7 +1529,7 @@ class TestPluginCacheGuard:
     @pytest.mark.parametrize(
         "path",
         [
-            "/Users/x/.claude/plugins/cache/bit-agora/i-am/0.8.0",
+            "/Users/x/.claude/plugins/cache/bit-agora/praxion/0.8.0",
             "/home/u/.config/plugins/cache",
         ],
     )
@@ -1546,7 +1546,7 @@ class TestPluginCacheGuard:
     def test_main_refuses_when_resolved_root_is_cache(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        cache = Path("/Users/x/.claude/plugins/cache/bit-agora/i-am/0.8.0")
+        cache = Path("/Users/x/.claude/plugins/cache/bit-agora/praxion/0.8.0")
         monkeypatch.setattr(finalize, "resolve_repo_root", lambda _arg: cache)
         # If the guard fails, _apply_repo_root would point at the cache; assert
         # we exit non-zero before any mutation instead.

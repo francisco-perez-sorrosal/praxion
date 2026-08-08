@@ -48,7 +48,7 @@ def _load_module():
 
 def _payload(
     *,
-    subagent_type: str = "i-am:systems-architect",
+    subagent_type: str = "praxion:systems-architect",
     prompt: str = "Task slug: auth-flow\n\nDesign the thing.",
     cwd: str,
     tool_name: str = "Agent",
@@ -116,7 +116,7 @@ def test_canary_fires_when_brief_missing(repo: Path) -> None:
 
 
 def test_canary_fires_for_implementation_planner(repo: Path) -> None:
-    result = _run(_payload(subagent_type="i-am:implementation-planner", cwd=str(repo)), repo)
+    result = _run(_payload(subagent_type="praxion:implementation-planner", cwd=str(repo)), repo)
     assert ADVISORY_PREFIX in result.stderr
 
 
@@ -149,7 +149,7 @@ def test_silent_when_brief_exists(repo: Path) -> None:
 
 def test_silent_for_non_brief_consuming_stage(repo: Path) -> None:
     """researcher runs at Lightweight too -- reminding there would misfire."""
-    result = _run(_payload(subagent_type="i-am:researcher", cwd=str(repo)), repo)
+    result = _run(_payload(subagent_type="praxion:researcher", cwd=str(repo)), repo)
     assert result.stderr == ""
 
 
@@ -198,5 +198,5 @@ def test_slug_regex_accepts_backticked_form() -> None:
 
 def test_namespaced_subagent_type_is_normalized() -> None:
     module = _load_module()
-    assert module._normalize_stage("i-am:systems-architect") == "systems-architect"
+    assert module._normalize_stage("praxion:systems-architect") == "systems-architect"
     assert module._normalize_stage("systems-architect") == "systems-architect"

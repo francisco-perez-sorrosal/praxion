@@ -472,7 +472,7 @@ praxion-claude-dev       # installed by install.sh at ~/.local/bin/praxion-claud
 # equivalent to: claude --plugin-dir /path/to/Praxion --settings <session-overlay> --dangerously-skip-permissions
 ```
 
-The working-tree copy is loaded via `--plugin-dir`, and a session-scoped `--settings` overlay disables the marketplace-installed `i-am@bit-agora` for the session. Without the overlay, the user-settings line `"i-am@bit-agora": true` in `enabledPlugins` force-enables the marketplace copy alongside the working tree (per Claude Code docs, force-enables override `--plugin-dir`'s shadowing) — so `/context` would load both copies and double the skill, agent, and command tokens. The overlay flips that one entry to `false` for the session only; your global `~/.claude/settings.json` is untouched, so non-Praxion sessions still get the marketplace copy as usual.
+The working-tree copy is loaded via `--plugin-dir`, and a session-scoped `--settings` overlay disables the marketplace-installed `praxion@bit-agora` for the session. Without the overlay, the user-settings line `"praxion@bit-agora": true` in `enabledPlugins` force-enables the marketplace copy alongside the working tree (per Claude Code docs, force-enables override `--plugin-dir`'s shadowing) — so `/context` would load both copies and double the skill, agent, and command tokens. The overlay flips that one entry to `false` for the session only; your global `~/.claude/settings.json` is untouched, so non-Praxion sessions still get the marketplace copy as usual.
 
 Edits to skills, commands, agents, or hooks are live. Run `/reload-plugins` inside the session to re-read them without relaunching; a full restart is only needed when `plugin.json` itself changes.
 
@@ -486,7 +486,7 @@ After modifying the plugin manifest or adding new components, update the install
 
 ```bash
 ./install.sh code              # Re-run installer (marketplace install)
-claude plugin install i-am@bit-agora --scope user   # Or install directly from the marketplace
+claude plugin install praxion@bit-agora --scope user   # Or install directly from the marketplace
 ```
 
 ### Dev-link mode
@@ -498,7 +498,7 @@ claude plugin install i-am@bit-agora --scope user   # Or install directly from t
 ./install.sh --dev-link=off    # restore the fetched copies from the pre-link backup
 ```
 
-Idempotent — safe to re-run. Refuses cleanly (non-zero exit, no changes) when no pinned plugin install can be resolved from `~/.claude/plugins/installed_plugins.json`, or when the resolved cache path falls outside `~/.claude/plugins/cache/bit-agora/i-am/`. `--dev-link=off` restores from a same-directory `.pre-dev-link` backup taken at link time; a plain `./install.sh code` re-fetch or `claude plugin update i-am` is also expected to overwrite the cache, but `--dev-link=off` is the explicit, script-verified path back.
+Idempotent — safe to re-run. Refuses cleanly (non-zero exit, no changes) when no pinned plugin install can be resolved from `~/.claude/plugins/installed_plugins.json`, or when the resolved cache path falls outside `~/.claude/plugins/cache/bit-agora/praxion/`. `--dev-link=off` restores from a same-directory `.pre-dev-link` backup taken at link time; a plain `./install.sh code` re-fetch or `claude plugin update praxion` is also expected to overwrite the cache, but `--dev-link=off` is the explicit, script-verified path back.
 
 Scripts invoked from the worktree directly (e.g., `scripts/dispatch-reworks`) do not need this — they run from the worktree's own path. Only files Claude Code resolves through the installed plugin cache need dev-link.
 
@@ -516,11 +516,11 @@ The plugin manifest lives in `.claude-plugin/plugin.json`. Key constraints:
 
 - See `.claude-plugin/PLUGIN_SCHEMA_NOTES.md` for validator constraints
 - The plugin is distributed via the [`bit-agora`](https://github.com/francisco-perez-sorrosal/bit-agora) GitHub marketplace
-- When installed, commands are namespaced as `/i-am:<name>`
+- When installed, commands are namespaced as `/praxion:<name>`
 
 ### Plugin cache contains the full repo
 
-When `claude plugin install i-am@bit-agora` runs, Claude Code clones the entire Praxion repo at the marketplace-pinned tag into `~/.claude/plugins/cache/bit-agora/i-am/<version>/`. The plugin mechanism only **loads** what `plugin.json` declares (skills, commands, agents, hooks, MCP servers) — but the rest of the repo (rules, CLI scripts, `install.sh`, `lib/`, `task-chronograph-mcp/`, `eval/`, etc.) sits on disk unused by the loader.
+When `claude plugin install praxion@bit-agora` runs, Claude Code clones the entire Praxion repo at the marketplace-pinned tag into `~/.claude/plugins/cache/bit-agora/praxion/<version>/`. The plugin mechanism only **loads** what `plugin.json` declares (skills, commands, agents, hooks, MCP servers) — but the rest of the repo (rules, CLI scripts, `install.sh`, `lib/`, `task-chronograph-mcp/`, `eval/`, etc.) sits on disk unused by the loader.
 
 `/praxion-complete-install` relies on this. It resolves `${CLAUDE_PLUGIN_ROOT}` (set by Claude Code) and invokes the cached `install.sh` with `--complete-install`, which symlinks `${CLAUDE_PLUGIN_ROOT}/rules/` → `~/.claude/rules/` and `${CLAUDE_PLUGIN_ROOT}/scripts/` → `~/.local/bin/`. Source and destination are both local; no network, no extra clone.
 
@@ -539,14 +539,14 @@ The inverse pair (`complete_uninstall_from_plugin()` + `/praxion-complete-uninst
 | Target | Install Command | Plugin body source | Rules + scripts source | Flow |
 |---|---|---|---|---|
 | **Clone-based (full)** | `./install.sh code` | Local checkout | Local checkout | One-step installer; no follow-up needed |
-| **Marketplace (plugin only)** | `claude plugin install i-am@bit-agora` | Plugin cache | Plugin cache via auto-completion hook | Auto-completes on first session (no manual step required) |
+| **Marketplace (plugin only)** | `claude plugin install praxion@bit-agora` | Plugin cache | Plugin cache via auto-completion hook | Auto-completes on first session (no manual step required) |
 | **Marketplace (explicit reconfigure)** | `/praxion-complete-install` | Plugin cache | Plugin cache | Optional: re-invoke for reconfiguration/recovery/re-link |
 
 For live-edit development on Praxion itself, use `praxion-claude-dev` (a thin wrapper around `claude --plugin-dir`) to launch a session that loads the plugin directly from the working tree — see [Session-scoped local testing](#session-scoped-local-testing).
 
 ### Post-update refresh
 
-`claude plugin update i-am` replaces the cache directory entirely. Existing symlinks in `~/.claude/rules/` and `~/.local/bin/` continue pointing to the old cache version. Refresh by either:
+`claude plugin update praxion` replaces the cache directory entirely. Existing symlinks in `~/.claude/rules/` and `~/.local/bin/` continue pointing to the old cache version. Refresh by either:
 - Start a fresh Claude Code session (triggers auto-completion automatically), OR
 - Explicitly run `/praxion-complete-install` to re-link against the new version, OR
 - For clone-based installs: run `./install.sh code --relink`
@@ -555,7 +555,7 @@ No automatic refresh hook exists today because Claude Code doesn't expose a Post
 
 ### Uninstall ordering
 
-Always run `/praxion-complete-uninstall` **before** `claude plugin uninstall i-am`. Reversing the order leaves dangling symlinks pointing at a deleted cache directory. The complete-uninstall still cleans them up correctly in that case (filter by `target begins with ${CLAUDE_PLUGIN_ROOT}` — absent target doesn't matter, the link itself gets removed), but the right-order path avoids the intermediate broken state.
+Always run `/praxion-complete-uninstall` **before** `claude plugin uninstall praxion`. Reversing the order leaves dangling symlinks pointing at a deleted cache directory. The complete-uninstall still cleans them up correctly in that case (filter by `target begins with ${CLAUDE_PLUGIN_ROOT}` — absent target doesn't matter, the link itself gets removed), but the right-order path avoids the intermediate broken state.
 
 ## Quality Evals
 
@@ -582,10 +582,10 @@ The `regression` sub-package was retired in the praxion-self-eval-v1 pipeline. B
 ### Examples
 
 ```sh
-/i-am:eval-praxion                                                           # LLM-as-judge over main HEAD
-/i-am:eval-praxion --task-slug architecture-doc --mechanical-only            # verify deliverables, free
-/i-am:eval-praxion --task-slug architecture-doc --tier full                  # include DESIGN.md + docs/architecture.md recency
-/i-am:eval-praxion my-worktree-name                                          # eval a specific worktree by name
+/praxion:eval-praxion                                                           # LLM-as-judge over main HEAD
+/praxion:eval-praxion --task-slug architecture-doc --mechanical-only            # verify deliverables, free
+/praxion:eval-praxion --task-slug architecture-doc --tier full                  # include DESIGN.md + docs/architecture.md recency
+/praxion:eval-praxion my-worktree-name                                          # eval a specific worktree by name
 ```
 
 ### Benefits
@@ -596,7 +596,7 @@ The `regression` sub-package was retired in the praxion-self-eval-v1 pipeline. B
 
 ### Scope
 
-Currently Praxion-internal: `/i-am:eval-praxion` resolves `Bash(uv run ...)` in its `allowed-tools` frontmatter, which requires the `eval/` project on disk. When the plugin is installed in another project, the command is exposed but invocation fails — there is no `eval/` directory and no `praxion-evals` binary on the path.
+Currently Praxion-internal: `/praxion:eval-praxion` resolves `Bash(uv run ...)` in its `allowed-tools` frontmatter, which requires the `eval/` project on disk. When the plugin is installed in another project, the command is exposed but invocation fails — there is no `eval/` directory and no `praxion-evals` binary on the path.
 
 Making the tooling portable would require bundling `eval/` inside the plugin or publishing `praxion-evals` to PyPI. Not in scope today — open an issue if you need to consume it downstream.
 

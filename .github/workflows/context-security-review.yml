@@ -46,7 +46,7 @@ jobs:
     # --json-schema blob.
     env:
       REVIEW_PROMPT: |
-        Load the i-am:context-security-review skill in DIFF MODE. Review ONLY
+        Load the praxion:context-security-review skill in DIFF MODE. Review ONLY
         the files modified in this PR -- do not scan the entire project.
 
         Steps:

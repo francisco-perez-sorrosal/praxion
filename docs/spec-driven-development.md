@@ -122,7 +122,7 @@ For the full check catalog with evaluation criteria and common failure patterns,
 
 The table below compares this project's SDD integration with spec-focused tools across the full development lifecycle.
 
-| Capability | Spec Kit / Kiro / OpenSpec | i-am SDD |
+| Capability | Spec Kit / Kiro / OpenSpec | praxion SDD |
 |-----------|---------------------------|----------|
 | Ideation | -- | promethean generates feature proposals |
 | Research | -- | researcher explores codebase and external docs |

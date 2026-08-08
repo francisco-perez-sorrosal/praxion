@@ -907,7 +907,7 @@ cleanup:
    without installation, and `/plugin marketplace add ./my-marketplace` works from a local directory.
    A throwaway plugin therefore yields a genuine plugin subagent at zero cost to Praxion's release
    train — which removes the reason the spike kept being postponed.
-4. **The self-hosting trap is avoided structurally**, by running outside Praxion so no `i-am` copy
+4. **The self-hosting trap is avoided structurally**, by running outside Praxion so no `praxion` copy
    participates. Note the cache's `gitCommitSha` in `installed_plugins.json` is **wrong** here (a
    `0.7.1`-era sha recorded against a `0.18.0` install), so any precondition check must `diff` trees,
    never compare shas.
@@ -966,10 +966,10 @@ newly authored agent stays invisible — observed directly). The probe agent was
 |---|---|
 | Does a custom agent with `tools: Read, Skill` receive an available-skills listing? | **YES** — ~95 entries, beginning `digitalocean-ai` and `plugin-dev:create-plugin`; both target skills present verbatim |
 | Is `Skill` among its granted tools? | **YES** |
-| Does runtime invocation of a plugin-namespaced skill succeed? | **YES** — `i-am:testing-strategy` returned `Launching skill: i-am:testing-strategy`, resolving to `~/.claude/plugins/cache/bit-agora/i-am/0.16.0/skills/testing-strategy` |
+| Does runtime invocation of a plugin-namespaced skill succeed? | **YES** — `praxion:testing-strategy` returned `Launching skill: praxion:testing-strategy`, resolving to `~/.claude/plugins/cache/bit-agora/praxion/0.16.0/skills/testing-strategy` |
 | Did the content genuinely load? | **YES** — distinctive verbatim line quoted: *"**Coverage theater.** Chasing a line coverage target (e.g., 90%) incentivizes testing trivial code (getters, framework glue) while ignoring complex logic that is hard to cover."* |
-| Second skill, to rule out a fluke | **YES** — `i-am:multi-perspective-analysis` loaded, distinctive HARD-gate line quoted |
-| Is the `i-am:` namespace prefix required? | **Optional** — bare `testing-strategy` resolved to the same skill (deduplicated against the already-loaded body rather than erroring) |
+| Second skill, to rule out a fluke | **YES** — `praxion:multi-perspective-analysis` loaded, distinctive HARD-gate line quoted |
+| Is the `praxion:` namespace prefix required? | **Optional** — bare `testing-strategy` resolved to the same skill (deduplicated against the already-loaded body rather than erroring) |
 
 **Verdict recorded as `WORKS`.** The probe's own return header self-labelled `FAILS`, which is a
 mislabel worth preserving as a lesson: it graded itself against its *precondition* ("no listing
@@ -1349,7 +1349,7 @@ challenge from either would have belonged in the other's fragment. The registry'
 about their data licenses what we are doing with it* — is discriminating in practice, not just on paper.
 
 **One degradation, declared rather than hidden.** The appraiser's `Skill`-tool binding **failed**
-(`Unknown skill: i-am:evidence-appraisal`) because the skill was authored minutes earlier and the
+(`Unknown skill: praxion:evidence-appraisal`) because the skill was authored minutes earlier and the
 installed plugin cache predates it. The consultant did not improvise: it reported the failure, loaded the
 canonical in-repo source by direct read, and left the void/no-void call to the convener. This is the same
 self-hosting staleness that halted the Wave-1 smoke test, and it exposes a real limit on the

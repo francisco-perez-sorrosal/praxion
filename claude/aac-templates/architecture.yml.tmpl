@@ -167,7 +167,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
-            Load the i-am:architect-validator agent. Run in --mode=pre-merge
+            Load the praxion:architect-validator agent. Run in --mode=pre-merge
             for PR #${{ github.event.pull_request.number }} on ${{ github.repository }}.
 
             Steps:

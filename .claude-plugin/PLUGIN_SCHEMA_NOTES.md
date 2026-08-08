@@ -39,7 +39,7 @@ my-plugin/
 
 Reference: the official `hookify` plugin uses `<plugin-root>/hooks/hooks.json`.
 
-**`${CLAUDE_PLUGIN_ROOT}` resolution:** Resolves to the installed plugin's root directory in the cache (e.g., `~/.claude/plugins/cache/bit-agora/i-am/0.1.1.dev0/`). Scripts at `hooks/send_event.py` are referenced as `${CLAUDE_PLUGIN_ROOT}/hooks/send_event.py`.
+**`${CLAUDE_PLUGIN_ROOT}` resolution:** Resolves to the installed plugin's root directory in the cache (e.g., `~/.claude/plugins/cache/bit-agora/praxion/0.1.1.dev0/`). Scripts at `hooks/send_event.py` are referenced as `${CLAUDE_PLUGIN_ROOT}/hooks/send_event.py`.
 
 ## Do Not Declare Hooks in plugin.json
 

@@ -49,7 +49,7 @@ _TRUTHY = frozenset({"1", "true", "yes"})
 _MARKER_FILENAME = ".praxion-complete-installed"
 _DECLINE_MARKER_FILENAME = ".praxion-install-declined"
 
-_PLUGIN_CACHE_SUBPATH = Path(".claude") / "plugins" / "cache" / "bit-agora" / "i-am"
+_PLUGIN_CACHE_SUBPATH = Path(".claude") / "plugins" / "cache" / "bit-agora" / "praxion"
 _RULES_SENTINEL_SUBPATH = Path(".claude") / "rules" / "swe" / "agent-behavioral-contract.md"
 _CLAUDE_MD_SUBPATH = Path(".claude") / "CLAUDE.md"
 

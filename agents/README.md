@@ -91,7 +91,7 @@ List all available agents (built-in, user, project, and plugin):
 Run Claude *as* a specific agent for the entire session. This makes the agent the main thread, not a delegated subagent — useful for headless or scripted runs:
 
 ```bash
-claude --agent i-am:researcher -p "investigate X"
+claude --agent praxion:researcher -p "investigate X"
 ```
 
 ### `--agents` JSON flag (session-only overrides)

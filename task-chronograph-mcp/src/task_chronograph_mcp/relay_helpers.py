@@ -38,7 +38,7 @@ STRIP_LLM_ATTRS_ENV = "CHRONOGRAPH_STRIP_LLM_ATTRS"
 TRACER_NAME = "praxion.chronograph"
 
 # Agent origin detection prefix
-_PRAXION_AGENT_PREFIX = "i-am:"
+_PRAXION_AGENT_PREFIX = "praxion:"
 
 # Main agent synthetic span
 MAIN_AGENT_ID = "__main_agent__"
@@ -235,7 +235,7 @@ def _detect_agent_origin(agent_type: str) -> str:
 
 
 def _clean_agent_type(agent_type: str) -> str:
-    """Strip the ``i-am:`` prefix if present to get the bare agent type name."""
+    """Strip the ``praxion:`` prefix if present to get the bare agent type name."""
     if agent_type.startswith(_PRAXION_AGENT_PREFIX):
         return agent_type[len(_PRAXION_AGENT_PREFIX) :]
     return agent_type

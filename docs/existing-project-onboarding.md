@@ -31,7 +31,7 @@ Reference for the `/onboard-project` slash command — the entry point that retr
 
 - `claude` binary on PATH — install Claude Code from `https://claude.com/product/claude-code`
 - The current directory is a git repository (`git init` if not, before running the command)
-- The `i-am` plugin installed in the user-scope plugin registry (`./install.sh code` from a Praxion checkout, or `claude plugin install i-am@bit-agora`). Project-scope installs are also detected. Without the plugin, the command still runs but **Phase 4 (git hooks) is skipped** — the hooks need the plugin's `scripts/` directory to resolve.
+- The `praxion` plugin installed in the user-scope plugin registry (`./install.sh code` from a Praxion checkout, or `claude plugin install praxion@bit-agora`). Project-scope installs are also detected. Without the plugin, the command still runs but **Phase 4 (git hooks) is skipped** — the hooks need the plugin's `scripts/` directory to resolve.
 - Optional: `jq` on PATH (the pre-commit hook uses it to resolve the plugin install path at hook-run time). Most package managers ship it; install via `brew install jq` on macOS.
 
 ## How to run it
@@ -53,8 +53,8 @@ If `AskUserQuestion` is unavailable (headless invocation, tool error), the gates
 | 0 | **Pre-flight** — diagnostic only | none (prints report) | n/a |
 | 1 | **`.gitignore` hygiene** — append the canonical AI-assistants block | `.gitignore` | yes (header detection) |
 | 2 | **`.ai-state/` skeleton** — create the persistent-intelligence seed files (enumerated under [Phase 2](#phase-2--ai-state-skeleton) below) | `.ai-state/` | yes (per-file existence check) |
-| 3 | **`.gitattributes` + merge drivers** — append entries; register Python merge drivers via `git config`; clean up retired drivers from older versions | `.gitattributes`, `.git/config` | yes (line + git config check; **version-aware** — a stale `/i-am/<old-version>/` driver path is re-registered) |
-| 4 | **Git hooks** — install pre-commit (id-citation discipline) + the three finalize hooks (post-merge, post-commit, post-checkout) | `.git/hooks/pre-commit`, `.git/hooks/{post-merge,post-commit,post-checkout}` | yes (symlink target check; **version-aware** — a finalize-hook symlink pinned to a stale `/i-am/<old-version>/` path is re-pointed, not skipped) |
+| 3 | **`.gitattributes` + merge drivers** — append entries; register Python merge drivers via `git config`; clean up retired drivers from older versions | `.gitattributes`, `.git/config` | yes (line + git config check; **version-aware** — a stale `/praxion/<old-version>/` driver path is re-registered) |
+| 4 | **Git hooks** — install pre-commit (id-citation discipline) + the three finalize hooks (post-merge, post-commit, post-checkout) | `.git/hooks/pre-commit`, `.git/hooks/{post-merge,post-commit,post-checkout}` | yes (symlink target check; **version-aware** — a finalize-hook symlink pinned to a stale `/praxion/<old-version>/` path is re-pointed, not skipped) |
 | 5 | **`.claude/settings.json` toggles + `permissions.allow` baseline** — enable the observability hook (ships Claude Code events to a localhost Phoenix instance + the `.ai-state/observations.jsonl` WAL); install the minimal standing allow list that keeps subagent pipeline writes from being denied | `.claude/settings.json` | yes (per sub-step: key presence; allow-list subset check) |
 | 6 | **`CLAUDE.md` blocks** — idempotently append Agent Pipeline + Compaction Guidance + Behavioral Contract + Praxion Process + Working in this project | `CLAUDE.md` | yes (per-block heading detection) |
 | 7 | **Companion CLIs** — print install commands for `chub`, `scc`, `uv` if missing and stack-relevant | none (advisory) | yes (always advisory) |
@@ -199,11 +199,11 @@ If `CLAUDE.md` doesn't exist, the command instructs you to run `/init` first (wh
 
 ### Refreshing canonical blocks after a plugin upgrade
 
-Run `/refresh-claude-blocks` to synchronize your project's canonical blocks with a newly installed or upgraded i-am plugin version. The command auto-applies safe updates and prompts you for locally customized blocks.
+Run `/refresh-claude-blocks` to synchronize your project's canonical blocks with a newly installed or upgraded praxion plugin version. The command auto-applies safe updates and prompts you for locally customized blocks.
 
 **When to use:**
 
-- After upgrading the i-am plugin — you want to pick up the latest canonical blocks shipped by the new version
+- After upgrading the praxion plugin — you want to pick up the latest canonical blocks shipped by the new version
 - When `/onboard-project` Phase 6 reports a block needs attention
 - Anytime you want to audit whether your blocks are current vs. stale vs. customized
 
@@ -219,7 +219,7 @@ The command is idempotent: running it multiple times produces the same result. A
 
 **Troubleshooting:** an unexpected `modified` verdict on apparent boilerplate usually means the block predates the plugin's shipped history manifest (very old onboards often carry pre-extraction-era phrasing). The mechanism deliberately refuses to guess whether such a block should be considered stale or customized. If this happens, run `/refresh-claude-blocks --check` to see the diff, then decide manually via the disposition loop.
 
-**Refresh semantics:** the command targets the **currently installed plugin's** canonical version. After upgrading the i-am plugin to a newer version, re-run `/refresh-claude-blocks` to pick up the newer blocks. If you downgrade the plugin, the older canonical version is used instead — the mechanism is always "refresh to what the installed plugin ships, not what Praxion main ships."
+**Refresh semantics:** the command targets the **currently installed plugin's** canonical version. After upgrading the praxion plugin to a newer version, re-run `/refresh-claude-blocks` to pick up the newer blocks. If you downgrade the plugin, the older canonical version is used instead — the mechanism is always "refresh to what the installed plugin ships, not what Praxion main ships."
 
 ### Phase 7 — Companion CLIs (advisory)
 
@@ -338,7 +338,7 @@ Every write phase has a predicate that makes re-runs no-ops. Reference: `command
 |-------|--------------------------|
 | 1 | `grep -q '^# AI assistants$' .gitignore` |
 | 2 | Per-file `test -e .ai-state/<file>` (skip files individually) |
-| 3 | `.gitattributes` line present AND `git config --get merge.observations-jsonl.driver` returns a value containing `i-am` |
+| 3 | `.gitattributes` line present AND `git config --get merge.observations-jsonl.driver` returns a value containing `praxion` |
 | 4 | `readlink .git/hooks/post-merge` resolves to a Praxion path AND pre-commit content contains `check_id_citation_discipline` |
 | 5 | Per sub-step, never phase-level: 5a — `PRAXION_DISABLE_OBSERVABILITY` present under `env` in `.claude/settings.json`; 5b — every baseline entry already present in `permissions.allow` (subset check) |
 | 6 | `## Agent Pipeline` heading present in `CLAUDE.md` (per-block check) |
@@ -354,7 +354,7 @@ Every write phase has a predicate that makes re-runs no-ops. Reference: `command
 |---------|-------|-----|
 | Command aborts: "This command must be run inside a git repository." | Current directory is not a git repo | Run `git init` first |
 | Command aborts: "This directory looks like a freshly-scaffolded greenfield project..." | Pre-flight detected greenfield signature (no source code, AI-assistants `.gitignore` present, empty `.claude/`) | Run `/new-project` instead — it does the full greenfield scaffold then chains to `/onboard-project` |
-| Phase 4 skipped with "install the plugin and re-run" | Plugin not detected in `~/.claude/plugins/installed_plugins.json` | Install the plugin: `claude plugin install i-am@bit-agora` (or `./install.sh code` from a Praxion checkout), then re-run `/onboard-project` |
+| Phase 4 skipped with "install the plugin and re-run" | Plugin not detected in `~/.claude/plugins/installed_plugins.json` | Install the plugin: `claude plugin install praxion@bit-agora` (or `./install.sh code` from a Praxion checkout), then re-run `/onboard-project` |
 | Phase 3 emits "merge.observations-jsonl.driver is already set..." | A non-Praxion driver is registered for that file pattern | Remove the existing driver: `git config --unset merge.observations-jsonl.driver`, then re-run Phase 3 (or accept the existing driver and skip — Praxion's reconciliation will degrade) |
 | Phase 4 backs up `pre-commit.pre-praxion` | A non-Praxion pre-commit hook was already in place | Decide: merge the two hook bodies manually, or restore the original (`mv .git/hooks/pre-commit.pre-praxion .git/hooks/pre-commit`) and skip Praxion's pre-commit |
 | Pre-commit hook fails with "command not found: jq" | `jq` not on PATH; the hook uses it to resolve plugin install path | Install `jq` (`brew install jq` on macOS, `apt install jq` on Debian/Ubuntu) — the hook degrades to an no-op exit 0 if `jq` is unavailable but the id-citation check is then skipped |

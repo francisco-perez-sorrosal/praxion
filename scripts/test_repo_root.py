@@ -37,11 +37,11 @@ class TestResolveRepoRoot:
         seen: list[Path] = []
         result = _repo_root.resolve_repo_root(
             None,
-            script_dir=Path("/plugin/i-am/0.9.0/scripts"),
+            script_dir=Path("/plugin/praxion/0.9.0/scripts"),
             on_fallback=seen.append,
         )
-        assert result == Path("/plugin/i-am/0.9.0")
-        assert seen == [Path("/plugin/i-am/0.9.0")]
+        assert result == Path("/plugin/praxion/0.9.0")
+        assert seen == [Path("/plugin/praxion/0.9.0")]
 
 
 class TestGitToplevelFromCwd:
@@ -69,7 +69,7 @@ class TestIsPluginCachePath:
     @pytest.mark.parametrize(
         "path",
         [
-            "/Users/x/.claude/plugins/cache/bit-agora/i-am/0.9.0",
+            "/Users/x/.claude/plugins/cache/bit-agora/praxion/0.9.0",
             "/home/u/.config/plugins/cache",
         ],
     )

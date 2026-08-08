@@ -52,6 +52,12 @@ MIGRATION_REFERENCES: dict[str, str] = {
     ),
 }
 
+# Generated projections of other files. They cannot be independently wrong: their
+# text is copied from sources that are themselves exempt (an ADR title naming both
+# the old and new identifier is correct, and regenerating preserves it). Editing
+# one by hand to satisfy this scan would desynchronise it from its builder.
+DERIVED_INDEXES: tuple[str, ...] = (".ai-state/doc_manifest.yaml",)
+
 # Records of what was true when written. See the module docstring.
 HISTORICAL_PATHS: tuple[str, ...] = (
     ".ai-state/decisions/",
@@ -104,7 +110,7 @@ def test_manifest_declares_the_current_namespace():
 def test_no_live_surface_carries_the_retired_namespace():
     offenders: list[str] = []
     for rel in _tracked_files():
-        if _is_historical(rel) or rel in MIGRATION_REFERENCES:
+        if _is_historical(rel) or rel in MIGRATION_REFERENCES or rel in DERIVED_INDEXES:
             continue
         path = REPO_ROOT / rel
         try:

@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-07T23:23:46Z'
+generated_at: '2026-08-08T06:15:41Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -8,7 +8,7 @@ surfaces:
   path: README.md
   type: markdown
   title: Praxion
-  last_modified: '2026-06-16'
+  last_modified: '2026-08-07'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-ledger
@@ -33,7 +33,7 @@ surfaces:
   path: README_DEV.md
   type: markdown
   title: Developer Guide
-  last_modified: '2026-07-01'
+  last_modified: '2026-08-07'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-040-eval-framework-out-of-band
@@ -139,7 +139,7 @@ surfaces:
   path: docs/claude-code-limitations.md
   type: markdown
   title: Known Claude Code Limitations
-  last_modified: '2026-07-30'
+  last_modified: '2026-08-07'
   renderer: default_markdown
 - id: docs-claude-ecosystem-learning-resources
   path: docs/claude-ecosystem-learning-resources.md
@@ -153,7 +153,7 @@ surfaces:
   path: docs/concepts.md
   type: markdown
   title: Core Concepts
-  last_modified: '2026-06-11'
+  last_modified: '2026-08-07'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -273,7 +273,7 @@ surfaces:
   path: docs/cursor-compat.md
   type: markdown
   title: 'Claude Code vs Cursor: differences'
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-07'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -307,7 +307,7 @@ surfaces:
   path: docs/existing-project-onboarding.md
   type: markdown
   title: Existing-Project Onboarding
-  last_modified: '2026-08-06'
+  last_modified: '2026-08-07'
   diataxis: tutorial
   audience: developer
   renderer: tutorial_shell
@@ -343,7 +343,7 @@ surfaces:
   path: docs/greenfield-onboarding.md
   type: markdown
   title: Greenfield Project Onboarding
-  last_modified: '2026-05-17'
+  last_modified: '2026-08-07'
   diataxis: tutorial
   audience: developer
   renderer: tutorial_shell
@@ -357,7 +357,7 @@ surfaces:
   path: docs/independent-analysis/cursor-ci-autofix-research-brief.md
   type: markdown
   title: "Research Brief \u2014 Autonomous CI/PR Failure Remediation via the Cursor Agent (installable across Praxion + managed projects)"
-  last_modified: '2026-06-24'
+  last_modified: '2026-08-07'
   renderer: default_markdown
 - id: docs-independent-analysis-linear-integration-analysis
   path: docs/independent-analysis/linear-integration-analysis.md
@@ -424,7 +424,7 @@ surfaces:
   path: docs/multi-session.md
   type: markdown
   title: Multi-Session Workflows
-  last_modified: '2026-05-29'
+  last_modified: '2026-08-07'
   renderer: default_markdown
   surfaces_referenced:
   - docs-rework-dispatch
@@ -432,7 +432,7 @@ surfaces:
   path: docs/multidisciplinary-identities-evidence.md
   type: markdown
   title: "Multidisciplinary Identities \u2014 Evidence Dossier"
-  last_modified: '2026-08-01'
+  last_modified: '2026-08-07'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -440,7 +440,7 @@ surfaces:
   path: docs/observability.md
   type: markdown
   title: Observability
-  last_modified: '2026-05-09'
+  last_modified: '2026-08-07'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -487,7 +487,7 @@ surfaces:
   path: docs/spec-driven-development.md
   type: markdown
   title: Spec-Driven Development
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-07'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -512,7 +512,7 @@ surfaces:
   path: .ai-state/SYSTEM_DEPLOYMENT.md
   type: markdown
   title: System Deployment
-  last_modified: '2026-08-04'
+  last_modified: '2026-08-07'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-116-ai-training-results-schema-owner
@@ -2560,6 +2560,12 @@ surfaces:
   title: TASK_BRIEF obligation enforced by a non-blocking spawn-time advisory, not a gate
   last_modified: '2026-08-07'
   renderer: adr_card
+- id: ai-state-decisions-333-rename-plugin-identity-to-praxion
+  path: .ai-state/decisions/333-rename-plugin-identity-to-praxion.md
+  type: markdown
+  title: Rename the Claude Code plugin identity from `i-am` to `praxion`
+  last_modified: '2026-08-07'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3183,6 +3189,7 @@ groups:
   - ai-state-decisions-330-retire-p01-and-p02-rather-than-await-a-s
   - ai-state-decisions-331-finalize-scope-idea-ledgers
   - ai-state-decisions-332-task-brief-obligation-enforced-by-a-non
+  - ai-state-decisions-333-rename-plugin-identity-to-praxion
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

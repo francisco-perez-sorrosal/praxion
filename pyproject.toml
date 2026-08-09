@@ -61,7 +61,7 @@ dev = [
     # rewrites back, and no amount of re-staging settles it. `==` not `>=`,
     # because a floating local side is the defect, not a stale pin.
     # scripts/check_ruff_pin_drift.py enforces the equality.
-    "ruff==0.15.22",
+    "ruff==0.16.1",
 ]
 
 # --- test-coverage skill: default Python coverage config -------------------

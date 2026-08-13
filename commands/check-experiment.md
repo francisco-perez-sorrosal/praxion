@@ -1,16 +1,5 @@
 ---
-description: >
-  Poll or report on an ML training experiment. Identify the run by run_tag argument,
-  by reading the most-recent .ai-work/<task-slug>/TRAINING_RESULTS.md, or by listing
-  recent archived runs from .ai-state/training_runs/. For in-flight runs (status
-  pending or running): poll status() and log_stream(), surface current metrics,
-  estimate remaining wall-clock and GPU-hours. For completed runs: read
-  TRAINING_RESULTS.md, report final metrics, and apply PASS/FAIL/WARN acceptance
-  check if metric-threshold ACs exist in the plan. Output is concise and
-  terminal-friendly: run-tag, status, current/final metrics, AC deltas,
-  actionable next-step suggestion. Use after /run-experiment to monitor an
-  in-flight run, to review a completed run's results, or to compare a run against
-  acceptance criteria before invoking the verifier.
+description: "Poll or report an ML training run: in-flight status/metrics, or completed results with PASS/FAIL/WARN checks. Use after /run-experiment or before verifying."
 argument-hint: "[<run_tag>] [--task-slug <slug>]"
 allowed-tools: [Read, Bash, Glob]
 ---

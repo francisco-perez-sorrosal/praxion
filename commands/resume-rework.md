@@ -42,6 +42,12 @@ EXIT CODES
   5   VERIFIER_FINDINGS.md malformed — required section missing
 ```
 
+## Arguments
+
+`$ARGUMENTS` holds the invocation. Parse it for the optional `--findings <path>` and `--dry-run`
+flags documented above (plus `--json`, `--quiet`/`-q`, and `--help`/`-h`) — no positional
+argument is required; an empty `$ARGUMENTS` triggers auto-discovery below.
+
 ## Auto-discovery
 
 When `--findings` is not specified, the command resolves the findings file automatically:

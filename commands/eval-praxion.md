@@ -11,6 +11,9 @@ Single user-invoked entrypoint for the `eval/` harness package. Runs two quality
 
 ## Argument Resolver
 
+`$ARGUMENTS` holds the invocation: the first non-flag token becomes `TARGET`; remaining tokens are
+parsed per the [Modes and Flags](#modes-and-flags) table below.
+
 `TARGET` resolves in this order (first match wins):
 
 | Case | Input | Resolution |

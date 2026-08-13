@@ -27,6 +27,8 @@ reports a block needs attention.
 
 ## Arguments
 
+`$ARGUMENTS` carries at most one flag:
+
 - (none) or `--check` — classify and report only. Mutates nothing.
 - `--apply` — auto-apply `absent`/`stale`, then run the interactive
   disposition loop for any `modified` block.

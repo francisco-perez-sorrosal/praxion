@@ -11,6 +11,8 @@ Remove task-scoped subdirectories from `.ai-work/` — but never silently delete
 
 ## Arguments
 
+`$ARGUMENTS` holds the invocation; parse it for the flags and optional slugs below before Step 1.
+
 - `slug ...` — restrict to these task slugs; omit to scan every task directory.
 - `--dry-run` — report classifications and stop; delete nothing.
 - `--force <slug>` — override a **BLOCK** for that one slug after the user confirms; never a blanket force.

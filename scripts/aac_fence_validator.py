@@ -55,9 +55,14 @@ class ValidationResult:
 # Fence-line pattern matching
 # ---------------------------------------------------------------------------
 
-_GENERATED_PATTERN = re.compile(r"<!--\s*aac:generated(.*?)-->")
+GENERATED_PATTERN = re.compile(r"<!--\s*aac:generated(.*?)-->")
 _AUTHORED_PATTERN = re.compile(r"<!--\s*aac:authored(.*?)-->")
-_CLOSER_PATTERN = re.compile(r"<!--\s*aac:end\s*-->")
+CLOSER_PATTERN = re.compile(r"<!--\s*aac:end\s*-->")
+
+# Private aliases retained for backward compatibility with existing importers.
+_GENERATED_PATTERN = GENERATED_PATTERN
+_CLOSER_PATTERN = CLOSER_PATTERN
+
 _ATTR_PATTERN = re.compile(r"(\w[\w-]*)=(\S+)")
 # Matches CommonMark fenced-code-block delimiters: 3+ backticks or 3+ tildes
 # at the start of a line (after optional leading spaces per CommonMark spec).

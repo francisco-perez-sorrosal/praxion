@@ -38,10 +38,10 @@ from _git_runner import GitUnavailableError, run_git
 # ---------------------------------------------------------------------------
 
 try:
-    from aac_fence_validator import _CLOSER_PATTERN, _GENERATED_PATTERN
+    from aac_fence_validator import CLOSER_PATTERN, GENERATED_PATTERN
 except ImportError:
-    _GENERATED_PATTERN = re.compile(r"<!--\s*aac:generated(.*?)-->")
-    _CLOSER_PATTERN = re.compile(r"<!--\s*aac:end\s*-->")
+    GENERATED_PATTERN = re.compile(r"<!--\s*aac:generated(.*?)-->")
+    CLOSER_PATTERN = re.compile(r"<!--\s*aac:end\s*-->")
 
 _ATTR_PATTERN = re.compile(r"(\w[\w-]*)=(\S+)")
 _DIAGRAM_OUTPUT_RE = re.compile(r"^docs/diagrams/(?P<name>[^/]+)/(?P<view>[^/]+)\.(?:d2|svg)$")
@@ -182,13 +182,13 @@ def _parse_fence_regions(content: str) -> list[FenceRegion]:
     regions: list[FenceRegion] = []
     open_region: FenceRegion | None = None
     for lineno, raw in enumerate(content.splitlines(), start=1):
-        if _CLOSER_PATTERN.search(raw):
+        if CLOSER_PATTERN.search(raw):
             if open_region is not None:
                 open_region.closer_line = lineno
                 regions.append(open_region)
                 open_region = None
             continue
-        m = _GENERATED_PATTERN.search(raw)
+        m = GENERATED_PATTERN.search(raw)
         if not m:
             continue
         if open_region is not None:

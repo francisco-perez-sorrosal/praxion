@@ -35,9 +35,17 @@ This is the focused, gate-free counterpart to re-running the full
    project's `additional:` block — and any comments around either key —
    untouched. This runs whenever the manifest is present — it needs no
    cross-repo commit pin, only the shipped template.
+7. Two AaC-tier surfaces instantiated by `/onboard-project` Phase 8b —
+   `.github/workflows/architecture.yml`'s `architect-validator` agent-load
+   prompt and the installed Block D pre-commit fragment's skip-gracefully
+   notice — each re-pointed in place, line-for-line, when the namespace
+   token they were rendered with has fallen behind the live template's
+   (td-145). Neither needs `gh` or any commit resolution; both are
+   independent of surfaces 5-6.
 
-The pre-commit hook resolves the plugin path at run time, so it is never stale
-and is left untouched.
+The pre-commit hook's `${PLUGIN_ROOT}` resolution runs at run time, so it is
+never stale and is left untouched — only the literal Block D notice text
+(surface 7) can drift.
 
 ## What this command does
 
@@ -116,27 +124,126 @@ surfaces the result, and reminds you to commit.
    if it changed. Skip entirely (no print needed) when `.github/labels.yml`
    is absent.
 
-5. **Report the outcome** verbatim from the script — which surfaces were
-   stale, what was re-pointed, and what was staged. If the script's
-   `[caller]` section reports the `cross-model-review.yml` caller was
-   installed this run, print the one-time operator step (never auto-run it —
-   the same print-not-inject convention onboard 8e.8 uses for this secret):
+5. **Reconcile the AaC namespace surfaces** (surface 7, td-145) —
+   independent of whether `NEW_SHA` resolved, and independent of the
+   labels-taxonomy refresh above. `/onboard-project` Phase 8b instantiates
+   two templates into the project tree — `.github/workflows/architecture.yml`
+   and a Block D fragment appended to `.git/hooks/pre-commit` — each
+   embedding the plugin namespace in one line of static text. Neither is
+   re-rendered by a later `/onboard-project` re-run (both sub-step
+   predicates are file-existence guards that skip once the file exists) nor
+   by the script-driven surfaces above, so a project onboarded before a
+   plugin namespace change carries a permanently stale copy of both: the
+   workflow's `claude-code-action` prompt asks for an agent name that will
+   never resolve — nothing rejects an unresolvable agent name, so the job
+   still reports **green** while the architecture sweep silently never runs
+   — and the Block D skip-gracefully guard's `info:` notice misnames the
+   plugin.
+
+   Detect drift by comparing each installed file's namespace token against
+   the **live template's** current token — never a hardcoded name, so this
+   keeps working across future renames — and fix only that one line,
+   in place, never a full re-render (which would clobber the project's
+   `{{PROJECT_PATHS_DIAGRAMS}}` / `{{PROJECT_PYTHON_VERSION}}` /
+   `{{PROJECT_PLUGIN_DIR}}` substitutions or any hand edits made since
+   Phase 8b):
+   ```bash
+   case "$ARGUMENTS" in
+     --check)   MODE="check" ;;
+     --dry-run) MODE="dry-run" ;;
+     *)         MODE="apply" ;;
+   esac
+
+   python3 - "$PLUGIN_ROOT" "$MODE" <<'PYEOF'
+   import re
+   import subprocess
+   import sys
+   from pathlib import Path
+
+   plugin_root, mode = Path(sys.argv[1]), sys.argv[2]
+   repo_root = Path(subprocess.run(
+       ["git", "rev-parse", "--show-toplevel"],
+       capture_output=True, text=True, check=True,
+   ).stdout.strip()).resolve()
+
+   # (label, template, installed, anchor pattern, line format, tracked-by-git)
+   SURFACES = [
+       (
+           "architecture.yml",
+           plugin_root / "claude/aac-templates/architecture.yml.tmpl",
+           repo_root / ".github/workflows/architecture.yml",
+           re.compile(r"Load the (\S+):architect-validator agent"),
+           "Load the {}:architect-validator agent",
+           True,
+       ),
+       (
+           "pre-commit Block D",
+           plugin_root / "claude/aac-templates/precommit-block-d.sh.frag",
+           repo_root / ".git/hooks/pre-commit",
+           re.compile(r"info: (\S+) plugin not found in installed_plugins\.json"),
+           "info: {} plugin not found in installed_plugins.json",
+           False,
+       ),
+   ]
+
+   drift = False
+   for label, template_path, installed_path, anchor, line_fmt, tracked in SURFACES:
+       if not installed_path.exists():
+           print(f"{label}: not installed — nothing to reconcile")
+           continue
+       current = anchor.search(template_path.read_text())
+       installed_text = installed_path.read_text()
+       installed = anchor.search(installed_text)
+       if not current or not installed:
+           print(f"{label}: anchor line not found — skipping (manual review)")
+           continue
+       if current.group(1) == installed.group(1):
+           print(f"{label}: current (namespace={current.group(1)})")
+           continue
+       drift = True
+       old_line = line_fmt.format(installed.group(1))
+       new_line = line_fmt.format(current.group(1))
+       if mode == "check":
+           print(f"{label}: STALE — names '{installed.group(1)}', template now says '{current.group(1)}'")
+       elif mode == "dry-run":
+           print(f"{label}: would replace:\n  - {old_line}\n  + {new_line}")
+       else:
+           installed_path.write_text(installed_text.replace(old_line, new_line))
+           print(f"{label}: fixed — re-pointed to '{current.group(1)}'")
+           if tracked:
+               subprocess.run(["git", "add", str(installed_path)], cwd=repo_root, check=True)
+
+   if mode == "check" and drift:
+       sys.exit(1)
+   PYEOF
+   ```
+   A second run after applying finds both surfaces `current` and prints
+   nothing further to fix — idempotent by construction, since the check is a
+   direct string comparison against the live template rather than an
+   unconditional overwrite.
+
+6. **Report the outcome** verbatim from the script and from Step 5 — which
+   surfaces were stale, what was re-pointed, and what was staged. If the
+   script's `[caller]` section reports the `cross-model-review.yml` caller
+   was installed this run, print the one-time operator step (never auto-run
+   it — the same print-not-inject convention onboard 8e.8 uses for this
+   secret):
    ```
    gh secret set CURSOR_API_KEY
    ```
    Without it, the review gate's reviewer step no-ops.
 
-6. **If changes were applied** (not `--check`/`--dry-run`), remind the user that
+7. **If changes were applied** (not `--check`/`--dry-run`), remind the user that
    the staged changes are ready and propose a commit message — do **not** commit
    for them:
    ```
    chore: re-point Praxion pins to <version>
    ```
-   Note that the hook symlink and git-config changes are **not** tracked files
-   (they live in `.git/`), so the staged diff covers `.gitattributes`, the
-   onboard manifest, and — when surface 5 reconciled — the caller workflow
-   file(s) under `.github/workflows/`. The hook/driver re-points take effect
-   immediately.
+   Note that the hook symlink, git-config, and Block D fragment changes are
+   **not** tracked files (they live in `.git/`), so the staged diff covers
+   `.gitattributes`, the onboard manifest, and — when surface 5 or surface 7
+   reconciled — the caller workflow file(s) and/or `.github/workflows/architecture.yml`.
+   The hook/driver re-points take effect immediately.
 
 ## Notes
 
@@ -154,15 +261,18 @@ surfaces the result, and reminds you to commit.
 - **The labels-taxonomy baseline refresh (surface 6) needs no `gh` and no hub
   SHA** — it runs whenever `.github/labels.yml` is present, independent of
   whether surface 5 resolved this run.
+- **Surface 7 needs no `gh` and no hub SHA either** — like surface 6, it
+  diffs the live template against the installed file directly, so it
+  reconciles regardless of whether surface 5 resolved this run. Unlike
+  surface 6, it patches only the one line that changed per file — never a
+  full re-render — so project-specific template substitutions and any hand
+  edits survive untouched.
 - This command is the maintenance path; the full `/onboard-project` re-run still
   works and reconciles the same surfaces as part of its broader flow.
-- **Known gap — the plugin namespace rename (`i-am` → `praxion`) is not
-  reconciled here.** Two shipped templates embed the plugin namespace in text
-  this command does not re-render: `.github/workflows/architecture.yml` (a
-  `Load the <ns>:architect-validator agent` prompt) and the Block D pre-commit
-  fragment. Both **fail open** — the workflow reports green while the
-  architecture sweep never runs, and the golden-rule gate stops enforcing
-  behind a single `info:` line — so nothing surfaces the breakage on its own.
-  A project onboarded before the rename must update both by hand until
-  `td-145` closes. Check with
-  `grep -rn 'i-am:' .github/ .pre-commit-config.yaml` in the managed project.
+- **Historical note (td-145).** Before surface 7 shipped, a plugin namespace
+  rename (e.g. `i-am` → `praxion`) left `.github/workflows/architecture.yml`
+  and the installed Block D fragment silently stale in any project onboarded
+  before the rename — both fail open (green CI with no sweep ever running; a
+  skip notice naming the wrong plugin). Step 5 above now detects and fixes
+  both. Confirm a pre-surface-7 project needed it with
+  `grep -rn 'i-am:' .github/workflows/architecture.yml .git/hooks/pre-commit`.

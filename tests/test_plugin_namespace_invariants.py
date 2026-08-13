@@ -154,6 +154,28 @@ def test_each_migration_reference_is_still_earning_its_exemption(path, reason):
     )
 
 
+def test_upgrade_project_reconciles_the_instantiated_aac_templates():
+    """td-145: a rename moves the *shipped* templates, but two of their
+    renders are already instantiated into a managed project's own tree --
+    `.github/workflows/architecture.yml` and the installed Block D
+    pre-commit fragment -- and nothing else re-renders an existing copy.
+    Both fail open if left stale: the workflow still reports green with the
+    architecture sweep never running, and the golden-rule gate's skip notice
+    misnames the plugin. `/upgrade-project` is the only reconciliation path
+    for an already-instantiated copy, so this canary pins the reference to
+    both target files and to the drift-detection anchors themselves -- if a
+    future edit drops any of them, `/upgrade-project` silently stops
+    detecting the drift and td-145 reopens with no test failing to say so.
+    """
+    content = (REPO_ROOT / "commands" / "upgrade-project.md").read_text(encoding="utf-8")
+
+    assert ".github/workflows/architecture.yml" in content
+    assert ".git/hooks/pre-commit" in content
+    assert "architect-validator agent" in content
+    assert "info: {} plugin not found in installed_plugins.json" in content
+    assert "td-145" in content
+
+
 @pytest.mark.parametrize("agent_type", ["researcher", "implementer", "sentinel"])
 def test_retired_prefix_is_not_recognised_as_praxion_native(agent_type):
     """Canary: reverting the predicate to the retired prefix must fail here."""

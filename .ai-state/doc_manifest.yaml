@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-08T06:15:41Z'
+generated_at: '2026-08-13T07:51:20Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -123,7 +123,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-08-07'
+  last_modified: '2026-08-13'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -495,7 +495,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-08-07'
+  last_modified: '2026-08-13'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -526,7 +526,7 @@ surfaces:
   path: .ai-state/TEST_TOPOLOGY.md
   type: markdown
   title: "Test Topology \u2014 Praxion"
-  last_modified: '2026-08-07'
+  last_modified: '2026-08-13'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-design
@@ -534,7 +534,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-08-07'
+  last_modified: '2026-08-13'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -542,13 +542,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-08-07'
+  last_modified: '2026-08-13'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-08-07'
+  last_modified: '2026-08-13'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -2138,7 +2138,7 @@ surfaces:
   path: .ai-state/decisions/262-tier-vs-execution-mode-taxonomy.md
   type: markdown
   title: "Tier is not execution mode \u2014 pipeline_tier semantics + orchestrator as Direct/Lightweight ADR author"
-  last_modified: '2026-07-01'
+  last_modified: '2026-08-13'
   renderer: adr_card
 - id: ai-state-decisions-263-retire-future-designed-producers
   path: .ai-state/decisions/263-retire-future-designed-producers.md
@@ -2636,7 +2636,7 @@ surfaces:
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-07_14-00-50.md
   type: markdown
   title: Sentinel Report
-  last_modified: '2026-08-07'
+  last_modified: '2026-08-13'
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-06-18-23-41-03
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-18_23-41-03.json
@@ -2762,7 +2762,7 @@ surfaces:
   path: .ai-state/specs/SPEC_agent-model-routing_2026-04-25.md
   type: markdown
   title: 'SPEC: Per-Agent Model Routing Policy'
-  last_modified: '2026-06-20'
+  last_modified: '2026-08-13'
   renderer: default_markdown
 - id: ai-state-specs-spec-design-dialectic-2026-04-17
   path: .ai-state/specs/SPEC_design-dialectic_2026-04-17.md
@@ -2777,19 +2777,19 @@ surfaces:
   path: .ai-state/specs/SPEC_diagrams_2026-04-30.md
   type: markdown
   title: 'SPEC: LikeC4 + D2 Dual-Toolchain Diagram Convention'
-  last_modified: '2026-08-07'
+  last_modified: '2026-08-13'
   renderer: default_markdown
 - id: ai-state-specs-spec-multi-language-support-2026-05-11
   path: .ai-state/specs/SPEC_multi-language-support_2026-05-11.md
   type: markdown
   title: "SPEC: Multi-Language Support \u2014 Polyglot Skill Architecture"
-  last_modified: '2026-07-29'
+  last_modified: '2026-08-13'
   renderer: default_markdown
 - id: ai-state-specs-spec-multidisciplinary-identities-2026-07-30
   path: .ai-state/specs/SPEC_multidisciplinary_identities_2026-07-30.md
   type: markdown
   title: "SPEC: Multidisciplinary Consulting Identities (Wave 1 \u2014 `statistician`)"
-  last_modified: '2026-07-30'
+  last_modified: '2026-08-13'
   renderer: default_markdown
   surfaces_referenced:
   - docs-multidisciplinary-identities-evidence
@@ -2797,19 +2797,19 @@ surfaces:
   path: .ai-state/specs/SPEC_p5-issue-autofix_2026-07-24.md
   type: markdown
   title: "SPEC: P5 \u2014 Praxion-Side Issue Autofix (Self-Healing Loop Subsystem C)"
-  last_modified: '2026-07-29'
+  last_modified: '2026-08-13'
   renderer: default_markdown
 - id: ai-state-specs-spec-production-gate-cohort-2026-06-26
   path: .ai-state/specs/SPEC_production-gate-cohort_2026-06-26.md
   type: markdown
   title: "SPEC: Wave 3 \u2014 Production-Gate Cohort + Registry Declarative Spine"
-  last_modified: '2026-06-26'
+  last_modified: '2026-08-13'
   renderer: default_markdown
 - id: ai-state-specs-spec-project-metrics-2026-04-23
   path: .ai-state/specs/SPEC_project-metrics_2026-04-23.md
   type: markdown
   title: "SPEC: `/project-metrics` Command \u2014 Project Complexity/Health Metrics"
-  last_modified: '2026-08-07'
+  last_modified: '2026-08-13'
   renderer: default_markdown
 groups:
 - id: tutorial

@@ -23,7 +23,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from check_metrics_freshness import evaluate_freshness  # noqa: E402
+from check_metrics_freshness import evaluate_freshness, main  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Fixtures — a real git repo, because the gate's whole subject is git distance.
@@ -261,3 +261,140 @@ def test_dirty_capture_is_surfaced(repo: Path, tmp_path: Path) -> None:
     result = evaluate_freshness(repo, reports_dir=reports)
 
     assert result["dirty"] is True
+
+
+# ---------------------------------------------------------------------------
+# Classification robustness — absent-directory and malformed-filename edges.
+#
+# These are still "absent" / context-field paths, not new statuses, but a
+# false "clean" verdict on any of them is the same un-bars-a-TD01-filing risk
+# named in td-135: an existing-but-empty reports dir, or a report whose
+# filename doesn't carry a parseable timestamp, must degrade gracefully
+# rather than crash or silently misreport.
+# ---------------------------------------------------------------------------
+
+
+def test_absent_when_reports_directory_has_no_matching_reports(repo: Path, tmp_path: Path) -> None:
+    """An existing but empty reports directory is `absent`, not a crash.
+
+    Distinct from the missing-directory case above: this is the
+    directory-created-but-no-report-yet path (e.g. right after `mkdir -p`
+    but before the first `/project-metrics` run writes a file), which takes
+    a different branch through `_latest_report` than a wholly-absent path.
+    """
+
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    (reports / "not_a_report.txt").write_text("noise")
+
+    result = evaluate_freshness(repo, reports_dir=reports)
+
+    assert result["status"] == "absent"
+    assert result["findings"] == []
+    assert "METRICS_REPORT_" in result["note"]
+
+
+def test_age_days_withheld_for_non_timestamp_filename(repo: Path, tmp_path: Path) -> None:
+    """A report filename with no parseable timestamp reports no age, not a crash.
+
+    `age_days` is documented as context, never the gate — but a caller that
+    does read it must see an honest `None` rather than a wrong number from a
+    misparsed name. The overall verdict (`fresh`/`stale`) is unaffected,
+    since that classification runs on `run_metadata.commit`, not the
+    filename.
+    """
+
+    head = _git(repo, "rev-parse", "HEAD")
+    reports = tmp_path / "reports"
+    _write_report(reports, stamp="latest", commit=head, paths=["hot.py"])
+
+    result = evaluate_freshness(repo, reports_dir=reports)
+
+    assert result["report"] == "METRICS_REPORT_latest.json"
+    assert result["age_days"] is None
+    assert result["status"] == "fresh"
+
+
+def test_age_days_none_for_filename_with_invalid_calendar_date(repo: Path, tmp_path: Path) -> None:
+    """A syntactically-dated but calendar-invalid filename reports no age.
+
+    The filename regex checks digit *shape* only (`\\d{2}` accepts "13" as a
+    month); `strptime` is what rejects it. That gap must degrade to unknown
+    age, not raise past the caller and abort the whole freshness check.
+    """
+
+    head = _git(repo, "rev-parse", "HEAD")
+    reports = tmp_path / "reports"
+    _write_report(reports, stamp="2026-13-40_25-70-99", commit=head, paths=["hot.py"])
+
+    result = evaluate_freshness(repo, reports_dir=reports)
+
+    assert result["age_days"] is None
+    assert result["status"] == "fresh"
+
+
+# ---------------------------------------------------------------------------
+# CLI (`main`) — exit codes and both render modes.
+#
+# `evaluate_freshness` is the classification; `main` is what the sentinel
+# and a human operator actually invoke, so its exit code and both render
+# paths (`--json` and human) are part of the gate's contract, not incidental
+# plumbing.
+# ---------------------------------------------------------------------------
+
+
+def test_main_json_reports_fresh_status_and_exits_zero(repo: Path, tmp_path: Path, capsys) -> None:
+    head = _git(repo, "rev-parse", "HEAD")
+    reports = tmp_path / "reports"
+    _write_report(reports, commit=head, paths=["hot.py"])
+
+    exit_code = main(["--repo-root", str(repo), "--reports-dir", str(reports), "--json"])
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "fresh"
+
+
+def test_main_human_output_lists_stale_hotspot_and_exits_one(
+    repo: Path, tmp_path: Path, capsys
+) -> None:
+    head_at_report = _git(repo, "rev-parse", "HEAD")
+    reports = tmp_path / "reports"
+    _write_report(reports, commit=head_at_report, paths=["hot.py"])
+
+    (repo / "hot.py").write_text("# decomposed\n")
+    _git(repo, "add", "hot.py")
+    _git(repo, "commit", "-q", "-m", "refactor: decompose hot.py")
+
+    exit_code = main(["--repo-root", str(repo), "--reports-dir", str(reports)])
+
+    out = capsys.readouterr().out
+    assert exit_code == 1
+    assert "STALE #1 hot.py" in out
+
+
+def test_main_human_output_shows_withheld_reason(repo: Path, tmp_path: Path, capsys) -> None:
+    """A withheld verdict renders its reason in the human format, not a blank line."""
+
+    reports = tmp_path / "reports"
+    _write_report(reports, commit=None, paths=["hot.py"])
+
+    exit_code = main(["--repo-root", str(repo), "--reports-dir", str(reports)])
+
+    out = capsys.readouterr().out
+    assert exit_code == 0
+    assert "WITHHELD commits_since" in out
+
+
+def test_main_refuses_plugin_cache_repo_root(tmp_path: Path) -> None:
+    """A resolved repo root inside an installed-plugin cache is refused (exit 2).
+
+    This is the hard backstop from `_repo_root.is_plugin_cache_path` — the
+    gate must never evaluate or mutate shared plugin state.
+    """
+
+    fake_plugin_root = tmp_path / "plugins" / "cache" / "acme" / "widget" / "1.0.0"
+
+    exit_code = main(["--repo-root", str(fake_plugin_root)])
+
+    assert exit_code == 2

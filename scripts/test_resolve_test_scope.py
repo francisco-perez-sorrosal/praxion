@@ -36,6 +36,7 @@ CHAIN = FIXTURES / "chain_topology.md"
 PARALLEL = FIXTURES / "parallel_safety_topology.md"
 GLOBS = FIXTURES / "glob_shapes_topology.md"
 MALFORMED = FIXTURES / "malformed_anchor_topology.md"
+DELETED_SELECTOR_PATH = FIXTURES / "deleted_selector_path_topology.md"
 
 
 # -- Helpers ------------------------------------------------------------------
@@ -798,3 +799,88 @@ class TestStdlibOnly:
     def test_the_parser_sibling_is_not_executable(self) -> None:
         """A library, not a tool -- the installer's `-f && -x` filter must skip it."""
         assert not (SCRIPTS_DIR / "_topology_yaml.py").stat().st_mode & 0o111
+
+
+# == Selector resolution (td-143) =============================================
+#
+# `resolve_test_scope.py` never checks that a `pytest-globs` selector `arg`
+# resolves to anything on disk -- it only ever *reads* `selectors` to compose
+# an invocation, never validates them. That is exactly how the incident this
+# guards against reached green: splitting `tests/test_ci_autofix_hub_invariants.py`
+# left the `ci-workflows` group's selector naming a deleted path, the resulting
+# `pytest <deleted-path>` invocation exited 4, and nothing in the suite noticed
+# because a test group that silently stops selecting anything is
+# indistinguishable from one that passes.
+#
+# Scope is deliberately `pytest-globs` only: `pytest-markers` args are marker
+# names and `pytest-keywords` args are `-k` expressions, neither of which is a
+# filesystem path, so validating them here would be a category error.
+#
+# Glob decision: a glob selector arg (one containing `*`, `?`, or `[`) is held
+# to the same standard as a literal one -- it must match at least one path.
+# A glob matching zero files is the identical false-green in a different
+# shape: the group's invocation still exits cleanly (pytest's own "no tests
+# collected" is exit code 5, not a hard failure a caller would notice), so
+# nothing distinguishes "covers nothing today" from "covers nothing anymore".
+# Held to a lower bar than the literal case would silently reintroduce the
+# same gap this check exists to close. `pathlib.Path.glob` (not
+# `resolve_test_scope.glob_to_regex`) is used to evaluate the match -- it is a
+# deliberately simpler proxy answering only "does anything match", not the
+# production module's exact segment-boundary semantics, which is all this
+# existence check needs.
+
+
+def _unresolved_pytest_globs_args(groups: tuple, repo_root: Path) -> list[str]:
+    """`pytest-globs` selector args that don't resolve against `repo_root`.
+
+    A literal arg (no glob metacharacter) must exist as a file or directory.
+    A glob arg must match at least one path. Returns one message per problem,
+    prefixed with the owning group id, so a failure names both the group and
+    the arg without further digging.
+    """
+    problems: list[str] = []
+    for group in groups:
+        for selector in group.selectors:
+            if selector.strategy != "pytest-globs":
+                continue
+            for arg in selector.args:
+                if any(ch in arg for ch in "*?["):
+                    if not any(repo_root.glob(arg)):
+                        problems.append(
+                            f"{group.id}: glob {arg!r} matches no path under {repo_root}"
+                        )
+                elif not (repo_root / arg).exists():
+                    problems.append(
+                        f"{group.id}: {arg!r} does not resolve to a path under {repo_root}"
+                    )
+    return problems
+
+
+class TestSelectorPathResolution:
+    def test_real_topology_selector_args_all_resolve(self) -> None:
+        """Regression guard: every selector in the live topology names a real path.
+
+        This is the check itself, run against `.ai-state/TEST_TOPOLOGY.md`. A
+        future module split that forgets to update a selector fails loudly
+        here instead of shipping a group that silently selects nothing.
+        """
+        repo_root = SCRIPTS_DIR.parent
+        groups = rts.load_topology(repo_root / rts.DEFAULT_TOPOLOGY)
+
+        problems = _unresolved_pytest_globs_args(groups, repo_root)
+
+        assert problems == [], "\n".join(problems)
+
+    def test_canary_flags_selector_arg_naming_a_deleted_path(self) -> None:
+        """The gate bites: a deleted path is flagged, a real one is not.
+
+        Four groups in one fixture -- literal-real, literal-deleted,
+        glob-empty, glob-nonempty -- so the assertion proves discrimination,
+        not just "fires on something".
+        """
+        groups = rts.load_topology(DELETED_SELECTOR_PATH)
+
+        problems = _unresolved_pytest_globs_args(groups, FIXTURES)
+
+        flagged = {p.split(":", 1)[0] for p in problems}
+        assert flagged == {"has-deleted-path", "has-empty-glob"}

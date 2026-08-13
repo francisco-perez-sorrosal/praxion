@@ -467,6 +467,270 @@ def test_supersession_missing_superseded_by_fails():
     )
 
 
+def test_supersession_bare_commented_key_is_not_a_dangling_reference():
+    """A bare 'supersedes:' key (YAML None, e.g. trailed by only a comment)
+    must not be stringified into a phantom target and reported as dangling.
+    """
+    adr_fresh = textwrap.dedent("""\
+        ---
+        id: dec-050
+        title: Fresh decision with a commented-out supersedes key
+        status: accepted
+        category: architectural
+        date: "2026-01-01"
+        summary: supersedes key present but bare — not a real reference
+        tags: [test]
+        made_by: agent
+        supersedes: # none — fresh decision, no prior ADR replaced
+        ---
+
+        ## Context
+
+        Fresh context.
+
+        ## Decision
+
+        Fresh decision.
+
+        ## Considered Options
+
+        ### Option A
+
+        Only option.
+
+        ## Consequences
+
+        None yet.
+    """)
+    from praxion_evals.harness.families.family1_pipeline_fidelity import (
+        Family1PipelineOutcomeFidelity,
+    )
+
+    family = Family1PipelineOutcomeFidelity()
+    corpus = _make_corpus(decisions=[(".ai-state/decisions/050-fresh.md", adr_fresh)])
+    fake_judge = FakeJudgeClient()
+
+    results = family.run(corpus, fake_judge)
+
+    reciprocity_results = [r for r in results if r.check_name == "supersession_reciprocity"]
+    assert all(r.verdict == "PASS" for r in reciprocity_results), (
+        "A bare/None-valued supersedes key must not produce a reciprocity finding"
+    )
+
+
+def test_supersession_list_form_with_existing_targets_passes():
+    """A list-valued 'supersedes' whose every element resolves and back-links
+    correctly must PASS (the string|list frontmatter contract)."""
+    adr_target_a = textwrap.dedent("""\
+        ---
+        id: dec-100
+        title: First superseded decision
+        status: superseded
+        category: architectural
+        date: "2026-01-01"
+        summary: One of several decisions replaced by dec-102
+        tags: [test]
+        made_by: agent
+        superseded_by: dec-102
+        ---
+
+        ## Context
+
+        Old context A.
+
+        ## Decision
+
+        Old decision A.
+
+        ## Considered Options
+
+        ### Option A
+
+        Done.
+
+        ## Consequences
+
+        Superseded.
+    """)
+    adr_target_b = textwrap.dedent("""\
+        ---
+        id: dec-101
+        title: Second superseded decision
+        status: superseded
+        category: architectural
+        date: "2026-01-02"
+        summary: Another decision replaced by dec-102
+        tags: [test]
+        made_by: agent
+        superseded_by: dec-102
+        ---
+
+        ## Context
+
+        Old context B.
+
+        ## Decision
+
+        Old decision B.
+
+        ## Considered Options
+
+        ### Option A
+
+        Done.
+
+        ## Consequences
+
+        Superseded.
+    """)
+    adr_replacement = textwrap.dedent("""\
+        ---
+        id: dec-102
+        title: Consolidated replacement decision
+        status: accepted
+        category: architectural
+        date: "2026-02-01"
+        summary: Supersedes both dec-100 and dec-101
+        tags: [test]
+        made_by: agent
+        supersedes: [dec-100, dec-101]
+        ---
+
+        ## Context
+
+        New context.
+
+        ## Decision
+
+        Consolidated decision.
+
+        ## Considered Options
+
+        ### Option A
+
+        Better.
+
+        ## Consequences
+
+        Improved.
+
+        ## Prior Decision
+
+        dec-100 and dec-101 were consolidated here.
+    """)
+    from praxion_evals.harness.families.family1_pipeline_fidelity import (
+        Family1PipelineOutcomeFidelity,
+    )
+
+    family = Family1PipelineOutcomeFidelity()
+    corpus = _make_corpus(
+        decisions=[
+            (".ai-state/decisions/100-target-a.md", adr_target_a),
+            (".ai-state/decisions/101-target-b.md", adr_target_b),
+            (".ai-state/decisions/102-replacement.md", adr_replacement),
+        ]
+    )
+    fake_judge = FakeJudgeClient()
+
+    results = family.run(corpus, fake_judge)
+
+    reciprocity_results = [r for r in results if r.check_name == "supersession_reciprocity"]
+    assert any(r.verdict == "PASS" for r in reciprocity_results), (
+        "A list-valued supersedes with every target correctly back-linked must PASS"
+    )
+
+
+def test_supersession_list_form_missing_one_target_fails_naming_it():
+    """A list-valued 'supersedes' where one element has no corpus target
+    must FAIL and name the specific missing element."""
+    adr_target_a = textwrap.dedent("""\
+        ---
+        id: dec-100
+        title: First superseded decision
+        status: superseded
+        category: architectural
+        date: "2026-01-01"
+        summary: Correctly back-linked target
+        tags: [test]
+        made_by: agent
+        superseded_by: dec-102
+        ---
+
+        ## Context
+
+        Old context A.
+
+        ## Decision
+
+        Old decision A.
+
+        ## Considered Options
+
+        ### Option A
+
+        Done.
+
+        ## Consequences
+
+        Superseded.
+    """)
+    adr_replacement = textwrap.dedent("""\
+        ---
+        id: dec-102
+        title: Replacement decision with one dangling target
+        status: accepted
+        category: architectural
+        date: "2026-02-01"
+        summary: Supersedes dec-100 (present) and dec-999 (absent from corpus)
+        tags: [test]
+        made_by: agent
+        supersedes: [dec-100, dec-999]
+        ---
+
+        ## Context
+
+        New context.
+
+        ## Decision
+
+        Replacement decision.
+
+        ## Considered Options
+
+        ### Option A
+
+        Better.
+
+        ## Consequences
+
+        Improved.
+
+        ## Prior Decision
+
+        dec-100 replaced here; dec-999 does not exist in this corpus.
+    """)
+    from praxion_evals.harness.families.family1_pipeline_fidelity import (
+        Family1PipelineOutcomeFidelity,
+    )
+
+    family = Family1PipelineOutcomeFidelity()
+    corpus = _make_corpus(
+        decisions=[
+            (".ai-state/decisions/100-target-a.md", adr_target_a),
+            (".ai-state/decisions/102-replacement.md", adr_replacement),
+        ]
+    )
+    fake_judge = FakeJudgeClient()
+
+    results = family.run(corpus, fake_judge)
+
+    reciprocity_results = [r for r in results if r.check_name == "supersession_reciprocity"]
+    assert any(
+        r.verdict == "FAIL" and any("dec-999" in finding for finding in r.findings)
+        for r in reciprocity_results
+    ), "A list-valued supersedes with one missing target must FAIL naming that element"
+
+
 # ---------------------------------------------------------------------------
 # Re-affirmation reciprocity checks
 # ---------------------------------------------------------------------------
@@ -646,6 +910,57 @@ def test_re_affirmation_missing_back_link_fails():
     reciprocity_results = [r for r in results if r.check_name == "re_affirmation_reciprocity"]
     assert any(r.verdict == "FAIL" for r in reciprocity_results), (
         "A re_affirms link without the matching re_affirmed_by must FAIL reciprocity check"
+    )
+
+
+def test_re_affirmation_bare_commented_key_is_not_a_dangling_reference():
+    """A bare 're_affirms:' key (YAML None, e.g. trailed by only a comment)
+    must not be stringified into a phantom target and reported as dangling.
+    """
+    adr_fresh = textwrap.dedent("""\
+        ---
+        id: dec-051
+        title: Fresh decision with a commented-out re_affirms key
+        status: accepted
+        category: architectural
+        date: "2026-01-01"
+        summary: re_affirms key present but bare — not a real reference
+        tags: [test]
+        made_by: agent
+        re_affirms: # none — fresh decision, nothing re-affirmed
+        ---
+
+        ## Context
+
+        Fresh context.
+
+        ## Decision
+
+        Fresh decision.
+
+        ## Considered Options
+
+        ### Option A
+
+        Only option.
+
+        ## Consequences
+
+        None yet.
+    """)
+    from praxion_evals.harness.families.family1_pipeline_fidelity import (
+        Family1PipelineOutcomeFidelity,
+    )
+
+    family = Family1PipelineOutcomeFidelity()
+    corpus = _make_corpus(decisions=[(".ai-state/decisions/051-fresh.md", adr_fresh)])
+    fake_judge = FakeJudgeClient()
+
+    results = family.run(corpus, fake_judge)
+
+    reciprocity_results = [r for r in results if r.check_name == "re_affirmation_reciprocity"]
+    assert all(r.verdict == "PASS" for r in reciprocity_results), (
+        "A bare/None-valued re_affirms key must not produce a reciprocity finding"
     )
 
 

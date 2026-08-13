@@ -142,6 +142,28 @@ def _extract_id(content: str) -> str:
     return str(fm.get("id", ""))
 
 
+def _normalize_reference_ids(raw: Any) -> list[str]:
+    """Normalize a cross-reference frontmatter value to a list of ADR ids.
+
+    Handles every shape the ADR corpus actually carries for fields like
+    ``supersedes`` and ``re_affirms``: absent, explicitly ``None`` (a bare
+    ``key:`` with no value — including a YAML end-of-line comment such as
+    ``re_affirms: # none — ...``, which parses to ``None``), a single scalar
+    id, or a list of ids (e.g. ``supersedes: [dec-009, dec-025, dec-039]``
+    per the ``string | list`` frontmatter contract). ``str(None)`` would
+    otherwise stringify to the literal ``"None"`` and be treated as a
+    dangling reference — this normalizer is what prevents that.
+
+    Returns an empty list when the field carries no reference at all.
+    """
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        return [str(item).strip() for item in raw if str(item).strip()]
+    value = str(raw).strip()
+    return [value] if value else []
+
+
 def _count_index_rows(index_content: str) -> int:
     """Count the number of data rows in a DECISIONS_INDEX.md table."""
     # Table rows start with '|' and are not the header or separator rows
@@ -409,30 +431,28 @@ class Family1PipelineOutcomeFidelity(Family):
                 id_to_fm[adr_id] = fm
 
         violations: list[str] = []
+        has_supersession = False
 
         for adr_id, fm in id_to_fm.items():
-            supersedes = str(fm.get("supersedes", "")).strip()
-            if not supersedes:
-                continue
+            for target_id in _normalize_reference_ids(fm.get("supersedes")):
+                has_supersession = True
 
-            target_fm = id_to_fm.get(supersedes)
-            if target_fm is None:
-                # Target not in corpus — cannot verify; skip with WARN
-                violations.append(
-                    f"{adr_id} supersedes {supersedes!r} but target ADR not found in corpus."
-                )
-                continue
+                target_fm = id_to_fm.get(target_id)
+                if target_fm is None:
+                    # Target not in corpus — cannot verify; skip with WARN
+                    violations.append(
+                        f"{adr_id} supersedes {target_id!r} but target ADR not found in corpus."
+                    )
+                    continue
 
-            back_link = str(target_fm.get("superseded_by", "")).strip()
-            if back_link != adr_id:
-                violations.append(
-                    f"{adr_id} supersedes {supersedes!r} but "
-                    f"{supersedes!r}.superseded_by={back_link!r} (expected {adr_id!r})."
-                )
+                back_link = str(target_fm.get("superseded_by", "")).strip()
+                if back_link != adr_id:
+                    violations.append(
+                        f"{adr_id} supersedes {target_id!r} but "
+                        f"{target_id!r}.superseded_by={back_link!r} (expected {adr_id!r})."
+                    )
 
         if not violations and id_to_fm:
-            # Check whether any supersedes links exist; if none, PASS trivially
-            has_supersession = any("supersedes" in fm for fm in id_to_fm.values())
             verdict_note = (
                 "All supersedes/superseded_by links are symmetric."
                 if has_supersession
@@ -492,34 +512,33 @@ class Family1PipelineOutcomeFidelity(Family):
                 id_to_fm[adr_id] = fm
 
         violations: list[str] = []
+        has_reaffirmation = False
 
         for adr_id, fm in id_to_fm.items():
-            re_affirms = str(fm.get("re_affirms", "")).strip()
-            if not re_affirms:
-                continue
+            for target_id in _normalize_reference_ids(fm.get("re_affirms")):
+                has_reaffirmation = True
 
-            target_fm = id_to_fm.get(re_affirms)
-            if target_fm is None:
-                violations.append(
-                    f"{adr_id} re_affirms {re_affirms!r} but target ADR not found in corpus."
-                )
-                continue
+                target_fm = id_to_fm.get(target_id)
+                if target_fm is None:
+                    violations.append(
+                        f"{adr_id} re_affirms {target_id!r} but target ADR not found in corpus."
+                    )
+                    continue
 
-            # re_affirmed_by is a list field
-            back_links_raw = target_fm.get("re_affirmed_by", [])
-            if isinstance(back_links_raw, list):
-                back_links = [str(x).strip() for x in back_links_raw]
-            else:
-                back_links = [str(back_links_raw).strip()]
+                # re_affirmed_by is a list field
+                back_links_raw = target_fm.get("re_affirmed_by", [])
+                if isinstance(back_links_raw, list):
+                    back_links = [str(x).strip() for x in back_links_raw]
+                else:
+                    back_links = [str(back_links_raw).strip()]
 
-            if adr_id not in back_links:
-                violations.append(
-                    f"{adr_id} re_affirms {re_affirms!r} but "
-                    f"{re_affirms!r}.re_affirmed_by={back_links!r} does not include {adr_id!r}."
-                )
+                if adr_id not in back_links:
+                    violations.append(
+                        f"{adr_id} re_affirms {target_id!r} but "
+                        f"{target_id!r}.re_affirmed_by={back_links!r} does not include {adr_id!r}."
+                    )
 
         if not violations and id_to_fm:
-            has_reaffirmation = any("re_affirms" in fm for fm in id_to_fm.values())
             verdict_note = (
                 "All re_affirms/re_affirmed_by links are symmetric."
                 if has_reaffirmation

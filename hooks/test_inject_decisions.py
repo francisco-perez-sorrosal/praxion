@@ -580,6 +580,21 @@ class TestMainInProcess:
 
         assert "dec-042" in capsys.readouterr().out
 
+    @pytest.mark.parametrize("payload_text", ["[]", "null", '"a bare string"', "123"])
+    def test_well_formed_non_object_payload_still_resolves_from_the_process_directory(
+        self,
+        payload_text: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        _write_index(tmp_path, "| dec-042 | Adopt uv | accepted | a | 2026-03-04 | tooling | s |\n")
+        monkeypatch.chdir(tmp_path)
+
+        _drive_main(payload_text, monkeypatch)
+
+        assert "dec-042" in capsys.readouterr().out
+
 
 @pytest.fixture
 def signalled_repo(tmp_path: Path) -> Path:

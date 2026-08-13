@@ -568,14 +568,25 @@ class TestObservationsAreSuppressed:
 
         assert _wal_rows(isolated_project) == []
 
+    @pytest.mark.parametrize("payload_text", ["[]", "null", '"a bare string"', "123"])
+    def test_well_formed_non_object_payload_records_nothing(
+        self, payload_text: str, isolated_project: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        m = _load_module()
+
+        _drive_main(m, payload_text, monkeypatch)
+
+        assert _wal_rows(isolated_project) == []
+
 
 class TestHookNeverRaisesIntoTheHarness:
     """The script boundary must swallow everything -- it runs on every tool call.
 
-    Driven through `runpy` rather than `main()` so the `__main__` guard is part
-    of what is under test: that guard is the *only* thing standing between a
-    malformed payload and a raised exception (see `main()`'s own tolerance
-    gaps -- a well-formed non-object payload propagates out of `main()`).
+    Driven through `runpy` so the `__main__` guard is exercised as a second,
+    outer line of defense on top of `main()`'s own totality against
+    well-formed non-object payloads (`[]`, `null`, a bare string, a bare
+    number) -- see `TestObservationsAreSuppressed` for the in-process proof
+    that `main()` itself no longer propagates on these inputs.
     """
 
     @pytest.mark.parametrize(

@@ -388,3 +388,17 @@ class TestMainInProcess:
         _drive_main("<<not json>>", monkeypatch)
 
         assert "Worktree session" in capsys.readouterr().out
+
+    @pytest.mark.parametrize("payload_text", ["[]", "null", '"a bare string"', "123"])
+    def test_well_formed_non_object_payload_still_resolves_from_the_process_directory(
+        self,
+        payload_text: str,
+        linked_worktree: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        monkeypatch.chdir(linked_worktree)
+
+        _drive_main(payload_text, monkeypatch)
+
+        assert "Worktree session" in capsys.readouterr().out

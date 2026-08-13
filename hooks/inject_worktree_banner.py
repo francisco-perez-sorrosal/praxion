@@ -158,6 +158,8 @@ def main() -> None:
         payload = json.loads(raw) if raw.strip() else {}
     except (json.JSONDecodeError, TypeError):
         payload = {}
+    if not isinstance(payload, dict):
+        payload = {}  # well-formed but non-object JSON ([], null, "str", 123)
     cwd = Path(payload.get("cwd") or os.getcwd())
     worktree_root = _linked_worktree_root(cwd)
     if worktree_root is None:

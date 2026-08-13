@@ -212,6 +212,8 @@ def main() -> None:
         payload = json.loads(sys.stdin.read())
     except (json.JSONDecodeError, OSError):
         return
+    if not isinstance(payload, dict):
+        return  # well-formed but non-object JSON ([], null, "str", 123) -- no fields to read
 
     tool_name = payload.get("tool_name", "")
     if tool_name in BLOCKLIST:

@@ -82,7 +82,7 @@ the first.
 
 | Column | Definition |
 |---|---|
-| `timestamp` | ISO 8601 UTC of the disposition; matches this consult's `CONSULT_LEDGER.md` rows |
+| `timestamp` | ISO 8601 UTC of the disposition. Written independently of this consult's `CONSULT_LEDGER.md` rows -- the two are not expected to match. Only the write order is guaranteed: the ledger disposition is written first, this classification row after, so this timestamp is **later than or equal to** the corresponding ledger row's, never earlier. No check enforces this beyond the ordering itself |
 | `task-slug` / `discipline` / `stage` | Same triple |
 | `challenge-id` | The `### CH-NN` id from the consultant's fragment; the same value the ledger row carries |
 | `classification` | `novel` \| `matched`. `matched` means the sealed list already contained this concern |

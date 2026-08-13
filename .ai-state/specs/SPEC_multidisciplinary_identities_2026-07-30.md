@@ -79,16 +79,16 @@ rather than by prose.
 | REQ | Behaviour | ADR | Primary artifact | Verifying AC |
 |---|---|---|---|---|
 | REQ-01 | Peer, not lens; methodological framing | `dec-303` | `agents/discipline-consultant.md` | AC14 |
-| REQ-02 | `lens-collision` declared per row | `dec-303` | `discipline-registry.md` | AC18 |
+| REQ-02 | `lens-collision` declared per row | `dec-303` | `skills/multi-perspective-analysis/references/discipline-registry.md` | AC18 |
 | REQ-03 | `Discipline:` directive resolution | `dec-302` | `agents/discipline-consultant.md`, `agents/CLAUDE.md` | AC2 |
-| REQ-04 | Registry `fires-when` = Tier-1 table | `dec-302`, `dec-300` | `discipline-registry.md` | AC1 |
+| REQ-04 | Registry `fires-when` = Tier-1 table | `dec-302`, `dec-300` | `skills/multi-perspective-analysis/references/discipline-registry.md` | AC1 |
 | REQ-05 | Runtime `Skill`-tool binding; fixed frontmatter | `dec-302` | `agents/discipline-consultant.md` | AC2, AC16 |
-| REQ-06 | Generic difficulty→model policy | `dec-301` | `rules/swe/agent-model-routing.md`, `discipline-registry.md` | AC15 |
+| REQ-06 | Generic difficulty→model policy | `dec-301` | `rules/swe/agent-model-routing.md`, `skills/multi-perspective-analysis/references/discipline-registry.md` | AC15 |
 | REQ-07 | 1D routing preserved; no `effort:` | `dec-301` | `rules/swe/agent-model-routing.md` | AC12 |
 | REQ-08 | Round-0 isolation + `## Sources Read` | `dec-298` | `CONSULT_<discipline>.md` schema | AC4, AC13 |
 | REQ-09 | Challenge carries decision + test | `dec-298` | `CONSULT_<discipline>.md` schema | AC5 |
-| REQ-10 | Disposition obligation | `dec-298` | `coordination-details.md`, `agents/systems-architect.md` | AC6 |
-| REQ-11 | One loop-back, then escalate | `dec-298` | `coordination-details.md` | AC7, AC15 |
+| REQ-10 | Disposition obligation | `dec-298` | `skills/software-planning/references/coordination-details.md`, `agents/systems-architect.md` | AC6 |
+| REQ-11 | One loop-back, then escalate | `dec-298` | `skills/software-planning/references/coordination-details.md` | AC7, AC15 |
 | REQ-12 | Single-owner, per-challenge adjudication | `dec-298` | `agents/systems-architect.md` | AC8 |
 | REQ-13 | One ledger row per challenge, one writer | `dec-299` | `.ai-state/CONSULT_LEDGER.md` | AC9, AC13 |
 | REQ-14 | `P07` presence gate extended | `dec-299` | `agents/sentinel.md` | AC17 |

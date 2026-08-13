@@ -13,7 +13,7 @@ pipeline_tier: standard
 affected_files:
   - rules/swe/adr-conventions.md
   - skills/spec-driven-development/references/calibration-procedure.md
-  - .ai-state/decisions/dec-133-drop-pep440-dev-prereleases.md
+  - .ai-state/decisions/133-drop-dev-prereleases.md
 affected_reqs: [REQ-04, REQ-07]
 re_affirms: dec-114
 ---

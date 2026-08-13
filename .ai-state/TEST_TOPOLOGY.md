@@ -224,6 +224,13 @@ variance, but **these envelopes should be recalibrated from per-group metrics co
 real pipeline cycles before TT04 is allowed to file `topology-drift` rows against them.** They
 are recorded because measured-and-caveated beats absent; they are not yet a contract.
 
+**Advisory status (2026-08-13, closing sentinel S-05's disclosure arm):** no instrument reads
+these envelopes today — 0 of 10 metrics reports emit per-group timings, so sentinel TT04 has no
+oracle and correctly reports SKIP rather than PASS. Until a per-group timing collector exists in
+`scripts/project_metrics/` (the named prerequisite for TT04's M3 activation), every envelope in
+this file is **advisory, undefended by any gate** — a reader planning against one should treat
+it as a stale local measurement, not a monitored bound.
+
 ### About `parallel_safe`
 
 `pytest-xdist` is **not installed in this project**, so no `-n auto` run was available to

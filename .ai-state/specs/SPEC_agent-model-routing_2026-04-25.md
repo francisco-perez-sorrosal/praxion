@@ -26,18 +26,18 @@ Praxion's main orchestrator chooses the Claude model tier (`opus` / `sonnet` / `
 
 ## Traceability Matrix
 
-| AC | Implementing artifact | Verification |
-|----|----------------------|--------------|
-| AC1 | `rules/swe/agent-model-routing.md` (always-loaded; no `paths:`); pointer added in `rules/swe/swe-agent-coordination-protocol.md § Agent Selection Criteria` | Catalogued in `rules/README.md` (tree + table) |
-| AC2 | Tier table in `rules/swe/agent-model-routing.md` § Tier Table — 13 rows, all assigned (4 H / 8 M / 1 L) | Direct count in rule body |
-| AC3 | `rules/swe/agent-model-routing.md` § Principles, item (i); reinforcement note in `skills/agent-crafting/references/configuration.md` after `**model**` bullet | 3 pinned agents (systems-architect, promethean, roadmap-cartographer) verified to keep `model: opus`; rule body declares "may route up, never below" |
-| AC4 | `rules/swe/agent-model-routing.md` § Researcher Routing Modes — 3 modes (simple-lookup L, comparative M default, contested H) | Table present in rule |
-| AC5 | `rules/swe/agent-model-routing.md` § Operator Kill Switch — 3 scenarios (emergency-cheap `haiku`, emergency-quality `opus`, bypass `default`) | Table present in rule |
-| AC6 | Rule uses aliases only; verified by Step 8 lint check (`grep -E "claude-(opus\|sonnet\|haiku)-[0-9]"` returns 0) | LEARNINGS.md § Isolation Sanity (PASS) |
-| AC7 | Step 1 audit (`grep -rn "thinking\.budget_tokens\|temperature\|top_p\|top_k"` over `hooks/` + `commands/`) returned 0 spawn-path hits; rule body states the prohibition prospectively | LEARNINGS.md § Audit Results, Step 1 (PASS) |
-| AC8 | `rules/swe/agent-model-routing.md` paragraph below kill-switch table — "fall back to the next-cheaper tier (Opus → Sonnet → Haiku) and log it for the runbook" | Paragraph present in rule |
-| AC9 | Rationale column populated for all 13 rows in the tier table; ≤12 words each | Direct count |
-| AC10 | `rules/swe/agent-model-routing.md` § Quality-Cliff Guards — 4 signatures (deep scientific reasoning, long-horizon coding, cross-codebase refactoring, `verifier` never-downgrade) | Bullet list present in rule |
+| AC | Implementing artifact | Notes | Verification |
+|----|----------------------|-------|--------------|
+| AC1 | `rules/swe/agent-model-routing.md`, `rules/swe/swe-agent-coordination-protocol.md` | Always-loaded, no `paths:` frontmatter; pointer added at § Agent Selection Criteria | Catalogued in `rules/README.md` (tree + table) |
+| AC2 | `rules/swe/agent-model-routing.md` | § Tier Table — 13 rows, all assigned (4 H / 8 M / 1 L) | Direct count in rule body |
+| AC3 | `rules/swe/agent-model-routing.md`, `skills/agent-crafting/references/configuration.md` | § Principles, item (i); reinforcement note added after the **model** bullet | 3 pinned agents (systems-architect, promethean, roadmap-cartographer) verified to keep `model: opus`; rule body declares "may route up, never below" |
+| AC4 | `rules/swe/agent-model-routing.md` | § Researcher Routing Modes — 3 modes (simple-lookup L, comparative M default, contested H) | Table present in rule |
+| AC5 | `rules/swe/agent-model-routing.md` | § Operator Kill Switch — 3 scenarios (emergency-cheap `haiku`, emergency-quality `opus`, bypass `default`) | Table present in rule |
+| AC6 | — (rule uses aliases only; no artifact rename) | Rule uses aliases only; verified by Step 8 lint check (`grep -E "claude-(opus\|sonnet\|haiku)-[0-9]"` returns 0) | LEARNINGS.md § Isolation Sanity (PASS) |
+| AC7 | `hooks/`, `commands/` | Step 1 audit (`grep -rn "thinking\.budget_tokens\|temperature\|top_p\|top_k"`) returned 0 spawn-path hits; rule body states the prohibition prospectively | LEARNINGS.md § Audit Results, Step 1 (PASS) |
+| AC8 | `rules/swe/agent-model-routing.md` | Paragraph below kill-switch table — "fall back to the next-cheaper tier (Opus → Sonnet → Haiku) and log it for the runbook" | Paragraph present in rule |
+| AC9 | — (same tier table as AC2) | Rationale column populated for all 13 rows in the tier table; ≤12 words each | Direct count |
+| AC10 | `rules/swe/agent-model-routing.md` | § Quality-Cliff Guards — 4 signatures (deep scientific reasoning, long-horizon coding, cross-codebase refactoring, `verifier` never-downgrade) | Bullet list present in rule |
 
 ## Key Decisions (Cross-Reference)
 

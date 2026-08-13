@@ -78,7 +78,7 @@ The per-REQ traceability map was maintained in `.ai-work/project-metrics/traceab
 | REQ | Implementing file(s) | Test reference |
 |-----|----------------------|----------------|
 | REQ-PM-01 | `commands/project-metrics.md`, `scripts/project_metrics/cli.py`, `scripts/project_metrics/runner.py` | `scripts/project_metrics/tests/test_cli.py`, `scripts/project_metrics/tests/test_integration.py` |
-| REQ-PM-02 | `scripts/project_metrics/runner.py`, `scripts/project_metrics/collectors/base.py` | `scripts/project_metrics/tests/test_integration.py` (`fixtures/minimal_repo/`) |
+| REQ-PM-02 | `scripts/project_metrics/runner.py`, `scripts/project_metrics/collectors/base.py` | `scripts/project_metrics/tests/test_integration.py` (`scripts/project_metrics/tests/fixtures/minimal_repo/`) |
 | REQ-PM-03 | `scripts/project_metrics/cli.py` | `scripts/project_metrics/tests/test_cli.py` |
 | REQ-PM-04 | `scripts/project_metrics/__init__.py`, `scripts/project_metrics/collectors/base.py` | `scripts/project_metrics/tests/test_cli.py`, `scripts/project_metrics/tests/test_collectors_base.py` |
 | REQ-PM-05 | `commands/project-metrics.md`, `scripts/project_metrics/`, `scripts/check_shipped_artifact_isolation.py` | `scripts/project_metrics/tests/test_integration.py`; `scripts/check_shipped_artifact_isolation.py` (CI gate) |

@@ -58,14 +58,19 @@ For your assigned step:
 5. **Type check** — run the project's type checker if one is configured. When the step builds a new typed-language service and no type-check config exists, establish it first from the per-language asset (`skills/python-development/assets/mypy-baseline.toml` for Python; `skills/typescript-development/assets/tsconfig.json` for TypeScript) before running the checker.
 6. **Run tests** — if the step carries a `Tests:` field and the project has a populated `.ai-state/TEST_TOPOLOGY.md`: read the trunk schema (`skills/testing-strategy/references/test-topology.md`) for the `Tests:` field contract and the closure rule for the declared `tier`, then load the language leaf for the project's detected language (the "Language Context" step already determines the language; the leaf is `references/<lang>-testing.md`) to translate the named groups into a concrete scoped runner invocation. Run that scope. **If no language leaf exists for the project's language, do not silently run the full suite or invent a selector — surface the gap (Register Objection) and follow the trunk's "Additive Leaf Escalation Clause."** If the step carries no `Tests:` field, run the step's `Testing` field commands or project-level test commands (today's behavior). For **integration checkpoint steps** (`tier=pipeline` or no field): run the full test suite (new behavioral tests from the test-engineer + all pre-existing tests). Fix any test failures — adjust production code for new test failures, fix pre-existing tests broken by your changes (boy scout rule). Iterate until all tests pass. When a scoped invocation was run, emit the optional `Tier:` / `Groups:` / `Per-group results:` lines in `TEST_RESULTS.md` (see trunk §"Document Conventions" for the block schema) so the verifier and sentinel TT04 have per-group data.
 7. **Self-review** — check your changes against the coding-style conventions (see below).
-7.5. **Update deployment doc** — if the step's `Files` field includes deployment configuration files (`compose.yaml`, `Dockerfile`, `Caddyfile`, `systemd` units, `.env.example`), update the corresponding section of `.ai-state/SYSTEM_DEPLOYMENT.md`:
+
+### Post-implementation updates (after every step)
+
+Run these after step 7 (Self-review) and before step 8 (Update WIP.md):
+
+1. **Update deployment doc** — if the step's `Files` field includes deployment configuration files (`compose.yaml`, `Dockerfile`, `Caddyfile`, `systemd` units, `.env.example`), update the corresponding section of `.ai-state/SYSTEM_DEPLOYMENT.md`:
    - `compose.yaml` changes → update Section 3 (Service Topology: ports, health checks, restart policies) and Section 8 (Scaling: resource limits)
    - `Dockerfile` changes → update Section 3 (image/build info)
    - `Caddyfile` changes → update Section 3 (reverse proxy entry)
    - `.env.example` changes → update Section 4 (Configuration: environment variables table)
    - `systemd` unit changes → update Section 5 (Deployment Process)
    If `.ai-state/SYSTEM_DEPLOYMENT.md` does not exist, skip this step — the systems-architect creates it.
-7.6. **Update architecture doc** — if the step is annotated with `[Architecture]` or its `Files` field includes structural changes (new modules/packages, interface changes, dependency additions/removals), update the corresponding section of `.ai-state/DESIGN.md`:
+2. **Update architecture doc** — if the step is annotated with `[Architecture]` or its `Files` field includes structural changes (new modules/packages, interface changes, dependency additions/removals), update the corresponding section of `.ai-state/DESIGN.md`:
    - New module/package created → update Section 3 (Components: add to component table and L1 diagram)
    - Interface/API changes → update Section 4 (Interfaces: update contract table)
    - Data model changes → update Section 5 (Data Flow: update flow descriptions)
@@ -73,15 +78,15 @@ For your assigned step:
    - ADR created → update Section 8 (Decisions: add cross-reference row)
    - **Diagram regen:** if the structural change touches a C4 view (System Context or Components), update the relevant `.c4` source in `docs/diagrams/` and run `scripts/diagram-regen-hook.sh` (or stage the `.c4` file so the pre-commit hook auto-regenerates) so the committed `.d2` and `.svg` stay in sync with the model.
    If `.ai-state/DESIGN.md` does not exist, skip this step — the systems-architect creates it.
-7.7. **Update developer architecture guide** — if `.ai-state/DESIGN.md` was updated in step 7.6 AND `docs/architecture.md` exists, propagate the change to `docs/architecture.md` with developer framing:
+3. **Update developer architecture guide** — if `.ai-state/DESIGN.md` was updated in the previous step AND `docs/architecture.md` exists, propagate the change to `docs/architecture.md` with developer framing:
    - Only include components that exist on disk (verify with Glob/ls)
    - Use present tense ("handles" not "will handle")
    - Include actual file paths verified against filesystem
    - No Status column — omit Planned/Designed items
    If `docs/architecture.md` does not exist, skip — the systems-architect creates it.
    When a step modifies architectural surfaces (DSL files, `.ai-state/DESIGN.md`, ADRs, or `aac:generated` fence regions), the change is also subject to the `architect-validator` agent's pre-merge structural-drift gate — implementers do not run this check themselves; it runs in the validation pipeline.
-7.8. **Write test results** — if this step ran tests, write `.ai-work/<task-slug>/TEST_RESULTS.md` using the canonical schema (sections per step: command, pass/fail/skip counts, duration, optional coverage, failure blocks, notes). Presence of the file is the handoff signal to the verifier. In parallel mode, write fragment `TEST_RESULTS_implementer.md` — the planner merges fragments by concatenating `## Step N` sections in ascending step order. If a paired test-engineer ran the step's tests, they are the canonical writer and the implementer skips this sub-step.
-7.9. **Write traceability entries** — if this step implements behavior tied to specific REQ IDs from `SYSTEMS_PLAN.md`'s `## Behavioral Specification`, record the REQ-to-implementation mapping in `.ai-work/<task-slug>/traceability.yml` (sequential mode) or `.ai-work/<task-slug>/traceability_implementer.yml` (parallel mode). Schema:
+4. **Write test results** — if this step ran tests, write `.ai-work/<task-slug>/TEST_RESULTS.md` using the canonical schema (sections per step: command, pass/fail/skip counts, duration, optional coverage, failure blocks, notes). Presence of the file is the handoff signal to the verifier. In parallel mode, write fragment `TEST_RESULTS_implementer.md` — the planner merges fragments by concatenating `## Step N` sections in ascending step order. If a paired test-engineer ran the step's tests, they are the canonical writer and the implementer skips this sub-step.
+5. **Write traceability entries** — if this step implements behavior tied to specific REQ IDs from `SYSTEMS_PLAN.md`'s `## Behavioral Specification`, record the REQ-to-implementation mapping in `.ai-work/<task-slug>/traceability.yml` (sequential mode) or `.ai-work/<task-slug>/traceability_implementer.yml` (parallel mode). Schema:
 
    ```yaml
    requirements:
@@ -92,6 +97,7 @@ For your assigned step:
    ```
 
    Only record the REQ IDs whose implementation you just wrote. Do not include test files — the test-engineer owns that layer. **Do not embed REQ/AC IDs in code, docstrings, or comments** — the traceability lives in this YAML file, not in the source. See [`rules/swe/id-citation-discipline.md`](../rules/swe/id-citation-discipline.md). Skip this sub-step entirely if no `## Behavioral Specification` section exists (Direct/Lightweight/Spike tier).
+
 8. **Update WIP.md** — mark your step as complete (see WIP.md Update Protocol).
 9. **Update LEARNINGS.md** — record any discoveries (see LEARNINGS.md Protocol).
 10. **Report** — stop and report one of: `[COMPLETE]`, `[BLOCKED]`, or `[CONFLICT]`.

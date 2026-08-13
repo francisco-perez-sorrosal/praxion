@@ -27,7 +27,7 @@ This is the **authoritative source of truth** for per-agent delegation deliverab
 **implementer** — always include in prompt:
 - "Execute step N from `WIP.md` at `.ai-work/<task-slug>/`"
 - "Update `WIP.md` with completion status"
-- "If structural changes: update `.ai-state/DESIGN.md` (step 7.6) and `docs/architecture.md` (step 7.7)"
+- "If structural changes: update `.ai-state/DESIGN.md` and `docs/architecture.md` (Post-implementation updates)"
 - "If the step runs tests: write `TEST_RESULTS.md` at `.ai-work/<task-slug>/` per the canonical schema in [agent-pipeline-details.md](agent-pipeline-details.md)"
 
 **verifier** — always include in prompt:

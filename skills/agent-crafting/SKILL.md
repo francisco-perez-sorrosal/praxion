@@ -112,7 +112,7 @@ Keep agent prompts focused. When a prompt grows too long, use the `skills` field
 - **Hard ceiling**: ~300 lines — beyond this, extract domain content into skills (via the `skills` field) or inline it
 - **Progressive disclosure**: Use the `skills` field to inject reusable knowledge that the agent needs but that doesn't define its core behavior
 
-**Plugin agent self-containment:** Agents distributed via the plugin system must be self-contained. Reference/satellite files placed next to the agent definition (e.g., `agents/references/`) are NOT accessible when the agent runs in other projects — the sub-agent's `Read` calls resolve relative to the project's working directory, not the plugin cache. This fails silently: the read returns "file not found" but the agent continues without the missing content, producing degraded output with no visible error. If an agent's prompt exceeds the ceiling:
+**Plugin agent self-containment:** Agents distributed via the plugin system must be self-contained. Reference/satellite files placed next to the agent definition (e.g., `agents/references/`) are NOT accessible when the agent runs in other projects — the subagent's `Read` calls resolve relative to the project's working directory, not the plugin cache. This fails silently: the read returns "file not found" but the agent continues without the missing content, producing degraded output with no visible error. If an agent's prompt exceeds the ceiling:
 - Use the `skills` field to offload domain knowledge (skills are resolved from the plugin)
 - Inline the content directly in the agent prompt (acceptable for agents since they run in their own context window and are not always-loaded)
 - Do NOT use satellite/reference files that the agent reads at runtime
@@ -148,7 +148,7 @@ Do **not** reach for a subagent for a quick targeted edit (spawn latency dwarfs 
 - **Agents cannot spawn agents.** Do not include `Agent` (or its `Task` alias) in tools. Chain agents from the main conversation instead.
 - **System prompt isolation.** Agents receive only their markdown body + basic env details, not the full Claude Code system prompt. They do **not** inherit:
   - Skills from the parent context (must be listed in the `skills` field)
-  - Rules (`~/.claude/rules/` content is not injected into sub-agents)
+  - Rules (`~/.claude/rules/` content is not injected into subagents)
   - Parent CLAUDE.md content (project or user-level)
   - Memory settings (must be set via the `memory` field)
   - Parent's conversation history or context

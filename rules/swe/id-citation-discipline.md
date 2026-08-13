@@ -32,7 +32,7 @@ This is the inward-facing parallel of [`shipped-artifact-isolation.md`](shipped-
 |----------|-----------------|-----------|---------------------|
 | `REQ-NN` | `SYSTEMS_PLAN.md` (in-pipeline) / archived SPEC (post-archive) | Ephemeral during pipeline; frozen-per-feature after archive | **Never** |
 | `AC-NN` | `SYSTEMS_PLAN.md` § Acceptance Criteria | Always ephemeral (no archive path) | **Never** |
-| `Step N` / `Step 7.8` | `IMPLEMENTATION_PLAN.md`, `WIP.md` | Pipeline-local, always ephemeral | **Never** |
+| `Step N` | `IMPLEMENTATION_PLAN.md`, `WIP.md` | Pipeline-local, always ephemeral | **Never** |
 | `dec-draft-<hash>` | `.ai-state/decisions/drafts/` | Mid-pipeline only (rewritten at finalize) | **Never** |
 | `dec-NNN` | `.ai-state/decisions/<NNN>-<slug>.md` | Persistent, committed to git | **Yes** (in comments, when citing architectural rationale) |
 | Sentinel check IDs (`F07`, `T03`, `EC06`) | `agents/sentinel.md` | Part of the agent definition (persistent) | **Yes** (in sentinel code) |

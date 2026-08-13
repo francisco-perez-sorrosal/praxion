@@ -33,6 +33,9 @@ The directory name is the skill's identity -- Claude Code infers the `name` from
 - A bare noun (`documentation`) is too vague -- it could mean writing docs, managing READMEs, doc engineering, or API reference generation. Add a qualifier: `doc-management`, `doc-authoring`, `readme-authoring`
 - The name should answer "skill for doing what?" -- `python-development` (developing in Python), `code-review` (reviewing code), `refactoring` (refactoring code)
 - Abbreviations acceptable when the long form is unwieldy and the abbreviation is unambiguous: `python-prj-mgmt` (not `python-project-management`)
+- The `-development` suffix is conventionally reserved for language skills (`python-development`, `typescript-development`) — it is how the ecosystem's naming check (sentinel N01) tells a language skill from any other `{domain}-{activity}` skill
+
+**Exception — `spec-driven-development`:** this skill carries the `-development` suffix without being a language skill. The convention is a one-way implication — every language skill ends `-development`, not every `-development` skill is a language skill — so the suffix no longer discriminates on its own, but that is a documented exception rather than a violation. Renaming (e.g. to `spec-driven-dev`) was considered and rejected: it would touch every cross-reference to the skill for a cosmetic gain. Recording the exception here is the cheaper correct move.
 
 **Good and bad names:**
 

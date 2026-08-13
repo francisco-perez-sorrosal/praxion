@@ -557,6 +557,7 @@ When `.ai-work/<task-slug>/INTERFACE_DESIGN.md` is present in a pipeline run, ru
 | vs. systems-architect | Reviews implemented code | Make design judgments; flags for re-invocation if needed |
 | vs. context-engineer | Checks completeness of planned context artifact updates | Assess quality/structure of context artifact content |
 | vs. user | Identifies issues, recommends action | Fix issues, make go/no-go decisions |
+| Document ownership | Writes `VERIFICATION_REPORT.md`, `REWORK_MANIFEST.md`, `VERIFIER_FINDINGS.md`, and `TECH_DEBT_LEDGER.md` rows | Never writes `WIP.md` or `TEST_RESULTS.md` — those are owned by the implementer / implementation-planner / test-engineer |
 | Execution | Reads code, diffs, and test reports | Runs tests, executes production code, writes production code |
 
 ## Output

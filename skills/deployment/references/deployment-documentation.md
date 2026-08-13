@@ -79,7 +79,7 @@ Natural pipeline sequencing prevents concurrent edits: architect writes first (P
 Four layers of defense:
 
 1. **Main agent awareness** -- when modifying deployment files in Direct/Lightweight tier (no pipeline), the main agent checks for `.ai-state/SYSTEM_DEPLOYMENT.md` and updates affected sections. The deployment skill's gotchas section reminds of this
-2. **Implementer post-step** -- in Standard/Full pipelines, updates doc when deployment files change (proactive, step 7.5)
+2. **Implementer post-step** -- in Standard/Full pipelines, updates doc when deployment files change (proactive, Post-implementation updates: update deployment doc)
 3. **Verifier Phase 7** -- cross-checks doc vs actual configs after implementation (reactive, per-pipeline)
 4. **Sentinel audit** -- checks freshness and consistency independently (reactive, periodic). Finding routing:
 

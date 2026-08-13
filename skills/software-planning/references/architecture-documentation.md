@@ -46,7 +46,7 @@ Sections 4 (Interfaces) and 6 (Dependencies) are left with template guidance for
 
 Skip creation for trivially simple projects (single module, no external dependencies).
 
-**Updates:** The **implementer** updates the architect doc after completing any step annotated with `[Architecture]` or that creates/modifies structural files (step 7.6):
+**Updates:** The **implementer** updates the architect doc after completing any step annotated with `[Architecture]` or that creates/modifies structural files (Post-implementation updates: update architecture doc):
 
 | Change Type | Sections Updated |
 |-------------|-----------------|
@@ -86,8 +86,8 @@ A stale architect doc is a WARN, not a FAIL — it's advisory, not a gate.
 
 Skip creation when the architect doc is skipped (trivially simple projects).
 
-**Updates:** The **implementer** propagates changes to the developer guide after updating the architect doc (step 7.7):
-- Only fires when step 7.6 was done AND `docs/architecture.md` exists
+**Updates:** The **implementer** propagates changes to the developer guide after updating the architect doc (Post-implementation updates: update developer architecture guide):
+- Only fires when the architecture-doc update (Post-implementation updates: update architecture doc) was done AND `docs/architecture.md` exists
 - Filters to Built components only — verify each with Glob/ls
 - Uses present tense ("handles" not "will handle")
 - Verifies all file paths against the filesystem
@@ -95,7 +95,7 @@ Skip creation when the architect doc is skipped (trivially simple projects).
 
 If `docs/architecture.md` does not exist, the implementer skips — the systems-architect creates it.
 
-**Maintenance:** The **doc-engineer** maintains the developer guide at pipeline checkpoints by verifying content against the filesystem (code-verified accuracy). This is independent of the implementer's step 7.7 — it's a periodic freshness check.
+**Maintenance:** The **doc-engineer** maintains the developer guide at pipeline checkpoints by verifying content against the filesystem (code-verified accuracy). This is independent of the implementer's Post-implementation updates step (update developer architecture guide) — it's a periodic freshness check.
 
 **Validation:** The **verifier** checks code accuracy during Phase 9:
 - Every component name in Section 3a matches an actual module/directory name on disk. §3b capabilities are cross-cutting and own no single directory, so this check does not apply to them

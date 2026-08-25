@@ -72,16 +72,21 @@ dev = [
 # so downstream tooling finds it at the first-candidate path.
 
 [tool.pytest.ini_options]
-# --cov-config is pinned explicitly (rather than left to pytest-cov's
-# ".coveragerc" default) so that subprocess coverage embedding -- triggered
-# automatically via pytest-cov's globally-installed .pth site hook whenever
-# a spawned child inherits the COV_CORE_* env vars -- resolves to this exact
-# file's [tool.coverage.run] branch=true, regardless of the child's own cwd.
-# Tests that spawn `sys.executable` subprocesses with cwd set to a tmp_path
-# fixture (not the repo root) cannot auto-discover pyproject.toml by relative
-# search; without this pin they silently fall back to statement-only
-# coverage, which the session-level combine step cannot merge with the
-# parent's branch-mode data (INTERNALERROR coverage.exceptions.DataError).
+# SUBPROCESS COVERAGE IS NOT MEASURED (td-140, verified 2026-08-07 and re-verified
+# with a wired experiment 2026-08-24). Under the installed pytest-cov 7.x no
+# COV_CORE_* or COVERAGE_PROCESS_START variable is exported during a --cov run,
+# so the site-packages a1_coverage.pth never activates in spawned children.
+# Exporting COVERAGE_PROCESS_START by hand does make the child collect -- but it
+# writes its data file into its own cwd (usually a tmp_path destroyed at
+# teardown) and pytest-cov 7 has no combine step for foreign child data, so the
+# lines still never reach the report. Consequence: a module tested ONLY via
+# `subprocess.run([sys.executable, ...])` measures near-zero however good its
+# tests are. Do not file coverage-debt rows against such modules; give them
+# in-process tests instead -- `runpy.run_path(script, run_name="__main__")`
+# exercises the real `__main__` fail-open guard while staying measurable (see
+# skills/testing-strategy/references/python-testing.md). Subprocess tests remain
+# valuable as end-to-end contract proof; they just do not count toward coverage.
+# --cov-config stays pinned so every invocation cwd resolves this exact file.
 addopts = "--cov --cov-config=pyproject.toml --cov-report=xml --cov-report=term-missing"
 # `hooks` joined `tests`/`scripts` on 2026-08-06. It was previously excluded and
 # invoked as a separate `pytest hooks/ --no-cov` CI step, which made the canonical

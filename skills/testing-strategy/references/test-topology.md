@@ -69,9 +69,12 @@ selectors:
 file_dependencies:
   - <path-or-glob>
 # required, 1 or more entries
-# Source paths or globs whose change should fire this group (used by future
-# change-detection tooling). Globs are filesystem-relative from the project
-# root. Absolute path semantics are not allowed.
+# Source paths or globs whose change should fire this group. The mechanical
+# consumer is `scripts/resolve_test_scope.py` (see §"Mechanical Resolver").
+# Globs are filesystem-relative from the project root. Absolute path semantics
+# are not allowed. A bare directory name does NOT match its subtree — write
+# `dir/**` (over-matching suppresses escalation and narrows the run; the
+# resolver deliberately takes the narrower reading of every ambiguous shape).
 
 integration_boundaries:
   - <other-group-id>
@@ -398,6 +401,16 @@ Tests: groups=[<group_id>, ...] tier=<step|phase|pipeline> selector=<auto|manual
 - `note` — required when `reason=other`; one-line free-form explanation.
 
 **Absence means protocol inactive.** A step without a `Tests:` field runs the full suite (today's default behavior). The field is strictly optional at the schema level.
+
+### Mechanical Resolver — `scripts/resolve_test_scope.py`
+
+Change-detection has a shipped mechanical consumer; do not hand-translate `file_dependencies` matches or the tier closure. Stdlib-only; installed as `resolve_test_scope.py` on PATH by `install_claude.sh` (in the Praxion self-host checkout, `python3 scripts/resolve_test_scope.py`):
+
+```
+resolve_test_scope.py --changed <path> [--changed <path> ...] --tier <step|phase|pipeline> --json [--topology <path>] [--repo-root <path>] [--non-source <glob>]
+```
+
+With no `--changed`, it reads the working-tree change set itself (`git diff --name-only HEAD` unioned with untracked files). It maps changed paths to groups, applies the declared tier's closure, and emits one concrete runner invocation **per strategy per parallelism bucket** (`parallel_safe: false` groups stay in their own sequential call). Its load-bearing property: **an unmatched path widens the radius** — a changed file matching no group escalates to the full suite and names the path, so the resolver can under-select only if a glob over-matches, never by omission. Non-source exemptions are per-path rules echoed in `ignored_non_source`, auditable rather than an opaque allowlist. Exit 2 (e.g. unparseable topology, `selector=manual` groups) means fall back to the full suite — loudly, never a silent narrow run. `argv[0]` is emitted as the bare runner (`pytest`); callers prefix `uv run` / `pixi run` themselves.
 
 ### TEST_RESULTS.md Per-Group Block
 

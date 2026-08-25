@@ -208,6 +208,14 @@ Run: `<runner> pytest --cov --cov-report=term-missing`.
 - **`--cov-fail-under` as ratchet**: Set to current level and only increase; goal is preventing regression, not hitting a target
 - **Exclusions**: Type-checking blocks, abstract stubs, generated code. Be explicit in `exclude_lines` rather than scattering `# pragma: no cover`
 
+### Subprocess-Driven Tests Measure Zero Coverage
+
+Under pytest-cov 7.x, a test that drives a script via `subprocess.run([sys.executable, path])` contributes **nothing** to measured coverage: no `COV_CORE_*` or `COVERAGE_PROCESS_START` variable is exported to children, so coverage never starts in the spawned process — and even hand-exporting the variable strands the child's data file in the child's cwd with no combine step. A well-tested hook or CLI script measured this way reads near-zero and gets misfiled as a coverage gap.
+
+- **Do not** diagnose such a module as under-tested from its coverage number alone — check *how* its tests drive it first
+- **Measure with in-process tests**: `runpy.run_path(script, run_name="__main__")` executes the real `if __name__ == "__main__"` guard (fail-open wrappers included) inside the measured process — the contract a bare `main()` call skips
+- **Keep subprocess tests** as end-to-end contract proof (real argv, real stdin, real exit codes); just don't expect them to move coverage
+
 ## Async Testing
 
 Set `asyncio_mode = "auto"` in `[tool.pytest.ini_options]` so all `async def test_*` functions run as async tests without `@pytest.mark.asyncio`.
@@ -280,7 +288,7 @@ These three identifiers are **registered** by this leaf in the trunk's Selector 
 These two identifiers are **registered** by this leaf in the trunk's Parallel Runner Registry (Registry 2) — they are live, not indicative.
 
 | Identifier | Concrete invocation | When to use |
-|-----------|--------------------|-----------| 
+|-----------|--------------------|-----------|
 | `pytest-xdist-loadfile` | `<runner> pytest -n auto --dist loadfile` | **Recommended default** for parallel-safe groups. Workers are assigned whole files; file-scoped fixture state is stable across tests in the same file. Preferred when groups have `shared_fixture_scope: per-file` or narrower. |
 | `pytest-xdist-load` | `<runner> pytest -n auto --dist load` | Load-balanced distribution. Less robust when tests in the same file share fixture state. Use only when groups have `shared_fixture_scope: none` or `per-test`. |
 

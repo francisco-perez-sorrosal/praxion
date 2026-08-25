@@ -1,3 +1,39 @@
+## v0.23.0 (2026-08-25)
+
+### BREAKING CHANGE
+
+- the plugin is now `praxion@bit-agora`. Installs on
+Claude Code below v2.1.193 must re-install under the new name.
+
+### Feat
+
+- **upgrade**: reconcile the instantiated AaC surfaces the rename cannot reach
+- **testing**: adopt the test topology with a change-driven test radius
+- **gates**: close the detection gaps the sentinel audit surfaced
+
+### Fix
+
+- **sentinel**: four catalog amendments from the 2026-08-24 sweep
+- **testing**: correct the subprocess-coverage claim; wire the test-scope resolver
+- **contracts**: close the sentinel S-batch drift across agents, skills and catalogs
+- **commands**: plumb declared arguments; cut a procedure-bearing description
+- **hooks**: guard main() against well-formed non-dict payloads
+- **eval**: make ADR reciprocity checks total over None and list references
+- **test**: exempt the generated doc manifest from the namespace scan
+- **adr**: walk the idea ledgers when rewriting cross-references
+- **hooks**: attest start correlation on agent stop events
+- **pipeline**: bind the plan schema to the path, not the author
+- **sentinel**: make vacuous catalog gates assert substance
+
+### Refactor
+
+- **dashboard**: decompose the readiness section per the console-overhaul pattern
+- **codex**: split the rules bridge into responsibility modules
+- **metrics**: split report.py into an orchestration shell and three section modules
+- **scripts**: publish the AaC fence patterns their consumer imports
+- **plugin**: rename the plugin namespace to praxion
+- **tests**: split the CI autofix hub invariants by family
+
 ## v0.22.0 (2026-08-06)
 
 ### Feat

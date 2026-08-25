@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-25T04:27:29Z'
+generated_at: '2026-08-25T04:44:41Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -57,7 +57,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-08-06'
+  last_modified: '2026-08-25'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md

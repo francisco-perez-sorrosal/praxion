@@ -126,6 +126,7 @@ EXCLUDED_PATH_FRAGMENTS = (
     # Vendored dependency trees — never scan third-party library code.
     "/.venv/",
     "/venv/",
+    "/vendor/",
     "/node_modules/",
     "/.tox/",
     "/dist/",

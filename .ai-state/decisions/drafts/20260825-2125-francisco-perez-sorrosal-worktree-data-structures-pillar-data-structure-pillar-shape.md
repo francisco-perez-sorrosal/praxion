@@ -13,9 +13,13 @@ pipeline_tier: full
 dissent: "Prompt obligations without a dedicated agent's separate context may under-enforce the pillar on exactly the large tasks where representation errors are costliest — a shadow sub-architect (interface-designer precedent) would guarantee focused attention."
 affected_files:
   - claude/config/CLAUDE.md.tmpl
+  - codex/config/AGENTS.md.tmpl
+  - AGENTS.md
   - skills/data-structure-design/SKILL.md
   - skills/data-structure-design/references/design-review-checklist.md
-  - skills/data-structure-design/references/representation-patterns.md
+  - skills/data-structure-design/references/python-patterns.md
+  - skills/data-structure-design/references/typescript-patterns.md
+  - skills/data-structure-design/references/schema-contract-patterns.md
   - skills/multi-perspective-analysis/references/discipline-registry.md
   - rules/swe/coding-style.md
   - agents/systems-architect.md

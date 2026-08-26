@@ -120,7 +120,7 @@ Reusable skill modules for AI coding assistants. Each skill is a self-contained 
 
 ## Polyglot Skill Pattern
 
-Fourteen skills ship TypeScript-specific material through `contexts/` or `references/`: `agent-evals`, `agentic-sdks`, `api-documentation`, `architectural-fitness-functions`, `communicating-agents`, `deployment`, `llm-prompt-engineering`, `mcp-crafting`, `node-prj-mgmt`, `observability`, `software-planning`, `test-coverage`, `testing-strategy`, and `typescript-development`. TypeScript-specific content is progressively disclosed — load the skill and follow the language-specific context or reference for framework and toolchain details.
+Fifteen skills ship TypeScript-specific material through `contexts/` or `references/`: `agent-evals`, `agentic-sdks`, `api-documentation`, `architectural-fitness-functions`, `communicating-agents`, `data-structure-design`, `deployment`, `llm-prompt-engineering`, `mcp-crafting`, `node-prj-mgmt`, `observability`, `software-planning`, `test-coverage`, `testing-strategy`, and `typescript-development`. TypeScript-specific content is progressively disclosed — load the skill and follow the language-specific context or reference for framework and toolchain details.
 
 ## How Skills Work
 

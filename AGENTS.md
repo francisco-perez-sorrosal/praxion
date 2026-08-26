@@ -20,6 +20,10 @@ This is the most operationally consequential principle. The entire ecosystem - s
 
 Every change starts from a desired behavior - what the system should do - not from structural concerns or implementation details. The behavior defines what to build; the implementation should be the simplest thing that achieves it. Only touch what the change requires - minimal scope, minimal blast radius. Simplicity does not mean sloppiness - when in doubt, favor readability over cleverness.
 
+### Data Structures First
+
+Behavior defines what to build; the representation is the first - and most leveraged - decision about how. For every building block of an architecture - component, module, agent contract, pipeline artifact - choose its data structures deliberately before writing the behavior that consumes them: enumerate the legal states, name each invariant and its enforcer, parse at the boundary so the interior can trust its types. Every illegal state made unrepresentable deletes a class of validation, defensive code, and tests before it is written. The design pass, techniques, and review checklist live in the `data-structure-design` skill; persistence-layer schemas remain with `data-modeling`.
+
 ### Incremental Evolution
 
 The simplest thing that works is the seed, not the ceiling. Systems grow through purposeful, incremental steps - each expanding capability while preserving what already works. Don't over-design for futures you don't yet need, but build with changeability in mind: clean boundaries and cohesive modules that welcome growth without predicting its shape. Leave what you touch better than you found it - but don't wander beyond the change's scope.

@@ -92,6 +92,8 @@ def create_user(data: UserData) -> User:
     ...
 ```
 
+Extraction is the reactive half; the proactive discipline — choosing the representation (legal states, invariants, enforcement points) before the behavior exists — lives in `skills/data-structure-design/SKILL.md`. When extracting, take the opportunity to run its Representation Design Pass on the extracted shape rather than mirroring the parameter list verbatim.
+
 ### Inline Over-Abstraction
 
 **When**: Abstraction serves only one use case or adds no value.

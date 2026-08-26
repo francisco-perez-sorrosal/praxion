@@ -160,6 +160,7 @@ ORMs reduce boilerplate for standard CRUD operations. Use them as a starting poi
 
 ## Related Skills
 
+- **[`data-structure-design`](../data-structure-design/SKILL.md)** -- the program-level counterpart: in-memory types, invariants, state shapes, and component/agent schema contracts. Boundary rule: if it lives in a database, start here; if it lives in memory or on a wire between components, start there. The two meet at the repository/serialization boundary, where a stored row is parsed into a domain type
 - **[`api-design`](../api-design/SKILL.md)** -- data models inform API resource surfaces; schema evolution rules complement API versioning
 - **[`python-development`](../python-development/SKILL.md)** -- SQLAlchemy and Pydantic model patterns when working in Python
 - **[`cicd`](../cicd/SKILL.md)** -- running migration checks and schema validation in CI pipelines

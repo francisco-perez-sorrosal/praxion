@@ -8,7 +8,7 @@ description: >
   analysis, technology selection, or structural assessment of a codebase before
   implementation.
 tools: Read, Glob, Grep, Bash, Write, Edit
-skills: [claude-ecosystem, agentic-sdks, communicating-agents, mcp-crafting, external-api-docs]
+skills: [claude-ecosystem, agentic-sdks, communicating-agents, mcp-crafting, external-api-docs, data-structure-design]
 model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.
 background: true
 memory: user
@@ -156,6 +156,7 @@ Design the architecture by working through these questions:
 - Design for the current requirements, not hypothetical future ones
 - Favor composition over inheritance, interfaces over concrete coupling
 - Balance coupling — keep integration strength (shared knowledge) and distance in balance; gather what changes together, separate different reasons to change, point dependencies toward stability. Apply SOLID as heuristics, not commandments (consult the `software-design-principles` skill; cite `CLAUDE.md§Balanced Coupling`)
+- Data structures first — for every component whose data crosses a boundary, carries invariants, or has a lifecycle, run the Representation Design Pass from the `data-structure-design` skill before designing the behavior: enumerate the legal states (sum type over correlated nullables), name each invariant and its enforcement point, decide identity-vs-value and ownership, parse at boundaries, state the evolution contract. Record the outcome in `### Data Structures` (cite `CLAUDE.md§Data Structures First`). Persistence-layer schemas stay with the `data-modeling` skill
 - Make the architecture testable — if it can't be tested, redesign it
 - When the architecture includes a typed-language runtime service, the design must establish (i) the typecheck baseline (cite per-language assets: `skills/python-development/assets/mypy-baseline.toml` for Python; `skills/typescript-development/assets/tsconfig.json` for TypeScript), (ii) the logging baseline (cite the `observability` skill § Service Observability Baseline; structlog for Python services, pino for Node services), and (iii) the health-surface baseline appropriate to the service type — a `/healthz` route + container `HEALTHCHECK` for a web service, the `ping`/`list_tools` signal for an MCP server, or liveness+progress+`/status` for a long-running agent (cite the `observability` skill's `references/healthcheck-patterns.md`; never an unconditional 200)
 
@@ -349,6 +350,9 @@ Write `SYSTEMS_PLAN.md`:
 
 ### Components
 [What is being added, modified, or removed — with file paths where known]
+
+### Data Structures
+[Core structures introduced or changed: shape, invariants + enforcement point, identity-vs-value/ownership, lifecycle, evolution contract — the Representation Design Pass outcome from the data-structure-design skill. Omit only when the task has no representation surface]
 
 ### Data Flow
 [How data moves through the system for the new functionality]

@@ -133,6 +133,7 @@ heuristic.
 | `refactoring` | Reactive cleanup | The "Four Pillars" (modularity, low coupling, high cohesion, pragmatic structure) are this canon applied to code that already drifted. |
 | `architectural-fitness-functions` | Enforcement | Make a chosen invariant executable; cite `CLAUDE.md§Balanced Coupling`. |
 | `agentic-interface-design` / `api-design-craft` | Boundary surfaces | ISP/LSP for tool, MCP, and API contracts — the agent-as-consumer lens. |
+| `data-structure-design` | Up-front design / representation | The representation lens beside this coupling lens: coupling measures how much two parts know about each other; representation decides what shape that shared knowledge takes. A well-chosen type shrinks integration strength (cite `CLAUDE.md§Data Structures First`). |
 
 ## Gotchas
 

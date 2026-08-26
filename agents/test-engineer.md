@@ -116,7 +116,7 @@ Write the tests following these structural rules:
 - Use `pytest.mark.parametrize` (or equivalent) for testing across equivalence partitions
 
 **Advanced techniques** (apply when the step requires them):
-- **Property-based testing**: for code with invariants, parsers, serializers, mathematical properties — define properties the code must satisfy across random inputs
+- **Property-based testing**: for code with invariants, parsers, serializers, mathematical properties — define properties the code must satisfy across random inputs. When `SYSTEMS_PLAN.md § Architecture ### Data Structures` declares invariants, each declared invariant is a property candidate — the declaration is the test oracle
 - **Contract testing**: for service boundaries — verify consumer/provider contracts without full-stack integration
 - **Boundary value analysis**: for numeric ranges, string lengths, collection sizes — test at and around boundaries
 - **Mutation testing**: to assess test suite quality on existing code — verify assertions are strong enough to catch code mutations

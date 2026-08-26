@@ -7,7 +7,7 @@ description: >
   SYSTEMS_PLAN.md is ready to decompose into steps, when resuming multi-session
   work, or when supervising execution against a plan.
 tools: Read, Glob, Grep, Bash, Write, Edit
-skills: [software-planning, external-api-docs]
+skills: [software-planning, external-api-docs, data-structure-design]
 background: true
 memory: user
 maxTurns: 100
@@ -89,7 +89,7 @@ Break the architecture into incremental implementation steps.
 
 - Infrastructure and setup before business logic
 - Preparatory refactoring before feature steps (when the systems-architect flagged structural issues)
-- Data model before operations on that model
+- Data model before operations on that model — a step that introduces a boundary-crossing or invariant-bearing structure *defines its representation first* (shape, invariants + enforcement point, from `SYSTEMS_PLAN.md § Architecture ### Data Structures` when present, else the `data-structure-design` skill's Representation Design Pass), and every step consuming that structure orders after it
 - Core logic before UI / API surface
 - Happy path before error handling
 - Each step leaves the system in a working state

@@ -77,7 +77,7 @@ This is the load-bearing phase. **Decide** the interface-layer technology:
 - Pagination: cursor vs offset; default 10–20 items for agent tools
 - Interaction model, design tokens, component patterns
 
-**Sketch** the designs in text: ASCII/markdown component layouts, interaction-flow descriptions, state-inventory tables (default / loading / empty / error / partial), resource models, endpoint shapes, tool JSON-schemas, error contracts, exit-code tables, help-text structures. Apply the canon as a working checklist.
+**Sketch** the designs in text: ASCII/markdown component layouts, interaction-flow descriptions, state-inventory tables (default / loading / empty / error / partial), resource models, endpoint shapes, tool JSON-schemas, error contracts, exit-code tables, help-text structures. Apply the canon as a working checklist. Wire shapes are data structures: when designing resource models, tool JSON-schemas, or error contracts, apply the representation discipline from `skills/data-structure-design/SKILL.md` (read on demand — closed sets as enums not bare strings, unambiguous field names, bounded collections, no field combinations encoding illegal states); the *internal* domain representation behind the interface stays the systems-architect's call in `SYSTEMS_PLAN.md § Architecture ### Data Structures`.
 
 **If a SYSTEMS_PLAN.md architectural decision constrains a materially-better interface design** — draft the challenge now for Phase 4. Identify the contested decision, the better alternative, the quality rationale, and the blast-radius. Do **not** silently design within the constraint.
 

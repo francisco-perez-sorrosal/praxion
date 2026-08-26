@@ -76,6 +76,18 @@ Rationale: immutable data prevents hidden side effects, simplifies debugging, an
 
 Exceptions: performance-critical inner loops where allocation cost is measured and significant, or when the language idiom strongly favors mutation (e.g., builder patterns).
 
+### Data Structures and Invariants
+
+Choose a structure's representation before writing the behavior that consumes it. For types that cross a component boundary, carry invariants, or have a lifecycle:
+
+- **Make illegal states unrepresentable** where the language allows it cheaply — mutually exclusive shapes are a sum type / discriminated union, not correlated nullable fields or boolean pairs whose combinations include impossible states
+- **Every invariant has a named enforcement point** — type system, validating constructor, or runtime check. An invariant stated only in a comment or docstring is not enforced
+- **Closed option sets are enums or literal unions**, never raw strings; matches over them are exhaustive (compiler flag, linter, or `assert_never`)
+- **Constrained domain values get a domain type** (newtype/branded type + validating constructor), not a bare primitive re-validated at every call site
+- **Parse, don't validate, at boundaries** — external input becomes a precisely typed internal value once, at the edge; the interior never re-checks and never handles the raw shape (extends `### Input Validation` below: validation *produces the validated type*, it doesn't just gate)
+
+Exceptions: throwaway/glue shapes that never cross a boundary; exploratory spikes where the domain model is still moving. Methodology, techniques, and the review checklist: `skills/data-structure-design/SKILL.md`.
+
 ### Code Organization
 
 - Modularize with meaningful, well-scoped package/module names
@@ -183,4 +195,3 @@ Always store and transmit in UTC. Convert to local time only at the presentation
 - Avoid abbreviations unless universally understood (`id`, `url`, `config`)
 - Collections: plural nouns (`users`, `pending_tasks`)
 - Functions: verb phrases (`fetch_user`, `validate_input`, `calculate_total`)
-

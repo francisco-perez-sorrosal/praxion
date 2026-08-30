@@ -227,10 +227,14 @@ never flagged for nonconformity alone.
   [references/beauty-review-checklist.md](references/beauty-review-checklist.md)
   on milestone reviews; the creativity guard keeps unfamiliar-but-justified
   designs from being flagged as violations
-- **`.ai-state/principles.yaml`** (when a project adopts it) can carry the
-  dimensions as advisory principles — the planner threads them into step
-  acceptance criteria and the verifier gates them in Phase 4.5; Praxion's own
-  instance does exactly this
+- **`.ai-state/principles.yaml`** carries the dimensions as advisory
+  principles in every managed project: `/onboard-project` seeds it from
+  `claude/project-baseline/principles.yaml.tmpl` (never overwriting an
+  existing one; the project owns and edits it), the planner threads matching
+  principles into step acceptance criteria, and the verifier gates them in
+  Phase 4.5. Praxion's own instance does the same. This is the mechanism that
+  makes the dimensions an *active gate* — not just documentation — when the
+  pipeline drives a managed project's research, design, and implementation
 - **code-review skill** needs no change to see the dimensions: its Convention
   Check applies every `coding-style` section, so the new sections flow in
 

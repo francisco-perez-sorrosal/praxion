@@ -370,6 +370,14 @@ If the user agrees, remove that line. If they decline, proceed without changing 
   The two enums are deliberately **disjoint** (`{lens, prior}` vs `{novel, matched}`) so a `grep` can tell the two tables apart on a single cell match, with no parser.
   ```
 
+- `.ai-state/principles.yaml` — the eight dimensions of beautiful code seeded as advisory project principles, from `${PLUGIN_INSTALL_PATH}/claude/project-baseline/principles.yaml.tmpl`.
+
+  **Why this ships.** The project-principles mechanism's *consumers* are plugin-global: the implementation-planner threads matching principles into step acceptance criteria (Phase 1b) and the verifier gates them per severity (Phase 4.5) — both activate the moment `.ai-state/principles.yaml` exists and is non-empty, in any managed project. Without a seed, the mechanism ships and stays silent: the dimensions engraved in the philosophy and the `beautiful-code` skill never become an active gate in the project's own pipeline. The seed's eight rows are all `severity: advisory` (WARN, never FAIL), and the file belongs to the project from the moment it lands — edit statements, narrow scopes to the project layout, promote rows to `blocking`, or delete rows that do not apply.
+
+  **Predicate (skip if present).** If `.ai-state/principles.yaml` already exists, skip — never overwrite: the project may have edited statements, narrowed scopes, or promoted severities, and those decisions are the project's own.
+
+  **Action.** Copy `${PLUGIN_INSTALL_PATH}/claude/project-baseline/principles.yaml.tmpl` to `.ai-state/principles.yaml`, stripping the leading template-doc comment block (the lines from `# -- template-doc` through the first `# ---` divider); keep the retained header comments — they document ownership and the consumer contract for the project's readers. If the plugin install path was not detected at pre-flight (skip-phase-4 flag set), skip this sub-step and emit: `Skipping principles.yaml seed — install the plugin and re-run /onboard-project. Without it, the beautiful-code dimensions are documented but never gate this project's pipeline.` Print on success: `Phase 2: .ai-state/principles.yaml seeded (8 advisory principles — the beautiful-code dimensions; edit freely, it is yours)`.
+
 Do NOT create `.ai-state/observations.jsonl` — that is written on first use by the observability hook. Pre-creating it confuses the semantic merge driver.
 
 ## §Phase 3 — `.gitattributes` + merge driver registration
@@ -1287,11 +1295,12 @@ Print: `8e.9: .github/labels.yml + .github/workflows/labels-reconcile.yml instal
          "hub_sha": "<resolved 40-hex hub commit SHA>"
        },
        "praxion_feedback": ".ai-state/praxion_feedback/PENDING.md",
-       "consult_ledgers": [".ai-state/CONSULT_LEDGER.md", ".ai-state/CONSULT_COSTS.md", ".ai-state/CONSULT_PRIORS.md"]
+       "consult_ledgers": [".ai-state/CONSULT_LEDGER.md", ".ai-state/CONSULT_COSTS.md", ".ai-state/CONSULT_PRIORS.md"],
+       "principles": ".ai-state/principles.yaml"
      }
    }
    ```
-   List only artifacts actually installed this run (omit hooks if Phase 4 was skipped; omit `ci_autofix` if Phase 8e was skipped or its caller/policy predicate already hit; omit `praxion_feedback` and any `consult_ledgers` entry whose Phase 2 predicate already hit — those files pre-existed). If the plugin version could not be captured at pre-flight (skip-phase-4 flag), write `"onboarded_with_version": "unknown"` and emit a one-line note. Add `.ai-state/.praxion-onboard.json` to the staged set.
+   List only artifacts actually installed this run (omit hooks if Phase 4 was skipped; omit `ci_autofix` if Phase 8e was skipped or its caller/policy predicate already hit; omit `praxion_feedback`, `principles`, and any `consult_ledgers` entry whose Phase 2 predicate already hit — those files pre-existed). If the plugin version could not be captured at pre-flight (skip-phase-4 flag), write `"onboarded_with_version": "unknown"` and emit a one-line note. Add `.ai-state/.praxion-onboard.json` to the staged set.
 
 4. **Stage modified files**: run `git add` with the explicit list of files this command touched (built up through phases 1–6, plus `.ai-state/.praxion-onboard.json`). Do NOT run `git add -A`. Do NOT commit. The user reviews staging and decides.
 

@@ -24,6 +24,9 @@ affected_files:
   - agents/systems-architect.md
   - skills/code-review/SKILL.md
   - .ai-state/principles.yaml
+  - claude/project-baseline/principles.yaml.tmpl
+  - commands/onboard-project.md
+  - tests/commands/test_onboard_principles_install.py
 ---
 
 # Eight beauty dimensions land as a clause under Structural Beauty + beautiful-code skill + coding-style anchors + Praxion's first principles.yaml, not new principles
@@ -77,6 +80,16 @@ reconciliation). A dormant, fully-built `.ai-state/principles.yaml` mechanism
    tolerance (consistent with parse-don't-validate), naming the robustness
    principle as superseded-in-part; contested attributions stay labeled
    (Dijkstra/Hoare; Saint-Exupéry paraphrase; Bernhardt attributed-not-verbatim).
+7. **Managed-project reach (amendment)**: the dimensions must gate the
+   projects Praxion *drives*, not only Praxion itself — so the seed ships:
+   `/onboard-project` §Phase 2 installs `.ai-state/principles.yaml` from the
+   single-sourced `claude/project-baseline/principles.yaml.tmpl` (skip-if-
+   present, never overwriting; all rows advisory; the project owns the file),
+   the completion manifest records it, and a structural test guards the
+   producer-consumer pairing (the consult-ledgers precedent: consumers ship
+   with the plugin, the per-project artifact is what activates them). Without
+   this, planner Phase 1b threading and verifier Phase 4.5 gating fire only
+   in Praxion — machinery shipped but silent exactly where it matters most.
 
 ## Considered Options
 

@@ -65,6 +65,8 @@ When the architecture involves external APIs, use the `external-api-docs` skill 
 
 **Library selection (Python projects):** Before naming a candidate library for a new capability — not just verifying one already chosen — consult the `python-development` skill's [`references/essential-libraries.md`](../skills/python-development/references/essential-libraries.md) catalog. It shortlists battle-tested, actively-maintained defaults by project archetype (web API, CLI, data/ML, async services, general-purpose, scripting) so the architecture reaches for a vetted default instead of reinventing common functionality or picking an unproven option. This applies equally to brownfield work — recommending a catalog library to replace hand-rolled functionality in an existing codebase is a legitimate architectural improvement, not just a greenfield concern.
 
+**Library selection (Rust projects):** On tasks involving Rust crate selection, consult the `rust-development` skill's [`references/essential-crates.md`](../skills/rust-development/references/essential-crates.md) catalog before naming a candidate crate. It shortlists crates by archetype (async runtime, CLI, web API, serialization, testing/benchmarking) with honest annotations on contested picks rather than one-size verdicts, so the architecture reaches for a vetted default instead of reinventing common functionality. Applies equally to brownfield work — recommending a catalog crate to replace hand-rolled functionality is a legitimate architectural improvement.
+
 Before acting on drift, **assess the dependency's criticality** to decide how much attention it deserves:
 
 | Priority | Criteria | Example | Action |

@@ -5,9 +5,9 @@ Documenting an API surface the core six references don't cover — gRPC/protobuf
 This reference does two things:
 
 1. Gives you a **reusable, surface-agnostic pattern** for documenting any API surface — instantiating the universal core's checklist for a surface that has no dedicated reference yet.
-2. Ships **seeded inline sections** for four surfaces (gRPC/protobuf, Go, Rust, AsyncAPI) — each a standard toolchain + one canonical source + minimal setup. These are intentionally shallow; the pattern is what makes them extensible.
+2. Ships **seeded inline sections** for three surfaces (gRPC/protobuf, Go, AsyncAPI) — each a standard toolchain + one canonical source + minimal setup. These are intentionally shallow; the pattern is what makes them extensible. Rust has outgrown its stub — see [`rust.md`](rust.md).
 
-**Honesty about depth**: the four seeded sections below are *starting points*, not exhaustive treatments. Each names the dominant toolchain, the docstring/annotation convention, and the minimal command — enough to get a project documenting that surface correctly. They are not as deep as `rest-openapi.md` or `python.md`. When a project leans hard on one of these surfaces, the obvious place to deepen is to **promote that section into its own `references/<surface>.md`** (mirroring the structure of the existing six) and add a Reference Routing row in `SKILL.md`. That promotion is the one canonical extension point — don't fork the pattern; instantiate it.
+**Honesty about depth**: the three seeded sections below are *starting points*, not exhaustive treatments. Each names the dominant toolchain, the docstring/annotation convention, and the minimal command — enough to get a project documenting that surface correctly. They are not as deep as `rest-openapi.md` or `python.md`. When a project leans hard on one of these surfaces, the obvious place to deepen is to **promote that section into its own `references/<surface>.md`** (mirroring the structure of the existing six) and add a Reference Routing row in `SKILL.md`. That promotion is the one canonical extension point — don't fork the pattern; instantiate it.
 
 ---
 
@@ -91,12 +91,11 @@ Each section: **standard toolchain · docstring/annotation convention · one can
 
 ### Rust
 
-- **Toolchain**: **rustdoc** (`cargo doc`) — built into the toolchain; publishes to docs.rs automatically for crates.io crates.
-- **Convention**: `///` outer / `//!` inner doc comments written in **Markdown**. `# Examples` code blocks are compiled and run as **doctests** — docs that cannot go stale, because a broken example fails `cargo test`. This is the strongest contract-test-as-doc property of any surface here.
-- **Spec link**: library-only; a Rust service's wire contract comes from a separate OpenAPI/proto spec (cross-link as with Go).
-- **Deprecation**: the `#[deprecated(since = "...", note = "...")]` attribute; rustdoc renders the note.
-- **Minimal setup**: `cargo doc --open`. Run `cargo test --doc` in CI to enforce that examples stay correct.
-- **Canonical source**: https://doc.rust-lang.org/rustdoc/
+Rust now has a dedicated reference — see [`rust.md`](rust.md) for rustdoc
+structure, the `# Errors`/`# Panics`/`# Safety` named-heading contract,
+doc-tests as executed contracts (`should_panic`/`no_run`/`compile_fail`),
+C-QUESTION-MARK, `#[deprecated]`, and the `cargo test --doc` CI gate
+(including the nextest interaction).
 
 ### AsyncAPI / Event-Driven
 

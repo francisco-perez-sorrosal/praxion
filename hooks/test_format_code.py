@@ -1,11 +1,10 @@
-"""Characterization tests for the format hook's current `.py` behavior.
+"""Characterization tests for the format hook's `.py` behavior.
 
-Pins `format_python.py`'s observable behavior on `.py` input *before* Step 2's
-extraction of `hooks/_lang_tools.py` and rename to `format_code.py`. Per
+Pins the hook's observable behavior on `.py` input across the extraction of
+`hooks/_lang_tools.py` and the hook rename that produced `format_code.py`. Per
 `skills/refactoring/SKILL.md`, this is the safety net for that restructuring --
-these assertions must hold unchanged once the rename lands, proving REQ-07 (no
-Python regression). Only `HOOK_PATH` below is retargeted by Step 2; no
-assertion here is expected to change.
+these assertions held before the rename and hold unchanged after it, which is
+the proof that Python formatting did not regress.
 
 Invokes the hook as a real subprocess (matching the PostToolUse Write|Edit
 contract: a JSON payload with `tool_input.file_path` on stdin) rather than
@@ -23,9 +22,7 @@ import sys
 from pathlib import Path
 
 HOOKS_DIR = Path(__file__).resolve().parent
-# Step 2 retargets this single constant to `format_code.py` -- no other line
-# in this file is expected to change.
-HOOK_PATH = HOOKS_DIR / "format_python.py"
+HOOK_PATH = HOOKS_DIR / "format_code.py"
 
 BADLY_FORMATTED_PYTHON = "def   foo( x,y ):\n    return x+y\n"
 

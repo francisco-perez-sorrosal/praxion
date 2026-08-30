@@ -1,27 +1,23 @@
 #!/usr/bin/env python3
-"""Auto-format Python files on Write/Edit.
+"""Auto-format source files on Write/Edit.
 
-PostToolUse hook that runs ruff format after every Python file write or edit.
-Reports what changed via stdout JSON so Claude and the user see the fixes.
-Exits 0 unconditionally -- must never block agent execution.
+PostToolUse hook that formats every written or edited file whose extension is
+served by the ``_lang_tools`` registry. Reports what changed via stdout JSON so
+Claude and the user see the fixes. Exits 0 unconditionally -- must never block
+agent execution, and an unreachable formatter is a silent no-op.
+
+Language support is registry-driven: adding an extension row to
+``_lang_tools.LANG_TOOLS`` widens this hook with no change here.
 """
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 
+from _lang_tools import tool_for
 
-def _find_ruff():
-    """Find ruff executable. Returns command list or None."""
-    if shutil.which("ruff"):
-        return ["ruff"]
-    if shutil.which("uv"):
-        return ["uv", "run", "ruff"]
-    if shutil.which("pixi"):
-        return ["pixi", "run", "ruff"]
-    return None
+FORMAT_TIMEOUT_SECONDS = 10
 
 
 def main():
@@ -32,14 +28,15 @@ def main():
         return
 
     file_path = data.get("tool_input", {}).get("file_path", "")
-    if not file_path.endswith(".py"):
+    lang = tool_for(file_path)
+    if lang is None:
         return
 
     if not os.path.isfile(file_path):
         return
 
-    ruff = _find_ruff()
-    if not ruff:
+    prefix = lang.resolve()
+    if not prefix:
         return
 
     # Snapshot before formatting
@@ -47,10 +44,10 @@ def main():
         before = f.read()
 
     result = subprocess.run(
-        [*ruff, "format", file_path],
+        lang.build_format_argv(prefix, file_path),
         capture_output=True,
         text=True,
-        timeout=10,
+        timeout=FORMAT_TIMEOUT_SECONDS,
     )
 
     # Check if file changed
@@ -63,7 +60,7 @@ def main():
         before_lines = set(before.splitlines())
         after_lines = set(after.splitlines())
         changed = len(before_lines.symmetric_difference(after_lines))
-        msg = f"[format hook] ruff formatted {basename} ({changed} lines changed)"
+        msg = f"[format hook] {lang.tool_name} formatted {basename} ({changed} lines changed)"
         if result.stderr.strip():
             msg += f"\n{result.stderr.strip()}"
         print(json.dumps({"additionalContext": msg}))

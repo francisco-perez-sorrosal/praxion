@@ -12,7 +12,7 @@ echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command"
 echo "Exit code: $?"
 
 # PostToolUse — simulate a Python file write
-echo '{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"/tmp/test.py","content":"def foo( x,y ): pass"},"session_id":"test","cwd":"/tmp"}' | python3 hooks/format_python.py
+echo '{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"/tmp/test.py","content":"def foo( x,y ): pass"},"session_id":"test","cwd":"/tmp"}' | python3 hooks/format_code.py
 echo "Exit code: $?"
 
 # SessionStart

@@ -318,7 +318,7 @@ from hook_runtime import run_canonical_hook
 
 def main() -> int:
     raw = sys.stdin.read()
-    return run_canonical_hook("hooks/format_python.py", raw)
+    return run_canonical_hook("hooks/format_code.py", raw)
 
 
 if __name__ == "__main__":

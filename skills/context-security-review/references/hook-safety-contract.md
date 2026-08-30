@@ -10,7 +10,7 @@ Behavioral contract for each hook in the Praxion plugin ecosystem. Documents wha
 | `commit_gate.sh` | PreToolUse (Bash) | stdin (JSON payload) | None | None | Fail-open (exit 0) |
 | `check_code_quality.py` | PreToolUse (Bash, commit-gated) | stdin, staged files via `git diff` | Staged files via `git add` | None | Fail-open (exit 0), blocks on unfixable violations (exit 2) |
 | `adr_reminder.py` | PreToolUse (Bash, commit-gated) | stdin (JSON payload), `.ai-state/decisions/` (file listing) | None | None | Fail-open (exit 0) |
-| `format_python.py` | PostToolUse (Write\|Edit) | stdin, target Python file | Target Python file (formatted) | None | Fail-open (exit 0) |
+| `format_code.py` | PostToolUse (Write\|Edit) | stdin, `_lang_tools.py` registry, target source file | Target source file (formatted) | None | Fail-open (exit 0) |
 | `precompact_state.py` | PreCompact | stdin, `.ai-work/` pipeline docs | `.ai-work/PIPELINE_STATE.md` | None | Fail-open (exit 0) |
 
 ## Individual Hook Contracts
@@ -105,16 +105,17 @@ Behavioral contract for each hook in the Praxion plugin ecosystem. Documents wha
 - Never blocks commits (exit 0 unconditionally)
 - Never requires any API keys or external dependencies
 
-### `format_python.py`
+### `format_code.py`
 
-**Purpose**: Auto-format Python files after Write or Edit tool use via `ruff format`.
+**Purpose**: Auto-format source files after Write or Edit tool use, dispatching on file extension through the `_lang_tools.py` registry (the registry names the formatter, how to resolve it on this machine, and its argv).
 
 **Reads**:
 - stdin: JSON hook payload
-- Target Python file (to snapshot before formatting)
+- The `_lang_tools.py` registry (in-process import, sibling module)
+- Target source file (to snapshot before formatting)
 
 **Writes**:
-- Target Python file (formatted in place via `ruff format`)
+- Target source file (formatted in place by the registry-resolved formatter)
 - stdout: JSON `additionalContext` message when formatting changes occurred
 
 **External contact**:
@@ -123,7 +124,8 @@ Behavioral contract for each hook in the Praxion plugin ecosystem. Documents wha
 **Guarantees NOT to do**:
 - Never contacts any network endpoint
 - Never reads or writes files other than the specific file from the tool use
-- Never processes non-Python files (skips silently)
+- Never processes files whose extension has no registry row (skips silently)
+- Never errors when the registry-resolved formatter is unreachable on this machine -- an unresolvable tool is a silent no-op
 - Never blocks agent execution (exit 0 unconditionally)
 
 ### `precompact_state.py`

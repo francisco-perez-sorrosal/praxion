@@ -110,7 +110,7 @@ Hooks from all sources are additive:
 
 ```bash
 # Check what hooks are registered at user level
-grep -A5 "format_python\|check_code_quality" ~/.claude/settings.json
+grep -A5 "format_code\|check_code_quality" ~/.claude/settings.json
 
 # In Claude Code session
 /hooks  # Read-only browser showing all active hooks

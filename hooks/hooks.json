@@ -154,7 +154,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/format_python.py",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/format_code.py",
             "timeout": 10,
             "async": false
           },

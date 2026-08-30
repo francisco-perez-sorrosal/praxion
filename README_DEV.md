@@ -101,13 +101,14 @@ rules/                               # Rules (installed to ~/.claude/rules/ or .
 hooks/                               # Hook scripts (auto-discovered by Claude Code)
 ├── hooks.json                       # Hook manifest (single source of truth)
 ├── _hook_utils.py
+├── _lang_tools.py                   # Extension-to-formatter registry
 ├── capture_memory.py
 ├── capture_session.py
 ├── check_code_quality.py
 ├── cleanup_gate.sh
 ├── commit_gate.sh
 ├── detect_duplication.py
-├── format_python.py
+├── format_code.py
 ├── inject_decisions.py
 ├── precompact_state.py
 ├── promote_learnings.py

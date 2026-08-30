@@ -92,6 +92,21 @@ def _check_staged_python_files():
     return True
 
 
+def _group_by_edition(rs_files):
+    """Group staged Rust files by their resolved `--edition`, preserving order.
+
+    A workspace mid-migration can stage files from members declaring
+    different editions in the same commit; resolving one file's edition and
+    applying it to all of them misparses the others. Grouping means each
+    group is checked under its own resolved edition.
+    """
+    groups: dict[str, list[str]] = {}
+    for rs_file in rs_files:
+        edition = resolve_rust_edition(rs_file)
+        groups.setdefault(edition, []).append(rs_file)
+    return groups
+
+
 def _check_staged_rust_files():
     """Verify staged Rust files are rustfmt-clean. Returns True iff the commit should block.
 
@@ -110,14 +125,18 @@ def _check_staged_rust_files():
 
     _log(f"checking {len(rs_files)} staged Rust file(s): {', '.join(rs_files)}")
 
-    edition = resolve_rust_edition(rs_files[0])
-    rc, output = _run([*rustfmt, "--edition", edition, "--check", *rs_files])
-    if rc == 0:
+    violations = []
+    for edition, files in _group_by_edition(rs_files).items():
+        rc, output = _run([*rustfmt, "--edition", edition, "--check", *files])
+        if rc != 0:
+            violations.append(output)
+
+    if not violations:
         _log("all Rust checks passed")
         return False
 
     _log("BLOCKED -- unfixable violations remain:")
-    print(f"Formatting:\n{output}", file=sys.stderr)
+    print(f"Formatting:\n{chr(10).join(violations)}", file=sys.stderr)
     print(
         "\nFix these manually (`cargo fmt`), stage the files, then retry the commit.",
         file=sys.stderr,

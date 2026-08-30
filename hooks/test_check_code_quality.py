@@ -127,6 +127,70 @@ def test_rejects_a_staged_badly_formatted_rust_file(tmp_path: Path) -> None:
     )
 
 
+def _fake_rustfmt_record_argv_script(log_path: Path) -> str:
+    """A fake `rustfmt` that appends its argv (minus argv[0]) to `log_path` and exits 0."""
+    return f"""#!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+Path({str(log_path)!r}).open("a", encoding="utf-8").write(" ".join(sys.argv[1:]) + "\\n")
+sys.exit(0)
+"""
+
+
+def test_groups_staged_rust_files_by_resolved_edition(tmp_path: Path) -> None:
+    """Staged files from crates on different editions are checked in separate groups.
+
+    Expected RED before the mixed-edition fix: the gate resolved `--edition`
+    from `rs_files[0]` alone and applied that single edition to every staged
+    file, so one of the two crates below would have been checked under the
+    other's edition.
+    """
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    _init_repo(repo_dir)
+
+    _stage_file(
+        repo_dir,
+        "crates/legacy/Cargo.toml",
+        '[package]\nname = "legacy"\nedition = "2021"\n',
+    )
+    _stage_file(repo_dir, "crates/legacy/src/lib.rs", BADLY_FORMATTED_RUST)
+    _stage_file(
+        repo_dir,
+        "crates/new/Cargo.toml",
+        '[package]\nname = "new"\nedition = "2024"\n',
+    )
+    _stage_file(repo_dir, "crates/new/src/lib.rs", BADLY_FORMATTED_RUST)
+
+    bin_dir = tmp_path / "bin"
+    log_path = tmp_path / "rustfmt-invocations.log"
+    _write_fake_rustfmt(bin_dir, script=_fake_rustfmt_record_argv_script(log_path))
+    env = {"PATH": _controlled_path(bin_dir)}
+
+    result = _run_hook(_commit_payload(), cwd=repo_dir, env=env)
+
+    assert result.returncode == 0, (
+        "the fake rustfmt always exits 0, so the gate must never block; "
+        f"stdout={result.stdout!r}, stderr={result.stderr!r}"
+    )
+
+    invocations = log_path.read_text(encoding="utf-8").splitlines()
+    assert len(invocations) == 2, (
+        f"expected one rustfmt invocation per resolved edition group; got {invocations!r}"
+    )
+
+    def _edition_for(file_suffix: str) -> str:
+        for line in invocations:
+            if file_suffix in line:
+                args = line.split()
+                return args[args.index("--edition") + 1]
+        raise AssertionError(f"no invocation checked {file_suffix}; invocations={invocations!r}")
+
+    assert _edition_for("crates/legacy/src/lib.rs") == "2021"
+    assert _edition_for("crates/new/src/lib.rs") == "2024"
+
+
 def test_silently_passes_when_rustfmt_is_unresolvable(tmp_path: Path) -> None:
     """A staged `.rs` file with no `rustfmt` on PATH never blocks the commit.
 

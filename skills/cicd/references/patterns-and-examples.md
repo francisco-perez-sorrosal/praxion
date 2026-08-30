@@ -158,6 +158,8 @@ jobs:
 
 ## Rust CI
 
+Five-job shape: `fmt` (fastest, fails first) / `clippy` / `test` (nextest + doctests) / `deny` / `msrv` (conditional on a published `rust-version`). Never `actions-rs/*` — the entire `actions-rs` GitHub organization is archived and unmaintained, and its actions run on deprecated Node 12 with the removed `set-output` command. Use `dtolnay/rust-toolchain` for the toolchain and plain `cargo` run steps for everything else.
+
 ```yaml
 name: Rust CI
 on:
@@ -174,8 +176,39 @@ concurrency:
   group: rust-ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CARGO_INCREMENTAL: 0        # incremental compilation hurts in CI (no cross-run cache reuse to amortize it)
+  CARGO_PROFILE_TEST_DEBUG: 0 # shrinks target/, which matters against the 10 GB Swatinem/rust-cache cap
+
 jobs:
-  check:
+  fmt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@<full-sha>
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@<full-sha>
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@<full-sha>
+      # -D warnings is complementary to a [lints] table in Cargo.toml, not a replacement for
+      # one — [lints] is the durable policy, this flag is the CI enforcement of it.
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -183,20 +216,52 @@ jobs:
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@<full-sha>
+      - run: cargo install cargo-nextest --locked
+      - run: cargo nextest run --workspace --locked
+      # nextest cannot run doctests (stable-Rust limitation) — this second step is required,
+      # not optional, or doc examples silently stop being tested.
+      - run: cargo test --doc --workspace --locked
+
+  deny:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@<full-sha>
         with:
-          components: rustfmt, clippy
-      - uses: actions/cache@<full-sha>
+          persist-credentials: false
+      - uses: EmbarkStudios/cargo-deny-action@<full-sha>
+
+  msrv:
+    # Only add this job if Cargo.toml declares `rust-version`.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@<full-sha>
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
-      - run: cargo fmt --check
-      - run: cargo clippy -- -D warnings
-      - run: cargo test
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@<rust-version>  # pin to the declared MSRV, not `stable`
+      - uses: Swatinem/rust-cache@<full-sha>
+      - run: cargo check --workspace --locked
 ```
+
+### Conditional jobs
+
+Gate each of the following on a project property — never add unconditionally. An unused Miri job on a project with no `unsafe` is context pollution, same reasoning as an unused `fuzz/` directory.
+
+| Job | Add when | Notes |
+|---|---|---|
+| `miri` | the crate contains `unsafe` | nightly-only; interprets, so it's slow; catches only the UB your tests actually exercise, not a proof |
+| `cargo-hack --each-feature` | the crate has a non-trivial feature matrix | slow (rewrites manifests, processes members sequentially) — scheduled or pre-release, not every PR |
+| `cargo-semver-checks` | the crate is published to a registry | compares rustdoc JSON between versions to catch breaking API changes before publish |
+| `cargo-mutants` | always, but **scheduled only** | mutation testing; runtime is roughly (mutant count) × (suite duration) — never the PR path |
+| `cargo-machete` | always, but **scheduled only** | unused-dependency check; its own README calls it "fast (yet imprecise)" — false positives shouldn't block merges |
+
+### Cross-cutting settings
+
+- **`Swatinem/rust-cache`** on every job that compiles — caches `~/.cargo` and `./target` dependency artifacts. Never use raw `actions/cache` for cargo: it requires hand-rolled key/restore-key logic that `rust-cache` already gets right (shared-key across jobs, save-if to limit writes to the default branch, cache-on-failure).
+- **`--locked`** on every `cargo` invocation in CI — reproducibility; refuses to silently re-resolve `Cargo.lock`.
+- **`CARGO_INCREMENTAL: 0`** and **`CARGO_PROFILE_TEST_DEBUG: 0`** as job-level or workflow-level `env` — see the comments in the workflow above for why each one exists.
 
 ## Go CI
 
@@ -502,14 +567,8 @@ jobs:
     go-version-file: go.mod
     cache: true
 
-# Rust (manual)
-- uses: actions/cache@<full-sha>
-  with:
-    path: |
-      ~/.cargo/registry
-      ~/.cargo/git
-      target
-    key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+# Rust (Swatinem/rust-cache — never raw actions/cache for cargo, see Rust CI above)
+- uses: Swatinem/rust-cache@<full-sha>
 
 # Docker layer caching (BuildKit)
 - uses: docker/build-push-action@<full-sha>

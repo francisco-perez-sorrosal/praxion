@@ -13,8 +13,8 @@ description: >
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:
-  - "crate-verdicts"
-  - "toolchain"
+  - "Essential Crates"
+  - "Toolchain and Workspace"
 staleness_threshold_days: 90
 ---
 

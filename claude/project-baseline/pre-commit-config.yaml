@@ -7,11 +7,12 @@
 #
 # Wires the three things the rubric's remediation calls for: a linter, a
 # formatter, and a secret scanner. The UNIVERSAL block (file hygiene + gitleaks)
-# is always kept. Phase 8e KEEPS the PYTHON block only when Python is detected
-# and the JS/TS block only when package.json is present; it strips the
-# non-applicable language block before writing. After install, the user runs
-# `pre-commit install` once to activate the git hook. Bump `rev:` pins to the
-# latest stable tags periodically — these are a safe modern floor.
+# is always kept. Phase 8e KEEPS the PYTHON block only when Python is detected,
+# the JS/TS block only when package.json is present, and the RUST block only
+# when Cargo.toml is detected; it strips each non-applicable language block
+# before writing. After install, the user runs `pre-commit install` once to
+# activate the git hook. Bump `rev:` pins to the latest stable tags
+# periodically — these are a safe modern floor.
 
 repos:
   # --- UNIVERSAL (always kept) -------------------------------------------------
@@ -75,6 +76,12 @@ repos:
   # `cargo fmt` — always in lockstep with `rustup` (stable, or the project's
   # `rust-toolchain.toml` pin) — so there is no second version to fall out of
   # sync with.
+  #
+  # `cargo fmt` (unlike `ruff`) does not accept file arguments, so `--all` +
+  # `pass_filenames: false` is the conventional shape and reformats the whole
+  # package/workspace on every commit, not just the staged files — a repo that
+  # objects to that scope can swap this hook for a staged-file `rustfmt
+  # --edition <edition> --check`/`--emit files` invocation instead.
   - repo: local
     hooks:
       - id: cargo-fmt

@@ -327,7 +327,7 @@ Conditional activation: **skip all HK checks and emit nothing** when `PRAXION_HA
 
 | ID | Tp | Rule | Pass |
 |----|----|------|------|
-| HK01 | A | Hackathon mode graduation nudge when project exceeds PoC size | **Check** (run only when `PRAXION_HACKATHON_MODE=1`): count non-test Python source files via `find . -name "*.py" -not -path "*/test*" -not -path "*/.git/*" \| wc -l`; count commits via `git rev-list --count HEAD`. **Advisory finding** (not WARN, not FAIL) when source-file count > 40 OR commit count > 150: "This project is in hackathon mode and has outgrown typical PoC size (source files: N, commits: M). Consider graduating to full 5-tier ceremony — see the `### To exit hackathon mode` section in `CLAUDE.md`." **Pass condition**: `PRAXION_HACKATHON_MODE` is unset/0 (check skipped), OR project is below both thresholds (≤40 source files AND ≤150 commits). |
+| HK01 | A | Hackathon mode graduation nudge when project exceeds PoC size | **Check** (run only when `PRAXION_HACKATHON_MODE=1`): count non-test source files across `.py`/`.rs`/`.ts`/`.tsx` via `find . \( -name "*.py" -o -name "*.rs" -o -name "*.ts" -o -name "*.tsx" \) -not -path "*/test*" -not -path "*/.git/*" \| wc -l`; count commits via `git rev-list --count HEAD`. **Advisory finding** (not WARN, not FAIL) when source-file count > 40 OR commit count > 150: "This project is in hackathon mode and has outgrown typical PoC size (source files: N, commits: M). Consider graduating to full 5-tier ceremony — see the `### To exit hackathon mode` section in `CLAUDE.md`." **Pass condition**: `PRAXION_HACKATHON_MODE` is unset/0 (check skipped), OR project is below both thresholds (≤40 source files AND ≤150 commits). |
 
 ### Gate Liveness (GL)
 

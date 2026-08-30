@@ -29,11 +29,12 @@ normalization, migrations) is the `data-modeling` skill's territory.
 **Satellite files** (loaded on-demand):
 
 - [references/python-patterns.md](references/python-patterns.md) -- Python idioms: frozen-dataclass sum types, `assert_never` exhaustiveness, `NewType` vs wrapper decision guide, pydantic boundary parsing, Python-specific gotchas
+- [references/rust-patterns.md](references/rust-patterns.md) -- Rust idioms: smell-to-remedy checklist (enum over bool, newtype, builder, typestate), serde boundary parsing, exhaustive `match`, `bitflags` for flag sets, Rust-specific gotchas
 - [references/typescript-patterns.md](references/typescript-patterns.md) -- TypeScript idioms: discriminated unions, branded types, literal unions over `enum`, zod boundary parsing, `satisfies`, TS-specific gotchas
 - [references/schema-contract-patterns.md](references/schema-contract-patterns.md) -- language-neutral schema contracts for model consumers: tool JSON-schemas, error shapes, evolution policy, pipeline-artifact schemas
 - [references/design-review-checklist.md](references/design-review-checklist.md) -- verifier-facing review checklist with golden bad-cases, keyed to the Representation Design Pass
 
-Load only the language reference matching the project's language (detect per the language-context conventions the pipeline already uses); load `schema-contract-patterns.md` when designing a tool/agent/artifact schema regardless of language. For other languages, apply the SKILL body's techniques through the language's native mechanisms — sum types and boundary parsing exist in every ecosystem worth shipping in.
+Load only the language reference matching the project's language (detect per the language-context conventions the pipeline already uses; leaves exist for Python, TypeScript, and Rust); load `schema-contract-patterns.md` when designing a tool/agent/artifact schema regardless of language. For other languages, apply the SKILL body's techniques through the language's native mechanisms — sum types and boundary parsing exist in every ecosystem worth shipping in.
 
 ## Gotchas
 
@@ -138,7 +139,7 @@ enforcement point, ownership, lifecycle, evolution contract.
 | **Immutable value default** | Values are time-independent; no defensive copying, safe sharing | Anything without identity; concurrent reads |
 | **Exhaustiveness checking** | Compiler/linter flags unhandled variants when a sum type grows | Every match/switch over a sum type |
 
-Worked examples and per-language idioms: [references/python-patterns.md](references/python-patterns.md) or [references/typescript-patterns.md](references/typescript-patterns.md) — load only the one matching the project's language.
+Worked examples and per-language idioms: [references/python-patterns.md](references/python-patterns.md), [references/typescript-patterns.md](references/typescript-patterns.md), or [references/rust-patterns.md](references/rust-patterns.md) — load only the one matching the project's language.
 
 **Enforcement point is language-relative, not doctrinal.** The type-driven camp
 (Minsky, King, Wlaschin) enforces at compile time; the data-oriented dynamic

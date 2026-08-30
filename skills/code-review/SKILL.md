@@ -126,10 +126,10 @@ The coding-style rule is language-independent. Map generic conventions to langua
 
 | Generic Convention | Python | TypeScript | Go | Rust |
 | --- | --- | --- | --- | --- |
-| Immutability | frozen dataclasses, tuples | `readonly`, `const`, `Readonly<T>` | value receivers, unexported fields | ownership, borrowing |
-| Error handling | explicit `try/except`, no bare `except` | explicit `try/catch`, typed errors | error returns, no `panic` in libraries | `Result<T, E>`, no `unwrap` in libraries |
-| Naming | `snake_case` functions/vars, `PascalCase` classes | `camelCase` functions/vars, `PascalCase` types | `camelCase` unexported, `PascalCase` exported | `snake_case` functions/vars, `PascalCase` types |
-| Code organization | packages with `__init__.py` | modules with `index.ts` | packages by directory | modules with `mod.rs` |
+| Immutability | frozen dataclasses, tuples | `readonly`, `const`, `Readonly<T>` | value receivers, unexported fields | `let` immutable by default, `mut` opt-in; ownership/borrowing enforced by the compiler, not a lint |
+| Error handling | explicit `try/except`, no bare `except` | explicit `try/catch`, typed errors | error returns, no `panic` in libraries | `Result<T, E>` + `?`; `panic!` only for broken invariants; no bare `unwrap`/`expect` in libraries (clippy `unwrap_used`/`expect_used`, opt-in) |
+| Naming | `snake_case` functions/vars, `PascalCase` classes | `camelCase` functions/vars, `PascalCase` types | `camelCase` unexported, `PascalCase` exported | `snake_case` fns/vars, `PascalCase` types/traits (C-CASE); casing is rustc-lint-enforced, not just convention |
+| Code organization | packages with `__init__.py` | modules with `index.ts` | packages by directory | modules via `mod.rs` or `<name>.rs` (contested layout, see `rust-development` skill); visibility ladder (`pub(crate)`/`pub`) gates organization |
 
 ### Fallback
 

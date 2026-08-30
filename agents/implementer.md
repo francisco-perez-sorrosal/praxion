@@ -113,6 +113,8 @@ Before reporting completion, check your changes against coding-style conventions
 - [ ] Descriptive naming
 - [ ] Immutable patterns where applicable
 - [ ] New or changed types make illegal states unrepresentable where the language allows it cheaply — no correlated nullables or boolean pairs encoding a lifecycle; invariants enforced at construction; external input parsed once at the boundary (see `skills/data-structure-design/SKILL.md`)
+- [ ] Effects at the edges — new logic separates gather → compute (pure) → use; no hidden ambient inputs (globals, singletons, wall clock) behind a pure-looking signature; core logic testable without mocks (see `coding-style § Side-Effect Discipline`)
+- [ ] The file reads top-down by decreasing abstraction; every comment says what the code cannot (why, invariant, cross-file obligation) — no restatements, no commented-out code (see `coding-style § Reading Order and Narrative`)
 - [ ] No code duplication (check for repeated logic in this file and grep sibling modules for similar patterns)
 
 Fix any violations before reporting. Do not produce a formal report — just fix the code.

@@ -130,13 +130,21 @@ Convention checks (derived from `coding-style` rule):
 - File size (target 200-400, ceiling 800)
 - Nesting depth (maximum 4 levels)
 - Error handling (explicit, no silent swallowing)
+- Compatibility and deprecation (no silent break of observable public behavior — error text, ordering, defaults included; deliberate breaks carry an explicit deprecation/versioning path; boundaries reject malformed input contractually, never silently coerce). Anchor findings to `coding-style § Compatibility and Deprecation`; the ratchet binds public consumed surfaces only — internals behind a stable contract stay free to improve
 - Magic values (named constants required)
 - Immutability (prefer immutable patterns)
+- Side-effect discipline (gather → compute → use; no hidden ambient inputs — globals, singletons, wall clock — behind a pure-looking signature; core logic testable without mocks). Anchor findings to `coding-style § Side-Effect Discipline`; purity is a continuum — flag effect entanglement in core logic, not ceremony-free IO glue
 - Data structures and invariants (new or changed types make illegal states unrepresentable where the language allows it cheaply — no correlated nullables or boolean pairs encoding a lifecycle; every stated invariant has a named enforcement point; external input parsed once at the boundary, no raw `dict`/`any` traveling deep into the interior). Anchor findings to `coding-style § Data Structures and Invariants`; when the change carries a substantial representation surface, run the checklist routed by the Specialist Design Review below
 - Naming (descriptive, intention-revealing)
+- Expressive constructs (the construct states the intent directly — declarative where it removes mental simulation, explicit where ordering/effects need visibility; density that must be decoded rather than read is a finding). Anchor to `coding-style § Expressive Constructs`
 - Code organization (modular, no catch-all utils)
+- Reading order and narrative (files read top-down by decreasing abstraction; comments say what the code cannot — why/guide/checklist — never restate it; no commented-out code). Anchor to `coding-style § Reading Order and Narrative`
 - Balanced coupling (cohesion: related logic grouped by reason-to-change; coupling: no policy depending on volatile detail, no leaking abstractions). Flag SOLID violations as `architecture`-bucket findings against `CLAUDE.md§Balanced Coupling` — but only where the coupling actually hurts; do not flag the absence of speculative abstraction (Incremental Evolution governs)
 - Code duplication (no repeated logic within files; for changed files, read sibling files in the same module — capped at 5 — and use LLM judgment to assess cross-module semantic similarity; report duplicated patterns with file paths and line ranges)
+
+**Creativity guard.** An unfamiliar-but-justified design is interrogated, never flagged for nonconformity alone: classify a non-obvious solution as *clever* (exploits a language/environment quirk — flag it in production paths) or *insightful* (exploits a documented domain property or a reframed decomposition — admissible when its premise is stated in a comment, test, or ADR). A missing premise on an insight-pole solution is the finding; the unfamiliarity itself is not. See `skills/beautiful-code/SKILL.md` for the distinction's canon.
+
+**Milestone-scope reviews** (multi-step or pipeline-end): also run `skills/beautiful-code/references/beauty-review-checklist.md` on demand (that skill is not injected into this agent) — the judgment layer above these mechanical checks; anchor its findings per the checklist's own per-dimension anchors.
 
 #### Specialist Design Review (conditional)
 

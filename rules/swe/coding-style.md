@@ -68,6 +68,17 @@ These are not authored per-project from scratch. The **canonical baselines are s
 
 Formatting, linting rules, and language idioms belong to each language's toolchain — not here. This rule covers structural and design conventions that transcend any single language.
 
+### Expressive Constructs
+
+Choose the construct that states the intent most directly for the file's actual readers:
+
+- Prefer declarative forms (comprehension, pattern match, pipeline) when they remove accumulator boilerplate the reader would otherwise simulate mentally; keep the explicit loop when ordering, effects, or error flow genuinely need to be visible
+- Write idiomatically for the language — an idiom imported from another paradigm forces a context switch and needs justification
+- Density has a ceiling: code a reader must *decode* rather than *read* has left expressiveness for cleverness. Expressiveness serves clarity, never terseness for its own sake
+- Calibrate surprise to the actual reading audience, not the author's habits
+
+Type-level expressiveness (sum types, newtypes, exhaustiveness): `### Data Structures and Invariants` below and `skills/data-structure-design/SKILL.md`. Judgment layer: `skills/beautiful-code/SKILL.md`.
+
 ### Immutability
 
 Create new objects instead of mutating existing ones. When a language provides immutable alternatives, prefer them.
@@ -75,6 +86,17 @@ Create new objects instead of mutating existing ones. When a language provides i
 Rationale: immutable data prevents hidden side effects, simplifies debugging, and enables safe concurrency.
 
 Exceptions: performance-critical inner loops where allocation cost is measured and significant, or when the language idiom strongly favors mutation (e.g., builder patterns).
+
+### Side-Effect Discipline
+
+Isolate computation from effect — functional core, imperative shell:
+
+- Structure impure procedures as gather → compute → use: collect inputs at the edge, pass them through pure logic, apply effects (I/O, logging, mutation) at the end — never buried mid-call-stack inside "business logic"
+- A function's parameter list accounts for every value affecting its output — no hidden reads of globals, singletons, ambient config, or the wall clock behind a pure-looking signature
+- Core logic is unit-testable without mocks; needing a mock to test a function signals effect entanglement — extract the pure part
+- Purity is a continuum, not a gate: grade by impurity count (reads global / writes global / does I/O / mutates parameters) and move code toward zero; do not wrap trivial IO-glue in ceremony
+
+Complements `### Immutability` (data discipline) with effect placement (control discipline).
 
 ### Data Structures and Invariants
 
@@ -94,6 +116,16 @@ Exceptions: throwaway/glue shapes that never cross a boundary; exploratory spike
 - Avoid catch-all modules like `utils` — only use when a function is so generic it has no natural home
 - When a module grows large, extract its helpers into `<module_name>_utils`, not a shared `utils`
 - Break code into multiple files before splitting across directories
+
+### Reading Order and Narrative
+
+A file tells its story top-down:
+
+- Order file contents by decreasing abstraction — entry point or top-level function first, helpers after — so a top-to-bottom read follows the call structure (the newspaper/stepdown reading). Language-forced declaration orders are acceptable when applied consistently
+- Comments carry what code cannot: *why* comments (rationale, invariants, units), *guide* comments (skimmable section structure in long files), and *checklist* comments ("if you change X, also update Y") at cross-file obligation sites. Comments that restate the code and commented-out code are removed on sight
+- A change lands as named, revertible, commit-sized steps — the commit sequence is part of the narrative, never "WIP / fix / more fixes"
+
+Extends `### Code Organization` from placement to reading order. Module-tree narrative (the directory as table of contents) is owned by the implementation-planner's structure discipline.
 
 ### Code Reuse and DRY
 
@@ -167,6 +199,17 @@ System boundaries:
 - Database query results when schema is not enforced
 
 Use schema-based validation where available. Fail fast with clear error messages that identify what was wrong and what was expected.
+
+### Compatibility and Deprecation
+
+Observable behavior of a consumed surface is a contract — with enough users, everything observable (error text, ordering, defaults, timing) is depended on by somebody (Hyrum's Law):
+
+- A change that breaks observable public behavior is a defect by default; shipping one deliberately requires an explicit deprecation or versioning path stated with the change
+- Minimize unintended observability on public surfaces; document what cannot be hidden as explicit contract
+- At boundaries, reject malformed input with a contractual error rather than silently tolerating or coercing it — silent tolerance calcifies divergent behavior (the modern supersession of "be liberal in what you accept"; same stance as `### Input Validation`'s fail-fast)
+- Compatibility rigor is proportional to blast radius: the ratchet binds public, consumed surfaces; internals behind a stable contract stay free to improve
+
+Evolution and versioning mechanics for data shapes: `### Data Structures and Invariants` and `skills/data-structure-design/SKILL.md`.
 
 ### Constants Over Magic Values
 

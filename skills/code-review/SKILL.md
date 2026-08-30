@@ -151,3 +151,4 @@ canonical `VERIFICATION_REPORT.md` structure. Load on demand when producing a re
 ## Related Skills
 
 - **`refactoring`**: When review findings reveal structural issues (oversized modules, deep coupling, misplaced responsibilities), hand off to the `refactoring` skill for remediation planning rather than prescribing structural changes in the review report.
+- **`beautiful-code`**: The judgment layer above the mechanical convention checks — the eight dimensions of beautiful code with their tension resolutions. For milestone-scope reviews, also run its `references/beauty-review-checklist.md`; its reviewer guard governs how to treat creative-but-unfamiliar designs (interrogate the premise, never flag nonconformity alone).

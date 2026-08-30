@@ -1,0 +1,48 @@
+# Praxion's own project principles: the eight dimensions of beautiful code,
+# threaded into the pipeline as advisory gates.
+# Consumers: implementation-planner Phase 1b (threads applicable principles into
+# step acceptance criteria) and verifier Phase 4.5 (gates per severity).
+# Schema: skills/software-planning/references/project-principles.md
+# Canon and review checks: skills/beautiful-code/SKILL.md
+version: 1
+principles:
+  - id: beauty-storytelling
+    statement: Changed files read top-down by decreasing abstraction, comments say only what the code cannot (why, invariants, cross-file obligations), and the change lands as named revertible steps
+    severity: advisory
+    scope: "*"
+    rationale: Code is written for the human who reads it next; narrative order and why-comments are the cheapest comprehension levers (coding-style § Reading Order and Narrative)
+  - id: beauty-simplicity
+    statement: Every added line, parameter, flag, and abstraction serves a requirement that exists today, and no new module's interface merely mirrors its implementation
+    severity: advisory
+    scope: "*"
+    rationale: Simplicity First made checkable — YAGNI gate plus the deep-module test; simple is un-braided, not familiar
+  - id: beauty-clarity-of-intent
+    statement: Behavior and side effects are predictable from names and signatures alone, using full words or established domain notation
+    severity: advisory
+    scope: ["scripts/**", "hooks/**", "dashboard_app/**", "task-chronograph-mcp/**", "tests/**"]
+    rationale: Intention-revealing names are empirically faster to comprehend; a reader should not need the body to know the contract (coding-style § Naming)
+  - id: beauty-expressiveness
+    statement: Each construct states its intent directly — declarative where it removes mental simulation, explicit where ordering or effects need visibility — and nothing requires decoding rather than reading
+    severity: advisory
+    scope: ["scripts/**", "hooks/**", "dashboard_app/**", "task-chronograph-mcp/**", "tests/**"]
+    rationale: Notation is a tool of thought; density that must be decoded is cleverness, not expressiveness (coding-style § Expressive Constructs)
+  - id: beauty-purity
+    statement: New logic separates gather, compute, and use — pure core, effects at owned edges — with every input visible in the signature and core logic testable without mocks
+    severity: advisory
+    scope: ["scripts/**", "hooks/**", "dashboard_app/**", "task-chronograph-mcp/**", "tests/**"]
+    rationale: Most defects are unconsidered states; explicit state and isolated effects shrink the state space (coding-style § Side-Effect Discipline)
+  - id: beauty-sustainability
+    statement: Changes to untested code are preceded by characterization tests, incomplete understanding is visibly recorded (ledger, ADR, or owned TODO), and cleanup stays within the files the change already touches
+    severity: advisory
+    scope: "*"
+    rationale: Debt is incomplete understanding made visible, never sanctioned sloppiness; boy-scouting is bounded by Stay Surgical
+  - id: beauty-durability
+    statement: Observable behavior of consumed surfaces survives the change unchanged, or the change carries an explicit deprecation or versioning path; boundaries reject malformed input contractually
+    severity: advisory
+    scope: "*"
+    rationale: All observable behavior is somebody's contract (Hyrum's Law); silent tolerance calcifies divergence (coding-style § Compatibility and Deprecation)
+  - id: beauty-creativity
+    statement: Non-obvious solutions document the domain premise they exploit, name their concrete payoff, and spend novelty only where the problem is genuinely novel; language-trick cleverness stays out of production paths
+    severity: advisory
+    scope: "*"
+    rationale: Creativity is licensed at the design level (insight, reframing) and banned at the line level (tricks); an undocumented premise is the failure mode (beautiful-code § Creativity)

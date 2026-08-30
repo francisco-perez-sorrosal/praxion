@@ -117,7 +117,8 @@ Load only the references your surface requires. A Python REST service loads `pyt
 | A TypeScript/Node library and/or service (tsoa, zod-to-openapi) | [`references/typescript.md`](references/typescript.md) |
 | A GraphQL API (SDL-as-docs, SpectaQL, GraphiQL) | [`references/graphql.md`](references/graphql.md) |
 | An existing MCP server (from live `tools/list` introspection) | [`references/mcp-docs.md`](references/mcp-docs.md) |
-| A surface not listed above (gRPC, Go, Rust, AsyncAPI) — or adding a new one | [`references/extending.md`](references/extending.md) |
+| A Rust crate (rustdoc, doc-tests, `# Errors`/`# Panics`/`# Safety`) | [`references/rust.md`](references/rust.md) |
+| A surface not listed above (gRPC, Go, AsyncAPI) — or adding a new one | [`references/extending.md`](references/extending.md) |
 
 ## Scaffolding
 

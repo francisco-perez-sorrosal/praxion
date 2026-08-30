@@ -1,0 +1,65 @@
+# Canonical Praxion cargo-lints baseline — [lints] policy for Cargo.toml.
+#
+# Single source of truth for the Rust lint-level baseline. This table sets
+# POLICY (which lints are on and at what level); it does NOT replace `-D
+# warnings` in CI, which promotes every remaining warning — including rustc
+# defaults and future new lints — to an error at the CI boundary (see
+# SKILL.md § Gotchas). Do both.
+#
+# `correctness` is deny-by-default in Clippy already and is left untouched
+# here — do not lower it.
+#
+# `unsafe_code` has two legitimate settings, project-dependent:
+#   "forbid" — the crate contains no `unsafe` and never should (also makes a
+#              Miri CI job close to pure cost — skip it).
+#   "allow"  — the crate legitimately contains `unsafe` (FFI, performance-
+#              critical data structures); pair with `clippy::undocumented_unsafe_blocks`
+#              and gate a Miri job on its presence instead of forbidding it.
+# Uncomment exactly one; do not leave both commented (an unstated policy is
+# itself a finding — see essential rust-canon doctrine on unsafe hygiene).
+#
+# `pedantic` is deliberately NOT enabled below — it is contested (verbosity
+# vs. rigor trade-off, no tier-1/tier-2 source resolves it). Enable it as a
+# per-project ADR decision, not a default.
+#
+# Negative-priority gotcha: when an individual lint overrides a group, the
+# GROUP needs a negative `priority` (lower priority is emitted first) or the
+# override silently loses. Every group entry below already carries
+# `priority = -1` for this reason.
+
+# --- Package form (single-crate project; put this directly in Cargo.toml) ---
+
+[lints.rust]
+# unsafe_code = "forbid"
+# unsafe_code = "allow"
+unused_must_use = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+correctness = { level = "deny", priority = -1 }
+suspicious = { level = "warn", priority = -1 }
+complexity = { level = "warn", priority = -1 }
+perf = { level = "warn", priority = -1 }
+# pedantic = { level = "warn", priority = -1 }  # contested — route to a project ADR
+
+# --- Workspace form (multi-crate project) -----------------------------------
+# Put this block in the ROOT (virtual manifest) Cargo.toml instead of the
+# package form above:
+#
+# [workspace.lints.rust]
+# # unsafe_code = "forbid"
+# # unsafe_code = "allow"
+# unused_must_use = "warn"
+#
+# [workspace.lints.clippy]
+# all = { level = "warn", priority = -1 }
+# correctness = { level = "deny", priority = -1 }
+# suspicious = { level = "warn", priority = -1 }
+# complexity = { level = "warn", priority = -1 }
+# perf = { level = "warn", priority = -1 }
+# # pedantic = { level = "warn", priority = -1 }  # contested — route to a project ADR
+#
+# Then EVERY member Cargo.toml must opt in:
+#
+# [lints]
+# workspace = true

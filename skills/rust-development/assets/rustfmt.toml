@@ -1,0 +1,17 @@
+# Canonical Praxion rustfmt baseline — stable-toolchain formatting config.
+#
+# Single source of truth for the Rust formatting baseline. Only STABLE keys are
+# listed below (verify at rustfmt-version-check time; do not extend this file
+# from memory). Every key beyond `edition` and `style_edition` is a divergence
+# from what every other Rust reader expects (see SKILL.md § Gotchas:
+# "Stable rustfmt silently ignores nightly-only keys").
+#
+# Nightly-only keys — most-wanted, but silently ignored by `cargo fmt` on a
+# stable toolchain (do NOT add these unless the project runs a dedicated
+# `cargo +nightly fmt` CI job):
+#   group_imports, imports_granularity, wrap_comments, comment_width,
+#   format_code_in_doc_comments, normalize_comments, format_strings,
+#   reorder_impl_items
+
+edition = "2024"
+style_edition = "2024"

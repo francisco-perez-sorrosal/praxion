@@ -5,7 +5,7 @@ description: >
   tooling and assertion-based tests, decision rubric (graph-rule vs assertion),
   citation contract (ADR/CLAUDE.md), waiver pattern. Triggers: authoring fitness
   rules, deciding between graph-rule and assertion-based invariants, authoring a
-  fitness waiver. Language modules available for Python, TypeScript.
+  fitness waiver. Language modules available for Python, TypeScript, Rust.
 allowed-tools: [Read, Grep, Bash, Write, Edit]
 compatibility: Claude Code
 ---
@@ -19,6 +19,7 @@ runnable check that fails loudly when a structural constraint is violated.
 
 - [contexts/python.md](contexts/python.md) -- import-linter quickstart, pytest fitness tests, meta-citation rule, authoring workflow for Python
 - [contexts/typescript.md](contexts/typescript.md) -- dependency-cruiser quickstart, ESLint no-restricted-imports, ArchUnitTS alternative, authoring workflow for TypeScript
+- [contexts/rust.md](contexts/rust.md) -- visibility-as-layering-mechanism at crate granularity only, compile-time API guarantee tiers (rustdoc `compile_fail` vs `trybuild`), `cargo-deny`/`cargo-hack` fitness roles, authoring workflow for Rust
 - [references/import-linter-recipes.md](references/import-linter-recipes.md) -- common import-linter contract recipes with INI stanzas and citation examples
 
 ## Decision Rubric
@@ -95,6 +96,7 @@ the code it waives, and waivers surface immediately in code review diffs.
 |----------|--------------|---------|
 | Python | [contexts/python.md](contexts/python.md) | graph-rule tool + pytest |
 | TypeScript | [contexts/typescript.md](contexts/typescript.md) | dependency-cruiser + ESLint |
+| Rust | [contexts/rust.md](contexts/rust.md) | assertion-based tests + `cargo-deny`/`cargo-hack` (no established graph-rule tool) |
 
 ## Related Skills
 

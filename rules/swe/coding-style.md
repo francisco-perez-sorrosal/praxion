@@ -34,8 +34,8 @@ Language-independent structural and design conventions for writing and reviewing
 ### Core Principles
 
 - Object and functional programming with immutable data when possible
-- Self-documenting code — readable enough that comments are rarely needed
-- Comments only to clarify complex algorithms or obscure language idioms to other readers
+- Self-documenting code — naming and structure carry the *what*, so restatement comments are never needed
+- Comments carry what code cannot: rationale and invariants (*why*), complex-algorithm explanation, skimmable structure in long files, cross-file obligations — per `### Reading Order and Narrative` below; never a restatement of the next line
 - Natural line breaks unless the surrounding code is wrapped at a specific column
 - Trailing newline in all files
 

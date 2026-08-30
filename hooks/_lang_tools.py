@@ -21,12 +21,19 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import tomllib
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 # Bound on the `git diff --cached` lookup in staged_files(). Matches the
 # commit-gate hook's existing git timeout.
 GIT_TIMEOUT_SECONDS = 5
+
+# Bare `rustfmt` invoked without `--edition` silently parses its input as
+# edition 2015. Default applied when no ancestor `rustfmt.toml`/`Cargo.toml`
+# declares one.
+DEFAULT_RUST_EDITION = "2024"
 
 
 @dataclass(frozen=True)
@@ -62,12 +69,88 @@ def _build_ruff_format_argv(prefix: Sequence[str], file_path: str) -> list[str]:
     return [*prefix, "format", file_path]
 
 
+def _resolve_rustfmt() -> list[str] | None:
+    """Resolve a rustfmt invocation prefix. Returns None when unreachable."""
+    if shutil.which("rustfmt"):
+        return ["rustfmt"]
+    return None
+
+
+def _build_rustfmt_format_argv(prefix: Sequence[str], file_path: str) -> list[str]:
+    """Build the `rustfmt --edition <resolved> <file>` argv from a resolved prefix."""
+    edition = resolve_rust_edition(file_path)
+    return [*prefix, "--edition", edition, file_path]
+
+
+def _load_toml(path: Path) -> dict | None:
+    """Parse `path` as TOML. Returns None when absent, unreadable, or malformed."""
+    if not path.is_file():
+        return None
+    try:
+        with path.open("rb") as f:
+            return tomllib.load(f)
+    except (tomllib.TOMLDecodeError, OSError):
+        return None
+
+
+def _rustfmt_toml_edition(path: Path) -> str | None:
+    """Read the top-level `edition` key from a `rustfmt.toml`, if declared."""
+    data = _load_toml(path)
+    if data is None:
+        return None
+    edition = data.get("edition")
+    return edition if isinstance(edition, str) else None
+
+
+def _cargo_toml_edition(path: Path) -> str | None:
+    """Read `edition` from a `Cargo.toml`'s `[package]` or `[workspace.package]`."""
+    data = _load_toml(path)
+    if data is None:
+        return None
+    package = data.get("package")
+    if isinstance(package, dict) and isinstance(package.get("edition"), str):
+        return package["edition"]
+    workspace = data.get("workspace")
+    if isinstance(workspace, dict):
+        workspace_package = workspace.get("package")
+        if isinstance(workspace_package, dict) and isinstance(
+            workspace_package.get("edition"), str
+        ):
+            return workspace_package["edition"]
+    return None
+
+
+def resolve_rust_edition(file_path: str) -> str:
+    """Resolve the Rust `--edition` for `file_path`.
+
+    Walks upward from the file's directory. A `rustfmt.toml` in a directory
+    takes precedence over a co-located `Cargo.toml`; the walk continues past
+    a directory that declares neither. Defaults to `DEFAULT_RUST_EDITION`
+    when no ancestor directory declares an edition.
+    """
+    directory = Path(file_path).resolve().parent
+    for candidate in (directory, *directory.parents):
+        edition = _rustfmt_toml_edition(candidate / "rustfmt.toml")
+        if edition is not None:
+            return edition
+        edition = _cargo_toml_edition(candidate / "Cargo.toml")
+        if edition is not None:
+            return edition
+    return DEFAULT_RUST_EDITION
+
+
 LANG_TOOLS: dict[str, LangTool] = {
     ".py": LangTool(
         extension=".py",
         tool_name="ruff",
         resolve=_resolve_ruff,
         build_format_argv=_build_ruff_format_argv,
+    ),
+    ".rs": LangTool(
+        extension=".rs",
+        tool_name="rustfmt",
+        resolve=_resolve_rustfmt,
+        build_format_argv=_build_rustfmt_format_argv,
     ),
 }
 

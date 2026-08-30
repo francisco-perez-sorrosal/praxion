@@ -841,8 +841,9 @@ class TestDetectUnrewrittenIds:
         draft = make_draft(repo_root, "20260419-1810", "alice", "main", "gap-decision")
         draft_id = f"dec-draft-{_draft_hash(draft.name)}"
 
-        unlisted = repo_root / ".ai-state" / "calibration_log.md"
-        unlisted.write_text(f"| task | authored {draft_id} |\n", encoding="utf-8")
+        unlisted = repo_root / ".ai-state" / "metrics_reports" / "METRICS_LOG.md"
+        unlisted.parent.mkdir(parents=True, exist_ok=True)
+        unlisted.write_text(f"| run | cites {draft_id} |\n", encoding="utf-8")
 
         finalize.promote_draft(draft, 66, repo_root)
         finalize.rewrite_cross_references(repo_root, draft_id, "dec-066")
@@ -1683,8 +1684,9 @@ class TestWidenedCrossReferenceScope:
         ledger.parent.mkdir(parents=True, exist_ok=True)
         ledger.write_text(f"- Grounded in {old}; see the cluster above.\n", encoding="utf-8")
 
-        unlisted = repo_root / ".ai-state" / "calibration_log.md"
-        unlisted_original = f"| some-task | standard | authored {old} |\n"
+        unlisted = repo_root / ".ai-state" / "metrics_reports" / "METRICS_LOG.md"
+        unlisted.parent.mkdir(parents=True, exist_ok=True)
+        unlisted_original = f"| run | cites {old} |\n"
         unlisted.write_text(unlisted_original, encoding="utf-8")
 
         modified = finalize.rewrite_cross_references(repo_root, old, new)
@@ -1694,6 +1696,32 @@ class TestWidenedCrossReferenceScope:
         assert new in ledger_text
         assert old not in ledger_text
         assert unlisted.read_text(encoding="utf-8") == unlisted_original
+
+    def test_rewrites_calibration_log(self, repo_root: Path) -> None:
+        """Every tier's completion row may name the decisions the task
+        executed, and a row appended while the pipeline is in flight can only
+        know the `dec-draft-<hash>` id -- so the calibration log must be in
+        scope.
+
+        Regression: the log was absent from the named-persistent-files list, so
+        finalize stranded a draft id in a committed row; the gap was first
+        closed as an uncommitted hotfix in a live checkout, unable to land
+        because these canary tests used the log as their unlisted fixture.
+        """
+        old, new = "dec-draft-ca11b0a7", "dec-305"  # id-citation-discipline:ignore
+        log = repo_root / ".ai-state" / "calibration_log.md"
+        log.parent.mkdir(parents=True, exist_ok=True)
+        log.write_text(
+            f"| 2026-08-31 | some-task | Full | Full | authored {old} |\n",
+            encoding="utf-8",
+        )
+
+        modified = finalize.rewrite_cross_references(repo_root, old, new)
+
+        assert modified == 1
+        text = log.read_text(encoding="utf-8")
+        assert new in text
+        assert old not in text
 
     def test_rewrites_spec_despite_separator_mismatch(self, repo_root: Path) -> None:
         """Spec filenames use underscores; task slugs are kebab-case.

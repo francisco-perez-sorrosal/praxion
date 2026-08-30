@@ -101,8 +101,10 @@ def _cross_reference_targets(repo_root: Path) -> Iterator[Path]:
     # Named persistent files that legitimately cite ADR ids: the design target,
     # both tech-debt ledgers (rows reference the ADR that resolved them), the
     # consult disposition ledger (its `rationale-ref` column is documented to
-    # hold `dec-NNN` or, pre-finalize, `dec-draft-<hash>`), plus a project-root
-    # ROADMAP.md when present.
+    # hold `dec-NNN` or, pre-finalize, `dec-draft-<hash>`), the calibration log
+    # (every tier's completion row may name the decisions the task executed,
+    # and rows written mid-pipeline can only know the draft id), plus a
+    # project-root ROADMAP.md when present.
     for persistent_doc in (
         repo_root / ".ai-state" / "DESIGN.md",
         repo_root / ".ai-state" / "TECH_DEBT_LEDGER.md",
@@ -111,6 +113,7 @@ def _cross_reference_targets(repo_root: Path) -> Iterator[Path]:
         repo_root / ".ai-state" / "CONSULT_COSTS.md",
         repo_root / ".ai-state" / "CONSULT_PRIORS.md",
         repo_root / ".ai-state" / "SYSTEM_DEPLOYMENT.md",
+        repo_root / ".ai-state" / "calibration_log.md",
         repo_root / "ROADMAP.md",
     ):
         if persistent_doc.is_file():

@@ -622,6 +622,8 @@ See [`docs/rules-taxonomy.md`](../docs/rules-taxonomy.md) for the complete refer
    - replace `<typecheck command>` / `<test command>` / `<lint command>` / `<build command>` with the project's actual commands — omit a numbered step (and renumber) when the project has no such command; never invent one;
    - replace `<list 3–5 of this project's most common task intents>` with a ≤5-bullet list of what an agent is most often asked to do here, derived from the codebase shape and the README.
 
+   **Rust command resolution.** When `Cargo.toml` is detected: `<build command>` → `cargo build`; `<test command>` → `cargo test` (or `cargo nextest run` once the project has adopted `cargo-nextest`), **plus** `cargo test --doc` on its own line — nextest does not run doc-tests, and plain `cargo test` running them is not a substitute for calling this out explicitly; `<lint command>` → `cargo clippy --all-targets -- -D warnings`. Omit the `<typecheck command>` line entirely (renumber) — the compiler performs type checking as part of `cargo build`/`cargo test`, so there is no separate Rust typecheck step to name. Also add a formatting-check line alongside the numbered list — `cargo fmt --all -- --check` — since Rust's format gate is a distinct command from its lint gate (unlike some stacks where one tool does both).
+
    If a value is genuinely undeterminable, leave the placeholder with an inline `# TODO:` note so the user fills it.
 
 ## §Phase 7 — Companion CLIs (advisory)
@@ -635,8 +637,9 @@ See [`docs/rules-taxonomy.md`](../docs/rules-taxonomy.md) for the complete refer
 | `chub` | Always | Curated docs for 600+ external libraries; used by the `external-api-docs` skill to avoid hallucinated SDK signatures | `npm install -g @aisuite/chub` |
 | `scc` | Any stack | Fast SLOC counter used by `/project-metrics`; without it, metrics fall back to a stdlib counter that misses language detail | `brew install scc` (macOS) or `go install github.com/boyter/scc/v3@latest` |
 | `uv` | Python detected | Fast Python package manager; required for `pytest -q` in Praxion's metrics flow | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| `cargo-nextest` | Rust detected | Process-per-test runner recommended by the `testing-strategy` Rust leaf and the `rust-development` skill for large local suites and CI; plain `cargo test` remains fine for a small crate | `cargo install cargo-nextest --locked` |
 
-Do not recommend tools the user already has, and do not recommend `uv` if no Python signal was detected in §Pre-flight.
+Do not recommend tools the user already has, and do not recommend `uv` if no Python signal was detected in §Pre-flight, or `cargo-nextest` if no Rust signal was detected. **No Rust package-manager row exists here** — Cargo ships bundled with the toolchain (installed via `rustup`, pinned by `rust-toolchain.toml` when Phase 8e installs one), so there is no separate package-manager binary to recommend the way `uv` fills that role for Python.
 
 **Agentic transactions (opt-in):** If your managed project will implement agentic payments or trading, the `agentic-transactions-architect` agent and the `agentic-transactions` skill are available as Praxion-internal pipeline capabilities — activate them by including `transaction`, `payment`, or `trading` context in your task description.
 
@@ -1167,6 +1170,27 @@ full allowlist rationale.
 
 **Action.** If `pyproject.toml` exists, append the `[tool.ruff]`, `[tool.ruff.lint]`, and `[tool.ruff.format]` blocks from `skills/python-development/assets/ruff-baseline.toml` (this single asset satisfies both the linter and formatter criteria). If no `pyproject.toml` exists, emit `8e.2: deferred (no pyproject.toml — add a build manifest first, then re-run)` rather than creating one (manifest creation is the project-management skill's concern). Print: `8e.2: ruff lint+format config appended to pyproject.toml`.
 
+### Sub-step 8e.2b — Rust formatter + linter policy + toolchain pin
+
+**Predicate.** No Rust signal in the detected stack (`Cargo.toml` absent) → skip with `8e.2b: skipped (no Rust detected)`. OR `rustfmt.toml` / `.rustfmt.toml` already exists at the repo root → skip the whole sub-step with `8e.2b: skipped (rustfmt.toml already present)`. Each of the three artifacts below additionally guards its own write, so a partially-set-up project (e.g. one that already pins its own `rust-toolchain.toml`) is never double-written.
+
+**Action.**
+
+1. **`rustfmt.toml`.** Copy `skills/rust-development/assets/rustfmt.toml` (from the plugin install) to `<repo-root>/rustfmt.toml`, stripping the leading template-doc comment lines.
+2. **`[lints]` policy.** Determine whether the repo-root `Cargo.toml` is a **virtual manifest** (`[workspace]` present, no `[package]` table) or a **package manifest** (`[package]` present):
+   - **Package form.** If the root `Cargo.toml` declares no `[lints.rust]` / `[lints.clippy]` table yet, append the package-form `[lints.rust]` / `[lints.clippy]` blocks from `skills/rust-development/assets/cargo-lints.toml`.
+   - **Workspace form.** If the root `Cargo.toml` is a virtual manifest, append the asset's `[workspace.lints.rust]` / `[workspace.lints.clippy]` blocks (the asset's commented workspace-form section, uncommented) to the root manifest. Then, for every member listed under `[workspace.members]` whose own `Cargo.toml` does not already declare a `[lints]` table, append:
+     ```toml
+     [lints]
+     workspace = true
+     ```
+   - Never overwrite a manifest (root or member) that already declares `[lints]` / `[lints.rust]` / `[lints.clippy]` / `[workspace.lints.*]`.
+3. **`rust-toolchain.toml`.** If neither `rust-toolchain.toml` nor the legacy bare-channel `rust-toolchain` file exists at the repo root, copy `skills/rust-development/assets/rust-toolchain.toml`, stripping the leading template-doc comment lines.
+4. **`cargo-deny` — print, never run.** Print (do not execute): `cargo deny init` — scaffolds a `deny.toml` for dependency-policy enforcement (license/advisory/ban rules); a deliberate per-project decision the user runs by hand (same print-not-run precedent as sub-step 8e.3's npm install command).
+5. **Never scaffold `clippy.toml`.** Unlike `[lints]` (a *level* policy this baseline can set safely), `clippy.toml` holds project-specific lint *values* (cognitive-complexity thresholds, MSRV, disallowed-methods lists) with no universal baseline to ship.
+
+Print: `8e.2b: rustfmt.toml + Cargo.toml [lints] policy + rust-toolchain.toml installed (Rust code-quality baseline)` — or, when one artifact was individually skipped, a per-artifact variant, e.g. `8e.2b: rustfmt.toml installed; [lints] policy skipped (already present); rust-toolchain.toml installed`.
+
 ### Sub-step 8e.3 — JS/TS linter + formatter (Biome, or ESLint+Prettier for frameworks)
 
 **Predicate.** No JavaScript/TypeScript signal (`package.json` absent) → skip with `8e.3: skipped (no JS/TS detected)`. OR any of `biome.json` / `biome.jsonc` / `eslint.config.*` / `.eslintrc.*` already exists → skip with `8e.3: skipped (JS/TS linter already configured)`.
@@ -1177,25 +1201,27 @@ full allowlist rationale.
 
 **Predicate.** `.pre-commit-config.yaml` OR `.pre-commit-config.yml` exists at the repo root → skip with `8e.4: skipped (pre-commit config already present)`.
 
-**Action.** Read `claude/project-baseline/pre-commit-config.yaml` (from the plugin install) and write it to `<repo-root>/.pre-commit-config.yaml`, stripping the leading template-doc comment lines. Then **strip the non-applicable language blocks** per the detected stack: remove the `# --- PYTHON` repo block when no Python signal is present, and the `# --- JS/TS` repo block when `package.json` is absent. The `# --- UNIVERSAL` block (file hygiene + the gitleaks secret scanner) is always kept. Do **not** run `pre-commit install` for the user; print the one-line activation command instead. Print: `8e.4: .pre-commit-config.yaml installed (run \`pre-commit install\` once to activate the git hook)`.
+**Action.** Read `claude/project-baseline/pre-commit-config.yaml` (from the plugin install) and write it to `<repo-root>/.pre-commit-config.yaml`, stripping the leading template-doc comment lines. Then **strip the non-applicable language blocks** per the detected stack: remove the `# --- PYTHON` repo block when no Python signal is present, the `# --- JS/TS` repo block when `package.json` is absent, and the `# --- RUST` repo block when `Cargo.toml` is absent. The `# --- UNIVERSAL` block (file hygiene + the gitleaks secret scanner) is always kept. Do **not** run `pre-commit install` for the user; print the one-line activation command instead. Print: `8e.4: .pre-commit-config.yaml installed (run \`pre-commit install\` once to activate the git hook)`.
 
 ### Sub-step 8e.5 — Static type-checker config
 
-**Predicate.** **Python path:** `pyproject.toml` already contains a `[tool.mypy]` or `[tool.pyright]` section, OR `mypy.ini` / `.mypy.ini` / `pyrightconfig.json` exists → skip the Python action with `8e.5: skipped (Python type-checker already configured)`. **TS path:** `tsconfig.json` exists → skip the TS action with `8e.5: skipped (tsconfig.json already present)`. With neither Python nor JS/TS detected → skip entirely with `8e.5: skipped (no typed stack detected)`.
+**Predicate.** **Python path:** `pyproject.toml` already contains a `[tool.mypy]` or `[tool.pyright]` section, OR `mypy.ini` / `.mypy.ini` / `pyrightconfig.json` exists → skip the Python action with `8e.5: skipped (Python type-checker already configured)`. **TS path:** `tsconfig.json` exists → skip the TS action with `8e.5: skipped (tsconfig.json already present)`. **Rust path:** `Cargo.toml` detected → always the named skip below (there is no config to install or to check for pre-existence). With none of Python, JS/TS, or Rust detected → skip entirely with `8e.5: skipped (no typed stack detected)`.
 
 **Action.** For a Python stack with a `pyproject.toml`: append the `[tool.mypy]` block from `skills/python-development/assets/mypy-baseline.toml` (this satisfies the type-check criterion via the `[tool.mypy]` section). If Python is detected but no `pyproject.toml` exists, emit `8e.5: deferred (no pyproject.toml — add a build manifest first, then re-run)`. For a JS/TS stack: install `tsconfig.json` from `skills/typescript-development/assets/tsconfig.json` (strict baseline). Wire type-checking into CI is the project's concern (the `cicd` skill owns the workflow step); the config presence is what the rubric checks. Print: `8e.5: <mypy config appended to pyproject.toml | tsconfig.json installed>`.
+
+**Rust action.** No separate type-checker config exists or is installed for Rust — the compiler *is* the type checker, and `[lints]` (installed in sub-step 8e.2b) carries the policy layer a config file would otherwise hold. Print the explicit named skip: `8e.5: skipped (Rust — the compiler is the type checker; no separate config)`.
 
 ### Sub-step 8e.6 — Contributing guide
 
 **Predicate.** Any of `CONTRIBUTING.md` / `CONTRIBUTING.rst` / `CONTRIBUTING` / `docs/CONTRIBUTING.md` / `.github/CONTRIBUTING.md` exists → skip with `8e.6: skipped (contributing guide already present)`.
 
-**Action.** Read `claude/project-baseline/CONTRIBUTING.md.tmpl` (from the plugin install). Strip the leading HTML template-doc comment, then fill the `<lint command>` / `<typecheck command>` / `<test command>` / `<build command>` placeholders from the detected stack — reuse the exact values resolved for Phase 6's Project Essentials block (e.g. `uv run ruff …`, `uv run mypy src/`, `uv run pytest`). Leave a `# TODO:` for any command the project does not have rather than inventing one. Write the result to `<repo-root>/CONTRIBUTING.md`. Print: `8e.6: CONTRIBUTING.md installed (filled from detected stack commands)`.
+**Action.** Read `claude/project-baseline/CONTRIBUTING.md.tmpl` (from the plugin install). Strip the leading HTML template-doc comment, then fill the `<lint command>` / `<typecheck command>` / `<test command>` / `<build command>` placeholders from the detected stack — reuse the exact values resolved for Phase 6's Project Essentials block (e.g. `uv run ruff …`, `uv run mypy src/`, `uv run pytest`; for Rust, `cargo clippy --all-targets -- -D warnings` / no separate typecheck line / `cargo test` (or `cargo nextest run`) plus `cargo test --doc` / `cargo build`, with `cargo fmt --all -- --check` alongside as the format-check command). Leave a `# TODO:` for any command the project does not have rather than inventing one. Write the result to `<repo-root>/CONTRIBUTING.md`. Print: `8e.6: CONTRIBUTING.md installed (filled from detected stack commands)`.
 
 ### Sub-step 8e.7 — Dependency-scanning config
 
 **Predicate.** Any of `.github/dependabot.yml` / `.github/dependabot.yaml` / `renovate.json` / `.renovaterc` / `.renovaterc.json` / `.snyk` exists → skip with `8e.7: skipped (dependency-scanning config already present)`.
 
-**Action.** Read `claude/project-baseline/dependabot.yml.tmpl` (from the plugin install). Strip the leading template-doc comment lines. Emit `updates:` blocks only for detected ecosystems: a Python manifest present anywhere in the repo → include the `pip` block with `directory:` set to the discovered manifest directory; a `package.json` present anywhere in the repo → include the `npm` block with `directory:` set to the discovered `package.json` directory; a `.github/workflows/` directory present → include the `github-actions` block. Multiple Python or npm manifests at different directories each get their own `updates:` entry. Strip blocks for undetected ecosystems. Write the result to `<repo-root>/.github/dependabot.yml` (creating `.github/` if absent). Print: `8e.7: .github/dependabot.yml installed (dependency scanning enabled for detected ecosystems)`.
+**Action.** Read `claude/project-baseline/dependabot.yml.tmpl` (from the plugin install). Strip the leading template-doc comment lines. Emit `updates:` blocks only for detected ecosystems: a Python manifest present anywhere in the repo → include the `pip` block with `directory:` set to the discovered manifest directory; a `package.json` present anywhere in the repo → include the `npm` block with `directory:` set to the discovered `package.json` directory; a `Cargo.toml` present anywhere in the repo → include the `cargo` block with `directory:` set to the discovered manifest directory (a workspace's root virtual manifest counts as one directory — dependabot resolves the whole workspace's `Cargo.lock` from there, not per-member manifest); a `.github/workflows/` directory present → include the `github-actions` block. Multiple Python, npm, or Cargo manifests at different directories each get their own `updates:` entry. Strip blocks for undetected ecosystems. Write the result to `<repo-root>/.github/dependabot.yml` (creating `.github/` if absent). Print: `8e.7: .github/dependabot.yml installed (dependency scanning enabled for detected ecosystems)`.
 
 ### Sub-step 8e.8 — CI autofix caller + policy + cross-model review gate
 
@@ -1261,6 +1287,7 @@ Print: `8e.9: .github/labels.yml + .github/workflows/labels-reconcile.yml instal
      Phase 8b: AaC tier — fence seed, fitness/, Block D, architecture.yml, docs/diagrams/ (or skipped per sub-step)
      Phase 8c: ML scaffold — .ai-state/experiments/, .gitignore block, gpu_budget.yaml, program.md (or skipped per sub-step)
      Phase 8d: Obsidian integration — .gitignore Obsidian block, obsidian@obsidian-skills plugin verified, CLAUDE.md ## Obsidian Integration block, .claude/settings.json deny entries (or skipped per sub-step)
+     Phase 8e: code-quality baseline — .editorconfig, per-stack linter/formatter/type-check config (Rust: rustfmt.toml, Cargo.toml [lints]/[workspace.lints] policy, rust-toolchain.toml — when Cargo.toml detected), .pre-commit-config.yaml, CONTRIBUTING.md, .github/dependabot.yml, ci-autofix caller/policy, labels manifest + reconciler caller (or skipped per sub-step)
      Phase 9: .ai-state/.praxion-onboard.json (onboard manifest — version <version>, artifact inventory)
    ```
    Also report any cross-version cleanup performed in Phase 3 (e.g. `removed retired merge driver 'memory-json' + its .gitattributes line`) and any stale-pin upgrades in Phase 3/4 (e.g. `re-pointed finalize hooks from praxion/0.6.0 to praxion/0.8.0`).

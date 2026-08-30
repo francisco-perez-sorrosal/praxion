@@ -16,6 +16,7 @@ committed.
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -25,6 +26,30 @@ HOOKS_DIR = Path(__file__).resolve().parent
 HOOK_PATH = HOOKS_DIR / "format_code.py"
 
 BADLY_FORMATTED_PYTHON = "def   foo( x,y ):\n    return x+y\n"
+BADLY_FORMATTED_RUST = "fn foo(x:i32,y:i32)->i32{x+y}\n"
+FORMATTED_RUST = "fn foo(x: i32, y: i32) -> i32 {\n    x + y\n}\n"
+
+# A deterministic fake `rustfmt`: rewrites its target file(s) to a fixed
+# formatted form, ignoring every flag it is passed (--edition, --check, ...).
+# Per PM-2 (WIP.md Pre-Mortem), gate-liveness canaries must run -- and bite --
+# on machines with no Rust toolchain, so this PATH-shim stands in for a real
+# `rustfmt` rather than gating the canary behind `skipif`.
+FAKE_RUSTFMT_SCRIPT = f"""#!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+for arg in sys.argv[1:]:
+    if arg.endswith(".rs"):
+        Path(arg).write_text({FORMATTED_RUST!r}, encoding="utf-8")
+"""
+
+
+def _write_fake_rustfmt(bin_dir: Path) -> None:
+    """Stage an executable fake `rustfmt` at `bin_dir/rustfmt`."""
+    bin_dir.mkdir(exist_ok=True)
+    fake = bin_dir / "rustfmt"
+    fake.write_text(FAKE_RUSTFMT_SCRIPT, encoding="utf-8")
+    fake.chmod(0o755)
 
 
 def _payload_for(file_path: Path) -> dict:
@@ -112,3 +137,37 @@ def test_ignores_a_python_path_that_does_not_exist(tmp_path: Path) -> None:
 
     assert result.returncode == 0
     assert result.stdout == ""
+
+
+# ---------------------------------------------------------------------------
+# Rust gate-liveness canary (RED until the `.rs` registry row lands)
+# ---------------------------------------------------------------------------
+
+
+def test_formats_a_badly_formatted_rust_file(tmp_path: Path) -> None:
+    """A `.rs` file with `rustfmt` on PATH is rewritten and reported.
+
+    Driven by a PATH-shimmed fake `rustfmt` (PM-2) rather than a real Rust
+    toolchain, so this canary runs -- and bites -- on any machine. Expected
+    RED until `hooks/_lang_tools.py` gains a `.rs` registry row: today
+    `tool_for()` returns `None` for a `.rs` path and the hook no-ops, so the
+    fixture is never rewritten.
+    """
+    bin_dir = tmp_path / "bin"
+    _write_fake_rustfmt(bin_dir)
+    target = tmp_path / "messy.rs"
+    target.write_text(BADLY_FORMATTED_RUST, encoding="utf-8")
+
+    env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+    result = _run_hook(_payload_for(target), env=env)
+
+    assert result.returncode == 0
+    formatted = target.read_text(encoding="utf-8")
+    assert formatted != BADLY_FORMATTED_RUST, (
+        "rustfmt must rewrite the messy Rust file once the `.rs` registry row "
+        f"exists; stdout={result.stdout!r}, stderr={result.stderr!r}"
+    )
+    assert formatted == FORMATTED_RUST
+
+    report = json.loads(result.stdout)
+    assert "messy.rs" in report["additionalContext"]

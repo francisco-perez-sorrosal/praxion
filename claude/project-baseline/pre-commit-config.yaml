@@ -65,3 +65,27 @@ repos:
     hooks:
       - id: biome-check  # lint + format in one tool (reads biome.json)
         additional_dependencies: ["@biomejs/biome@1.9.4"]
+
+  # --- RUST (keep iff Cargo.toml detected) -------------------------------------
+  # No external `rev:` pin here — same rationale as the PIN COHERENCE note on
+  # the PYTHON block above: a pinned pre-commit repo drifts from whatever
+  # `rustfmt`/`clippy` the local toolchain resolves, and two
+  # independently-versioned formatters fighting over the same files never
+  # converge. `repo: local` + `language: system` runs the toolchain's own
+  # `cargo fmt` — always in lockstep with `rustup` (stable, or the project's
+  # `rust-toolchain.toml` pin) — so there is no second version to fall out of
+  # sync with.
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt
+        entry: cargo fmt --all --
+        language: system
+        types: [rust]
+        pass_filenames: false
+      # - id: cargo-clippy  # opt-in — slower; enable when the project wants a
+      #   name: cargo clippy  # commit-time lint gate (Primer: clippy is a
+      #   entry: cargo clippy --all-targets -- -D warnings  # merge-stage gate)
+      #   language: system
+      #   types: [rust]
+      #   pass_filenames: false

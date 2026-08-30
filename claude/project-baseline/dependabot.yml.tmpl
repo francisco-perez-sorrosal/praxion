@@ -42,6 +42,16 @@ updates:
       npm:
         patterns: ["*"]
 
+  # --- RUST/CARGO (keep iff Cargo.toml detected; set directory: per manifest location) ---
+  - package-ecosystem: cargo
+    directory: /         # Phase-8e tailoring: replace with the manifest directory
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      cargo:
+        patterns: ["*"]
+
   # --- GITHUB ACTIONS (keep iff .github/workflows/ exists) ---
   - package-ecosystem: github-actions
     directory: /

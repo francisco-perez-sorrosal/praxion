@@ -21,6 +21,7 @@ re_affirmed_by:
   - dec-136
   - dec-137
   - dec-140
+  - dec-336
 ---
 
 ## Context

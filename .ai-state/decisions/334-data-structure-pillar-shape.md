@@ -1,7 +1,7 @@
 ---
-id: dec-draft-0aa570a6
+id: dec-334
 title: Data-structures pillar lands as principle + skill + embedded obligations + discipline row, not a dedicated agent
-status: proposed
+status: accepted
 category: architectural
 date: 2026-08-25
 summary: Embed representation design (types, invariants, state shapes, schemas-as-contracts) as the Data Structures First principle operationalized by a new data-structure-design skill, per-agent pipeline obligations, a coding-style conventions anchor, and a gated data-structure-specialist discipline row — rejecting a dedicated always-on shadow agent

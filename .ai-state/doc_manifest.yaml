@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-25T04:44:41Z'
+generated_at: '2026-08-30T23:05:48Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -33,7 +33,7 @@ surfaces:
   path: README_DEV.md
   type: markdown
   title: Developer Guide
-  last_modified: '2026-08-07'
+  last_modified: '2026-08-30'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-040-eval-framework-out-of-band
@@ -51,7 +51,7 @@ surfaces:
   path: AGENTS.md
   type: markdown
   title: Development Guidelines for Codex
-  last_modified: '2026-06-11'
+  last_modified: '2026-08-30'
   renderer: default_markdown
 - id: changelog
   path: CHANGELOG.md
@@ -495,7 +495,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-08-13'
+  last_modified: '2026-08-30'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -534,7 +534,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-08-24'
+  last_modified: '2026-08-30'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -548,7 +548,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-08-24'
+  last_modified: '2026-08-30'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -2566,6 +2566,42 @@ surfaces:
   title: Rename the Claude Code plugin identity from `i-am` to `praxion`
   last_modified: '2026-08-07'
   renderer: adr_card
+- id: ai-state-decisions-334-data-structure-pillar-shape
+  path: .ai-state/decisions/334-data-structure-pillar-shape.md
+  type: markdown
+  title: Data-structures pillar lands as principle + skill + embedded obligations + discipline row, not a dedicated agent
+  last_modified: '2026-08-30'
+  renderer: adr_card
+- id: ai-state-decisions-335-beauty-dimensions-shape
+  path: .ai-state/decisions/335-beauty-dimensions-shape.md
+  type: markdown
+  title: Eight beauty dimensions land as a clause under Structural Beauty + beautiful-code skill + coding-style anchors + Praxion's first principles.yaml, not new principles
+  last_modified: '2026-08-30'
+  renderer: adr_card
+- id: ai-state-decisions-336-rust-development-skill-shape
+  path: .ai-state/decisions/336-rust-development-skill-shape.md
+  type: markdown
+  title: Rust ships as one unified rust-development skill, not a rust-development / rust-prj-mgmt pair
+  last_modified: '2026-08-30'
+  renderer: adr_card
+- id: ai-state-decisions-337-language-dispatching-format-hook
+  path: .ai-state/decisions/337-language-dispatching-format-hook.md
+  type: markdown
+  title: One language-dispatching format hook over a shared tool registry, replacing the Python-only format hook
+  last_modified: '2026-08-30'
+  renderer: adr_card
+- id: ai-state-decisions-338-rust-onboarding-integration
+  path: .ai-state/decisions/338-rust-onboarding-integration.md
+  type: markdown
+  title: Rust onboarding lands as lettered sub-step 8e.2b with install-vs-print split and repo-local pre-commit hooks
+  last_modified: '2026-08-30'
+  renderer: adr_card
+- id: ai-state-decisions-339-rust-contested-areas-adr-prompts
+  path: .ai-state/decisions/339-rust-contested-areas-adr-prompts.md
+  type: markdown
+  title: "Two regimes for weakly-grounded Rust guidance \u2014 contested practices ship as per-project ADR prompts; no-source-exists content ships as conditioned decision procedures"
+  last_modified: '2026-08-30'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3202,6 +3238,12 @@ groups:
   - ai-state-decisions-331-finalize-scope-idea-ledgers
   - ai-state-decisions-332-task-brief-obligation-enforced-by-a-non
   - ai-state-decisions-333-rename-plugin-identity-to-praxion
+  - ai-state-decisions-334-data-structure-pillar-shape
+  - ai-state-decisions-335-beauty-dimensions-shape
+  - ai-state-decisions-336-rust-development-skill-shape
+  - ai-state-decisions-337-language-dispatching-format-hook
+  - ai-state-decisions-338-rust-onboarding-integration
+  - ai-state-decisions-339-rust-contested-areas-adr-prompts
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

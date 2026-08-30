@@ -1,7 +1,7 @@
 ---
-id: dec-draft-a35b4f12
+id: dec-338
 title: Rust onboarding lands as lettered sub-step 8e.2b with install-vs-print split and repo-local pre-commit hooks
-status: proposed
+status: accepted
 category: architectural
 date: 2026-08-30
 summary: Add a lettered /onboard-project sub-step 8e.2b installing the Rust formatter, lint-policy and toolchain baselines from skills/rust-development/assets/, add Rust predicates to the pre-commit and Dependabot shipped templates with a repo-local (unpinned) Rust hook block, print rather than install policy-laden configs, and emit a named skip for the type-checker sub-step — rejecting both terminal-substep placement and renumbering.

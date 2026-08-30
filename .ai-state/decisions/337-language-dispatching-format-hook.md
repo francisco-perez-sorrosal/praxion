@@ -1,7 +1,7 @@
 ---
-id: dec-draft-d6c1d832
+id: dec-337
 title: One language-dispatching format hook over a shared tool registry, replacing the Python-only format hook
-status: proposed
+status: accepted
 category: architectural
 date: 2026-08-30
 summary: Generalize hooks/format_python.py into hooks/format_code.py backed by a new hooks/_lang_tools.py extension-to-tool registry consumed by both the PostToolUse formatter and the commit-gate quality check — rejecting parallel per-language hook files, because ~80% of the existing hook body is language-neutral and duplicating it a second and third time is a DRY violation by construction.

@@ -1,7 +1,7 @@
 ---
-id: dec-draft-13f135c9
+id: dec-339
 title: Two regimes for weakly-grounded Rust guidance — contested practices ship as per-project ADR prompts; no-source-exists content ships as conditioned decision procedures
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-08-30
 summary: Two distinct regimes govern weakly-grounded Rust guidance. REGIME A (sources disagree) — every contested area the research named (MSRV policy, error granularity, anyhow in libraries, clippy::pedantic, source-level deny(warnings), cancellation safety, workspace layout, preludes, module file layout, mocking doctrine, date/time crate, ORM) ships with both positions, their evidence tiers, and a routing sentence to a per-project ADR; no shipped artifact enforces a contested default. REGIME B (no tier-1/2 source exists) — architecture-shaped content is re-expressed as a conditioned decision procedure gated on an observable project property, or deferred to a dedicated research pass; a marker string stating the absence is a disclosure that rides along on residual prescription, never the mitigation. Each subject is bound to exactly one regime.

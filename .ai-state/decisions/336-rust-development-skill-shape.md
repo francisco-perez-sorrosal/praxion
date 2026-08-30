@@ -1,7 +1,7 @@
 ---
-id: dec-draft-bcb2a103
+id: dec-336
 title: Rust ships as one unified rust-development skill, not a rust-development / rust-prj-mgmt pair
-status: proposed
+status: accepted
 category: architectural
 date: 2026-08-30
 summary: Create a single skills/rust-development/ skill covering language idioms, Cargo/workspace/toolchain, crate selection, unsafe/concurrency, and scaffolding — rejecting the python-development/python-prj-mgmt and typescript-development/node-prj-mgmt twin-skill split, because those splits exist to arbitrate a package-manager choice that Cargo removes, and because the unified name is the one three agent prompts already reference.

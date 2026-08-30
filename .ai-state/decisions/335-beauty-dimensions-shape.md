@@ -1,7 +1,7 @@
 ---
-id: dec-draft-c7238bd8
+id: dec-335
 title: Eight beauty dimensions land as a clause under Structural Beauty + beautiful-code skill + coding-style anchors + Praxion's first principles.yaml, not new principles
-status: proposed
+status: accepted
 category: architectural
 date: 2026-08-30
 summary: Engrave the eight dimensions of beautiful code (storytelling, simplicity, clarity of intent, expressiveness, purity, sustainability, durability, creativity) as one clause under Structural Beauty, a new beautiful-code index-plus-gap-filler skill, four path-scoped coding-style sections, verifier/implementer/architect hooks with a creativity guard, and Praxion's first live .ai-state/principles.yaml — rejecting both a new top-level principle and dimension-per-principle expansion

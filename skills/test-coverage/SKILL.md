@@ -6,7 +6,7 @@ description: >
   tooling or mutates config. Triggers: reporting coverage percentages, running
   canonical coverage targets, rendering coverage tables, comparing against a
   prior run, wiring coverage into commands/agents/metrics pipelines.
-  Per-language references for Python and TypeScript.
+  Per-language references for Python, TypeScript, and Rust.
 allowed-tools: [Read, Glob, Grep, Bash]
 compatibility: Claude Code
 ---
@@ -30,6 +30,7 @@ Future language references (e.g., `references/go.md`, `references/rust.md`) are 
 |------------|-----------|-------------------------|
 | Python     | [references/python.md](references/python.md) | `pytest` + `pytest-cov` |
 | TypeScript | [references/typescript.md](references/typescript.md) | `vitest` + `@vitest/coverage-v8` |
+| Rust       | [references/rust.md](references/rust.md) | `cargo-llvm-cov` (`cargo-tarpaulin` alternative) |
 
 When a caller activates this skill for a project, detect the language and load the matching reference. If no reference exists for the detected language, fall back gracefully — emit a clear "no language reference available" message and decline to invent a probe order.
 

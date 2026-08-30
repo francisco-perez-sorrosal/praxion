@@ -17,6 +17,10 @@ core: false
 
 Declarative constraints for test code. These define what must be true about tests -- not how to achieve it. For strategy and methodology, load the [testing-strategy](../../skills/testing-strategy/SKILL.md) skill.
 
+### Rust Boundary
+
+`tests/**` in this rule's `paths:` already covers Rust integration tests (`tests/*.rs`). Inline `#[cfg(test)] mod tests` blocks in source files are deliberately NOT covered by this rule's globs -- those conventions live in `rules/swe/coding-style.md` (loads on `.rs` reads) and the `testing-strategy` skill's Rust leaf.
+
 ### Naming
 
 Test functions describe the behavior being verified, not the method being called.

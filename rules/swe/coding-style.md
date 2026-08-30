@@ -53,16 +53,16 @@ Language-specific tool choices and configuration belong in each language's skill
 
 The "must pass the linters/formatters/type-checks" mandate above is vacuous if no config exists. Every Praxion-managed project therefore **must** carry, at the repository root:
 
-- a **linter config** (`[tool.ruff]` for Python; `biome.json` or `eslint.config.*` for JS/TS; the language's equivalent otherwise),
-- a **formatter config** (`[tool.ruff.format]`/black; Biome or Prettier; the language's equivalent),
+- a **linter config** (`[tool.ruff]` for Python; `biome.json` or `eslint.config.*` for JS/TS; `[lints]` in `Cargo.toml` for Rust; the language's equivalent otherwise),
+- a **formatter config** (`[tool.ruff.format]`/black; Biome or Prettier; `rustfmt.toml` for Rust; the language's equivalent),
 - a universal **`.editorconfig`** (charset, end-of-line, indentation) — stack-agnostic,
-- a **type-check config** (`[tool.mypy]`/`[tool.pyright]` for Python; strict `tsconfig.json` for TS),
+- a **type-check config** (`[tool.mypy]`/`[tool.pyright]` for Python; strict `tsconfig.json` for TS; for Rust, **the compiler is the type checker** — `[lints]` in `Cargo.toml` carries the policy and no separate config file exists, so this bullet is satisfied by the linter config above, not by an additional file),
 - a **`.pre-commit-config.yaml`** wiring linter + formatter + a secret scanner (run `pre-commit install` once to activate),
 - a **`CONTRIBUTING.md`** documenting branch/commit conventions, the local-check commands, and the PR flow.
 
 Runtime-service signals — a structured-logging dependency, a health check — are **not** in this universal set; they are service-conditional and owned by the `observability` skill (a library or research harness should not be forced to carry them).
 
-These are not authored per-project from scratch. The **canonical baselines are single-sourced** in the language skills and `claude/project-baseline/`, installed idempotently by `/onboard-project` Phase 8e (and `/new-project`): `skills/python-development/assets/{ruff-baseline.toml, mypy-baseline.toml}`, `skills/typescript-development/assets/{biome.json, eslint.config.mjs, prettierrc.json, tsconfig.json}`, and `claude/project-baseline/{editorconfig, pre-commit-config.yaml, CONTRIBUTING.md.tmpl}`. When you find a managed project missing any of these, install from the canonical asset rather than hand-rolling — onboarding never overwrites an existing config. Edit the asset, not the per-project copy, to evolve the baseline.
+These are not authored per-project from scratch. The **canonical baselines are single-sourced** in the language skills and `claude/project-baseline/`, installed idempotently by `/onboard-project` Phase 8e (and `/new-project`): `skills/python-development/assets/{ruff-baseline.toml, mypy-baseline.toml}`, `skills/typescript-development/assets/{biome.json, eslint.config.mjs, prettierrc.json, tsconfig.json}`, `skills/rust-development/assets/{rustfmt.toml, cargo-lints.toml, rust-toolchain.toml}`, and `claude/project-baseline/{editorconfig, pre-commit-config.yaml, CONTRIBUTING.md.tmpl}`. When you find a managed project missing any of these, install from the canonical asset rather than hand-rolling — onboarding never overwrites an existing config. Edit the asset, not the per-project copy, to evolve the baseline.
 
 ### Language-Specific Style
 
@@ -228,6 +228,7 @@ Language-specific:
 - Python: `datetime.isoformat()`
 - Java/Kotlin: `Instant.toString()`
 - JS/TS: `toISOString()`
+- Rust: format via `time`/`chrono`/`jiff` `Display`/`to_rfc3339`, not manual string-building — crate choice: `skills/rust-development/references/essential-crates.md`
 
 Always store and transmit in UTC. Convert to local time only at the presentation layer.
 

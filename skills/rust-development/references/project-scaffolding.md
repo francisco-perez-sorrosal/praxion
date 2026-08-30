@@ -8,8 +8,8 @@ handful of layout questions that stay open rather than settled.
 
 | File | Content |
 |---|---|
-| `Cargo.toml` (root) | `[workspace]` (virtual manifest if multi-crate) with `resolver = "3"`, `members`, `[workspace.package]` (edition/license/repository/rust-version), `[workspace.dependencies]`, `[workspace.lints.rust]` + `[workspace.lints.clippy]` |
-| `Cargo.toml` (members) | `[lints] workspace = true`; inherit shared fields with `field.workspace = true` |
+| `Cargo.toml` (root) | a well-formed manifest for the chosen shape — `[package]` with `edition`, `license`, `rust-version` for a single package; `[workspace]` with `resolver = "3"`, `members`, `[workspace.package]`, `[workspace.dependencies]`, `[workspace.lints.rust]` + `[workspace.lints.clippy]` only once a workspace is warranted — see [Workspace Layout](#workspace-layout--decide-in-a-project-adr) below |
+| `Cargo.toml` (members, workspace only) | `[lints] workspace = true`; inherit shared fields with `field.workspace = true` |
 | `Cargo.lock` | committed for binaries and workspaces; optional but recommended for pure libraries when pinning a toolchain |
 | `rust-toolchain.toml` | `channel`, `components = ["rustfmt", "clippy"]`, `profile = "minimal"` — see [`assets/rust-toolchain.toml`](../assets/rust-toolchain.toml) |
 | `rustfmt.toml` | `edition` + `style_edition` only, unless the project accepts a nightly fmt job — stable `rustfmt` cannot enforce `group_imports`/`imports_granularity` (see the parent skill's Gotchas) |
@@ -99,6 +99,31 @@ property holds, not as additional unconditional reasons to apply the pattern:
 **Both**: `src/lib.rs` + `src/main.rs` in one package is the common and correct shape for a CLI
 tool with reusable logic — this is the default this skill scaffolds when a binary's logic is worth
 testing in-process.
+
+## Module Layout — Two Contested Questions
+
+Presented as positions, not resolved here — route both choices to a per-project ADR.
+
+### `mod.rs` vs. `<module_name>.rs`
+
+Both forms are supported by the compiler: a legacy `foo/mod.rs`, or the 2018-style `foo.rs` +
+`foo/` sibling directory. The 2018-style form is the modern default in most new code. No primary
+source states a preference either way — treat this as a project-consistency question (pick one
+form and hold to it within a project), not a correctness question. `[certainty: low — absence of
+evidence; not searched exhaustively]`
+
+### Prelude Modules
+
+Wildcard *imports* are condemned by canon (the Rust Book and Effective Rust both warn they obscure
+provenance and break on a dependency upgrade that adds a name) — that part is not contested.
+Whether a crate should *ship* a `prelude` module that re-exports via a glob is a narrower and less
+settled question: no primary source directly addresses it, and the practice exists in respected
+crates (`std`, `rayon`, embedded HALs) precisely because ergonomics depend on many extension
+traits being in scope at once. A prelude is justified when that condition holds; otherwise it is a
+downstream-breakage hazard — a `cargo update` that adds a name to the glob can silently break a
+consumer for a reason unrelated to their own code. `[certainty: med — the sources condemn wildcard
+imports unambiguously; "don't ship a prelude absent that condition" is an inference from that plus
+the ecosystem's narrow use of preludes, not a directly stated rule]`
 
 ## Automation
 

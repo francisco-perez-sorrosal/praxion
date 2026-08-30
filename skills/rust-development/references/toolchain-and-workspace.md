@@ -124,6 +124,24 @@ The shipped baseline lives at [`assets/cargo-lints.toml`](../assets/cargo-lints.
 package form (`[lints.*]`) and workspace form (`[workspace.lints.*]` + member
 `lints.workspace = true`).
 
+### Contested: Source-Level `#![deny(warnings)]` (`C5`)
+
+Presented as positions, not resolved here — route the choice to a per-project ADR.
+
+- **Canonical position** (Rust Design Patterns, secondary): a crate-level `#![deny(warnings)]` is
+  an anti-pattern. New compiler lints and deprecations land as warnings first; a source-level
+  blanket `deny` turns a future toolchain upgrade into a broken build, for both the crate's own CI
+  and every downstream consumer who builds it from source. The recommended form is CI-level
+  `RUSTFLAGS="-D warnings"` (already covered above) plus, where a specific lint truly must be
+  hard-enforced, an explicit `#![deny(that_lint)]` naming it.
+- **Common habit**: the source-level blanket form remains widespread in the wild despite the
+  documented anti-pattern status.
+- **Evidence tier**: this is not a disagreement between two sources — it is canon against habit.
+  `[certainty: high on the anti-pattern mechanism (a future toolchain adding a warning is
+  observable, not speculative); the routing to ADR follows Decision 4's rule that even a
+  one-sided disagreement between documented guidance and common practice is not enforced as a
+  shipped default]`.
+
 ### `rustfmt.toml`: the Stable/Nightly Split
 
 **Stable-usable keys** (a checked-in `rustfmt.toml` enforced by a stable `cargo fmt`): `edition`,
@@ -303,10 +321,15 @@ for reproducibility.
 - **Library**: `src/lib.rs`; public API documented with `///` so doc-tests verify the
   documentation; `tests/` for public-API integration tests; `rust-version` set;
   `cargo-semver-checks` run before publish.
-- **Binary**: `src/main.rs` as a thin shell over `src/lib.rs`. A `bin`-only crate (no library
-  target) cannot be exercised from `tests/` through its own API, cannot be depended on by another
-  crate, and cannot be cached by `sccache` (bin crates invoke the linker) — three independent
-  reasons converging on the same fix.
+- **Binary**: `src/main.rs` as a thin shell over `src/lib.rs`, resting on one mechanism: a
+  bin-only crate (no library target) cannot be exercised in-process through its own API from
+  `tests/*.rs` — there is no library target for an integration test to `use`. Two further
+  consequences follow only **conditionally**, not as additional unconditional reasons: if another
+  crate will consume this logic, a `bin`-only crate cannot be depended on at all; if the project
+  uses a compiler-wrapper cache that cannot cache binaries (bin/dylib/cdylib/proc-macro crate
+  types invoke the linker rather than only the compiler — see [Caching](#caching) above), a `lib`
+  target is cacheable where a `bin`-only crate is not, a narrow-configuration benefit that does
+  not hold for a project caching by other means.
 - **Both**: `src/lib.rs` + `src/main.rs` in one package is the common shape for a CLI tool with
   reusable internal logic.
 

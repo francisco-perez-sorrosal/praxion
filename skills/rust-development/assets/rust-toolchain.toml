@@ -2,13 +2,13 @@
 # format, and lint the project.
 #
 # Single source of truth for the toolchain pin. `channel = "stable"` is the
-# default here; pinning an exact version (e.g. "1.98.0") instead gives
-# byte-reproducible formatting and lint behaviour but silently pins CI to an
-# aging compiler and defeats the "new Clippy lints land on nightly first"
-# feedback loop. Libraries generally pin nothing (or "stable") and test a
-# matrix; applications more often pin an exact version. This trade-off is a
-# per-project decision — route it to a project ADR rather than deciding it
-# here.
+# default here; pinning an exact release (check the current one with
+# `rustc --version`) instead gives byte-reproducible formatting and lint
+# behaviour but silently pins CI to an aging compiler and defeats the "new
+# Clippy lints land on nightly first" feedback loop. Libraries generally pin
+# nothing (or "stable") and test a matrix; applications more often pin an
+# exact version. This trade-off is a per-project decision — route it to a
+# project ADR rather than deciding it here.
 
 [toolchain]
 channel = "stable"

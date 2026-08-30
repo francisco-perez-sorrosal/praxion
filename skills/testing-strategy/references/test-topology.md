@@ -167,18 +167,19 @@ The `selector_strategy` registry maps the abstract `strategy` identifier in the 
 | `pytest-globs` | List of path/glob strings (1+ entries; empty list is invalid) | Python leaf (`references/python-testing.md`) | `pytest <args>` — the strings are passed positionally to pytest. Multiple entries are unioned (all paths run). No marker registration required. |
 | `pytest-markers` | List of snake_case marker name strings (1+ entries; empty list is invalid) | Python leaf (`references/python-testing.md`) | `pytest -m "<m1> or <m2> or ..."` — entries are OR-joined into a single marker expression. A single entry materializes as `pytest -m "<m1>"`. Each marker must be registered in the pocket's `pyproject.toml` (`--strict-markers`). |
 | `pytest-keywords` | A single keyword expression string (not a list; empty string is invalid) | Python leaf (`references/python-testing.md`) | `pytest -k "<expr>"` — the string is passed verbatim to `-k`. Optional within the Python leaf; requires no marker registration. Prefer `pytest-markers` for declared groups; use `pytest-keywords` only for transient/debug-scope selections. |
+| `cargo-test-filters` | List of path/glob strings (1+ entries; empty list is invalid) | Rust leaf (`references/rust-testing.md`) | `cargo test <args>` — the strings are passed positionally as filters, matched by substring against the fully-qualified test name. Multiple entries are unioned (a test matching any filter runs). |
+| `nextest-filters` | List of filter strings (1+ entries; empty list is invalid) | Rust leaf (`references/rust-testing.md`) | `cargo nextest run <args>` — same substring-match semantics as `cargo-test-filters`, for parity. nextest also supports its own `-E '<filterset-expr>'` DSL for expression-based selection; verify current syntax against the installed nextest version before relying on it in CI. |
 
-<!-- last-verified: 2026-05-23 -->
+<!-- last-verified: 2026-08-30 -->
 
 ### Indicative Future Identifiers
 
-The following identifiers are illustrative — they show the additive pattern language leaves follow. They are **not registered at this milestone** and must not be used in `TEST_TOPOLOGY.md` files until the corresponding leaf file ships. (The Python selector identifiers — `pytest-globs`, `pytest-markers`, `pytest-keywords` — were promoted into the registered table above when the Python leaf shipped.)
+The following identifiers are illustrative — they show the additive pattern language leaves follow. They are **not registered at this milestone** and must not be used in `TEST_TOPOLOGY.md` files until the corresponding leaf file ships. (The Python selector identifiers — `pytest-globs`, `pytest-markers`, `pytest-keywords` — and the Rust selector identifiers — `cargo-test-filters`, `nextest-filters` — were promoted into the registered table above when their respective leaves shipped.)
 
 | Identifier (future) | Registered by (future) | Indicative concrete meaning |
 |--------------------|-----------------------|-----------------------------|
 | `go-test-packages` | Go leaf | `go test <args>` where args is a list of package paths |
 | `vitest-projects` | TypeScript leaf | `vitest run --project <args>` |
-| `cargo-test-filters` | Rust leaf | `cargo test <filter>` where args is a list of filter strings |
 
 A Go project would register `go-test-packages` via a future `references/go-testing.md`. No trunk schema file needs modification — leaves add rows to the registered table above.
 
@@ -196,18 +197,19 @@ The `parallel_runner` registry records the runners a language leaf supports. Unl
 | `none` | Trunk (default) | Sequential — no parallel runner. All tests in the group run in a single process. |
 | `pytest-xdist-loadfile` | Python leaf (`references/python-testing.md`) | `pytest -n auto --dist loadfile` — workers are assigned whole files; file-scoped fixture state is stable across tests in the same file. **Recommended default** for parallel-safe Python groups; safe for `shared_fixture_scope: per-file` or narrower. |
 | `pytest-xdist-load` | Python leaf (`references/python-testing.md`) | `pytest -n auto --dist load` — load-balanced distribution across workers; less robust when tests in the same file share fixture state. Use only for groups with `shared_fixture_scope: none` or `per-test`. |
+| `cargo-test-jobs` | Rust leaf (`references/rust-testing.md`) | `cargo test -- --test-threads=N` — libtest runs all tests in one shared process; this flag only changes thread count, not isolation. For projects that have not adopted `cargo-nextest`. |
+| `nextest-threads` | Rust leaf (`references/rust-testing.md`) | `cargo nextest run --test-threads=N` — **recommended default** wherever `cargo-nextest` is on the toolchain; each test runs in its own process. |
 
-<!-- last-verified: 2026-05-23 -->
+<!-- last-verified: 2026-08-30 -->
 
 ### Indicative Future Identifiers
 
-(The Python parallel-runner identifiers — `pytest-xdist-loadfile`, `pytest-xdist-load` — were promoted into the registered table above when the Python leaf shipped.)
+(The Python parallel-runner identifiers — `pytest-xdist-loadfile`, `pytest-xdist-load` — and the Rust parallel-runner identifiers — `cargo-test-jobs`, `nextest-threads` — were promoted into the registered table above when their respective leaves shipped.)
 
 | Identifier (future) | Registered by (future) | Indicative concrete meaning |
 |--------------------|-----------------------|-----------------------------|
 | `go-test-parallel` | Go leaf | `go test -parallel N` |
 | `vitest-threads` | TypeScript leaf | Vitest worker threads parallelism |
-| `cargo-test-jobs` | Rust leaf | `cargo test -- --test-threads N` |
 
 ---
 
@@ -433,6 +435,7 @@ These lines are **optional and backward-compatible**. Existing `TEST_RESULTS.md`
 This trunk file defines the protocol contract. Concrete tooling examples for each language live in the corresponding leaf reference file:
 
 - **Python**: `references/python-testing.md` — registers `pytest-globs`, `pytest-markers`, and `pytest-keywords` as selector strategy identifiers; registers `pytest-xdist-loadfile` and `pytest-xdist-load` as parallel runner identifiers; provides the `shared_fixture_scope` mapping table to pytest scope keywords; documents the marker registration recipe and the filelock-based session-fixture pattern for parallel-unsafe groups.
+- **Rust**: `references/rust-testing.md` — registers `cargo-test-filters` and `nextest-filters` as selector strategy identifiers; registers `cargo-test-jobs` and `nextest-threads` as parallel runner identifiers; provides the `shared_fixture_scope` mapping table to `OnceLock`/`static`-based Rust idioms; documents the `cargo-nextest` doc-test gotcha (nextest cannot run doc-tests) and a filelock-equivalent cross-process pattern for `per-suite` groups.
 
 Future leaf reference files follow the same pattern: one file per language, registering that language's identifiers in the two registries, mapping the abstract schema fields to the framework's concrete equivalents, and providing worked invocation examples for the implementer and test-engineer.
 

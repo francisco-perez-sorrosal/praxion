@@ -13,6 +13,8 @@ tools: Read, Glob, Grep, Bash, Write, Edit
 skills: skill-crafting, rule-crafting, command-crafting, agent-crafting
 background: true
 memory: user
+model: sonnet  # capability floor per rules/swe/agent-model-routing.md
+effort: high
 maxTurns: 80
 ---
 

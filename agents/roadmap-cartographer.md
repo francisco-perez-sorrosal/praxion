@@ -38,6 +38,7 @@ description: >-
   </example>
 tools: Read, Glob, Grep, Bash(git:*), Bash(wc:*), Bash(grep:*), Bash(find:*), Bash(jq:*), Write, Edit, AskUserQuestion, Task
 model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.
+effort: xhigh
 skills: [roadmap-synthesis, roadmap-planning]
 memory: user
 maxTurns: 80

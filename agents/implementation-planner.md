@@ -10,6 +10,8 @@ tools: Read, Glob, Grep, Bash, Write, Edit
 skills: [software-planning, external-api-docs, data-structure-design]
 background: true
 memory: user
+model: sonnet  # capability floor per rules/swe/agent-model-routing.md
+effort: xhigh
 maxTurns: 100
 ---
 

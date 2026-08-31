@@ -20,6 +20,8 @@ description: >
 tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit
 memory: user
+model: sonnet  # capability floor per rules/swe/agent-model-routing.md
+effort: high
 maxTurns: 300
 background: true
 ---

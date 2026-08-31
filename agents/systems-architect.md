@@ -10,6 +10,7 @@ description: >
 tools: Read, Glob, Grep, Bash, Write, Edit
 skills: [claude-ecosystem, agentic-sdks, communicating-agents, mcp-crafting, external-api-docs, data-structure-design]
 model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.
+effort: xhigh
 background: true
 memory: user
 maxTurns: 80

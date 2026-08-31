@@ -11,6 +11,7 @@ description: >
 tools: Read, Write, Edit, Glob, Grep, Bash
 skills: [doc-management, web-ui-design, api-documentation]
 memory: user
+model: claude-haiku-4-5  # pinned full ID: the bare 'haiku' alias resolves to Haiku 3.5
 maxTurns: 50
 background: true
 ---

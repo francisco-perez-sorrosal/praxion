@@ -7,6 +7,7 @@ description: >
   when the planner's Phase 7 confirms plan adherence, or at milestones to
   validate quality before committing results.
 model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.
+effort: xhigh
 tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit
 skills: [code-review, context-security-review, web-ui-design, tui-design, agentic-interface-design, api-design-craft]

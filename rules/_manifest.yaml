@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-08-31T02:18:12Z'
+generated_at: '2026-08-31T04:36:36Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
@@ -40,7 +40,7 @@ rules:
   load: always_on
   core: false
   install: hook-deliver
-  chars: 6247
+  chars: 7318
 - id: swe/vcs/git-conventions
   path: rules/swe/vcs/git-conventions.md
   load: always_on

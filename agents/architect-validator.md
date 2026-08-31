@@ -12,6 +12,7 @@ description: >
   doc-engineer (markdown quality), sentinel (periodic audit), and cicd-engineer
   (CI harness authoring).
 model: opus
+effort: high
 tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit
 skills: [external-api-docs]

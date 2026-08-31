@@ -15,6 +15,7 @@ description: >
 tools: Read, Glob, Grep, Bash, Write, Edit, Skill
 skills: [multi-perspective-analysis]
 model: sonnet  # capability floor, deliberately low; the convener routes up per the difficulty-hint policy below. See rules/swe/agent-model-routing.md.
+effort: high
 background: true
 memory: user
 maxTurns: 60

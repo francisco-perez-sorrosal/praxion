@@ -10,6 +10,7 @@ description: >
 tools: Read, Glob, Grep, Bash, Write, Edit, AskUserQuestion, WebFetch
 skills: [software-planning, external-api-docs, web-ui-design, tui-design, agentic-interface-design, api-design-craft]
 model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.
+effort: xhigh
 memory: user
 maxTurns: 60
 ---

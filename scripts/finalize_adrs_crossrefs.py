@@ -19,6 +19,11 @@ from pathlib import Path
 
 logger = logging.getLogger("finalize_adrs")
 
+# Frozen historical reports: never regenerated, no downstream automated
+# reader, and (verified) carry zero `dec-draft-<hash>` ids -- so excluding
+# them from the sweep can never strand a dangling draft reference.
+_FROZEN_DOCS_SUBTREE = Path("docs") / "independent-analysis"
+
 
 def rewrite_cross_references(repo_root: Path, old_id: str, new_id: str) -> int:
     """Rewrite every occurrence of `old_id` to `new_id` in bounded locations.
@@ -31,8 +36,11 @@ def rewrite_cross_references(repo_root: Path, old_id: str, new_id: str) -> int:
       `.ai-state/SYSTEM_DEPLOYMENT.md`, and a project-root `ROADMAP.md` --
       named persistent files that cite the ADR a decision/debt/disposition
       row resolved.
-    - Every markdown file under `docs/` (subsumes `docs/architecture.md`):
-      design notes and integration docs cite ADR ids outside `.ai-state/`.
+    - Every markdown file under `docs/` (subsumes `docs/architecture.md`),
+      excluding `docs/independent-analysis/`: design notes and integration
+      docs cite ADR ids outside `.ai-state/`. `docs/independent-analysis/`
+      is frozen historical analysis -- never regenerated, no downstream
+      automated reader, and carries zero draft ids -- so it is swept out.
     - `.ai-state/idea_ledgers/*.md`: idea entries ground their clusters in the
       ADRs that motivated them, cited as draft ids while the pipeline that
       authored those drafts is still in flight.
@@ -123,11 +131,16 @@ def _cross_reference_targets(repo_root: Path) -> Iterator[Path]:
     # developer architecture guide). Consumer projects cite ADR ids from
     # design notes and integration docs that live outside .ai-state/; without
     # this sweep those references dangle the moment finalize runs.
+    # `docs/independent-analysis/` is excluded -- see _FROZEN_DOCS_SUBTREE.
     docs_dir = repo_root / "docs"
+    frozen_docs_dir = repo_root / _FROZEN_DOCS_SUBTREE
     if docs_dir.is_dir():
         for entry in docs_dir.rglob("*.md"):
-            if entry.is_file():
-                yield entry
+            if not entry.is_file():
+                continue
+            if frozen_docs_dir in entry.parents:
+                continue
+            yield entry
 
     # Idea ledgers cite the ADRs that motivated a cluster, and the citation is
     # authored mid-pipeline when only the draft id exists -- the case

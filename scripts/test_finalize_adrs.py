@@ -1743,6 +1743,32 @@ class TestWidenedCrossReferenceScope:
         assert new in text
         assert old not in text
 
+    def test_independent_analysis_excluded_but_sibling_docs_rewritten(
+        self, repo_root: Path
+    ) -> None:
+        """`docs/independent-analysis/` is frozen historical analysis and is
+        swept out of the docs/ walk; a sibling docs/ file is still rewritten.
+
+        Regression guard: proves the exclusion is scoped to exactly the one
+        subtree rather than disabling the docs/ sweep entirely.
+        """
+        old, new = "dec-draft-f20zen01", "dec-311"  # id-citation-discipline:ignore
+        frozen = repo_root / "docs" / "independent-analysis" / "x.md"
+        frozen.parent.mkdir(parents=True, exist_ok=True)
+        frozen_original = f"per {old}\n"
+        frozen.write_text(frozen_original, encoding="utf-8")
+
+        sibling = repo_root / "docs" / "other.md"
+        sibling.write_text(f"per {old}\n", encoding="utf-8")
+
+        modified = finalize.rewrite_cross_references(repo_root, old, new)
+
+        assert modified == 1
+        assert frozen.read_text(encoding="utf-8") == frozen_original
+        sibling_text = sibling.read_text(encoding="utf-8")
+        assert new in sibling_text
+        assert old not in sibling_text
+
 
 # -- re_affirmed_by back-link self-healing (dec-070/DL06) ---------------------
 

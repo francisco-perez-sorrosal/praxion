@@ -95,9 +95,8 @@ class BlockSpec:
     fence_closer: str = CODE_FENCE_CLOSER
 
 
-_ONBOARDING_PAIR = (
-    REPO_ROOT / "commands" / "onboard-project.md",
-    REPO_ROOT / "commands" / "new-project.md",
+_ONBOARDING_CONSUMERS = (
+    REPO_ROOT / "skills" / "onboard-project" / "references" / "claude-md-blocks.md",
 )
 
 _COMMIT_PAIR = (
@@ -107,13 +106,13 @@ _COMMIT_PAIR = (
 
 # Block registry. Order is preserved for deterministic help/error messages.
 BLOCKS: dict[str, BlockSpec] = {
-    "agent-pipeline": BlockSpec(consumers=_ONBOARDING_PAIR),
-    "compaction-guidance": BlockSpec(consumers=_ONBOARDING_PAIR),
-    "behavioral-contract": BlockSpec(consumers=_ONBOARDING_PAIR),
-    "praxion-process": BlockSpec(consumers=_ONBOARDING_PAIR),
-    "hackathon-mode": BlockSpec(consumers=_ONBOARDING_PAIR),
-    "project-essentials": BlockSpec(consumers=_ONBOARDING_PAIR),
-    "obsidian-integration": BlockSpec(consumers=_ONBOARDING_PAIR),
+    "agent-pipeline": BlockSpec(consumers=_ONBOARDING_CONSUMERS),
+    "compaction-guidance": BlockSpec(consumers=_ONBOARDING_CONSUMERS),
+    "behavioral-contract": BlockSpec(consumers=_ONBOARDING_CONSUMERS),
+    "praxion-process": BlockSpec(consumers=_ONBOARDING_CONSUMERS),
+    "hackathon-mode": BlockSpec(consumers=_ONBOARDING_CONSUMERS),
+    "project-essentials": BlockSpec(consumers=_ONBOARDING_CONSUMERS),
+    "obsidian-integration": BlockSpec(consumers=_ONBOARDING_CONSUMERS),
     "commit-process": BlockSpec(
         consumers=_COMMIT_PAIR,
         fence_opener=COMMENT_FENCE_OPENER,

@@ -105,12 +105,13 @@ repos:
         pass_filenames: true
 
       # Block B — canonical-block sync. Whole-repo --check; fires only when a
-      # canonical block or an onboarding command file is staged.
+      # canonical block or the onboarding skill's consolidated
+      # claude-md-blocks.md consumer is staged.
       - id: canonical-block-sync
         name: Canonical-block sync
         entry: python3 scripts/sync_canonical_blocks.py --check
         language: system
-        files: '^(claude/canonical-blocks/.*\.md|commands/(onboard-project|new-project)\.md)$'
+        files: '^(claude/canonical-blocks/.*\.md|skills/onboard-project/references/claude-md-blocks\.md)$'
         pass_filenames: false
 
       # Block B2 — canonical-block history-manifest liveness. Whole-repo

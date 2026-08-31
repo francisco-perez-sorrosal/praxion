@@ -1,7 +1,7 @@
 ---
-id: dec-draft-c4713004
+id: dec-341
 title: Persist the onboarding mode in the onboard stamp and make hackathon promotion mechanical
-status: proposed
+status: accepted
 category: architectural
 date: 2026-08-30
 summary: Add a "mode" field (values "full" | "hackathon") to .ai-state/.praxion-onboard.json as the single persisted onboarding-mode signal, and add Sub-step 5b.t so promotion from hackathon to fully-managed removes all six hackathon artifacts instead of a partly-documented three-item manual checklist.

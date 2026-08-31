@@ -259,9 +259,9 @@ Also refusable at the shape-guard boundary: `onboard-project` on a `git-no-praxi
 - [`dec-053`](../.ai-state/decisions/053-prompt-over-template-greenfield-scaffold.md) — prompt-over-template discipline for the seed pipeline's default app.
 - [`dec-054`](../.ai-state/decisions/054-separate-new-cc-project-from-install.md) — separating project scaffolding from plugin installation.
 - [`dec-055`](../.ai-state/decisions/055-hybrid-bash-slash-command-orchestration.md) — hybrid bash + Claude-session orchestration (deterministic prereqs in bash, conversational flow in Claude).
-- `dec-draft-ec94fa61` — unifying the two onboarding commands into one user-invocable skill plus one entry script.
-- `dec-draft-6bebc4d4` — preserving onboarding phase identifiers verbatim across the migration.
-- `dec-draft-25d94017` — one idempotency mechanism and one embedding site for the seven canonical `CLAUDE.md` blocks.
-- `dec-draft-c4713004` — persisting the onboarding mode in the onboard stamp and making hackathon promotion mechanical.
+- `dec-340` — unifying the two onboarding commands into one user-invocable skill plus one entry script.
+- `dec-342` — preserving onboarding phase identifiers verbatim across the migration.
+- `dec-343` — one idempotency mechanism and one embedding site for the seven canonical `CLAUDE.md` blocks.
+- `dec-341` — persisting the onboarding mode in the onboard stamp and making hackathon promotion mechanical.
 
 (The four `dec-draft-*` ids above finalize to `dec-NNN` records under `.ai-state/decisions/` at merge-to-main; look them up by title in [`DECISIONS_INDEX.md`](../.ai-state/decisions/DECISIONS_INDEX.md) once finalized.)

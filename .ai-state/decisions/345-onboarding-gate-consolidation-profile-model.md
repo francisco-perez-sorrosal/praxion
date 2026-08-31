@@ -1,7 +1,7 @@
 ---
-id: dec-draft-113cc050
+id: dec-345
 title: Onboarding gate consolidation via a single detection-defaulted Profile question
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-08-30
 summary: Collapse the 25 onboarding AskUserQuestion fires into 3 gate slots — one detection-defaulted capability Profile plus two conditional asks — so the happy path asks at most one question.

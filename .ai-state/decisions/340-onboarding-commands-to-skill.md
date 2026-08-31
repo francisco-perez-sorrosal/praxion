@@ -1,7 +1,7 @@
 ---
-id: dec-draft-ec94fa61
+id: dec-340
 title: Unify the two onboarding commands into one user-invocable skill plus one entry script
-status: proposed
+status: accepted
 category: architectural
 date: 2026-08-30
 summary: Retire /new-project and commands/onboard-project.md in favor of skills/onboard-project/ (SKILL.md + 5 references) driven by one phase engine, with new_project.sh replaced by scripts/onboard-project.

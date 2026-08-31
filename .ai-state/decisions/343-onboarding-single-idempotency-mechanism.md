@@ -1,7 +1,7 @@
 ---
-id: dec-draft-25d94017
+id: dec-343
 title: One idempotency mechanism for canonical CLAUDE.md blocks; one embedding site for the canonical-block sync
-status: proposed
+status: accepted
 category: architectural
 date: 2026-08-30
 summary: Phase 6 becomes the sole writer of canonical CLAUDE.md blocks — refresh_claude_blocks.py's 4-state classifier for the four refreshable blocks, heading-grep for the three conditional ones — and sync_canonical_blocks.py's onboarding consumer pair collapses to a single file.

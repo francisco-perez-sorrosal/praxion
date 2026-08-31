@@ -1,7 +1,7 @@
 ---
-id: dec-draft-2ffbaf98
+id: dec-346
 title: Unified onboard CLI contract — argument-presence mode selection and capability-ID flags
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-08-30
 summary: One entry script whose mode is selected by positional-argument presence, with a uniform --with/--without capability-ID vocabulary replacing bespoke negative flags, legacy exit codes 2-6 preserved and 7-8 appended.

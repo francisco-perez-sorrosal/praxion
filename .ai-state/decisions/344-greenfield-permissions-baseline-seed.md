@@ -1,7 +1,7 @@
 ---
-id: dec-draft-57d9129b
+id: dec-344
 title: Seed the permissions baseline at greenfield scaffold time; hoist Phase 5b ahead of the seed pipeline
-status: proposed
+status: accepted
 category: architectural
 date: 2026-08-30
 summary: The bash scaffold writes a minimal .claude/settings.json carrying only the permissions.allow baseline, so the empty-.claude contract becomes a seeded-.claude contract; Phase 5b is hoisted ahead of Phase 0s in new mode to cover direct skill invocation; Phase 5 remains the idempotent authority that extends it.

@@ -1,7 +1,7 @@
 ---
-id: dec-draft-6bebc4d4
+id: dec-342
 title: Preserve onboarding phase identifiers verbatim across the skill migration
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-08-30
 summary: Phase ids 0.5, 1-7, 5b, 8, 8b-8e, 9 and every "Sub-step N.M" heading survive the commands-to-skill move unchanged; the seed phase takes the new id 0s.

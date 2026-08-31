@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-30T23:06:50Z'
+generated_at: '2026-08-31T02:37:47Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -8,7 +8,7 @@ surfaces:
   path: README.md
   type: markdown
   title: Praxion
-  last_modified: '2026-08-07'
+  last_modified: '2026-08-30'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-ledger
@@ -19,13 +19,12 @@ surfaces:
   - docs-concepts
   - docs-cursor-compat
   - docs-decision-tracking
-  - docs-existing-project-onboarding
   - docs-external-api-docs
   - docs-getting-started
-  - docs-greenfield-onboarding
   - docs-ml-training-onramp
   - docs-multi-session
   - docs-observability
+  - docs-onboarding
   - docs-rework-dispatch
   - docs-spec-driven-development
   - readme-dev
@@ -43,7 +42,7 @@ surfaces:
   path: CLAUDE.md
   type: markdown
   title: Praxion
-  last_modified: '2026-08-05'
+  last_modified: '2026-08-30'
   renderer: default_markdown
   surfaces_referenced:
   - docs-claude-code-limitations
@@ -63,7 +62,7 @@ surfaces:
   path: docs/README.md
   type: markdown
   title: Praxion docs
-  last_modified: '2026-07-29'
+  last_modified: '2026-08-30'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -80,14 +79,13 @@ surfaces:
   - docs-cursor-compat
   - docs-decision-tracking
   - docs-diagrams-readme
-  - docs-existing-project-onboarding
   - docs-external-api-docs
   - docs-getting-started
-  - docs-greenfield-onboarding
   - docs-metrics-readme
   - docs-ml-training-onramp
   - docs-multidisciplinary-identities-evidence
   - docs-observability
+  - docs-onboarding
   - docs-rules-taxonomy
   - docs-skill-genesis
   - docs-spec-driven-development
@@ -96,7 +94,7 @@ surfaces:
   path: docs/aac-dac.md
   type: markdown
   title: Architecture-as-Code + Documentation-as-Code
-  last_modified: '2026-08-07'
+  last_modified: '2026-08-30'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -123,7 +121,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-08-13'
+  last_modified: '2026-08-30'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -132,14 +130,13 @@ surfaces:
   - ai-state-decisions-189-hackathon-mode-activation-and-tier-integration
   - ai-state-decisions-decisions-index
   - ai-state-design
-  - docs-existing-project-onboarding
-  - docs-greenfield-onboarding
+  - docs-onboarding
   - docs-rework-dispatch
 - id: docs-claude-code-limitations
   path: docs/claude-code-limitations.md
   type: markdown
   title: Known Claude Code Limitations
-  last_modified: '2026-08-07'
+  last_modified: '2026-08-30'
   renderer: default_markdown
 - id: docs-claude-ecosystem-learning-resources
   path: docs/claude-ecosystem-learning-resources.md
@@ -303,17 +300,6 @@ surfaces:
   - docs-rework-dispatch
   - docs-skill-genesis
   - docs-spec-driven-development
-- id: docs-existing-project-onboarding
-  path: docs/existing-project-onboarding.md
-  type: markdown
-  title: Existing-Project Onboarding
-  last_modified: '2026-08-07'
-  diataxis: tutorial
-  audience: developer
-  renderer: tutorial_shell
-  surfaces_referenced:
-  - docs-greenfield-onboarding
-  - docs-ml-training-onramp
 - id: docs-external-api-docs
   path: docs/external-api-docs.md
   type: markdown
@@ -326,33 +312,18 @@ surfaces:
   path: docs/getting-started.md
   type: markdown
   title: Getting Started
-  last_modified: '2026-06-25'
+  last_modified: '2026-08-30'
   diataxis: tutorial
   audience: developer
   renderer: tutorial_shell
   surfaces_referenced:
   - docs-architecture
   - docs-claude-ecosystem-learning-resources
-  - docs-existing-project-onboarding
   - docs-external-api-docs
-  - docs-greenfield-onboarding
+  - docs-onboarding
   - docs-spec-driven-development
   - readme
   - readme-dev
-- id: docs-greenfield-onboarding
-  path: docs/greenfield-onboarding.md
-  type: markdown
-  title: Greenfield Project Onboarding
-  last_modified: '2026-08-07'
-  diataxis: tutorial
-  audience: developer
-  renderer: tutorial_shell
-  surfaces_referenced:
-  - ai-state-decisions-053-prompt-over-template-greenfield-scaffold
-  - docs-architecture
-  - docs-existing-project-onboarding
-  - docs-external-api-docs
-  - docs-ml-training-onramp
 - id: docs-independent-analysis-cursor-ci-autofix-research-brief
   path: docs/independent-analysis/cursor-ci-autofix-research-brief.md
   type: markdown
@@ -413,7 +384,7 @@ surfaces:
   path: docs/ml-training-onramp.md
   type: markdown
   title: ML Training Onramp
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-30'
   diataxis: tutorial
   audience: developer
   renderer: tutorial_shell
@@ -448,10 +419,23 @@ surfaces:
   path: docs/obsidian-integration.md
   type: markdown
   title: Obsidian integration
-  last_modified: '2026-05-22'
+  last_modified: '2026-08-30'
   diataxis: reference
   audience: operator
   renderer: reference_shell
+- id: docs-onboarding
+  path: docs/onboarding.md
+  type: markdown
+  title: Project Onboarding
+  last_modified: '2026-08-30'
+  diataxis: how-to
+  audience: developer
+  renderer: how_to_shell
+  surfaces_referenced:
+  - ai-state-decisions-053-prompt-over-template-greenfield-scaffold
+  - ai-state-decisions-054-separate-new-cc-project-from-install
+  - ai-state-decisions-055-hybrid-bash-slash-command-orchestration
+  - ai-state-decisions-decisions-index
 - id: docs-rework-dispatch
   path: docs/rework-dispatch.md
   type: markdown
@@ -466,12 +450,13 @@ surfaces:
   path: docs/rules-taxonomy.md
   type: markdown
   title: Rules Taxonomy and Disable Guide
-  last_modified: '2026-06-25'
+  last_modified: '2026-08-30'
   diataxis: reference
   audience: developer
   renderer: reference_shell
   surfaces_referenced:
   - docs-architecture
+  - docs-onboarding
 - id: docs-skill-genesis
   path: docs/skill-genesis.md
   type: markdown
@@ -542,7 +527,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-08-24'
+  last_modified: '2026-08-30'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -2602,6 +2587,48 @@ surfaces:
   title: "Two regimes for weakly-grounded Rust guidance \u2014 contested practices ship as per-project ADR prompts; no-source-exists content ships as conditioned decision procedures"
   last_modified: '2026-08-30'
   renderer: adr_card
+- id: ai-state-decisions-340-onboarding-commands-to-skill
+  path: .ai-state/decisions/340-onboarding-commands-to-skill.md
+  type: markdown
+  title: Unify the two onboarding commands into one user-invocable skill plus one entry script
+  last_modified: '2026-08-30'
+  renderer: adr_card
+- id: ai-state-decisions-341-onboarding-hackathon-mode-signal-promotion
+  path: .ai-state/decisions/341-onboarding-hackathon-mode-signal-promotion.md
+  type: markdown
+  title: Persist the onboarding mode in the onboard stamp and make hackathon promotion mechanical
+  last_modified: '2026-08-30'
+  renderer: adr_card
+- id: ai-state-decisions-342-onboarding-phase-id-stability
+  path: .ai-state/decisions/342-onboarding-phase-id-stability.md
+  type: markdown
+  title: Preserve onboarding phase identifiers verbatim across the skill migration
+  last_modified: '2026-08-30'
+  renderer: adr_card
+- id: ai-state-decisions-343-onboarding-single-idempotency-mechanism
+  path: .ai-state/decisions/343-onboarding-single-idempotency-mechanism.md
+  type: markdown
+  title: One idempotency mechanism for canonical CLAUDE.md blocks; one embedding site for the canonical-block sync
+  last_modified: '2026-08-30'
+  renderer: adr_card
+- id: ai-state-decisions-344-greenfield-permissions-baseline-seed
+  path: .ai-state/decisions/344-greenfield-permissions-baseline-seed.md
+  type: markdown
+  title: Seed the permissions baseline at greenfield scaffold time; hoist Phase 5b ahead of the seed pipeline
+  last_modified: '2026-08-30'
+  renderer: adr_card
+- id: ai-state-decisions-345-onboarding-gate-consolidation-profile-model
+  path: .ai-state/decisions/345-onboarding-gate-consolidation-profile-model.md
+  type: markdown
+  title: Onboarding gate consolidation via a single detection-defaulted Profile question
+  last_modified: '2026-08-30'
+  renderer: adr_card
+- id: ai-state-decisions-346-unified-onboard-cli-contract
+  path: .ai-state/decisions/346-unified-onboard-cli-contract.md
+  type: markdown
+  title: "Unified onboard CLI contract \u2014 argument-presence mode selection and capability-ID flags"
+  last_modified: '2026-08-30'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -2863,9 +2890,7 @@ groups:
 - id: tutorial
   label: Tutorials (learning by doing)
   surface_ids:
-  - docs-existing-project-onboarding
   - docs-getting-started
-  - docs-greenfield-onboarding
   - docs-ml-training-onramp
 - id: how-to
   label: How-to guides
@@ -2873,6 +2898,7 @@ groups:
   - docs-cursor-compat
   - docs-external-api-docs
   - docs-observability
+  - docs-onboarding
   - docs-skill-genesis
 - id: reference
   label: Reference
@@ -3244,6 +3270,13 @@ groups:
   - ai-state-decisions-337-language-dispatching-format-hook
   - ai-state-decisions-338-rust-onboarding-integration
   - ai-state-decisions-339-rust-contested-areas-adr-prompts
+  - ai-state-decisions-340-onboarding-commands-to-skill
+  - ai-state-decisions-341-onboarding-hackathon-mode-signal-promotion
+  - ai-state-decisions-342-onboarding-phase-id-stability
+  - ai-state-decisions-343-onboarding-single-idempotency-mechanism
+  - ai-state-decisions-344-greenfield-permissions-baseline-seed
+  - ai-state-decisions-345-onboarding-gate-consolidation-profile-model
+  - ai-state-decisions-346-unified-onboard-cli-contract
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

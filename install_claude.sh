@@ -290,10 +290,11 @@ relink_all() {
         info "Scripts: ${scripts_count} files linked"
     fi
 
-    # 4. new-project entry (parked at repo root, not scripts/)
-    if [ -f "${SCRIPT_DIR}/new_project.sh" ] && [ -x "${SCRIPT_DIR}/new_project.sh" ]; then
+    # 4. onboard-project entry (also linked by the generic scripts/ loop above;
+    # kept explicit for clarity since it is the single onboarding entry point)
+    if [ -f "${SCRIPT_DIR}/scripts/onboard-project" ] && [ -x "${SCRIPT_DIR}/scripts/onboard-project" ]; then
         mkdir -p "$bin_dir"
-        link_item "${SCRIPT_DIR}/new_project.sh" "${bin_dir}/new-project" "new-project (greenfield project entry)"
+        link_item "${SCRIPT_DIR}/scripts/onboard-project" "${bin_dir}/onboard-project" "onboard-project (project onboarding entry)"
     fi
 
     # PATH check for scripts
@@ -547,7 +548,7 @@ complete_install_from_plugin() {
     # ---- CLI scripts ----
     printf "\n  ${B}[1] Symlink CLI scripts to ~/.local/bin/?${R}\n"
     printf "      ${D}check_id_citation_discipline.py, praxion-parallel (multi-session launcher),\n"
-    printf "      chronograph-ctl, phoenix-ctl, new-project — runnable from any\n"
+    printf "      chronograph-ctl, phoenix-ctl, onboard-project — runnable from any\n"
     printf "      shell. Filters internal helpers (merge drivers, git hooks).${R}\n"
     printf "  ${B}[2] Skip scripts${R}\n"
     ask 1 2
@@ -568,10 +569,11 @@ complete_install_from_plugin() {
         done
         info "Scripts: ${scripts_count} files linked"
 
-        # new-project (parked at repo root)
-        if [ -f "${SCRIPT_DIR}/new_project.sh" ] && [ -x "${SCRIPT_DIR}/new_project.sh" ]; then
-            ln -sf "${SCRIPT_DIR}/new_project.sh" "${bin_dir}/new-project"
-            info "new-project: linked"
+        # onboard-project (also linked by the generic scripts/ loop above;
+        # kept explicit for clarity since it is the single onboarding entry point)
+        if [ -f "${SCRIPT_DIR}/scripts/onboard-project" ] && [ -x "${SCRIPT_DIR}/scripts/onboard-project" ]; then
+            ln -sf "${SCRIPT_DIR}/scripts/onboard-project" "${bin_dir}/onboard-project"
+            info "onboard-project: linked"
         fi
 
         if [[ ":$PATH:" != *":${HOME}/.local/bin:"* ]]; then
@@ -1129,12 +1131,13 @@ check_claude_code() {
         fi
     done
 
-    # new-project entry (lives at repo root, not scripts/)
-    if [ -f "${SCRIPT_DIR}/new_project.sh" ] && [ -x "${SCRIPT_DIR}/new_project.sh" ]; then
-        if [ -L "${bin_dir}/new-project" ] && [ "$(readlink "${bin_dir}/new-project")" = "${SCRIPT_DIR}/new_project.sh" ]; then
-            info "new-project linked"
+    # onboard-project entry (also covered by the generic scripts/ loop above;
+    # kept explicit since it is the single onboarding entry point)
+    if [ -f "${SCRIPT_DIR}/scripts/onboard-project" ] && [ -x "${SCRIPT_DIR}/scripts/onboard-project" ]; then
+        if [ -L "${bin_dir}/onboard-project" ] && [ "$(readlink "${bin_dir}/onboard-project")" = "${SCRIPT_DIR}/scripts/onboard-project" ]; then
+            info "onboard-project linked"
         else
-            warn "new-project not linked to ~/.local/bin/"
+            warn "onboard-project not linked to ~/.local/bin/"
             healthy=false
         fi
     fi
@@ -1428,9 +1431,6 @@ dry_run_claude_code() {
     for script in "${SCRIPT_DIR}/scripts"/*; do
         [ -f "$script" ] && printf "    %s\n" "$(basename "$script")"
     done
-    if [ -f "${SCRIPT_DIR}/new_project.sh" ]; then
-        printf "    new_project.sh -> ~/.local/bin/new-project (greenfield project entry)\n"
-    fi
     printf "\n"
 }
 

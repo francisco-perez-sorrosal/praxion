@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-31T04:34:59Z'
+generated_at: '2026-08-31T06:05:14Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -2629,6 +2629,12 @@ surfaces:
   title: "Unified onboard CLI contract \u2014 argument-presence mode selection and capability-ID flags"
   last_modified: '2026-08-30'
   renderer: adr_card
+- id: ai-state-decisions-347-adr-retrieval-query-tool
+  path: .ai-state/decisions/347-adr-retrieval-query-tool.md
+  type: markdown
+  title: ADR retrieval ships as a standalone affected_files query script, not index-schema or hook-scoring changes
+  last_modified: '2026-08-30'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3265,6 +3271,7 @@ groups:
   - ai-state-decisions-344-greenfield-permissions-baseline-seed
   - ai-state-decisions-345-onboarding-gate-consolidation-profile-model
   - ai-state-decisions-346-unified-onboard-cli-contract
+  - ai-state-decisions-347-adr-retrieval-query-tool
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

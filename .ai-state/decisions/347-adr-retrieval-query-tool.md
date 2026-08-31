@@ -1,7 +1,7 @@
 ---
-id: dec-draft-d634d65a
+id: dec-347
 title: ADR retrieval ships as a standalone affected_files query script, not index-schema or hook-scoring changes
-status: proposed
+status: accepted
 category: architectural
 date: 2026-08-30
 summary: affected_files-gated ADR retrieval lands as scripts/query_adrs.py (stdlib-capable, current-streamline default view) plus one Discovery Protocol line; index schema and inject_decisions.py scoring stay unchanged

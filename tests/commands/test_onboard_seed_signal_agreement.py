@@ -28,7 +28,11 @@ SEED_PIPELINE_FILE = (
 _SCRIPT_TRAILER_KEY_RE = re.compile(r"^# ([A-Za-z ]+): \$\{", re.MULTILINE)
 
 # Matches backtick-fenced `` `# Mode:` `` / `` `# Capabilities:` `` citations.
-_DOC_SIGNAL_KEY_RE = re.compile(r"`# ([A-Za-z ]+):`")
+# Captures the key of any backticked trailer-signal citation, with or without a
+# value after the colon — the original defect wrote `# Hackathon mode: true`
+# (value-bearing), which a colon-then-backtick-only pattern cannot see, making
+# the subset check vacuous on exactly the file it was written to catch.
+_DOC_SIGNAL_KEY_RE = re.compile(r"`# ([A-Za-z ]+):[^`]*`")
 
 
 def _script_body() -> str:

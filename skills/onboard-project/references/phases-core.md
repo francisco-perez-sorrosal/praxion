@@ -562,7 +562,7 @@ Do not recommend tools the user already has, and do not recommend `uv` if no Pyt
      3. Run /co to commit (the git-conventions rule will write a precise commit message), or unstage and review individually.
 
    Resources:
-     - docs/existing-project-onboarding.md (companion guide to this command — open it in the Praxion repo for the full walkthrough)
+     - docs/onboarding.md (companion guide — open it in the Praxion repo for the full walkthrough)
      - rules/swe/swe-agent-coordination-protocol.md (how the agent pipeline works)
    ```
 

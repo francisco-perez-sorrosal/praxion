@@ -30,6 +30,10 @@ version_files = [
     # on bump, which is the intended in-sync behavior).
     "pyproject.toml:^version = ",
 ]
+# Runs after version_files are rewritten and before the bump commit (which
+# uses `git commit -a`), so regenerated uv.lock files land inside the tagged
+# commit — without this, every release tag ships locks one version behind.
+pre_bump_hooks = ["scripts/sync_locks_on_bump.sh"]
 tag_format = "v$version"
 changelog_start_rev = "v0.0.0"
 annotated_tag = true

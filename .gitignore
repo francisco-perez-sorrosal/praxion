@@ -82,3 +82,7 @@ tmp/
 
 # Praxion carries no living ROADMAP.md — regenerated on demand by /roadmap (dec-092)
 ROADMAP.md
+
+# Release-workflow console capture (release.yml tees cz bump output here on the
+# runner); must stay untracked or cz's `git commit -a` folds it into the bump commit
+bump_output.txt

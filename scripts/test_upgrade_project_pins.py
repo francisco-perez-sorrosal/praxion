@@ -307,6 +307,47 @@ def test_non_praxion_driver_not_overwritten(project):
     assert "refusing to overwrite" in r.stdout
 
 
+def test_upgrade_preserves_the_mode_stamp_field(project):
+    """An upgrade run must rewrite only `onboarded_with_version` -- never `mode`.
+
+    The onboarding skill's Sub-step 5b.t stamp addition (`"mode": "full" |
+    "hackathon"`) records whether a project graduated from hackathon mode. A
+    pins upgrade that clobbered this field on every run would silently
+    un-promote every hackathon-graduated project the next time its plugin
+    version bumped -- the single highest-impact unmitigated risk flagged for
+    this reconciler.
+    """
+    repo, live = project["repo"], project["live"]
+    manifest_path = repo / ".ai-state" / ".praxion-onboard.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["mode"] = "hackathon"
+    manifest_path.write_text(json.dumps(manifest))
+
+    r = _run(repo, live)
+
+    assert r.returncode == 0, r.stderr
+    after = _manifest(repo)
+    assert after["mode"] == "hackathon"
+    assert after["onboarded_with_version"] == "0.9.0"
+
+
+def test_upgrade_leaves_an_absent_mode_field_absent(project):
+    """Back-compat: a pre-mode manifest must not gain a fabricated `mode` key.
+
+    Onboarding treats an absent `mode` as `"full"` by convention (additive,
+    back-compat stamp schema) -- the reconciler must not itself write that
+    default into the manifest, which would make a project's stamp diverge
+    from what onboarding actually recorded.
+    """
+    repo, live = project["repo"], project["live"]
+    assert "mode" not in _manifest(repo)
+
+    r = _run(repo, live)
+
+    assert r.returncode == 0, r.stderr
+    assert "mode" not in _manifest(repo)
+
+
 def test_refuses_non_onboarded_project(tmp_path: Path):
     repo = tmp_path / "bare"
     (repo / ".git").mkdir(parents=True)

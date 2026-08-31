@@ -124,7 +124,7 @@ The 7-step procedure agents follow when creating a fragment ADR (identity deriva
 
 Retrieval-first. An ungated full `Read` of `DECISIONS_INDEX.md` is **forbidden** — it grows unbounded with the corpus, running tens of thousands of tokens at a few hundred ADRs. Sole exception: a genuinely cross-cutting task a keyword scan would miss; say so when you take it.
 
-1. **Pre-scan**: `grep -in '<keyword>' .ai-state/decisions/DECISIONS_INDEX.md` per scope keyword (`tags`, `category`, affected paths, feature terms); read only matching rows via `offset`+`limit`
+1. **Pre-scan**: when file scope is known, prefer `python3 scripts/query_adrs.py --paths <files>` (or `--staged`) — it matches `affected_files` frontmatter and defaults to the current streamline (accepted + re-affirmation); otherwise `grep -in '<keyword>' .ai-state/decisions/DECISIONS_INDEX.md` per scope keyword (`tags`, `category`, affected paths, feature terms), reading only matching rows via `offset`+`limit`
 2. For in-flight work, also scan `.ai-state/decisions/drafts/` — drafts are not indexed but are authoritative during the pipeline that authored them
 3. Read full ADR files for matching decisions
 4. Fallback (if index missing): `Glob .ai-state/decisions/[0-9]*.md` + `Glob .ai-state/decisions/drafts/*.md` + Grep frontmatter

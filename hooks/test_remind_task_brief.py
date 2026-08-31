@@ -16,12 +16,25 @@ The advisory is also asserted to keep stdout empty on every path. That is not
 cosmetic: `inject_subagent_context.py` is the single `updatedInput` emitter
 registered on the same PreToolUse(Agent|Task) matcher, and a second emitter
 on one spawn is a resolved defect this hook must not reintroduce.
+
+**Coverage note (td-147):** subprocess-driven tests measure zero coverage
+under pytest-cov (see `skills/testing-strategy/references/python-testing.md`
+§ Subprocess-Driven Tests Measure Zero Coverage) -- no `COVERAGE_PROCESS_START`
+reaches the spawned process. The bulk of this file therefore drives
+`_process()`/`main()` in-process (module loaded via `importlib`, stdin/stderr
+monkeypatched); the `runpy.run_path(..., run_name="__main__")` tests exercise
+the real `if __name__ == "__main__":` guard, including its fail-open wrapper.
+A handful of subprocess tests are kept at the bottom as an end-to-end contract
+proof (real argv, real stdin, real exit code) -- they are not expected to move
+the coverage number.
 """
 
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
+import runpy
 import subprocess
 import sys
 from pathlib import Path
@@ -52,38 +65,17 @@ def _payload(
     prompt: str = "Task slug: auth-flow\n\nDesign the thing.",
     cwd: str,
     tool_name: str = "Agent",
-) -> str:
-    return json.dumps(
-        {
-            "tool_name": tool_name,
-            "cwd": cwd,
-            "session_id": "s1",
-            "tool_input": {
-                "subagent_type": subagent_type,
-                "description": "design",
-                "prompt": prompt,
-            },
-        }
-    )
-
-
-def _run(payload: str, cwd: Path, env_extra: dict[str, str] | None = None):
-    """Invoke the hook as the harness does: a subprocess fed JSON on stdin."""
-    import os
-
-    env = dict(os.environ)
-    env.pop("PRAXION_DISABLE_TASK_BRIEF_REMINDER", None)
-    if env_extra:
-        env.update(env_extra)
-    return subprocess.run(
-        [sys.executable, str(MODULE_PATH)],
-        input=payload,
-        capture_output=True,
-        text=True,
-        cwd=str(cwd),
-        env=env,
-        timeout=30,
-    )
+) -> dict:
+    return {
+        "tool_name": tool_name,
+        "cwd": cwd,
+        "session_id": "s1",
+        "tool_input": {
+            "subagent_type": subagent_type,
+            "description": "design",
+            "prompt": prompt,
+        },
+    }
 
 
 @pytest.fixture
@@ -95,94 +87,237 @@ def repo(tmp_path: Path) -> Path:
     return tmp_path
 
 
+def _drive_process(module, payload: dict, monkeypatch: pytest.MonkeyPatch) -> str:
+    """Call `_process()` in-process, capturing what it writes to stderr."""
+    buf = io.StringIO()
+    monkeypatch.setattr(sys, "stderr", buf)
+    module._process(payload)
+    return buf.getvalue()
+
+
+def _drive_main(module, payload_text: str, monkeypatch: pytest.MonkeyPatch) -> tuple[str, str]:
+    """Call `main()` in-process, capturing stdout and stderr."""
+    out, err = io.StringIO(), io.StringIO()
+    monkeypatch.setattr(sys, "stdin", io.StringIO(payload_text))
+    monkeypatch.setattr(sys, "stdout", out)
+    monkeypatch.setattr(sys, "stderr", err)
+    module.main()
+    return out.getvalue(), err.getvalue()
+
+
 # ---------------------------------------------------------------------------
-# Canary -- the gate bites on the bad input
+# Canary -- the gate bites on the bad input (in-process)
 # ---------------------------------------------------------------------------
 
 
-def test_canary_fires_when_brief_missing(repo: Path) -> None:
+def test_canary_fires_when_brief_missing(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """THE canary: architect spawn, slug present, TASK_BRIEF.md absent."""
     assert not (repo / ".ai-work" / "auth-flow" / "TASK_BRIEF.md").exists()
+    m = _load_module()
 
-    result = _run(_payload(cwd=str(repo)), repo)
+    stderr = _drive_process(m, _payload(cwd=str(repo)), monkeypatch)
 
-    assert result.returncode == 0, "the advisory must never block a spawn"
-    assert ADVISORY_PREFIX in result.stderr, (
+    assert ADVISORY_PREFIX in stderr, (
         "the gate did not bite: a systems-architect spawn for slug `auth-flow` "
         "with no .ai-work/auth-flow/TASK_BRIEF.md produced no advisory"
     )
-    assert ".ai-work/auth-flow/TASK_BRIEF.md" in result.stderr
-    assert result.stdout == "", "stdout must stay empty -- see module docstring"
+    assert ".ai-work/auth-flow/TASK_BRIEF.md" in stderr
 
 
-def test_canary_fires_for_implementation_planner(repo: Path) -> None:
-    result = _run(_payload(subagent_type="praxion:implementation-planner", cwd=str(repo)), repo)
-    assert ADVISORY_PREFIX in result.stderr
-
-
-def test_canary_fires_for_task_alias_and_bare_agent_name(repo: Path) -> None:
-    result = _run(
-        _payload(subagent_type="systems-architect", cwd=str(repo), tool_name="Task"),
-        repo,
+def test_canary_fires_for_implementation_planner(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    m = _load_module()
+    stderr = _drive_process(
+        m, _payload(subagent_type="praxion:implementation-planner", cwd=str(repo)), monkeypatch
     )
-    assert ADVISORY_PREFIX in result.stderr
+    assert ADVISORY_PREFIX in stderr
 
 
-def test_canary_fires_when_ai_work_slug_dir_does_not_exist_at_all(tmp_path: Path) -> None:
+def test_canary_fires_for_task_alias_and_bare_agent_name(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    m = _load_module()
+    stderr = _drive_process(
+        m,
+        _payload(subagent_type="systems-architect", cwd=str(repo), tool_name="Task"),
+        monkeypatch,
+    )
+    assert ADVISORY_PREFIX in stderr
+
+
+def test_canary_fires_when_ai_work_slug_dir_does_not_exist_at_all(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """First spawn of a pipeline: `.ai-work/<slug>/` has not been created yet."""
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
-    result = _run(_payload(cwd=str(tmp_path)), tmp_path)
-    assert ADVISORY_PREFIX in result.stderr
+    m = _load_module()
+    stderr = _drive_process(m, _payload(cwd=str(tmp_path)), monkeypatch)
+    assert ADVISORY_PREFIX in stderr
 
 
 # ---------------------------------------------------------------------------
-# Suppression -- the gate stays quiet when it should
+# Suppression -- the gate stays quiet when it should (in-process)
 # ---------------------------------------------------------------------------
 
 
-def test_silent_when_brief_exists(repo: Path) -> None:
+def test_silent_when_brief_exists(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     (repo / ".ai-work" / "auth-flow" / "TASK_BRIEF.md").write_text("# Task Brief\n")
-    result = _run(_payload(cwd=str(repo)), repo)
-    assert result.stderr == ""
-    assert result.stdout == ""
+    m = _load_module()
+    stderr = _drive_process(m, _payload(cwd=str(repo)), monkeypatch)
+    assert stderr == ""
 
 
-def test_silent_for_non_brief_consuming_stage(repo: Path) -> None:
+def test_silent_for_non_brief_consuming_stage(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """researcher runs at Lightweight too -- reminding there would misfire."""
-    result = _run(_payload(subagent_type="praxion:researcher", cwd=str(repo)), repo)
-    assert result.stderr == ""
-
-
-def test_silent_when_prompt_carries_no_task_slug(repo: Path) -> None:
-    result = _run(_payload(prompt="Design the thing.", cwd=str(repo)), repo)
-    assert result.stderr == ""
-
-
-def test_silent_for_non_agent_tool(repo: Path) -> None:
-    result = _run(_payload(cwd=str(repo), tool_name="Bash"), repo)
-    assert result.stderr == ""
-
-
-def test_silent_when_disabled_by_env(repo: Path) -> None:
-    result = _run(
-        _payload(cwd=str(repo)),
-        repo,
-        env_extra={"PRAXION_DISABLE_TASK_BRIEF_REMINDER": "1"},
+    m = _load_module()
+    stderr = _drive_process(
+        m, _payload(subagent_type="praxion:researcher", cwd=str(repo)), monkeypatch
     )
-    assert result.stderr == ""
+    assert stderr == ""
 
 
-def test_silent_outside_a_git_repo(tmp_path: Path) -> None:
-    result = _run(_payload(cwd=str(tmp_path)), tmp_path)
-    assert result.returncode == 0
-    assert result.stderr == ""
+def test_silent_when_prompt_carries_no_task_slug(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    m = _load_module()
+    stderr = _drive_process(m, _payload(prompt="Design the thing.", cwd=str(repo)), monkeypatch)
+    assert stderr == ""
 
 
-def test_malformed_stdin_exits_zero_silently(repo: Path) -> None:
-    result = _run("not json at all", repo)
-    assert result.returncode == 0
-    assert result.stdout == ""
-    assert result.stderr == ""
+def test_silent_for_non_agent_tool(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    m = _load_module()
+    stderr = _drive_process(m, _payload(cwd=str(repo), tool_name="Bash"), monkeypatch)
+    assert stderr == ""
+
+
+def test_silent_when_tool_input_is_not_a_dict(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    m = _load_module()
+    payload = _payload(cwd=str(repo))
+    payload["tool_input"] = "not-a-dict"
+    stderr = _drive_process(m, payload, monkeypatch)
+    assert stderr == ""
+
+
+def test_silent_when_disabled_by_env(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PRAXION_DISABLE_TASK_BRIEF_REMINDER", "1")
+    m = _load_module()
+    stderr = _drive_process(m, _payload(cwd=str(repo)), monkeypatch)
+    assert stderr == ""
+
+
+def test_silent_outside_a_git_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    m = _load_module()
+    stderr = _drive_process(m, _payload(cwd=str(tmp_path)), monkeypatch)
+    assert stderr == ""
+
+
+def test_silent_when_git_rev_parse_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`_repo_root` returns None on a non-zero git exit, not just a missing git."""
+    m = _load_module()
+
+    class _FakeCompleted:
+        returncode = 128
+        stdout = ""
+
+    monkeypatch.setattr(m.subprocess, "run", lambda *a, **k: _FakeCompleted(), raising=True)
+    stderr = _drive_process(m, _payload(cwd=str(tmp_path)), monkeypatch)
+    assert stderr == ""
+
+
+def test_silent_when_git_binary_is_unavailable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`_repo_root` degrades to None when `git` itself cannot be invoked."""
+    m = _load_module()
+
+    def _missing_binary(*_a, **_k):
+        raise FileNotFoundError("git not found")
+
+    monkeypatch.setattr(m.subprocess, "run", _missing_binary, raising=True)
+    stderr = _drive_process(m, _payload(cwd=str(tmp_path)), monkeypatch)
+    assert stderr == ""
+
+
+def test_silent_when_git_toplevel_output_is_blank(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A git call that succeeds but prints nothing must not resolve to a truthy root."""
+    m = _load_module()
+
+    class _FakeCompleted:
+        returncode = 0
+        stdout = "\n"
+
+    monkeypatch.setattr(m.subprocess, "run", lambda *a, **k: _FakeCompleted(), raising=True)
+    stderr = _drive_process(m, _payload(cwd=str(tmp_path)), monkeypatch)
+    assert stderr == ""
+
+
+# ---------------------------------------------------------------------------
+# main() -- stdin parsing, stdout emptiness (in-process)
+# ---------------------------------------------------------------------------
+
+
+def test_main_fires_advisory_on_stderr_and_keeps_stdout_empty(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    m = _load_module()
+    out, err = _drive_main(m, json.dumps(_payload(cwd=str(repo))), monkeypatch)
+    assert out == "", "stdout must stay empty -- see module docstring"
+    assert ADVISORY_PREFIX in err
+
+
+def test_main_malformed_stdin_is_silent(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    m = _load_module()
+    out, err = _drive_main(m, "not json at all", monkeypatch)
+    assert out == ""
+    assert err == ""
+
+
+@pytest.mark.parametrize("payload_text", ["[]", "null", '"a bare string"', "123"])
+def test_main_well_formed_non_object_payload_is_silent(
+    payload_text: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    m = _load_module()
+    out, err = _drive_main(m, payload_text, monkeypatch)
+    assert out == ""
+    assert err == ""
+
+
+# ---------------------------------------------------------------------------
+# Script boundary -- the __main__ guard's fail-open wrapper (runpy)
+# ---------------------------------------------------------------------------
+
+
+class TestHookNeverRaisesIntoTheHarness:
+    """The script boundary must swallow everything -- it runs on every spawn."""
+
+    @pytest.mark.parametrize(
+        "payload_text",
+        ["not-json-at-all", "[]", "null", '"a bare string"', "123", ""],
+    )
+    def test_hostile_stdin_is_swallowed_at_the_script_boundary(
+        self, payload_text: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(sys, "stdin", io.StringIO(payload_text))
+        runpy.run_path(str(MODULE_PATH), run_name="__main__")
+
+    def test_an_unexpected_exception_inside_main_does_not_propagate(
+        self, repo: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A collaborator raising something `_repo_root` does not catch (e.g. a
+        `RuntimeError` from `subprocess.run`) must still exit the script cleanly
+        -- that is the fail-open wrapper's whole job.
+        """
+        monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(_payload(cwd=str(repo)))))
+
+        def _boom(*_a, **_k):
+            raise RuntimeError("simulated collaborator failure")
+
+        monkeypatch.setattr(subprocess, "run", _boom)
+
+        runpy.run_path(str(MODULE_PATH), run_name="__main__")  # must not raise
 
 
 # ---------------------------------------------------------------------------
@@ -200,3 +335,53 @@ def test_namespaced_subagent_type_is_normalized() -> None:
     module = _load_module()
     assert module._normalize_stage("praxion:systems-architect") == "systems-architect"
     assert module._normalize_stage("systems-architect") == "systems-architect"
+
+
+def test_repo_root_resolves_the_real_toplevel(repo: Path) -> None:
+    module = _load_module()
+    assert module._repo_root(str(repo)) == repo.resolve() or module._repo_root(str(repo)) == Path(
+        str(repo)
+    )
+
+
+# ---------------------------------------------------------------------------
+# End-to-end contract proof (subprocess) -- real argv/stdin/exit code.
+#
+# Kept minimal deliberately: these do not move the coverage number (see the
+# module docstring's coverage note) and exist only to prove the script is
+# invocable exactly as the harness invokes it.
+# ---------------------------------------------------------------------------
+
+
+def _run_subprocess(payload: dict | str, cwd: Path, env_extra: dict[str, str] | None = None):
+    import os
+
+    env = dict(os.environ)
+    env.pop("PRAXION_DISABLE_TASK_BRIEF_REMINDER", None)
+    if env_extra:
+        env.update(env_extra)
+    text = payload if isinstance(payload, str) else json.dumps(payload)
+    return subprocess.run(
+        [sys.executable, str(MODULE_PATH)],
+        input=text,
+        capture_output=True,
+        text=True,
+        cwd=str(cwd),
+        env=env,
+        timeout=30,
+    )
+
+
+def test_subprocess_contract_fires_and_exits_zero(repo: Path) -> None:
+    result = _run_subprocess(_payload(cwd=str(repo)), repo)
+    assert result.returncode == 0, "the advisory must never block a spawn"
+    assert ADVISORY_PREFIX in result.stderr
+    assert result.stdout == ""
+
+
+def test_subprocess_contract_disabled_by_env_is_silent(repo: Path) -> None:
+    result = _run_subprocess(
+        _payload(cwd=str(repo)), repo, env_extra={"PRAXION_DISABLE_TASK_BRIEF_REMINDER": "1"}
+    )
+    assert result.returncode == 0
+    assert result.stderr == ""

@@ -1,3 +1,25 @@
+## v0.26.0 (2026-08-31)
+
+### Feat
+
+- **design**: advance the living-view checkpoint to dec-354
+- **living-view**: Step 19 — sentinel DL04/DL06 partial-edge coverage, DH06, carve-out retired
+- **adr-corpus**: convert five partial supersessions to first-class edges
+- **living-view**: batch 4 — narrowing renderers, graph edges, liveness warning
+- **living-view**: batch 3 — partial-supersession schema + status_edge_conflicts enforcer
+- **living-view**: batch 2 — checkpoint validator, consumer wiring, propagation
+- **living-view**: batch 1 — DESIGN.md navigation, loader category, checkpoint docs
+- **architecture**: Q3 revision post-consult + consult bookkeeping + td-150
+- **architecture**: adr-living-view stage — checkpoint design + 4 ADR drafts
+- **adr-query**: affected_files-gated ADR retrieval tool
+- **context**: retrieval-first ADR discovery + fetched-content hygiene
+- **adr-finalize**: exclude frozen docs/independent-analysis from cross-ref sweep
+
+### Fix
+
+- **consult**: seal-witness points at the tombstone-bearing commit
+- **living-view**: verification findings — all 5 FAILs + 4 WARNs closed
+
 ## v0.25.0 (2026-08-31)
 
 ### Feat

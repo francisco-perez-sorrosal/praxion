@@ -31,7 +31,9 @@ Decisions are captured as individual Markdown files in `.ai-state/decisions/`, e
   002-otel-relay-architecture.md
   003-phoenix-isolated-venv.md
   ...
-  DECISIONS_INDEX.md         # Auto-generated summary table
+  drafts/                    # In-flight, pipeline-authored ADRs (pre-finalize)
+    20260830-1200-fperez-adr-living-view-slug.md
+  DECISIONS_INDEX.md         # Auto-generated summary table (finalized records only)
 ```
 
 ### Who Writes ADRs
@@ -40,18 +42,23 @@ Decisions are captured as individual Markdown files in `.ai-state/decisions/`, e
 |-------|------|-------|
 | systems-architect | Trade-off analysis (Phase 4) | System boundaries, data model, technology selection, security |
 | implementation-planner | Step decomposition | Step ordering, module structure, approach decisions |
-| user | Direct tier or manual | Any decision worth preserving |
+| interface-designer | Trade-off analysis (Phase 4) | Interface-layer decisions: UI framework, API paradigm, MCP tool decomposition, error format |
+| orchestrator | Direct/Lightweight tier, no pipeline agent spawned | Any decision worth preserving during an interactive session |
+| user | Manual (no session, no agent) | Any decision worth preserving |
 
-All ADR authors also record decisions in `LEARNINGS.md ### Decisions Made`. The implementer and test-engineer record decisions in `LEARNINGS.md` only -- they do not create ADR files (the planner/architect handle persistence).
+All ADR authors also record decisions in `LEARNINGS.md ### Decisions Made`. The implementer and test-engineer record decisions in `LEARNINGS.md` only -- they do not create ADR files (the planner/architect/designer/orchestrator handle persistence).
 
 ### How ADRs Are Written
 
-Agents create ADR files directly using the Write tool:
+Pipeline-authored ADRs (systems-architect, implementation-planner, interface-designer, or the orchestrator inside a Standard/Full-tier pipeline) follow **fragment-name-at-create, finalize-at-merge**:
 
-1. Scan `.ai-state/decisions/` for the highest existing sequence number
-2. Create `.ai-state/decisions/<NNN+1>-<slug>.md` with frontmatter and MADR body
-3. Record the same decision in `LEARNINGS.md ### Decisions Made`
-4. Regenerate `DECISIONS_INDEX.md` via `python scripts/regenerate_adr_index.py`
+1. Write the ADR as a fragment at `.ai-state/decisions/drafts/<YYYYMMDD-HHMM>-<user>-<branch>-<slug>.md` with a provisional `id: dec-draft-<8-char-hash>` and `status: proposed`
+2. Record the same decision in `LEARNINGS.md ### Decisions Made`, citing the `dec-draft-<hash>` id
+3. Do **not** invoke `scripts/regenerate_adr_index.py` manually -- `DECISIONS_INDEX.md` regenerates automatically at finalize
+
+At merge-to-main, `scripts/finalize_adrs.py` (invoked by the post-merge git hook or `/merge-worktree`) promotes each draft to `.ai-state/decisions/<NNN>-<slug>.md`, assigns the sequence number, rewrites `dec-draft-<hash>` cross-references to `dec-NNN` across the bounded citing surface, and regenerates the index.
+
+Manual, no-session ADRs (hand-authored with no session or agent involved) may skip the draft stage and be created directly at `.ai-state/decisions/<NNN>-<slug>.md` -- this path is deprecated for pipeline-authored ADRs. See [`adr-conventions.md`](../rules/swe/adr-conventions.md) for the full schema and finalize protocol.
 
 No external CLI tool or API key is required -- the Write tool is sufficient.
 
@@ -61,37 +68,31 @@ A lightweight `PreToolUse` hook (`adr_reminder.py`) checks at commit time whethe
 
 ## ADR File Format
 
-Each ADR file has YAML frontmatter with required fields (`id`, `title`, `status`, `category`, `date`, `summary`, `tags`, `made_by`) and a MADR body with four sections:
+Each ADR file has YAML frontmatter with required fields (`id`, `title`, `status`, `category`, `date`, `summary`, `tags`, `made_by`) and a MADR body with four sections plus a conditional fifth:
 
 1. **Context** -- what prompted the decision
 2. **Decision** -- what was decided
 3. **Considered Options** -- alternatives with pros/cons
 4. **Consequences** -- positive and negative outcomes
+5. **Disconfirmation** -- always-on for `category: architectural`; falsifier, steelmanned runner-up, reversal trigger
 
-Statuses: `proposed`, `accepted`, `superseded`, `rejected`.
+Statuses: `proposed`, `accepted`, `superseded`, `rejected`, `re-affirmation`, `retired`.
 
 Categories: `architectural`, `behavioral`, `implementation`, `configuration`.
 
-When a decision supersedes a prior one, both ADR files get bidirectional pointers (`supersedes` / `superseded_by` fields) and the old ADR's status changes to `superseded`.
+When a decision supersedes a prior one, both ADR files get bidirectional pointers (`supersedes` / `superseded_by` fields) and the old ADR's status changes to `superseded`. Re-affirmation and retirement follow parallel protocols -- see [`adr-conventions.md`](../rules/swe/adr-conventions.md) for the full set.
 
 ## Discovery and Index
 
-`DECISIONS_INDEX.md` is an auto-generated table with columns: ID, Title, Status, Category, Date, Tags, and Summary. It provides a single-read overview for both humans and agents.
+`DECISIONS_INDEX.md` is an auto-generated table (columns: ID, Title, Status, Category, Date, Tags, Summary) covering **finalized** records only -- it regenerates automatically at merge-to-main finalize and is never hand-edited or manually invoked.
 
-Agents discover decisions by:
+Discovery is retrieval-first, not index-first. An ungated full `Read` of `DECISIONS_INDEX.md` is forbidden once the corpus grows past a keyword scan's blind spot -- the index has no upper bound and can run to tens of thousands of tokens. Agents discover decisions by:
 
-1. Reading `DECISIONS_INDEX.md` for overview
-2. Grepping for matching `category`, `tags`, or `affected_files`
-3. Reading full ADR files for details
-4. Fallback (if index missing): `Glob .ai-state/decisions/[0-9]*.md` + Grep frontmatter
+1. **Pre-scan**: prefer `python3 scripts/query_adrs.py --paths <files>` (or `--staged`) when the file scope is known -- it matches `affected_files` frontmatter and defaults to the current streamline (accepted + re-affirmation); otherwise `grep -in '<keyword>' .ai-state/decisions/DECISIONS_INDEX.md` per scope keyword (tags, category, affected paths, feature terms), reading only matching rows via `offset`+`limit`
+2. For in-flight work, also scan `.ai-state/decisions/drafts/` -- drafts are not indexed but are authoritative during the pipeline that authored them
+3. Read full ADR files for matching decisions
+4. Fallback (if index missing): `Glob .ai-state/decisions/[0-9]*.md` + `Glob .ai-state/decisions/drafts/*.md` + Grep frontmatter
 
 ## Ecosystem Consumption
 
-Four downstream agents consume ADR files:
-
-| Consumer          | How It Uses Decisions                                                                          |
-| ----------------- | ---------------------------------------------------------------------------------------------- |
-| sentinel          | DL01-DL05: validates ADR directory, frontmatter, body sections, index consistency, frequency   |
-| skill-genesis     | Recurring decision patterns across features become candidates for rules or skills               |
-| verifier          | Cross-references `affected_reqs` against the traceability matrix during post-implementation review |
-| systems-architect | Reads prior feature decisions as brownfield baseline for new architecture work                   |
+See [`adr-conventions.md § Consumption`](../rules/swe/adr-conventions.md#consumption) for the authoritative, per-consumer table (sentinel's DL0x range, skill-genesis, verifier, systems-architect, and `architect-validator`'s code↔DSL↔ADR triangle check) -- kept there to avoid duplicating a table that drifts whenever a consumer's check set changes.

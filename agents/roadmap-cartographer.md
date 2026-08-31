@@ -61,7 +61,7 @@ The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.
 - Project root: `CLAUDE.md`, `AGENTS.md`, `README.md`, primary manifest (`pyproject.toml`, `package.json`, `Cargo.toml`, `go.mod`)
 - Ecosystem: `Glob skills/*/SKILL.md`, `Glob agents/*.md`, `Glob rules/**/*.md`, `Glob commands/*`, `Glob hooks/*`, `.claude-plugin/plugin.json`
 - CI/tests: `.github/workflows/*`, `tests/**`
-- State: `.ai-state/DESIGN.md`, `.ai-state/decisions/DECISIONS_INDEX.md` (grows unbounded — **pre-scan with `grep -in '<keyword>' .ai-state/decisions/DECISIONS_INDEX.md` before reading it whole**, then read only matching rows via `offset`+`limit`), latest `.ai-state/sentinel_reports/SENTINEL_REPORT_*.md` (via `.ai-state/sentinel_reports/SENTINEL_LOG.md`)
+- State: `.ai-state/DESIGN.md`, `.ai-state/decisions/DECISIONS_INDEX.md` (grows unbounded — prefer `python3 scripts/query_adrs.py --paths <files>` when scope is known, otherwise **pre-scan with `grep -in '<keyword>' .ai-state/decisions/DECISIONS_INDEX.md` before reading it whole**, then read only matching rows via `offset`+`limit`), latest `.ai-state/sentinel_reports/SENTINEL_REPORT_*.md` (via `.ai-state/sentinel_reports/SENTINEL_LOG.md`)
 - Existing roadmap (for `diff` mode): `ROADMAP.md` at project root
 
 Mode is passed from the command as a single token:

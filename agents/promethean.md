@@ -80,7 +80,7 @@ Build a picture of what exists from three information sources:
 - Rules: `Glob rules/**/*.md` — list and count
 - Plugin config: `.claude-plugin/plugin.json`
 - Archived specs: `Glob .ai-state/specs/SPEC_*.md` — review completed feature specs for context on prior formal specifications and decisions
-- Past decisions: `.ai-state/decisions/DECISIONS_INDEX.md` — the index grows unbounded, so **pre-scan with `grep -in '<keyword>' .ai-state/decisions/DECISIONS_INDEX.md` before reading it whole** (read only matching rows via `offset`+`limit`); scan for rejected alternatives and superseded decisions to avoid re-proposing ideas that were already evaluated and declined
+- Past decisions: `.ai-state/decisions/DECISIONS_INDEX.md` — the index grows unbounded. Prefer `python3 scripts/query_adrs.py --paths <files>` (or `--staged`) when scope is known; otherwise **pre-scan with `grep -in '<keyword>' .ai-state/decisions/DECISIONS_INDEX.md` before reading it whole** (read only matching rows via `offset`+`limit`); scan for rejected alternatives and superseded decisions to avoid re-proposing ideas that were already evaluated and declined
 - Architecture context: `.ai-state/DESIGN.md` — if present, read for design intent, system structure, and component inventory (includes planned components). Also check `docs/architecture.md` — if present, read for verified current component inventory with filesystem-confirmed file paths
 - Structure gaps: thin or missing categories
 

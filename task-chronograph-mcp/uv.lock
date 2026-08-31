@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.13"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -971,7 +971,7 @@ wheels = [
 
 [[package]]
 name = "task-chronograph-mcp"
-version = "0.26.1"
+version = "0.26.2"
 source = { editable = "." }
 dependencies = [
     { name = "arize-phoenix-otel" },

@@ -1,3 +1,9 @@
+## v0.26.2 (2026-08-31)
+
+### Fix
+
+- **release**: regenerate uv lockfiles inside the tagged bump commit
+
 ## v0.26.1 (2026-08-31)
 
 ### Fix

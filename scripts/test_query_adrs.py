@@ -43,6 +43,7 @@ def _write_adr(
     summary: str = "a summary",
     tags: list[str] | None = None,
     affected_files: list[str] | None = None,
+    superseded_in_part_by: list[str] | None = None,
 ) -> Path:
     decisions_dir.mkdir(parents=True, exist_ok=True)
     body = FRONTMATTER.format(
@@ -55,6 +56,15 @@ def _write_adr(
         tags=", ".join(tags or []),
         affected_files=", ".join(f'"{f}"' for f in (affected_files or [])),
     )
+    if superseded_in_part_by:
+        narrowing_list = ", ".join(f'"{n}"' for n in superseded_in_part_by)
+        # Inserted before the closing frontmatter fence -- appended, never
+        # interleaved, so every other field's position stays stable across
+        # tests that don't care about narrowing.
+        body = body.replace(
+            "---\n\n# Body\n",
+            f"superseded_in_part_by: [{narrowing_list}]\n---\n\n# Body\n",
+        )
     path = decisions_dir / filename
     path.write_text(body, encoding="utf-8")
     return path
@@ -521,3 +531,102 @@ def test_help_exits_0(capsys):
         query_adrs.main(["--help"])
     assert exc_info.value.code == 0
     assert "EXAMPLES" in capsys.readouterr().out
+
+
+# -- Narrowing caveat (superseded_in_part_by) ---------------------------------
+
+
+def test_narrowed_record_stays_in_default_view_with_caveat(decisions_dir, capsys):
+    # A record carrying `superseded_in_part_by` is a live, narrowed decision --
+    # it must still surface under the default (non-`--all`) status view, with
+    # a caveat naming the narrowing id, not silently disappear the way a
+    # naive `DEFAULT_STATUSES` exclusion would hide it.
+    _write_adr(
+        decisions_dir,
+        "203-narrowed.md",
+        adr_id="dec-203",
+        status="accepted",
+        tags=["x"],
+        superseded_in_part_by=["dec-328"],
+    )
+
+    exit_code = query_adrs.main(["--tags", "x", "--repo-root", str(decisions_dir.parent.parent)])
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "dec-203" in out
+    assert "dec-328" in out
+
+
+def test_record_without_narrowing_field_carries_no_caveat(decisions_dir, capsys):
+    _write_adr(decisions_dir, "001-a.md", adr_id="dec-001", status="accepted", tags=["x"])
+
+    exit_code = query_adrs.main(["--tags", "x", "--repo-root", str(decisions_dir.parent.parent)])
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "dec-001" in out
+    assert "narrowed" not in out.lower()
+
+
+def test_narrowing_caveat_present_in_tsv_output(decisions_dir, capsys):
+    _write_adr(
+        decisions_dir,
+        "203-narrowed.md",
+        adr_id="dec-203",
+        status="accepted",
+        title="A narrowed decision",
+        tags=["x"],
+        superseded_in_part_by=["dec-328"],
+    )
+
+    exit_code = query_adrs.main(
+        ["--tags", "x", "--format", "tsv", "--repo-root", str(decisions_dir.parent.parent)]
+    )
+
+    assert exit_code == 0
+    out = capsys.readouterr().out.strip()
+    # tsv is decoration-free per its contract (test_tsv_format_has_no_decoration) --
+    # the caveat must still be present as data, naming the narrowing id, without
+    # introducing a stray extra column that breaks existing tsv consumers'
+    # fixed-width parsing.
+    assert "dec-328" in out
+    fields = out.split("\t")
+    assert fields[0] == "dec-203"
+
+
+def test_narrowing_caveat_unaffected_record_tsv_matches_pre_change_shape(decisions_dir, capsys):
+    # Non-regression: a record with no narrowing field keeps the exact
+    # 4-column tsv shape asserted by test_tsv_format_has_no_decoration.
+    _write_adr(decisions_dir, "001-a.md", adr_id="dec-001", title="A title", tags=["x"])
+
+    exit_code = query_adrs.main(
+        ["--tags", "x", "--format", "tsv", "--repo-root", str(decisions_dir.parent.parent)]
+    )
+
+    assert exit_code == 0
+    out = capsys.readouterr().out.strip()
+    assert out == "dec-001\taccepted\tA title\t.ai-state/decisions/001-a.md"
+
+
+def test_all_flag_still_shows_narrowing_caveat(decisions_dir, capsys):
+    # --all's status expansion and the narrowing caveat are independent
+    # concerns -- a record reachable only via --all must still carry the
+    # caveat when it also carries superseded_in_part_by.
+    _write_adr(
+        decisions_dir,
+        "203-narrowed.md",
+        adr_id="dec-203",
+        status="superseded",  # old, incorrect encoding -- reachable via --all only
+        tags=["x"],
+        superseded_in_part_by=["dec-328"],
+    )
+
+    exit_code = query_adrs.main(
+        ["--tags", "x", "--all", "--repo-root", str(decisions_dir.parent.parent)]
+    )
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "dec-203" in out
+    assert "dec-328" in out

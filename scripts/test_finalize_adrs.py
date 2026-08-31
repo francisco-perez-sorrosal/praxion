@@ -801,6 +801,41 @@ class TestFinalizeCrossReferences:
         # Untouched: the draft id literal still present, no dec-088 injected.
         assert fixture.read_text(encoding="utf-8") == original
 
+    def test_frontmatter_supersedes_in_part_list_rewritten(self, repo_root: Path) -> None:
+        """AC-16 regression: `supersedes_in_part: [dec-draft-<hash>]` rewrites
+        to `dec-NNN` at finalize.
+
+        Pins the field-agnostic rewrite behaviour documented in
+        `SYSTEMS_PLAN.md § Architecture Gap Found`: `rewrite_cross_references`
+        performs a whole-file string replacement with no frontmatter field
+        list, so it already covers `supersedes_in_part` for free. This test
+        exists so a future narrowing of the rewrite to an explicit field
+        allowlist -- which would silently strand this id -- fails loudly
+        instead of shipping unnoticed.
+        """
+        draft_b = make_draft(repo_root, "20260419-1810", "alice", "main", "narrowing-target")
+        draft_b_id = f"dec-draft-{_draft_hash(draft_b.name)}"
+
+        draft_a = make_draft(
+            repo_root,
+            "20260419-1811",
+            "alice",
+            "main",
+            "narrowed",
+            frontmatter_extra={"supersedes_in_part": f"[{draft_b_id}]"},
+        )
+
+        new_path_b, old_id_b = finalize.promote_draft(draft_b, 1, repo_root)
+        assert old_id_b == draft_b_id
+        _ = new_path_b
+
+        count = finalize.rewrite_cross_references(repo_root, old_id_b, "dec-001")
+        assert count >= 1
+
+        draft_a_content = draft_a.read_text(encoding="utf-8")
+        assert "supersedes_in_part: [dec-001]" in draft_a_content
+        assert draft_b_id not in draft_a_content
+
     def test_system_deployment_refs_rewritten(self, repo_root: Path) -> None:
         """.ai-state/SYSTEM_DEPLOYMENT.md is in the rewrite scope.
 

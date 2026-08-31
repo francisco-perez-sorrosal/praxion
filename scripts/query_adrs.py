@@ -74,6 +74,7 @@ class AdrRecord:
     summary: str
     category: str
     affected_files: tuple[str, ...]
+    superseded_in_part_by: tuple[str, ...]  # narrowing ids; record stays live, not fully superseded
     file: str  # repo-relative, posix separators
 
 
@@ -213,6 +214,7 @@ def load_adr(path: Path, repo_root: Path, yaml_module) -> AdrRecord | None:
         summary=str(data.get("summary", "")).strip(),
         category=str(data.get("category", "")).strip(),
         affected_files=tuple(_as_list(data.get("affected_files"))),
+        superseded_in_part_by=tuple(_as_list(data.get("superseded_in_part_by"))),
         file=path.relative_to(repo_root).as_posix(),
     )
 
@@ -324,9 +326,19 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _narrowing_caveat(record: AdrRecord) -> str | None:
+    """`narrowed by dec-NNN[, dec-MMM...]`, or None when the record is unaffected."""
+    if not record.superseded_in_part_by:
+        return None
+    return "narrowed by " + ", ".join(record.superseded_in_part_by)
+
+
 def _print_text(matches: list[tuple[AdrRecord, str]]) -> None:
     for record, matched in matches:
         print(f"{record.id} | {record.status} | {record.title}")
+        caveat = _narrowing_caveat(record)
+        if caveat is not None:
+            print(f"  {caveat}")
         print(f"  matched: {matched}")
         print(f"  file: {record.file}")
     count = len(matches)
@@ -335,7 +347,11 @@ def _print_text(matches: list[tuple[AdrRecord, str]]) -> None:
 
 def _print_tsv(matches: list[tuple[AdrRecord, str]]) -> None:
     for record, _matched in matches:
-        print(f"{record.id}\t{record.status}\t{record.title}\t{record.file}")
+        line = f"{record.id}\t{record.status}\t{record.title}\t{record.file}"
+        caveat = _narrowing_caveat(record)
+        if caveat is not None:
+            line += f"\t{caveat}"
+        print(line)
 
 
 def _select(

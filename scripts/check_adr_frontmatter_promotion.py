@@ -55,6 +55,7 @@ from pathlib import Path
 
 from _git_runner import run_git
 from _repo_root import resolve_repo_root as _resolve_repo_root
+from validate_adr_references import parse_affected_files
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -62,6 +63,10 @@ DECISIONS_SUBDIR = ".ai-state/decisions"
 FRONTMATTER_DELIMITER = "---"
 FINALIZED_ADR_FILENAME_RE = re.compile(r"^(\d+)-.+\.md$")
 EXEMPT_FILENAMES = frozenset({"DECISIONS_INDEX.md", "CLAUDE.md"})
+REMOVAL_EXEMPTION_NOTE = (
+    "if this decision's own action was the removal of this path, that is expected "
+    "and this warning can be ignored"
+)
 
 
 # -- Frontmatter extraction ----------------------------------------------------
@@ -188,6 +193,81 @@ def find_violations(repo_root: Path, *, staged: bool = False) -> list[str]:
     return violations
 
 
+# -- affected_files liveness (non-blocking) --------------------------------------
+#
+# Reuses pre-commit Block G's existing `^\.ai-state/decisions/.*\.md$` filter --
+# no new hook wiring. Unlike `_default_mode_entries`/`_staged_mode_entries` above
+# (which are scoped to the promotion-lifecycle check and deliberately exclude
+# `drafts/`), this scan covers every ADR the hook filter matches, drafts included:
+# a draft naming a dead path is just as much a hygiene signal as a finalized one.
+
+
+def _affected_files_default_entries(repo_root: Path) -> list[tuple[str, str]]:
+    """(relative path, content) for every ``.md`` file on disk, drafts included."""
+    decisions_dir = repo_root / ".ai-state" / "decisions"
+    if not decisions_dir.is_dir():
+        return []
+    entries: list[tuple[str, str]] = []
+    for path in sorted(decisions_dir.rglob("*.md")):
+        content = path.read_text(encoding="utf-8", errors="replace")
+        entries.append((path.relative_to(repo_root).as_posix(), content))
+    return entries
+
+
+def _affected_files_staged_entries(repo_root: Path) -> list[tuple[str, str]]:
+    """(relative path, content) for every staged ``.md`` blob, drafts included."""
+    listing = _git(repo_root, "ls-files", "--", DECISIONS_SUBDIR)
+    if listing.returncode != 0:
+        return []
+
+    entries: list[tuple[str, str]] = []
+    prefix = f"{DECISIONS_SUBDIR}/"
+    for raw_line in listing.stdout.splitlines():
+        rel = raw_line.strip()
+        if not rel.startswith(prefix) or not rel.endswith(".md"):
+            continue
+        blob = _git(repo_root, "show", f":{rel}")
+        if blob.returncode != 0:
+            continue
+        entries.append((rel, blob.stdout))
+    return entries
+
+
+def _is_live(repo_root: Path, entry: str) -> bool:
+    """Whether an ``affected_files`` entry resolves in the working tree.
+
+    A directory-prefix entry (``"scripts/"``) is live when the directory
+    exists; liveness is filesystem resolution, not path-string shape.
+    """
+    target = repo_root / entry
+    if entry.endswith("/"):
+        return target.is_dir()
+    return target.exists()
+
+
+def find_affected_files_warnings(repo_root: Path, *, staged: bool = False) -> list[str]:
+    """Non-blocking warnings for dead ``affected_files`` paths in staged ADRs.
+
+    Never a violation -- a decision whose own action was removing the path it
+    names is legitimately citing something absent. Callers must not fold this
+    into the process exit code.
+    """
+    entries = (
+        _affected_files_staged_entries(repo_root)
+        if staged
+        else _affected_files_default_entries(repo_root)
+    )
+    warnings: list[str] = []
+    for rel_path, content in entries:
+        for path_entry in parse_affected_files(content):
+            if not _is_live(repo_root, path_entry):
+                warnings.append(
+                    f"{rel_path}: affected_files entry {path_entry!r} does not "
+                    f"resolve in the working tree -- {REMOVAL_EXEMPTION_NOTE}"
+                )
+    return warnings
+
+
 # -- CLI ------------------------------------------------------------------------
 
 
@@ -220,13 +300,33 @@ def main(argv: list[str]) -> int:
 
     try:
         violations = find_violations(repo_root, staged=args.staged)
+        liveness_warnings = find_affected_files_warnings(repo_root, staged=args.staged)
     except OSError as exc:
         print(f"check_adr_frontmatter_promotion: error: {exc}", file=sys.stderr)
         return 2
 
     if args.json:
-        print(json.dumps({"violations": violations, "count": len(violations)}, indent=2))
+        print(
+            json.dumps(
+                {
+                    "violations": violations,
+                    "count": len(violations),
+                    "affected_files_warnings": liveness_warnings,
+                },
+                indent=2,
+            )
+        )
         return 1 if violations else 0
+
+    if liveness_warnings:
+        print(
+            f"check_adr_frontmatter_promotion: {len(liveness_warnings)} affected_files "
+            "liveness warning(s) (non-blocking):",
+            file=sys.stderr,
+        )
+        for warning in liveness_warnings:
+            print(f"  - {warning}", file=sys.stderr)
+        print("", file=sys.stderr)
 
     if not violations:
         mode = "staged" if args.staged else "working-tree"

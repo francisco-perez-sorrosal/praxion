@@ -30,7 +30,28 @@ per-test failure rather than a collection error.
 Pinned interface (negotiable with the implementer, recorded in LEARNINGS.md):
 
     find_violations(repo_root: Path, *, staged: bool = False) -> list[str]
+    find_affected_files_warnings(repo_root: Path, *, staged: bool = False) -> list[str]
     main(argv: list[str]) -> int   # 0 clean / 1 violations found
+
+``affected_files`` liveness warning (SYSTEMS_PLAN.md Q4 -- non-blocking creation-time
+hygiene, reusing pre-commit Block G's existing ``^\\.ai-state/decisions/.*\\.md$``
+filter, no new hook wiring):
+
+7. A staged ADR naming a dead ``affected_files`` path warns by name, naming both the
+   path and the removal-decision exemption -- and the process **exit code is
+   unchanged** (0 when no blocking violation coexists). A blocking gate here would
+   punish a decision whose own *action* was removing the file it names.
+8. An ADR whose ``affected_files`` all resolve on disk produces no warning output.
+9. A directory-prefix entry (e.g. ``"scripts/"``) is live when the directory exists,
+   dead when it does not -- liveness is not string-shape, it is filesystem
+   resolution.
+10. Draft ADRs under ``.ai-state/decisions/drafts/`` are in scope: Block G's filter
+    matches drafts too (unlike the promotion gate's own staged-entry collection,
+    which explicitly excludes them), so the liveness warning must not silently skip
+    drafts.
+11. A blocking violation (draft id / proposed status) still exits 1 even when a
+    liveness warning also fires for the same ADR -- the new non-blocking mechanism
+    must not mask or downgrade an existing blocking class.
 """
 
 from __future__ import annotations
@@ -79,7 +100,11 @@ def _decisions_dir(root: Path) -> Path:
     return path
 
 
-def _adr_text(*, adr_id: str, status: str) -> str:
+def _adr_text(*, adr_id: str, status: str, affected_files: list[str] | None = None) -> str:
+    affected_files_block = ""
+    if affected_files is not None:
+        entries = "\n".join(f'  - "{path}"' for path in affected_files)
+        affected_files_block = f"affected_files:\n{entries}\n"
     return (
         "---\n"
         f"id: {adr_id}\n"
@@ -87,6 +112,7 @@ def _adr_text(*, adr_id: str, status: str) -> str:
         f"status: {status}\n"
         "category: architectural\n"
         "date: 2026-07-31\n"
+        f"{affected_files_block}"
         "---\n"
         "\n"
         "## Context\n"
@@ -95,9 +121,18 @@ def _adr_text(*, adr_id: str, status: str) -> str:
     )
 
 
-def _write_adr(root: Path, name: str, *, adr_id: str, status: str = "accepted") -> Path:
+def _write_adr(
+    root: Path,
+    name: str,
+    *,
+    adr_id: str,
+    status: str = "accepted",
+    affected_files: list[str] | None = None,
+) -> Path:
     path = _decisions_dir(root) / name
-    path.write_text(_adr_text(adr_id=adr_id, status=status), encoding="utf-8")
+    path.write_text(
+        _adr_text(adr_id=adr_id, status=status, affected_files=affected_files), encoding="utf-8"
+    )
     return path
 
 
@@ -232,3 +267,148 @@ def test_cli_exits_zero_when_all_adrs_conform(tmp_path: Path) -> None:
     _write_adr(tmp_path, "312-good-decision.md", adr_id="dec-312", status="accepted")
 
     assert _exit_code(["--repo-root", str(tmp_path)]) == 0
+
+
+# -- affected_files liveness warning (SYSTEMS_PLAN.md Q4, non-blocking) -------
+
+
+@pytest.fixture
+def staged_draft_with_dead_path_repo(tmp_path: Path) -> Path:
+    """A committed repo with a staged draft ADR naming an unresolved path.
+
+    Reproduces the shape Block G's ``^\\.ai-state/decisions/.*\\.md$`` filter
+    actually matches: a draft under ``drafts/`` with a dead ``affected_files``
+    entry, staged but not yet finalized.
+    """
+    repo = _init_repo(tmp_path)
+    drafts = _decisions_dir(repo) / "drafts"
+    drafts.mkdir(parents=True, exist_ok=True)
+    fragment = drafts / "20260731-2115-user-branch-some-decision.md"
+    fragment.write_text(
+        _adr_text(
+            adr_id=DRAFT_FRONTMATTER_ID,
+            status="proposed",
+            affected_files=["scripts/does_not_exist_anywhere.py"],
+        ),
+        encoding="utf-8",
+    )
+    _git(repo, "add", "-A")
+    return repo
+
+
+def test_absent_affected_files_path_warns_and_leaves_exit_code_at_zero(
+    tmp_path: Path,
+) -> None:
+    # Both halves asserted explicitly per Step 21's "Done when" -- a blocking gate
+    # here would punish a decision whose action legitimately removed the file.
+    _write_adr(
+        tmp_path,
+        "313-removal-decision.md",
+        adr_id="dec-313",
+        affected_files=["scripts/does_not_exist_anywhere.py"],
+    )
+
+    warnings = _gate().find_affected_files_warnings(tmp_path)
+
+    report = "\n".join(warnings)
+    assert warnings, "a dead affected_files path must produce a warning"
+    assert "313-removal-decision.md" in report, report
+    assert "scripts/does_not_exist_anywhere.py" in report, report
+    assert "removal" in report.lower(), (
+        "warning must name the removal-decision exemption, not just the dead path"
+    )
+    assert _exit_code(["--repo-root", str(tmp_path)]) == 0, (
+        "the liveness warning must never block the commit"
+    )
+
+
+def test_fully_live_affected_files_produces_no_warning(tmp_path: Path) -> None:
+    live_target = tmp_path / "scripts" / "real_file.py"
+    live_target.parent.mkdir(parents=True, exist_ok=True)
+    live_target.write_text("# real\n", encoding="utf-8")
+    _write_adr(
+        tmp_path,
+        "314-live-decision.md",
+        adr_id="dec-314",
+        affected_files=["scripts/real_file.py"],
+    )
+
+    assert _gate().find_affected_files_warnings(tmp_path) == []
+
+
+def test_directory_prefix_affected_files_entry_is_live_when_the_dir_exists(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "scripts").mkdir()
+    _write_adr(
+        tmp_path,
+        "315-directory-decision.md",
+        adr_id="dec-315",
+        affected_files=["scripts/"],
+    )
+
+    assert _gate().find_affected_files_warnings(tmp_path) == []
+
+
+def test_directory_prefix_affected_files_entry_warns_when_the_dir_is_absent(
+    tmp_path: Path,
+) -> None:
+    _write_adr(
+        tmp_path,
+        "316-missing-directory-decision.md",
+        adr_id="dec-316",
+        affected_files=["nonexistent_subsystem/"],
+    )
+
+    warnings = _gate().find_affected_files_warnings(tmp_path)
+
+    report = "\n".join(warnings)
+    assert warnings, "a dead directory-prefix entry must also warn"
+    assert "nonexistent_subsystem/" in report, report
+
+
+def test_staged_draft_adr_with_dead_path_is_included_in_the_liveness_scan(
+    staged_draft_with_dead_path_repo: Path,
+) -> None:
+    # CANARY: Block G's filter matches drafts/, so the liveness scan must not
+    # silently exclude them the way the promotion gate's staged-entry collection
+    # does (that exclusion is specific to the promotion-lifecycle check).
+    warnings = _gate().find_affected_files_warnings(staged_draft_with_dead_path_repo, staged=True)
+
+    report = "\n".join(warnings)
+    assert warnings, "a staged draft naming a dead path must warn"
+    assert "does_not_exist_anywhere.py" in report, report
+
+
+def test_blocking_violation_still_exits_nonzero_alongside_a_liveness_warning(
+    tmp_path: Path,
+) -> None:
+    # A finalized ADR that is BOTH still draft-identified (blocking) AND names a
+    # dead path (non-blocking): the new warning mechanism must not mask or
+    # downgrade the pre-existing blocking class.
+    _write_adr(
+        tmp_path,
+        "317-both-defects.md",
+        adr_id=DRAFT_FRONTMATTER_ID,
+        affected_files=["scripts/does_not_exist_anywhere.py"],
+    )
+
+    assert _exit_code(["--repo-root", str(tmp_path)]) == 1
+
+
+def test_cli_prints_the_liveness_warning_text(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _write_adr(
+        tmp_path,
+        "318-removal-decision.md",
+        adr_id="dec-318",
+        affected_files=["scripts/does_not_exist_anywhere.py"],
+    )
+
+    exit_code = _exit_code(["--repo-root", str(tmp_path)])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    combined = captured.out + captured.err
+    assert "scripts/does_not_exist_anywhere.py" in combined, combined

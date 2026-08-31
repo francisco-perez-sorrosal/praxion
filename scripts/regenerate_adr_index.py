@@ -121,6 +121,26 @@ def format_tags(raw_tags: str) -> str:
     return raw_tags
 
 
+def _narrowing_ids(raw_superseded_in_part_by: str) -> list[str]:
+    """Parse the (already-inline-normalized) `superseded_in_part_by` value into ids."""
+    if not raw_superseded_in_part_by:
+        return []
+    if raw_superseded_in_part_by.startswith("[") and raw_superseded_in_part_by.endswith("]"):
+        inner = raw_superseded_in_part_by[1:-1]
+        if not inner.strip():
+            return []
+        return [item.strip().strip('"').strip("'") for item in inner.split(",")]
+    return [raw_superseded_in_part_by]
+
+
+def format_status_cell(status: str, raw_superseded_in_part_by: str) -> str:
+    """`accepted (narrowed by dec-NNN[, dec-MMM...])` when the record is narrowed."""
+    narrowing_ids = _narrowing_ids(raw_superseded_in_part_by)
+    if not narrowing_ids:
+        return status
+    return f"{status} (narrowed by {', '.join(narrowing_ids)})"
+
+
 def collect_adrs() -> list[dict[str, str]]:
     """Read all ADR files and return parsed frontmatter sorted by ID."""
     if not DECISIONS_DIR.is_dir():
@@ -154,7 +174,7 @@ def generate_index(adrs: list[dict[str, str]]) -> str:
     for adr in adrs:
         adr_id = adr["id"]
         title = adr["title"]
-        status = adr["status"]
+        status = format_status_cell(adr["status"], adr.get("superseded_in_part_by", ""))
         category = adr["category"]
         date = adr["date"]
         tags = format_tags(adr.get("tags", ""))

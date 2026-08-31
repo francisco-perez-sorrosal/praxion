@@ -1,3 +1,62 @@
+## v0.24.0 (2026-08-31)
+
+### Feat
+
+- **onboarding**: retire /new-project and the onboard-project command — the skill is the single surface
+- **onboard-project**: consolidate gates to 3, add capability vocabulary, hackathon teardown
+- **onboard**: add scripts/onboard-project unified CLI entry
+- **onboarding**: add Rust code-quality baseline to /onboard-project
+- **systems-architect**: add Rust library-selection paragraph
+- **cicd**: replace single-job Rust workflow with researched 5-job shape
+- **project-baseline**: add Rust blocks to shipped pre-commit and dependabot templates
+- **architectural-fitness-functions**: add Rust context leaf, fix Finding-1 frontmatter
+- **api-documentation**: promote Rust reference from stub to full leaf
+- **code-review**: populate Rust column in generic convention table
+- **testing-strategy**: close Rust leaf trunk-contract gap, register Registry 1/2 rows
+- **rust-first-class**: ADR draft fragments, consult ledger rows, DESIGN.md capability row
+- **data-structure-design**: add Rust patterns leaf (rust-first-class step 13)
+- **test-coverage**: add Rust reference leaf and language-references row
+- **rust-development**: author project-scaffolding.md with evidence-appraiser reformulations
+- **rust-development**: add essential-crates reference leaf
+- **rust-development**: add unsafe-and-concurrency reference leaf
+- **rust-development**: add toolchain-and-workspace reference leaf
+- **rust-development**: author type-and-api-design reference leaf
+- **rust-development**: add error-and-panic reference leaf
+- **rust-development**: create the anchor skill skeleton and shipped assets
+- **hooks**: wire the .rs registry row and rustfmt commit-gate branch
+- **onboarding**: seed the eight beauty dimensions into every managed project
+- **philosophy**: engrave the eight dimensions of beautiful code
+- **philosophy**: add the Data Structures First pillar across philosophy and pipeline
+
+### Fix
+
+- **onboard-project**: move interaction machinery out of phase bodies
+- **onboarding**: close residual stale-surface references and re-anchor the hooks block guard
+- **tests**: re-anchor schema-surface tuple and regenerate AGENTS templates via the generator
+- **onboarding**: seed permissions.allow baseline at scaffold time (td-130)
+- **scripts**: mint dedup_key discriminator only on base-tuple collision (td-133)
+- **scripts**: share boundary-index primitive between block classify/apply (td-056)
+- **sentinel**: widen SH07 REQ_PATTERN to match prefixed corpus shapes
+- **install**: remove legacy new-project symlink on relink/upgrade (rw-f0f05214)
+- **onboard-project**: scope Phase 5b predicate to the install write-set, not Sub-step 5b.t
+- **adr-finalize**: include calibration_log.md in the cross-reference walk
+- **project-baseline**: disposition PM-3 for the shipped Rust pre-commit hook
+- **hooks**: group staged Rust files by resolved edition in the commit gate
+- **rust-development**: apply CH-04 consult disposition to toolchain-and-workspace.md
+- scope 8e.2b rustfmt.toml guard to its own artifact, not whole sub-step
+- **sentinel**: generalize HK01 hackathon-mode source-file probe to .py/.rs/.ts/.tsx
+- **api-documentation**: route Rust to its own reference in the routing table
+- point rust-development staleness sections at rendered heading text
+- **coding-style**: harmonize Core Principles comment bullets with Reading Order and Narrative
+
+### Refactor
+
+- **onboarding**: seed phase gates become print-and-proceed previews
+- **install**: re-anchor onboarding entry to scripts/onboard-project (step 21)
+- **sync**: re-anchor onboarding canonical-block consumer to the skill (steps 16+18)
+- **hooks**: generalize format_python into a registry-driven format_code
+- **data-structure-design**: per-language reference leaves + Codex philosophy mirror
+
 ## v0.23.0 (2026-08-25)
 
 ### BREAKING CHANGE

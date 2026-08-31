@@ -574,7 +574,7 @@ Print: `8e.2b: rustfmt.toml + Cargo.toml [lints] policy + rust-toolchain.toml in
 
 **Predicate.** Any of `CONTRIBUTING.md` / `CONTRIBUTING.rst` / `CONTRIBUTING` / `docs/CONTRIBUTING.md` / `.github/CONTRIBUTING.md` exists → skip with `8e.6: skipped (contributing guide already present)`.
 
-**Action.** Read `claude/project-baseline/CONTRIBUTING.md.tmpl` (from the plugin install). Strip the leading HTML template-doc comment, then fill the `<lint command>` / `<typecheck command>` / `<test command>` / `<build command>` placeholders from the detected stack — reuse the exact values resolved for Phase 6's Project Essentials block (e.g. `uv run ruff …`, `uv run mypy src/`, `uv run pytest`; for Rust, `cargo clippy --all-targets -- -D warnings` / no separate typecheck line / `cargo test` (or `cargo nextest run`) plus `cargo test --doc` / `cargo build`, with `cargo fmt --all -- --check` alongside as the format-check command). Leave a `# TODO:` for any command the project does not have rather than inventing one. Write the result to `<repo-root>/CONTRIBUTING.md`. Print: `8e.6: CONTRIBUTING.md installed (filled from detected stack commands)`.
+**Action.** Read `claude/project-baseline/CONTRIBUTING.md.tmpl` (from the plugin install). Strip the leading HTML template-doc comment, then fill the `<lint command>` / `<typecheck command>` / `<test command>` / `<build command>` placeholders per [shared-procedures.md § Stack command resolution](shared-procedures.md#-stack-command-resolution) — reuse the exact values already resolved for Phase 6's Project Essentials block rather than re-deriving them. Write the result to `<repo-root>/CONTRIBUTING.md`. Print: `8e.6: CONTRIBUTING.md installed (filled from detected stack commands)`.
 
 ### Sub-step 8e.7 — Dependency-scanning config
 
@@ -590,9 +590,9 @@ Print: `8e.2b: rustfmt.toml + Cargo.toml [lints] policy + rust-toolchain.toml in
 
 - `{{WATCHED_WORKFLOWS}}` → the comma-separated, quoted names of the project's own CI workflows (detected under `.github/workflows/`, confirmed with the user). GitHub Actions requires `on.workflow_run.workflows` to be a static literal, so this cannot be read from the policy at runtime — keep it in sync with the policy's `watched_workflows` by hand.
 - `{{PRAXION_HUB}}` → `francisco-perez-sorrosal/praxion` (the public hub's owner/repo).
-- `{{HUB_SHA}}` → the hub's **real, current 40-hex commit SHA**, resolved at install time — e.g. `gh api repos/francisco-perez-sorrosal/praxion/commits/main --jq .sha` (the tip of the hub's default branch), or the SHA behind a pinned hub release tag. Resolve it to an actual SHA: **never** a placeholder, and never a mutable tag or branch ref — a dangling `uses:` ref makes the installed caller fail to load.
+- `{{HUB_SHA}}` → resolved per [shared-procedures.md § Hub SHA resolution and template self-check](shared-procedures.md#-hub-sha-resolution-and-template-self-check).
 
-After writing, self-check the installed caller: grep `.github/workflows/ci-autofix.yml` for any surviving `{{` and abort loudly if one remains — no unresolved placeholder may survive into the installed file.
+After writing, apply the `{{`-survivor self-check from that same section to `.github/workflows/ci-autofix.yml`.
 
 Write the rendered caller to `<repo-root>/.github/workflows/ci-autofix.yml` and the rendered policy to `<repo-root>/.github/autofix-policy.yml` (creating `.github/workflows/` if absent).
 
@@ -615,9 +615,9 @@ Print: `8e.8: .github/workflows/ci-autofix.yml + .github/autofix-policy.yml inst
 **Action.** Read `claude/project-baseline/labels/labels.yml.tmpl` and `claude/project-baseline/labels/labels-reconcile.yml.tmpl` (from the plugin install) and strip each file's leading template-doc comment header. Fill the caller template's two placeholders:
 
 - `{{PRAXION_HUB}}` → `francisco-perez-sorrosal/praxion` (the public hub's owner/repo).
-- `{{HUB_SHA}}` → the hub's **real, current 40-hex commit SHA**, resolved at install time — reuse the SHA already resolved earlier in this same onboarding run if sub-step 8e.8 ran first, rather than re-resolving; otherwise resolve it the same way 8e.8 does, e.g. `gh api repos/francisco-perez-sorrosal/praxion/commits/main --jq .sha` (the tip of the hub's default branch), or the SHA behind a pinned hub release tag. Resolve it to an actual SHA: **never** a placeholder, and never a mutable tag or branch ref — a dangling `uses:` ref makes the installed caller fail to load.
+- `{{HUB_SHA}}` → resolved per [shared-procedures.md § Hub SHA resolution and template self-check](shared-procedures.md#-hub-sha-resolution-and-template-self-check) (reuse the SHA already resolved earlier in this same onboarding run if sub-step 8e.8 ran first).
 
-After writing, self-check the installed caller: grep `.github/workflows/labels-reconcile.yml` for any surviving `{{` and abort loudly if one remains — no unresolved placeholder may survive into the installed file.
+After writing, apply the `{{`-survivor self-check from that same section to `.github/workflows/labels-reconcile.yml`.
 
 Write the rendered manifest to `<repo-root>/.github/labels.yml` and the rendered caller to `<repo-root>/.github/workflows/labels-reconcile.yml` (creating `.github/workflows/` if absent).
 

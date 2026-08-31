@@ -1,15 +1,10 @@
 """Structural tests for the label-taxonomy-manifest onboarding install sub-step.
 
-`/onboard-project` is a slash command (Markdown body executed by a live Claude
-Code session) — it cannot be invoked from pytest. These tests validate the
-documented contract by parsing `commands/onboard-project.md` structurally,
-matching the precedent set by `tests/commands/test_onboard_ci_autofix_install.py`.
-
-All tests below are expected to FAIL until the implementer adds a new
-"Sub-step 8e.9" section to `commands/onboard-project.md` — the label taxonomy
-manifest + reconciler caller install, positioned immediately after the
-existing sub-step 8e.8 (whose Predicate/Action/placeholder-resolution shape
-this new sub-step must mirror).
+`/onboard-project` (now `skills/onboard-project/SKILL.md` + its phase-body
+references) is executed by a live Claude Code session — it cannot be invoked
+from pytest. These tests validate the documented contract by parsing
+`skills/onboard-project/references/phases-optional.md` structurally, matching
+the precedent set by `tests/commands/test_onboard_ci_autofix_install.py`.
 """
 
 from __future__ import annotations
@@ -17,7 +12,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-ONBOARD_FILE = Path(__file__).parents[2] / "commands" / "onboard-project.md"
+ONBOARD_FILE = (
+    Path(__file__).parents[2] / "skills" / "onboard-project" / "references" / "phases-optional.md"
+)
 
 # The caller template's exact placeholder tokens, matching sub-step 8e.8's own
 # resolution convention (claude/project-baseline/ci-autofix/ci-autofix.yml.tmpl).
@@ -30,6 +27,19 @@ def _onboard_body() -> str:
     return ONBOARD_FILE.read_text(encoding="utf-8")
 
 
+def _hub_sha_shared_section() -> str:
+    """Return the '§ Hub SHA resolution' section shared-procedures.md now owns.
+
+    A dedup pass (planner Step 7) moved the hub-SHA resolution rules — including
+    the "never a placeholder, never a mutable ref" requirement asserted below —
+    out of the per-sub-step body and into one shared section cited by anchor.
+    Behavior is unchanged; only its location moved.
+    """
+    text = (ONBOARD_FILE.parents[0] / "shared-procedures.md").read_text(encoding="utf-8")
+    match = re.search(r"##\s+§ Hub SHA resolution.*?(?=\n## |\Z)", text, re.DOTALL)
+    return match.group(0) if match else ""
+
+
 def _sub_step_8e9_section() -> str:
     """Return the '### Sub-step 8e.9' section body, or '' if not yet documented.
 
@@ -37,9 +47,15 @@ def _sub_step_8e9_section() -> str:
     CI autofix caller + policy + cross-model review gate'), extracting up to
     the next '##'-or-shallower heading so assertions stay scoped to this
     sub-step's own text and cannot pass vacuously against 8e.8's prose.
+    Appends the shared hub-SHA resolution section it cites by anchor, so
+    assertions written against the pre-dedup inline text still see the same
+    behavioral content.
     """
     match = re.search(r"###\s+Sub-step 8e\.9.*?(?=\n##|\Z)", _onboard_body(), re.DOTALL)
-    return match.group(0) if match else ""
+    section = match.group(0) if match else ""
+    if section and "shared-procedures.md#" in section:
+        section += "\n\n" + _hub_sha_shared_section()
+    return section
 
 
 def test_label_taxonomy_install_substep_is_documented() -> None:

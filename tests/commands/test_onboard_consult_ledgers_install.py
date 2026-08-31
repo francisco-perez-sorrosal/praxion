@@ -1,9 +1,10 @@
 """Structural tests for the consult-ledger §Phase 2 onboarding sub-step.
 
-`/onboard-project` is a slash command (Markdown body executed by a live Claude
-Code session) — it cannot be invoked from pytest. These tests validate the
-documented contract by parsing `commands/onboard-project.md` structurally,
-matching the precedent set by `tests/commands/test_onboard_praxion_feedback_install.py`.
+`/onboard-project` (now `skills/onboard-project/SKILL.md` + its phase-body
+references) is executed by a live Claude Code session — it cannot be invoked
+from pytest. These tests validate the documented contract by parsing
+`skills/onboard-project/references/phases-core.md` structurally, matching the
+precedent set by `tests/commands/test_onboard_praxion_feedback_install.py`.
 
 The gap these guard against is invisible from inside Praxion: Praxion's own
 `.ai-state/` already holds the three consult ledgers, so a consult convened here
@@ -19,8 +20,7 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parents[2]
-ONBOARD_FILE = REPO_ROOT / "commands" / "onboard-project.md"
-NEW_PROJECT_FILE = REPO_ROOT / "commands" / "new-project.md"
+ONBOARD_FILE = REPO_ROOT / "skills" / "onboard-project" / "references" / "phases-core.md"
 
 LEDGER_PATHS = (
     ".ai-state/CONSULT_LEDGER.md",
@@ -138,17 +138,3 @@ def test_skeletons_cite_no_praxion_local_decision_records() -> None:
             f"{path} skeleton cites a concrete decision-record id; state the rationale "
             "inline instead — the id does not resolve in a managed project"
         )
-
-
-def test_new_project_gains_no_duplicate_install_logic() -> None:
-    """`/new-project` defers every `.ai-state/` skeleton install to `/onboard-project`.
-
-    Mirrors the same guard already pinned for the praxion_feedback ledger, so the
-    consult skeletons cannot silently acquire a second install path.
-    """
-    body = NEW_PROJECT_FILE.read_text(encoding="utf-8")
-    assert body.count("CONSULT_") == 0, (
-        "commands/new-project.md must not gain its own copy of the consult-ledger "
-        "install logic — installs stay deferred to /onboard-project, matching the "
-        "established single-install-path convention"
-    )

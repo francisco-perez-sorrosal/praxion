@@ -1,21 +1,16 @@
 """Structural tests for the ci-autofix onboarding install sub-step.
 
-`/onboard-project` is a slash command (Markdown body executed by a live Claude
-Code session) — it cannot be invoked from pytest. These tests validate the
-documented contract by parsing `commands/onboard-project.md` structurally,
-matching the precedent set by `tests/commands/test_resume_rework.py`.
+`/onboard-project` (now `skills/onboard-project/SKILL.md` + its phase-body
+references) is executed by a live Claude Code session — it cannot be invoked
+from pytest. These tests validate the documented contract by parsing the
+skill's phase files structurally, matching the precedent set by
+`tests/commands/test_resume_rework.py`.
 
-All tests exercising the new sub-step are expected to FAIL until the
-implementer adds it to `commands/onboard-project.md`. The regression-guard
-test on `commands/new-project.md` is expected to PASS from the start — it
-pins the pre-existing baseline the plan depends on, not new behavior.
-
-A second wave of tests below targets the still-deferred cross-model-review
-caller install (sub-step 8e.8 currently says "Do NOT install
-cross-model-review.yml.tmpl — deferred") and the still-stale
-`autofix-policy.yml.tmpl` "reserved, not yet read by the hub" comments. These
-are expected to FAIL until the implementer flips the deferral to a
-policy-gated install and corrects the policy-template comments.
+Sub-step 8e.8 (the ci-autofix caller+policy install) lives in
+`references/phases-optional.md`; the §Phase 9 onboard-manifest example it
+must extend lives in `references/phases-core.md` — the two files are read
+independently below rather than joined, since each assertion targets exactly
+one of them.
 """
 
 from __future__ import annotations
@@ -23,8 +18,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-ONBOARD_FILE = Path(__file__).parents[2] / "commands" / "onboard-project.md"
-NEW_PROJECT_FILE = Path(__file__).parents[2] / "commands" / "new-project.md"
+_SKILL_ROOT = Path(__file__).parents[2] / "skills" / "onboard-project"
+PHASES_CORE_FILE = _SKILL_ROOT / "references" / "phases-core.md"
+PHASES_OPTIONAL_FILE = _SKILL_ROOT / "references" / "phases-optional.md"
 POLICY_TEMPLATE_FILE = (
     Path(__file__).parents[2]
     / "claude"
@@ -39,18 +35,31 @@ HUB_OWNER_PLACEHOLDER = "{{PRAXION_HUB}}"
 
 
 def _onboard_body() -> str:
-    """Return the full onboard-project.md content (read lazily so collection succeeds)."""
-    return ONBOARD_FILE.read_text(encoding="utf-8")
+    """Return the phases-optional.md content that owns Sub-step 8e.8 (read lazily)."""
+    return PHASES_OPTIONAL_FILE.read_text(encoding="utf-8")
 
 
-def _new_project_body() -> str:
-    """Return the full new-project.md content (read lazily so collection succeeds)."""
-    return NEW_PROJECT_FILE.read_text(encoding="utf-8")
+def _phases_core_body() -> str:
+    """Return the phases-core.md content that owns §Phase 9 (read lazily)."""
+    return PHASES_CORE_FILE.read_text(encoding="utf-8")
 
 
 def _policy_template_body() -> str:
     """Return the full autofix-policy.yml.tmpl content (read lazily so collection succeeds)."""
     return POLICY_TEMPLATE_FILE.read_text(encoding="utf-8")
+
+
+def _hub_sha_shared_section() -> str:
+    """Return the '§ Hub SHA resolution' section shared-procedures.md now owns.
+
+    A dedup pass (planner Step 7) moved the hub-SHA resolution rules — including
+    the "never a placeholder, never a mutable ref" requirement asserted below —
+    out of the per-sub-step body and into one shared section cited by anchor.
+    Behavior is unchanged; only its location moved.
+    """
+    text = (PHASES_CORE_FILE.parents[0] / "shared-procedures.md").read_text(encoding="utf-8")
+    match = re.search(r"##\s+§ Hub SHA resolution.*?(?=\n## |\Z)", text, re.DOTALL)
+    return match.group(0) if match else ""
 
 
 def _sub_step_8e8_section() -> str:
@@ -59,10 +68,15 @@ def _sub_step_8e8_section() -> str:
     Mirrors the sibling sub-steps' heading shape (e.g. '### Sub-step 8e.7 —
     Dependency-scanning config'), extracting up to the next '##'-or-shallower
     heading so assertions stay scoped to this sub-step's own text and cannot
-    pass vacuously against a neighboring sub-step's prose.
+    pass vacuously against a neighboring sub-step's prose. Appends the shared
+    hub-SHA resolution section it cites by anchor, so assertions written
+    against the pre-dedup inline text still see the same behavioral content.
     """
     match = re.search(r"###\s+Sub-step 8e\.8.*?(?=\n##|\Z)", _onboard_body(), re.DOTALL)
-    return match.group(0) if match else ""
+    section = match.group(0) if match else ""
+    if section and "shared-procedures.md#" in section:
+        section += "\n\n" + _hub_sha_shared_section()
+    return section
 
 
 def _manifest_artifacts_snippet() -> str:
@@ -73,9 +87,9 @@ def _manifest_artifacts_snippet() -> str:
     at any indentation), so anchoring on a generous character window is more
     robust than depending on exact brace nesting.
     """
-    body = _onboard_body()
+    body = _phases_core_body()
     idx = body.find('"artifacts"')
-    assert idx != -1, "commands/onboard-project.md must document an 'artifacts' manifest key"
+    assert idx != -1, "phases-core.md's §Phase 9 must document an 'artifacts' manifest key"
     return body[idx : idx + 600]
 
 
@@ -304,21 +318,3 @@ def test_autofix_policy_template_documents_pr_checks_dependabot_fork_prs_as_live
             "as a LIVE surface read by the hub (P3a made these live, no "
             "longer reserved)"
         )
-
-
-def test_new_project_gains_no_duplicate_install_logic() -> None:
-    """Regression guard for the scoping decision to keep installs single-path.
-
-    `/new-project` defers all `claude/project-baseline/*` installs to a later
-    `/onboard-project` run — it must not gain its own copy of the ci-autofix
-    install logic. This pins the pre-existing baseline (currently zero
-    'dependabot' mentions) so a future edit cannot silently duplicate the
-    install path here instead of confirming the defer-only contract.
-    """
-    body = _new_project_body()
-    assert body.lower().count("dependabot") == 0, (
-        "commands/new-project.md must not gain its own copy of any "
-        "project-baseline install logic (dependabot is the existing precedent "
-        "asset) — installs stay deferred to /onboard-project, matching the "
-        "established single-install-path convention"
-    )

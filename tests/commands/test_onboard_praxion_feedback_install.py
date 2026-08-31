@@ -1,9 +1,10 @@
 """Structural tests for the healing-sidecar §Phase 2 onboarding sub-step.
 
-`/onboard-project` is a slash command (Markdown body executed by a live Claude
-Code session) — it cannot be invoked from pytest. These tests validate the
-documented contract by parsing `commands/onboard-project.md` structurally,
-matching the precedent set by `tests/commands/test_onboard_ci_autofix_install.py`.
+`/onboard-project` (now `skills/onboard-project/SKILL.md` + its phase-body
+references) is executed by a live Claude Code session — it cannot be invoked
+from pytest. These tests validate the documented contract by parsing
+`skills/onboard-project/references/phases-core.md` structurally, matching the
+precedent set by `tests/commands/test_onboard_ci_autofix_install.py`.
 
 Unlike the ci-autofix sub-step (its own `### Sub-step 8e.8` heading), the
 healing-sidecar install is a new bullet inside the existing `## §Phase 2` list
@@ -16,20 +17,16 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-ONBOARD_FILE = Path(__file__).parents[2] / "commands" / "onboard-project.md"
-NEW_PROJECT_FILE = Path(__file__).parents[2] / "commands" / "new-project.md"
+ONBOARD_FILE = (
+    Path(__file__).parents[2] / "skills" / "onboard-project" / "references" / "phases-core.md"
+)
 
 PENDING_PATH = ".ai-state/praxion_feedback/PENDING.md"
 
 
 def _onboard_body() -> str:
-    """Return the full onboard-project.md content (read lazily so collection succeeds)."""
+    """Return the full phases-core.md content (read lazily so collection succeeds)."""
     return ONBOARD_FILE.read_text(encoding="utf-8")
-
-
-def _new_project_body() -> str:
-    """Return the full new-project.md content (read lazily so collection succeeds)."""
-    return NEW_PROJECT_FILE.read_text(encoding="utf-8")
 
 
 def _phase_2_section() -> str:
@@ -118,23 +115,4 @@ def test_reporter_and_command_documented_as_plugin_global_not_per_project() -> N
         "Sub-step must explicitly rule out any additional per-project asset "
         "install beyond the PENDING.md skeleton (reporter/command/hook ship "
         "plugin-wide via hooks/hooks.json)"
-    )
-
-
-def test_new_project_gains_no_duplicate_install_logic() -> None:
-    """Regression guard for the scoping decision to keep installs single-path.
-
-    `/new-project` defers all `.ai-state/` skeleton installs to a later
-    `/onboard-project` run — it must not gain its own copy of the
-    praxion_feedback install logic. This pins the pre-existing baseline
-    (currently zero 'praxion_feedback' mentions) so a future edit cannot
-    silently duplicate the install path here instead of confirming the
-    defer-only contract.
-    """
-    body = _new_project_body()
-    assert body.count("praxion_feedback") == 0, (
-        "commands/new-project.md must not gain its own copy of the "
-        "praxion_feedback install logic — installs stay deferred to "
-        "/onboard-project, matching the established single-install-path "
-        "convention"
     )

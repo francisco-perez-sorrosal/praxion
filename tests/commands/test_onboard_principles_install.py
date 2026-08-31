@@ -1,9 +1,10 @@
 """Structural tests for the principles.yaml §Phase 2 onboarding sub-step.
 
-`/onboard-project` is a slash command (Markdown body executed by a live Claude
-Code session) — it cannot be invoked from pytest. These tests validate the
-documented contract by parsing `commands/onboard-project.md` structurally,
-matching the precedent of `tests/commands/test_onboard_consult_ledgers_install.py`.
+`/onboard-project` (now `skills/onboard-project/SKILL.md` + its phase-body
+references) is executed by a live Claude Code session — it cannot be invoked
+from pytest. These tests validate the documented contract by parsing
+`skills/onboard-project/references/phases-core.md` structurally, matching the
+precedent of `tests/commands/test_onboard_consult_ledgers_install.py`.
 
 The gap these guard against is invisible from inside Praxion: Praxion's own
 `.ai-state/principles.yaml` exists, so the planner's Phase 1b threading and the
@@ -20,7 +21,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parents[2]
-ONBOARD_FILE = REPO_ROOT / "commands" / "onboard-project.md"
+ONBOARD_FILE = REPO_ROOT / "skills" / "onboard-project" / "references" / "phases-core.md"
 TEMPLATE_FILE = REPO_ROOT / "claude" / "project-baseline" / "principles.yaml.tmpl"
 
 PRINCIPLES_PATH = ".ai-state/principles.yaml"

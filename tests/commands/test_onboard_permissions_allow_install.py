@@ -1,9 +1,10 @@
 """Structural tests for the `permissions.allow` baseline in §Phase 5 of onboarding.
 
-`/onboard-project` is a slash command (Markdown body executed by a live Claude
-Code session) — it cannot be invoked from pytest. These tests validate the
-documented contract by parsing `commands/onboard-project.md` structurally,
-matching the precedent set by `tests/commands/test_onboard_praxion_feedback_install.py`.
+`/onboard-project` (now `skills/onboard-project/SKILL.md` + its phase-body
+references) is executed by a live Claude Code session — it cannot be invoked
+from pytest. These tests validate the documented contract by parsing
+`skills/onboard-project/references/phases-core.md` structurally, matching the
+precedent set by `tests/commands/test_onboard_praxion_feedback_install.py`.
 
 The gap these guard against is invisible from inside Praxion: this repo's own
 `.claude/settings.json` already pre-allows subagent writes to the ephemeral
@@ -17,14 +18,21 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parents[2]
-ONBOARD_FILE = REPO_ROOT / "commands" / "onboard-project.md"
+_SKILL_ROOT = REPO_ROOT / "skills" / "onboard-project"
+ONBOARD_FILE = _SKILL_ROOT / "references" / "phases-core.md"
+SKILL_FILE = _SKILL_ROOT / "SKILL.md"
 
 AI_WORK_WRITE_ENTRY = "Write(.ai-work/**)"
 
 
 def _onboard_body() -> str:
-    """Return the full onboard-project.md content (read lazily so collection succeeds)."""
+    """Return the phases-core.md content that owns §Phase 5 (read lazily)."""
     return ONBOARD_FILE.read_text(encoding="utf-8")
+
+
+def _skill_body() -> str:
+    """Return SKILL.md's content, the sole owner of §Idempotency Predicates (read lazily)."""
+    return SKILL_FILE.read_text(encoding="utf-8")
 
 
 def _phase_5_section() -> str:
@@ -129,7 +137,7 @@ def test_merge_preserves_the_sibling_deny_array_and_user_entries() -> None:
 def test_phase_5_predicate_is_evaluated_per_sub_step_not_phase_wide() -> None:
     """A phase-level skip would strand already-onboarded projects without the baseline."""
     predicates_section = re.search(
-        r"##\s+§Idempotency Predicates.*?(?=\n## |\Z)", _onboard_body(), re.DOTALL
+        r"##\s+§Idempotency Predicates.*?(?=\n## |\Z)", _skill_body(), re.DOTALL
     )
     assert predicates_section, "§Idempotency Predicates section not found"
     table_row = re.search(r"^\| 5 \| (.*)$", predicates_section.group(0), re.MULTILINE)

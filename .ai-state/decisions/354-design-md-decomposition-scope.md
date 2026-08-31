@@ -100,7 +100,7 @@ surfaced tech debt, not attempted here.
 
 ## Relationship to the Checkpoint Decision
 
-This record does **not** supersede or re-affirm `dec-draft-c5d81484` (the living view is `DESIGN.md`
+This record does **not** supersede or re-affirm `dec-351` (the living view is `DESIGN.md`
 plus a checkpoint plus a validator, no generated artifact) — that decision's scope boundary,
 "trustworthy, not cheap", is unchanged in substance and was not re-examined. This is a separate,
 narrower decision about how much document-ergonomics work rides along with the checkpoint pipeline,

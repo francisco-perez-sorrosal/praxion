@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-31T06:05:14Z'
+generated_at: '2026-08-31T09:31:32Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -280,7 +280,7 @@ surfaces:
   path: docs/decision-tracking.md
   type: markdown
   title: Decision Tracking
-  last_modified: '2026-05-08'
+  last_modified: '2026-08-31'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -480,7 +480,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-08-30'
+  last_modified: '2026-08-31'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -511,7 +511,7 @@ surfaces:
   path: .ai-state/TEST_TOPOLOGY.md
   type: markdown
   title: "Test Topology \u2014 Praxion"
-  last_modified: '2026-08-13'
+  last_modified: '2026-08-31'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-design
@@ -519,7 +519,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-08-30'
+  last_modified: '2026-08-31'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -533,7 +533,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-08-30'
+  last_modified: '2026-08-31'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -557,7 +557,7 @@ surfaces:
   path: .ai-state/decisions/001-skill-wrapper-over-mcp-server.md
   type: markdown
   title: Skill wrapper as primary context-hub integration
-  last_modified: '2026-04-02'
+  last_modified: '2026-08-31'
   renderer: adr_card
 - id: ai-state-decisions-002-otel-relay-architecture
   path: .ai-state/decisions/002-otel-relay-architecture.md
@@ -791,7 +791,7 @@ surfaces:
   path: .ai-state/decisions/040-eval-framework-out-of-band.md
   type: markdown
   title: Eval framework is out-of-band only (/eval command + CI, never hook-driven)
-  last_modified: '2026-08-30'
+  last_modified: '2026-08-31'
   renderer: adr_card
 - id: ai-state-decisions-041-pyright-over-mypy
   path: .ai-state/decisions/041-pyright-over-mypy.md
@@ -1223,7 +1223,7 @@ surfaces:
   path: .ai-state/decisions/112-aac-dac-traceability-sentinel-ac-traceability-checks.md
   type: markdown
   title: "Sentinel AC-dimension extension \u2014 three conditional-activation checks for fence integrity, model\u2194markdown agreement, and traceability orphans"
-  last_modified: '2026-08-05'
+  last_modified: '2026-08-31'
   renderer: adr_card
 - id: ai-state-decisions-113-aac-dac-onboarding-aac-onboarding-tier
   path: .ai-state/decisions/113-aac-dac-onboarding-aac-onboarding-tier.md
@@ -1277,7 +1277,7 @@ surfaces:
   path: .ai-state/decisions/121-pipeline-dashboard-dashboard-claudemd-placement.md
   type: markdown
   title: "Pipeline Dashboard CLAUDE.md placement \u2014 Working Here mention, no philosophical block"
-  last_modified: '2026-08-04'
+  last_modified: '2026-08-31'
   renderer: adr_card
 - id: ai-state-decisions-122-pipeline-dashboard-dashboard-cross-platform-scope
   path: .ai-state/decisions/122-pipeline-dashboard-dashboard-cross-platform-scope.md
@@ -1769,13 +1769,13 @@ surfaces:
   path: .ai-state/decisions/203-sentinel-t03-threshold-exception.md
   type: markdown
   title: Recalibrate T03 with a line-count exception for the gate-encoding agents (sentinel + verifier)
-  last_modified: '2026-08-07'
+  last_modified: '2026-08-31'
   renderer: adr_card
 - id: ai-state-decisions-204-praxion-self-eval-framework
   path: .ai-state/decisions/204-praxion-self-eval-framework.md
   type: markdown
   title: "Praxion self-eval v1 \u2014 `/eval-praxion` adds LLM-as-judge over completed artifacts (narrow supersession of dec-040 clause 3)"
-  last_modified: '2026-07-15'
+  last_modified: '2026-08-31'
   renderer: adr_card
 - id: ai-state-decisions-205-harness-module-layout
   path: .ai-state/decisions/205-harness-module-layout.md
@@ -1865,7 +1865,7 @@ surfaces:
   path: .ai-state/decisions/219-project-profile-yaml-schema.md
   type: markdown
   title: .ai-state/project_profile.yaml as the machine-consumable archetype + run-store record
-  last_modified: '2026-08-30'
+  last_modified: '2026-08-31'
   renderer: adr_card
 - id: ai-state-decisions-220-run-store-backend-abstraction
   path: .ai-state/decisions/220-run-store-backend-abstraction.md
@@ -1937,13 +1937,13 @@ surfaces:
   path: .ai-state/decisions/231-defer-eval-lens-and-ach-matrix.md
   type: markdown
   title: Defer the agentic eval-lens and the full ACH matrix
-  last_modified: '2026-07-15'
+  last_modified: '2026-08-31'
   renderer: adr_card
 - id: ai-state-decisions-232-di-disconfirmation-replaces-ach
   path: .ai-state/decisions/232-di-disconfirmation-replaces-ach.md
   type: markdown
   title: Dialectical Inquiry + two-tier Disconfirmation replaces an ACH matrix for ADR deliberation
-  last_modified: '2026-06-18'
+  last_modified: '2026-08-31'
   renderer: adr_card
 - id: ai-state-decisions-233-extend-context-engineering-principle
   path: .ai-state/decisions/233-extend-context-engineering-principle.md
@@ -2129,7 +2129,7 @@ surfaces:
   path: .ai-state/decisions/263-retire-future-designed-producers.md
   type: markdown
   title: Retire the onboarding-producer expectation for the future-designed agentic-eval artifacts
-  last_modified: '2026-07-16'
+  last_modified: '2026-08-31'
   renderer: adr_card
 - id: ai-state-decisions-264-tier-threshold-drift-accepted
   path: .ai-state/decisions/264-tier-threshold-drift-accepted.md
@@ -2489,7 +2489,7 @@ surfaces:
   path: .ai-state/decisions/323-retire-sentinel-ac11-as-subsumed-by-ac13.md
   type: markdown
   title: Retire sentinel AC11 as subsumed by AC13
-  last_modified: '2026-08-07'
+  last_modified: '2026-08-31'
   renderer: adr_card
 - id: ai-state-decisions-324-p07-consult-clause-is-correct
   path: .ai-state/decisions/324-p07-consult-clause-is-correct.md
@@ -2519,7 +2519,7 @@ surfaces:
   path: .ai-state/decisions/328-derive-the-sentinel-t03-ceiling-from-its.md
   type: markdown
   title: Derive the sentinel T03 ceiling from its own check catalog span
-  last_modified: '2026-08-07'
+  last_modified: '2026-08-31'
   renderer: adr_card
 - id: ai-state-decisions-329-specify-mcp-dependent-checks-against-bas
   path: .ai-state/decisions/329-specify-mcp-dependent-checks-against-bas.md
@@ -2635,11 +2635,53 @@ surfaces:
   title: ADR retrieval ships as a standalone affected_files query script, not index-schema or hook-scoring changes
   last_modified: '2026-08-30'
   renderer: adr_card
+- id: ai-state-decisions-348-reaffirm-context-hub-skill-wrapper
+  path: .ai-state/decisions/348-reaffirm-context-hub-skill-wrapper.md
+  type: markdown
+  title: "Skill wrapper remains the primary context-hub integration \u2014 re-affirmed against doc drift"
+  last_modified: '2026-08-31'
+  renderer: adr_card
+- id: ai-state-decisions-349-supersede-dashboard-claude-md-placement
+  path: .ai-state/decisions/349-supersede-dashboard-claude-md-placement.md
+  type: markdown
+  title: Dashboard CLAUDE.md acknowledgment lives in the Repository-layout table
+  last_modified: '2026-08-31'
+  renderer: adr_card
+- id: ai-state-decisions-350-affected-files-creation-time-hygiene
+  path: .ai-state/decisions/350-affected-files-creation-time-hygiene.md
+  type: markdown
+  title: affected_files hygiene enforces at creation time as a non-blocking warning; query-side filtering is rejected
+  last_modified: '2026-08-31'
+  renderer: adr_card
+- id: ai-state-decisions-351-design-checkpoint-living-view
+  path: .ai-state/decisions/351-design-checkpoint-living-view.md
+  type: markdown
+  title: The architecture living view is DESIGN.md plus an authored checkpoint and a derived validator, never a generated digest
+  last_modified: '2026-08-31'
+  renderer: adr_card
+- id: ai-state-decisions-352-discard-active-index
+  path: .ai-state/decisions/352-discard-active-index.md
+  type: markdown
+  title: "ACTIVE_INDEX.md is not built \u2014 the current-streamline filter already ships at query time"
+  last_modified: '2026-08-31'
+  renderer: adr_card
+- id: ai-state-decisions-353-partial-supersession-edge
+  path: .ai-state/decisions/353-partial-supersession-edge.md
+  type: markdown
+  title: "Partial supersession is an edge property \u2014 reciprocal id lists converting the full edge, with a named status\xD7edge enforcer"
+  last_modified: '2026-08-31'
+  renderer: adr_card
+- id: ai-state-decisions-354-design-md-decomposition-scope
+  path: .ai-state/decisions/354-design-md-decomposition-scope.md
+  type: markdown
+  title: "DESIGN.md decomposition is scoped to \xA73b; \xA73a is gate-bound and stays whole"
+  last_modified: '2026-08-31'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-08-30'
+  last_modified: '2026-08-31'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3272,6 +3314,13 @@ groups:
   - ai-state-decisions-345-onboarding-gate-consolidation-profile-model
   - ai-state-decisions-346-unified-onboard-cli-contract
   - ai-state-decisions-347-adr-retrieval-query-tool
+  - ai-state-decisions-348-reaffirm-context-hub-skill-wrapper
+  - ai-state-decisions-349-supersede-dashboard-claude-md-placement
+  - ai-state-decisions-350-affected-files-creation-time-hygiene
+  - ai-state-decisions-351-design-checkpoint-living-view
+  - ai-state-decisions-352-discard-active-index
+  - ai-state-decisions-353-partial-supersession-edge
+  - ai-state-decisions-354-design-md-decomposition-scope
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

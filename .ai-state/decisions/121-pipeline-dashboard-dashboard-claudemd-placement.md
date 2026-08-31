@@ -2,7 +2,7 @@
 id: dec-121
 title: Pipeline Dashboard CLAUDE.md placement — Working Here mention, no philosophical block
 status: superseded
-superseded_by: dec-draft-39713c4d
+superseded_by: dec-349
 category: architectural
 date: 2026-05-07
 summary: Mention streamlit_app/ in Praxion's CLAUDE.md "Working Here" section to satisfy sentinel EC03; the SYSTEMS_PLAN's Goal section is the canonical philosophical statement, not a separate CLAUDE.md block.

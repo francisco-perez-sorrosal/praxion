@@ -29,7 +29,7 @@ Three independent reasons, any one sufficient:
 
 1. **The filter already ships at query time.** `query_adrs.py`'s `DEFAULT_STATUSES` is `{accepted, re-affirmation}`, with `--all` as the opt-out — `dec-347` delivered the "filter the list" capability as a query-time view. A materialized index is the same filter, stale between regenerations, and a fourth flat-glob consumer of `.ai-state/decisions/`.
 2. **It fails at the job it would exist for.** As an *orientation* tier it would be a ~41.6K-token artifact — itself an ungated full read, the exact act the Discovery Protocol forbids. It removes 5.5% of a cost that is an order of magnitude over the threshold that matters.
-3. **Orientation is answered elsewhere.** The checkpointed `DESIGN.md` (`dec-draft-c5d81484`) is the sanctioned answer to "what is the architecture now". Building both yields two orientation tiers, one of them 40× the tokens and answering a strictly worse question.
+3. **Orientation is answered elsewhere.** The checkpointed `DESIGN.md` (`dec-351`) is the sanctioned answer to "what is the architecture now". Building both yields two orientation tiers, one of them 40× the tokens and answering a strictly worse question.
 
 `query_adrs.py`'s existing contract — a selector is mandatory, there is no unfiltered mode — is a correct constraint, not a gap. Its output is bounded by the query, not by the corpus; an `--index` mode would give that property up.
 

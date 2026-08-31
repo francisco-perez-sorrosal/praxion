@@ -30,7 +30,7 @@ Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.m
 ## Frequent operations
 
 - **Craft or modify a component** (skill / rule / agent / command / hook) — load the matching `*-crafting` skill first, then run that skill's validator.
-- **Update content shipped into managed projects** — edit `claude/canonical-blocks/<slug>.md`, run `python3 scripts/sync_canonical_blocks.py --write`, mirror the change in `commands/onboard-project.md` + `commands/new-project.md` (the sync-check is in *Build / test / lint* above).
+- **Update content shipped into managed projects** — edit `claude/canonical-blocks/<slug>.md`, run `python3 scripts/sync_canonical_blocks.py --write` (the sync-check is in *Build / test / lint* above; the sole embedding site is `skills/onboard-project/references/claude-md-blocks.md`).
 - **Run an audit or roadmap pass** — `/sentinel` (coherence), `/project-metrics` (health), `/eval-praxion` (single eval entrypoint: mechanical + LLM-as-judge quality checks; pass `--task-slug <slug>` to add the in-flight artifact-manifest scan; `--mechanical-only` for the free, auth-less structural surface), `/roadmap` (audit→roadmap; per `dec-092` Praxion does not carry a living `ROADMAP.md` instance — the cartographer regenerates on demand).
 - **Work on the dashboard** — `dashboard_app/` (Next.js runtime over `.ai-state/`); its test + build commands are in *Build / test / lint* above.
 - **Add or refine docs** — long-form Diátaxis-shaped docs under `docs/` (index: `docs/README.md`); component catalogs in `agents/README.md` / `skills/README.md` / `commands/README.md` / `rules/README.md`.
@@ -82,14 +82,15 @@ Match process weight to task scale. The tier table + fast-path selector (Direct 
 
 **Worktrees**: Praxion's canonical worktree home is `.claude/worktrees/<name>/`. Follow the worktree workflows in `commands/create-worktree.md` and `commands/merge-worktree.md`. ADRs created in a pipeline land as fragments under `.ai-state/decisions/drafts/` and are promoted to `dec-NNN` at merge-to-main by `scripts/finalize_adrs.py`. PR-adjacent workflow conventions live in `rules/swe/vcs/pr-conventions.md` (path-scoped).
 
-**Onboarding artifacts dogfooding**: Praxion's own `.ai-state/`, `.gitattributes`, git hooks, and `CLAUDE.md` blocks are products of the patterns `/onboard-project` applies to user projects. When updating `/onboard-project` or `/new-project`, verify the change still produces what Praxion has on disk — or, if evolving the contract, propose what Praxion's own state must change.
+**Onboarding artifacts dogfooding**: Praxion's own `.ai-state/`, `.gitattributes`, git hooks, and `CLAUDE.md` blocks are products of the patterns `onboard-project` applies to user projects. When updating `skills/onboard-project/` or `scripts/onboard-project`, verify the change still produces what Praxion has on disk — or, if evolving the contract, propose what Praxion's own state must change.
 
-**Onboarding contract**: Praxion ships **two onboarding paths** converging on the same end state — `.gitignore` block, `.ai-state/` skeleton, `.gitattributes` + merge drivers, git hooks, `.claude/settings.json` toggles, three `CLAUDE.md` blocks (Agent Pipeline + Compaction Guidance + Behavioral Contract), opt-in architecture baseline:
+**Onboarding contract**: Praxion ships **one path**, `onboard-project`, converging on the same end state — `.gitignore` block, `.ai-state/` skeleton, `.gitattributes` + merge drivers, git hooks, `.claude/settings.json` toggles, four `CLAUDE.md` blocks (Agent Pipeline + Compaction Guidance + Behavioral Contract + Praxion Process), opt-in architecture/quality/CI/AaC/ML/Obsidian tiers. One phase engine (`skills/onboard-project/`) and one entry script (`scripts/onboard-project`) resolve four modes from detected state:
 
-- **Greenfield** (empty dir): `new_project.sh` + the workflow in `commands/new-project.md` — the bash entry validates prereqs and scaffolds, then launches the seed workflow and chains to `commands/onboard-project.md`. Companion: `docs/greenfield-onboarding.md`.
-- **Existing project** (has code): `commands/onboard-project.md` — phased, gated, idempotent (10 phases, 9 gates). Phase 8 optionally produces `.ai-state/DESIGN.md` + `docs/architecture.md`; Phase 8b installs the AaC tier; Phase 8c scaffolds ML/AI training conventions when detected. Companion: `docs/existing-project-onboarding.md`.
+- **`new`** (empty dir): the entry script validates prereqs and scaffolds, then launches the seed workflow (default app) and applies the remaining surfaces.
+- **`existing`** (has code): retrofits an already-populated repo. Gate count is 3 total (mode-confirm, build-intent, capability Profile) — a gate that carries no decision earns no interruption.
+- **`hackathon`** (minimal, promotable) and **`promote`** (`--full` — hackathon → fully managed, mechanical teardown of the six hackathon artifacts).
 
-Source-of-truth chain for canonical blocks: `commands/onboard-project.md` → `commands/new-project.md` → `new_project.sh`. Changes to canonical blocks must mirror across both commands for byte-identical output.
+Companion doc: `docs/onboarding.md`. Source-of-truth chain for canonical blocks: `claude/canonical-blocks/<slug>.md` → `skills/onboard-project/references/claude-md-blocks.md` (single embedding site — the byte-identical-across-two-files problem no longer exists).
 
 **Behavioral Contract (applied)**: Praxion enforces the four behaviors — Surface Assumptions, Register Objection, Stay Surgical, Simplicity First — via per-agent self-tests and named failure-mode tags in verification reports. Canonical text: `rules/swe/agent-behavioral-contract.md` (always loaded); deep dive: `skills/software-planning/references/behavioral-contract.md`.
 

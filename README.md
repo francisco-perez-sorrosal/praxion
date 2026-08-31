@@ -47,14 +47,14 @@ Other targets: `./install.sh desktop` (Claude Desktop), `./install.sh cursor` (C
 
 ### Onboard a Project
 
-Two entry points, picked by what is already in the directory. Both converge on the same Praxion-aware end state — identical `.gitignore` block, `.ai-state/` skeleton, git hooks, and `CLAUDE.md` blocks.
+One command, `onboard-project`, detects the directory's state and resolves the right mode. Every mode converges on the same Praxion-aware end state — identical `.gitignore` block, `.ai-state/` skeleton, git hooks, and `CLAUDE.md` blocks.
 
-| Starting point                   | Entry point                                                                 | Companion doc                                                      |
-| -------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| **Empty directory** (greenfield) | `./new_project.sh <name>`, then `/new-project` inside the launched session  | [Greenfield Project Onboarding](docs/greenfield-onboarding.md)     |
-| **Existing project** (has code)  | `/onboard-project` inside a Claude Code session at the project root         | [Existing-Project Onboarding](docs/existing-project-onboarding.md) |
+```bash
+onboard-project <name>   # empty directory — scaffolds, then onboards
+onboard-project          # existing project — onboards this directory
+```
 
-The greenfield flow ends by chaining to `/onboard-project`, so there is one source of truth for what "Praxion-onboarded" means. `/onboard-project` runs ten idempotent phases with `AskUserQuestion` gates — including an opt-in architecture baseline that produces `.ai-state/DESIGN.md` + `docs/architecture.md` from the existing codebase. For a pipeline walkthrough from ideation through verification, see [Getting Started](docs/getting-started.md).
+Three gates total (mode confirm, build intent, capability Profile) replace the old two-command, 20-gate split. See [Project Onboarding](docs/onboarding.md) for the full contract, including the opt-in architecture baseline that produces `.ai-state/DESIGN.md` + `docs/architecture.md` from the existing codebase. For a pipeline walkthrough from ideation through verification, see [Getting Started](docs/getting-started.md).
 
 ## Core Concepts
 
@@ -62,7 +62,8 @@ The ecosystem has five building blocks that layer from always-on background know
 
 - **Rules** — domain knowledge loaded automatically by relevance. Declarative constraints (coding style, git conventions) the assistant applies without explicit invocation.
 - **Skills** — reusable knowledge modules loaded on demand. Deeper than rules: workflows, procedures, and reference material for specific domains.
-- **Commands** — slash commands for frequent workflows. User-invoked quick actions (`/co` for commits, `/create-worktree` for git worktrees, `/onboard-project` for project setup).
+- **Commands** — slash commands for frequent workflows. User-invoked quick actions (`/co` for commits, `/create-worktree` for git worktrees).
+- **Skills that are also entry points** — `onboard-project` (bringing a project into the ecosystem) ships as a user-invocable skill rather than a command, so it can carry supporting reference files loaded progressively.
 - **Agents** — autonomous subprocesses for complex multi-step tasks. Each runs in its own context with a specialty and communicates through shared documents, forming a pipeline.
 - **MCP servers** — external tool servers for capabilities like persistent memory and task observability.
 
@@ -76,7 +77,7 @@ Praxion manages three project archetypes through one shared pipeline:
 - **Agentic-AI apps** — agents-as-products; activated by `agentic-sdks`, `agent-evals`, `mcp-crafting`, `communicating-agents`.
 - **ML/AI training** — pre-training projects with compute budgets, eval thresholds, and experiment loops; activated by `ml-training`, `llm-training-eval`, `neo-cloud-abstraction`, `experiment-tracking`. Run `/run-experiment` to dispatch a training run, `/check-experiment` to poll one. See the [ML/AI Training Onramp](docs/ml-training-onramp.md).
 
-Orthogonal to the archetypes, **hackathon mode** is a project-scoped opt-in that replaces the 5-tier process selector with a flexible-entry **Hackathon Spine**: a fixed-order pipeline you enter at any stage by describing what you need in natural language, move around in freely mid-task, and exit. Test/SDD/ADR ceremony is relaxed for proof-of-concept work; the behavioral contract and the verifier remain. Enabled via `/onboard-project` Phase 5b or `/new-project --hackathon`; day-to-day launch is `scripts/praxion-hackathon`. Component map: [Architecture Guide §11](docs/architecture.md#11-hackathon-mode).
+Orthogonal to the archetypes, **hackathon mode** is a project-scoped opt-in that replaces the 5-tier process selector with a flexible-entry **Hackathon Spine**: a fixed-order pipeline you enter at any stage by describing what you need in natural language, move around in freely mid-task, and exit. Test/SDD/ADR ceremony is relaxed for proof-of-concept work; the behavioral contract and the verifier remain. Enabled via `onboard-project <name> --hackathon`; promote to fully managed later with `onboard-project --full`; day-to-day launch is `scripts/praxion-hackathon`. Component map: [Architecture Guide §11](docs/architecture.md#11-hackathon-mode).
 
 ## Guiding Principles
 
@@ -121,7 +122,7 @@ Reusable knowledge modules loaded automatically based on context. See [skills/RE
 
 - `/co`, `/cop` — create a commit (and push)
 - `/create-worktree`, `/merge-worktree` — git worktree lifecycle
-- `/onboard-project`, `/new-project` — bring a project into the ecosystem
+- `/onboard-project` — bring a project into the ecosystem (skill, not a command; invoked the same way)
 - `/roadmap` — produce a lens-audited `ROADMAP.md`
 - `/project-metrics`, `/eval-praxion` — health metrics and out-of-band quality evals
 - `/run-experiment`, `/check-experiment` — ML training experiment dispatch

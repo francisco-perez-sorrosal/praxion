@@ -429,7 +429,7 @@ See [`docs/rules-taxonomy.md`](../docs/rules-taxonomy.md) for the complete refer
 
 ## §Phase 5b — Hackathon mode gate
 
-**Predicate.** `PRAXION_HACKATHON_MODE=1` present under `.env` in `.claude/settings.json` — skip the entire phase if already set (fully idempotent re-run).
+**Predicate.** `PRAXION_HACKATHON_MODE=1` present under `.env` in `.claude/settings.json` — skip **Gate 5b and the six-artifact write-set below** if already set (fully idempotent re-run). This predicate does **not** gate Sub-step 5b.t, which declares its own independent predicate (stamp `mode == "hackathon"` ∧ resolved mode `promote`) — the teardown must remain reachable precisely when hackathon mode is installed.
 
 **Gate 5b.** When the `no-more-gates` flag is not set, fire `AskUserQuestion` with `header: "Hackathon mode"`, `multiSelect: false`, and the headline from the gate map. When `--hackathon` was passed to the command, auto-default to `Enable hackathon mode` without prompting. When `no-more-gates` is set, apply the default (`Skip — keep full ceremony`). When the user picks `Enable hackathon mode`, run the six-artifact write-set below. When the user picks `Skip — keep full ceremony`, skip Phase 5b entirely.
 

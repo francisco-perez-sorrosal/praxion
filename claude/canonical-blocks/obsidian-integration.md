@@ -31,7 +31,7 @@ This is why `move`/`rename` are denied above: file renames go through `git mv`, 
 
 ### Opt-out
 
-Obsidian integration can be skipped by passing `--no-obsidian` to `/onboard-project` or `/new-project`. To retrofit integration later, re-run `/onboard-project` — it is idempotent on Phase 8d.
+Obsidian integration can be skipped with `onboard-project --without obsidian` (the legacy `--no-obsidian` flag is accepted for one release with a deprecation warning). To retrofit integration later, re-run `onboard-project --with obsidian` — Phase 8d is idempotent.
 
 ### Reference
 

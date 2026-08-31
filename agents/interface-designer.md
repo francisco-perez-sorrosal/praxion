@@ -132,7 +132,7 @@ Implicitly, via shared documents: `RESEARCH_FINDINGS*.md` and `SYSTEMS_PLAN.md` 
 
 ### Onboarding-Mode Compatibility
 
-`systems-architect` runs in *baseline-audit mode* for `/onboard-project` Phase 8 and in *greenfield mode* for `/new-project`. Neither mode invokes `interface-designer` — baseline-audit describes what *is* (no design decisions); greenfield's seed pipeline makes interface decisions via the architect with the four skills available rather than a separate agent. The systems-architect collaboration bullet is therefore **additive only** — no change to either onboarding mode.
+`systems-architect` runs in *baseline-audit mode* for onboarding Phase 8 and in *greenfield mode* for the `new`-mode seed pipeline (`skills/onboard-project`). Neither mode invokes `interface-designer` — baseline-audit describes what *is* (no design decisions); greenfield's seed pipeline makes interface decisions via the architect with the four skills available rather than a separate agent. The systems-architect collaboration bullet is therefore **additive only** — no change to either onboarding mode.
 
 ## Consumers / Handoff
 

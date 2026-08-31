@@ -46,7 +46,7 @@ Onboard a project to work cleanly with the Praxion plugin (`praxion`) — one ph
 - [references/phases-core.md](references/phases-core.md) -- always-on phase bodies: 0.5, 1, 2, 3, 4, 5, 5b, 6, 7, 9
 - [references/phases-optional.md](references/phases-optional.md) -- opt-in phase bodies: 8, 8b, 8c, 8d, 8e
 - [references/claude-md-blocks.md](references/claude-md-blocks.md) -- the 7 canonical `CLAUDE.md` block bodies
-- [references/seed-pipeline.md](references/seed-pipeline.md) -- greenfield-only seed-pipeline content (from the retiring `/new-project` command)
+- [references/seed-pipeline.md](references/seed-pipeline.md) -- greenfield-only seed-pipeline content (from the retired `/new-project` command)
 
 ## §Pre-flight
 

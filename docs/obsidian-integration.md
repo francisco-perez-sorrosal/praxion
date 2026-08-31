@@ -13,8 +13,8 @@ Git and GitHub remain the version-control and collaboration layer. Obsidian inte
 
 The integration activates in two ways:
 
-- **Default-on gate** in `/onboard-project` (Gate 8d) and `/new-project` — the operator picks `Install Obsidian integration (recommended)` or `Skip`.
-- **Retrofit existing projects** via re-running `/onboard-project` — it is idempotent and re-enters Phase 8d to apply any missing sub-steps.
+- **Detection-gated default** in `onboard-project` — the `obsidian` capability is pre-checked in the Profile question when both the `obsidian` CLI and the `obsidian@obsidian-skills` marketplace plugin are detected (asking and then silently skipping is worse than an honest default); toggle it in the Profile, or pass `--with obsidian` / `--without obsidian`.
+- **Retrofit existing projects** via `onboard-project --with obsidian` — the engine is idempotent and re-enters Phase 8d to apply any missing sub-steps.
 
 ## Installation (machine-level)
 
@@ -68,8 +68,7 @@ When the session reaches Gate 8d, pick `Install Obsidian integration (recommende
 
 ### Before onboarding
 
-- `/onboard-project` — pick `Skip` at Gate 8d.
-- `/new-project` (bash entry point) — pass `--no-obsidian` flag, or set `PRAXION_NEW_PROJECT_NO_OBSIDIAN=1`.
+- `onboard-project` (any mode) — untick `obsidian` in the Profile question, or pass `--without obsidian`. The legacy `--no-obsidian` flag and `PRAXION_NEW_PROJECT_NO_OBSIDIAN=1` env var are accepted for one release with a deprecation warning.
 
 ### After onboarding (manual removal)
 

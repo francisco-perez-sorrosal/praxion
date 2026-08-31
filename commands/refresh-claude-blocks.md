@@ -115,9 +115,10 @@ commit — this command never commits for you.
   chosen — those stay `modified` by design; that is not drift, it's an
   honored customization).
 - **Refuses on a plugin source repo.** The underlying script mirrors the
-  self-onboard guard already applied by `/onboard-project` and
-  `/new-project` — it refuses to run against a Claude Code plugin source
-  repo unless `PRAXION_ALLOW_SELF_ONBOARD=1` is set.
+  self-onboard guard already applied by the onboarding engine
+  (`skills/onboard-project/references/detection.md`, guard G1) — it refuses
+  to run against a Claude Code plugin source repo unless
+  `PRAXION_ALLOW_SELF_ONBOARD=1` is set.
 - **Scope is fixed.** Only the four refresh-eligible blocks above are ever
   classified or touched. The template-filled `## Working in this project`
   section and conditional blocks like `## Obsidian Integration` are out of

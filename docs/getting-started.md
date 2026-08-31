@@ -224,7 +224,7 @@ The pipeline above takes you from idea to working code. Going from working code 
 
 ### Suggested order for a brand-new project
 
-After `/new-project` lands the seed app:
+After the `new`-mode seed pipeline lands the seed app:
 
 1. Iterate on features using the **Lessons** in `onboarding_for_mushi_busy_ppl.md` (L1–L7, generated alongside the seed)
 2. Run a **sentinel audit** once the codebase has more than ~10 files — establishes the health baseline future audits diff against

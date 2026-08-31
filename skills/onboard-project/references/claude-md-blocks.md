@@ -249,7 +249,7 @@ You'll most often be asked to:
 - `<list 3–5 of this project's most common task intents>`
 ```
 
-The fenced content above is a **template** — `/onboard-project` Phase 6 appends it and then fills the `<placeholders>` from the project's config (see §Phase 6 Action step 3); `/new-project` fills them at scaffold time. The fence is kept byte-identical to `claude/canonical-blocks/project-essentials.md` by `scripts/sync_canonical_blocks.py`; the `<placeholders>` are intentional and must survive the sync.
+The fenced content above is a **template** — Phase 6 appends it and then fills the `<placeholders>` from the project's config (see §Phase 6 Action step 3); in `new` mode the seed pipeline fills them at scaffold time. The fence is kept byte-identical to `claude/canonical-blocks/project-essentials.md` by `scripts/sync_canonical_blocks.py`; the `<placeholders>` are intentional and must survive the sync.
 
 ## §Obsidian Integration Block
 
@@ -289,7 +289,7 @@ This is why `move`/`rename` are denied above: file renames go through `git mv`, 
 
 ### Opt-out
 
-Obsidian integration can be skipped by passing `--no-obsidian` to `/onboard-project` or `/new-project`. To retrofit integration later, re-run `/onboard-project` — it is idempotent on Phase 8d.
+Obsidian integration can be skipped with `onboard-project --without obsidian` (the legacy `--no-obsidian` flag is accepted for one release with a deprecation warning). To retrofit integration later, re-run `onboard-project --with obsidian` — Phase 8d is idempotent.
 
 ### Reference
 

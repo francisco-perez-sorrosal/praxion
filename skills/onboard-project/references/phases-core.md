@@ -14,7 +14,7 @@ Always-on phase bodies for `skills/onboard-project/SKILL.md` — phases 0.5, 1, 
 
 **Action (only when `CLAUDE.md` is absent).**
 
-1. **Prefer `/init`** (when the user chose `Generate from codebase`). Invoke the official Claude `/init` command — it analyzes the codebase and writes a `CLAUDE.md` describing what actually exists. This mirrors `/new-project`'s greenfield step 9.
+1. **Prefer `/init`** (when the user chose `Generate from codebase`). Invoke the official Claude `/init` command — it analyzes the codebase and writes a `CLAUDE.md` describing what actually exists. This mirrors the seed pipeline's greenfield step 9 (`references/seed-pipeline.md`).
 
 2. **Verify, then fall back — never leave the project without a `CLAUDE.md`.** After the `/init` attempt, check `test -e CLAUDE.md`:
    - If `/init` produced a `CLAUDE.md`, continue to §Flow.

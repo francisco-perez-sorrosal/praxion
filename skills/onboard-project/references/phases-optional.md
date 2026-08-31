@@ -8,12 +8,12 @@ Opt-in phase bodies for `skills/onboard-project/SKILL.md` — phases 8, 8b, 8c, 
 
 **Predicate.** Skip the phase entirely if either of these holds:
 
-- `test -e .ai-state/DESIGN.md` (architect-facing doc already present — likely a re-run on a fully-onboarded project, or a greenfield-followed-by-onboard sequence where `/new-project`'s seed pipeline already produced it)
+- `test -e .ai-state/DESIGN.md` (architect-facing doc already present — likely a re-run on a fully-onboarded project, or a `new`-mode run whose seed pipeline (Phase 0s) already produced it)
 - `test -e docs/architecture.md` (developer-facing doc already present — same provenance)
 
 When skipped via predicate, emit: `Phase 8: skipped (architecture docs already exist — produced by the seed pipeline or a prior /onboard-project run)`. Skipping is idempotent and does not block Phase 9.
 
-**Why this phase exists.** Praxion's `sentinel` coherence audits and future feature pipelines (`systems-architect` updates these docs incrementally) both benefit from an architectural baseline. Without it, the existing-project onboarding is half-complete from the agent ecosystem's perspective — every future agent runs context-poor on the codebase shape. Greenfield (`/new-project`) gets this for free via the seed pipeline; existing-project needs the same treatment, which is what this phase delivers.
+**Why this phase exists.** Praxion's `sentinel` coherence audits and future feature pipelines (`systems-architect` updates these docs incrementally) both benefit from an architectural baseline. Without it, the existing-project onboarding is half-complete from the agent ecosystem's perspective — every future agent runs context-poor on the codebase shape. Greenfield (`new` mode) gets this for free via the seed pipeline; existing-project needs the same treatment, which is what this phase delivers.
 
 **Gate 8 — three-option AskUserQuestion.** Use `AskUserQuestion` with `header: "Next?"`, `multiSelect: false`, the headline from the gate map, and these three options:
 

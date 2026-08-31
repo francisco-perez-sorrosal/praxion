@@ -1,6 +1,6 @@
 # Praxion Onboarding — Seed Pipeline (Greenfield)
 
-Unique greenfield-only content from the retiring `/new-project` command: guard/flow/gates, the pipeline-framing prose, the default app spec, the SDK smoke check, init idempotency, the mushi-doc spec, the five-to-seven lesson ladder, prereq-recovery procedures, the AaC scaffolding sub-flow, the seed-pipeline's own idempotency predicates, the test gate, and the exit handoff. The 7 canonical `CLAUDE.md` blocks this pipeline installs live in [claude-md-blocks.md](claude-md-blocks.md) (shared with the existing-project phases in [phases-core.md](phases-core.md) / [phases-optional.md](phases-optional.md)).
+Unique greenfield-only content from the retired `/new-project` command: guard/flow/gates, the pipeline-framing prose, the default app spec, the SDK smoke check, init idempotency, the mushi-doc spec, the five-to-seven lesson ladder, prereq-recovery procedures, the AaC scaffolding sub-flow, the seed-pipeline's own idempotency predicates, the test gate, and the exit handoff. The 7 canonical `CLAUDE.md` blocks this pipeline installs live in [claude-md-blocks.md](claude-md-blocks.md) (shared with the existing-project phases in [phases-core.md](phases-core.md) / [phases-optional.md](phases-optional.md)).
 
 
 Onboard the current (freshly scaffolded) directory. Ask one question first, show the user *how* Praxion is driven (orchestrator + subagents), frame the build as a pipeline task so they watch the orchestrator in action, then — once the codebase exists — run `/init`, append the five Praxion blocks (Agent Pipeline + Compaction Guidance + Behavioral Contract + Praxion Process + Working in this project) idempotently, generate a per-run trail map, and hand off to `/onboard-project` (which applies the remaining surfaces — git hooks, merge drivers, `.ai-state/` skeleton, `.claude/settings.json` toggles) before the user runs `/co` to commit. **Greenfield and existing-project paths converge on the same end state**: this command is the existing-project counterpart of `/onboard-project`'s Phase 6 ("CLAUDE.md blocks"); both produce byte-identical CLAUDE.md sections.
@@ -298,9 +298,9 @@ Never copy symbol names from this file into generated code — this file deliber
 
 ## §Init idempotency
 
-`/new-project` appends the same five blocks to `CLAUDE.md` that `/onboard-project`'s Phase 6 owns: §Agent Pipeline Block, §Compaction Guidance Block, §Behavioral Contract Block, §Praxion Process Block, §Project Essentials Block. **This is the same write, not a second one** — use [phases-core.md § Phase 6](phases-core.md#-phase-6--claudemd-praxion-blocks)'s classification mechanism verbatim, rather than restating it here: `refresh_claude_blocks.py`'s absent/current/stale/modified classifier for the four refreshable blocks, and an independent heading-grep for Project Essentials (`## Working in this project`).
+The seed pipeline appends the same five blocks to `CLAUDE.md` that Phase 6 owns: §Agent Pipeline Block, §Compaction Guidance Block, §Behavioral Contract Block, §Praxion Process Block, §Project Essentials Block. **This is the same write, not a second one** — use [phases-core.md § Phase 6](phases-core.md#-phase-6--claudemd-praxion-blocks)'s classification mechanism verbatim, rather than restating it here: `refresh_claude_blocks.py`'s absent/current/stale/modified classifier for the four refreshable blocks, and an independent heading-grep for Project Essentials (`## Working in this project`).
 
-Re-running either command — or running both — never duplicates a section. If `/new-project` lands all five blocks during greenfield, `/onboard-project`'s Phase 6 becomes a complete no-op (every per-block predicate hits) — the smooth-integration contract.
+Re-running the engine in any mode never duplicates a section. If the seed lands all five blocks during greenfield, Phase 6 becomes a complete no-op (every per-block predicate hits) — the smooth-integration contract.
 
 ## §Mushi Doc Spec
 
@@ -486,7 +486,7 @@ After rendering, YAML-load the output to validate syntax before writing. If YAML
 
 ## §Idempotency Predicates — per-Flow-phase contracts
 
-Per-phase predicates that govern §Flow steps. Re-running `/new-project` on a directory mid-flight (e.g., after a partial run) honors these checks so completed phases are not redone.
+Per-phase predicates that govern §Flow steps. Re-running the seed pipeline on a directory mid-flight (e.g., after a partial run) honors these checks so completed phases are not redone.
 
 | Flow step | Predicate (skip if true) |
 |-----------|--------------------------|
@@ -505,18 +505,18 @@ Per-phase predicates that govern §Flow steps. Re-running `/new-project` on a di
 | 5g.3 (obsidian@obsidian-skills plugin) | `claude plugin list 2>/dev/null \| grep -q 'obsidian@obsidian-skills'` |
 | 5g.4 (.obsidian/app.json link-safety config) | `jq -e '(.useMarkdownLinks == true) and (.alwaysUpdateLinks == false)' .obsidian/app.json` exits 0 |
 | 5g.5 (## Obsidian Integration CLAUDE.md append) | `grep -q '^## Obsidian Integration$' CLAUDE.md` |
-| 5g.5b (permissions.deny block) | All required `Bash(obsidian …)` deny entries present (subset check — see §Phase 8d sub-step 8d.5b in `/onboard-project`) |
+| 5g.5b (permissions.deny block) | All required `Bash(obsidian …)` deny entries present (subset check — see §Phase 8d sub-step 8d.5b in `phases-optional.md`) |
 
-Other §Flow steps (1–7, 9, 11–13) are not idempotent in the strict sense because the seed pipeline (researcher → architect → planner → implementer + test-engineer → verifier) produces new artifacts each run. The §Guard at flow-start refuses to run on a non-greenfield directory, so re-invocation is rare; if it does happen, the user gets a Guard abort and is directed to `/onboard-project` instead.
+Other §Flow steps (1–7, 9, 11–13) are not idempotent in the strict sense because the seed pipeline (researcher → architect → planner → implementer + test-engineer → verifier) produces new artifacts each run. The §Guard at flow-start refuses to run on a non-greenfield directory, so re-invocation is rare; if it does happen, the user gets a Guard abort and is redirected to the engine's `existing` mode.
 
-**Smooth integration contract.** When `/new-project` finishes successfully and the user runs `/onboard-project` next (per the exit handoff recommendation), three phases of `/onboard-project` are complete no-ops because the seed pipeline already produced their outputs:
+**Smooth integration contract.** When the seed pipeline (Phase 0s) finishes, the engine continues with the remaining phases in the same run, and three of them are complete no-ops because the seed already produced their outputs:
 
-- **`/onboard-project` Phase 6 (CLAUDE.md blocks)** — all five standard predicates hit (Agent Pipeline, Compaction Guidance, Behavioral Contract, Praxion Process, and Working in this project are present from this command's Flow step 10). When hackathon mode was enabled, the `## Hackathon Mode` block is also present; `/onboard-project --hackathon`'s Phase 5b finds its per-artifact CLAUDE.md-block predicate already satisfied and skips just that artifact while still writing the remaining five (env var, preset, wrapper, directive, settings) — Phase 5b is not skipped wholesale, only its block-append sub-step.
-- **`/onboard-project` Phase 8 (Architecture Baseline)** — the predicate `test -e .ai-state/DESIGN.md` hits because the seed pipeline's `systems-architect` (gate 4b) already produced both `.ai-state/DESIGN.md` and `docs/architecture.md`. Re-running the architect would overwrite a real-content baseline with another real-content baseline; the predicate prevents that.
-- **`/onboard-project` Phase 8b (AaC scaffolding)** — when AaC was not opted out of (the default), all five sub-step predicates hit (`fitness/` exists, Block D is present, `architecture.yml` exists, fence markers are in `.ai-state/DESIGN.md`, `docs/diagrams/.gitkeep` exists). The `/onboard-project --with-aac` path becomes a clean no-op.
-- **`/onboard-project` Phase 8d (Obsidian integration)** — when Obsidian was not opted out of (the default), all sub-step predicates hit (`.gitignore` Obsidian block present, `obsidian@obsidian-skills` plugin installed at user scope, `.obsidian/app.json` link-safety keys pinned, `## Obsidian Integration` block in `CLAUDE.md`, `permissions.deny` entries present). `/onboard-project`'s Phase 8d becomes a complete no-op.
+- **Phase 6 (CLAUDE.md blocks)** — all five standard predicates hit (Agent Pipeline, Compaction Guidance, Behavioral Contract, Praxion Process, and Working in this project are present from the seed's Flow step 10). When hackathon mode was selected, the `## Hackathon Mode` block is also present; Phase 5b finds its per-artifact CLAUDE.md-block predicate already satisfied and skips just that artifact while still writing the remaining five (env var, preset, wrapper, directive, settings) — Phase 5b is not skipped wholesale, only its block-append sub-step.
+- **Phase 8 (Architecture Baseline, capability `arch`)** — the predicate `test -e .ai-state/DESIGN.md` hits because the seed pipeline's `systems-architect` already produced both `.ai-state/DESIGN.md` and `docs/architecture.md`. Re-running the architect would overwrite a real-content baseline with another real-content baseline; the predicate prevents that.
+- **Phase 8b (AaC scaffolding, capability `aac`)** — when `aac` was selected, all five sub-step predicates hit (`fitness/` exists, Block D is present, `architecture.yml` exists, fence markers are in `.ai-state/DESIGN.md`, `docs/diagrams/.gitkeep` exists) on any later re-run (`onboard-project --with aac`), which becomes a clean no-op.
+- **Phase 8d (Obsidian integration, capability `obsidian`)** — when `obsidian` was selected, all sub-step predicates hit (`.gitignore` Obsidian block present, `obsidian@obsidian-skills` plugin installed at user scope, `.obsidian/app.json` link-safety keys pinned, `## Obsidian Integration` block in `CLAUDE.md`, `permissions.deny` entries present) and Phase 8d becomes a complete no-op.
 
-The other phases of `/onboard-project` (1, 2, 3, 4, 5, 7, 9) apply the surfaces this command does not — git hooks, merge drivers, the full `.ai-state/` skeleton (enumerated in `/onboard-project` §Phase 2, which is the only place that list lives), `.gitattributes`, `.claude/settings.json` toggles and permissions, companion CLI advisories, and the verification handoff.
+The remaining phases (1, 2, 3, 4, 5, 7, 9) apply the surfaces the seed does not — git hooks, merge drivers, the full `.ai-state/` skeleton (enumerated in §Phase 2 of `phases-core.md`, which is the only place that list lives), `.gitattributes`, `.claude/settings.json` toggles and permissions, companion CLI advisories, and the verification handoff.
 
 ## Test gate
 

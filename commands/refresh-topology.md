@@ -24,7 +24,7 @@ Read `.ai-state/DESIGN.md` §3 (Components) and count Built components.
 
 If `.ai-state/DESIGN.md` is absent or §3 has fewer Built components than the structural-feasibility threshold defined in `skills/testing-strategy/references/test-topology.md` §"Growth-Trigger Policy", **decline gracefully**:
 
-> "Cannot scaffold a topology: the project does not yet have enough distinct Built components in `.ai-state/DESIGN.md` §3. With fewer components than the structural-feasibility threshold, topology groups would recapitulate the whole project rather than map to real architectural subsystems — a topology anti-pattern. To proceed, first establish an architecture baseline by running `/onboard-project` (Phase 8) or the `/new-project` seed pipeline, then re-run `/refresh-topology --init` once the component model is populated."
+> "Cannot scaffold a topology: the project does not yet have enough distinct Built components in `.ai-state/DESIGN.md` §3. With fewer components than the structural-feasibility threshold, topology groups would recapitulate the whole project rather than map to real architectural subsystems — a topology anti-pattern. To proceed, first establish an architecture baseline by running `onboard-project --with arch` (Phase 8, or the `new`-mode seed pipeline), then re-run `/refresh-topology --init` once the component model is populated."
 
 If `.ai-state/TEST_TOPOLOGY.md` already exists, confirm with the user before overwriting — a topology already exists. They may want `/refresh-topology` (no flag) instead.
 

@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 FIXTURES = Path(__file__).parent / "fixtures" / "spec_drift"
 
 # ---------------------------------------------------------------------------
@@ -344,3 +346,79 @@ def test_missing_pyyaml_raises_rather_than_reporting_no_drift(tmp_path: Path, mo
 
     with pytest.raises(RuntimeError, match="PyYAML"):
         spec_drift._load_traceability(traceability)
+
+
+# ---------------------------------------------------------------------------
+# REQ_PATTERN corpus-form coverage (td-142: widen from bare-only to the live
+# corpus's prefixed forms)
+# ---------------------------------------------------------------------------
+
+_SPECS_DIR = Path(__file__).parents[1] / ".ai-state" / "specs"
+
+
+@pytest.mark.parametrize(
+    "req_id",
+    ["REQ-01", "REQ-PM-01", "REQ-DDL-01", "REQ-DIAGRAM-01"],
+)
+def test_req_pattern_matches_each_corpus_shape(req_id: str) -> None:
+    """REQ_PATTERN matches bare and every prefixed form seen in .ai-state/specs/."""
+    from scripts.spec_drift import REQ_PATTERN
+
+    assert REQ_PATTERN.fullmatch(req_id), (
+        f"REQ_PATTERN must match {req_id!r} — a shape present in the live spec corpus"
+    )
+
+
+def test_req_pattern_rejects_non_req_identifier_lookalikes() -> None:
+    """REQ_PATTERN must not match prose words that merely start with 'REQ-'.
+
+    The live corpus contains glossary prose like 'REQ-level' and 'REQ-tagged'
+    that are not requirement identifiers — a pattern widened too far would
+    misclassify them as untracked reqs.
+    """
+    from scripts.spec_drift import REQ_PATTERN
+
+    for lookalike in ("REQ-level", "REQ-tagged", "REQ-ID", "REQ-DDLs"):
+        assert not REQ_PATTERN.fullmatch(lookalike), (
+            f"REQ_PATTERN must not fullmatch prose lookalike {lookalike!r}"
+        )
+
+
+@pytest.mark.skipif(not _SPECS_DIR.is_dir(), reason="no .ai-state/specs/ corpus in this checkout")
+def test_req_pattern_prefix_shapes_cover_the_live_corpus() -> None:
+    """Canary: every REQ prefix token present in .ai-state/specs/ is matched.
+
+    Parses the real corpus (not a fixture) for anything shaped like a REQ
+    identifier and asserts REQ_PATTERN's matched set includes every distinct
+    prefix token found — so a future corpus form (e.g. REQ-FOO-NN) that the
+    pattern can't see fails this canary instead of silently going untracked.
+    """
+    import re as _re
+
+    from scripts.spec_drift import REQ_PATTERN
+
+    # Broad probe: anything "REQ-" followed by letters/digits/hyphens, so this
+    # canary can detect a shape REQ_PATTERN itself would miss.
+    probe = _re.compile(r"\bREQ-[A-Za-z0-9-]+\b")
+
+    found_prefixes: set[str] = set()
+    matched_prefixes: set[str] = set()
+    for spec_file in _SPECS_DIR.glob("**/*.md"):
+        content = spec_file.read_text(encoding="utf-8", errors="ignore")
+        for candidate in probe.findall(content):
+            # Only consider candidates that are genuine "REQ-<prefix>-NN" or
+            # "REQ-NN" identifiers — i.e. end in digits — to exclude prose
+            # lookalikes like "REQ-level" from the expected set.
+            if not candidate[-1].isdigit():
+                continue
+            prefix_match = _re.fullmatch(r"REQ-(?:([A-Za-z]+)-)?\d+", candidate)
+            if prefix_match is None:
+                continue
+            found_prefixes.add(prefix_match.group(1) or "")
+            if REQ_PATTERN.fullmatch(candidate):
+                matched_prefixes.add(prefix_match.group(1) or "")
+
+    assert found_prefixes, "expected at least one REQ identifier in the live corpus"
+    assert matched_prefixes == found_prefixes, (
+        f"REQ_PATTERN misses corpus prefix shape(s): {found_prefixes - matched_prefixes!r}"
+    )

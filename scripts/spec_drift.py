@@ -57,7 +57,7 @@ SPEC_SOURCE_FILENAMES = frozenset(
     }
 )
 
-REQ_PATTERN = re.compile(r"\bREQ-\d+\b")
+REQ_PATTERN = re.compile(r"\bREQ-(?:[A-Z]+-)?\d+\b")
 
 
 # ---------------------------------------------------------------------------

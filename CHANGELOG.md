@@ -1,3 +1,9 @@
+## v0.26.1 (2026-08-31)
+
+### Fix
+
+- **id-citation**: repo-relative worktree exclusion + loud pre-commit checker resolution
+
 ## v0.26.0 (2026-08-31)
 
 ### Feat

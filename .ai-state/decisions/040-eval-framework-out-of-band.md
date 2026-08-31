@@ -19,9 +19,9 @@ affected_reqs:
   - REQ-EV-02
   - REQ-EV-04
   - REQ-EV-05
-superseded_by: dec-204
-re_affirmed_by:
+superseded_in_part_by:
   - dec-204
+re_affirmed_by:
   - dec-258
 ---
 

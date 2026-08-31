@@ -13,7 +13,8 @@ pipeline_tier: standard
 affected_files:
   - agents/sentinel.md
   - agents/verifier.md
-supersedes: dec-203
+supersedes_in_part:
+  - dec-203
 ---
 
 ## Context

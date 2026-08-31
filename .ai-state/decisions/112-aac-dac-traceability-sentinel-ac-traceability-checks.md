@@ -12,8 +12,7 @@ pipeline_tier: standard
 affected_files:
   - agents/sentinel.md
 re_affirms: dec-111
-superseded_by: dec-323
-re_affirmed_by:
+superseded_in_part_by:
   - dec-323
 ---
 

@@ -12,7 +12,8 @@ branch: worktree-storm-integration
 pipeline_tier: full
 affected_files: []
 affected_reqs: [REQ-09]
-superseded_by: dec-232
+superseded_in_part_by:
+  - dec-232
 dissent: "A reader could argue the agentic eval-lens should ship now because the coverage gap (no multi-perspective eval-coverage check before plan approval) is real today for any managed agentic project. Held minority view: revisit when a managed agentic project actually runs the pipeline and the project_profile.yaml infrastructure exists."
 re_affirmed_by:
   - dec-263

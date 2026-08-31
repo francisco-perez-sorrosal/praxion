@@ -15,7 +15,7 @@ agent_type: systems-architect
 pipeline_tier: full
 affected_files:
   - "scripts/finalize_adrs.py"
-  - "scripts/git-post-merge-hook.sh"
+  - "scripts/git-finalize-hook.sh"
   - "scripts/reconcile_ai_state.py"
   - "commands/merge-worktree.md"
   - "rules/swe/adr-conventions.md"

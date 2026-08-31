@@ -10,9 +10,9 @@ made_by: agent
 agent_type: systems-architect
 pipeline_tier: standard
 affected_files:
-  - commands/onboard-project.md
-  - commands/new-project.md
-  - new_project.sh
+  - skills/onboard-project/SKILL.md
+  - skills/onboard-project/references/seed-pipeline.md
+  - scripts/onboard-project
   - claude/aac-templates/architecture.yml.tmpl
   - claude/aac-templates/fitness-import-linter.cfg.tmpl
   - claude/aac-templates/fitness-test-meta-citation.py.tmpl

@@ -13,8 +13,8 @@ affected_files:
   - hooks/inject_subagent_context.py
   - hooks/inject_process_framing.py
   - hooks/hooks.json
-  - commands/onboard-project.md
-  - commands/new-project.md
+  - skills/onboard-project/SKILL.md
+  - skills/onboard-project/references/seed-pipeline.md
   - skills/hook-crafting/references/output-patterns.md
 affected_reqs: [REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-06, REQ-07, REQ-08, REQ-14, REQ-15]
 re_affirmed_by:

@@ -12,7 +12,7 @@ branch: feat-l3-readiness-config
 pipeline_tier: full
 affected_files:
   - claude/project-baseline/dependabot.yml.tmpl
-  - commands/onboard-project.md
+  - skills/onboard-project/SKILL.md
   - .github/dependabot.yml
 dissent: Inline-authoring a dependabot.yml per project (no canonical asset) avoids adding template indirection to claude/project-baseline/ for a few lines per ecosystem; the asset-plus-sub-step machinery is arguably overhead for a low-churn config.
 ---

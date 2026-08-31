@@ -16,8 +16,7 @@ affected_files:
   - claude/project-baseline/ci-autofix/ci-autofix.yml.tmpl
   - claude/project-baseline/ci-autofix/cross-model-review.yml.tmpl
   - claude/project-baseline/ci-autofix/autofix-policy.yml.tmpl
-  - commands/onboard-project.md
-  - commands/new-project.md
+  - skills/onboard-project/SKILL.md
 affected_reqs: [REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-06, REQ-07]
 dissent: "SHA-pinned callers make every hub security fix a manual, per-repo pin-bump — a fleet member that never bumps stays on vulnerable logic; the copied-templates-via-dec-271-manifest runner-up would auto-deliver that fix to every unmodified copy. We accept manual bumps to gain deliberate, auditable, blast-radius-controlled upgrades and a single audited home for the injection/sanitization logic."
 re_affirmed_by:

@@ -13,7 +13,7 @@ pipeline_tier: standard
 affected_files:
   - .github/workflows/reusable-ci-autofix.yml
   - .github/autofix-policy.yml
-  - tests/test_ci_autofix_hub_invariants.py
+  - tests/test_ci_autofix_hub_surfaces.py
 affected_reqs: [REQ-08, REQ-10, REQ-11]
 re_affirms: dec-277
 dissent: A fix-commit-to-fork-head surface (with the contributor's maintainer-edit opt-in) would close the loop for forks too; it is rejected because writing to an untrusted head from a privileged workflow_run context is exactly the pwn-request pattern GitHub's Security Lab warns against, and the residual risk dwarfs the convenience.

@@ -9,8 +9,7 @@ tags: [onboarding, self-host, guard, plugin-source, idempotency, source-of-truth
 made_by: user
 pipeline_tier: lightweight
 affected_files:
-  - commands/onboard-project.md
-  - commands/new-project.md
+  - skills/onboard-project/references/detection.md
 ---
 
 ## Context

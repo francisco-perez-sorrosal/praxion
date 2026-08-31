@@ -16,7 +16,7 @@ affected_files:
   - dashboard_app/src/server/diagrams/rewrite-image-refs.ts
   - dashboard_app/src/server/artifacts/files.ts
   - dashboard_app/src/server/view-models/architecture.ts
-  - dashboard_app/src/components/viz/diagram-viewer.tsx
+  - dashboard_app/src/components/viz/diagram-frame.tsx
   - rules/writing/diagram-conventions.md
 ---
 

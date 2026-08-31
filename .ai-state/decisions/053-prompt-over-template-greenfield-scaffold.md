@@ -15,9 +15,9 @@ made_by: user
 agent_type: systems-architect
 pipeline_tier: standard
 affected_files:
-  - new_project.sh
-  - commands/new-project.md
-  - docs/greenfield-onboarding.md
+  - scripts/onboard-project
+  - skills/onboard-project/references/seed-pipeline.md
+  - docs/onboarding.md
 affected_reqs:
   - REQ-ONBOARD-15
   - REQ-ONBOARD-16

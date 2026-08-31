@@ -12,9 +12,8 @@ branch: main
 pipeline_tier: lightweight
 affected_files:
   - claude/canonical-blocks/agent-pipeline.md
-  - commands/onboard-project.md
-  - commands/new-project.md
-  - hooks/test_onboard_praxion_block.py
+  - skills/onboard-project/references/claude-md-blocks.md
+  - tests/commands/test_onboard_block_mechanism.py
   - skills/software-planning/SKILL.md
 dissent: A no-Praxion collaborator loses the only in-repo narrative of the maintainer's pipeline, and the pointer assumes the coordination rule and skill surfaces stay installed and discoverable wherever the pipeline actually runs.
 re_affirmed_by:

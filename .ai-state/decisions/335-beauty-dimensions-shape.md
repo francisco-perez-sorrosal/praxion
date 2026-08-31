@@ -25,7 +25,7 @@ affected_files:
   - skills/code-review/SKILL.md
   - .ai-state/principles.yaml
   - claude/project-baseline/principles.yaml.tmpl
-  - commands/onboard-project.md
+  - skills/onboard-project/SKILL.md
   - tests/commands/test_onboard_principles_install.py
 ---
 

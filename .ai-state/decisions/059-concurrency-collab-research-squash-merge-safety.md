@@ -15,7 +15,7 @@ agent_type: systems-architect
 pipeline_tier: full
 affected_files:
   - "scripts/check_squash_safety.py"
-  - "scripts/git-post-merge-hook.sh"
+  - "scripts/git-finalize-hook.sh"
   - "commands/merge-worktree.md"
   - "rules/swe/vcs/pr-conventions.md"
 ---

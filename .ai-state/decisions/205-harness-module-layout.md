@@ -12,7 +12,6 @@ branch: worktree-praxion-self-eval-v1
 pipeline_tier: standard
 affected_files:
   - eval/src/praxion_evals/harness/families/
-  - eval/src/praxion_evals/harness/checks/
 re_affirms: dec-204
 ---
 

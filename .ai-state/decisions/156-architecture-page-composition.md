@@ -13,7 +13,7 @@ pipeline_tier: standard
 affected_files:
   - dashboard_app/src/app/architecture/page.tsx
   - dashboard_app/src/components/markdown-toc.tsx
-  - dashboard_app/src/components/viz/diagram-viewer.tsx
+  - dashboard_app/src/components/viz/diagram-frame.tsx
   - dashboard_app/src/app/globals.css
 ---
 

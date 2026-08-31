@@ -11,7 +11,7 @@ agent_type: systems-architect
 pipeline_tier: standard
 affected_files:
   - eval/
-  - commands/eval.md
+  - commands/eval-praxion.md
   - .github/workflows/test.yml
   - hooks/hooks.json
 affected_reqs:

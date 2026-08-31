@@ -12,8 +12,8 @@ branch: worktree-data-structures-pillar
 pipeline_tier: full
 dissent: "A pinned upstream pre-commit repo gives hermetic, version-reproducible Rust hooks that do not depend on each contributor's local toolchain — the same property that makes the existing ruff hook reproducible — and repo-local system hooks trade that away for a class of contributor-machine failures."
 affected_files:
-  - commands/onboard-project.md
-  - commands/new-project.md
+  - skills/onboard-project/SKILL.md
+  - skills/onboard-project/references/seed-pipeline.md
   - claude/project-baseline/pre-commit-config.yaml
   - claude/project-baseline/dependabot.yml.tmpl
   - skills/rust-development/assets/rustfmt.toml

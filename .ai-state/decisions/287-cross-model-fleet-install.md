@@ -11,9 +11,8 @@ agent_type: systems-architect
 branch: worktree-p3b-fleet-install
 pipeline_tier: standard
 affected_files:
-  - commands/onboard-project.md
+  - skills/onboard-project/SKILL.md
   - claude/project-baseline/ci-autofix/autofix-policy.yml.tmpl
-  - commands/new-project.md
 affected_reqs: [REQ-01, REQ-02, REQ-03, REQ-04, REQ-06, REQ-07, REQ-08]
 re_affirms: dec-274
 dissent: "Rolling a second vendor's secret requirement (CURSOR_API_KEY) into every managed onboard — even print-only and policy-gated — is the exact cost dec-278 deferred pending a Praxion dogfooding signal; installing it now for the whole fleet trusts that the dogfood signal is favorable, which this pass asserts rather than measures."

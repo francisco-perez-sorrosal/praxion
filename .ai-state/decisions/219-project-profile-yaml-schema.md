@@ -13,7 +13,7 @@ pipeline_tier: standard
 affected_files:
   - .ai-state/project_profile.yaml
   - rules/swe/agent-intermediate-documents.md
-  - commands/onboard-project.md
+  - skills/onboard-project/SKILL.md
 related: [dec-221, dec-220, dec-216]
 superseded_by: dec-263
 ---

@@ -13,7 +13,6 @@ pipeline_tier: lightweight
 affected_files:
   - scripts/self_healing_metrics.py
   - scripts/test_self_healing_metrics.py
-  - commands/loop-metrics.md
   - .ai-state/metrics_reports/SELF_HEALING_LOG.md
 ---
 

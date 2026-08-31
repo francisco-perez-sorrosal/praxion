@@ -14,7 +14,7 @@ made_by: agent
 agent_type: implementation-planner
 pipeline_tier: standard
 affected_files:
-  - hooks/test_onboard_praxion_block.py
+  - tests/commands/test_onboard_block_mechanism.py
   - scripts/test_sync_canonical_blocks.py
   - scripts/sync_canonical_blocks.py
 ---

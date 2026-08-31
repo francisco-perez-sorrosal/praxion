@@ -14,7 +14,7 @@ made_by: user
 agent_type: systems-architect
 pipeline_tier: standard
 affected_files:
-  - new_project.sh
+  - scripts/onboard-project
   - install_claude.sh
 ---
 

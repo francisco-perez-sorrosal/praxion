@@ -16,7 +16,7 @@ affected_files:
   - .github/workflows/labels-reconcile.yml
   - claude/project-baseline/labels/labels.yml.tmpl
   - claude/project-baseline/labels/labels-reconcile.yml.tmpl
-  - commands/onboard-project.md
+  - skills/onboard-project/SKILL.md
   - commands/upgrade-project.md
   - scripts/refresh_labels_baseline.py
   - scripts/upgrade_project_pins.sh

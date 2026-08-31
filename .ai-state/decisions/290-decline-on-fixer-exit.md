@@ -12,7 +12,7 @@ branch: worktree-autofix-fixer-hardening
 pipeline_tier: standard
 affected_files:
   - .github/workflows/reusable-ci-autofix.yml
-  - tests/test_ci_autofix_hub_invariants.py
+  - tests/test_ci_autofix_hub_contract.py
 dissent: A masked agent crash surfaces as a green "declined" job, not a red X — an operator watching for red misses a genuine infra failure.
 ---
 

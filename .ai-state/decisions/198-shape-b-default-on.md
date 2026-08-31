@@ -17,10 +17,10 @@ affected_files:
   - install.sh
   - scripts/install-obsidian-deps.sh
   - claude/canonical-blocks/obsidian-integration.md
-  - commands/onboard-project.md
-  - commands/new-project.md
-  - new_project.sh
-  - docs/obsidian-shape-b.md
+  - skills/onboard-project/SKILL.md
+  - skills/onboard-project/references/seed-pipeline.md
+  - scripts/onboard-project
+  - docs/obsidian-integration.md
 ---
 
 ## Context

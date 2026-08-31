@@ -12,7 +12,7 @@ branch: worktree-dashboard-redesign
 pipeline_tier: full
 affected_files:
   - dashboard_app/src/components/viz/use-pan-zoom.ts
-  - dashboard_app/src/components/viz/diagram-viewer.tsx
+  - dashboard_app/src/components/viz/diagram-frame.tsx
   - dashboard_app/src/components/viz/decision-graph.tsx
   - dashboard_app/src/components/metrics-dashboard.tsx
   - dashboard_app/src/components/metrics-summary-cards.tsx

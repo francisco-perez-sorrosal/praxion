@@ -24,9 +24,8 @@ affected_files:
   - claude/canonical-blocks/praxion-process.md
   - scripts/sync_canonical_blocks.py
   - .pre-commit-config.yaml
-  - commands/onboard-project.md
-  - commands/new-project.md
-  - hooks/test_onboard_praxion_block.py
+  - skills/onboard-project/references/claude-md-blocks.md
+  - tests/commands/test_onboard_block_mechanism.py
 ---
 
 ## Context

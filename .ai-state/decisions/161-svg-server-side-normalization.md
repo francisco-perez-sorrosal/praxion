@@ -13,7 +13,7 @@ pipeline_tier: standard
 affected_files:
   - dashboard_app/src/server/diagrams/normalize-svg.ts
   - dashboard_app/src/server/view-models/architecture.ts
-  - dashboard_app/src/components/viz/diagram-viewer.tsx
+  - dashboard_app/src/server/diagrams/sanitize.ts
   - dashboard_app/src/components/viz/diagram-frame.tsx
   - dashboard_app/src/components/viz/diagram-modal.tsx
   - dashboard_app/src/components/viz/use-pan-zoom.ts

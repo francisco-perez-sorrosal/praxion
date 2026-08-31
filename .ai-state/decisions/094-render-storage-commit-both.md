@@ -14,7 +14,7 @@ affected_files:
   - .github/workflows/
   - skills/doc-management/references/diagram-conventions.md
   - rules/writing/diagram-conventions.md
-  - commands/onboard-project.md
+  - skills/onboard-project/SKILL.md
 re_affirmed_by:
   - dec-098
   - dec-099

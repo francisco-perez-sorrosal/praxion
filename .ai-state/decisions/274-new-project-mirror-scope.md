@@ -1,7 +1,9 @@
 ---
 id: dec-274
 title: AC7 "/new-project mirrors the install" satisfied by existing defer pattern, no new-project.md code change
-status: accepted
+status: retired
+retired_by:
+  - dec-340
 category: implementation
 date: 2026-07-22
 summary: The P1 ci-autofix onboarding install (caller + policy templates) lands only in /onboard-project Phase 8e; /new-project needs no duplicate logic because its existing generic exit-handoff already defers all Phase 8e-style baseline installs (dependabot, pre-commit, CONTRIBUTING) to a subsequent /onboard-project run.
@@ -75,3 +77,14 @@ required, since the enumeration is already deliberately partial today.
 
 None — this is a scoping clarification made during P1 step decomposition, not a
 supersession of `dec-273`.
+
+## Prior Decision
+
+Retired by dec-340 (*Unify the two onboarding commands into one user-invocable
+skill plus one entry script*). This record answered "does `/new-project` need
+its own copy of the ci-autofix install logic to satisfy AC7's mirror clause?"
+— dec-340's action removed `/new-project` itself, so there are no longer two
+onboarding surfaces to keep in mirror and the question this record answered no
+longer exists. dec-340 made no claim about install-mirroring; it eliminated
+the surface the mirroring was scoped to. The decision would matter again only
+if a separate greenfield entry command returned alongside the unified skill.

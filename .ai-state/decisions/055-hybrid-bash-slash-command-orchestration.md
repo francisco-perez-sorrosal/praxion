@@ -14,8 +14,8 @@ made_by: user
 agent_type: systems-architect
 pipeline_tier: standard
 affected_files:
-  - new_project.sh
-  - commands/new-project.md
+  - scripts/onboard-project
+  - skills/onboard-project/references/seed-pipeline.md
 affected_reqs:
   - REQ-ONBOARD-01
   - REQ-ONBOARD-02

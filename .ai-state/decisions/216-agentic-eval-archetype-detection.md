@@ -12,7 +12,7 @@ branch: worktree-sia-praxion-fit-research
 pipeline_tier: standard
 affected_files:
   - skills/roadmap-synthesis/references/paradigm-detection.md
-  - commands/onboard-project.md
+  - skills/onboard-project/SKILL.md
 related: [dec-219, dec-221]
 ---
 

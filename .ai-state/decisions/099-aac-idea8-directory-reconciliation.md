@@ -10,9 +10,9 @@ made_by: agent
 agent_type: systems-architect
 pipeline_tier: standard
 affected_files:
-  - commands/onboard-project.md
-  - commands/new-project.md
-  - new_project.sh
+  - skills/onboard-project/SKILL.md
+  - skills/onboard-project/references/seed-pipeline.md
+  - scripts/onboard-project
 re_affirms: dec-094
 re_affirmed_by:
   - dec-113

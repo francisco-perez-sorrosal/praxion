@@ -16,7 +16,7 @@ affected_files:
   - docs/architecture.md
   - .ai-state/DESIGN.md
   - skills/doc-management/references/diagram-conventions.md
-  - commands/onboard-project.md
+  - skills/onboard-project/SKILL.md
   - agents/systems-architect.md
   - agents/implementer.md
 ---

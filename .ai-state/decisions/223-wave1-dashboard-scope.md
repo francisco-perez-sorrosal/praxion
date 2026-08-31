@@ -15,7 +15,7 @@ affected_files:
   - dashboard_app/src/lib/evals.ts
   - dashboard_app/src/components/eval-leaderboard.tsx
   - dashboard_app/src/app/evals/page.tsx
-  - dashboard_app/tests/eval-leaderboard.test.ts
+  - dashboard_app/tests/server/eval-leaderboard.test.ts
 ---
 
 ## Context

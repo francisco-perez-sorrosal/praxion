@@ -15,7 +15,7 @@ affected_files:
   - .pre-commit-config.yaml
   - claude/project-baseline/pre-commit-config.yaml
   - scripts/check_ruff_pin_drift.py
-  - commands/onboard-project.md
+  - skills/onboard-project/SKILL.md
   - rules/swe/vcs/git-conventions.md
 dissent: >
   Pinning the local side exactly makes every ruff upgrade a two-file coordinated

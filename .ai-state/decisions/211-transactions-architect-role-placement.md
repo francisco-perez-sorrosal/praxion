@@ -13,7 +13,7 @@ pipeline_tier: full
 affected_files:
   - agents/agentic-transactions-architect.md
   - skills/agentic-transactions/SKILL.md
-  - plugin.json
+  - .claude-plugin/plugin.json
   - agents/README.md
   - rules/swe/agent-model-routing.md
 affected_reqs: [REQ-01, REQ-02, REQ-03]

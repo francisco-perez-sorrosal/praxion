@@ -27,7 +27,7 @@ affected_files:
   - skills/refactoring/SKILL.md
   - claude/config/CLAUDE.md.tmpl
   - claude/canonical-blocks/agent-pipeline.md
-  - commands/onboard-project.md
+  - skills/onboard-project/SKILL.md
   - commands/resume-rework.md
   - .ai-state/DESIGN.md
 affected_reqs:

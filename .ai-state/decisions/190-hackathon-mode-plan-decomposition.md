@@ -13,8 +13,8 @@ pipeline_tier: standard
 affected_files:
   - claude/canonical-blocks/hackathon-mode.md
   - scripts/sync_canonical_blocks.py
-  - commands/onboard-project.md
-  - commands/new-project.md
+  - skills/onboard-project/SKILL.md
+  - skills/onboard-project/references/seed-pipeline.md
   - tests/test_hackathon_mode.py
 re_affirms: dec-189
 ---

@@ -12,7 +12,7 @@ pipeline_tier: standard
 affected_files:
   - skills/ml-training/SKILL.md
   - rules/ml/experiment-tracking-conventions.md
-  - commands/onboard-project.md
+  - skills/onboard-project/SKILL.md
 affected_reqs: []
 ---
 

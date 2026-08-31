@@ -13,7 +13,7 @@ pipeline_tier: standard
 affected_files:
   - .github/workflows/reusable-ci-autofix.yml
   - .github/autofix-policy.yml
-  - tests/test_ci_autofix_hub_invariants.py
+  - tests/test_ci_autofix_hub_contract.py
 affected_reqs: [REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-06, REQ-07, REQ-09, REQ-10, REQ-11, REQ-12, REQ-13, REQ-14]
 re_affirms: dec-273
 dissent: A single surface-aware job with computed conditionals (A1) would be DRYer and keep one hub abstraction; the N-jobs choice trades some boilerplate for a structural — not merely tested — no-regression guarantee, and that guarantee is the whole point of the additive constraint.

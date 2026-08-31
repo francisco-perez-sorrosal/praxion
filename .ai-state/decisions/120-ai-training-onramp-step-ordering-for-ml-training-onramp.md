@@ -14,7 +14,7 @@ affected_files:
   - skills/llm-training-eval/
   - skills/neo-cloud-abstraction/
   - commands/run-experiment.md
-  - commands/onboard-project.md
+  - skills/onboard-project/SKILL.md
 affected_reqs: []
 re_affirms: dec-117
 ---

@@ -15,7 +15,7 @@ affected_files:
   - scripts/report_praxion_issue.py
   - commands/report-praxion-issue.md
   - .ai-state/praxion_feedback/PENDING.md
-  - commands/onboard-project.md
+  - skills/onboard-project/SKILL.md
 affected_reqs: [REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-06, REQ-07, REQ-08]
 dissent: "If capture precision is high, an Issues:Write-only GitHub App filing whitelisted mechanical categories (hooks/scripts) would close the healing loop faster and avoid a candidate backlog that never gets filed — the dec-014 'user must remember' failure mode. We hold HITL-only because that precision is unmeasured today; auto-filing on an unproven rate risks spamming the upstream tracker with false ecosystem-defect reports, an asymmetric downside a human dismissal cheaply avoids."
 re_affirmed_by:

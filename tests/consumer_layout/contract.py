@@ -1,8 +1,9 @@
 """Machine-derived model of the consumer layout `/onboard-project` installs.
 
 Support module for `test_consumer_layout.py`. Nothing here asserts; it parses
-`commands/onboard-project.md` into a typed contract and provides a runner that
-executes the contract's own shell fragments against a scratch tree.
+`skills/onboard-project/SKILL.md` + its `phases-core.md`/`phases-optional.md`
+references into a typed contract and provides a runner that executes the
+contract's own shell fragments against a scratch tree.
 
 **Why a parser and not a hand-written list.** A hand-written expectation is an
 answer key: it passes because someone transcribed the command correctly once,
@@ -35,7 +36,18 @@ from functools import lru_cache
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parents[2]
-ONBOARD_FILE = REPO_ROOT / "commands" / "onboard-project.md"
+_SKILL_ROOT = REPO_ROOT / "skills" / "onboard-project"
+_ONBOARD_FILES = (
+    _SKILL_ROOT / "SKILL.md",
+    _SKILL_ROOT / "references" / "phases-core.md",
+    _SKILL_ROOT / "references" / "phases-optional.md",
+)
+_CLAUDE_MD_BLOCKS_FILE = _SKILL_ROOT / "references" / "claude-md-blocks.md"
+
+# Joins the three files with a sentinel that is not itself a `## ` heading, so
+# `section()`'s `(?=\n## |\Z)` lookahead cannot let one file's section window
+# bleed into the next file's content -- the join boundary is unambiguous.
+_FILE_BOUNDARY_SENTINEL = "\n\n## §File Boundary\n\n"
 
 HAVE_JQ = shutil.which("jq") is not None
 
@@ -51,8 +63,19 @@ _HOST_COMMANDS = ("command -v", "claude plugin", "claude ")
 
 @lru_cache(maxsize=1)
 def onboard_text() -> str:
-    """Return `commands/onboard-project.md` verbatim."""
-    return ONBOARD_FILE.read_text(encoding="utf-8")
+    """Return `SKILL.md` + `phases-core.md` + `phases-optional.md`, sentinel-joined.
+
+    The three files are the driver plus its two phase-body references; joining
+    them (rather than picking one) is what makes every downstream `section()` /
+    `sub_step()` lookup transparent to which file actually carries a heading.
+    """
+    return _FILE_BOUNDARY_SENTINEL.join(f.read_text(encoding="utf-8") for f in _ONBOARD_FILES)
+
+
+@lru_cache(maxsize=1)
+def claude_md_blocks_text() -> str:
+    """Return `references/claude-md-blocks.md` verbatim."""
+    return _CLAUDE_MD_BLOCKS_FILE.read_text(encoding="utf-8")
 
 
 def section(heading_pattern: str, text: str | None = None) -> str:
@@ -154,7 +177,9 @@ def claude_md_blocks() -> dict[str, str]:
     authored texts rather than one text with itself.
     """
     blocks: dict[str, str] = {}
-    for match in re.finditer(r"^## §(.+?) Block\b.*?(?=\n## §|\Z)", onboard_text(), re.S | re.M):
+    for match in re.finditer(
+        r"^## §(.+?) Block\b.*?(?=\n## §|\Z)", claude_md_blocks_text(), re.S | re.M
+    ):
         fences = _fences(match.group(0), "markdown")
         if not fences:
             continue

@@ -76,7 +76,7 @@ it licenses the belief.
 * **Adjacent gates are not duplicated**: template-versus-live drift belongs to
   `scripts/check_template_mirrors.py`, canonical-block sync to
   `scripts/sync_canonical_blocks.py`, and the greenfield path to
-  `tests/new_project_test.sh`.
+  `tests/onboard_project_test.sh`.
 
 Everything runs in `tmp_path`; nothing here reads or writes this repository's own
 `.ai-state/`, `.claude/`, or `HOME`.
@@ -122,6 +122,38 @@ def _heading_predicates() -> list[tuple[str, str]]:
 
 
 HEADING_PREDICATES = _heading_predicates()
+
+
+# -- Multi-file join integrity -----------------------------------------------
+#
+# `onboard_text()` now joins three files (SKILL.md driver + two phase-body
+# references) with a sentinel. A path typo or a broken join would silently
+# collapse the parse to an empty or partial string -- these are the canaries
+# the risk table calls out: a floor on the count so an empty parse cannot pass
+# vacuously, and a set-equality against an independently-sourced table so a
+# partial (single-file) parse cannot pass either.
+
+
+def test_phase_headings_are_populated_and_match_the_flow_table_exactly() -> None:
+    """The join must be non-empty AND internally consistent, not merely non-empty.
+
+    A dangling path would make `phase_headings()` return `()` -- caught by the
+    floor. A join that silently dropped one of the three files (e.g. only
+    `SKILL.md` resolved) would still return a non-trivial, non-empty set --
+    caught only by comparing it against the `§Flow` table, an independently
+    authored enumeration of the same phases.
+    """
+    headings = c.phase_headings()
+    assert len(headings) >= 15, (
+        f"only {len(headings)} phase headings resolved across the joined SKILL.md + "
+        "phases-core.md + phases-optional.md files -- the multi-file join may be silently "
+        "empty or broken."
+    )
+    assert set(headings) == set(c.flow_phases()), (
+        f"phase headings {sorted(set(headings))} do not match the §Flow table's phase ids "
+        f"{sorted(set(c.flow_phases()))} -- the join may have dropped one of the three files, "
+        "silently producing a partial parse that still returns some phases."
+    )
 
 
 # -- Contract completeness ---------------------------------------------------

@@ -140,8 +140,8 @@ Do not ship code that requires Node.js < 22 LTS unless explicitly targeting a le
 ## tsconfig strict configuration
 
 A **canonical, dependency-free strict baseline** ships at
-[`../assets/tsconfig.json`](../assets/tsconfig.json); `/onboard-project` Phase 8e
-(and `/new-project`) install it as `tsconfig.json` when none exists — so the
+[`../assets/tsconfig.json`](../assets/tsconfig.json); onboarding Phase 8e
+(`skills/onboard-project`, all entry modes) installs it as `tsconfig.json` when none exists — so the
 type-check mandate in [`coding-style.md`](../../../rules/swe/coding-style.md)
 § Baseline Configuration is never vacuous and the agent-readiness type-check
 criterion passes. Run it in CI with `tsc --noEmit`. For richer projects, prefer

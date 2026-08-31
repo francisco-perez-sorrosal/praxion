@@ -34,8 +34,7 @@ surfaces:
     title: "Getting started"               # human-readable; from frontmatter or first H1
     summary: "First-time setup; build a small URL shortener through the full pipeline."
     surfaces_referenced:                   # outbound links to other surface ids in this manifest
-      - docs-greenfield-onboarding
-      - docs-existing-project-onboarding
+      - docs-onboarding
       - docs-claude-ecosystem-learning-resources
     diagrams:                              # diagrams embedded by this surface (paths to rendered SVGs)
       - docs/diagrams/getting-started-pipeline/rendered/getting-started-pipeline.svg
@@ -48,8 +47,7 @@ groups:                                    # optional: sidebar grouping for the 
     label: Tutorials (learning by doing)
     surface_ids:
       - docs-getting-started
-      - docs-greenfield-onboarding
-      - docs-existing-project-onboarding
+      - docs-onboarding
       - docs-ml-training-onramp
   - id: how-to
     label: How-to guides

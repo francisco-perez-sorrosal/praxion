@@ -124,8 +124,8 @@ class Processor(Protocol):
 
 **Formatter + linter**: Use ruff for both. The **canonical baseline** is shipped
 as a single source of truth at [`assets/ruff-baseline.toml`](assets/ruff-baseline.toml)
-and installed into a project's `pyproject.toml` by `/onboard-project` Phase 8e
-(and `/new-project`) — every Python project gets it, idempotently, so the
+and installed into a project's `pyproject.toml` by onboarding Phase 8e
+(`skills/onboard-project`, all entry modes) — every Python project gets it, idempotently, so the
 linter/formatter mandate in [`coding-style.md`](../../rules/swe/coding-style.md)
 is never vacuous. The baseline is:
 
@@ -184,7 +184,7 @@ Configure mypy (strict mode), pytest, and coverage in `pyproject.toml`. Use pre-
 
 The **canonical mypy baseline** is shipped as a single source of truth at
 [`assets/mypy-baseline.toml`](assets/mypy-baseline.toml) and appended to a
-project's `pyproject.toml` by `/onboard-project` Phase 8e (and `/new-project`)
+project's `pyproject.toml` by onboarding Phase 8e (`skills/onboard-project`, all entry modes)
 when no `[tool.mypy]`/`[tool.pyright]` section exists — so the type-check mandate
 in [`coding-style.md`](../../rules/swe/coding-style.md) § Baseline Configuration is
 never vacuous, and the agent-readiness type-check criterion passes. The same phase

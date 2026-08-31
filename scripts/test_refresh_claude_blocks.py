@@ -56,7 +56,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPTS_DIR.parent
 
 sys.path.insert(0, str(SCRIPTS_DIR))
-from canonical_block_identity import hash_block_body  # noqa: E402
+from canonical_block_identity import find_heading_span, hash_block_body  # noqa: E402
 
 # Synthetic bodies for a single refresh-eligible slug, shaped like a real
 # canonical block (heading line + prose) without depending on any specific
@@ -870,4 +870,87 @@ def test_apply_replaces_only_first_occurrence_when_heading_is_duplicated(
     assert after.count("## Agent Pipeline") == 2, (
         "a pre-existing duplicate heading must stay a duplicate -- apply must never fuse "
         f"or further duplicate headings. Got:\n{after!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# td-056: apply-mode's span lookup is the shared primitive, not a re-implementation
+# ---------------------------------------------------------------------------
+
+
+def test_module_no_longer_defines_its_own_block_span_scanner() -> None:
+    """`refresh_claude_blocks` must not carry a private re-implementation of
+    the heading-boundary scan -- `_find_block_span` (the historical name) is
+    gone, and every consumer calls `canonical_block_identity.find_heading_span`
+    directly. A resurrected private copy is exactly how classify-time and
+    apply-time boundaries silently diverged before."""
+    mod = _load_module()
+
+    assert not hasattr(mod, "_find_block_span"), (
+        "a private _find_block_span means the module re-implemented the shared "
+        "boundary primitive instead of calling canonical_block_identity.find_heading_span"
+    )
+
+
+def test_apply_replace_span_matches_classification_span_on_an_h3_nested_fixture() -> None:
+    """Behavioral divergence canary: feed the SAME H3-nested fixture through
+    both the classify-time path (`extract_live_body`) and the apply-time path
+    (`_apply_stale_replacements`'s span lookup, now `find_heading_span`) and
+    assert they bound the identical span. Before td-056, the two paths were
+    separate implementations that happened to agree; this proves they are now
+    structurally the same call, not just coincidentally identical output."""
+    from canonical_block_identity import extract_live_body
+
+    claude_md_text = (
+        "# Project\n\nProse.\n\n"
+        + _AGENT_PIPELINE_STALE_BODY.rstrip("\n")
+        + "\n\n### Not a section boundary\n\nMore prose under the block.\n\n"
+        "## Trailing Heading\n\nTrailing prose.\n"
+    )
+    heading = "## Agent Pipeline"
+
+    classify_time_body = extract_live_body(claude_md_text, heading)
+
+    lines = claude_md_text.splitlines(keepends=True)
+    span = find_heading_span(lines, heading)
+    assert span is not None
+    apply_time_body = "".join(lines[span[0] : span[1]])
+
+    assert apply_time_body == classify_time_body, (
+        "classify-time extraction and apply-time span lookup disagree on an "
+        f"H3-nested fixture. classify={classify_time_body!r} apply={apply_time_body!r}"
+    )
+
+
+def test_apply_reads_claude_md_from_disk_exactly_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`--apply` reads CLAUDE.md exactly once (in `main()`'s classification
+    read) and threads that text through to `run_apply` -- it must never
+    perform a second, independent `read_text` of the same file (the TOCTOU
+    double-read td-056 also flagged)."""
+    before = "# Project\n\nExisting prose untouched by refresh.\n\n" + _AGENT_PIPELINE_STALE_BODY
+    repo = _write_repo(tmp_path, before)
+    manifest_path = _write_manifest(tmp_path, _SINGLE_SLUG_BLOCKS)
+    canonical_dir = _write_canonical_dir(tmp_path, {"agent-pipeline": _AGENT_PIPELINE_CURRENT_BODY})
+
+    mod = _load_module()
+    mod.CANONICAL_DIR = canonical_dir  # type: ignore[attr-defined]
+
+    read_calls = {"count": 0}
+    original_read_text = Path.read_text
+
+    def _counting_read_text(self: Path, *args: object, **kwargs: object) -> str:
+        if self == repo / "CLAUDE.md":
+            read_calls["count"] += 1
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", _counting_read_text)
+
+    exit_code = mod.main(["--apply", "--repo-root", str(repo), "--manifest", str(manifest_path)])
+
+    assert exit_code == 0
+    assert read_calls["count"] == 1, (
+        f"CLAUDE.md was read {read_calls['count']} time(s) during --apply; expected exactly "
+        "one read, threaded from classification into run_apply"
     )

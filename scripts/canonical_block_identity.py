@@ -66,17 +66,21 @@ def hash_block_body(text: str) -> str:
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
-def extract_live_body(claude_md_text: str, heading: str) -> str | None:
-    """Extract a block's live body from a target CLAUDE.md.
+def find_heading_span(lines: list[str], heading: str) -> tuple[int, int] | None:
+    """Return the (start, end) 0-indexed line bounds of a heading's raw span.
 
     ``heading`` is the literal heading line (e.g. ``"## Agent Pipeline"``).
-    Extraction runs from the first line matching ``heading`` exactly through
+    The span runs from the first line matching ``heading`` exactly through
     the next line starting with ``"## "`` (a top-level heading) or EOF.
     Returns ``None`` when the heading is absent. When the heading appears
     more than once, the first occurrence wins deterministically.
-    """
-    lines = claude_md_text.splitlines(keepends=True)
 
+    This is the single boundary-index primitive: both ``extract_live_body``
+    (classify-time, below) and ``refresh_claude_blocks.py``'s apply-mode
+    span lookup call it, so classify-time and apply-time boundaries can
+    never silently diverge -- see the module docstring for why that would
+    corrupt a managed project's ``CLAUDE.md``.
+    """
     start_index = next((i for i, line in enumerate(lines) if line.rstrip("\n") == heading), None)
     if start_index is None:
         return None
@@ -89,4 +93,18 @@ def extract_live_body(claude_md_text: str, heading: str) -> str | None:
         ),
         len(lines),
     )
+    return start_index, end_index
+
+
+def extract_live_body(claude_md_text: str, heading: str) -> str | None:
+    """Extract a block's live body from a target CLAUDE.md.
+
+    Delegates the boundary computation to ``find_heading_span``. Returns
+    ``None`` when the heading is absent.
+    """
+    lines = claude_md_text.splitlines(keepends=True)
+    span = find_heading_span(lines, heading)
+    if span is None:
+        return None
+    start_index, end_index = span
     return "".join(lines[start_index:end_index])

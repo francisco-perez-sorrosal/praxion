@@ -55,7 +55,12 @@ import sys
 from pathlib import Path
 from typing import NoReturn
 
-from canonical_block_identity import REFRESHABLE_SLUGS, extract_live_body, hash_block_body
+from canonical_block_identity import (
+    REFRESHABLE_SLUGS,
+    extract_live_body,
+    find_heading_span,
+    hash_block_body,
+)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -148,16 +153,25 @@ def _heading_for_slug(slug: str) -> str:
     return f"## {slug.replace('-', ' ').title()}"
 
 
-def _classify_all(repo_root: Path, manifest: dict) -> dict[str, str]:
+def _read_claude_md(repo_root: Path) -> str:
+    """Read the target repo's CLAUDE.md once; "" when absent.
+
+    Read exactly once per invocation and threaded through both
+    ``_classify_all`` and ``run_apply`` -- a second independent read would be
+    a TOCTOU double-read of the same file within one process, however
+    unlikely to observe a change in the single-threaded CLI path.
+    """
+    claude_md_path = repo_root / "CLAUDE.md"
+    return claude_md_path.read_text(encoding="utf-8") if claude_md_path.is_file() else ""
+
+
+def _classify_all(claude_md_text: str, manifest: dict) -> dict[str, str]:
     """Classify every refresh-eligible slug present in the manifest.
 
     Scoped to the intersection of the manifest's slugs and REFRESHABLE_SLUGS
     -- a hard membership boundary enforced here regardless of what a
     hand-edited or malformed manifest might otherwise carry.
     """
-    claude_md_path = repo_root / "CLAUDE.md"
-    claude_md_text = claude_md_path.read_text(encoding="utf-8") if claude_md_path.is_file() else ""
-
     eligible_slugs = sorted(set(manifest.get("blocks", {})) & REFRESHABLE_SLUGS)
     classifications: dict[str, str] = {}
     for slug in eligible_slugs:
@@ -241,24 +255,6 @@ def _load_canonical_body(slug: str) -> str:
         _error(f"cannot read canonical file {canonical_path}: {exc}")
 
 
-def _find_block_span(lines: list[str], heading: str) -> tuple[int, int] | None:
-    """Return (start, end) 0-indexed line bounds of a block's raw span.
-
-    Mirrors canonical_block_identity.extract_live_body's boundary logic
-    (heading line through the next "## " heading or EOF) so the replaceable
-    region is computed identically to the classification-hashing region.
-    None when the heading is absent.
-    """
-    start = next((i for i, line in enumerate(lines) if line.rstrip("\n") == heading), None)
-    if start is None:
-        return None
-    end = next(
-        (i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")),
-        len(lines),
-    )
-    return start, end
-
-
 def _trim_trailing_blank_lines(lines: list[str], start: int, end: int) -> int:
     """Shrink `end` past any trailing blank lines in [start, end).
 
@@ -282,7 +278,7 @@ def _apply_stale_replacements(lines: list[str], stale_slugs: list[str]) -> None:
     """
     spans = []
     for slug in stale_slugs:
-        span = _find_block_span(lines, _heading_for_slug(slug))
+        span = find_heading_span(lines, _heading_for_slug(slug))
         if span is not None:
             spans.append((slug, span[0], span[1]))
 
@@ -328,15 +324,18 @@ def _report_modified_block(slug: str, live_body: str) -> None:
     print("Resolve interactively:  /refresh-claude-blocks\n")
 
 
-def run_apply(repo_root: Path, classifications: dict[str, str]) -> int:
+def run_apply(repo_root: Path, original_text: str, classifications: dict[str, str]) -> int:
     """--apply mode: append absent blocks, replace stale blocks in place,
     refuse to touch modified blocks. Writes the target file at most once,
     only when something actually changed -- never for a purely
     current/modified classification set. Always returns 0: a refused
     modified block is normal, expected behavior, not a run failure.
+
+    ``original_text`` is the CLAUDE.md text ``main()`` already read for
+    classification -- passed in rather than re-read here, so this mode never
+    performs a second, independent read of the same file.
     """
     claude_md_path = repo_root / "CLAUDE.md"
-    original_text = claude_md_path.read_text(encoding="utf-8") if claude_md_path.is_file() else ""
     lines = original_text.splitlines(keepends=True)
 
     by_class: dict[str, list[str]] = {"absent": [], "stale": [], "modified": []}
@@ -415,13 +414,14 @@ def main(argv: list[str] | None = None) -> int:
 
     manifest_path = Path(args.manifest_path) if args.manifest_path else _default_manifest_path()
     manifest = _load_manifest(manifest_path)
-    classifications = _classify_all(repo_root, manifest)
+    claude_md_text = _read_claude_md(repo_root)
+    classifications = _classify_all(claude_md_text, manifest)
 
     if args.json_output:
         print(json.dumps(classifications))
         return 0
     if args.apply:
-        return run_apply(repo_root, classifications)
+        return run_apply(repo_root, claude_md_text, classifications)
     return _report_check(classifications)
 
 

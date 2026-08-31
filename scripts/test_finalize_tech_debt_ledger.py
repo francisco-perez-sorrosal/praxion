@@ -108,8 +108,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 _ACTIVE_SCHEMA_SURFACES = (
     "docs/architecture.md",
     "rules/swe/agent-intermediate-documents.md",
-    "commands/onboard-project.md",
-    "docs/existing-project-onboarding.md",
+    "skills/onboard-project/references/phases-core.md",
+    "docs/onboarding.md",
     ".ai-state/DESIGN.md",
     "agents/sentinel.md",
     "agents/verifier.md",

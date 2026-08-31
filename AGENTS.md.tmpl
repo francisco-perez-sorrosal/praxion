@@ -86,7 +86,7 @@ Match process weight to task scale. The tier table + fast-path selector (Direct 
 
 **Onboarding contract**: Praxion ships **one path**, `onboard-project`, converging on the same end state — `.gitignore` block, `.ai-state/` skeleton, `.gitattributes` + merge drivers, git hooks, `.claude/settings.json` toggles, four `CLAUDE.md` blocks (Agent Pipeline + Compaction Guidance + Behavioral Contract + Praxion Process), opt-in architecture/quality/CI/AaC/ML/Obsidian tiers. One phase engine (`skills/onboard-project/`) and one entry script (`scripts/onboard-project`) resolve four modes from detected state:
 
-- **`new`** (empty dir): the entry script validates prereqs and scaffolds, then launches the seed workflow (default app) and applies the remaining surfaces.
+- **`new`** (empty dir): the entry script validates prereqs and scaffolds, then `exec`s a Claude Code session that runs the seed pipeline (default app) and applies the remaining surfaces.
 - **`existing`** (has code): retrofits an already-populated repo. Gate count is 3 total (mode-confirm, build-intent, capability Profile) — a gate that carries no decision earns no interruption.
 - **`hackathon`** (minimal, promotable) and **`promote`** (`--full` — hackathon → fully managed, mechanical teardown of the six hackathon artifacts).
 

@@ -1,3 +1,14 @@
+## v0.25.0 (2026-08-31)
+
+### Feat
+
+- **agents**: route the fleet to Claude 5 models with per-role effort
+
+### Fix
+
+- **state**: re-anchor DESIGN.md ci-autofix row to the onboarding skill
+- **decisions**: repair decayed affected_files refs across 43 ADRs
+
 ## v0.24.0 (2026-08-31)
 
 ### Feat

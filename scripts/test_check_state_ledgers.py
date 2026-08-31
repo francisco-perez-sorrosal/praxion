@@ -324,25 +324,55 @@ def test_conforming_dedup_key_produces_no_finding(tmp_path: Path) -> None:
 
 
 def test_collision_blocked_row_is_advisory_and_never_backfilled(tmp_path: Path) -> None:
-    """A repair that would collide is worse than the bad data it repairs.
-
-    The conforming row already owns the key; recomputing the stale one would let
-    the next finalize run collapse two distinct findings, erasing a `td-NNN`.
+    """The td-133 discriminator (a row's own `notes` cell) has nothing left to
+    distinguish two rows whose `notes` are ALSO identical -- that residue is
+    the only case still blocked. Repairing either row's key to the other's
+    discriminated form would collide, which is worse than the bad data it
+    repaired: the next finalize run would collapse two distinct findings,
+    erasing a `td-NNN`.
     """
     module = _gate()
-    conforming = _td_row("td-001")
-    stale = _td_row("td-002", dedup_key="ffffffffffff")  # same 5-tuple, wrong key
-    root = _write_tech_debt(tmp_path, conforming, stale)
+    row_a = _td_row("td-001", dedup_key="ffffffffffff")  # same 5-tuple AND notes,
+    row_b = _td_row("td-002", dedup_key="eeeeeeeeeeee")  # neither holds the base key
+    root = _write_tech_debt(tmp_path, row_a, row_b)
 
     findings = module.check_dedup_keys(module.parse_all(root))
     blocked = [finding for finding in findings if finding.kind == "dedup-collision-blocked"]
-    assert [finding.row_id for finding in blocked] == ["td-002"]
+    assert {finding.row_id for finding in blocked} == {"td-001", "td-002"}
     assert not blocked[0].blocking
-    assert "td-001" in blocked[0].message
 
-    before = (root / ".ai-state" / "TECH_DEBT_RESOLVED.md").read_text(encoding="utf-8")
+    before = (root / ".ai-state" / "TECH_DEBT_LEDGER.md").read_text(encoding="utf-8")
     assert module.backfill_dedup_keys(root) == []
-    assert (root / ".ai-state" / "TECH_DEBT_RESOLVED.md").read_text(encoding="utf-8") == before
+    assert (root / ".ai-state" / "TECH_DEBT_LEDGER.md").read_text(encoding="utf-8") == before
+
+
+def test_discriminator_resolves_a_base_collision_when_notes_differ(tmp_path: Path) -> None:
+    """td-133: two rows sharing a base 5-tuple, but with DIFFERENT `notes`, are
+    no longer a dead end. The row that already holds the plain base key is
+    left untouched; the other resolves to a notes-discriminated key -- a
+    plain `dedup-mismatch`, never `dedup-collision-blocked` -- and backfill
+    repairs it to a key that does not collide with the holder's."""
+    module = _gate()
+    holder = _td_row("td-001", notes="the first finding")
+    other = _td_row("td-002", notes="a completely different finding", dedup_key="ffffffffffff")
+    root = _write_tech_debt(tmp_path, holder, other)
+
+    findings = module.check_dedup_keys(module.parse_all(root))
+    assert "dedup-collision-blocked" not in {finding.kind for finding in findings}
+    assert {finding.row_id for finding in findings} == {"td-002"}
+    assert findings[0].kind == "dedup-mismatch"
+
+    updated = module.backfill_dedup_keys(root)
+    assert [entry[1] for entry in updated] == ["td-002"]
+
+    after = module.parse_all(root)
+    assert module.check_dedup_keys(after) == []
+    holder_row = next(row for row in module.dedup_rows(after) if row.row_id == "td-001")
+    other_row = next(row for row in module.dedup_rows(after) if row.row_id == "td-002")
+    assert holder_row.value("dedup_key") not in ("ffffffffffff", "")
+    assert holder_row.value("dedup_key") != other_row.value("dedup_key"), (
+        "the discriminated key must not collide with the holder's plain base key"
+    )
 
 
 def test_backfill_repairs_only_the_dedup_key_cell(tmp_path: Path) -> None:

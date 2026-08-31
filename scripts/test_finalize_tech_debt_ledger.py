@@ -1002,6 +1002,54 @@ class TestWithinResolvedCollapse:
         assert row["last-seen"] == "2026-04-01"  # newer last-seen wins on tie
 
 
+# -- td-133: discriminated keys no longer collapse historical pairs ----------
+
+
+class TestDiscriminatorPreventsHistoricalPairCollapse:
+    """Two distinct findings that share a base 5-tuple, once backfilled with
+    `state_ledger_schema.resolve_dedup_keys`'s notes-digest discriminator,
+    carry genuinely distinct `dedup_key` values. This script groups rows
+    purely by the `dedup_key` cell it reads from disk -- it has no formula
+    logic of its own -- so once the two keys differ on disk, this collapse
+    routine must treat them as two independent rows, never merge them into
+    one and erase a `td-NNN`."""
+
+    def test_two_resolved_rows_with_distinct_discriminated_keys_stay_separate(
+        self, ledger_path: Path, resolved_path: Path
+    ) -> None:
+        """Reconstructs the historical td-054/td-017 shape: two resolved rows
+        that once shared one (wrong) written key now carry the two distinct
+        keys the discriminator backfill produces -- and finalize must leave
+        both rows standing."""
+        write_ledger(ledger_path, rows=[])
+        write_resolved(
+            resolved_path,
+            [
+                make_row(
+                    row_id="td-017",
+                    dedup_key="f540526ae620",  # plain base key -- the holder
+                    status="resolved",
+                    notes="Single-fragment branch-parsing ambiguity.",
+                ),
+                make_row(
+                    row_id="td-054",
+                    dedup_key="68a1ae78beed",  # notes-discriminated key
+                    status="resolved",
+                    notes="finalize_adrs.py is over the 800-line hard ceiling.",
+                ),
+            ],
+        )
+
+        code = finalize_td.finalize_ledger(ledger_path, dry_run=False)
+
+        assert code == 0
+        survivors = {parse_row(row)["id"] for row in read_rows(resolved_path)}
+        assert survivors == {"td-017", "td-054"}, (
+            "distinct discriminated dedup_keys must never collapse into one row "
+            f"-- got survivors: {survivors}"
+        )
+
+
 # -- Settled-pair idempotency -------------------------------------------------
 
 

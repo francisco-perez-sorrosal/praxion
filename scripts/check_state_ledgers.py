@@ -90,6 +90,7 @@ from state_ledger_schema import (
     normalize_location,
     parse_all,
     parse_ledger,
+    resolve_dedup_keys,
     split_row,
 )
 
@@ -112,6 +113,7 @@ __all__ = [
     "normalize_location",
     "parse_all",
     "parse_ledger",
+    "resolve_dedup_keys",
     "split_row",
 ]
 
@@ -288,13 +290,14 @@ def _dedup_value_finding(
 def check_dedup_keys(parsed: list[ParsedLedger]) -> list[Finding]:
     """Validate `dedup_key` format, value, and uniqueness across the pair."""
     rows = dedup_rows(parsed)
+    resolved = resolve_dedup_keys(rows)
     blocked = collision_blocked_ids(parsed)
     findings: list[Finding] = []
 
     seen: dict[str, DataRow] = {}
     for row in rows:
         written = row.value("dedup_key")
-        expected = compute_dedup_key(row)
+        expected = resolved[row.row_id]
 
         if written != expected:
             # The collision test is applied BEFORE the format test on purpose. A
@@ -382,6 +385,7 @@ def backfill_dedup_keys(repo_root: Path) -> list[tuple[str, str, str, str]]:
     Only the `dedup_key` cell is touched; no other byte of a row changes.
     """
     parsed = parse_all(repo_root)
+    resolved = resolve_dedup_keys(dedup_rows(parsed))
     blocked = collision_blocked_ids(parsed)
     updated: list[tuple[str, str, str, str]] = []
 
@@ -396,7 +400,7 @@ def backfill_dedup_keys(repo_root: Path) -> list[tuple[str, str, str, str]]:
             if row.table is None or len(row.cells) != len(row.table.columns):
                 continue
             written = row.value("dedup_key")
-            expected = compute_dedup_key(row)
+            expected = resolved[row.row_id]
             if written == expected or row.row_id in blocked:
                 continue
             index = row.line_no - 1
@@ -418,7 +422,8 @@ def backfill_dedup_keys(repo_root: Path) -> list[tuple[str, str, str, str]]:
 def _summarize(parsed: list[ParsedLedger]) -> dict[str, int]:
     """Row and conformance counts, for the human report and the JSON payload."""
     rows = dedup_rows(parsed)
-    conforming = sum(1 for row in rows if row.value("dedup_key") == compute_dedup_key(row))
+    resolved = resolve_dedup_keys(rows)
+    conforming = sum(1 for row in rows if row.value("dedup_key") == resolved[row.row_id])
     return {
         "ledgers": len(parsed),
         "rows": sum(len(ledger.rows) for ledger in parsed),

@@ -295,7 +295,7 @@ def normalize_location(cell: str) -> str:
     return ",".join(sorted(paths))
 
 
-def compute_dedup_key(row: DataRow) -> str:
+def compute_dedup_key(row: DataRow, discriminator: str = "") -> str:
     """Recompute a tech-debt row's `dedup_key` from the documented formula.
 
     ``sha1(class|normalize(location)|direction|goal-ref-type|goal-ref-value)[:12]``
@@ -303,17 +303,38 @@ def compute_dedup_key(row: DataRow) -> str:
     ``skills/software-planning/references/tech-debt-ledger.md`` § Schema. The
     formula is not re-derived here: it was confirmed by brute-forcing 56
     variants against the full row set, and scores highest of all 56.
+
+    ``discriminator``, when non-empty, appends one more field to the hashed
+    payload. It exists solely for ``resolve_dedup_keys`` below, which mints it
+    from a colliding row's own `notes` cell -- never call this with a
+    discriminator directly. Leaving it "" (the default) reproduces the
+    original 5-tuple formula byte-for-byte, which is what keeps every
+    already-conforming key in the corpus unaffected by this parameter's mere
+    existence.
     """
-    payload = "|".join(
-        (
-            row.value("class"),
-            normalize_location(row.value("location")),
-            row.value("direction"),
-            row.value("goal-ref-type"),
-            row.value("goal-ref-value"),
-        )
+    fields = (
+        row.value("class"),
+        normalize_location(row.value("location")),
+        row.value("direction"),
+        row.value("goal-ref-type"),
+        row.value("goal-ref-value"),
     )
+    if discriminator:
+        fields = (*fields, discriminator)
+    payload = "|".join(fields)
     return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:12]  # noqa: S324 - identity, not security
+
+
+def _notes_digest(row: DataRow) -> str:
+    """Short, stable discriminator derived from a row's own `notes` cell.
+
+    `notes` is a field every producer already writes -- using it as the
+    collision discriminator needs no new schema field and no write-time
+    behavior change from any producer. Two colliding rows are indistinguishable
+    by it only when their notes are themselves identical, which is the
+    genuinely-unresolvable case `resolve_dedup_keys` still surfaces as blocked.
+    """
+    return hashlib.sha1(row.value("notes").encode("utf-8")).hexdigest()[:8]  # noqa: S324
 
 
 def dedup_rows(parsed: list[ParsedLedger]) -> list[DataRow]:
@@ -327,8 +348,50 @@ def dedup_rows(parsed: list[ParsedLedger]) -> list[DataRow]:
     ]
 
 
+def resolve_dedup_keys(rows: list[DataRow]) -> dict[str, str]:
+    """Map row id -> its correct `dedup_key`, discriminator included.
+
+    The plain 5-tuple formula (`compute_dedup_key` with no discriminator) is
+    unchanged and is what every singleton row -- the overwhelming majority --
+    resolves to, byte-identical to before this function existed. A base
+    5-tuple collision is a legitimate outcome: two genuinely distinct findings
+    can share (class, location, direction, goal-ref-type, goal-ref-value);
+    td-085 confirmed the formula is otherwise sound, so granularity, not
+    correctness, is what needed fixing.
+
+    Within a colliding group, at most one member can already validly hold the
+    plain base key (its written `dedup_key` cell equals the base formula) --
+    that member's resolved key is left as the plain base key, untouched. Every
+    other member in the group is assigned a key discriminated by its own
+    `notes` cell. A group with no existing holder (every member's written key
+    already disagrees with the base formula, e.g. two mutually-wrong rows)
+    discriminates every member. Members sharing identical `notes` still
+    collide even after discrimination -- `collision_blocked_ids` below is what
+    catches that genuinely unresolvable residue.
+    """
+    base_by_id = {row.row_id: compute_dedup_key(row) for row in rows}
+    groups: dict[str, list[DataRow]] = {}
+    for row in rows:
+        groups.setdefault(base_by_id[row.row_id], []).append(row)
+
+    resolved: dict[str, str] = {}
+    for base, members in groups.items():
+        if len(members) == 1:
+            resolved[members[0].row_id] = base
+            continue
+        holder = next((member for member in members if member.value("dedup_key") == base), None)
+        for member in members:
+            if member is holder:
+                resolved[member.row_id] = base
+            else:
+                resolved[member.row_id] = compute_dedup_key(
+                    member, discriminator=_notes_digest(member)
+                )
+    return resolved
+
+
 def collision_blocked_ids(parsed: list[ParsedLedger]) -> dict[str, str]:
-    """Map row id -> the id its recomputed `dedup_key` would collide with.
+    """Map row id -> the id it would still collide with after discrimination.
 
     A backfill that produced a duplicate key would be *worse* than the bad data
     it repaired: the next `finalize_tech_debt_ledger.py` run collapses rows
@@ -336,30 +399,23 @@ def collision_blocked_ids(parsed: list[ParsedLedger]) -> dict[str, str]:
     one live case) destroying a `wontfix` tombstone the schema says is never
     removed. So the exemption is *derived* here rather than kept as a hand-
     maintained skip-list -- it updates itself, and every run names the reason.
+
+    With the discriminator in `resolve_dedup_keys`, two rows can only land
+    here when their base 5-tuple AND their `notes` cell are both identical --
+    the discriminator has nothing left to distinguish them with.
     """
     rows = dedup_rows(parsed)
-    conforming: dict[str, str] = {}
-    for row in rows:
-        if row.value("dedup_key") == compute_dedup_key(row):
-            conforming[compute_dedup_key(row)] = row.row_id
+    resolved = resolve_dedup_keys(rows)
 
-    recomputed: dict[str, list[str]] = {}
+    by_resolved: dict[str, list[str]] = {}
     for row in rows:
-        recomputed.setdefault(compute_dedup_key(row), []).append(row.row_id)
+        by_resolved.setdefault(resolved[row.row_id], []).append(row.row_id)
 
     blocked: dict[str, str] = {}
     for row in rows:
-        if row.value("dedup_key") == compute_dedup_key(row):
+        if row.value("dedup_key") == resolved[row.row_id]:
             continue
-        key = compute_dedup_key(row)
-        holder = conforming.get(key)
-        peers = [other for other in recomputed[key] if other != row.row_id]
-        if holder and holder != row.row_id:
-            blocked[row.row_id] = holder
-        elif peers:
-            # No row holds the key yet and two want it. Awarding it to either
-            # would be arbitrary *and* semantically load-bearing -- the winner
-            # is what a future recurrence at this 5-tuple re-opens. Both stay
-            # stale, which is the only non-arbitrary answer available.
+        peers = [other for other in by_resolved[resolved[row.row_id]] if other != row.row_id]
+        if peers:
             blocked[row.row_id] = peers[0]
     return blocked

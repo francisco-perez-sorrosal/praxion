@@ -53,9 +53,11 @@ This is a *clarification* of the existing consumer contract — not a schema cha
 | `status` | enum | `open` \| `in-flight` \| `resolved` \| `wontfix` | Updated in place by consumer agents |
 | `resolved-by` | string | ADR id, commit SHA, or PR URL when `status = resolved`; empty otherwise | `wontfix` SHOULD populate `notes` with rationale rather than `resolved-by` |
 | `notes` | string | Short prose — intent, rationale, scope hints, override-survivor flag | One sentence preferred; multi-line discouraged |
-| `dedup_key` | string | `sha1(f"{class}\|{normalize(location)}\|{direction}\|{goal-ref-type}\|{goal-ref-value}")[:12]` | Computed at write time; structural; used by post-merge dedupe |
+| `dedup_key` | string | `sha1(f"{class}\|{normalize(location)}\|{direction}\|{goal-ref-type}\|{goal-ref-value}")[:12]`, extended by a collision discriminator (below) | Computed at write time; structural; used by post-merge dedupe |
 
 `normalize(location)` is the sorted, comma-joined list of paths (no line ranges) — so two rows that differ only in line range or path order produce the same `dedup_key`.
+
+**Collision discriminator (td-133).** The plain 5-tuple above is a granularity, not a correctness, formula — two genuinely distinct findings can legitimately share it. When a new row's plain 5-tuple hash would collide with an existing row's, the colliding row's key is extended with one more field before hashing: `sha1(f"{class}\|{normalize(location)}\|{direction}\|{goal-ref-type}\|{goal-ref-value}\|{notes_digest}")[:12]`, where `notes_digest` is `sha1(notes)[:8]` — a field every producer already writes, so no new schema field or write-time behavior is required. The discriminator is minted **only on collision**: a row with no colliding peer keeps the plain, undiscriminated key, byte-identical to the pre-td-133 formula. Within a colliding group, at most one member may already hold the plain key (its written `dedup_key` cell equals the plain formula) — that member is left untouched; every other member is assigned the discriminated key. A group with no existing holder discriminates every member. Two rows whose `notes` are themselves identical remain a genuine, unresolvable collision (`dedup-collision-blocked` in `check_state_ledgers.py`) — the discriminator has nothing left to distinguish them with.
 
 ## Owner-role heuristic (canonical class-to-role mapping)
 

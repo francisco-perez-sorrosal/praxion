@@ -91,14 +91,31 @@ _MIN_INVENTORY_ROWS = 8
 # A decision at a terminal status no longer constrains work, so its references
 # are history rather than a live index and their decay is expected, not
 # actionable. Skipping these is the exclusion DH01 already specifies ("no
-# supersedes/superseded_by link between them") -- the supersession protocol
-# flips status at the same moment it writes the field, so status subsumes the
-# link check. `retired` is listed ahead of the status existing: it is the
-# terminal state B2 introduces, and omitting it would make every retired
-# decision start emitting decay findings the day it lands.
+# supersedes/superseded_by link between them"). `retired` is listed ahead of
+# the status existing: it is the terminal state B2 introduces, and omitting it
+# would make every retired decision start emitting decay findings the day it
+# lands.
+#
+# Full supersession writes `superseded_by` and flips `status` to a terminal
+# value in the same edit, so for that field status and edge always agree.
+# Partial supersession does not: a narrowed record keeps its live status and
+# only grows a `superseded_in_part_by` entry, so status no longer subsumes the
+# link check for every edge shape. `status_edge_conflicts` (below) exists
+# precisely to police that divergence -- mechanically, from frontmatter alone.
 _TERMINAL_STATUSES = frozenset({"superseded", "rejected", "retired"})
 _STATUS = re.compile(r"^status:\s*(\S+)", re.MULTILINE)
 _CATEGORY = re.compile(r"^category:\s*(\S+)", re.MULTILINE)
+_FRONTMATTER = re.compile(r"^---\n(.*?\n)---", re.DOTALL)
+
+# Dispositions for the five `status_edge_conflicts` shapes -- see
+# `_status_edge_conflicts` for what each shape detects.
+_CONFLICT_DISPOSITIONS = {
+    "a": "resolve manually -- a record cannot both supersede and be superseded by the same id",
+    "b": "resolve manually -- a terminal-status record should not carry a live partial edge",
+    "c": "resolve manually -- the narrowing record must be reinstated, or the edge removed",
+    "d": "resolve manually -- migration residue: drop the stale re_affirmed_by entry",
+    "e": "resolve manually -- flip status to a terminal value, or remove superseded_by",
+}
 
 # Decisions are ordered by id, so the tail is the most recently authored. A
 # window, because a corpus-wide share barely moves as new decisions land and so
@@ -275,6 +292,139 @@ def _matches_shape(path: str, shape: str) -> bool:
     return bool(stem) and (stem in path or path in stem)
 
 
+# -- Status/edge conflicts -----------------------------------------------------
+
+
+def _parse_edge_ids(fm: str, field: str) -> list[str]:
+    """Extract a supersession-edge frontmatter field as a list of ids.
+
+    `supersedes` is scalar-or-list per the ADR schema; the others are always
+    lists. Trying block-list, then inline-list, then scalar in turn keeps every
+    caller field-agnostic about which shape a given record used. Anchoring on
+    `^{field}:` (colon required immediately after the name) is what keeps
+    `supersedes:` from matching a `supersedes_in_part:` line.
+    """
+    block = re.search(rf"^{field}:\s*\n((?:\s+-\s.*\n)+)", fm, re.MULTILINE)
+    if block:
+        return [line.split("-", 1)[1].strip().strip("\"'") for line in block.group(1).splitlines()]
+    inline = re.search(rf"^{field}:\s*\[(.*?)\]\s*$", fm, re.MULTILINE)
+    if inline:
+        return [v.strip().strip("\"'") for v in inline.group(1).split(",") if v.strip()]
+    scalar = re.search(rf"^{field}:\s*(\S+)\s*$", fm, re.MULTILINE)
+    if scalar:
+        return [scalar.group(1).strip().strip("\"'")]
+    return []
+
+
+def _conflict(rid: str, shape: str, detail: str) -> dict:
+    return {
+        "id": rid,
+        "shape": shape,
+        "detail": detail,
+        "disposition": _CONFLICT_DISPOSITIONS[shape],
+    }
+
+
+def _status_edge_conflicts(adrs: list[Path]) -> list[dict]:
+    """Frontmatter-only contradictions between a record's status and its edges.
+
+    Every finding here is mechanical -- derived from `status` and the five
+    supersession-edge fields alone, never from prose (see the module docstring
+    on why prose-based heuristics are the wrong tool for a gate). Runs over
+    every record, including terminal ones: shapes (b) and (e) are specifically
+    about a status/edge pair that disagrees, so excluding terminal records
+    would hide the very shapes that name a terminal status as one side of the
+    contradiction.
+
+    (a) the same id appears in both `supersedes` and `superseded_by` -- a
+        record cannot both supersede and be superseded by the same decision.
+    (b) `supersedes_in_part`/`superseded_in_part_by` is non-empty while the
+        record's own status is terminal -- a live partial edge has no meaning
+        once the record it is attached to no longer constrains work.
+    (c) an id in `superseded_in_part_by` names a record that is itself
+        `retired`/`rejected` -- the narrower cannot be gone while its edge
+        still stands.
+    (d) the same id appears in `re_affirmed_by` alongside either
+        `superseded_in_part_by` or the full `superseded_by` -- migration
+        residue from the pre-partial-supersession encoding, where a
+        supersession (full or partial) was *also* recorded as a
+        re-affirmation of the very decision it superseded.
+    (e) `superseded_by` is set but status is not terminal -- full supersession
+        always writes both together, so this pair alone means the edit is
+        incomplete.
+    """
+    records = []
+    for adr in adrs:
+        text = adr.read_text(encoding="utf-8")
+        fm = (_FRONTMATTER.match(text) or [None, ""])[1]
+        rid = (re.search(r"^id:\s*(\S+)", fm, re.MULTILINE) or [None, ""])[1].strip()
+        status = (_STATUS.search(text) or [None, ""])[1].strip().strip("\"'")
+        records.append(
+            {
+                "id": rid,
+                "status": status,
+                "supersedes": _parse_edge_ids(fm, "supersedes"),
+                "superseded_by": _parse_edge_ids(fm, "superseded_by"),
+                "supersedes_in_part": _parse_edge_ids(fm, "supersedes_in_part"),
+                "superseded_in_part_by": _parse_edge_ids(fm, "superseded_in_part_by"),
+                "re_affirmed_by": _parse_edge_ids(fm, "re_affirmed_by"),
+            }
+        )
+    status_by_id = {r["id"]: r["status"] for r in records}
+
+    findings = []
+    for r in records:
+        shared_full = set(r["supersedes"]) & set(r["superseded_by"])
+        for target in sorted(shared_full):
+            findings.append(
+                _conflict(r["id"], "a", f"names {target} in both supersedes and superseded_by")
+            )
+
+        if r["status"] in _TERMINAL_STATUSES and (
+            r["supersedes_in_part"] or r["superseded_in_part_by"]
+        ):
+            findings.append(
+                _conflict(
+                    r["id"], "b", f"carries a partial edge while status is terminal ({r['status']})"
+                )
+            )
+
+        for target in r["superseded_in_part_by"]:
+            target_status = status_by_id.get(target)
+            if target_status in {"retired", "rejected"}:
+                findings.append(
+                    _conflict(
+                        r["id"], "c", f"{target} narrows this record but is itself {target_status}"
+                    )
+                )
+
+        superseded_targets = set(r["superseded_in_part_by"]) | set(r["superseded_by"])
+        shared_partial_reaffirm = superseded_targets & set(r["re_affirmed_by"])
+        for target in sorted(shared_partial_reaffirm):
+            findings.append(
+                _conflict(
+                    r["id"],
+                    "d",
+                    f"names {target} in both superseded_in_part_by and re_affirmed_by",
+                )
+            )
+
+        # Excludes targets already reported under (a): a record whose only
+        # `superseded_by` id is the one it also `supersedes` is exclusively an
+        # (a) contradiction, not an additional (e) finding for the same edge.
+        residual_full = set(r["superseded_by"]) - shared_full
+        if residual_full and r["status"] not in _TERMINAL_STATUSES:
+            findings.append(
+                _conflict(
+                    r["id"],
+                    "e",
+                    f"carries superseded_by while status is {r['status']!r}, not terminal",
+                )
+            )
+
+    return findings
+
+
 # -- Classification -----------------------------------------------------------
 
 
@@ -354,6 +504,7 @@ def classify(repo_root: Path) -> dict:
         "reopen_candidates": reopen,
         "category_mix": _category_mix(categories, adr_ids),
         "summary": _summarize(findings),
+        "status_edge_conflicts": _status_edge_conflicts(adrs),
     }
 
 
@@ -588,6 +739,8 @@ def main(argv: list[str] | None = None) -> int:
         )
     for cls, n in report["summary"].items():
         print(f"  {cls:20} {n:4}")
+    for c in report["status_edge_conflicts"]:
+        print(f"\n  CONFLICT ({c['shape']}) {c['id']}: {c['detail']}\n    {c['disposition']}")
     for f in report["findings"]:
         if f["disposition"] != "none":
             print(

@@ -16,7 +16,8 @@ affected_files:
   - skills/software-planning/references/adr-authoring-protocols.md
   - skills/software-planning/references/design-synthesis.md
 affected_reqs: [REQ-03, REQ-04, REQ-05]
-supersedes: dec-231
+supersedes_in_part:
+  - dec-231
 dissent: "A reader who wants exhaustive option enumeration may argue DI (one genuine rival) is narrower than an ACH matrix (all plausible hypotheses scored by disconfirmation). Held minority view: revisit if decisions with >2 genuinely-live options recur and DI's single-rival framing demonstrably loses coverage."
 ---
 

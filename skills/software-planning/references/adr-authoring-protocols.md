@@ -186,6 +186,37 @@ A retired decision is preserved, never deleted. If its subject returns — a rem
 
 Terminal records stay in `.ai-state/decisions/`. Moving them into a subdirectory would break the path-form links that persistent documents are required to use, and would silently narrow every consumer that globs the decisions directory flat — including the next-`NNN` scan in `finalize_adrs.py`, which iterates files and skips subdirectories, and would therefore reissue an archived record's id the first time a recent decision is retired. The lifecycle separation the archive was meant to provide is delivered by `status` plus index filtering, with no file movement and no dangling links.
 
+## Partial-Supersession Protocol
+
+Use this protocol when a later decision narrows **specific clauses** of a prior one while the rest of the prior record stays in force — the prior decision is not fully replaced and must remain retrievable under its live status. This is distinct from full [Supersession](#supersession-protocol) (which answers the *same question differently*, end to end), [Re-affirmation](#re-affirmation-protocol) (which changes nothing about the prior record), and [Retirement](#retirement-protocol) (which fires only when the prior decision's subject was removed, not narrowed).
+
+**Frontmatter fields**: `supersedes_in_part` (list, on the narrowing record) and `superseded_in_part_by` (list, on the narrowed record). Schema definitions live in [`adr-conventions.md`](../../../rules/swe/adr-conventions.md#frontmatter).
+
+### Step sequence
+
+1. Set `supersedes_in_part: [<target-id>, ...]` in the **new** (narrowing) ADR frontmatter.
+2. Set `superseded_in_part_by: [<new-id>, ...]` in the **old** (narrowed) ADR frontmatter — append, don't overwrite, if a list already exists.
+3. **Conversion, not addition.** If the pair currently carries a full `supersedes`/`superseded_by` edge, **remove** that edge on both records — a pair cannot hold both a full and a partial edge to the same target. If the old record's `re_affirmed_by` carries the same new-id (from an earlier re-affirmation that a partial narrowing now supersedes), **remove** that same-id entry too. The partial edge fully replaces whatever full-edge or re-affirmation encoding previously existed for that pair.
+4. **Keep the narrowed record's status non-terminal.** A record with a non-empty `superseded_in_part_by` must not carry a terminal `status` (`superseded`, `retired`, `rejected`) — the surviving clauses are still live and the record must stay retrievable by status-keyed consumers (`query_adrs.py`'s default view, `adr_health.py`'s `_TERMINAL_STATUSES`).
+5. Add a `## Prior Decision` section to the **new** ADR body naming, in prose, which clauses of the old record are narrowed and which clauses survive unchanged. This prose is the only place the clause-level distinction is recorded — frontmatter carries the relation, not its content.
+6. `DECISIONS_INDEX.md` regenerates automatically at finalize — do not manually invoke.
+
+### Mutual-exclusion invariant
+
+For any ordered pair (A, B): `A.supersedes ∋ B` ⊕ `A.supersedes_in_part ∋ B` — never both. A pair recorded as partial must not simultaneously carry a full edge to the same target; step 3 above is what enforces this at write time.
+
+### Named enforcers
+
+| Enforcer | Checks |
+|---|---|
+| Sentinel DL04 | Referential existence — every id in `supersedes_in_part` / `superseded_in_part_by` resolves to a real record |
+| Sentinel DL06 | Reciprocity — every `supersedes_in_part` entry has a matching `superseded_in_part_by` entry on the target, and vice versa |
+| `adr_health.py` `status_edge_conflicts` | State consistency — five mechanical contradiction shapes, none requiring prose: **(a)** the same target id appears in both a full and a partial edge field on one record; **(b)** a `superseded_in_part_by` entry coexists with a terminal `status`; **(c)** the narrowing record itself carries `retired`/`rejected` status; **(d)** the same id appears in both `superseded_in_part_by` and `re_affirmed_by` on one record (migration residue from step 3); **(e)** `superseded_by` (full) coexists with a non-terminal `status` (the pre-existing divergence this protocol corrects) |
+
+### The supersession-vs-partial decision test
+
+Ask what fraction of the old record's *decision content* the new record actually re-decides. If the new record answers the whole question the old one asked — nothing in the old record remains correct on its own — record full [Supersession](#supersession-protocol). If the new record narrows one clause, one exception, or one scope boundary while the rest of the old record's reasoning still stands unmodified, record a **partial** supersession: the old record keeps answering everything it answered except the narrowed part. Frontmatter alone cannot make this call — two records can carry an identical `superseded_by`-shaped edge while one is a full replacement and the other narrows a single clause. The discriminating evidence is always in the narrowing record's `## Prior Decision` prose; read it before choosing full vs. partial, never infer the shape from the edge alone.
+
 ## Finalize at Merge-to-Main
 
 At merge-to-main, the post-merge finalize step promotes drafts in `.ai-state/decisions/drafts/` to finalized `<NNN>-<slug>.md` records. The protocol is **idempotent** (running twice on the same state is a no-op), so duplicated invocations from the post-merge hook + `/merge-worktree` command are safe. Agents do not run finalize manually.

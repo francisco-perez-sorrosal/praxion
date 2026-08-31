@@ -175,6 +175,98 @@ describe("buildAdrGraph", () => {
     expect(graph[0]?.id).toBe("dec-draft-a1b2c3d4"); // id-citation-discipline:ignore
     expect(graph[0]?.supersedes).toEqual(["dec-draft-e5f6a7b8"]); // id-citation-discipline:ignore
   });
+
+  it("renders every edge of a record carrying all three narrowing/retirement fields at once", () => {
+    // dec-347's own bug class: a family added but silently dropped by the
+    // renderer is worse than never having the data, because the graph then
+    // asserts "no relation" where one exists. Assert exact edge values, not
+    // mere presence, so a partially-wired field cannot pass this test.
+    const graph = buildAdrGraph([
+      {
+        data: {
+          id: "dec-263",
+          title: "Narrows and retires several decisions",
+          status: "accepted",
+          supersedes_in_part: ["dec-219"],
+          superseded_in_part_by: ["dec-400"],
+          retired_by: ["dec-401", "dec-402"]
+        },
+        slug: "263-narrows-and-retires"
+      }
+    ]);
+
+    const node = graph[0];
+    expect(node?.supersedes_in_part).toEqual(["dec-219"]);
+    expect(node?.superseded_in_part_by).toEqual(["dec-400"]);
+    expect(node?.retired_by).toEqual(["dec-401", "dec-402"]);
+  });
+
+  it("coerces a scalar supersedes_in_part into a single-element list", () => {
+    const graph = buildAdrGraph([
+      {
+        data: {
+          id: "dec-500",
+          title: "Narrows one decision",
+          status: "accepted",
+          supersedes_in_part: "dec-100"
+        },
+        slug: "500-narrows-one"
+      }
+    ]);
+
+    expect(graph[0]?.supersedes_in_part).toEqual(["dec-100"]);
+  });
+
+  it("coerces a scalar superseded_in_part_by into a single-element list", () => {
+    const graph = buildAdrGraph([
+      {
+        data: {
+          id: "dec-100",
+          title: "Narrowed by dec-500",
+          status: "accepted",
+          superseded_in_part_by: "dec-500"
+        },
+        slug: "100-narrowed"
+      }
+    ]);
+
+    expect(graph[0]?.superseded_in_part_by).toEqual(["dec-500"]);
+  });
+
+  it("coerces a scalar retired_by into a single-element list", () => {
+    // The pre-existing omission this step closes: retired_by never reached
+    // the graph at all, scalar or list.
+    const graph = buildAdrGraph([
+      {
+        data: {
+          id: "dec-600",
+          title: "Retired by one decision",
+          status: "retired",
+          retired_by: "dec-601"
+        },
+        slug: "600-retired"
+      }
+    ]);
+
+    expect(graph[0]?.retired_by).toEqual(["dec-601"]);
+  });
+
+  it("omits supersedes_in_part, superseded_in_part_by, and retired_by keys when frontmatter carries none of them", () => {
+    const graph = buildAdrGraph([
+      {
+        data: { id: "dec-700", title: "No narrowing or retirement", status: "accepted" },
+        slug: "700-plain"
+      }
+    ]);
+
+    const node = graph[0];
+    expect(node?.supersedes_in_part).toBeUndefined();
+    expect(node?.superseded_in_part_by).toBeUndefined();
+    expect(node?.retired_by).toBeUndefined();
+    expect(Object.prototype.hasOwnProperty.call(node, "supersedes_in_part")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(node, "superseded_in_part_by")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(node, "retired_by")).toBe(false);
+  });
 });
 
 // ─── computeLayers tests ──────────────────────────────────────────────────────

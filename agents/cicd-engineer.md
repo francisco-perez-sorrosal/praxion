@@ -12,7 +12,7 @@ skills: [cicd, external-api-docs]
 memory: user
 model: sonnet  # capability floor per rules/swe/agent-model-routing.md
 effort: high
-maxTurns: 50
+maxTurns: 80
 background: true
 ---
 

@@ -30,7 +30,7 @@ Retrieve accurate, current API documentation for external libraries transparentl
 - **Large docs blow up context.** A single API reference can be 10K-50K+ tokens. When using CLI, fetch to file (`-o`) and read selectively. When using MCP tools, the content arrives in the tool response -- summarize or extract only what is needed before proceeding.
 - **Curated does not mean correct.** Community-contributed docs may be outdated, incomplete, or vendor-biased. Cross-check critical details (auth flows, error codes, rate limits) against the official source when the stakes are high. Prefer entries marked `official` or `maintainer` over `community`.
 - **Annotations are local and single-slot.** Each annotation overwrites the previous one for that entry -- there is no annotation history. Write comprehensive notes, not incremental updates.
-- **Node.js required.** Both the MCP server and CLI need Node.js 18+. The Praxion installer configures the MCP server via `npx` (auto-downloads on first use). If Node.js is unavailable, fall back to web search.
+- **Node.js required.** Both the MCP server and CLI need Node.js 18+. The Praxion installer installs the CLI globally (`npm install -g @aisuite/chub`) and writes `~/.chub/config.yaml`; it registers no MCP server — the opt-in skill wrapper is the integration, keeping the plugin free of hard runtime dependencies. If Node.js is unavailable, fall back to web search.
 
 ## Automatic Behavior
 

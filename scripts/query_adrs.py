@@ -42,6 +42,14 @@ DEFAULT_STATUSES = frozenset({"accepted", "re-affirmation"})
 _FRONTMATTER_RE = re.compile(r"^---\n(.*?\n)---", re.DOTALL)
 _FALLBACK_KEY_RE = re.compile(r"^(\w[\w-]*)\s*:\s*(.*)$")
 _FALLBACK_BLOCK_ITEM_RE = re.compile(r"^\s+-\s*(.+)$")
+# `key: >` (folded) or `key: |` (literal), optionally with a chomping
+# indicator (`-`/`+`) or explicit indentation digit -- the YAML block-scalar
+# forms that carry a long free-text value (e.g. `dissent:`, `summary:`) across
+# several indented continuation lines with no `- ` marker of their own.
+_FALLBACK_SCALAR_BLOCK_RE = re.compile(r"^(\w[\w-]*)\s*:\s*([>|][-+0-9]*)\s*$")
+# An indented, non-blank line -- the shape both a block-scalar continuation
+# and a `- item` bullet share; which one it is depends on which mode is open.
+_FALLBACK_CONTINUATION_RE = re.compile(r"^\s+\S")
 
 EXAMPLES = """\
 EXAMPLES
@@ -72,7 +80,9 @@ class AdrRecord:
     date: str
     tags: tuple[str, ...]
     summary: str
+    category: str
     affected_files: tuple[str, ...]
+    superseded_in_part_by: tuple[str, ...]  # narrowing ids; record stays live, not fully superseded
     file: str  # repo-relative, posix separators
 
 
@@ -115,7 +125,9 @@ def _parse_inline_list(value: str) -> list[str]:
 def _parse_frontmatter_fallback(raw: str, path: Path) -> dict[str, object] | None:
     """Minimal stdlib line-parser for exactly the fields this script needs.
 
-    Handles scalar values, inline lists (`[a, b]`), and block lists (`- item`).
+    Handles scalar values, inline lists (`[a, b]`), block lists (`- item`),
+    and multi-line block scalars (`key: >` / `key: |`, e.g. `dissent:`,
+    `summary:`) whose continuation lines carry no `- ` marker of their own.
     Kept honest per the fallback contract: any line it cannot classify --
     inside or outside a block, an unterminated inline list -- causes it to
     warn and skip the file rather than guess at a shape it does not recognize.
@@ -123,6 +135,8 @@ def _parse_frontmatter_fallback(raw: str, path: Path) -> dict[str, object] | Non
     fields: dict[str, object] = {}
     block_key: str | None = None
     block_items: list[str] = []
+    scalar_key: str | None = None
+    scalar_lines: list[str] = []
 
     def flush_block() -> None:
         nonlocal block_key, block_items
@@ -131,13 +145,32 @@ def _parse_frontmatter_fallback(raw: str, path: Path) -> dict[str, object] | Non
         block_key = None
         block_items = []
 
+    def flush_scalar() -> None:
+        nonlocal scalar_key, scalar_lines
+        if scalar_key is not None:
+            fields[scalar_key] = " ".join(scalar_lines)
+        scalar_key = None
+        scalar_lines = []
+
     for line in raw.splitlines():
         if not line.strip():
             continue
 
+        if scalar_key is not None and _FALLBACK_CONTINUATION_RE.match(line):
+            scalar_lines.append(line.strip())
+            continue
+        flush_scalar()
+
         block_item = _FALLBACK_BLOCK_ITEM_RE.match(line)
         if block_item and block_key is not None:
             block_items.append(_strip_quotes(block_item.group(1)))
+            continue
+
+        scalar_block = _FALLBACK_SCALAR_BLOCK_RE.match(line)
+        if scalar_block:
+            flush_block()
+            scalar_key = scalar_block.group(1)
+            scalar_lines = []
             continue
 
         key_match = _FALLBACK_KEY_RE.match(line)
@@ -165,6 +198,7 @@ def _parse_frontmatter_fallback(raw: str, path: Path) -> dict[str, object] | Non
             fields[key] = _strip_quotes(value)
 
     flush_block()
+    flush_scalar()
     return fields
 
 
@@ -210,7 +244,9 @@ def load_adr(path: Path, repo_root: Path, yaml_module) -> AdrRecord | None:
         date=str(data.get("date", "")).strip(),
         tags=tuple(_as_list(data.get("tags"))),
         summary=str(data.get("summary", "")).strip(),
+        category=str(data.get("category", "")).strip(),
         affected_files=tuple(_as_list(data.get("affected_files"))),
+        superseded_in_part_by=tuple(_as_list(data.get("superseded_in_part_by"))),
         file=path.relative_to(repo_root).as_posix(),
     )
 
@@ -219,7 +255,13 @@ def discover_adr_files(repo_root: Path) -> list[Path]:
     """Every finalized and in-flight-draft ADR file, finalized first."""
     decisions_dir = repo_root / ".ai-state" / "decisions"
     finalized = sorted(decisions_dir.glob("[0-9]*.md"))
-    drafts = sorted((decisions_dir / "drafts").glob("*.md"))
+    # Directory docs (CLAUDE.md, README.md) live beside draft fragments but are
+    # not ADRs; excluding them keeps the unparseable count meaning real failures.
+    drafts = sorted(
+        path
+        for path in (decisions_dir / "drafts").glob("*.md")
+        if path.name not in ("CLAUDE.md", "README.md")
+    )
     return finalized + drafts
 
 
@@ -322,9 +364,19 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _narrowing_caveat(record: AdrRecord) -> str | None:
+    """`narrowed by dec-NNN[, dec-MMM...]`, or None when the record is unaffected."""
+    if not record.superseded_in_part_by:
+        return None
+    return "narrowed by " + ", ".join(record.superseded_in_part_by)
+
+
 def _print_text(matches: list[tuple[AdrRecord, str]]) -> None:
     for record, matched in matches:
         print(f"{record.id} | {record.status} | {record.title}")
+        caveat = _narrowing_caveat(record)
+        if caveat is not None:
+            print(f"  {caveat}")
         print(f"  matched: {matched}")
         print(f"  file: {record.file}")
     count = len(matches)
@@ -333,7 +385,11 @@ def _print_text(matches: list[tuple[AdrRecord, str]]) -> None:
 
 def _print_tsv(matches: list[tuple[AdrRecord, str]]) -> None:
     for record, _matched in matches:
-        print(f"{record.id}\t{record.status}\t{record.title}\t{record.file}")
+        line = f"{record.id}\t{record.status}\t{record.title}\t{record.file}"
+        caveat = _narrowing_caveat(record)
+        if caveat is not None:
+            line += f"\t{caveat}"
+        print(line)
 
 
 def _select(

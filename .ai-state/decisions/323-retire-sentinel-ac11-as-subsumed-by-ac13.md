@@ -11,8 +11,8 @@ agent_type: orchestrator
 branch: main
 pipeline_tier: direct
 dissent: 'AC13 binds element ids and never reads the Component name, so it cannot detect a §3a row whose human-readable name has drifted into inaccuracy — retiring the only check that looked at names trades a noisy signal for a permanent blind spot in the one column a human actually reads.'
-supersedes: dec-112
-re_affirms: dec-112
+supersedes_in_part:
+  - dec-112
 affected_files:
   - agents/sentinel.md
   - docs/aac-dac.md

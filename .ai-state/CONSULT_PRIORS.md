@@ -44,6 +44,7 @@ the first.
 | 2026-07-31T19:12:50Z | verify-multidisciplinary | statistician | verification | P-05 | lens | Clause 'is any trend claim exposed to Simpson's-paradox reversal' fails at Section 2 FAIL-6: the 51.2% dedup_key conformance is pooled over the whole td-NNN history while the non-conformance is time-stratified with a reported boundary at td-073, so a pooled rate conflates a possibly-conforming recent regime with a non-conforming older one and was never stratified. |
 | 2026-07-31T19:12:50Z | verify-multidisciplinary | statistician | verification | P-06 | lens | Clause 'is a tolerance band derived from an error model or merely asserted' fails at the FAIL/WARN/PASS verdict scheme itself: no rule separates FAIL from WARN, the boundary is applied inconsistently across lenses (D5 returned 0 FAIL for defects comparable to D2's FAILs), and the report's own gate therefore has exactly the asserted-threshold defect it charges others with. |
 | 2026-07-31T19:12:50Z | verify-multidisciplinary | statistician | verification | P-07 | lens | Clause 'was the stopping rule fixed in advance of looking' fails at Sections 1-2: the set of lens claims re-derived by the orchestrator was chosen AFTER reading the returns, on salience, so dramatic findings were audited and quiet ones were not -- optional stopping applied to verification effort, biasing toward confirming what looked interesting. |
+| 2026-08-31T09:05:00Z | adr-living-view | data-structure-specialist | architecture | NONE | lens | Tombstone, recorded post-hoc: the convener spawned this consult before performing a lens pass or reading the seal protocol (learned mid-pipeline; UNSEALED note in the matching CONSULT_COSTS row). No priors existed to seal, so no P-NN row is backfilled — all 8 classification rows are 'novel' by construction and the novelty rate of this consult must not be read as informative about the discipline. |
 
 ## Challenge Classification
 
@@ -65,6 +66,14 @@ the first.
 | 2026-07-31T19:33:43Z | verify-multidisciplinary | statistician | verification | CH-07 | matched | P-04 | 37df0f33084e0268ec85b85fe6c34e7997150560 | 0 |
 | 2026-07-31T19:33:43Z | verify-multidisciplinary | statistician | verification | CH-08 | novel |  | 37df0f33084e0268ec85b85fe6c34e7997150560 | 0 |
 | 2026-07-31T19:33:43Z | verify-multidisciplinary | statistician | verification | CH-09 | matched | P-05 | 37df0f33084e0268ec85b85fe6c34e7997150560 | 0 |
+| 2026-08-31T07:45:00Z | adr-living-view | data-structure-specialist | architecture | CH-01 | novel |  | 166c50844a96b0c6ea4d479022d0cf5b9e6bdf06 | 5 |
+| 2026-08-31T07:45:00Z | adr-living-view | data-structure-specialist | architecture | CH-02 | novel |  | 166c50844a96b0c6ea4d479022d0cf5b9e6bdf06 | 5 |
+| 2026-08-31T07:45:00Z | adr-living-view | data-structure-specialist | architecture | CH-03 | novel |  | 166c50844a96b0c6ea4d479022d0cf5b9e6bdf06 | 5 |
+| 2026-08-31T07:45:00Z | adr-living-view | data-structure-specialist | architecture | CH-04 | novel |  | 166c50844a96b0c6ea4d479022d0cf5b9e6bdf06 | 5 |
+| 2026-08-31T07:45:00Z | adr-living-view | data-structure-specialist | architecture | CH-05 | novel |  | 166c50844a96b0c6ea4d479022d0cf5b9e6bdf06 | 5 |
+| 2026-08-31T07:45:00Z | adr-living-view | data-structure-specialist | architecture | CH-06 | novel |  | 166c50844a96b0c6ea4d479022d0cf5b9e6bdf06 | 5 |
+| 2026-08-31T07:45:00Z | adr-living-view | data-structure-specialist | architecture | CH-07 | novel |  | 166c50844a96b0c6ea4d479022d0cf5b9e6bdf06 | 5 |
+| 2026-08-31T07:45:00Z | adr-living-view | data-structure-specialist | architecture | CH-08 | novel |  | 166c50844a96b0c6ea4d479022d0cf5b9e6bdf06 | 5 |
 
 ## Column Definitions
 

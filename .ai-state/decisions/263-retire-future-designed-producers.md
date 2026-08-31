@@ -15,7 +15,8 @@ affected_files:
   - skills/software-planning/references/artifact-inventory.md
   - skills/agent-evals/references/run-ledger-schema.md
   - .ai-state/decisions/219-project-profile-yaml-schema.md
-supersedes: dec-219
+supersedes_in_part:
+  - dec-219
 re_affirms: dec-231
 re_affirmed_by: [dec-268]
 dissent: If the agentic-eval archetype loop lands soon, a minimal Phase 8f stub now would have saved re-opening this; retiring an almost-ready seam risks it being rebuilt from scratch rather than resumed.

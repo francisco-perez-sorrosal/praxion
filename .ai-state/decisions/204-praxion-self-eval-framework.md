@@ -17,7 +17,8 @@ affected_files:
   - eval/src/praxion_evals/cli.py
   - commands/eval-praxion.md
   - .ai-state/praxion_eval_reports/
-supersedes: dec-040
+supersedes_in_part:
+  - dec-040
 re_affirmed_by:
   - dec-206
   - dec-205

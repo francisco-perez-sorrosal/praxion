@@ -12,6 +12,9 @@ export type AdrGraphNode = {
   readonly superseded_by?: string;
   readonly re_affirms?: string;
   readonly re_affirmed_by?: string[];
+  readonly supersedes_in_part?: readonly string[];
+  readonly superseded_in_part_by?: readonly string[];
+  readonly retired_by?: readonly string[];
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -56,8 +59,9 @@ function resolveId(data: Record<string, unknown>, slug: string | undefined): str
  * Builds a flat array of AdrGraphNode from already-loaded ADR records.
  *
  * Reads frontmatter fields: id, title, status, supersedes, superseded_by,
- * re_affirms, re_affirmed_by. Works for both dec-NNN and dec-draft-<hash> ids.
- * Records missing required fields are included with sensible defaults (not
+ * re_affirms, re_affirmed_by, supersedes_in_part, superseded_in_part_by,
+ * retired_by. Works for both dec-NNN and dec-draft-<hash> ids. Records
+ * missing required fields are included with sensible defaults (not
  * omitted) so the graph remains consistent.
  */
 export function buildAdrGraph(adrs: AdrRecord[]): AdrGraphNode[] {
@@ -70,6 +74,9 @@ export function buildAdrGraph(adrs: AdrRecord[]): AdrGraphNode[] {
     const superseded_by = asString(data["superseded_by"]);
     const re_affirms = asString(data["re_affirms"]);
     const re_affirmed_by = asStringArray(data["re_affirmed_by"]);
+    const supersedes_in_part = asIdList(data["supersedes_in_part"]);
+    const superseded_in_part_by = asIdList(data["superseded_in_part_by"]);
+    const retired_by = asIdList(data["retired_by"]);
 
     return {
       id,
@@ -78,7 +85,10 @@ export function buildAdrGraph(adrs: AdrRecord[]): AdrGraphNode[] {
       ...(supersedes !== undefined && { supersedes }),
       ...(superseded_by !== undefined && { superseded_by }),
       ...(re_affirms !== undefined && { re_affirms }),
-      ...(re_affirmed_by !== undefined && { re_affirmed_by })
+      ...(re_affirmed_by !== undefined && { re_affirmed_by }),
+      ...(supersedes_in_part !== undefined && { supersedes_in_part }),
+      ...(superseded_in_part_by !== undefined && { superseded_in_part_by }),
+      ...(retired_by !== undefined && { retired_by })
     };
   });
 }

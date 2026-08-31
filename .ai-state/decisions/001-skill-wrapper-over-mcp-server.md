@@ -9,6 +9,7 @@ tags: [context-hub, skills, integration]
 made_by: agent
 agent_type: systems-architect
 affected_files: ["skills/external-api-docs/SKILL.md"]
+re_affirmed_by: [dec-draft-b169b522]
 ---
 
 ## Context

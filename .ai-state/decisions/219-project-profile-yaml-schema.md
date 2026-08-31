@@ -15,7 +15,8 @@ affected_files:
   - rules/swe/agent-intermediate-documents.md
   - skills/onboard-project/SKILL.md
 related: [dec-221, dec-220, dec-216]
-superseded_by: dec-263
+superseded_in_part_by:
+  - dec-263
 ---
 
 ## Context

@@ -29,12 +29,22 @@ type GraphLayout = {
   readonly height: number;
 };
 
-type EdgeKind = "supersedes" | "re_affirms";
+type EdgeKind = "supersedes" | "supersedes_in_part" | "re_affirms" | "retired_by";
 
 type GraphEdge = {
   readonly sourceId: string;
   readonly targetId: string;
   readonly kind: EdgeKind;
+};
+
+// Distinct dash pattern per edge kind, in the same visual vocabulary as the
+// existing solid/dashed split — each kind must stay visually distinguishable
+// from its neighbors without relying on color.
+const EDGE_DASH_PATTERN: Record<EdgeKind, string | undefined> = {
+  supersedes: undefined,
+  supersedes_in_part: "2 3",
+  re_affirms: "5 4",
+  retired_by: "1 3"
 };
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -140,8 +150,22 @@ function extractEdges(nodes: AdrGraphNode[]): GraphEdge[] {
         edges.push({ sourceId: node.id, targetId: target, kind: "supersedes" });
       }
     }
+    // Read only the forward field (supersedes_in_part), mirroring the
+    // supersedes/superseded_by pair above: reciprocity is enforced upstream
+    // (status_edge_conflicts), so reading both directions would double-draw
+    // the same edge.
+    for (const target of node.supersedes_in_part ?? []) {
+      if (idSet.has(target)) {
+        edges.push({ sourceId: node.id, targetId: target, kind: "supersedes_in_part" });
+      }
+    }
     if (node.re_affirms && idSet.has(node.re_affirms)) {
       edges.push({ sourceId: node.id, targetId: node.re_affirms, kind: "re_affirms" });
+    }
+    for (const target of node.retired_by ?? []) {
+      if (idSet.has(target)) {
+        edges.push({ sourceId: node.id, targetId: target, kind: "retired_by" });
+      }
     }
   }
 
@@ -170,7 +194,10 @@ function hasAnyEdge(node: AdrGraphNode): boolean {
     (node.supersedes !== undefined && node.supersedes.length > 0) ||
     node.superseded_by !== undefined ||
     node.re_affirms !== undefined ||
-    (node.re_affirmed_by !== undefined && node.re_affirmed_by.length > 0)
+    (node.re_affirmed_by !== undefined && node.re_affirmed_by.length > 0) ||
+    (node.supersedes_in_part !== undefined && node.supersedes_in_part.length > 0) ||
+    (node.superseded_in_part_by !== undefined && node.superseded_in_part_by.length > 0) ||
+    (node.retired_by !== undefined && node.retired_by.length > 0)
   );
 }
 
@@ -274,7 +301,6 @@ function DecisionGraphInner({
                 const src = posMap.get(edge.sourceId);
                 const tgt = posMap.get(edge.targetId);
                 if (!src || !tgt) return null;
-                const isSolid = edge.kind === "supersedes";
                 return (
                   <line
                     key={`${edge.sourceId}-${edge.targetId}-${edge.kind}`}
@@ -284,7 +310,7 @@ function DecisionGraphInner({
                     y2={tgt.y}
                     stroke="var(--color-text-muted)"
                     strokeWidth={1.5}
-                    strokeDasharray={isSolid ? undefined : "5 4"}
+                    strokeDasharray={EDGE_DASH_PATTERN[edge.kind]}
                   />
                 );
               })}

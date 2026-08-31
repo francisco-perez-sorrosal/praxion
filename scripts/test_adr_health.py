@@ -567,3 +567,190 @@ def test_never_mutates_an_adr(repo: Path) -> None:
     before = path.read_bytes()
     adr_health.classify(repo)
     assert path.read_bytes() == before
+
+
+# -- status_edge_conflicts: the five contradiction shapes (a)-(e) --------------
+#
+# `status_edge_conflicts` is a distinct, mechanical-only array in the report --
+# every finding is derivable from frontmatter fields alone, never from prose.
+# Each positive fixture below exercises exactly one shape and asserts exactly
+# one finding: an over-firing detector is as wrong as a silent one (see the
+# module docstring's canary discipline). PM-2 requires the mirror-image
+# fixtures too -- legitimate composite histories the enforcer must NOT flag,
+# so a false-positive-prone check does not get muted into ignored noise.
+
+_CONFLICT_FRONTMATTER = """---
+id: dec-{n:03d}
+title: {title}
+status: {status}
+category: architectural
+date: {date}
+summary: s
+tags: [t]
+made_by: agent
+affected_files:
+  - noop
+{extra}
+---
+
+# Body
+"""
+
+
+def _conflict_adr(
+    root: Path,
+    n: int,
+    *,
+    status="accepted",
+    title="A decision",
+    date="2026-01-01",
+    extra_fields=None,
+):
+    """Write a finalized ADR carrying arbitrary edge-field frontmatter.
+
+    Distinct from `_adr` above (which only varies `affected_files`) -- these
+    fixtures need `supersedes`/`superseded_by`/`supersedes_in_part`/
+    `superseded_in_part_by`/`re_affirmed_by`/`retired_by` combinations that the
+    decay-class fixtures never touch.
+    """
+    d = root / ".ai-state" / "decisions"
+    d.mkdir(parents=True, exist_ok=True)
+    lines: list[str] = []
+    for key, value in (extra_fields or {}).items():
+        if isinstance(value, list):
+            lines.append(f"{key}:")
+            lines.extend(f"  - {v}" for v in value)
+        else:
+            lines.append(f"{key}: {value}")
+    body = _CONFLICT_FRONTMATTER.format(
+        n=n, title=title, status=status, date=date, extra="\n".join(lines)
+    )
+    path = d / f"{n:03d}-slug.md"
+    path.write_text(body, encoding="utf-8")
+    return path
+
+
+def _conflicts(report):
+    return report["status_edge_conflicts"]
+
+
+def test_shape_a_same_target_in_both_full_supersession_fields(repo: Path) -> None:
+    """A record cannot both supersede and be superseded by the same id."""
+    _conflict_adr(repo, 1, extra_fields={"supersedes": "dec-002", "superseded_by": "dec-002"})
+    conflicts = _conflicts(adr_health.classify(repo))
+    assert len(conflicts) == 1
+    assert conflicts[0]["shape"] == "a"
+    assert conflicts[0]["id"] == "dec-001"
+
+
+def test_shape_b_partial_edge_on_terminal_status_record(repo: Path) -> None:
+    """`supersedes_in_part`/`superseded_in_part_by` requires a non-terminal narrowed status."""
+    _conflict_adr(
+        repo,
+        1,
+        status="superseded",
+        extra_fields={"superseded_in_part_by": ["dec-002"]},
+    )
+    conflicts = _conflicts(adr_health.classify(repo))
+    assert len(conflicts) == 1
+    assert conflicts[0]["shape"] == "b"
+    assert conflicts[0]["id"] == "dec-001"
+
+
+def test_shape_c_narrowing_record_itself_retired(repo: Path) -> None:
+    """The record named as the narrowing target must itself be live, not retired/rejected."""
+    _conflict_adr(repo, 1, extra_fields={"superseded_in_part_by": ["dec-002"]})
+    _conflict_adr(repo, 2, status="retired", extra_fields={"retired_by": ["dec-999"]})
+    conflicts = _conflicts(adr_health.classify(repo))
+    assert len(conflicts) == 1
+    assert conflicts[0]["shape"] == "c"
+    assert conflicts[0]["id"] == "dec-001"
+    assert "dec-002" in conflicts[0]["detail"]
+
+
+def test_shape_d_same_id_in_superseded_in_part_by_and_re_affirmed_by(repo: Path) -> None:
+    """Migration residue: old-encoding `re_affirmed_by` coexisting with the new field, same target."""
+    _conflict_adr(
+        repo,
+        1,
+        extra_fields={"superseded_in_part_by": ["dec-002"], "re_affirmed_by": ["dec-002"]},
+    )
+    conflicts = _conflicts(adr_health.classify(repo))
+    assert len(conflicts) == 1
+    assert conflicts[0]["shape"] == "d"
+    assert conflicts[0]["id"] == "dec-001"
+
+
+def test_shape_e_superseded_by_on_non_terminal_record(repo: Path) -> None:
+    """A full `superseded_by` edge implies a terminal status; `accepted` contradicts it."""
+    _conflict_adr(repo, 1, status="accepted", extra_fields={"superseded_by": "dec-002"})
+    conflicts = _conflicts(adr_health.classify(repo))
+    assert len(conflicts) == 1
+    assert conflicts[0]["shape"] == "e"
+    assert conflicts[0]["id"] == "dec-001"
+
+
+def test_every_conflict_finding_carries_a_disposition(repo: Path) -> None:
+    """Step 10's protocol names a disposition per shape -- an empty one is not a finding."""
+    _conflict_adr(repo, 1, extra_fields={"supersedes": "dec-002", "superseded_by": "dec-002"})
+    conflicts = _conflicts(adr_health.classify(repo))
+    assert conflicts[0]["disposition"]
+    assert isinstance(conflicts[0]["disposition"], str)
+
+
+# -- status_edge_conflicts: legitimate-negative shapes (PM-2) ------------------
+
+
+def test_correctly_migrated_partial_pair_emits_zero_conflicts(repo: Path) -> None:
+    """The post-migration steady state: reciprocal partial fields, non-terminal narrowed status."""
+    _conflict_adr(repo, 1, status="accepted", extra_fields={"superseded_in_part_by": ["dec-002"]})
+    _conflict_adr(repo, 2, status="accepted", extra_fields={"supersedes_in_part": ["dec-001"]})
+    assert _conflicts(adr_health.classify(repo)) == []
+
+
+def test_fully_superseded_then_separately_re_affirmed_is_not_a_conflict(repo: Path) -> None:
+    """A composite history -- superseded by one record, re-affirmed by an unrelated one -- is legitimate.
+
+    This is the dec-231 shape: `superseded_by` and `re_affirmed_by` name
+    DIFFERENT ids. PM-2: an enforcer that fires here mutes itself into noise
+    the first time a real composite history like this appears.
+    """
+    _conflict_adr(
+        repo,
+        1,
+        status="superseded",
+        extra_fields={"superseded_by": "dec-002", "re_affirmed_by": ["dec-003"]},
+    )
+    assert _conflicts(adr_health.classify(repo)) == []
+
+
+def test_partial_narrowing_with_different_id_re_affirmed_by_is_not_shape_d(repo: Path) -> None:
+    """Shape (d) requires the SAME id in both fields -- different ids must not trip it.
+
+    Distinguishes the migration-residue contradiction from a record that
+    legitimately carries both a partial narrowing and an unrelated re-affirmation.
+    """
+    _conflict_adr(
+        repo,
+        1,
+        extra_fields={"superseded_in_part_by": ["dec-002"], "re_affirmed_by": ["dec-003"]},
+    )
+    assert _conflicts(adr_health.classify(repo)) == []
+
+
+def test_full_supersession_of_a_different_id_than_the_partial_edge_is_not_a_conflict(
+    repo: Path,
+) -> None:
+    """Shape (a) requires the SAME target in both full fields -- distinct targets are legitimate.
+
+    A record can be fully superseded by one decision while separately having
+    narrowed another (via `supersedes_in_part`) -- two unrelated edges, not a
+    contradiction.
+    """
+    _conflict_adr(
+        repo,
+        1,
+        status="superseded",
+        extra_fields={"supersedes": "dec-002", "superseded_by": "dec-003"},
+    )
+    assert _conflicts(adr_health.classify(repo)) == []

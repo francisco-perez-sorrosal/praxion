@@ -62,6 +62,8 @@ The frontmatter schema is shared between draft and finalized ADRs. Only the `id`
 | `re_affirms` | string | No | id of prior decision this ADR re-affirms without superseding |
 | `re_affirmed_by` | list | No | ids of later ADRs that re-affirmed this decision |
 | `retired_by` | list | When `retired` | ids of the decisions whose action removed this one's subject. A **list**, because one removal commonly strands several decisions and `superseded_by` (a string) cannot express that |
+| `supersedes_in_part` | list | No | ids of prior decisions this one narrows (some, not all, clauses). Mutually exclusive with `supersedes` per target pair; requires `## Prior Decision` |
+| `superseded_in_part_by` | list | No | ids of later decisions that narrowed this record. Mutually exclusive with `superseded_by` per pair; status stays non-terminal (`accepted`/`re-affirmation`) |
 | `dissent:` | string | No | Machine-queryable companion to the `## Disconfirmation` body block; one-line strongest objection to the chosen option. Required when `category: architectural`. |
 
 #### What makes a decision `architectural`
@@ -97,6 +99,10 @@ When a new ADR re-affirms an existing one *without* superseding it (a re-opening
 ### Retirement Protocol
 
 When a later decision's action **removed this decision's subject** rather than answering its question differently: set `status: retired` + `retired_by: [<ids>]`, and add a `## Prior Decision` section naming what was removed and by which decision. The removing decisions are **not** modified — they made no claim about this one. Retired records are preserved, never deleted, and **re-open** (back to `accepted`, `retired_by` cleared) if the subject returns. Use only when the question itself is gone; a decision answered differently is a supersession. Full step sequence and the supersession-vs-retirement test: [`adr-authoring-protocols.md` § Retirement Protocol](../../skills/software-planning/references/adr-authoring-protocols.md#retirement-protocol).
+
+### Partial-Supersession Protocol
+
+Narrowing only *some* clauses of an existing ADR uses `supersedes_in_part`/`superseded_in_part_by` in place of the full edge. Full protocol: [`adr-authoring-protocols.md § Partial-Supersession Protocol`](../../skills/software-planning/references/adr-authoring-protocols.md#partial-supersession-protocol).
 
 ### Finalize Protocol
 
@@ -135,12 +141,7 @@ Persistent files — `docs/`, `.ai-state/DESIGN.md`, READMEs — link the **fina
 
 ### Consumption
 
-| Consumer | Purpose |
-|----------|---------|
-| sentinel | DL01-DL05: validate ADR format, frontmatter, body, index consistency, frequency — for both draft and finalized ADRs |
-| skill-genesis | Recurring decision patterns across features |
-| verifier | Cross-reference `affected_reqs` against traceability matrix |
-| systems-architect | Brownfield baseline for prior feature decisions |
+Each consumer's ADR-touching behavior lives at its own definition, not duplicated here: sentinel's DL0x checks, skill-genesis's pattern-harvest scope, verifier's `affected_reqs` cross-reference, systems-architect's brownfield baseline, `architect-validator`'s code↔DSL↔ADR triangle check.
 
 ### Relationship to LEARNINGS.md
 

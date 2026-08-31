@@ -135,6 +135,24 @@ sweep_stale_script_symlinks() {
     done
 }
 
+# Remove the legacy `new-project` entry (pre-rename installs linked this at
+# repo root, not scripts/, so sweep_stale_script_symlinks() never sees it).
+# Fires when the symlink either still points at the old new_project.sh
+# location or is now dangling (the file was renamed to scripts/onboard-project).
+# Shared by relink_all(), check_claude_code(), and uninstall_claude_code() so
+# the predicate lives in exactly one place.
+remove_stale_new_project_symlink() {
+    local bin_dir="${HOME}/.local/bin"
+    local legacy_link="${bin_dir}/new-project"
+    [ -L "$legacy_link" ] || return 0
+    local legacy_target
+    legacy_target="$(readlink "$legacy_link")"
+    if [ "$legacy_target" = "${SCRIPT_DIR}/new_project.sh" ] || [ ! -e "$legacy_link" ]; then
+        rm "$legacy_link"
+        info "Removed stale new-project symlink from ~/.local/bin/"
+    fi
+}
+
 clean_stale_symlinks() {
     local dest_dir="${HOME}/.claude"
     local list_file="${CLAUDE_CONFIG_DIR}/stale_symlinks.txt"
@@ -296,6 +314,10 @@ relink_all() {
         mkdir -p "$bin_dir"
         link_item "${SCRIPT_DIR}/scripts/onboard-project" "${bin_dir}/onboard-project" "onboard-project (project onboarding entry)"
     fi
+
+    # 5. Remove the legacy new-project symlink, if any (runs on every
+    # relink/upgrade, not just uninstall — see remove_stale_new_project_symlink).
+    remove_stale_new_project_symlink
 
     # PATH check for scripts
     if [[ ":$PATH:" != *":${HOME}/.local/bin:"* ]]; then
@@ -1142,6 +1164,18 @@ check_claude_code() {
         fi
     fi
 
+    # Legacy new-project entry — should have been removed by relink_all()
+    # (see remove_stale_new_project_symlink); a survivor here means an
+    # upgrade path missed it.
+    if [ -L "${bin_dir}/new-project" ]; then
+        local new_project_target
+        new_project_target="$(readlink "${bin_dir}/new-project")"
+        if [ "$new_project_target" = "${SCRIPT_DIR}/new_project.sh" ] || [ ! -e "${bin_dir}/new-project" ]; then
+            warn "Stale new-project symlink still present in ~/.local/bin/ (run --relink)"
+            healthy=false
+        fi
+    fi
+
     printf "\n  ${B}Hooks:${R}\n"
     local hooks_json="${SCRIPT_DIR}/hooks/hooks.json"
     if [ -f "$hooks_json" ]; then
@@ -1289,10 +1323,7 @@ uninstall_claude_code() {
     done
 
     # Remove new-project entry (lives at repo root, not scripts/)
-    if [ -L "${bin_dir}/new-project" ] && [ "$(readlink "${bin_dir}/new-project")" = "${SCRIPT_DIR}/new_project.sh" ]; then
-        rm "${bin_dir}/new-project"
-        info "Removed new-project from ~/.local/bin/"
-    fi
+    remove_stale_new_project_symlink
 
     # Remove hooks from settings.json
     local settings_file="${HOME}/.claude/settings.json"

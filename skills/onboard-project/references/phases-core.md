@@ -459,6 +459,30 @@ See [`docs/rules-taxonomy.md`](../docs/rules-taxonomy.md) for the complete refer
 
 **Phase 5b in the §Phase 9 summary.** Report per-artifact: `Phase 5b: hackathon mode enabled — PRAXION_HACKATHON_MODE=1, ## Hackathon Mode appended, praxion-rules preset added, scripts/praxion-hackathon written, .claude/hackathon-directive.md written, .claude/hackathon-settings.json written` (or `skipped (user chose Skip)` / `skipped (already enabled)`).
 
+### Sub-step 5b.t — Hackathon teardown
+
+**Predicate.** Entire sub-step fires only when the resolved mode is `promote` (hackathon → fully managed); skipped in every other mode, including plain `existing` re-runs of an already-fully-managed project.
+
+**Why this exists.** §Phase 5b installs six artifacts. Today's documented graduation path names only three of them and is gated by nothing — the other three (`scripts/praxion-hackathon`, `.claude/hackathon-directive.md`, `.claude/hackathon-settings.json`) are silently orphaned. Sub-step 5b.t is the *inverse* of §Phase 5b's install: it removes all six, not a subset, and it never uses a recursive delete.
+
+**Enumerate-before-remove.** Before touching anything, build the full removal list — all six install-side artifacts, named explicitly so none can be silently dropped:
+
+1. `PRAXION_HACKATHON_MODE` env key in `.claude/settings.json`
+2. `## Hackathon Mode` block in `CLAUDE.md`
+3. the hackathon preset entries in `.claude/praxion-rules.yaml`
+4. `scripts/praxion-hackathon`
+5. `.claude/hackathon-directive.md`
+6. `.claude/hackathon-settings.json`
+
+**Template-compare, then remove or skip.** For each of the six, compare the artifact's *current on-disk content* against the template it was installed from (the same canonical source §Phase 5b's install-side reads: `claude/aac-templates/*.tmpl` for artifacts 4–6; the exact literal value/heading/entry for artifacts 1–3). Two outcomes:
+
+- **Matches the template (unmodified since install)** — remove it. Artifacts 1 and 3 are surgical edits (delete the env key / the hackathon entries from `praxion-rules.yaml`, preserving every other key), never a whole-file delete. Artifact 2 removes only the `## Hackathon Mode` section from `CLAUDE.md` (heading through the next `##` heading), never the whole file. Artifacts 4–6 are individually-named single-file deletes (`scripts/praxion-hackathon`, `.claude/hackathon-directive.md`, `.claude/hackathon-settings.json`) — **never a recursive directory removal**, since this is a one-way door acting on a user's repo and a bulk directory delete could not distinguish a hand-added sibling file from the template's own tree.
+- **Diverged from the template (hand-edited since install)** — **skip that artifact and warn**: `5b.t: skipped <artifact> — content diverges from the installed template; remove it manually if you no longer need it.` Never force-remove a diverged artifact.
+
+**Action order.** Evaluate and report all six before writing anything (parallels §Phase 5b's own atomic style): print the per-artifact remove/skip decision, then apply the removes, then continue to §Phase 6 onward with the remaining capability profile (per the Mode × Phase Matrix's `existing` column, since `promote` inherits it in full except this sub-step).
+
+**Reporting in the §Phase 9 summary.** `5b.t: promoted from hackathon — removed N of 6 hackathon artifacts (M skipped, diverged from template — see warnings above)`.
+
 ## §Phase 6 — `CLAUDE.md` Praxion blocks
 
 **Predicate — one classification mechanism per block class, never two for the same heading.** The seven canonical `CLAUDE.md` blocks split into exactly two classes:
@@ -547,6 +571,7 @@ Do not recommend tools the user already has, and do not recommend `uv` if no Pyt
      "onboarded_with_version": "<version captured at pre-flight>",
      "onboarded_at": "<ISO 8601 UTC timestamp>",
      "scope": "user | project",
+     "mode": "<'full' or 'hackathon' — see below>",
      "artifacts": {
        "hooks": ["pre-commit", "post-merge", "post-commit", "post-checkout"],
        "merge_drivers": ["observations-jsonl"],
@@ -562,6 +587,10 @@ Do not recommend tools the user already has, and do not recommend `uv` if no Pyt
      }
    }
    ```
-   List only artifacts actually installed this run (omit hooks if Phase 4 was skipped; omit `ci_autofix` if Phase 8e was skipped or its caller/policy predicate already hit; omit `praxion_feedback`, `principles`, and any `consult_ledgers` entry whose Phase 2 predicate already hit — those files pre-existed). If the plugin version could not be captured at pre-flight (skip-phase-4 flag), write `"onboarded_with_version": "unknown"` and emit a one-line note. Add `.ai-state/.praxion-onboard.json` to the staged set.
+   List only artifacts actually installed this run (omit hooks if Phase 4 was skipped; omit `ci_autofix` if Phase 8e was skipped or its caller/policy predicate already hit; omit `praxion_feedback`, `principles`, and any `consult_ledgers` entry whose Phase 2 predicate already hit — those files pre-existed). If the plugin version could not be captured at pre-flight (skip-phase-4 flag), write `"onboarded_with_version": "unknown"` and emit a one-line note.
+
+   **The `mode` field is additive-only** (REQ-06 / AC-7 / AC-8): write `"full"` for a fully-managed onboard/re-onboard/promote run, `"hackathon"` for a hackathon-mode onboard. A stamp written before this field existed has no `mode` key at all — every reader (this phase's own re-run, §Pre-flight's prior-onboarding detection, `references/detection.md`'s state predicates) must treat an **absent `mode` key as `"full"`** for back-compat, never as `"hackathon"` — a project onboarded before this field existed must not silently read as hackathon-managed.
+
+   Add `.ai-state/.praxion-onboard.json` to the staged set.
 
 4. **Stage modified files**: run `git add` with the explicit list of files this command touched (built up through phases 1–6, plus `.ai-state/.praxion-onboard.json`). Do NOT run `git add -A`. Do NOT commit. The user reviews staging and decides.

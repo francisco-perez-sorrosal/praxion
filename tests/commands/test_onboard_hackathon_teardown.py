@@ -5,27 +5,14 @@ reference body — it cannot be invoked from pytest. These tests validate the
 documented contract by parsing the file structurally, matching the precedent
 set by `tests/commands/test_onboard_ci_autofix_install.py`.
 
-RED-first (BDD/TDD): as of this test's authoring, `phases-core.md` documents
-only the six-artifact hackathon *install* (§Phase 5b) and Phase 9's stamp has
-no `mode` field. Every test below is expected to FAIL until the paired
-implementer step adds Sub-step 5b.t and the additive-only stamp schema, per
-`SYSTEMS_PLAN.md` REQ-06 / AC-7 / AC-8. The module-level `pytestmark` records
-this as a non-blocking xfail so the rest of the suite stays green for other
-agents running concurrently; the implementer removes the marker when 5b.t
-lands.
+`phases-core.md` documents Sub-step 5b.t (hackathon teardown) and Phase 9's
+additive-only stamp `mode` field per `SYSTEMS_PLAN.md` REQ-06 / AC-7 / AC-8.
 """
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
-
-import pytest
-
-pytestmark = pytest.mark.xfail(
-    strict=False,
-    reason="RED until the paired implementer step adds Sub-step 5b.t + stamp mode field",
-)
 
 PHASES_CORE_FILE = (
     Path(__file__).parents[2] / "skills" / "onboard-project" / "references" / "phases-core.md"
@@ -115,7 +102,13 @@ def test_5bt_skips_with_warning_on_a_diverged_artifact_never_rm_rf() -> None:
 
 def test_phase_9_stamp_schema_gains_an_additive_mode_field() -> None:
     body = _phases_core_body()
-    manifest_match = re.search(r"onboard manifest.*?(?=\n##\s*§Phase|\Z)", body, re.DOTALL)
+    # Anchored on the bolded action phrase, not the bare "onboard manifest"
+    # substring -- that phrase also appears earlier, in Phase 3/4's
+    # cross-version-cleanup prose describing a *read* of a prior run's
+    # manifest, which is not the Phase 9 stamp-write section under test.
+    manifest_match = re.search(
+        r"\*\*Write the onboard manifest\*\*.*?(?=\n##\s*§Phase|\Z)", body, re.DOTALL
+    )
     assert manifest_match, "phases-core.md §Phase 9 must document the onboard-manifest write"
     manifest_section = manifest_match.group(0)
     assert re.search(r'"mode"\s*:', manifest_section), (

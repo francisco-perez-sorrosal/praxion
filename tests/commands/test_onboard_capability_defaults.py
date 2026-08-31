@@ -5,28 +5,15 @@ invoked from pytest. These tests validate the documented contract by parsing
 the skill file structurally, matching the precedent set by
 `tests/commands/test_onboard_ci_autofix_install.py`.
 
-RED-first (BDD/TDD): as of this test's authoring, `SKILL.md` still speaks
-only the internal phase-id vocabulary — there is no user-facing capability
-table. Every test below is expected to FAIL until the paired implementer
-step publishes the capability-ID -> phase-id mapping table and the
+`SKILL.md` publishes the capability-ID -> phase-id mapping table and the
 Mode x Phase Matrix per `INTERFACE_DESIGN.md §2.3` / `SYSTEMS_PLAN.md
-§Capability IDs`. The module-level `pytestmark` records this as a
-non-blocking xfail so the rest of the suite stays green for other agents
-running concurrently; the implementer removes the marker when the tables
-land.
+§Capability IDs`.
 """
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
-
-import pytest
-
-pytestmark = pytest.mark.xfail(
-    strict=False,
-    reason="RED until the paired implementer step publishes SKILL.md's capability vocabulary",
-)
 
 SKILL_FILE = Path(__file__).parents[2] / "skills" / "onboard-project" / "SKILL.md"
 
@@ -75,10 +62,17 @@ def _skill_body() -> str:
 
 def _capability_table_section() -> str:
     """Return the capability-ID mapping table section, or '' if absent."""
-    match = re.search(
-        r"^##\s*.*Capability.*$.*?(?=\n##\s|\Z)", _skill_body(), re.MULTILINE | re.DOTALL
-    )
-    return match.group(0) if match else ""
+    # Two-step extraction rather than one combined regex -- see the identical
+    # note in test_onboard_gate_consolidation.py's `_gates_section()`:
+    # MULTILINE `^`/`$` anchors and a DOTALL greedy `.*` before "Capability"
+    # are mutually defeating in a single pattern.
+    body = _skill_body()
+    heading = re.search(r"^##\s*.*Capability.*$", body, re.MULTILINE)
+    if not heading:
+        return ""
+    rest = body[heading.start() :]
+    next_heading = re.search(r"\n##\s", rest)
+    return rest[: next_heading.start()] if next_heading else rest
 
 
 def test_capability_id_table_is_published_once_in_skill_md() -> None:

@@ -6,28 +6,16 @@ pytest. These tests validate the documented contract by parsing the skill
 file structurally, matching the precedent set by
 `tests/commands/test_onboard_ci_autofix_install.py`.
 
-RED-first (BDD/TDD): as of this test's authoring, `SKILL.md` still carries
-the pre-existing 25-gate-fire surface (one `AskUserQuestion` pause per phase
-plus the one-way `Run all rest` escape hatch). Every test below is expected
-to FAIL until the paired implementer step publishes the 3-gate policy
-(G1 mode-confirm / G2 build-intent / G3 profile) per
-`INTERFACE_DESIGN.md §3.3`. The module-level `pytestmark` records this as a
-non-blocking xfail so the rest of the suite stays green for other agents
-running concurrently; the implementer removes the marker when the gate
-table lands.
+`SKILL.md` publishes the 3-gate policy (G1 mode-confirm / G2 build-intent /
+G3 profile) per `INTERFACE_DESIGN.md §3.3`; the old 25-gate-fire surface
+(one `AskUserQuestion` pause per phase plus the one-way `Run all rest`
+escape hatch) is retired.
 """
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
-
-import pytest
-
-pytestmark = pytest.mark.xfail(
-    strict=False,
-    reason="RED until the paired implementer step publishes SKILL.md's 3-gate policy",
-)
 
 SKILL_FILE = Path(__file__).parents[2] / "skills" / "onboard-project" / "SKILL.md"
 
@@ -47,8 +35,18 @@ def _gates_section() -> str:
     '## §Gates' vs '## §Phase Gates' vs a renamed heading — the behavioral
     contract under test is the gate *count* and *names*, not the heading text.
     """
-    match = re.search(r"^##\s*.*Gate.*$.*?(?=\n##\s|\Z)", _skill_body(), re.MULTILINE | re.DOTALL)
-    return match.group(0) if match else ""
+    # Two-step extraction rather than one combined regex: MULTILINE's `^`/`$`
+    # anchors and DOTALL's newline-matching `.` are mutually defeating in a
+    # single pattern -- a DOTALL `.*` before "Gate" greedily walks past the
+    # first heading match and re-anchors on whichever heading contains the
+    # *last* "Gate" occurrence in the whole document, not the first one.
+    body = _skill_body()
+    heading = re.search(r"^##\s*.*Gate.*$", body, re.MULTILINE)
+    if not heading:
+        return ""
+    rest = body[heading.start() :]
+    next_heading = re.search(r"\n##\s", rest)
+    return rest[: next_heading.start()] if next_heading else rest
 
 
 def test_gate_table_collapses_to_exactly_three_gates() -> None:

@@ -51,11 +51,13 @@ Run these five checks from the project root:
 2. `grep -q '^# AI assistants$' .gitignore && grep -q '^\.ai-work/$' .gitignore` — the AI-assistants block is present.
 3. `test -d .claude && [ -z "$(ls -A .claude 2>/dev/null)" ]` — `.claude/` exists and is empty.
 4. `! test -e src || [ -z "$(ls -A src 2>/dev/null)" ]` — `src/` is absent, or is an empty directory.
-5. `[ "${PRAXION_ALLOW_SELF_ONBOARD:-}" = "1" ] || ! test -e .claude-plugin/plugin.json` — the project is not a Claude Code plugin source repo (Praxion itself or any plugin in development). Plugin source repos curate the four `CLAUDE.md` blocks (`## Agent Pipeline`, `## Compaction Guidance`, `## Behavioral Contract`, `## Praxion Process`) as canonical sources; injecting them again would duplicate content under conflicting headings and skew the source-of-truth chain. The override `PRAXION_ALLOW_SELF_ONBOARD=1` is provided for divergent forks that genuinely want self-onboarding.
+5. **Plugin-source-repo guard (G1).** Predicate, abort message, and rationale are specified once in [detection.md § Guard G1](detection.md#-guard-g1--plugin-source-repo-guard) — apply it here rather than restating it.
 
-If any check fails, abort with:
+If any of checks 1–4 fails, abort with:
 
-> This directory doesn't look like a freshly-scaffolded Praxion greenfield project. `/new-project` expects to run inside a directory produced by `new_project.sh` (a `.git/` repo with the AI-assistants `.gitignore` block, an empty `.claude/`, and no `src/` tree yet). If `.claude-plugin/plugin.json` is present, this is a Claude Code plugin source repo and self-onboarding requires `PRAXION_ALLOW_SELF_ONBOARD=1`. If you meant to onboard an existing project, run `/onboard-project` instead.
+> This directory doesn't look like a freshly-scaffolded Praxion greenfield project. `/new-project` expects to run inside a directory produced by `new_project.sh` (a `.git/` repo with the AI-assistants `.gitignore` block, an empty `.claude/`, and no `src/` tree yet). If you meant to onboard an existing project, run `/onboard-project` instead.
+
+If check 5 fails, abort with detection.md's own G1 abort message.
 
 Exit without writing anything.
 
@@ -285,20 +287,9 @@ Never copy symbol names from this file into generated code — this file deliber
 
 ## §Init idempotency
 
-`/new-project` appends **five** blocks to `CLAUDE.md`: §Agent Pipeline Block, §Compaction Guidance Block, §Behavioral Contract Block, §Praxion Process Block, §Project Essentials Block. Each is guarded by an independent heading-detection predicate so re-runs are no-ops per block.
+`/new-project` appends the same five blocks to `CLAUDE.md` that `/onboard-project`'s Phase 6 owns: §Agent Pipeline Block, §Compaction Guidance Block, §Behavioral Contract Block, §Praxion Process Block, §Project Essentials Block. **This is the same write, not a second one** — use [phases-core.md § Phase 6](phases-core.md#-phase-6--claudemd-praxion-blocks)'s classification mechanism verbatim, rather than restating it here: `refresh_claude_blocks.py`'s absent/current/stale/modified classifier for the four refreshable blocks, and an independent heading-grep for Project Essentials (`## Working in this project`).
 
-For each of the five blocks, before appending:
-
-```
-grep -q '^## <BLOCK_HEADING>$' CLAUDE.md
-```
-
-…where `<BLOCK_HEADING>` is `Agent Pipeline`, `Compaction Guidance`, `Behavioral Contract`, `Praxion Process`, or `Working in this project` respectively.
-
-- Exit `0` (match found) → block already exists; skip the append.
-- Exit non-zero → append the block verbatim from its §-named source section.
-
-These predicates mirror `/onboard-project`'s §Phase 6 byte-for-byte. Re-running either command — or running both — never duplicates a section. If `/new-project` lands all five blocks during greenfield, `/onboard-project`'s Phase 6 becomes a complete no-op (every per-block predicate hits) — the smooth-integration contract.
+Re-running either command — or running both — never duplicates a section. If `/new-project` lands all five blocks during greenfield, `/onboard-project`'s Phase 6 becomes a complete no-op (every per-block predicate hits) — the smooth-integration contract.
 
 ## §Mushi Doc Spec
 
@@ -494,10 +485,7 @@ Per-phase predicates that govern §Flow steps. Re-running `/new-project` on a di
 | 5f.4 (architecture.yml) | `test -e .github/workflows/architecture.yml` |
 | 5f.5 (docs/diagrams/.gitkeep) | `test -e docs/diagrams/.gitkeep` OR directory non-empty |
 | 8 (Python `.gitignore` block) | `grep -q '^# Python$' .gitignore` AND each of the four lines (`__pycache__/`, `.venv/`, `*.egg-info/`, `.pytest_cache/`) already present |
-| 10a (Agent Pipeline append) | `grep -q '^## Agent Pipeline$' CLAUDE.md` |
-| 10b (Compaction Guidance append) | `grep -q '^## Compaction Guidance$' CLAUDE.md` |
-| 10c (Behavioral Contract append) | `grep -q '^## Behavioral Contract$' CLAUDE.md` |
-| 10d (Praxion Process append) | `grep -q '^## Praxion Process$' CLAUDE.md` |
+| 10a–10d (Agent Pipeline, Compaction Guidance, Behavioral Contract, Praxion Process append) | [phases-core.md § Phase 6](phases-core.md#-phase-6--claudemd-praxion-blocks)'s `refresh_claude_blocks.py` absent/current/stale/modified classifier — no separate heading-grep predicate |
 | 10e (Hackathon Mode append — only when hackathon mode is enabled) | `grep -q '^## Hackathon Mode$' CLAUDE.md` |
 | 10f (Working-in-this-project append) | `grep -q '^## Working in this project$' CLAUDE.md` |
 | 10g (Obsidian Integration append — only when Obsidian integration is enabled) | `grep -q '^## Obsidian Integration$' CLAUDE.md` |

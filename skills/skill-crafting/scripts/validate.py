@@ -31,6 +31,10 @@ OPTIONAL_FIELDS = {
     "paths",  # path-scoped activation — Claude Code skill convention
     "staleness_sensitive_sections",  # per rules/swe/staleness-policy.md
     "staleness_threshold_days",  # per rules/swe/staleness-policy.md
+    "when_to_use",  # invocation-context hint for user-invoked skills
+    "argument-hint",  # slash-invocation argument hint, mirrors command frontmatter
+    "arguments",  # named-argument descriptions for slash-invoked skills
+    "disable-model-invocation",  # fail-closed: model cannot self-trigger this skill
 }
 ALL_KNOWN_FIELDS = REQUIRED_FIELDS | OPTIONAL_FIELDS
 

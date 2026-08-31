@@ -65,6 +65,14 @@ the first.
 | 2026-07-31T19:33:43Z | verify-multidisciplinary | statistician | verification | CH-07 | matched | P-04 | 37df0f33084e0268ec85b85fe6c34e7997150560 | 0 |
 | 2026-07-31T19:33:43Z | verify-multidisciplinary | statistician | verification | CH-08 | novel |  | 37df0f33084e0268ec85b85fe6c34e7997150560 | 0 |
 | 2026-07-31T19:33:43Z | verify-multidisciplinary | statistician | verification | CH-09 | matched | P-05 | 37df0f33084e0268ec85b85fe6c34e7997150560 | 0 |
+| 2026-08-31T07:45:00Z | adr-living-view | data-structure-specialist | architecture | CH-01 | novel |  | 9021caae0055b72e4be42d21e7d29767a645d58d | 5 |
+| 2026-08-31T07:45:00Z | adr-living-view | data-structure-specialist | architecture | CH-02 | novel |  | 9021caae0055b72e4be42d21e7d29767a645d58d | 5 |
+| 2026-08-31T07:45:00Z | adr-living-view | data-structure-specialist | architecture | CH-03 | novel |  | 9021caae0055b72e4be42d21e7d29767a645d58d | 5 |
+| 2026-08-31T07:45:00Z | adr-living-view | data-structure-specialist | architecture | CH-04 | novel |  | 9021caae0055b72e4be42d21e7d29767a645d58d | 5 |
+| 2026-08-31T07:45:00Z | adr-living-view | data-structure-specialist | architecture | CH-05 | novel |  | 9021caae0055b72e4be42d21e7d29767a645d58d | 5 |
+| 2026-08-31T07:45:00Z | adr-living-view | data-structure-specialist | architecture | CH-06 | novel |  | 9021caae0055b72e4be42d21e7d29767a645d58d | 5 |
+| 2026-08-31T07:45:00Z | adr-living-view | data-structure-specialist | architecture | CH-07 | novel |  | 9021caae0055b72e4be42d21e7d29767a645d58d | 5 |
+| 2026-08-31T07:45:00Z | adr-living-view | data-structure-specialist | architecture | CH-08 | novel |  | 9021caae0055b72e4be42d21e7d29767a645d58d | 5 |
 
 ## Column Definitions
 

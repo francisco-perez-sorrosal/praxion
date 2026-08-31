@@ -396,6 +396,91 @@ def test_blocking_violation_still_exits_nonzero_alongside_a_liveness_warning(
     assert _exit_code(["--repo-root", str(tmp_path)]) == 1
 
 
+def test_staged_mode_ignores_dead_path_in_an_already_committed_unstaged_record(
+    tmp_path: Path,
+) -> None:
+    # FAIL-3 regression: a record's dead path must warn only when the record
+    # itself is part of the staged change set, not merely tracked in the repo.
+    repo = _init_repo(tmp_path)
+    _write_adr(
+        tmp_path,
+        "320-already-committed.md",
+        adr_id="dec-320",
+        affected_files=["scripts/does_not_exist_anywhere.py"],
+    )
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "chore: pre-existing dead-path record")
+
+    assert _gate().find_affected_files_warnings(repo, staged=True) == []
+
+
+def test_staged_mode_does_not_scan_the_full_untouched_corpus(tmp_path: Path) -> None:
+    # FAIL-3 CANARY: --staged used to run `git ls-files` (every tracked ADR),
+    # so one staged record cost a `git show` per file in the whole corpus. A
+    # call-count assertion is timing-insensitive and portable across runners.
+    repo = _init_repo(tmp_path)
+    for i in range(350):
+        _write_adr(tmp_path, f"{i}-old-decision.md", adr_id=f"dec-{i}")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "chore: seed a large pre-existing corpus")
+
+    _write_adr(
+        tmp_path,
+        "999-new-decision.md",
+        adr_id="dec-999",
+        affected_files=["scripts/does_not_exist_anywhere.py"],
+    )
+    _git(repo, "add", ".ai-state/decisions/999-new-decision.md")
+
+    gate = _gate()
+    original_git = gate._git
+    call_count = 0
+
+    def _counting_git(root: Path, *args: str) -> Any:
+        nonlocal call_count
+        call_count += 1
+        return original_git(root, *args)
+
+    gate._git = _counting_git
+    try:
+        warnings = gate.find_affected_files_warnings(repo, staged=True)
+    finally:
+        gate._git = original_git
+
+    report = "\n".join(warnings)
+    assert warnings, "the one staged record's dead path must still be flagged"
+    assert "999-new-decision.md" in report, report
+    assert "old-decision.md" not in report, (
+        "the 350 pre-existing, unstaged records must not be scanned"
+    )
+    assert call_count <= 3, (
+        f"staged mode made {call_count} git calls scanning a 350-file corpus for "
+        "1 staged record -- scope has regressed to a full sweep"
+    )
+
+
+def test_liveness_all_sweeps_the_full_corpus_regardless_of_staged_mode(
+    tmp_path: Path,
+) -> None:
+    # The opt-in escape hatch for on-demand audits: --liveness-all must still
+    # surface a dead path in an already-committed, unstaged record.
+    repo = _init_repo(tmp_path)
+    _write_adr(
+        tmp_path,
+        "321-already-committed.md",
+        adr_id="dec-321",
+        affected_files=["scripts/does_not_exist_anywhere.py"],
+    )
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "chore: pre-existing dead-path record")
+
+    warnings = _gate().find_affected_files_warnings(repo, staged=True, liveness_all=True)
+
+    report = "\n".join(warnings)
+    assert warnings, "liveness_all=True must sweep records outside the staged diff"
+    assert "321-already-committed.md" in report, report
+
+
 def test_cli_prints_the_liveness_warning_text(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

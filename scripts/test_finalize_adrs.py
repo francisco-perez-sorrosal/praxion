@@ -1038,7 +1038,7 @@ class TestFinalizeIndex:
         def _fake_run(args: Any, *_a: Any, **_k: Any) -> subprocess.CompletedProcess[str]:
             args_list = list(args) if not isinstance(args, str) else args.split()
             if any("regenerate_adr_index" in str(a) for a in args_list):
-                regen_mod.main()
+                regen_mod.main(argv=[])
             return subprocess.CompletedProcess(args=args_list, returncode=0, stdout="", stderr="")
 
         monkeypatch.setattr(finalize.subprocess, "run", _fake_run)
@@ -1050,7 +1050,7 @@ class TestFinalizeIndex:
         # against the tmp-path-patched constants. The real finalize invokes
         # regenerate_adr_index.py via subprocess; our _fake_run stub above
         # triggers the same code path when finalize calls subprocess.run.
-        regen_mod.main()
+        regen_mod.main(argv=[])
 
         # The index now exists and lists dec-001
         index_path = repo_root / ".ai-state" / "decisions" / "DECISIONS_INDEX.md"

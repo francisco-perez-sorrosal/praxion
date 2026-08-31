@@ -65,3 +65,57 @@ describe("DecisionGraph — degenerate case: no supersession/re-affirmation edge
     expect(screen.queryByRole("button", { name: /reset/i })).toBeNull();
   });
 });
+
+describe("DecisionGraph — partial-supersession edges", () => {
+  it("draws an edge for a node whose only relation is supersedes_in_part", () => {
+    const nodes: AdrGraphNode[] = [
+      { id: "dec-040", title: "Old broad decision", status: "accepted" },
+      {
+        id: "dec-204",
+        title: "Narrows the old decision",
+        status: "accepted",
+        supersedes_in_part: ["dec-040"]
+      }
+    ];
+    const { container } = render(<DecisionGraph nodes={nodes} />);
+
+    // A fixture node with only a partial edge must not fall into the
+    // standalone-decisions legend, and must produce a drawn <line>.
+    expect(container.querySelector(".decision-graph-legend")).toBeNull();
+    expect(container.querySelectorAll("svg > g > line")).toHaveLength(1);
+  });
+
+  it("draws an edge for a node whose only relation is retired_by", () => {
+    const nodes: AdrGraphNode[] = [
+      { id: "dec-050", title: "Retiring decision", status: "accepted" },
+      {
+        id: "dec-010",
+        title: "Retired decision",
+        status: "accepted",
+        retired_by: ["dec-050"]
+      }
+    ];
+    const { container } = render(<DecisionGraph nodes={nodes} />);
+
+    expect(container.querySelector(".decision-graph-legend")).toBeNull();
+    expect(container.querySelectorAll("svg > g > line")).toHaveLength(1);
+  });
+
+  it("draws every edge kind present without dropping any", () => {
+    const nodes: AdrGraphNode[] = [
+      { id: "dec-001", title: "Base decision", status: "accepted" },
+      { id: "dec-002", title: "Full supersession", status: "accepted", supersedes: ["dec-001"] },
+      {
+        id: "dec-003",
+        title: "Partial supersession",
+        status: "accepted",
+        supersedes_in_part: ["dec-001"]
+      },
+      { id: "dec-004", title: "Re-affirmation", status: "re-affirmation", re_affirms: "dec-001" },
+      { id: "dec-005", title: "Retired sibling", status: "accepted", retired_by: ["dec-002"] }
+    ];
+    const { container } = render(<DecisionGraph nodes={nodes} />);
+
+    expect(container.querySelectorAll("svg > g > line")).toHaveLength(4);
+  });
+});

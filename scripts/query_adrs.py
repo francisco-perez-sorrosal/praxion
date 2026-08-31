@@ -42,6 +42,14 @@ DEFAULT_STATUSES = frozenset({"accepted", "re-affirmation"})
 _FRONTMATTER_RE = re.compile(r"^---\n(.*?\n)---", re.DOTALL)
 _FALLBACK_KEY_RE = re.compile(r"^(\w[\w-]*)\s*:\s*(.*)$")
 _FALLBACK_BLOCK_ITEM_RE = re.compile(r"^\s+-\s*(.+)$")
+# `key: >` (folded) or `key: |` (literal), optionally with a chomping
+# indicator (`-`/`+`) or explicit indentation digit -- the YAML block-scalar
+# forms that carry a long free-text value (e.g. `dissent:`, `summary:`) across
+# several indented continuation lines with no `- ` marker of their own.
+_FALLBACK_SCALAR_BLOCK_RE = re.compile(r"^(\w[\w-]*)\s*:\s*([>|][-+0-9]*)\s*$")
+# An indented, non-blank line -- the shape both a block-scalar continuation
+# and a `- item` bullet share; which one it is depends on which mode is open.
+_FALLBACK_CONTINUATION_RE = re.compile(r"^\s+\S")
 
 EXAMPLES = """\
 EXAMPLES
@@ -117,7 +125,9 @@ def _parse_inline_list(value: str) -> list[str]:
 def _parse_frontmatter_fallback(raw: str, path: Path) -> dict[str, object] | None:
     """Minimal stdlib line-parser for exactly the fields this script needs.
 
-    Handles scalar values, inline lists (`[a, b]`), and block lists (`- item`).
+    Handles scalar values, inline lists (`[a, b]`), block lists (`- item`),
+    and multi-line block scalars (`key: >` / `key: |`, e.g. `dissent:`,
+    `summary:`) whose continuation lines carry no `- ` marker of their own.
     Kept honest per the fallback contract: any line it cannot classify --
     inside or outside a block, an unterminated inline list -- causes it to
     warn and skip the file rather than guess at a shape it does not recognize.
@@ -125,6 +135,8 @@ def _parse_frontmatter_fallback(raw: str, path: Path) -> dict[str, object] | Non
     fields: dict[str, object] = {}
     block_key: str | None = None
     block_items: list[str] = []
+    scalar_key: str | None = None
+    scalar_lines: list[str] = []
 
     def flush_block() -> None:
         nonlocal block_key, block_items
@@ -133,13 +145,32 @@ def _parse_frontmatter_fallback(raw: str, path: Path) -> dict[str, object] | Non
         block_key = None
         block_items = []
 
+    def flush_scalar() -> None:
+        nonlocal scalar_key, scalar_lines
+        if scalar_key is not None:
+            fields[scalar_key] = " ".join(scalar_lines)
+        scalar_key = None
+        scalar_lines = []
+
     for line in raw.splitlines():
         if not line.strip():
             continue
 
+        if scalar_key is not None and _FALLBACK_CONTINUATION_RE.match(line):
+            scalar_lines.append(line.strip())
+            continue
+        flush_scalar()
+
         block_item = _FALLBACK_BLOCK_ITEM_RE.match(line)
         if block_item and block_key is not None:
             block_items.append(_strip_quotes(block_item.group(1)))
+            continue
+
+        scalar_block = _FALLBACK_SCALAR_BLOCK_RE.match(line)
+        if scalar_block:
+            flush_block()
+            scalar_key = scalar_block.group(1)
+            scalar_lines = []
             continue
 
         key_match = _FALLBACK_KEY_RE.match(line)
@@ -167,6 +198,7 @@ def _parse_frontmatter_fallback(raw: str, path: Path) -> dict[str, object] | Non
             fields[key] = _strip_quotes(value)
 
     flush_block()
+    flush_scalar()
     return fields
 
 
@@ -223,7 +255,13 @@ def discover_adr_files(repo_root: Path) -> list[Path]:
     """Every finalized and in-flight-draft ADR file, finalized first."""
     decisions_dir = repo_root / ".ai-state" / "decisions"
     finalized = sorted(decisions_dir.glob("[0-9]*.md"))
-    drafts = sorted((decisions_dir / "drafts").glob("*.md"))
+    # Directory docs (CLAUDE.md, README.md) live beside draft fragments but are
+    # not ADRs; excluding them keeps the unparseable count meaning real failures.
+    drafts = sorted(
+        path
+        for path in (decisions_dir / "drafts").glob("*.md")
+        if path.name not in ("CLAUDE.md", "README.md")
+    )
     return finalized + drafts
 
 

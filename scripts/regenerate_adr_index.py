@@ -4,11 +4,15 @@
 Reads all ADR files in .ai-state/decisions/, extracts YAML frontmatter,
 and generates a markdown index table sorted by ID.
 
-Usage: python scripts/regenerate_adr_index.py
+Usage:
+    python scripts/regenerate_adr_index.py                 # write the index
+    python scripts/regenerate_adr_index.py --check          # read-only: diff, no write
+    python scripts/regenerate_adr_index.py --repo-root PATH
 """
 
 from __future__ import annotations
 
+import argparse
 import re
 import sys
 from pathlib import Path
@@ -188,18 +192,42 @@ def generate_index(adrs: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
-def _parse_repo_root_arg() -> str | None:
-    """Extract `--repo-root <path>` from argv, if present."""
-    if "--repo-root" in sys.argv:
-        idx = sys.argv.index("--repo-root")
-        if idx + 1 < len(sys.argv):
-            return sys.argv[idx + 1]
-    return None
+def _build_arg_parser() -> argparse.ArgumentParser:
+    """Build the CLI parser. Unknown flags exit 2 without touching the index."""
+    parser = argparse.ArgumentParser(
+        description="Regenerate DECISIONS_INDEX.md from ADR file frontmatter.",
+    )
+    parser.add_argument(
+        "--repo-root",
+        default=None,
+        help="Repo root to operate against (defaults to the resolved repo root).",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Read-only: regenerate the index in memory and diff against the "
+        "committed file. Exits 0 if identical, 1 with a summary if stale. "
+        "Never writes.",
+    )
+    return parser
 
 
-def main() -> None:
-    """Entry point: collect ADRs, generate index, write to file."""
-    root = resolve_repo_root(_parse_repo_root_arg())
+def _run_check(index_content: str, adr_count: int) -> int:
+    """Diff freshly generated content against the committed file. No writes."""
+    on_disk = INDEX_PATH.read_text(encoding="utf-8") if INDEX_PATH.is_file() else None
+    if on_disk == index_content:
+        print(f"{INDEX_PATH} is up to date ({adr_count} entries).")
+        return 0
+    print(f"{INDEX_PATH} is stale ({adr_count} entries in source of truth).", file=sys.stderr)
+    print("Run without --check to regenerate.", file=sys.stderr)
+    return 1
+
+
+def main(argv: list[str] | None = None) -> None:
+    """Entry point: collect ADRs, then either check (read-only) or write the index."""
+    args = _build_arg_parser().parse_args(argv)
+
+    root = resolve_repo_root(args.repo_root)
     if is_plugin_cache_path(root):
         print(
             f"refusing to regenerate index against a plugin-cache path: {root}",
@@ -209,8 +237,11 @@ def main() -> None:
     apply_repo_root(root)
     adrs = collect_adrs()
     index_content = generate_index(adrs)
-    INDEX_PATH.write_text(index_content, encoding="utf-8")
 
+    if args.check:
+        sys.exit(_run_check(index_content, len(adrs)))
+
+    INDEX_PATH.write_text(index_content, encoding="utf-8")
     print(f"Generated {INDEX_PATH} with {len(adrs)} entries.")
 
 

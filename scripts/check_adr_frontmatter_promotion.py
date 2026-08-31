@@ -42,6 +42,7 @@ Usage:
     python3 scripts/check_adr_frontmatter_promotion.py --staged
     python3 scripts/check_adr_frontmatter_promotion.py --repo-root PATH
     python3 scripts/check_adr_frontmatter_promotion.py --json
+    python3 scripts/check_adr_frontmatter_promotion.py --liveness-all  # on-demand audit
 """
 
 from __future__ import annotations
@@ -200,6 +201,14 @@ def find_violations(repo_root: Path, *, staged: bool = False) -> list[str]:
 # (which are scoped to the promotion-lifecycle check and deliberately exclude
 # `drafts/`), this scan covers every ADR the hook filter matches, drafts included:
 # a draft naming a dead path is just as much a hygiene signal as a finalized one.
+#
+# Creation-time design intent (SYSTEMS_PLAN.md): catch decay at the cheapest
+# moment -- authoring -- with zero backlog obligation. The hook path (`--staged`,
+# no `--liveness-all`) must therefore scope to what the *author is committing*,
+# never the corpus: warning about 100+ pre-existing paths on every commit trains
+# authors to ignore the block entirely. Corpus-wide scanning is still useful for
+# an on-demand audit, so it stays available -- but only behind `--liveness-all`,
+# never as the default of either read mode.
 
 
 def _affected_files_default_entries(repo_root: Path) -> list[tuple[str, str]]:
@@ -214,18 +223,38 @@ def _affected_files_default_entries(repo_root: Path) -> list[tuple[str, str]]:
     return entries
 
 
-def _affected_files_staged_entries(repo_root: Path) -> list[tuple[str, str]]:
-    """(relative path, content) for every staged ``.md`` blob, drafts included."""
-    listing = _git(repo_root, "ls-files", "--", DECISIONS_SUBDIR)
-    if listing.returncode != 0:
-        return []
+def _staged_decisions_paths(repo_root: Path) -> list[str]:
+    """Relative paths of ``.md`` files this commit actually touches.
 
-    entries: list[tuple[str, str]] = []
+    ``git diff --cached --name-only`` reports the staged *change set* -- unlike
+    ``git ls-files``, which reports every tracked path regardless of whether it
+    is part of the commit being made. ``--diff-filter=ACMR`` keeps additions,
+    copies, modifications, and renames (the shapes that can introduce or carry
+    forward a dead path) and drops deletions, which have no content left to scan.
+    """
+    diff = _git(
+        repo_root,
+        "diff",
+        "--cached",
+        "--name-only",
+        "--diff-filter=ACMR",
+        "--",
+        DECISIONS_SUBDIR,
+    )
+    if diff.returncode != 0:
+        return []
     prefix = f"{DECISIONS_SUBDIR}/"
-    for raw_line in listing.stdout.splitlines():
-        rel = raw_line.strip()
-        if not rel.startswith(prefix) or not rel.endswith(".md"):
-            continue
+    return [
+        rel
+        for rel in (line.strip() for line in diff.stdout.splitlines())
+        if rel.startswith(prefix) and rel.endswith(".md")
+    ]
+
+
+def _affected_files_staged_entries(repo_root: Path) -> list[tuple[str, str]]:
+    """(relative path, content) for every ``.md`` blob staged in this commit."""
+    entries: list[tuple[str, str]] = []
+    for rel in _staged_decisions_paths(repo_root):
         blob = _git(repo_root, "show", f":{rel}")
         if blob.returncode != 0:
             continue
@@ -245,18 +274,28 @@ def _is_live(repo_root: Path, entry: str) -> bool:
     return target.exists()
 
 
-def find_affected_files_warnings(repo_root: Path, *, staged: bool = False) -> list[str]:
-    """Non-blocking warnings for dead ``affected_files`` paths in staged ADRs.
+def find_affected_files_warnings(
+    repo_root: Path, *, staged: bool = False, liveness_all: bool = False
+) -> list[str]:
+    """Non-blocking warnings for dead ``affected_files`` paths.
+
+    ``staged=True`` (the mode the pre-commit hook uses) reads only the ``.md``
+    blobs this commit actually stages -- see ``_staged_decisions_paths``.
+    ``staged=False`` reads every ``.md`` file on disk, drafts included; this is
+    the default for standalone/manual invocation, not the hook path.
+    ``liveness_all=True`` overrides either mode to sweep the full corpus -- an
+    explicit opt-in for on-demand audits, never the hook's default.
 
     Never a violation -- a decision whose own action was removing the path it
     names is legitimately citing something absent. Callers must not fold this
     into the process exit code.
     """
-    entries = (
-        _affected_files_staged_entries(repo_root)
-        if staged
-        else _affected_files_default_entries(repo_root)
-    )
+    if liveness_all:
+        entries = _affected_files_default_entries(repo_root)
+    elif staged:
+        entries = _affected_files_staged_entries(repo_root)
+    else:
+        entries = _affected_files_default_entries(repo_root)
     warnings: list[str] = []
     for rel_path, content in entries:
         for path_entry in parse_affected_files(content):
@@ -290,6 +329,15 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Read git index blobs instead of the working tree.",
     )
+    parser.add_argument(
+        "--liveness-all",
+        action="store_true",
+        help=(
+            "Sweep the full affected_files corpus (drafts included) instead of "
+            "scoping to this commit's own change set. On-demand audit only -- "
+            "never wire this into the pre-commit hook path."
+        ),
+    )
     parser.add_argument("--json", action="store_true", help="Machine-readable output.")
     return parser.parse_args(argv)
 
@@ -300,7 +348,9 @@ def main(argv: list[str]) -> int:
 
     try:
         violations = find_violations(repo_root, staged=args.staged)
-        liveness_warnings = find_affected_files_warnings(repo_root, staged=args.staged)
+        liveness_warnings = find_affected_files_warnings(
+            repo_root, staged=args.staged, liveness_all=args.liveness_all
+        )
     except OSError as exc:
         print(f"check_adr_frontmatter_promotion: error: {exc}", file=sys.stderr)
         return 2

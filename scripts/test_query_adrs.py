@@ -380,6 +380,32 @@ def test_fallback_parser_handles_block_and_inline_lists():
     assert data["affected_files"] == ["skills/foo.py", "skills/bar.py"]
 
 
+def test_fallback_parser_handles_multiline_folded_scalar():
+    """WARN-1 regression: a `dissent: >` folded block scalar (real-corpus shape,
+    e.g. dec-241) must not defeat the stdlib fallback -- its continuation
+    lines are neither `key: value` nor a `- item`, so the pre-fix parser
+    treated the first one as unparseable and gave up on the whole record."""
+    raw = (
+        'id: dec-241\ntitle: A decision\nstatus: accepted\ndate: "2026-06-20"\n'
+        "summary: a summary\ntags: [x]\naffected_files: []\n"
+        "dissent: >\n"
+        "  A standalone file ahead of project_profile.yaml creates a second\n"
+        "  principles read-site to fold in later.\n"
+        "re_affirmed_by:\n  - dec-242\n"
+    )
+
+    data = query_adrs._parse_frontmatter_fallback(raw, Path("adr.md"))
+
+    assert data is not None
+    assert data["id"] == "dec-241"
+    # Fidelity to the exact YAML fold is not the contract here -- only that
+    # the block scalar's continuation lines were consumed as part of it,
+    # not misread as a new (invalid) top-level key.
+    assert "dissent" in data
+    assert "standalone file" in data["dissent"]
+    assert data["re_affirmed_by"] == ["dec-242"]
+
+
 def test_fallback_parser_gives_up_honestly_on_confusing_input(capsys):
     # A stray continuation line that is neither `key: value` nor a `- item`
     # under an open block -- the fallback must skip, not guess.

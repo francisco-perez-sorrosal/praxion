@@ -16,11 +16,12 @@ finalize above the checkpoint it just advanced, would teach consumers to
 ignore it), and never generates an artifact. Reuses `query_adrs.py`'s ADR
 loader rather than forking it.
 
-The checkpoint cell is parsed at the boundary into a three-state sum type
-(`DesignCheckpoint.state`: present/absent/malformed) -- never coerced to a
-default. Collapsing "the mark could not be read" into the same empty-list
-shape as "the mark is clean" is the one failure mode that would make the
-whole mechanism a lie (SYSTEMS_PLAN.md Data Structures #1).
+The checkpoint cell is parsed at the boundary into a four-state sum type
+(`DesignCheckpoint.state`: present/draft/absent/malformed) -- never coerced
+to a default. Collapsing "the mark could not be read" or "the mark names an
+in-flight draft, not yet comparable" into the same empty-list shape as "the
+mark is clean" is the one failure mode that would make the whole mechanism a
+lie (SYSTEMS_PLAN.md Data Structures #1).
 
 Usage:
     python3 scripts/check_design_checkpoint.py --json
@@ -56,6 +57,12 @@ _PRESENT_CELL_PREFIX = re.compile(
     r"^`(?P<id>dec-[A-Za-z0-9_-]+)`\s*\(asserted\s+(?P<date>\d{4}-\d{2}-\d{2})"
 )
 _NUMERIC_ID = re.compile(r"^dec-(\d+)$")
+# A checkpoint pinned to an in-flight ADR fragment -- legal per AC-1 (the
+# normal state while a pipeline is running) but not yet a resolvable corpus
+# position: finalize renumbers it to `dec-NNN` and only then can the un-folded
+# suffix be computed. Distinguished from `_NUMERIC_ID` at parse time so this
+# case never falls through to the `[]` branch a comparable checkpoint uses.
+_DRAFT_ID = re.compile(r"^dec-draft-[0-9a-f]+$")
 
 _STREAMLINE_STATUSES = frozenset({"accepted", "re-affirmation"})
 _ARCHITECTURAL_CATEGORY = "architectural"
@@ -70,10 +77,19 @@ class DesignCheckpoint:
 
     `state` discriminates which of `checkpoint_id` / `asserted` / `raw` is
     meaningful. Callers must switch on `state` first; there is no default
-    value to fall back on for the other fields when `state != "present"`.
+    value to fall back on for the other fields when `state == "absent"`.
+
+    `"draft"` is a fourth, deliberate state distinct from `"present"`: the
+    cell is well-formed and both `checkpoint_id`/`asserted` are populated,
+    but the id is a `dec-draft-<hash>` fragment with no numeric position to
+    compare against the corpus -- resolvable only after finalize. Folding it
+    into `"present"` would let `_id_number()`'s `None` return silently
+    collapse "un-resolvable" into the same `unfolded: []` shape a genuinely
+    clean checkpoint produces -- exactly the ambiguity this type exists to
+    prevent.
     """
 
-    state: str  # "present" | "absent" | "malformed"
+    state: str  # "present" | "draft" | "absent" | "malformed"
     checkpoint_id: str | None
     asserted: str | None
     raw: str | None
@@ -103,9 +119,11 @@ def parse_design_checkpoint(design_text: str) -> DesignCheckpoint:
     if present is None:
         return DesignCheckpoint(state="malformed", checkpoint_id=None, asserted=None, raw=cell)
 
+    checkpoint_id = present.group("id")
+    state = "draft" if _DRAFT_ID.match(checkpoint_id) else "present"
     return DesignCheckpoint(
-        state="present",
-        checkpoint_id=present.group("id"),
+        state=state,
+        checkpoint_id=checkpoint_id,
         asserted=present.group("date"),
         raw=cell,
     )
@@ -132,7 +150,7 @@ def _is_architecture_bearing(
         return False
     if record.status.lower() not in _STREAMLINE_STATUSES:
         return False
-    if record.category != _ARCHITECTURAL_CATEGORY:
+    if record.category.lower() != _ARCHITECTURAL_CATEGORY:
         return False
     return _has_live_affected_file(record, repo_root)
 
@@ -153,7 +171,9 @@ def _unfolded_entry(
 
 
 def _corpus_tip(records: list[query_adrs.AdrRecord]) -> query_adrs.AdrRecord | None:
-    numbered = [(number, record) for record in records if (number := _id_number(record.id))]
+    numbered = [
+        (number, record) for record in records if (number := _id_number(record.id)) is not None
+    ]
     if not numbered:
         return None
     return max(numbered, key=lambda pair: pair[0])[1]
@@ -176,11 +196,16 @@ def check_design_checkpoint(repo_root: Path) -> tuple[int, dict[str, object]]:
     checkpoint = parse_design_checkpoint(design_text)
 
     yaml_module = query_adrs._try_import_yaml()
+    adr_paths = query_adrs.discover_adr_files(repo_root)
     records = [
         record
-        for path in query_adrs.discover_adr_files(repo_root)
+        for path in adr_paths
         if (record := query_adrs.load_adr(path, repo_root, yaml_module)) is not None
     ]
+    # `load_adr` returning `None` for a file the loader could not parse must
+    # never disappear silently into the un-folded computation -- a record
+    # this validator cannot see is a record it cannot certify as folded in.
+    unparseable = len(adr_paths) - len(records)
     corpus_tip_record = _corpus_tip(records)
     corpus_tip = corpus_tip_record.id if corpus_tip_record is not None else None
 
@@ -189,6 +214,7 @@ def check_design_checkpoint(repo_root: Path) -> tuple[int, dict[str, object]]:
         "checkpoint": checkpoint.checkpoint_id,
         "corpus_tip": corpus_tip,
         "predicate": _PREDICATE_DESCRIPTION,
+        "unparseable": unparseable,
     }
 
     if checkpoint.state != "present":
@@ -199,6 +225,13 @@ def check_design_checkpoint(repo_root: Path) -> tuple[int, dict[str, object]]:
         payload["count"] = None
         if checkpoint.state == "malformed":
             payload["raw"] = checkpoint.raw
+        elif checkpoint.state == "draft":
+            payload["asserted"] = checkpoint.asserted
+            payload["message"] = (
+                f"checkpoint {checkpoint.checkpoint_id} is a draft ADR id -- "
+                "un-resolvable to a corpus position until finalize; the "
+                "un-folded suffix is UNCOMPUTABLE, not empty"
+            )
         return 0, payload
 
     payload["asserted"] = checkpoint.asserted
@@ -250,6 +283,10 @@ def _print_text(payload: dict[str, object]) -> None:
     if state == "malformed":
         print(f"checkpoint: malformed -- unparseable cell: {payload['raw']!r}")
         return
+    if state == "draft":
+        print(f"checkpoint: {payload['checkpoint']} (asserted {payload['asserted']})")
+        print(f"checkpoint_state: draft -- {payload['message']}")
+        return
     print(f"checkpoint: {payload['checkpoint']} (asserted {payload['asserted']})")
     print(f"corpus tip: {payload['corpus_tip']}")
     print(f"un-folded architecture-bearing ADRs: {payload['count']}")
@@ -275,6 +312,13 @@ def main(argv: list[str] | None = None) -> int:
 
     if "warning" in payload:
         print(f"warning: {payload['warning']}", file=sys.stderr)
+
+    if payload.get("unparseable"):
+        print(
+            f"warning: {payload['unparseable']} ADR file(s) could not be parsed and are "
+            "excluded from the un-folded computation -- see stderr above for which",
+            file=sys.stderr,
+        )
 
     return exit_code
 

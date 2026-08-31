@@ -198,6 +198,54 @@ def test_absent_checkpoint_never_yields_empty_unfolded_list(tmp_path, capsys):
     )
 
 
+def test_draft_checkpoint_reports_draft_state_not_present(tmp_path, capsys):
+    """AC-1 sanctions a `dec-draft-<hash>` mark as the normal in-flight state --
+    it must surface as its own state, distinct from `present`, since a draft id
+    has no numeric position to compare against the corpus."""
+    _write_design(tmp_path, _present_cell("dec-draft-0abc1234", date="2026-08-30"))
+
+    exit_code = check_design_checkpoint.main(["--json", "--repo-root", str(tmp_path)])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert payload["checkpoint_state"] == "draft"
+    assert payload["checkpoint"] == "dec-draft-0abc1234"
+    assert payload["asserted"] == "2026-08-30"
+
+
+def test_draft_checkpoint_never_yields_empty_unfolded_list(tmp_path, capsys):
+    """The FAIL-1 regression case: a draft mark must not silently coerce to
+    `unfolded: [], count: 0` -- that shape is indistinguishable from a
+    genuinely clean, comparable checkpoint (the exact failure the
+    `DesignCheckpoint` sum type exists to prevent)."""
+    decisions_dir = tmp_path / ".ai-state" / "decisions"
+    _write_adr(decisions_dir, "900-tip.md", adr_id="dec-900")
+    _write_live_file(tmp_path, "src/module.py")
+    _write_design(tmp_path, _present_cell("dec-draft-0abc1234"))
+
+    exit_code = check_design_checkpoint.main(["--json", "--repo-root", str(tmp_path)])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert payload["checkpoint_state"] == "draft"
+    assert payload.get("unfolded") != [], (
+        "draft checkpoint must not report an empty unfolded list -- it must be "
+        "null/absent, distinguishable from a genuinely clean present state"
+    )
+    assert payload["unfolded"] is None
+    assert payload["count"] is None
+    assert "message" in payload
+    assert "dec-draft-0abc1234" in payload["message"]
+
+
+def test_exits_zero_on_draft_checkpoint(tmp_path):
+    _write_design(tmp_path, _present_cell("dec-draft-0abc1234"))
+
+    exit_code = check_design_checkpoint.main(["--json", "--repo-root", str(tmp_path)])
+
+    assert exit_code == 0
+
+
 def test_present_checkpoint_with_no_post_checkpoint_adrs_yields_genuine_empty_list(
     tmp_path, capsys
 ):
@@ -490,6 +538,46 @@ def test_repeated_runs_produce_identical_output(tmp_path, capsys):
     second = capsys.readouterr().out
 
     assert first == second
+
+
+# -- Unparseable records surfaced, never silently dropped (WARN-1) -----------
+
+
+def test_unparseable_adr_count_surfaces_in_json_payload(tmp_path, capsys):
+    """A record `load_adr` cannot parse must not vanish from the un-folded
+    computation without a trace -- the `--json` payload is the surface
+    `check_design_checkpoint` consumers actually read, so the count belongs
+    there, not only in a stderr warning."""
+    decisions_dir = tmp_path / ".ai-state" / "decisions"
+    _write_adr(decisions_dir, "100-checkpoint.md", adr_id="dec-100")
+    # Missing `title`/`status` -- `load_adr` returns None for this file
+    # regardless of which parser (PyYAML or the stdlib fallback) reads it.
+    decisions_dir.mkdir(parents=True, exist_ok=True)
+    (decisions_dir / "101-broken.md").write_text(
+        '---\nid: dec-101\ndate: "2026-09-01"\n---\n\n# Body\n', encoding="utf-8"
+    )
+    _write_design(tmp_path, _present_cell("dec-100"))
+
+    exit_code = check_design_checkpoint.main(["--json", "--repo-root", str(tmp_path)])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert payload["unparseable"] == 1
+
+
+def test_zero_unparseable_records_reports_zero_not_absent(tmp_path, capsys):
+    """The positive control: a fully clean corpus reports `unparseable: 0`,
+    proving the field is always present rather than only appearing when
+    something goes wrong."""
+    decisions_dir = tmp_path / ".ai-state" / "decisions"
+    _write_adr(decisions_dir, "100-checkpoint.md", adr_id="dec-100")
+    _write_design(tmp_path, _present_cell("dec-100"))
+
+    exit_code = check_design_checkpoint.main(["--json", "--repo-root", str(tmp_path)])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert payload["unparseable"] == 0
 
 
 # -- Checkpoint-ahead-of-corpus warning ---------------------------------------

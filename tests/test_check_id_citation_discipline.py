@@ -242,6 +242,33 @@ def test_citation_inside_a_sibling_worktree_is_not_flagged(tmp_path: Path) -> No
     )
 
 
+def test_a_worktrees_own_run_scans_its_own_files(tmp_path: Path) -> None:
+    """Running *from inside* `.claude/worktrees/<name>/` scans that checkout.
+
+    The sibling-worktree exclusion above is stated as "each worktree is scanned
+    by its own run" — so that run must actually scan something. Matching the
+    exclusion fragment against the *absolute* path inverted it: inside a
+    worktree every file's absolute path contains `/.claude/worktrees/`, so the
+    gate dropped the entire checkout and exited 0 on `scanned 0 code file(s)`.
+    Since Standard/Full-tier pipelines mandate worktrees, that silently
+    disabled the commit gate for exactly the commits it exists to guard.
+    """
+    worktree_root = tmp_path / ".claude" / "worktrees" / "feature-branch"
+    own_file = worktree_root / "scripts" / "mod.py"
+    own_file.parent.mkdir(parents=True)
+    own_file.write_text('EXAMPLE = "dec-draft-cafebabe"\n')
+
+    result = _run(["--repo-root", str(worktree_root)], cwd=worktree_root)
+
+    assert "scanned 0 code file(s)" not in result.stdout, (
+        "a worktree's own run must scan its own files, not drop them as if they "
+        f"were a sibling worktree's; got:\n{result.stdout}"
+    )
+    assert "[draft-adr-id]" in result.stdout, (
+        f"expected the worktree's own citation to be flagged\n{result.stdout}"
+    )
+
+
 def test_finalized_dec_nnn_citation_is_not_flagged(tmp_path: Path) -> None:
     """A finalized `dec-NNN` citation — explicitly permitted by
     `rules/swe/id-citation-discipline.md`'s lifecycle table — is never

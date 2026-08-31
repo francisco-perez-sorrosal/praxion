@@ -293,22 +293,44 @@ Composition per trigger: `post-merge` runs `reconcile_ai_state.py` (when `.ai-st
    # 2. id-citation-discipline — blocks commits that reference ephemeral
    #    pipeline ids (REQ-*, AC-*, Step N) in committed source code.
    #    Rationale: rules/swe/id-citation-discipline.md.
+   #
+   # Checker resolution, in order: this repo's own scripts/ copy first, then
+   # the plugin's. A project that vendors the checker tests and gates its own
+   # copy should be gated by the copy it maintains. A missing checker is
+   # announced, never silently skipped — a gate that exits 0 because it could
+   # not find itself is indistinguishable from no gate at all.
    set -eo pipefail
    REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
    [ -z "$REPO_ROOT" ] && exit 0
-   PLUGIN_ROOT="$(jq -r '.plugins["praxion@bit-agora"][0].installPath' "$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null)"
 
-   PIN_CHECK="${PLUGIN_ROOT}/scripts/check_ruff_pin_drift.py"
-   [ -f "$PIN_CHECK" ] && python3 "$PIN_CHECK" --repo-root "$REPO_ROOT"
+   PLUGIN_ROOT=""
+   for KEY in "praxion@bit-agora" "i-am@bit-agora"; do
+     CANDIDATE="$(jq -r --arg k "$KEY" '.plugins[$k][0].installPath // empty' \
+       "$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null)"
+     if [ -n "$CANDIDATE" ] && [ -d "$CANDIDATE" ]; then
+       PLUGIN_ROOT="$CANDIDATE"
+       break
+     fi
+   done
 
-   CHECK="${PLUGIN_ROOT}/scripts/check_id_citation_discipline.py"
-   [ ! -f "$CHECK" ] && exit 0
+   if [ -n "$PLUGIN_ROOT" ] && [ -f "${PLUGIN_ROOT}/scripts/check_ruff_pin_drift.py" ]; then
+     python3 "${PLUGIN_ROOT}/scripts/check_ruff_pin_drift.py" --repo-root "$REPO_ROOT"
+   fi
+
+   CHECK="${REPO_ROOT}/scripts/check_id_citation_discipline.py"
+   [ ! -f "$CHECK" ] && CHECK="${PLUGIN_ROOT}/scripts/check_id_citation_discipline.py"
+   if [ ! -f "$CHECK" ]; then
+     echo "pre-commit: id-citation checker not found (repo copy absent and no" >&2
+     echo "            Praxion plugin installed) — the gate did NOT run." >&2
+     exit 1
+   fi
+
    STAGED="$(git diff --cached --name-only --diff-filter=ACMR || true)"
    [ -z "$STAGED" ] && exit 0
    # shellcheck disable=SC2086
    python3 "$CHECK" --repo-root "$REPO_ROOT" --files $STAGED
    ```
-   `chmod +x .git/hooks/pre-commit` after writing. Resolving the plugin path at hook-run time means plugin upgrades (different install paths) flow automatically.
+   `chmod +x .git/hooks/pre-commit` after writing. Resolving the plugin path at hook-run time means plugin upgrades (different install paths) flow automatically — but **the plugin *key* is part of the hook body, not the resolved path**: a hook installed under an older plugin name resolves `PLUGIN_ROOT` to empty forever, and the pre-repair body then exited 0 silently. Hence the key loop above (current name first, legacy name second) and the loud failure. A body-level change like this reaches already-onboarded projects only through the content-aware top-up below.
 
    **If `.git/hooks/pre-commit` already exists and is NOT a Praxion hook**, back it up to `.git/hooks/pre-commit.pre-praxion` and warn the user. Do not silently overwrite a non-Praxion hook.
 
@@ -317,7 +339,9 @@ Composition per trigger: `post-merge` runs `reconcile_ai_state.py` (when `.ai-st
    | Predicate | Action |
    |---|---|
    | Hook does NOT contain `check_ruff_pin_drift` | Insert the `PIN_CHECK` stanza (the two lines above the `CHECK=` assignment) and report `4: pre-commit hook topped up (ruff pin coherence)` |
-   | Hook already contains it | Skip with `4: pre-commit hook current` |
+   | Hook contains `i-am@bit-agora` but not `praxion@bit-agora`, or resolves `PLUGIN_ROOT` from a single hard-coded key | Replace the `PLUGIN_ROOT=` line with the key loop above and report `4: pre-commit hook topped up (plugin key resolution)`. **Verify by running the hook**, not by reading it: a hook stuck on the old key resolves `PLUGIN_ROOT` empty and exits 0 in silence, so it looks installed and healthy while gating nothing |
+   | Hook contains `[ ! -f "$CHECK" ] && exit 0` | Replace with the repo-copy-first resolution plus the loud failure above, and report `4: pre-commit hook topped up (checker resolution)` |
+   | Hook already contains all of the above | Skip with `4: pre-commit hook current` |
 
    **Insert; do not regenerate.** §Phase 8b.3 *appends* a Block D fragment to this same file, so rewriting the hook wholesale would silently delete Block D from every project that installed the AaC tier. Add the missing stanza in place and leave everything else untouched.
 

@@ -223,9 +223,20 @@ def is_bash_shebang(path: Path) -> bool:
     return any(pattern.search(text) for pattern in _SHEBANG_PATTERNS)
 
 
-def is_excluded_path(path: Path) -> bool:
-    path_str = str(path).replace("\\", "/")
-    return any(fragment in path_str for fragment in EXCLUDED_PATH_FRAGMENTS)
+def is_excluded_path(rel_path: Path) -> bool:
+    """Exclude by location *inside the repository*, never by absolute path.
+
+    Every fragment in EXCLUDED_PATH_FRAGMENTS describes a directory nested in
+    the repo being scanned. Matching them against the absolute path silently
+    inverts the `/.claude/worktrees/` intent: when the scan runs from inside a
+    worktree, every file's absolute path contains that fragment, so the whole
+    checkout is dropped and the gate reports `scanned 0 code file(s)` while
+    exiting 0. Matching against the repo-root-relative path keeps sibling
+    worktrees out of a canonical-checkout scan and keeps a worktree's own run
+    scanning its own files.
+    """
+    rel_str = "/" + str(rel_path).replace("\\", "/")
+    return any(fragment in rel_str for fragment in EXCLUDED_PATH_FRAGMENTS)
 
 
 def is_exempt_by_path(rel_path: Path) -> bool:
@@ -250,7 +261,7 @@ def iter_code_files(repo_root: Path) -> list[Path]:
                 rel = path.relative_to(repo_root)
             except ValueError:
                 continue
-            if is_exempt_by_path(rel) or is_excluded_path(path):
+            if is_exempt_by_path(rel) or is_excluded_path(rel):
                 continue
             files.append(path)
 
@@ -267,7 +278,7 @@ def iter_code_files(repo_root: Path) -> list[Path]:
             rel = path.relative_to(repo_root)
         except ValueError:
             continue
-        if is_exempt_by_path(rel) or is_excluded_path(path):
+        if is_exempt_by_path(rel) or is_excluded_path(rel):
             continue
         if not os.access(path, os.X_OK):
             continue
@@ -311,7 +322,7 @@ def filter_files(explicit_files: list[Path], repo_root: Path) -> list[Path]:
             rel = abs_path.relative_to(repo_root)
         except ValueError:
             continue
-        if is_exempt_by_path(rel) or is_excluded_path(abs_path):
+        if is_exempt_by_path(rel) or is_excluded_path(rel):
             continue
         out.append(abs_path)
     return out

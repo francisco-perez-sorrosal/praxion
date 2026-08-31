@@ -63,6 +63,22 @@ re-derive the pairing, and record the emitter's own verdict in
 The verdict is scoped to the same bounded tail window the backfill reads, so
 ``unobserved-start`` asserts **non-observation, not non-existence** -- which is
 precisely the distinction a reader needs and could not previously make.
+
+Known WAL anomalies (diagnosed 2026-08-30, sentinel P03)
+--------------------------------------------------------
+* 2026-08-25 only: 30 lifecycle rows are near-duplicates (same agent_id +
+  event_type, ms apart, one row old-style empty ``agent_type`` and one
+  new-style ``unknown``) -- two installed copies of this hook (stale plugin
+  cache + refreshed copy) raced during that day's plugin update. Not
+  reproducing since 2026-08-26; no dedup logic is warranted for a
+  one-day install-transition artifact.
+* ``a045b98b6e9067762`` (2026-08-13) and ``a74850d8996d9fef1``
+  (2026-08-25): unpaired ``agent_start`` rows with real ``tool_use``.
+  The first is a resumed subagent (second start 8 min later, same id)
+  whose final stop was lost to session truncation; the second is the
+  duplicate-emission incident above. Historical rows; expected to stay
+  unpaired forever -- an auditor re-deriving P03 should treat these two
+  ids as dispositioned.
 A `tool_use` row deliberately does not satisfy the pairing (it satisfies the
 backfill): it names the agent, it does not witness its spawn.
 

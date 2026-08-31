@@ -262,6 +262,35 @@ def test_canary_a_registry_with_a_computed_key_withholds_rather_than_part_readin
     assert cap.canonical_block_slugs(repo) is None
 
 
+def test_tolerates_a_registry_entry_with_a_single_element_consumers_tuple(repo: Path) -> None:
+    """Forward cover for the onboarding-unification cut: `_ONBOARDING_PAIR` (2
+    consumers) narrows to a 1-tuple once the two command files retire in favor
+    of one skill reference file. `canonical_block_slugs()` extracts only
+    `BLOCKS` dict *keys* via `ast.walk` -- it never inspects `consumers`
+    contents -- so a 1-element tuple is already trivially tolerated. This pins
+    that tolerance as a regression guard, not a fix for a real defect.
+    """
+    registry = repo / cap._REGISTRY
+    registry.parent.mkdir(parents=True, exist_ok=True)
+    registry.write_text(
+        "from pathlib import Path\n"
+        "from dataclasses import dataclass\n\n"
+        "@dataclass(frozen=True)\n"
+        "class BlockSpec:\n"
+        "    consumers: tuple\n\n"
+        "BLOCKS = {\n"
+        '    "onboarding-solo": BlockSpec(consumers=(Path("skills/onboard-project/'
+        'references/claude-md-blocks.md"),)),\n'
+        "}\n",
+        encoding="utf-8",
+    )
+    assert cap.canonical_block_slugs(repo) == ("onboarding-solo",)
+
+    _with_section_4(repo, "| Canonical block: `onboarding-solo` | Markdown |\n")
+    report = cap.check_projection(repo, block_slugs=("onboarding-solo",))
+    assert report["findings"] == []
+
+
 def test_never_edits_either_side(repo: Path) -> None:
     """Reports drift; resolving it is a human judgment about which side is right."""
     _write_rows(repo, "| Skills | `knowledge.skills` | r | Built | f |\n")

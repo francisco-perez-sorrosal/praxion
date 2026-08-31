@@ -1,5 +1,5 @@
 ---
-paths: ["install*.sh", "scripts/install*.sh", "claude/canonical-blocks/**/*.md", "commands/onboard-project*.md", "commands/new-project.md", "new_project.sh"]
+paths: ["install*.sh", "scripts/install*.sh", "claude/canonical-blocks/**/*.md", "skills/onboard-project/**/*.md", "scripts/onboard-project"]
 core: false
 ---
 

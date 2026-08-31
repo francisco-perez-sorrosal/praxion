@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-08-30T21:55:41Z'
+generated_at: '2026-08-31T00:59:16Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
@@ -190,14 +190,13 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 3659
+  chars: 3643
   paths:
   - install*.sh
   - scripts/install*.sh
   - claude/canonical-blocks/**/*.md
-  - commands/onboard-project*.md
-  - commands/new-project.md
-  - new_project.sh
+  - skills/onboard-project/**/*.md
+  - scripts/onboard-project
 - id: swe/shipped-artifact-isolation
   path: rules/swe/shipped-artifact-isolation.md
   load: path_scoped

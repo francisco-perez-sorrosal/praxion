@@ -24,8 +24,8 @@ Reusable slash commands for AI coding assistants. Each `.md` file becomes a `/co
 | `/decisions` | Disposition decision-health findings — repairs as grouped approvals, retirement candidates one at a time, never in bulk |
 | `/decontaminate-ids` | Detect and remediate REQ/AC/step citations in the current project's source code |
 | `/merge-worktree` | Merge a worktree branch back into current branch |
-| `/new-project` | Scaffold a greenfield Claude-ready Python project and onboard it to Praxion |
-| `/onboard-project` | Onboard the current project for the Praxion plugin ecosystem |
+| `/new-project` | Scaffold a greenfield Claude-ready Python project and onboard it to Praxion. Retiring → `skills/onboard-project/` (cut pending) |
+| `/onboard-project` | Onboard the current project for the Praxion plugin ecosystem. Retiring → `skills/onboard-project/` (cut pending) |
 | `/project-coverage` | Run the project's canonical coverage target and render a terminal summary via the `test-coverage` skill |
 | `/project-metrics` | Compute project complexity/health metrics (churn, complexity, coupling, hot-spots, trends) and write a timestamped report triple to `.ai-state/` |
 | `/refresh-claude-blocks` | Refresh a project's onboarded `CLAUDE.md` canonical blocks against the installed plugin, dispositioning locally customized blocks |

@@ -16,8 +16,8 @@ The docs below are organized by [Diátaxis](https://diataxis.fr) quadrant — pi
 Step-by-step walkthroughs to build skill. Read these front-to-back; expect to type along.
 
 - [Getting started](getting-started.md) — first-time setup; build a small URL shortener through the full pipeline
-- [Greenfield onboarding](greenfield-onboarding.md) — start a new project with Praxion (`new_project.sh` + `/new-project`)
-- [Existing-project onboarding](existing-project-onboarding.md) — add Praxion to a project that already has code (`/onboard-project`)
+- [Greenfield onboarding](greenfield-onboarding.md) — start a new project with Praxion (`new_project.sh` + `/new-project`). Being replaced by a single `docs/onboarding.md` (in progress; both `skills/onboard-project/` and this doc's row retire together once the atomic cut lands)
+- [Existing-project onboarding](existing-project-onboarding.md) — add Praxion to a project that already has code (`/onboard-project`). Being replaced by the same forthcoming `docs/onboarding.md`
 - [ML training onramp](ml-training-onramp.md) — Praxion conventions for ML/AI training projects (`program.md`, GPU budget, experiment tracking)
 
 ## How-to guides — achieving a specific goal

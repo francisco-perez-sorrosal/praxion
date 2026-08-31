@@ -47,7 +47,7 @@ Consume all available learning sources in priority order. Skip any source that d
 2. **VERIFICATION_REPORT.md** (`.ai-work/<task-slug>/`) -- recurring quality patterns
 3. **Latest SENTINEL_REPORT_*.md** (`.ai-state/sentinel_reports/`) -- ecosystem patterns and recurring findings
 4. **Latest IDEA_LEDGER_*.md** (`.ai-state/idea_ledgers/`) -- avoid re-proposing implemented or discarded ideas
-5. **ADR files** -- read `.ai-state/decisions/DECISIONS_INDEX.md` for a scannable overview. Recurring decision patterns across multiple features (same category, similar rationale in the summary column) are candidates for rule or skill formalization. Read the full ADR files for promising matches.
+5. **ADR files** -- `.ai-state/decisions/DECISIONS_INDEX.md` is the scannable overview, but it grows unbounded, so **pre-scan with `grep -in '<keyword>' .ai-state/decisions/DECISIONS_INDEX.md` before reading it whole**: read only the matching rows (via `offset`+`limit`). Recurring decision patterns across multiple features (same category, similar rationale in the summary column) are candidates for rule or skill formalization. Read the full ADR files for promising matches.
 6. **`.ai-state/calibration_log.md` `Retrospective` cells** newer than the last harvest -- Direct-tier learning/gotcha/debt/decision micro-notes captured via the commit-time convention (see `swe-agent-coordination-protocol.md` § Process Calibration).
 
 For each source, extract discrete learning items. A learning item is a pattern, gotcha, convention, workflow, decision rationale, or recurring issue that appears actionable and reusable beyond its original context.
@@ -66,7 +66,7 @@ For each extracted learning item, check whether it is already captured by an exi
 1. **Skills** -- read `skills/*/SKILL.md` frontmatter descriptions. Does an existing skill cover this?
 2. **Rules** -- read `rules/**/*.md`. Does an existing rule encode this knowledge?
 3. **CLAUDE.md** -- is this already documented as a project convention?
-4. **ADR files** -- read `.ai-state/decisions/DECISIONS_INDEX.md` to check if the learning item overlaps with an existing decision. Read the full ADR for matches to verify coverage.
+4. **ADR files** -- check whether the learning item overlaps an existing decision by grep-pre-scanning `.ai-state/decisions/DECISIONS_INDEX.md` on the item's keywords (never a full read — the index grows unbounded). Read the full ADR for matches to verify coverage.
 
 Discard items already covered. Flag items that partially overlap but extend existing artifacts -- these become "update existing artifact" proposals rather than "create new artifact" proposals.
 

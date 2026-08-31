@@ -87,7 +87,7 @@ Run `PYTHONPATH=eval/src uv run lint-imports --config fitness/import-linter.cfg 
 
 ### ADR set
 
-Read `.ai-state/decisions/DECISIONS_INDEX.md` for the index. Read individual `.ai-state/decisions/<NNN>-*.md` files for `affected_files` frontmatter cross-references. In `--mode=pre-merge`, also run `git diff --name-only $BASE..HEAD` restricted to `.ai-state/decisions/` to identify ADRs touched by the PR.
+Consult `.ai-state/decisions/DECISIONS_INDEX.md`. The index grows unbounded, so **pre-scan with `grep -in '<keyword>' .ai-state/decisions/DECISIONS_INDEX.md` before reading it whole**: read only the matching rows (via `offset`+`limit`). Read individual `.ai-state/decisions/<NNN>-*.md` files for `affected_files` frontmatter cross-references. In `--mode=pre-merge`, also run `git diff --name-only $BASE..HEAD` restricted to `.ai-state/decisions/` to identify ADRs touched by the PR.
 
 ### Markdown fences
 
@@ -121,7 +121,7 @@ If no file matches: emit `no architectural-touch slice detected; skipping` and e
 
 1. Discover the LikeC4 model with `find docs/diagrams -name '*.c4'`, then `Read` each file returned
 2. Run `PYTHONPATH=eval/src uv run lint-imports --config fitness/import-linter.cfg --no-cache` to refresh the import graph. The `PYTHONPATH` is required — one root package lives in a sibling project this environment does not install, and omitting it fails loudly rather than silently dropping that contract (rationale in the cfg header)
-3. Read `.ai-state/decisions/DECISIONS_INDEX.md`
+3. Grep-pre-scan `.ai-state/decisions/DECISIONS_INDEX.md` (never a full read)
 4. In `--mode=pre-merge`: run `git diff --name-only $BASE..HEAD` filtered to `.ai-state/decisions/` to collect ADRs touched in this PR
 5. Identify architecture markdown files in scope: `**/DESIGN.md` and `docs/architecture.md`
 

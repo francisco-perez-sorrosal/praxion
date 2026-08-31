@@ -100,7 +100,7 @@ When a later decision's action **removed this decision's subject** rather than a
 
 ### Finalize Protocol
 
-Finalize promotes drafts in `.ai-state/decisions/drafts/` to finalized `<NNN>-<slug>.md` records at merge-to-main. Invoked by the post-merge git hook and `/merge-worktree`; the protocol is **idempotent**, advisory-locked, and rewrites `dec-draft-<hash>` cross-references across a **bounded** walk scope (sibling ADR files; the persistent `.ai-state/` documents that cite ADR ids — `DESIGN.md`, both tech-debt ledgers, the three `CONSULT_*` files, `SYSTEM_DEPLOYMENT.md`, `calibration_log.md`, `idea_ledgers/*.md` — and a project-root `ROADMAP.md`; every markdown file under `docs/`; in-flight `.ai-work/*/LEARNINGS.md` / `SYSTEMS_PLAN.md` / `IMPLEMENTATION_PLAN.md`; and `.ai-state/specs/SPEC_*` matching the current task slug — an explicit allowlist of named files and bounded subtrees, never an arbitrary repo sweep). The bounded scope is the contract — finalize never touches unrelated text. It is **widened, never worked around**: a citation that dangles because its file is unlisted is fixed by adding that file here, not by forbidding the citation, and finalize's own allowlist-gap detector emits exactly that instruction. `DECISIONS_INDEX.md` regenerates last.
+Finalize promotes drafts in `.ai-state/decisions/drafts/` to finalized `<NNN>-<slug>.md` records at merge-to-main. Invoked by the post-merge git hook and `/merge-worktree`; the protocol is **idempotent**, advisory-locked, and rewrites `dec-draft-<hash>` cross-references across a **bounded** walk scope (sibling ADR files; the persistent `.ai-state/` documents that cite ADR ids — `DESIGN.md`, both tech-debt ledgers, the three `CONSULT_*` files, `SYSTEM_DEPLOYMENT.md`, `calibration_log.md`, `idea_ledgers/*.md` — and a project-root `ROADMAP.md`; every markdown file under `docs/` **except `docs/independent-analysis/`** (frozen historical reports — no `dec-draft` ids, no downstream reader, exempt on the same grounds as frozen diagrams); in-flight `.ai-work/*/LEARNINGS.md` / `SYSTEMS_PLAN.md` / `IMPLEMENTATION_PLAN.md`; and `.ai-state/specs/SPEC_*` matching the current task slug — an explicit allowlist of named files and bounded subtrees, never an arbitrary repo sweep). The bounded scope is the contract — finalize never touches unrelated text. It is **widened, never worked around**: a citation that dangles because its file is unlisted is fixed by adding that file here, not by forbidding the citation, and finalize's own allowlist-gap detector emits exactly that instruction. `DECISIONS_INDEX.md` regenerates last.
 
 For the full step sequence (draft detection, NNN assignment, file rename + frontmatter `id:`/`status:` rewrites, the cross-reference-rewrite location table, concurrency safety, and exit codes), see [`adr-authoring-protocols.md § Finalize at Merge-to-Main`](../../skills/software-planning/references/adr-authoring-protocols.md#finalize-at-merge-to-main).
 
@@ -122,11 +122,12 @@ The 7-step procedure agents follow when creating a fragment ADR (identity deriva
 
 ### Discovery Protocol
 
-1. Read `.ai-state/decisions/DECISIONS_INDEX.md` for an overview of finalized ADRs
-2. Grep for matching `category`, `tags`, or `affected_files` in the index table
-3. For in-flight work, also scan `.ai-state/decisions/drafts/` — drafts are not indexed but are authoritative during the pipeline that authored them
-4. Read full ADR files for matching decisions
-5. Fallback (if index missing): `Glob .ai-state/decisions/[0-9]*.md` + `Glob .ai-state/decisions/drafts/*.md` + Grep frontmatter
+Retrieval-first. An ungated full `Read` of `DECISIONS_INDEX.md` is **forbidden** — it grows unbounded with the corpus, running tens of thousands of tokens at a few hundred ADRs. Sole exception: a genuinely cross-cutting task a keyword scan would miss; say so when you take it.
+
+1. **Pre-scan**: `grep -in '<keyword>' .ai-state/decisions/DECISIONS_INDEX.md` per scope keyword (`tags`, `category`, affected paths, feature terms); read only matching rows via `offset`+`limit`
+2. For in-flight work, also scan `.ai-state/decisions/drafts/` — drafts are not indexed but are authoritative during the pipeline that authored them
+3. Read full ADR files for matching decisions
+4. Fallback (if index missing): `Glob .ai-state/decisions/[0-9]*.md` + `Glob .ai-state/decisions/drafts/*.md` + Grep frontmatter
 
 ### Linking to ADRs
 

@@ -17,7 +17,7 @@ tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit
 skills: [external-api-docs]
 memory: user
-maxTurns: 60
+maxTurns: 80
 background: true
 ---
 

@@ -238,12 +238,10 @@ The Mermaid diagram below represents this loop. It is authored prose today and c
 
 ## Adopting It
 
-**Existing projects** — run `/onboard-project`. A gate between Phase 8 and Phase 9 presents: `Skip AaC
-(recommended)` (default), `Install AaC tier`, or `Run all rest`. The default is OFF — retrofitting fence
-regions into established documents requires deliberate author review.
-
-**Greenfield projects** — run `/new-project` or `new_project.sh`. AaC is default-ON. Opt out with
-`new_project.sh --no-aac` or `PRAXION_NEW_PROJECT_NO_AAC=1`.
+**Any project** — run `onboard-project` (any mode: `new`, `existing`, `hackathon`, `promote`). The `aac`
+capability defaults OFF in every mode; the capability Profile gate (G3) opts it in, or pass `--with aac`
+(or `--profile all`) directly. The default is OFF — retrofitting fence regions into established documents
+requires deliberate author review.
 
 **What lands per project**: `fitness/` scaffold, `.github/workflows/architecture.yml` (rendered from
 `claude/aac-templates/architecture.yml.tmpl`), `docs/diagrams/` directory, Block D fragment in

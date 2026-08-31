@@ -12,7 +12,7 @@ Companion doc for Praxion's third project archetype: ML/AI training. Where the S
 - **Skills:** [`ml-training`](../skills/ml-training/SKILL.md), [`llm-training-eval`](../skills/llm-training-eval/SKILL.md), [`neo-cloud-abstraction`](../skills/neo-cloud-abstraction/SKILL.md), [`experiment-tracking`](../skills/experiment-tracking/SKILL.md)
 - **Skill references:** [`gpu-compute-budgeting`](../skills/deployment/references/gpu-compute-budgeting.md) (under `deployment`), [`ml-experiment-ci`](../skills/cicd/references/ml-experiment-ci.md) (under `cicd`)
 - **Rules:** [`ml/eval-driven-verification`](../rules/ml/eval-driven-verification.md), [`ml/gpu-budget-conventions`](../rules/ml/gpu-budget-conventions.md), [`ml/experiment-tracking-conventions`](../rules/ml/experiment-tracking-conventions.md)
-- **Commands:** [`/run-experiment`](../commands/run-experiment.md), [`/check-experiment`](../commands/check-experiment.md), [`/onboard-project`](../commands/onboard-project.md) Phase 8c
+- **Commands:** [`/run-experiment`](../commands/run-experiment.md), [`/check-experiment`](../commands/check-experiment.md), [`onboard-project`](../skills/onboard-project/SKILL.md) Phase 8c
 - **Architecture:** [`docs/architecture.md`](architecture.md), `.ai-state/DESIGN.md`
 
 ## The third archetype in context
@@ -90,7 +90,7 @@ Two reference variants:
 - **[`karpathy/autoresearch`](https://github.com/karpathy/autoresearch)** — NVIDIA reference implementation (CUDA).
 - **[`miolini/autoresearch-macos`](https://github.com/miolini/autoresearch-macos)** — Apple Silicon fork (MPS).
 
-When you onboard autoresearch with [`/onboard-project`](../commands/onboard-project.md), Phase 8c detects ML signals in the codebase (training entry points, eval harness, checkpoint directories, `program.md`) and scaffolds the conventions described in this doc — `rules/ml/`, `program.md` recognition, `TRAINING_RESULTS.md` placement, and the `runs/` directory if absent.
+When you onboard autoresearch with [`onboard-project`](../skills/onboard-project/SKILL.md), Phase 8c detects ML signals in the codebase (training entry points, eval harness, checkpoint directories, `program.md`) and scaffolds the conventions described in this doc — `rules/ml/`, `program.md` recognition, `TRAINING_RESULTS.md` placement, and the `runs/` directory if absent.
 
 ## Beyond autoresearch — what this archetype supports
 
@@ -125,7 +125,7 @@ Three-tier backend strategy:
 | Skills | [`ml-training`](../skills/ml-training/SKILL.md), [`llm-training-eval`](../skills/llm-training-eval/SKILL.md), [`neo-cloud-abstraction`](../skills/neo-cloud-abstraction/SKILL.md), [`experiment-tracking`](../skills/experiment-tracking/SKILL.md) |
 | Skill references | [`operational-modes`](../skills/ml-training/references/operational-modes.md), [`training-results-schema`](../skills/llm-training-eval/references/training-results-schema.md), [`local-backend`](../skills/neo-cloud-abstraction/references/local-backend.md), [`skypilot-backend`](../skills/neo-cloud-abstraction/references/skypilot-backend.md), [`runpod-direct-adapter`](../skills/neo-cloud-abstraction/references/runpod-direct-adapter.md), [`gpu-compute-budgeting`](../skills/deployment/references/gpu-compute-budgeting.md), [`ml-experiment-ci`](../skills/cicd/references/ml-experiment-ci.md) |
 | Rules | [`ml/eval-driven-verification`](../rules/ml/eval-driven-verification.md), [`ml/gpu-budget-conventions`](../rules/ml/gpu-budget-conventions.md), [`ml/experiment-tracking-conventions`](../rules/ml/experiment-tracking-conventions.md) |
-| Commands | [`/run-experiment`](../commands/run-experiment.md), [`/check-experiment`](../commands/check-experiment.md), [`/onboard-project`](../commands/onboard-project.md) Phase 8c |
+| Commands | [`/run-experiment`](../commands/run-experiment.md), [`/check-experiment`](../commands/check-experiment.md), [`onboard-project`](../skills/onboard-project/SKILL.md) Phase 8c |
 | Architecture | [`docs/architecture.md`](architecture.md), `.ai-state/DESIGN.md` |
 | Verifier extension | [`agents/verifier.md`](../agents/verifier.md) Phase 3a |
 

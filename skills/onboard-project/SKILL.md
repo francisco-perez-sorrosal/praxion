@@ -30,7 +30,7 @@ allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion, Task]
 ---
 
 
-Onboard the **current existing** project to work cleanly with the Praxion plugin (`praxion`). This is the existing-project counterpart to `/new-project` (greenfield). Detection (§Pre-flight) computes a correct default for nearly everything; the command fires at most three `AskUserQuestion` gates (§Phase Gates) — mode confirm, build intent, and a single capability Profile — rather than pausing once per phase.
+Onboard a project to work cleanly with the Praxion plugin (`praxion`) — one phase engine covering all four entry states (`new`, `existing`, `hackathon`, `promote`; see §Mode × Phase Matrix). Detection (§Pre-flight) computes a correct default for nearly everything; the command fires at most three `AskUserQuestion` gates (§Phase Gates) — mode confirm, build intent, and a single capability Profile — rather than pausing once per phase.
 
 ## Sections
 

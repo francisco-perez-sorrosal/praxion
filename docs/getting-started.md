@@ -13,12 +13,12 @@ A walkthrough of developing a small application using the Praxion agent pipeline
 2. Verify: `./install.sh --check`
 3. Start a Claude Code session in your project directory
 
-**Two onboarding paths** — pick the one that matches your starting point:
+One command, `onboard-project`, detects your starting point and resolves the right mode — see [Project Onboarding](onboarding.md) for the full contract:
 
-- **Greenfield (empty directory)**: `new_project.sh` + `/new-project` scaffolds a Claude-ready Python starter app, then chains to `/onboard-project` for the remaining surfaces. See [Greenfield Project Onboarding](greenfield-onboarding.md).
-- **Existing project (has code already)**: `/onboard-project` applies Praxion's surfaces — `.gitignore` block, `.ai-state/` skeleton, `.gitattributes` + merge drivers, git hooks (pre-commit + post-merge), `.claude/settings.json` toggles, `CLAUDE.md` blocks. See [Existing-Project Onboarding](existing-project-onboarding.md).
+- **Empty directory**: `onboard-project my-app` scaffolds a Claude-ready Python starter app, then applies the remaining surfaces.
+- **Existing project (has code already)**: `onboard-project` (no positional arg) applies Praxion's surfaces — `.gitignore` block, `.ai-state/` skeleton, `.gitattributes` + merge drivers, git hooks (pre-commit + post-merge), `.claude/settings.json` toggles, `CLAUDE.md` blocks.
 
-Both paths converge on the same end state — Praxion-ready repo with a self-contained `## Agent Pipeline` block in `CLAUDE.md`.
+Both modes converge on the same end state — Praxion-ready repo with a self-contained `## Agent Pipeline` block in `CLAUDE.md`.
 
 ## Parallel Reading: Claude Ecosystem Foundations
 

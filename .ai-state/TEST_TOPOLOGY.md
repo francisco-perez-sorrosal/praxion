@@ -185,10 +185,16 @@ verified against both the trunk set and the Python leaf's superset.
 markdown backticks of `` `.ai-state/` `` / `` `.ai-work/` `` stripped — the backticks are
 table formatting, not part of the component's name.
 
-**No group declares `integration_boundaries`.** The field is planner-owned, optional in the
+**One group declares `integration_boundaries`.** `decision-records` names `knowledge-projection`,
+populated by the `adr-living-view` pipeline: `rules/swe/adr-conventions.md` and
+`skills/software-planning/references/adr-authoring-protocols.md` are `decision-records`
+`file_dependencies` *and* match `knowledge-projection`'s `rules/**/*.md` / `skills/**/*.md`
+globs, and `agents/sentinel.md`'s DL/DH rows are behavioural consumers of `scripts/adr_health.py`.
+A change to the ADR schema therefore has a radius neither group's own selectors cover. Every
+other group omits the field. It is planner-owned, optional in the
 trunk schema ("0 or more entries"), and populates lazily when a real pipeline discovers actual
 cross-group coupling — guessed boundaries would be indistinguishable from measured ones the
-moment they were written. Omission, not `[]`, is how that zero state is written here, for a
+moment they were written. Omission, not `[]`, is how that zero state is written, for a
 mechanical reason worth recording: `scripts/_topology_yaml.py::_flow_sequence` rejects *any*
 empty flow sequence with the message "empty flow sequence is not a valid selector argument".
 That rule is correct for a `pytest-globs`/`pytest-markers` `arg` (the trunk requires 1+ entries
@@ -327,6 +333,8 @@ file_dependencies:
   - "rules/swe/adr-conventions.md"
   - "skills/software-planning/references/adr-authoring-protocols.md"
   - "skills/spec-driven-development/**/*.md"
+integration_boundaries:
+  - knowledge-projection
 parallel_safe: true
 shared_fixture_scope: per-test
 expected_runtime_envelope:

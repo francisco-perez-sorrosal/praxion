@@ -1,7 +1,7 @@
 ---
-id: dec-draft-9faf4a80
+id: dec-353
 title: Partial supersession is an edge property — reciprocal id lists converting the full edge, with a named status×edge enforcer
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-08-31
 summary: 'A decision narrowing some clauses of an earlier one converts the full supersedes/superseded_by edge into reciprocal supersedes_in_part / superseded_in_part_by id lists; the narrowed record keeps its non-terminal status, contradiction shapes are caught by a new adr_health status_edge_conflicts class surfaced as sentinel DH06, and all five existing instances migrate before DL06 loses its carve-out.'

@@ -1,7 +1,7 @@
 ---
-id: dec-draft-39713c4d
+id: dec-349
 title: Dashboard CLAUDE.md acknowledgment lives in the Repository-layout table
-status: proposed
+status: accepted
 category: architectural
 date: 2026-08-31
 summary: Supersedes dec-121, whose three referents (streamlit_app/, the "Working Here" block, .ai-state/ARCHITECTURE.md) all vanished in later refactors; the surviving substance — acknowledge the dashboard operationally, no philosophical CLAUDE.md block — is carried by the Repository-layout table row for dashboard_app/

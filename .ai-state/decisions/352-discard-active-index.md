@@ -1,7 +1,7 @@
 ---
-id: dec-draft-bcb5a45c
+id: dec-352
 title: ACTIVE_INDEX.md is not built — the current-streamline filter already ships at query time
-status: proposed
+status: accepted
 category: implementation
 date: 2026-08-31
 summary: 'A generated accepted+re-affirmation index would remove 5.5% of DECISIONS_INDEX.md while remaining an ungated ~41.6K-token read; query_adrs.py already defaults to the current streamline, so no ACTIVE_INDEX.md and no --index emission mode are built.'

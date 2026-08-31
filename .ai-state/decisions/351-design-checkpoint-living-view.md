@@ -1,7 +1,7 @@
 ---
-id: dec-draft-c5d81484
+id: dec-351
 title: The architecture living view is DESIGN.md plus an authored checkpoint and a derived validator, never a generated digest
-status: proposed
+status: accepted
 category: architectural
 date: 2026-08-31
 summary: '.ai-state/DESIGN.md carries a `Current as of dec-NNN` high-water mark; scripts/check_design_checkpoint.py derives the un-folded architecture-bearing suffix of the decision log; no digest artifact is generated and no LLM synthesis step exists.'

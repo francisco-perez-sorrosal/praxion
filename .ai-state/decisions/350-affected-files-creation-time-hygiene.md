@@ -1,7 +1,7 @@
 ---
-id: dec-draft-03f65506
+id: dec-350
 title: affected_files hygiene enforces at creation time as a non-blocking warning; query-side filtering is rejected
-status: proposed
+status: accepted
 category: implementation
 date: 2026-08-31
 summary: 'Staged ADR files whose affected_files name an absent path emit a non-blocking pre-commit warning; sentinel DH02 remains the continuous backstop; query_adrs.py never filters on path liveness because that would suppress the decisions most needing repair.'

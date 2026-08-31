@@ -1,7 +1,7 @@
 ---
-id: dec-draft-eacf6a4d
+id: dec-354
 title: DESIGN.md decomposition is scoped to §3b; §3a is gate-bound and stays whole
-status: proposed
+status: accepted
 category: implementation
 date: 2026-08-31
 summary: Sub-anchor DESIGN.md §3b (prose-owned, ~19.9K tokens, no mechanical consumer) and leave §3a intact, because four gates bind §3a as a single table.

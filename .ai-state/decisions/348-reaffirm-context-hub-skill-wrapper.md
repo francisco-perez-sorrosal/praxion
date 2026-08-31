@@ -1,5 +1,5 @@
 ---
-id: dec-draft-b169b522
+id: dec-348
 title: Skill wrapper remains the primary context-hub integration — re-affirmed against doc drift
 status: re-affirmation
 category: architectural

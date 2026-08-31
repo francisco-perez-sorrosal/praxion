@@ -16,6 +16,7 @@
 | **Language / Framework** | [e.g., Python 3.13 / FastAPI] |
 | **Architecture pattern** | [e.g., Layered, Hexagonal, Microservices, Monolith] |
 | **Source stage** | [Phase 5 creation / Step N update / Pipeline `<slug>`] |
+| **Current as of** | [dec-NNN — authored high-water mark; asserted YYYY-MM-DD. Advance only after considering every architecture-bearing decision up to this id (folded in or judged not applicable). See "Checkpoint" in skills/software-planning/references/architecture-documentation.md] |
 | **Last verified** | [YYYY-MM-DD by agent or human] |
 
 [One paragraph describing the system's purpose and high-level architectural approach.]

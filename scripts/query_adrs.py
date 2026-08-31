@@ -72,6 +72,7 @@ class AdrRecord:
     date: str
     tags: tuple[str, ...]
     summary: str
+    category: str
     affected_files: tuple[str, ...]
     file: str  # repo-relative, posix separators
 
@@ -210,6 +211,7 @@ def load_adr(path: Path, repo_root: Path, yaml_module) -> AdrRecord | None:
         date=str(data.get("date", "")).strip(),
         tags=tuple(_as_list(data.get("tags"))),
         summary=str(data.get("summary", "")).strip(),
+        category=str(data.get("category", "")).strip(),
         affected_files=tuple(_as_list(data.get("affected_files"))),
         file=path.relative_to(repo_root).as_posix(),
     )

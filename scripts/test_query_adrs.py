@@ -9,6 +9,7 @@ contract to pin).
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -18,7 +19,7 @@ FRONTMATTER = """---
 id: {id}
 title: {title}
 status: {status}
-category: architectural
+category: {category}
 date: "{date}"
 summary: {summary}
 tags: [{tags}]
@@ -37,6 +38,7 @@ def _write_adr(
     adr_id: str,
     title: str = "A decision",
     status: str = "accepted",
+    category: str = "architectural",
     date: str = "2026-01-01",
     summary: str = "a summary",
     tags: list[str] | None = None,
@@ -47,6 +49,7 @@ def _write_adr(
         id=adr_id,
         title=title,
         status=status,
+        category=category,
         date=date,
         summary=summary,
         tags=", ".join(tags or []),
@@ -54,6 +57,25 @@ def _write_adr(
     )
     path = decisions_dir / filename
     path.write_text(body, encoding="utf-8")
+    return path
+
+
+def _write_adr_without_category(decisions_dir: Path, filename: str, *, adr_id: str) -> Path:
+    """An ADR authored before `category` existed -- no `category:` line at all."""
+    decisions_dir.mkdir(parents=True, exist_ok=True)
+    raw = (
+        "---\n"
+        f"id: {adr_id}\n"
+        "title: A decision\n"
+        "status: accepted\n"
+        'date: "2026-01-01"\n'
+        "summary: a summary\n"
+        "tags: [x]\n"
+        "affected_files: []\n"
+        "---\n\n# Body\n"
+    )
+    path = decisions_dir / filename
+    path.write_text(raw, encoding="utf-8")
     return path
 
 
@@ -376,6 +398,119 @@ def test_cli_runs_end_to_end_with_yaml_forced_unavailable(decisions_dir, monkeyp
 
     assert exit_code == 0
     assert "dec-001" in capsys.readouterr().out
+
+
+# -- Category field ----------------------------------------------------------
+
+
+def test_category_loads_under_pyyaml_parser(decisions_dir):
+    yaml_module = query_adrs._try_import_yaml()
+    if yaml_module is None:
+        pytest.skip("PyYAML not installed in this environment")
+    path = _write_adr(decisions_dir, "001-a.md", adr_id="dec-001", category="behavioral")
+
+    record = query_adrs.load_adr(path, decisions_dir.parent.parent, yaml_module=yaml_module)
+
+    assert record is not None
+    assert record.category == "behavioral"
+
+
+def test_category_loads_under_stdlib_fallback_parser(decisions_dir):
+    path = _write_adr(decisions_dir, "001-a.md", adr_id="dec-001", category="implementation")
+
+    record = query_adrs.load_adr(path, decisions_dir.parent.parent, yaml_module=None)
+
+    assert record is not None
+    assert record.category == "implementation"
+
+
+def test_category_missing_yields_defined_sentinel_under_stdlib_fallback(decisions_dir):
+    # A record missing `category` (authored before the field existed) must not
+    # raise -- it yields the same "" sentinel every other optional str field
+    # (summary, date) already uses for an absent key.
+    path = _write_adr_without_category(decisions_dir, "001-a.md", adr_id="dec-001")
+
+    record = query_adrs.load_adr(path, decisions_dir.parent.parent, yaml_module=None)
+
+    assert record is not None
+    assert record.category == ""
+
+
+def test_category_missing_yields_defined_sentinel_under_pyyaml(decisions_dir):
+    yaml_module = query_adrs._try_import_yaml()
+    if yaml_module is None:
+        pytest.skip("PyYAML not installed in this environment")
+    path = _write_adr_without_category(decisions_dir, "001-a.md", adr_id="dec-001")
+
+    record = query_adrs.load_adr(path, decisions_dir.parent.parent, yaml_module=yaml_module)
+
+    assert record is not None
+    assert record.category == ""
+
+
+def test_cli_text_output_unchanged_by_category_field(decisions_dir, capsys):
+    # No CLI behaviour change from Step 2 -- category is loaded, not displayed.
+    _write_adr(
+        decisions_dir,
+        "001-a.md",
+        adr_id="dec-001",
+        title="A title",
+        tags=["x"],
+        category="behavioral",
+    )
+
+    exit_code = query_adrs.main(["--tags", "x", "--repo-root", str(decisions_dir.parent.parent)])
+
+    assert exit_code == 0
+    assert "category" not in capsys.readouterr().out.lower()
+
+
+def test_cli_tsv_output_unchanged_by_category_field(decisions_dir, capsys):
+    _write_adr(
+        decisions_dir,
+        "001-a.md",
+        adr_id="dec-001",
+        title="A title",
+        tags=["x"],
+        category="behavioral",
+    )
+
+    exit_code = query_adrs.main(
+        ["--tags", "x", "--format", "tsv", "--repo-root", str(decisions_dir.parent.parent)]
+    )
+
+    assert exit_code == 0
+    out = capsys.readouterr().out.strip()
+    assert out == "dec-001\taccepted\tA title\t.ai-state/decisions/001-a.md"
+
+
+# -- Sibling-script importability --------------------------------------------
+
+
+def test_loader_symbols_importable_by_sibling_script_without_side_effects(tmp_path: Path):
+    """`load_adr`, `discover_adr_files`, `resolve_repo_root` must be usable
+    from another script via a plain `import query_adrs` -- no filesystem
+    access, no stdout/stderr output, at import time.
+    """
+    scripts_dir = str(Path(__file__).resolve().parent)
+    probe = tmp_path / "sibling_probe.py"
+    probe.write_text(
+        "import sys\n"
+        f"sys.path.insert(0, {scripts_dir!r})\n"
+        "import query_adrs\n"
+        "assert callable(query_adrs.load_adr)\n"
+        "assert callable(query_adrs.discover_adr_files)\n"
+        "assert callable(query_adrs.resolve_repo_root)\n"
+        "print('OK')\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, str(probe)], capture_output=True, text=True, check=False
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "OK"
 
 
 # -- Help / usage -----------------------------------------------------------

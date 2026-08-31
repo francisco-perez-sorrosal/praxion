@@ -18,9 +18,19 @@ import re
 from pathlib import Path
 
 SKILL_FILE = Path(__file__).parents[2] / "skills" / "onboard-project" / "SKILL.md"
+PHASES_FILES = (
+    Path(__file__).parents[2] / "skills" / "onboard-project" / "references" / "phases-core.md",
+    Path(__file__).parents[2] / "skills" / "onboard-project" / "references" / "phases-optional.md",
+)
 
 # The three surviving gates, per INTERFACE_DESIGN.md §3.3.
 _GATE_NAMES = ("mode confirm", "build intent", "profile")
+
+# Interaction machinery that belongs only to the driver (SKILL.md) and
+# detection.md -- a phase body that fires its own AskUserQuestion, checks a
+# no-more-gates flag, or offers "Run all rest" contradicts the 3-gate policy
+# even when SKILL.md itself is correct (the two-textual-sites anti-pattern).
+_INTERACTION_MACHINERY = ("AskUserQuestion", "no-more-gates", "Run all rest")
 
 
 def _skill_body() -> str:
@@ -110,6 +120,28 @@ def test_g2_build_intent_fires_only_in_new_mode() -> None:
     assert re.search(r"brief|--yes", g2, re.IGNORECASE), (
         "G2 (Build intent) must document its bypass via --brief or --yes"
     )
+
+
+def test_phase_bodies_carry_no_interaction_machinery_of_their_own() -> None:
+    """Regression guard: gate consolidation must not stop at the driver.
+
+    `SKILL.md` can correctly declare a 3-gate policy while the phase bodies
+    in phases-core.md/phases-optional.md still fire their own
+    `AskUserQuestion`, check a `no-more-gates` flag, or offer a `Run all
+    rest` escape hatch -- contradicting the driver from underneath it (two
+    textual sites disagreeing about who owns interaction). The driver +
+    detection.md are the only interaction sites; a phase body declares only
+    its selection binding (a capability row or a mode/flag) and keeps its
+    write-set semantics.
+    """
+    for phases_file in PHASES_FILES:
+        body = phases_file.read_text(encoding="utf-8")
+        for marker in _INTERACTION_MACHINERY:
+            assert marker not in body, (
+                f"{phases_file.name} must not contain {marker!r} -- phase bodies "
+                "declare a selection binding only; all interaction is owned by "
+                "SKILL.md's 3-gate policy (and detection.md's guards)"
+            )
 
 
 def test_g3_profile_fires_once_before_any_write() -> None:

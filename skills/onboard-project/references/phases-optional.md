@@ -15,15 +15,9 @@ When skipped via predicate, emit: `Phase 8: skipped (architecture docs already e
 
 **Why this phase exists.** Praxion's `sentinel` coherence audits and future feature pipelines (`systems-architect` updates these docs incrementally) both benefit from an architectural baseline. Without it, the existing-project onboarding is half-complete from the agent ecosystem's perspective — every future agent runs context-poor on the codebase shape. Greenfield (`new` mode) gets this for free via the seed pipeline; existing-project needs the same treatment, which is what this phase delivers.
 
-**Gate 8 — three-option AskUserQuestion.** Use `AskUserQuestion` with `header: "Next?"`, `multiSelect: false`, the headline from the gate map, and these three options:
+**Selection.** The `arch` capability row (Profile G3, `SKILL.md` §Capability IDs — pre-checked on unless `.ai-state/DESIGN.md` or `docs/architecture.md` already exists). No question fires here; this phase reads the resolved capability set. When `arch` is selected, delegate to `systems-architect` in baseline-audit mode (~5–15 minutes for a medium project under 500 source files, longer for large repos) and produce real, code-verified content for both architecture docs. When `arch` is not selected, skip Phase 8 entirely — future Standard-tier feature pipelines will create the docs when `systems-architect` runs for the first time; acceptable for lean onboarding when `/sentinel` isn't run immediately afterward.
 
-| Option label | Description |
-|--------------|-------------|
-| `Run baseline now (recommended)` | Default. Delegate to `systems-architect` in baseline-audit mode. ~5–15 minutes for a medium project (under 500 source files); longer for large repos. Produces real, code-verified content — both architecture docs |
-| `Skip — first feature pipeline will produce these` | Skip Phase 8 entirely. Future Standard-tier feature pipelines will create the docs when `systems-architect` runs for the first time. Acceptable if you want lean onboarding and are not running `/sentinel` immediately afterward |
-| `Run all rest` | Skip remaining gates, default the architecture-baseline choice to `Run baseline now`, and run autonomously through Phase 9. Honors users who have onboarded a project before and trust the recommended defaults |
-
-**Action when "Run baseline now" is chosen.**
+**Action when `arch` is selected.**
 
 Delegate to `systems-architect` via the `Task` tool. The delegation prompt MUST include all of these directives:
 
@@ -53,17 +47,9 @@ The architect operates in a fresh context window (`Task` tool spawn) and reports
 
 Note: AaC enforcement via Block D requires the `praxion` plugin to be installed. If the plugin is absent, the golden-rule hook block silently exits 0 — same behavior as Phase 4's id-citation check.
 
-**Gate 8b — three-option AskUserQuestion.** Use `AskUserQuestion` with `header: "Next?"`, `multiSelect: false`, the Gate 8b headline from the gate map, and these three options:
+**Selection.** The `aac` capability row (Profile G3, `SKILL.md` §Capability IDs — pre-checked off; matches the existing-project principle "extend existing patterns; do not impose"). No question fires here; this phase reads the resolved capability set. When `aac` is not selected: no AaC scaffolding installed, Phase 9 verification handoff runs normally, re-run `/onboard-project --with aac` later when ready — all sub-steps are idempotent. When `aac` is selected: run all five sub-steps (8b.1–8b.5); each is independently idempotent, already-installed surfaces are silently skipped.
 
-| Option label | Description |
-|---|---|
-| `Skip AaC (recommended for existing projects)` | **Default.** No AaC scaffolding installed. Phase 9 verification handoff runs normally. Re-run `/onboard-project` later when ready — all sub-steps are idempotent. |
-| `Install AaC tier` | Run all five sub-steps (8b.1–8b.5). Each is independently idempotent; already-installed surfaces are silently skipped. |
-| `Run all rest` | Skip remaining gates; default the AaC choice to `Skip AaC` (matches the existing-project principle "extend existing patterns; do not impose"). |
-
-When the `no-more-gates` flag is set (user previously picked `Run all rest`), default to `Skip AaC` without prompting.
-
-**Action when "Install AaC tier" is chosen.** Run sub-steps 8b.1 through 8b.5 in order. Each sub-step prints one line on completion or skip.
+**Action when `aac` is selected.** Run sub-steps 8b.1 through 8b.5 in order. Each sub-step prints one line on completion or skip.
 
 ### Sub-step 8b.1 — Fence seed
 
@@ -175,17 +161,9 @@ Phase 9 verification handoff lists every staged file across all phases — Phase
 
 When none of these signals is detected, skip Phase 8c entirely and emit: `Phase 8c: skipped (no ML training signals detected — train.py, torch/jax/tensorflow dependency, or program.md)`.
 
-**Gate 8c — three-option AskUserQuestion.** Use `AskUserQuestion` with `header: "Next?"`, `multiSelect: false`, the Gate 8c headline from the gate map, and these three options:
+**Selection.** The `ml` capability row (Profile G3, `SKILL.md` §Capability IDs — pre-checked on iff ML signals were detected in §Pre-flight, off otherwise). No question fires here; this phase reads the resolved capability set. When `ml` is selected: run all five sub-steps (8c.1–8c.5); each is independently idempotent, already-present scaffolding is silently skipped. When `ml` is not selected: skip Phase 8c entirely — re-run `/onboard-project --with ml` later when ready, all sub-steps are idempotent.
 
-| Option label | Description |
-|---|---|
-| `Run ML scaffold` | **Default when ML signals detected.** Run all five sub-steps (8c.1–8c.5). Each is independently idempotent; already-present scaffolding is silently skipped. |
-| `Skip ML scaffold` | **Default when no ML signals detected.** Skip Phase 8c entirely. Re-run `/onboard-project` later when ready — all sub-steps are idempotent. |
-| `Run all rest` | Skip remaining gates; default the ML scaffold choice to `Run ML scaffold` when signals detected, `Skip ML scaffold` otherwise; run autonomously through Phase 9. |
-
-When the `no-more-gates` flag is set (user previously picked `Run all rest`), default to `Run ML scaffold` if signals were detected in §Pre-flight, `Skip ML scaffold` otherwise.
-
-**Action when "Run ML scaffold" is chosen.** Run sub-steps 8c.1 through 8c.5 in order. Each sub-step prints one line on completion or skip.
+**Action when `ml` is selected.** Run sub-steps 8c.1 through 8c.5 in order. Each sub-step prints one line on completion or skip.
 
 ### Sub-step 8c.1 — Experiment tracking directory
 
@@ -328,21 +306,13 @@ ML scaffold summary:
 
 Phase 9 verification handoff lists every staged file across all phases — Phase 8c's surfaces are included in that enumeration.
 
-## §Phase 8d — Obsidian Integration (opt-in, default-yes)
+## §Phase 8d — Obsidian Integration (opt-in, detection-gated default)
 
 **Why this phase exists.** Projects that use Obsidian as a vault inside the repository benefit from four surfaces: a `.gitignore` block that keeps workspace state files out of commits, the `obsidian@obsidian-skills` marketplace plugin (installed at user scope via `./install.sh code`) so agents can navigate the vault, a link-safety config in `.obsidian/app.json` that pins Markdown-form links and disables auto link-rewrite so vault tooling cannot corrupt project-artifact links, and a `permissions.deny` block in `.claude/settings.json` that mechanically blocks the dangerous `obsidian` CLI subcommands. Without these, an agent can inadvertently commit Obsidian workspace noise, miss vault-navigation tools, rewrite project links into wikilink form, or be denied permissions silently without knowing why. Phase 8d verifies all four idempotently.
 
-**Gate 8d — three-option AskUserQuestion.** Use `AskUserQuestion` with `header: "Next?"`, `multiSelect: false`, the Gate 8d headline from the gate map, and these three options:
+**Selection.** The `obsidian` capability row (Profile G3, `SKILL.md` §Capability IDs — pre-checked on only when both the `claude` CLI and the `obsidian@obsidian-skills` marketplace plugin are detected present; off otherwise). No question fires here; this phase reads the resolved capability set. When `obsidian` is selected: run all sub-steps (8d.1–8d.6); each is independently idempotent, already-installed surfaces are silently skipped. When `obsidian` is not selected: skip Phase 8d entirely — re-run `/onboard-project --with obsidian` later when ready, all sub-steps are idempotent.
 
-| Option label | Description |
-|---|---|
-| `Install Obsidian integration (recommended)` | **Default.** Run all sub-steps (8d.1–8d.6). Each is independently idempotent; already-installed surfaces are silently skipped. |
-| `Skip` | Skip Phase 8d entirely. Re-run `/onboard-project` later when ready — all sub-steps are idempotent. |
-| `Run all rest` | Skip remaining gates; default the Obsidian choice to `Install Obsidian integration`; run autonomously through Phase 9. |
-
-When the `no-more-gates` flag is set (user previously picked `Run all rest`), default to `Install Obsidian integration` without prompting.
-
-**Action when "Install Obsidian integration" is chosen.** Run sub-steps 8d.1 through 8d.6 in order. Each sub-step prints one line on completion or skip.
+**Action when `obsidian` is selected.** Run sub-steps 8d.1 through 8d.6 in order. Each sub-step prints one line on completion or skip.
 
 ### Sub-step 8d.1 — `.gitignore` Obsidian block
 
@@ -507,15 +477,9 @@ full allowlist rationale.
 
 **Asset resolution.** Canonical assets live in the praxion plugin install (the `installPath` captured in §Pre-flight): `skills/python-development/assets/{ruff-baseline.toml, mypy-baseline.toml}`, `skills/typescript-development/assets/{biome.json, eslint.config.mjs, prettierrc.json, tsconfig.json}`, `claude/project-baseline/{editorconfig, pre-commit-config.yaml, CONTRIBUTING.md.tmpl, dependabot.yml.tmpl}`, `claude/project-baseline/ci-autofix/{ci-autofix.yml.tmpl, autofix-policy.yml.tmpl, cross-model-review.yml.tmpl}`, and `claude/project-baseline/labels/{labels.yml.tmpl, labels-reconcile.yml.tmpl}`. Read the asset from there; write the materialized file into the project. Edit the asset (never the per-project copy) to evolve the baseline.
 
-**Gate 8e — three-option AskUserQuestion.** Use `AskUserQuestion` with `header: "Next?"`, `multiSelect: false`, the Gate 8e headline from the gate map, and these three options:
+**Selection.** Two independent capability rows (Profile G3, `SKILL.md` §Capability IDs) govern this phase's sub-steps — no question fires here, this phase reads the resolved capability set: `quality` (sub-steps 8e.1–8e.7 — pre-checked on if any stack was detected in §Pre-flight, off otherwise) and `ci` (sub-steps 8e.8–8e.9 — pre-checked **off** by default, on only under `--profile all`, since it is the only capability with out-of-band prerequisites — two `gh secret set` calls). Each sub-step is independently idempotent and skips when its config already exists; none overwrites an existing config — the baseline is additive only.
 
-| Option | Effect |
-|--------|--------|
-| `Install code-quality baseline` | **Default.** Run sub-steps 8e.1–8e.9; each is independently idempotent and skips when its config already exists. |
-| `Skip` | Skip Phase 8e entirely. Re-run `/onboard-project` later — all sub-steps are idempotent. |
-| `Run all rest` | Skip remaining gates, default this choice to `Install code-quality baseline`, run autonomously through Phase 9. |
-
-**Action when "Install code-quality baseline" is chosen.** Run sub-steps 8e.1 through 8e.9 in order. Each prints one line on completion or skip. None overwrites an existing config — the baseline is additive only.
+**Action.** When `quality` is selected, run sub-steps 8e.1 through 8e.7 in order. When `ci` is selected, run sub-steps 8e.8 through 8e.9 in order. Either, both, or neither may run per the Profile's resolved selection. Each sub-step prints one line on completion or skip.
 
 ### Sub-step 8e.1 — Universal `.editorconfig`
 

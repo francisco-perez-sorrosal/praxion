@@ -10,17 +10,17 @@ Always-on phase bodies for `skills/onboard-project/SKILL.md` — phases 0.5, 1, 
 
 **Predicate.** `test -e CLAUDE.md` is true → skip the entire phase (Phase 6 will append to the existing file).
 
-**Gate 0.5.** When `CLAUDE.md` is absent AND the `no-more-gates` flag is not set, fire `AskUserQuestion` with `header: "CLAUDE.md"`, `multiSelect: false`, and the Gate 0.5 headline from the gate map (two options: `Generate from codebase` (default) / `Minimal stub`). When `no-more-gates` is set, apply the default (`Generate from codebase`).
+**Selection.** The `--claude-md generate|stub|skip` flag (default `generate`) picks the action below; no question fires here — the driver's gate policy (`SKILL.md` §Phase Gates) owns all interaction, this phase only reads the resolved flag.
 
 **Action (only when `CLAUDE.md` is absent).**
 
-1. **Prefer `/init`** (when the user chose `Generate from codebase`). Invoke the official Claude `/init` command — it analyzes the codebase and writes a `CLAUDE.md` describing what actually exists. This mirrors the seed pipeline's greenfield step 9 (`references/seed-pipeline.md`).
+1. **`--claude-md generate` (default) — prefer `/init`.** Invoke the official Claude `/init` command — it analyzes the codebase and writes a `CLAUDE.md` describing what actually exists. This mirrors the seed pipeline's greenfield step 9 (`references/seed-pipeline.md`).
 
 2. **Verify, then fall back — never leave the project without a `CLAUDE.md`.** After the `/init` attempt, check `test -e CLAUDE.md`:
    - If `/init` produced a `CLAUDE.md`, continue to §Flow.
    - **If `CLAUDE.md` is still absent** (`/init` could not be invoked in this execution context — it is a built-in command and may not be programmatically callable mid-command), generate it **inline**: analyze the codebase — project purpose (README / package metadata), primary stack (from §Pre-flight stack detection), entry points, and the build/test/lint/type-check commands (`pyproject.toml` / `package.json` / Makefile / the project's test gate) — and Write a concise `CLAUDE.md` at the project root with a one-paragraph description, a short structure note, and a `## Commands` section listing the *verified* commands. Keep it factual; do not invent. Leave a `# TODO:` for anything undeterminable. (This init-equivalent content is later enriched by Phase 6's §Project Essentials Block.)
 
-3. **Minimal stub** (when the user chose `Minimal stub`). Write only:
+3. **`--claude-md stub` — minimal stub.** Write only:
    ```markdown
    # <project name>
 
@@ -29,9 +29,11 @@ Always-on phase bodies for `skills/onboard-project/SKILL.md` — phases 0.5, 1, 
    ```
    Derive `<project name>` from the directory name or package metadata. The Praxion blocks (Phase 6) still append cleanly onto the stub.
 
+4. **`--claude-md skip` — leave `CLAUDE.md` absent.** Skip the phase's write entirely. The block-append phases (5b, 6, 8d) then have no target and skip in turn (per their own predicates) — printed in the §Phase 9 summary as a consequence, not a silent loss.
+
 **Idempotency.** Guarded by `test -e CLAUDE.md` — a re-run after `CLAUDE.md` exists is a complete no-op. Phase 6's per-heading `grep` predicates independently prevent block duplication.
 
-**§Phase 9 summary line.** `Phase 0.5: CLAUDE.md bootstrapped (/init | inline-generated | minimal stub)` or `skipped (CLAUDE.md already present)`.
+**§Phase 9 summary line.** `Phase 0.5: CLAUDE.md bootstrapped (/init | inline-generated | minimal stub)` or `skipped (CLAUDE.md already present)` or `skipped (--claude-md skip — block-append phases will skip in turn)`.
 
 ## §Phase 1 — `.gitignore` hygiene
 
@@ -345,19 +347,14 @@ This phase owns `.claude/settings.json`. It has two independently-predicated sub
 
 **Predicate.** Read `.claude/settings.json` if it exists. If `PRAXION_DISABLE_OBSERVABILITY` is already set (any value), skip **this sub-step** (not the phase — 5b still runs) but report the current value in Phase 9. If the file exists but the key is missing, merge it in using the user's choice below; never overwrite a key the user has already set.
 
-**Gate 5 — toggle picker.** Use `AskUserQuestion` with `multiSelect: true`, header `"Praxion features"`, question `"Should the observability hook be ENABLED in this project? It ships Claude Code events to a localhost Phoenix instance — useful for trace inspection but requires Phoenix to be running. Leave unchecked to disable."`, and this option:
+**Selection.** The `observability` capability row (Profile G3, `SKILL.md` §Capability IDs — default on, always offered as a checkbox, never a standalone question). Ship Claude Code events to a localhost Phoenix instance via `send_event.py` (trace inspection) **and** to the local `.ai-state/observations.jsonl` WAL, which lets `/resume-pipeline` localize a partially-completed step when recovering a context-truncated agent — that's what the checkbox buys the user. Truncation recovery works without it (Tier-1 git+tests alone); enabling it adds `partial@<file>` localization precision. Phoenix is needed only for trace *visualization* — events drop silently to Phoenix if it is not running, but the WAL (and recovery) are unaffected.
 
-| Option label | Description |
-|--------------|-------------|
-| `Observability events` | Ship Claude Code events to a localhost Phoenix instance via `send_event.py` (trace inspection) **and** to the local `.ai-state/observations.jsonl` WAL, which lets `/resume-pipeline` localize a partially-completed step when recovering a context-truncated agent. Truncation recovery works without this (Tier-1 git+tests alone); enabling it adds `partial@<file>` localization precision. Phoenix is needed only for trace *visualization* — events drop silently to Phoenix if it is not running, but the WAL (and recovery) are unaffected. |
+**Mapping** the Profile selection to the env var (Praxion uses negative `DISABLE` semantics — `"1"` disables, `"0"` enables):
 
-**Mapping** unchecked option to env var (Praxion uses negative `DISABLE` semantics — `"1"` disables, `"0"` enables):
-
-| Unchecked option | Env var written | Value |
-|------------------|-----------------|-------|
-| Observability | `PRAXION_DISABLE_OBSERVABILITY` | `"1"` |
-
-Checked option writes `PRAXION_DISABLE_OBSERVABILITY` to `"0"`.
+| `observability` in Profile | Env var written | Value |
+|-----------------------------|-----------------|-------|
+| Unchecked (or `--without observability`) | `PRAXION_DISABLE_OBSERVABILITY` | `"1"` |
+| Checked (default) | `PRAXION_DISABLE_OBSERVABILITY` | `"0"` |
 
 **Action.** Write `.claude/settings.json` (creating `.claude/` if needed):
 
@@ -433,7 +430,7 @@ See [`docs/rules-taxonomy.md`](../docs/rules-taxonomy.md) for the complete refer
 
 **Predicate.** `PRAXION_HACKATHON_MODE=1` present under `.env` in `.claude/settings.json` — skip **Gate 5b and the six-artifact write-set below** if already set (fully idempotent re-run). This predicate does **not** gate Sub-step 5b.t, which declares its own independent predicate (stamp `mode == "hackathon"` ∧ resolved mode `promote`) — the teardown must remain reachable precisely when hackathon mode is installed.
 
-**Gate 5b.** When the `no-more-gates` flag is not set, fire `AskUserQuestion` with `header: "Hackathon mode"`, `multiSelect: false`, and the headline from the gate map. When `--hackathon` was passed to the command, auto-default to `Enable hackathon mode` without prompting. When `no-more-gates` is set, apply the default (`Skip — keep full ceremony`). When the user picks `Enable hackathon mode`, run the six-artifact write-set below. When the user picks `Skip — keep full ceremony`, skip Phase 5b entirely.
+**Selection.** Mode, not a capability: `--hackathon` / `--mode hackathon` selects it explicitly; otherwise G1 mode-confirm (`SKILL.md` §Phase Gates) fires only when hackathon state is ambiguous and offers it as an option. No question fires here — this phase reads the resolved mode. Runs the six-artifact write-set below when the resolved mode is `hackathon`; skipped (Phase 5b entirely) for every other mode.
 
 **Six-artifact write-set.** When enabled, write these six artifacts idempotently (each guarded by its own predicate):
 

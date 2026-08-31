@@ -404,6 +404,8 @@ jq '.permissions.allow = ((.permissions.allow // []) + ["Write(.ai-work/**)"] | 
 
 Print: `5b: permissions.allow baseline written to .claude/settings.json`.
 
+**Canonical value, hoisted for `new` mode (td-130, dec-draft-57d9129b).** This sub-step's baseline value (`["Write(.ai-work/**)"]`) is canonical here — every other site that seeds or checks it points at this section rather than restating it. In `new` mode this sub-step also runs before Phase 0s (SKILL.md's §Mode × Phase Matrix `5b′` row), so the seed pipeline's subagents are covered from their first spawn, which the bash layer cannot reach directly; `scripts/onboard-project::scaffold_project` seeds the same value at scaffold time so the window between scaffold and Phase 5b's own run is never uncovered. When Phase 5 runs afterward, the predicate above finds nothing missing and skips as a no-op.
+
 ### Optional: Rule Blacklist Configuration
 
 Praxion rules are categorized into core (always-loaded, non-disableable) and disableable (every other rule — hook-deliver and symlinked alike). The per-project `.claude/praxion-rules.yaml` disable list reaches both delivery channels uniformly: hook-deliver rules are filtered from `additionalContext` at SessionStart; symlinked rules get `claudeMdExcludes` entries reconciled into `.claude/settings.json`. To customize which rules your project inherits, create an optional `.claude/praxion-rules.yaml` file:

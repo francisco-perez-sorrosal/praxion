@@ -213,7 +213,8 @@ err_greenfield_shape() {
     local target="$1"
     cat >&2 <<EOF
 Refusing to onboard: ${target} looks like a freshly-scaffolded greenfield
-project (.git/ + AI-assistants .gitignore + empty .claude/ + no source tree).
+project (.git/ + AI-assistants .gitignore + .claude/ carrying only the seeded
+permissions baseline + no source tree).
 Run the new-project entry instead — it scaffolds the codebase via the agent
 pipeline AND applies existing-project onboarding at the end:
   onboard-project <project-name> <target-dir>
@@ -342,7 +343,13 @@ has_source_markers() {
 guard_greenfield_shape() {
     local target="$1"
     [ -f "$target/.gitignore" ] && grep -qF '# AI assistants' "$target/.gitignore" || return 0
-    [ -d "$target/.claude" ] && [ -z "$(ls -A "$target/.claude" 2>/dev/null)" ] || return 0
+    if [ -d "$target/.claude" ]; then
+        local _claude_entries
+        _claude_entries="$(ls -A "$target/.claude" 2>/dev/null | grep -v '^settings\.json$' || true)"
+        [ -z "$_claude_entries" ] || return 0
+    else
+        return 0
+    fi
     has_source_markers "$target" && return 0
 
     err_greenfield_shape "$target"
@@ -556,6 +563,21 @@ scaffold_project() {
     cd "$path"
     git init -q
     mkdir -p .claude
+    # Permissions baseline, seeded so the Phase 0s seed pipeline's subagents are
+    # covered before they spawn (td-130, dec-draft-57d9129b). Canonical value:
+    # skills/onboard-project/references/phases-core.md § Phase 5, sub-step 5b.
+    # Kept in agreement by tests/onboard_project_test.sh::t13_scaffold_seeds_permissions_baseline.
+    if [ ! -e .claude/settings.json ]; then
+        cat > .claude/settings.json <<'EOF'
+{
+  "permissions": {
+    "allow": [
+      "Write(.ai-work/**)"
+    ]
+  }
+}
+EOF
+    fi
     cat > .gitignore <<'EOF'
 # AI assistants
 .ai-work/

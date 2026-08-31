@@ -26,6 +26,16 @@
 # T12 (REQUIRED canary): the bash script's detected-state name set equals
 #      references/detection.md's enumerated 6-state set -- SYSTEMS_PLAN.md
 #      §Detection Algorithm requires these to never drift apart.
+# T13 (REQUIRED canary, td-130/dec-draft-57d9129b): the scaffolded
+#      .claude/settings.json carries the permissions.allow baseline, and its
+#      value stays in agreement with phases-core.md § Phase 5's canonical
+#      copy -- TD130_MECHANISM_SPEC.md Edit 6's naming ("t12_...") predates
+#      T12 above already owning that ordinal; renumbered here, content
+#      unchanged.
+# T14: the greenfield guard still fires (exit 7) on a re-invocation against a
+#      seeded scaffold (settings.json present, nothing else) -- the
+#      regression edit 2 of TD130_MECHANISM_SPEC.md exists to prevent, plus
+#      the pre-seed (empty .claude/) backward-tolerance case.
 #
 # Run from repo root:
 #   bash tests/onboard_project_test.sh
@@ -37,6 +47,7 @@ set -u
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SCRIPT_UNDER_TEST="$REPO_ROOT/scripts/onboard-project"
 DETECTION_DOC="$REPO_ROOT/skills/onboard-project/references/detection.md"
+PHASES_CORE_DOC="$REPO_ROOT/skills/onboard-project/references/phases-core.md"
 
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -210,6 +221,7 @@ t6_empty_target_detects_new_mode_with_4line_trailer() {
     fi
     [ -d "$project_dir/.git" ] || { fail "T6: missing .git/ in $project_dir"; return; }
     [ -d "$project_dir/.claude" ] || { fail "T6: missing .claude/ in $project_dir"; return; }
+    [ -f "$project_dir/.claude/settings.json" ] || { fail "T6: missing .claude/settings.json in $project_dir"; return; }
     [ -f "$stub_log" ] || { fail "T6: claude stub never invoked (no $stub_log)"; return; }
     if ! grep -q "cwd=$project_dir" "$stub_log"; then
         fail "T6: claude stub not invoked from inside $project_dir; log=$(cat "$stub_log")"; return
@@ -375,6 +387,83 @@ t12_bash_state_names_agree_with_detection_md() {
     fi
 }
 
+# REQUIRED canary (td-130 / dec-draft-57d9129b): the bash-scaffolded
+# .claude/settings.json's permissions.allow baseline must agree with the
+# canonical value in phases-core.md § Phase 5, sub-step 5b -- a change to
+# either site without the other must fail loudly.
+t13_scaffold_seeds_permissions_baseline() {
+    local s project_dir
+
+    if [ ! -f "$PHASES_CORE_DOC" ]; then
+        fail "T13: $PHASES_CORE_DOC not found -- cannot verify permissions-baseline agreement"
+        return
+    fi
+
+    s="$(make_sandbox)"
+    run_script "$s" test-app "$s/target"
+    project_dir="$s/target/test-app"
+
+    if [ ! -f "$project_dir/.claude/settings.json" ]; then
+        fail "T13: $project_dir/.claude/settings.json was not scaffolded"
+        return
+    fi
+
+    if command -v jq >/dev/null 2>&1; then
+        if ! jq -e '.permissions.allow' "$project_dir/.claude/settings.json" >/dev/null 2>&1; then
+            fail "T13: $project_dir/.claude/settings.json does not parse as JSON with .permissions.allow"
+            return
+        fi
+        if ! jq -e '.permissions.allow | index("Write(.ai-work/**)")' "$project_dir/.claude/settings.json" >/dev/null 2>&1; then
+            fail "T13: .permissions.allow is missing the required entry Write(.ai-work/**)"
+            return
+        fi
+    fi
+
+    # Grep-based agreement half runs unconditionally (no jq dependency).
+    if ! grep -qF 'Write(.ai-work/**)' "$PHASES_CORE_DOC"; then
+        fail "T13: phases-core.md's § Phase 5 no longer states the canonical Write(.ai-work/**) value"
+        return
+    fi
+    if ! grep -qF 'Write(.ai-work/**)' "$project_dir/.claude/settings.json"; then
+        fail "T13: scaffolded settings.json does not carry the canonical Write(.ai-work/**) value"
+        return
+    fi
+
+    pass "T13: scaffold seeds the permissions.allow baseline in agreement with phases-core.md"
+}
+
+# REQUIRED canary (td-130 / dec-draft-57d9129b): the greenfield guard must
+# still fire on a re-invocation against a seeded scaffold -- this is the
+# regression edit 2 of TD130_MECHANISM_SPEC.md exists to prevent.
+t14_greenfield_guard_fires_on_seeded_scaffold() {
+    local s project_dir
+
+    s="$(make_sandbox)"
+    run_script "$s" test-app "$s/target"
+    project_dir="$s/target/test-app"
+
+    if [ ! -d "$project_dir/.claude" ]; then
+        fail "T14: setup: expected $project_dir/.claude to exist after scaffold"
+        return
+    fi
+
+    run_script_in "$s" "$project_dir"
+    if [ "$LAST_EXIT" -ne 7 ]; then
+        fail "T14: seeded-scaffold re-invocation expected exit=7 (EXIT_REFUSED); got exit=$LAST_EXIT, stderr=$(cat "$LAST_ERR")"
+        return
+    fi
+    pass "T14: greenfield guard fires (exit 7) on a re-invocation against a seeded scaffold"
+
+    # Backward-tolerance case: a pre-seed scaffold (empty .claude/) also matches.
+    rm -f "$project_dir/.claude/settings.json"
+    run_script_in "$s" "$project_dir"
+    if [ "$LAST_EXIT" -ne 7 ]; then
+        fail "T14: pre-seed (empty .claude/) re-invocation expected exit=7 (EXIT_REFUSED); got exit=$LAST_EXIT, stderr=$(cat "$LAST_ERR")"
+        return
+    fi
+    pass "T14: greenfield guard remains backward-tolerant of a pre-seed empty .claude/"
+}
+
 main() {
     if [ ! -f "$SCRIPT_UNDER_TEST" ]; then
         printf 'SETUP FAIL: script under test not found at %s\n' "$SCRIPT_UNDER_TEST" >&2
@@ -393,13 +482,15 @@ main() {
     t10_stamp_present_hackathon_mode_detects_hackathon_managed
     t11_source_no_git_detects_code_no_git
     t12_bash_state_names_agree_with_detection_md
+    t13_scaffold_seeds_permissions_baseline
+    t14_greenfield_guard_fires_on_seeded_scaffold
 
     printf '\n--- summary: %d passed, %d failed ---\n' "$PASS_COUNT" "$FAIL_COUNT"
     if [ "$FAIL_COUNT" -eq 0 ]; then
-        printf '=== T1-T12 passed ===\n'
+        printf '=== T1-T14 passed ===\n'
         exit 0
     fi
-    printf '=== %d of 12 failed ===\n' "$FAIL_COUNT" >&2
+    printf '=== %d of 14 failed ===\n' "$FAIL_COUNT" >&2
     exit 1
 }
 

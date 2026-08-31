@@ -139,6 +139,7 @@ Four modes over one phase engine: `new` (empty dir, seeded via [references/seed-
 | Phase | `new` | `existing` | `hackathon` |
 |---|---|---|---|
 | 0 (pre-flight) | run | run | run |
+| 5b′ (permissions baseline, hoisted)² | run | skip | skip |
 | 0s (seed pipeline) | run | skip | skip |
 | 0.5 (`CLAUDE.md` bootstrap) | run | run | run |
 | 1–4 (`core`) | run | run | run |
@@ -155,6 +156,8 @@ Four modes over one phase engine: `new` (empty dir, seeded via [references/seed-
 | 9 (`core`) | run | run | run |
 
 ¹ The `0s` seed pipeline's own architect step already writes `.ai-state/DESIGN.md` + `docs/architecture.md`, so `arch`'s default-derivation rule (off when either file exists) makes this skip mechanical, not hardcoded.
+
+² `new` mode runs Phase 5's `permissions.allow` sub-step (5b) before Phase 0s so the seed pipeline's subagents are covered from their first spawn (td-130, dec-draft-57d9129b). It is the same sub-step with the same predicate — Phase 5 later re-runs it as a subset check and finds nothing to do. `5b′` is an ordering marker, not a new phase: it has no body of its own, is absent from §Capability IDs and §Idempotency Predicates, and appears in no other table.
 
 ## §Phase Gates
 

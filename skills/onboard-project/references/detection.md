@@ -36,12 +36,12 @@ Exit without writing.
 
 ## § Guard — greenfield-shape guard
 
-**Predicate.** `.git/` exists, `.gitignore` contains the AI-assistants header, `.claude/` is empty, AND there is no `src/`, `pyproject.toml`, `package.json`, `Cargo.toml`, or `go.mod` (no source code yet).
+**Predicate.** `.git/` exists, `.gitignore` contains the AI-assistants header, `.claude/` contains nothing but the seeded `settings.json` (an empty `.claude/` from a pre-seed scaffold also matches), AND there is no `src/`, `pyproject.toml`, `package.json`, `Cargo.toml`, or `go.mod` (no source code yet).
 
 **Why this guard exists.** Detect whether the user has accidentally invoked existing-project onboarding on a freshly-scaffolded greenfield project that should run the `new` mode instead.
 
 **Action on match.** Abort with:
 
-> `This directory looks like a freshly-scaffolded greenfield project (.git/ + AI-assistants .gitignore + empty .claude/ + no source tree). Run the new-project entry instead — it scaffolds the codebase via the agent pipeline AND applies the existing-project onboarding surfaces at the end. This entry is for projects that already have code.`
+> `This directory looks like a freshly-scaffolded greenfield project (.git/ + AI-assistants .gitignore + .claude/ carrying only the seeded permissions baseline + no source tree). Run the new-project entry instead — it scaffolds the codebase via the agent pipeline AND applies the existing-project onboarding surfaces at the end. This entry is for projects that already have code.`
 
 Exit without writing.

@@ -12,9 +12,9 @@
 # corresponding source change and without an adjacent override comment.
 #
 # Script resolution: ${PLUGIN_ROOT} is derived at hook-run time from
-# ~/.claude/plugins/installed_plugins.json (same pattern as the id-citation
-# block installed in Phase 4). If the plugin is not installed, Block D exits
-# cleanly (skip-gracefully guard below).
+# ~/.claude/plugins/installed_plugins.json via the same jq key loop as the
+# id-citation block installed in Phase 4. If the plugin is not installed,
+# Block D exits cleanly (skip-gracefully guard below).
 # ---------------------------------------------------------------------------
 
 STAGED_AAC="$(git diff --cached --name-only --diff-filter=ACMR \
@@ -22,24 +22,21 @@ STAGED_AAC="$(git diff --cached --name-only --diff-filter=ACMR \
     || true)"
 
 if [ -n "$STAGED_AAC" ]; then
-    # Resolve plugin install path from installed_plugins.json
+    # Resolve plugin install path from installed_plugins.json — the registry is
+    # {"version": N, "plugins": {"<name>@<marketplace>": [{"installPath": ...}]}},
+    # so the lookup must go through .plugins[$k][0].installPath (the flat
+    # top-level walk a previous version of this block used never resolved).
     PLUGIN_ROOT=""
     PLUGINS_JSON="$HOME/.claude/plugins/installed_plugins.json"
-    if [ -f "$PLUGINS_JSON" ]; then
-        PLUGIN_ROOT="$(python3 -c "
-import json, sys
-try:
-    data = json.load(open('$PLUGINS_JSON'))
-    # installed_plugins.json is a dict keyed by plugin name;
-    # value is the install path string or an object with 'path'
-    for _name, entry in data.items():
-        path = entry if isinstance(entry, str) else entry.get('path', '')
-        if path:
-            print(path)
-            break
-except Exception:
-    pass
-" 2>/dev/null || true)"
+    if [ -f "$PLUGINS_JSON" ] && command -v jq >/dev/null 2>&1; then
+        for AAC_KEY in "praxion@bit-agora" "i-am@bit-agora"; do
+            AAC_CANDIDATE="$(jq -r --arg k "$AAC_KEY" \
+                '.plugins[$k][0].installPath // empty' "$PLUGINS_JSON" 2>/dev/null)"
+            if [ -n "$AAC_CANDIDATE" ] && [ -d "$AAC_CANDIDATE" ]; then
+                PLUGIN_ROOT="$AAC_CANDIDATE"
+                break
+            fi
+        done
     fi
 
     # Skip-gracefully guard: if plugin root not found, exit 0 (non-blocking)

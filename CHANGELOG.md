@@ -1,3 +1,18 @@
+## v0.27.0 (2026-09-01)
+
+### Feat
+
+- **self-healing**: Block D repair rides the finalize chain as a fleet backstop
+- **upgrade**: fold labels + AaC surfaces into upgrade_project_pins.sh; fix self-host hook classification
+
+### Fix
+
+- **aac**: Block D never resolved PLUGIN_ROOT — jq key-loop fix + tested reconciler
+
+### Refactor
+
+- **upgrade-project**: thin-wrapper rewrite; honest onboard-rerun claim; companion runbook links
+
 ## v0.26.2 (2026-08-31)
 
 ### Fix

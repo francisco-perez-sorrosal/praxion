@@ -403,7 +403,10 @@ elif [ -z "$cur_driver" ]; then
     else
         info "not registered and no .gitattributes mapping → nothing to do"
     fi
-elif case "$cur_driver" in */praxion/*) true;; *) false;; esac; then
+elif case "$cur_driver" in */plugins/cache/*|*/praxion/*) true;; *) false;; esac; then
+    # */plugins/cache/* covers i-am-era registrations too: the old namespace's
+    # cache path contains no /praxion/ token, and treating it as "non-Praxion"
+    # left every pre-rename project's driver permanently stale.
     note_change; info "stale ($cur_driver) → re-register"
     mutating && git -C "$REPO_ROOT" config merge.observations-jsonl.driver "$LIVE_DRIVER"
 else

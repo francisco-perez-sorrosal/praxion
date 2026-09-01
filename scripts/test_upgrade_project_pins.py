@@ -684,3 +684,23 @@ def test_live_but_old_plugin_cache_symlink_still_repointed(project, tmp_path):
     for h in ("post-merge", "post-commit", "post-checkout"):
         resolved = (repo / ".git" / "hooks" / h).readlink()
         assert resolved == live / "scripts" / "git-finalize-hook.sh"
+
+
+def test_i_am_era_driver_registration_is_repointed(project):
+    """A merge driver registered by the pre-rename i-am plugin lives at a cache
+    path with no /praxion/ token; the shape */plugins/cache/* must classify it
+    as Praxion-managed and re-register -- 'refusing to overwrite' here left
+    every pre-rename project's driver permanently stale."""
+    repo, live = project["repo"], project["live"]
+    _git(
+        repo,
+        "config",
+        "merge.observations-jsonl.driver",
+        "python3 /home/u/.claude/plugins/cache/bit-agora/i-am/0.5.0/scripts/merge_driver_observations.py %O %A %B",
+    )
+
+    r = _run(repo, live)
+
+    assert r.returncode == 0, r.stderr
+    current = _git(repo, "config", "--get", "merge.observations-jsonl.driver")
+    assert str(live) in current

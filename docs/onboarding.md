@@ -219,9 +219,9 @@ Every phase's write is gated by an idempotency predicate — re-running `onboard
 
 Use `onboard-project` again to **add** a capability you skipped (`onboard-project --with aac`) or to promote out of hackathon mode (`--full`).
 
-Use `/upgrade-project` (wrapping `scripts/upgrade_project_pins.sh`) instead when the **plugin version changed** and you need version-pinned surfaces (finalize-hook symlinks, the merge-driver `git config` entry, CI-autofix caller SHAs) re-pointed at the live install — a narrower, gate-free operation than a full re-run.
+Use `/upgrade-project` (wrapping `scripts/upgrade_project_pins.sh`) instead when the **plugin version changed** and you need the pinned surfaces re-pointed at the live install — finalize-hook symlinks, the merge-driver `git config` entry, the hub-SHA workflow callers, the `.github/labels.yml` baseline block, and the instantiated AaC surfaces (`architecture.yml` prompt + pre-commit Block D, including the structural repair of the broken pre-fix Block D resolution). A narrower, gate-free operation than a full re-run — and for the caller SHAs, labels baseline, and AaC surfaces it is the **only** refresh path, since a re-run's file-existence predicates skip them.
 
-Use `/refresh-claude-blocks` when you only need the four refreshable `CLAUDE.md` canonical blocks brought current.
+Use `/refresh-claude-blocks` when you only need the four refreshable `CLAUDE.md` canonical blocks brought current. After a plugin upgrade, the complete runbook is `/upgrade-project` (pins) followed by `/refresh-claude-blocks` (block content).
 
 ## Troubleshooting
 

@@ -127,3 +127,7 @@ commit — this command never commits for you.
   runs the same script in `--apply` mode non-interactively (auto-applying
   `absent`/`stale`, skipping `modified` blocks with a pointer back to this
   command).
+- **Companion step.** This command covers `CLAUDE.md` block content only; the
+  path/SHA/namespace pins a plugin upgrade invalidates (git hooks, merge
+  driver, workflow callers, labels baseline, AaC surfaces) are owned by
+  `/upgrade-project`. After a plugin upgrade, run both.

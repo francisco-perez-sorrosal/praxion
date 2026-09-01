@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-08-31T09:36:58Z'
+generated_at: '2026-09-01T05:01:57Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -427,7 +427,7 @@ surfaces:
   path: docs/onboarding.md
   type: markdown
   title: Project Onboarding
-  last_modified: '2026-08-30'
+  last_modified: '2026-08-31'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -2677,6 +2677,12 @@ surfaces:
   title: "DESIGN.md decomposition is scoped to \xA73b; \xA73a is gate-bound and stays whole"
   last_modified: '2026-08-31'
   renderer: adr_card
+- id: ai-state-decisions-355-upgrade-path-consolidation
+  path: .ai-state/decisions/355-upgrade-path-consolidation.md
+  type: markdown
+  title: Upgrade-path reconciliation consolidates in the script layer; /upgrade-project stays a standalone thin wrapper
+  last_modified: '2026-08-31'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3321,6 +3327,7 @@ groups:
   - ai-state-decisions-352-discard-active-index
   - ai-state-decisions-353-partial-supersession-edge
   - ai-state-decisions-354-design-md-decomposition-scope
+  - ai-state-decisions-355-upgrade-path-consolidation
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

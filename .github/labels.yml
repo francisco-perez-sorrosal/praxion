@@ -1,5 +1,3 @@
-# baseline: Praxion-owned. Refreshed by /upgrade-project. Do not hand-edit — edits are overwritten.
-#           GitHub defaults (bug, duplicate) intentionally omitted — always provisioned by GitHub.
 baseline:
   # --- reporter (from-managed-project reporter set) — scripts/praxion_feedback/render.py::_BASE_ISSUE_LABELS ---
   - { name: auto-filed,           color: "5319e7", description: "Auto-filed via /report-praxion-issue or the ecosystem-defect template" }

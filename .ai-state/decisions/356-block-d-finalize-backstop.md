@@ -1,7 +1,7 @@
 ---
-id: dec-draft-4383a145
+id: dec-356
 title: Broken-Block-D repair rides the finalize hook chain as a self-delivering fleet backstop
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-01
 summary: The finalize chain gains a branch-independent, marker-guarded step that repairs the fail-open Block D fragment in any managed project's pre-commit hook, because the finalize hooks are the only channel that executes current plugin code fleet-wide without operator action; /upgrade-project remains the manual/immediate path.

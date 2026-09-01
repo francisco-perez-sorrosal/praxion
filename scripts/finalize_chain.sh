@@ -6,8 +6,8 @@
 #
 #   - Path resolution (works for both cp-installed and symlink-installed hooks)
 #   - Repo-state predicates (on_main, drafts_present, state_was_touched)
-#   - Composition of the finalize chain (ADR drafts -> dec-NNN, ledger dedup,
-#     reconcile, squash-safety diagnostic)
+#   - Composition of the finalize chain (broken-Block-D hook repair, ADR
+#     drafts -> dec-NNN, ledger dedup, reconcile, squash-safety diagnostic)
 #
 # Public entry points (called from hooks):
 #
@@ -181,6 +181,38 @@ _finalize_chain_run_on_main() {
     fi
 }
 
+# -- Block D self-repair backstop ---------------------------------------------
+#
+# A Block D fragment installed from the pre-fix template resolves PLUGIN_ROOT
+# by walking the top level of installed_plugins.json (whose real shape nests
+# installs under .plugins[key][N].installPath), so the AaC golden-rule gate
+# silently skipped on every commit while printing a green result.
+# /upgrade-project repairs it — but only when an operator remembers to run it.
+# These finalize hooks are the one channel that executes CURRENT plugin code
+# inside every managed project on every merge/commit/checkout, so the repair
+# rides here as a backstop: once the operator updates the plugin, the next git
+# activity in each project heals its hook with no further action.
+#
+# Guarded by a cheap two-marker grep (Block D present AND the broken shape's
+# unique data.items() literal — the fixed template deliberately avoids that
+# string), so healthy projects pay one grep and the repair fires at most once
+# ever: repairing removes the marker. Scoped to --surface block-d because a
+# git hook must never mutate tracked files — the workflow-namespace re-point
+# remains /upgrade-project's. Branch-independent (hooks are not branch-scoped),
+# so callers run it BEFORE any on-main gate. Non-blocking like every chain step.
+_finalize_chain_repair_broken_block_d() {
+    local repo_root="$1"
+    local hook="${repo_root}/.git/hooks/pre-commit"
+    [ -f "$hook" ] || return 0
+    grep -q 'check_aac_golden_rule' "$hook" 2>/dev/null || return 0
+    grep -q 'data\.items()' "$hook" 2>/dev/null || return 0
+    echo "praxion: .git/hooks/pre-commit carries the broken Block D PLUGIN_ROOT resolution (the AaC gate has been silently skipping) — repairing from the shipped template"
+    _finalize_chain_run_script "block-d repair" \
+        "${FINALIZE_CHAIN_DIR}/reconcile_aac_surfaces.py" \
+        --plugin-root "${FINALIZE_CHAIN_DIR}/.." --repo-root "$repo_root" \
+        --mode apply --no-stage --surface block-d
+}
+
 # -- Public entry points ------------------------------------------------------
 
 # Public wrapper around the on-main composition, for callers that source this
@@ -201,6 +233,8 @@ _finalize_chain_state_driven() {
     local repo_root
     repo_root="$(_finalize_chain_repo_root)"
     [ -n "$repo_root" ] || return 0
+    # Hook repair is branch-independent — run before the on-main gate.
+    _finalize_chain_repair_broken_block_d "$repo_root"
     _finalize_chain_on_main || return 0
     _finalize_chain_run_on_main "$repo_root"
 }
@@ -208,6 +242,7 @@ _finalize_chain_state_driven() {
 # Post-merge entry point.
 #
 # Sequence (load-bearing):
+#   0. broken-Block-D hook repair               — branch-independent backstop
 #   1. reconcile_ai_state.py --post-merge      — only if .ai-state/ was touched
 #   2. finalize on main (ADR if drafts; ledger always) — only on main
 #   3. check_squash_safety.py                   — diagnostic, always runs
@@ -219,6 +254,8 @@ finalize_chain_post_merge() {
     local repo_root
     repo_root="$(_finalize_chain_repo_root)"
     [ -n "$repo_root" ] || return 0
+
+    _finalize_chain_repair_broken_block_d "$repo_root"
 
     if _finalize_chain_state_was_touched "$repo_root"; then
         _finalize_chain_run_script "post-merge: reconcile_ai_state" \

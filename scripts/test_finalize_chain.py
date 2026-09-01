@@ -282,3 +282,106 @@ def test_unusable_override_falls_through_rather_than_breaking(tmp_path: Path) ->
         repo_root=str(tmp_path), env={"PRAXION_PYTHON": str(tmp_path / "gone")}
     )
     assert resolved == str(python)
+
+
+# ---------------------------------------------------------------------------
+# Block D self-repair backstop
+# ---------------------------------------------------------------------------
+
+# Minimal structurally-valid broken Block D: both grep markers the chain guard
+# requires (check_aac_golden_rule + the data.items() literal unique to the
+# pre-fix resolution) and the region shape reconcile_aac_surfaces.py locates
+# (banner -> header -> outer STAGED_AAC if -> column-0 fi).
+_BROKEN_BLOCK_D = """# ---------------------------------------------------------------------------
+# Block D: AaC golden-rule gate
+# ---------------------------------------------------------------------------
+
+STAGED_AAC="$(git diff --cached --name-only | grep -E '^docs/' || true)"
+
+if [ -n "$STAGED_AAC" ]; then
+    PLUGIN_ROOT="$(python3 -c "
+for _name, entry in data.items():
+    path = entry if isinstance(entry, str) else entry.get('path', '')
+" 2>/dev/null || true)"
+    if [ -z "$PLUGIN_ROOT" ]; then
+        echo "info: praxion plugin not found in installed_plugins.json — skipping Block D golden-rule gate"
+    else
+        python3 "$PLUGIN_ROOT/scripts/check_aac_golden_rule.py" --mode=gate
+    fi
+fi
+"""
+
+
+def _make_repo_with_hook(tmp_path: Path, hook_body: str) -> Path:
+    repo = tmp_path / "proj"
+    (repo / ".git" / "hooks").mkdir(parents=True)
+    subprocess.run(["git", "-C", str(repo), "init", "-q"], check=True)
+    hook = repo / ".git" / "hooks" / "pre-commit"
+    hook.write_text("#!/usr/bin/env bash\n" + hook_body)
+    hook.chmod(0o755)
+    return repo
+
+
+def _run_post_commit_for_real(repo: Path) -> subprocess.CompletedProcess:
+    """Source the chain unstubbed and fire the post-commit entry from inside
+    the fixture repo -- the real backstop path, real python, real reconciler."""
+    snippet = f"""
+        cd {str(repo)!r}
+        source {str(CHAIN_PATH)!r}
+        finalize_chain_post_commit
+    """
+    return subprocess.run(["bash", "-c", snippet], capture_output=True, text=True)
+
+
+def test_backstop_repairs_broken_block_d_end_to_end(tmp_path: Path) -> None:
+    repo = _make_repo_with_hook(tmp_path, _BROKEN_BLOCK_D)
+    hook = repo / ".git" / "hooks" / "pre-commit"
+
+    result = _run_post_commit_for_real(repo)
+
+    assert result.returncode == 0, result.stderr
+    assert "repairing from the shipped template" in result.stdout
+    text = hook.read_text()
+    assert "data.items()" not in text
+    assert ".plugins[$k][0].installPath" in text
+
+
+def test_backstop_is_a_noop_on_a_healthy_hook(tmp_path: Path) -> None:
+    repo = _make_repo_with_hook(tmp_path, "echo healthy-hook\n")
+    hook = repo / ".git" / "hooks" / "pre-commit"
+    before = hook.read_text()
+
+    result = _run_post_commit_for_real(repo)
+
+    assert result.returncode == 0, result.stderr
+    assert "repairing" not in result.stdout
+    assert hook.read_text() == before
+
+
+def test_backstop_fires_even_off_main(tmp_path: Path) -> None:
+    """Hook repair is branch-independent: it must run before the on-main gate
+    that keeps the finalizers themselves quiet off main."""
+    repo = _make_repo_with_hook(tmp_path, _BROKEN_BLOCK_D)
+    snippet = f"""
+        source {str(CHAIN_PATH)!r}
+        _finalize_chain_run_script() {{ echo "RAN:$1"; }}
+        _finalize_chain_repo_root() {{ echo {str(repo)!r}; }}
+        _finalize_chain_on_main() {{ return 1; }}
+        _finalize_chain_state_driven
+    """
+    result = subprocess.run(["bash", "-c", snippet], capture_output=True, text=True)
+
+    assert result.returncode == 0, result.stderr
+    assert "RAN:block-d repair" in result.stdout
+    assert "RAN:finalize_adrs" not in result.stdout
+    assert "RAN:finalize_tech_debt_ledger" not in result.stdout
+
+
+def test_backstop_repair_is_idempotent(tmp_path: Path) -> None:
+    repo = _make_repo_with_hook(tmp_path, _BROKEN_BLOCK_D)
+
+    first = _run_post_commit_for_real(repo)
+    second = _run_post_commit_for_real(repo)
+
+    assert "repairing from the shipped template" in first.stdout
+    assert "repairing" not in second.stdout

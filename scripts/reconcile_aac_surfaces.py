@@ -265,6 +265,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo-root", type=Path, default=None)
     parser.add_argument("--mode", choices=("check", "dry-run", "apply"), default="apply")
     parser.add_argument("--no-stage", action="store_true")
+    parser.add_argument(
+        "--surface",
+        choices=("workflow", "block-d", "all"),
+        default="all",
+        help=(
+            "restrict to one surface; the finalize-chain backstop passes"
+            " block-d so a git hook never touches tracked files"
+        ),
+    )
     args = parser.parse_args(argv)
 
     repo_root = args.repo_root
@@ -284,8 +293,10 @@ def main(argv: list[str] | None = None) -> int:
         mode=args.mode,
         stage=not args.no_stage,
     )
-    reconciler.reconcile_workflow()
-    reconciler.reconcile_block_d()
+    if args.surface in ("workflow", "all"):
+        reconciler.reconcile_workflow()
+    if args.surface in ("block-d", "all"):
+        reconciler.reconcile_block_d()
     print(f"aac-changes: {reconciler.changes}")
     return 1 if (args.mode == "check" and reconciler.changes > 0) else 0
 

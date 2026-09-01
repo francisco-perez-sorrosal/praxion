@@ -154,7 +154,10 @@ never goes stale and is left alone — only its appended Block D fragment
   so the AaC golden-rule gate silently skipped on every commit while printing
   a green result. Surface 7 detects that shape and replaces the block with the
   fixed shipped template. Confirm a project needed it with
-  `grep -n 'data.items()' .git/hooks/pre-commit`. The earlier namespace-rename
+  `grep -n 'data.items()' .git/hooks/pre-commit`. This particular repair also
+  self-delivers: the finalize hook chain carries it as a backstop, so once the
+  plugin is updated, the next merge/commit/checkout in a project heals its
+  hook even if this command is never run. The earlier namespace-rename
   staleness (a project onboarded under the old plugin name carrying
   `i-am:architect-validator` in `architecture.yml`) is handled by the same
   surface's token re-point.

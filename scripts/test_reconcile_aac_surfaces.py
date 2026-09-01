@@ -346,3 +346,34 @@ def test_legacy_block_d_demonstrates_the_silent_skip(repo, tmp_path):
     result = subprocess.run(["bash", str(hook)], cwd=repo, capture_output=True, text=True, env=env)
     assert result.returncode == 0
     assert "skipping Block D" in result.stdout
+
+
+# ---- --surface scoping (the finalize-chain backstop contract) ---------------
+
+
+def test_surface_block_d_never_touches_the_workflow(repo, tmp_path):
+    """The finalize-chain backstop runs with --surface block-d; a git hook must
+    never mutate tracked files, so a stale workflow stays byte-identical."""
+    wf = _install_workflow(repo, "i-am")
+    before_wf = wf.read_text()
+    hook = _install_hook(repo, LEGACY_BLOCK_D)
+
+    result = _run(repo, _fake_plugin(tmp_path), "--surface", "block-d")
+
+    assert result.returncode == 0, result.stderr
+    assert "repaired" in result.stdout
+    assert "data.items()" not in hook.read_text()
+    assert wf.read_text() == before_wf
+    assert "architecture.yml" not in result.stdout
+
+
+def test_surface_workflow_never_touches_the_hook(repo, tmp_path):
+    wf = _install_workflow(repo, "i-am")
+    hook = _install_hook(repo, LEGACY_BLOCK_D)
+    before_hook = hook.read_text()
+
+    result = _run(repo, _fake_plugin(tmp_path), "--surface", "workflow", "--no-stage")
+
+    assert result.returncode == 0, result.stderr
+    assert "Load the praxion:architect-validator agent" in wf.read_text()
+    assert hook.read_text() == before_hook

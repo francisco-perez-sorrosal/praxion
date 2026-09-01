@@ -1,3 +1,9 @@
+## v0.27.1 (2026-09-01)
+
+### Fix
+
+- **upgrade**: classify i-am-era merge-driver registrations as Praxion-managed
+
 ## v0.27.0 (2026-09-01)
 
 ### Feat

@@ -535,3 +535,152 @@ def test_manifest_merge_preserves_caller_set_key_while_pruning_retired_driver(pr
     after = _manifest(repo)["artifacts"]
     assert after["ci_autofix"] == ["ci-autofix.yml", "autofix-policy.yml"]
     assert after["merge_drivers"] == ["observations-jsonl"]
+
+
+# ---- labels-taxonomy baseline (surface 6, folded in from the command layer) --
+
+_LABELS_TEMPLATE = (
+    "# Praxion-owned baseline block\n"
+    "baseline:\n"
+    '  - { name: new-label, color: "5319e7" }\n'
+    "additional: []\n"
+)
+
+
+def _install_labels_surface(live: Path, repo: Path, *, stale: bool) -> Path:
+    tmpl = live / "claude" / "project-baseline" / "labels" / "labels.yml.tmpl"
+    tmpl.parent.mkdir(parents=True, exist_ok=True)
+    tmpl.write_text(_LABELS_TEMPLATE)
+    manifest = repo / ".github" / "labels.yml"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    baseline_item = "old-label" if stale else "new-label"
+    manifest.write_text(
+        "# Praxion-owned baseline block\n"
+        "baseline:\n"
+        f'  - {{ name: {baseline_item}, color: "5319e7" }}\n'
+        "additional:\n"
+        '  - { name: project-own-label, color: "ffffff" }\n'
+    )
+    return manifest
+
+
+def test_labels_baseline_check_reports_stale_without_mutating(project):
+    """--check on a stale labels baseline reports drift and mutates nothing --
+    the mode-blindness the old command-layer step had (it refreshed even under
+    --check) must not survive the fold into the script."""
+    repo, live = project["repo"], project["live"]
+    manifest = _install_labels_surface(live, repo, stale=True)
+    before = manifest.read_text()
+
+    r = _run(repo, live, "--check")
+
+    assert r.returncode == 1
+    assert "labels.yml: baseline STALE" in r.stdout
+    assert manifest.read_text() == before
+
+
+def test_labels_baseline_apply_refreshes_and_preserves_additional(project):
+    repo, live = project["repo"], project["live"]
+    manifest = _install_labels_surface(live, repo, stale=True)
+
+    r = _run(repo, live)
+
+    assert r.returncode == 0, r.stderr
+    text = manifest.read_text()
+    assert "new-label" in text
+    assert "old-label" not in text
+    assert "project-own-label" in text
+    staged = _git(repo, "diff", "--cached", "--name-only")
+    assert ".github/labels.yml" in staged
+
+
+def test_labels_baseline_current_is_noop(project):
+    repo, live = project["repo"], project["live"]
+    manifest = _install_labels_surface(live, repo, stale=False)
+    before = manifest.read_text()
+
+    r = _run(repo, live)  # apply run also reconciles the fixture's stale core pins
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "labels.yml: baseline current" in r.stdout
+    assert manifest.read_text() == before
+    assert _run(repo, live, "--check").returncode == 0
+
+
+def test_labels_manifest_absent_is_a_clean_skip(project):
+    repo, live = project["repo"], project["live"]
+    r = _run(repo, live)
+    assert r.returncode == 0, r.stderr
+    assert "labels.yml: absent" in r.stdout
+
+
+# ---- AaC surfaces (surface 7, delegated to reconcile_aac_surfaces.py) -------
+
+
+def test_aac_surfaces_reconciled_through_the_script(project):
+    """End-to-end wiring: a stale-namespace architecture.yml is re-pointed by
+    the [aac] section, the drift is folded into the change count (--check exits
+    1), and a post-apply --check comes back clean."""
+    repo, live = project["repo"], project["live"]
+    wf = repo / ".github" / "workflows" / "architecture.yml"
+    wf.parent.mkdir(parents=True, exist_ok=True)
+    wf.write_text("      Load the i-am:architect-validator agent. Run in --mode=pre-merge\n")
+
+    check = _run(repo, live, "--check")
+    assert check.returncode == 1
+    assert "architecture.yml: STALE" in check.stdout
+
+    apply = _run(repo, live)
+    assert apply.returncode == 0, apply.stderr
+    assert "Load the praxion:architect-validator agent" in wf.read_text()
+
+    recheck = _run(repo, live, "--check")
+    assert recheck.returncode == 0, recheck.stdout
+
+
+# ---- self-host classification ordering --------------------------------------
+
+
+def test_self_host_symlink_in_a_praxion_named_dir_left_untouched(project, tmp_path):
+    """The real self-host shape: a checkout literally named `praxion`, so the
+    broad */praxion/* glob matches. The dev/self-host branch must win -- before
+    the ordering fix every self-host symlink was misclassified as stale (the
+    original fixture path just happened not to contain /praxion/)."""
+    repo, live = project["repo"], project["live"]
+    selfhost = tmp_path / "dev" / "praxion" / "scripts"
+    selfhost.mkdir(parents=True)
+    target = selfhost / "git-finalize-hook.sh"
+    target.write_text("#!/usr/bin/env bash\n")
+    for h in ("post-merge", "post-commit", "post-checkout"):
+        hook = repo / ".git" / "hooks" / h
+        hook.unlink()
+        hook.symlink_to(target)
+
+    r = _run(repo, live)
+
+    assert r.returncode == 0, r.stderr
+    assert "skip (dev/self-host symlink" in r.stdout
+    for h in ("post-merge", "post-commit", "post-checkout"):
+        assert (repo / ".git" / "hooks" / h).readlink() == target
+
+
+def test_live_but_old_plugin_cache_symlink_still_repointed(project, tmp_path):
+    """The inverse guard for the ordering fix: an old cache install that has
+    NOT been garbage-collected yet (target exists, basename matches) must not
+    ride the self-host branch -- the /plugins/cache/ shape identifies it."""
+    repo, live = project["repo"], project["live"]
+    old_cache = tmp_path / "plugins" / "cache" / "bit-agora" / "praxion" / "0.8.0" / "scripts"
+    old_cache.mkdir(parents=True)
+    target = old_cache / "git-finalize-hook.sh"
+    target.write_text("#!/usr/bin/env bash\n")
+    for h in ("post-merge", "post-commit", "post-checkout"):
+        hook = repo / ".git" / "hooks" / h
+        hook.unlink()
+        hook.symlink_to(target)
+
+    r = _run(repo, live)
+
+    assert r.returncode == 0, r.stderr
+    for h in ("post-merge", "post-commit", "post-checkout"):
+        resolved = (repo / ".git" / "hooks" / h).readlink()
+        assert resolved == live / "scripts" / "git-finalize-hook.sh"

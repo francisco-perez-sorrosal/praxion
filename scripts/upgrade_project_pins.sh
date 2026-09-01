@@ -14,23 +14,30 @@
 # logic runs once. This script IS that newer logic, factored out of the 10-phase
 # onboard flow into a deterministic, gate-free, LLM-free reconciler.
 #
-# It touches exactly the four version-pinned (drift-prone) surfaces — nothing
-# else from onboarding is path-pinned:
+# It reconciles every onboarding-installed surface that a plugin upgrade (or
+# rename) can invalidate:
 #   1. The three finalize-hook symlinks (post-merge, post-commit, post-checkout)
 #   2. The merge.observations-jsonl.driver git config
 #   3. Retired merge drivers + their .gitattributes lines (cross-version cleanup)
 #   4. The .ai-state/.praxion-onboard.json manifest version stamp
-# The pre-commit hook is written inline and resolves the plugin path at run time,
-# so it is version-independent and never goes stale — this script leaves it be.
-#
-# A fifth surface is reconciled ONLY when --hub-sha <SHA> is passed: the
-# .github/workflows/ ci-autofix.yml + cross-model-review.yml + labels-reconcile.yml
-# reusable-workflow callers, whose version identity is a cross-repo hub git ref
-# (the pinned SHA) rather than a local plugin-cache path. The script never
-# resolves the SHA itself (that would depend on the hub's moving tip and break
-# determinism) — the SHA is resolved in the /upgrade-project command layer and
-# passed in. Without --hub-sha the caller surface is skipped entirely and the
-# four surfaces above reconcile exactly as before (backward compatible).
+#   5. (only with --hub-sha <SHA>) The .github/workflows/ ci-autofix.yml +
+#      cross-model-review.yml + labels-reconcile.yml reusable-workflow callers,
+#      whose version identity is a cross-repo hub git ref (the pinned SHA)
+#      rather than a local plugin-cache path. The script never resolves the SHA
+#      itself (that would depend on the hub's moving tip and break determinism)
+#      — the SHA is resolved in the /upgrade-project command layer and passed
+#      in. Without --hub-sha this surface is skipped entirely.
+#   6. The .github/labels.yml `baseline:` block, refreshed from the shipped
+#      template via refresh_labels_baseline.py (the project's `additional:`
+#      block and surrounding comments are preserved). Needs no hub SHA.
+#   7. The two AaC-instantiated surfaces (architecture.yml agent-load prompt +
+#      pre-commit Block D), delegated to the tested sibling
+#      reconcile_aac_surfaces.py: namespace-token re-point plus the structural
+#      repair of the broken pre-fix Block D PLUGIN_ROOT resolution. Needs no
+#      hub SHA.
+# The Phase-4 pre-commit hook body (id-citation gate) resolves the plugin path
+# at run time, so it is version-independent and never goes stale — this script
+# leaves it be; only its appended Block D fragment (surface 7) can drift.
 #
 # Usage
 # -----
@@ -154,16 +161,20 @@ mutating()    { [ "$MODE" = "apply" ]; }
 
 # ---- caller-reconcile helpers (only reached when --hub-sha is passed) -------
 
-# Locate the shipped cross-model-review caller template: prefer the resolved live
+# Locate a shipped plugin file by repo-relative path: prefer the resolved live
 # plugin install (the same tree that provides the finalize hook), fall back to
 # the script's own checkout. Never fetched over the network.
-find_cross_model_template() {
-    local rel="claude/project-baseline/ci-autofix/cross-model-review.yml.tmpl"
+find_plugin_file() {
+    local rel="$1"
     local c
     for c in "$PLUGIN_INSTALL_PATH/$rel" "$SCRIPT_DIR/../$rel"; do
         [ -f "$c" ] && { printf '%s\n' "$c"; return 0; }
     done
     return 1
+}
+
+find_cross_model_template() {
+    find_plugin_file "claude/project-baseline/ci-autofix/cross-model-review.yml.tmpl"
 }
 
 # Render a caller template to stdout: strip the leading doc-comment header (the
@@ -343,13 +354,18 @@ for h in "${FINALIZE_HOOKS[@]}"; do
         action="repoint"            # dangling symlink (stale cache GC'd)
     elif [ -n "$target" ] && [ "$(basename "$target")" = "$LEGACY_HOOK_BASENAME" ]; then
         action="repoint"            # legacy single-trigger hook name
-    elif [ -n "$target" ] && case "$target" in */praxion/*) true;; *) false;; esac; then
-        action="repoint"            # version-pinned to a non-live cache path
+    elif [ -n "$target" ] && case "$target" in */plugins/cache/*) true;; *) false;; esac; then
+        action="repoint"            # version-pinned to a non-live plugin-cache path
     elif [ -L "$hp" ] && [ "$(basename "$target")" = "git-finalize-hook.sh" ]; then
-        # Resolves to a real finalize hook outside the /praxion/ cache — a dev /
-        # self-host install (Praxion's own tree). Not stale; leave it.
+        # Resolves to a real finalize hook outside the plugin cache — a dev /
+        # self-host install (Praxion's own tree). Not stale; leave it. This
+        # branch must come BEFORE the broad */praxion/* fallback: a self-host
+        # checkout is typically a directory literally named praxion, so the
+        # glob alone would misclassify every self-host symlink as stale.
         info "$h: skip (dev/self-host symlink → $target)"
         continue
+    elif [ -n "$target" ] && case "$target" in */praxion/*) true;; *) false;; esac; then
+        action="repoint"            # non-cache-shaped but praxion-pinned path
     else
         action="backup-install"     # a non-Praxion hook occupies the slot
     fi
@@ -481,6 +497,69 @@ if [ -n "$HUB_SHA" ]; then
     reconcile_labels_caller
     echo
 fi
+
+# ---- 6. labels-taxonomy baseline (no hub SHA needed) ------------------------
+# Refreshes the Praxion-owned `baseline:` block of .github/labels.yml from the
+# shipped template, preserving the project's `additional:` block untouched.
+# Mode-aware: the refresh runs against a temp copy first, so --check/--dry-run
+# report the diff verdict without mutating the manifest.
+
+echo "[labels] Labels-taxonomy baseline"
+reconcile_labels_baseline() {
+    local manifest="$REPO_ROOT/.github/labels.yml"
+    [ -f "$manifest" ] || { info "labels.yml: absent → nothing to refresh"; return 0; }
+    local tmpl refresher tmp
+    tmpl="$(find_plugin_file 'claude/project-baseline/labels/labels.yml.tmpl')" || {
+        info "labels.yml: shipped template not found → skipping"; return 0; }
+    refresher="$(find_plugin_file 'scripts/refresh_labels_baseline.py')" || {
+        info "labels.yml: refresh_labels_baseline.py not found → skipping"; return 0; }
+    tmp="$(mktemp)"
+    cp "$manifest" "$tmp"
+    if ! python3 "$refresher" "$tmpl" "$tmp" >/dev/null 2>&1; then
+        rm -f "$tmp"
+        info "labels.yml: refresh script failed → left untouched (manual review)"
+        return 0
+    fi
+    if cmp -s "$tmp" "$manifest"; then
+        rm -f "$tmp"
+        info "labels.yml: baseline current"
+        return 0
+    fi
+    note_change
+    case "$MODE" in
+        check)   info "labels.yml: baseline STALE vs the shipped template"; rm -f "$tmp" ;;
+        dry-run) info "labels.yml: baseline would be refreshed from the shipped template"; rm -f "$tmp" ;;
+        apply)
+            mv "$tmp" "$manifest"
+            info "labels.yml: baseline refreshed (project 'additional:' block preserved)"
+            STAGED_FILES+=("$manifest")
+            ;;
+    esac
+}
+reconcile_labels_baseline
+echo
+
+# ---- 7. AaC instantiated surfaces (no hub SHA needed) -----------------------
+# architecture.yml + pre-commit Block D: namespace-token re-point and the
+# structural repair of the broken pre-fix Block D PLUGIN_ROOT resolution.
+# Logic lives in the tested sibling reconcile_aac_surfaces.py; its final
+# `aac-changes: N` line is folded into this script's change count.
+
+echo "[aac] AaC instantiated surfaces"
+AAC_RECONCILER="$(find_plugin_file 'scripts/reconcile_aac_surfaces.py')" || AAC_RECONCILER=""
+if [ -z "$AAC_RECONCILER" ]; then
+    info "reconcile_aac_surfaces.py not found → skipping"
+else
+    AAC_ARGS=(--plugin-root "$PLUGIN_INSTALL_PATH" --repo-root "$REPO_ROOT" --mode "$MODE")
+    [ "$STAGE" -eq 0 ] && AAC_ARGS+=(--no-stage)
+    AAC_OUT="$(python3 "$AAC_RECONCILER" "${AAC_ARGS[@]}" 2>&1)" || true
+    printf '%s\n' "$AAC_OUT" | sed '/^aac-changes: /d; s/^/  /'
+    AAC_N="$(printf '%s\n' "$AAC_OUT" | sed -n 's/^aac-changes: //p')"
+    if [ -n "$AAC_N" ] && [ "$AAC_N" -gt 0 ] 2>/dev/null; then
+        CHANGES=$((CHANGES + AAC_N))
+    fi
+fi
+echo
 
 # ---- staging + summary -----------------------------------------------------
 

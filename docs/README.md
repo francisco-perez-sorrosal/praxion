@@ -38,6 +38,9 @@ Authoritative tables and schemas. Look up, don't read sequentially.
 - [Rules Taxonomy](rules-taxonomy.md) — rule categories (core, hook-deliver, path-scoped), per-project disable list reaching both delivery channels, token accounting
 - [Metrics schema](metrics/README.md) — `/project-metrics` JSON output schema and field reference
 - [Known Claude Code limitations](claude-code-limitations.md) — tracked Claude Code bugs/constraints, workarounds, and their upstream issues + `td-NNN` rows
+- [Multi-session](multi-session.md) — running parallel Claude Code sessions on worktrees with the `praxion-parallel` launcher
+- [Rework dispatch](rework-dispatch.md) — verifier rework worktrees, `REWORK_MANIFEST.md`, and `/resume-rework`
+- [Obsidian integration](obsidian-integration.md) — vault policy, `obsidian` CLI allowlist, and link-safety pins
 
 ## Concepts — mental models (the why)
 
@@ -48,6 +51,8 @@ Discursive explanations of design decisions and ideas. Read for understanding, n
 - [Architecture-as-Code (AaC) and Documentation-as-Code (DaC)](aac-dac.md) — the toolchain and rationale for the LikeC4 + Diátaxis approach
 - [Claude ecosystem learning resources](claude-ecosystem-learning-resources.md) — curated external links for Claude API/SDK/Code
 - [Context-engineering comparison study (2026-05-12)](context-prj-comparison-2026-05-12/README.md) — four "Karpathy-inspired CLAUDE.md" projects vs. Praxion; the adoptable-ideas roadmap (P1–P6 completed 2026-05-12) is preserved as study material at [`07-praxion-roadmap.md`](context-prj-comparison-2026-05-12/07-praxion-roadmap.md)
+- [Agent Readiness](agent-readiness.md) — how the Factory-comparable 8-pillar × 5-level score plus the native Pillar 9 sub-score is computed by `/project-metrics` and read on the dashboard
+- [Praxion as a personal software factory (2026-09-02)](independent-analysis/personal-software-factory-analysis.md) — landscape comparison, SDLC/software-factory coverage map, integration seams, and the decision-grade sidecar-placement design for using Praxion privately on team repositories
 - [Multidisciplinary identities — evidence dossier](multidisciplinary-identities-evidence.md) — the research base for adding disciplinary consulting identities (statistician, performance, reliability, formalist) to the pipeline: societies-of-thought evidence, the persona paradox, multi-agent failure data, measured token constraints, and the dialogue protocol
 
 ## Diagrams

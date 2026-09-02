@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-01T07:02:45Z'
+generated_at: '2026-09-02T06:53:30Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -69,6 +69,7 @@ surfaces:
   surfaces_referenced:
   - claude
   - docs-aac-dac
+  - docs-agent-readiness
   - docs-architecture
   - docs-architecture-diagrams
   - docs-claude-code-limitations
@@ -81,11 +82,15 @@ surfaces:
   - docs-diagrams-readme
   - docs-external-api-docs
   - docs-getting-started
+  - docs-independent-analysis-personal-software-factory-analysis
   - docs-metrics-readme
   - docs-ml-training-onramp
+  - docs-multi-session
   - docs-multidisciplinary-identities-evidence
   - docs-observability
+  - docs-obsidian-integration
   - docs-onboarding
+  - docs-rework-dispatch
   - docs-rules-taxonomy
   - docs-skill-genesis
   - docs-spec-driven-development
@@ -337,6 +342,14 @@ surfaces:
   last_modified: '2026-06-24'
   audience: architect / maintainer
   renderer: default_markdown
+- id: docs-independent-analysis-personal-software-factory-analysis
+  path: docs/independent-analysis/personal-software-factory-analysis.md
+  type: markdown
+  title: "Praxion as a Personal Software Factory \u2014 Landscape, SDLC Coverage, Integration Seams, and the Sidecar Placement"
+  last_modified: '2026-09-01'
+  diataxis: explanation
+  audience: architect / maintainer
+  renderer: explanation_shell
 - id: docs-independent-analysis-praxion-artifact-lifecycle-audit
   path: docs/independent-analysis/praxion-artifact-lifecycle-audit.md
   type: markdown
@@ -2973,6 +2986,7 @@ groups:
   - docs-context-prj-comparison-2026-05-12-07-praxion-roadmap
   - docs-context-prj-comparison-2026-05-12-readme
   - docs-decision-tracking
+  - docs-independent-analysis-personal-software-factory-analysis
   - docs-multidisciplinary-identities-evidence
 - id: other
   label: Other

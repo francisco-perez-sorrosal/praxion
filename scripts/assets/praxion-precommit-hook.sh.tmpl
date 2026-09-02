@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Praxion commit gate (installed by /onboard-project).
+#
+# 1. ruff pin coherence — blocks when the ruff pinned in
+#    .pre-commit-config.yaml differs from the one this project installs.
+#    Two independently-versioned ruffs formatting the same files never
+#    converge: the hook reformats on commit, you reformat back, and the
+#    commit will not settle. Runs FIRST so the version mismatch is named
+#    rather than presenting as a confusing reformat loop. No-ops on a repo
+#    with no ruff hook. Rationale: rules/swe/vcs/git-conventions.md.
+# 2. id-citation-discipline — blocks commits that reference ephemeral
+#    pipeline ids (REQ-*, AC-*, Step N) in committed source code.
+#    Rationale: rules/swe/id-citation-discipline.md.
+#
+# Checker resolution, in order: this repo's own scripts/ copy first, then
+# the plugin's. A project that vendors the checker tests and gates its own
+# copy should be gated by the copy it maintains. A missing checker is
+# announced, never silently skipped — a gate that exits 0 because it could
+# not find itself is indistinguishable from no gate at all.
+set -eo pipefail
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+[ -z "$REPO_ROOT" ] && exit 0
+
+PLUGIN_ROOT=""
+for KEY in "praxion@bit-agora" "i-am@bit-agora"; do
+  CANDIDATE="$(jq -r --arg k "$KEY" '.plugins[$k][0].installPath // empty' \
+    "$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null)"
+  if [ -n "$CANDIDATE" ] && [ -d "$CANDIDATE" ]; then
+    PLUGIN_ROOT="$CANDIDATE"
+    break
+  fi
+done
+
+if [ -n "$PLUGIN_ROOT" ] && [ -f "${PLUGIN_ROOT}/scripts/check_ruff_pin_drift.py" ]; then
+  python3 "${PLUGIN_ROOT}/scripts/check_ruff_pin_drift.py" --repo-root "$REPO_ROOT"
+fi
+
+CHECK="${REPO_ROOT}/scripts/check_id_citation_discipline.py"
+[ ! -f "$CHECK" ] && CHECK="${PLUGIN_ROOT}/scripts/check_id_citation_discipline.py"
+if [ ! -f "$CHECK" ]; then
+  echo "pre-commit: id-citation checker not found (repo copy absent and no" >&2
+  echo "            Praxion plugin installed) — the gate did NOT run." >&2
+  exit 1
+fi
+
+STAGED="$(git diff --cached --name-only --diff-filter=ACMR || true)"
+[ -z "$STAGED" ] && exit 0
+# shellcheck disable=SC2086
+python3 "$CHECK" --repo-root "$REPO_ROOT" --files $STAGED

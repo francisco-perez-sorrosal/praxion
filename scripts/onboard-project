@@ -358,6 +358,30 @@ guard_greenfield_shape() {
 
 # ---- State detection (detection.md §State detection) ---------------------
 
+# Resolve the EFFECTIVE hooks directory for a project: core.hooksPath when it
+# names a Praxion wrapper directory (scripts/install_git_hooks.py's chaining
+# takeover, P0), else the plain .git/hooks. A project whose hooks are already
+# chained has its finalize symlink inside the wrapper dir, not .git/hooks/ --
+# a plain .git/hooks/post-merge check alone would misclassify it as
+# git-no-praxion and re-onboard from scratch.
+_effective_hooks_dir() {
+    local dir="$1" hooks_path common_dir
+    hooks_path="$(git -C "$dir" config --get core.hooksPath 2>/dev/null || true)"
+    if [ -n "$hooks_path" ]; then
+        case "$hooks_path" in
+            /*) : ;;
+            *)  hooks_path="$dir/$hooks_path" ;;
+        esac
+        common_dir="$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+        if [ -n "$common_dir" ] && [ -d "$hooks_path" ] \
+            && [ "$(cd "$hooks_path" 2>/dev/null && pwd)" = "$common_dir/praxion-hooks" ]; then
+            printf '%s' "$hooks_path"
+            return
+        fi
+    fi
+    printf '%s' "$dir/.git/hooks"
+}
+
 detect_state() {
     local dir="$1" stamp ai_state
     stamp="$dir/.ai-state/.praxion-onboard.json"
@@ -382,10 +406,17 @@ detect_state() {
     if [ -f "$dir/CLAUDE.md" ] && grep -q '^## Agent Pipeline$' "$dir/CLAUDE.md"; then
         printf '%s' "$STATE_PARTIALLY_MANAGED"; return
     fi
-    if [ -L "$dir/.git/hooks/post-merge" ]; then
-        case "$(readlink "$dir/.git/hooks/post-merge")" in
+    local effective_hooks_dir
+    effective_hooks_dir="$(_effective_hooks_dir "$dir")"
+    if [ -L "$effective_hooks_dir/post-merge" ]; then
+        case "$(readlink "$effective_hooks_dir/post-merge")" in
             */git-finalize-hook.sh) printf '%s' "$STATE_PARTIALLY_MANAGED"; return ;;
         esac
+    elif [ -f "$effective_hooks_dir/post-merge" ] \
+        && head -n 5 "$effective_hooks_dir/post-merge" 2>/dev/null | grep -q '# praxion-hook-wrapper v1'; then
+        # Chained wrapper file (occupied-slot or wrapper-dir case) -- not a
+        # symlink, so classified separately from the plain-install case above.
+        printf '%s' "$STATE_PARTIALLY_MANAGED"; return
     fi
     if [ -d "$dir/.git" ]; then
         printf '%s' "$STATE_GIT_NO_PRAXION"; return

@@ -553,6 +553,7 @@ selectors:
       - "scripts/test_install_dev_link.py"
       - "scripts/test_manage_codex_mcp.py"
       - "scripts/test_upgrade_project_pins.py"
+      - "scripts/test_install_git_hooks.py"
 file_dependencies:
   - "install.sh"
   - "install_claude.sh"
@@ -561,9 +562,13 @@ file_dependencies:
   - "lib/install_shared.sh"
   - "scripts/upgrade_project_pins.sh"
   - "scripts/git-finalize-hook.sh"
+  - "scripts/install_git_hooks.py"
+  - "scripts/assets/praxion-hook-wrapper.sh.tmpl"
   - "codex/config/**"
   - "claude/config/**"
   - ".claude-plugin/plugin.json"
+integration_boundaries:
+  - onboarding-contract
 parallel_safe: true
 shared_fixture_scope: per-test
 expected_runtime_envelope:

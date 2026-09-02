@@ -429,18 +429,25 @@ def _hook_scope_from_stdin(
     """
     if not _stdin_has_payload():
         return None
+    # Under the commit-payload signal, any failure to read or parse the payload
+    # must resolve pass-safe, never to a whole-repo scan that blocks the commit
+    # — a truncated read under load is a transient, not a reason to gate on
+    # unrelated pre-existing violations. Without the signal (direct CLI), a
+    # non-payload stdin correctly falls through to the full scan.
+    signalled = bool(os.environ.get(_PAYLOAD_ENV))
+    on_failure: type[_ScopeUnavailable] | None = _ScopeUnavailable if signalled else None
     try:
         raw = sys.stdin.read()
     except (OSError, ValueError):
-        return None
+        return on_failure
     if not raw.strip():
-        return None
+        return on_failure
     try:
         payload = json.loads(raw)
     except ValueError:
-        return None
+        return on_failure
     if not isinstance(payload, dict) or "tool_input" not in payload:
-        return None
+        return on_failure
     return hook_scope_files(payload, default_root)
 
 

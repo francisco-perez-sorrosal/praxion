@@ -156,6 +156,22 @@ def test_non_payload_stdin_falls_back_to_full_scan(tmp_path: Path) -> None:
     assert result.returncode == 1, result.stdout + result.stderr
 
 
+def test_unparseable_payload_under_signal_passes_not_full_scans(tmp_path: Path) -> None:
+    # With the commit-payload signal set, a garbled/truncated payload must pass
+    # safe rather than escalate to a whole-repo scan that blocks the commit.
+    _write(tmp_path, "src/bad.py", VIOLATING_LINE)
+    result = subprocess.run(
+        [sys.executable, str(CHECKER), "--repo-root", str(tmp_path)],
+        input='{"tool_input": {"command": "git comm',  # truncated JSON
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+        env={**os.environ, "PRAXION_COMMIT_PAYLOAD": "1"},
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "src/bad.py" not in result.stdout
+
+
 def test_payload_env_signal_forces_hook_mode_without_probing(tmp_path: Path) -> None:
     # The commit-gate wrapper sets PRAXION_COMMIT_PAYLOAD so hook mode engages
     # deterministically under load, where a timed stdin probe could lose the

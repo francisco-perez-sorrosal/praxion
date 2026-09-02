@@ -42,6 +42,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 CODE_EXTENSIONS = frozenset(
@@ -297,49 +298,81 @@ def iter_code_files(repo_root: Path) -> list[Path]:
 _COMMIT_ALL_FLAG = re.compile(r"(?:^|\s)(?:-a|--all|-[a-zA-Z]*a[a-zA-Z]*)(?:\s|$)")
 
 
+_GIT_RETRIES = 3
+_GIT_RETRY_SLEEP = 0.1
+
+
+def _git(cwd: Path, *args: str) -> subprocess.CompletedProcess[str] | None:
+    """Run a git command, retrying transient failures (index-lock contention).
+
+    Concurrent git activity in the same worktree — a sibling agent committing,
+    a finalize hook firing — can make an index-reading command fail for a
+    moment. Retrying a few times absorbs that; a persistent failure returns
+    ``None`` so the caller can choose a safe response rather than misread it.
+    """
+    for attempt in range(_GIT_RETRIES):
+        result = subprocess.run(
+            ["git", "-C", str(cwd), *args],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0:
+            return result
+        if attempt + 1 < _GIT_RETRIES:
+            time.sleep(_GIT_RETRY_SLEEP)
+    return None
+
+
 def _git_changed_names(repo_root: Path, *diff_args: str) -> list[str]:
-    result = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(repo_root),
-            "diff",
-            "--name-only",
-            "--diff-filter=ACMR",
-            "-z",
-            *diff_args,
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
+    result = _git(repo_root, "diff", "--name-only", "--diff-filter=ACMR", "-z", *diff_args)
+    if result is None:
         return []
     return [name for name in result.stdout.split("\0") if name]
 
 
-def hook_scope_files(payload: dict, default_root: Path) -> tuple[Path, list[Path]] | None:
+class _ScopeUnavailable:
+    """Marker: hook mode is in effect but the commit scope could not be computed."""
+
+
+def hook_scope_files(
+    payload: dict, default_root: Path
+) -> tuple[Path, list[Path]] | type[_ScopeUnavailable] | None:
     """Resolve the file set a ``git commit`` about to run would actually record.
 
     Invoked as a PreToolUse hook the script receives the tool payload on stdin
-    and no ``--files``; scanning the whole repository there gates every commit
-    on every pre-existing violation in the tree rather than on the change being
-    committed, and costs a full walk per commit. The commit's scope is the
-    staged set, plus the tracked-but-unstaged modifications when the command
-    carries ``-a``/``--all`` (``-am`` included). Returns ``None`` when the
-    payload's directory is not inside a git repository, so the caller falls
-    back to the full scan.
+    and no ``--files``. The commit's scope is the staged set, plus the
+    tracked-but-unstaged modifications when the command carries ``-a``/``--all``
+    (``-am`` included). Three outcomes: the scoped file list; ``None`` when the
+    payload's directory is not inside a git repository (a genuine non-hook
+    caller — the full scan is right); and ``_ScopeUnavailable`` when we are in a
+    git repo but scoping failed even after retries — the caller must pass rather
+    than full-scan, because gating a commit on the whole tree's pre-existing
+    violations is never the right hook behaviour.
     """
     tool_input = payload.get("tool_input") or {}
     command = str(tool_input.get("command", ""))
     cwd = Path(str(payload.get("cwd") or default_root))
-    top = subprocess.run(
-        ["git", "-C", str(cwd), "rev-parse", "--show-toplevel"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if top.returncode != 0 or not top.stdout.strip():
+    top = _git(cwd, "rev-parse", "--show-toplevel")
+    if top is None:
+        # The commit-gate wrapper only fires on a real `git commit`, so when its
+        # env signal is present a git failure is never "not a repo" — it is
+        # contention, and a whole-repo scan would wrongly gate the commit on
+        # unrelated pre-existing violations. Return the pass-safe marker.
+        if os.environ.get(_PAYLOAD_ENV):
+            return _ScopeUnavailable
+        # Direct CLI: distinguish "not a repo" (full scan is correct) from a
+        # transient error inside a repo with one quick probe.
+        probe = subprocess.run(
+            ["git", "-C", str(cwd), "rev-parse", "--is-inside-work-tree"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if probe.returncode != 0:
+            return None
+        return _ScopeUnavailable
+    if not top.stdout.strip():
         return None
     repo_root = Path(top.stdout.strip()).resolve()
     names = _git_changed_names(repo_root, "--cached")
@@ -376,8 +409,15 @@ def _stdin_has_payload() -> bool:
         return False
 
 
-def _hook_scope_from_stdin(default_root: Path) -> tuple[Path, list[Path]] | None:
-    """Return the hook-mode scope when stdin carries a tool payload, else None."""
+def _hook_scope_from_stdin(
+    default_root: Path,
+) -> tuple[Path, list[Path]] | type[_ScopeUnavailable] | None:
+    """Return the hook-mode scope when stdin carries a tool payload.
+
+    ``None`` means "not a hook payload" (the full scan is right); a
+    ``_ScopeUnavailable`` marker means "a hook payload, but scoping failed" (the
+    caller must pass, never full-scan).
+    """
     if not _stdin_has_payload():
         return None
     try:
@@ -481,6 +521,12 @@ def main(argv: list[str]) -> int:
         files = filter_files(list(args.files), repo_root)
     else:
         scope = _hook_scope_from_stdin(repo_root)
+        if scope is _ScopeUnavailable:
+            # A commit payload we could not scope (transient git failure). Pass
+            # rather than gate the commit on the whole tree's pre-existing
+            # violations — that is never the right hook behaviour.
+            print("hook mode: commit scope unavailable (transient); passing.")
+            return 0
         if scope is not None:
             repo_root, candidates = scope
             files = filter_files(candidates, repo_root)

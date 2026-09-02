@@ -183,6 +183,37 @@ def test_payload_env_signal_still_blocks_a_staged_violation(tmp_path: Path) -> N
     assert "src/bad.py" in result.stdout
 
 
+def test_hook_mode_passes_when_git_scoping_fails_transiently(tmp_path: Path) -> None:
+    # Inside a git repo but with the scoping calls failing (a fake git that
+    # answers --is-inside-work-tree but fails everything else, standing in for
+    # index-lock contention), hook mode must PASS — never fall back to a
+    # whole-repo scan that would gate the commit on unrelated pre-existing
+    # violations.
+    _write(tmp_path, "src/bad.py", VIOLATING_LINE)
+    fake_bin = tmp_path / "fakebin"
+    fake_bin.mkdir()
+    # git fails on everything, including the work-tree probe, standing in for
+    # sustained contention. With the env signal set, this must still PASS —
+    # never a whole-repo scan.
+    git_stub = fake_bin / "git"
+    git_stub.write_text("#!/bin/sh\nexit 1\n")
+    git_stub.chmod(0o755)
+    payload = json.dumps(
+        {"tool_name": "Bash", "tool_input": {"command": "git commit -m x"}, "cwd": str(tmp_path)}
+    )
+    result = subprocess.run(
+        [sys.executable, str(CHECKER)],
+        input=payload,
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+        env={**os.environ, "PRAXION_COMMIT_PAYLOAD": "1", "PATH": str(fake_bin)},
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "src/bad.py" not in result.stdout
+    assert "scope unavailable" in result.stdout
+
+
 def test_open_but_silent_stdin_does_not_hang_the_full_scan(tmp_path: Path) -> None:
     _write(tmp_path, "src/ok.py", CLEAN_LINE)
     read_end, write_end = os.pipe()

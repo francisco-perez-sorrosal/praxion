@@ -51,6 +51,12 @@
             "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/measure_context_surface.py 2>/dev/null",
             "timeout": 5,
             "async": true
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/heal_hook_chain.py",
+            "timeout": 15,
+            "async": false
           }
         ]
       }

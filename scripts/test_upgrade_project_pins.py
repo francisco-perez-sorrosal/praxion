@@ -283,6 +283,55 @@ def test_dry_run_mutates_nothing(project):
     assert _manifest(repo)["onboarded_with_version"] == "0.8.0"
 
 
+# ---------------------------------------------------------------------------
+# Hook-chain composition (P0) -- the [1b] block delegating to
+# scripts/install_git_hooks.py, layered on top of the finalize-hook
+# staleness loop above rather than replacing it (self-host/cache-path
+# staleness detection has no equivalent in install_git_hooks.py, which
+# knows nothing about plugin *versions* -- only about hooksPath/slot shape).
+# ---------------------------------------------------------------------------
+
+
+def test_foreign_hookspath_check_reports_drift_without_mutating(project):
+    """core.hooksPath set to a directory Praxion does not own (husky-style):
+    [1/4] must report the composition drift under --check and mutate
+    nothing -- the exact defect this milestone exists to fix (a foreign
+    hooksPath the pre-P0 readlink loop had no notion of at all)."""
+    repo, live = project["repo"], project["live"]
+    delegate_dir = repo / ".husky" / "_"
+    delegate_dir.mkdir(parents=True)
+    _git(repo, "config", "core.hooksPath", ".husky/_")
+
+    r = _run(repo, live, "--check")
+    assert r.returncode == 1
+    assert "hook chain: drift" in r.stdout
+    assert _git(repo, "config", "--get", "core.hooksPath") == ".husky/_"
+
+
+def test_foreign_hookspath_apply_delegates_to_heal_and_converges(project):
+    """Applying re-points core.hooksPath at a Praxion wrapper directory that
+    delegates back to `.husky/_`; running apply twice more performs no
+    further core.hooksPath writes (REQ-11's non-oscillation guarantee)."""
+    repo, live = project["repo"], project["live"]
+    delegate_dir = repo / ".husky" / "_"
+    delegate_dir.mkdir(parents=True)
+    _git(repo, "config", "core.hooksPath", ".husky/_")
+
+    r = _run(repo, live)
+    assert r.returncode == 0, r.stderr
+    assert "hook chain:" in r.stdout
+    wrapper_hooks_path = _git(repo, "config", "--get", "core.hooksPath")
+    assert wrapper_hooks_path != ".husky/_"
+    assert wrapper_hooks_path.endswith("praxion-hooks")
+
+    # Two more runs: core.hooksPath must not oscillate back toward .husky/_,
+    # and no further writes should occur.
+    for _ in range(2):
+        again = _run(repo, live)
+        assert again.returncode == 0, again.stderr
+        assert _git(repo, "config", "--get", "core.hooksPath") == wrapper_hooks_path
+
+
 def test_dev_self_host_symlink_left_untouched(project):
     """A finalize hook that resolves to a real file outside the /praxion/ cache is
     a dev/self-host install and must not be re-pointed."""

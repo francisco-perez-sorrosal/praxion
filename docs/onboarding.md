@@ -223,6 +223,34 @@ Use `/upgrade-project` (wrapping `scripts/upgrade_project_pins.sh`) instead when
 
 Use `/refresh-claude-blocks` when you only need the four refreshable `CLAUDE.md` canonical blocks brought current. After a plugin upgrade, the complete runbook is `/upgrade-project` (pins) followed by `/refresh-claude-blocks` (block content).
 
+## Hook chaining
+
+Phase 4's git hooks are installed and repaired by one deterministic reconciler, `scripts/install_git_hooks.py`, rather than by writing straight into `.git/hooks` and hoping nothing else is using it. It **observes** the repository's hook configuration first and installs the shape that *composes* with what it finds, instead of silently doing nothing or displacing an existing hook manager.
+
+**Why this matters.** A repo managed by [husky](https://typicode.github.io/husky/) or [lefthook](https://github.com/evilmartians/lefthook) points git at its own hooks via `core.hooksPath` — a config value the pre-chaining installer never inspected, so Praxion's hooks silently never fired there. A repo using the [`pre-commit`](https://pre-commit.com/) framework occupies `.git/hooks/pre-commit` directly; the pre-chaining installer would back that file up and overwrite it, silently disabling the team's own gate. Both are now composed with, not fought:
+
+- **`core.hooksPath` set to a directory Praxion does not own** (husky's `.husky/_`, lefthook's `.lefthook/`) — a Praxion *wrapper directory* is created inside the repository's **git common** directory (`git rev-parse --git-common-dir`; shared across all worktrees, never a linked worktree's own `.git`), the observed value is recorded as the delegate, and `core.hooksPath` is re-pointed at the wrapper. No tracked file is ever touched — the takeover is entirely local `.git/config` state, invisible to teammates' clones.
+- **A hook slot is occupied by a non-Praxion script** (e.g., `pre-commit` framework's `.git/hooks/pre-commit`) — the occupant is preserved at `<name>.pre-praxion` and a chaining wrapper takes its place: the preserved hook runs **first**.
+- **Per-hook-class exit-code policy.** For `pre-commit`, a non-zero delegate exit aborts the commit immediately with that exit code and Praxion's own gates do **not** run — the team's gate stays authoritative and its failure is never masked. For `post-merge` / `post-commit` / `post-checkout`, a non-zero delegate exit is reported on stderr and the chain continues, always exiting `0` — matching the finalize chain's existing non-blocking contract (a hook cannot abort an already-completed git operation).
+- **`core.hooksPath` unset and every slot empty** — today's plain symlink (`post-*`) or the tailored inline pre-commit script, byte-identical to a pre-chaining install. Nothing changes for the majority of projects.
+- **`core.hooksPath` set but unresolvable** (garbage value, not a directory) — refuses to install or heal, warns once naming the observed value, and changes nothing rather than guessing.
+
+**Self-heal.** A package manager's `prepare` script (husky's on `npm install`, lefthook's `install`) can re-point `core.hooksPath` away from the wrapper without any Praxion code path running. A `SessionStart` hook (`hooks/heal_hook_chain.py`) detects this on every Claude Code session start and restores the chain, printing one line when it does. It fast-exits on a handful of pure filesystem reads (no subprocess) for the overwhelming majority of sessions that never installed a wrapper directory at all, and never invokes `install_git_hooks.py --heal` (its one possible subprocess call) unless the wrapper directory is confirmed present. Opt out with `PRAXION_DISABLE_HOOK_CHAIN_HEAL=1`. Repeated heals converge — `core.hooksPath` never oscillates, and the recorded delegate is never the wrapper directory itself (the non-ping-pong invariant: a wrapper can never delegate to itself).
+
+**Diagnosing and reversing.**
+
+```console
+$ python3 <plugin-root>/scripts/install_git_hooks.py --status --repo-root .
+core.hooksPath: Foreign
+  delegate: .husky/_
+  pre-commit: PraxionWrapperFile [ok]
+  post-merge: PraxionWrapperFile [ok]
+  post-commit: PraxionWrapperFile [ok]
+  post-checkout: PraxionWrapperFile [ok]
+```
+
+`--status` reports the observed `core.hooksPath` state, the delegate, per-slot ownership, and names any slot where Praxion's hooks currently cannot fire — the diagnosis path for a silently-inert install without reading `.git/` by hand. `--uninstall` restores the recorded pre-Praxion `core.hooksPath` (or unsets it if none was recorded) and re-installs each delegate hook in its original slot from its `.pre-praxion` backup where one exists — full reversibility, no manual `.git/config` surgery required. Exit codes: `0` ok, `1` actionable (`--status` found a slot that cannot fire), `2` usage, `3` refused, `4` environment (not a git repository).
+
 ## Troubleshooting
 
 The bash layer uses distinct exit codes for each failure so you can diagnose without reading the source:

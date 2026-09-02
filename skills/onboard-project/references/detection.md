@@ -12,9 +12,19 @@ Evaluated top-to-bottom; first match wins.
 | 1 | `empty` | target path absent, or exists and contains no entries other than `.`/`..` |
 | 2 | `hackathon-managed` | `.ai-state/.praxion-onboard.json` exists ∧ its `.mode == "hackathon"` (fallback: `.claude/settings.json` `env.PRAXION_HACKATHON_MODE == "1"`) |
 | 3 | `fully-managed` | `.ai-state/.praxion-onboard.json` exists ∧ `.mode != "hackathon"` |
-| 4 | `partially-managed` | `.ai-state/` non-empty ∨ `CLAUDE.md` contains `^## Agent Pipeline$` ∨ any `.git/hooks/post-merge` → `git-finalize-hook.sh` — but no stamp |
+| 4 | `partially-managed` | `.ai-state/` non-empty ∨ `CLAUDE.md` contains `^## Agent Pipeline$` ∨ any *effective* `post-merge` slot → `git-finalize-hook.sh` — but no stamp |
 | 5 | `git-no-praxion` | `.git/` exists, none of the above |
 | 6 | `code-no-git` | source files present, no `.git/` |
+
+**Effective hooks directory (state 4's hook clause).** Since `scripts/install_git_hooks.py`
+(P0 hook chaining) can re-point `core.hooksPath` at a Praxion wrapper directory, a plain
+`.git/hooks/post-merge` check misses an already-chained project entirely — the finalize
+symlink lives inside the wrapper directory, not `.git/hooks/`, once chaining is active. The
+predicate resolves through the *effective* hooks directory first: run
+`git config --get core.hooksPath`; if it is set and names a directory ending in
+`praxion-hooks` under the repository's git common directory (`git rev-parse
+--git-common-dir`), that directory is the effective hooks directory; otherwise fall back to
+`.git/hooks`. Check `post-merge` inside whichever directory that resolves to.
 
 **Mode defaults from state.** `empty` → `new`; `hackathon-managed` → `hackathon` (or `promote` when `--full` / `--mode promote` is given); all others → `existing`. `code-no-git` additionally offers `git init` as the first gated action. Argument presence also selects the mode: a positional `<project-name>` means `new`, no positional means "onboard this directory". An explicit `--mode` overrides and fails fast (exit 2) when it contradicts the detected state.
 

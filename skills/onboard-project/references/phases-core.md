@@ -274,92 +274,30 @@ Composition per trigger: `post-merge` runs `reconcile_ai_state.py` (when `.ai-st
 
 **Skip condition.** If §Pre-flight set the `skip-phase-4` flag (plugin not installed), skip this phase entirely and emit: `Skipping Phase 4 — install the plugin and re-run /onboard-project to install hooks.`
 
-**Predicate (version-aware).** Detect existing symlinks via `readlink .git/hooks/<name>` and check whether the target contains `/praxion/`. The user-project pre-commit hook is written inline and resolves the plugin path at run time, so it is version-independent and never goes stale; the three finalize hooks (`post-merge`, `post-commit`, `post-checkout`) all share `git-finalize-hook.sh` as their target. A finalize-hook symlink is **stale** (must be re-pointed, not skipped) when its target contains `/praxion/` but is NOT `${PLUGIN_INSTALL_PATH}/scripts/git-finalize-hook.sh` — see [shared-procedures.md § Version-aware staleness comparison rationale](shared-procedures.md#-version-aware-staleness-comparison-rationale) for why a full-path comparison is required. Each hook that already points at the live target is skipped; absent, stale, or legacy (`git-post-merge-hook.sh` from older versions) hooks are (re-)installed without prompting.
+**Delegated implementation.** All four hook slots (`pre-commit`, `post-merge`, `post-commit`, `post-checkout`) are installed by one deterministic reconciler, `scripts/install_git_hooks.py`, rather than by prose+bash carried in this skill:
 
-**Action.**
+```bash
+python3 "${PLUGIN_INSTALL_PATH}/scripts/install_git_hooks.py" \
+  --install --repo-root "$REPO_ROOT" --plugin-root "${PLUGIN_INSTALL_PATH}"
+```
 
-1. **Pre-commit hook** — symlink `.git/hooks/pre-commit` to a *user-project-tailored* hook script. Praxion's own repo uses a `.pre-commit-config.yaml` (the `pre-commit` framework) for its author gates including the shipped-artifact-isolation check (Praxion-author-specific). For user projects, write a tailored hook directly into `.git/hooks/pre-commit` (executable) that runs only `check_id_citation_discipline.py`:
-   ```bash
-   #!/usr/bin/env bash
-   # Praxion commit gate (installed by /onboard-project).
-   #
-   # 1. ruff pin coherence — blocks when the ruff pinned in
-   #    .pre-commit-config.yaml differs from the one this project installs.
-   #    Two independently-versioned ruffs formatting the same files never
-   #    converge: the hook reformats on commit, you reformat back, and the
-   #    commit will not settle. Runs FIRST so the version mismatch is named
-   #    rather than presenting as a confusing reformat loop. No-ops on a repo
-   #    with no ruff hook. Rationale: rules/swe/vcs/git-conventions.md.
-   # 2. id-citation-discipline — blocks commits that reference ephemeral
-   #    pipeline ids (REQ-*, AC-*, Step N) in committed source code.
-   #    Rationale: rules/swe/id-citation-discipline.md.
-   #
-   # Checker resolution, in order: this repo's own scripts/ copy first, then
-   # the plugin's. A project that vendors the checker tests and gates its own
-   # copy should be gated by the copy it maintains. A missing checker is
-   # announced, never silently skipped — a gate that exits 0 because it could
-   # not find itself is indistinguishable from no gate at all.
-   set -eo pipefail
-   REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
-   [ -z "$REPO_ROOT" ] && exit 0
+It *observes* the repository's hook configuration before writing anything, so it composes with a husky/lefthook-style `core.hooksPath` and an occupied `.git/hooks/pre-commit` (pre-commit-framework repos) instead of silently no-op'ing or displacing what is already there — see `docs/onboarding.md`'s hook-chaining section for the full behavior and `dec-draft-c66a19a6` for the design rationale. Concretely, per repository state:
 
-   PLUGIN_ROOT=""
-   for KEY in "praxion@bit-agora" "i-am@bit-agora"; do
-     CANDIDATE="$(jq -r --arg k "$KEY" '.plugins[$k][0].installPath // empty' \
-       "$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null)"
-     if [ -n "$CANDIDATE" ] && [ -d "$CANDIDATE" ]; then
-       PLUGIN_ROOT="$CANDIDATE"
-       break
-     fi
-   done
+- `core.hooksPath` unset and a slot empty → today's plain symlink (`post-*`) or the tailored inline pre-commit script, byte-identical to what this skill previously wrote directly.
+- `core.hooksPath` unset and a slot occupied by a non-Praxion hook → the occupant is preserved at `<name>.pre-praxion` (never overwriting an existing backup) and a **chaining wrapper** is installed in its place: the preserved hook runs first, Praxion's own step runs after (pre-commit) or is reported non-blocking (post-*).
+- `core.hooksPath` set to a directory Praxion does not own (husky's `.husky/_`, lefthook's `.lefthook/`) → a Praxion wrapper directory is created inside the repository's **git common** directory, the observed value is recorded as the delegate, and `core.hooksPath` is re-pointed at the wrapper — no tracked file is ever touched.
+- `core.hooksPath` already names the Praxion wrapper directory, or a slot is already Praxion-installed → refreshed in place only if its content has drifted from the current shipped template (the mechanism that replaces this skill's former content-aware top-up table below); otherwise no write occurs at all.
+- `core.hooksPath` set but unresolvable (garbage value, not a directory) → refuses to install or heal, warns once naming the observed value, changes nothing.
 
-   if [ -n "$PLUGIN_ROOT" ] && [ -f "${PLUGIN_ROOT}/scripts/check_ruff_pin_drift.py" ]; then
-     python3 "${PLUGIN_ROOT}/scripts/check_ruff_pin_drift.py" --repo-root "$REPO_ROOT"
-   fi
+Report the reconciler's own one-line-per-hook summary (its `messages` list, or `--json` for machine parsing) rather than re-deriving a report from file state.
 
-   CHECK="${REPO_ROOT}/scripts/check_id_citation_discipline.py"
-   [ ! -f "$CHECK" ] && CHECK="${PLUGIN_ROOT}/scripts/check_id_citation_discipline.py"
-   if [ ! -f "$CHECK" ]; then
-     echo "pre-commit: id-citation checker not found (repo copy absent and no" >&2
-     echo "            Praxion plugin installed) — the gate did NOT run." >&2
-     exit 1
-   fi
+**Content-aware top-up (already-onboarded projects).** This section previously carried a bespoke predicate table for repairing a drifted pre-commit body (ruff-pin-coherence stanza, plugin-key-loop resolution, checker-resolution loud-failure). That table is now subsumed by the installer's own idempotent-write behavior described above: re-running the delegated call on an already-onboarded project rewrites a drifted pre-commit body in place and performs zero writes when it is already current. One predicate remains skill-level, since it decides *whether to re-run the delegated call at all*, per the content-aware top-up mechanism shared with §Phase 8b.3:
 
-   STAGED="$(git diff --cached --name-only --diff-filter=ACMR || true)"
-   [ -z "$STAGED" ] && exit 0
-   # shellcheck disable=SC2086
-   python3 "$CHECK" --repo-root "$REPO_ROOT" --files $STAGED
-   ```
-   `chmod +x .git/hooks/pre-commit` after writing. Resolving the plugin path at hook-run time means plugin upgrades (different install paths) flow automatically — but **the plugin *key* is part of the hook body, not the resolved path**: a hook installed under an older plugin name resolves `PLUGIN_ROOT` to empty forever, and the pre-repair body then exited 0 silently. Hence the key loop above (current name first, legacy name second) and the loud failure. A body-level change like this reaches already-onboarded projects only through the content-aware top-up below.
+| Predicate | Action |
+|---|---|
+| Hook chain is not chaining-aware (`core.hooksPath` set to a foreign directory, or a hook slot is occupied, with no Praxion wrapper present) | Re-run `install_git_hooks.py --install`; report `4: hook chain topped up (composes with core.hooksPath / occupied slot)` |
 
-   **If `.git/hooks/pre-commit` already exists and is NOT a Praxion hook**, back it up to `.git/hooks/pre-commit.pre-praxion` and warn the user. Do not silently overwrite a non-Praxion hook.
-
-   **If it already exists and IS a Praxion hook, the hook BODY can still be stale.** Runtime `PLUGIN_ROOT` resolution keeps the *script paths* fresh; it does nothing for checks added to the hook after this project was onboarded. Those arrive only by editing the installed file. Apply a content-aware top-up, mirroring §Phase 8b.3's predicate style:
-
-   | Predicate | Action |
-   |---|---|
-   | Hook does NOT contain `check_ruff_pin_drift` | Insert the `PIN_CHECK` stanza (the two lines above the `CHECK=` assignment) and report `4: pre-commit hook topped up (ruff pin coherence)` |
-   | Hook contains `i-am@bit-agora` but not `praxion@bit-agora`, or resolves `PLUGIN_ROOT` from a single hard-coded key | Replace the `PLUGIN_ROOT=` line with the key loop above and report `4: pre-commit hook topped up (plugin key resolution)`. **Verify by running the hook**, not by reading it: a hook stuck on the old key resolves `PLUGIN_ROOT` empty and exits 0 in silence, so it looks installed and healthy while gating nothing |
-   | Hook contains `[ ! -f "$CHECK" ] && exit 0` | Replace with the repo-copy-first resolution plus the loud failure above, and report `4: pre-commit hook topped up (checker resolution)` |
-   | Hook already contains all of the above | Skip with `4: pre-commit hook current` |
-
-   **Insert; do not regenerate.** §Phase 8b.3 *appends* a Block D fragment to this same file, so rewriting the hook wholesale would silently delete Block D from every project that installed the AaC tier. Add the missing stanza in place and leave everything else untouched.
-
-   When adding a future check to this hook, add its predicate row here in the same pass — otherwise already-onboarded projects never receive it, which is the defect this table exists to prevent.
-
-2. **Finalize hooks (post-merge, post-commit, post-checkout)** — symlink all three `.git/hooks/<name>` entries to the plugin's multiplexed dispatcher:
-   ```bash
-   for hook in post-merge post-commit post-checkout; do
-     ln -sf "${PLUGIN_INSTALL_PATH}/scripts/git-finalize-hook.sh" ".git/hooks/${hook}"
-   done
-   ```
-   The dispatcher reads `basename($0)` to determine which trigger fired and dispatches to the matching entry point in `finalize_chain.sh`. Together the three hooks cover every path that lands draft ADRs on `main` — fast-forward merges (post-merge), direct commits / non-ff merges / rebases / cherry-picks (post-commit), branch switch / fresh clone (post-checkout). Without all three, draft ADRs that arrive on main via paths that don't fire `post-merge` (or that landed without a textbook merge event) silently sit in `decisions/drafts/` indefinitely.
-
-   The dispatcher is state-driven: each entry point gates on `on_main && drafts_present` before invoking `finalize_adrs.py --all` and `finalize_tech_debt_ledger.py --all`. `post-merge` additionally runs `reconcile_ai_state.py` (when `.ai-state/` was touched) and `check_squash_safety.py` (always, as a diagnostic). All steps are non-blocking — a hook cannot abort a completed git operation.
-
-   Same conflict-handling rule as pre-commit: if any of the three hooks already exists and is NOT a Praxion-managed file, back it up to `.git/hooks/<name>.pre-praxion`. Detect Praxion-managed files by symlink target (canonical) or by grepping for `finalize_chain` / `finalize_adrs` / `reconcile_ai_state` (legacy copies from older versions).
-
-   `chmod +x` is implicit on a symlink target that is already executable.
+An already-onboarded project whose hooks predate P0's chaining support receives the fix through this row on its next `/onboard-project` or `/upgrade-project` run — no other Phase 4 predicate changes.
 
 ## §Phase 5 — `.claude/settings.json` toggles + `permissions.allow` baseline
 

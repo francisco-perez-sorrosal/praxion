@@ -337,6 +337,16 @@ echo "Mode: $MODE"
 echo
 
 # ---- 1. finalize-hook symlinks ---------------------------------------------
+#
+# Two orthogonal jobs share this section, kept as two blocks rather than one
+# merged pass: the ORIGINAL loop below detects drift ACROSS PLUGIN VERSIONS
+# (a stale/dangling/legacy-named symlink from an old cache path, with a
+# self-host safety carve-out this script has always owned); the NEW block
+# after it detects drift in the P0 hook-CHAINING composition (a
+# husky/lefthook-style core.hooksPath the loop above has no notion of at
+# all, or an orphaned wrapper directory) via scripts/install_git_hooks.py.
+# Both run every invocation -- they answer different questions about the
+# same four hook slots and neither subsumes the other.
 
 echo "[1/4] Finalize hooks"
 for h in "${FINALIZE_HOOKS[@]}"; do
@@ -385,6 +395,66 @@ for h in "${FINALIZE_HOOKS[@]}"; do
         ln -sf "$LIVE_HOOK" "$hp"
     fi
 done
+
+# ---- 1b. hook-chain composition (P0) ---------------------------------------
+
+INSTALL_GIT_HOOKS="$(find_plugin_file 'scripts/install_git_hooks.py')" || {
+    err "install_git_hooks.py not found under plugin install or script tree"
+    exit 1
+}
+if mutating; then
+    # install_git_hooks.py exits non-zero for a legitimate refusal (3) as
+    # well as success (0) -- `|| true` keeps that from tripping `set -e`;
+    # the JSON payload (parsed below) is the actual source of truth either
+    # way. --heal restores a KNOWN wrapper only -- it never newly onboards
+    # an Absent/ForeignOccupied slot, which the loop above already owns.
+    HEAL_JSON="$(python3 "$INSTALL_GIT_HOOKS" --heal \
+        --repo-root "$REPO_ROOT" --plugin-root "$PLUGIN_INSTALL_PATH" --json)" || true
+    HEAL_ACTIONABLE="$(printf '%s' "$HEAL_JSON" | python3 -c '
+import json, sys
+p = json.load(sys.stdin)
+print("True" if p.get("changed") or p.get("refused") else "False")
+')"
+    if [ "$HEAL_ACTIONABLE" = "True" ]; then
+        note_change
+        info "hook chain:"
+        printf '%s' "$HEAL_JSON" | python3 -c '
+import json, sys
+payload = json.load(sys.stdin)
+for m in payload.get("messages") or []:
+    print(f"  {m}")
+if payload.get("refused"):
+    print(f"  refused: {payload.get('reason')}")
+'
+    fi
+else
+    # --status is inherently read-only, so no separate --dry-run flag on the
+    # installer is needed to keep this script's non-mutating modes so.
+    #
+    # pre-commit is deliberately excluded from this section's drift count:
+    # this script has never owned the pre-commit slot (Phase 4's own inline
+    # install / a direct `install_git_hooks.py --install` does), so a
+    # standalone pre-commit hook the wrapper mechanism does not (yet) manage
+    # is not this section's drift to report.
+    STATUS_JSON="$(python3 "$INSTALL_GIT_HOOKS" --status \
+        --repo-root "$REPO_ROOT" --plugin-root "$PLUGIN_INSTALL_PATH" --json)" || true
+    CANNOT_FIRE="$(printf '%s' "$STATUS_JSON" | python3 -c '
+import json, sys
+names = [n for n in (json.load(sys.stdin).get("cannot_fire") or []) if n != "pre-commit"]
+print(len(names))
+')"
+    if [ "$CANNOT_FIRE" != "0" ]; then
+        note_change
+        info "hook chain: drift (not fully composed)"
+        printf '%s' "$STATUS_JSON" | python3 -c '
+import json, sys
+payload = json.load(sys.stdin)
+for name in payload.get("cannot_fire") or []:
+    if name != "pre-commit":
+        print(f"  cannot fire: {name}")
+'
+    fi
+fi
 echo
 
 # ---- 2. merge driver registration ------------------------------------------

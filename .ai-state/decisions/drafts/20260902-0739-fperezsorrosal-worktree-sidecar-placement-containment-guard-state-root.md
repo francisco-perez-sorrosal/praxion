@@ -1,11 +1,13 @@
 ---
 id: dec-draft-a3f65ba3
 title: Both containment guards accept a second, explicitly-declared state root, while keeping their original checks intact
-status: proposed
+status: retired
 category: implementation
 date: 2026-09-02
-summary: worktree_guard.py allows a write whose resolved git root equals the designated state repository, and the dashboard's project-root.ts allows a realpath that lands inside a state root supplied by the environment. Neither check is removed - the dashboard keeps mandatory lexical containment against the project root, and the guard keeps blocking every other foreign git tree - so the relaxation is an allowlist entry, not a weakened predicate.
-tags: [security, path-traversal, containment, worktree-guard, dashboard, sidecar, allowlist]
+retired_by:
+  - dec-draft-0516562a
+summary: RETIRED before implementation. This decision admitted one declared containment escape into worktree_guard.py and the dashboard's project-root.ts so that a sidecar reached by an escaping symlink could be written and read. dec-draft-0516562a materialises sidecar state as a git worktree inside each checkout instead, so every Praxion path resolves inside the project root and there is no escape left to admit - the question this record answered no longer exists. Both guards keep their current logic unchanged.
+tags: [security, path-traversal, containment, worktree-guard, dashboard, sidecar, allowlist, retired]
 made_by: agent
 agent_type: systems-architect
 branch: worktree-sidecar-placement
@@ -16,6 +18,12 @@ affected_files:
   - scripts/praxion-dashboard
   - scripts/_state_repo.py
 ---
+
+> **RETIRED 2026-09-02 by `dec-draft-0516562a`, before implementation.** The
+> body below is preserved as written; read it as the reasoning that *was*
+> correct for a design where sidecar state was reached by a symlink escaping the
+> checkout. It is not. See `## Prior Decision` at the end for what changed, what
+> survives, and the condition under which this record re-opens.
 
 ## Context
 
@@ -151,3 +159,48 @@ retreat.
 Two is an allowlist; three is a policy, and a policy belongs in one place with
 its own tests rather than duplicated across a Python hook and a TypeScript
 server module.
+
+## Prior Decision
+
+**What removed this decision's subject.** `dec-draft-0516562a` changed how
+sidecar state is materialised: instead of a symlink escaping the checkout into
+`${PRAXION_SIDECAR_ROOT}/<id>/`, each checkout mounts the sidecar as a
+`git worktree` at `<checkout>/.praxion/` and the shadows become *relative*
+symlinks pointing inward. Every Praxion path therefore resolves **inside the
+project root**. The question this record answered — "how do we admit one
+specific containment escape without admitting the class?" — no longer has a
+subject: there is no escape.
+
+Concretely, both clauses lapse:
+
+- **`worktree_guard.py`** needs nothing. Its existing
+  `_is_within(target.resolve(), session_root)` early return fires before any git
+  logic, because the resolved target is inside the session worktree. Verified
+  against the source.
+- **`project-root.ts`** keeps *both* containment checks and gains no second
+  realpath root and no `PRAXION_STATE_ROOT` environment channel. One small
+  change survives, and it is a different decision than this one: because
+  `assertProjectPath` re-applies `isAllowedArtifactPath` to the **resolved**
+  relative path — which under the mount reads `.praxion/.ai-state/…` — that
+  allowlist constant gains a `.praxion/.ai-state` entry. An allowlist entry for
+  an in-project prefix is not a containment relaxation, so it is recorded in the
+  plan and in `dec-draft-0516562a`, not here.
+
+This is a **retirement, not a supersession**: `dec-draft-0516562a` makes no
+claim about whether admitting a declared escape was the right answer to the
+question. It removed the question.
+
+**Re-open condition** (retired records return to `accepted` and clear
+`retired_by` if their subject returns). If a Praxion write path is found that
+must target the sidecar's git common directory — or any path outside the
+checkout — by absolute path, then a containment escape exists again and this
+record's analysis, including its option table and its falsifier about treating
+the dashboard's two checks as independent, becomes live. The most likely route:
+a future component that operates on the sidecar repository itself rather than
+through a mount.
+
+**What survives regardless.** The falsifier recorded above is still worth a test
+under the new design, in a sharper form: position the sidecar *inside* the
+project directory and assert the dashboard's lexical and realpath checks agree.
+The chosen design makes that configuration ordinary rather than exotic, so the
+probe is cheaper to write and more likely to matter.

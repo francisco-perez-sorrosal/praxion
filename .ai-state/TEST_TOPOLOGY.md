@@ -842,14 +842,16 @@ file_dependencies:
   - "scripts/_git_runner.py"
   - "scripts/_repo_root.py"
   - "scripts/_script_cli.py"
+integration_boundaries:
+  - decision-records
+  - state-ledgers
 parallel_safe: true
 shared_fixture_scope: per-test
 expected_runtime_envelope:
   p50_seconds: 2.6
   p95_seconds: 4
 shared_state: tmp_path
-notes: "Small on purpose -- a node for the planner to hang wide boundaries off."
-```
+notes: "Small on purpose -- a node for the planner to hang wide boundaries off. sidecar-placement (P1) added _state_repo.py, _sidecar_manifest.py, _sidecar_checks.py, _sidecar_link.py, _sidecar_commit.py, praxion-sidecar and their test files as selectors/file_dependencies for the test-engineer to register in Steps 1b-7b; the integration_boundaries above widen because _state_repo.py is now a dependency of finalize_adrs.py (decision-records) and reconcile_ai_state.py/reconcile_aac_surfaces.py (state-ledgers)."
 
 Nearly every other `scripts/` group imports this plumbing, so a change here
 legitimately deserves a large radius — and that radius belongs in

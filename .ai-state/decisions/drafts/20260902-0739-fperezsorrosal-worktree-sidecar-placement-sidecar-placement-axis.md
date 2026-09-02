@@ -10,6 +10,8 @@ made_by: agent
 agent_type: systems-architect
 branch: worktree-sidecar-placement
 pipeline_tier: full
+superseded_in_part_by:
+  - dec-draft-0516562a
 affected_files:
   - scripts/praxion-sidecar
   - scripts/_state_repo.py
@@ -62,6 +64,14 @@ Onboarding gains a **placement** axis alongside its four modes.
    preserved**; only the answer to "which git repository owns this path"
    changes. Every agent, hook, skill and command that reads `.ai-state/` is
    untouched.
+
+   > **Narrowed by `dec-draft-0516562a`.** The projection mechanism is no longer
+   > "a symlink into `${PRAXION_SIDECAR_ROOT}`". Each checkout mounts the
+   > sidecar as a `git worktree` at `<checkout>/.praxion/` and the shadows are
+   > *relative* symlinks pointing inward, because Claude Code's worktree
+   > isolation refuses `Write`/`Edit` on any lexically-in-worktree path whose
+   > realpath escapes the worktree. The path contract, the invisibility
+   > mechanism and the reversibility below are unchanged.
 3. Two new components carry the mode: `scripts/praxion-sidecar` (the only
    writer of the sidecar and of the `.git/info/exclude` Praxion block) and
    `scripts/_state_repo.py` (the resolver, specified separately).
@@ -137,9 +147,11 @@ a backup path exists if the operator wants one; one sidecar serves every clone
 and worktree of a project; the failure mode of a wrong `git add` is a loud
 error rather than a silent leak; promotion in and out is mechanical.
 
-Cons: a second repository the operator must know about; branch-scoped state
-isolation is lost, taking `reconcile_ai_state.py` and the `observations.jsonl`
-merge driver out of play for this mode; two new components to maintain.
+Cons: a second repository the operator must know about; two new components to
+maintain. ~~branch-scoped state isolation is lost, taking `reconcile_ai_state.py`
+and the `observations.jsonl` merge driver out of play for this mode~~ —
+corrected by `dec-draft-0516562a`: the state mount keeps both in play, on the
+sidecar side, at the price of a merge-back step.
 
 ## Consequences
 
@@ -152,14 +164,26 @@ placement instead of four heuristics. `publish` makes the decision reversible,
 which matters because an operator's judgement about whether a team will adopt
 Praxion is exactly the kind of judgement that changes.
 
-**Negative.** State is now shared live across worktrees rather than diverging
+**Negative.** ~~State is now shared live across worktrees rather than diverging
 and reconciling at merge; two concurrent pipelines on one project see each
 other's drafts immediately. `reconcile_ai_state.py` and the squash-safety
 diagnostic become no-ops in this mode, so a reader must know the mode to know
-whether they ran. There is no automatic backup, and with no remote by default a
+whether they ran.~~ — **this clause no longer holds; narrowed by
+`dec-draft-0516562a`.** The state mount gives each checkout its own sidecar
+branch, so state is branch-scoped again, `reconcile_ai_state.py` and the merge
+drivers are back in play (on the sidecar side, at merge-back), and each mount
+has its own git index. The cost that replaces it is a **merge-back ordering
+constraint**: a worktree's sidecar branch must merge before the project branch,
+or the post-merge ADR promotion finds no drafts. See that record's
+`## Prior Decision` for why this is a trade rather than a free correction — the
+mechanism was chosen for the write path, and branch-scoped isolation is a
+consequence of it, not a vindication of the trigger recorded below.
+
+There is no automatic backup, and with no remote by default a
 lost machine loses the intelligence — an operator responsibility this design
 documents rather than solves. Placement multiplies the onboarding test matrix:
-every capability now has a placement dimension.
+every capability now has a placement dimension. And each checkout now carries a
+nested git repository, which is one more thing an operator can be surprised by.
 
 **Neutral.** `dec-221`'s two-tier model is not contradicted for its own scope —
 disposable bulk still goes out of tree, and machine-specific absolute paths are
@@ -172,10 +196,21 @@ the curated tier gains a second legal home.
 no `git log` on the sidecar, no recovery from it, no cross-machine sync — then
 the entire justification for a *repository* rather than a plain excluded
 directory has evaporated, and option A was right: same guard fixes, far less
-machinery. A second, faster falsifier: if two concurrent Standard-tier pipelines
+machinery. **This falsifier is now stronger, not weaker** — under
+`dec-draft-0516562a` the repository is load-bearing in a second way (it is what
+`git worktree` mounts from, and what merge-back merges within), so "the history
+is never consulted" would have to coexist with machinery that exists only
+because it is a repository.
+
+~~A second, faster falsifier: if two concurrent Standard-tier pipelines
 on one sidecar-placed project produce a single lost write in `calibration_log.md`
 or a ledger, the shared-live-tree premise is wrong and the design needs
-per-worktree state, which is a different architecture rather than a patch.
+per-worktree state, which is a different architecture rather than a patch.~~ —
+**retired: the shared-live-tree premise is gone.** Per-worktree state is what
+`dec-draft-0516562a` implements, arrived at from the write path rather than from
+this trigger. Its replacement, recorded in that decision: one ADR draft written
+inside a pipeline worktree that is not promoted after `/merge-worktree` because
+the sidecar merge-back was missed.
 
 **Steelmanned runner-up.** Option A is stronger than its rejection makes it
 sound. It requires no identity derivation, no manifest, no cross-repository
@@ -192,8 +227,10 @@ not trust the store stops investing in it. But that is a judgement about
 behaviour under risk, not a measured fact, and it is the weakest joint in this
 decision.
 
-**Reversal trigger.** Either falsifier firing. Additionally: if Claude Code
-introduces first-class support for external per-project state (an official
-mechanism for machine-local project intelligence outside the repository), that
-mechanism should be evaluated as a replacement for the sidecar rather than
-carrying both.
+**Reversal trigger.** The surviving falsifier firing (the sidecar's history is
+never consulted), or `dec-draft-0516562a`'s merge-back falsifier firing — the
+latter reverses the *mechanism*, not this decision's placement axis.
+Additionally: if Claude Code introduces first-class support for external
+per-project state (an official mechanism for machine-local project intelligence
+outside the repository), that mechanism should be evaluated as a replacement for
+the sidecar rather than carrying both.

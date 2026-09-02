@@ -4,7 +4,7 @@ title: A single resolver answers which git repository owns .ai-state/, returning
 status: proposed
 category: architectural
 date: 2026-09-02
-summary: scripts/_state_repo.py is the sole answer to "which repo owns .ai-state/", returning InRepo | SidecarOwned | Dangling | Foreign with fully-resolved paths, never a bare path or an Optional. Two entry points split the contract - resolve_placement for readers, require_writable_placement for writers, which raises on the two error variants so a broken or third-party link can never be written into.
+summary: scripts/_state_repo.py is the sole answer to "which repo owns .ai-state/", returning InRepo | SidecarOwned | Dangling | Foreign with fully-resolved paths, never a bare path or an Optional. Two entry points split the contract - resolve_placement for readers, require_writable_placement for writers, which raises on the two error variants so a broken or third-party link can never be written into. Revised by dec-draft-0516562a: SidecarOwned now carries the in-checkout state mount as its state_git_root plus the sidecar common dir and branch, discovery is stdlib and subprocess-free via the mount's .git pointer file, and the consumer set drops the two containment guards and the dashboard entirely.
 tags: [resolver, sum-type, state-ownership, sidecar, fail-closed, data-structure-design, scripts]
 made_by: agent
 agent_type: systems-architect
@@ -17,16 +17,26 @@ affected_files:
   - scripts/reconcile_aac_surfaces.py
   - scripts/finalize_chain.sh
   - scripts/refresh_claude_blocks.py
-  - hooks/worktree_guard.py
-  - scripts/praxion-dashboard
-dissent: "Seven consumers now import a module that runs git subprocesses and reads a YAML manifest on paths as hot as a PreToolUse guard and a per-commit hook; the previous design had no such shared dependency, and a resolver that is slow, or that raises where a caller expected a path, becomes a single point of failure for machinery that was previously independent and individually fail-open."
+  - scripts/praxion-sidecar
+dissent: "Six consumers now import a module that reads a manifest on paths as hot as a per-commit hook; the previous design had no such shared dependency, and a resolver that is slow, or that raises where a caller expected a path, becomes a single point of failure for machinery that was previously independent and individually fail-open. The state mount removed the hottest consumer (a PreToolUse guard on every write) from that set, which weakens but does not retire the objection."
 ---
+
+> **Revised in place 2026-09-02** (still a draft) after `dec-draft-0516562a`
+> changed how sidecar state is materialised. The decision's substance is
+> unchanged — one resolver, a four-variant sum type, fully-resolved paths, a
+> reader/writer entry-point split, identity compared and never re-derived.
+> Three things moved: `state_git_root` is the in-checkout **state mount** rather
+> than the sidecar root; discovery is stdlib and subprocess-free via the mount's
+> `.git` pointer file; and the consumer set lost `worktree_guard.py`,
+> `project-root.ts` and `praxion-dashboard`, which need no resolver at all now
+> that every Praxion path resolves inside the checkout.
 
 ## Context
 
-Under sidecar placement `.ai-state/` is a symlink into a different git
-repository. Several existing consumers must therefore stop assuming that the
-repository containing the project also owns the state:
+Under sidecar placement `.ai-state/` is a symlink into the state mount, which is
+a `git worktree` of a different git repository. Several existing consumers must
+therefore stop assuming that the repository containing the project also owns the
+state:
 
 - `finalize_adrs.py` runs `git mv` and `git add` on ADR paths — both refuse a
   path beyond a symlink, so they need the *state* repository and realpaths.
@@ -34,12 +44,17 @@ repository containing the project also owns the state:
   exist when every checkout shares one physical tree.
 - `reconcile_aac_surfaces.py` stages surfaces that may live beyond a shadow.
 - `finalize_chain.sh` composes all of the above.
-- `worktree_guard.py` blocks writes into any git tree other than the session
-  worktree — which, verified against the code, is exactly what a write into the
-  sidecar looks like.
-- The dashboard's path guard resolves symlinks and requires containment.
 - `refresh_claude_blocks.py` writes to a `CLAUDE.md` whose location is now
   placement-dependent.
+
+Two consumers named in the original draft — `worktree_guard.py` and the
+dashboard's `project-root.ts` (with `praxion-dashboard` as its launcher) —
+**left this set** with `dec-draft-0516562a`. Both broke only because a write or
+read had to follow a symlink *escaping* the checkout; under the state mount the
+resolved path lands inside the project root, so both keep their existing logic
+and neither imports this module. That is a strictly better outcome than the
+allowlist they were going to receive: two security-relevant files gain no new
+dependency at all.
 
 The naive shape is `state_repo_root() -> Path`, with each consumer branching on
 `!= project_root`. That is the failure this decision exists to prevent. A bare
@@ -67,8 +82,12 @@ exactly like `_repo_root.py` (`scripts/` is on `sys.path[0]` for all of them).
 
    - `InRepo` — carries `project_root`, `state_dir`, and `state_git_root`
      equal to `project_root`.
-   - `SidecarOwned` — carries `project_root`, `state_dir`, `state_git_root`,
-     `sidecar_root`, and a `SidecarIdentity {schema, id, origin}` — **not** a
+   - `SidecarOwned` — carries `project_root`, `state_dir`, `mount_dir`
+     (`<project_root>/.praxion`, the state mount), `state_git_root` **equal to
+     `mount_dir`** (every `git -C` for state runs inside the checkout),
+     `sidecar_common_dir` (`<sidecar>/.git`, which identifies the sidecar across
+     all its worktrees), `branch` (this checkout's sidecar branch), and a
+     `SidecarIdentity {schema, id, origin}` — **not** a
      full parsed manifest. The resolver constructs this variant on every hook
      and finalize path, where it may lack PyYAML and can read only the three
      identity fields; a `manifest` field would hold a partial object whose
@@ -80,20 +99,37 @@ exactly like `_repo_root.py` (`scripts/` is on `sys.path[0]` for all of them).
      deliberately by calling the full reader — so "I only have the three
      identity fields here" is a representable, checkable state
      (`MinimalView`), not an under-populated bag. Verified against the consumer
-     set: the four stagers, both guards and the dashboard need only
-     `{schema, id, origin, sidecar_root}`; only `praxion-sidecar` and
-     `sidecar_autocommit.py` (already full-YAML contexts) read the wider fields.
-   - `Dangling` — the shadow is a symlink whose target does not exist; carries
-     the link path and its target.
+     set: the four stagers need only
+     `{schema, id, origin, mount_dir, sidecar_common_dir}`; only
+     `praxion-sidecar` and `sidecar_autocommit.py` (already full-YAML contexts)
+     read the wider fields.
+   - `Dangling` — the shadow is a symlink whose target does not exist (typically
+     an unmaterialised mount); carries the link path and its target.
    - `Foreign` — the target exists but is not this project's sidecar; carries
      the resolved target and a `reason` from the closed set `no-manifest`,
      `manifest-unreadable`, `schema-too-new`, `identity-mismatch`,
-     `not-a-git-repo`.
+     `not-a-git-repo`, `unrecognized-mount`.
 
 2. **All paths are fully resolved by the resolver**, once. Consumers compare
    resolver-supplied paths with each other and never call `resolve()`
    themselves. This is what makes the realpath-normalisation problem a
    single-site concern.
+
+2a. **Discovery is stdlib and subprocess-free on the hot path.** Read the
+   `.ai-state` symlink → derive `<checkout>/.praxion` → read its `.git`
+   **pointer file** (`gitdir: <sidecar>/.git/worktrees/<name>`) → strip the
+   trailing `worktrees/<name>` segment → `sidecar_common_dir` → read the
+   manifest beside it. Two file reads, no `git` invocation. An unrecognised
+   pointer shape returns `Foreign(unrecognized-mount)` rather than guessing;
+   `git rev-parse --git-common-dir` exists only as a fallback and is never the
+   primary. Verified live against git 2.44.0.
+
+2b. **`SidecarOwned` asserts the in-checkout realpath invariant.** `mount_dir`
+   is inside `project_root`; `sidecar_common_dir` is outside it. A mount that
+   fails either containment is `Foreign(unrecognized-mount)`, never a
+   `SidecarOwned` carrying a surprising path. This is the constructor-level
+   statement of the property that keeps Claude Code's worktree isolation, the
+   worktree guard, and the dashboard's containment checks all satisfied.
 
 3. **Two entry points split the contract by caller obligation.**
    `resolve_placement()` returns the sum type and is for readers, which may
@@ -188,10 +224,14 @@ a stated reason. Adding a future consumer is an import plus a `match`, not a
 re-derivation. `InRepo` keeps every existing code path byte-identical, so the
 resolver is additive for the ~all projects that never adopt sidecar placement.
 
-**Negative.** A shared dependency on hot paths. `worktree_guard.py` is a
-PreToolUse hook on every `Write`/`Edit`, so the resolver must fast-exit before
-any subprocess when `.ai-state` is not a symlink — a performance obligation the
-guard did not previously have. `require_writable_placement()` raising means
+**Negative.** A shared dependency on paths that run per commit and per session.
+The sharpest version of this objection has been **removed by
+`dec-draft-0516562a`**: `worktree_guard.py`, a PreToolUse hook on every
+`Write`/`Edit`, is no longer a consumer, so the resolver no longer owes a
+per-write fast-exit budget. What remains is the finalize chain and the
+SessionStart hooks, where the stdlib two-read discovery above is cheap enough
+that the obligation is met by construction rather than by care.
+`require_writable_placement()` raising means
 callers that previously could not fail now can, and each needs its refusal
 message wired to the resolver's `reason`. The `Foreign(identity-mismatch)`
 variant will fire on legitimate operator actions (renaming a GitHub
@@ -202,10 +242,18 @@ organisation) and the escape hatch must be discoverable or it reads as breakage.
 **Falsifier.** If, across the consumer set, `Dangling` and `Foreign` are handled
 identically at every site — every caller collapsing them to "refuse, print the
 message" — then the two variants bought a distinction nobody uses and should
-merge into one `Unusable { reason }`. Equally: if profiling shows the resolver's
-fast-exit path measurably slowing `worktree_guard.py` on a normal in-repo
-project, the shared-module design is paying a cost the in-repo majority should
-not bear, and the guard needs its own cheaper predicate.
+merge into one `Unusable { reason }`. Under the state mount `Dangling` acquires
+a *second*, more common cause (an unmaterialised mount awaiting the SessionStart
+heal) that is genuinely recoverable rather than an error, which makes the
+distinction more likely to earn its keep — so if it *still* collapses at every
+site, the falsifier has fired hard.
+
+The original second clause of this falsifier — profiling showing the resolver
+slowing `worktree_guard.py` — is **retired**: the guard is no longer a consumer.
+Its replacement: if the two-read stdlib discovery ever needs a `git` subprocess
+on the finalize path to be correct, the "no subprocess on the hot path" property
+was aspirational rather than structural, and the manifest-location decision
+(sidecar git common dir) should be revisited.
 
 **Steelmanned runner-up.** Option A is defensible on the grounds that the
 consumers are not symmetric: only `finalize_adrs.py` genuinely needs the state

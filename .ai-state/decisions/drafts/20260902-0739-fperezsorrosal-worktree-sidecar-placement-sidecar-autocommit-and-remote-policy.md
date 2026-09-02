@@ -49,6 +49,27 @@ and a channel created by a single convenient command.
    automatic commit under any placement — the existing `git add`-never-`git
    commit` contract is untouched.
 
+1a. **The commit is serialized by an advisory lock; staging is
+   pathspec-scoped.** Under the shared-live-tree model
+   (`dec-draft-4b33b1df`), two concurrent pipelines produce up to four
+   committers — two finalize, two `Stop` — racing on the sidecar's single
+   `.git/index` and `index.lock`. The sidecar index is shared mutable state and
+   is given a named owner: `praxion-sidecar commit` acquires an advisory
+   `fcntl` lock scoped to the sidecar repo (`<sidecar>/.git/praxion-sidecar-commit.lock`,
+   mirroring `finalize_adrs.py`'s `.finalize.lock`) before staging and releases
+   it after committing; a committer that cannot acquire it waits (bounded) and,
+   on timeout, defers to the next trigger rather than racing — safe because the
+   discipline is idempotent. Staging is **pathspec-scoped**
+   (`git add -- <written paths>`), never `git add -A`, so two committers that
+   acquire the lock in sequence never stage each other's partial work. The
+   held-lock ("commit-in-progress") state is modeled and reported by `doctor`,
+   so a stale lock from a crashed process is diagnosable rather than surfacing
+   as an opaque `fatal: Unable to create '.../index.lock'`. This closes the
+   index-corruption failure mode inside the accepted shared-live-tree trade-off;
+   it does not remove that trade-off (the higher-level "two pipelines see each
+   other's drafts" property keeps its own reversal trigger in
+   `dec-draft-4b33b1df`).
+
 2. **The policy is a manifest field with a closed enum**, not a hardcoded
    behaviour: `on-finalize-and-stop` (default), `on-finalize`, `manual`. An
    operator who wants full control sets `manual` and the automatic paths become

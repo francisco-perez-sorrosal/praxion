@@ -54,8 +54,9 @@ There is a second reason the error cases must be in the type. A `.ai-state`
 symlink pointing at *some other* directory — an operator's manual experiment,
 another project's sidecar — is indistinguishable from a legitimate one by path
 shape alone. Only comparing the target manifest's recorded identity against the
-project's observed origin separates them, and only the resolver is positioned
-to do that.
+project — its recorded `origin` for a remote project, or the project root's
+membership in the manifest's `roots:` list for a remote-less one — separates
+them, and only the resolver is positioned to do that.
 
 ## Decision
 
@@ -67,7 +68,21 @@ exactly like `_repo_root.py` (`scripts/` is on `sys.path[0]` for all of them).
    - `InRepo` — carries `project_root`, `state_dir`, and `state_git_root`
      equal to `project_root`.
    - `SidecarOwned` — carries `project_root`, `state_dir`, `state_git_root`,
-     `sidecar_root`, and the parsed manifest.
+     `sidecar_root`, and a `SidecarIdentity {schema, id, origin}` — **not** a
+     full parsed manifest. The resolver constructs this variant on every hook
+     and finalize path, where it may lack PyYAML and can read only the three
+     identity fields; a `manifest` field would hold a partial object whose
+     absent `paths`/`autocommit`/`remote` keys are indistinguishable from
+     legitimately-absent ones (the correlated-nullable smell this design
+     eliminates elsewhere). Manifest content beyond identity is reached through
+     a separate `ManifestView` sum (`MinimalView { identity } | FullView
+     { identity, paths, excludes, autocommit, remote }`) that a consumer widens
+     deliberately by calling the full reader — so "I only have the three
+     identity fields here" is a representable, checkable state
+     (`MinimalView`), not an under-populated bag. Verified against the consumer
+     set: the four stagers, both guards and the dashboard need only
+     `{schema, id, origin, sidecar_root}`; only `praxion-sidecar` and
+     `sidecar_autocommit.py` (already full-YAML contexts) read the wider fields.
    - `Dangling` — the shadow is a symlink whose target does not exist; carries
      the link path and its target.
    - `Foreign` — the target exists but is not this project's sidecar; carries
@@ -92,18 +107,40 @@ exactly like `_repo_root.py` (`scripts/` is on `sys.path[0]` for all of them).
    construction; the variants are frozen dataclasses built only inside
    `resolve_placement()`.
 
-5. **The resolver does not depend on PyYAML.** It runs inside `finalize_adrs.py`
-   and hooks in consumer projects whose interpreter may lack it — the pyenv-shim
-   failure `finalize_chain.sh` already documents. It reads only `schema`,
-   `project.id` and `project.origin` with a stdlib line parser and treats any
-   parse difficulty as `Foreign(manifest-unreadable)`. `praxion-sidecar` remains
-   the full-fidelity reader and sole writer; a test asserts the two readers agree
-   on those three fields across the manifest fixtures.
+5. **The resolver does not depend on PyYAML, and its degraded reader carries
+   the evolution contract.** It runs inside `finalize_adrs.py` and hooks in
+   consumer projects whose interpreter may lack PyYAML — the pyenv-shim failure
+   `finalize_chain.sh` already documents. It reads only the frozen triple
+   `{schema, project.id, project.origin}` with a stdlib line parser. Because
+   this stdlib reader is the one that *gates state-mutating callers*, the
+   forward-compatibility guarantee is its responsibility, not just the full
+   parser's: it **parses `schema` first and hard-refuses `schema != 1`**
+   (returning `Foreign(schema-too-new)`) before trusting any other line, so a
+   future schema-2 layout that relocated `project.id` cannot make the old
+   positional parser read a stale line and yield a confident wrong identity —
+   a successful-but-wrong parse that "any parse difficulty ⇒ foreign" would not
+   catch. `{schema, project.id, project.origin}` are a **frozen, top-level,
+   never-relocated compatibility triple** any future `schema` bump must
+   preserve in place. `praxion-sidecar` remains the full-fidelity reader and
+   sole writer; tests assert the two readers agree on the triple across
+   fixtures **and** that the stdlib reader refuses a hand-written schema-2
+   fixture that renests `project`.
 
-6. **Identity is compared, never re-derived.** Derivation lives in
-   `praxion-sidecar` and runs once at `init`. A project whose observed origin
-   disagrees with the manifest's recorded origin resolves as
-   `Foreign(identity-mismatch)`, never as a silent re-key.
+6. **Identity is compared, never re-derived — and the comparison is defined for
+   both identity kinds.** Derivation lives in `praxion-sidecar` and runs once
+   at `init`. For an `OriginDerived` project the resolver compares the observed
+   `remote.origin.url` against the recorded `project.origin`. For a remote-less
+   `PathDerived` project, `origin` is `null` on both sides, so origin comparison
+   gives **zero** protection — the resolver instead checks whether the observed
+   `.ai-state` realpath's owning-project root is a **member of the manifest's
+   `roots:` list**; a non-member link belongs to another project and resolves as
+   `Foreign(identity-mismatch)`. This promotes `roots:` from informational to
+   load-bearing for the remote-less population, and the resolver **compares a
+   realpath against a recorded list** rather than re-deriving the `PathDerived`
+   hash — so the single-derivation-owner invariant is preserved
+   (`praxion-sidecar` appends to `roots:` on each new checkout at `init`/`link`).
+   A silent re-key never happens in either case; `praxion-sidecar link --rekey`
+   is the explicit escape.
 
 ## Considered Options
 

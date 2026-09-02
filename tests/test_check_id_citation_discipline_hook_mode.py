@@ -51,16 +51,22 @@ def _commit_all(repo: Path, message: str = "c") -> None:
     _git(repo, "commit", "-q", "-m", message)
 
 
-def _run_hook(repo: Path, command: str) -> subprocess.CompletedProcess[str]:
+def _run_hook(
+    repo: Path, command: str, *, signal_env: bool = False
+) -> subprocess.CompletedProcess[str]:
     payload = json.dumps(
         {"tool_name": "Bash", "tool_input": {"command": command}, "cwd": str(repo)}
     )
+    env = None
+    if signal_env:
+        env = {**os.environ, "PRAXION_COMMIT_PAYLOAD": "1"}
     return subprocess.run(
         [sys.executable, str(CHECKER)],
         input=payload,
         capture_output=True,
         text=True,
         cwd=str(repo),
+        env=env,
     )
 
 
@@ -148,6 +154,33 @@ def test_non_payload_stdin_falls_back_to_full_scan(tmp_path: Path) -> None:
     result = _run_full(tmp_path, stdin_text="not a hook payload")
 
     assert result.returncode == 1, result.stdout + result.stderr
+
+
+def test_payload_env_signal_forces_hook_mode_without_probing(tmp_path: Path) -> None:
+    # The commit-gate wrapper sets PRAXION_COMMIT_PAYLOAD so hook mode engages
+    # deterministically under load, where a timed stdin probe could lose the
+    # race and fall back to a whole-repo scan that blocks the commit.
+    _init_repo(tmp_path)
+    _write(tmp_path, "src/legacy.py", VIOLATING_LINE)
+    _commit_all(tmp_path)
+    _write(tmp_path, "src/clean.py", CLEAN_LINE)
+    _git(tmp_path, "add", "src/clean.py")
+
+    result = _run_hook(tmp_path, 'git commit -q -m "add clean"', signal_env=True)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "legacy.py" not in result.stdout
+
+
+def test_payload_env_signal_still_blocks_a_staged_violation(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _write(tmp_path, "src/bad.py", VIOLATING_LINE)
+    _git(tmp_path, "add", "src/bad.py")
+
+    result = _run_hook(tmp_path, 'git commit -m "x"', signal_env=True)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "src/bad.py" in result.stdout
 
 
 def test_open_but_silent_stdin_does_not_hang_the_full_scan(tmp_path: Path) -> None:

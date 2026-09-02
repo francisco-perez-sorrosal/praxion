@@ -348,21 +348,26 @@ def hook_scope_files(payload: dict, default_root: Path) -> tuple[Path, list[Path
     return repo_root, [repo_root / name for name in dict.fromkeys(names)]
 
 
-_STDIN_PROBE_SECONDS = 0.25
+_STDIN_PROBE_SECONDS = 1.0
+_PAYLOAD_ENV = "PRAXION_COMMIT_PAYLOAD"
 
 
 def _stdin_has_payload() -> bool:
-    """True when stdin is a non-terminal stream with data already waiting.
+    """True when stdin should be read for a hook payload.
 
-    A hook pipes its payload before the process starts, so the data is ready
-    at once. A CLI or CI invocation frequently inherits an *open* pipe that
-    carries nothing and never closes; a blind ``read()`` there hangs forever.
-    Probing readiness with a short timeout distinguishes the two without
-    consuming anything.
+    The commit-gate wrapper exports ``PRAXION_COMMIT_PAYLOAD`` and pipes the
+    payload with a closing writer, so that signal is authoritative and immune
+    to load — a blocking read behind it always reaches EOF. Without the signal
+    (a direct CLI or test invocation) we fall back to a readiness probe: a
+    non-terminal stream with data waiting is a piped payload; an inherited
+    *open* pipe that never writes is not, and a blind ``read()`` there would
+    hang, so the probe consumes nothing and treats "not ready" as no payload.
     """
     try:
         if sys.stdin is None or sys.stdin.isatty():
             return False
+        if os.environ.get(_PAYLOAD_ENV):
+            return True
         import select
 
         ready, _, _ = select.select([sys.stdin], [], [], _STDIN_PROBE_SECONDS)

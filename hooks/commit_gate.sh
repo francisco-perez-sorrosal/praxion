@@ -39,7 +39,13 @@ input=$(cat)
 # False positives (rare) just run the Python hook unnecessarily — same as before.
 if echo "$input" | grep -q 'git.*commit'; then
     rc=0
-    echo "$input" | python3 "$1" || rc=$?
+    # PRAXION_COMMIT_PAYLOAD tells a payload-aware checker that stdin carries a
+    # hook payload deterministically, rather than sniffing stdin readiness with
+    # a timed probe that can lose the race under load (a false "no payload" then
+    # runs a whole-repo scan and blocks the commit). Harmless to checkers that
+    # ignore it. The `echo | python3` pipe always reaches EOF, so a blocking
+    # read is safe here.
+    echo "$input" | PRAXION_COMMIT_PAYLOAD=1 python3 "$1" || rc=$?
     if [ "$blocking" -eq 1 ] && [ "$rc" -eq 1 ]; then
         exit 2
     fi

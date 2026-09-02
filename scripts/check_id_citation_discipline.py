@@ -311,13 +311,19 @@ def _git(cwd: Path, *args: str) -> subprocess.CompletedProcess[str] | None:
     ``None`` so the caller can choose a safe response rather than misread it.
     """
     for attempt in range(_GIT_RETRIES):
-        result = subprocess.run(
-            ["git", "-C", str(cwd), *args],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if result.returncode == 0:
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(cwd), *args],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError:
+            # git could not even be spawned (resource pressure, transient
+            # exec failure). Treat as a failed call so the caller falls to its
+            # pass-safe path rather than crashing the gate.
+            result = None
+        if result is not None and result.returncode == 0:
             return result
         if attempt + 1 < _GIT_RETRIES:
             time.sleep(_GIT_RETRY_SLEEP)
@@ -363,12 +369,15 @@ def hook_scope_files(
             return _ScopeUnavailable
         # Direct CLI: distinguish "not a repo" (full scan is correct) from a
         # transient error inside a repo with one quick probe.
-        probe = subprocess.run(
-            ["git", "-C", str(cwd), "rev-parse", "--is-inside-work-tree"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        try:
+            probe = subprocess.run(
+                ["git", "-C", str(cwd), "rev-parse", "--is-inside-work-tree"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError:
+            return None
         if probe.returncode != 0:
             return None
         return _ScopeUnavailable
@@ -520,7 +529,15 @@ def main(argv: list[str]) -> int:
     if args.files:
         files = filter_files(list(args.files), repo_root)
     else:
-        scope = _hook_scope_from_stdin(repo_root)
+        try:
+            scope = _hook_scope_from_stdin(repo_root)
+        except Exception:
+            # A commit payload signal plus any unforeseen scoping failure must
+            # never escalate to a whole-repo scan that blocks the commit.
+            if os.environ.get(_PAYLOAD_ENV):
+                print("hook mode: commit scope unavailable (transient); passing.")
+                return 0
+            raise
         if scope is _ScopeUnavailable:
             # A commit payload we could not scope (transient git failure). Pass
             # rather than gate the commit on the whole tree's pre-existing

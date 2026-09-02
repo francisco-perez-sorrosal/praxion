@@ -37,8 +37,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -252,40 +254,140 @@ def is_exempt_by_path(rel_path: Path) -> bool:
 
 
 def iter_code_files(repo_root: Path) -> list[Path]:
+    """Full-repo corpus: code files by extension plus extensionless bash scripts.
+
+    Walks with ``os.walk`` and prunes excluded directories *before* descending
+    into them. The earlier ``rglob`` enumeration filtered ``node_modules``,
+    sibling worktrees and the like only after visiting every file inside them,
+    which on a checkout with an installed dashboard took longer than the
+    PreToolUse hook budget — so the commit gate timed out and failed open on
+    the main checkout while a fresh worktree (no ``node_modules``) finished in
+    time and blocked. Pruning makes the walk cost proportional to the corpus.
+    """
     files: list[Path] = []
-    for ext in CODE_EXTENSIONS:
-        for path in repo_root.rglob(f"*{ext}"):
-            if not path.is_file():
-                continue
-            try:
-                rel = path.relative_to(repo_root)
-            except ValueError:
-                continue
+    for dirpath, dirnames, filenames in os.walk(repo_root):
+        rel_dir = Path(dirpath).relative_to(repo_root)
+        # Prune by repo-relative location so the walk never enters an excluded
+        # subtree; `is_excluded_path` matches directory fragments, so probe
+        # with a placeholder child name.
+        dirnames[:] = sorted(d for d in dirnames if not is_excluded_path(rel_dir / d / "_probe_"))
+        for name in sorted(filenames):
+            path = Path(dirpath) / name
+            rel = rel_dir / name
             if is_exempt_by_path(rel) or is_excluded_path(rel):
                 continue
+            if path.suffix in CODE_EXTENSIONS:
+                if path.is_file():
+                    files.append(path)
+                continue
+            # Extensionless executable shell scripts identified by shebang.
+            # Heuristic: only executable files are scanned in full-repo mode to
+            # keep false positives down (most extensionless text files are not
+            # scripts).
+            if path.suffix or not path.is_file():
+                continue
+            if not os.access(path, os.X_OK):
+                continue
+            if not is_bash_shebang(path):
+                continue
             files.append(path)
-
-    # Second pass: extensionless executable shell scripts identified by shebang.
-    # Heuristic: only executable files are scanned in full-repo mode to keep
-    # false positives down (most extensionless text files are not scripts).
-    seen = {f.resolve() for f in files}
-    for path in repo_root.rglob("*"):
-        if not path.is_file() or path.suffix:
-            continue
-        if path.resolve() in seen:
-            continue
-        try:
-            rel = path.relative_to(repo_root)
-        except ValueError:
-            continue
-        if is_exempt_by_path(rel) or is_excluded_path(rel):
-            continue
-        if not os.access(path, os.X_OK):
-            continue
-        if not is_bash_shebang(path):
-            continue
-        files.append(path)
     return files
+
+
+_COMMIT_ALL_FLAG = re.compile(r"(?:^|\s)(?:-a|--all|-[a-zA-Z]*a[a-zA-Z]*)(?:\s|$)")
+
+
+def _git_changed_names(repo_root: Path, *diff_args: str) -> list[str]:
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo_root),
+            "diff",
+            "--name-only",
+            "--diff-filter=ACMR",
+            "-z",
+            *diff_args,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return []
+    return [name for name in result.stdout.split("\0") if name]
+
+
+def hook_scope_files(payload: dict, default_root: Path) -> tuple[Path, list[Path]] | None:
+    """Resolve the file set a ``git commit`` about to run would actually record.
+
+    Invoked as a PreToolUse hook the script receives the tool payload on stdin
+    and no ``--files``; scanning the whole repository there gates every commit
+    on every pre-existing violation in the tree rather than on the change being
+    committed, and costs a full walk per commit. The commit's scope is the
+    staged set, plus the tracked-but-unstaged modifications when the command
+    carries ``-a``/``--all`` (``-am`` included). Returns ``None`` when the
+    payload's directory is not inside a git repository, so the caller falls
+    back to the full scan.
+    """
+    tool_input = payload.get("tool_input") or {}
+    command = str(tool_input.get("command", ""))
+    cwd = Path(str(payload.get("cwd") or default_root))
+    top = subprocess.run(
+        ["git", "-C", str(cwd), "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if top.returncode != 0 or not top.stdout.strip():
+        return None
+    repo_root = Path(top.stdout.strip()).resolve()
+    names = _git_changed_names(repo_root, "--cached")
+    if _COMMIT_ALL_FLAG.search(command):
+        names.extend(_git_changed_names(repo_root))
+    return repo_root, [repo_root / name for name in dict.fromkeys(names)]
+
+
+_STDIN_PROBE_SECONDS = 0.25
+
+
+def _stdin_has_payload() -> bool:
+    """True when stdin is a non-terminal stream with data already waiting.
+
+    A hook pipes its payload before the process starts, so the data is ready
+    at once. A CLI or CI invocation frequently inherits an *open* pipe that
+    carries nothing and never closes; a blind ``read()`` there hangs forever.
+    Probing readiness with a short timeout distinguishes the two without
+    consuming anything.
+    """
+    try:
+        if sys.stdin is None or sys.stdin.isatty():
+            return False
+        import select
+
+        ready, _, _ = select.select([sys.stdin], [], [], _STDIN_PROBE_SECONDS)
+        return bool(ready)
+    except (OSError, ValueError, ImportError):
+        return False
+
+
+def _hook_scope_from_stdin(default_root: Path) -> tuple[Path, list[Path]] | None:
+    """Return the hook-mode scope when stdin carries a tool payload, else None."""
+    if not _stdin_has_payload():
+        return None
+    try:
+        raw = sys.stdin.read()
+    except (OSError, ValueError):
+        return None
+    if not raw.strip():
+        return None
+    try:
+        payload = json.loads(raw)
+    except ValueError:
+        return None
+    if not isinstance(payload, dict) or "tool_input" not in payload:
+        return None
+    return hook_scope_files(payload, default_root)
 
 
 def scan_file(path: Path) -> list[tuple[int, str, str, str]]:
@@ -373,7 +475,15 @@ def main(argv: list[str]) -> int:
     if args.files:
         files = filter_files(list(args.files), repo_root)
     else:
-        files = iter_code_files(repo_root)
+        scope = _hook_scope_from_stdin(repo_root)
+        if scope is not None:
+            repo_root, candidates = scope
+            files = filter_files(candidates, repo_root)
+            if not files:
+                print("hook mode: no staged code files; 0 id-citation violations.")
+                return 0
+        else:
+            files = iter_code_files(repo_root)
 
     total, detail_lines = format_findings(files, repo_root)
 

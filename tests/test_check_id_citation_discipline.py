@@ -289,3 +289,41 @@ def test_finalized_dec_nnn_citation_is_not_flagged(tmp_path: Path) -> None:
     assert result.stdout.count("[draft-adr-id]") == 1
     assert "dec-draft-facade00" in result.stdout
     assert "dec-308" not in result.stdout
+
+
+def test_explicit_extensionless_python_with_violation_is_detected(tmp_path: Path) -> None:
+    """A shell-only interpreter list skipped every extensionless Python
+    executable in `scripts/` -- `praxion-sidecar` among them -- so the gate
+    reported them as "not a code file" and passed silently."""
+    script = tmp_path / "scripts" / "my-cli"
+    _make_exec_script(script, '#!/usr/bin/env python3\n# Step 1 must be caught\nprint("hi")\n')
+
+    result = _run(["--files", str(script), "--repo-root", str(tmp_path)], cwd=tmp_path)
+
+    assert result.returncode == 1, (
+        f"expected exit 1; got {result.returncode}\n{result.stdout}\n{result.stderr}"
+    )
+    assert "step-ref" in result.stdout
+    assert "1 file" in result.stdout or "my-cli" in result.stdout
+
+
+def test_full_scan_finds_extensionless_executable_python(tmp_path: Path) -> None:
+    script = tmp_path / "scripts" / "another-cli"
+    _make_exec_script(script, "#!/usr/bin/python3\n# REQ-FOO-02 must be caught\n")
+
+    result = _run(["--repo-root", str(tmp_path)], cwd=tmp_path)
+
+    assert result.returncode == 1
+    assert "REQ-FOO-02" in result.stdout or "req-id" in result.stdout
+
+
+def test_a_clean_extensionless_python_executable_is_scanned_not_skipped(tmp_path: Path) -> None:
+    """Discriminates "scanned and clean" from "never scanned": the file count
+    must show the file entered the corpus."""
+    script = tmp_path / "scripts" / "clean-cli"
+    _make_exec_script(script, '#!/usr/bin/env python3\nprint("hello")\n')
+
+    result = _run(["--files", str(script), "--repo-root", str(tmp_path)], cwd=tmp_path)
+
+    assert result.returncode == 0, result.stdout
+    assert "1 code file" in result.stdout, result.stdout

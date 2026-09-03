@@ -230,6 +230,77 @@ def _install_workflow(repo: Path, namespace: str) -> Path:
     return wf
 
 
+# ---- Staging under the environment git hands its hooks ---------------------
+#
+# This reconciler runs from inside the finalize hook chain, where git has
+# exported `GIT_INDEX_FILE=.git/index` and `GIT_DIR=.git` *relative*. A `git
+# add` inheriting those resolves them under whatever directory it is pointed
+# at -- and against a checkout whose `.git` is a worktree pointer *file* (the
+# shape of a sidecar state mount) it fails outright rather than misstaging
+# quietly. The staging call must therefore run through the scrubbing runner.
+
+
+@pytest.fixture
+def linked_worktree(repo: Path, tmp_path: Path) -> Path:
+    """A linked worktree of `repo` -- its `.git` is a pointer file."""
+    (repo / "seed.txt").write_text("seed\n")
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "seed"], check=True)
+    linked = tmp_path / "linked"
+    subprocess.run(
+        ["git", "-C", str(repo), "worktree", "add", "-q", str(linked), "-b", "side"],
+        check=True,
+    )
+    assert (linked / ".git").is_file(), "the fixture must produce a pointer-file worktree"
+    return linked
+
+
+_HOOK_ENV = {"GIT_INDEX_FILE": ".git/index", "GIT_DIR": ".git"}
+
+
+def test_staging_survives_the_relative_index_git_exports_to_hooks(linked_worktree, tmp_path):
+    wf = _install_workflow(linked_worktree, "i-am")
+    result = subprocess.run(
+        [
+            "python3",
+            str(_SCRIPT),
+            "--plugin-root",
+            str(_fake_plugin(tmp_path)),
+            "--repo-root",
+            str(linked_worktree),
+            "--surface",
+            "workflow",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+        env=dict(os.environ, **_HOOK_ENV),
+    )
+    assert result.returncode == 0, result.stderr
+    assert "Load the praxion:architect-validator agent" in wf.read_text()
+    staged = subprocess.run(
+        ["git", "-C", str(linked_worktree), "diff", "--cached", "--name-only"],
+        capture_output=True,
+        text=True,
+    ).stdout
+    assert ".github/workflows/architecture.yml" in staged
+
+
+def test_the_unscrubbed_environment_really_does_break_that_stage(linked_worktree):
+    """Canary for the canary: unscrubbed, the same `git add` fails -- so the
+    test above discriminates rather than passing vacuously."""
+    wf = _install_workflow(linked_worktree, "i-am")
+    result = subprocess.run(
+        ["git", "add", "--", str(wf)],
+        cwd=str(linked_worktree),
+        env=dict(os.environ, **_HOOK_ENV),
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "Not a directory" in result.stderr
+
+
 def test_workflow_namespace_repointed_and_staged(repo, tmp_path):
     wf = _install_workflow(repo, "i-am")
     result = _run(repo, _fake_plugin(tmp_path))

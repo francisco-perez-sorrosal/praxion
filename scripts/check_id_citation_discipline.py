@@ -45,6 +45,8 @@ import sys
 import time
 from pathlib import Path
 
+from _git_runner import run_git
+
 CODE_EXTENSIONS = frozenset(
     {
         ".py",
@@ -201,16 +203,23 @@ PATTERNS: tuple[tuple[str, re.Pattern[str], str], ...] = (
 
 
 _SHEBANG_INTERPRETERS = ("bash", "sh", "zsh", "dash", "ksh")
-_SHEBANG_PATTERNS = tuple(re.compile(rf"\b{shell}\b") for shell in _SHEBANG_INTERPRETERS)
+_SHEBANG_PATTERNS = (
+    *(re.compile(rf"\b{shell}\b") for shell in _SHEBANG_INTERPRETERS),
+    # `python`, `python3`, `python3.11` -- an extensionless Python executable
+    # carries exactly the same citation obligations as its `.py` siblings, but
+    # a shell-only interpreter list skipped every one of them silently.
+    re.compile(r"\bpython[0-9.]*"),
+)
 
 
-def is_bash_shebang(path: Path) -> bool:
-    """Return True if `path`'s first line is a bash/sh-family shebang.
+def is_script_shebang(path: Path) -> bool:
+    """Return True if `path`'s first line is a recognized script shebang.
 
     Extensionless executable scripts (e.g., `scripts/dispatch-reworks`) escape
     the extension-based corpus selection. Shebang detection brings them back
-    into scope so id-citation violations in bash scripts are not silently
-    skipped on commit.
+    into scope so id-citation violations in them are not silently skipped on
+    commit -- for the Python executables in `scripts/` as much as the shell
+    ones.
     """
     try:
         with path.open("rb") as f:
@@ -281,7 +290,7 @@ def iter_code_files(repo_root: Path) -> list[Path]:
                 if path.is_file():
                     files.append(path)
                 continue
-            # Extensionless executable shell scripts identified by shebang.
+            # Extensionless executable scripts identified by shebang.
             # Heuristic: only executable files are scanned in full-repo mode to
             # keep false positives down (most extensionless text files are not
             # scripts).
@@ -289,7 +298,7 @@ def iter_code_files(repo_root: Path) -> list[Path]:
                 continue
             if not os.access(path, os.X_OK):
                 continue
-            if not is_bash_shebang(path):
+            if not is_script_shebang(path):
                 continue
             files.append(path)
     return files
@@ -312,15 +321,15 @@ def _git(cwd: Path, *args: str) -> subprocess.CompletedProcess[str] | None:
     """
     for attempt in range(_GIT_RETRIES):
         try:
-            result = subprocess.run(
-                ["git", "-C", str(cwd), *args],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
+            # Through the shared runner: this gate fires on every `git commit`,
+            # so it always runs with git's repository-scoping variables in the
+            # environment -- exported *relative*, which silently re-targets any
+            # call naming a different repository than the firing hook's.
+            result = run_git(cwd, *args)
         except OSError:
-            # git could not even be spawned (resource pressure, transient
-            # exec failure). Treat as a failed call so the caller falls to its
+            # git could not be run to completion (resource pressure, transient
+            # exec failure, the runner's timeout -- GitUnavailableError is an
+            # OSError). Treat as a failed call so the caller falls to its
             # pass-safe path rather than crashing the gate.
             result = None
         if result is not None and result.returncode == 0:
@@ -370,12 +379,7 @@ def hook_scope_files(
         # Direct CLI: distinguish "not a repo" (full scan is correct) from a
         # transient error inside a repo with one quick probe.
         try:
-            probe = subprocess.run(
-                ["git", "-C", str(cwd), "rev-parse", "--is-inside-work-tree"],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
+            probe = run_git(cwd, "rev-parse", "--is-inside-work-tree")
         except OSError:
             return None
         if probe.returncode != 0:
@@ -476,10 +480,10 @@ def filter_files(explicit_files: list[Path], repo_root: Path) -> list[Path]:
         if not abs_path.is_file():
             continue
         # Accept recognized code extensions OR extensionless files with a
-        # bash/sh-family shebang. Explicit user-passed paths (e.g., from
+        # recognized script shebang. Explicit user-passed paths (e.g., from
         # pre-commit's staged-files list) override the executable-bit
         # heuristic used in full-repo scans.
-        if abs_path.suffix not in CODE_EXTENSIONS and not is_bash_shebang(abs_path):
+        if abs_path.suffix not in CODE_EXTENSIONS and not is_script_shebang(abs_path):
             continue
         try:
             rel = abs_path.relative_to(repo_root)

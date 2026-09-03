@@ -289,6 +289,52 @@ def test_unusable_override_falls_through_rather_than_breaking(tmp_path: Path) ->
     assert resolved == str(python)
 
 
+def _sidecar_argv(sidecar: Path, *, env: dict[str, str] | None = None) -> list[str]:
+    """Source the chain and return the argv prefix it would run `sidecar` with."""
+    snippet = f"""
+        source {CHAIN_PATH}
+        _finalize_chain_repo_root() {{ echo {str(sidecar.parent)!r}; }}
+        _finalize_chain_sidecar_argv {shlex.quote(str(sidecar))}
+    """
+    result = subprocess.run(
+        ["bash", "-c", snippet],
+        capture_output=True,
+        text=True,
+        check=True,
+        env={**os.environ, **(env or {})},
+    )
+    return result.stdout.split()
+
+
+def test_a_python_sidecar_runs_under_the_chains_resolved_interpreter(tmp_path: Path) -> None:
+    """The CLI's own `#!/usr/bin/env python3` is the ambient interpreter, which
+    need not hold the project's declared dependencies -- and the CLI needs
+    PyYAML. Run that way on a consumer without it, every verb dies at import and
+    the chain records only a non-blocking warning: the mount commit and the
+    merge-back are silently lost. So it runs under the same interpreter the .py
+    siblings do."""
+    override = tmp_path / "chosen-python"
+    override.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    override.chmod(0o755)
+    sidecar = tmp_path / "praxion-sidecar"
+    sidecar.write_text("#!/usr/bin/env python3\nprint('hi')\n", encoding="utf-8")
+    sidecar.chmod(0o755)
+
+    argv = _sidecar_argv(sidecar, env={"PRAXION_PYTHON": str(override)})
+
+    assert argv == [str(override), str(sidecar)]
+
+
+def test_a_non_python_sidecar_is_still_invoked_as_itself(tmp_path: Path) -> None:
+    """The test fixtures swap the CLI for a bash recording shim, which no
+    interpreter but bash could run -- so the routing is gated on the shebang."""
+    sidecar = tmp_path / "praxion-sidecar"
+    sidecar.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    sidecar.chmod(0o755)
+
+    assert _sidecar_argv(sidecar) == [str(sidecar)]
+
+
 # ---------------------------------------------------------------------------
 # Block D self-repair backstop
 # ---------------------------------------------------------------------------
@@ -562,7 +608,7 @@ def _mount_worktree(
     return checkout / _sidecar_mount.MOUNT_DIRNAME
 
 
-def _write_draft(mount_dir: Path, *, slug: str = "test-decision") -> Path:
+def _write_draft(mount_dir: Path, *, slug: str = "test-decision", commit: bool = True) -> Path:
     drafts_dir = mount_dir / ".ai-state" / "decisions" / "drafts"
     drafts_dir.mkdir(parents=True, exist_ok=True)
     path = drafts_dir / f"20260101-0000-tester-main-{slug}.md"
@@ -579,7 +625,8 @@ def _write_draft(mount_dir: Path, *, slug: str = "test-decision") -> Path:
         "branch: main\n"
         "---\n\n## Context\n\nTest.\n"
     )
-    _commit_all(mount_dir, "add draft")
+    if commit:
+        _commit_all(mount_dir, "add draft")
     return path
 
 
@@ -741,10 +788,17 @@ def test_sidecar_owned_post_merge_reports_squash_safety_skipped_project_side(
 # --- SidecarOwned: the mount gets exactly one commit --------------------------
 
 
-def test_sidecar_owned_post_merge_commits_the_mount_exactly_once(tmp_path: Path) -> None:
-    """After the on-main composition mutates the mount, the chain calls
-    `praxion-sidecar commit` exactly once -- the only commit anywhere in the
-    chain -- and the project's own HEAD never moves."""
+def test_sidecar_owned_post_merge_commits_the_mount_only_around_promotion(
+    tmp_path: Path,
+) -> None:
+    """The chain's only mount mutations are `commit` calls, and the project's
+    own HEAD never moves.
+
+    Two commits, not one: promotion moves the *index* blob, so the mount is
+    committed once just before it (a draft written since the last commit is
+    otherwise untracked exactly when the chain fires) and once after
+    composition finishes mutating it.
+    """
     fixture = _build_sidecar_owned_project(tmp_path)
     _write_draft(fixture.mount_dir)
     project_head_before = _head(fixture.project_root)
@@ -757,15 +811,14 @@ def test_sidecar_owned_post_merge_commits_the_mount_exactly_once(tmp_path: Path)
 
     assert result.returncode == 0, result.stderr
     calls = call_log.read_text().splitlines() if call_log.exists() else []
-    sidecar_calls = [line for line in calls if line.startswith("CALL:")]
-    assert len(sidecar_calls) == 1, sidecar_calls
-    assert sidecar_calls[0].split(":", 1)[1].split()[0] == "commit"
+    verbs = [line.split(":", 1)[1].split()[0] for line in calls if line.startswith("CALL:")]
+    assert verbs == ["commit", "commit"], calls
     assert _head(fixture.project_root) == project_head_before
 
 
-def test_sidecar_owned_post_commit_also_commits_the_mount_exactly_once(tmp_path: Path) -> None:
+def test_sidecar_owned_post_commit_commits_the_mount_the_same_way(tmp_path: Path) -> None:
     """`finalize_chain_post_commit` shares the state-driven composition body
-    with post-merge -- the single-mount-commit contract holds there too."""
+    with post-merge -- the mount-commit shape holds there too."""
     fixture = _build_sidecar_owned_project(tmp_path)
     _write_draft(fixture.mount_dir)
 
@@ -781,8 +834,8 @@ def test_sidecar_owned_post_commit_also_commits_the_mount_exactly_once(tmp_path:
         for line in (call_log.read_text().splitlines() if call_log.exists() else [])
         if line.startswith("CALL:")
     ]
-    assert len(calls) == 1, calls
-    assert calls[0].split(":", 1)[1].split()[0] == "commit"
+    verbs = [line.split(":", 1)[1].split()[0] for line in calls]
+    assert verbs == ["commit", "commit"], calls
 
 
 # --- SidecarOwned: draft promotion targets the mount, not the project --------
@@ -950,6 +1003,38 @@ def test_squash_merge_shape_converges_and_promotes_under_the_real_hook_environme
     assert "Not a directory" not in result.stdout
     finalized = list((fixture.mount_dir / ".ai-state" / "decisions").glob("[0-9]*-from-wt-x.md"))
     assert len(finalized) == 1, result.stdout
+
+
+def test_an_uncommitted_draft_in_the_mount_promotes_under_the_real_hook_environment(
+    tmp_path: Path,
+) -> None:
+    """A draft written into the mount but never committed there still promotes.
+
+    The mount's commits are made by this chain, so between an agent writing a
+    draft and the next `praxion-sidecar commit` the draft is untracked -- which
+    is exactly when a project commit fires the chain. Promotion moved the index
+    blob, so it refused; and because the draft's frontmatter had already been
+    rewritten to `dec-NNN`/`accepted` at the drafts path, every later run then
+    skipped it as malformed. The ADR was destroyed rather than promoted, and
+    the chain reported only a non-blocking warning.
+    """
+    fixture = _build_sidecar_owned_project(tmp_path)
+    _write_draft(fixture.mount_dir, slug="never-committed", commit=False)
+
+    scripts_dir = _make_fake_plugin(tmp_path / "plugin")
+    result = _run_chain(
+        cwd=fixture.project_root,
+        finalize_dir=scripts_dir,
+        entry="finalize_chain_post_commit",
+        git_hook_env=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    decisions = fixture.mount_dir / ".ai-state" / "decisions"
+    finalized = list(decisions.glob("[0-9]*-never-committed.md"))
+    assert len(finalized) == 1, result.stdout
+    assert "id: dec-" in finalized[0].read_text()
+    assert not list((decisions / "drafts").glob("*never-committed.md")), result.stdout
 
 
 def test_one_ineligible_branch_never_blocks_another_branchs_convergence(tmp_path: Path) -> None:

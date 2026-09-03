@@ -162,10 +162,18 @@ def _build_sidecar_owned_fixture(
 
 
 def _forbid_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _boom(*args: object, **kwargs: object) -> None:
-        raise AssertionError(f"subprocess.run must not be called on the happy path (args={args!r})")
+    """Pin the subprocess-free happy path at the module's only git route.
 
-    monkeypatch.setattr(_state_repo.subprocess, "run", _boom)
+    The module reaches git solely through the shared runner it imports, so
+    that name is the choke point -- patching `subprocess.run` instead would
+    silently stop guarding anything the day the module stopped importing
+    `subprocess` directly, which is exactly what happened.
+    """
+
+    def _boom(*args: object, **kwargs: object) -> None:
+        raise AssertionError(f"git must not be run on the happy path (args={args!r})")
+
+    monkeypatch.setattr(_state_repo, "run_git", _boom)
 
 
 # --- InRepo ------------------------------------------------------------------

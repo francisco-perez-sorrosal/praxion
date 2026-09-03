@@ -32,12 +32,13 @@ from __future__ import annotations
 
 import argparse
 import re
-import subprocess
 import sys
 from datetime import datetime, timezone
 from functools import cache
 from pathlib import Path
 from typing import Any
+
+from _git_runner import GitUnavailableError, git_output, run_git
 
 try:
     import yaml
@@ -221,11 +222,10 @@ def _git_commit_dates(root: str) -> dict[str, str]:
     no-op-regen guard actually hold. One subprocess for the whole history
     rather than one per file.
     """
-    shallow = subprocess.run(
-        ["git", "-C", root, "rev-parse", "--is-shallow-repository"],
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
+    # Through the shared runner, which scrubs the repository-scoping variables
+    # git exports to its hooks: this runs inside the finalize chain, where an
+    # inherited relative `GIT_DIR` would silently re-target `root`.
+    shallow = git_output(root, "rev-parse", "--is-shallow-repository")
     if shallow == "true":
         # A shallow clone exposes one commit, so git log can date almost nothing
         # and nearly every surface falls back to mtime -- which in a fresh
@@ -240,15 +240,12 @@ def _git_commit_dates(root: str) -> dict[str, str]:
         )
 
     try:
-        out = subprocess.run(
-            ["git", "-C", root, "log", "--name-only", "--format=%x00%cs", "--no-merges"],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=120,
-        ).stdout
-    except (subprocess.SubprocessError, OSError):
+        result = run_git(root, "log", "--name-only", "--format=%x00%cs", "--no-merges", timeout=120)
+    except GitUnavailableError:
         return {}
+    if result.returncode != 0:
+        return {}
+    out = result.stdout
 
     dates: dict[str, str] = {}
     current = ""

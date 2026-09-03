@@ -52,6 +52,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from _git_runner import git_output, run_git
+
 WORKFLOW_REL = ".github/workflows/architecture.yml"
 WORKFLOW_TEMPLATE_REL = "claude/aac-templates/architecture.yml.tmpl"
 HOOK_REL = ".git/hooks/pre-commit"
@@ -129,9 +131,26 @@ class Reconciler:
         return None
 
     def _git_add(self, path: Path) -> None:
-        if self.stage:
-            subprocess.run(["git", "add", str(path)], cwd=self.repo_root, check=True)
-            self.say(f"staged: {path.relative_to(self.repo_root)}")
+        """Stage `path` through the shared runner, which scrubs git's
+        repository-scoping environment.
+
+        This reconciler is invoked from inside the finalize hook chain, where
+        git exports `GIT_INDEX_FILE`/`GIT_DIR` *relative* to the firing hook's
+        repository. A plain `subprocess.run(["git", "add", ...])` inherits
+        them, so the add lands in whatever index those resolve to rather than
+        `self.repo_root`'s -- and against a repository whose `.git` is a
+        worktree pointer file it fails outright.
+        """
+        if not self.stage:
+            return
+        result = run_git(self.repo_root, "add", "--", str(path))
+        if result.returncode != 0:
+            # Same exception the previous `check=True` raised, so callers that
+            # already handle a failed stage keep working unchanged.
+            raise subprocess.CalledProcessError(
+                result.returncode, result.args, result.stdout, result.stderr
+            )
+        self.say(f"staged: {path.relative_to(self.repo_root)}")
 
     # -- surface: architecture.yml namespace token ---------------------------
 
@@ -278,13 +297,11 @@ def main(argv: list[str] | None = None) -> int:
 
     repo_root = args.repo_root
     if repo_root is None:
-        proc = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True
-        )
-        if proc.returncode != 0:
+        toplevel = git_output(Path.cwd(), "rev-parse", "--show-toplevel")
+        if toplevel is None:
             print("reconcile-aac: not inside a git repository", file=sys.stderr)
             return 2
-        repo_root = Path(proc.stdout.strip())
+        repo_root = Path(toplevel)
     repo_root = repo_root.resolve()
 
     reconciler = Reconciler(

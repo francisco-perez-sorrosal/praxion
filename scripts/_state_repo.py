@@ -32,11 +32,12 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import os
-import subprocess
 import sys
 from enum import Enum
 from pathlib import Path
 from typing import Union
+
+from _git_runner import run_git
 
 __all__ = [
     "Dangling",
@@ -382,13 +383,10 @@ def _mount_layout_via_git(mount_dir: Path) -> tuple[Path, Path] | None:
     answer is trusted.
     """
     try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel", "--git-dir", "--git-common-dir"],
-            cwd=str(mount_dir),
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        # Through the shared runner: consumers of this resolver include a
+        # per-commit hook, whose inherited relative `GIT_DIR` would answer for
+        # the firing repository instead of `mount_dir`.
+        result = run_git(mount_dir, "rev-parse", "--show-toplevel", "--git-dir", "--git-common-dir")
     except OSError:
         return None
     lines = result.stdout.splitlines()

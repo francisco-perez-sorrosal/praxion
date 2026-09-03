@@ -39,6 +39,7 @@ import sys
 from pathlib import Path
 
 import _sidecar_mount
+from _git_runner import run_git
 from _repo_root import is_plugin_cache_path
 from _repo_root import resolve_repo_root as _resolve_repo_root
 from _state_repo import SidecarOwned, resolve_placement
@@ -111,12 +112,16 @@ def fail(msg: str) -> None:
 
 
 def git(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", *args],
-        capture_output=True,
-        text=True,
-        cwd=REPO_ROOT,
-    )
+    """Run git in `REPO_ROOT` through the shared runner.
+
+    The runner is what strips the repository-scoping variables git exports to
+    its hooks -- and it exports `GIT_INDEX_FILE`/`GIT_DIR` *relative*, so a
+    plain `subprocess.run` here silently resolved `.git/index` under whatever
+    directory this script was pointed at. This script runs inside the
+    post-merge hook chain, so that inheritance is the normal case, not an
+    edge one.
+    """
+    return run_git(REPO_ROOT, *args)
 
 
 def is_conflicted(path: Path) -> bool:

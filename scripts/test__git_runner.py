@@ -32,9 +32,12 @@ import pytest
 _SCRIPTS_DIR = Path(__file__).resolve().parent
 _MODULE_PATH = _SCRIPTS_DIR / "_git_runner.py"
 
-# The six modules migrated off their private, unbounded `_git`/`_run_git`
+# The modules migrated off their private, unbounded `_git`/`_run_git`
 # helpers. Named explicitly rather than globbed: the set is the contract the
 # fork-regression canary below checks, so it must be a datum, not a scan.
+# The last five joined when the finalize chain's scripts adopted the shared
+# runner so a hook-inherited relative GIT_INDEX_FILE could no longer redirect
+# them into the wrong repository.
 MIGRATED_MODULES = (
     "finalize_adrs.py",
     "check_squash_safety.py",
@@ -42,6 +45,11 @@ MIGRATED_MODULES = (
     "check_release_staleness.py",
     "check_adr_frontmatter_promotion.py",
     "check_aac_golden_rule.py",
+    "reconcile_ai_state.py",
+    "reconcile_aac_surfaces.py",
+    "build_doc_manifest.py",
+    "check_id_citation_discipline.py",
+    "_state_repo.py",
 )
 
 # Wall-clock bound proving the timeout fired. The shim below hangs for

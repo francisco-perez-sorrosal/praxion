@@ -33,8 +33,10 @@
 # promotion (channel 1 of three idempotent convergence channels, ARCH_WT_RULING.md
 # § 13.3) so a plain `git merge` or a GitHub squash-merge-then-pull promotes a
 # worktree's drafts in the SAME finalize run; finalize_adrs.py is pointed at
-# the state mount via --state-root; and the mount gets exactly one
-# `praxion-sidecar commit` once composition finishes mutating it. Under
+# the state mount via --state-root; and the mount gets a `praxion-sidecar
+# commit` once composition finishes mutating it, preceded by a second one
+# just before ADR-draft promotion so a draft written since the last mount
+# commit is already in the mount's history when it is renamed. Under
 # in-repo placement every one of the above is a no-op and the chain's
 # behavior is byte-identical to before sidecar placement existed.
 #
@@ -196,21 +198,45 @@ _finalize_chain_run_script() {
         echo "${label}: warned (non-blocking) — inspect output above"
 }
 
-# Run praxion-sidecar directly. Unlike the .py siblings _finalize_chain_run_script
-# invokes through a resolved interpreter, praxion-sidecar is a self-contained
-# executable carrying its own shebang (and the test fixtures swap it for a
-# recording shim or a bash shim, neither of which `python3 <path>` could run)
-# -- so it is invoked as itself. Same non-blocking-by-default /
-# FINALIZE_CHAIN_STRICT contract as _finalize_chain_run_script.
+# Build the argv prefix that runs praxion-sidecar.
+#
+# The CLI's own shebang is `#!/usr/bin/env python3`, i.e. whatever the ambient
+# shell exposes -- and its import chain needs PyYAML. On a consumer whose
+# ambient python3 lacks it, every verb dies at import with a raw
+# ModuleNotFoundError and the chain records only "warned (non-blocking)": the
+# mount commit and the merge-back are silently lost. So it is run through the
+# same interpreter _finalize_chain_run_script resolves for the .py siblings
+# (PRAXION_PYTHON -> the project venv -> ambient), which is the one holding the
+# project's declared dependencies.
+#
+# Gated on the file actually being a python script: the test fixtures swap
+# praxion-sidecar for a bash recording shim, which no interpreter but bash
+# could run. A non-python shebang is invoked as itself, exactly as before.
+_finalize_chain_sidecar_argv() {
+    local sidecar="$1" python
+    if head -n 1 "$sidecar" 2>/dev/null | grep -q 'python'; then
+        python="$(_finalize_chain_python)"
+        if [ -n "$python" ]; then
+            printf '%s\n%s\n' "$python" "$sidecar"
+            return 0
+        fi
+    fi
+    printf '%s\n' "$sidecar"
+}
+
+# Run praxion-sidecar. Same non-blocking-by-default / FINALIZE_CHAIN_STRICT
+# contract as _finalize_chain_run_script.
 _finalize_chain_run_sidecar() {
     local label="$1"; shift
     local sidecar="${FINALIZE_CHAIN_DIR}/praxion-sidecar"
     [ -x "$sidecar" ] || return 0
+    local -a argv=()
+    while IFS= read -r word; do argv+=("$word"); done < <(_finalize_chain_sidecar_argv "$sidecar")
     if [ -n "${FINALIZE_CHAIN_STRICT:-}" ]; then
-        _finalize_chain_unscoped "$sidecar" "$@"
+        _finalize_chain_unscoped "${argv[@]}" "$@"
         return $?
     fi
-    _finalize_chain_unscoped "$sidecar" "$@" 2>&1 \
+    _finalize_chain_unscoped "${argv[@]}" "$@" 2>&1 \
         || echo "${label}: warned (non-blocking) — inspect output above"
 }
 
@@ -286,7 +312,9 @@ _finalize_chain_state_branches_pending() {
 _finalize_chain_merge_back_auto() {
     local sidecar="${FINALIZE_CHAIN_DIR}/praxion-sidecar"
     [ -x "$sidecar" ] || return 0
-    _finalize_chain_unscoped "$sidecar" merge-back --auto 2>&1 || true
+    local -a argv=()
+    while IFS= read -r word; do argv+=("$word"); done < <(_finalize_chain_sidecar_argv "$sidecar")
+    _finalize_chain_unscoped "${argv[@]}" merge-back --auto 2>&1 || true
 }
 
 # Run the on-main finalize steps. Caller has already gated on `on_main`; each
@@ -342,6 +370,14 @@ _finalize_chain_run_on_main() {
         local -a state_root_args=()
         if [ "$_FC_PLACEMENT" = "sidecar" ]; then
             state_root_args=(--state-root "$_FC_STATE_GIT_ROOT")
+            # Commit the mount BEFORE promotion, not only after. The mount's
+            # commits are made by this chain, so a draft written since the last
+            # one is untracked in the mount exactly when finalize runs -- and a
+            # promotion moves the *index* blob. Committing first makes the
+            # draft's promotion an ordinary tracked rename, and leaves the
+            # draft recoverable in the mount's history if anything downstream
+            # refuses.
+            _finalize_chain_run_sidecar "praxion-sidecar commit (pre-promotion)" commit --quiet
         fi
         # Unscoped: under sidecar placement finalize_adrs' git plumbing runs
         # against --state-root (the mount), not this repo_root.

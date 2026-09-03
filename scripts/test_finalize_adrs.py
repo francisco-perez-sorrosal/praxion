@@ -803,11 +803,10 @@ class TestFinalizeCrossReferences:
         assert fixture.read_text(encoding="utf-8") == original
 
     def test_frontmatter_supersedes_in_part_list_rewritten(self, repo_root: Path) -> None:
-        """AC-16 regression: `supersedes_in_part: [dec-draft-<hash>]` rewrites
-        to `dec-NNN` at finalize.
+        """A `supersedes_in_part: [dec-draft-<hash>]` list rewrites to
+        `dec-NNN` at finalize.
 
-        Pins the field-agnostic rewrite behaviour documented in
-        `SYSTEMS_PLAN.md § Architecture Gap Found`: `rewrite_cross_references`
+        Pins the field-agnostic rewrite behaviour: `rewrite_cross_references`
         performs a whole-file string replacement with no frontmatter field
         list, so it already covers `supersedes_in_part` for free. This test
         exists so a future narrowing of the rewrite to an explicit field
@@ -2088,6 +2087,77 @@ class TestPromotionStaging:
         assert "id: dec-311" in staged
         assert "status: accepted" in staged
         assert status_lines == [f"R  {draft.relative_to(root)} -> {rel}"], status_lines
+
+    def test_untracked_draft_promotes_end_to_end_instead_of_being_stranded(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A draft that is not in the index yet still promotes cleanly.
+
+        Under sidecar placement the state mount's commits are made by the
+        finalize chain itself, so a draft written since the last one is
+        legitimately untracked exactly when promotion runs. Rewriting its
+        frontmatter before the move made this fatal: `git mv` refused the
+        untracked source *after* the file had already been rewritten to
+        `dec-NNN`/`accepted` at the drafts path, so every later run skipped it
+        as malformed and its number collided with the ADR that legitimately
+        took it. The draft was stranded permanently and silently.
+        """
+        root = tmp_path / "repo"
+        root.mkdir()
+        (root / ".ai-state" / "decisions" / "drafts").mkdir(parents=True)
+        self._git(root, "init", "-q", "-b", "main")
+        self._git(root, "config", "user.email", "tester@example.com")
+        self._git(root, "config", "user.name", "Tester")
+        (root / "seed.txt").write_text("seed\n")
+        self._git(root, "add", "-A")
+        self._git(root, "commit", "-qm", "seed")
+        draft = make_draft(
+            root,
+            "20260101-1200",
+            "tester",
+            "main",
+            "never-committed",
+            frontmatter_extra={"branch": "main"},
+        )
+        assert self._git(root, "status", "--short").count("??") == 1
+
+        monkeypatch.setattr(finalize, "REPO_ROOT", root)
+        monkeypatch.setattr(finalize, "DECISIONS_DIR", root / ".ai-state" / "decisions")
+        monkeypatch.setattr(finalize, "DRAFTS_DIR", draft.parent)
+
+        new_path, _ = finalize.promote_draft(draft, 7, root)
+
+        assert not draft.exists()
+        assert "id: dec-007" in new_path.read_text(encoding="utf-8")
+        rel = str(new_path.relative_to(root))
+        assert self._git(root, "show", f":{rel}") == new_path.read_text(encoding="utf-8")
+
+    def test_refused_promotion_leaves_the_draft_byte_unchanged(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Every refusal path raises before anything is written.
+
+        This is what makes a failed promotion retryable: a draft carrying
+        promoted frontmatter at the drafts path is skipped as malformed
+        forever, so the *only* safe failure is a byte-identical file.
+        """
+        root = tmp_path / "repo"
+        root.mkdir()
+        draft = self._init_repo_with_committed_draft(root)
+        before = draft.read_bytes()
+        monkeypatch.setattr(finalize, "REPO_ROOT", root)
+        monkeypatch.setattr(finalize, "DECISIONS_DIR", root / ".ai-state" / "decisions")
+        monkeypatch.setattr(finalize, "DRAFTS_DIR", draft.parent)
+
+        def _refuse(repo_root: Path, *args: str, **kwargs: object) -> object:
+            return subprocess.CompletedProcess(["git", *args], 1, "", "fatal: refused")
+
+        monkeypatch.setattr(finalize, "run_git", _refuse)
+
+        with pytest.raises(finalize.GitPromotionError):
+            finalize.promote_draft(draft, 7, root)
+
+        assert draft.read_bytes() == before
 
 
 # -- Mount redirection: --state-root under sidecar placement ------------------

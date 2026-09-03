@@ -485,6 +485,15 @@ def promote_draft(draft_path: Path, nnn: int, state_git_root: Path) -> tuple[Pat
 
     Returns `(new_path, old_draft_id)` where `old_draft_id` is the
     `dec-draft-<hash>` value extracted before the rewrite.
+
+    **Move first, rewrite second.** The reverse order -- rewrite the draft in
+    place, then move it -- is not atomic: a refused move leaves a file at the
+    `drafts/` path already carrying `id: dec-NNN` and `status: accepted`, which
+    every later run then skips as malformed ("no `id: dec-draft-<hash>`") while
+    its `dec-NNN` collides with the ADR that legitimately takes that number.
+    The draft is stranded permanently and silently. Moving first means every
+    refusal path raises with the draft byte-unchanged, so the next run retries
+    cleanly.
     """
     _, _, _, slug = parse_fragment_filename(draft_path)
     new_name = f"{nnn:03d}-{slug}.md"
@@ -496,16 +505,22 @@ def promote_draft(draft_path: Path, nnn: int, state_git_root: Path) -> tuple[Pat
 
     old_id = _read_draft_id(draft_path)
 
-    # Rewrite frontmatter `id:` and `status:` in-place, then rename. The
-    # status flip from `proposed` to `accepted` matches the lifecycle
-    # transition that finalize represents; without it, finalized ADRs
-    # stay flagged as proposals indefinitely.
-    content = draft_path.read_text(encoding="utf-8")
+    staged = _rename(draft_path, new_path, state_git_root)
+
+    # The status flip from `proposed` to `accepted` matches the lifecycle
+    # transition that finalize represents; without it, finalized ADRs stay
+    # flagged as proposals indefinitely.
+    content = new_path.read_text(encoding="utf-8")
     rewritten = FRONTMATTER_ID_PATTERN.sub(rf"\g<1>{new_id}", content, count=1)
     rewritten = FRONTMATTER_STATUS_PROPOSED_PATTERN.sub(r"\g<1>accepted", rewritten, count=1)
-    draft_path.write_text(rewritten, encoding="utf-8")
+    new_path.write_text(rewritten, encoding="utf-8")
 
-    _rename(draft_path, new_path, state_git_root)
+    # `git mv` stages the rename from the *index* blob, so the rewrite above
+    # is an unstaged modification against the new path until it is re-staged
+    # -- the `RM` shape that once shipped a finalized ADR still carrying its
+    # draft `id:` and `status: proposed`.
+    if staged:
+        _stage_path(new_path, state_git_root)
     return new_path, old_id
 
 
@@ -522,15 +537,12 @@ def _state_relative(path: Path, state_git_root: Path) -> str:
     return str(path.resolve().relative_to(state_git_root))
 
 
-def _rename(src: Path, dst: Path, state_git_root: Path) -> None:
+def _rename(src: Path, dst: Path, state_git_root: Path) -> bool:
     """Rename src -> dst, preferring `git mv` when inside a git worktree.
 
-    `git mv` stages the rename from the *index* blob, not from the working
-    tree, so the frontmatter rewrite `promote_draft` applies just before the
-    move is left behind as an unstaged modification against the new path --
-    the `RM` shape that once shipped a finalized ADR still carrying its draft
-    `id:` and `status: proposed`. `_stage_path` re-stages the destination so
-    the index matches the working tree.
+    Returns True when the move was recorded in an index (so the caller must
+    re-stage anything it writes to `dst` afterwards), False when the plain
+    filesystem fallback ran and no index is involved at all.
 
     A refused `git mv` raises rather than falling back to `Path.rename`: the
     fallback moved the file with nothing staged anywhere and logged only at
@@ -548,7 +560,8 @@ def _rename(src: Path, dst: Path, state_git_root: Path) -> None:
             src.name,
         )
         src.rename(dst)
-        return
+        return False
+    _require_tracked(src, state_git_root)
     result = run_git(
         state_git_root,
         "mv",
@@ -559,7 +572,28 @@ def _rename(src: Path, dst: Path, state_git_root: Path) -> None:
         raise GitPromotionError(
             f"git mv refused to promote {src.name} in {state_git_root}: {result.stderr.strip()}"
         )
-    _stage_path(dst, state_git_root)
+    return True
+
+
+def _require_tracked(src: Path, state_git_root: Path) -> None:
+    """Put `src` in the index, since `git mv` moves the *index* blob.
+
+    Drafts are meant to be tracked, but under sidecar placement the state
+    mount's commit is made by the finalize chain itself, so a draft written
+    since the last one is legitimately still untracked when promotion runs --
+    and `git mv` refuses an untracked source. Staging it here is the same
+    thing the operator's own commit would have done a moment later, and the
+    file's content is unaffected either way.
+
+    Raises so the refusal happens before `promote_draft` writes anything: an
+    unstageable draft is left byte-identical for the next run to retry.
+    """
+    rel = _state_relative(src, state_git_root)
+    result = run_git(state_git_root, "add", "--", rel)
+    if result.returncode != 0:
+        raise GitPromotionError(
+            f"git add refused to track {src.name} in {state_git_root}: {result.stderr.strip()}"
+        )
 
 
 def _stage_path(path: Path, state_git_root: Path) -> None:

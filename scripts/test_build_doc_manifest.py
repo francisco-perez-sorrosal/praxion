@@ -373,9 +373,16 @@ def _run_without_yaml() -> subprocess.CompletedProcess:
     why the guard catches ImportError rather than ModuleNotFoundError -- a
     broken install deserves the same actionable message as an absent one.
     """
+    script = Path(bdm.__file__)
+    # `runpy.run_path` leaves sys.path[0] at the caller's cwd, whereas every
+    # real call site runs `<python> scripts/build_doc_manifest.py`, which puts
+    # the script's own directory there -- the only place its sibling imports
+    # resolve from. Without this the run dies on a sibling import and never
+    # reaches the PyYAML guard under test.
     code = (
-        "import sys; sys.modules['yaml'] = None; import runpy; "
-        f"runpy.run_path({str(Path(bdm.__file__))!r}, run_name='__main__')"
+        f"import sys; sys.path.insert(0, {str(script.parent)!r}); "
+        "sys.modules['yaml'] = None; import runpy; "
+        f"runpy.run_path({str(script)!r}, run_name='__main__')"
     )
     return subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)
 

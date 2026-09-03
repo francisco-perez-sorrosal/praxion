@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import dataclasses
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -913,3 +914,62 @@ def test_link_on_a_detached_head_worktree_never_maps_head_as_the_project_branch(
         fixture.sidecar_root, "config", "--get", f"branch.{branch}.praxion-project-branch"
     )
     assert mapping.returncode != 0
+
+
+# --- recovering a mount whose directory was removed outside git ----------------------
+
+
+def test_link_recreates_a_mount_whose_directory_was_deleted_by_hand(tmp_path: Path) -> None:
+    """`git clean -ffdx` removes the mount directory and nothing else, leaving
+    the sidecar's own worktree record behind -- which git then refuses to add
+    over. Recovery must not require the operator to know about `worktree
+    prune`, and the committed state must come back with the mount."""
+    fixture = _build_link_fixture(tmp_path)
+    _sidecar_link.link(fixture.project_root, fixture.sidecar_root, fixture.manifest)
+    shutil.rmtree(fixture.project_root / _MOUNT_DIRNAME)
+
+    result = _sidecar_link.link(fixture.project_root, fixture.sidecar_root, fixture.manifest)
+
+    assert result.created_mount
+    restored = fixture.project_root / _MOUNT_DIRNAME / ".ai-state" / "DESIGN.md"
+    assert restored.read_text(encoding="utf-8") == "seed\n"
+
+
+# --- repairing the sidecar's record after the project moves --------------------------
+
+
+def _recorded_worktree_paths(sidecar_root: Path) -> list[str]:
+    return [
+        gitdir.read_text(encoding="utf-8").strip()
+        for gitdir in sorted((sidecar_root / ".git" / "worktrees").glob("*/gitdir"))
+    ]
+
+
+def test_link_repairs_the_sidecar_record_after_the_project_directory_moves(
+    tmp_path: Path,
+) -> None:
+    """Moving a project leaves its mount working -- the forward pointer is
+    absolute -- while the sidecar still believes the mount is at the old path.
+    `link` is the advertised fix, so it has to actually be one."""
+    fixture = _build_link_fixture(tmp_path)
+    _sidecar_link.link(fixture.project_root, fixture.sidecar_root, fixture.manifest)
+    moved = tmp_path / "project-moved"
+    shutil.move(str(fixture.project_root), str(moved))
+
+    result = _sidecar_link.link(moved, fixture.sidecar_root, fixture.manifest)
+
+    assert result.repaired_mount
+    assert _recorded_worktree_paths(fixture.sidecar_root) == [str(moved / _MOUNT_DIRNAME / ".git")]
+    listing = _git_ok(fixture.sidecar_root, "worktree", "list").stdout
+    assert str(moved / _MOUNT_DIRNAME) in listing
+
+
+def test_link_reports_no_repair_when_the_project_has_not_moved(tmp_path: Path) -> None:
+    """The inverse guard: a healthy mount must not provoke a repair on every
+    re-run, which would turn the idempotent SessionStart heal into a write."""
+    fixture = _build_link_fixture(tmp_path)
+    _sidecar_link.link(fixture.project_root, fixture.sidecar_root, fixture.manifest)
+
+    result = _sidecar_link.link(fixture.project_root, fixture.sidecar_root, fixture.manifest)
+
+    assert not result.repaired_mount

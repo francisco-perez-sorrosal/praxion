@@ -232,8 +232,9 @@ def test_unknown_verb_exits_usage_error_with_short_usage_on_stderr(
 ) -> None:
     result = run_cli(["frobnicate"], tmp_path, cli_env)
     assert result.returncode == 2
-    assert "Usage: praxion-sidecar {init|link|status|doctor|commit|publish|absorb|remote}" in (
-        result.stderr
+    assert (
+        "Usage: praxion-sidecar {init|link|status|doctor|commit|merge-back|publish|absorb|remote}"
+        in result.stderr
     )
     assert "Run 'praxion-sidecar --help' for examples and the full option reference." in (
         result.stderr
@@ -894,7 +895,9 @@ def test_doctor_on_in_repo_project_reports_only_hook_rows_and_exits_zero(
     result = run_cli(["doctor"], local_project, cli_env)
     assert result.returncode == 0, result.stderr
     assert "hooks-path" in result.stdout
-    assert "hooks-chained" in result.stdout
+    # The chain row exists only where a wrapper is installed to inspect; a
+    # plain-symlink install has no chain call whose presence could be judged.
+    assert "hooks-chained" not in result.stdout
     assert "sidecar repo" not in result.stdout
 
 
@@ -1880,6 +1883,54 @@ def test_publish_then_absorb_is_a_round_trip(
     # The backup from the publish leg is still on disk beside the new sidecar.
     retired = [p for p in sidecar_root.iterdir() if p.name.startswith(f"{_ORIGIN_ID}.published-")]
     assert len(retired) == 1
+
+
+def test_publish_then_absorb_restores_every_shadow_not_only_the_state_directory(
+    origin_project: Path, cli_env: dict[str, str]
+) -> None:
+    """publish turns every shadowed file back into a real one, so an absorb
+    that re-shadowed only the state directory left the rest as real files
+    `link` refuses to reclaim -- a round trip that ends unhealthy."""
+    _init_ok(origin_project, cli_env)
+    (origin_project / "CLAUDE.local.md").write_text("local guidance\n", encoding="utf-8")
+    (origin_project / ".claude" / "settings.local.json").write_text(
+        '{"local": true}\n', encoding="utf-8"
+    )
+    assert run_cli(["commit"], origin_project, cli_env).returncode == 0
+    assert _run_cli_no_stdin(["publish", "--yes"], origin_project, cli_env).returncode == 0
+    _git_ok(origin_project, "add", "-A")
+    _git_ok(origin_project, "commit", "-q", "-m", "chore: adopt Praxion state")
+
+    absorbed = _run_cli_no_stdin(["absorb", "--yes"], origin_project, cli_env)
+    assert absorbed.returncode == 0, absorbed.stderr
+
+    for relpath in (".ai-state", "CLAUDE.local.md", ".claude/settings.local.json"):
+        assert (origin_project / relpath).is_symlink(), relpath
+    assert (origin_project / "CLAUDE.local.md").read_text(encoding="utf-8") == "local guidance\n"
+    doctor = run_cli(["doctor"], origin_project, cli_env)
+    assert doctor.returncode == 0, doctor.stdout + doctor.stderr
+
+
+def test_link_from_a_second_clone_names_the_checkout_holding_the_sidecar_branch(
+    origin_project: Path, cli_env: dict[str, str], tmp_path: Path
+) -> None:
+    """Two clones of one origin derive the same sidecar identity and the same
+    mount branch, and git allows a branch in one worktree only. Nothing
+    occupies the second clone's own slot, so the refusal must name the
+    collision rather than advise moving something aside."""
+    _init_ok(origin_project, cli_env)
+    second_clone = tmp_path / "billing-second"
+    _init_project_repo(second_clone, origin="https://github.com/acme/billing")
+
+    result = run_cli(["link"], second_clone, cli_env)
+
+    assert result.returncode == 3
+    assert "another checkout of this project already holds the sidecar branch 'main'" in (
+        result.stderr
+    )
+    assert str(origin_project / ".praxion") in result.stderr
+    assert "second clone on the same machine is not supported yet" in result.stderr
+    assert not (second_clone / ".praxion").exists()
 
 
 def test_absorb_on_a_staged_but_uncommitted_state_move_says_commit_the_adoption(

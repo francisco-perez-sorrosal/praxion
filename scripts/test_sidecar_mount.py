@@ -479,6 +479,90 @@ def test_create_mount_refuses_a_branch_already_checked_out_elsewhere(tmp_path: P
     assert excinfo.value.git_exit_code == 128
 
 
+def test_create_mount_names_the_holder_when_the_branch_is_mounted_elsewhere(
+    tmp_path: Path,
+) -> None:
+    """Nothing occupies the second checkout's own slot, so a refusal that only
+    quotes git's wording sends the operator hunting for a file that is not
+    there. The message has to name the collision and where it lives."""
+    sidecar_root = tmp_path / "sidecar"
+    project_a = tmp_path / "project-a"
+    project_b = tmp_path / "project-b"
+    _init_sidecar(sidecar_root)
+    _init_project(project_a)
+    _init_project(project_b)
+    _mount_main(sidecar_root, project_a)
+
+    with pytest.raises(_sidecar_mount.MountBranchInUse) as excinfo:
+        _sidecar_mount.create_mount(sidecar_root, project_b, "main", project_branch="main")
+
+    assert excinfo.value.branch == "main"
+    assert Path(excinfo.value.holder) == project_a / _sidecar_mount.MOUNT_DIRNAME
+    assert "second clone on the same machine is not supported yet" in str(excinfo.value)
+
+
+def test_create_mount_clears_a_stale_worktree_record_before_claiming_the_slot(
+    tmp_path: Path,
+) -> None:
+    """A mount directory removed outside git's knowledge leaves a record git
+    then refuses to add over -- the `git clean -ffdx` case, and the case of a
+    sidecar copied from another machine with its worktree records in tow."""
+    sidecar_root = tmp_path / "sidecar"
+    project_root = tmp_path / "project"
+    _init_sidecar(sidecar_root)
+    _init_project(project_root)
+    mount = _mount_main(sidecar_root, project_root)
+    shutil.rmtree(mount)
+
+    _sidecar_mount.create_mount(sidecar_root, project_root, "main", project_branch="main")
+
+    assert (mount / ".ai-state" / "DESIGN.md").read_text(encoding="utf-8") == "seed\n"
+
+
+def test_create_mount_leaves_a_live_worktree_record_of_another_checkout_alone(
+    tmp_path: Path,
+) -> None:
+    """The inverse guard on the pruning above: clearing stale records must
+    never reach a mount whose directory is still standing."""
+    sidecar_root = tmp_path / "sidecar"
+    project_a = tmp_path / "project-a"
+    project_b = tmp_path / "project-b"
+    _init_sidecar(sidecar_root)
+    _init_project(project_a)
+    _init_project(project_b)
+    live = _mount_main(sidecar_root, project_a)
+    _git_ok(sidecar_root, "branch", "wt/b", "main")
+
+    _sidecar_mount.create_mount(sidecar_root, project_b, "wt/b", project_branch="main")
+
+    assert str(live) in _git_ok(sidecar_root, "worktree", "list").stdout
+
+
+def test_repair_mount_repoints_the_sidecar_record_at_the_moved_checkout(tmp_path: Path) -> None:
+    sidecar_root = tmp_path / "sidecar"
+    project_root = tmp_path / "project"
+    _init_sidecar(sidecar_root)
+    _init_project(project_root)
+    _mount_main(sidecar_root, project_root)
+    moved = tmp_path / "project-moved"
+    shutil.move(str(project_root), str(moved))
+    assert _sidecar_mount.backlink_is_stale(moved)
+
+    _sidecar_mount.repair_mount(sidecar_root, moved)
+
+    assert not _sidecar_mount.backlink_is_stale(moved)
+
+
+def test_backlink_is_not_stale_for_a_checkout_that_never_moved(tmp_path: Path) -> None:
+    sidecar_root = tmp_path / "sidecar"
+    project_root = tmp_path / "project"
+    _init_sidecar(sidecar_root)
+    _init_project(project_root)
+    _mount_main(sidecar_root, project_root)
+
+    assert not _sidecar_mount.backlink_is_stale(project_root)
+
+
 def test_create_mount_records_project_branch_mapping_in_sidecar_config_only(tmp_path: Path) -> None:
     fixture = _build_diverged_fixture(tmp_path, name="map")
 

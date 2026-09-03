@@ -21,7 +21,8 @@ from churning the tree, since a clean re-run performs zero writes.
 
 Sequence: classify the mount (refuse before any write if something
 foreign occupies it); rewrite ``info/exclude`` in the *common* git dir if
-it would change; create the mount if ``Absent``; create shadow symlinks
+it would change; create the mount if ``Absent``, or repair the sidecar's
+record of it when the checkout has moved; create shadow symlinks
 from ``Absent`` slots; converge state branches, main checkout only.
 Gathering and computing run unconditionally; every effect is gated behind
 one ``if not dry_run``.
@@ -359,6 +360,7 @@ class LinkResult:
     """
 
     created_mount: bool = False
+    repaired_mount: bool = False
     linked: list[str] = dataclasses.field(default_factory=list)
     skipped: list[tuple[str, ShadowSlotState]] = dataclasses.field(default_factory=list)
     exclude_changed: bool = False
@@ -373,6 +375,7 @@ class _LinkPlan:
     """
 
     created_mount: bool
+    repaired_mount: bool
     exclude_path: Path
     new_exclude_text: str
     exclude_changed: bool
@@ -407,6 +410,10 @@ def _plan_link(
     }
     return _LinkPlan(
         created_mount=isinstance(mount_state, _sidecar_mount.Absent),
+        repaired_mount=(
+            isinstance(mount_state, _sidecar_mount.SidecarWorktree)
+            and _sidecar_mount.backlink_is_stale(checkout)
+        ),
         exclude_path=exclude_path,
         new_exclude_text=new_exclude_text,
         exclude_changed=not (exclude_path.exists() and new_exclude_text == existing_exclude),
@@ -442,6 +449,8 @@ def _apply_link(
         )
         if project_branch is None:
             _clear_project_branch_mapping(sidecar_root, branch)
+    if plan.repaired_mount:
+        _sidecar_mount.repair_mount(sidecar_root, checkout)
     for relpath, entry in plan.shadow_entries:
         if isinstance(plan.slot_states[relpath], Absent):
             _ensure_real_parent_dir(checkout, relpath)
@@ -488,6 +497,7 @@ def link(
     ]
     return LinkResult(
         created_mount=plan.created_mount,
+        repaired_mount=plan.repaired_mount,
         linked=linked,
         skipped=skipped,
         exclude_changed=plan.exclude_changed,

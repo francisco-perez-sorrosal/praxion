@@ -91,6 +91,23 @@ def common_dir_of_worktree(worktree_git_dir: Path) -> Path | None:
     return worktree_git_dir.parent.parent
 
 
+def recorded_worktree_path(worktree_git_dir: Path) -> Path | None:
+    """The `.git` file path a repository records for one of its worktrees.
+
+    The reverse of ``read_gitdir_pointer``: git keeps a ``gitdir`` file inside
+    ``<repo>/.git/worktrees/<name>/`` naming where that worktree's own ``.git``
+    file lives. Moving the worktree leaves the forward pointer valid (it is
+    absolute and the repository did not move) while this one goes stale, which
+    is the only observable difference between a healthy and a moved worktree.
+    """
+    try:
+        recorded = (worktree_git_dir / "gitdir").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    recorded = recorded.strip()
+    return Path(recorded) if recorded else None
+
+
 def head_branch(worktree_git_dir: Path) -> str | None:
     """The branch a git dir's HEAD points at, or ``None`` when detached."""
     try:

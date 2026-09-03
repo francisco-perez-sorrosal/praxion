@@ -213,6 +213,15 @@ def verb_link(args: argparse.Namespace, context: Context) -> int:
         manifest = _record_root(sidecar, manifest, context.checkout)
     try:
         result = linker.link(context.checkout, sidecar, manifest, dry_run=args.dry_run)
+    except mounts.MountBranchInUse as error:
+        # Nothing occupies *this* checkout's slot, so the generic advice below
+        # would send the operator looking for something that is not there.
+        raise refusal(
+            "Refusing to link: this project's sidecar branch is mounted by another checkout.",
+            str(error),
+            f"Use a project worktree of that checkout instead:  "
+            f"git worktree add <path>   (run from {Path(error.holder).parent})",
+        ) from error
     except (linker.LinkRefused, mounts.SidecarMountError) as error:
         raise refusal(
             "Refusing to link: this checkout's .praxion slot cannot be used as a state mount.",
@@ -220,7 +229,9 @@ def verb_link(args: argparse.Namespace, context: Context) -> int:
             "Move whatever occupies it aside, then:  praxion-sidecar link",
         ) from error
 
-    if result.linked or result.created_mount or result.exclude_changed:
+    if result.repaired_mount:
+        _say(args, f"Repaired the sidecar's record of {context.checkout}/{mounts.MOUNT_DIRNAME}.")
+    if result.linked or result.created_mount or result.exclude_changed or result.repaired_mount:
         _say(args, f"Linked {len(result.linked)} surface(s) into {context.checkout}.")
     else:
         _say(args, "Already linked — no changes.")
@@ -536,7 +547,13 @@ def main(argv: list[str] | None = None) -> int:
     except identity.InvalidProjectId as error:
         print(f"Usage error: {error}", file=sys.stderr)
         return EXIT_USAGE
-    except (EnvironmentProblem, GitUnavailableError, commits.GitCommandError, OSError) as error:
+    except (
+        EnvironmentProblem,
+        GitUnavailableError,
+        commits.GitCommandError,
+        manifests.ManifestError,  # `init`/`absorb` write the manifest before any read maps it
+        OSError,
+    ) as error:
         print(error, file=sys.stderr)
         return EXIT_ENVIRONMENT
 

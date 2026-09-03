@@ -31,6 +31,8 @@ explicitly; nothing here reads the process working directory.
 from __future__ import annotations
 
 import dataclasses
+import os
+import re
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import AbstractContextManager
 from enum import Enum
@@ -72,6 +74,10 @@ SKELETON_SUBDIRS: tuple[str, ...] = (
 
 _GITKEEP = ".gitkeep"
 
+# git's own wording when `worktree add` is refused because the branch is held
+# by another worktree; the captured group is that worktree's path.
+_BRANCH_HELD_ELSEWHERE = re.compile(r"is already used by worktree at '([^']+)'")
+
 
 class SidecarMountError(Exception):
     """A mount operation could not be carried out.
@@ -94,6 +100,27 @@ class MountCreationRefused(SidecarMountError):  # noqa: N818 - see SidecarMountE
         super().__init__(reason)
         self.reason = reason
         self.git_exit_code = git_exit_code
+
+
+class MountBranchInUse(MountCreationRefused):  # noqa: N818 - see SidecarMountError
+    """The sidecar branch this mount needs is checked out by another mount.
+
+    A distinct type rather than a message variant because the operator's next
+    move is different in kind: nothing occupies *this* checkout's slot, so the
+    generic "move it aside" advice is not merely unhelpful but wrong.
+    """
+
+    def __init__(self, branch: str, holder: str) -> None:
+        super().__init__(
+            reason=(
+                f"another checkout of this project already holds the sidecar branch "
+                f"{branch!r} at {holder}; a second clone on the same machine is not "
+                f"supported yet"
+            ),
+            git_exit_code=128,
+        )
+        self.branch = branch
+        self.holder = holder
 
 
 class MountRemovalRefused(SidecarMountError):  # noqa: N818 - see SidecarMountError
@@ -259,6 +286,14 @@ def create_mount(
             reason=f"{Path(checkout) / MOUNT_DIRNAME} cannot be created: {_describe(state)}"
         )
 
+    # The slot is `Absent`, so any administrative entry the sidecar still holds
+    # for it -- or for any other checkout -- describes a directory that is gone:
+    # a `git clean -ffdx` in the project, or a sidecar copied from another
+    # machine whose worktree records came with it. `worktree prune` drops
+    # exactly those entries and never a live one, so it cannot cost anything
+    # here, while without it git refuses the add below outright.
+    run_git(sidecar_root, "worktree", "prune")
+
     mount = Path(checkout) / MOUNT_DIRNAME
     add_args = ["worktree", "add", "-q"]
     if base_branch is None:
@@ -268,6 +303,9 @@ def create_mount(
 
     result = run_git(sidecar_root, *add_args)
     if result.returncode != 0:
+        held_at = _BRANCH_HELD_ELSEWHERE.search(result.stderr)
+        if held_at is not None:
+            raise MountBranchInUse(branch, held_at.group(1))
         raise MountCreationRefused(
             reason=result.stderr.strip() or f"git worktree add exited {result.returncode}",
             git_exit_code=result.returncode,
@@ -275,6 +313,40 @@ def create_mount(
     gitp.set_branch_config(
         sidecar_root, branch, PROJECT_BRANCH_CONFIG_SUFFIX, project_branch, error=SidecarMountError
     )
+
+
+def backlink_is_stale(checkout: Path) -> bool:
+    """Whether the sidecar's record of where this mount lives has gone stale.
+
+    Moving a project directory leaves the mount's own forward pointer correct
+    -- it is absolute and the sidecar did not move -- so the checkout keeps
+    working while every sidecar-side operation (``worktree list``, pruning,
+    merge-back bookkeeping) still believes the mount is at the old path.
+
+    Compared through ``realpath`` on both sides: the recorded path is whatever
+    string git was handed at ``worktree add`` time, so an unresolved symlink in
+    a temp-directory prefix would otherwise read as a move and provoke a repair
+    on every single ``link``.
+    """
+    mount = Path(checkout) / MOUNT_DIRNAME
+    worktree_git_dir = gitp.read_gitdir_pointer(mount / ".git")
+    if worktree_git_dir is None:
+        return False
+    recorded = gitp.recorded_worktree_path(worktree_git_dir)
+    if recorded is None:
+        return False
+    return os.path.realpath(recorded) != os.path.realpath(mount / ".git")
+
+
+def repair_mount(sidecar_root: Path, checkout: Path) -> None:
+    """Point the sidecar's own record back at where the mount actually is.
+
+    ``git worktree repair`` rewrites that one reverse pointer and touches
+    nothing else; it is idempotent, so a caller that repairs a healthy mount
+    merely wastes a subprocess.
+    """
+    mount = Path(checkout) / MOUNT_DIRNAME
+    gitp.run_or_raise(sidecar_root, SidecarMountError, "worktree", "repair", str(mount))
 
 
 def prune_mount(sidecar_root: Path, checkout: Path) -> None:

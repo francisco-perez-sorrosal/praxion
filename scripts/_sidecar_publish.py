@@ -345,11 +345,13 @@ def absorb(context: Context, *, shadows: list[str], shares: list[str], dry_run: 
     sidecar = context.sidecar_dir(slug)
     initializer.require_free_sidecar(sidecar, project_id, slug)
     manifest = initializer.build_manifest(checkout, project_id, slug, shadows, shares)
+    adopted = _read_real_shadow_files(checkout, manifest)
     if dry_run:
         return Report(
             (
                 f"Would move {checkout}/{STATE_DIRNAME} into "
                 f"{render.abbreviate_home(sidecar)} with its history.",
+                *_adoption_plan(adopted),
                 "Would leave the removal staged for you to commit.",
                 DRY_RUN_TRAILER,
             )
@@ -357,12 +359,14 @@ def absorb(context: Context, *, shadows: list[str], shares: list[str], dry_run: 
 
     initializer.create_repo(sidecar, manifest, slug)
     manifests.write_manifest(manifests.manifest_path(sidecar / ".git"), manifest)
-    _absorb_history(sidecar, checkout)
+    _absorb_history(sidecar, checkout, adopted)
     _untrack_state_dir(checkout)
+    _free_shadow_slots(checkout, adopted)
     linker.link(checkout, sidecar, initializer.reload_manifest(sidecar), dry_run=False)
     return Report(
         (
             f"Absorbed {STATE_DIRNAME}/ into {render.abbreviate_home(sidecar)} with its history.",
+            *_adoption_notice(adopted),
             f"{checkout}/{STATE_DIRNAME} is now a symlink; its removal is staged, not committed.",
             "Review and commit it yourself:  git commit -m 'chore: move Praxion state to a sidecar'",
             "Next: praxion-sidecar doctor",
@@ -370,18 +374,95 @@ def absorb(context: Context, *, shadows: list[str], shares: list[str], dry_run: 
     )
 
 
-def _absorb_history(sidecar: Path, checkout: Path) -> None:
+def _absorb_history(sidecar: Path, checkout: Path, adopted: dict[str, str]) -> None:
     """Graft onto ``main`` rather than the detached HEAD ``create_repo`` leaves.
 
     The sidecar detaches so the main checkout's mount can claim ``main``; the
     mount does not exist yet here, so re-attaching briefly is safe and is the
-    only way the merge lands on the branch that mount will check out.
+    only way the merge -- and the shadow files adopted with it -- land on the
+    branch that mount will check out.
     """
     gitp.run_or_raise(sidecar, EnvironmentProblem, "checkout", "-q", "main")
     graft_state_history(
         sidecar, checkout, "HEAD", "chore(state): absorb the project's .ai-state/ with history."
     )
+    _adopt_shadow_files(sidecar, adopted)
     gitp.run_or_raise(sidecar, EnvironmentProblem, "checkout", "-q", "--detach")
+
+
+def _read_real_shadow_files(checkout: Path, manifest: manifests.Manifest) -> dict[str, str]:
+    """Every shadowed *file* that is a real file in the checkout right now.
+
+    The mirror image of publish's `_read_shadowed_files`, and the reason absorb
+    is publish's inverse rather than a partial one: publish turns each of these
+    back into a plain file, so a round trip that only re-shadowed the state
+    directory left them behind as real files `link` then refuses to reclaim.
+    The state directory is excluded here for the same reason it is there -- it
+    moves through the history graft, not by copying bytes.
+    """
+    contents = {}
+    for relpath, entry in manifest.paths.items():
+        if not isinstance(entry, manifests.ShadowEntry) or relpath == STATE_DIRNAME:
+            continue
+        slot = checkout / relpath
+        if slot.is_file() and not slot.is_symlink():
+            contents[relpath] = slot.read_text(encoding="utf-8")
+    return contents
+
+
+def _adopt_shadow_files(sidecar: Path, adopted: dict[str, str]) -> None:
+    """Write the adopted files at the leaves their shadows will point at.
+
+    The leaf comes from `shadow_target()`, not from `relpath`: shadows are
+    flattened into the mount root, and re-deriving that here would be a second,
+    silently-divergent answer to where a shadow actually points.
+    """
+    if not adopted:
+        return
+    leaves = []
+    for relpath, text in adopted.items():
+        leaf = Path(linker.shadow_target(relpath)).name
+        (sidecar / leaf).write_text(text, encoding="utf-8")
+        leaves.append(leaf)
+    gitp.run_or_raise(sidecar, EnvironmentProblem, "add", "--", *leaves)
+    # A file whose bytes already match what `init` seeded stages nothing, and
+    # git refuses an empty commit -- so the adoption is simply already done.
+    if gitp.succeeds(sidecar, "diff", "--cached", "--quiet"):
+        return
+    gitp.run_or_raise(
+        sidecar,
+        EnvironmentProblem,
+        *gitp.identity_args(sidecar),
+        "commit",
+        "-q",
+        "-m",
+        "chore(state): absorb the project's local shadow files.",
+    )
+
+
+def _free_shadow_slots(checkout: Path, adopted: dict[str, str]) -> None:
+    """Empty each adopted slot so `link` sees the ``Absent`` it creates from.
+
+    Tracked files have their removal *staged and not committed*, exactly as
+    `_untrack_state_dir` does for the state directory: absorb never commits to
+    the project repository, and the operator records the whole move at once.
+    """
+    for relpath in adopted:
+        if gitp.succeeds(checkout, "ls-files", "--error-unmatch", "--", relpath):
+            gitp.run_or_raise(checkout, EnvironmentProblem, "rm", "-q", "--cached", "--", relpath)
+        (checkout / relpath).unlink()
+
+
+def _adoption_plan(adopted: dict[str, str]) -> tuple[str, ...]:
+    if not adopted:
+        return ()
+    return (f"Would move {', '.join(sorted(adopted))} into the sidecar and shadow them.",)
+
+
+def _adoption_notice(adopted: dict[str, str]) -> tuple[str, ...]:
+    if not adopted:
+        return ()
+    return (f"Moved {', '.join(sorted(adopted))} into the sidecar; each is now a symlink.",)
 
 
 def _untrack_state_dir(checkout: Path) -> None:

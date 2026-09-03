@@ -281,11 +281,7 @@ expected_runtime_envelope:
   p50_seconds: 29.3
   p95_seconds: 30
 shared_state: tmp_path
-notes: "Self-contained by construction -- 20 files, 623 tests, no fan-out.
-  2026-09-03: hooks/test_inject_sidecar_banner.py and
-  hooks/test_sidecar_autocommit.py added (sidecar-placement P1, RED-first
-  against praxion-sidecar stub fixtures); both already match the hooks/
-  selector glob above, no selector change needed."
+notes: "Self-contained by construction -- 20 files, 623 tests, no fan-out. 2026-09-03: hooks/test_inject_sidecar_banner.py and hooks/test_sidecar_autocommit.py added (sidecar-placement P1, RED-first against praxion-sidecar stub fixtures); both already match the hooks/ selector glob above, no selector change needed."
 ```
 
 The tier is `integration` rather than `unit` because 14 of the 20 files spawn real
@@ -638,15 +634,7 @@ expected_runtime_envelope:
   p50_seconds: 2.5
   p95_seconds: 10
 shared_state: filesystem
-notes: "Tier is contract, not integration -- a deliberate call; see below.
-  scripts/test_onboard_project_placement.py drives scripts/onboard-project and
-  the real scripts/praxion-sidecar (Praxion's own already-tested collaborator,
-  not an external boundary) via real subprocesses and real git worktrees under
-  tmp_path -- the p95 bump over the pre-existing 4s reflects that; only
-  `claude` is stubbed. test_onboard_placement_phase_matrix.py and
-  test_onboard_project_detection.py extend this group with the placement-axis
-  phase-matrix regression suite (prose contract + a real detect_state()
-  subprocess check)."
+notes: "Tier is contract, not integration -- a deliberate call; see below. scripts/test_onboard_project_placement.py drives scripts/onboard-project and the real scripts/praxion-sidecar (Praxion's own already-tested collaborator, not an external boundary) via real subprocesses and real git worktrees under tmp_path -- the p95 bump over the pre-existing 4s reflects that; only `claude` is stubbed. test_onboard_placement_phase_matrix.py and test_onboard_project_detection.py extend this group with the placement-axis phase-matrix regression suite (prose contract + a real detect_state() subprocess check)."
 ```
 
 `/onboard-project` is a Markdown slash command that pytest cannot invoke, so these

@@ -1,7 +1,7 @@
 ---
 description: Merge a worktree branch back into current branch
 argument-hint: "[branch-name]"
-allowed-tools: [Bash(git:*), Bash(python*), Bash(test:*), Read, Grep]
+allowed-tools: [Bash(git:*), Bash(python*), Bash(test:*), Bash(praxion-sidecar:*), Read, Grep]
 disable-model-invocation: true
 ---
 
@@ -22,6 +22,7 @@ Merge the $ARGUMENTS worktree into the current branch. Primary worktree home is 
    - Check whether the branch touched `.ai-state/`: `git diff --name-only "$BASE..$BRANCH" -- .ai-state/ | head -n 1`.
    - If any path is returned, refuse the merge and print: `Squash-merge erases .ai-state/ history. Use regular merge (no --squash) or rebase + merge. See rules/swe/vcs/pr-conventions.md for details.` Stop without merging.
    - If no `.ai-state/` paths are touched, squash-merge is permitted.
+4.5. State convergence (preferred, not required). Resolve the worktree's `.ai-state/` placement: `python3 scripts/_state_repo.py --print "$WORKTREE_PATH"`. If the output includes `placement=sidecar`, the project's `.ai-state/` lives in a state-mount sidecar rather than inside the project repo — run `praxion-sidecar merge-back --from wt/$ARGUMENTS` from the root directory, against the target checkout's own mount. This is the explicit merge-back form: it **may leave conflict markers** in the mount rather than aborting, which is correct here because an operator is present to resolve them (the CLI prints both the resolve and the abort commands). Doing this now, before Step 5's project-branch merge, promotes any draft ADRs or other `.ai-state/` writes made inside the worktree in this same run, giving the earliest possible visibility. If the output is `placement=in-repo` (or any other value), skip this step — there is no separate mount to converge. Proceed to Step 5 regardless of this step's outcome (converged, nothing to converge, or conflict markers left for later resolution): this step is a **convenience, not a correctness requirement**. State written inside a sidecar-placed worktree also converges automatically, from the project's own post-merge finalize chain and from the next session's start-up self-heal, so skipping this step, letting it time out, or merging with a different tool entirely never strands worktree state permanently. Anything still unconverged is surfaced by `praxion-sidecar doctor`'s `state-unmerged` and `state-eligible` rows, each printed with its exact fix command.
 5. Merge in the worktree. Default: `git merge --ff-only "$BRANCH"` to preserve a linear history. If `--ff-only` refuses because the branch has diverged from the target, stop and tell the user to rebase the branch on the target first (`git rebase <default-branch>` from inside the worktree) and re-run the merge. Do not silently fall back to a non-fast-forward merge commit. The user's explicit `--squash` or rebase choice (when it passed the check in Step 4) is honored.
 6. Check for merge conflicts using `git status`, `git diff --name-only --diff-filter=U`, or `git ls-files -u`.
 7. Run `.ai-state/` reconciliation: `python scripts/reconcile_ai_state.py` — this resolves `observations.jsonl` conflicts semantically, renumbers duplicate ADR sequence numbers, and regenerates `DECISIONS_INDEX.md`.

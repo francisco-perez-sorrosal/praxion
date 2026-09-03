@@ -74,26 +74,6 @@ def apply_repo_root(root: Path) -> None:
     REPO_ROOT = root
 
 
-def resolve_target_mount(path_str: str) -> Path:
-    """Validate `--target-mount` and return the mount path.
-
-    Mirrors `reconcile_ai_state.resolve_target_mount` -- refuses anything
-    that is not itself `<checkout>/.praxion` for some checkout currently on
-    a state branch, so a shadow symlink or an arbitrary directory is
-    refused even when it resolves into a real mount's content.
-    """
-    mount = Path(path_str)
-    if mount.name != _sidecar_mount.MOUNT_DIRNAME:
-        raise ValueError(
-            f"--target-mount must name a state mount "
-            f"({_sidecar_mount.MOUNT_DIRNAME} directory); got {mount}"
-        )
-    state = _sidecar_mount.classify_mount(mount.parent, expected_common_dir=None)
-    if not isinstance(state, _sidecar_mount.SidecarWorktree):
-        raise ValueError(f"{mount} is not a state mount: {state!r}")
-    return mount
-
-
 # -- Git helpers --------------------------------------------------------------
 
 
@@ -321,7 +301,7 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.target_mount is not None:
         try:
-            mount = resolve_target_mount(args.target_mount)
+            mount = _sidecar_mount.resolve_target_mount(args.target_mount)
         except ValueError as exc:
             logger.error("check_squash_safety: %s", exc)
             sys.exit(1)

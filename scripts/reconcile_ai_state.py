@@ -74,28 +74,6 @@ def apply_repo_root(root: Path) -> None:
     OBSERVATIONS_PATH = AI_STATE / "observations.jsonl"
 
 
-def resolve_target_mount(path_str: str) -> Path:
-    """Validate `--target-mount` and return the mount path.
-
-    Refuses anything that is not itself `<checkout>/.praxion` for some
-    checkout, currently on a state branch -- a shadow symlink
-    (`<project>/.ai-state`) or an arbitrary directory both fail this even
-    when they resolve into a real mount's content, because the caller
-    (`_sidecar_mount.merge_back`'s post-merge seam) always names the mount
-    itself, never a path that merely reaches through it.
-    """
-    mount = Path(path_str)
-    if mount.name != _sidecar_mount.MOUNT_DIRNAME:
-        raise ValueError(
-            f"--target-mount must name a state mount "
-            f"({_sidecar_mount.MOUNT_DIRNAME} directory); got {mount}"
-        )
-    state = _sidecar_mount.classify_mount(mount.parent, expected_common_dir=None)
-    if not isinstance(state, _sidecar_mount.SidecarWorktree):
-        raise ValueError(f"{mount} is not a state mount: {state!r}")
-    return mount
-
-
 # -- Helpers ------------------------------------------------------------------
 
 
@@ -381,7 +359,7 @@ def _run_target_mount(target_mount_arg: str) -> None:
     project repository: every git call below runs with the mount as `cwd`.
     """
     try:
-        mount = resolve_target_mount(target_mount_arg)
+        mount = _sidecar_mount.resolve_target_mount(target_mount_arg)
     except ValueError as exc:
         fail(str(exc))
         sys.exit(1)

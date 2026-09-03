@@ -233,6 +233,28 @@ def classify_mount(checkout: Path, *, expected_common_dir: Path | None = None) -
     return SidecarWorktree(branch=branch, sidecar_common_dir=common_dir)
 
 
+def resolve_target_mount(path_str: str) -> Path:
+    """Validate a ``--target-mount`` CLI argument and return the mount path.
+
+    Shared by ``reconcile_ai_state.py`` and ``check_squash_safety.py`` --
+    both diagnose a state mount at merge-back and both refuse anything that
+    is not itself ``<checkout>/.praxion`` for some checkout currently on a
+    state branch. A shadow symlink (``<project>/.ai-state``) or an arbitrary
+    directory both fail this even when they resolve into a real mount's
+    content, because the caller (``merge_back``'s post-merge seam) always
+    names the mount itself, never a path that merely reaches through it.
+    """
+    mount = Path(path_str)
+    if mount.name != MOUNT_DIRNAME:
+        raise ValueError(
+            f"--target-mount must name a state mount ({MOUNT_DIRNAME} directory); got {mount}"
+        )
+    state = classify_mount(mount.parent, expected_common_dir=None)
+    if not isinstance(state, SidecarWorktree):
+        raise ValueError(f"{mount} is not a state mount: {state!r}")
+    return mount
+
+
 def _describe(state: StateMountState) -> str:
     if isinstance(state, ForeignDir):
         return state.reason

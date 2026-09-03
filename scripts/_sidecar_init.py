@@ -98,7 +98,7 @@ def _recorded_origin(manifest_path: Path) -> str | None:
 def _same_origin(recorded: str, ours: str | None) -> bool:
     if ours is None:
         return False
-    return _state_repo._normalize_origin(recorded) == _state_repo._normalize_origin(ours)  # noqa: SLF001
+    return _state_repo.normalize_origin(recorded) == _state_repo.normalize_origin(ours)
 
 
 def build_manifest(

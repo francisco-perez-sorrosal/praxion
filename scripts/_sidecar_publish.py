@@ -627,4 +627,4 @@ def _has_staged_state_change(status: str) -> bool:
 def _exclude_path(checkout: Path) -> Path:
     # The one `info/exclude` every worktree of this project honours; the same
     # derivation `link` writes through.
-    return linker._project_common_git_dir(checkout) / "info" / "exclude"  # noqa: SLF001
+    return linker.project_common_git_dir(checkout) / "info" / "exclude"

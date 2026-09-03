@@ -240,11 +240,11 @@ def _checkout_facts(checkout: Path) -> render.Checkout:
 
 
 def _exclude_block_state(checkout: Path, manifest: manifests.Manifest) -> checks.ExcludeBlockState:
-    exclude_path = linker._project_common_git_dir(checkout) / "info" / "exclude"  # noqa: SLF001
-    existing, expected = linker._compute_new_exclude_text(  # noqa: SLF001
+    exclude_path = linker.project_common_git_dir(checkout) / "info" / "exclude"
+    existing, expected = linker.compute_new_exclude_text(
         exclude_path, linker.exclude_lines(manifest)
     )
-    if linker._BLOCK_START not in existing:  # noqa: SLF001
+    if linker.BLOCK_START not in existing:
         return checks.ExcludeBlockState.ABSENT
     return (
         checks.ExcludeBlockState.CURRENT
@@ -365,7 +365,7 @@ def _remote_state(manifest: manifests.Manifest, checkout: Path) -> checks.Remote
 
 
 def _host_of(url: str | None) -> str | None:
-    normalized = _state_repo._normalize_origin(url) if url else None  # noqa: SLF001
+    normalized = _state_repo.normalize_origin(url) if url else None
     return normalized.partition("/")[0] if normalized else None
 
 

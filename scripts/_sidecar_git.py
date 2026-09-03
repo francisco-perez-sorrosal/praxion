@@ -45,11 +45,19 @@ def succeeds(repo: Path, *args: str) -> bool:
         return False
 
 
-def run_or_raise(repo: Path, error: type[Exception], *args: str) -> None:
-    """Run a mutating git command, raising ``error`` with git's own message."""
+def run_or_raise(
+    repo: Path, error: type[Exception], *args: str
+) -> subprocess.CompletedProcess[str]:
+    """Run a mutating git command, raising ``error`` with git's own message.
+
+    Returns the ``CompletedProcess`` on success -- read by callers that need
+    its ``stdout`` (`_sidecar_commit.residue_paths`'s `status --porcelain`).
+    """
     result = run_git(repo, *args)
     if result.returncode != 0:
-        raise error(result.stderr.strip() or f"git {args[0]} exited {result.returncode}")
+        stderr = result.stderr.strip()
+        raise error(f"git {' '.join(args)} failed in {repo} (rc={result.returncode}): {stderr}")
+    return result
 
 
 def porcelain_status(repo: Path) -> str | None:

@@ -40,7 +40,6 @@ import contextlib
 import dataclasses
 import fcntl
 import os
-import subprocess
 import time
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import AbstractContextManager
@@ -49,6 +48,7 @@ from pathlib import Path
 from typing import TextIO, Union
 
 from _git_runner import git_output, run_git
+from _sidecar_git import run_or_raise
 
 LOCK_FILENAME = "praxion-sidecar-commit.lock"
 
@@ -339,27 +339,16 @@ def commit_paths(
 
 def _stage_and_commit(mount: Path, paths: list[str], message: str) -> CommitResult:
     """Under the lock: stage the pathspec, then commit only if it changed HEAD."""
-    _git_or_raise(mount, "add", "--", *paths)
+    run_or_raise(mount, GitCommandError, "add", "--", *paths)
     if _index_matches_head(mount):
         return CommitResult(committed=False, sha=None, staged=[])
-    _git_or_raise(mount, "commit", "-m", message)
+    run_or_raise(mount, GitCommandError, "commit", "-m", message)
     return CommitResult(committed=True, sha=git_output(mount, "rev-parse", "HEAD"), staged=paths)
 
 
 def _index_matches_head(mount: Path) -> bool:
     """True when nothing is staged -- the clean no-op, not a failure."""
     return run_git(mount, "diff", "--cached", "--quiet").returncode == 0
-
-
-def _git_or_raise(mount: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    """Run a git command against the mount, or raise with its stderr attached."""
-    result = run_git(mount, *args)
-    if result.returncode != 0:
-        raise GitCommandError(
-            f"git {' '.join(args)} failed in {mount} (rc={result.returncode}): "
-            f"{result.stderr.strip()}"
-        )
-    return result
 
 
 def residue_paths(mount: Path) -> list[str]:
@@ -378,7 +367,7 @@ def residue_paths(mount: Path) -> list[str]:
     # whole output, and porcelain's status column is leading whitespace on an
     # unstaged line -- stripping it shifts every path left by one character and
     # silently eats the leading dot of a `.ai-state/` path.
-    status = _git_or_raise(mount, "status", "--porcelain")
+    status = run_or_raise(mount, GitCommandError, "status", "--porcelain")
     return [_porcelain_path(line) for line in status.stdout.splitlines() if line.strip()]
 
 

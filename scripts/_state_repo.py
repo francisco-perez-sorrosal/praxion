@@ -277,7 +277,7 @@ def _through_main_checkout(root: Path) -> Placement | None:
 def _main_checkout_root(root: Path) -> Path | None:
     """The main checkout of `root`, when `root` is a **linked** worktree.
 
-    Unlike `_project_git_common_dir`, which collapses a linked worktree and a
+    Unlike `project_git_common_dir`, which collapses a linked worktree and a
     standalone pointer file into one answer, this refuses everything but the
     linked shape: a `.git` directory means `root` already IS the main
     checkout, and an unrecognized pointer is not guessed at.
@@ -450,7 +450,7 @@ def _require_identity_match(root: Path, identity: SidecarIdentity, roots: list[s
     """
     if identity.origin is not None:
         observed = _observed_origin(root)
-        if observed is None or observed != _normalize_origin(identity.origin):
+        if observed is None or observed != normalize_origin(identity.origin):
             raise _MountRefusalError(ForeignReason.IDENTITY_MISMATCH)
         return
     if root not in {Path(recorded).resolve() for recorded in roots}:
@@ -459,14 +459,14 @@ def _require_identity_match(root: Path, identity: SidecarIdentity, roots: list[s
 
 def _observed_origin(project_root: Path) -> str | None:
     """This project's normalized `remote.origin.url`, read from its git config."""
-    common_dir = _project_git_common_dir(project_root)
+    common_dir = project_git_common_dir(project_root)
     if common_dir is None:
         return None
-    url = _remote_origin_url(common_dir)
-    return _normalize_origin(url) if url else None
+    url = remote_origin_url(common_dir)
+    return normalize_origin(url) if url else None
 
 
-def _project_git_common_dir(project_root: Path) -> Path | None:
+def project_git_common_dir(project_root: Path) -> Path | None:
     """The project's git common dir -- where remotes live, in a worktree too."""
     git_entry = project_root / _GIT_ENTRY_NAME
     if git_entry.is_dir():
@@ -478,7 +478,7 @@ def _project_git_common_dir(project_root: Path) -> Path | None:
     return linked[1] if linked is not None else gitdir
 
 
-def _remote_origin_url(git_common_dir: Path) -> str | None:
+def remote_origin_url(git_common_dir: Path) -> str | None:
     """`remote.origin.url` from `.git/config`, with a line reader.
 
     Not `configparser`: git indents its keys, which configparser reads as
@@ -499,7 +499,7 @@ def _remote_origin_url(git_common_dir: Path) -> str | None:
     return None
 
 
-def _normalize_origin(url: str) -> str | None:
+def normalize_origin(url: str) -> str | None:
     """Normalize a remote URL so SSH and HTTPS forms of one repo compare equal.
 
     Drops the scheme, credentials, a `.git` suffix and trailing slashes:

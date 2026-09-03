@@ -66,8 +66,8 @@ __all__ = [
 
 _MAIN_BRANCH = "main"
 _WORKTREE_BRANCH_PREFIX = "wt/"
-_BLOCK_START = "# >>> praxion:sidecar >>>"
-_BLOCK_END = "# <<< praxion:sidecar <<<"
+BLOCK_START = "# >>> praxion:sidecar >>>"
+BLOCK_END = "# <<< praxion:sidecar <<<"
 
 
 class LinkRefused(Exception):  # noqa: N818 - a refusal to act, not a failure mid-operation
@@ -239,13 +239,13 @@ def _split_block(text: str) -> tuple[str, str]:
     trailing newline right after the end marker is consumed as part of the
     block, so ``before + block + after`` never doubles up at the seam.
     """
-    start = text.find(_BLOCK_START)
+    start = text.find(BLOCK_START)
     if start == -1:
         return text, ""
-    end = text.find(_BLOCK_END, start)
+    end = text.find(BLOCK_END, start)
     if end == -1:
         return text[:start], ""
-    end += len(_BLOCK_END)
+    end += len(BLOCK_END)
     after = text[end:]
     if after.startswith("\n"):
         after = after[1:]
@@ -254,10 +254,10 @@ def _split_block(text: str) -> tuple[str, str]:
 
 def _build_block(lines: Sequence[str]) -> str:
     body = "\n".join(lines)
-    return f"{_BLOCK_START}\n{body}\n{_BLOCK_END}\n"
+    return f"{BLOCK_START}\n{body}\n{BLOCK_END}\n"
 
 
-def _compute_new_exclude_text(exclude_path: Path, lines: Sequence[str]) -> tuple[str, str]:
+def compute_new_exclude_text(exclude_path: Path, lines: Sequence[str]) -> tuple[str, str]:
     """The exclude file's current text and what it would become -- a pure
     read, so a caller can decide whether a write is needed before making one.
     """
@@ -275,7 +275,7 @@ def rewrite_exclude_block(exclude_path: Path, lines: Sequence[str]) -> bool:
     block; content outside the markers is preserved byte for byte.
     """
     exclude_path = Path(exclude_path)
-    existing, new_text = _compute_new_exclude_text(exclude_path, lines)
+    existing, new_text = compute_new_exclude_text(exclude_path, lines)
     if exclude_path.exists() and new_text == existing:
         return False
     exclude_path.parent.mkdir(parents=True, exist_ok=True)
@@ -291,7 +291,7 @@ def remove_exclude_block(exclude_path: Path) -> bool:
     if not exclude_path.exists():
         return False
     existing = exclude_path.read_text(encoding="utf-8")
-    if _BLOCK_START not in existing:
+    if BLOCK_START not in existing:
         return False
     before, after = _split_block(existing)
     if before and not before.endswith("\n"):
@@ -316,7 +316,7 @@ def exclude_lines(manifest: _sidecar_manifest.Manifest) -> list[str]:
     return lines
 
 
-def _project_common_git_dir(checkout: Path) -> Path:
+def project_common_git_dir(checkout: Path) -> Path:
     """The git directory shared by every worktree of ``checkout``'s
     project -- a main checkout's own ``.git``, or a linked worktree's
     derived from its ``.git`` pointer -- so a write here lands in the one
@@ -395,8 +395,8 @@ def _plan_link(
     if isinstance(mount_state, (_sidecar_mount.ForeignDir, _sidecar_mount.ForeignRepo)):
         raise LinkRefused(_foreign_mount_reason(checkout, mount_state))
 
-    exclude_path = _project_common_git_dir(checkout) / "info" / "exclude"
-    existing_exclude, new_exclude_text = _compute_new_exclude_text(
+    exclude_path = project_common_git_dir(checkout) / "info" / "exclude"
+    existing_exclude, new_exclude_text = compute_new_exclude_text(
         exclude_path, exclude_lines(manifest)
     )
     shadow_entries = [

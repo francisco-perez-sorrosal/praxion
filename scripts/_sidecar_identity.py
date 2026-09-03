@@ -17,7 +17,7 @@ hashed off the **main worktree's** realpath so every linked worktree of one
 project resolves to the same sidecar -- the property that makes the mount
 lifecycle work at all.
 
-Normalization is not re-implemented here: `_state_repo._normalize_origin` is
+Normalization is not re-implemented here: `_state_repo.normalize_origin` is
 the existing owner of "SSH and HTTPS spell the same repo", and it is the
 function the resolver's own identity comparison runs. Deriving through a
 second normalizer would let `init` record a slug the resolver later refuses.
@@ -117,7 +117,7 @@ def derive_project_id(project_root: Path) -> ProjectId:
     main_root = main_worktree_root(project_root)
     origin = _configured_origin(project_root)
     if origin is not None:
-        normalized = _state_repo._normalize_origin(origin)  # noqa: SLF001 -- see module docstring
+        normalized = _state_repo.normalize_origin(origin)
         components = _split_normalized(normalized)
         if components is not None:
             host, owner, repo = components
@@ -150,7 +150,7 @@ def main_worktree_root(project_root: Path) -> Path:
     worktree -- which is why all worktrees of one project derive one identity
     without any of them having to know it is not the main one.
     """
-    common_dir = _state_repo._project_git_common_dir(project_root)  # noqa: SLF001
+    common_dir = _state_repo.project_git_common_dir(project_root)
     if common_dir is None:
         raise InvalidProjectId(
             "not-a-git-checkout",
@@ -183,10 +183,10 @@ def sanitize(text: str) -> str:
 
 def _configured_origin(project_root: Path) -> str | None:
     """`remote.origin.url` as configured, read from the git common dir."""
-    common_dir = _state_repo._project_git_common_dir(project_root)  # noqa: SLF001
+    common_dir = _state_repo.project_git_common_dir(project_root)
     if common_dir is None:
         return None
-    url = _state_repo._remote_origin_url(common_dir)  # noqa: SLF001
+    url = _state_repo.remote_origin_url(common_dir)
     return url or None
 
 

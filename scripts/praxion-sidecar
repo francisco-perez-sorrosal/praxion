@@ -1,0 +1,431 @@
+#!/usr/bin/env python3
+"""praxion-sidecar — keep Praxion's project intelligence outside a team repository.
+
+A thin orchestration layer, deliberately: argparse, the exit-code mapping, and
+five verb bodies. Every decision it renders is made somewhere else --
+
+    _sidecar_cli        the exit-code contract, the checkout, the two gates
+    _sidecar_identity   DS-7 identity: the one place a slug is derived
+    _sidecar_init       bringing a sidecar into existence
+    _sidecar_inputs     the world, read into the check registry's input type
+    _sidecar_manifest   DS-2 manifest: the smart constructor that validates it
+    _sidecar_mount      DS-10 mount lifecycle: create / prune / classify
+    _sidecar_link       the sole reconciler (D2): exclude block, shadows, mount
+    _sidecar_checks     the D3 check registry: one "is this healthy", two renderings
+    _sidecar_commit     the per-mount commit lock and pathspec-scoped commit
+    _sidecar_render     everything the operator sees
+
+**No verb here ever commits to the project repository.** Only the sidecar
+autocommits; the project sees symlinks and a `.git/info/exclude` block, and
+nothing else. `doctor` additionally performs no network I/O and mutates
+nothing (D2).
+
+Exit codes (D1, `INTERFACE_DESIGN.md` sec. 2.1): `0` ok · `1` actionable ·
+`2` usage · `3` refused on safety grounds · `4` environment. `3` and `4` are
+separate because a hook must distinguish "set up but blocked" (warn once) from
+"not set up here" (skip silently). The mapping exists exactly once, in
+`main()`.
+"""
+
+from __future__ import annotations
+
+import argparse
+import dataclasses
+import json
+import sys
+from collections.abc import Sequence
+from pathlib import Path
+from typing import NoReturn
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import _sidecar_checks as checks  # noqa: E402
+import _sidecar_commit as commits  # noqa: E402
+import _sidecar_identity as identity  # noqa: E402
+import _sidecar_init as initializer  # noqa: E402
+import _sidecar_inputs as inputs  # noqa: E402
+import _sidecar_link as linker  # noqa: E402
+import _sidecar_manifest as manifests  # noqa: E402
+import _sidecar_mount as mounts  # noqa: E402
+import _sidecar_render as render  # noqa: E402
+import _state_repo  # noqa: E402
+from _git_runner import GitUnavailableError, run_git  # noqa: E402
+from _sidecar_cli import (  # noqa: E402
+    EXIT_ACTIONABLE,
+    EXIT_ENVIRONMENT,
+    EXIT_OK,
+    EXIT_REFUSED,
+    EXIT_USAGE,
+    Context,
+    EnvironmentProblem,
+    Refused,
+    UsageError,
+    no_sidecar_message,
+    refusal,
+    require_context,
+    require_sidecar,
+)
+
+STATE_DIRNAME = mounts.STATE_DIRNAME
+
+
+# --- argument parsing --------------------------------------------------------
+
+
+class _Parser(argparse.ArgumentParser):
+    """Argparse, re-pointed at this CLI's usage contract.
+
+    Argparse's own error path prints its generated usage and exits 2; ours
+    raises the shared `UsageError` carrying the short usage the help text
+    advertises (sec. 2.1), so every usage failure leaves through one clause.
+    """
+
+    def error(self, message: str) -> NoReturn:
+        raise UsageError(f"{render.SHORT_USAGE}\n({message})")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = _Parser(prog="praxion-sidecar", add_help=False)
+    subcommands = parser.add_subparsers(dest="verb", required=True)
+
+    def add(name: str) -> argparse.ArgumentParser:
+        sub = subcommands.add_parser(name, add_help=False)
+        sub.add_argument("--quiet", "-q", action="store_true")
+        return sub
+
+    init = add("init")
+    init.add_argument("--id")
+    init.add_argument("--shadow", action="append", default=[])
+    init.add_argument("--share", action="append", default=[])
+    init.add_argument("--dry-run", action="store_true")
+
+    link = add("link")
+    link.add_argument("--prune", action="store_true")
+    link.add_argument("--dry-run", action="store_true")
+
+    for name in ("status", "doctor"):
+        reader = add(name)
+        reader.add_argument("--json", action="store_true")
+
+    commit = add("commit")
+    commit.add_argument("--paths", nargs="+", default=None)
+    commit.add_argument("--message", "-m", default=None)
+    commit.add_argument("--dry-run", action="store_true")
+
+    for name in ("publish", "absorb", "remote"):
+        add(name)
+    return parser
+
+
+# --- init --------------------------------------------------------------------
+
+
+def verb_init(args: argparse.Namespace, context: Context) -> int:
+    _refuse_real_state_dir(context.checkout)
+    project_id = identity.derive_project_id(context.checkout)
+    slug = identity.validate_id_override(args.id) if args.id else identity.slug(project_id)
+    sidecar = context.sidecar_dir(slug)
+    initializer.require_free_sidecar(sidecar, project_id, slug)
+
+    manifest = initializer.build_manifest(
+        context.checkout, project_id, slug, args.shadow, args.share
+    )
+    # One plan drives both the dry run and the real run's report, so a preview
+    # can never describe a shape the real run would not produce.
+    plan = linker.link(context.checkout, sidecar, manifest, dry_run=True)
+    body = render.sectioned_report(
+        f"praxion-sidecar init · {slug}", initializer.sections(sidecar, manifest, plan)
+    )
+    if args.dry_run:
+        changes = len(plan.linked) + int(plan.created_mount) + int(plan.exclude_changed)
+        _say(args, body, "", f"Dry run: {changes} surface(s) would change. Nothing was modified.")
+        return EXIT_OK
+
+    initializer.create_repo(sidecar, manifest, slug)
+    manifests.write_manifest(manifests.manifest_path(sidecar / ".git"), manifest)
+    linker.link(context.checkout, sidecar, initializer.reload_manifest(sidecar), dry_run=False)
+    _say(
+        args,
+        body,
+        "",
+        "Sidecar ready. Project commits will never include Praxion state.",
+        "Next: praxion-sidecar doctor",
+    )
+    return EXIT_OK
+
+
+def _refuse_real_state_dir(checkout: Path) -> None:
+    """R1 -- a real `.ai-state/` would be shadowed by the mount and lost."""
+    slot = checkout / STATE_DIRNAME
+    if not slot.is_dir() or slot.is_symlink():
+        return
+    raise refusal(
+        "Refusing to init: .ai-state/ is a real directory in this repo, not a symlink.",
+        "Sidecar placement projects .ai-state/ in from outside; a directory there "
+        "would be shadowed and lost.",
+        "If it is committed, move it out with history:  praxion-sidecar absorb",
+        "If it is untracked scratch state:  rm -rf .ai-state && praxion-sidecar init",
+    )
+
+
+# --- link --------------------------------------------------------------------
+
+
+def verb_link(args: argparse.Namespace, context: Context) -> int:
+    sidecar, manifest = require_sidecar(context, _project_id(context))
+    _refuse_foreign_shadows(context.checkout, manifest)
+    if args.prune:
+        _prune_orphaned_mounts(sidecar, args)
+    if not args.dry_run:
+        # `link` is the sole reconciler (D2), so it re-applies every repo-level
+        # invariant `init` established -- including the semantic merge routing a
+        # re-cloned or version-stale sidecar would otherwise be missing.
+        initializer.ensure_merge_drivers(sidecar)
+        manifest = _record_root(sidecar, manifest, context.checkout)
+    try:
+        result = linker.link(context.checkout, sidecar, manifest, dry_run=args.dry_run)
+    except (linker.LinkRefused, mounts.SidecarMountError) as error:
+        raise refusal(
+            "Refusing to link: this checkout's .praxion slot cannot be used as a state mount.",
+            str(error),
+            "Move whatever occupies it aside, then:  praxion-sidecar link",
+        ) from error
+
+    if result.linked or result.created_mount or result.exclude_changed:
+        _say(args, f"Linked {len(result.linked)} surface(s) into {context.checkout}.")
+    else:
+        _say(args, "Already linked — no changes.")
+    return EXIT_OK
+
+
+def _refuse_foreign_shadows(checkout: Path, manifest: manifests.Manifest) -> None:
+    """R2 -- a shadow pointing into some *other* sidecar is never reclaimed.
+
+    `link` creates only from `Absent` (DS-6), so it would otherwise report a
+    stale cross-project link as a skipped slot and exit 0 -- leaving every
+    Praxion write in this checkout landing in another project's state.
+    """
+    for relpath, entry in manifest.paths.items():
+        if not isinstance(entry, manifests.ShadowEntry):
+            continue
+        expected = linker.shadow_target(relpath)
+        state = linker.classify_shadow_slot(checkout, relpath, expected)
+        if isinstance(state, linker.LinkElsewhere):
+            raise refusal(
+                f"Refusing to link: {relpath} points at a different sidecar.",
+                f"found:    {state.target}\nexpected: {expected}\n"
+                "A stale link from a renamed or re-cloned project.",
+                f"Remove it and re-link:  rm {relpath} && praxion-sidecar link",
+            )
+
+
+def _record_root(sidecar: Path, manifest: manifests.Manifest, checkout: Path) -> manifests.Manifest:
+    """Append this checkout to `roots:` when it is new (DS-7).
+
+    `roots:` is the remote-less population's only identity anchor, so a
+    worktree missing from it resolves as `Foreign` and every state write in it
+    is refused. Appending here is what makes `link` the whole repair.
+    """
+    if checkout in {Path(root).resolve() for root in manifest.project.roots}:
+        return manifest
+    project = dataclasses.replace(manifest.project, roots=[*manifest.project.roots, checkout])
+    updated = dataclasses.replace(manifest, project=project)
+    manifests.write_manifest(manifests.manifest_path(sidecar / ".git"), updated)
+    return updated
+
+
+def _prune_orphaned_mounts(sidecar: Path, args: argparse.Namespace) -> None:
+    """Drop every sidecar worktree whose project checkout is gone.
+
+    Two shapes, both real: the checkout directory still exists but is being
+    dismantled (`prune_mount` removes the mount properly, refusing while it is
+    dirty), and the checkout is already gone entirely (nothing is left to
+    remove, so git's own `worktree prune` clears the administrative entry).
+    """
+    orphans = [
+        mount for mount in inputs.sidecar_mounts(sidecar) if not inputs.checkout_of(mount).is_dir()
+    ]
+    for mount in orphans:
+        try:
+            mounts.prune_mount(sidecar, inputs.checkout_of(mount))
+        except mounts.MountRemovalRefused as error:
+            raise refusal(
+                f"Refusing to prune {render.abbreviate_home(mount)}.",
+                str(error),
+                "Resolve it in the mount, then:  praxion-sidecar link --prune",
+            ) from error
+    run_git(sidecar, "worktree", "prune")
+    _say(args, f"Pruned {len(orphans)} orphaned mount(s).")
+
+
+# --- status and doctor -------------------------------------------------------
+
+
+def verb_status(args: argparse.Namespace, context: Context) -> int:
+    check_inputs, facts = inputs.gather(context)
+    results = checks.evaluate_checks(check_inputs)
+    status = inputs.status_of(context, check_inputs, facts, results)
+    if args.json:
+        print(json.dumps(render.status_json(status), indent=2))
+    else:
+        _say(args, render.status_text(status))
+    return EXIT_OK
+
+
+def verb_doctor(args: argparse.Namespace, context: Context) -> int:
+    check_inputs, _facts = inputs.gather(context)
+    results = checks.evaluate_checks(check_inputs)
+    if args.json:
+        print(json.dumps(checks.render_doctor_json(results), indent=2))
+    else:
+        table = checks.render_doctor_text(results, color=render.use_color())
+        _say(args, _doctor_header(check_inputs) + table)
+    return EXIT_OK if checks.overall_verdict(results) is checks.Verdict.PASS else EXIT_ACTIONABLE
+
+
+def _doctor_header(check_inputs: checks.CheckInputs) -> str:
+    """The sidecar id, when there is one -- an in-repo doctor names no sidecar."""
+    if isinstance(check_inputs.placement, _state_repo.SidecarOwned):
+        return f"praxion-sidecar doctor · {check_inputs.placement.identity.id}\n"
+    return ""
+
+
+# --- commit ------------------------------------------------------------------
+
+
+def verb_commit(args: argparse.Namespace, context: Context) -> int:
+    mount, branch = _require_mount(context)
+    paths = (
+        _mount_relative(mount, context.checkout, args.paths)
+        if args.paths
+        else commits.residue_paths(mount)
+    )
+    if not paths:
+        _say(args, "Nothing to commit.")
+        return EXIT_OK
+    message = args.message or f"chore(state): praxion-sidecar commit on {branch}."
+    if args.dry_run:
+        _say(args, f"Dry run: {len(paths)} file(s) would be committed. Nothing was modified.")
+        return EXIT_OK
+
+    outcome = commits.commit_paths(mount, paths, message)
+    if isinstance(outcome, commits.CommitDeferred):
+        _say(args, "Another commit holds the sidecar lock. Deferred — nothing was lost.")
+        return EXIT_OK
+    if not outcome.committed or outcome.sha is None:
+        _say(args, "Nothing to commit.")
+        return EXIT_OK
+    _say(
+        args,
+        f"Committed {len(outcome.staged)} file(s) to the sidecar ({outcome.sha[:7]}) — {message}",
+    )
+    return EXIT_OK
+
+
+def _require_mount(context: Context) -> tuple[Path, str]:
+    """The state mount to commit in, or the reason there is none."""
+    placement = _state_repo.resolve_placement(context.checkout)
+    if isinstance(placement, _state_repo.InRepo):
+        sidecar = context.sidecar_dir(_project_id(context))
+        raise EnvironmentProblem(no_sidecar_message(manifests.manifest_path(sidecar / ".git")))
+    if not isinstance(placement, _state_repo.SidecarOwned):
+        raise inputs.unresolvable_placement(placement)
+    return placement.state_git_root, placement.branch
+
+
+def _mount_relative(mount: Path, checkout: Path, paths: Sequence[str]) -> list[str]:
+    """Translate operator-facing project paths into the mount's own pathspec.
+
+    Resolving through the shadow symlink *is* the translation: `.ai-state/x`
+    resolves into the mount, and a path that does not is one the sidecar has
+    no business staging -- which is how a `--paths` typo becomes a refusal
+    rather than a silent no-op.
+    """
+    mount_root = mount.resolve()
+    translated = []
+    for entry in paths:
+        resolved = (checkout / entry).resolve()
+        try:
+            translated.append(str(resolved.relative_to(mount_root)))
+        except ValueError as error:
+            raise refusal(
+                f"Refusing to commit: {entry} is not inside the sidecar.",
+                "praxion-sidecar commits the sidecar's working tree only; this path "
+                "resolves into the project repository.",
+                f"Name a shadowed path instead, or commit it yourself:  git add {entry} "
+                "&& git commit",
+            ) from error
+    return translated
+
+
+# --- not yet implemented (the CLI's second half) -----------------------------
+
+
+def verb_unimplemented(args: argparse.Namespace, _context: Context) -> int:
+    raise EnvironmentProblem(
+        "\n".join(
+            [
+                f"`praxion-sidecar {args.verb}` is not available in this build.",
+                "It is part of the sidecar CLI's second half (merge-back, publish, "
+                "absorb, remote) and has not shipped yet.",
+                "Use the verbs this build carries:  praxion-sidecar --help",
+            ]
+        )
+    )
+
+
+# --- dispatch ----------------------------------------------------------------
+
+VERB_HANDLERS = {
+    "init": verb_init,
+    "link": verb_link,
+    "status": verb_status,
+    "doctor": verb_doctor,
+    "commit": verb_commit,
+    "publish": verb_unimplemented,
+    "absorb": verb_unimplemented,
+    "remote": verb_unimplemented,
+}
+
+
+def _project_id(context: Context) -> str:
+    return identity.slug(identity.derive_project_id(context.checkout))
+
+
+def _say(args: argparse.Namespace, *lines: str) -> None:
+    """Report bodies go to stdout, and only when the operator wants them."""
+    if not getattr(args, "quiet", False):
+        print("\n".join(lines))
+
+
+def _parse(argv: list[str]) -> argparse.Namespace:
+    args = build_parser().parse_args(argv)
+    if getattr(args, "json", False):
+        args.quiet = True  # D4: --json implies --quiet
+    return args
+
+
+def main(argv: list[str] | None = None) -> int:
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if "--help" in arguments or "-h" in arguments:
+        print(render.HELP)
+        return EXIT_OK
+    try:
+        args = _parse(arguments)
+        return VERB_HANDLERS[args.verb](args, require_context(Path.cwd()))
+    except UsageError as error:
+        print(error, file=sys.stderr)
+        return EXIT_USAGE
+    except (Refused, linker.LinkRefused, mounts.SidecarMountError) as error:
+        print(error, file=sys.stderr)
+        return EXIT_REFUSED
+    except identity.InvalidProjectId as error:
+        print(f"Usage error: {error}", file=sys.stderr)
+        return EXIT_USAGE
+    except (EnvironmentProblem, GitUnavailableError, commits.GitCommandError, OSError) as error:
+        print(error, file=sys.stderr)
+        return EXIT_ENVIRONMENT
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -19,10 +19,13 @@ from __future__ import annotations
 
 import dataclasses
 import subprocess
+import sys
 from pathlib import Path
 
 import _state_repo
 import pytest
+
+_CLI_PATH = Path(__file__).parent / "_state_repo.py"
 
 # --- Fixture builders --------------------------------------------------------
 
@@ -366,6 +369,111 @@ def test_origin_from_a_genuinely_different_repository_resolves_to_foreign_identi
     assert result.reason == "identity-mismatch"
 
 
+# --- NotYetLinked ------------------------------------------------------------
+
+
+def _add_project_worktree(project_root: Path, name: str) -> Path:
+    """A linked worktree of the project, exactly as `git worktree add` leaves
+    it: no `.ai-state` entry of any kind, since the shadow is excluded from
+    the project repository and never tracked."""
+    _run_git(project_root, "commit", "-q", "--allow-empty", "-m", "seed project")
+    checkout = project_root / "wts" / name
+    _run_git(project_root, "worktree", "add", "-q", str(checkout), "-b", f"feat/{name}")
+    return checkout
+
+
+def _mount_worktree(sidecar_root: Path, checkout: Path, *, branch: str) -> Path:
+    """The mount `praxion-sidecar link` would create in `checkout`."""
+    mount_dir = checkout / ".praxion"
+    _run_git(sidecar_root, "worktree", "add", "-q", "-b", branch, str(mount_dir), "main")
+    return mount_dir
+
+
+def test_fresh_linked_worktree_of_a_sidecar_project_resolves_to_not_yet_linked(
+    tmp_path: Path,
+) -> None:
+    """A seconds-old worktree has no shadow, which by shape alone is
+    indistinguishable from an unmanaged project. The main checkout's mount is
+    what names the sidecar this worktree is about to be linked into -- the
+    answer the post-checkout and SessionStart heals are gated on."""
+    fixture = _build_sidecar_owned_fixture(tmp_path, origin="https://github.com/acme/billing")
+    worktree = _add_project_worktree(fixture.project_root, "wt1")
+
+    result = _state_repo.resolve_placement(worktree)
+
+    assert isinstance(result, _state_repo.NotYetLinked)
+    assert result.project_root == worktree.resolve()
+    assert result.main_checkout_root == fixture.project_root.resolve()
+    assert result.sidecar_common_dir == fixture.sidecar_common_dir
+    assert result.identity.id == "local--abc123def456"
+
+
+def test_not_yet_linked_discovery_performs_zero_subprocess_calls(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = _build_sidecar_owned_fixture(tmp_path, origin="https://github.com/acme/billing")
+    worktree = _add_project_worktree(fixture.project_root, "wt1")
+    _forbid_subprocess(monkeypatch)
+
+    assert isinstance(_state_repo.resolve_placement(worktree), _state_repo.NotYetLinked)
+
+
+def test_worktree_resolves_to_sidecar_owned_once_its_own_mount_is_linked(
+    tmp_path: Path,
+) -> None:
+    """`NotYetLinked` is a transition, not a resting state: the same checkout
+    resolves to `SidecarOwned` the moment `link` materializes its mount."""
+    fixture = _build_sidecar_owned_fixture(tmp_path, origin="https://github.com/acme/billing")
+    worktree = _add_project_worktree(fixture.project_root, "wt1")
+    assert isinstance(_state_repo.resolve_placement(worktree), _state_repo.NotYetLinked)
+
+    mount_dir = _mount_worktree(fixture.sidecar_root, worktree, branch="wt/feat-wt1")
+    _link_shadow(worktree, mount_dir)
+
+    result = _state_repo.resolve_placement(worktree)
+
+    assert isinstance(result, _state_repo.SidecarOwned)
+    assert result.state_git_root == mount_dir.resolve()
+    assert result.branch == "wt/feat-wt1"
+
+
+def test_linked_worktree_of_an_in_repo_project_resolves_to_in_repo(tmp_path: Path) -> None:
+    """The main checkout owns its own `.ai-state`, so there is no sidecar to
+    be unlinked from -- an absent shadow here means unmanaged, as before."""
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    _run_git(project_root, "init", "-q", "-b", "main")
+    _run_git(project_root, "config", "user.email", "project@example.com")
+    _run_git(project_root, "config", "user.name", "Project Test")
+    (project_root / ".ai-state").mkdir()  # untracked, so the worktree gets none
+
+    worktree = _add_project_worktree(project_root, "wt1")
+
+    assert isinstance(_state_repo.resolve_placement(worktree), _state_repo.InRepo)
+
+
+def test_linked_worktree_whose_main_shadow_is_foreign_resolves_to_foreign(
+    tmp_path: Path,
+) -> None:
+    """A refusal the main checkout already earned is not softened into
+    "unmanaged" for its worktrees: the evidence names the offending path, and
+    `project_root` names the checkout that asked."""
+    fixture = _build_sidecar_owned_fixture(
+        tmp_path,
+        origin="https://github.com/acme/billing",
+        project_remote_origin="https://github.com/other/unrelated",
+    )
+    assert isinstance(_state_repo.resolve_placement(fixture.project_root), _state_repo.Foreign)
+    worktree = _add_project_worktree(fixture.project_root, "wt1")
+
+    result = _state_repo.resolve_placement(worktree)
+
+    assert isinstance(result, _state_repo.Foreign)
+    assert result.reason is _state_repo.ForeignReason.IDENTITY_MISMATCH
+    assert result.project_root == worktree.resolve()
+    assert result.resolved_target == fixture.mount_dir.resolve()
+
+
 # --- Dangling ------------------------------------------------------------------
 
 
@@ -548,6 +656,18 @@ def test_require_writable_placement_returns_sidecar_owned(tmp_path: Path) -> Non
     assert isinstance(result, _state_repo.SidecarOwned)
 
 
+def test_require_writable_placement_raises_on_not_yet_linked_naming_the_link_command(
+    tmp_path: Path,
+) -> None:
+    """State must be materialized before it can be written: the refusal names
+    the command that materializes it rather than letting a writer proceed."""
+    fixture = _build_sidecar_owned_fixture(tmp_path, origin="https://github.com/acme/billing")
+    worktree = _add_project_worktree(fixture.project_root, "wt1")
+
+    with pytest.raises(_state_repo.UnwritablePlacementError, match="praxion-sidecar link"):
+        _state_repo.require_writable_placement(worktree)
+
+
 def test_require_writable_placement_raises_naming_dangling_and_target(
     tmp_path: Path,
 ) -> None:
@@ -572,3 +692,106 @@ def test_require_writable_placement_raises_naming_foreign_reason_and_target(
 
     with pytest.raises(_state_repo.UnwritablePlacementError, match="no-manifest"):
         _state_repo.require_writable_placement(project_root)
+
+
+# --- CLI (`--print`) --------------------------------------------------------
+#
+# The finalize chain (`scripts/finalize_chain.sh`) resolves placement via a
+# real subprocess call to this CLI, once per entry point, and parses its
+# stdout as plain `key=value` lines -- these tests exercise the actual
+# subprocess boundary rather than calling `main()` in-process, since the
+# shell's parsing contract is what matters.
+
+
+def _run_print_cli(root: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(_CLI_PATH), "--print", str(root)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _parse_kv(stdout: str) -> dict[str, str]:
+    parsed: dict[str, str] = {}
+    for line in stdout.splitlines():
+        if not line:
+            continue
+        key, _, value = line.partition("=")
+        parsed[key] = value
+    return parsed
+
+
+def test_print_cli_reports_in_repo_placement(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    (project_root / ".ai-state").mkdir()
+
+    result = _run_print_cli(project_root)
+
+    assert result.returncode == 0, result.stderr
+    fields = _parse_kv(result.stdout)
+    assert fields["placement"] == "in-repo"
+    assert fields["state_git_root"] == str(project_root.resolve())
+
+
+def test_print_cli_reports_sidecar_placement_with_mount_and_common_dir(
+    tmp_path: Path,
+) -> None:
+    fixture = _build_sidecar_owned_fixture(tmp_path, origin=None)
+
+    result = _run_print_cli(fixture.project_root)
+
+    assert result.returncode == 0, result.stderr
+    fields = _parse_kv(result.stdout)
+    assert fields["placement"] == "sidecar"
+    assert fields["state_git_root"] == str(fixture.mount_dir.resolve())
+    assert fields["mount_dir"] == str(fixture.mount_dir.resolve())
+    assert fields["sidecar_common_dir"] == str(fixture.sidecar_common_dir.resolve())
+
+
+def test_print_cli_reports_not_yet_linked_placement_with_main_checkout_and_common_dir(
+    tmp_path: Path,
+) -> None:
+    """The finalize chain's post-checkout `link` gate reads exactly these
+    keys, so they are the shell-facing contract, not an implementation note."""
+    fixture = _build_sidecar_owned_fixture(tmp_path, origin="https://github.com/acme/billing")
+    worktree = _add_project_worktree(fixture.project_root, "wt1")
+
+    result = _run_print_cli(worktree)
+
+    assert result.returncode == 0, result.stderr
+    fields = _parse_kv(result.stdout)
+    assert fields["placement"] == "not-yet-linked"
+    assert fields["main_checkout_root"] == str(fixture.project_root.resolve())
+    assert fields["sidecar_common_dir"] == str(fixture.sidecar_common_dir.resolve())
+
+
+def test_print_cli_reports_dangling_placement_and_exits_zero(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    link_path = project_root / ".ai-state"
+    link_path.symlink_to(Path(".praxion") / ".ai-state")  # .praxion never created
+
+    result = _run_print_cli(project_root)
+
+    assert result.returncode == 0, result.stderr
+    fields = _parse_kv(result.stdout)
+    assert fields["placement"] == "dangling"
+    assert "reason" in fields
+
+
+def test_print_cli_reports_foreign_placement_and_exits_zero(tmp_path: Path) -> None:
+    sidecar_root = tmp_path / "sidecar"
+    project_root = tmp_path / "project"
+    _init_sidecar(sidecar_root)
+    mount_dir = _mount_project(sidecar_root, project_root, branch="main")
+    _link_shadow(project_root, mount_dir)
+    # No manifest -- Foreign(no-manifest), same fixture shape as the library test above.
+
+    result = _run_print_cli(project_root)
+
+    assert result.returncode == 0, result.stderr
+    fields = _parse_kv(result.stdout)
+    assert fields["placement"] == "foreign"
+    assert fields["reason"].startswith("no-manifest")

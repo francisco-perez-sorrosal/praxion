@@ -15,10 +15,11 @@ five verb bodies. Every decision it renders is made somewhere else --
     _sidecar_commit     the per-mount commit lock and pathspec-scoped commit
     _sidecar_render     everything the operator sees
 
-**No verb here ever commits to the project repository.** Only the sidecar
-autocommits; the project sees symlinks and a `.git/info/exclude` block, and
-nothing else. `doctor` additionally performs no network I/O and mutates
-nothing (D2).
+**Only the sidecar autocommits.** The project sees symlinks and a
+`.git/info/exclude` block and nothing else, with exactly one exception:
+`publish`'s history import, which is a commit in the project repository, is
+operator-confirmed, and is the whole point of the verb. `doctor` additionally
+performs no network I/O and mutates nothing (D2).
 
 Exit codes (D1, `INTERFACE_DESIGN.md` sec. 2.1): `0` ok · `1` actionable ·
 `2` usage · `3` refused on safety grounds · `4` environment. `3` and `4` are
@@ -46,7 +47,9 @@ import _sidecar_init as initializer  # noqa: E402
 import _sidecar_inputs as inputs  # noqa: E402
 import _sidecar_link as linker  # noqa: E402
 import _sidecar_manifest as manifests  # noqa: E402
+import _sidecar_mergeback as mergeback  # noqa: E402
 import _sidecar_mount as mounts  # noqa: E402
+import _sidecar_publish as publishing  # noqa: E402
 import _sidecar_render as render  # noqa: E402
 import _state_repo  # noqa: E402
 from _git_runner import GitUnavailableError, run_git  # noqa: E402
@@ -62,8 +65,10 @@ from _sidecar_cli import (  # noqa: E402
     UsageError,
     no_sidecar_message,
     refusal,
+    require_confirmation,
     require_context,
     require_sidecar,
+    require_sidecar_repo,
 )
 
 STATE_DIRNAME = mounts.STATE_DIRNAME
@@ -112,8 +117,32 @@ def build_parser() -> argparse.ArgumentParser:
     commit.add_argument("--message", "-m", default=None)
     commit.add_argument("--dry-run", action="store_true")
 
-    for name in ("publish", "absorb", "remote"):
-        add(name)
+    merge_back = add("merge-back")
+    merge_back.add_argument("--from", dest="from_branch")
+    merge_back.add_argument("--auto", action="store_true")
+    merge_back.add_argument("--drop", action="store_true")
+    merge_back.add_argument("--yes", "-y", action="store_true")
+    merge_back.add_argument("--dry-run", action="store_true")
+
+    publish = add("publish")
+    publish.add_argument("--yes", "-y", action="store_true")
+    publish.add_argument("--dry-run", action="store_true")
+
+    absorb = add("absorb")
+    absorb.add_argument("--yes", "-y", action="store_true")
+    absorb.add_argument("--shadow", action="append", default=[])
+    absorb.add_argument("--share", action="append", default=[])
+    absorb.add_argument("--dry-run", action="store_true")
+
+    remote = add("remote")
+    remote.add_argument("url", nargs="?")
+    remote.add_argument(
+        "--push",
+        choices=[policy.value for policy in manifests.PushPolicy],
+        default=manifests.PushPolicy.NEVER.value,
+    )
+    remote.add_argument("--clear", action="store_true")
+    remote.add_argument("--allow-foreign-host", action="store_true")
     return parser
 
 
@@ -172,7 +201,7 @@ def _refuse_real_state_dir(checkout: Path) -> None:
 
 
 def verb_link(args: argparse.Namespace, context: Context) -> int:
-    sidecar, manifest = require_sidecar(context, _project_id(context))
+    sidecar, manifest = require_sidecar(context, _project_id(context), verb="link")
     _refuse_foreign_shadows(context.checkout, manifest)
     if args.prune:
         _prune_orphaned_mounts(sidecar, args)
@@ -358,20 +387,89 @@ def _mount_relative(mount: Path, checkout: Path, paths: Sequence[str]) -> list[s
     return translated
 
 
-# --- not yet implemented (the CLI's second half) -----------------------------
+# --- merge-back --------------------------------------------------------------
 
 
-def verb_unimplemented(args: argparse.Namespace, _context: Context) -> int:
-    raise EnvironmentProblem(
-        "\n".join(
-            [
-                f"`praxion-sidecar {args.verb}` is not available in this build.",
-                "It is part of the sidecar CLI's second half (merge-back, publish, "
-                "absorb, remote) and has not shipped yet.",
-                "Use the verbs this build carries:  praxion-sidecar --help",
-            ]
+def verb_merge_back(args: argparse.Namespace, context: Context) -> int:
+    """Three forms, one seam: drop, converge-all, or merge one named branch."""
+    _require_merge_back_form(args)
+    sidecar = require_sidecar_repo(context, _project_id(context), verb="merge back")
+    if args.drop:
+        report = mergeback.drop_state_branch(sidecar, args.from_branch, dry_run=args.dry_run)
+    elif args.auto:
+        report = mergeback.merge_back_auto(
+            sidecar, context.checkout, context.checkout, dry_run=args.dry_run
         )
+    else:
+        report = mergeback.merge_back_from(
+            sidecar, context.checkout, args.from_branch, dry_run=args.dry_run
+        )
+    return _report(args, report)
+
+
+def _require_merge_back_form(args: argparse.Namespace) -> None:
+    """Reject every ill-formed invocation before a single ref is resolved.
+
+    `--drop` without `--yes` is a usage error rather than a prompt on purpose:
+    it is the one path that can discard unmerged state, and a prompt is not
+    available to the automated callers that would otherwise hang on it.
+    """
+    if args.auto and args.from_branch:
+        raise UsageError(
+            "Usage error: merge-back takes --from <branch> or --auto, not both.\n"
+            "Name one branch, or converge them all:  praxion-sidecar merge-back --auto"
+        )
+    if not args.auto and not args.from_branch:
+        raise UsageError(
+            "Usage error: merge-back needs --from <branch> or --auto.\n"
+            "Converge everything eligible:  praxion-sidecar merge-back --auto"
+        )
+    if args.drop and not args.from_branch:
+        raise UsageError(
+            "Usage error: --drop deletes exactly one branch and needs --from <branch>.\n"
+            "Name it:  praxion-sidecar merge-back --from wt/<name> --drop --yes"
+        )
+    if args.drop and not args.yes:
+        raise UsageError(
+            "Usage error: --drop discards whatever state only that branch carries.\n"
+            f"Confirm it explicitly:  praxion-sidecar merge-back --from {args.from_branch} "
+            "--drop --yes"
+        )
+
+
+# --- publish, absorb, remote --------------------------------------------------
+
+
+def verb_publish(args: argparse.Namespace, context: Context) -> int:
+    sidecar, manifest = require_sidecar(context, _project_id(context), verb="publish")
+    if not args.dry_run:
+        require_confirmation("publish", yes=args.yes, prompt=publishing.PUBLISH_CONFIRMATION)
+    return _report(args, publishing.publish(context, sidecar, manifest, dry_run=args.dry_run))
+
+
+def verb_absorb(args: argparse.Namespace, context: Context) -> int:
+    # No `require_sidecar` here, deliberately: absorb is the verb that *creates*
+    # one, so demanding a manifest first would make it unreachable.
+    if not args.dry_run:
+        require_confirmation("absorb", yes=args.yes, prompt=publishing.ABSORB_CONFIRMATION)
+    report = publishing.absorb(
+        context, shadows=args.shadow, shares=args.share, dry_run=args.dry_run
     )
+    return _report(args, report)
+
+
+def verb_remote(args: argparse.Namespace, context: Context) -> int:
+    sidecar, manifest = require_sidecar(context, _project_id(context), verb="set the remote")
+    report = publishing.remote(
+        context,
+        sidecar,
+        manifest,
+        url=args.url,
+        push=args.push,
+        clear=args.clear,
+        allow_foreign_host=args.allow_foreign_host,
+    )
+    return _report(args, report)
 
 
 # --- dispatch ----------------------------------------------------------------
@@ -382,14 +480,30 @@ VERB_HANDLERS = {
     "status": verb_status,
     "doctor": verb_doctor,
     "commit": verb_commit,
-    "publish": verb_unimplemented,
-    "absorb": verb_unimplemented,
-    "remote": verb_unimplemented,
+    "merge-back": verb_merge_back,
+    "publish": verb_publish,
+    "absorb": verb_absorb,
+    "remote": verb_remote,
 }
 
 
 def _project_id(context: Context) -> str:
     return identity.slug(identity.derive_project_id(context.checkout))
+
+
+def _report(args: argparse.Namespace, report: mergeback.Report) -> int:
+    """One rule for which stream a report lands on.
+
+    A successful report is informational, so `--quiet` may suppress it; a
+    non-zero one names a problem the operator must see, so it goes to stderr
+    unconditionally. Keeping the rule here is what stops each verb from
+    inventing its own.
+    """
+    if report.exit_code == EXIT_OK:
+        _say(args, *report.lines)
+    else:
+        print("\n".join(report.lines), file=sys.stderr)
+    return report.exit_code
 
 
 def _say(args: argparse.Namespace, *lines: str) -> None:

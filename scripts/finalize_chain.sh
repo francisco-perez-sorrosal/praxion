@@ -13,12 +13,30 @@
 #
 #   finalize_chain_post_merge       — reconcile + state-driven finalize + squash-safety
 #   finalize_chain_post_commit      — state-driven finalize on main (ADR promotion sub-gated on drafts)
-#   finalize_chain_post_checkout    — state-driven finalize on branch switch to main
+#   finalize_chain_post_checkout    — state-driven finalize on branch switch to main, plus an
+#                                     unconditional (branch-independent) sidecar `link` under
+#                                     sidecar placement -- the primary channel that materializes
+#                                     a new project worktree's state mount
 #   finalize_chain_run_on_main      — on-main composition (adr -> ledger -> manifest) for
 #                                     non-hook callers (e.g. CI); resolves repo_root from the
 #                                     argument or the current working tree. Honors
 #                                     FINALIZE_CHAIN_STRICT (unset = non-blocking hook
 #                                     semantics; set = fail-loud, for server-side callers).
+#
+# Sidecar placement (ARCH_WT_RULING.md). Every entry point resolves which git
+# repository owns .ai-state/ exactly ONCE (see "Placement resolution" below)
+# into a handful of _FC_* shell variables every later branch in that same
+# call reads. Under sidecar placement: the project-side reconcile_ai_state.py
+# / check_squash_safety.py calls stay in place unmodified -- both already
+# self-detect SidecarOwned and report why they no-op; the on-main
+# composition runs `praxion-sidecar merge-back --auto` before ADR-draft
+# promotion (channel 1 of three idempotent convergence channels, ARCH_WT_RULING.md
+# § 13.3) so a plain `git merge` or a GitHub squash-merge-then-pull promotes a
+# worktree's drafts in the SAME finalize run; finalize_adrs.py is pointed at
+# the state mount via --state-root; and the mount gets exactly one
+# `praxion-sidecar commit` once composition finishes mutating it. Under
+# in-repo placement every one of the above is a no-op and the chain's
+# behavior is byte-identical to before sidecar placement existed.
 #
 # Design rules:
 #
@@ -147,6 +165,98 @@ _finalize_chain_run_script() {
         echo "${label}: warned (non-blocking) — inspect output above"
 }
 
+# Run praxion-sidecar directly. Unlike the .py siblings _finalize_chain_run_script
+# invokes through a resolved interpreter, praxion-sidecar is a self-contained
+# executable carrying its own shebang (and the test fixtures swap it for a
+# recording shim or a bash shim, neither of which `python3 <path>` could run)
+# -- so it is invoked as itself. Same non-blocking-by-default /
+# FINALIZE_CHAIN_STRICT contract as _finalize_chain_run_script.
+_finalize_chain_run_sidecar() {
+    local label="$1"; shift
+    local sidecar="${FINALIZE_CHAIN_DIR}/praxion-sidecar"
+    [ -x "$sidecar" ] || return 0
+    if [ -n "${FINALIZE_CHAIN_STRICT:-}" ]; then
+        "$sidecar" "$@"
+        return $?
+    fi
+    "$sidecar" "$@" 2>&1 || echo "${label}: warned (non-blocking) — inspect output above"
+}
+
+# -- Placement resolution ------------------------------------------------------
+#
+# Which git repository owns .ai-state/? Resolved via _state_repo.py's --print
+# CLI, which is contracted to never raise and always exit 0 -- so this call
+# needs no failure handling of its own. When the interpreter or the script is
+# unavailable, _finalize_chain_load_placement falls back to `in-repo`, which
+# reproduces every pre-sidecar chain's behavior exactly.
+_finalize_chain_resolve_placement() {
+    local repo_root="$1" python
+    python="$(_finalize_chain_python)"
+    [ -n "$python" ] || return 0
+    [ -f "${FINALIZE_CHAIN_DIR}/_state_repo.py" ] || return 0
+    "$python" "${FINALIZE_CHAIN_DIR}/_state_repo.py" --print "$repo_root" 2>/dev/null
+}
+
+_FC_PLACEMENT=""
+_FC_STATE_GIT_ROOT=""
+_FC_MOUNT_DIR=""
+_FC_SIDECAR_COMMON_DIR=""
+_FC_REASON=""
+
+# Resolve placement ONCE per entry point into the _FC_* globals above; every
+# later branch in that same entry-point call reads them rather than
+# re-resolving. Never fails: an unparseable or empty result leaves placement
+# at its safe `in-repo` default.
+_finalize_chain_load_placement() {
+    local repo_root="$1" key value
+    _FC_PLACEMENT="in-repo"
+    _FC_STATE_GIT_ROOT="$repo_root"
+    _FC_MOUNT_DIR=""
+    _FC_SIDECAR_COMMON_DIR=""
+    _FC_REASON=""
+    while IFS='=' read -r key value; do
+        case "$key" in
+            placement) _FC_PLACEMENT="$value" ;;
+            state_git_root) _FC_STATE_GIT_ROOT="$value" ;;
+            mount_dir) _FC_MOUNT_DIR="$value" ;;
+            sidecar_common_dir) _FC_SIDECAR_COMMON_DIR="$value" ;;
+            reason) _FC_REASON="$value" ;;
+        esac
+    done < <(_finalize_chain_resolve_placement "$repo_root")
+}
+
+# Cheap existence check for at least one sidecar-side wt/* state branch,
+# read directly from the sidecar's own common dir rather than by shelling
+# out to praxion-sidecar -- a `merge-back --auto` call against a sidecar
+# with nothing to converge would still count as one praxion-sidecar
+# invocation, and the common case (no worktree in flight) should never pay
+# for a Python CLI startup just to hear "Nothing to converge."
+_finalize_chain_state_branches_pending() {
+    local sidecar_common_dir="$1"
+    [ -n "$sidecar_common_dir" ] && [ -d "$sidecar_common_dir" ] || return 1
+    local ref
+    ref="$(git --git-dir="$sidecar_common_dir" for-each-ref --count=1 \
+        --format='%(refname)' refs/heads/wt/ 2>/dev/null)"
+    [ -n "$ref" ]
+}
+
+# Merge-back convergence (ARCH_WT_RULING.md § 13, channel 1). Runs BEFORE
+# drafts_present/finalize_adrs so a plain `git merge`, or a GitHub squash
+# merge followed by `git pull`, promotes a worktree's drafts in the SAME
+# finalize run. Per-branch outcomes (converged/skipped/aborted) are printed
+# by merge-back's own report -- forwarded verbatim via 2>&1, never
+# reconstructed here. An aborted branch is a reported, expected outcome for
+# THAT branch, not a finalizer crash, so this call never affects the chain's
+# exit code, not even under FINALIZE_CHAIN_STRICT (contrast
+# _finalize_chain_run_sidecar, whose STRICT mode does propagate failure) --
+# and it is never --quiet, since --quiet would suppress exactly the
+# converged/skipped/aborted lines this call exists to surface.
+_finalize_chain_merge_back_auto() {
+    local sidecar="${FINALIZE_CHAIN_DIR}/praxion-sidecar"
+    [ -x "$sidecar" ] || return 0
+    "$sidecar" merge-back --auto 2>&1 || true
+}
+
 # Run the on-main finalize steps. Caller has already gated on `on_main`; each
 # finalizer is then gated on its OWN input rather than a shared condition:
 #   - ADR-draft promotion runs only when draft fragments are present.
@@ -159,14 +269,51 @@ _finalize_chain_run_script() {
 #     resolutions committed without a concurrent ADR draft.
 _finalize_chain_run_on_main() {
     local repo_root="$1"
+
+    # Caller has already called _finalize_chain_load_placement -- reads
+    # _FC_* only, never re-resolves. A dangling or foreign shadow can't be
+    # written through safely, so every state-mutating step below is skipped
+    # (fail closed for writers); the chain itself stays non-blocking.
+    case "$_FC_PLACEMENT" in
+        dangling | foreign)
+            echo "praxion: .ai-state/ placement is ${_FC_PLACEMENT} (${_FC_REASON}) -- skipping state finalization"
+            return 0
+            ;;
+        not-yet-linked)
+            # Defensive: a main checkout is never not-yet-linked (the variant
+            # names a linked worktree whose own mount has not been created),
+            # so this arm should be unreachable on main. It exists so a future
+            # caller reaching it fails closed with a reason instead of writing.
+            echo "praxion: .ai-state/ is not materialized in this checkout yet -- skipping state finalization"
+            return 0
+            ;;
+    esac
+
+    # Channel 1 (ARCH_WT_RULING.md § 13.3): converge every eligible wt/*
+    # state branch into this checkout's sidecar branch BEFORE draft
+    # promotion, so a plain `git merge` or a squash-merge-then-pull promotes
+    # a worktree's drafts in this same run. Skipped when the sidecar has no
+    # wt/* branches at all -- nothing could converge either way.
+    if [ "$_FC_PLACEMENT" = "sidecar" ] \
+        && _finalize_chain_state_branches_pending "$_FC_SIDECAR_COMMON_DIR"; then
+        _finalize_chain_merge_back_auto
+    fi
+
     # Pass --repo-root explicitly: the python scripts may be executing from a
     # symlinked plugin cache, where their own file location resolves to the
     # plugin rather than this consumer repo. repo_root is the git worktree root
     # resolved above; handing it down is what makes finalize act on the
-    # consumer's .ai-state/ instead of the plugin's (empty) one.
+    # consumer's .ai-state/ instead of the plugin's (empty) one. Under sidecar
+    # placement --state-root points the git plumbing at the mount instead of
+    # the project checkout, which owns no .ai-state/ of its own.
     if _finalize_chain_drafts_present "$repo_root"; then
+        local -a state_root_args=()
+        if [ "$_FC_PLACEMENT" = "sidecar" ]; then
+            state_root_args=(--state-root "$_FC_STATE_GIT_ROOT")
+        fi
         _finalize_chain_run_script "finalize_adrs" \
-            "${FINALIZE_CHAIN_DIR}/finalize_adrs.py" --all --repo-root "$repo_root" || return $?
+            "${FINALIZE_CHAIN_DIR}/finalize_adrs.py" --all --repo-root "$repo_root" \
+            "${state_root_args[@]}" || return $?
     fi
     _finalize_chain_run_script "finalize_tech_debt_ledger" \
         "${FINALIZE_CHAIN_DIR}/finalize_tech_debt_ledger.py" --all --repo-root "$repo_root" || return $?
@@ -178,6 +325,13 @@ _finalize_chain_run_on_main() {
     if [ -f "${repo_root}/.ai-state/doc_manifest.yaml" ]; then
         _finalize_chain_run_script "build_doc_manifest" \
             "${FINALIZE_CHAIN_DIR}/build_doc_manifest.py" --root "$repo_root" || return $?
+    fi
+
+    # The only commit in the chain: once composition has finished mutating
+    # the mount, commit it. commit's own residue_paths() makes this
+    # a clean no-op when nothing changed, so it is safe to call unconditionally.
+    if [ "$_FC_PLACEMENT" = "sidecar" ]; then
+        _finalize_chain_run_sidecar "praxion-sidecar commit" commit --quiet
     fi
 }
 
@@ -223,12 +377,13 @@ _finalize_chain_repair_broken_block_d() {
 finalize_chain_run_on_main() {
     local repo_root="${1:-$(_finalize_chain_repo_root)}"
     [ -n "$repo_root" ] || return 0
+    _finalize_chain_load_placement "$repo_root"
     _finalize_chain_run_on_main "$repo_root"
 }
 
-# State-driven finalize on main. Shared body for post-commit and post-checkout
-# entry points. Inlined into both for clarity (the entry name is part of the
-# hook's contract).
+# State-driven finalize on main. Shared body for post-commit (and, when
+# already on main, post-checkout's tail). Inlined into both for clarity (the
+# entry name is part of the hook's contract).
 _finalize_chain_state_driven() {
     local repo_root
     repo_root="$(_finalize_chain_repo_root)"
@@ -236,6 +391,10 @@ _finalize_chain_state_driven() {
     # Hook repair is branch-independent — run before the on-main gate.
     _finalize_chain_repair_broken_block_d "$repo_root"
     _finalize_chain_on_main || return 0
+    # Placement is resolved only once we know the composition will actually
+    # run — the common case (an ordinary commit on a feature branch) never
+    # pays for it.
+    _finalize_chain_load_placement "$repo_root"
     _finalize_chain_run_on_main "$repo_root"
 }
 
@@ -256,6 +415,7 @@ finalize_chain_post_merge() {
     [ -n "$repo_root" ] || return 0
 
     _finalize_chain_repair_broken_block_d "$repo_root"
+    _finalize_chain_load_placement "$repo_root"
 
     if _finalize_chain_state_was_touched "$repo_root"; then
         _finalize_chain_run_script "post-merge: reconcile_ai_state" \
@@ -279,13 +439,37 @@ finalize_chain_post_commit() {
 }
 
 # Post-checkout entry point. Catches paths that arrive on main without a
-# local commit: branch switch, fresh clone, reset to main.
+# local commit: branch switch, fresh clone, reset to main. Under sidecar
+# placement it is also the PRIMARY channel that materializes a new project
+# worktree's own state mount -- confirmed to fire on `git worktree add`,
+# with the SessionStart heal as the idempotent backstop.
 #
 # Git invokes post-checkout with three args: prev-head, new-head, branch-flag.
 # branch-flag is "1" for branch checkout, "0" for file checkout. We act only
-# on branch checkouts; file checkouts cannot land drafts on main.
+# on branch checkouts; file checkouts cannot land drafts on main and cannot
+# be a new worktree either.
 finalize_chain_post_checkout() {
     local branch_flag="${3:-0}"
     [ "$branch_flag" = "1" ] || return 0
-    _finalize_chain_state_driven
+    local repo_root
+    repo_root="$(_finalize_chain_repo_root)"
+    [ -n "$repo_root" ] || return 0
+
+    _finalize_chain_repair_broken_block_d "$repo_root"
+    # Resolved before the on_main gate: the link call below must fire on
+    # EVERY branch checkout (a new worktree checks out its own feature
+    # branch, never main), not only when the checkout lands on main.
+    _finalize_chain_load_placement "$repo_root"
+
+    # `not-yet-linked` is the shape a brand-new worktree actually has: `git
+    # worktree add` copies no `.ai-state`, so gating on `sidecar` alone made
+    # this call unreachable in exactly the case it exists to serve.
+    case "$_FC_PLACEMENT" in
+        sidecar | not-yet-linked)
+            _finalize_chain_run_sidecar "praxion-sidecar link" link --quiet
+            ;;
+    esac
+
+    _finalize_chain_on_main || return 0
+    _finalize_chain_run_on_main "$repo_root"
 }

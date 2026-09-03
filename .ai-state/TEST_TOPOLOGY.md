@@ -281,7 +281,11 @@ expected_runtime_envelope:
   p50_seconds: 29.3
   p95_seconds: 30
 shared_state: tmp_path
-notes: "Self-contained by construction -- 20 files, 623 tests, no fan-out."
+notes: "Self-contained by construction -- 20 files, 623 tests, no fan-out.
+  2026-09-03: hooks/test_inject_sidecar_banner.py and
+  hooks/test_sidecar_autocommit.py added (sidecar-placement P1, RED-first
+  against praxion-sidecar stub fixtures); both already match the hooks/
+  selector glob above, no selector change needed."
 ```
 
 The tier is `integration` rather than `unit` because 14 of the 20 files spawn real
@@ -609,6 +613,9 @@ selectors:
       - "tests/commands/test_upgrade_labels_baseline.py"
       - "tests/commands/test_upgrade_project_command.py"
       - "tests/consumer_layout/"
+      - "scripts/test_onboard_project_placement.py"
+      - "tests/commands/test_onboard_placement_phase_matrix.py"
+      - "tests/test_onboard_project_detection.py"
 file_dependencies:
   - "commands/onboard-project.md"
   - "commands/new-project.md"
@@ -622,13 +629,24 @@ file_dependencies:
   - ".github/workflows/ci-autofix.yml"
   - ".github/workflows/cross-model-review.yml"
   - ".github/workflows/labels-reconcile.yml"
+  - "scripts/onboard-project"
+  - "scripts/praxion-sidecar"
+  - "skills/onboard-project/references/*.md"
 parallel_safe: true
 shared_fixture_scope: per-test
 expected_runtime_envelope:
   p50_seconds: 2.5
-  p95_seconds: 4
+  p95_seconds: 10
 shared_state: filesystem
-notes: "Tier is contract, not integration -- a deliberate call; see below."
+notes: "Tier is contract, not integration -- a deliberate call; see below.
+  scripts/test_onboard_project_placement.py drives scripts/onboard-project and
+  the real scripts/praxion-sidecar (Praxion's own already-tested collaborator,
+  not an external boundary) via real subprocesses and real git worktrees under
+  tmp_path -- the p95 bump over the pre-existing 4s reflects that; only
+  `claude` is stubbed. test_onboard_placement_phase_matrix.py and
+  test_onboard_project_detection.py extend this group with the placement-axis
+  phase-matrix regression suite (prose contract + a real detect_state()
+  subprocess check)."
 ```
 
 `/onboard-project` is a Markdown slash command that pytest cannot invoke, so these
@@ -841,6 +859,11 @@ selectors:
       - "scripts/test_state_repo.py"
       - "scripts/test_sidecar_manifest.py"
       - "scripts/test_sidecar_mount.py"
+      - "scripts/test_sidecar_link.py"
+      - "scripts/test_sidecar_commit.py"
+      - "scripts/test_sidecar_checks.py"
+      - "scripts/test_praxion_sidecar.py"
+      - "scripts/test_sidecar_identity.py"
 file_dependencies:
   - "scripts/_git_runner.py"
   - "scripts/_repo_root.py"
@@ -848,6 +871,17 @@ file_dependencies:
   - "scripts/_state_repo.py"
   - "scripts/_sidecar_manifest.py"
   - "scripts/_sidecar_mount.py"
+  - "scripts/_sidecar_link.py"
+  - "scripts/_sidecar_commit.py"
+  - "scripts/_sidecar_checks.py"
+  - "scripts/_sidecar_git.py"
+  - "scripts/_sidecar_cli.py"
+  - "scripts/_sidecar_identity.py"
+  - "scripts/_sidecar_init.py"
+  - "scripts/_sidecar_inputs.py"
+  - "scripts/_sidecar_render.py"
+  - "scripts/install_git_hooks.py"
+  - "scripts/praxion-sidecar"
 integration_boundaries:
   - decision-records
   - state-ledgers

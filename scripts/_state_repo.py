@@ -4,14 +4,17 @@ Under sidecar placement `.ai-state/` is a relative symlink into a **state
 mount**: a real directory at `<checkout>/.praxion/` that is a `git worktree` of
 a separate sidecar repository. Consumers that stage, commit or rename state
 files must therefore run git against the mount, not the project -- and must
-refuse outright when the shadow dangles or leads somewhere that is not this
-project's sidecar. `resolve_placement()` answers with a four-variant sum type
-so each of those cases is named and carries its evidence;
-`require_writable_placement()` narrows it to the two writable variants and
-raises, so a state-mutating caller cannot silently take the permissive path.
+refuse outright when the shadow dangles, leads somewhere that is not this
+project's sidecar, or has not been materialised in this checkout yet.
+`resolve_placement()` answers with a five-variant sum type so each of those
+cases is named and carries its evidence; `require_writable_placement()`
+narrows it to the two writable variants and raises, so a state-mutating
+caller cannot silently take the permissive path.
 
 Discovery is stdlib-only and subprocess-free on both happy paths: an `InRepo`
-project costs one `lstat`, and a mounted one costs a handful of file reads
+project costs one `lstat` (two plus a `.git` read when it has no `.ai-state`
+at all, which is what distinguishes it from an unlinked worktree), and a
+mounted one costs a handful of file reads
 (the mount's `.git` pointer, its `HEAD`, the manifest, the project's git
 config). That budget is load-bearing -- this module is imported by finalize
 scripts and session hooks in consumer projects whose interpreter may lack
@@ -26,9 +29,11 @@ for every script that lives beside it, exactly like `_repo_root.py`.
 
 from __future__ import annotations
 
+import argparse
 import dataclasses
 import os
 import subprocess
+import sys
 from enum import Enum
 from pathlib import Path
 from typing import Union
@@ -38,11 +43,13 @@ __all__ = [
     "Foreign",
     "ForeignReason",
     "InRepo",
+    "NotYetLinked",
     "Placement",
     "SidecarIdentity",
     "SidecarOwned",
     "UnwritablePlacementError",
     "WritablePlacement",
+    "main",
     "require_writable_placement",
     "resolve_placement",
 ]
@@ -113,6 +120,28 @@ class SidecarOwned:
 
 
 @dataclasses.dataclass(frozen=True)
+class NotYetLinked:
+    """A linked worktree of a sidecar-owned project, before its own `link` ran.
+
+    `git worktree add` copies no `.ai-state`: the shadow is excluded and never
+    tracked, so a checkout seconds old has no shadow at all -- which reads as
+    `InRepo` by shape alone and would silently retire the post-checkout and
+    SessionStart heals that exist to materialise it. The project's own sidecar
+    is nonetheless known, because the **main** checkout is mounted and every
+    worktree of one project shares one sidecar; `main_checkout_root` is where
+    that answer came from, and `sidecar_common_dir` is the answer.
+
+    Not writable: there is no mount here yet, so the variant carries no
+    `state_git_root` for a caller to reach for.
+    """
+
+    project_root: Path
+    main_checkout_root: Path
+    sidecar_common_dir: Path
+    identity: SidecarIdentity
+
+
+@dataclasses.dataclass(frozen=True)
 class Dangling:
     """The shadow is a symlink whose target does not exist.
 
@@ -146,7 +175,7 @@ class Foreign:
 # is imported by git hooks in consumer projects whose interpreter Praxion does
 # not choose (`scripts/**` targets 3.9+ -- see the per-file-ignores note in
 # `pyproject.toml`). The same constraint keeps `ForeignReason` off `StrEnum`.
-Placement = Union[InRepo, SidecarOwned, Dangling, Foreign]  # noqa: UP007
+Placement = Union[InRepo, SidecarOwned, NotYetLinked, Dangling, Foreign]  # noqa: UP007
 WritablePlacement = Union[InRepo, SidecarOwned]  # noqa: UP007
 
 
@@ -157,7 +186,7 @@ class UnwritablePlacementError(RuntimeError):
 def resolve_placement(project_root: Path) -> Placement:
     """Classify who owns `<project_root>/.ai-state/`.
 
-    Readers may degrade on `Dangling` / `Foreign`; writers call
+    Readers may degrade on `NotYetLinked` / `Dangling` / `Foreign`; writers call
     `require_writable_placement()` instead. Every returned path is fully
     resolved here, once, so consumers compare resolver-supplied paths with
     each other and never have to get macOS `/System/Volumes/Data` aliasing
@@ -166,6 +195,10 @@ def resolve_placement(project_root: Path) -> Placement:
     root = project_root.resolve()
     slot = root / _STATE_DIR_NAME
     if not slot.is_symlink():
+        if not slot.exists():
+            unlinked = _through_main_checkout(root)
+            if unlinked is not None:
+                return unlinked
         return InRepo(project_root=root, state_dir=slot, state_git_root=root)
 
     link_path = slot.resolve()
@@ -192,6 +225,12 @@ def require_writable_placement(project_root: Path) -> WritablePlacement:
     placement = resolve_placement(project_root)
     if isinstance(placement, (InRepo, SidecarOwned)):
         return placement
+    if isinstance(placement, NotYetLinked):
+        raise UnwritablePlacementError(
+            f"{_STATE_DIR_NAME} is not materialized in {placement.project_root} yet "
+            f"(sidecar {placement.sidecar_common_dir.parent}); "
+            "run `praxion-sidecar link` first"
+        )
     if isinstance(placement, Dangling):
         raise UnwritablePlacementError(
             f"{_STATE_DIR_NAME} is dangling: {placement.link_path} does not exist "
@@ -201,6 +240,52 @@ def require_writable_placement(project_root: Path) -> WritablePlacement:
         f"{_STATE_DIR_NAME} resolves to {placement.link_path}, which is not this "
         f"project's state sidecar ({placement.reason.value}): {placement.resolved_target}"
     )
+
+
+def _through_main_checkout(root: Path) -> Placement | None:
+    """Answer for a linked worktree with no shadow of its own, or None.
+
+    Asked only when `<root>/.ai-state` is absent entirely. That shape is
+    ambiguous by itself -- an unmanaged project and a seconds-old worktree of
+    a sidecar-owned one look identical -- and the project's main checkout is
+    what disambiguates them, since every worktree of one project shares one
+    sidecar. A `Foreign` main checkout is propagated rather than degraded to
+    `InRepo`: its shadow contradicts the project either way, and answering
+    "unmanaged" here would let a writer proceed past a refusal the main
+    checkout already earned.
+    """
+    main_checkout_root = _main_checkout_root(root)
+    if main_checkout_root is None or main_checkout_root == root:
+        return None
+    main_placement = resolve_placement(main_checkout_root)
+    if isinstance(main_placement, SidecarOwned):
+        return NotYetLinked(
+            project_root=root,
+            main_checkout_root=main_checkout_root,
+            sidecar_common_dir=main_placement.sidecar_common_dir,
+            identity=main_placement.identity,
+        )
+    if isinstance(main_placement, Foreign):
+        # Keep the main checkout's evidence (`link_path`, `resolved_target`,
+        # `reason`) -- it names the path actually at fault -- and re-point
+        # `project_root` at the checkout that asked.
+        return dataclasses.replace(main_placement, project_root=root)
+    return None
+
+
+def _main_checkout_root(root: Path) -> Path | None:
+    """The main checkout of `root`, when `root` is a **linked** worktree.
+
+    Unlike `_project_git_common_dir`, which collapses a linked worktree and a
+    standalone pointer file into one answer, this refuses everything but the
+    linked shape: a `.git` directory means `root` already IS the main
+    checkout, and an unrecognized pointer is not guessed at.
+    """
+    gitdir = _git_pointer_gitdir(root)
+    if gitdir is None:
+        return None
+    linked = _split_linked_worktree(gitdir)
+    return None if linked is None else linked[1].parent
 
 
 class _MountRefusalError(Exception):
@@ -269,6 +354,15 @@ def _gitdir_target(pointer_text: str, base: Path) -> Path | None:
     if key.strip() != _GITDIR_KEY or not separator or not target.strip():
         return None
     return _absolute(Path(target.strip()), base)
+
+
+def _git_pointer_gitdir(root: Path) -> Path | None:
+    """`<root>/.git`'s absolute `gitdir:` target, when it is a pointer file."""
+    git_entry = root / _GIT_ENTRY_NAME
+    if git_entry.is_dir():
+        return None
+    pointer_text = _read_text(git_entry)
+    return None if pointer_text is None else _gitdir_target(pointer_text, root)
 
 
 def _split_linked_worktree(gitdir: Path) -> tuple[Path, Path] | None:
@@ -379,10 +473,7 @@ def _project_git_common_dir(project_root: Path) -> Path | None:
     git_entry = project_root / _GIT_ENTRY_NAME
     if git_entry.is_dir():
         return git_entry
-    pointer_text = _read_text(git_entry)
-    if pointer_text is None:
-        return None
-    gitdir = _gitdir_target(pointer_text, project_root)
+    gitdir = _git_pointer_gitdir(project_root)
     if gitdir is None:
         return None
     linked = _split_linked_worktree(gitdir)
@@ -584,3 +675,79 @@ def _absolute(path: Path, base: Path) -> Path:
 
 def _is_inside(path: Path, ancestor: Path) -> bool:
     return path == ancestor or ancestor in path.parents
+
+
+# --- CLI -----------------------------------------------------------------
+#
+# `--print` is the sole reader-facing entry point: shell callers (the
+# finalize chain) resolve placement ONCE via a subprocess, then read the
+# result back as plain `key=value` lines rather than re-implementing this
+# module's discovery logic in bash. Never raises and always exits 0 -- a
+# reader with no other error-handling machinery of its own must never see
+# this crash, so a variant that cannot be classified prints `foreign` with
+# a `resolver-error` reason instead of propagating the exception.
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="_state_repo.py",
+        description="Resolve who owns <root>/.ai-state/ and print it as key=value lines.",
+    )
+    parser.add_argument(
+        "--print",
+        dest="do_print",
+        action="store_true",
+        help="Print placement=<in-repo|sidecar|not-yet-linked|dangling|foreign> plus its evidence, "
+        "one key=value per line, and exit 0.",
+    )
+    parser.add_argument(
+        "root", nargs="?", default=".", help="Project root to resolve (default: cwd)."
+    )
+    return parser
+
+
+def _print_kv(key: str, value: str) -> None:
+    print(f"{key}={value}")
+
+
+def _print_placement(root: Path) -> None:
+    try:
+        placement = resolve_placement(root)
+    except Exception as error:  # a --print reader must never see this raise
+        _print_kv("placement", "foreign")
+        _print_kv("reason", f"resolver-error: {error}")
+        return
+    if isinstance(placement, InRepo):
+        _print_kv("placement", "in-repo")
+        _print_kv("state_git_root", str(placement.state_git_root))
+    elif isinstance(placement, SidecarOwned):
+        _print_kv("placement", "sidecar")
+        _print_kv("state_git_root", str(placement.state_git_root))
+        _print_kv("mount_dir", str(placement.mount_dir))
+        _print_kv("sidecar_common_dir", str(placement.sidecar_common_dir))
+    elif isinstance(placement, NotYetLinked):
+        _print_kv("placement", "not-yet-linked")
+        _print_kv("main_checkout_root", str(placement.main_checkout_root))
+        _print_kv("sidecar_common_dir", str(placement.sidecar_common_dir))
+    elif isinstance(placement, Dangling):
+        _print_kv("placement", "dangling")
+        _print_kv(
+            "reason",
+            f"{placement.link_path} does not exist (recorded target {placement.link_target})",
+        )
+    else:
+        _print_kv("placement", "foreign")
+        _print_kv("reason", f"{placement.reason.value}: {placement.resolved_target}")
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _build_parser().parse_args(argv)
+    if not args.do_print:
+        print("_state_repo.py: pass --print <root> to resolve placement", file=sys.stderr)
+        return 2
+    _print_placement(Path(args.root))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

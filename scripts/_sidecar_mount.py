@@ -554,7 +554,8 @@ def converge(
         merged, aborted = _merge_eligible(
             sidecar_root, checkout, mount, plan.eligible, post_merge_hook
         )
-        deleted, refused = _delete_orphans(sidecar_root, mount, plan.orphaned, mount_state.branch)
+        orphaned = plan.orphaned + _newly_orphaned(sidecar_root, checkout, project_root, merged)
+        deleted, refused = _delete_orphans(sidecar_root, mount, orphaned, mount_state.branch)
     return ConvergeResult(
         merged=merged,
         deleted=deleted,
@@ -576,6 +577,26 @@ def _plan_convergence(sidecar_root: Path, checkout: Path, project_root: Path) ->
         eligible=eligible,
         orphaned=orphaned,
         skipped=tuple(b for b in states if b not in eligible and b not in orphaned),
+    )
+
+
+def _newly_orphaned(
+    sidecar_root: Path, checkout: Path, project_root: Path, merged: tuple[str, ...]
+) -> tuple[str, ...]:
+    """Branches this run's own merges just turned into deletion candidates.
+
+    The plan is computed before anything is touched, so a branch merged here
+    was ``UnmergedEligible`` at plan time and cannot appear in the plan's
+    orphan set -- yet the moment its state lands in the target branch and no
+    mount holds it, it is exactly what ``_delete_orphans`` exists to remove.
+    Re-classifying *only* the branches this run merged is what lets one call
+    reach the fixed point, rather than leaving a branch that a second,
+    identical call would delete.
+    """
+    return tuple(
+        branch
+        for branch in merged
+        if isinstance(classify_branch(sidecar_root, checkout, branch, project_root), MergedOrphan)
     )
 
 

@@ -1,10 +1,10 @@
 ---
 id: dec-draft-bdbeea95
-title: A single resolver answers which git repository owns .ai-state/, returning a four-variant sum type; state-mutating callers fail closed
+title: A single resolver answers which git repository owns .ai-state/, returning a five-variant sum type; state-mutating callers fail closed
 status: proposed
 category: architectural
 date: 2026-09-02
-summary: scripts/_state_repo.py is the sole answer to "which repo owns .ai-state/", returning InRepo | SidecarOwned | Dangling | Foreign with fully-resolved paths, never a bare path or an Optional. Two entry points split the contract - resolve_placement for readers, require_writable_placement for writers, which raises on the two error variants so a broken or third-party link can never be written into. Revised by dec-draft-0516562a: SidecarOwned now carries the in-checkout state mount as its state_git_root plus the sidecar common dir and branch, discovery is stdlib and subprocess-free via the mount's .git pointer file, and the consumer set drops the two containment guards and the dashboard entirely.
+summary: scripts/_state_repo.py is the sole answer to "which repo owns .ai-state/", returning InRepo | SidecarOwned | NotYetLinked | Dangling | Foreign with fully-resolved paths, never a bare path or an Optional. Two entry points split the contract - resolve_placement for readers, require_writable_placement for writers, which raises on the three unwritable variants so a broken or third-party link can never be written into. Revised by dec-draft-0516562a: SidecarOwned now carries the in-checkout state mount as its state_git_root plus the sidecar common dir and branch, discovery is stdlib and subprocess-free via the mount's .git pointer file, and the consumer set drops the two containment guards and the dashboard entirely. Extended in draft with a fifth variant, NotYetLinked: a linked worktree carries no shadow until link runs, so an absent .ai-state in a worktree of a sidecar-owned project is its own named state rather than InRepo.
 tags: [resolver, sum-type, state-ownership, sidecar, fail-closed, data-structure-design, scripts]
 made_by: agent
 agent_type: systems-architect
@@ -78,7 +78,7 @@ them, and only the resolver is positioned to do that.
 `scripts/_state_repo.py` is the single answer, imported as a sibling module
 exactly like `_repo_root.py` (`scripts/` is on `sys.path[0]` for all of them).
 
-1. **The result is a four-variant sum type**, not a path and not an optional:
+1. **The result is a five-variant sum type**, not a path and not an optional:
 
    - `InRepo` — carries `project_root`, `state_dir`, and `state_git_root`
      equal to `project_root`.
@@ -103,12 +103,32 @@ exactly like `_repo_root.py` (`scripts/` is on `sys.path[0]` for all of them).
      `{schema, id, origin, mount_dir, sidecar_common_dir}`; only
      `praxion-sidecar` and `sidecar_autocommit.py` (already full-YAML contexts)
      read the wider fields.
+   - `NotYetLinked` — `.ai-state` is absent entirely and this checkout is a
+     **linked worktree** of a project whose main checkout is `SidecarOwned`;
+     carries `project_root`, `main_checkout_root`, `sidecar_common_dir` and the
+     `SidecarIdentity`, and no `state_git_root` (there is nothing here to write
+     to yet).
    - `Dangling` — the shadow is a symlink whose target does not exist (typically
      an unmaterialised mount); carries the link path and its target.
    - `Foreign` — the target exists but is not this project's sidecar; carries
      the resolved target and a `reason` from the closed set `no-manifest`,
      `manifest-unreadable`, `schema-too-new`, `identity-mismatch`,
      `not-a-git-repo`, `unrecognized-mount`.
+
+   The fifth variant exists because `git worktree add` copies no `.ai-state` —
+   the shadow is excluded from the project repository and never tracked — so a
+   worktree seconds old has *no* shadow, which by shape alone is
+   indistinguishable from an unmanaged project. Answering `InRepo` there
+   silently retires the two channels that exist to materialise it (the
+   post-checkout `link` and the SessionStart heal, both gated on placement),
+   and the knowledge that rescued it lived in one consumer as an ad-hoc
+   main-worktree fallback rather than in the type. "Which repo owns
+   `.ai-state`?" therefore has a fifth honest answer — *this project's sidecar,
+   but not materialised in this checkout yet* — and it is a state, not a
+   boolean on `InRepo`: it carries the sidecar it will be linked into, which no
+   flag could. It is not writable (`require_writable_placement()` refuses it,
+   naming `praxion-sidecar link`), and it is a transition rather than a resting
+   place: the same checkout resolves `SidecarOwned` the moment `link` runs.
 
 2. **All paths are fully resolved by the resolver**, once. Consumers compare
    resolver-supplied paths with each other and never call `resolve()`
@@ -134,7 +154,7 @@ exactly like `_repo_root.py` (`scripts/` is on `sys.path[0]` for all of them).
 3. **Two entry points split the contract by caller obligation.**
    `resolve_placement()` returns the sum type and is for readers, which may
    degrade. `require_writable_placement()` returns only `InRepo | SidecarOwned`
-   and raises on the two error variants; every state-mutating script uses it,
+   and raises on the other three; every state-mutating script uses it,
    so a mutating caller cannot silently take the permissive path. The
    distinction is in the API rather than in a convention each caller remembers.
 

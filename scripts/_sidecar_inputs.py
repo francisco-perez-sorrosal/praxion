@@ -127,12 +127,22 @@ def status_of(context: Context, inputs: checks.CheckInputs, facts: Facts, result
 
 
 def unresolvable_placement(placement: _state_repo.Placement) -> Refused:
-    """`Dangling` / `Foreign` -- reportable states, but not reportable *by* status.
+    """The three unwritable variants -- reportable states, but not *by* status.
 
-    Both mean the checkout's `.ai-state` does not resolve into a sidecar this
-    command can identify, so there is no honest report to render; `link` is
-    the repair for the first and the operator's decision for the second.
+    All three mean the checkout's `.ai-state` does not resolve into a sidecar
+    this command can report on, so there is no honest report to render.
+    `link` is the repair for the first two -- `NotYetLinked` is a worktree
+    whose mount was never created and `Dangling` a shadow whose mount went
+    away -- and the third is the operator's decision.
     """
+    if isinstance(placement, _state_repo.NotYetLinked):
+        return refusal(
+            "Refusing to report: this checkout has no .ai-state yet.",
+            f"It is a worktree of {placement.main_checkout_root}, whose sidecar is "
+            f"{placement.sidecar_common_dir.parent} — but no state mount has been "
+            "created here.",
+            "Materialise it:  praxion-sidecar link",
+        )
     if isinstance(placement, _state_repo.Dangling):
         return refusal(
             "Refusing to report: .ai-state is a dangling symlink.",

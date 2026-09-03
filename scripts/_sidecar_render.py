@@ -54,6 +54,9 @@ EXAMPLES
   # Keep docs/architecture.md in the team repo, shadow everything else (the default)
   praxion-sidecar init --share docs/architecture.md
 
+  # A worktree finished and merged — bring its state home
+  praxion-sidecar merge-back --auto
+
   # The team wants Praxion after all — move the state in, with history
   praxion-sidecar publish
 
@@ -63,7 +66,8 @@ COMMANDS
   status    Placement, sidecar location, shadow inventory, clean/dirty  [--json]
   doctor    Per-check PASS/WARN/FAIL with one-line fixes; no network I/O  [--json]
   commit    Commit the sidecar working tree; no-op when clean
-  publish   Sidecar -> project repo via git subtree (history preserved)
+  merge-back  Merge one worktree's state branch back, or converge them all
+  publish   Sidecar -> project repo (history preserved)
   absorb    Project repo -> sidecar (the inverse of publish)
   remote    Print the sidecar remote; set it with a URL argument
 
@@ -82,6 +86,16 @@ PLACEMENT OPTIONS  (init, absorb)
                                                   touched and Praxion's blocks go to the
                                                   shadowed CLAUDE.local.md instead.
                                                   Use --share CLAUDE.md to commit one.
+
+MERGE-BACK OPTIONS  (merge-back)
+  --from <wt/name>   Merge this state branch into the branch mounted here. May
+                     leave conflict markers for you to resolve — you asked for
+                     this branch, so nothing is aborted behind your back.
+  --auto             Converge every eligible state branch and drop every merged
+                     one whose mount is gone. A conflict aborts and leaves the
+                     mount clean; the run exits 1 naming the branch.
+  --drop --yes       Delete --from's branch outright, merged or not. Refused
+                     while a mount still holds it; --yes is required.
 
 REMOTE OPTIONS  (remote)
   --push <never|on-autocommit>   When to push the sidecar (default: never)
@@ -110,7 +124,8 @@ EXIT CODES
   3  refused on safety grounds (the message always names the exact fix)
   4  environment: not a git repo, no manifest, sidecar unreadable, git failed
 
-Nothing here ever commits to the *project* repo. Only the sidecar autocommits."""
+Only the sidecar autocommits; the one project commit Praxion ever makes is publish's
+history import, and it asks first."""
 
 
 # --- presentation gates ------------------------------------------------------

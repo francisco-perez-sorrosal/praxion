@@ -190,8 +190,17 @@ def identity_args(repo: Path) -> tuple[str, ...]:
 
 
 def merge_branch(repo: Path, ref: str) -> bool:
-    """Merge ``ref`` into the repository's current branch. ``False`` on conflict."""
-    return run_git(repo, *identity_args(repo), "merge", "-q", "--no-edit", ref).returncode == 0
+    """Merge ``ref`` into the repository's current branch. ``False`` on conflict.
+
+    ``--no-ff`` because a merge-back is a *convergence point*, and a
+    fast-forward records none: the target branch would silently become the
+    source, leaving no commit that says when a worktree's state came home and
+    nothing for `git log --first-parent` on the mount to show.
+    """
+    return (
+        run_git(repo, *identity_args(repo), "merge", "-q", "--no-ff", "--no-edit", ref).returncode
+        == 0
+    )
 
 
 def abort_merge(repo: Path) -> None:

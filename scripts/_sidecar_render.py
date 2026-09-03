@@ -32,7 +32,8 @@ _INDENT = "  "
 _NONE_MARK = "—"
 
 SHORT_USAGE = (
-    "Usage: praxion-sidecar {init|link|status|doctor|commit|publish|absorb|remote} [options]\n"
+    "Usage: praxion-sidecar {init|link|status|doctor|commit|merge-back|publish|absorb|remote}"
+    " [options]\n"
     "Run 'praxion-sidecar --help' for examples and the full option reference."
 )
 
@@ -327,11 +328,6 @@ def _health_lines(status: Status) -> list[str]:
         return [
             _continuation("Healthy. For pin drift, run: scripts/upgrade_project_pins.sh --check")
         ]
-    if status.checkout.total > 1:
-        tail = (
-            f" State is shared live across {status.checkout.total} checkouts — no branch isolation."
-        )
-        return [_continuation(f"Healthy.{tail}")]
     return [_continuation("Healthy.")]
 
 

@@ -211,6 +211,7 @@ def _status_json_response(
     failed_checks: list[str] | None = None,
     dirty_files: int = 0,
     counts: dict[str, int] | None = None,
+    paths: list[dict] | None = None,
 ) -> str:
     failed_checks = failed_checks or []
     # Default counts mirror the dogfooded scenario (F-4): an unhealthy
@@ -232,7 +233,7 @@ def _status_json_response(
         },
         "remote": None,
         "autocommit": "on-finalize-and-stop",
-        "paths": [],
+        "paths": paths if paths is not None else [],
         "healthy": healthy,
         "failed_checks": failed_checks,
         "counts": counts,
@@ -293,12 +294,35 @@ class TestHealthyBanner:
         assert HEADING in banner
         assert "lives **outside it**" in banner
         assert "excluded via `.git/info/exclude`" in banner
-        assert "`git add` through the symlink fails loudly" in banner
+        assert "docs/architecture.md" not in banner  # no `share` row in this fixture (IF-23)
         # tilde-abbreviated sidecar path (HOME pinned to tmp_path above)
         assert f"~/{sidecar_root.relative_to(tmp_path)}" in banner
         assert "doctor" not in banner.split("\n\n")[-1].lower() or "⚠️" not in banner
         assert "state branch" not in banner  # no convergence line at the fixed point
         assert "must target the mount path" in banner  # file-shadow write-target line
+
+    def test_healthy_with_a_share_row_names_architecture_md_by_dec_nnn(
+        self, sidecar_owned, tmp_path, monkeypatch
+    ):
+        """IF-23: the shipped literal is the placeholder `dec-NNN`, never a
+        real ADR id, and only rendered when a `share` row is actually in the
+        inventory (never assumed)."""
+        project_root, sidecar_root = sidecar_owned
+        monkeypatch.setenv("HOME", str(tmp_path))
+        response = _status_json_response(
+            sidecar_root,
+            healthy=True,
+            failed_checks=[],
+            paths=[{"path": "docs/architecture.md", "intent": "share", "state": "shared"}],
+        )
+        env, _ = _install_stub_cli(tmp_path, {"status": {"stdout": response}, "link": {}})
+
+        result = _run_hook({"cwd": str(project_root)}, env)
+
+        banner = _additional_context(result)
+        assert "docs/architecture.md" in banner
+        assert "dec-NNN" in banner
+        assert "dec-355" not in banner
 
 
 class TestUnhealthyBanner:
@@ -352,10 +376,9 @@ class TestConvergenceLine:
         banner = _additional_context(result)
         occurrences = banner.count("State branch(es) awaiting merge-back")
         assert occurrences == 1, f"expected exactly one convergence line, banner was:\n{banner}"
-        assert (
-            "State branch(es) awaiting merge-back: wt/a, wt/b, wt/c — run: praxion-sidecar doctor"
-            in banner
-        ), f"expected all three branches named, banner was:\n{banner}"
+        assert "State branch(es) awaiting merge-back: wt/a, wt/b, wt/c" in banner, (
+            f"expected all three branches named, banner was:\n{banner}"
+        )
 
     def test_named_branch_matches_the_dogfooded_example(self, sidecar_owned, tmp_path):
         """F-3 repro: a single unmerged branch must be NAMED, not just counted."""
@@ -368,9 +391,7 @@ class TestConvergenceLine:
         result = _run_hook({"cwd": str(project_root)}, env)
 
         banner = _additional_context(result)
-        assert (
-            "State branch(es) awaiting merge-back: wt/wt6 — run: praxion-sidecar doctor" in banner
-        )
+        assert "State branch(es) awaiting merge-back: wt/wt6" in banner
 
     def test_more_than_three_branches_shows_first_three_and_a_remainder_count(
         self, sidecar_owned, tmp_path

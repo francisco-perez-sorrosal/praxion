@@ -9,7 +9,7 @@ directory Praxion never inspected, or occupy ``.git/hooks/pre-commit``
 directly. This script is the single writer of both surfaces: it *observes*
 the repository's hook configuration (``scripts/_hook_chain_state`` sum
 types below) and then installs the shape that *composes* with it rather than
-displacing it. See ``dec-draft-c66a19a6``.
+displacing it -- see the hook-chaining ADR.
 
 Data model (DS-4, ``SYSTEMS_PLAN.md § Data Structures``):
 
@@ -17,8 +17,9 @@ Data model (DS-4, ``SYSTEMS_PLAN.md § Data Structures``):
                     | Unresolvable{raw, reason}
     HookSlotState  = Absent | PraxionSymlink | PraxionWrapperFile
                     | ForeignOccupied{path}
-    DelegateRef    = {raw, is_relative}   -- stored raw; resolved per-worktree
-                                             at hook-run time (REQ-09)
+    DelegateRef    = {raw, is_relative}   -- stored raw; resolved per-worktree at
+                                             hook-run time, never frozen absolute
+                                             at install time
 
 Observation -> action table (five branches, ``install_or_heal``):
 
@@ -173,6 +174,15 @@ def wrapper_dir_path(repo_root: Path) -> Path | None:
     return None if common_dir is None else common_dir / WRAPPER_DIRNAME
 
 
+def hooks_dir_for(repo_root: Path) -> Path:
+    """The plain-slot hooks directory: the git COMMON dir's ``hooks/``, never
+    ``repo_root/.git/hooks`` -- in a linked worktree ``.git`` is a file, not
+    that directory, so the plain slots, ``--status``, and ``--uninstall`` must
+    all resolve through here (IF-16) rather than re-deriving the path."""
+    common_dir = git_common_dir(repo_root)
+    return (common_dir if common_dir is not None else repo_root / ".git") / "hooks"
+
+
 def read_recorded_delegate(wrapper_dir: Path) -> DelegateRef | None:
     """Read the delegate Praxion recorded when it adopted a ``Foreign`` hooksPath.
 
@@ -256,7 +266,7 @@ def _has_marker(path: Path, marker: str) -> bool:
     return any(marker in line for line in head)
 
 
-# ---- Wrapper rendering (Step 2) ---------------------------------------------
+# ---- Wrapper rendering ------------------------------------------------------
 
 # The two exit-code policies are two distinct, statically-chosen bash
 # snippets substituted at render time -- never a runtime `if $HOOK_CLASS`
@@ -315,12 +325,32 @@ def render_wrapper(
     )
 
 
+# The literal render_wrapper() bakes into a hook class's own {{PRAXION_STEP}}
+# block (see that function) -- present in a wrapper's body iff the chain call
+# to Praxion's own step survived, which is exactly what `hooks-chained`
+# (`_sidecar_checks.py`) reports on.
+_PRECOMMIT_CHAIN_MARKER = "praxion-precommit-hook.sh.tmpl"
+
+
+def _chain_call_marker(hook_name: str) -> str:
+    return _PRECOMMIT_CHAIN_MARKER if hook_name == "pre-commit" else FINALIZE_DISPATCHER
+
+
+def _wrapper_chain_intact(path: Path, hook_name: str) -> bool:
+    """True iff `path`'s body still invokes Praxion's own step for `hook_name`."""
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return _chain_call_marker(hook_name) in content
+
+
 def _write_wrapper_bodies(
     wrapper_dir: Path, delegate_raw: str, delegate_mode: str, plugin_root: Path
 ) -> bool:
     """Render + write every hook's wrapper body; return True iff any byte changed.
 
-    Idempotency (REQ-11 / P0-6): a target whose rendered content already
+    Idempotency: a target whose rendered content already
     matches is never rewritten, so a second call performs zero writes.
     """
     wrapper_dir.mkdir(parents=True, exist_ok=True)
@@ -373,7 +403,7 @@ def _install_plain_slot(hooks_dir: Path, name: str, plugin_root: Path) -> bool:
 def _install_wrapper_file(hooks_dir: Path, name: str, occupant: Path, plugin_root: Path) -> None:
     backup = hooks_dir / f"{name}.pre-praxion"
     if not backup.exists():
-        # Never overwrite an existing backup (DS-4 / Step 3).
+        # Never overwrite an existing backup (DS-4).
         occupant.replace(backup)
     rendered = render_wrapper(
         hook_name=name, delegate_raw=str(backup), delegate_mode="file", plugin_root=plugin_root
@@ -384,7 +414,7 @@ def _install_wrapper_file(hooks_dir: Path, name: str, occupant: Path, plugin_roo
 
 
 def _install_plain_slots(repo_root: Path, plugin_root: Path) -> InstallResult:
-    hooks_dir = repo_root / ".git" / "hooks"
+    hooks_dir = hooks_dir_for(repo_root)
     hooks_dir.mkdir(parents=True, exist_ok=True)
     messages: list[str] = []
     changed = False
@@ -486,7 +516,7 @@ def _heal_from_unset(repo_root: Path, wrapper_dir: Path | None) -> InstallResult
     return InstallResult(changed=True, messages=[f"core.hooksPath restored -> {wrapper_dir}"])
 
 
-# ---- The five(+one)-branch action table (Step 3) ----------------------------
+# ---- The five(+one)-branch action table --------------------------------------
 
 
 def install_or_heal(repo_root: Path, mode: str, plugin_root: Path) -> InstallResult:
@@ -536,7 +566,7 @@ def install_or_heal(repo_root: Path, mode: str, plugin_root: Path) -> InstallRes
     return _install_plain_slots(repo_root, plugin_root)
 
 
-# ---- Status (Step 4) --------------------------------------------------------
+# ---- Status -------------------------------------------------------------------
 
 
 def build_status(repo_root: Path, plugin_root: Path) -> dict:
@@ -558,14 +588,16 @@ def build_status(repo_root: Path, plugin_root: Path) -> dict:
         report["delegate"] = hooks_state.delegate.raw if hooks_state.delegate else None
         wrapper_dir = wrapper_dir_path(repo_root)
         for name in ALL_HOOK_NAMES:
-            present = wrapper_dir is not None and (wrapper_dir / name).is_file()
-            report["slots"].append(
-                {
-                    "name": name,
-                    "state": "wrapper-file" if present else "absent",
-                    "praxion_can_fire": present,
-                }
-            )
+            slot_path = wrapper_dir / name if wrapper_dir is not None else None
+            present = slot_path is not None and slot_path.is_file()
+            slot: dict = {
+                "name": name,
+                "state": "wrapper-file" if present else "absent",
+                "praxion_can_fire": present,
+            }
+            if present:
+                slot["chain_intact"] = _wrapper_chain_intact(slot_path, name)
+            report["slots"].append(slot)
             if not present:
                 report["cannot_fire"].append(name)
         return report
@@ -580,19 +612,20 @@ def build_status(repo_root: Path, plugin_root: Path) -> dict:
         return report
 
     # Unset
-    hooks_dir = repo_root / ".git" / "hooks"
+    hooks_dir = hooks_dir_for(repo_root)
     for name in ALL_HOOK_NAMES:
         slot_state = classify_hook_slot(hooks_dir, name)
         can_fire = isinstance(slot_state, (PraxionSymlink, PraxionWrapperFile))
-        report["slots"].append(
-            {"name": name, "state": type(slot_state).__name__, "praxion_can_fire": can_fire}
-        )
+        slot = {"name": name, "state": type(slot_state).__name__, "praxion_can_fire": can_fire}
+        if isinstance(slot_state, PraxionWrapperFile):
+            slot["chain_intact"] = _wrapper_chain_intact(hooks_dir / name, name)
+        report["slots"].append(slot)
         if not can_fire:
             report["cannot_fire"].append(name)
     return report
 
 
-# ---- Uninstall (Step 4) ------------------------------------------------------
+# ---- Uninstall ----------------------------------------------------------------
 
 
 def uninstall(repo_root: Path) -> InstallResult:
@@ -618,7 +651,7 @@ def uninstall(repo_root: Path) -> InstallResult:
             shutil.rmtree(wrapper_dir)
             messages.append(f"removed wrapper directory {wrapper_dir}")
 
-    hooks_dir = repo_root / ".git" / "hooks"
+    hooks_dir = hooks_dir_for(repo_root)
     for name in ALL_HOOK_NAMES:
         slot_state = classify_hook_slot(hooks_dir, name)
         if not isinstance(slot_state, (PraxionSymlink, PraxionWrapperFile)):

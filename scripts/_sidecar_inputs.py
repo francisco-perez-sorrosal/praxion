@@ -19,6 +19,7 @@ import dataclasses
 from pathlib import Path
 
 import _sidecar_checks as checks
+import _sidecar_commit
 import _sidecar_git as gitp
 import _sidecar_identity as identity
 import _sidecar_link as linker
@@ -26,6 +27,7 @@ import _sidecar_manifest as manifests
 import _sidecar_mount as mounts
 import _sidecar_render as render
 import _state_repo
+import install_git_hooks
 from _git_runner import git_output
 from _sidecar_cli import Context, Refused, refusal, require_sidecar
 
@@ -81,9 +83,9 @@ def gather(context: Context) -> tuple[checks.CheckInputs, Facts]:
         mount_mid_merge=gitp.merge_in_progress(mount),
         sidecar_repo=repo_state,
         remote=_remote_state(manifest, context.checkout),
-        guards_unreadable_by=(),
         guards_roots_stale=context.checkout
         not in {Path(root).resolve() for root in manifest.project.roots},
+        lock_state=_sidecar_commit.read_lock_state(mount),
     )
     facts = Facts(
         checkout=checkout,
@@ -199,8 +201,8 @@ def _in_repo_inputs(context: Context, placement: _state_repo.InRepo) -> checks.C
         mount_mid_merge=False,
         sidecar_repo=None,
         remote=None,
-        guards_unreadable_by=(),
         guards_roots_stale=False,
+        lock_state=None,
     )
 
 
@@ -304,12 +306,7 @@ def _hooks_status(checkout: Path) -> dict:
     than "every slot is broken". The registry's row has no not-applicable
     state, so absence is expressed as an empty inventory: no slots, none
     stale. A repo with a partially-installed chain still reports it in full.
-
-    Imported here rather than at module scope: `install_git_hooks` builds a
-    runtime `X | Y` union, which needs 3.10, while `scripts/` targets 3.9+.
     """
-    import install_git_hooks
-
     plugin_root = Path(__file__).resolve().parent.parent
     status = install_git_hooks.build_status(checkout, plugin_root)
     installed = any(slot.get("praxion_can_fire") for slot in status.get("slots") or [])

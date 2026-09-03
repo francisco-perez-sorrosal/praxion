@@ -9,10 +9,10 @@
 # `<name>.pre-praxion`) with Praxion's own step. The exit-code policy below is
 # baked in at RENDER time (two distinct blocks the Python renderer chooses
 # between, never a runtime `if $HOOK_CLASS` branch) so a future edit to one
-# hook class's handling cannot silently touch the other (dec-draft-c66a19a6).
+# hook class's handling cannot silently touch the other (see the hook-chaining ADR).
 set -eo pipefail
 
-# Re-entrancy guard (REQ-08 defense-in-depth) — refuse to exec the delegate
+# Re-entrancy guard (defense-in-depth) — refuse to exec the delegate
 # at chain depth >= 1. A correctly-configured wrapper never re-enters itself
 # (the non-ping-pong invariant is enforced at install/heal time, before this
 # file is ever written); this only fires if a delegate re-invokes git hooks
@@ -22,7 +22,7 @@ if [ "$PRAXION_HOOK_CHAIN_DEPTH" -ge 1 ]; then
     echo "praxion-hook-wrapper: refusing to exec delegate at chain depth $PRAXION_HOOK_CHAIN_DEPTH (re-entrancy guard)" >&2
     _DELEGATE_STATUS=0
 else
-    # Resolve the delegate against the CURRENT worktree's root (REQ-09) —
+    # Resolve the delegate against the CURRENT worktree's root —
     # never frozen absolute at install time, so a linked worktree runs its
     # own copy of the team's hooks exactly as bare git would.
     _WORKTREE_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"

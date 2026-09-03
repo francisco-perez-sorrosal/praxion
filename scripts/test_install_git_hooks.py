@@ -77,7 +77,7 @@ def plugin_root(tmp_path: Path) -> Path:
     return root
 
 
-# ---- DS-4 classification (Step 1) -------------------------------------------
+# ---- DS-4 classification -------------------------------------------------------
 
 
 class TestObserveHooksPath:
@@ -156,7 +156,7 @@ class TestClassifyHookSlot:
         assert isinstance(hooks.classify_hook_slot(hooks_dir, "pre-commit"), hooks.ForeignOccupied)
 
 
-# ---- Wrapper exit-code policy + re-entrancy (Step 2) ------------------------
+# ---- Wrapper exit-code policy + re-entrancy -------------------------------------
 
 
 class TestWrapperExitPolicy:
@@ -279,7 +279,7 @@ class TestWrapperExitPolicy:
         assert not delegate_marker.exists()
 
     def test_relative_delegate_resolves_against_second_worktree_root(self, repo, plugin_root):
-        """REQ-09: a linked worktree runs its OWN copy of the delegate, not
+        """A linked worktree runs its OWN copy of the delegate, not
         the main checkout's, even though the delegate path is recorded raw
         and relative."""
         (repo / ".husky" / "_").mkdir(parents=True)
@@ -309,7 +309,7 @@ class TestWrapperExitPolicy:
         assert wt_marker.exists()
 
 
-# ---- Five(+one)-branch action table + idempotency + non-ping-pong (Step 3) --
+# ---- Five(+one)-branch action table + idempotency + non-ping-pong --------------
 
 
 class TestInstallOrHeal:
@@ -460,7 +460,7 @@ class TestInstallOrHeal:
         assert not str(hooks.wrapper_dir_path(wt)).startswith(wt_git)
 
 
-# ---- --status / --uninstall / exit-code contract (Step 4) -------------------
+# ---- --status / --uninstall / exit-code contract --------------------------------
 
 
 class TestCLI:
@@ -480,6 +480,38 @@ class TestCLI:
         hooks.install_or_heal(repo, "install", plugin_root)
         result = _run_cli("--status", "--repo-root", str(repo), "--plugin-root", str(plugin_root))
         assert result.returncode == 0
+
+    def test_status_and_install_from_linked_worktree_resolve_common_hooks_dir(
+        self, repo, plugin_root
+    ):
+        """IF-16 canary: `--install`/`--status` from a linked worktree (whose
+        `.git` is a file, not a directory) must resolve the plain-slot hooks
+        directory through the git COMMON dir -- before the fix, `--install`
+        crashed `NotADirectoryError` and `--status` reported every slot
+        absent because both read `repo_root / ".git" / "hooks"` literally."""
+        wt = repo.parent / "wt-if16"
+        _git(repo, "worktree", "add", str(wt), "-b", "wt-if16-branch")
+
+        install_result = _run_cli(
+            "--install", "--repo-root", str(wt), "--plugin-root", str(plugin_root)
+        )
+        assert install_result.returncode == 0, install_result.stderr
+
+        status_result = _run_cli(
+            "--status",
+            "--repo-root",
+            str(wt),
+            "--plugin-root",
+            str(plugin_root),
+            "--json",
+        )
+        assert status_result.returncode == 0, status_result.stdout
+        payload = json.loads(status_result.stdout)
+        assert not payload["cannot_fire"], payload
+        assert all(slot["praxion_can_fire"] for slot in payload["slots"])
+        # And the slots landed in the COMMON dir's hooks/, not the worktree's own .git file.
+        common_dir = hooks.git_common_dir(wt)
+        assert (common_dir / "hooks" / "pre-commit").is_file()
 
     def test_status_actionable_when_a_slot_cannot_fire(self, repo, plugin_root):
         result = _run_cli("--status", "--repo-root", str(repo), "--plugin-root", str(plugin_root))

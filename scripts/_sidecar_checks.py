@@ -12,12 +12,6 @@ to the CLI wiring layer that builds a `CheckInputs`. This is asserted
 directly: the test suite makes `subprocess.run` and the `os.stat` family
 raise inside a call and confirms nothing breaks.
 
-**The `hooks-chained` payload gap** (see `LEARNINGS.md` for the full
-writeup): `install_git_hooks.build_status()` (P0, unchanged, re-read here
-per D2's "one repairer, two readers" split) cannot tell "no team hook to
-chain" (PASS) apart from "a `.pre-praxion` backup exists but the chain call
-is missing" (WARN) -- `delegate is None` fits both. This row therefore
-reports only what the payload can prove: no observed chaining defect.
 """
 
 from __future__ import annotations
@@ -26,6 +20,7 @@ import dataclasses
 from collections.abc import Mapping, Sequence
 from enum import Enum
 
+import _sidecar_commit
 import _sidecar_mount
 import _state_repo
 
@@ -37,6 +32,7 @@ _SIDECAR_REPO_FIX = "praxion-sidecar commit"
 _REMOTE_POLICY_FIX = "praxion-sidecar remote --clear, or re-set"
 _MOUNT_ORPHANED_FIX = "praxion-sidecar link --prune"
 _MERGE_BACK_FIX_TEMPLATE = "praxion-sidecar merge-back --from {branch}"
+_COMMIT_LOCK_WAIT_FIX = "re-run: praxion-sidecar doctor"
 
 # `sidecar-repo`'s WARN threshold (INTERFACE_DESIGN.md sec. 7.3): named so
 # the number "50 unpushed" appears exactly once.
@@ -157,8 +153,8 @@ class CheckInputs:
     mount_mid_merge: bool
     sidecar_repo: SidecarRepoState | None
     remote: RemoteState | None
-    guards_unreadable_by: tuple[str, ...]
     guards_roots_stale: bool
+    lock_state: _sidecar_commit.SidecarCommit | None
 
 
 def evaluate_checks(inputs: CheckInputs) -> list[CheckResult]:
@@ -292,11 +288,21 @@ def _rows_hooks_path(inputs: CheckInputs) -> list[CheckResult]:
 
 
 def _rows_hooks_chained(inputs: CheckInputs) -> list[CheckResult]:
-    # See the module docstring's "hooks-chained payload gap" -- the payload
-    # cannot yet distinguish WARN/FAIL from PASS, so this reports only what
-    # it can prove: no observed chaining defect.
-    del inputs
-    return [_row("hooks-chained", Verdict.PASS, "no chaining defect observed")]
+    """FAIL naming any wrapper slot whose Praxion chain call is missing from
+    its body (`install_git_hooks.build_status()`'s per-slot `chain_intact`);
+    PASS when every wrapper slot's chain call is present; no row at all when
+    no wrapper file exists to check -- a plain, non-chaining install has
+    nothing composed with it to lose a chain call from."""
+    slots = inputs.hooks_status.get("slots") or []
+    checked = [slot for slot in slots if "chain_intact" in slot]
+    if not checked:
+        return []
+    broken = [slot["name"] for slot in checked if not slot["chain_intact"]]
+    if broken:
+        detail = f"chain call missing from: {', '.join(broken)}"
+        why = "the wrapper body was hand-edited, or a stale wrapper predates a template change"
+        return [_row("hooks-chained", Verdict.FAIL, detail, why=why, fix=_HOOKS_PATH_FIX)]
+    return [_row("hooks-chained", Verdict.PASS, "chain call intact in every wrapper slot")]
 
 
 def _rows_sidecar_repo(inputs: CheckInputs) -> list[CheckResult]:
@@ -386,23 +392,38 @@ def _rows_remote_policy(inputs: CheckInputs) -> list[CheckResult]:
     return [_row("remote-policy", Verdict.PASS, f"remote configured ({remote.url})")]
 
 
-def _rows_guards(inputs: CheckInputs) -> list[CheckResult]:
-    if inputs.guards_unreadable_by:
-        readers = ", ".join(inputs.guards_unreadable_by)
-        detail = f"the manifest is unreadable by: {readers}"
-        why = "the manifest is missing, malformed, or the sidecar root moved"
-        return [_row("guards", Verdict.FAIL, detail, why=why, fix=_LINK_FIX)]
+def _rows_manifest_roots(inputs: CheckInputs) -> list[CheckResult]:
+    """The manifest's `project.roots` (DS-7 identity anchor) names this
+    checkout -- WARN when it does not, since the checkout was moved or the
+    manifest predates it (`link` re-derives and re-writes `roots`)."""
     if inputs.guards_roots_stale:
-        detail = "the manifest is readable but its recorded roots are stale"
-        return [_row("guards", Verdict.WARN, detail, fix=_LINK_FIX)]
-    detail = "worktree_guard and the dashboard resolve the sidecar root"
-    return [_row("guards", Verdict.PASS, detail)]
+        detail = "roots: this checkout is not among the manifest's recorded roots"
+        return [_row("manifest-roots", Verdict.WARN, detail, fix=_LINK_FIX)]
+    return [
+        _row("manifest-roots", Verdict.PASS, "roots: this checkout is recorded in the manifest")
+    ]
+
+
+def _rows_commit_lock(inputs: CheckInputs) -> list[CheckResult]:
+    """The per-mount commit lock (`_sidecar_commit.read_lock_state`, DS-9) --
+    WARN on a held or abandoned lock, no row on `Idle` (nothing to report)."""
+    state = inputs.lock_state
+    if state is None or isinstance(state, _sidecar_commit.Idle):
+        return []
+    if isinstance(state, _sidecar_commit.Committing):
+        detail = f"commit lock held by pid {state.holder_pid} since {state.since}"
+        why = "a commit is in progress -- normal under contention, expected to clear quickly"
+        return [_row("commit-lock", Verdict.WARN, detail, why=why, fix=_COMMIT_LOCK_WAIT_FIX)]
+    detail = f"commit lock abandoned by pid {state.holder_pid} since {state.since}"
+    why = "the holder died before releasing -- the next committer overwrites the stale record"
+    return [_row("commit-lock", Verdict.WARN, detail, why=why, fix=_SIDECAR_REPO_FIX)]
 
 
 # The pinned row order: exclude-block, shadow:<path>*, shared:<path>*,
 # hooks-path, hooks-chained, sidecar-repo, then the four DS-11 convergence
-# rows, then remote-policy, guards. Split into three lists only for the
-# `InRepo` gate in `evaluate_checks` -- `_HOOK_ROW_FUNCS` runs under both.
+# rows, then remote-policy, manifest-roots, commit-lock. Split into three
+# lists only for the `InRepo` gate in `evaluate_checks` -- `_HOOK_ROW_FUNCS`
+# runs under both.
 _SIDECAR_HEAD_ROW_FUNCS = [_rows_exclude_block, _rows_shadow_slots, _rows_shared_slots]
 _HOOK_ROW_FUNCS = [_rows_hooks_path, _rows_hooks_chained]
 _SIDECAR_TAIL_ROW_FUNCS = [
@@ -412,7 +433,8 @@ _SIDECAR_TAIL_ROW_FUNCS = [
     _rows_mount_orphaned,
     _rows_mount_conflict,
     _rows_remote_policy,
-    _rows_guards,
+    _rows_manifest_roots,
+    _rows_commit_lock,
 ]
 
 

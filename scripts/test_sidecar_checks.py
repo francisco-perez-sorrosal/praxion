@@ -48,6 +48,7 @@ import subprocess
 from pathlib import Path
 
 import _sidecar_checks
+import _sidecar_commit
 import _sidecar_mount
 import _state_repo
 import install_git_hooks
@@ -163,8 +164,8 @@ def _healthy_sidecar_owned_inputs(hooks_status: dict) -> _sidecar_checks.CheckIn
             is_git_repo=True, dirty_files=0, unpushed_commits=0
         ),
         remote=None,
-        guards_unreadable_by=(),
         guards_roots_stale=False,
+        lock_state=None,
     )
 
 
@@ -318,34 +319,61 @@ def test_hooks_path_unresolvable_hookspath_is_fail(hooks_repo: Path) -> None:
     assert row.fix == "scripts/upgrade_project_pins.sh"
 
 
-def test_hooks_chained_with_no_preexisting_team_hook_is_pass(healthy_inputs) -> None:
-    """Nothing to chain -- trivially satisfied, the `healthy_inputs` baseline
-    (a freshly-installed repo with no prior pre-commit hook)."""
-    row = _result(_sidecar_checks.evaluate_checks(healthy_inputs), "hooks-chained")
+def test_hooks_chained_absent_when_no_wrapper_installed(healthy_inputs) -> None:
+    """Nothing to chain, nothing to check -- the `healthy_inputs` baseline (a
+    freshly-installed repo with no prior pre-commit hook) writes plain,
+    non-chaining slots, so there is no wrapper body a chain call could go
+    missing from and the row is skipped entirely."""
+    results = _sidecar_checks.evaluate_checks(healthy_inputs)
 
-    assert row.verdict == _sidecar_checks.Verdict.PASS
+    assert "hooks-chained" not in {r.id for r in results}
 
 
-def test_hooks_chained_with_an_adopted_team_hook_is_pass(
-    hooks_repo: Path, hooks_plugin_root: Path
-) -> None:
-    """A pre-existing team `core.hooksPath` gets adopted into Praxion's own
+def _adopted_foreign_hooks_status(hooks_repo: Path, hooks_plugin_root: Path) -> dict:
+    """A pre-existing team `core.hooksPath` adopted into Praxion's own
     wrapper directory, with the original recorded as `delegate` -- the
-    genuine chaining case, distinct from "nothing to chain". (A stray
-    `.git/hooks/pre-commit` file alone hits the per-slot `ForeignOccupied`
-    path, which `build_status()` never surfaces a `delegate` for -- only a
-    `core.hooksPath` redirection does.)"""
+    genuine chaining case, whose wrapper files carry a real chain call to
+    check (distinct from "nothing to chain")."""
     team_hooks_dir = hooks_repo / "team-hooks"
     team_hooks_dir.mkdir()
     _write_and_chmod(team_hooks_dir / "pre-commit", "#!/usr/bin/env bash\nexit 0\n")
     _git(hooks_repo, "config", "core.hooksPath", str(team_hooks_dir))
     status = _healthy_hooks_status(hooks_repo, hooks_plugin_root)
     assert status["delegate"] is not None, "fixture must produce a real chained delegate"
+    return status
+
+
+def test_hooks_chained_with_an_adopted_team_hook_is_pass(
+    hooks_repo: Path, hooks_plugin_root: Path
+) -> None:
+    status = _adopted_foreign_hooks_status(hooks_repo, hooks_plugin_root)
     inputs = _healthy_sidecar_owned_inputs(status)
 
     row = _result(_sidecar_checks.evaluate_checks(inputs), "hooks-chained")
 
     assert row.verdict == _sidecar_checks.Verdict.PASS
+
+
+def test_hooks_chained_missing_chain_call_is_fail_naming_the_slot(
+    hooks_repo: Path, hooks_plugin_root: Path
+) -> None:
+    """Canary: strip the chain call out of one installed wrapper's body and
+    re-read `build_status()` -- `hooks-chained` must FAIL and name the slot."""
+    _adopted_foreign_hooks_status(hooks_repo, hooks_plugin_root)
+    common_dir = Path(
+        _git(hooks_repo, "rev-parse", "--path-format=absolute", "--git-common-dir").stdout.strip()
+    )
+    wrapper_path = common_dir / "praxion-hooks" / "pre-commit"
+    body = wrapper_path.read_text(encoding="utf-8")
+    corrupted = body.replace("praxion-precommit-hook.sh.tmpl", "")
+    wrapper_path.write_text(corrupted, encoding="utf-8")
+    status = install_git_hooks.build_status(hooks_repo, hooks_plugin_root)
+    inputs = _healthy_sidecar_owned_inputs(status)
+
+    row = _result(_sidecar_checks.evaluate_checks(inputs), "hooks-chained")
+
+    assert row.verdict == _sidecar_checks.Verdict.FAIL
+    assert "pre-commit" in row.detail
 
 
 # --- sidecar-repo --------------------------------------------------------------
@@ -574,36 +602,68 @@ def test_remote_policy_push_on_autocommit_without_upstream_is_warn(healthy_input
     assert row.verdict == _sidecar_checks.Verdict.WARN
 
 
-# --- guards ----------------------------------------------------------------------
+# --- manifest-roots ---------------------------------------------------------
 
 
-def test_guards_readable_and_current_is_pass(healthy_inputs) -> None:
-    row = _result(_sidecar_checks.evaluate_checks(healthy_inputs), "guards")
+def test_manifest_roots_current_is_pass(healthy_inputs) -> None:
+    row = _result(_sidecar_checks.evaluate_checks(healthy_inputs), "manifest-roots")
 
     assert row.verdict == _sidecar_checks.Verdict.PASS
+    assert "roots:" in row.detail
 
 
-def test_guards_manifest_unreadable_by_worktree_guard_is_fail(healthy_inputs) -> None:
-    inputs = dataclasses.replace(healthy_inputs, guards_unreadable_by=("worktree_guard",))
+def test_manifest_roots_stale_is_warn(healthy_inputs) -> None:
+    inputs = dataclasses.replace(healthy_inputs, guards_roots_stale=True)
 
-    row = _result(_sidecar_checks.evaluate_checks(inputs), "guards")
+    row = _result(_sidecar_checks.evaluate_checks(inputs), "manifest-roots")
 
-    assert row.verdict == _sidecar_checks.Verdict.FAIL
+    assert row.verdict == _sidecar_checks.Verdict.WARN
+    assert "roots:" in row.detail
     assert row.fix == "praxion-sidecar link"
 
 
-def test_guards_readable_but_roots_stale_is_warn(healthy_inputs) -> None:
-    inputs = dataclasses.replace(healthy_inputs, guards_roots_stale=True)
+# --- commit-lock -------------------------------------------------------------
 
-    row = _result(_sidecar_checks.evaluate_checks(inputs), "guards")
+
+def test_commit_lock_idle_emits_no_row(healthy_inputs) -> None:
+    results = _sidecar_checks.evaluate_checks(healthy_inputs)
+
+    assert "commit-lock" not in {r.id for r in results}
+
+
+def test_commit_lock_held_is_warn(healthy_inputs) -> None:
+    inputs = dataclasses.replace(
+        healthy_inputs,
+        lock_state=_sidecar_commit.Committing(holder_pid=4242, since="2026-09-02T10:00:00Z"),
+    )
+
+    row = _result(_sidecar_checks.evaluate_checks(inputs), "commit-lock")
 
     assert row.verdict == _sidecar_checks.Verdict.WARN
+    assert "4242" in row.detail
+
+
+def test_commit_lock_stale_is_warn(healthy_inputs) -> None:
+    """Canary: a planted stale lock record surfaces as a `commit-lock` WARN."""
+    inputs = dataclasses.replace(
+        healthy_inputs,
+        lock_state=_sidecar_commit.StaleLock(holder_pid=4242, since="2026-09-02T10:00:00Z"),
+    )
+
+    row = _result(_sidecar_checks.evaluate_checks(inputs), "commit-lock")
+
+    assert row.verdict == _sidecar_checks.Verdict.WARN
+    assert "abandoned" in row.detail
+    assert row.fix == "praxion-sidecar commit"
 
 
 # --- InRepo placement gating ------------------------------------------------
 
 
-def test_in_repo_placement_emits_only_the_two_hook_rows(hooks_repo, hooks_plugin_root) -> None:
+def test_in_repo_placement_emits_only_hook_rows(hooks_repo, hooks_plugin_root) -> None:
+    """Plain install: only `hooks-path` fires -- no wrapper exists, so
+    `hooks-chained` is correctly absent (see
+    `test_hooks_chained_absent_when_no_wrapper_installed`)."""
     status = _healthy_hooks_status(hooks_repo, hooks_plugin_root)
     inputs = _sidecar_checks.CheckInputs(
         placement=_in_repo_placement(),
@@ -618,8 +678,38 @@ def test_in_repo_placement_emits_only_the_two_hook_rows(hooks_repo, hooks_plugin
         mount_mid_merge=False,
         sidecar_repo=None,
         remote=None,
-        guards_unreadable_by=(),
         guards_roots_stale=False,
+        lock_state=None,
+    )
+
+    results = _sidecar_checks.evaluate_checks(inputs)
+
+    assert {r.id for r in results} == {"hooks-path"}
+
+
+def test_in_repo_placement_with_adopted_wrapper_emits_both_hook_rows(
+    hooks_repo, hooks_plugin_root
+) -> None:
+    """An adopted `core.hooksPath` gives `hooks-chained` a wrapper to check
+    even under `InRepo` placement -- the row set is a function of what
+    `hooks_status` carries, not of placement itself (both P0 rows apply
+    under `InRepo`, sec. 7.3)."""
+    status = _adopted_foreign_hooks_status(hooks_repo, hooks_plugin_root)
+    inputs = _sidecar_checks.CheckInputs(
+        placement=_in_repo_placement(),
+        exclude_block=None,
+        shadow_slots={},
+        shared_slots={},
+        untouched_paths={},
+        hooks_status=status,
+        mount=_sidecar_mount.Absent(),
+        branches={},
+        orphaned_mounts=(),
+        mount_mid_merge=False,
+        sidecar_repo=None,
+        remote=None,
+        guards_roots_stale=False,
+        lock_state=None,
     )
 
     results = _sidecar_checks.evaluate_checks(inputs)

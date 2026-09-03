@@ -16,54 +16,28 @@ Behavior contract:
   the commit call's own exit code is ignored.
 - **Opt-out**: ``PRAXION_DISABLE_SIDECAR_AUTOCOMMIT=1`` disables the hook
   entirely (mirrors the ``PRAXION_DISABLE_*`` convention).
-- **CLI resolution mirrors ``inject_sidecar_banner.py``/``heal_hook_chain.py``**:
-  ``CLAUDE_PLUGIN_ROOT`` env var, else this hook's own plugin root, then
-  ``<plugin_root>/scripts/praxion-sidecar``. No ``PATH`` fallback.
+- **CLI resolution + invocation**: shared with ``inject_sidecar_banner.py``
+  via ``_sidecar_hook_common`` -- ``CLAUDE_PLUGIN_ROOT`` env var, else this
+  hook's own plugin root, then ``<plugin_root>/scripts/praxion-sidecar``, run
+  with this process's own interpreter against the *payload's* cwd (IF-09/
+  IF-17). No ``PATH`` fallback.
 """
 
 from __future__ import annotations
 
 import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 
 from _hook_utils import is_disabled
+from _sidecar_hook_common import resolve_cli, resolve_plugin_root, run_cli
 
 DISABLE_FLAG = "PRAXION_DISABLE_SIDECAR_AUTOCOMMIT"
-CLI_NAME = "praxion-sidecar"
 STATUS_TIMEOUT_SECONDS = 3
 COMMIT_TIMEOUT_SECONDS = 10
 STATE_DIR_NAME = ".ai-state"
 AUTOCOMMIT_POLICY_ON_STOP = "on-finalize-and-stop"
-
-
-def _resolve_plugin_root() -> Path:
-    plugin_root_str = os.environ.get("CLAUDE_PLUGIN_ROOT", "")
-    if plugin_root_str:
-        return Path(plugin_root_str)
-    return Path(__file__).resolve().parent.parent
-
-
-def _resolve_cli(plugin_root: Path) -> Path | None:
-    cli_path = plugin_root / "scripts" / CLI_NAME
-    return cli_path if cli_path.is_file() else None
-
-
-def _run_cli(
-    cli_path: Path, args: list[str], *, timeout: float
-) -> subprocess.CompletedProcess | None:
-    """Run the sidecar CLI; None on timeout or launch failure (fail-open)."""
-    try:
-        return subprocess.run(
-            [str(cli_path), *args],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-    except (subprocess.TimeoutExpired, OSError):
-        return None
 
 
 def _is_symlinked_state_dir(cwd: Path) -> bool:
@@ -91,11 +65,11 @@ def main() -> None:
     if not _is_symlinked_state_dir(cwd):
         return  # fast-exit: not a candidate for sidecar autocommit
 
-    cli_path = _resolve_cli(_resolve_plugin_root())
+    cli_path = resolve_cli(resolve_plugin_root(__file__))
     if cli_path is None:
         return  # unresolvable CLI -- silent, not an error
 
-    status_result = _run_cli(cli_path, ["status", "--json"], timeout=STATUS_TIMEOUT_SECONDS)
+    status_result = run_cli(cli_path, ["status", "--json"], cwd=cwd, timeout=STATUS_TIMEOUT_SECONDS)
     if status_result is None or status_result.returncode != 0:
         return
     try:
@@ -104,6 +78,8 @@ def main() -> None:
         return
     if not isinstance(status, dict):
         return
+    if status.get("placement") != "sidecar":
+        return  # a re-derived status disagreeing with the fast-exit gate above
 
     sidecar = status.get("sidecar") or {}
     dirty_files = sidecar.get("dirty_files", 0)
@@ -113,7 +89,7 @@ def main() -> None:
 
     # Fire-and-forget: a commit refusal or failure must never fail the
     # session -- the exit code is deliberately unread beyond this call.
-    _run_cli(cli_path, ["commit", "--quiet"], timeout=COMMIT_TIMEOUT_SECONDS)
+    run_cli(cli_path, ["commit", "--quiet"], cwd=cwd, timeout=COMMIT_TIMEOUT_SECONDS)
 
 
 if __name__ == "__main__":

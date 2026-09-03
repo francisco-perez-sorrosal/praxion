@@ -1,6 +1,6 @@
 # Praxion Onboarding — CLAUDE.md Canonical Blocks
 
-The 7 canonical `CLAUDE.md` block bodies installed by `skills/onboard-project/SKILL.md` and its phase files. Source of truth for `scripts/sync_canonical_blocks.py`.
+The 8 canonical `CLAUDE.md` block bodies installed by `skills/onboard-project/SKILL.md` and its phase files. Source of truth for `scripts/sync_canonical_blocks.py`.
 
 ## §Agent Pipeline Block
 
@@ -297,3 +297,28 @@ See `docs/obsidian-integration.md` for installation, configuration, troubleshoot
 ```
 
 This block is installed into the user project's `CLAUDE.md` by Phase 8d sub-step 8d.5. It is guarded by `grep -q '^## Obsidian Integration$' CLAUDE.md`. The fence is kept byte-identical to `claude/canonical-blocks/obsidian-integration.md` by `scripts/sync_canonical_blocks.py`.
+
+## §Sidecar Placement Block
+
+<!-- canonical-source: claude/canonical-blocks/sidecar-placement.md — edit the canonical file, then run: python3 scripts/sync_canonical_blocks.py --write -->
+
+```markdown
+## Praxion Sidecar Placement
+
+This project onboarded with `--placement sidecar`: Praxion's project intelligence lives
+**outside** this repository, in a separate git-tracked sidecar repository at
+`~/.praxion/sidecars/<sidecar-id>`. The state mount at `<project>/.praxion` is a real
+`git worktree` of that sidecar; `.ai-state/`, this file, and `.claude/settings.local.json`
+are symlinks into it, excluded via `.git/info/exclude` — **your commits in this repository
+never include Praxion state**, and a `git add` through one of these symlinks fails loudly
+rather than silently leaking one in.
+
+`docs/architecture.md`, when shared, cites ADRs by **id text** (e.g. `dec-NNN`), never by
+an `.ai-state/` path — a path reference would dangle for anyone without sidecar access.
+
+Run `praxion-sidecar doctor` to confirm the mount and shadow projection are intact (mount
+present, shadows linked, no state branches awaiting merge-back). See
+`docs/onboarding.md#placement` for the full placement model.
+```
+
+This block is a **conditional, placeholder-filled** block (like Hackathon Mode and Project Essentials, never a `REFRESHABLE_SLUGS` member) — installed into the shadowed `CLAUDE.local.md` (DS-8 `untouched`/`shadow` cases) or a shared `CLAUDE.md` (DS-8 `share` case) by §Phase 6, only under `--placement sidecar`, with `<sidecar-id>` filled from the manifest's `project.id`. It is guarded by `grep -q '^## Praxion Sidecar Placement$'` against whichever file §Phase 6's placement lookup resolved. The fence is kept byte-identical to `claude/canonical-blocks/sidecar-placement.md` by `scripts/sync_canonical_blocks.py`; the `<sidecar-id>` placeholder is intentional and must survive the sync.

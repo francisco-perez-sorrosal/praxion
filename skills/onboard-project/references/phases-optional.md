@@ -2,6 +2,23 @@
 
 Opt-in phase bodies for `skills/onboard-project/SKILL.md` — phases 8, 8b, 8c, 8d, 8e. See [../SKILL.md](../SKILL.md) for §Pre-flight, §Flow, §Phase Gates, and §Idempotency Predicates.
 
+## §Capability × placement
+
+Placement (`--placement in-repo|sidecar`) is *nearly* orthogonal to the G3 capability Profile below, but not entirely — several capabilities write **tracked** files, which is precisely the footprint sidecar placement exists to avoid. Each capability falls into exactly one of four classes under sidecar placement:
+
+| Capability | Class under `sidecar` | Reason |
+|---|---|---|
+| `core` | **local** | every surface this phase file's siblings write redirects — `.gitignore` → `.git/info/exclude`, `.ai-state/` → shadow, `.gitattributes` + merge driver → the sidecar's own, `CLAUDE.md` blocks → per DS-8 (§Phase 6) |
+| `observability` | **local** | a `.claude/settings.json` env toggle; redirects to the shadowed `settings.local.json` |
+| `arch` | **local (with one share default)** | `.ai-state/DESIGN.md` is private in the sidecar; `docs/architecture.md` defaults to `share` — a plain doc the team benefits from, citing ADRs by id text and never by an `.ai-state/` path — with `--shadow docs/architecture.md` opting out |
+| `ml` | **local** | `.ai-state/experiments/` and `gpu_budget.yaml` follow the shadow; the checkpoint `.gitignore` block goes to `.git/info/exclude`; `program.md` becomes a shadow |
+| `aac` (§Phase 8b) | **local, shadowed** | `architecture/` and `fitness/` shadow into the sidecar; the Block D gate installs into the local hook chain only; the `.github/workflows/architecture.yml` sub-surface is **dropped** (GitHub-visible by construction, no invisible variant) |
+| `quality` (§Phase 8e) | **share-gated** | `.editorconfig`, ruff/mypy `pyproject.toml` blocks, Biome/ESLint configs, `.pre-commit-config.yaml`, `CONTRIBUTING.md`, `.github/dependabot.yml` are all tracked — ordinary project hygiene, not Praxion branding. Offered, never silently: the operator sees the exact file list and confirms, or declines and proposes the same files to the team as a normal PR |
+| `obsidian` (§Phase 8d) | **share-gated** | `.obsidian/app.json` link-safety keys are tracked. Same treatment as `quality` — named, confirmed, or declined. The `.gitignore` block redirects and the `CLAUDE.md` / settings blocks follow placement |
+| `ci` (§Phase 8e) | **unavailable** | `.github/workflows/*`, `.github/labels.yml`, and two `gh secret set` calls are GitHub-visible by construction — there is no invisible variant. Refused at the Profile gate with a one-line reason naming the local hook chain as the closest equivalent |
+
+**Invariant — no silent tracked write under sidecar placement.** No capability writes a tracked file without either the `share` intent recorded in the manifest or an explicit per-capability confirmation naming the files. A sidecar onboarding run that declines every share-gated capability leaves `git status --porcelain` empty.
+
 ## §Phase 8 — Architecture Baseline (opt-in, default-yes)
 
 **Templates.** The architect doc uses `skills/software-planning/assets/ARCHITECTURE_TEMPLATE.md` (architect-facing design target — full section ownership tags). The developer doc uses `skills/doc-management/assets/ARCHITECTURE_GUIDE_TEMPLATE.md` (filtered to Built components only — every name and path code-verified). The agent's full standing contract is in `agents/systems-architect.md`; this phase invokes a *baseline-audit subset* of that contract, with the directives below as the diff.

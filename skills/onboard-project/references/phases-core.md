@@ -75,6 +75,22 @@ tmp/
 
 If the user agrees, remove that line. If they decline, proceed without changing it but note the choice in the Phase 8 summary.
 
+**Sidecar placement.** Under `--placement sidecar`, this phase's target shifts from the tracked `.gitignore` to the per-clone `.git/info/exclude` — `.gitignore` stays **untouched** (a per-clone file is never teammate-visible, which is exactly what sidecar placement exists to avoid leaking through a tracked one). The block heads with `/.praxion/` (the state mount, DS-10), followed by the shadow paths:
+
+```gitignore
+# >>> praxion:sidecar >>>  (managed by praxion-sidecar; edit outside these markers)
+/.praxion/
+/.ai-state
+/CLAUDE.local.md
+/.claude/settings.local.json
+/.ai-work/
+/.claude/worktrees/
+/tmp/
+# <<< praxion:sidecar <<<
+```
+
+`praxion-sidecar init`/`link` writes this block — one Praxion block per file, regenerated wholesale from the manifest, never hand-edited — in the git *common* directory, so every linked worktree inherits it. This phase itself never touches `.git/info/exclude` directly under sidecar placement.
+
 ## §Phase 2 — `.ai-state/` skeleton
 
 **Canonical schemas.** TECH_DEBT_LEDGER schema (14 row fields + structural `dedup_key`), producer/consumer contracts, and dedup semantics: [`skills/software-planning/references/tech-debt-ledger.md`](../skills/software-planning/references/tech-debt-ledger.md) (summary + pointer in `rules/swe/agent-intermediate-documents.md` § `TECH_DEBT_LEDGER.md`). DECISIONS_INDEX format and calibration_log format: `rules/swe/agent-intermediate-documents.md`. The skeletons below are header-only seeds — agents populate rows over time per the canonical contracts. ADR fragment naming and lifecycle live in `rules/swe/adr-conventions.md`. The three `CONSULT_*.md` skeletons are the one exception to *brief*: the convening instructions cite `<file> § Column Definitions` as the schema, so each file **is** its own schema anchor and must ship with that section complete rather than pointing elsewhere.
@@ -240,6 +256,8 @@ If the user agrees, remove that line. If they decline, proceed without changing 
 
 Do NOT create `.ai-state/observations.jsonl` — that is written on first use by the observability hook. Pre-creating it confuses the semantic merge driver.
 
+**Sidecar placement.** Under `--placement sidecar`, the skeleton above is created in the **sidecar mount** (`<project>/.praxion`, DS-10 — the sidecar's own working tree materialised inside the checkout) rather than directly in the project. Every subdirectory this phase creates additionally seeds a `.gitkeep` (or keeps a real file already present) so a fresh `git worktree` materialises it: `git worktree add` only materialises **tracked** content and git does not track empty directories, so an unseeded subdirectory silently vanishes from a newly mounted worktree. `praxion-sidecar link` then symlinks the mounted skeleton back into the checkout (`.ai-state -> .praxion/.ai-state`) — the same mount-then-link sequence §Phase 6 relies on for `CLAUDE.local.md`.
+
 ## §Phase 3 — `.gitattributes` + merge driver registration
 
 **Why this phase exists.** Line-based merge corrupts structured data. `.ai-state/observations.jsonl` (event log) is a merge-conflict target when concurrent edits land — the semantic merge driver reconciles it at the JSONL level instead. The full `.ai-state/` safety contract at PR time, including merge policy and the squash-merge ban for `.ai-state/`-touching branches, lives in `rules/swe/vcs/pr-conventions.md`.
@@ -264,6 +282,8 @@ Do NOT create `.ai-state/observations.jsonl` — that is written on first use by
 
 3. **Conflict check.** If `git config --get merge.observations-jsonl.driver` already returns a value that does NOT contain `praxion` and is NOT empty, refuse to overwrite. Print: `merge.observations-jsonl.driver is already set to '<value>' — refusing to overwrite. Remove the existing driver manually if you want Praxion's, or leave as-is.`
 
+**Sidecar placement.** Under `--placement sidecar`, step 2's `git config` target is the **sidecar's own repository**, never the project's — `praxion-sidecar init` runs the registration against the sidecar's common directory, so the driver is set exactly once and every mounted worktree inherits it via that shared common directory (mirroring how the DS-5 `.git/info/exclude` block is written once and inherited the same way). `.gitattributes` itself is written inside the sidecar's tracked tree, alongside its own `.ai-state/`.
+
 ## §Phase 4 — Git hooks
 
 **Why these hooks.** The pre-commit hook enforces id-citation discipline — committed code must not reference ephemeral pipeline ids (`REQ-NN`, `AC-NN`, `Step N`, draft ADR hashes). Rationale, exempt paths, and escape hatch live in `rules/swe/id-citation-discipline.md`.
@@ -281,7 +301,7 @@ python3 "${PLUGIN_INSTALL_PATH}/scripts/install_git_hooks.py" \
   --install --repo-root "$REPO_ROOT" --plugin-root "${PLUGIN_INSTALL_PATH}"
 ```
 
-It *observes* the repository's hook configuration before writing anything, so it composes with a husky/lefthook-style `core.hooksPath` and an occupied `.git/hooks/pre-commit` (pre-commit-framework repos) instead of silently no-op'ing or displacing what is already there — see `docs/onboarding.md`'s hook-chaining section for the full behavior and `dec-draft-c66a19a6` for the design rationale. Concretely, per repository state:
+It *observes* the repository's hook configuration before writing anything, so it composes with a husky/lefthook-style `core.hooksPath` and an occupied `.git/hooks/pre-commit` (pre-commit-framework repos) instead of silently no-op'ing or displacing what is already there — see `docs/onboarding.md`'s hook-chaining section for the full behavior. **Design rationale, inline:** observe the existing configuration first, then compose rather than replace — a chaining wrapper lives inside the repository's **git common directory** (never a linked worktree's own `.git`), the pre-existing hook it wraps is recorded as a delegate and always runs, and the SessionStart self-heal channel re-asserts the wrapper idempotently, so neither install nor heal ever silently displaces a framework the project already depends on. Concretely, per repository state:
 
 - `core.hooksPath` unset and a slot empty → today's plain symlink (`post-*`) or the tailored inline pre-commit script, byte-identical to what this skill previously wrote directly.
 - `core.hooksPath` unset and a slot occupied by a non-Praxion hook → the occupant is preserved at `<name>.pre-praxion` (never overwriting an existing backup) and a **chaining wrapper** is installed in its place: the preserved hook runs first, Praxion's own step runs after (pre-commit) or is reported non-blocking (post-*).
@@ -363,7 +383,7 @@ jq '.permissions.allow = ((.permissions.allow // []) + ["Write(.ai-work/**)"] | 
 
 Print: `5b: permissions.allow baseline written to .claude/settings.json`.
 
-**Canonical value, hoisted for `new` mode (td-130, dec-draft-57d9129b).** This sub-step's baseline value (`["Write(.ai-work/**)"]`) is canonical here — every other site that seeds or checks it points at this section rather than restating it. In `new` mode this sub-step also runs before Phase 0s (SKILL.md's §Mode × Phase Matrix `5b′` row), so the seed pipeline's subagents are covered from their first spawn, which the bash layer cannot reach directly; `scripts/onboard-project::scaffold_project` seeds the same value at scaffold time so the window between scaffold and Phase 5b's own run is never uncovered. When Phase 5 runs afterward, the predicate above finds nothing missing and skips as a no-op.
+**Canonical value, hoisted for `new` mode (td-130).** This sub-step's baseline value (`["Write(.ai-work/**)"]`) is canonical here — every other site that seeds or checks it points at this section rather than restating it. In `new` mode this sub-step also runs before Phase 0s (SKILL.md's §Mode × Phase Matrix `5b′` row), so the seed pipeline's subagents are covered from their first spawn, which the bash layer cannot reach directly; `scripts/onboard-project::scaffold_project` seeds the same value at scaffold time so the window between scaffold and Phase 5b's own run is never uncovered. When Phase 5 runs afterward, the predicate above finds nothing missing and skips as a no-op.
 
 ### Optional: Rule Blacklist Configuration
 
@@ -453,6 +473,16 @@ See [`docs/rules-taxonomy.md`](../docs/rules-taxonomy.md) for the complete refer
   - `## Hackathon Mode` — written by §Phase 5b; predicate: `grep -q '^## Hackathon Mode$' CLAUDE.md`.
   - `## Working in this project` (Project Essentials) — written by this phase; predicate: `grep -q '^## Working in this project$' CLAUDE.md`.
   - `## Obsidian Integration` — written by §Phase 8d; predicate: `grep -q '^## Obsidian Integration$' CLAUDE.md`. This phase reads (never writes) that same predicate purely to decide whether to mention the block as already present in its own summary line — it is not a second write path.
+
+**Sidecar placement (DS-8).** DS-8's three-case table decides, per project and once at `init`, where the Praxion block *writers* above actually target. When the project's own `CLAUDE.md` is `untouched` — a tracked file the team already owns — Praxion never writes to it; the block set goes to the shadowed `CLAUDE.local.md` instead, which loads last regardless of case:
+
+| Case | When | Praxion block target | `CLAUDE.md` on disk |
+|---|---|---|---|
+| `untouched` | project has a tracked `CLAUDE.md` | `CLAUDE.local.md` (shadowed) | untouched, tracked |
+| `shadow` (default) | no `CLAUDE.md` exists | `CLAUDE.md` (shadowed, symlinked into the sidecar) | excluded, never committed |
+| `share` | no `CLAUDE.md` and `--share CLAUDE.md` was passed | `CLAUDE.md` | real file, tracked, committed |
+
+Every writer above — this phase, §Phase 5b, §Phase 8d, and `/upgrade-project`'s `refresh_claude_blocks.py` call — resolves its target through the same `placement.block_target()` lookup rather than hardcoding `CLAUDE.md`. **Invariant: no write path ever targets a `CLAUDE.md` whose placement is `untouched`.**
 
 **Action.**
 
@@ -555,3 +585,13 @@ Do not recommend tools the user already has, and do not recommend `uv` if no Pyt
    Add `.ai-state/.praxion-onboard.json` to the staged set.
 
 4. **Stage modified files**: run `git add` with the explicit list of files this command touched (built up through phases 1–6, plus `.ai-state/.praxion-onboard.json`). Do NOT run `git add -A`. Do NOT commit. The user reviews staging and decides.
+
+**Sidecar placement.** Under `--placement sidecar`, staging splits across two repositories: step 4's `git add` list touches only **project**-side files — any `share`-intent path (e.g. `docs/architecture.md`); `.git/info/exclude` is per-clone and is never staged at all. Everything shadowed (`.ai-state/`, `CLAUDE.local.md`, `.claude/settings.local.json`) is committed separately, via `praxion-sidecar commit`, against the mount at `<project>/.praxion` — never against this repository's own index. `praxion-sidecar link` (this phase's own reconciler, and the SessionStart self-heal channel) also runs a convergence pass in the main checkout every time it runs, so a worktree's state that was merged by hand — a manual `git merge`, a GitHub squash-and-pull — promotes without a separate step.
+
+Under sidecar placement, step 2's printed change summary gains a `Placement: sidecar — ~/.praxion/sidecars/<id>` header line, and the verification next-steps gain a step before `/sentinel`:
+
+```
+   0. Run 'praxion-sidecar doctor' — confirms the mount and shadow projection are intact.
+```
+
+and step 2's own expectation flips: under sidecar placement `git status` should show **NO Praxion files at all** — an empty `git status --porcelain` here is the point of the placement, not a sign onboarding failed.

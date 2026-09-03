@@ -22,6 +22,11 @@
 #             5 no git, 6 target exists & non-empty, 7 refused (guard),
 #             8 --check only: work is pending.
 #
+# The sidecar-placement gate (scripts/onboard_placement.sh) reuses 2/3
+# verbatim rather than adding new numbers: praxion-sidecar's own exit-code
+# contract (INTERFACE_DESIGN.md D1) already fixes 2=usage/3=refused, and a
+# delegated call's exit code passes straight through unmapped.
+#
 # See docs/onboarding.md for the full flow and troubleshooting matrix.
 
 set -euo pipefail
@@ -36,6 +41,11 @@ readonly EXIT_NO_GIT=5
 readonly EXIT_TARGET_EXISTS=6
 readonly EXIT_REFUSED=7
 readonly EXIT_CHECK_PENDING=8
+# Same numeric value as EXIT_NO_CLAUDE by design (see the header comment
+# above) -- the two never fire in the same run, since check_prereqs's
+# `claude` check and the placement gate's own refusals sit on either side
+# of a delegated call that cannot both succeed and be missing `claude`.
+readonly EXIT_SIDECAR_REFUSED=3
 
 readonly NAME_REGEX='^[A-Za-z0-9][A-Za-z0-9._-]*$'
 readonly PLUGIN_KEY='praxion@bit-agora'
@@ -75,6 +85,17 @@ PROFILE="standard"
 CAPABILITIES_WITH=""
 CAPABILITIES_WITHOUT=""
 CAPABILITIES=""
+PLACEMENT="in-repo"
+PLACEMENT_SET=0
+SHADOW_PATHS=()
+SHARE_PATHS=()
+
+# DS-1's placement x mode gate, the confirmation-block renderer, and
+# delegation to `praxion-sidecar init` -- split out once this surface grew
+# past onboard-project's own per-step size target (see WIP.md Batch 15
+# implementer self-review). Sourced for its functions only; every global it
+# reads is declared above.
+source "$(dirname "$0")/onboard_placement.sh"
 
 # Legacy opt-out env vars (deprecated; --hackathon / --without are current).
 if [ "${PRAXION_NEW_PROJECT_HACKATHON:-}" = "1" ]; then
@@ -142,6 +163,16 @@ CAPABILITIES
   aac            Architecture-as-Code tier (fitness/, fences, workflow, diagrams)
   ml             ML/AI training conventions (auto-enabled when ML signals are detected)
   obsidian       Obsidian vault integration (auto-enabled when Obsidian is available)
+
+PLACEMENT
+  --placement <in-repo|sidecar>   Where durable Praxion state lives (default: in-repo).
+                                   sidecar is legal only when the resolved mode is
+                                   existing; prints a confirmation block, then
+                                   delegates to `praxion-sidecar init`.
+  --shadow <relpath>               Keep this path out of the project repo. Repeatable.
+                                    Requires --placement sidecar.
+  --share  <relpath>               Keep this path committed in the project repo.
+                                    Repeatable. Requires --placement sidecar.
 
 OPTIONS
   --mode <new|existing|hackathon|promote>   Force a mode (default: auto-detect)
@@ -403,7 +434,8 @@ detect_state() {
     if [ -d "$ai_state" ] && [ -n "$(ls -A "$ai_state" 2>/dev/null)" ]; then
         printf '%s' "$STATE_PARTIALLY_MANAGED"; return
     fi
-    if [ -f "$dir/CLAUDE.md" ] && grep -q '^## Agent Pipeline$' "$dir/CLAUDE.md"; then
+    if { [ -f "$dir/CLAUDE.md" ] && grep -q '^## Agent Pipeline$' "$dir/CLAUDE.md"; } \
+        || { [ -f "$dir/CLAUDE.local.md" ] && grep -q '^## Agent Pipeline$' "$dir/CLAUDE.local.md"; }; then
         printf '%s' "$STATE_PARTIALLY_MANAGED"; return
     fi
     local effective_hooks_dir
@@ -595,7 +627,8 @@ scaffold_project() {
     git init -q
     mkdir -p .claude
     # Permissions baseline, seeded so the Phase 0s seed pipeline's subagents are
-    # covered before they spawn (td-130, dec-draft-57d9129b). Canonical value:
+    # covered before they spawn (td-130; write access to .ai-work/ granted up
+    # front rather than left for the first subagent to request). Canonical value:
     # skills/onboard-project/references/phases-core.md § Phase 5, sub-step 5b.
     # Kept in agreement by tests/onboard_project_test.sh::t13_scaffold_seeds_permissions_baseline.
     if [ ! -e .claude/settings.json ]; then
@@ -747,6 +780,15 @@ parse_args() {
             --profile)
                 [ $# -ge 2 ] || { printf 'Usage error: --profile requires a value\n' >&2; exit "$EXIT_USAGE"; }
                 PROFILE="$2"; shift 2 ;;
+            --placement)
+                [ $# -ge 2 ] || { printf 'Usage error: --placement requires a value\n' >&2; exit "$EXIT_USAGE"; }
+                PLACEMENT="$2"; PLACEMENT_SET=1; shift 2 ;;
+            --shadow)
+                [ $# -ge 2 ] || { printf 'Usage error: --shadow requires a value\n' >&2; exit "$EXIT_USAGE"; }
+                SHADOW_PATHS+=("$2"); shift 2 ;;
+            --share)
+                [ $# -ge 2 ] || { printf 'Usage error: --share requires a value\n' >&2; exit "$EXIT_USAGE"; }
+                SHARE_PATHS+=("$2"); shift 2 ;;
             --yes|-y)
                 YES_FLAG=1; shift ;;
             --check)
@@ -843,6 +885,12 @@ main() {
 
     mode="$(resolve_mode "$state")"
     CAPABILITIES="$(spaced_to_csv "$(resolve_capabilities)")"
+
+    # Before any detection side effect (scaffold, --check, hand-off): DS-1's
+    # placement x mode gate, the composition rules, and (on a legal
+    # --placement sidecar request) the confirmation block + delegated
+    # `praxion-sidecar init`. A no-op for the in-repo default.
+    resolve_sidecar_placement "$target" "$mode"
 
     print_detection "$target" "$state" "$mode"
 

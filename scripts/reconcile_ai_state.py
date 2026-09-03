@@ -8,13 +8,26 @@ Handles two reconciliation tasks:
 Designed to run AFTER `git merge` to resolve conflicts or validate
 auto-merged results. Can also run standalone to reconcile two copies.
 
+Under the sidecar-placement ruling (`ARCH_WT_RULING.md` § 8) the project
+repository no longer owns `.ai-state/` when it is `SidecarOwned` — the state
+lives in a nested git-worktree mount instead, and the observable divergence
+this script exists to resolve happens *there*, at merge-back, not in the
+project repo. `--target-mount <mount>` runs the ADR/index half of this
+reconciler against that mount (observations.jsonl is already resolved by
+the mount's own `git merge` -- its union merge driver handles that during
+the merge itself, the same division of labor `--post-merge` already uses for
+the project-side case). `--repo-root <project>` (no `--target-mount`) is a
+no-op on a `SidecarOwned` project for the same reason.
+
 Usage:
-    python scripts/reconcile_ai_state.py                  # auto-detect from git merge state
-    python scripts/reconcile_ai_state.py --theirs <path>  # explicit worktree .ai-state/ path
+    python scripts/reconcile_ai_state.py                       # auto-detect from git merge state
+    python scripts/reconcile_ai_state.py --theirs <path>       # explicit worktree .ai-state/ path
+    python scripts/reconcile_ai_state.py --target-mount <path> # reconcile a state mount at merge-back
 
 Exit codes:
     0 — reconciliation succeeded (or nothing to do)
-    1 — reconciliation failed (manual intervention needed)
+    1 — reconciliation failed (manual intervention needed, or --target-mount
+        does not name a real state mount)
 """
 
 from __future__ import annotations
@@ -25,8 +38,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import _sidecar_mount
 from _repo_root import is_plugin_cache_path
 from _repo_root import resolve_repo_root as _resolve_repo_root
+from _state_repo import SidecarOwned, resolve_placement
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
@@ -56,6 +71,28 @@ def apply_repo_root(root: Path) -> None:
     AI_STATE = root / ".ai-state"
     DECISIONS_DIR = AI_STATE / "decisions"
     OBSERVATIONS_PATH = AI_STATE / "observations.jsonl"
+
+
+def resolve_target_mount(path_str: str) -> Path:
+    """Validate `--target-mount` and return the mount path.
+
+    Refuses anything that is not itself `<checkout>/.praxion` for some
+    checkout, currently on a state branch -- a shadow symlink
+    (`<project>/.ai-state`) or an arbitrary directory both fail this even
+    when they resolve into a real mount's content, because the caller
+    (`_sidecar_mount.merge_back`'s post-merge seam) always names the mount
+    itself, never a path that merely reaches through it.
+    """
+    mount = Path(path_str)
+    if mount.name != _sidecar_mount.MOUNT_DIRNAME:
+        raise ValueError(
+            f"--target-mount must name a state mount "
+            f"({_sidecar_mount.MOUNT_DIRNAME} directory); got {mount}"
+        )
+    state = _sidecar_mount.classify_mount(mount.parent, expected_common_dir=None)
+    if not isinstance(state, _sidecar_mount.SidecarWorktree):
+        raise ValueError(f"{mount} is not a state mount: {state!r}")
+    return mount
 
 
 # -- Helpers ------------------------------------------------------------------
@@ -328,7 +365,43 @@ def _check_merge_drivers() -> None:
             )
 
 
+def _run_target_mount(target_mount_arg: str) -> None:
+    """`--target-mount <mount>`: reconcile a state mount at merge-back.
+
+    The mount's own `git merge` (run by `_sidecar_mount.merge_back` before
+    this is called) already resolved `observations.jsonl` through the
+    sidecar's union merge driver -- so this runs the same ADR-renumbering +
+    index-regeneration half `--post-merge` runs for the project-side case,
+    pointed at the mount instead of the project root. It never touches the
+    project repository: every git call below runs with the mount as `cwd`.
+    """
+    try:
+        mount = resolve_target_mount(target_mount_arg)
+    except ValueError as exc:
+        fail(str(exc))
+        sys.exit(1)
+
+    apply_repo_root(mount)
+    print("\n  .ai-state/ reconciliation (state mount)\n")
+    _check_merge_drivers()
+
+    if _reconcile_adr_and_index():
+        print("\n  ✓ Reconciliation complete — review staged changes\n")
+    else:
+        print("\n  ✓ Nothing to reconcile\n")
+
+
 def main() -> None:
+    # --target-mount <path>: reconcile the sidecar's state mount at
+    # merge-back, in place of the project repository (ARCH_WT_RULING.md § 8).
+    if "--target-mount" in sys.argv:
+        idx = sys.argv.index("--target-mount")
+        if idx + 1 < len(sys.argv):
+            _run_target_mount(sys.argv[idx + 1])
+            return
+        fail("--target-mount requires a path argument")
+        sys.exit(1)
+
     # --post-merge: only ADR renumbering + index regen (observations
     # already handled by git merge drivers during the merge itself)
     post_merge_only = "--post-merge" in sys.argv
@@ -348,6 +421,19 @@ def main() -> None:
             "pass --repo-root or run from the consumer worktree"
         )
         sys.exit(1)
+
+    # The project repository does not own .ai-state/ when it is
+    # SidecarOwned -- reconciliation runs at merge-back, against the mount
+    # (see _run_target_mount above), not here.
+    placement = resolve_placement(root)
+    if isinstance(placement, SidecarOwned):
+        print(
+            "\n  ✓ .ai-state/ reconciliation skipped: the project repository "
+            "does not own .ai-state/ (reconciliation runs at merge-back, "
+            "against the state mount)\n"
+        )
+        return
+
     apply_repo_root(root)
 
     print("\n  .ai-state/ reconciliation\n")

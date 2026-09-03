@@ -503,3 +503,218 @@ class TestVerboseFlag:
             "--verbose must emit at least one DEBUG record; "
             f"captured levels: {[r.levelname for r in caplog.records]}"
         )
+
+
+# -- --target-mount: reinstated at merge-back (ARCH_WT_RULING.md § 8) -------
+#
+# Everything below drives *real* `git worktree` / `git merge --squash` via
+# subprocess -- deliberately departing from this file's own
+# monkeypatched-`subprocess.run` convention above, because the behaviour
+# under test is a genuine squash-shaped commit's parent count and tree diff,
+# which a router fake cannot produce. `--target-mount` does not exist yet
+# (concurrent BDD/TDD with the paired implementation work): confirmed
+# empirically before writing these tests that passing it today is an *argparse* error
+# (`unrecognized arguments: --target-mount ...`, exit 2) -- so every test
+# below is RED today for a different, simpler reason than the reconciler's:
+# the flag itself does not parse.
+
+_TM_IDENTITY_ARGS = ("-c", "user.email=test@example.com", "-c", "user.name=Test")
+
+
+def _tm_git(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=False)
+
+
+def _tm_git_ok(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    result = _tm_git(cwd, *args)
+    if result.returncode != 0:
+        raise RuntimeError(f"git {' '.join(args)} in {cwd} failed: {result.stderr}")
+    return result
+
+
+def _tm_configure_identity(repo: Path) -> None:
+    _tm_git_ok(repo, "config", "user.email", "test@example.com")
+    _tm_git_ok(repo, "config", "user.name", "Test")
+
+
+def _tm_commit_all(repo: Path, message: str) -> None:
+    _tm_git_ok(repo, "add", "-A")
+    _tm_git_ok(repo, *_TM_IDENTITY_ARGS, "commit", "-q", "-m", message)
+
+
+def _tm_adr_body(num: int, slug: str) -> str:
+    return (
+        f"---\nid: dec-{num:03d}\ntitle: {slug}\nstatus: accepted\n"
+        "category: architectural\ndate: 2026-01-01\n"
+        f"summary: {slug}\ntags: [test]\nmade_by: agent\n---\n\n## Context\n\nTest.\n"
+    )
+
+
+def _tm_init_sidecar(sidecar_root: Path) -> None:
+    """Seed a sidecar repo with two finalized ADRs, then detach `main` so it
+    is free for the mounts below (mirrors `praxion-sidecar init`'s own
+    sequence, `ARCH_WT_RULING.md` § 5)."""
+    _tm_git_ok(sidecar_root, "init", "-q", "-b", "main")
+    _tm_configure_identity(sidecar_root)
+    decisions = sidecar_root / ".ai-state" / "decisions"
+    decisions.mkdir(parents=True)
+    (decisions / "001-first.md").write_text(_tm_adr_body(1, "first"))
+    (decisions / "002-other.md").write_text(_tm_adr_body(2, "other"))
+    _tm_commit_all(sidecar_root, "seed sidecar state")
+    _tm_git_ok(sidecar_root, "checkout", "-q", "--detach")
+
+
+def _tm_init_project(project_root: Path) -> None:
+    _tm_git_ok(project_root, "init", "-q", "-b", "main")
+    _tm_configure_identity(project_root)
+    (project_root / "app.py").write_text("code\n")
+    _tm_commit_all(project_root, "init")
+
+
+def _tm_mount(sidecar_root: Path, dest: Path, branch: str, *, base: str | None = None) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    args = ["worktree", "add", "-q"]
+    args += [str(dest), branch] if base is None else ["-b", branch, str(dest), base]
+    _tm_git_ok(sidecar_root, *args)
+    _tm_configure_identity(dest)
+    return dest
+
+
+def _tm_safe_cwd(tmp_path: Path) -> Path:
+    """A throwaway, unrelated git repo used only as subprocess `cwd` -- see
+    the module-level note above for why this matters even though this
+    file's `--target-mount` tests fail on an argparse error today rather
+    than a git-root fallback."""
+    anchor = tmp_path / "cwd_anchor"
+    anchor.mkdir()
+    _tm_git_ok(anchor, "init", "-q", "-b", "main")
+    _tm_configure_identity(anchor)
+    return anchor
+
+
+def _tm_write_manifest(
+    sidecar_root: Path, project_root: Path, *, project_id: str = "local--abc123"
+) -> None:
+    manifest_path = sidecar_root / ".git" / "praxion-sidecar.yaml"
+    manifest_path.write_text(
+        "schema: 1\n"
+        "project:\n"
+        "  origin: null\n"
+        f'  id: "{project_id}"\n'
+        f'  roots: ["{project_root.resolve()}"]\n'
+    )
+
+
+def _tm_run(safe_cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(_SCRIPT_PATH), *args],
+        cwd=safe_cwd,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _tm_build_squash_erasure_fixture(tmp_path: Path) -> Path:
+    """`main` mount with two ADRs; `wt/x` adds a third; `main` squash-merges
+    `wt/x` and the squash commit *also* drops one of the original two ADRs
+    -- the exact single-parent-plus-`.ai-state/`-deletion signature this
+    script exists to detect. Returns the main mount path."""
+    sidecar_root = tmp_path / "sidecar"
+    project_root = tmp_path / "project"
+    sidecar_root.mkdir()
+    project_root.mkdir()
+    _tm_init_sidecar(sidecar_root)
+    _tm_init_project(project_root)
+    main_mount = _tm_mount(sidecar_root, project_root / ".praxion", "main")
+    wt_mount = _tm_mount(
+        sidecar_root, project_root / ".claude" / "worktrees" / "x" / ".praxion", "wt/x", base="main"
+    )
+
+    (wt_mount / ".ai-state" / "decisions" / "003-new.md").write_text(_tm_adr_body(3, "new"))
+    _tm_commit_all(wt_mount, "wt: add 003")
+
+    _tm_git_ok(main_mount, "merge", "-q", "--squash", "wt/x")
+    _tm_git_ok(main_mount, "rm", "-q", ".ai-state/decisions/002-other.md")
+    _tm_commit_all(main_mount, "squash wt/x (drops 002)")
+
+    return main_mount
+
+
+def _tm_build_sidecar_owned_fixture(tmp_path: Path) -> tuple[Path, Path]:
+    """A minimal, fully-wired `SidecarOwned` project -- mount, manifest,
+    shadow symlink. Returns `(project_root, main_mount)`."""
+    sidecar_root = tmp_path / "sidecar"
+    project_root = tmp_path / "project"
+    sidecar_root.mkdir()
+    project_root.mkdir()
+    _tm_init_sidecar(sidecar_root)
+    _tm_init_project(project_root)
+    main_mount = _tm_mount(sidecar_root, project_root / ".praxion", "main")
+    _tm_write_manifest(sidecar_root, project_root)
+    (project_root / ".ai-state").symlink_to(
+        Path(".praxion") / ".ai-state", target_is_directory=True
+    )
+    return project_root, main_mount
+
+
+class TestTargetMountSquashErasureDiagnostic:
+    """`check_squash_safety.py --target-mount <mount>` diagnoses a
+    squash-shaped merge that erased a `.ai-state/` entry -- at the mount,
+    where the sidecar's own history now lives (`ARCH_WT_RULING.md` § 8)."""
+
+    def test_reports_the_erased_entry_and_stays_non_blocking(self, tmp_path: Path):
+        main_mount = _tm_build_squash_erasure_fixture(tmp_path)
+        safe_cwd = _tm_safe_cwd(tmp_path)
+
+        result = _tm_run(safe_cwd, "--target-mount", str(main_mount))
+
+        assert result.returncode == 0, result.stderr
+        combined = result.stdout + result.stderr
+        assert "WARNING" in combined.upper()
+        assert "002-other.md" in combined
+
+
+class TestTargetMountRefusesInvalidPaths:
+    """`--target-mount` validates its argument the same way
+    `reconcile_ai_state.py` does -- it must name a real state mount, never a
+    path that merely resolves into (or through) one. The exact wording is
+    an implementation choice; this test pins only the observable contract:
+    refuse loudly (non-zero exit), never diagnose a directory as if it were
+    the mount."""
+
+    def test_refuses_a_directory_that_is_not_a_sidecar_worktree(self, tmp_path: Path):
+        safe_cwd = _tm_safe_cwd(tmp_path)
+        not_a_mount = tmp_path / "plain_dir"
+        not_a_mount.mkdir()
+
+        result = _tm_run(safe_cwd, "--target-mount", str(not_a_mount))
+
+        assert result.returncode != 0
+        combined = (result.stdout + result.stderr).lower()
+        assert "mount" in combined
+
+
+class TestProjectSideSkipsUnderSidecarOwnership:
+    """`check_squash_safety.py --repo-root <project>` (no `--target-mount`)
+    on a `SidecarOwned` project is a no-op: the project repository does not
+    own `.ai-state/` -- the diagnostic runs at merge-back, against the
+    mount, not here (`ARCH_WT_RULING.md` § 8).
+
+    Today there is no such skip: the script inspects the *project's own*
+    single-commit history (unrelated to the mount's), which happens to be
+    harmless here only because a freshly-initialized project has no parent
+    commit to compare against -- `is_single_parent_commit` never finds a
+    signature to report. The corrected-reason message is absent either way,
+    which is what `test_skips_with_the_corrected_reason` pins as RED.
+    """
+
+    def test_skips_with_the_corrected_reason(self, tmp_path: Path):
+        project_root, _main_mount = _tm_build_sidecar_owned_fixture(tmp_path)
+
+        result = _tm_run(_tm_safe_cwd(tmp_path), "--repo-root", str(project_root))
+
+        assert result.returncode == 0, result.stderr
+        combined = (result.stdout + result.stderr).lower()
+        assert "does not own" in combined
+        assert ".ai-state" in combined

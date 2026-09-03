@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import importlib.util
 import json
 import subprocess
@@ -799,3 +800,423 @@ class TestMainObservationsAndAdrChanges:
         # Post-condition: merged file has both entries
         lines = [ln for ln in obs.read_text().strip().splitlines() if ln.strip()]
         assert len(lines) == 2
+
+
+# -- --target-mount: reinstated merge-back reconciliation --------------------
+#
+# `ARCH_WT_RULING.md` § 8 walks back the "shared live tree" no-op: at
+# merge-back, on the sidecar side, against the mount, this reconciler has a
+# real job again. Every fixture below drives *real* `git worktree` / `git
+# merge` -- nothing about git is mocked here, because the behaviour under
+# test is the sidecar's own union merge driver resolving an
+# `observations.jsonl` conflict during `git merge`, which a mocked
+# subprocess cannot exercise (this deliberately departs from the rest of
+# this file's importlib/monkeypatch style -- see `test_sidecar_mount.py` and
+# `test_state_repo.py` for the precedent of driving real git for this class
+# of behaviour).
+#
+# `--target-mount` does not exist yet (concurrent BDD/TDD with the paired
+# implementation work): confirmed empirically before writing these tests
+# that the flag is silently ignored by the current hand-rolled argv parser
+# (no argparse here) -- so every assertion below that depends on `--target-mount`
+# actually routing reconciliation to the mount is RED today. Every
+# invocation below pins its subprocess `cwd` at a throwaway, unrelated git
+# repository (never the mount, never a project, never this checkout) and
+# passes no `--repo-root`, so today's silent-ignore-plus-git-root-from-cwd
+# fallback can only ever resolve to that throwaway repo -- it cannot
+# coincidentally reach the mount under test and cannot fall through to the
+# live Praxion checkout this suite runs from.
+
+_DRIVER_SCRIPT_PATH = Path(__file__).resolve().parent / "merge_driver_observations.py"
+_TM_IDENTITY_ARGS = ("-c", "user.email=test@example.com", "-c", "user.name=Test")
+
+
+def _tm_git(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=False)
+
+
+def _tm_git_ok(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    result = _tm_git(cwd, *args)
+    if result.returncode != 0:
+        raise RuntimeError(f"git {' '.join(args)} in {cwd} failed: {result.stderr}")
+    return result
+
+
+def _tm_configure_identity(repo: Path) -> None:
+    _tm_git_ok(repo, "config", "user.email", "test@example.com")
+    _tm_git_ok(repo, "config", "user.name", "Test")
+
+
+def _tm_commit_all(repo: Path, message: str) -> None:
+    _tm_git_ok(repo, "add", "-A")
+    _tm_git_ok(repo, *_TM_IDENTITY_ARGS, "commit", "-q", "-m", message)
+
+
+def _tm_init_sidecar(sidecar_root: Path) -> None:
+    """Seed a sidecar repo: two observation lines, one finalized ADR, the
+    union merge driver registered and `.gitattributes` routing to it -- then
+    detach `main` so it is free for the mounts below (mirrors
+    `praxion-sidecar init`'s own sequence, `ARCH_WT_RULING.md` § 5).
+
+    The driver is registered against THIS worktree's real
+    `merge_driver_observations.py`, at the exact invocation string
+    `skills/onboard-project/references/phases-core.md` § Phase 3 documents
+    for onboarding: `python3 <path>/scripts/merge_driver_observations.py
+    %O %A %B`. Registration happens once, in the sidecar's own git config,
+    which every worktree of that sidecar shares -- exactly the load-bearing
+    property `ARCH_WT_RULING.md` § 8 names.
+    """
+    _tm_git_ok(sidecar_root, "init", "-q", "-b", "main")
+    _tm_configure_identity(sidecar_root)
+    ai_state = sidecar_root / ".ai-state"
+    (ai_state / "decisions").mkdir(parents=True)
+    seed_lines = [
+        json.dumps(
+            {
+                "timestamp": "2026-01-01T00:00:00Z",
+                "session_id": "s1",
+                "event_type": "a",
+                "tool_name": "",
+            }
+        ),
+        json.dumps(
+            {
+                "timestamp": "2026-01-02T00:00:00Z",
+                "session_id": "s2",
+                "event_type": "b",
+                "tool_name": "",
+            }
+        ),
+    ]
+    (ai_state / "observations.jsonl").write_text("\n".join(seed_lines) + "\n")
+    (ai_state / "decisions" / "001-example.md").write_text(
+        "---\nid: dec-001\ntitle: Example\nstatus: accepted\n"
+        "category: architectural\ndate: 2026-01-01\n"
+        "summary: Example decision\ntags: [test]\nmade_by: agent\n---\n\n"
+        "## Context\n\nTest.\n"
+    )
+    (sidecar_root / ".gitattributes").write_text(
+        ".ai-state/observations.jsonl merge=observations-jsonl\n"
+    )
+    _tm_commit_all(sidecar_root, "seed sidecar state")
+    _tm_git_ok(
+        sidecar_root,
+        "config",
+        "merge.observations-jsonl.driver",
+        f"python3 {_DRIVER_SCRIPT_PATH} %O %A %B",
+    )
+    _tm_git_ok(sidecar_root, "checkout", "-q", "--detach")
+
+
+def _tm_init_project(project_root: Path) -> None:
+    _tm_git_ok(project_root, "init", "-q", "-b", "main")
+    _tm_configure_identity(project_root)
+    (project_root / "app.py").write_text("code\n")
+    _tm_commit_all(project_root, "init")
+
+
+def _tm_mount(sidecar_root: Path, dest: Path, branch: str, *, base: str | None = None) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    args = ["worktree", "add", "-q"]
+    args += [str(dest), branch] if base is None else ["-b", branch, str(dest), base]
+    _tm_git_ok(sidecar_root, *args)
+    _tm_configure_identity(dest)
+    return dest
+
+
+def _tm_append_observation(mount: Path, *, session_id: str, event: str, timestamp: str) -> None:
+    obs = mount / ".ai-state" / "observations.jsonl"
+    line = json.dumps(
+        {"timestamp": timestamp, "session_id": session_id, "event_type": event, "tool_name": ""}
+    )
+    with obs.open("a", encoding="utf-8") as fh:
+        fh.write(line + "\n")
+
+
+def _tm_safe_cwd(tmp_path: Path) -> Path:
+    """A throwaway, unrelated git repo used only as subprocess `cwd`.
+
+    Guarantees `--target-mount`'s current silent-ignore fallback
+    (`git rev-parse --show-toplevel` from cwd, when neither `--target-mount`
+    nor `--repo-root` is honoured) can only ever resolve here -- never to
+    the mount under test, never to the live checkout this suite runs from.
+    """
+    anchor = tmp_path / "cwd_anchor"
+    anchor.mkdir()
+    _tm_git_ok(anchor, "init", "-q", "-b", "main")
+    _tm_configure_identity(anchor)
+    return anchor
+
+
+def _tm_write_manifest(
+    sidecar_root: Path, project_root: Path, *, project_id: str = "local--abc123"
+) -> None:
+    manifest_path = sidecar_root / ".git" / "praxion-sidecar.yaml"
+    manifest_path.write_text(
+        "schema: 1\n"
+        "project:\n"
+        "  origin: null\n"
+        f'  id: "{project_id}"\n'
+        f'  roots: ["{project_root.resolve()}"]\n'
+    )
+
+
+@dataclasses.dataclass(frozen=True)
+class _TargetMountFixture:
+    sidecar_root: Path
+    project_root: Path
+    main_mount: Path
+    wt_mount: Path
+    safe_cwd: Path
+
+
+def _tm_build_diverged_fixture(tmp_path: Path) -> _TargetMountFixture:
+    """Sidecar + main mount + a second `wt/x` mount, unmerged, with real
+    diverged `observations.jsonl` content on each side: `main` gets one
+    unique entry; `wt/x` gets an IDENTICAL duplicate of that entry plus one
+    entry unique to it, and a distinct draft ADR. This shape is what lets a
+    single merge prove two things at once: the union driver resolves a real
+    conflict (both sides touched the same file), and its dedup collapses an
+    identical entry rather than doubling it.
+
+    `wt/x`'s mount sits at a plain directory, `<project>/.claude/worktrees/
+    x/.praxion` -- not a real linked *project* worktree, since nothing under
+    test here needs project-side branch tracking.
+    """
+    sidecar_root = tmp_path / "sidecar"
+    project_root = tmp_path / "project"
+    sidecar_root.mkdir()
+    project_root.mkdir()
+    _tm_init_sidecar(sidecar_root)
+    _tm_init_project(project_root)
+
+    main_mount = _tm_mount(sidecar_root, project_root / ".praxion", "main")
+    wt_mount = _tm_mount(
+        sidecar_root, project_root / ".claude" / "worktrees" / "x" / ".praxion", "wt/x", base="main"
+    )
+
+    _tm_append_observation(main_mount, session_id="sM", event="m", timestamp="2026-01-03T00:00:00Z")
+    _tm_commit_all(main_mount, "main: add M")
+
+    _tm_append_observation(wt_mount, session_id="sM", event="m", timestamp="2026-01-03T00:00:00Z")
+    _tm_commit_all(wt_mount, "wt: add M (identical duplicate)")
+    _tm_append_observation(wt_mount, session_id="sW", event="w", timestamp="2026-01-04T00:00:00Z")
+    drafts_dir = wt_mount / ".ai-state" / "decisions" / "drafts"
+    drafts_dir.mkdir(parents=True, exist_ok=True)
+    (drafts_dir / "20260104-test-wtx-draft.md").write_text(
+        "---\nid: dec-draft-abc12345\ntitle: Draft\nstatus: proposed\n"  # id-citation-discipline:ignore
+        "category: implementation\ndate: 2026-01-04\n"
+        "summary: A draft from wt/x\ntags: [test]\nmade_by: agent\n---\n\n"
+        "## Context\n\nTest draft.\n"
+    )
+    _tm_commit_all(wt_mount, "wt: add W and a draft")
+
+    return _TargetMountFixture(
+        sidecar_root=sidecar_root,
+        project_root=project_root,
+        main_mount=main_mount,
+        wt_mount=wt_mount,
+        safe_cwd=_tm_safe_cwd(tmp_path),
+    )
+
+
+def _tm_merge_wt_into_main(fixture: _TargetMountFixture) -> subprocess.CompletedProcess[str]:
+    return _tm_git(fixture.main_mount, "merge", "-q", "--no-edit", "wt/x")
+
+
+def _tm_build_merged_mount_fixture(tmp_path: Path) -> _TargetMountFixture:
+    """The diverged fixture, already merged cleanly through the sidecar's
+    own union driver -- the state every `--target-mount` reconciliation test
+    starts from. Asserts the precondition itself holds, so a broken fixture
+    never masquerades as a `--target-mount` failure."""
+    fixture = _tm_build_diverged_fixture(tmp_path)
+    result = _tm_merge_wt_into_main(fixture)
+    assert result.returncode == 0, f"precondition merge failed: {result.stderr}"
+    obs_text = (fixture.main_mount / ".ai-state" / "observations.jsonl").read_text()
+    assert "<<<<<<<" not in obs_text, "precondition merge left conflict markers"
+    return fixture
+
+
+def _tm_build_sidecar_owned_fixture(tmp_path: Path) -> _TargetMountFixture:
+    """A minimal, fully-wired `SidecarOwned` project -- mount, manifest,
+    shadow symlink -- for the project-side call-site tests. No `wt/x`
+    branch: the project-side no-op does not depend on branch divergence."""
+    sidecar_root = tmp_path / "sidecar"
+    project_root = tmp_path / "project"
+    sidecar_root.mkdir()
+    project_root.mkdir()
+    _tm_init_sidecar(sidecar_root)
+    _tm_init_project(project_root)
+    main_mount = _tm_mount(sidecar_root, project_root / ".praxion", "main")
+    _tm_write_manifest(sidecar_root, project_root)
+    (project_root / ".ai-state").symlink_to(
+        Path(".praxion") / ".ai-state", target_is_directory=True
+    )
+
+    return _TargetMountFixture(
+        sidecar_root=sidecar_root,
+        project_root=project_root,
+        main_mount=main_mount,
+        wt_mount=main_mount,
+        safe_cwd=_tm_safe_cwd(tmp_path),
+    )
+
+
+def _tm_run(safe_cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(_SCRIPT_PATH), *args],
+        cwd=safe_cwd,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+class TestTargetMountMergeBackPrecondition:
+    """The precondition every `--target-mount` test below assumes: the
+    sidecar's own union merge driver resolves a real `observations.jsonl`
+    divergence during `git merge`, deduplicating an identical entry rather
+    than leaving conflict markers or a literal duplicate. Not a
+    `--target-mount` behaviour itself -- proven independently so a
+    `--target-mount` failure is never confused with a broken fixture."""
+
+    def test_union_driver_merges_diverged_branches_without_conflict_markers(self, tmp_path: Path):
+        fixture = _tm_build_diverged_fixture(tmp_path)
+
+        result = _tm_merge_wt_into_main(fixture)
+
+        assert result.returncode == 0, result.stderr
+        obs_text = (fixture.main_mount / ".ai-state" / "observations.jsonl").read_text()
+        assert "<<<<<<<" not in obs_text
+        assert ">>>>>>>" not in obs_text
+        lines = [ln for ln in obs_text.strip().splitlines() if ln.strip()]
+        session_ids = sorted(json.loads(ln)["session_id"] for ln in lines)
+        # 2 seed + M (deduped from an identical append on both branches) + W
+        # -- not 5, which is what a naive concat-without-dedup would produce.
+        assert session_ids == ["s1", "s2", "sM", "sW"]
+
+
+class TestTargetMountReconciliation:
+    """`reconcile_ai_state.py --target-mount <mount>` after a clean
+    merge-back: the reinstated, retargeted reconciler (`ARCH_WT_RULING.md`
+    § 8) runs its own job -- ADR/index reconciliation -- against the MOUNT,
+    never the project repository."""
+
+    def test_completes_cleanly_and_preserves_deduped_observations(self, tmp_path: Path):
+        fixture = _tm_build_merged_mount_fixture(tmp_path)
+        index_path = fixture.main_mount / ".ai-state" / "decisions" / "DECISIONS_INDEX.md"
+
+        result = _tm_run(fixture.safe_cwd, "--target-mount", str(fixture.main_mount))
+
+        assert result.returncode == 0, result.stderr
+        # Proof the run actually reached the mount (not merely that the
+        # fixture's own pre-existing merge state happened to look right):
+        # nothing but this script writes DECISIONS_INDEX.md.
+        assert index_path.exists()
+        obs_text = (fixture.main_mount / ".ai-state" / "observations.jsonl").read_text()
+        assert "<<<<<<<" not in obs_text
+        lines = [ln for ln in obs_text.strip().splitlines() if ln.strip()]
+        assert len(lines) == 4  # 2 seed + M (deduped) + W -- not 5
+
+    def test_regenerates_decisions_index_in_the_mount(self, tmp_path: Path):
+        fixture = _tm_build_merged_mount_fixture(tmp_path)
+        index_path = fixture.main_mount / ".ai-state" / "decisions" / "DECISIONS_INDEX.md"
+
+        result = _tm_run(fixture.safe_cwd, "--target-mount", str(fixture.main_mount))
+
+        assert result.returncode == 0, result.stderr
+        assert index_path.exists()
+        assert "dec-001" in index_path.read_text()
+
+    def test_leaves_the_project_repository_untouched(self, tmp_path: Path):
+        fixture = _tm_build_merged_mount_fixture(tmp_path)
+        index_path = fixture.main_mount / ".ai-state" / "decisions" / "DECISIONS_INDEX.md"
+        before_head = _tm_git_ok(fixture.project_root, "rev-parse", "HEAD").stdout
+        before_status = _tm_git_ok(fixture.project_root, "status", "--porcelain").stdout
+
+        result = _tm_run(fixture.safe_cwd, "--target-mount", str(fixture.main_mount))
+
+        assert result.returncode == 0, result.stderr
+        # Proof the run actually reached the mount -- otherwise "the project
+        # is untouched" would hold trivially even if --target-mount were a
+        # complete no-op.
+        assert index_path.exists()
+        after_head = _tm_git_ok(fixture.project_root, "rev-parse", "HEAD").stdout
+        after_status = _tm_git_ok(fixture.project_root, "status", "--porcelain").stdout
+        assert after_head == before_head
+        assert after_status == before_status
+
+    def test_stages_its_own_changes_in_the_mount_not_the_project(self, tmp_path: Path):
+        fixture = _tm_build_merged_mount_fixture(tmp_path)
+
+        result = _tm_run(fixture.safe_cwd, "--target-mount", str(fixture.main_mount))
+
+        assert result.returncode == 0, result.stderr
+        mount_staged = _tm_git_ok(fixture.main_mount, "diff", "--cached", "--name-only").stdout
+        project_staged = _tm_git_ok(fixture.project_root, "diff", "--cached", "--name-only").stdout
+        assert "DECISIONS_INDEX.md" in mount_staged
+        assert project_staged == ""
+
+
+class TestTargetMountRefusesInvalidPaths:
+    """`--target-mount` validates its argument -- it must name a real state
+    mount, never a path that merely resolves into (or through) one. The
+    exact refusal wording is an implementation choice; these tests pin only
+    the observable contract: refuse loudly (non-zero exit), never proceed
+    silently as if the path were the mount."""
+
+    def test_refuses_a_directory_that_is_not_a_sidecar_worktree(self, tmp_path: Path):
+        safe_cwd = _tm_safe_cwd(tmp_path)
+        not_a_mount = tmp_path / "plain_dir"
+        not_a_mount.mkdir()
+
+        result = _tm_run(safe_cwd, "--target-mount", str(not_a_mount))
+
+        assert result.returncode != 0
+        combined = (result.stdout + result.stderr).lower()
+        assert "mount" in combined
+
+    def test_refuses_a_shadow_symlink_path_instead_of_the_mount_itself(self, tmp_path: Path):
+        fixture = _tm_build_sidecar_owned_fixture(tmp_path)
+        shadow_path = fixture.project_root / ".ai-state"
+        assert shadow_path.is_symlink()
+
+        result = _tm_run(fixture.safe_cwd, "--target-mount", str(shadow_path))
+
+        assert result.returncode != 0
+        combined = (result.stdout + result.stderr).lower()
+        assert "mount" in combined
+
+
+class TestProjectSideSkipsUnderSidecarOwnership:
+    """`reconcile_ai_state.py --repo-root <project>` (no `--target-mount`)
+    on a `SidecarOwned` project is a no-op: the project repository does not
+    own `.ai-state/` -- reconciliation runs at merge-back, against the
+    mount, not here (`ARCH_WT_RULING.md` § 8).
+
+    Today this is NOT a no-op: confirmed empirically before writing these
+    tests that `--repo-root <project>` blindly follows the `.ai-state`
+    shadow symlink and mutates the mount (writes and stages a fresh
+    `DECISIONS_INDEX.md` there) -- reproduced by
+    `test_touches_nothing_in_the_mount` below, which fails today for
+    exactly that reason.
+    """
+
+    def test_skips_with_the_corrected_reason(self, tmp_path: Path):
+        fixture = _tm_build_sidecar_owned_fixture(tmp_path)
+
+        result = _tm_run(fixture.safe_cwd, "--repo-root", str(fixture.project_root))
+
+        assert result.returncode == 0, result.stderr
+        combined = (result.stdout + result.stderr).lower()
+        assert "does not own" in combined
+        assert ".ai-state" in combined
+
+    def test_touches_nothing_in_the_mount(self, tmp_path: Path):
+        fixture = _tm_build_sidecar_owned_fixture(tmp_path)
+        before_status = _tm_git_ok(fixture.main_mount, "status", "--porcelain").stdout
+
+        _tm_run(fixture.safe_cwd, "--repo-root", str(fixture.project_root))
+
+        after_status = _tm_git_ok(fixture.main_mount, "status", "--porcelain").stdout
+        assert after_status == before_status

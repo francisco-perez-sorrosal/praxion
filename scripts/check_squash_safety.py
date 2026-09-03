@@ -19,14 +19,25 @@ file deliberately will also trigger the warning. That is a false positive,
 not a false negative -- users can inspect the diagnostic message and ignore
 it. Missing a real squash erasure would be worse.
 
+Under the sidecar-placement ruling (`ARCH_WT_RULING.md` § 8) the project
+repository no longer owns `.ai-state/` when it is `SidecarOwned` -- the
+squash signature this script exists to catch happens in the state mount at
+merge-back, not in the project repo. `--target-mount <mount>` diagnoses
+that mount directly; `--repo-root <project>` (no `--target-mount`) is a
+no-op on a `SidecarOwned` project for the same reason.
+
 Invocation:
 
-    check_squash_safety.py              # check HEAD automatically
-    check_squash_safety.py --verbose    # DEBUG logging
-    check_squash_safety.py --since REF  # compare against REF instead of HEAD~1
-    check_squash_safety.py --dry-run    # accepted for interface symmetry; no-op
+    check_squash_safety.py                     # check HEAD automatically
+    check_squash_safety.py --verbose            # DEBUG logging
+    check_squash_safety.py --since REF          # compare against REF instead of HEAD~1
+    check_squash_safety.py --dry-run            # accepted for interface symmetry; no-op
+    check_squash_safety.py --target-mount PATH  # diagnose a state mount at merge-back
 
-Exit code: always 0 (diagnostic; cannot abort a completed merge).
+Exit code: 0 for every diagnostic outcome (including a skip and including
+`--target-mount` naming a valid mount; diagnostics never abort a completed
+merge). `--target-mount` naming something that is not a real state mount is
+the one usage error this script reports non-zero (exit 1).
 """
 
 from __future__ import annotations
@@ -36,9 +47,11 @@ import logging
 import sys
 from pathlib import Path
 
+import _sidecar_mount
 from _git_runner import git_output
 from _repo_root import resolve_repo_root as _resolve_repo_root
 from _script_cli import configure_logging
+from _state_repo import SidecarOwned, resolve_placement
 
 # -- Constants ----------------------------------------------------------------
 
@@ -59,6 +72,26 @@ def apply_repo_root(root: Path) -> None:
     """Rebind the module-level REPO_ROOT (git `cwd`) to a resolved repo root."""
     global REPO_ROOT
     REPO_ROOT = root
+
+
+def resolve_target_mount(path_str: str) -> Path:
+    """Validate `--target-mount` and return the mount path.
+
+    Mirrors `reconcile_ai_state.resolve_target_mount` -- refuses anything
+    that is not itself `<checkout>/.praxion` for some checkout currently on
+    a state branch, so a shadow symlink or an arbitrary directory is
+    refused even when it resolves into a real mount's content.
+    """
+    mount = Path(path_str)
+    if mount.name != _sidecar_mount.MOUNT_DIRNAME:
+        raise ValueError(
+            f"--target-mount must name a state mount "
+            f"({_sidecar_mount.MOUNT_DIRNAME} directory); got {mount}"
+        )
+    state = _sidecar_mount.classify_mount(mount.parent, expected_common_dir=None)
+    if not isinstance(state, _sidecar_mount.SidecarWorktree):
+        raise ValueError(f"{mount} is not a state mount: {state!r}")
+    return mount
 
 
 # -- Git helpers --------------------------------------------------------------
@@ -105,14 +138,21 @@ def is_single_parent_commit(ref: str = "HEAD") -> bool:
 def detect_potentially_erased_files(parent_sha: str, head_sha: str) -> list[str]:
     """Return `.ai-state/` paths deleted in `head_sha` relative to `parent_sha`.
 
-    Uses `git diff --diff-filter=D --name-only` which lists files removed in
-    the target revision compared to the source. An empty list means either
-    no `.ai-state/` deletions occurred or the git query failed (in which
-    case callers should not warn -- false positives from warnings are
+    Uses `git diff --no-renames --diff-filter=D --name-only` which lists
+    files removed in the target revision compared to the source.
+    `--no-renames` is deliberate: two ADR files sharing the same frontmatter
+    template are similar enough that git's default heuristic reports the
+    deletion as a rename into the new file's path, which `--diff-filter=D`
+    then never sees -- exactly the failure mode this diagnostic exists to
+    catch (a specific path erased) regardless of what else may have been
+    added under a different name in the same commit. An empty list means
+    either no `.ai-state/` deletions occurred or the git query failed (in
+    which case callers should not warn -- false positives from warnings are
     preferable, but spurious warnings on git failure are not).
     """
     output = _git(
         "diff",
+        "--no-renames",
         "--diff-filter=D",
         "--name-only",
         parent_sha,
@@ -220,6 +260,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--target-mount",
+        metavar="PATH",
+        default=None,
+        help=(
+            "Diagnose a sidecar state mount instead of --repo-root -- the "
+            "merge-back case (ARCH_WT_RULING.md § 8). Must name a real "
+            "state mount (<checkout>/.praxion, currently on a state branch)."
+        ),
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help=(
@@ -261,10 +311,36 @@ def _run(since: str | None) -> int:
 
 
 def main(argv: list[str] | None = None) -> None:
-    """CLI entry point. Never raises; logs errors and exits 0."""
+    """CLI entry point. Never raises for a diagnostic outcome; exits 0.
+
+    Exception: `--target-mount` naming something that is not a real state
+    mount is a caller/usage error, not a diagnostic verdict, and exits 1.
+    """
     args = _parse_args(argv)
     configure_logging(args.verbose)
-    apply_repo_root(resolve_repo_root(args.repo_root))
+
+    if args.target_mount is not None:
+        try:
+            mount = resolve_target_mount(args.target_mount)
+        except ValueError as exc:
+            logger.error("check_squash_safety: %s", exc)
+            sys.exit(1)
+        apply_repo_root(mount)
+    else:
+        root = resolve_repo_root(args.repo_root)
+        # The project repository does not own .ai-state/ when it is
+        # SidecarOwned -- the diagnostic runs at merge-back, against the
+        # mount (the --target-mount branch above), not here.
+        placement = resolve_placement(root)
+        if isinstance(placement, SidecarOwned):
+            logger.info(
+                "check_squash_safety: .ai-state/ check skipped -- the "
+                "project repository does not own .ai-state/ (the "
+                "diagnostic runs at merge-back, against the state mount)"
+            )
+            sys.exit(0)
+        apply_repo_root(root)
+
     try:
         code = _run(args.since)
     except OSError as exc:

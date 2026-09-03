@@ -153,6 +153,20 @@ resolve_plugin || exit 1
 LIVE_HOOK="$PLUGIN_INSTALL_PATH/scripts/git-finalize-hook.sh"
 LIVE_DRIVER="python3 $PLUGIN_INSTALL_PATH/scripts/merge_driver_observations.py %O %A %B"
 
+# ---- placement (IF-02): under sidecar placement the merge driver that
+# matters lives in the sidecar's own .git/config, not the project's --------
+
+PLACEMENT="in-repo"
+MOUNT_DIR=""
+if [ -f "$SCRIPT_DIR/_state_repo.py" ]; then
+    while IFS='=' read -r _upp_key _upp_value; do
+        case "$_upp_key" in
+            placement) PLACEMENT="$_upp_value" ;;
+            mount_dir) MOUNT_DIR="$_upp_value" ;;
+        esac
+    done < <(python3 "$SCRIPT_DIR/_state_repo.py" --print "$REPO_ROOT" 2>/dev/null || true)
+fi
+
 CHANGES=0          # count of surfaces that needed (or, in check/dry-run, would need) change
 declare -a STAGED_FILES=()
 
@@ -460,29 +474,52 @@ echo
 # ---- 2. merge driver registration ------------------------------------------
 
 echo "[2/4] Merge driver (observations-jsonl)"
-cur_driver="$(git -C "$REPO_ROOT" config --get merge.observations-jsonl.driver 2>/dev/null || true)"
-attr_present=0
-[ -f "$GITATTR" ] && grep -qF '.ai-state/observations.jsonl merge=observations-jsonl' "$GITATTR" && attr_present=1
 
-if [ "$cur_driver" = "$LIVE_DRIVER" ]; then
-    info "ok"
-elif [ -z "$cur_driver" ]; then
-    if [ "$attr_present" -eq 1 ]; then
-        note_change; info "absent but .gitattributes maps it → register"
+if [ "$PLACEMENT" = "sidecar" ] && [ -n "$MOUNT_DIR" ]; then
+    # Under sidecar placement the driver that matters lives in the sidecar's
+    # own .git/config (shared across every worktree of it, including this
+    # mount) -- the project repository does not own .ai-state/, so mutating
+    # the project's own git config here would reconcile the wrong repo
+    # (IF-02). `praxion-sidecar link` is the sole reconciler for the sidecar
+    # side (it re-points the driver as part of D2's "re-apply every
+    # repo-level invariant" contract); this step never calls `git config`
+    # directly against the mount.
+    cur_driver="$(git -C "$MOUNT_DIR" config --get merge.observations-jsonl.driver 2>/dev/null || true)"
+    if [ "$cur_driver" = "$LIVE_DRIVER" ]; then
+        info "ok (sidecar)"
+    else
+        note_change
+        info "sidecar driver stale ('$cur_driver') → reconcile via praxion-sidecar link"
+        if mutating; then
+            (cd "$REPO_ROOT" && python3 "$PLUGIN_INSTALL_PATH/scripts/praxion-sidecar" link --quiet)
+        fi
+    fi
+    echo
+else
+    cur_driver="$(git -C "$REPO_ROOT" config --get merge.observations-jsonl.driver 2>/dev/null || true)"
+    attr_present=0
+    [ -f "$GITATTR" ] && grep -qF '.ai-state/observations.jsonl merge=observations-jsonl' "$GITATTR" && attr_present=1
+
+    if [ "$cur_driver" = "$LIVE_DRIVER" ]; then
+        info "ok"
+    elif [ -z "$cur_driver" ]; then
+        if [ "$attr_present" -eq 1 ]; then
+            note_change; info "absent but .gitattributes maps it → register"
+            mutating && git -C "$REPO_ROOT" config merge.observations-jsonl.driver "$LIVE_DRIVER"
+        else
+            info "not registered and no .gitattributes mapping → nothing to do"
+        fi
+    elif case "$cur_driver" in */plugins/cache/*|*/praxion/*) true;; *) false;; esac; then
+        # */plugins/cache/* covers i-am-era registrations too: the old namespace's
+        # cache path contains no /praxion/ token, and treating it as "non-Praxion"
+        # left every pre-rename project's driver permanently stale.
+        note_change; info "stale ($cur_driver) → re-register"
         mutating && git -C "$REPO_ROOT" config merge.observations-jsonl.driver "$LIVE_DRIVER"
     else
-        info "not registered and no .gitattributes mapping → nothing to do"
+        info "set to a non-Praxion value ('$cur_driver') → refusing to overwrite (leave as-is)"
     fi
-elif case "$cur_driver" in */plugins/cache/*|*/praxion/*) true;; *) false;; esac; then
-    # */plugins/cache/* covers i-am-era registrations too: the old namespace's
-    # cache path contains no /praxion/ token, and treating it as "non-Praxion"
-    # left every pre-rename project's driver permanently stale.
-    note_change; info "stale ($cur_driver) → re-register"
-    mutating && git -C "$REPO_ROOT" config merge.observations-jsonl.driver "$LIVE_DRIVER"
-else
-    info "set to a non-Praxion value ('$cur_driver') → refusing to overwrite (leave as-is)"
+    echo
 fi
-echo
 
 # ---- 3. retired merge-driver cleanup (manifest-driven) ---------------------
 

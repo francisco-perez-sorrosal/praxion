@@ -954,3 +954,51 @@ def test_apply_reads_claude_md_from_disk_exactly_once(
         f"CLAUDE.md was read {read_calls['count']} time(s) during --apply; expected exactly "
         "one read, threaded from classification into run_apply"
     )
+
+
+# ---------------------------------------------------------------------------
+# IF-04: placement-resolved target (sidecar-owned projects never mutate the
+# tracked CLAUDE.md; blocks land in the shadowed CLAUDE.local.md instead)
+# ---------------------------------------------------------------------------
+
+
+def test_apply_under_sidecar_placement_writes_shadow_and_leaves_tracked_file_untouched(
+    tmp_path: Path,
+) -> None:
+    """A sidecar-placed project whose manifest marks `CLAUDE.md` `untouched`
+    must have `--apply` append the absent block to `.praxion/CLAUDE.local.md`
+    (`block_target()`'s fallback redirect, DS-8) -- never to the tracked
+    `CLAUDE.md`, which stays byte-identical (P1-10, IF-04)."""
+    from test_state_repo import _build_sidecar_owned_fixture
+
+    tracked_claude_md = "# Team Project\n\nHand-written, tracked prose.\n"
+    fixture = _build_sidecar_owned_fixture(
+        tmp_path,
+        origin=None,
+        extra_manifest=(
+            "paths:\n  CLAUDE.md:\n    intent: untouched\n    reason: preexisting-team-file\n"
+            "autocommit: manual\nremote: null\n"
+        ),
+    )
+    (fixture.project_root / "CLAUDE.md").write_text(tracked_claude_md, encoding="utf-8")
+
+    manifest_path = _write_manifest(tmp_path, _SINGLE_SLUG_BLOCKS)
+    canonical_dir = _write_canonical_dir(tmp_path, {"agent-pipeline": _AGENT_PIPELINE_CURRENT_BODY})
+
+    mod = _load_module()
+    mod.CANONICAL_DIR = canonical_dir  # type: ignore[attr-defined]
+
+    exit_code = mod.main(
+        ["--apply", "--repo-root", str(fixture.project_root), "--manifest", str(manifest_path)]
+    )
+
+    assert exit_code == 0
+    assert (fixture.project_root / "CLAUDE.md").read_text(encoding="utf-8") == tracked_claude_md, (
+        "sidecar-placed project's tracked CLAUDE.md was mutated by --apply -- "
+        "should be untouched under the manifest's `untouched` intent"
+    )
+    shadow_path = fixture.project_root / "CLAUDE.local.md"
+    assert shadow_path.is_file(), (
+        "the absent block was not appended to the shadowed CLAUDE.local.md"
+    )
+    assert _AGENT_PIPELINE_CURRENT_BODY in shadow_path.read_text(encoding="utf-8")

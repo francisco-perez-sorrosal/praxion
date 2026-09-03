@@ -23,8 +23,10 @@ pytest's prepend import mode puts it on `sys.path[0]`), matching
 
 from __future__ import annotations
 
+import builtins
 import dataclasses
 import subprocess
+import sys
 from pathlib import Path
 
 import _sidecar_manifest
@@ -744,3 +746,69 @@ def test_empty_project_id_is_refused(tmp_path: Path) -> None:
         _load(sidecar_root)
 
     assert exc_info.value.reason == "project-id-missing"
+
+
+# --- IF-17: PyYAML is imported lazily -- a missing install raises a named,
+# actionable ManifestError, never a raw ModuleNotFoundError traceback -------
+
+
+def _block_yaml_import(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make `import yaml` raise `ModuleNotFoundError` for the rest of this
+    test, without touching the real interpreter's installed packages.
+    `builtins.__import__` is called for every `import` statement regardless
+    of `sys.modules` caching state, so replacing it is enough on its own."""
+    real_import = builtins.__import__
+
+    def _blocked(name: str, *args: object, **kwargs: object) -> object:
+        if name == "yaml":
+            raise ModuleNotFoundError("No module named 'yaml'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _blocked)
+
+
+def test_require_yaml_raises_named_manifest_error_when_pyyaml_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _block_yaml_import(monkeypatch)
+
+    with pytest.raises(_sidecar_manifest.ManifestError) as exc_info:
+        _sidecar_manifest._require_yaml()
+
+    assert exc_info.value.reason == "pyyaml-missing"
+    assert sys.executable in str(exc_info.value)
+
+
+def test_load_manifest_raises_named_manifest_error_when_pyyaml_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sidecar_root = _plain_sidecar(tmp_path)
+    _write_manifest_yaml(sidecar_root, _manifest_yaml())
+    _block_yaml_import(monkeypatch)
+
+    with pytest.raises(_sidecar_manifest.ManifestError) as exc_info:
+        _load(sidecar_root)
+
+    assert exc_info.value.reason == "pyyaml-missing"
+
+
+def test_write_manifest_raises_named_manifest_error_when_pyyaml_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sidecar_root = _plain_sidecar(tmp_path)
+    manifest = _sidecar_manifest.Manifest(
+        schema=1,
+        project=_sidecar_manifest.ProjectIdentity(origin=None, id="local--abc123def456", roots=[]),
+        paths={},
+        excludes=[],
+        autocommit=_sidecar_manifest.Autocommit.MANUAL,
+        remote=None,
+    )
+    _block_yaml_import(monkeypatch)
+
+    with pytest.raises(_sidecar_manifest.ManifestError) as exc_info:
+        _sidecar_manifest.write_manifest(
+            _sidecar_manifest.manifest_path(sidecar_root / ".git"), manifest
+        )
+
+    assert exc_info.value.reason == "pyyaml-missing"

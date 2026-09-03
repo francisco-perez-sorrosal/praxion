@@ -13,7 +13,6 @@ branch: worktree-sidecar-placement
 affected_files:
   - scripts/onboard-project
 affected_reqs: [REQ-14]
-supersedes: []
 ---
 
 ## Context
@@ -104,7 +103,7 @@ Ship D10's rule behind an opt-in flag, DS-1's as default.
 - **Risk accepted**: none — DS-1's own Disconfirmation section already
   reasons through the trade-off this decision inherits.
 
-## Prior Decision
+## Departure from the Plan
 
 Not a supersession of any finalized ADR — this resolves an in-pipeline
 conflict between two draft-stage specialist artifacts (`SYSTEMS_PLAN.md` and

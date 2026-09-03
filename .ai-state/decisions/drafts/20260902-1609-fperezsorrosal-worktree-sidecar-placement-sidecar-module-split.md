@@ -110,7 +110,7 @@ As described in Decision above.
   decision does not change what the architecture builds, only how its
   already-specified data structures are distributed across files.
 
-## Prior Decision
+## Departure from the Plan
 
 Not a supersession — this decision fills a gap the architect's Components
 table left open (file-level packaging within an already-approved component

@@ -356,6 +356,125 @@ def test_non_praxion_driver_not_overwritten(project):
     assert "refusing to overwrite" in r.stdout
 
 
+# ---------------------------------------------------------------------------
+# IF-02: under sidecar placement the merge driver that matters lives in the
+# SIDECAR's own .git/config, not the project's -- `praxion-sidecar link` is
+# the sole reconciler for that side.
+# ---------------------------------------------------------------------------
+
+# The real, working scripts/ tree -- used as the "live plugin install" for
+# this fixture only, since the reconcile path under test shells out to the
+# real `praxion-sidecar link`, whose sibling-module imports (`_sidecar_*`)
+# a minimal fake plugin dir cannot cheaply reproduce.
+_REAL_SCRIPTS_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _build_sidecar_project(tmp_path: Path, *, stale_driver: str) -> Path:
+    """A real, minimal sidecar-owned project: sidecar repo + `git worktree`
+    mount + manifest + shadowed `.ai-state` -- mirrors `test_state_repo.py`'s
+    own fixture pattern, rebuilt locally to keep this module import-
+    independent. The SIDECAR's own merge driver (not the project's, which
+    never gets one) starts stale."""
+    sidecar_root = tmp_path / "sidecar"
+    project_root = tmp_path / "proj"
+
+    sidecar_root.mkdir(parents=True)
+    subprocess.run(["git", "-C", str(sidecar_root), "init", "-q", "-b", "main"], check=True)
+    subprocess.run(["git", "-C", str(sidecar_root), "config", "user.email", "s@s.s"], check=True)
+    subprocess.run(["git", "-C", str(sidecar_root), "config", "user.name", "s"], check=True)
+    (sidecar_root / ".ai-state").mkdir()
+    (sidecar_root / ".ai-state" / "DESIGN.md").write_text("# design\n")
+    subprocess.run(["git", "-C", str(sidecar_root), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(sidecar_root), "commit", "-q", "-m", "seed"], check=True)
+    subprocess.run(["git", "-C", str(sidecar_root), "checkout", "-q", "--detach"], check=True)
+
+    project_root.mkdir(parents=True)
+    subprocess.run(["git", "-C", str(project_root), "init", "-q", "-b", "main"], check=True)
+    subprocess.run(["git", "-C", str(project_root), "config", "user.email", "p@p.p"], check=True)
+    subprocess.run(["git", "-C", str(project_root), "config", "user.name", "p"], check=True)
+
+    mount_dir = project_root / ".praxion"
+    subprocess.run(
+        ["git", "-C", str(sidecar_root), "worktree", "add", "-q", str(mount_dir), "main"],
+        check=True,
+    )
+
+    manifest_path = sidecar_root / ".git" / "praxion-sidecar.yaml"
+    manifest_path.write_text(
+        "schema: 1\n"
+        "project:\n"
+        "  origin: null\n"
+        '  id: "local--abc123def456"\n'
+        f'  roots: ["{project_root.resolve()}"]\n'
+        "paths: {}\n"
+        "excludes: []\n"
+        "autocommit: manual\n"
+        "remote: null\n"
+    )
+
+    (project_root / ".ai-state").symlink_to(
+        Path(".praxion") / ".ai-state", target_is_directory=True
+    )
+
+    subprocess.run(
+        ["git", "-C", str(sidecar_root), "config", "merge.observations-jsonl.driver", stale_driver],
+        check=True,
+    )
+    return project_root
+
+
+def _sidecar_driver(project_root: Path) -> str:
+    return _git(
+        project_root / ".praxion",
+        "config",
+        "--get",
+        "merge.observations-jsonl.driver",
+    )
+
+
+def test_sidecar_placement_apply_reconciles_the_sidecar_driver_via_link(tmp_path: Path) -> None:
+    stale = f"python3 {tmp_path / 'gone' / 'scripts' / 'merge_driver_observations.py'} %O %A %B"
+    project_root = _build_sidecar_project(tmp_path, stale_driver=stale)
+    project_driver_before = subprocess.run(
+        ["git", "-C", str(project_root), "config", "--get", "merge.observations-jsonl.driver"],
+        capture_output=True,
+        text=True,
+    )
+
+    r = _run(project_root, _REAL_SCRIPTS_ROOT)
+
+    assert r.returncode == 0, r.stderr
+    live_driver = f"python3 {_REAL_SCRIPTS_ROOT}/scripts/merge_driver_observations.py %O %A %B"
+    assert _sidecar_driver(project_root) == live_driver, (
+        "the sidecar's own driver was not re-pointed by the reconcile"
+    )
+    # the PROJECT repository never owns .ai-state/ under sidecar placement --
+    # its own git config must stay untouched (empty: no driver was ever set
+    # there).
+    assert project_driver_before.returncode != 0, (
+        "test setup bug: the project repo already had a driver configured"
+    )
+    project_driver_after = subprocess.run(
+        ["git", "-C", str(project_root), "config", "--get", "merge.observations-jsonl.driver"],
+        capture_output=True,
+        text=True,
+    )
+    assert project_driver_after.returncode != 0, (
+        "the project repository's own git config was mutated -- sidecar placement must "
+        "reconcile the sidecar's config, never the project's"
+    )
+
+
+def test_sidecar_placement_check_reports_drift_without_mutating(tmp_path: Path) -> None:
+    stale = f"python3 {tmp_path / 'gone' / 'scripts' / 'merge_driver_observations.py'} %O %A %B"
+    project_root = _build_sidecar_project(tmp_path, stale_driver=stale)
+
+    r = _run(project_root, _REAL_SCRIPTS_ROOT, "--check")
+
+    assert r.returncode == 1, r.stdout
+    assert _sidecar_driver(project_root) == stale, "--check must never mutate the sidecar's driver"
+
+
 def test_upgrade_preserves_the_mode_stamp_field(project):
     """An upgrade run must rewrite only `onboarded_with_version` -- never `mode`.
 

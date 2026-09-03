@@ -186,11 +186,17 @@ Sidecar state is projected into each checkout as a real directory, not a plain s
 
 **Why a mount, not a plain symlink.** Claude Code's worktree isolation refuses a `Write`/`Edit` on any lexically-in-worktree path whose `realpath` escapes the worktree — a symlink from inside a linked pipeline worktree straight out to `~/.praxion/sidecars/...` is refused mid-step, not at session start, with a harness message that points at a copy that does not exist. The mount avoids the refusal structurally: `<checkout>/.praxion` is a `git worktree` of the sidecar **materialised inside the checkout**, so every shadow symlink resolves to a realpath still under the checkout. This is the **in-checkout realpath invariant** — for every path Praxion asks an agent to write, `realpath(path)` stays inside the checkout the session is running in — and it holds uniformly for the main checkout and for every linked worktree, with no discriminator between them. `worktree_guard.py`'s containment check and the dashboard's `project-root.ts` containment check both stay correct **without modification**, because the paths they see never leave the checkout to begin with.
 
-The cost is a branch per checkout — the sidecar carries `main` for the main checkout and `wt/<name>` per linked worktree — and a merge step to bring a worktree's state home. That merge is a **convergence step**, not an ordering rule you must remember: three independent, idempotent channels can perform it (below), so skipping the explicit path costs latency, never correctness.
+The cost is a branch per checkout — the sidecar carries `main` for the main checkout and `wt/<name>` per linked worktree — and a merge step to bring a worktree's state home. That merge is a **convergence step**, not an ordering rule you must remember: three independent, idempotent channels can perform it (see [State convergence and merge-back](#state-convergence-and-merge-back) below), so skipping the explicit path costs latency, never correctness.
 
 ### Onboarding with `--placement sidecar`
 
-**Mode rule.** `--placement sidecar` is legal only with mode `existing` — a `Sidecar` onboarding plan carries no mode field at all; it is structurally `existing`. `new` scaffolds a repo you just created and own; `hackathon` is a deliberately minimal, throwaway footprint; `promote` (hackathon → full) has no meaning without the in-repo hackathon artifacts sidecar placement would hide. Any other combination fails fast at exit `2`, naming the legal one.
+**Mode rule.** `--placement sidecar` is legal only with mode `existing` — a `Sidecar` onboarding plan carries no mode field at all; it is structurally `existing`. `new` scaffolds a repo you just created and own; `hackathon` is a deliberately minimal, throwaway footprint; `promote` (hackathon → full) has no meaning without the in-repo hackathon artifacts sidecar placement would hide. Any other combination fails fast at exit `2`, naming the legal one:
+
+```console
+$ onboard-project --placement sidecar --mode new; echo "exit=$?"
+Usage error: --placement sidecar is legal only when the resolved mode is existing (got: new). Onboard the project first with a plain run, then re-run with --placement sidecar.
+exit=2
+```
 
 **`--shadow` / `--share`** move a path between the sidecar (shadowed — symlinked, excluded, never committed in the project) and the project (shared — a real tracked file). The allowlist and defaults:
 
@@ -200,7 +206,7 @@ The cost is a branch per checkout — the sidecar carries `main` for the main ch
 | `CLAUDE.local.md`, `.claude/settings.local.json` | shadow | — |
 | `CLAUDE.md` — repo already has one | untouched (Praxion blocks go to `CLAUDE.local.md` instead) | — (never touched, by construction) |
 | `CLAUDE.md` — repo has none | shadow | `--share CLAUDE.md` |
-| `docs/architecture.md` | share (a plain doc; cites ADRs by **id text**, never by `.ai-state/` path) | `--shadow docs/architecture.md` |
+| `docs/architecture.md` | share (a plain doc; cites ADRs by **id text**, never by `.ai-state/` path — verify on your own project with `grep -c '\.ai-state/' docs/architecture.md`, which should report `0`) | `--shadow docs/architecture.md` |
 | `architecture/`, `fitness/` (AaC tier) | shadow, when the tier is selected | `--share architecture` |
 
 Before any write, the confirmation block names the exact split:
@@ -232,11 +238,21 @@ Praxion onboarding · plugin 0.27.1
 Proceed? [y/N]
 ```
 
+Verify the "no Praxion files" claim on your own sidecar-placed project — `git
+ls-files` lists only what you shared (`docs/architecture.md` here, nothing
+under `.ai-state/` or the shadowed local files):
+
+```console
+$ git ls-files
+app.py
+docs/architecture.md
+```
+
 **The three `CLAUDE.md` cases**, decided once at `init` and immutable except through an explicit migration:
 
 | Case | Precondition | Praxion block target | `CLAUDE.md` on disk |
 |---|---|---|---|
-| `untouched` | project already has a tracked `CLAUDE.md` | `CLAUDE.local.md` (shadowed) | untouched, tracked, byte-unchanged |
+| `untouched` | project already has a tracked `CLAUDE.md` | `CLAUDE.local.md` (shadowed) | untouched, tracked, byte-unchanged — verify with `git diff --stat -- CLAUDE.md` (empty) after `/refresh-claude-blocks --apply` |
 | `shadow` (default) | no `CLAUDE.md` exists | `CLAUDE.md` (shadowed) | symlink into the sidecar, excluded |
 | `share` | no `CLAUDE.md`, `--share CLAUDE.md` passed | `CLAUDE.md` | real file, tracked, committed |
 
@@ -275,23 +291,48 @@ praxion-sidecar <command> [options]
   remote       Show or set the sidecar's git remote (trust-boundary gated)
 ```
 
-One example per verb:
+One example per verb. `status` and `doctor` below reproduce a **real run**
+against a healthy sidecar-placed project — not hand-written; field set, row
+order and the closing summary line are copied verbatim from
+`praxion-sidecar status`/`doctor` output, with only the project name and
+absolute paths normalized to this doc's running `billing` example. Each
+checkout carries its own branch (DS-10), so a healthy `status` names no
+cross-checkout sharing claim:
 
 ```console
 $ praxion-sidecar status
   Placement   sidecar
+  Project     /Users/me/work/billing  (origin https://github.com/acme/billing)
+  Checkout    /Users/me/work/billing  (main checkout, 1 of 1)
   Sidecar     ~/.praxion/sidecars/github.com--acme--billing
               branch main · clean · 4 commits unpushed
-  Healthy. State is shared live across 3 checkouts — no branch isolation.
+  Autocommit  on-finalize-and-stop
+  Remote      none  (push: never)
+
+  Shadowed    .ai-state                              linked
+              CLAUDE.md                              linked
+              CLAUDE.local.md                        linked
+              .claude/settings.local.json            linked
+  Shared      docs/architecture.md                   committed in the project repo
+  Untouched   —
+
+              Healthy.
 
 $ praxion-sidecar doctor
-  PASS  exclude-block         6 Praxion entries in .git/info/exclude
-  FAIL  shadow:CLAUDE.md      a real file occupies the slot, not a symlink
-        why   a `git pull` brought a committed CLAUDE.md into a shadowed slot
-        fix   mv CLAUDE.md CLAUDE.md.team && praxion-sidecar link
-  WARN  sidecar-repo          3 files uncommitted in the sidecar
-        fix   praxion-sidecar commit
-  1 failed · 1 warning · 6 passed.
+praxion-sidecar doctor · github.com--acme--billing
+PASS  exclude-block  Praxion entries current in .git/info/exclude
+PASS  shadow:.ai-state  .ai-state -> sidecar
+PASS  shadow:CLAUDE.md  CLAUDE.md -> sidecar
+PASS  shadow:CLAUDE.local.md  CLAUDE.local.md -> sidecar
+PASS  shadow:.claude/settings.local.json  .claude/settings.local.json -> sidecar
+PASS  shared:docs/architecture.md  docs/architecture.md committed in the project repo
+PASS  hooks-path  core.hooksPath resolves cleanly; every hook slot can fire
+PASS  sidecar-repo  clean, no unusual backlog
+PASS  remote-policy  no remote configured
+PASS  manifest-roots  roots: this checkout is recorded in the manifest
+
+0 failed · 0 warnings · 10 passed.
+Healthy.
 
 $ praxion-sidecar init --share docs/architecture.md
 $ praxion-sidecar link
@@ -302,6 +343,19 @@ $ praxion-sidecar merge-back --auto
 $ praxion-sidecar publish   # sidecar -> project repo, history preserved, --yes or TTY-confirmed
 $ praxion-sidecar absorb    # project repo -> sidecar
 $ praxion-sidecar remote git@github.com:acme/billing-praxion.git --push on-autocommit
+```
+
+`doctor`'s per-row verdicts read the same when something is wrong — illustrative,
+not captured:
+
+```console
+PASS  exclude-block         6 Praxion entries in .git/info/exclude
+FAIL  shadow:CLAUDE.md      a real file occupies the slot, not a symlink
+      why   a `git pull` brought a committed CLAUDE.md into a shadowed slot
+      fix   mv CLAUDE.md CLAUDE.md.team && praxion-sidecar link
+WARN  sidecar-repo          3 files uncommitted in the sidecar
+      fix   praxion-sidecar commit
+1 failed · 1 warning · 6 passed.
 ```
 
 **Exit codes.**

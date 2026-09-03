@@ -55,6 +55,8 @@ import sys
 from pathlib import Path
 from typing import NoReturn
 
+import _sidecar_manifest
+import _state_repo
 from canonical_block_identity import (
     REFRESHABLE_SLUGS,
     extract_live_body,
@@ -153,15 +155,32 @@ def _heading_for_slug(slug: str) -> str:
     return f"## {slug.replace('-', ' ').title()}"
 
 
-def _read_claude_md(repo_root: Path) -> str:
-    """Read the target repo's CLAUDE.md once; "" when absent.
+def _claude_md_target(repo_root: Path) -> Path:
+    """Resolve where this project's Praxion blocks live (DS-8).
+
+    In-repo (and every other non-sidecar-owned placement): the tracked
+    ``CLAUDE.md`` at repo root, as always. Sidecar-owned: the manifest's own
+    ``block_target()`` -- which redirects to the shadowed
+    ``.praxion/CLAUDE.local.md`` when the project's ``CLAUDE.md`` entry is
+    ``untouched``, never the team's tracked file.
+    """
+    placement = _state_repo.resolve_placement(repo_root)
+    if not isinstance(placement, _state_repo.SidecarOwned):
+        return repo_root / "CLAUDE.md"
+    manifest = _sidecar_manifest.load_manifest(
+        _sidecar_manifest.manifest_path(placement.sidecar_common_dir)
+    )
+    return _sidecar_manifest.block_target(manifest, repo_root)
+
+
+def _read_claude_md(claude_md_path: Path) -> str:
+    """Read the target repo's resolved CLAUDE.md once; "" when absent.
 
     Read exactly once per invocation and threaded through both
     ``_classify_all`` and ``run_apply`` -- a second independent read would be
     a TOCTOU double-read of the same file within one process, however
     unlikely to observe a change in the single-threaded CLI path.
     """
-    claude_md_path = repo_root / "CLAUDE.md"
     return claude_md_path.read_text(encoding="utf-8") if claude_md_path.is_file() else ""
 
 
@@ -324,7 +343,7 @@ def _report_modified_block(slug: str, live_body: str) -> None:
     print("Resolve interactively:  /refresh-claude-blocks\n")
 
 
-def run_apply(repo_root: Path, original_text: str, classifications: dict[str, str]) -> int:
+def run_apply(claude_md_path: Path, original_text: str, classifications: dict[str, str]) -> int:
     """--apply mode: append absent blocks, replace stale blocks in place,
     refuse to touch modified blocks. Writes the target file at most once,
     only when something actually changed -- never for a purely
@@ -333,9 +352,11 @@ def run_apply(repo_root: Path, original_text: str, classifications: dict[str, st
 
     ``original_text`` is the CLAUDE.md text ``main()`` already read for
     classification -- passed in rather than re-read here, so this mode never
-    performs a second, independent read of the same file.
+    performs a second, independent read of the same file. ``claude_md_path``
+    is the placement-resolved target (``_claude_md_target()``) -- the tracked
+    ``CLAUDE.md`` in-repo, or the shadowed ``.praxion/CLAUDE.local.md`` under
+    sidecar placement (DS-8).
     """
-    claude_md_path = repo_root / "CLAUDE.md"
     lines = original_text.splitlines(keepends=True)
 
     by_class: dict[str, list[str]] = {"absent": [], "stale": [], "modified": []}
@@ -414,14 +435,15 @@ def main(argv: list[str] | None = None) -> int:
 
     manifest_path = Path(args.manifest_path) if args.manifest_path else _default_manifest_path()
     manifest = _load_manifest(manifest_path)
-    claude_md_text = _read_claude_md(repo_root)
+    claude_md_path = _claude_md_target(repo_root)
+    claude_md_text = _read_claude_md(claude_md_path)
     classifications = _classify_all(claude_md_text, manifest)
 
     if args.json_output:
         print(json.dumps(classifications))
         return 0
     if args.apply:
-        return run_apply(repo_root, claude_md_text, classifications)
+        return run_apply(claude_md_path, claude_md_text, classifications)
     return _report_check(classifications)
 
 

@@ -6,8 +6,14 @@ manifest; `_state_repo.py`'s stdlib line parser reads only the frozen
 `{schema, project.id, project.origin}` triple, on the hot path, in consumer
 interpreters that may lack PyYAML. This module is the deliberate, separate
 widening a caller reaches for when it needs `paths`/`autocommit`/`remote` --
-never imported by a hook or finalize script, so the top-level `import yaml`
-below costs nothing on that hot path.
+never imported by a hook or finalize script.
+
+`yaml` is imported lazily, inside `_require_yaml()`, rather than at module
+scope: a consumer interpreter without PyYAML must get a named, actionable
+`ManifestError` (naming `sys.executable` and the install fix) the moment
+this module's widening is actually reached, never a raw
+`ModuleNotFoundError` traceback surfacing out of a bare `import yaml` at
+import time (IF-17).
 
 `Manifest` is constructible only through `load_manifest()`: every invariant
 DS-2 names (closed enums, the `PathEntry` intent-discriminated sum, the
@@ -26,13 +32,16 @@ merge conflicts the common directory does not have.
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Union
+from types import ModuleType
+from typing import TYPE_CHECKING, Union
 
-import yaml
+if TYPE_CHECKING:
+    import yaml
 
 __all__ = [
     "NEVER_SHADOW",
@@ -184,6 +193,29 @@ def manifest_path(sidecar_common_dir: Path) -> Path:
     return sidecar_common_dir / _MANIFEST_FILENAME
 
 
+def _require_yaml() -> ModuleType:
+    """Import PyYAML, or raise a named, actionable `ManifestError`.
+
+    The interpreter running a hook or the finalize chain may not have PyYAML
+    installed (they never reach this module); an interpreter that reaches
+    for the manifest's full parse -- `praxion-sidecar`'s own entry point,
+    chiefly -- must instead. A raw `ModuleNotFoundError` traceback here would
+    both violate the "loud, named failure" promise and, for a hook shelling
+    out with `#!/usr/bin/env python3`, no-op silently (IF-17).
+    """
+    try:
+        import yaml
+    except ModuleNotFoundError as error:
+        raise ManifestError(
+            "pyyaml-missing",
+            f"PyYAML is not installed for {sys.executable} -- install it into that "
+            "interpreter (`python3 -m pip install pyyaml`), or re-run this command "
+            "with the interpreter the Praxion plugin ships (its own venv, when one "
+            "exists).",
+        ) from error
+    return yaml
+
+
 def load_manifest(path: Path) -> Manifest:
     """Parse, validate and return the manifest at `path`, or raise `ManifestError`.
 
@@ -191,6 +223,7 @@ def load_manifest(path: Path) -> Manifest:
     (DS-2's evolution contract) -- a future schema that relocated a field
     must not let this parser succeed with a confident wrong result.
     """
+    yaml = _require_yaml()
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     schema = _require_schema(data)
 
@@ -223,6 +256,8 @@ def write_manifest(path: Path, manifest: Manifest) -> None:
     triple's positional stability, which is what lets the stdlib line parser
     in `_state_repo.py` trust its own reading of the same file.
     """
+    yaml = _require_yaml()
+    _register_flow_sequence_representer(yaml)
     data = {
         "schema": manifest.schema,
         "project": {
@@ -448,7 +483,24 @@ def _represent_flow_sequence(dumper: yaml.Dumper, data: _FlowSequence) -> yaml.N
     return dumper.represent_sequence("tag:yaml.org,2002:seq", list(data), flow_style=True)
 
 
-yaml.SafeDumper.add_representer(_FlowSequence, _represent_flow_sequence)
+_flow_sequence_representer_registered = False
+
+
+def _register_flow_sequence_representer(yaml: ModuleType) -> None:
+    """Register `_FlowSequence`'s one-off representer, once.
+
+    Deferred alongside the rest of PyYAML's usage (`_require_yaml()`) rather
+    than run at module import time -- registration needs the `yaml` module
+    object, which a consumer interpreter lacking PyYAML must never be forced
+    to import just to load this module (IF-17). Idempotent: `write_manifest`
+    calls this on every invocation, and `add_representer` tolerates being
+    called twice with the same mapping.
+    """
+    global _flow_sequence_representer_registered
+    if _flow_sequence_representer_registered:
+        return
+    yaml.SafeDumper.add_representer(_FlowSequence, _represent_flow_sequence)
+    _flow_sequence_representer_registered = True
 
 
 def _dump_path_entry(entry: PathEntry) -> dict:

@@ -615,6 +615,54 @@ def test_reonboard_reads_placement_from_the_manifest_and_refuses_a_contradiction
     assert _PROCEED not in silent.stdout, "an already-established placement must not re-prompt"
 
 
+# -- IF-01: `--check` is a dry-run by contract -- prints the plan, delegates
+# nothing (no `praxion-sidecar init`, no `.praxion`, `git status` unchanged) --
+
+
+def test_placement_sidecar_check_prints_the_block_and_delegates_nothing(
+    sandbox: Sandbox, tmp_path: Path
+) -> None:
+    repo = existing_repo(tmp_path / "billing")
+    status_before = _git_status(repo)
+
+    result = run_onboard(sandbox, repo, ["--placement", "sidecar", "--check"])
+
+    assert result.returncode == 8, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    for header in (_SHADOWED, _SHARED, _UNAVAILABLE):
+        assert header in result.stdout, f"missing section {header!r} in:\n{result.stdout}"
+    assert _PROCEED not in result.stdout, "--check must never prompt for confirmation"
+    assert _sidecar_root_untouched(sandbox), "--check must never delegate to praxion-sidecar init"
+    assert not (repo / ".praxion").exists(), "--check must never materialize the mount"
+    assert _git_status(repo) == status_before, "--check must never mutate the target repo"
+
+
+def test_placement_sidecar_check_json_emits_the_plan_and_delegates_nothing(
+    sandbox: Sandbox, tmp_path: Path
+) -> None:
+    repo = existing_repo(tmp_path / "billing")
+
+    result = run_onboard(sandbox, repo, ["--placement", "sidecar", "--check", "--json"])
+
+    assert result.returncode == 8, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    payload = _find_json_object(result.stdout, "placement")
+    assert payload is not None, f"no placement JSON object found in:\n{result.stdout!r}"
+    assert payload["placement"] == "sidecar"
+    assert _sidecar_root_untouched(sandbox), "--check --json must never delegate"
+    assert not (repo / ".praxion").exists()
+
+
+def _git_status(repo: Path) -> str:
+    result = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        env={**os.environ, **_ISOLATED_GIT_ENV},
+    )
+    return result.stdout
+
+
 # -- --help ---------------------------------------------------------------
 
 

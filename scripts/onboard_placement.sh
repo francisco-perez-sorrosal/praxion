@@ -179,13 +179,10 @@ _placement_delegate_init() {
     [ "$rc" -eq 0 ] || exit "$rc"
 }
 
-# Renders the block (or the --json object) BEFORE calling praxion-sidecar,
-# so the operator sees what was about to happen even when delegation
-# refuses -- and only actually blocks on a read when stdin is a real,
-# interactive TTY and neither --yes nor --json (which implies --yes) was
-# given, so a piped/closed stdin never hangs.
-_placement_confirm_and_delegate() {
-    local target="$1" answer=""
+# Shared by both the --check preview and the real confirm-and-delegate path
+# below: the block (or --json plan), --quiet summary included.
+_placement_print_preview() {
+    local target="$1"
 
     if [ "$JSON_MODE" -eq 1 ]; then
         _placement_emit_json "$target"
@@ -194,6 +191,17 @@ _placement_confirm_and_delegate() {
     else
         _placement_print_quiet_summary "$target"
     fi
+}
+
+# Renders the block (or the --json object) BEFORE calling praxion-sidecar,
+# so the operator sees what was about to happen even when delegation
+# refuses -- and only actually blocks on a read when stdin is a real,
+# interactive TTY and neither --yes nor --json (which implies --yes) was
+# given, so a piped/closed stdin never hangs.
+_placement_confirm_and_delegate() {
+    local target="$1" answer=""
+
+    _placement_print_preview "$target"
 
     # The prompt line itself is printed here, unconditionally within this
     # guard, rather than as part of _placement_render_block above -- so
@@ -244,5 +252,15 @@ resolve_sidecar_placement() {
     [ "$PLACEMENT" = "sidecar" ] || return 0
 
     _placement_validate_mode "$mode"
+
+    # `--check` (and `--check --json`) is a dry-run by contract (see
+    # onboard-project's own `--check` help text): print what would happen,
+    # never delegate to `praxion-sidecar init` -- no sidecar directory, no
+    # `.git/info/exclude` edit, `git status` unchanged (IF-01).
+    if [ "$CHECK_ONLY" -eq 1 ]; then
+        _placement_print_preview "$target"
+        return 0
+    fi
+
     _placement_confirm_and_delegate "$target"
 }

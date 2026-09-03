@@ -14,6 +14,7 @@ How to bring a project into the Praxion ecosystem — one command, one engine, f
 - [Quick start](#quick-start)
 - [The phase list](#the-phase-list)
 - [Modes in depth](#modes-in-depth)
+- [Placement](#placement)
 - [Hackathon → full promotion](#hackathon--full-promotion)
 - [Re-running and upgrading](#re-running-and-upgrading)
 - [Troubleshooting](#troubleshooting)
@@ -161,6 +162,216 @@ onboard-project --with aac,ci --without obsidian
 ### `hackathon` — minimal, promotable
 
 `onboard-project my-app --hackathon` (or `--mode hackathon` on an existing repo) installs the invariant `core` surfaces plus six hackathon artifacts, skipping every opt-in tier. See [Hackathon → full promotion](#hackathon--full-promotion).
+
+## Placement
+
+By default, `.ai-state/` is committed in your project repository — the normal case, and the only one on a repo you own outright. On a team repo you do not own alone, that same commit history broadcasts every ADR, tech-debt row, and pipeline artifact to every co-owner. **Placement** answers where Praxion's state lives without changing the path contract agents read and write: `.ai-state/DESIGN.md` still resolves, `CLAUDE.local.md` still loads, only *what owns the git history behind that path* moves.
+
+`--placement sidecar` moves state ownership to a separate, per-operator git repository — the **sidecar** — while the project repo sees, at most, a plain doc you chose to share. `--placement in-repo` (the default) is unchanged from every example above this section.
+
+### The state mount
+
+Sidecar state is projected into each checkout as a real directory, not a plain symlink:
+
+```
+<checkout>/.praxion/                       REAL dir; git worktree of the sidecar, branch per checkout
+    .ai-state/                             tracked in the sidecar
+    CLAUDE.local.md                        tracked in the sidecar
+    settings.local.json                    tracked in the sidecar
+    .git                                   FILE: "gitdir: <sidecar>/.git/worktrees/<name>"
+<checkout>/.ai-state                    -> .praxion/.ai-state                 (relative)
+<checkout>/CLAUDE.local.md              -> .praxion/CLAUDE.local.md           (relative)
+<checkout>/.claude/settings.local.json  -> ../.praxion/settings.local.json    (relative)
+```
+
+**Why a mount, not a plain symlink.** Claude Code's worktree isolation refuses a `Write`/`Edit` on any lexically-in-worktree path whose `realpath` escapes the worktree — a symlink from inside a linked pipeline worktree straight out to `~/.praxion/sidecars/...` is refused mid-step, not at session start, with a harness message that points at a copy that does not exist. The mount avoids the refusal structurally: `<checkout>/.praxion` is a `git worktree` of the sidecar **materialised inside the checkout**, so every shadow symlink resolves to a realpath still under the checkout. This is the **in-checkout realpath invariant** — for every path Praxion asks an agent to write, `realpath(path)` stays inside the checkout the session is running in — and it holds uniformly for the main checkout and for every linked worktree, with no discriminator between them. `worktree_guard.py`'s containment check and the dashboard's `project-root.ts` containment check both stay correct **without modification**, because the paths they see never leave the checkout to begin with.
+
+The cost is a branch per checkout — the sidecar carries `main` for the main checkout and `wt/<name>` per linked worktree — and a merge step to bring a worktree's state home. That merge is a **convergence step**, not an ordering rule you must remember: three independent, idempotent channels can perform it (below), so skipping the explicit path costs latency, never correctness.
+
+### Onboarding with `--placement sidecar`
+
+**Mode rule.** `--placement sidecar` is legal only with mode `existing` — a `Sidecar` onboarding plan carries no mode field at all; it is structurally `existing`. `new` scaffolds a repo you just created and own; `hackathon` is a deliberately minimal, throwaway footprint; `promote` (hackathon → full) has no meaning without the in-repo hackathon artifacts sidecar placement would hide. Any other combination fails fast at exit `2`, naming the legal one.
+
+**`--shadow` / `--share`** move a path between the sidecar (shadowed — symlinked, excluded, never committed in the project) and the project (shared — a real tracked file). The allowlist and defaults:
+
+| Path | Default | Opt-out |
+|---|---|---|
+| `.ai-state/` | shadow | — (a sidecar without it is not a sidecar) |
+| `CLAUDE.local.md`, `.claude/settings.local.json` | shadow | — |
+| `CLAUDE.md` — repo already has one | untouched (Praxion blocks go to `CLAUDE.local.md` instead) | — (never touched, by construction) |
+| `CLAUDE.md` — repo has none | shadow | `--share CLAUDE.md` |
+| `docs/architecture.md` | share (a plain doc; cites ADRs by **id text**, never by `.ai-state/` path) | `--shadow docs/architecture.md` |
+| `architecture/`, `fitness/` (AaC tier) | shadow, when the tier is selected | `--share architecture` |
+
+Before any write, the confirmation block names the exact split:
+
+```
+Praxion onboarding · plugin 0.27.1
+
+  Directory   /Users/me/work/billing
+  Placement   sidecar
+
+  Project intelligence will live OUTSIDE this repository, in
+    ~/.praxion/sidecars/github.com--acme--billing
+
+  Shadowed — symlinked in, excluded via .git/info/exclude, never committed here:
+    .ai-state/                        the whole pipeline + decision record
+    CLAUDE.local.md                   your Praxion instructions (loads last, wins)
+    .claude/settings.local.json       your local Claude Code settings
+
+  Shared — committed in this repository, visible to the team:
+    docs/architecture.md              a plain architecture doc; cites ADRs by id
+                                      text, never by .ai-state/ path
+
+  Unavailable under sidecar placement:
+    ci                                CI workflows are GitHub-visible by construction
+
+  Your teammates see no Praxion files. Only the sidecar autocommits; commits in
+  this repository stay yours.
+
+Proceed? [y/N]
+```
+
+**The three `CLAUDE.md` cases**, decided once at `init` and immutable except through an explicit migration:
+
+| Case | Precondition | Praxion block target | `CLAUDE.md` on disk |
+|---|---|---|---|
+| `untouched` | project already has a tracked `CLAUDE.md` | `CLAUDE.local.md` (shadowed) | untouched, tracked, byte-unchanged |
+| `shadow` (default) | no `CLAUDE.md` exists | `CLAUDE.md` (shadowed) | symlink into the sidecar, excluded |
+| `share` | no `CLAUDE.md`, `--share CLAUDE.md` passed | `CLAUDE.md` | real file, tracked, committed |
+
+**Capability × placement.** Every `core` surface redirects into the sidecar (`.gitignore` → `.git/info/exclude`, `.gitattributes` + merge driver → the sidecar's own, `.claude/settings.json` → the shadowed `settings.local.json`). Beyond `core`:
+
+| Class | Capabilities | Behavior |
+|---|---|---|
+| **local** | `core`, `observability`, `arch` (with `docs/architecture.md` shared by default), `aac`, `ml` | Every tracked artifact redirects into the sidecar; the project repo sees nothing new (or, for `arch`, exactly the one shared doc) |
+| **share-gated** | `quality`, `obsidian` | These write ordinary tracked hygiene files (`.editorconfig`, `.pre-commit-config.yaml`, `.obsidian/app.json` pins). Never silent: the operator sees the exact file list and confirms, or declines and proposes them to the team as a normal PR |
+| **unavailable** | `ci` | `.github/workflows/*` and friends are GitHub-visible by construction — there is no invisible variant. Refused with a one-line reason naming the local hook chain as the closest equivalent |
+
+**What `git status` shows afterwards.** Nothing — and that is the point:
+
+```console
+$ git status --porcelain
+$ git add -A
+$ git add .ai-state/x
+fatal: adding files failed
+```
+
+The last command fails loudly (`... is beyond a symbolic link`) rather than silently leaking a shadowed file into a commit.
+
+### `praxion-sidecar`
+
+```
+praxion-sidecar <command> [options]
+
+  init         Create the sidecar for this project, move state into it, link it back
+  link         (Re)project the sidecar into this checkout — the idempotent repair verb
+  status       Where project intelligence lives, and whether it is clean       [--json]
+  doctor       Health checks with per-row verdicts and one-line fixes          [--json]
+  commit       Commit the sidecar's working tree (called by the finalize chain + Stop hook)
+  merge-back   Merge one worktree's state branch back, or converge them all
+  publish      Move sidecar state into the project repo, history preserved
+  absorb       Move committed project state out into the sidecar
+  remote       Show or set the sidecar's git remote (trust-boundary gated)
+```
+
+One example per verb:
+
+```console
+$ praxion-sidecar status
+  Placement   sidecar
+  Sidecar     ~/.praxion/sidecars/github.com--acme--billing
+              branch main · clean · 4 commits unpushed
+  Healthy. State is shared live across 3 checkouts — no branch isolation.
+
+$ praxion-sidecar doctor
+  PASS  exclude-block         6 Praxion entries in .git/info/exclude
+  FAIL  shadow:CLAUDE.md      a real file occupies the slot, not a symlink
+        why   a `git pull` brought a committed CLAUDE.md into a shadowed slot
+        fix   mv CLAUDE.md CLAUDE.md.team && praxion-sidecar link
+  WARN  sidecar-repo          3 files uncommitted in the sidecar
+        fix   praxion-sidecar commit
+  1 failed · 1 warning · 6 passed.
+
+$ praxion-sidecar init --share docs/architecture.md
+$ praxion-sidecar link
+Linked 2 surface(s) into /Users/me/work/billing/.claude/worktrees/auth-flow.
+$ praxion-sidecar commit
+Committed 3 file(s) to the sidecar (a1b2c3d) — chore(state): session 0e2bf758.
+$ praxion-sidecar merge-back --auto
+$ praxion-sidecar publish   # sidecar -> project repo, history preserved, --yes or TTY-confirmed
+$ praxion-sidecar absorb    # project repo -> sidecar
+$ praxion-sidecar remote git@github.com:acme/billing-praxion.git --push on-autocommit
+```
+
+**Exit codes.**
+
+| Exit | Meaning |
+|---|---|
+| `0` | success, healthy, or nothing to do |
+| `1` | actionable: `doctor` found drift, `--dry-run` found pending work, or an automatic `merge-back --auto` aborted a conflict |
+| `2` | usage error |
+| `3` | refused on safety grounds (the message always names the exact fix) |
+| `4` | environment: not a git repo, no manifest, sidecar unreadable, git failed |
+
+**When it refuses (exit 3, unless noted).** A real directory occupies the `.ai-state` slot at `init`. `.ai-state` symlinks to a *different* sidecar. `--shadow .claude` (Claude Code refuses a worktree when `.claude/` itself is a symlink — shadow the settings file instead). `remote` targets a host that differs from the project origin's host, without `--allow-foreign-host`. `--placement sidecar` in `hackathon`/`promote` mode. `publish`/`absorb` with a dirty project working tree. `init` when the sidecar root already belongs to a different origin. Usage errors (`2`) cover a `--shadow` path off the allowlist and a confirmation prompt with no TTY and no `--yes`.
+
+### State convergence and merge-back
+
+Each checkout — main and every linked worktree — carries its own sidecar branch (`main`, `wt/<name>`). A worktree's writes need to reach the base branch before ADR promotion sees its drafts.
+
+**Positive evidence, not memory.** A branch is judged **eligible** to merge back only when its recorded project branch is provably merged — an ancestor test, or (for squash merges) a squashed-branch patch-identity test. A deleted project branch, a removed worktree, or a missing mapping is **not** evidence of a merge; each leaves the branch `UnmergedIneligible` with its own named reason. Nothing is ever dropped on absent evidence.
+
+**Three idempotent channels**, none of them mandatory:
+
+1. The project's own `post-merge` finalize chain — converges **before** draft promotion, so a manual `git merge` or a GitHub-merge-then-`git pull` promotes drafts in the same run.
+2. SessionStart self-heal (`praxion-sidecar link`) — covers `git reset --hard origin/main`, which fires no hook at all.
+3. `/merge-worktree` step 4.5, explicit (`praxion-sidecar merge-back --from wt/<name>`) — **preferred, not required**: earliest visibility, and the only form allowed to leave conflict markers for you to resolve, because an operator is present.
+
+**On conflict.** An automatic channel (1 or 2) **aborts** the merge and exits `1`, naming the branch — the mount is never left mid-merge. Only the explicit verb (`merge-back --from`) may leave markers; it prints both the resolve and the abort commands.
+
+**`doctor`'s convergence rows**, each with its exact fix:
+
+| Id | Level | Condition | Fix |
+|---|---|---|---|
+| `state-unmerged` | WARN | a branch has unmerged commits and no positive evidence of a merge | `praxion-sidecar merge-back --from wt/<name>` |
+| `state-eligible` | WARN | eligible but not yet converged | `praxion-sidecar link` |
+| `mount-orphaned` | WARN | a sidecar worktree entry with no project checkout behind it | `praxion-sidecar link --prune` |
+| `mount-conflict` | FAIL | a mount is left mid-merge | resolve then commit in the mount, or abort the merge in the mount |
+
+A **new** linked worktree starts with no mount of its own; `post-checkout` materialises one on `git worktree add`, and the SessionStart heal is the backstop for any creation path that skips hooks.
+
+### Autocommit and remotes
+
+| Policy | Meaning |
+|---|---|
+| `autocommit: on-finalize-and-stop` (default) | The sidecar commits on the finalize chain and on the `Stop` hook |
+| `autocommit: on-finalize` | Finalize-triggered commits only |
+| `autocommit: manual` | Nothing autocommits; run `praxion-sidecar commit` yourself |
+
+**No remote by default.** `praxion-sidecar remote` prints "No remote configured. Push policy: never." until you set one. Setting a remote on a host that differs from the project origin's is refused (`--allow-foreign-host` overrides it deliberately) — on a work machine, project intelligence must not leave the boundary the code already lives in.
+
+**The project repo never autocommits.** The one exception, and the only commit `praxion-sidecar` ever makes in the *project* repository, is `publish`'s single history-preserving import merge — operator-confirmed, never automatic.
+
+> [!WARNING]
+> With no remote configured (the default), the sidecar's history exists only on the machine that created it. A lost or wiped laptop loses the project intelligence with it. Backing up the sidecar — a remote, a periodic copy, whatever fits your setup — is an **operator responsibility**; Praxion does not solve it for you.
+
+### Reversibility
+
+Nothing here is a one-way door. `publish` moves sidecar state into the project repo with history preserved; `absorb` moves it back out. `PRAXION_DISABLE_SIDECAR_BANNER=1` and `PRAXION_DISABLE_SIDECAR_AUTOCOMMIT=1` opt out of the SessionStart banner and the autocommit hook respectively. `praxion-sidecar link --prune` removes a stale mount entry after a worktree is gone.
+
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `doctor` reports `shadow:<path>` as `dangling` or `missing` | The symlink target moved or was never created in this checkout | `praxion-sidecar link` |
+| `doctor` reports `shadow:<path>` as `blocked`/`foreign` | A real file or directory occupies a shadowed slot (e.g. `git pull` brought in a tracked `CLAUDE.md`) | move it aside, then `praxion-sidecar link` |
+| `mount-conflict` FAIL | A mount was left mid-merge by the explicit `merge-back --from` | resolve then commit in the mount, or abort the merge in the mount — never a "rule was violated," an operator may legitimately be mid-resolution |
+| Project directory moved or was re-cloned | `.ai-state` (or the mount) now points at a stale sidecar path | `rm .ai-state && praxion-sidecar link`, or `praxion-sidecar link --repair` if the mount itself is foreign |
+| A worktree's `.ai-state` looks empty right after creation | `NotYetLinked` — the mount has not materialised yet | `post-checkout` or the next SessionStart heals it; run `praxion-sidecar link` to force it now |
+| `praxion-sidecar` hooks silently do nothing on an older Python | The consumer hooks require **Python ≥3.9** | upgrade the interpreter git invokes hooks with |
+
+---
 
 ## Hackathon → full promotion
 

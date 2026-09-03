@@ -311,7 +311,7 @@ def test_foreign_hookspath_check_reports_drift_without_mutating(project):
 def test_foreign_hookspath_apply_delegates_to_heal_and_converges(project):
     """Applying re-points core.hooksPath at a Praxion wrapper directory that
     delegates back to `.husky/_`; running apply twice more performs no
-    further core.hooksPath writes (REQ-11's non-oscillation guarantee)."""
+    further core.hooksPath writes (the chain's non-oscillation guarantee)."""
     repo, live = project["repo"], project["live"]
     delegate_dir = repo / ".husky" / "_"
     delegate_dir.mkdir(parents=True)

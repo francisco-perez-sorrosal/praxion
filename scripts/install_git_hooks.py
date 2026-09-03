@@ -50,6 +50,7 @@ import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Union
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -115,7 +116,11 @@ class Unresolvable:
     reason: str
 
 
-HooksPathState = Unset | PraxionWrapper | Foreign | Unresolvable
+# `Union`, not `X | Y`: a runtime alias in that form needs Python 3.10, and this
+# script is invoked with the ambient `python3` by the SessionStart heal hook
+# and by `upgrade_project_pins.sh` in consumer projects whose interpreter
+# Praxion does not choose (`scripts/**` targets 3.9+ -- `pyproject.toml`).
+HooksPathState = Union[Unset, PraxionWrapper, Foreign, Unresolvable]  # noqa: UP007
 
 
 @dataclass(frozen=True)
@@ -138,7 +143,7 @@ class ForeignOccupied:
     path: Path
 
 
-HookSlotState = Absent | PraxionSymlink | PraxionWrapperFile | ForeignOccupied
+HookSlotState = Union[Absent, PraxionSymlink, PraxionWrapperFile, ForeignOccupied]  # noqa: UP007
 
 
 @dataclass(frozen=True)

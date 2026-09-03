@@ -11,7 +11,7 @@ commits to:
     next_adr_number(decisions_dir)
     detect_drafts_to_promote(mode, branch)
     parse_fragment_filename(path) -> (datetime, user, branch, slug)
-    promote_draft(draft_path, nnn, repo_root) -> (new_path, old_id)
+    promote_draft(draft_path, nnn, state_git_root) -> (new_path, old_id)
     rewrite_cross_references(repo_root, old_id, new_id) -> int
     acquire_lock(lock_path)  # context manager
     main()                    # CLI entry
@@ -26,6 +26,7 @@ suite.
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import importlib.util
 import inspect
@@ -1339,13 +1340,19 @@ class TestRepoRootResolution:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         # Use monkeypatch.setattr so the global rebind is reverted post-test.
-        for attr in ("REPO_ROOT", "DECISIONS_DIR", "DRAFTS_DIR", "LOCK_PATH"):
+        for attr in ("REPO_ROOT", "DECISIONS_DIR", "DRAFTS_DIR", "LOCK_PATH", "STATE_GIT_ROOT"):
             monkeypatch.setattr(finalize, attr, getattr(finalize, attr))
         finalize._apply_repo_root(tmp_path)
         assert finalize.REPO_ROOT == tmp_path
         assert finalize.DECISIONS_DIR == tmp_path / ".ai-state" / "decisions"
         assert finalize.DRAFTS_DIR == tmp_path / ".ai-state" / "decisions" / "drafts"
         assert finalize.LOCK_PATH == finalize.DRAFTS_DIR / ".finalize.lock"
+        # Omitting the state root means in-repo placement: the project owns
+        # its own .ai-state/, so the state git root IS the repo root.
+        assert finalize.STATE_GIT_ROOT == tmp_path
+        finalize._apply_repo_root(tmp_path, tmp_path / "mount")
+        assert finalize.STATE_GIT_ROOT == tmp_path / "mount"
+        assert finalize.REPO_ROOT == tmp_path
 
 
 def _init_consumer_repo(root: Path) -> None:
@@ -1405,6 +1412,7 @@ def _make_fake_plugin(plugin_dir: Path) -> Path:
         "_repo_root.py",
         "_script_cli.py",
         "_git_runner.py",
+        "_state_repo.py",
     ):
         shutil.copy2(src_dir / name, plugin_scripts / name)
     (plugin_dir / ".ai-state" / "decisions" / "drafts").mkdir(parents=True)
@@ -2080,3 +2088,370 @@ class TestPromotionStaging:
         assert "id: dec-311" in staged
         assert "status: accepted" in staged
         assert status_lines == [f"R  {draft.relative_to(root)} -> {rel}"], status_lines
+
+
+# -- Mount redirection: --state-root under sidecar placement ------------------
+#
+# `ARCH_WT_RULING.md` Option F: `.ai-state/` shadows a real `git worktree`
+# ("the mount") at `<project>/.praxion`, checked out from a separate sidecar
+# repository. Promotion's `git mv`/`git add` must run against the MOUNT, with
+# mount-realpath src/dst -- never against the project repo, and never with a
+# shadow-symlink path, both of which the ruling's live probe found refused
+# ("outside repository") rather than silently misstaged. These fixtures build
+# a real `git worktree` (mirroring `scripts/test_state_repo.py`'s own
+# fixture style) -- a bare symlink fixture would not reproduce that refusal.
+
+
+@dataclasses.dataclass(frozen=True)
+class _MountFixture:
+    """A fully wired sidecar-placement fixture: sidecar + mount + project."""
+
+    project_root: Path
+    sidecar_root: Path
+    mount_dir: Path
+    old_id: str
+    draft_filename: str
+    architecture_doc: Path
+    learnings_doc: Path
+
+
+def _mount_git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True)
+
+
+def _mount_git_ok(root: Path, *args: str) -> str:
+    result = _mount_git(root, *args)
+    assert result.returncode == 0, f"git -C {root} {args} failed: {result.stderr}"
+    return result.stdout
+
+
+def _git_status_porcelain(root: Path) -> list[str]:
+    return [line for line in _mount_git_ok(root, "status", "--porcelain").splitlines() if line]
+
+
+def _git_head(root: Path) -> str:
+    return _mount_git_ok(root, "rev-parse", "HEAD").strip()
+
+
+def _init_mount_sidecar(sidecar_root: Path) -> tuple[str, str]:
+    """Seed a sidecar repo carrying one draft ADR on `main`, then detach.
+
+    Detaching mirrors `praxion-sidecar init`'s own sequence
+    (`ARCH_WT_RULING.md` sec. 5): `main` must be free for the project's mount
+    to check out. Returns `(old_id, draft_filename)`.
+    """
+    sidecar_root.mkdir(parents=True, exist_ok=True)
+    _mount_git_ok(sidecar_root, "init", "-q", "-b", "main")
+    _mount_git_ok(sidecar_root, "config", "user.email", "sidecar@example.com")
+    _mount_git_ok(sidecar_root, "config", "user.name", "Sidecar Test")
+    draft = make_draft(
+        sidecar_root,
+        "20260101-1200",
+        "tester",
+        "main",
+        "mount-redirect",
+        frontmatter_extra={"branch": "main"},
+    )
+    old_id = f"dec-draft-{_draft_hash(draft.name)}"
+    (sidecar_root / ".ai-state" / "decisions").mkdir(parents=True, exist_ok=True)
+    _mount_git_ok(sidecar_root, "add", "-A")
+    _mount_git_ok(sidecar_root, "commit", "-qm", "seed sidecar")
+    _mount_git_ok(sidecar_root, "checkout", "-q", "--detach")
+    return old_id, draft.name
+
+
+def _mount_project(
+    sidecar_root: Path, project_root: Path, old_id: str, *, task_slug: str
+) -> tuple[Path, Path, Path]:
+    """Mount the sidecar at `<project_root>/.praxion`, shadow `.ai-state`, and
+    seed two project-side files citing `old_id`. Returns
+    `(mount_dir, architecture_doc, learnings_doc)`.
+    """
+    project_root.mkdir(parents=True, exist_ok=True)
+    mount_dir = project_root / ".praxion"
+    _mount_git_ok(sidecar_root, "worktree", "add", "-q", str(mount_dir), "main")
+
+    _mount_git_ok(project_root, "init", "-q", "-b", "main")
+    _mount_git_ok(project_root, "config", "user.email", "project@example.com")
+    _mount_git_ok(project_root, "config", "user.name", "Project Test")
+
+    # `git init` already creates `.git/info/`; overwrite `exclude` with the
+    # two lines the ruling's lifecycle table names for a linked mount.
+    (project_root / ".git" / "info" / "exclude").write_text(
+        "/.praxion/\n/.ai-state\n", encoding="utf-8"
+    )
+    (project_root / ".ai-state").symlink_to(
+        Path(mount_dir.name) / ".ai-state", target_is_directory=True
+    )
+
+    docs_dir = project_root / "docs"
+    docs_dir.mkdir()
+    architecture_doc = docs_dir / "architecture.md"
+    architecture_doc.write_text(f"See {old_id} for the mount rationale.\n", encoding="utf-8")
+
+    ai_work_dir = project_root / ".ai-work" / task_slug
+    ai_work_dir.mkdir(parents=True)
+    learnings_doc = ai_work_dir / "LEARNINGS.md"
+    learnings_doc.write_text(f"Decision recorded as {old_id}.\n", encoding="utf-8")
+
+    _mount_git_ok(project_root, "add", "-A")
+    _mount_git_ok(project_root, "commit", "-qm", "seed project")
+    return mount_dir, architecture_doc, learnings_doc
+
+
+def _write_mount_manifest(
+    sidecar_root: Path, project_root: Path, *, project_id: str = "local--mount-test"
+) -> None:
+    """A minimal remote-less manifest -- `roots:` is the only anchor.
+
+    Mirrors `scripts/test_state_repo.py`'s own `_write_manifest` fixture
+    style (flow-list `roots:`), scoped down to what this file's tests need.
+    """
+    manifest_path = sidecar_root / ".git" / "praxion-sidecar.yaml"
+    manifest_path.write_text(
+        "# managed by praxion-sidecar\n"
+        "schema: 1\n"
+        "project:\n"
+        "  origin: null\n"
+        f'  id: "{project_id}"\n'
+        f'  roots: ["{project_root.resolve()}"]\n',
+        encoding="utf-8",
+    )
+
+
+def _build_mount_fixture(
+    root: Path, *, with_manifest: bool = False, task_slug: str = "sidecar-placement"
+) -> _MountFixture:
+    """A real git-worktree mount fixture (`ARCH_WT_RULING.md` Option F).
+
+    Not a bare symlink: the ruling's verified "shadow-symlink path refused
+    loudly" behavior only reproduces against a real `git worktree`
+    (`tmp/probe_finalize.sh`).
+    """
+    sidecar_root = root / "sidecar"
+    project_root = root / "project"
+    old_id, draft_filename = _init_mount_sidecar(sidecar_root)
+    mount_dir, architecture_doc, learnings_doc = _mount_project(
+        sidecar_root, project_root, old_id, task_slug=task_slug
+    )
+    if with_manifest:
+        _write_mount_manifest(sidecar_root, project_root)
+    return _MountFixture(
+        project_root=project_root,
+        sidecar_root=sidecar_root,
+        mount_dir=mount_dir,
+        old_id=old_id,
+        draft_filename=draft_filename,
+        architecture_doc=architecture_doc,
+        learnings_doc=learnings_doc,
+    )
+
+
+def _run_finalize(fixture: _MountFixture, *extra_args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            sys.executable,
+            str(_SCRIPT_PATH),
+            "--all",
+            "--repo-root",
+            str(fixture.project_root),
+            *extra_args,
+        ],
+        capture_output=True,
+        text=True,
+        cwd=str(fixture.project_root),
+    )
+
+
+class TestFinalizeStateRootMountRedirection:
+    """`--state-root` redirects promotion's git plumbing into the sidecar mount.
+
+    No `subprocess.run` monkeypatching here: the behavior under test *is*
+    git's realpath/repository-boundary semantics, and only a real `git
+    worktree` reproduces the ruling's verified refusal
+    (`tmp/probe_finalize.sh`).
+    """
+
+    def test_state_root_stages_the_rename_inside_the_mount(self, tmp_path: Path) -> None:
+        fixture = _build_mount_fixture(tmp_path)
+        project_head_before = _git_head(fixture.project_root)
+
+        result = _run_finalize(fixture, "--state-root", str(fixture.mount_dir))
+
+        assert result.returncode == 0, result.stderr
+
+        mount_status = _git_status_porcelain(fixture.mount_dir)
+        assert any(line.startswith("R") for line in mount_status), mount_status
+
+        # The project repo's own index is untouched: no entry is staged, and
+        # HEAD has not moved. Working-tree modifications from the
+        # cross-reference rewrite are expected and checked separately below.
+        project_status = _git_status_porcelain(fixture.project_root)
+        staged = [line for line in project_status if line[0] not in (" ", "?")]
+        assert staged == [], f"project repo must have nothing staged: {project_status}"
+        assert _git_head(fixture.project_root) == project_head_before
+
+        architecture = fixture.architecture_doc.read_text(encoding="utf-8")
+        learnings = fixture.learnings_doc.read_text(encoding="utf-8")
+        assert "dec-001" in architecture, architecture
+        assert fixture.old_id not in architecture, architecture
+        assert "dec-001" in learnings, learnings
+        assert fixture.old_id not in learnings, learnings
+
+        index = (fixture.mount_dir / ".ai-state" / "decisions" / "DECISIONS_INDEX.md").read_text(
+            encoding="utf-8"
+        )
+        assert "dec-001" in index
+
+    def test_omitting_state_root_resolves_the_same_mount_by_default(self, tmp_path: Path) -> None:
+        fixture = _build_mount_fixture(tmp_path, with_manifest=True)
+
+        result = _run_finalize(fixture)
+
+        assert result.returncode == 0, result.stderr
+        mount_status = _git_status_porcelain(fixture.mount_dir)
+        assert any(line.startswith("R") for line in mount_status), mount_status
+        project_status = _git_status_porcelain(fixture.project_root)
+        staged = [line for line in project_status if line[0] not in (" ", "?")]
+        assert staged == [], f"project repo must have nothing staged: {project_status}"
+
+    def test_default_resolution_refuses_a_shadow_with_no_sidecar_manifest(
+        self, tmp_path: Path
+    ) -> None:
+        """A shadow that resolves somewhere unrecognised is refused, not guessed.
+
+        Without a manifest the mount is indistinguishable from any other
+        directory a `.ai-state` symlink might point at, so the placement
+        resolver classifies it foreign. Finalize mutates state, so it must
+        stop and say why rather than fall back to the project repo.
+        """
+        fixture = _build_mount_fixture(tmp_path)
+        original_draft = (
+            fixture.mount_dir / ".ai-state" / "decisions" / "drafts" / fixture.draft_filename
+        )
+
+        result = _run_finalize(fixture)
+
+        assert result.returncode != 0, result.stdout
+        assert "no-manifest" in result.stderr, result.stderr
+        assert original_draft.exists(), "draft was promoted despite the refusal"
+        decisions_dir = fixture.mount_dir / ".ai-state" / "decisions"
+        assert not list(decisions_dir.glob("[0-9][0-9][0-9]-*.md"))
+
+    def test_state_root_that_is_not_a_git_repo_is_refused(self, tmp_path: Path) -> None:
+        """A state root that no index backs cannot stage anything, so it is
+        refused up front rather than silently degrading to `Path.rename`.
+
+        The path-identity check alone passes here -- `<plain>/.ai-state` is
+        literally the state root's own `.ai-state` -- which is exactly why
+        the git-worktree requirement is a separate condition.
+        """
+        plain = tmp_path / "plain"
+        draft = make_draft(plain, "20260101-1200", "tester", "main", "no-git-here")
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(_SCRIPT_PATH),
+                "--all",
+                "--repo-root",
+                str(plain),
+                "--state-root",
+                str(plain),
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(plain),
+        )
+
+        assert result.returncode != 0, result.stdout
+        assert "not a git worktree" in result.stderr, result.stderr
+        assert draft.exists(), "draft was promoted despite the refusal"
+        decisions_dir = plain / ".ai-state" / "decisions"
+        assert not list(decisions_dir.glob("[0-9][0-9][0-9]-*.md"))
+
+    def test_state_root_pointed_at_the_project_fails_loudly_instead_of_misstaging(
+        self, tmp_path: Path
+    ) -> None:
+        """`--state-root <project>` is the shadow-symlink-path mistake the
+        ruling's probe found refused: `git mv` runs against mount-realpath
+        src/dst from the wrong `-C` repository. The failure must be loud --
+        never a silent `Path.rename` fallback that leaves the working tree
+        renamed with nothing staged anywhere.
+        """
+        fixture = _build_mount_fixture(tmp_path)
+        original_draft = (
+            fixture.mount_dir / ".ai-state" / "decisions" / "drafts" / fixture.draft_filename
+        )
+
+        result = _run_finalize(fixture, "--state-root", str(fixture.project_root))
+
+        assert result.returncode != 0, result.stdout
+        stderr_lower = result.stderr.lower()
+        assert "outside repository" in stderr_lower or "beyond a symbolic link" in stderr_lower, (
+            result.stderr
+        )
+
+        assert original_draft.exists(), "draft was renamed despite the loud git failure"
+        decisions_dir = fixture.mount_dir / ".ai-state" / "decisions"
+        assert not list(decisions_dir.glob("[0-9][0-9][0-9]-*.md")), (
+            "a finalized ADR leaked out despite the failure"
+        )
+        # `.finalize.lock` is created (and never deleted -- an advisory lock,
+        # not a staging artifact) the moment the lock is acquired, on every
+        # run regardless of outcome, so it is excluded here rather than
+        # asserting an unconditionally-empty status.
+        non_lock_entries = [
+            line
+            for line in _git_status_porcelain(fixture.mount_dir)
+            if ".finalize.lock" not in line
+        ]
+        assert non_lock_entries == [], "nothing should be staged in the mount on a failed run"
+
+    def test_second_run_with_no_remaining_drafts_leaves_the_mount_unchanged(
+        self, tmp_path: Path
+    ) -> None:
+        fixture = _build_mount_fixture(tmp_path)
+        first = _run_finalize(fixture, "--state-root", str(fixture.mount_dir))
+        assert first.returncode == 0, first.stderr
+        status_after_first = _git_status_porcelain(fixture.mount_dir)
+        head_after_first = _git_head(fixture.mount_dir)
+
+        second = _run_finalize(fixture, "--state-root", str(fixture.mount_dir))
+
+        assert second.returncode == 0, second.stderr
+        assert _git_status_porcelain(fixture.mount_dir) == status_after_first
+        assert _git_head(fixture.mount_dir) == head_after_first
+
+    def test_project_reached_through_a_symlinked_parent_still_stages_in_the_mount(
+        self, tmp_path: Path
+    ) -> None:
+        """A symlinked ancestor directory (the macOS `/tmp` vs
+        `/private/tmp` shape) must not defeat the mount-realpath comparison
+        that lets `git mv` succeed."""
+        real_parent = tmp_path / "real-parent"
+        real_parent.mkdir()
+        fixture = _build_mount_fixture(real_parent)
+        aliased_parent = tmp_path / "alias-parent"
+        aliased_parent.symlink_to(real_parent, target_is_directory=True)
+        aliased_project = aliased_parent / "project"
+        aliased_mount = aliased_project / ".praxion"
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(_SCRIPT_PATH),
+                "--all",
+                "--repo-root",
+                str(aliased_project),
+                "--state-root",
+                str(aliased_mount),
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(aliased_project),
+        )
+
+        assert result.returncode == 0, result.stderr
+        mount_status = _git_status_porcelain(fixture.mount_dir)
+        assert any(line.startswith("R") for line in mount_status), mount_status

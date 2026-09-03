@@ -3,7 +3,17 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-export const ALLOWED_ARTIFACT_ROOTS = [".ai-state", ".ai-work", "docs", "ROADMAP.md"] as const;
+// Under sidecar placement `.ai-state` is a relative symlink into the state
+// mount at `.praxion/.ai-state`, and the realpath re-check below re-applies
+// this allowlist to the *resolved* relative path. Only that one subtree is
+// admitted; nothing else under `.praxion/` is a dashboard artifact.
+export const ALLOWED_ARTIFACT_ROOTS = [
+  ".ai-state",
+  ".ai-work",
+  "docs",
+  "ROADMAP.md",
+  ".praxion/.ai-state"
+] as const;
 const REQUIRED_PROJECT_DIRECTORIES = [".ai-state"] as const;
 
 async function pathExists(target: string): Promise<boolean> {

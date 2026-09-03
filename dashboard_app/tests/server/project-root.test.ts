@@ -1,10 +1,11 @@
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  ALLOWED_ARTIFACT_ROOTS,
   assertAllowedArtifactPath,
   validateProjectRoot
 } from "@/server/artifacts/project-root";
@@ -82,5 +83,136 @@ describe("project-root guards", () => {
     const root = await createTempProjectRoot("dashboard-root-empty-");
 
     await expect(validateProjectRoot(root)).rejects.toThrow(/project root/i);
+  });
+});
+
+describe("project-root guards — sidecar state mount", () => {
+  // Sidecar placement (ARCH_WT_RULING.md § 9): every checkout that opts into
+  // sidecar placement mounts Praxion state as a real git worktree at
+  // `<checkout>/.praxion/`, and `.ai-state` in the checkout becomes a
+  // *relative* symlink pointing inward at `.praxion/.ai-state`. Both existing
+  // containment checks (lexical + post-existence realpath) stay unchanged;
+  // the only change under test is the allowlist gaining a `.praxion/.ai-state`
+  // entry so the resolved path clears `isAllowedArtifactPath` too.
+  async function createSidecarMountFixture(prefix: string): Promise<string> {
+    const root = await createTempProjectRoot(prefix);
+    await mkdir(path.join(root, ".praxion", ".ai-state", "decisions", "drafts"), {
+      recursive: true
+    });
+    await writeFile(path.join(root, ".praxion", ".ai-state", "DESIGN.md"), "# Design\n");
+    await writeFile(
+      path.join(root, ".praxion", ".ai-state", "decisions", "drafts", "x.md"),
+      "# Draft\n"
+    );
+    // Relative symlink, matching the ruling's contract exactly — an absolute
+    // symlink would still resolve correctly here but wouldn't pin the
+    // relative-ness the ruling requires for a portable checkout.
+    await symlink(path.join(".praxion", ".ai-state"), path.join(root, ".ai-state"), "dir");
+    return root;
+  }
+
+  it("serves an artifact reached through the state mount", async () => {
+    const root = await createSidecarMountFixture("dashboard-sidecar-mount-");
+
+    const allowedPath = await assertAllowedArtifactPath(
+      root,
+      path.join(root, ".ai-state", "DESIGN.md")
+    );
+
+    expect(allowedPath).toBe(path.join(root, ".ai-state", "DESIGN.md"));
+  });
+
+  it("serves a nested artifact reached through the state mount", async () => {
+    const root = await createSidecarMountFixture("dashboard-sidecar-nested-");
+
+    const allowedPath = await assertAllowedArtifactPath(
+      root,
+      path.join(root, ".ai-state", "decisions", "drafts", "x.md")
+    );
+
+    expect(allowedPath).toBe(path.join(root, ".ai-state", "decisions", "drafts", "x.md"));
+  });
+
+  it("serves the same artifact when requested by its lexical mount path", async () => {
+    // Assumption: the allowlist gate applies identically whether the caller
+    // reaches the artifact through the `.ai-state` shadow or through the
+    // mount's own `.praxion/.ai-state` path — both are legitimate on-disk
+    // locations for the same data, so both must resolve.
+    const root = await createSidecarMountFixture("dashboard-sidecar-lexical-");
+
+    const allowedPath = await assertAllowedArtifactPath(
+      root,
+      path.join(root, ".praxion", ".ai-state", "DESIGN.md")
+    );
+
+    expect(allowedPath).toBe(path.join(root, ".praxion", ".ai-state", "DESIGN.md"));
+  });
+
+  it("still rejects a symlink that escapes the project root under an allowed name", async () => {
+    const outsideRoot = await createTempProjectRoot("dashboard-sidecar-outside-");
+    await writeFile(path.join(outsideRoot, "secret.md"), "# Secret\n");
+
+    const escapeRoot = await createTempProjectRoot("dashboard-sidecar-escape-");
+    await symlink(outsideRoot, path.join(escapeRoot, ".ai-state"), "dir");
+
+    await expect(
+      assertAllowedArtifactPath(escapeRoot, path.join(escapeRoot, ".ai-state", "secret.md"))
+    ).rejects.toThrow(/resolves outside the configured project root/i);
+  });
+
+  it("still rejects a lexically escaping relative path", async () => {
+    const root = await createSidecarMountFixture("dashboard-sidecar-traversal-");
+
+    await expect(
+      assertAllowedArtifactPath(root, path.join(root, "..", "..", "etc", "passwd"))
+    ).rejects.toThrow(/stay inside the configured project root/i);
+  });
+
+  it("rejects a path under the mount that falls outside the state allowlist", async () => {
+    const root = await createSidecarMountFixture("dashboard-sidecar-narrow-");
+    await writeFile(path.join(root, ".praxion", "CLAUDE.local.md"), "# Local\n");
+
+    await expect(
+      assertAllowedArtifactPath(root, path.join(root, ".praxion", "CLAUDE.local.md"))
+    ).rejects.toThrow(/allowed/i);
+  });
+
+  it("accepts a project root whose .ai-state is a symlink into the mount", async () => {
+    const root = await createSidecarMountFixture("dashboard-sidecar-validate-");
+
+    await expect(validateProjectRoot(root)).resolves.toBe(root);
+  });
+
+  it("ignores a PRAXION_STATE_ROOT environment override when rejecting an escape", async () => {
+    // Pins the retired containment-guard-state-root ADR's re-open condition:
+    // no second root is ever admitted through an environment channel. The
+    // module reads no env var today, so this guards against that changing
+    // silently — the escape is rejected identically whether or not the
+    // variable is set.
+    const outsideRoot = await createTempProjectRoot("dashboard-sidecar-env-outside-");
+    await writeFile(path.join(outsideRoot, "secret.md"), "# Secret\n");
+
+    const escapeRoot = await createTempProjectRoot("dashboard-sidecar-env-escape-");
+    await symlink(outsideRoot, path.join(escapeRoot, ".ai-state"), "dir");
+
+    const previousEnv = process.env.PRAXION_STATE_ROOT;
+    process.env.PRAXION_STATE_ROOT = outsideRoot;
+    try {
+      await expect(
+        assertAllowedArtifactPath(escapeRoot, path.join(escapeRoot, ".ai-state", "secret.md"))
+      ).rejects.toThrow(/resolves outside the configured project root/i);
+    } finally {
+      if (previousEnv === undefined) {
+        delete process.env.PRAXION_STATE_ROOT;
+      } else {
+        process.env.PRAXION_STATE_ROOT = previousEnv;
+      }
+    }
+  });
+
+  it("exposes exactly the expected allowed artifact roots, including the state mount", () => {
+    expect(new Set(ALLOWED_ARTIFACT_ROOTS)).toEqual(
+      new Set([".ai-state", ".ai-work", "docs", "ROADMAP.md", ".praxion/.ai-state"])
+    );
   });
 });

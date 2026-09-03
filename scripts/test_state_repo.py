@@ -81,17 +81,27 @@ def _write_manifest(
     project_id: str,
     roots: list[str],
     extra: str = "",
+    block_style_roots: bool = False,
 ) -> Path:
+    """Write a manifest fixture. `block_style_roots` renders `roots:` as a
+    YAML block sequence (`roots:\n  - "path"`) instead of the default flow
+    list -- covering an operator hand-edit `_parse_roots` must also accept,
+    distinct from `_sidecar_manifest.write_manifest()`'s own output style."""
     manifest_path = sidecar_root / ".git" / "praxion-sidecar.yaml"
     origin_yaml = "null" if origin is None else f'"{origin}"'
-    roots_yaml = ", ".join(f'"{root}"' for root in roots)
+    if block_style_roots:
+        items = "".join(f'    - "{root}"\n' for root in roots)
+        roots_block = f"  roots:\n{items}" if roots else "  roots: []\n"
+    else:
+        roots_yaml = ", ".join(f'"{root}"' for root in roots)
+        roots_block = f"  roots: [{roots_yaml}]\n"
     manifest_path.write_text(
         "# managed by praxion-sidecar\n"
         f"schema: {schema}\n"
         "project:\n"
         f"  origin: {origin_yaml}\n"
         f'  id: "{project_id}"\n'
-        f"  roots: [{roots_yaml}]\n"
+        f"{roots_block}"
         f"{extra}"
     )
     return manifest_path
@@ -111,6 +121,7 @@ def _build_sidecar_owned_fixture(
     project_id: str = "local--abc123def456",
     extra_manifest: str = "",
     project_remote_origin: str | None | object = _UNSET,
+    block_style_roots: bool = False,
 ) -> _MountFixture:
     """A fully wired `SidecarOwned` fixture: sidecar + mount + manifest + shadow.
 
@@ -135,6 +146,7 @@ def _build_sidecar_owned_fixture(
         project_id=project_id,
         roots=resolved_roots,
         extra=extra_manifest,
+        block_style_roots=block_style_roots,
     )
     _link_shadow(project_root, mount_dir)
     return _MountFixture(
@@ -462,6 +474,18 @@ def test_remote_less_project_root_present_in_recorded_roots_resolves_to_sidecar_
     tmp_path: Path,
 ) -> None:
     fixture = _build_sidecar_owned_fixture(tmp_path, origin=None)
+
+    result = _state_repo.resolve_placement(fixture.project_root)
+
+    assert isinstance(result, _state_repo.SidecarOwned)
+    assert result.identity.origin is None
+
+
+def test_hand_written_block_style_roots_resolves_to_sidecar_owned(tmp_path: Path) -> None:
+    """An operator may hand-edit `roots:` as a YAML block sequence
+    (`roots:\n  - "path"`) rather than a flow list -- `_parse_roots` must
+    accept both, since nothing constrains how a human edits the file."""
+    fixture = _build_sidecar_owned_fixture(tmp_path, origin=None, block_style_roots=True)
 
     result = _state_repo.resolve_placement(fixture.project_root)
 

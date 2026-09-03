@@ -345,7 +345,7 @@ def _read_identity(manifest_path: Path) -> tuple[SidecarIdentity, list[str]]:
     if not project_id:
         raise _MountRefusalError(ForeignReason.MANIFEST_UNREADABLE)
     identity = SidecarIdentity(schema=schema, id=project_id, origin=_scalar(project.get("origin")))
-    return identity, _flow_list(project.get("roots", ""))
+    return identity, _parse_roots(text)
 
 
 def _require_identity_match(root: Path, identity: SidecarIdentity, roots: list[str]) -> None:
@@ -496,6 +496,57 @@ def _scalar(raw: str | None) -> str | None:
     if value.lower() in _NULL_SCALARS:
         return None
     return _unquote(value)
+
+
+def _parse_roots(text: str) -> list[str]:
+    """`project.roots` -- flow style (`[a, b]`) or a YAML block sequence
+    (`roots:` followed by indented `- item` lines).
+
+    An operator may hand-edit the manifest in either style, and the writer
+    (`_sidecar_manifest.py`) may emit either. A `roots:` value that is
+    neither blank (block style follows) nor a `[...]` flow list is malformed
+    and refused outright: `roots` is DS-7's only identity anchor for a
+    remote-less project, so silently degrading a malformed value to `[]`
+    would misclassify every such project as `Foreign(identity-mismatch)`
+    instead of failing loudly.
+    """
+    lines = text.splitlines()
+    inside_project = False
+    for index, line in enumerate(lines):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if not line[:1].isspace():
+            inside_project = line.partition(":")[0].strip() == _PROJECT_KEY
+            continue
+        if not inside_project:
+            continue
+        name, separator, value = line.strip().partition(":")
+        if not separator or name.strip() != "roots":
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        stripped_value = value.strip()
+        if not stripped_value:
+            return _block_sequence_items(lines, index, indent)
+        if stripped_value.startswith("["):
+            return _flow_list(value)
+        raise _MountRefusalError(ForeignReason.MANIFEST_UNREADABLE)
+    return []
+
+
+def _block_sequence_items(lines: list[str], key_index: int, key_indent: int) -> list[str]:
+    """Items of a YAML block sequence starting on the line after `lines[key_index]`."""
+    items: list[str] = []
+    for line in lines[key_index + 1 :]:
+        if not line.strip():
+            continue
+        item_indent = len(line) - len(line.lstrip(" "))
+        if item_indent <= key_indent:
+            break
+        stripped = line.strip()
+        if not stripped.startswith("-"):
+            break
+        items.append(_unquote(stripped[1:].strip()))
+    return items
 
 
 def _flow_list(raw: str) -> list[str]:

@@ -482,7 +482,7 @@ See [`docs/rules-taxonomy.md`](../docs/rules-taxonomy.md) for the complete refer
 | `shadow` (default) | no `CLAUDE.md` exists | `CLAUDE.md` (shadowed, symlinked into the sidecar) | excluded, never committed |
 | `share` | no `CLAUDE.md` and `--share CLAUDE.md` was passed | `CLAUDE.md` | real file, tracked, committed |
 
-Every writer above — this phase, §Phase 5b, §Phase 8d, and `/upgrade-project`'s `refresh_claude_blocks.py` call — resolves its target through the same `placement.block_target()` lookup rather than hardcoding `CLAUDE.md`. **Invariant: no write path ever targets a `CLAUDE.md` whose placement is `untouched`.**
+Every writer above — this phase, §Phase 5b, §Phase 8d, and `/upgrade-project`'s `refresh_claude_blocks.py` call — resolves its target through the same `placement.block_target()` lookup rather than hardcoding `CLAUDE.md`. **Invariant: no write path ever targets a `CLAUDE.md` whose placement is `untouched`.** Every writer above targets the block's file through Python/bash, not the Write/Edit tools, so it is unaffected by a harness caveat that applies to *agents* editing these files directly: a file (not directory) shadow like a shadowed `CLAUDE.local.md` or `.claude/settings.local.json` loads through its link but refuses a direct Write/Edit, so a later hand-edit must target its mount path instead.
 
 **Action.**
 

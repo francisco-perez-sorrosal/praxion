@@ -313,10 +313,25 @@ def prune_mount(sidecar_root: Path, checkout: Path) -> None:
 # --- merging one branch back ------------------------------------------------
 
 
+class MergeOutcome(str, Enum):  # noqa: UP042 -- `StrEnum` needs 3.11
+    """The three things a merge-back attempt can do -- never two of them."""
+
+    MERGED = "merged"
+    CONFLICTED = "conflicted"
+    FAILED = "failed"
+
+
 @dataclasses.dataclass(frozen=True)
 class MergeBackResult:
     branch: str
-    conflicted: bool
+    outcome: MergeOutcome
+    # git's own first stderr line, carried only for FAILED: the operator needs
+    # the actual reason, and no other outcome has one to give.
+    detail: str = ""
+
+    @property
+    def conflicted(self) -> bool:
+        return self.outcome is MergeOutcome.CONFLICTED
 
 
 def merge_back(
@@ -332,13 +347,34 @@ def merge_back(
     automatic run aborts and leaves the mount clean, while the operator-driven
     verb may leave markers for manual resolution. The merge runs *in the
     mount*, so the sidecar's own merge drivers apply by construction.
+
+    A non-zero git exit is *not* evidence of a conflict. Git can also fail
+    before merging anything -- a broken environment, a locked index, an
+    unreadable object store -- and reporting that as a conflict sends the
+    operator to `merge-back --from`, which fails the same way for the same
+    reason. The two are told apart by the only artifact a real conflict leaves:
+    ``MERGE_HEAD``, checked before any abort can remove it.
     """
     mount = _require_state_mount(sidecar_root, target_checkout)
-    if gitp.merge_branch(mount, from_branch):
-        return MergeBackResult(branch=from_branch, conflicted=False)
+    try:
+        result = gitp.merge_branch(mount, from_branch)
+    except GitUnavailableError as error:
+        return MergeBackResult(from_branch, MergeOutcome.FAILED, str(error))
+    if result.returncode == 0:
+        return MergeBackResult(from_branch, MergeOutcome.MERGED)
+    if not gitp.merge_in_progress(mount):
+        return MergeBackResult(from_branch, MergeOutcome.FAILED, _first_line(result.stderr))
     if not allow_conflict_markers:
         gitp.abort_merge(mount)
-    return MergeBackResult(branch=from_branch, conflicted=True)
+    return MergeBackResult(from_branch, MergeOutcome.CONFLICTED)
+
+
+def _first_line(stderr: str) -> str:
+    """git's own diagnosis, first line only -- the rest is usually advice."""
+    for line in stderr.splitlines():
+        if line.strip():
+            return line.strip()
+    return "git exited non-zero without a message"
 
 
 def _require_state_mount(sidecar_root: Path, checkout: Path) -> Path:
@@ -488,6 +524,10 @@ class ConvergeResult:
     deleted: tuple[str, ...] = ()
     skipped: tuple[str, ...] = ()
     aborted: tuple[str, ...] = ()
+    # branch -> git's own reason. Distinct from `aborted`: nothing was merged
+    # and nothing conflicted, so the branch is still exactly as eligible as it
+    # was and the next run will retry it once the cause is gone.
+    failed: Mapping[str, str] = dataclasses.field(default_factory=lambda: MappingProxyType({}))
     # Carried so the callers that report convergence (a finalize-chain log
     # line, the session banner) can name each skip's reason without paying for
     # a second classification pass over the same branches.
@@ -551,7 +591,7 @@ def converge(
 
     mount = Path(checkout) / MOUNT_DIRNAME
     with _default_lock(mount) if lock is None else lock:
-        merged, aborted = _merge_eligible(
+        merged, aborted, failed = _merge_eligible(
             sidecar_root, checkout, mount, plan.eligible, post_merge_hook
         )
         orphaned = plan.orphaned + _newly_orphaned(sidecar_root, checkout, project_root, merged)
@@ -561,6 +601,7 @@ def converge(
         deleted=deleted,
         skipped=plan.skipped + refused,
         aborted=aborted,
+        failed=failed,
         states=plan.states,
     )
 
@@ -606,19 +647,29 @@ def _merge_eligible(
     mount: Path,
     branches: tuple[str, ...],
     post_merge_hook: Callable[[Path, str], None] | None,
-) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    """Merge each branch into the mount; return ``(merged, aborted)``."""
+) -> tuple[tuple[str, ...], tuple[str, ...], Mapping[str, str]]:
+    """Merge each branch into the mount; return ``(merged, aborted, failed)``.
+
+    ``failed`` maps a branch to git's own reason, and is kept apart from
+    ``aborted`` because the two need opposite advice: an aborted branch wants
+    an operator to resolve a conflict, a failed one wants the environment
+    fixed before any merge is attempted at all.
+    """
     merged: list[str] = []
     aborted: list[str] = []
+    failed: dict[str, str] = {}
     for branch in branches:
         result = merge_back(sidecar_root, checkout, branch, allow_conflict_markers=False)
-        if result.conflicted:
+        if result.outcome is MergeOutcome.FAILED:
+            failed[branch] = result.detail
+            continue
+        if result.outcome is MergeOutcome.CONFLICTED:
             aborted.append(branch)
             continue
         merged.append(branch)
         if post_merge_hook is not None:
             post_merge_hook(mount, branch)
-    return tuple(merged), tuple(aborted)
+    return tuple(merged), tuple(aborted), MappingProxyType(failed)
 
 
 def _delete_orphans(

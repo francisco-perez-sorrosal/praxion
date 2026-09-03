@@ -19,10 +19,15 @@ channels simultaneously (see `_install_stub_cli`). Pinned in
 Three further pinned assumptions, all grounded in already-shipped, already-
 merged code rather than guessed:
 
-- `status --json`'s `failed_checks` array is `tuple(row.id for row in results
-  if verdict is not PASS)` (`scripts/_sidecar_inputs.py::status_of`) -- one
-  entry PER OFFENDING ROW, so N occurrences of the `state-unmerged` /
-  `state-eligible` check ids is exactly the convergence-line count.
+- `status --json`'s `failed_checks` array is built by
+  `scripts/_sidecar_inputs.py::_failed_check_ids` -- one entry PER OFFENDING
+  ROW, bare `row.id` for most checks but `state-unmerged:<branch>` /
+  `state-eligible:<branch>` for the two DS-11 convergence rows (F-3: the
+  banner names branches, not just a count).
+- `status --json`'s `counts` field is `scripts/_sidecar_checks.py::counts()`'s
+  `{"pass": N, "warn": N, "fail": N}` tally, threaded through unchanged --
+  the unhealthy line renders the real fail/warn split from it (F-4), never
+  `len(failed_checks)`.
 - Dirty-mount detection reads `status --json`'s `sidecar.dirty_files` field
   (`scripts/_sidecar_render.py`'s `SidecarFacts.dirty_files`), not a direct
   `git status --porcelain` call -- this is the autocommit hook's file, but the
@@ -205,7 +210,14 @@ def _status_json_response(
     healthy: bool = True,
     failed_checks: list[str] | None = None,
     dirty_files: int = 0,
+    counts: dict[str, int] | None = None,
 ) -> str:
+    failed_checks = failed_checks or []
+    # Default counts mirror the dogfooded scenario (F-4): an unhealthy
+    # report whose rows are all WARN, never a phantom FAIL -- a caller that
+    # needs a FAIL in the split passes `counts=` explicitly.
+    if counts is None:
+        counts = {"pass": 0, "warn": len(failed_checks) if not healthy else 0, "fail": 0}
     payload = {
         "schema": 1,
         "placement": "sidecar",
@@ -222,7 +234,8 @@ def _status_json_response(
         "autocommit": "on-finalize-and-stop",
         "paths": [],
         "healthy": healthy,
-        "failed_checks": failed_checks or [],
+        "failed_checks": failed_checks,
+        "counts": counts,
     }
     return json.dumps(payload)
 
@@ -285,6 +298,7 @@ class TestHealthyBanner:
         assert f"~/{sidecar_root.relative_to(tmp_path)}" in banner
         assert "doctor" not in banner.split("\n\n")[-1].lower() or "⚠️" not in banner
         assert "state branch" not in banner  # no convergence line at the fixed point
+        assert "must target the mount path" in banner  # file-shadow write-target line
 
 
 class TestUnhealthyBanner:
@@ -302,8 +316,11 @@ class TestUnhealthyBanner:
         assert result.returncode == 0
         banner = _additional_context(result)
         assert HEADING in banner
-        assert "⚠️ `praxion-sidecar doctor` reports 2 failed checks" in banner
+        assert "⚠️ `praxion-sidecar doctor` reports 2 warnings" in banner
         assert "run it before writing state" in banner
+        assert "failed" not in banner.split("reports")[1].split("—")[0], (
+            "an all-WARN report must never claim a FAIL (F-4)"
+        )
 
 
 class TestConvergenceLine:
@@ -326,16 +343,95 @@ class TestConvergenceLine:
         response = _status_json_response(
             sidecar_root,
             healthy=False,
-            failed_checks=["state-unmerged", "state-unmerged", "state-eligible"],
+            failed_checks=["state-unmerged:wt/a", "state-unmerged:wt/b", "state-eligible:wt/c"],
         )
         env, _ = _install_stub_cli(tmp_path, {"status": {"stdout": response}, "link": {}})
 
         result = _run_hook({"cwd": str(project_root)}, env)
 
         banner = _additional_context(result)
-        occurrences = banner.count("state branch(es) awaiting merge-back")
+        occurrences = banner.count("State branch(es) awaiting merge-back")
         assert occurrences == 1, f"expected exactly one convergence line, banner was:\n{banner}"
-        assert "3 state branch(es) awaiting merge-back — run: praxion-sidecar doctor" in banner
+        assert (
+            "State branch(es) awaiting merge-back: wt/a, wt/b, wt/c — run: praxion-sidecar doctor"
+            in banner
+        ), f"expected all three branches named, banner was:\n{banner}"
+
+    def test_named_branch_matches_the_dogfooded_example(self, sidecar_owned, tmp_path):
+        """F-3 repro: a single unmerged branch must be NAMED, not just counted."""
+        project_root, sidecar_root = sidecar_owned
+        response = _status_json_response(
+            sidecar_root, healthy=False, failed_checks=["state-unmerged:wt/wt6"]
+        )
+        env, _ = _install_stub_cli(tmp_path, {"status": {"stdout": response}, "link": {}})
+
+        result = _run_hook({"cwd": str(project_root)}, env)
+
+        banner = _additional_context(result)
+        assert (
+            "State branch(es) awaiting merge-back: wt/wt6 — run: praxion-sidecar doctor" in banner
+        )
+
+    def test_more_than_three_branches_shows_first_three_and_a_remainder_count(
+        self, sidecar_owned, tmp_path
+    ):
+        project_root, sidecar_root = sidecar_owned
+        response = _status_json_response(
+            sidecar_root,
+            healthy=False,
+            failed_checks=[
+                "state-unmerged:wt/a",
+                "state-unmerged:wt/b",
+                "state-eligible:wt/c",
+                "state-unmerged:wt/d",
+                "state-eligible:wt/e",
+            ],
+        )
+        env, _ = _install_stub_cli(tmp_path, {"status": {"stdout": response}, "link": {}})
+
+        result = _run_hook({"cwd": str(project_root)}, env)
+
+        banner = _additional_context(result)
+        assert "wt/a, wt/b, wt/c, and 2 more" in banner, banner
+        assert "wt/d" not in banner
+        assert "wt/e" not in banner
+
+
+class TestDoctorSummarySplit:
+    """F-4 repro: doctor's own summary is `0 failed · 2 warnings`, the banner
+    must render the real split rather than treating every failed_checks entry
+    as a FAIL."""
+
+    def test_fail_and_warn_both_named(self, sidecar_owned, tmp_path):
+        project_root, sidecar_root = sidecar_owned
+        response = _status_json_response(
+            sidecar_root,
+            healthy=False,
+            failed_checks=["mount-conflict", "shadow:CLAUDE.md", "hooks-path"],
+            counts={"pass": 0, "warn": 2, "fail": 1},
+        )
+        env, _ = _install_stub_cli(tmp_path, {"status": {"stdout": response}, "link": {}})
+
+        result = _run_hook({"cwd": str(project_root)}, env)
+
+        banner = _additional_context(result)
+        assert "⚠️ `praxion-sidecar doctor` reports 1 failed, 2 warnings" in banner
+
+    def test_warnings_only_omits_the_word_failed(self, sidecar_owned, tmp_path):
+        project_root, sidecar_root = sidecar_owned
+        response = _status_json_response(
+            sidecar_root,
+            healthy=False,
+            failed_checks=["shadow:CLAUDE.md", "hooks-path"],
+            counts={"pass": 0, "warn": 2, "fail": 0},
+        )
+        env, _ = _install_stub_cli(tmp_path, {"status": {"stdout": response}, "link": {}})
+
+        result = _run_hook({"cwd": str(project_root)}, env)
+
+        banner = _additional_context(result)
+        assert "⚠️ `praxion-sidecar doctor` reports 2 warnings" in banner
+        assert "failed" not in banner.split("reports")[1].split("—")[0]
 
 
 class TestLinkInvokedBeforeStatus:

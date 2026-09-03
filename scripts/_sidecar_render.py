@@ -197,6 +197,7 @@ class InRepoStatus:
     checkout: Checkout
     healthy: bool
     failed_checks: tuple[str, ...]
+    counts: dict[str, int]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -216,6 +217,7 @@ class SidecarStatus:
     paths: tuple[dict, ...]
     healthy: bool
     failed_checks: tuple[str, ...]
+    counts: dict[str, int]
 
 
 # `Union`, not `X | Y`: a runtime alias in that form needs 3.10 and `scripts/`
@@ -260,6 +262,7 @@ def status_json(status: Status) -> dict:
         payload["paths"] = list(status.paths)
     payload["healthy"] = status.healthy
     payload["failed_checks"] = list(status.failed_checks)
+    payload["counts"] = dict(status.counts)
     return payload
 
 

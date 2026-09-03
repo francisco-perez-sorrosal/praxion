@@ -45,6 +45,7 @@ from _sidecar_mergeback import DRY_RUN_TRAILER, Report
 STATE_DIRNAME = mounts.STATE_DIRNAME
 PRE_PUBLISH_TAG_PREFIX = "praxion/pre-publish/"
 _TAG_TIMESTAMP = "%Y%m%d-%H%M%S"
+RETIRED_SUFFIX = ".published-"
 
 PUBLISH_CONFIRMATION = (
     "publish moves every shadowed path into the project repository and removes "
@@ -98,7 +99,9 @@ def publish(
     checkout = context.checkout
     _require_clean_project(checkout, "publish")
     _require_every_branch_merged(sidecar)
-    mounted = [inputs.checkout_of(mount) for mount in inputs.sidecar_mounts(sidecar)]
+    mounts_to_remove = inputs.sidecar_mounts(sidecar)
+    _require_every_mount_removable(mounts_to_remove)
+    mounted = [inputs.checkout_of(mount) for mount in mounts_to_remove]
     if dry_run:
         return Report((*_publish_plan(checkout, sidecar, mounted), DRY_RUN_TRAILER))
 
@@ -110,15 +113,38 @@ def publish(
     # exclude block and no state -- unrecoverable by any command this CLI has.
     _import_state_history(checkout, sidecar)
     _dismantle_sidecar(checkout, sidecar, manifest, mounted, keepsakes)
+    retired = _retire_sidecar(sidecar)
     return Report(
         (
             f"Published {STATE_DIRNAME}/ into {checkout} with its full history.",
             f"Removed {len(mounted)} mount(s) and every wt/* state branch.",
             *_keepsake_notice(keepsakes),
-            f"The sidecar is left at {render.abbreviate_home(sidecar)}, tagged {tag}.",
+            f"The old sidecar is kept as a backup at {render.abbreviate_home(retired)}, "
+            f"tagged {tag} — delete it once you trust the published history.",
             "Next: praxion-sidecar status",
         )
     )
+
+
+def _retire_sidecar(sidecar: Path) -> Path:
+    """Move the published sidecar out of the identity slot, keeping the bytes.
+
+    The sidecar is worth keeping -- it is the only copy of the state that
+    existed before the import merge -- but keeping it *at its canonical path*
+    makes the slot look occupied to everything that derives it from the project
+    id. `absorb`, publish's own documented inverse, then refuses with "already
+    initialised for this project", so a published project could never go back.
+    Renaming keeps the backup and frees the slot, which is what makes
+    publish -> commit -> absorb a real round trip.
+    """
+    stamp = datetime.now(timezone.utc).strftime(_TAG_TIMESTAMP)
+    retired = sidecar.with_name(f"{sidecar.name}{RETIRED_SUFFIX}{stamp}")
+    attempt = 1
+    while retired.exists():
+        attempt += 1
+        retired = sidecar.with_name(f"{sidecar.name}{RETIRED_SUFFIX}{stamp}-{attempt}")
+    sidecar.rename(retired)
+    return retired
 
 
 def _keepsake_notice(keepsakes: dict[str, str]) -> tuple[str, ...]:
@@ -207,6 +233,7 @@ def _publish_plan(checkout: Path, sidecar: Path, mounted: list[Path]) -> tuple[s
         f"Would import {render.abbreviate_home(sidecar)} (main) into "
         f"{checkout}/{STATE_DIRNAME} as one merge commit.",
         f"Would remove {len(mounted)} mount(s), every wt/* branch, and the exclude block.",
+        f"Would keep the old sidecar as a backup, renamed with a {RETIRED_SUFFIX}<timestamp> suffix.",
     )
 
 
@@ -230,6 +257,42 @@ def _require_every_branch_merged(sidecar: Path) -> None:
         f"Refusing to publish: {len(stranded)} state branch(es) carry work main does not.",
         "publish exports main only — " + ", ".join(stranded) + " would be left behind.",
         "Converge them first:  praxion-sidecar merge-back --auto",
+    )
+
+
+def _require_every_mount_removable(mounts_to_remove: list[Path]) -> None:
+    """Every refusal publish can raise must be raised *before* the import.
+
+    The teardown removes each mount, and `prune_mount` rightly refuses a mount
+    with uncommitted work -- but it runs *after* the import commit, so that
+    refusal used to leave the project reporting `in-repo` while a live
+    `.praxion`, every `wt/*` branch and the exclude block were all still
+    standing: a state neither placement describes and no verb can undo.
+    Checking every mount here makes the whole verb all-or-nothing, and lists
+    *every* offender at once rather than making the operator discover them one
+    failed publish at a time.
+    """
+    offenders: list[tuple[Path, str]] = []
+    for mount in mounts_to_remove:
+        if gitp.merge_in_progress(mount):
+            offenders.append((mount, "is mid-merge"))
+            continue
+        status = gitp.porcelain_status(mount)
+        if status is None:
+            offenders.append((mount, "could not be read by git"))
+        elif status.strip():
+            offenders.append((mount, "has uncommitted changes"))
+    if not offenders:
+        return
+    raise refusal(
+        f"Refusing to publish: {len(offenders)} state mount(s) are not safe to remove.",
+        "publish removes every mount, and removing one with unsaved state would "
+        "destroy work no commit holds — so nothing has been published.",
+        *(
+            f"{render.abbreviate_home(mount)} {problem} — "
+            f"commit it:  praxion-sidecar commit   (run from {inputs.checkout_of(mount)})"
+            for mount, problem in offenders
+        ),
     )
 
 
@@ -442,8 +505,42 @@ def _require_clean_project(checkout: Path, verb: str) -> None:
     raise refusal(
         f"Refusing to {verb}: the project working tree has uncommitted changes.",
         "The state move rewrites the index and would mix your work into it.",
-        f"Commit or stash, then re-run:  git stash && praxion-sidecar {verb}",
+        *_clean_project_fixes(verb, status),
     )
+
+
+def _clean_project_fixes(verb: str, status: str | None) -> tuple[str, ...]:
+    """Name the *specific* blocker when it is one Praxion itself just staged.
+
+    Right after `absorb`, `.ai-state/`'s removal is staged and deliberately
+    uncommitted (D1: absorb never commits to the project repo). Telling that
+    operator to `git stash` is advice that would stash Praxion's own half-done
+    move; what they actually need to hear is the sentence absorb already
+    printed.
+    """
+    if status and _has_staged_state_change(status):
+        return (
+            f"{STATE_DIRNAME}/ has staged, uncommitted changes — this is the state move "
+            "itself, waiting to be recorded.",
+            "Commit the adoption first:  git commit -m 'chore: move Praxion state to a sidecar'",
+        )
+    return (f"Commit or stash, then re-run:  git stash && praxion-sidecar {verb}",)
+
+
+def _has_staged_state_change(status: str) -> bool:
+    """Whether `status --porcelain` shows an index-side change under the state dir.
+
+    Porcelain v1: two status columns, then a space, then the path; column 0 is
+    the index. `?` there is untracked, ` ` is unstaged-only -- neither is a
+    staged change.
+    """
+    for line in status.splitlines():
+        if len(line) < 4 or line[0] in " ?":
+            continue
+        path = line[3:].split(" -> ")[-1].strip('"')
+        if path == STATE_DIRNAME or path.startswith(f"{STATE_DIRNAME}/"):
+            return True
+    return False
 
 
 def _exclude_path(checkout: Path) -> Path:

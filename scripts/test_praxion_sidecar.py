@@ -1704,7 +1704,12 @@ def test_publish_rolls_back_completely_when_the_project_refuses_the_import_commi
         "published note\n"
     )
     assert not (origin_project / ".praxion").exists()
-    assert _git_ok(sidecar_dir, "branch", "--list", "wt/*").stdout.strip() == ""
+    # A successful publish retires the sidecar out of the identity slot (it is
+    # kept as a backup under a `.published-<stamp>` name), so the branch check
+    # follows it there.
+    assert not sidecar_dir.exists()
+    retired = next(p for p in sidecar_root.iterdir() if p.name.startswith(f"{_ORIGIN_ID}."))
+    assert _git_ok(retired, "branch", "--list", "wt/*").stdout.strip() == ""
 
 
 def test_publish_leaves_the_local_only_shadows_as_real_files(
@@ -1795,3 +1800,134 @@ def test_absorb_moves_committed_project_state_into_a_new_sidecar_with_history(
     sidecar_dir = sidecar_root / sidecar_id
     log = _git_ok(sidecar_dir, "log", "--oneline", "--", ".ai-state").stdout
     assert "seed project state for absorb" in log
+
+
+# --- publish atomicity, and the publish -> absorb round trip -----------------
+
+
+def test_publish_refuses_before_touching_anything_when_a_mount_is_dirty(
+    origin_project: Path, cli_env: dict[str, str]
+) -> None:
+    """Every refusal publish can raise is a *pre*-check.
+
+    The teardown's own dirty-mount refusal fired after the import commit had
+    already landed, leaving the project reporting `in-repo` beside a live
+    `.praxion`, surviving `wt/*` branches and an intact exclude block -- a
+    state neither placement describes and no verb can undo."""
+    _init_ok(origin_project, cli_env)
+    worktree = _create_project_worktree(origin_project, "dirtymount")
+    _link_worktree(worktree, cli_env)
+    (worktree / ".ai-state" / "scratch.md").write_text("unsaved work\n", encoding="utf-8")
+
+    result = _run_cli_no_stdin(["publish", "--yes"], origin_project, cli_env)
+
+    assert result.returncode == 3
+    assert "not safe to remove" in result.stderr
+    # Names the offending mount and how to clean it, not just a count.
+    assert str(worktree / ".praxion") in result.stderr or ".praxion" in result.stderr
+    assert "praxion-sidecar commit" in result.stderr
+    # Nothing was touched: the project is still sidecar-placed, both mounts
+    # stand, and no import commit exists.
+    assert (origin_project / ".ai-state").is_symlink()
+    assert (origin_project / ".praxion").is_dir()
+    assert (worktree / ".praxion").is_dir()
+    payload = json.loads(run_cli(["status", "--json"], origin_project, cli_env).stdout)
+    assert payload["placement"] == "sidecar"
+
+
+def test_publish_retires_the_old_sidecar_out_of_the_identity_slot(
+    origin_project: Path, cli_env: dict[str, str], sidecar_root: Path
+) -> None:
+    """The backup is kept -- renamed, so the canonical path is free again."""
+    _init_ok(origin_project, cli_env)
+    sidecar_dir = sidecar_root / _ORIGIN_ID
+
+    result = _run_cli_no_stdin(["publish", "--yes"], origin_project, cli_env)
+    assert result.returncode == 0, result.stderr
+
+    assert not sidecar_dir.exists(), "the identity slot must be free after publish"
+    retired = [p for p in sidecar_root.iterdir() if p.name.startswith(f"{_ORIGIN_ID}.published-")]
+    assert len(retired) == 1, sorted(p.name for p in sidecar_root.iterdir())
+    assert (retired[0] / ".git").exists()
+    assert retired[0].name in result.stdout
+    assert "backup" in result.stdout
+
+
+def test_publish_then_absorb_is_a_round_trip(
+    origin_project: Path, cli_env: dict[str, str], sidecar_root: Path
+) -> None:
+    """`absorb` is documented as publish's inverse, so the pair must compose:
+    publish, commit the adoption, absorb -- and land back on a sidecar whose
+    history still carries the pre-publish commits."""
+    _init_ok(origin_project, cli_env)
+    (origin_project / ".ai-state" / "note.md").write_text("round trip\n", encoding="utf-8")
+    assert run_cli(["commit"], origin_project, cli_env).returncode == 0
+
+    assert _run_cli_no_stdin(["publish", "--yes"], origin_project, cli_env).returncode == 0
+    # publish leaves the machine-local shadows as untracked plain files; the
+    # operator's own next step is to record the adoption.
+    _git_ok(origin_project, "add", "-A")
+    _git_ok(origin_project, "commit", "-q", "-m", "chore: adopt Praxion state")
+
+    absorbed = _run_cli_no_stdin(["absorb", "--yes"], origin_project, cli_env)
+    assert absorbed.returncode == 0, absorbed.stderr
+
+    payload = json.loads(run_cli(["status", "--json"], origin_project, cli_env).stdout)
+    assert payload["placement"] == "sidecar"
+    sidecar_dir = sidecar_root / payload["project"]["id"]
+    log = _git_ok(sidecar_dir, "log", "--oneline", "--", ".ai-state").stdout
+    assert "chore(sidecar): initialise" in log, log
+    # The backup from the publish leg is still on disk beside the new sidecar.
+    retired = [p for p in sidecar_root.iterdir() if p.name.startswith(f"{_ORIGIN_ID}.published-")]
+    assert len(retired) == 1
+
+
+def test_absorb_on_a_staged_but_uncommitted_state_move_says_commit_the_adoption(
+    local_project: Path, cli_env: dict[str, str]
+) -> None:
+    """The refusal is right; the advice was not. `git stash` would stash the
+    state move itself -- exactly what the operator must commit -- so this
+    operator hears the sentence the move already printed instead."""
+    (local_project / ".ai-state").mkdir()
+    (local_project / ".ai-state" / "note.md").write_text("existing\n", encoding="utf-8")
+    _git_ok(local_project, "add", ".ai-state/note.md")
+    _git_ok(local_project, "commit", "-q", "-m", "seed project state")
+    # The adoption, staged and not yet recorded -- the shape publish leaves
+    # behind and the one absorb must name precisely.
+    (local_project / ".ai-state" / "note.md").write_text("adopted\n", encoding="utf-8")
+    _git_ok(local_project, "add", ".ai-state/note.md")
+
+    result = _run_cli_no_stdin(["absorb", "--yes"], local_project, cli_env)
+
+    assert result.returncode == 3
+    assert "Commit the adoption first" in result.stderr
+    assert "git stash" not in result.stderr
+    assert not (local_project / ".praxion").exists()
+
+
+def test_merge_back_auto_reports_a_plumbing_failure_as_failed_not_as_a_conflict(
+    origin_project: Path, cli_env: dict[str, str]
+) -> None:
+    """git failing *before* it merges anything is not a conflict.
+
+    Reported as one, the operator is sent to `merge-back --from`, which fails
+    the same way for the same reason, and the advice never applies. The
+    canonical trigger is the environment git itself exports to a commit hook:
+    a relative `GIT_INDEX_FILE=.git/index`, which resolves under the state
+    mount whose `.git` is a pointer file."""
+    _init_ok(origin_project, cli_env)
+    worktree = _build_merged_worktree(origin_project, cli_env, "envfail")
+
+    result = run_cli(
+        ["merge-back", "--auto"],
+        origin_project,
+        cli_env,
+        extra_env={"GIT_INDEX_FILE": ".git/index", "GIT_DIR": ".git"},
+    )
+
+    # The scrub in `_git_runner` means the hook environment no longer reaches
+    # git at all: the branch converges instead of being misdiagnosed.
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "converged wt/envfail" in result.stdout
+    assert "aborted" not in result.stdout
+    assert worktree.exists()

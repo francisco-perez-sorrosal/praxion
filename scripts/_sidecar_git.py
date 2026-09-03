@@ -23,6 +23,7 @@ reach this code run under a project's own interpreter.
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 from _git_runner import GitUnavailableError, git_output, run_git
@@ -189,18 +190,21 @@ def identity_args(repo: Path) -> tuple[str, ...]:
     return FALLBACK_IDENTITY
 
 
-def merge_branch(repo: Path, ref: str) -> bool:
-    """Merge ``ref`` into the repository's current branch. ``False`` on conflict.
+def merge_branch(repo: Path, ref: str) -> subprocess.CompletedProcess[str]:
+    """Merge ``ref`` into the repository's current branch, unjudged.
+
+    Returns git's own result rather than a boolean: a non-zero exit means
+    *either* a merge conflict *or* that git never got as far as merging, and
+    collapsing the two here is what let a plumbing failure be reported to
+    operators as a conflict. The caller distinguishes them (see
+    ``_sidecar_mount.merge_back``) and needs git's stderr to say why.
 
     ``--no-ff`` because a merge-back is a *convergence point*, and a
     fast-forward records none: the target branch would silently become the
     source, leaving no commit that says when a worktree's state came home and
     nothing for `git log --first-parent` on the mount to show.
     """
-    return (
-        run_git(repo, *identity_args(repo), "merge", "-q", "--no-ff", "--no-edit", ref).returncode
-        == 0
-    )
+    return run_git(repo, *identity_args(repo), "merge", "-q", "--no-ff", "--no-edit", ref)
 
 
 def abort_merge(repo: Path) -> None:

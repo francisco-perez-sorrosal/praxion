@@ -611,17 +611,35 @@ def _make_fake_plugin(plugin_dir: Path, *, sidecar_call_log: Path | None = None)
     return scripts_dir
 
 
+# Exactly what git exports to a `post-commit` hook: repository-scoping
+# variables, and the two that matter exported *relative* to the hook's cwd.
+# Any chain step that then targets a different repository (the sidecar state
+# mount, whose `.git` is a pointer file) resolves `.git/index` under that one
+# and dies `Not a directory`.
+_GIT_HOOK_ENV = "export GIT_INDEX_FILE=.git/index GIT_DIR=.git"
+
+
 def _run_chain(
-    *, cwd: Path, finalize_dir: Path, entry: str, args: Sequence[str] = ()
+    *,
+    cwd: Path,
+    finalize_dir: Path,
+    entry: str,
+    args: Sequence[str] = (),
+    git_hook_env: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     """Source the real, unmodified `finalize_chain.sh`, override
     `FINALIZE_CHAIN_DIR` to the fake plugin's `scripts/` dir, `cd` into
     `cwd`, and call the given public entry point -- the same override
     pattern `_run_on_main_real` above already uses to prove real (non-stubbed)
-    script execution."""
+    script execution.
+
+    `git_hook_env` reproduces the environment git itself hands a commit hook.
+    In production the chain is *only* ever invoked that way, so a scenario run
+    without it exercises a shape that never occurs."""
     quoted_args = " ".join(shlex.quote(a) for a in args)
     snippet = f"""
         cd {shlex.quote(str(cwd))}
+        {_GIT_HOOK_ENV if git_hook_env else ""}
         source {shlex.quote(str(CHAIN_PATH))}
         FINALIZE_CHAIN_DIR={shlex.quote(str(finalize_dir))}
         {entry} {quoted_args}
@@ -896,6 +914,40 @@ def test_squash_merge_shape_also_converges_and_promotes(tmp_path: Path) -> None:
     )
 
     assert "converged wt/x" in result.stdout
+    finalized = list((fixture.mount_dir / ".ai-state" / "decisions").glob("[0-9]*-from-wt-x.md"))
+    assert len(finalized) == 1, result.stdout
+
+
+def test_squash_merge_shape_converges_and_promotes_under_the_real_hook_environment(
+    tmp_path: Path,
+) -> None:
+    """The same squash-merge scenario, fired the way git actually fires it:
+    from `post-commit`, with `GIT_INDEX_FILE=.git/index` and `GIT_DIR=.git`
+    exported *relative*.
+
+    Every chain step that targets the state mount then inherited those and
+    resolved `.git/index` under the mount -- whose `.git` is a pointer file --
+    so git died `Not a directory`: merge-back reported it as a conflict and
+    finalize_adrs declined to promote, both non-blockingly. The channel was
+    silently dead in production while every test above passed, because no test
+    ran it under a hook environment."""
+    fixture = _build_sidecar_owned_project(tmp_path)
+    checkout = _add_project_worktree(fixture.project_root, "x", "feat/x")
+    wt_mount = _mount_worktree(fixture.sidecar_root, checkout, "wt/x", project_branch="feat/x")
+    _write_draft(wt_mount, slug="from-wt-x")
+    _git_ok(fixture.project_root, "merge", "-q", "--squash", "feat/x")
+    _commit_all(fixture.project_root, "squash-merge feat/x")
+
+    scripts_dir = _make_fake_plugin(tmp_path / "plugin")
+    result = _run_chain(
+        cwd=fixture.project_root,
+        finalize_dir=scripts_dir,
+        entry="finalize_chain_post_commit",
+        git_hook_env=True,
+    )
+
+    assert "converged wt/x" in result.stdout, result.stdout
+    assert "Not a directory" not in result.stdout
     finalized = list((fixture.mount_dir / ".ai-state" / "decisions").glob("[0-9]*-from-wt-x.md"))
     assert len(finalized) == 1, result.stdout
 

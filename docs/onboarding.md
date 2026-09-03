@@ -370,6 +370,7 @@ Nothing here is a one-way door. `publish` moves sidecar state into the project r
 | Project directory moved or was re-cloned | `.ai-state` (or the mount) now points at a stale sidecar path | `rm .ai-state && praxion-sidecar link`, or `praxion-sidecar link --repair` if the mount itself is foreign |
 | A worktree's `.ai-state` looks empty right after creation | `NotYetLinked` — the mount has not materialised yet | `post-checkout` or the next SessionStart heals it; run `praxion-sidecar link` to force it now |
 | `praxion-sidecar` hooks silently do nothing on an older Python | The consumer hooks require **Python ≥3.9** | upgrade the interpreter git invokes hooks with |
+| `Refusing to write … it is a symbolic link` on `CLAUDE.local.md` or `.claude/settings.local.json` | Claude Code's `Write`/`Edit` refuse a **file-level** symlink target even when its realpath is inside the checkout | edit the file at its mount path instead — `.praxion/<name>` (`.ai-state/` is a directory shadow and needs no such care) |
 
 ---
 

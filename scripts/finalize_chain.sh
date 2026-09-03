@@ -114,6 +114,37 @@ _finalize_chain_state_was_touched() {
     echo "$merged_files" | grep -q "^\.ai-state/"
 }
 
+# -- Hook environment scrubbing ------------------------------------------------
+#
+# git exports repository-scoping variables to the hooks it runs, and exports
+# GIT_INDEX_FILE / GIT_DIR *relative* (`.git/index`, `.git`). Any git call this
+# chain makes against a different repository -- the sidecar state mount, whose
+# `.git` is a worktree pointer *file* -- then resolves `.git/index` under that
+# mount and dies with `fatal: .git/index: index file open failed: Not a
+# directory`. That failure is what broke the post-commit convergence channel:
+# merge-back reported it as a merge conflict and finalize_adrs declined to
+# promote, both non-blockingly, so the squash-merge shape silently did nothing.
+#
+# The runner every python sibling uses (`scripts/_git_runner.py`) scrubs these
+# for itself. This wrapper is the defence in depth for the steps the chain
+# spawns as executables (praxion-sidecar) and for any `git` it runs directly:
+# it runs the command in a subshell with the variables unset, so the hook's own
+# environment -- which the rest of the hook may still need -- is untouched.
+_FINALIZE_CHAIN_GIT_SCOPE_VARS=(
+    GIT_INDEX_FILE
+    GIT_DIR
+    GIT_WORK_TREE
+    GIT_COMMON_DIR
+    GIT_OBJECT_DIRECTORY
+    GIT_ALTERNATE_OBJECT_DIRECTORIES
+    GIT_PREFIX
+    GIT_NAMESPACE
+)
+
+_finalize_chain_unscoped() {
+    ( unset "${_FINALIZE_CHAIN_GIT_SCOPE_VARS[@]}"; "$@" )
+}
+
 # -- Script invocation --------------------------------------------------------
 
 # Run a python script. Default: non-blocking failure semantics (warn, return 0)
@@ -176,10 +207,11 @@ _finalize_chain_run_sidecar() {
     local sidecar="${FINALIZE_CHAIN_DIR}/praxion-sidecar"
     [ -x "$sidecar" ] || return 0
     if [ -n "${FINALIZE_CHAIN_STRICT:-}" ]; then
-        "$sidecar" "$@"
+        _finalize_chain_unscoped "$sidecar" "$@"
         return $?
     fi
-    "$sidecar" "$@" 2>&1 || echo "${label}: warned (non-blocking) — inspect output above"
+    _finalize_chain_unscoped "$sidecar" "$@" 2>&1 \
+        || echo "${label}: warned (non-blocking) — inspect output above"
 }
 
 # -- Placement resolution ------------------------------------------------------
@@ -235,7 +267,7 @@ _finalize_chain_state_branches_pending() {
     local sidecar_common_dir="$1"
     [ -n "$sidecar_common_dir" ] && [ -d "$sidecar_common_dir" ] || return 1
     local ref
-    ref="$(git --git-dir="$sidecar_common_dir" for-each-ref --count=1 \
+    ref="$(_finalize_chain_unscoped git --git-dir="$sidecar_common_dir" for-each-ref --count=1 \
         --format='%(refname)' refs/heads/wt/ 2>/dev/null)"
     [ -n "$ref" ]
 }
@@ -254,7 +286,7 @@ _finalize_chain_state_branches_pending() {
 _finalize_chain_merge_back_auto() {
     local sidecar="${FINALIZE_CHAIN_DIR}/praxion-sidecar"
     [ -x "$sidecar" ] || return 0
-    "$sidecar" merge-back --auto 2>&1 || true
+    _finalize_chain_unscoped "$sidecar" merge-back --auto 2>&1 || true
 }
 
 # Run the on-main finalize steps. Caller has already gated on `on_main`; each
@@ -311,7 +343,9 @@ _finalize_chain_run_on_main() {
         if [ "$_FC_PLACEMENT" = "sidecar" ]; then
             state_root_args=(--state-root "$_FC_STATE_GIT_ROOT")
         fi
-        _finalize_chain_run_script "finalize_adrs" \
+        # Unscoped: under sidecar placement finalize_adrs' git plumbing runs
+        # against --state-root (the mount), not this repo_root.
+        _finalize_chain_unscoped _finalize_chain_run_script "finalize_adrs" \
             "${FINALIZE_CHAIN_DIR}/finalize_adrs.py" --all --repo-root "$repo_root" \
             "${state_root_args[@]}" || return $?
     fi

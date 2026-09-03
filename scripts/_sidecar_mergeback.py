@@ -150,7 +150,13 @@ def merge_back_from(sidecar: Path, checkout: Path, branch: str, *, dry_run: bool
     _require_clean_mount(target.mount, branch)
     with commits.mount_lock(target.mount):
         result = mounts.merge_back(sidecar, checkout, branch, allow_conflict_markers=True)
-        if result.conflicted:
+        if result.outcome is mounts.MergeOutcome.FAILED:
+            raise EnvironmentProblem(
+                f"Merging {branch} into {target.branch} failed before git merged anything.\n"
+                f"{result.detail}\n"
+                f"Nothing was merged and the mount is unchanged; fix the cause and re-run."
+            )
+        if result.outcome is mounts.MergeOutcome.CONFLICTED:
             return Report(_conflict_lines(target.mount, branch), EXIT_ACTIONABLE)
         reconcile_state_mount(target.mount, branch)
     return Report((f"Merged {branch} into {target.branch}.",))
@@ -188,7 +194,7 @@ def merge_back_auto(sidecar: Path, checkout: Path, project_root: Path, *, dry_ru
         return Report((FIXED_POINT_LINE,))
     if dry_run:
         lines = (*lines, DRY_RUN_TRAILER)
-    return Report(lines, EXIT_ACTIONABLE if result.aborted else EXIT_OK)
+    return Report(lines, EXIT_ACTIONABLE if (result.aborted or result.failed) else EXIT_OK)
 
 
 def _convergence_lines(result: mounts.ConvergeResult, *, dry_run: bool) -> tuple[str, ...]:
@@ -207,6 +213,12 @@ def _convergence_lines(result: mounts.ConvergeResult, *, dry_run: bool) -> tuple
         f"aborted {branch}: conflict — run praxion-sidecar merge-back --from {branch}"
         for branch in result.aborted
     ]
+    # Deliberately *not* phrased as a conflict, and deliberately not offering
+    # `merge-back --from`: git never merged anything, so the operator's next
+    # move is to fix what git reported, not to resolve markers that do not
+    # exist. The branch stays eligible and `doctor`'s state-branch row keeps
+    # showing it until a later run succeeds.
+    lines += [f"failed {branch}: {reason}" for branch, reason in sorted(result.failed.items())]
     lines += [
         f"skipped {branch}: {_skip_phrase(result.states.get(branch))}"
         for branch in result.skipped

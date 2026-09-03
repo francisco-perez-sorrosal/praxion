@@ -55,9 +55,12 @@ LINK_TIMEOUT_SECONDS = 10
 STATUS_TIMEOUT_SECONDS = 3
 
 # `status --json`'s `failed_checks` carries one entry per offending row
-# (`_sidecar_checks.py`'s `_rows_state_unmerged`/`_rows_state_eligible`), so
-# counting occurrences of these two ids is exactly the convergence-line count.
+# (`_sidecar_checks.py`'s `_rows_state_unmerged`/`_rows_state_eligible`), each
+# suffixed `:<branch>` by `_sidecar_inputs._failed_check_ids` -- e.g.
+# `"state-unmerged:wt/x"` -- so the branch name is recoverable without a
+# second `doctor` call.
 _CONVERGENCE_CHECK_IDS = frozenset({"state-unmerged", "state-eligible"})
+_MAX_NAMED_BRANCHES = 3
 
 _AUTOCOMMIT_PHRASES = {
     "on-finalize-and-stop": "on finalize + stop",
@@ -109,14 +112,46 @@ def _tilde_path(raw: str) -> str:
     return raw
 
 
+def _doctor_summary_phrase(counts: dict) -> str:
+    """`{N} failed, {M} warnings` -- omits either half when it is zero, so a
+    warnings-only report never claims a phantom failure (F-4)."""
+    failed = int(counts.get("fail", 0))
+    warnings = int(counts.get("warn", 0))
+    parts = [f"{failed} failed"] if failed else []
+    if warnings:
+        parts.append(f"{warnings} warnings")
+    return ", ".join(parts) if parts else "0 failed"
+
+
+def _convergence_branches(failed_checks: list[str]) -> list[str]:
+    """Branch names from `state-unmerged:<branch>` / `state-eligible:<branch>`
+    entries, in `failed_checks` order (F-3 -- name the branches, not just a count)."""
+    branches = []
+    for check_id in failed_checks:
+        check_type, sep, branch = check_id.partition(":")
+        if sep and check_type in _CONVERGENCE_CHECK_IDS:
+            branches.append(branch)
+    return branches
+
+
+def _convergence_line(branches: list[str]) -> str:
+    shown = branches[:_MAX_NAMED_BRANCHES]
+    remainder = len(branches) - len(shown)
+    names = ", ".join(shown)
+    if remainder:
+        names = f"{names}, and {remainder} more"
+    return f"State branch(es) awaiting merge-back: {names} — run: praxion-sidecar doctor"
+
+
 def _render_banner(status: dict) -> str:
-    """Render the 7-line healthy/unhealthy banner body, plus the convergence
+    """Render the 8-line healthy/unhealthy banner body, plus the convergence
     line when `status`'s `failed_checks` names any unmerged/eligible branch."""
     sidecar = status.get("sidecar") or {}
     sidecar_path = _tilde_path(sidecar.get("root", ""))
     autocommit = status.get("autocommit", "manual")
     autocommit_phrase = _AUTOCOMMIT_PHRASES.get(autocommit, autocommit)
     failed_checks = status.get("failed_checks") or []
+    counts = status.get("counts") or {}
     healthy = status.get("healthy", True)
 
     lines = [
@@ -138,16 +173,20 @@ def _render_banner(status: dict) -> str:
     else:
         lines.append("`git add` through the symlink fails loudly rather than leaking.")
         lines.append(
-            f"⚠️ `praxion-sidecar doctor` reports {len(failed_checks)} failed checks — "
+            f"⚠️ `praxion-sidecar doctor` reports {_doctor_summary_phrase(counts)} — "
             "run it before writing state."
         )
 
-    convergence_count = sum(1 for check_id in failed_checks if check_id in _CONVERGENCE_CHECK_IDS)
-    if convergence_count:
+    lines.append(
+        "File shadows (`CLAUDE.local.md`, a shadowed `CLAUDE.md`, `.claude/settings.local.json`) load "
+        "through their links, but `Write`/`Edit` must target the mount path — `.praxion/<name>`. Writes "
+        "under `.ai-state/` work in place."
+    )
+
+    branches = _convergence_branches(failed_checks)
+    if branches:
         lines.append("")
-        lines.append(
-            f"{convergence_count} state branch(es) awaiting merge-back — run: praxion-sidecar doctor"
-        )
+        lines.append(_convergence_line(branches))
 
     return "\n".join(lines)
 

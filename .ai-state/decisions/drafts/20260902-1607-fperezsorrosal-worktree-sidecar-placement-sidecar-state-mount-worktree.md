@@ -77,6 +77,7 @@ every linked worktree, uniformly — materialises the sidecar as a **state mount
    never absolute links into `${PRAXION_SIDECAR_ROOT}`. A link that reaches the
    right file by escaping the checkout is classified as `LinkElsewhere` and
    refused, because it works today and breaks the moment a worktree opens.
+   *(Amended 2026-09-03, `ARCH_WT_RULING.md` § 15.)* The harness loads a symlinked `CLAUDE.local.md`/`settings.local.json` but refuses `Write`/`Edit` on the three **file** shadows even when their realpath is inside the checkout, so tool writes to those three must target the mount path directly (`.ai-state`, a directory shadow, is unaffected).
 
 3. **The in-checkout realpath invariant.** For every path Praxion asks an agent
    to write, `realpath(path)` is inside the checkout the session runs in. This
@@ -244,7 +245,7 @@ operator can be surprised by. `reconcile_ai_state.py` returns from "no-op under
 sidecar" to "runs at merge-back", so a reader must now know *where* it runs
 rather than *whether*. And the design now depends on git worktree semantics in a
 place it previously depended only on symlinks — a smaller surface than the
-harness, but not zero.
+harness, but not zero. The mount also does not fully close the write-path gap it was built for: the three file shadows still refuse a direct `Write`/`Edit`, and an agent must target the mount path for those three, even though the directory shadow (`.ai-state`) writes through cleanly.
 
 **Neutral.** `dec-draft-4b33b1df`'s placement axis, mode pairing, capability
 classes and `publish`/`absorb` machinery are untouched; only its projection

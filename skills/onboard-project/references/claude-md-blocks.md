@@ -316,6 +316,10 @@ rather than silently leaking one in.
 `docs/architecture.md`, when shared, cites ADRs by **id text** (e.g. `dec-NNN`), never by
 an `.ai-state/` path — a path reference would dangle for anyone without sidecar access.
 
+`.ai-state/` (a directory shadow) accepts a direct `Write`/`Edit`; `CLAUDE.local.md`, a shadowed
+`CLAUDE.md`, and `.claude/settings.local.json` (file shadows) load through their links but refuse
+a direct tool write — edit those three at their mount path instead (`.praxion/<name>`).
+
 Run `praxion-sidecar doctor` to confirm the mount and shadow projection are intact (mount
 present, shadows linked, no state branches awaiting merge-back). See
 `docs/onboarding.md#placement` for the full placement model.

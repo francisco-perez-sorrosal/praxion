@@ -16,6 +16,11 @@ module exists: **the timeout is the load-bearing property, not the
 deduplication.** Body-hash duplication detection is structurally blind here --
 the helpers were a behavioural fork, not copies.
 
+The second load-bearing property arrived the same way: every helper here names
+its repository, and none of them scrubbed the repository-scoping variables git
+exports to hooks -- so a hook-triggered call silently acted on the *hook's*
+repository instead of the named one. See `REPOSITORY_SCOPING_ENV_VARS`.
+
 The contract generalizes `adr_health._git` and `check_metrics_freshness._git`,
 the two helpers that were already correct:
 
@@ -43,6 +48,7 @@ correct, since it is a library and not a user-facing tool.
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 from pathlib import Path
 
@@ -51,6 +57,48 @@ from pathlib import Path
 # only ever reached by a genuine hang (an index lock, a credential prompt on a
 # non-interactive hook path).
 GIT_TIMEOUT_SECONDS = 30.0
+
+# Git exports these to every hook it runs, scoped to the repository whose hook
+# is firing -- and it exports `GIT_INDEX_FILE` and `GIT_DIR` *relative*
+# (`.git/index`, `.git`). A `run_git(other_repo, ...)` call inheriting them
+# resolves `.git/index` under `other_repo`, so any repository whose `.git` is a
+# worktree *pointer file* dies with `fatal: .git/index: index file open failed:
+# Not a directory`. That is precisely the shape of a sidecar state mount, and
+# it broke the whole post-commit convergence channel: merge-back read the
+# failure as a merge conflict and finalize_adrs silently declined to promote.
+#
+# So a runner that takes its repository as an argument must never let an
+# inherited environment redirect it: `repo_root` is the caller's stated intent
+# and outranks whatever the ambient process was scoped to. Only the
+# repository-scoping variables are removed -- identity (`GIT_AUTHOR_*`,
+# `GIT_COMMITTER_*`), config (`GIT_CONFIG_*`), `GIT_SSH*` and everything else
+# a caller or a test fixture deliberately sets are left intact.
+REPOSITORY_SCOPING_ENV_VARS = (
+    "GIT_INDEX_FILE",
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_COMMON_DIR",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_PREFIX",
+    "GIT_NAMESPACE",
+)
+
+
+def _unscoped_environ() -> dict[str, str] | None:
+    """`os.environ` minus the repository-scoping variables, or `None`.
+
+    `None` means "nothing to scrub" and is passed straight to `subprocess.run`,
+    which then inherits the parent environment as before -- so off the hook
+    path this costs one membership test per variable and copies nothing.
+    """
+    present = [name for name in REPOSITORY_SCOPING_ENV_VARS if name in os.environ]
+    if not present:
+        return None
+    env = dict(os.environ)
+    for name in present:
+        del env[name]
+    return env
 
 
 class GitUnavailableError(OSError):
@@ -78,6 +126,10 @@ def run_git(
 
     Decoding is pinned to UTF-8 with `errors="replace"` so a diff carrying
     invalid bytes yields U+FFFD rather than crashing a hook mid-flight.
+
+    The child environment is stripped of the repository-scoping git variables
+    (see `REPOSITORY_SCOPING_ENV_VARS`) so `repo_root` is the only thing that
+    decides which repository the command acts on.
     """
     if timeout is None or timeout <= 0:
         raise ValueError(f"git timeout must be a positive number of seconds, got {timeout!r}")
@@ -85,6 +137,7 @@ def run_git(
         return subprocess.run(
             ["git", *args],
             cwd=str(repo_root),
+            env=_unscoped_environ(),
             capture_output=True,
             text=True,
             encoding="utf-8",

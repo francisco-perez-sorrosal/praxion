@@ -102,7 +102,8 @@ def gather(context: Context) -> tuple[checks.CheckInputs, Facts]:
 
 def status_of(context: Context, inputs: checks.CheckInputs, facts: Facts, results: list):
     """Project the registry's verdict and the report facts into one `Status`."""
-    failed = tuple(row.id for row in results if row.verdict is not checks.Verdict.PASS)
+    failed = _failed_check_ids(results)
+    tally = checks.counts(results)
     healthy = checks.overall_verdict(results) is checks.Verdict.PASS
     if facts.manifest is None or facts.sidecar is None:
         return render.InRepoStatus(
@@ -111,6 +112,7 @@ def status_of(context: Context, inputs: checks.CheckInputs, facts: Facts, result
             checkout=facts.checkout,
             healthy=healthy,
             failed_checks=failed,
+            counts=tally,
         )
     return render.SidecarStatus(
         project_root=context.checkout,
@@ -123,7 +125,32 @@ def status_of(context: Context, inputs: checks.CheckInputs, facts: Facts, result
         paths=tuple(checks.path_states(inputs)),
         healthy=healthy,
         failed_checks=failed,
+        counts=tally,
     )
+
+
+# `status --json`'s `failed_checks` entries are bare check ids by default
+# (`row.id`) -- fine for every check except the two DS-11 convergence rows,
+# which emit one row PER BRANCH but all share the same bare id
+# ("state-unmerged"/"state-eligible"), so the branch identity that
+# `_sidecar_checks.py` puts in `row.detail` (formatted `"{branch}: ..."`)
+# would otherwise be lost on the way into the JSON payload. This is the
+# STATUS payload's own minimal projection choice -- `_sidecar_checks.py`'s
+# row id and `doctor`'s own JSON/table renderings are untouched.
+_BRANCH_SUFFIXED_CHECK_IDS = frozenset({"state-unmerged", "state-eligible"})
+
+
+def _failed_check_ids(results: list) -> tuple[str, ...]:
+    ids: list[str] = []
+    for row in results:
+        if row.verdict is checks.Verdict.PASS:
+            continue
+        if row.id in _BRANCH_SUFFIXED_CHECK_IDS:
+            branch = row.detail.split(":", 1)[0]
+            ids.append(f"{row.id}:{branch}")
+        else:
+            ids.append(row.id)
+    return tuple(ids)
 
 
 def unresolvable_placement(placement: _state_repo.Placement) -> Refused:

@@ -22,7 +22,7 @@ affected_files:
   - dashboard_app/src/server/artifacts/project-root.ts
   - skills/onboard-project/references/phases-core.md
   - docs/onboarding.md
-dissent: "This buys a write path by taking on a git-worktree lifecycle (creation, per-checkout branch naming, prune, dirty-refusal) and an ordering constraint the previous design did not have - the sidecar branch must be merged before the project branch or ADR promotion silently finds no drafts - which trades a loud, immediate failure for a quiet, delayed one, and does so on the strength of an undocumented harness behaviour that could be given a sanctioned exemption in any release, at which point the entire mechanism is machinery bought to route around a temporary constraint."
+dissent: "This buys a write path by taking on a git-worktree lifecycle (creation, per-checkout branch naming, prune, dirty-refusal) and a convergence step the previous design did not have - every channel that can observe a merged project branch must merge the sidecar branch too, and a branch nothing observes stays unmerged until someone looks - and it does so on the strength of an undocumented harness behaviour that could be given a sanctioned exemption in any release, at which point the entire mechanism is machinery bought to route around a temporary constraint."
 ---
 
 ## Context
@@ -105,13 +105,31 @@ every linked worktree, uniformly — materialises the sidecar as a **state mount
    every checkout and its machine-local `roots:` list would conflict across
    branches.
 
-7. **Branch-scoped state returns, and with it a merge step.**
-   `praxion-sidecar merge-back` merges a worktree's sidecar branch into the base
-   checkout's, running `reconcile_ai_state.py` against the mount and using the
-   sidecar's own merge drivers. `/merge-worktree` runs it **before** the
-   project-branch merge; skipping it makes the post-merge ADR promotion find no
-   drafts, so the finalize chain must report that observably rather than
-   succeed silently.
+7. **Branch-scoped state returns, and with it a convergence step.**
+   *(Revised 2026-09-02, user-approved; `ARCH_WT_RULING.md` § 13.)*
+   `praxion-sidecar merge-back` merges a worktree's sidecar branch into the
+   current checkout's, running `reconcile_ai_state.py` against the mount and
+   using the sidecar's own merge drivers. It is **not an ordering rule.** It is
+   a convergence step — safe to run any number of times, and run from every
+   channel that can observe a merged project branch: the project `post-merge`
+   finalize chain (converge before draft promotion), the SessionStart heal
+   (`praxion-sidecar link`), and `/merge-worktree` explicitly (still preferred
+   for same-run visibility, no longer load-bearing). A manual `git merge`, a
+   GitHub squash merge followed by `git pull`, and a
+   `git reset --hard origin/main` therefore all converge without operator
+   memory.
+
+   A branch is merged **only on positive evidence** that its recorded project
+   branch is merged — an ancestor test, or the squashed-branch patch-id test
+   for a squash merge. A deleted project branch, a removed project worktree, a
+   missing mapping and an unresolvable ref are **not** evidence: those branches
+   stay unmerged, keep their commits, and are reported by `doctor` with the
+   explicit fix. A conflict in an **automatic** run is aborted — a mount is
+   never left mid-merge — and only the explicit `merge-back --from` may leave
+   conflict markers. Unmerged state is never dropped automatically; removing
+   the mount and then `merge-back --from <branch> --drop --yes` is the only
+   path, and a branch is deleted automatically only when it is an ancestor of
+   the base branch.
 
 Every mechanism claim above was verified live with git 2.44.0 before this
 decision was taken, not read from documentation: the mount creates inside
@@ -220,7 +238,7 @@ unchanged. Branch-scoped state returns: two pipelines no longer see each other's
 drafts, the sidecar's merge drivers become load-bearing instead of vestigial,
 and the per-mount index deletes the cross-pipeline half of the commit race.
 
-**Negative.** A lifecycle to own and a new ordering constraint, both described
+**Negative.** A lifecycle to own and a convergence step to run, both described
 above. Every checkout carries a nested git repository, which is one more thing an
 operator can be surprised by. `reconcile_ai_state.py` returns from "no-op under
 sidecar" to "runs at merge-back", so a reader must now know *where* it runs
@@ -266,11 +284,34 @@ own record carries the re-open condition.
 
 ## Disconfirmation
 
-**Falsifier.** One ADR draft written inside a pipeline worktree that is *not*
+**Falsifier — retired and replaced 2026-09-02 (`ARCH_WT_RULING.md` § 13).** The
+original read: *one ADR draft written inside a pipeline worktree that is not
 promoted after `/merge-worktree`, where the cause is a missing sidecar
-merge-back. That would mean the decision traded a loud, immediate write-path
-failure for a quiet, delayed state-visibility failure — a worse shape of
-failure even though a rarer one. A second, cheaper falsifier: a future Claude
+merge-back.* Its subject was the **ordering rule** — an operator or a command
+having to run merge-back first. Decision item 7 no longer contains that rule, so
+"the operator forgot" is not a reachable cause; a falsifier whose mechanism has
+been deleted is not evidence about the design that replaced it, and restating it
+would be dishonest bookkeeping.
+
+**The falsifier that replaces it** is narrower and harder to satisfy: one draft
+written in a worktree whose project branch is merged **by any path**, which is
+not promoted by the next post-merge finalize *or* the next session start — that
+is, a channel that *observes* the merge and does not converge. It is a coverage
+claim about the three channels, not a claim about memory. Deliberately excluded:
+a merge **no** channel observes (merged on another machine, never pulled, never
+opened in a session) leaves the branch unmerged and reported, which is the
+chosen behaviour, not a failure — acting on absent evidence is the worse error.
+
+**A second falsifier the convergence step introduces**, recorded because it is
+new risk rather than inherited: an eligibility **false positive** — a branch
+merged into the sidecar's base branch while its project work was in fact not
+merged — which would mean the squashed-branch patch-id detector is unsound for
+some merge shape. The retreat is pre-decided and cheap: drop that test, fall
+back to ancestor-only evidence plus the explicit verb, and pay one manual
+command per squash-merged branch. The mount, the channels and the state machine
+all survive it unchanged.
+
+A third, cheaper falsifier: a future Claude
 Code release documenting a sanctioned exemption (a settings key, an
 `EnterWorktree` flag, or a confirmed `worktree.symlinkDirectories` carve-out),
 which removes the *forcing* argument. That would not automatically make this
@@ -287,11 +328,12 @@ nothing for worktree machinery they never use concurrently. The Pipeline
 Isolation rule's stated rationale really is weak for this population. The only
 reason to decline it is enforceability: Praxion cannot prevent `EnterWorktree`,
 so D's failure mode is option B's mid-step refusal arriving with no warning. If
-the merge-back falsifier fires, D is the retreat — and it should be taken as a
-deliberate, documented posture with a placement-scoped exception to the Pipeline
-Isolation rule, not as a patch.
+the convergence-coverage falsifier fires, D is the retreat — and it should be
+taken as a deliberate, documented posture with a placement-scoped exception to
+the Pipeline Isolation rule, not as a patch.
 
-**Reversal trigger.** Any of: the merge-back falsifier firing once; a documented
-harness exemption appearing; or the mount acquiring a *third* materialisation
-shape — at two shapes this is a mount, at three it is a policy and belongs behind
+**Reversal trigger.** Any of: the convergence-coverage falsifier firing once (a
+channel that observed a merge and did not converge); an eligibility false
+positive; a documented harness exemption appearing; or the mount acquiring a
+*third* materialisation shape — at two shapes this is a mount, at three it is a policy and belongs behind
 one abstraction with its own tests.

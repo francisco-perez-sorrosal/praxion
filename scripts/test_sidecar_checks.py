@@ -166,6 +166,7 @@ def _healthy_sidecar_owned_inputs(hooks_status: dict) -> _sidecar_checks.CheckIn
         remote=None,
         guards_roots_stale=False,
         lock_state=None,
+        unresolved_placement=None,
     )
 
 
@@ -558,7 +559,6 @@ def test_remote_policy_foreign_host_with_no_ack_is_fail(healthy_inputs) -> None:
             push="never",
             host_matches_origin=False,
             foreign_host_ack=False,
-            has_upstream=True,
         ),
     )
 
@@ -576,7 +576,6 @@ def test_remote_policy_foreign_host_with_recorded_ack_is_pass(healthy_inputs) ->
             push="never",
             host_matches_origin=False,
             foreign_host_ack=True,
-            has_upstream=True,
         ),
     )
 
@@ -585,7 +584,9 @@ def test_remote_policy_foreign_host_with_recorded_ack_is_pass(healthy_inputs) ->
     assert row.verdict == _sidecar_checks.Verdict.PASS
 
 
-def test_remote_policy_push_on_autocommit_without_upstream_is_warn(healthy_inputs) -> None:
+def test_remote_policy_push_on_autocommit_needs_no_upstream_to_pass(healthy_inputs) -> None:
+    """The autocommit push names remote and branch explicitly, so a same-host
+    remote with the push policy set is healthy without tracking configuration."""
     inputs = dataclasses.replace(
         healthy_inputs,
         remote=_sidecar_checks.RemoteState(
@@ -593,13 +594,12 @@ def test_remote_policy_push_on_autocommit_without_upstream_is_warn(healthy_input
             push="on-autocommit",
             host_matches_origin=True,
             foreign_host_ack=False,
-            has_upstream=False,
         ),
     )
 
     row = _result(_sidecar_checks.evaluate_checks(inputs), "remote-policy")
 
-    assert row.verdict == _sidecar_checks.Verdict.WARN
+    assert row.verdict == _sidecar_checks.Verdict.PASS
 
 
 # --- manifest-roots ---------------------------------------------------------
@@ -680,6 +680,7 @@ def test_in_repo_placement_emits_only_hook_rows(hooks_repo, hooks_plugin_root) -
         remote=None,
         guards_roots_stale=False,
         lock_state=None,
+        unresolved_placement=None,
     )
 
     results = _sidecar_checks.evaluate_checks(inputs)
@@ -710,6 +711,7 @@ def test_in_repo_placement_with_adopted_wrapper_emits_both_hook_rows(
         remote=None,
         guards_roots_stale=False,
         lock_state=None,
+        unresolved_placement=None,
     )
 
     results = _sidecar_checks.evaluate_checks(inputs)

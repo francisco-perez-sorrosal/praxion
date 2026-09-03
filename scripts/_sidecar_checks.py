@@ -33,6 +33,7 @@ _REMOTE_POLICY_FIX = "praxion-sidecar remote --clear, or re-set"
 _MOUNT_ORPHANED_FIX = "praxion-sidecar link --prune"
 _MERGE_BACK_FIX_TEMPLATE = "praxion-sidecar merge-back --from {branch}"
 _COMMIT_LOCK_WAIT_FIX = "re-run: praxion-sidecar doctor"
+_RELINK_FIX = "rm .ai-state && praxion-sidecar link"
 
 # `sidecar-repo`'s WARN threshold (INTERFACE_DESIGN.md sec. 7.3): named so
 # the number "50 unpushed" appears exactly once.
@@ -88,6 +89,34 @@ class ExcludeBlockState(str, Enum):  # noqa: UP042 -- `StrEnum` needs 3.11
     DRIFTED = "drifted"
 
 
+class UnresolvedReason(str, Enum):  # noqa: UP042 -- `StrEnum` needs 3.11
+    """Why a checkout does not resolve into its own sidecar.
+
+    A **whole-checkout** fact, deliberately distinct from `ShadowState`: the
+    per-slot `shadow:<path>` rows are driven by manifest entries, and in each
+    of these three states there is no manifest of this project's to read. A
+    `shadow:.ai-state` row here would claim a slot the manifest never declared
+    and would collide with the real per-slot row under sidecar placement.
+    """
+
+    DANGLING = "dangling"
+    FOREIGN = "foreign"
+    UNLINKED = "unlinked"
+
+
+@dataclasses.dataclass(frozen=True)
+class UnresolvedPlacement:
+    """One unresolved placement, with the evidence its row names.
+
+    `evidence` is the recorded target (`DANGLING`), the refusal reason and
+    the path it was read from (`FOREIGN`), or the sidecar that exists for
+    this checkout's identity (`UNLINKED`).
+    """
+
+    reason: UnresolvedReason
+    evidence: str
+
+
 class ShadowState(str, Enum):  # noqa: UP042 -- `StrEnum` needs 3.11
     """A resolved `intent: shadow` slot -- pre-resolved by the CLI wiring
     layer (module docstring), never derived here."""
@@ -125,7 +154,6 @@ class RemoteState:
     push: str
     host_matches_origin: bool
     foreign_host_ack: bool
-    has_upstream: bool
 
 
 @dataclasses.dataclass(frozen=True)
@@ -136,12 +164,15 @@ class CheckInputs:
     future consumers (`status`'s sidecar block) -- no row reads it directly,
     since the convergence facts it would drive (`branches`,
     `orphaned_mounts`, `mount_mid_merge`) already arrive pre-derived from it.
-    Under `InRepo` placement, `exclude_block`/`sidecar_repo` are `None`;
-    `evaluate_checks` gates on `placement`'s type rather than re-deriving
-    "nothing applies" from empty collections.
+    Under every non-`SidecarOwned` placement, `exclude_block`/`sidecar_repo`
+    are `None`; `evaluate_checks` gates on `placement`'s type rather than
+    re-deriving "nothing applies" from empty collections. `placement` spans
+    the resolver's full five-variant sum type because `doctor` is total over
+    placements: an unresolved one is *reported* (through
+    `unresolved_placement`), never a reason to emit no rows at all.
     """
 
-    placement: _state_repo.InRepo | _state_repo.SidecarOwned
+    placement: _state_repo.Placement
     exclude_block: ExcludeBlockState | None
     shadow_slots: Mapping[str, ShadowState]
     shared_slots: Mapping[str, SharedState]
@@ -155,15 +186,18 @@ class CheckInputs:
     remote: RemoteState | None
     guards_roots_stale: bool
     lock_state: _sidecar_commit.SidecarCommit | None
+    unresolved_placement: UnresolvedPlacement | None
 
 
 def evaluate_checks(inputs: CheckInputs) -> list[CheckResult]:
-    """The D3 single source, pinned row order (the three lists below). Under
-    `InRepo` placement only `hooks-path`/`hooks-chained` apply -- P0's hook
-    chain runs with or without a sidecar (INTERFACE_DESIGN.md sec. 7.3)."""
+    """The D3 single source, pinned row order (the four lists below). Under
+    every non-sidecar placement only `placement`/`hooks-path`/`hooks-chained`
+    apply -- P0's hook chain runs with or without a sidecar
+    (INTERFACE_DESIGN.md sec. 7.3)."""
     is_sidecar = isinstance(inputs.placement, _state_repo.SidecarOwned)
     row_funcs = (
-        (_SIDECAR_HEAD_ROW_FUNCS if is_sidecar else [])
+        _PLACEMENT_ROW_FUNCS
+        + (_SIDECAR_HEAD_ROW_FUNCS if is_sidecar else [])
         + _HOOK_ROW_FUNCS
         + (_SIDECAR_TAIL_ROW_FUNCS if is_sidecar else [])
     )
@@ -198,6 +232,30 @@ _EXCLUDE_BLOCK_ROWS: dict[ExcludeBlockState, _RowSpec] = {
         "the exclude block has drifted from the manifest",
         "the manifest changed since it was written",
         _LINK_FIX,
+    ),
+}
+
+_PLACEMENT_ROWS: dict[UnresolvedReason, _RowSpec] = {
+    UnresolvedReason.DANGLING: (
+        Verdict.FAIL,
+        ".ai-state is a dangling symlink, recorded target {evidence}",
+        "the mount it records was removed, or was never materialised here",
+        _LINK_FIX,
+    ),
+    UnresolvedReason.FOREIGN: (
+        Verdict.FAIL,
+        ".ai-state does not resolve into this project's sidecar ({evidence})",
+        "linked by a different sidecar, or the sidecar was recreated",
+        _RELINK_FIX,
+    ),
+    UnresolvedReason.UNLINKED: (
+        Verdict.WARN,
+        "this checkout reads as in-repo, but a sidecar for its identity exists at {evidence}",
+        "the shadow was removed (a git clean), or this checkout was never linked",
+        # `link` creates only from an empty slot, so a real directory in the
+        # way has to be moved aside by hand first -- say so, or the printed
+        # fix is inert exactly when it is needed.
+        f"{_LINK_FIX}  (a real .ai-state directory here must be moved aside first)",
     ),
 }
 
@@ -239,6 +297,29 @@ def _templated_row(cid: str, path: str, spec: _RowSpec) -> CheckResult:
         why=why.format(path=path) if why is not None else None,
         fix=fix.format(path=path) if fix is not None else None,
     )
+
+
+def _rows_placement(inputs: CheckInputs) -> list[CheckResult]:
+    """P1-14's totality row: a checkout that does not resolve into its own
+    sidecar is *reported*, never a refusal that suppresses every other row.
+
+    No row at all when the placement resolves -- like `mount-orphaned` and
+    `commit-lock`, this one exists to name a problem, and a row that cannot
+    fail is noise (the `hooks-chained` lesson).
+    """
+    state = inputs.unresolved_placement
+    if state is None:
+        return []
+    verdict, detail, why, fix = _PLACEMENT_ROWS[state.reason]
+    return [
+        _row(
+            "placement",
+            verdict,
+            detail.format(evidence=state.evidence),
+            why=why,
+            fix=fix,
+        )
+    ]
 
 
 def _rows_exclude_block(inputs: CheckInputs) -> list[CheckResult]:
@@ -386,9 +467,8 @@ def _rows_remote_policy(inputs: CheckInputs) -> list[CheckResult]:
         detail = f"remote host does not match the project origin host ({remote.url})"
         why = "a foreign-host remote was set without an acknowledged --allow-foreign-host"
         return [_row("remote-policy", Verdict.FAIL, detail, why=why, fix=_REMOTE_POLICY_FIX)]
-    if remote.push == "on-autocommit" and not remote.has_upstream:
-        detail = "push policy is on-autocommit but no upstream branch is configured"
-        return [_row("remote-policy", Verdict.WARN, detail, fix=_REMOTE_POLICY_FIX)]
+    # No upstream check: the autocommit push names the remote and the branch
+    # explicitly, so a missing tracking configuration cannot make it misfire.
     return [_row("remote-policy", Verdict.PASS, f"remote configured ({remote.url})")]
 
 
@@ -419,11 +499,12 @@ def _rows_commit_lock(inputs: CheckInputs) -> list[CheckResult]:
     return [_row("commit-lock", Verdict.WARN, detail, why=why, fix=_SIDECAR_REPO_FIX)]
 
 
-# The pinned row order: exclude-block, shadow:<path>*, shared:<path>*,
-# hooks-path, hooks-chained, sidecar-repo, then the four DS-11 convergence
-# rows, then remote-policy, manifest-roots, commit-lock. Split into three
-# lists only for the `InRepo` gate in `evaluate_checks` -- `_HOOK_ROW_FUNCS`
-# runs under both.
+# The pinned row order: placement, exclude-block, shadow:<path>*,
+# shared:<path>*, hooks-path, hooks-chained, sidecar-repo, then the four
+# DS-11 convergence rows, then remote-policy, manifest-roots, commit-lock.
+# Split into four lists only for the non-sidecar gate in `evaluate_checks` --
+# `_PLACEMENT_ROW_FUNCS` and `_HOOK_ROW_FUNCS` run under every placement.
+_PLACEMENT_ROW_FUNCS = [_rows_placement]
 _SIDECAR_HEAD_ROW_FUNCS = [_rows_exclude_block, _rows_shadow_slots, _rows_shared_slots]
 _HOOK_ROW_FUNCS = [_rows_hooks_path, _rows_hooks_chained]
 _SIDECAR_TAIL_ROW_FUNCS = [

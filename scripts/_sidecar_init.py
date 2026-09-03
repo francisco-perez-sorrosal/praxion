@@ -109,7 +109,7 @@ def build_manifest(
     share_overrides: Sequence[str],
 ) -> manifests.Manifest:
     """The DS-2 manifest for a fresh sidecar: defaults, then the operator's flags."""
-    validate_placement_flags(shadow_overrides, share_overrides)
+    validate_placement_flags(shadow_overrides, share_overrides, checkout=checkout)
     paths: dict[str, manifests.PathEntry] = {}
     for relpath in DEFAULT_SHADOWS[:1]:
         paths[relpath] = manifests.ShadowEntry(kind=_shadow_kind(relpath))
@@ -137,12 +137,20 @@ def build_manifest(
     )
 
 
-def validate_placement_flags(shadows: Sequence[str], shares: Sequence[str]) -> None:
+def validate_placement_flags(
+    shadows: Sequence[str], shares: Sequence[str], *, checkout: Path | None = None
+) -> None:
     """D8 -- an allowlist, not arbitrary paths, with `.claude` taught explicitly.
 
     `.claude` is checked before the allowlist so a plausible mistake gets its
     real reason (Claude Code refuses to create a worktree when `.claude/` is a
     symlink) rather than the generic "not on the list".
+
+    `checkout`, when given, also enforces the tracked-path refusal -- last,
+    so a misspelled or never-shadowable path still gets its own message. The
+    boundary is here rather than in `link` because `link` acts only on
+    `Absent` slots, so a tracked file would be silently skipped after the
+    manifest had already recorded an intent the disk contradicts.
     """
     for relpath in shadows:
         if relpath.rstrip("/") in manifests.NEVER_SHADOW:
@@ -165,6 +173,28 @@ def validate_placement_flags(shadows: Sequence[str], shares: Sequence[str]) -> N
         raise UsageError(
             f"Usage error: {', '.join(both)} was passed to both --shadow and --share.\n"
             "Each path has exactly one intent. Pass it to one flag only."
+        )
+    if checkout is not None:
+        _refuse_tracked_shadows(checkout, shadows)
+
+
+def _refuse_tracked_shadows(checkout: Path, shadows: Sequence[str]) -> None:
+    """Shadowing a **tracked** path is a team-visible removal -- refuse it.
+
+    `git ls-files -- <path>` rather than `--error-unmatch`: the latter reports
+    a tracked *directory* as unmatched, and the allowlist admits directory
+    slots. A non-empty listing is the tracked answer for both shapes.
+    """
+    for relpath in shadows:
+        if not git_output(checkout, "ls-files", "--", relpath):
+            continue
+        raise refusal(
+            f"{relpath} is tracked in this repository; sidecar placement cannot "
+            "hide a tracked file.",
+            "Removing it from the project would be a deletion every teammate sees, "
+            "which init will not make on your behalf.",
+            f"Keep it shared, or remove it from the repository first "
+            f"(git rm --cached {relpath}, commit), then praxion-sidecar link.",
         )
 
 

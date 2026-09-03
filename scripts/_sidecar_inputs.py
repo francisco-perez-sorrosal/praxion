@@ -50,19 +50,24 @@ class Facts:
 
 
 def gather(context: Context) -> tuple[checks.CheckInputs, Facts]:
-    """Classify this checkout: the registry's inputs, and the report's facts."""
+    """Classify this checkout: the registry's inputs, and the report's facts.
+
+    **Total over the resolver's five variants** (P1-14). The three that carry
+    no sidecar of this project's -- `Dangling`, `Foreign`, `NotYetLinked` --
+    are classified into the `placement` row rather than raised, so `doctor`
+    reports them (in JSON when asked) instead of refusing before its first
+    row. `status` narrows this itself, through `require_reportable_placement`.
+    """
     placement = _state_repo.resolve_placement(context.checkout)
     checkout = _checkout_facts(context.checkout)
-    if isinstance(placement, _state_repo.InRepo):
+    if not isinstance(placement, _state_repo.SidecarOwned):
         facts = Facts(
             checkout=checkout,
             origin=observed_origin(context.checkout),
             sidecar=None,
             manifest=None,
         )
-        return _in_repo_inputs(context, placement), facts
-    if not isinstance(placement, _state_repo.SidecarOwned):
-        raise unresolvable_placement(placement)
+        return _hooks_only_inputs(context, placement), facts
 
     project_id = identity.slug(identity.derive_project_id(context.checkout))
     sidecar, manifest = require_sidecar(context, project_id)
@@ -86,6 +91,7 @@ def gather(context: Context) -> tuple[checks.CheckInputs, Facts]:
         guards_roots_stale=context.checkout
         not in {Path(root).resolve() for root in manifest.project.roots},
         lock_state=_sidecar_commit.read_lock_state(mount),
+        unresolved_placement=None,
     )
     facts = Facts(
         checkout=checkout,
@@ -115,6 +121,7 @@ def status_of(context: Context, inputs: checks.CheckInputs, facts: Facts, result
             healthy=healthy,
             failed_checks=failed,
             counts=tally,
+            placement_note=_placement_note(results),
         )
     return render.SidecarStatus(
         project_root=context.checkout,
@@ -140,6 +147,18 @@ def status_of(context: Context, inputs: checks.CheckInputs, facts: Facts, result
 # STATUS payload's own minimal projection choice -- `_sidecar_checks.py`'s
 # row id and `doctor`'s own JSON/table renderings are untouched.
 _BRANCH_SUFFIXED_CHECK_IDS = frozenset({"state-unmerged", "state-eligible"})
+
+_PLACEMENT_CHECK_ID = "placement"
+
+
+def _placement_note(results: list) -> str | None:
+    """`status`'s one-line qualifier, lifted from the `placement` row itself.
+
+    Read off the row rather than re-composed here, so an in-repo report can
+    never claim plain in-repo placement in wording the check registry has
+    already contradicted.
+    """
+    return next((row.detail for row in results if row.id == _PLACEMENT_CHECK_ID), None)
 
 
 def _failed_check_ids(results: list) -> tuple[str, ...]:
@@ -186,8 +205,22 @@ def unresolvable_placement(placement: _state_repo.Placement) -> Refused:
     )
 
 
-def _in_repo_inputs(context: Context, placement: _state_repo.InRepo) -> checks.CheckInputs:
-    """Under in-repo placement only the two P0 hook rows apply (sec. 7.3)."""
+def require_reportable_placement(placement: _state_repo.Placement) -> None:
+    """`status`'s own narrowing: it renders a placement, so it needs one.
+
+    `doctor` is total (it reports the unresolved variants as a row); `status`
+    describes *where this project's state lives*, and for the three variants
+    below there is no honest answer to render -- so the refusal stays here,
+    at the one verb whose report depends on it, instead of inside `gather`
+    where it would suppress `doctor`'s rows too.
+    """
+    if not isinstance(placement, (_state_repo.InRepo, _state_repo.SidecarOwned)):
+        raise unresolvable_placement(placement)
+
+
+def _hooks_only_inputs(context: Context, placement: _state_repo.Placement) -> checks.CheckInputs:
+    """Every non-sidecar placement: the two P0 hook rows (sec. 7.3), plus the
+    `placement` row when this checkout does not resolve into its own sidecar."""
     return checks.CheckInputs(
         placement=placement,
         exclude_block=None,
@@ -203,7 +236,50 @@ def _in_repo_inputs(context: Context, placement: _state_repo.InRepo) -> checks.C
         remote=None,
         guards_roots_stale=False,
         lock_state=None,
+        unresolved_placement=_unresolved_placement(context, placement),
     )
+
+
+def _unresolved_placement(
+    context: Context, placement: _state_repo.Placement
+) -> checks.UnresolvedPlacement | None:
+    """The `placement` row's evidence, or `None` when the placement is fine.
+
+    Read-only and offline by construction: the `InRepo` arm's only question
+    is whether a sidecar *file* exists at the configured root for this
+    checkout's derived identity -- the shape where a `git clean -ffdx`
+    removed the shadow and the checkout silently reads as in-repo again.
+    """
+    if isinstance(placement, _state_repo.Dangling):
+        return checks.UnresolvedPlacement(
+            reason=checks.UnresolvedReason.DANGLING, evidence=str(placement.link_target)
+        )
+    if isinstance(placement, _state_repo.Foreign):
+        return checks.UnresolvedPlacement(
+            reason=checks.UnresolvedReason.FOREIGN,
+            evidence=f"{placement.reason.value}: {placement.resolved_target}",
+        )
+    if isinstance(placement, _state_repo.NotYetLinked):
+        return checks.UnresolvedPlacement(
+            reason=checks.UnresolvedReason.UNLINKED,
+            evidence=render.abbreviate_home(placement.sidecar_common_dir.parent),
+        )
+    sidecar = _sidecar_for_identity(context)
+    if sidecar is None:
+        return None
+    return checks.UnresolvedPlacement(
+        reason=checks.UnresolvedReason.UNLINKED, evidence=render.abbreviate_home(sidecar)
+    )
+
+
+def _sidecar_for_identity(context: Context) -> Path | None:
+    """The sidecar this checkout's identity would use, if one exists there."""
+    try:
+        slug = identity.slug(identity.derive_project_id(context.checkout))
+    except identity.InvalidProjectId:
+        return None
+    sidecar = context.sidecar_dir(slug)
+    return sidecar if manifests.manifest_path(sidecar / ".git").is_file() else None
 
 
 # --- the project side --------------------------------------------------------
@@ -360,7 +436,6 @@ def _remote_state(manifest: manifests.Manifest, checkout: Path) -> checks.Remote
         push=remote.push.value,
         host_matches_origin=_host_of(remote.url) == _host_of(observed_origin(checkout)),
         foreign_host_ack=remote.foreign_host_ack,
-        has_upstream=False,
     )
 
 

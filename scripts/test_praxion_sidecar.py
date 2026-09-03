@@ -491,6 +491,42 @@ def test_init_refuses_same_path_in_both_shadow_and_share(
     assert "docs/architecture.md" in result.stderr
 
 
+def test_init_refuses_to_shadow_a_tracked_path_and_writes_nothing(
+    origin_project: Path, cli_env: dict[str, str], sidecar_root: Path
+) -> None:
+    """Hiding a tracked file behind a symlink is a team-visible deletion, so
+    the refusal is at the boundary -- before a sidecar exists to clean up."""
+    docs = origin_project / "docs"
+    docs.mkdir()
+    (docs / "architecture.md").write_text("# Architecture\n", encoding="utf-8")
+    _git_ok(origin_project, "add", "docs/architecture.md")
+    _git_ok(origin_project, "commit", "-q", "-m", "add architecture")
+    before = _fs_snapshot(origin_project)
+
+    result = run_cli(["init", "--shadow", "docs/architecture.md"], origin_project, cli_env)
+
+    assert result.returncode == 3, result.stdout
+    assert "docs/architecture.md is tracked in this repository" in result.stderr
+    assert "git rm --cached docs/architecture.md" in result.stderr
+    assert not (sidecar_root / _ORIGIN_ID).exists()
+    assert _fs_snapshot(origin_project) == before
+    assert _git_ok(origin_project, "status", "--porcelain").stdout == ""
+
+
+def test_init_still_shadows_an_untracked_existing_file(
+    origin_project: Path, cli_env: dict[str, str]
+) -> None:
+    """The refusal is about *tracked*, not about *existing* -- an untracked
+    file keeps the behaviour it had before the boundary check."""
+    docs = origin_project / "docs"
+    docs.mkdir()
+    (docs / "architecture.md").write_text("# Architecture\n", encoding="utf-8")
+
+    result = run_cli(["init", "--shadow", "docs/architecture.md"], origin_project, cli_env)
+
+    assert result.returncode == 0, result.stderr
+
+
 # --- link ------------------------------------------------------------
 
 
@@ -901,6 +937,109 @@ def test_doctor_on_in_repo_project_reports_only_hook_rows_and_exits_zero(
     assert "sidecar repo" not in result.stdout
 
 
+# --- doctor is total over placements ----------------------------------------
+
+
+def _doctor_json(project: Path, env: dict[str, str]) -> tuple[dict, int]:
+    result = run_cli(["doctor", "--json"], project, env)
+    return json.loads(result.stdout), result.returncode
+
+
+def _placement_row(payload: dict) -> dict:
+    rows = [row for row in payload["checks"] if row["id"] == "placement"]
+    assert rows, f"no placement row in {[row['id'] for row in payload['checks']]}"
+    return rows[0]
+
+
+def test_doctor_reports_a_dangling_shadow_instead_of_refusing(
+    origin_project: Path, cli_env: dict[str, str]
+) -> None:
+    _init_ok(origin_project, cli_env)
+    shutil.rmtree(origin_project / ".praxion")
+    before = _fs_snapshot(origin_project)
+
+    payload, code = _doctor_json(origin_project, cli_env)
+
+    row = _placement_row(payload)
+    assert code == 1
+    assert row["verdict"] == "fail"
+    assert ".praxion" in row["detail"]
+    assert row["fix"] == "praxion-sidecar link"
+    assert _fs_snapshot(origin_project) == before
+
+
+def test_doctor_reports_a_foreign_shadow_as_json_instead_of_refusing(
+    tmp_path: Path, cli_env: dict[str, str]
+) -> None:
+    project_a = tmp_path / "repo-a"
+    _init_project_repo(project_a, origin="https://github.com/acme/billing")
+    _init_ok(project_a, cli_env)
+
+    project_b = tmp_path / "repo-b"
+    _init_project_repo(project_b, origin="https://github.com/acme/other")
+    _init_ok(project_b, cli_env)
+    stale = project_b / ".ai-state"
+    stale.unlink()
+    stale.symlink_to(project_a / ".praxion" / ".ai-state", target_is_directory=True)
+    before = _fs_snapshot(project_b)
+
+    payload, code = _doctor_json(project_b, cli_env)
+
+    row = _placement_row(payload)
+    assert code == 1
+    assert row["verdict"] == "fail"
+    assert "identity-mismatch" in row["detail"] or "unrecognized-mount" in row["detail"]
+    assert row["fix"] == "rm .ai-state && praxion-sidecar link"
+    assert _fs_snapshot(project_b) == before
+
+
+def test_doctor_warns_when_an_unlinked_checkout_has_a_sidecar_for_its_identity(
+    origin_project: Path, cli_env: dict[str, str], sidecar_root: Path
+) -> None:
+    """A `git clean -ffdx` takes the shadow and the mount with it, so the
+    checkout reads as in-repo again while its sidecar (and every commit in
+    it) is still on disk."""
+    _init_ok(origin_project, cli_env)
+    (origin_project / ".ai-state").unlink()
+    shutil.rmtree(origin_project / ".praxion")
+
+    payload, code = _doctor_json(origin_project, cli_env)
+
+    row = _placement_row(payload)
+    assert code == 1
+    assert row["verdict"] == "warn"
+    assert "reads as in-repo" in row["detail"]
+    assert str(sidecar_root / _ORIGIN_ID) in row["detail"]
+    assert row["fix"].startswith("praxion-sidecar link")
+    assert "moved aside" in row["fix"]
+
+
+def test_status_names_the_sidecar_rather_than_claiming_plain_in_repo(
+    origin_project: Path, cli_env: dict[str, str], sidecar_root: Path
+) -> None:
+    _init_ok(origin_project, cli_env)
+    (origin_project / ".ai-state").unlink()
+    shutil.rmtree(origin_project / ".praxion")
+
+    result = run_cli(["status", "--json"], origin_project, cli_env)
+    assert result.returncode == 0, result.stderr
+
+    payload = json.loads(result.stdout)
+    assert payload["placement"] == "in-repo"
+    assert str(sidecar_root / _ORIGIN_ID) in payload["placement_note"]
+    assert "placement" in payload["failed_checks"]
+
+
+def test_doctor_on_a_plain_in_repo_project_emits_no_placement_row(
+    local_project: Path, cli_env: dict[str, str]
+) -> None:
+    """A row that cannot fail is noise: an unmanaged project has no sidecar
+    anywhere, so there is nothing for the placement row to report."""
+    payload, code = _doctor_json(local_project, cli_env)
+    assert code == 0
+    assert not [row for row in payload["checks"] if row["id"] == "placement"]
+
+
 # --- commit ------------------------------------------------------------
 
 
@@ -948,6 +1087,92 @@ def test_commit_paths_stages_only_the_named_path(
 
     still_dirty = _git_ok(mount, "status", "--porcelain").stdout
     assert "skip.md" in still_dirty
+
+
+def _bare_remote(tmp_path: Path) -> Path:
+    bare = tmp_path / "sidecar-remote.git"
+    _git_ok(tmp_path, "init", "-q", "--bare", "-b", "main", str(bare))
+    return bare
+
+
+def _remote_head(bare: Path, branch: str) -> str | None:
+    result = _git(bare, "rev-parse", branch)
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def test_commit_pushes_when_the_policy_is_on_autocommit(
+    origin_project: Path, cli_env: dict[str, str], tmp_path: Path
+) -> None:
+    _init_ok(origin_project, cli_env)
+    bare = _bare_remote(tmp_path)
+    remote = run_cli(
+        ["remote", f"file://{bare}", "--push", "on-autocommit", "--allow-foreign-host"],
+        origin_project,
+        cli_env,
+    )
+    assert remote.returncode == 0, remote.stderr
+    assert _remote_head(bare, "main") is None
+
+    (origin_project / ".ai-state" / "note.md").write_text("hello\n", encoding="utf-8")
+    result = run_cli(["commit"], origin_project, cli_env)
+
+    assert result.returncode == 0, result.stderr
+    assert "Pushed main to origin." in result.stdout
+    mount_head = _git_ok(origin_project / ".praxion", "rev-parse", "HEAD").stdout.strip()
+    assert _remote_head(bare, "main") == mount_head
+
+
+def test_commit_never_pushes_under_the_default_policy(
+    origin_project: Path,
+    cli_env: dict[str, str],
+    tmp_path: Path,
+    network_guarded_git: tuple[Path, Path],
+) -> None:
+    """`--push never` is the default, and the manifest is read before any push
+    plumbing -- so the guarded `git` shim never sees a network subcommand."""
+    _init_ok(origin_project, cli_env)
+    bare = _bare_remote(tmp_path)
+    remote = run_cli(
+        ["remote", f"file://{bare}", "--push", "never", "--allow-foreign-host"],
+        origin_project,
+        cli_env,
+    )
+    assert remote.returncode == 0, remote.stderr
+
+    bin_dir, log_path = network_guarded_git
+    guarded_env = dict(cli_env)
+    guarded_env["PATH"] = f"{bin_dir}{os.pathsep}{cli_env['PATH']}"
+    (origin_project / ".ai-state" / "note.md").write_text("hello\n", encoding="utf-8")
+
+    result = run_cli(["commit"], origin_project, guarded_env)
+
+    assert result.returncode == 0, result.stderr
+    log_text = log_path.read_text(encoding="utf-8") if log_path.exists() else ""
+    assert "REFUSED" not in log_text
+    assert not re.search(r"\bgit push\b", log_text), log_text
+    assert _remote_head(bare, "main") is None
+
+
+def test_a_failing_push_is_reported_without_changing_the_commit_exit_code(
+    origin_project: Path, cli_env: dict[str, str], tmp_path: Path
+) -> None:
+    """The commit is the contract; the push is best effort."""
+    _init_ok(origin_project, cli_env)
+    missing = tmp_path / "not-a-repo.git"
+    remote = run_cli(
+        ["remote", f"file://{missing}", "--push", "on-autocommit", "--allow-foreign-host"],
+        origin_project,
+        cli_env,
+    )
+    assert remote.returncode == 0, remote.stderr
+
+    (origin_project / ".ai-state" / "note.md").write_text("hello\n", encoding="utf-8")
+    result = run_cli(["commit"], origin_project, cli_env)
+
+    assert result.returncode == 0
+    assert "Committed 1 file(s) to the sidecar" in result.stdout
+    assert "Sidecar push to origin failed" in result.stderr
+    assert "The commit is safe in the sidecar" in result.stderr
 
 
 def test_no_verb_ever_commits_to_the_project_repository(

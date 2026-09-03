@@ -13,7 +13,7 @@ scope: a consumer interpreter without PyYAML must get a named, actionable
 `ManifestError` (naming `sys.executable` and the install fix) the moment
 this module's widening is actually reached, never a raw
 `ModuleNotFoundError` traceback surfacing out of a bare `import yaml` at
-import time (IF-17).
+import time.
 
 `Manifest` is constructible only through `load_manifest()`: every invariant
 DS-2 names (closed enums, the `PathEntry` intent-discriminated sum, the
@@ -201,7 +201,7 @@ def _require_yaml() -> ModuleType:
     for the manifest's full parse -- `praxion-sidecar`'s own entry point,
     chiefly -- must instead. A raw `ModuleNotFoundError` traceback here would
     both violate the "loud, named failure" promise and, for a hook shelling
-    out with `#!/usr/bin/env python3`, no-op silently (IF-17).
+    out with `#!/usr/bin/env python3`, no-op silently.
     """
     try:
         import yaml
@@ -492,7 +492,7 @@ def _register_flow_sequence_representer(yaml: ModuleType) -> None:
     Deferred alongside the rest of PyYAML's usage (`_require_yaml()`) rather
     than run at module import time -- registration needs the `yaml` module
     object, which a consumer interpreter lacking PyYAML must never be forced
-    to import just to load this module (IF-17). Idempotent: `write_manifest`
+    to import just to load this module. Idempotent: `write_manifest`
     calls this on every invocation, and `add_representer` tolerates being
     called twice with the same mapping.
     """

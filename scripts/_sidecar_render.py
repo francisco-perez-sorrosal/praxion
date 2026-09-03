@@ -191,7 +191,13 @@ class RemoteFacts:
 
 @dataclasses.dataclass(frozen=True)
 class InRepoStatus:
-    """`.ai-state/` is committed in the project -- a healthy answer, not an error."""
+    """`.ai-state/` is committed in the project -- a healthy answer, not an error.
+
+    `placement_note` is the one exception: a checkout can *read* as in-repo
+    while a sidecar for its identity exists (the shadow was cleaned away), and
+    reporting bare "in-repo" there would be true of the disk and false of the
+    project. The note carries the `placement` check row's own wording.
+    """
 
     project_root: Path
     origin: str | None
@@ -199,6 +205,7 @@ class InRepoStatus:
     healthy: bool
     failed_checks: tuple[str, ...]
     counts: dict[str, int]
+    placement_note: str | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -241,6 +248,8 @@ def status_json(status: Status) -> dict:
             "total_checkouts": status.checkout.total,
         },
     }
+    if isinstance(status, InRepoStatus) and status.placement_note is not None:
+        payload["placement_note"] = status.placement_note
     if isinstance(status, SidecarStatus):
         payload["project"]["id"] = status.project_id
         payload["sidecar"] = {
@@ -278,6 +287,8 @@ def status_text(status: Status) -> str:
         lines.extend(_sidecar_block(status))
     else:
         lines.append(_field("State", ".ai-state/", "committed in this repo"))
+        if status.placement_note is not None:
+            lines.append(_continuation(status.placement_note))
     lines.extend(["", *_health_lines(status)])
     return "\n".join(lines)
 

@@ -303,6 +303,7 @@ def _prune_orphaned_mounts(sidecar: Path, args: argparse.Namespace) -> None:
 
 def verb_status(args: argparse.Namespace, context: Context) -> int:
     check_inputs, facts = inputs.gather(context)
+    inputs.require_reportable_placement(check_inputs.placement)
     results = checks.evaluate_checks(check_inputs)
     status = inputs.status_of(context, check_inputs, facts, results)
     if args.json:
@@ -334,7 +335,8 @@ def _doctor_header(check_inputs: checks.CheckInputs) -> str:
 
 
 def verb_commit(args: argparse.Namespace, context: Context) -> int:
-    mount, branch = _require_mount(context)
+    placement = _require_mount(context)
+    mount, branch = placement.state_git_root, placement.branch
     paths = (
         _mount_relative(mount, context.checkout, args.paths)
         if args.paths
@@ -359,10 +361,11 @@ def verb_commit(args: argparse.Namespace, context: Context) -> int:
         args,
         f"Committed {len(outcome.staged)} file(s) to the sidecar ({outcome.sha[:7]}) — {message}",
     )
+    _push_on_autocommit(args, placement)
     return EXIT_OK
 
 
-def _require_mount(context: Context) -> tuple[Path, str]:
+def _require_mount(context: Context) -> _state_repo.SidecarOwned:
     """The state mount to commit in, or the reason there is none."""
     placement = _state_repo.resolve_placement(context.checkout)
     if isinstance(placement, _state_repo.InRepo):
@@ -370,7 +373,54 @@ def _require_mount(context: Context) -> tuple[Path, str]:
         raise EnvironmentProblem(no_sidecar_message(manifests.manifest_path(sidecar / ".git")))
     if not isinstance(placement, _state_repo.SidecarOwned):
         raise inputs.unresolvable_placement(placement)
-    return placement.state_git_root, placement.branch
+    return placement
+
+
+PUSH_REMOTE = "origin"
+
+
+def _push_on_autocommit(args: argparse.Namespace, placement: _state_repo.SidecarOwned) -> None:
+    """Act on `remote.push: on-autocommit` -- the policy's only enforcer.
+
+    **The commit is the contract; the push is best effort.** A push that fails,
+    times out, or finds no remote reachable is reported on stderr and leaves
+    the exit code alone: the state is already safe in the sidecar, and turning
+    an offline laptop into a failing Stop hook would be the worse error.
+
+    Nothing here runs under the default policy -- the manifest is read from
+    disk before any push plumbing, so `push: never` and "no remote at all"
+    make no git call at all, let alone a network one.
+    """
+    if _push_policy(placement) is not manifests.PushPolicy.ON_AUTOCOMMIT:
+        return
+    try:
+        result = run_git(placement.state_git_root, "push", PUSH_REMOTE, placement.branch)
+    except GitUnavailableError as error:
+        print(f"Sidecar push skipped: {error}", file=sys.stderr)
+        return
+    if result.returncode != 0:
+        print(
+            f"Sidecar push to {PUSH_REMOTE} failed: {result.stderr.strip()}\n"
+            "The commit is safe in the sidecar; push it yourself when you can.",
+            file=sys.stderr,
+        )
+        return
+    _say(args, f"Pushed {placement.branch} to {PUSH_REMOTE}.")
+
+
+def _push_policy(placement: _state_repo.SidecarOwned) -> manifests.PushPolicy:
+    """The manifest's push policy, defaulting to `never` on any unreadable one.
+
+    A manifest this verb could not parse is not a licence to push: `commit`
+    deliberately does not require a valid manifest (see `require_sidecar_repo`),
+    so the unreadable case degrades to the safe default rather than to an
+    exit-code change on an already-successful commit.
+    """
+    try:
+        manifest = manifests.load_manifest(manifests.manifest_path(placement.sidecar_common_dir))
+    except (manifests.ManifestError, OSError):
+        return manifests.PushPolicy.NEVER
+    return manifests.PushPolicy.NEVER if manifest.remote is None else manifest.remote.push
 
 
 def _mount_relative(mount: Path, checkout: Path, paths: Sequence[str]) -> list[str]:

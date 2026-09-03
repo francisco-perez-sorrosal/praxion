@@ -5,6 +5,7 @@ Regenerate: `python scripts/regenerate_specs_index.py`
 
 | Spec | Slug | Archived | Status | Tier | ADRs | Summary |
 |------|------|----------|--------|------|------|---------|
+| [SPEC_sidecar-placement_2026-09-03.md](SPEC_sidecar-placement_2026-09-03.md) | sidecar-placement | 2026-09-03 | Integration pass Batch 21 executed 49 scenarios | Full |  | Praxion assumes it owns the git tree it manages. That assumption breaks for an operator running Praxion on someone else'... |
 | [SPEC_multidisciplinary_identities_2026-07-30.md](SPEC_multidisciplinary_identities_2026-07-30.md) | multidisciplinary-identities | 2026-07-30 | Implemented and verified | Full | dec-303, dec-302, dec-243, dec-301, dec-076, dec-298, dec-154, dec-299, dec-300 | Praxion already owns most of the domain expertise a multidisciplinary reviewer would bring; what it lacks is a |
 | [SPEC_p5-issue-autofix_2026-07-24.md](SPEC_p5-issue-autofix_2026-07-24.md) | p5-issue-autofix | 2026-07-29 (retroactively, per ground-truth reconciliation — see Note below) | Shipped | Standard | dec-281, dec-282, dec-283 | Ships `.github/workflows/issue-autofix.yml` (label-gated on `ecosystem-feedback`, non-Bot actor) and `scripts/praxion_fe... |
 | [SPEC_production-gate-cohort_2026-06-26.md](SPEC_production-gate-cohort_2026-06-26.md) | production-gate-cohort | 2026-06-26 | Shipped | Full | dec-251, dec-252 | Turned the analysis's central theme — "designed obligation without a production mechanism" — into reality by adding five... |

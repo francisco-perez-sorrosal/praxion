@@ -170,7 +170,7 @@ def verb_init(args: argparse.Namespace, context: Context) -> int:
         _say(args, body, "", f"Dry run: {changes} surface(s) would change. Nothing was modified.")
         return EXIT_OK
 
-    initializer.create_repo(sidecar, manifest, slug)
+    initializer.create_repo(sidecar, context.checkout, manifest, slug)
     manifests.write_manifest(manifests.manifest_path(sidecar / ".git"), manifest)
     linker.link(context.checkout, sidecar, initializer.reload_manifest(sidecar), dry_run=False)
     _say(
@@ -373,7 +373,7 @@ def _require_mount(context: Context) -> _state_repo.SidecarOwned:
         sidecar = context.sidecar_dir(_project_id(context))
         raise EnvironmentProblem(no_sidecar_message(manifests.manifest_path(sidecar / ".git")))
     if not isinstance(placement, _state_repo.SidecarOwned):
-        raise inputs.unresolvable_placement(placement)
+        raise inputs.unresolvable_placement(placement, action="commit")
     return placement
 
 

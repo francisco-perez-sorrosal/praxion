@@ -28,10 +28,19 @@ from pathlib import Path
 
 from _git_runner import GitUnavailableError, git_output, run_git
 
-# Used only when a repository resolves no identity of its own: a merge commit
-# git would otherwise refuse to write is a worse outcome than a generic author
-# on a machine-local state repository.
-FALLBACK_IDENTITY = ("-c", "user.email=praxion@localhost", "-c", "user.name=Praxion")
+# Used only when neither the repository itself nor (for a fresh sidecar) the
+# project it belongs to resolves an identity: a merge commit git would
+# otherwise refuse to write is a worse outcome than a generic author on a
+# machine-local state repository.
+FALLBACK_IDENTITY_NAME = "Praxion"
+FALLBACK_IDENTITY_EMAIL = "praxion@localhost"
+FALLBACK_IDENTITY_PAIR = (FALLBACK_IDENTITY_NAME, FALLBACK_IDENTITY_EMAIL)
+FALLBACK_IDENTITY = (
+    "-c",
+    f"user.email={FALLBACK_IDENTITY_EMAIL}",
+    "-c",
+    f"user.name={FALLBACK_IDENTITY_NAME}",
+)
 
 
 # --- total predicates -------------------------------------------------------
@@ -206,11 +215,23 @@ def set_branch_config(repo: Path, branch: str, key: str, value: str, *, error: t
 # --- merging ----------------------------------------------------------------
 
 
+def configured_identity(repo: Path) -> tuple[str, str] | None:
+    """``repo``'s own resolved ``(name, email)``, or ``None`` if either is unset.
+
+    Reads through git's normal resolution chain (repo-local, then global,
+    then ``includeIf``) -- whatever git itself would use to author a commit
+    made in ``repo`` right now.
+    """
+    name = git_output(repo, "config", "--get", "user.name")
+    email = git_output(repo, "config", "--get", "user.email")
+    if name and email:
+        return (name, email)
+    return None
+
+
 def identity_args(repo: Path) -> tuple[str, ...]:
     """Prefer the repository's own configured identity; fall back if it has none."""
-    if git_output(repo, "config", "--get", "user.email") and git_output(
-        repo, "config", "--get", "user.name"
-    ):
+    if configured_identity(repo) is not None:
         return ()
     return FALLBACK_IDENTITY
 

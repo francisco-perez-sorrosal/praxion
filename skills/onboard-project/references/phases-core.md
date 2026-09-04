@@ -86,6 +86,7 @@ If the user agrees, remove that line. If they decline, proceed without changing 
 /.ai-work/
 /.claude/worktrees/
 /tmp/
+/.claude/praxion-rules.yaml.example
 # <<< praxion:sidecar <<<
 ```
 

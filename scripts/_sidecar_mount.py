@@ -374,12 +374,20 @@ def repair_mount(sidecar_root: Path, checkout: Path) -> None:
 def prune_mount(sidecar_root: Path, checkout: Path) -> None:
     """Remove ``<checkout>/.praxion-state`` from the sidecar's worktree list.
 
-    Refuses on the two git-mechanical states in which removal would discard
-    work: a dirty tree, or a mount left mid-merge. Branch-level eligibility is
-    a separate question, deliberately not consulted -- dropping an unmerged
-    branch is a two-step path that *starts* by removing its mount. A locked
-    worktree is reported, never forced: ``--force`` would override the lock
-    whichever tool placed it (Claude Code locks worktrees it creates).
+    Does not gate on the mount's own dirtiness: both production callers have
+    already made that check moot by the time they get here -- ``publish``
+    verifies every mount is clean before it ever starts tearing one down, and
+    the orphan sweep only reaches a mount whose checkout is already gone, at
+    which point any uncommitted content in it went with the checkout, not
+    with this call. Uncommitted mount state is protected upstream instead:
+    the Stop-hook autocommit and the pre-promotion mount commit bound how
+    much work a live checkout can carry uncommitted, and ``doctor`` reports
+    the mount's dirtiness for as long as the checkout is still there to read
+    it. The sidecar branch itself is untouched here -- dropping it is a
+    separate, deliberate step (``drop_branch``) -- so its committed history
+    survives a prune regardless. A locked worktree is reported, never
+    forced: ``--force`` would override the lock whichever tool placed it
+    (Claude Code locks worktrees it creates).
     """
     state = classify_mount(checkout, expected_common_dir=_sidecar_common_dir(sidecar_root))
     if isinstance(state, Absent):
@@ -387,14 +395,6 @@ def prune_mount(sidecar_root: Path, checkout: Path) -> None:
     mount = Path(checkout) / MOUNT_DIRNAME
     if not isinstance(state, SidecarWorktree):
         raise MountRemovalRefused(f"{mount} is not a state mount: {_describe(state)}")
-
-    if gitp.merge_in_progress(mount):
-        raise MountRemovalRefused(f"{mount} is mid-merge; resolve or abort the merge first")
-    status = gitp.porcelain_status(mount)
-    if status is None:
-        raise MountRemovalRefused(f"{mount} status could not be read")
-    if status.strip():
-        raise MountRemovalRefused(f"{mount} has uncommitted changes; commit or discard them first")
 
     removal = run_git(sidecar_root, "worktree", "remove", str(mount))
     if removal.returncode != 0:

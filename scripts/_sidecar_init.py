@@ -31,7 +31,17 @@ from _sidecar_cli import EnvironmentProblem, UsageError, refusal
 # made from repo state (DS-8), not a default -- see `_claude_md_entry`.
 DEFAULT_SHADOWS = (".ai-state", "CLAUDE.local.md", ".claude/settings.local.json")
 DEFAULT_SHARES = ("docs/architecture.md",)
-DEFAULT_EXCLUDES = (".ai-work/", ".claude/worktrees/", "tmp/")
+# `/.claude/praxion-rules.yaml.example` is seeded by `inject_rules.py`'s
+# SessionStart hook into every project, sidecar-placed or not -- the hook has
+# no placement awareness and none is owed here, since the exclude block is
+# already the mechanism that keeps placement-blind writers invisible to the
+# team repo.
+DEFAULT_EXCLUDES = (
+    ".ai-work/",
+    ".claude/worktrees/",
+    "tmp/",
+    "/.claude/praxion-rules.yaml.example",
+)
 DIR_SHADOW_PATHS = frozenset({".ai-state", "architecture/", "fitness/"})
 CLAUDE_MD = "CLAUDE.md"
 
@@ -302,12 +312,17 @@ def _ensure_gitattributes(sidecar: Path) -> bool:
     return True
 
 
-def create_repo(sidecar: Path, manifest: manifests.Manifest, slug: str) -> None:
+def create_repo(sidecar: Path, checkout: Path, manifest: manifests.Manifest, slug: str) -> None:
     """`git init` the sidecar, route its merge drivers, seed it, commit, detach.
 
     The merge routing lands *before* the first commit so `.gitattributes` is
     tracked from the sidecar's first revision -- a mount created later
     materialises it automatically, which is what makes `merge-back` safe.
+
+    The identity lands before the first commit too, and as *config* rather
+    than a per-commit `-c` override, so it is set exactly once and every
+    later commit against this sidecar -- the Stop-hook autocommit, `commit`,
+    `merge-back` -- inherits it the same way `git commit` always would.
 
     Detaching is what frees `main` for the project's main checkout to claim as
     a mount (`ARCH_WT_RULING.md` sec. 5): git refuses to check a branch out in
@@ -316,6 +331,7 @@ def create_repo(sidecar: Path, manifest: manifests.Manifest, slug: str) -> None:
     """
     sidecar.mkdir(parents=True, exist_ok=True)
     gitp.run_or_raise(sidecar, EnvironmentProblem, "init", "-q", "-b", "main")
+    _configure_identity(sidecar, checkout)
     ensure_merge_drivers(sidecar)
     _seed_shadow_targets(sidecar, manifest)
     gitp.run_or_raise(sidecar, EnvironmentProblem, "add", "-A")
@@ -329,6 +345,23 @@ def create_repo(sidecar: Path, manifest: manifests.Manifest, slug: str) -> None:
         f"chore(sidecar): initialise {slug}",
     )
     gitp.run_or_raise(sidecar, EnvironmentProblem, "checkout", "--detach", "-q")
+
+
+def _configure_identity(sidecar: Path, checkout: Path) -> None:
+    """Give the fresh sidecar its own committer identity, inherited from the
+    project it belongs to.
+
+    `publish` later grafts the sidecar's whole history into the project
+    repository, so a fixed Praxion identity would attribute every
+    sidecar-era change to a machine account instead of whoever actually made
+    it. The project's own effective identity is what git would use for a
+    commit made in the project right now (local config, global config, or an
+    `includeIf` match); the fixed fallback covers only the case the project
+    has no identity of its own either.
+    """
+    name, email = gitp.configured_identity(checkout) or gitp.FALLBACK_IDENTITY_PAIR
+    gitp.run_or_raise(sidecar, EnvironmentProblem, "config", "user.name", name)
+    gitp.run_or_raise(sidecar, EnvironmentProblem, "config", "user.email", email)
 
 
 def _seed_shadow_targets(sidecar: Path, manifest: manifests.Manifest) -> None:

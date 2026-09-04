@@ -619,22 +619,26 @@ def test_merge_back_makes_a_worktree_edit_visible_in_the_target_checkout(tmp_pat
 # --- prune_mount ----------------------------------------------------------------
 
 
-def test_prune_mount_refuses_a_dirty_mount(tmp_path: Path) -> None:
-    fixture = _build_diverged_fixture(tmp_path, name="dirty")
+def test_prune_mount_succeeds_for_a_gone_checkout_even_when_its_mount_was_dirty(
+    tmp_path: Path,
+) -> None:
+    """A removed project worktree takes its nested mount's working tree with
+    it -- there is nothing left for `prune_mount` to protect by the time it
+    runs, so it neither raises nor needs to inspect the mount's own git
+    status. The branch's committed history is untouched: `prune_mount` never
+    deletes a branch, only a worktree registration.
+    """
+    fixture = _build_diverged_fixture(tmp_path, name="gone")
     (fixture.wt_mount / ".ai-state" / "DESIGN.md").write_text("uncommitted\n")
+    committed_tip = _git_ok(fixture.sidecar_root, "rev-parse", fixture.sidecar_branch).stdout
 
-    with pytest.raises(_sidecar_mount.MountRemovalRefused):
-        _sidecar_mount.prune_mount(fixture.sidecar_root, fixture.wt_checkout)
+    shutil.rmtree(fixture.wt_checkout)
 
+    _sidecar_mount.prune_mount(fixture.sidecar_root, fixture.wt_checkout)
 
-def test_prune_mount_refuses_a_mount_left_mid_merge(tmp_path: Path) -> None:
-    fixture = _build_diverged_fixture(tmp_path, name="mid")
-    git_dir = _worktree_git_dir(fixture.wt_mount)
-    head = _git_ok(fixture.sidecar_root, "rev-parse", "main").stdout
-    (git_dir / "MERGE_HEAD").write_text(head)
-
-    with pytest.raises(_sidecar_mount.MountRemovalRefused):
-        _sidecar_mount.prune_mount(fixture.sidecar_root, fixture.wt_checkout)
+    assert (
+        _git_ok(fixture.sidecar_root, "rev-parse", fixture.sidecar_branch).stdout == committed_tip
+    )
 
 
 # --- StateBranchState / classify_branch (DS-11) ------------------------------

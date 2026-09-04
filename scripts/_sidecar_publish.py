@@ -263,11 +263,12 @@ def _require_every_branch_merged(sidecar: Path) -> None:
 def _require_every_mount_removable(mounts_to_remove: list[Path]) -> None:
     """Every refusal publish can raise must be raised *before* the import.
 
-    The teardown removes each mount, and `prune_mount` rightly refuses a mount
-    with uncommitted work -- but it runs *after* the import commit, so that
-    refusal used to leave the project reporting `in-repo` while a live
+    `prune_mount` does not check a mount's own dirtiness -- publishing is
+    this check, its only guard against destroying unsaved state during
+    teardown, and it must run *before* the import commit: checking after
+    used to leave the project reporting `in-repo` while a live
     `.praxion-state`, every `wt/*` branch and the exclude block were all still
-    standing: a state neither placement describes and no verb can undo.
+    standing -- a state neither placement describes and no verb can undo.
     Checking every mount here makes the whole verb all-or-nothing, and lists
     *every* offender at once rather than making the operator discover them one
     failed publish at a time.
@@ -357,7 +358,7 @@ def absorb(context: Context, *, shadows: list[str], shares: list[str], dry_run: 
             )
         )
 
-    initializer.create_repo(sidecar, manifest, slug)
+    initializer.create_repo(sidecar, checkout, manifest, slug)
     manifests.write_manifest(manifests.manifest_path(sidecar / ".git"), manifest)
     _absorb_history(sidecar, checkout, adopted)
     _untrack_state_dir(checkout)

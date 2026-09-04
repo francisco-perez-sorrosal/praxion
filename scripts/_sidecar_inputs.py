@@ -174,8 +174,12 @@ def _failed_check_ids(results: list) -> tuple[str, ...]:
     return tuple(ids)
 
 
-def unresolvable_placement(placement: _state_repo.Placement) -> Refused:
+def unresolvable_placement(placement: _state_repo.Placement, action: str = "report") -> Refused:
     """The three unwritable variants -- reportable states, but not *by* status.
+
+    `action` names the verb that is refusing (`report` for status, `commit`
+    for commit) so the first line of the refusal tells the operator which
+    command declined, not which command the helper was written for.
 
     All three mean the checkout's `.ai-state` does not resolve into a sidecar
     this command can report on, so there is no honest report to render.
@@ -185,7 +189,7 @@ def unresolvable_placement(placement: _state_repo.Placement) -> Refused:
     """
     if isinstance(placement, _state_repo.NotYetLinked):
         return refusal(
-            "Refusing to report: this checkout has no .ai-state yet.",
+            f"Refusing to {action}: this checkout has no .ai-state yet.",
             f"It is a worktree of {placement.main_checkout_root}, whose sidecar is "
             f"{placement.sidecar_common_dir.parent} — but no state mount has been "
             "created here.",
@@ -193,13 +197,13 @@ def unresolvable_placement(placement: _state_repo.Placement) -> Refused:
         )
     if isinstance(placement, _state_repo.Dangling):
         return refusal(
-            "Refusing to report: .ai-state is a dangling symlink.",
+            f"Refusing to {action}: .ai-state is a dangling symlink.",
             f"It records {placement.link_target}, which does not exist — usually a mount "
             "that has not been materialised in this checkout yet.",
             "Materialise it:  praxion-sidecar link",
         )
     return refusal(
-        "Refusing to report: .ai-state points at a different sidecar.",
+        f"Refusing to {action}: .ai-state points at a different sidecar.",
         f"found:    {placement.link_path}\nreason:   {placement.reason.value}",
         "Remove it and re-link:  rm .ai-state && praxion-sidecar link",
     )

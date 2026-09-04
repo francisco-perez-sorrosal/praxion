@@ -37,6 +37,22 @@ _CLI = Path(__file__).resolve().parent / "praxion-sidecar"
 
 _ORIGIN_ID = "github.com--acme--billing"
 
+# Isolate git from this machine's global/system config for the identity
+# tests below -- the same isolation `test_onboard_project_placement.py` uses,
+# for the same reason: a developer with `user.name` registered at global
+# scope must not change what those tests observe.
+_ISOLATED_GIT_ENV = {
+    "GIT_CONFIG_GLOBAL": os.devnull,
+    "GIT_CONFIG_SYSTEM": os.devnull,
+    "GIT_CONFIG_NOSYSTEM": "1",
+}
+_IDENTITY_ENV_VARS = (
+    "GIT_AUTHOR_NAME",
+    "GIT_AUTHOR_EMAIL",
+    "GIT_COMMITTER_NAME",
+    "GIT_COMMITTER_EMAIL",
+)
+
 
 # --- git plumbing ------------------------------------------------------------
 
@@ -527,6 +543,80 @@ def test_init_still_shadows_an_untracked_existing_file(
     assert result.returncode == 0, result.stderr
 
 
+def _identity_isolated_env(sidecar_root: Path, home: Path) -> dict[str, str]:
+    """An environment with no global/system git config and no author-identity
+    env vars, so a commit's author can only come from git config `init`
+    itself sets -- never from ambient machine state or `cli_env`'s own fixed
+    "Test" identity override.
+    """
+    env = {key: value for key, value in os.environ.items() if key not in _IDENTITY_ENV_VARS}
+    env["HOME"] = str(home)
+    env["PRAXION_SIDECAR_ROOT"] = str(sidecar_root)
+    env["NO_COLOR"] = "1"
+    env.update(_ISOLATED_GIT_ENV)
+    return env
+
+
+def _sidecar_first_commit_author(sidecar_root: Path, project_id: str) -> str:
+    sidecar = sidecar_root / project_id
+    return _git_ok(sidecar, "log", "-1", "--format=%an <%ae>", "main").stdout.strip()
+
+
+def test_init_inherits_the_projects_own_identity_for_the_sidecars_first_commit(
+    origin_project: Path, sidecar_root: Path, tmp_path: Path
+) -> None:
+    """The project already carries its own local identity (`_init_project_repo`
+    configures it for the seed commit) -- the sidecar's first commit must
+    carry the same one, not a fixed Praxion identity, so `publish` later
+    grafts attributable history into the team repo."""
+    env = _identity_isolated_env(sidecar_root, tmp_path / "empty-home")
+
+    result = run_cli(["init"], origin_project, env)
+
+    assert result.returncode == 0, result.stderr
+    assert _sidecar_first_commit_author(sidecar_root, _ORIGIN_ID) == "Test <test@example.com>"
+
+
+def test_init_falls_back_to_the_fixed_identity_when_the_project_has_none_either(
+    tmp_path: Path, sidecar_root: Path
+) -> None:
+    """With no project identity and no global git config to inherit, the
+    fixed Praxion identity is the only one available -- and the sidecar's
+    first commit must still succeed."""
+    project = tmp_path / "no-identity-project"
+    project.mkdir()
+    isolated_env = {**os.environ, **_ISOLATED_GIT_ENV}
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=project, check=True, env=isolated_env)
+    (project / "README.md").write_text("hello\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=project, check=True, env=isolated_env)
+    # A one-off identity, supplied only via env vars, produces the seed commit
+    # without leaving any local git config behind for `init` to inherit.
+    seed_env = {
+        **isolated_env,
+        "GIT_AUTHOR_NAME": "Seed",
+        "GIT_AUTHOR_EMAIL": "seed@example.com",
+        "GIT_COMMITTER_NAME": "Seed",
+        "GIT_COMMITTER_EMAIL": "seed@example.com",
+    }
+    subprocess.run(["git", "commit", "-q", "-m", "seed"], cwd=project, check=True, env=seed_env)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/acme/no-identity"],
+        cwd=project,
+        check=True,
+        env=isolated_env,
+    )
+
+    env = _identity_isolated_env(sidecar_root, tmp_path / "empty-home")
+
+    result = run_cli(["init"], project, env)
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        _sidecar_first_commit_author(sidecar_root, "github.com--acme--no-identity")
+        == "Praxion <praxion@localhost>"
+    )
+
+
 # --- link ------------------------------------------------------------
 
 
@@ -555,6 +645,21 @@ def test_link_recreates_a_deleted_shadow_symlink(
     assert result.returncode == 0, result.stderr
     assert "Linked 1 surface(s) into" in result.stdout
     assert claude_local.is_symlink()
+
+
+def test_link_excludes_the_rules_example_inject_rules_seeds_into_every_project(
+    origin_project: Path, cli_env: dict[str, str]
+) -> None:
+    """`inject_rules.py`'s SessionStart hook seeds this file into every
+    project, sidecar-placed or not -- it has no placement awareness and none
+    is owed here. The exclude block, not the hook, is what keeps the seeded
+    file invisible to the team repo's `git status`."""
+    _init_ok(origin_project, cli_env)
+    example = origin_project / ".claude" / "praxion-rules.yaml.example"
+    example.parent.mkdir(parents=True, exist_ok=True)
+    example.write_text("# seeded by inject_rules.py\n", encoding="utf-8")
+
+    assert _git_ok(origin_project, "status", "--porcelain").stdout == ""
 
 
 def test_link_in_a_project_worktree_creates_a_worktree_scoped_mount(
@@ -2207,3 +2312,20 @@ def test_merge_back_auto_reports_a_plumbing_failure_as_failed_not_as_a_conflict(
     assert "converged wt/envfail" in result.stdout
     assert "aborted" not in result.stdout
     assert worktree.exists()
+
+
+def test_commit_names_its_own_verb_when_the_mount_resolves_foreign(
+    tmp_path: Path, cli_env: dict[str, str]
+) -> None:
+    project_a = tmp_path / "repo-a"
+    _init_project_repo(project_a, origin="https://github.com/acme/billing")
+    _init_ok(project_a, cli_env)
+
+    project_b = tmp_path / "repo-b"
+    _init_project_repo(project_b, origin="https://github.com/acme/other")
+    (project_b / ".ai-state").symlink_to(project_a / ".praxion-state" / ".ai-state", True)
+
+    result = run_cli(["commit"], project_b, cli_env, _relocated_root(tmp_path))
+    assert result.returncode == 3
+    assert "Refusing to commit: .ai-state points at a different sidecar." in result.stderr
+    assert "Refusing to report" not in result.stderr

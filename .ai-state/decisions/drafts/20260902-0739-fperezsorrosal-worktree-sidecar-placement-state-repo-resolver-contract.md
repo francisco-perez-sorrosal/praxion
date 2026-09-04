@@ -23,8 +23,11 @@ dissent: "Six consumers now import a module that reads a manifest on paths as ho
 
 > **Revised in place 2026-09-02** (still a draft) after `dec-draft-0516562a`
 > changed how sidecar state is materialised. The decision's substance is
-> unchanged — one resolver, a four-variant sum type, fully-resolved paths, a
+> unchanged — one resolver, a closed sum type, fully-resolved paths, a
 > reader/writer entry-point split, identity compared and never re-derived.
+> *(Corrected 2026-09-03: this note and the option heading below both still said
+> "four-variant" after `NotYetLinked` was added; the type has **five** variants,
+> as the title, the summary and the Decision have said throughout.)*
 > Three things moved: `state_git_root` is the in-checkout **state mount** rather
 > than the sidecar root; discovery is stdlib and subprocess-free via the mount's
 > `.git` pointer file; and the consumer set lost `worktree_guard.py`,
@@ -83,7 +86,7 @@ exactly like `_repo_root.py` (`scripts/` is on `sys.path[0]` for all of them).
    - `InRepo` — carries `project_root`, `state_dir`, and `state_git_root`
      equal to `project_root`.
    - `SidecarOwned` — carries `project_root`, `state_dir`, `mount_dir`
-     (`<project_root>/.praxion`, the state mount), `state_git_root` **equal to
+     (`<project_root>/.praxion-state`, the state mount), `state_git_root` **equal to
      `mount_dir`** (every `git -C` for state runs inside the checkout),
      `sidecar_common_dir` (`<sidecar>/.git`, which identifies the sidecar across
      all its worktrees), `branch` (this checkout's sidecar branch), and a
@@ -98,8 +101,14 @@ exactly like `_repo_root.py` (`scripts/` is on `sys.path[0]` for all of them).
      { identity, paths, excludes, autocommit, remote }`) that a consumer widens
      deliberately by calling the full reader — so "I only have the three
      identity fields here" is a representable, checkable state
-     (`MinimalView`), not an under-populated bag. Verified against the consumer
-     set: the four stagers need only
+     (`MinimalView`), not an under-populated bag. *(Amended 2026-09-03.)* The
+     `ManifestView` sum was deliberately **not built**: the shipped identity
+     object only ever carries the three fields, so the sum would ship with one
+     inhabited variant and nothing to dispatch on. What survives is the split
+     reader — identity on the hot path, wider content through a separate call —
+     held as a **convention** rather than as a property of the type. Trigger to
+     build it: any consumer that must branch on whether it holds full manifest
+     content. Verified against the consumer set: the four stagers need only
      `{schema, id, origin, mount_dir, sidecar_common_dir}`; only
      `praxion-sidecar` and `sidecar_autocommit.py` (already full-YAML contexts)
      read the wider fields.
@@ -136,7 +145,7 @@ exactly like `_repo_root.py` (`scripts/` is on `sys.path[0]` for all of them).
    single-site concern.
 
 2a. **Discovery is stdlib and subprocess-free on the hot path.** Read the
-   `.ai-state` symlink → derive `<checkout>/.praxion` → read its `.git`
+   `.ai-state` symlink → derive `<checkout>/.praxion-state` → read its `.git`
    **pointer file** (`gitdir: <sidecar>/.git/worktrees/<name>`) → strip the
    trailing `worktrees/<name>` segment → `sidecar_common_dir` → read the
    manifest beside it. Two file reads, no `git` invocation. An unrecognised
@@ -217,7 +226,7 @@ Cons: `None` conflates "in-repo" with "could not determine", which are opposite
 instructions for a writer. The error cases still carry no data, so a diagnostic
 cannot say *why* the link is unusable — which is most of what an operator needs.
 
-### C — Four-variant sum type with a reader/writer entry-point split (chosen)
+### C — Five-variant sum type with a reader/writer entry-point split (chosen)
 
 Pros: every legal and illegal state is named and carries its evidence; the
 writer/reader obligation is in the API rather than in a convention; realpath

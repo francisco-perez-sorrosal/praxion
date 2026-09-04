@@ -67,7 +67,7 @@ Onboarding gains a **placement** axis alongside its four modes.
 
    > **Narrowed by `dec-draft-0516562a`.** The projection mechanism is no longer
    > "a symlink into `${PRAXION_SIDECAR_ROOT}`". Each checkout mounts the
-   > sidecar as a `git worktree` at `<checkout>/.praxion/` and the shadows are
+   > sidecar as a `git worktree` at `<checkout>/.praxion-state/` and the shadows are
    > *relative* symlinks pointing inward, because Claude Code's worktree
    > isolation refuses `Write`/`Edit` on any lexically-in-worktree path whose
    > realpath escapes the worktree. The path contract, the invisibility
@@ -77,6 +77,15 @@ Onboarding gains a **placement** axis alongside its four modes.
    `scripts/_state_repo.py` (the resolver, specified separately).
 4. Invisibility is delivered by a marker-delimited Praxion block in
    `.git/info/exclude` rather than by the `.gitignore` block, which is tracked.
+   *(Clarified 2026-09-03.)* The claim is a **closure property, not a list**:
+   every path Praxion causes to appear inside the checkout is covered by the
+   block, including paths a hook or a command seeds rather than onboarding.
+   Which literal entries the block holds is therefore implementation that
+   follows from the property — it is regenerated wholesale from one source and
+   is expected to grow whenever Praxion learns to write a new path. Stating it
+   as a list is what let a hook-seeded example file surface in `git status` on
+   an otherwise invisible installation: a missing entry is a violation of this
+   clause, not a new decision.
 5. **Placement is not freely orthogonal to mode.** Of the eight pairs, five are
    legal: all four `in-repo` pairs, and `sidecar × existing`. `sidecar × new`,
    `sidecar × hackathon` and `sidecar × promote` are refused at the argument

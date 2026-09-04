@@ -165,7 +165,7 @@ server module.
 **What removed this decision's subject.** `dec-draft-0516562a` changed how
 sidecar state is materialised: instead of a symlink escaping the checkout into
 `${PRAXION_SIDECAR_ROOT}/<id>/`, each checkout mounts the sidecar as a
-`git worktree` at `<checkout>/.praxion/` and the shadows become *relative*
+`git worktree` at `<checkout>/.praxion-state/` and the shadows become *relative*
 symlinks pointing inward. Every Praxion path therefore resolves **inside the
 project root**. The question this record answered — "how do we admit one
 specific containment escape without admitting the class?" — no longer has a
@@ -181,8 +181,8 @@ Concretely, both clauses lapse:
   realpath root and no `PRAXION_STATE_ROOT` environment channel. One small
   change survives, and it is a different decision than this one: because
   `assertProjectPath` re-applies `isAllowedArtifactPath` to the **resolved**
-  relative path — which under the mount reads `.praxion/.ai-state/…` — that
-  allowlist constant gains a `.praxion/.ai-state` entry. An allowlist entry for
+  relative path — which under the mount reads `.praxion-state/.ai-state/…` — that
+  allowlist constant gains a `.praxion-state/.ai-state` entry. An allowlist entry for
   an in-project prefix is not a containment relaxation, so it is recorded in the
   plan and in `dec-draft-0516562a`, not here.
 

@@ -4,7 +4,7 @@ title: Sidecar state is materialised as a git worktree mounted inside each check
 status: proposed
 category: architectural
 date: 2026-09-02
-summary: Claude Code's worktree isolation refuses Write/Edit on any lexically-in-worktree path whose realpath escapes the worktree, with no sanctioned exemption, which would leave .ai-state/ unwritable by every agent in every pipeline worktree. Under sidecar placement each checkout now materialises the sidecar as a real directory at <checkout>/.praxion - a git worktree of the sidecar on a per-checkout branch - and every shadow becomes a relative symlink into it, so all Praxion writes resolve inside the checkout and both containment guards stay unmodified.
+summary: Claude Code's worktree isolation refuses Write/Edit on any lexically-in-worktree path whose realpath escapes the worktree, with no sanctioned exemption, which would leave .ai-state/ unwritable by every agent in every pipeline worktree. Under sidecar placement each checkout now materialises the sidecar as a real directory at <checkout>/.praxion-state - a git worktree of the sidecar on a per-checkout branch - and every shadow becomes a relative symlink into it, so all Praxion writes resolve inside the checkout and both containment guards stay unmodified.
 tags: [sidecar, state-mount, git-worktree, worktree-isolation, claude-code, containment, branch-scoped-state, merge-back]
 made_by: agent
 agent_type: systems-architect
@@ -22,7 +22,7 @@ affected_files:
   - dashboard_app/src/server/artifacts/project-root.ts
   - skills/onboard-project/references/phases-core.md
   - docs/onboarding.md
-dissent: "This buys a write path by taking on a git-worktree lifecycle (creation, per-checkout branch naming, prune, dirty-refusal) and a convergence step the previous design did not have - every channel that can observe a merged project branch must merge the sidecar branch too, and a branch nothing observes stays unmerged until someone looks - and it does so on the strength of an undocumented harness behaviour that could be given a sanctioned exemption in any release, at which point the entire mechanism is machinery bought to route around a temporary constraint."
+dissent: "This buys a write path by taking on a git-worktree lifecycle (creation, per-checkout branch naming, prune) and a convergence step the previous design did not have - every channel that can observe a merged project branch must merge the sidecar branch too, and a branch nothing observes stays unmerged until someone looks - it forecloses a second clone of one project on one machine and leaves uncommitted mount state unguarded when a checkout is removed, and it does so on the strength of an undocumented harness behaviour that could be given a sanctioned exemption in any release, at which point the entire mechanism is machinery bought to route around a temporary constraint."
 ---
 
 ## Context
@@ -66,14 +66,15 @@ does not exist.
 Under sidecar placement, every project checkout — the main checkout **and**
 every linked worktree, uniformly — materialises the sidecar as a **state mount**.
 
-1. **The mount.** `<checkout>/.praxion/` is a real directory that is a
+1. **The mount.** `<checkout>/.praxion-state/` is a real directory that is a
    `git worktree` of the sidecar repository, on a per-checkout branch: `main`
    for the project's main checkout, `wt/<worktree-dir-name>` for each linked
    worktree, branched from the base checkout's sidecar branch.
 
 2. **The shadows point inward.** `.ai-state`, `CLAUDE.local.md`, a shadowed
    `CLAUDE.md` and `.claude/settings.local.json` become **relative** symlinks
-   into the mount (`.praxion/.ai-state`, `../.praxion/settings.local.json`, …),
+   into the mount (`.praxion-state/.ai-state`,
+   `../.praxion-state/settings.local.json`, …),
    never absolute links into `${PRAXION_SIDECAR_ROOT}`. A link that reaches the
    right file by escaping the checkout is classified as `LinkElsewhere` and
    refused, because it works today and breaks the moment a worktree opens.
@@ -89,7 +90,7 @@ every linked worktree, uniformly — materialises the sidecar as a **state mount
    `_is_within(target.resolve(), session_root)` early return is already correct
    under the invariant; `project-root.ts` keeps both its lexical and realpath
    containment checks with no second permitted root and no environment channel.
-   The dashboard's only change is one entry (`.praxion/.ai-state`) in its
+   The dashboard's only change is one entry (`.praxion-state/.ai-state`) in its
    `ALLOWED_ARTIFACT_ROOTS` constant, because it re-applies that allowlist to
    the *resolved* relative path.
 
@@ -99,12 +100,23 @@ every linked worktree, uniformly — materialises the sidecar as a **state mount
    would force two code paths through `link`, `doctor`, the resolver and the
    dashboard for no behavioural gain.
 
-6. **The mount name is a code constant (`.praxion`), not a manifest field.**
-   The manifest schema and its frozen `{schema, project.id, project.origin}`
-   triple are untouched. The manifest's *location* moves to the sidecar's git
-   common directory, because a tracked manifest would be materialised inside
-   every checkout and its machine-local `roots:` list would conflict across
-   branches.
+6. **The mount name is a code constant (`.praxion-state`), not a manifest
+   field.** *(Renamed from `.praxion` 2026-09-03, user-approved.)* The original
+   name collided with a directory Praxion already ships a meaning for:
+   `<repo>/.praxion/` is the team-committed home of the parallel-session recipes
+   file and of project-installed scripts. A repository carrying one **on
+   purpose** — squarely the population sidecar placement exists for —
+   classifies the mount slot as a foreign directory and is refused, so the
+   collision was never merely an accident the design detects: it was a hard
+   adoption block for a shipped feature. `.praxion-state` names what the
+   directory holds, leaves that convention untouched, and remains a constant:
+   one string per language is still cheaper than a configurable name that
+   `praxion-sidecar`, the resolver, the exclude-block generator and a TypeScript
+   constant in the dashboard would each have to learn. The manifest schema and
+   its frozen `{schema, project.id, project.origin}` triple stay untouched. The
+   manifest's *location* moves to the sidecar's git common directory, because a
+   tracked manifest would be materialised inside every checkout and its
+   machine-local `roots:` list would conflict across branches.
 
 7. **Branch-scoped state returns, and with it a convergence step.**
    *(Revised 2026-09-02, user-approved; `ARCH_WT_RULING.md` § 13.)*
@@ -220,7 +232,7 @@ structural rather than assumed; restores branch-scoped state and puts
 `reconcile_ai_state.py` and the merge drivers back in play; shrinks the DS-9
 index race by construction, since each mount has its own index.
 
-Cons: a git-worktree lifecycle to own (create, branch-name, prune, refuse-dirty);
+Cons: a git-worktree lifecycle to own (create, branch-name, prune);
 a merge-back step with a hard ordering constraint; a nested git repository inside
 every checkout; a `git clean -ffdx` can now lose *uncommitted* mount state
 (plain `-fdx` cannot — git skips nested repos); and the sidecar's seeded skeleton
@@ -247,6 +259,34 @@ rather than *whether*. And the design now depends on git worktree semantics in a
 place it previously depended only on symlinks — a smaller surface than the
 harness, but not zero. The mount also does not fully close the write-path gap it was built for: the three file shadows still refuse a direct `Write`/`Edit`, and an agent must target the mount path for those three, even though the directory shadow (`.ai-state`) writes through cleanly.
 
+**Accepted limits.** *(Recorded 2026-09-03, after integration exercised both.)*
+Two, each a consequence of a mechanism above rather than a separate choice — the
+first of one sidecar branch per project checkout, the second of the mount's
+lifecycle being tied to its checkout's:
+
+- **One main-checkout mount per project per machine.** The main checkout's
+  sidecar branch is `main`, and git refuses to check out a branch another
+  worktree already holds, so a **second clone of the same project on the same
+  machine** cannot mount. This is unsupported by design, not unhandled: the
+  refusal is a classified state that names the checkout already holding the
+  branch and names the sanctioned alternative — make the second working copy a
+  git worktree of the first, which mounts on its own `wt/*` branch. That refusal
+  message is the contract. Per-root branch naming (`main`, `main@2`, …) would
+  buy the case at the price of convergence rules among several equally
+  authoritative mains — a genuinely new merge shape, bought for one operator
+  holding two clones.
+- **Uncommitted mount state dies with its checkout.** No removal path refuses a
+  dirty mount, and none can usefully: the only caller that removes mounts is the
+  orphan sweep, which by construction runs *after* the checkout directory is
+  already gone, so a guard there would have nothing left to inspect. The
+  contract is therefore stated rather than guarded. Committed state lives in the
+  sidecar and is never at risk. The window between an agent's write and its
+  commit is bounded on both sides — by the Stop-hook autocommit at the session
+  boundary and by the mount commit the finalize chain runs before ADR promotion
+  — and while the checkout still exists, `doctor` reports the mount's dirtiness
+  with its fix. A `git clean -ffdx` in the project is the same event as removing
+  the checkout, and is covered by the same contract.
+
 **Neutral.** `dec-draft-4b33b1df`'s placement axis, mode pairing, capability
 classes and `publish`/`absorb` machinery are untouched; only its projection
 *mechanism* and its shared-live-tree consequences are narrowed. The consult
@@ -261,7 +301,7 @@ the commit lock, the schema-first stdlib reader, the split slot types and the
 
 - **Clause 2 (projection mechanism)** said state is "projected into the project
   by symlink". It is now projected by a git worktree mounted at
-  `<checkout>/.praxion`, with symlinks pointing *inward* to it. The placement
+  `<checkout>/.praxion-state`, with symlinks pointing *inward* to it. The placement
   axis, the `.ai-state/` path contract, the `.git/info/exclude` invisibility
   mechanism and the `publish`/`absorb` reversibility are unchanged.
 - **Its Consequences** recorded "state is now shared live across worktrees …
@@ -320,6 +360,23 @@ wrong — branch-scoped state and the merge drivers have independent value — b
 the design would then have to be re-argued on the remaining merits rather than
 inherited.
 
+**A falsifier for the mount name.** `.praxion-state` is a code constant rather
+than a manifest field on the claim that no project carries that name for another
+purpose and none will want to move it — the same claim `.praxion` failed. One
+repository found using `.praxion-state/` for something else, or one operator with
+a legitimate reason to relocate the mount, falsifies the "a name nobody will
+change" premise on which the constant is preferred, and the manifest-schema
+argument must then be re-argued against a `mount:` field rather than inherited.
+
+**A falsifier for the removal contract.** State lost because a checkout was
+removed, or `git clean -ffdx` run, between an agent's write and the next
+autocommit boundary. The contract above claims that window is small enough that
+bounding it beats guarding it; one observed loss says otherwise, and the retreat
+is an explicit dismantle step in the teardown path that can inspect the mount
+while its checkout still exists — reintroducing exactly the ordering rule the
+convergence design spent effort removing, which is why it is not taken
+pre-emptively.
+
 **Steelmanned runner-up.** Option D is stronger than its rejection sounds. It
 deletes the mount, the branch model, the merge-back, the ordering constraint and
 three `doctor` checks — a large fraction of P1's remaining surface — and its
@@ -337,4 +394,8 @@ the Pipeline Isolation rule, not as a patch.
 channel that observed a merge and did not converge); an eligibility false
 positive; a documented harness exemption appearing; or the mount acquiring a
 *third* materialisation shape — at two shapes this is a mount, at three it is a policy and belongs behind
-one abstraction with its own tests.
+one abstraction with its own tests. Added 2026-09-03: **a second operator on one
+machine, or CI-style disposable clones of one project**, which turns the
+one-main-mount limit from a documented refusal into a recurring obstruction and
+makes per-root branch naming (with its convergence rules for multiple mains)
+work that has to be designed rather than declined.

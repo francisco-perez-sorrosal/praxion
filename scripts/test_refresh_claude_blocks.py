@@ -1002,3 +1002,33 @@ def test_apply_under_sidecar_placement_writes_shadow_and_leaves_tracked_file_unt
         "the absent block was not appended to the shadowed CLAUDE.local.md"
     )
     assert _AGENT_PIPELINE_CURRENT_BODY in shadow_path.read_text(encoding="utf-8")
+
+
+def test_apply_refuses_when_the_state_link_is_dangling_instead_of_writing_the_tracked_file(
+    tmp_path: Path,
+) -> None:
+    """A sidecar-placed project whose mount is missing must not fall back to the
+    team's tracked `CLAUDE.md`: `--apply` exits 2 by name and writes nothing."""
+    from test_state_repo import _build_sidecar_owned_fixture
+
+    tracked_claude_md = "# Team Project\n\nHand-written, tracked prose.\n"
+    fixture = _build_sidecar_owned_fixture(tmp_path, origin=None)
+    (fixture.project_root / "CLAUDE.md").write_text(tracked_claude_md, encoding="utf-8")
+    state_link = fixture.project_root / ".ai-state"
+    target = str(state_link.readlink())
+    state_link.unlink()
+    state_link.symlink_to(target + "-gone", True)
+
+    manifest_path = _write_manifest(tmp_path, _SINGLE_SLUG_BLOCKS)
+    canonical_dir = _write_canonical_dir(tmp_path, {"agent-pipeline": _AGENT_PIPELINE_CURRENT_BODY})
+    mod = _load_module()
+    mod.CANONICAL_DIR = canonical_dir  # type: ignore[attr-defined]
+
+    with pytest.raises(SystemExit) as raised:
+        mod.main(
+            ["--apply", "--repo-root", str(fixture.project_root), "--manifest", str(manifest_path)]
+        )
+
+    assert raised.value.code == 2
+    assert (fixture.project_root / "CLAUDE.md").read_text(encoding="utf-8") == tracked_claude_md
+    assert not (fixture.project_root / "CLAUDE.local.md").exists()

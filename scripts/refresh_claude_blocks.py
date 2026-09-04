@@ -158,14 +158,20 @@ def _heading_for_slug(slug: str) -> str:
 def _claude_md_target(repo_root: Path) -> Path:
     """Resolve where this project's Praxion blocks live (DS-8).
 
-    In-repo (and every other non-sidecar-owned placement): the tracked
-    ``CLAUDE.md`` at repo root, as always. Sidecar-owned: the manifest's own
+    In-repo: the tracked ``CLAUDE.md`` at repo root, as always. A checkout
+    whose ``.ai-state`` is dangling, foreign or not yet linked is refused
+    (exit 2) rather than falling back to the team's tracked file -- the
+    fallback would be exactly the write sidecar placement exists to prevent.
+    Sidecar-owned: the manifest's own
     ``block_target()`` -- which redirects to the shadowed
     ``.praxion-state/CLAUDE.local.md`` when the project's ``CLAUDE.md`` entry is
     ``untouched``, never the team's tracked file.
     """
-    placement = _state_repo.resolve_placement(repo_root)
-    if not isinstance(placement, _state_repo.SidecarOwned):
+    try:
+        placement = _state_repo.require_writable_placement(repo_root)
+    except _state_repo.UnwritablePlacementError as exc:
+        _error(f"cannot resolve where this project's blocks live: {exc}")
+    if isinstance(placement, _state_repo.InRepo):
         return repo_root / "CLAUDE.md"
     manifest = _sidecar_manifest.load_manifest(
         _sidecar_manifest.manifest_path(placement.sidecar_common_dir)

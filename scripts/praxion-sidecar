@@ -224,7 +224,8 @@ def verb_link(args: argparse.Namespace, context: Context) -> int:
         ) from error
     except (linker.LinkRefused, mounts.SidecarMountError) as error:
         raise refusal(
-            "Refusing to link: this checkout's .praxion slot cannot be used as a state mount.",
+            f"Refusing to link: this checkout's {mounts.MOUNT_DIRNAME} slot cannot be used "
+            "as a state mount.",
             str(error),
             "Move whatever occupies it aside, then:  praxion-sidecar link",
         ) from error

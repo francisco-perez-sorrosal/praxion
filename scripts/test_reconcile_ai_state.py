@@ -980,7 +980,7 @@ def _tm_build_diverged_fixture(tmp_path: Path) -> _TargetMountFixture:
     identical entry rather than doubling it.
 
     `wt/x`'s mount sits at a plain directory, `<project>/.claude/worktrees/
-    x/.praxion` -- not a real linked *project* worktree, since nothing under
+    x/.praxion-state` -- not a real linked *project* worktree, since nothing under
     test here needs project-side branch tracking.
     """
     sidecar_root = tmp_path / "sidecar"
@@ -990,9 +990,12 @@ def _tm_build_diverged_fixture(tmp_path: Path) -> _TargetMountFixture:
     _tm_init_sidecar(sidecar_root)
     _tm_init_project(project_root)
 
-    main_mount = _tm_mount(sidecar_root, project_root / ".praxion", "main")
+    main_mount = _tm_mount(sidecar_root, project_root / ".praxion-state", "main")
     wt_mount = _tm_mount(
-        sidecar_root, project_root / ".claude" / "worktrees" / "x" / ".praxion", "wt/x", base="main"
+        sidecar_root,
+        project_root / ".claude" / "worktrees" / "x" / ".praxion-state",
+        "wt/x",
+        base="main",
     )
 
     _tm_append_observation(main_mount, session_id="sM", event="m", timestamp="2026-01-03T00:00:00Z")
@@ -1047,10 +1050,10 @@ def _tm_build_sidecar_owned_fixture(tmp_path: Path) -> _TargetMountFixture:
     project_root.mkdir()
     _tm_init_sidecar(sidecar_root)
     _tm_init_project(project_root)
-    main_mount = _tm_mount(sidecar_root, project_root / ".praxion", "main")
+    main_mount = _tm_mount(sidecar_root, project_root / ".praxion-state", "main")
     _tm_write_manifest(sidecar_root, project_root)
     (project_root / ".ai-state").symlink_to(
-        Path(".praxion") / ".ai-state", target_is_directory=True
+        Path(".praxion-state") / ".ai-state", target_is_directory=True
     )
 
     return _TargetMountFixture(

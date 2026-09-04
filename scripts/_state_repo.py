@@ -1,7 +1,7 @@
 """Which git repository owns `.ai-state/`? -- the single answer, for every consumer.
 
 Under sidecar placement `.ai-state/` is a relative symlink into a **state
-mount**: a real directory at `<checkout>/.praxion/` that is a `git worktree` of
+mount**: a real directory at `<checkout>/.praxion-state/` that is a `git worktree` of
 a separate sidecar repository. Consumers that stage, commit or rename state
 files must therefore run git against the mount, not the project -- and must
 refuse outright when the shadow dangles, leads somewhere that is not this

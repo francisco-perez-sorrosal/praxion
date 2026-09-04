@@ -484,7 +484,7 @@ class TestCLI:
     def test_status_and_install_from_linked_worktree_resolve_common_hooks_dir(
         self, repo, plugin_root
     ):
-        """IF-16 canary: `--install`/`--status` from a linked worktree (whose
+        """Canary: `--install`/`--status` from a linked worktree (whose
         `.git` is a file, not a directory) must resolve the plain-slot hooks
         directory through the git COMMON dir -- before the fix, `--install`
         crashed `NotADirectoryError` and `--status` reported every slot

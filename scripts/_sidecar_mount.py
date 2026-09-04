@@ -3,7 +3,7 @@
 Three layers, in the order a reader meets them:
 
 1. **The mount.** Every project checkout -- the main checkout and each linked
-   worktree, uniformly -- carries a real directory at ``<checkout>/.praxion``
+   worktree, uniformly -- carries a real directory at ``<checkout>/.praxion-state``
    that is a ``git worktree`` of the sidecar repository on a branch of its own,
    which is what keeps every path Praxion writes resolving *inside* the
    checkout the session runs in. ``classify_mount`` names whatever sits in that
@@ -46,7 +46,7 @@ from _sidecar_commit import mount_lock
 
 # The mount directory name is a code constant, not configuration: four readers
 # in two languages would otherwise have to learn a string nobody will change.
-MOUNT_DIRNAME = ".praxion"
+MOUNT_DIRNAME = ".praxion-state"
 
 # Sidecar branches for linked project worktrees all live under this prefix; the
 # main checkout's branch (`main`) is deliberately outside it, so a convergence
@@ -182,7 +182,7 @@ StateMountState = Union[Absent, SidecarWorktree, ForeignDir, ForeignRepo]  # noq
 
 
 def classify_mount(checkout: Path, *, expected_common_dir: Path | None = None) -> StateMountState:
-    """Name whatever occupies ``<checkout>/.praxion``.
+    """Name whatever occupies ``<checkout>/.praxion-state``.
 
     Pure filesystem reads -- no subprocess -- because this runs on the
     SessionStart and ``post-checkout`` paths for every checkout, and because
@@ -238,7 +238,7 @@ def resolve_target_mount(path_str: str) -> Path:
 
     Shared by ``reconcile_ai_state.py`` and ``check_squash_safety.py`` --
     both diagnose a state mount at merge-back and both refuse anything that
-    is not itself ``<checkout>/.praxion`` for some checkout currently on a
+    is not itself ``<checkout>/.praxion-state`` for some checkout currently on a
     state branch. A shadow symlink (``<project>/.ai-state``) or an arbitrary
     directory both fail this even when they resolve into a real mount's
     content, because the caller (``merge_back``'s post-merge seam) always
@@ -295,7 +295,7 @@ def create_mount(
     project_branch: str,
     base_branch: str | None = None,
 ) -> None:
-    """Materialise the sidecar at ``<checkout>/.praxion`` on ``branch``.
+    """Materialise the sidecar at ``<checkout>/.praxion-state`` on ``branch``.
 
     ``base_branch`` creates ``branch`` from it; omit it to check out a branch
     that already exists. Git refuses a branch already checked out elsewhere
@@ -372,7 +372,7 @@ def repair_mount(sidecar_root: Path, checkout: Path) -> None:
 
 
 def prune_mount(sidecar_root: Path, checkout: Path) -> None:
-    """Remove ``<checkout>/.praxion`` from the sidecar's worktree list.
+    """Remove ``<checkout>/.praxion-state`` from the sidecar's worktree list.
 
     Refuses on the two git-mechanical states in which removal would discard
     work: a dirty tree, or a mount left mid-merge. Branch-level eligibility is

@@ -3,7 +3,7 @@ with `_sidecar_init.build_manifest`'s own composition order (Python) on
 every path, across the `--shadow`/`--share` flag matrix and both states of
 a pre-existing `CLAUDE.md` (tracked vs. absent).
 
-Why this exists (IF-29, audit § 1.10/1.11): `onboard_placement.sh` renders
+Why this exists: `onboard_placement.sh` renders
 the confirmation block *before* `praxion-sidecar init` runs, so it cannot
 shell out to the real composer -- it re-implements the same DS-2 defaults ->
 `--share` overrides -> `--shadow` overrides ("last write wins") order in

@@ -115,7 +115,7 @@ def _init_sidecar_repo(sidecar_root: Path) -> None:
 
 
 def _mount_sidecar(sidecar_root: Path, project_root: Path) -> Path:
-    mount_dir = project_root / ".praxion"
+    mount_dir = project_root / ".praxion-state"
     _git(sidecar_root, "worktree", "add", "-q", str(mount_dir), "main")
     return mount_dir
 
@@ -137,7 +137,7 @@ def _write_manifest(sidecar_root: Path, *, project_root: Path, autocommit: str) 
 
 def _link_shadow(project_root: Path) -> None:
     (project_root / ".ai-state").symlink_to(
-        Path(".praxion") / ".ai-state", target_is_directory=True
+        Path(".praxion-state") / ".ai-state", target_is_directory=True
     )
 
 

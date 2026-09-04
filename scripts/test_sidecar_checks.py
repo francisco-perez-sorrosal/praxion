@@ -131,8 +131,8 @@ def _sidecar_owned_placement() -> _state_repo.SidecarOwned:
     return _state_repo.SidecarOwned(
         project_root=root,
         state_dir=root / ".ai-state",
-        mount_dir=root / ".praxion",
-        state_git_root=root / ".praxion",
+        mount_dir=root / ".praxion-state",
+        state_git_root=root / ".praxion-state",
         sidecar_common_dir=Path("/sidecar-common"),
         branch="main",
         identity=_state_repo.SidecarIdentity(schema=1, id="local--test", origin=None),

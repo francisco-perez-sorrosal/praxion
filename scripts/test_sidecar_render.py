@@ -1,4 +1,4 @@
-"""Behavioral tests for `_sidecar_render.py` -- IF-20/IF-24 regressions.
+"""Behavioral tests for `_sidecar_render.py` -- render regressions.
 
 Narrow by design: `_sidecar_render.py` has no prior test file, and this
 fixer's scope is the two findings below, not a full-coverage suite for the
@@ -15,7 +15,7 @@ import _sidecar_render as render
 
 def _healthy_multi_checkout_status() -> render.SidecarStatus:
     """A `SidecarStatus` at more than one checkout -- the exact shape that
-    used to trigger the deleted "no branch isolation" tail (IF-20)."""
+    used to trigger the deleted "no branch isolation" tail."""
     return render.SidecarStatus(
         project_root=Path("/project"),
         origin="https://github.com/acme/billing",
@@ -38,7 +38,7 @@ def _healthy_multi_checkout_status() -> render.SidecarStatus:
 
 
 def test_healthy_multi_checkout_status_never_claims_no_branch_isolation() -> None:
-    """IF-20: the pre-ruling model line must never render -- state is NOT
+    """The pre-ruling model line must never render -- state is NOT
     shared live across checkouts under sidecar placement (per-checkout
     mounts + branch isolation)."""
     text = render.status_text(_healthy_multi_checkout_status())
@@ -49,5 +49,5 @@ def test_healthy_multi_checkout_status_never_claims_no_branch_isolation() -> Non
 
 
 def test_short_usage_names_merge_back() -> None:
-    """IF-24: `SHORT_USAGE` must not omit a real subcommand."""
+    """`SHORT_USAGE` must not omit a real subcommand."""
     assert "merge-back" in render.SHORT_USAGE

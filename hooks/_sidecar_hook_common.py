@@ -5,7 +5,7 @@
 honestly: find the plugin root, find the CLI inside it, and run it against
 the *payload's* cwd -- not the hook process's own cwd, which can differ from
 the session's project when Claude Code launches hooks from an unrelated
-working directory (IF-09; the B-03x symptom: a banner naming the wrong
+working directory (the observed symptom: a banner naming the wrong
 project's sidecar path). Folded into one module so the two hooks cannot
 drift on this contract.
 
@@ -13,7 +13,7 @@ Also resolves the interpreter to run the CLI with: `sys.executable` (the
 interpreter that is running the *hook* itself) rather than a bare
 `[str(cli_path), *args]` relying on the CLI's own `#!/usr/bin/env python3`
 shebang, which is a different interpreter whenever the shebang's `python3`
-lacks PyYAML (IF-17) -- the hook always has a working interpreter, since it
+lacks PyYAML -- the hook always has a working interpreter, since it
 is running right now.
 """
 

@@ -731,8 +731,8 @@ def test_dangling_placement_skips_state_finalization_without_crashing(tmp_path: 
     _git_ok(project_root, "init", "-q", "-b", "main")
     _configure_identity_sc(project_root)
     (project_root / ".ai-state").symlink_to(
-        Path(".praxion") / ".ai-state"
-    )  # .praxion never created
+        Path(".praxion-state") / ".ai-state"
+    )  # .praxion-state never created
     (project_root / "app.py").write_text("code\n")
     _commit_all(project_root, "init")
 

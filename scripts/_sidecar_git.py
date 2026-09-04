@@ -9,7 +9,7 @@ value -- `None`/`False`/`()` when git cannot answer -- rather than raising, so
 the callers that run inside git hooks stay total by construction.
 
 **What does not.** Any knowledge of the state mount or the state branch: the
-`.praxion` directory name, the `wt/` branch prefix, the `praxion-project-branch`
+`.praxion-state` directory name, the `wt/` branch prefix, the `praxion-project-branch`
 config key, and every classification those feed. Those live in
 `_sidecar_mount.py`, which imports this module. The dependency is
 one-directional and must stay that way -- nothing here may import a sidecar

@@ -145,7 +145,7 @@ def _init_sidecar_repo(sidecar_root: Path) -> None:
 
 
 def _mount_sidecar(sidecar_root: Path, project_root: Path) -> Path:
-    mount_dir = project_root / ".praxion"
+    mount_dir = project_root / ".praxion-state"
     _git(sidecar_root, "worktree", "add", "-q", str(mount_dir), "main")
     return mount_dir
 
@@ -167,7 +167,7 @@ def _write_manifest(sidecar_root: Path, *, project_root: Path) -> None:
 
 def _link_shadow(project_root: Path) -> None:
     (project_root / ".ai-state").symlink_to(
-        Path(".praxion") / ".ai-state", target_is_directory=True
+        Path(".praxion-state") / ".ai-state", target_is_directory=True
     )
 
 
@@ -294,7 +294,7 @@ class TestHealthyBanner:
         assert HEADING in banner
         assert "lives **outside it**" in banner
         assert "excluded via `.git/info/exclude`" in banner
-        assert "docs/architecture.md" not in banner  # no `share` row in this fixture (IF-23)
+        assert "docs/architecture.md" not in banner  # no `share` row in this fixture
         # tilde-abbreviated sidecar path (HOME pinned to tmp_path above)
         assert f"~/{sidecar_root.relative_to(tmp_path)}" in banner
         assert "doctor" not in banner.split("\n\n")[-1].lower() or "⚠️" not in banner
@@ -304,7 +304,7 @@ class TestHealthyBanner:
     def test_healthy_with_a_share_row_names_architecture_md_by_dec_nnn(
         self, sidecar_owned, tmp_path, monkeypatch
     ):
-        """IF-23: the shipped literal is the placeholder `dec-NNN`, never a
+        """The shipped literal is the placeholder `dec-NNN`, never a
         real ADR id, and only rendered when a `share` row is actually in the
         inventory (never assumed)."""
         project_root, sidecar_root = sidecar_owned
@@ -615,8 +615,8 @@ class TestNotYetLinkedSelfHeal:
         script.write_text(
             f"set -e\n"
             f'git -C "{sidecar_root}" worktree add -q -b wt/feat-wt1 '
-            f'"{worktree}/.praxion" main\n'
-            f'ln -s .praxion/.ai-state "{worktree}/.ai-state"\n'
+            f'"{worktree}/.praxion-state" main\n'
+            f'ln -s .praxion-state/.ai-state "{worktree}/.ai-state"\n'
         )
         return ["/bin/sh", str(script)]
 

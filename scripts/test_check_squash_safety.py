@@ -626,9 +626,12 @@ def _tm_build_squash_erasure_fixture(tmp_path: Path) -> Path:
     project_root.mkdir()
     _tm_init_sidecar(sidecar_root)
     _tm_init_project(project_root)
-    main_mount = _tm_mount(sidecar_root, project_root / ".praxion", "main")
+    main_mount = _tm_mount(sidecar_root, project_root / ".praxion-state", "main")
     wt_mount = _tm_mount(
-        sidecar_root, project_root / ".claude" / "worktrees" / "x" / ".praxion", "wt/x", base="main"
+        sidecar_root,
+        project_root / ".claude" / "worktrees" / "x" / ".praxion-state",
+        "wt/x",
+        base="main",
     )
 
     (wt_mount / ".ai-state" / "decisions" / "003-new.md").write_text(_tm_adr_body(3, "new"))
@@ -650,10 +653,10 @@ def _tm_build_sidecar_owned_fixture(tmp_path: Path) -> tuple[Path, Path]:
     project_root.mkdir()
     _tm_init_sidecar(sidecar_root)
     _tm_init_project(project_root)
-    main_mount = _tm_mount(sidecar_root, project_root / ".praxion", "main")
+    main_mount = _tm_mount(sidecar_root, project_root / ".praxion-state", "main")
     _tm_write_manifest(sidecar_root, project_root)
     (project_root / ".ai-state").symlink_to(
-        Path(".praxion") / ".ai-state", target_is_directory=True
+        Path(".praxion-state") / ".ai-state", target_is_directory=True
     )
     return project_root, main_mount
 

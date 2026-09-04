@@ -357,7 +357,7 @@ def test_non_praxion_driver_not_overwritten(project):
 
 
 # ---------------------------------------------------------------------------
-# IF-02: under sidecar placement the merge driver that matters lives in the
+# Under sidecar placement the merge driver that matters lives in the
 # SIDECAR's own .git/config, not the project's -- `praxion-sidecar link` is
 # the sole reconciler for that side.
 # ---------------------------------------------------------------------------
@@ -393,7 +393,7 @@ def _build_sidecar_project(tmp_path: Path, *, stale_driver: str) -> Path:
     subprocess.run(["git", "-C", str(project_root), "config", "user.email", "p@p.p"], check=True)
     subprocess.run(["git", "-C", str(project_root), "config", "user.name", "p"], check=True)
 
-    mount_dir = project_root / ".praxion"
+    mount_dir = project_root / ".praxion-state"
     subprocess.run(
         ["git", "-C", str(sidecar_root), "worktree", "add", "-q", str(mount_dir), "main"],
         check=True,
@@ -413,7 +413,7 @@ def _build_sidecar_project(tmp_path: Path, *, stale_driver: str) -> Path:
     )
 
     (project_root / ".ai-state").symlink_to(
-        Path(".praxion") / ".ai-state", target_is_directory=True
+        Path(".praxion-state") / ".ai-state", target_is_directory=True
     )
 
     subprocess.run(
@@ -425,7 +425,7 @@ def _build_sidecar_project(tmp_path: Path, *, stale_driver: str) -> Path:
 
 def _sidecar_driver(project_root: Path) -> str:
     return _git(
-        project_root / ".praxion",
+        project_root / ".praxion-state",
         "config",
         "--get",
         "merge.observations-jsonl.driver",

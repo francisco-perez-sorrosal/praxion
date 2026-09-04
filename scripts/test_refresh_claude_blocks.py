@@ -957,7 +957,7 @@ def test_apply_reads_claude_md_from_disk_exactly_once(
 
 
 # ---------------------------------------------------------------------------
-# IF-04: placement-resolved target (sidecar-owned projects never mutate the
+# Placement-resolved target (sidecar-owned projects never mutate the
 # tracked CLAUDE.md; blocks land in the shadowed CLAUDE.local.md instead)
 # ---------------------------------------------------------------------------
 
@@ -966,9 +966,9 @@ def test_apply_under_sidecar_placement_writes_shadow_and_leaves_tracked_file_unt
     tmp_path: Path,
 ) -> None:
     """A sidecar-placed project whose manifest marks `CLAUDE.md` `untouched`
-    must have `--apply` append the absent block to `.praxion/CLAUDE.local.md`
+    must have `--apply` append the absent block to `.praxion-state/CLAUDE.local.md`
     (`block_target()`'s fallback redirect, DS-8) -- never to the tracked
-    `CLAUDE.md`, which stays byte-identical (P1-10, IF-04)."""
+    `CLAUDE.md`, which stays byte-identical."""
     from test_state_repo import _build_sidecar_owned_fixture
 
     tracked_claude_md = "# Team Project\n\nHand-written, tracked prose.\n"

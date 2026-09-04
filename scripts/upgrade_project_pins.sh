@@ -153,7 +153,7 @@ resolve_plugin || exit 1
 LIVE_HOOK="$PLUGIN_INSTALL_PATH/scripts/git-finalize-hook.sh"
 LIVE_DRIVER="python3 $PLUGIN_INSTALL_PATH/scripts/merge_driver_observations.py %O %A %B"
 
-# ---- placement (IF-02): under sidecar placement the merge driver that
+# ---- placement: under sidecar placement the merge driver that
 # matters lives in the sidecar's own .git/config, not the project's --------
 
 PLACEMENT="in-repo"
@@ -480,7 +480,7 @@ if [ "$PLACEMENT" = "sidecar" ] && [ -n "$MOUNT_DIR" ]; then
     # own .git/config (shared across every worktree of it, including this
     # mount) -- the project repository does not own .ai-state/, so mutating
     # the project's own git config here would reconcile the wrong repo
-    # (IF-02). `praxion-sidecar link` is the sole reconciler for the sidecar
+    # `praxion-sidecar link` is the sole reconciler for the sidecar
     # side (it re-points the driver as part of D2's "re-apply every
     # repo-level invariant" contract); this step never calls `git config`
     # directly against the mount.

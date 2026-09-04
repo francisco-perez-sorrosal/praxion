@@ -178,7 +178,7 @@ def hooks_dir_for(repo_root: Path) -> Path:
     """The plain-slot hooks directory: the git COMMON dir's ``hooks/``, never
     ``repo_root/.git/hooks`` -- in a linked worktree ``.git`` is a file, not
     that directory, so the plain slots, ``--status``, and ``--uninstall`` must
-    all resolve through here (IF-16) rather than re-deriving the path."""
+    all resolve through here rather than re-deriving the path."""
     common_dir = git_common_dir(repo_root)
     return (common_dir if common_dir is not None else repo_root / ".git") / "hooks"
 

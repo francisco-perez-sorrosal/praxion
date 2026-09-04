@@ -112,14 +112,14 @@ def _init_sidecar(sidecar_root: Path) -> Path:
 def _mount(
     sidecar_root: Path, checkout_dir: Path, branch: str, *, new: bool, base: str = "main"
 ) -> Path:
-    """Attach a real `git worktree` at `<checkout_dir>/.praxion`, built
+    """Attach a real `git worktree` at `<checkout_dir>/.praxion-state`, built
     directly with `git worktree add` -- no dependency on `_sidecar_mount`,
     which is concurrently in flight elsewhere. `new=False` checks out an
     existing branch (the main-checkout shape); `new=True` creates one from
     `base` (the linked-worktree shape) -- both are real sidecar worktrees,
     each with its own `.git/worktrees/<name>/` per DS-9.
     """
-    mount_dir = checkout_dir / ".praxion"
+    mount_dir = checkout_dir / ".praxion-state"
     checkout_dir.mkdir(parents=True, exist_ok=True)
     if new:
         _git_ok(sidecar_root, "worktree", "add", "-q", str(mount_dir), "-b", branch, base)

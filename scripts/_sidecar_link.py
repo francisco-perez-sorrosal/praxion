@@ -2,15 +2,15 @@
 
 ``link()`` drives two things from one call, in a fixed order that is
 itself a safety property: the **mount** (``_sidecar_mount.py``'s real
-``git worktree`` at ``<checkout>/.praxion``) and the **projection** of its
+``git worktree`` at ``<checkout>/.praxion-state``) and the **projection** of its
 paths onto ``.ai-state``, ``CLAUDE.local.md``,
 ``.claude/settings.local.json``, and ``CLAUDE.md`` when shadowed.
 
 The exclude block is written *before* the mount exists -- a mount that
 survives even one ``git add -A`` unexcluded records a gitlink in the
 project's index, shipping a broken submodule reference on the next push.
-Shadow targets are relative (``.praxion/.ai-state``, or one level down
-``../.praxion/settings.local.json``) so every shadow's realpath resolves
+Shadow targets are relative (``.praxion-state/.ai-state``, or one level down
+``../.praxion-state/settings.local.json``) so every shadow's realpath resolves
 *inside* its own checkout, never into whichever mount happens to sit at
 that relative path in a different one.
 
@@ -113,8 +113,8 @@ ShadowSlotState = Union[Absent, LinkToThisSidecar, LinkElsewhere, RealPath]  # n
 def shadow_target(relpath: str) -> str:
     """The relative symlink target for a shadow slot at ``relpath``: one
     ``../`` per directory level before the leaf, so it always resolves
-    inside the checkout (``.ai-state`` -> ``.praxion/.ai-state``;
-    ``.claude/settings.local.json`` -> ``../.praxion/settings.local.json``).
+    inside the checkout (``.ai-state`` -> ``.praxion-state/.ai-state``;
+    ``.claude/settings.local.json`` -> ``../.praxion-state/settings.local.json``).
     """
     parts = Path(relpath).parts
     climb = "../" * (len(parts) - 1)
@@ -301,7 +301,7 @@ def remove_exclude_block(exclude_path: Path) -> bool:
 
 
 def exclude_lines(manifest: _sidecar_manifest.Manifest) -> list[str]:
-    """The ``praxion:sidecar`` exclude lines, in order: ``/.praxion/``
+    """The ``praxion:sidecar`` exclude lines, in order: ``/.praxion-state/``
     first, then one anchored entry per ``shadow`` path (``share`` and
     ``untouched`` are never excluded), then the manifest's own
     ``excludes:`` verbatim.

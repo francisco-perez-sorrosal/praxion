@@ -2,7 +2,7 @@
 
 This project onboarded with `--placement sidecar`: Praxion's project intelligence lives
 **outside** this repository, in a separate git-tracked sidecar repository at
-`~/.praxion/sidecars/<sidecar-id>`. The state mount at `<project>/.praxion` is a real
+`~/.praxion/sidecars/<sidecar-id>`. The state mount at `<project>/.praxion-state` is a real
 `git worktree` of that sidecar; `.ai-state/`, this file, and `.claude/settings.local.json`
 are symlinks into it, excluded via `.git/info/exclude` — **your commits in this repository
 never include Praxion state**.
@@ -12,7 +12,7 @@ an `.ai-state/` path — a path reference would dangle for anyone without sideca
 
 `.ai-state/` (a directory shadow) accepts a direct `Write`/`Edit`; `CLAUDE.local.md`, a shadowed
 `CLAUDE.md`, and `.claude/settings.local.json` (file shadows) load through their links but refuse
-a direct tool write — edit those three at their mount path instead (`.praxion/<name>`).
+a direct tool write — edit those three at their mount path instead (`.praxion-state/<name>`).
 
 Run `praxion-sidecar doctor` to confirm the mount and shadow projection are intact. See
 `docs/onboarding.md#placement` for the full placement model.

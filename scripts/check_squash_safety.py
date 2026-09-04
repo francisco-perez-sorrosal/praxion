@@ -246,7 +246,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help=(
             "Diagnose a sidecar state mount instead of --repo-root -- the "
             "merge-back case (ARCH_WT_RULING.md § 8). Must name a real "
-            "state mount (<checkout>/.praxion, currently on a state branch)."
+            "state mount (<checkout>/.praxion-state, currently on a state branch)."
         ),
     )
     parser.add_argument(

@@ -2163,7 +2163,7 @@ class TestPromotionStaging:
 # -- Mount redirection: --state-root under sidecar placement ------------------
 #
 # `ARCH_WT_RULING.md` Option F: `.ai-state/` shadows a real `git worktree`
-# ("the mount") at `<project>/.praxion`, checked out from a separate sidecar
+# ("the mount") at `<project>/.praxion-state`, checked out from a separate sidecar
 # repository. Promotion's `git mv`/`git add` must run against the MOUNT, with
 # mount-realpath src/dst -- never against the project repo, and never with a
 # shadow-symlink path, both of which the ruling's live probe found refused
@@ -2233,12 +2233,12 @@ def _init_mount_sidecar(sidecar_root: Path) -> tuple[str, str]:
 def _mount_project(
     sidecar_root: Path, project_root: Path, old_id: str, *, task_slug: str
 ) -> tuple[Path, Path, Path]:
-    """Mount the sidecar at `<project_root>/.praxion`, shadow `.ai-state`, and
+    """Mount the sidecar at `<project_root>/.praxion-state`, shadow `.ai-state`, and
     seed two project-side files citing `old_id`. Returns
     `(mount_dir, architecture_doc, learnings_doc)`.
     """
     project_root.mkdir(parents=True, exist_ok=True)
-    mount_dir = project_root / ".praxion"
+    mount_dir = project_root / ".praxion-state"
     _mount_git_ok(sidecar_root, "worktree", "add", "-q", str(mount_dir), "main")
 
     _mount_git_ok(project_root, "init", "-q", "-b", "main")
@@ -2248,7 +2248,7 @@ def _mount_project(
     # `git init` already creates `.git/info/`; overwrite `exclude` with the
     # two lines the ruling's lifecycle table names for a linked mount.
     (project_root / ".git" / "info" / "exclude").write_text(
-        "/.praxion/\n/.ai-state\n", encoding="utf-8"
+        "/.praxion-state/\n/.ai-state\n", encoding="utf-8"
     )
     (project_root / ".ai-state").symlink_to(
         Path(mount_dir.name) / ".ai-state", target_is_directory=True
@@ -2505,7 +2505,7 @@ class TestFinalizeStateRootMountRedirection:
         aliased_parent = tmp_path / "alias-parent"
         aliased_parent.symlink_to(real_parent, target_is_directory=True)
         aliased_project = aliased_parent / "project"
-        aliased_mount = aliased_project / ".praxion"
+        aliased_mount = aliased_project / ".praxion-state"
 
         result = subprocess.run(
             [

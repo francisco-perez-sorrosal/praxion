@@ -296,7 +296,7 @@ def worktree_paths(repo: Path) -> list[Path]:
 
 
 def sidecar_mounts(sidecar: Path) -> list[Path]:
-    """Every `<checkout>/.praxion` the sidecar has registered as a worktree."""
+    """Every `<checkout>/.praxion-state` the sidecar has registered as a worktree."""
     return [path for path in worktree_paths(sidecar) if path.name == mounts.MOUNT_DIRNAME]
 
 

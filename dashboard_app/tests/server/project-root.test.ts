@@ -89,25 +89,25 @@ describe("project-root guards", () => {
 describe("project-root guards — sidecar state mount", () => {
   // Sidecar placement (ARCH_WT_RULING.md § 9): every checkout that opts into
   // sidecar placement mounts Praxion state as a real git worktree at
-  // `<checkout>/.praxion/`, and `.ai-state` in the checkout becomes a
-  // *relative* symlink pointing inward at `.praxion/.ai-state`. Both existing
+  // `<checkout>/.praxion-state/`, and `.ai-state` in the checkout becomes a
+  // *relative* symlink pointing inward at `.praxion-state/.ai-state`. Both existing
   // containment checks (lexical + post-existence realpath) stay unchanged;
-  // the only change under test is the allowlist gaining a `.praxion/.ai-state`
+  // the only change under test is the allowlist gaining a `.praxion-state/.ai-state`
   // entry so the resolved path clears `isAllowedArtifactPath` too.
   async function createSidecarMountFixture(prefix: string): Promise<string> {
     const root = await createTempProjectRoot(prefix);
-    await mkdir(path.join(root, ".praxion", ".ai-state", "decisions", "drafts"), {
+    await mkdir(path.join(root, ".praxion-state", ".ai-state", "decisions", "drafts"), {
       recursive: true
     });
-    await writeFile(path.join(root, ".praxion", ".ai-state", "DESIGN.md"), "# Design\n");
+    await writeFile(path.join(root, ".praxion-state", ".ai-state", "DESIGN.md"), "# Design\n");
     await writeFile(
-      path.join(root, ".praxion", ".ai-state", "decisions", "drafts", "x.md"),
+      path.join(root, ".praxion-state", ".ai-state", "decisions", "drafts", "x.md"),
       "# Draft\n"
     );
     // Relative symlink, matching the ruling's contract exactly — an absolute
     // symlink would still resolve correctly here but wouldn't pin the
     // relative-ness the ruling requires for a portable checkout.
-    await symlink(path.join(".praxion", ".ai-state"), path.join(root, ".ai-state"), "dir");
+    await symlink(path.join(".praxion-state", ".ai-state"), path.join(root, ".ai-state"), "dir");
     return root;
   }
 
@@ -136,16 +136,16 @@ describe("project-root guards — sidecar state mount", () => {
   it("serves the same artifact when requested by its lexical mount path", async () => {
     // Assumption: the allowlist gate applies identically whether the caller
     // reaches the artifact through the `.ai-state` shadow or through the
-    // mount's own `.praxion/.ai-state` path — both are legitimate on-disk
+    // mount's own `.praxion-state/.ai-state` path — both are legitimate on-disk
     // locations for the same data, so both must resolve.
     const root = await createSidecarMountFixture("dashboard-sidecar-lexical-");
 
     const allowedPath = await assertAllowedArtifactPath(
       root,
-      path.join(root, ".praxion", ".ai-state", "DESIGN.md")
+      path.join(root, ".praxion-state", ".ai-state", "DESIGN.md")
     );
 
-    expect(allowedPath).toBe(path.join(root, ".praxion", ".ai-state", "DESIGN.md"));
+    expect(allowedPath).toBe(path.join(root, ".praxion-state", ".ai-state", "DESIGN.md"));
   });
 
   it("still rejects a symlink that escapes the project root under an allowed name", async () => {
@@ -170,10 +170,10 @@ describe("project-root guards — sidecar state mount", () => {
 
   it("rejects a path under the mount that falls outside the state allowlist", async () => {
     const root = await createSidecarMountFixture("dashboard-sidecar-narrow-");
-    await writeFile(path.join(root, ".praxion", "CLAUDE.local.md"), "# Local\n");
+    await writeFile(path.join(root, ".praxion-state", "CLAUDE.local.md"), "# Local\n");
 
     await expect(
-      assertAllowedArtifactPath(root, path.join(root, ".praxion", "CLAUDE.local.md"))
+      assertAllowedArtifactPath(root, path.join(root, ".praxion-state", "CLAUDE.local.md"))
     ).rejects.toThrow(/allowed/i);
   });
 
@@ -212,7 +212,7 @@ describe("project-root guards — sidecar state mount", () => {
 
   it("exposes exactly the expected allowed artifact roots, including the state mount", () => {
     expect(new Set(ALLOWED_ARTIFACT_ROOTS)).toEqual(
-      new Set([".ai-state", ".ai-work", "docs", "ROADMAP.md", ".praxion/.ai-state"])
+      new Set([".ai-state", ".ai-work", "docs", "ROADMAP.md", ".praxion-state/.ai-state"])
     );
   });
 });

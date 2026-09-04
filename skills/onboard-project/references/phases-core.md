@@ -75,11 +75,11 @@ tmp/
 
 If the user agrees, remove that line. If they decline, proceed without changing it but note the choice in the Phase 8 summary.
 
-**Sidecar placement.** Under `--placement sidecar`, this phase's target shifts from the tracked `.gitignore` to the per-clone `.git/info/exclude` — `.gitignore` stays **untouched** (a per-clone file is never teammate-visible, which is exactly what sidecar placement exists to avoid leaking through a tracked one). The block heads with `/.praxion/` (the state mount, DS-10), followed by the shadow paths:
+**Sidecar placement.** Under `--placement sidecar`, this phase's target shifts from the tracked `.gitignore` to the per-clone `.git/info/exclude` — `.gitignore` stays **untouched** (a per-clone file is never teammate-visible, which is exactly what sidecar placement exists to avoid leaking through a tracked one). The block heads with `/.praxion-state/` (the state mount, DS-10), followed by the shadow paths:
 
 ```gitignore
 # >>> praxion:sidecar >>>  (managed by praxion-sidecar; edit outside these markers)
-/.praxion/
+/.praxion-state/
 /.ai-state
 /CLAUDE.local.md
 /.claude/settings.local.json
@@ -256,7 +256,7 @@ If the user agrees, remove that line. If they decline, proceed without changing 
 
 Do NOT create `.ai-state/observations.jsonl` — that is written on first use by the observability hook. Pre-creating it confuses the semantic merge driver.
 
-**Sidecar placement.** Under `--placement sidecar`, the skeleton above is created in the **sidecar mount** (`<project>/.praxion`, DS-10 — the sidecar's own working tree materialised inside the checkout) rather than directly in the project. Every subdirectory this phase creates additionally seeds a `.gitkeep` (or keeps a real file already present) so a fresh `git worktree` materialises it: `git worktree add` only materialises **tracked** content and git does not track empty directories, so an unseeded subdirectory silently vanishes from a newly mounted worktree. `praxion-sidecar link` then symlinks the mounted skeleton back into the checkout (`.ai-state -> .praxion/.ai-state`) — the same mount-then-link sequence §Phase 6 relies on for `CLAUDE.local.md`.
+**Sidecar placement.** Under `--placement sidecar`, the skeleton above is created in the **sidecar mount** (`<project>/.praxion-state`, DS-10 — the sidecar's own working tree materialised inside the checkout) rather than directly in the project. Every subdirectory this phase creates additionally seeds a `.gitkeep` (or keeps a real file already present) so a fresh `git worktree` materialises it: `git worktree add` only materialises **tracked** content and git does not track empty directories, so an unseeded subdirectory silently vanishes from a newly mounted worktree. `praxion-sidecar link` then symlinks the mounted skeleton back into the checkout (`.ai-state -> .praxion-state/.ai-state`) — the same mount-then-link sequence §Phase 6 relies on for `CLAUDE.local.md`.
 
 ## §Phase 3 — `.gitattributes` + merge driver registration
 
@@ -586,7 +586,7 @@ Do not recommend tools the user already has, and do not recommend `uv` if no Pyt
 
 4. **Stage modified files**: run `git add` with the explicit list of files this command touched (built up through phases 1–6, plus `.ai-state/.praxion-onboard.json`). Do NOT run `git add -A`. Do NOT commit. The user reviews staging and decides.
 
-**Sidecar placement.** Under `--placement sidecar`, staging splits across two repositories: step 4's `git add` list touches only **project**-side files — any `share`-intent path (e.g. `docs/architecture.md`); `.git/info/exclude` is per-clone and is never staged at all. Everything shadowed (`.ai-state/`, `CLAUDE.local.md`, `.claude/settings.local.json`) is committed separately, via `praxion-sidecar commit`, against the mount at `<project>/.praxion` — never against this repository's own index. `praxion-sidecar link` (this phase's own reconciler, and the SessionStart self-heal channel) also runs a convergence pass in the main checkout every time it runs, so a worktree's state that was merged by hand — a manual `git merge`, a GitHub squash-and-pull — promotes without a separate step.
+**Sidecar placement.** Under `--placement sidecar`, staging splits across two repositories: step 4's `git add` list touches only **project**-side files — any `share`-intent path (e.g. `docs/architecture.md`); `.git/info/exclude` is per-clone and is never staged at all. Everything shadowed (`.ai-state/`, `CLAUDE.local.md`, `.claude/settings.local.json`) is committed separately, via `praxion-sidecar commit`, against the mount at `<project>/.praxion-state` — never against this repository's own index. `praxion-sidecar link` (this phase's own reconciler, and the SessionStart self-heal channel) also runs a convergence pass in the main checkout every time it runs, so a worktree's state that was merged by hand — a manual `git merge`, a GitHub squash-and-pull — promotes without a separate step.
 
 Under sidecar placement, step 2's printed change summary gains a `Placement: sidecar — ~/.praxion/sidecars/<id>` header line, and the verification next-steps gain a step before `/sentinel`:
 

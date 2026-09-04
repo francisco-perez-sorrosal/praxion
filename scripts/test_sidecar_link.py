@@ -42,7 +42,7 @@ import _sidecar_link
 import pytest
 
 _IDENTITY = ("-c", "user.email=test@example.com", "-c", "user.name=Test")
-_MOUNT_DIRNAME = ".praxion"
+_MOUNT_DIRNAME = ".praxion-state"
 
 _DEFAULT_MANIFEST_YAML = """\
 schema: 1
@@ -208,15 +208,15 @@ def _build_link_fixture(base: Path, *, manifest_yaml: str = _DEFAULT_MANIFEST_YA
 
 
 def test_shadow_target_for_a_root_level_slot_points_directly_into_the_mount() -> None:
-    assert _sidecar_link.shadow_target(".ai-state") == ".praxion/.ai-state"
-    assert _sidecar_link.shadow_target("CLAUDE.local.md") == ".praxion/CLAUDE.local.md"
-    assert _sidecar_link.shadow_target("CLAUDE.md") == ".praxion/CLAUDE.md"
+    assert _sidecar_link.shadow_target(".ai-state") == ".praxion-state/.ai-state"
+    assert _sidecar_link.shadow_target("CLAUDE.local.md") == ".praxion-state/CLAUDE.local.md"
+    assert _sidecar_link.shadow_target("CLAUDE.md") == ".praxion-state/CLAUDE.md"
 
 
 def test_shadow_target_for_a_nested_slot_climbs_out_before_entering_the_mount() -> None:
     assert (
         _sidecar_link.shadow_target(".claude/settings.local.json")
-        == "../.praxion/settings.local.json"
+        == "../.praxion-state/settings.local.json"
     )
 
 
@@ -255,14 +255,14 @@ def test_a_symlink_to_a_different_relative_target_classifies_as_link_elsewhere(
 ) -> None:
     checkout = tmp_path / "checkout"
     checkout.mkdir()
-    (checkout / "CLAUDE.local.md").symlink_to(".praxion/some-other-file")
+    (checkout / "CLAUDE.local.md").symlink_to(".praxion-state/some-other-file")
 
     result = _sidecar_link.classify_shadow_slot(
         checkout, "CLAUDE.local.md", _sidecar_link.shadow_target("CLAUDE.local.md")
     )
 
     assert isinstance(result, _sidecar_link.LinkElsewhere)
-    assert result.target == ".praxion/some-other-file"
+    assert result.target == ".praxion-state/some-other-file"
 
 
 def test_an_absolute_symlink_to_the_correct_file_still_classifies_as_link_elsewhere(
@@ -274,7 +274,7 @@ def test_an_absolute_symlink_to_the_correct_file_still_classifies_as_link_elsewh
     """
     checkout = tmp_path / "checkout"
     checkout.mkdir()
-    mount = checkout / ".praxion"
+    mount = checkout / ".praxion-state"
     mount.mkdir()
     (mount / "CLAUDE.local.md").write_text("x\n")
     (checkout / "CLAUDE.local.md").symlink_to((mount / "CLAUDE.local.md").resolve())
@@ -340,7 +340,7 @@ def test_rewrite_exclude_block_preserves_content_outside_the_markers(tmp_path: P
     exclude_path = tmp_path / "exclude"
     exclude_path.write_text("*.pyc\n/build/\n")
 
-    _sidecar_link.rewrite_exclude_block(exclude_path, ["/.praxion/", "/.ai-state"])
+    _sidecar_link.rewrite_exclude_block(exclude_path, ["/.praxion-state/", "/.ai-state"])
 
     text = exclude_path.read_text()
     assert text.startswith("*.pyc\n/build/\n")
@@ -351,9 +351,11 @@ def test_rewrite_exclude_block_replaces_an_existing_block_wholesale_without_dupl
 ) -> None:
     exclude_path = tmp_path / "exclude"
     exclude_path.write_text("keep-me\n")
-    _sidecar_link.rewrite_exclude_block(exclude_path, ["/.praxion/", "/.ai-state"])
+    _sidecar_link.rewrite_exclude_block(exclude_path, ["/.praxion-state/", "/.ai-state"])
 
-    _sidecar_link.rewrite_exclude_block(exclude_path, ["/.praxion/", "/.ai-state", "/CLAUDE.md"])
+    _sidecar_link.rewrite_exclude_block(
+        exclude_path, ["/.praxion-state/", "/.ai-state", "/CLAUDE.md"]
+    )
 
     text = exclude_path.read_text()
     assert text.count("praxion:sidecar >>>") == 1
@@ -366,7 +368,7 @@ def test_rewrite_exclude_block_appends_a_new_block_with_exactly_one_trailing_new
 ) -> None:
     exclude_path = tmp_path / "info-exclude"
 
-    changed = _sidecar_link.rewrite_exclude_block(exclude_path, ["/.praxion/"])
+    changed = _sidecar_link.rewrite_exclude_block(exclude_path, ["/.praxion-state/"])
 
     assert changed is True
     text = exclude_path.read_text()
@@ -376,7 +378,7 @@ def test_rewrite_exclude_block_appends_a_new_block_with_exactly_one_trailing_new
 
 def test_rewrite_exclude_block_is_a_no_op_when_content_is_already_correct(tmp_path: Path) -> None:
     exclude_path = tmp_path / "exclude"
-    lines = ["/.praxion/", "/.ai-state"]
+    lines = ["/.praxion-state/", "/.ai-state"]
     first = _sidecar_link.rewrite_exclude_block(exclude_path, lines)
     before = exclude_path.stat().st_mtime_ns
 
@@ -391,7 +393,7 @@ def test_rewrite_exclude_block_is_a_no_op_when_content_is_already_correct(tmp_pa
 def test_remove_exclude_block_deletes_only_the_block(tmp_path: Path) -> None:
     exclude_path = tmp_path / "exclude"
     exclude_path.write_text("keep-before\n")
-    _sidecar_link.rewrite_exclude_block(exclude_path, ["/.praxion/"])
+    _sidecar_link.rewrite_exclude_block(exclude_path, ["/.praxion-state/"])
     with exclude_path.open("a") as handle:
         handle.write("keep-after\n")
 
@@ -412,7 +414,7 @@ def test_exclude_lines_puts_the_mount_entry_first(tmp_path: Path) -> None:
 
     lines = _sidecar_link.exclude_lines(manifest)
 
-    assert lines[0] == "/.praxion/"
+    assert lines[0] == "/.praxion-state/"
 
 
 def test_exclude_lines_includes_the_default_shadow_set(tmp_path: Path) -> None:
@@ -703,7 +705,7 @@ def test_second_link_run_performs_zero_filesystem_writes(
     assert result.exclude_changed is False
 
 
-# --- foreign `.praxion` --------------------------------------------------------------
+# --- foreign `.praxion-state` --------------------------------------------------------------
 
 
 def test_link_refuses_a_foreign_real_directory_at_the_mount_slot(tmp_path: Path) -> None:
@@ -973,3 +975,31 @@ def test_link_reports_no_repair_when_the_project_has_not_moved(tmp_path: Path) -
     result = _sidecar_link.link(fixture.project_root, fixture.sidecar_root, fixture.manifest)
 
     assert not result.repaired_mount
+
+
+# --- the mount name never collides with the team-committed recipes directory ---
+
+
+def test_the_mount_name_is_the_state_directory_not_the_recipes_directory() -> None:
+    """`<repo>/.praxion/` is the documented home of team-committed parallel-session
+    recipes, so the state mount must live under a different name."""
+    assert _MOUNT_DIRNAME == ".praxion-state"
+
+
+def test_link_still_mounts_when_the_project_carries_a_committed_recipes_directory(
+    tmp_path: Path,
+) -> None:
+    fixture = _build_link_fixture(tmp_path)
+    recipes_dir = fixture.project_root / ".praxion"
+    recipes_dir.mkdir()
+    (recipes_dir / "recipes.json").write_text("[]\n")
+    _git_ok(fixture.project_root, "add", ".praxion/recipes.json")
+    _git_ok(fixture.project_root, "commit", "-q", "-m", "team recipes")
+
+    result = _sidecar_link.link(fixture.project_root, fixture.sidecar_root, fixture.manifest)
+
+    assert result.created_mount is True
+    assert not result.refused
+    assert (fixture.project_root / _MOUNT_DIRNAME).is_dir()
+    assert (recipes_dir / "recipes.json").read_text() == "[]\n"
+    assert _git_ok(fixture.project_root, "status", "--porcelain", ".praxion").stdout == ""

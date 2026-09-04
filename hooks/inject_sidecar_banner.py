@@ -28,8 +28,7 @@ Behavior contract:
 - **CLI resolution + invocation**: shared with ``sidecar_autocommit.py`` via
   ``_sidecar_hook_common`` -- ``CLAUDE_PLUGIN_ROOT`` env var, else this
   hook's own plugin root, then ``<plugin_root>/scripts/praxion-sidecar``, run
-  with this process's own interpreter against the *payload's* cwd (IF-09/
-  IF-17). No ``PATH`` fallback. An unresolvable CLI is silent, not an error.
+  with this process's own interpreter against the *payload's* cwd. No ``PATH`` fallback. An unresolvable CLI is silent, not an error.
 """
 
 from __future__ import annotations
@@ -154,7 +153,7 @@ def _render_banner(status: dict) -> str:
 
     lines.append(
         "File shadows (`CLAUDE.local.md`, a shadowed `CLAUDE.md`, `.claude/settings.local.json`) load "
-        "through their links, but `Write`/`Edit` must target the mount path — `.praxion/<name>`. Writes "
+        "through their links, but `Write`/`Edit` must target the mount path — `.praxion-state/<name>`. Writes "
         "under `.ai-state/` work in place."
     )
 

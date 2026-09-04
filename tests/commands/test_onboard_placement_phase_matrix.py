@@ -97,26 +97,26 @@ def test_phases_optional_phase_id_set_is_unchanged_by_the_placement_axis(
     )
 
 
-# -- Phase 1: `.git/info/exclude` gains `/.praxion/` + shadow paths ---------
+# -- Phase 1: `.git/info/exclude` gains `/.praxion-state/` + shadow paths ---------
 
 
 def test_phase_1_names_the_mount_exclude_entry_ahead_of_the_shadow_paths(
     core_text: str,
 ) -> None:
     section = _phase_section(core_text, "1")
-    assert "/.praxion/" in section, (
-        "Phase 1 must name the state-mount exclude entry `/.praxion/` "
+    assert "/.praxion-state/" in section, (
+        "Phase 1 must name the state-mount exclude entry `/.praxion-state/` "
         "(DS-5/DS-10) — it heads the .git/info/exclude block under sidecar "
         "placement."
     )
-    mount_index = section.index("/.praxion/")
+    mount_index = section.index("/.praxion-state/")
     other_shadow_markers = ("/.ai-state", "/CLAUDE.local.md", "settings.local.json")
     later_markers = [
         m for m in other_shadow_markers if m in section and section.index(m) > mount_index
     ]
     assert later_markers, (
-        "Phase 1 names /.praxion/ but not a single shadow path following it — "
-        "DS-5 states /.praxion/ heads the block with the shadow entries after it."
+        "Phase 1 names /.praxion-state/ but not a single shadow path following it — "
+        "DS-5 states /.praxion-state/ heads the block with the shadow entries after it."
     )
 
 

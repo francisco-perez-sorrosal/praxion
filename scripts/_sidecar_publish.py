@@ -266,7 +266,7 @@ def _require_every_mount_removable(mounts_to_remove: list[Path]) -> None:
     The teardown removes each mount, and `prune_mount` rightly refuses a mount
     with uncommitted work -- but it runs *after* the import commit, so that
     refusal used to leave the project reporting `in-repo` while a live
-    `.praxion`, every `wt/*` branch and the exclude block were all still
+    `.praxion-state`, every `wt/*` branch and the exclude block were all still
     standing: a state neither placement describes and no verb can undo.
     Checking every mount here makes the whole verb all-or-nothing, and lists
     *every* offender at once rather than making the operator discover them one

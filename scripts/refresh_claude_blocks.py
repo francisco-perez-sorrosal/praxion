@@ -161,7 +161,7 @@ def _claude_md_target(repo_root: Path) -> Path:
     In-repo (and every other non-sidecar-owned placement): the tracked
     ``CLAUDE.md`` at repo root, as always. Sidecar-owned: the manifest's own
     ``block_target()`` -- which redirects to the shadowed
-    ``.praxion/CLAUDE.local.md`` when the project's ``CLAUDE.md`` entry is
+    ``.praxion-state/CLAUDE.local.md`` when the project's ``CLAUDE.md`` entry is
     ``untouched``, never the team's tracked file.
     """
     placement = _state_repo.resolve_placement(repo_root)
@@ -354,7 +354,7 @@ def run_apply(claude_md_path: Path, original_text: str, classifications: dict[st
     classification -- passed in rather than re-read here, so this mode never
     performs a second, independent read of the same file. ``claude_md_path``
     is the placement-resolved target (``_claude_md_target()``) -- the tracked
-    ``CLAUDE.md`` in-repo, or the shadowed ``.praxion/CLAUDE.local.md`` under
+    ``CLAUDE.md`` in-repo, or the shadowed ``.praxion-state/CLAUDE.local.md`` under
     sidecar placement (DS-8).
     """
     lines = original_text.splitlines(keepends=True)

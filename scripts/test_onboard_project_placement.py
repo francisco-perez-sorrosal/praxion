@@ -281,8 +281,8 @@ def test_placement_sidecar_with_default_existing_mode_is_legal(
     result = run_onboard(sandbox, repo, ["--placement", "sidecar", "--yes", "--no-launch"])
     assert result.returncode == 0, f"stdout={result.stdout!r} stderr={result.stderr!r}"
     assert not _sidecar_root_untouched(sandbox), "praxion-sidecar init was never delegated to"
-    assert (repo / ".praxion").is_dir()
-    assert (repo / ".praxion" / ".git").exists()
+    assert (repo / ".praxion-state").is_dir()
+    assert (repo / ".praxion-state" / ".git").exists()
     assert (repo / ".ai-state").is_symlink()
 
 
@@ -467,18 +467,18 @@ def test_shadow_docs_architecture_flips_it_out_of_the_default_shared_section(
 def test_confirmation_block_renders_before_the_delegated_write_even_when_it_fails(
     sandbox: Sandbox, tmp_path: Path
 ) -> None:
-    """A foreign real directory already occupying `.praxion` makes the
+    """A foreign real directory already occupying `.praxion-state` makes the
     delegated `praxion-sidecar init` refuse (DS-10's never-reclaim invariant).
     The block must still have printed -- proving it renders before, not as
     part of, the write it describes -- and nothing must have been committed
     to the sidecar root."""
     repo = existing_repo(tmp_path / "billing")
-    (repo / ".praxion").mkdir()
-    (repo / ".praxion" / "not-a-worktree.txt").write_text("occupied", encoding="utf-8")
+    (repo / ".praxion-state").mkdir()
+    (repo / ".praxion-state" / "not-a-worktree.txt").write_text("occupied", encoding="utf-8")
 
     result = run_onboard(sandbox, repo, ["--placement", "sidecar", "--yes", "--no-launch"])
 
-    assert result.returncode != 0, "a foreign .praxion must not be silently reclaimed"
+    assert result.returncode != 0, "a foreign .praxion-state must not be silently reclaimed"
     assert _SHADOWED in result.stdout, "the block must render even when delegation fails"
     assert _sidecar_root_untouched(sandbox), "a failed delegation must not leave sidecar state"
 
@@ -588,7 +588,7 @@ def test_no_placement_flag_never_touches_the_sidecar_or_renders_the_block(
     assert result.returncode == 0, f"stdout={result.stdout!r} stderr={result.stderr!r}"
     assert _SHADOWED not in result.stdout
     assert _UNAVAILABLE not in result.stdout
-    assert not (repo / ".praxion").exists()
+    assert not (repo / ".praxion-state").exists()
     assert _sidecar_root_untouched(sandbox)
 
 
@@ -615,8 +615,8 @@ def test_reonboard_reads_placement_from_the_manifest_and_refuses_a_contradiction
     assert _PROCEED not in silent.stdout, "an already-established placement must not re-prompt"
 
 
-# -- IF-01: `--check` is a dry-run by contract -- prints the plan, delegates
-# nothing (no `praxion-sidecar init`, no `.praxion`, `git status` unchanged) --
+# -- `--check` is a dry-run by contract -- prints the plan, delegates
+# nothing (no `praxion-sidecar init`, no `.praxion-state`, `git status` unchanged) --
 
 
 def test_placement_sidecar_check_prints_the_block_and_delegates_nothing(
@@ -632,7 +632,7 @@ def test_placement_sidecar_check_prints_the_block_and_delegates_nothing(
         assert header in result.stdout, f"missing section {header!r} in:\n{result.stdout}"
     assert _PROCEED not in result.stdout, "--check must never prompt for confirmation"
     assert _sidecar_root_untouched(sandbox), "--check must never delegate to praxion-sidecar init"
-    assert not (repo / ".praxion").exists(), "--check must never materialize the mount"
+    assert not (repo / ".praxion-state").exists(), "--check must never materialize the mount"
     assert _git_status(repo) == status_before, "--check must never mutate the target repo"
 
 
@@ -648,7 +648,7 @@ def test_placement_sidecar_check_json_emits_the_plan_and_delegates_nothing(
     assert payload is not None, f"no placement JSON object found in:\n{result.stdout!r}"
     assert payload["placement"] == "sidecar"
     assert _sidecar_root_untouched(sandbox), "--check --json must never delegate"
-    assert not (repo / ".praxion").exists()
+    assert not (repo / ".praxion-state").exists()
 
 
 def _git_status(repo: Path) -> str:

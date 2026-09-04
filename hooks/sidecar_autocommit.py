@@ -19,8 +19,7 @@ Behavior contract:
 - **CLI resolution + invocation**: shared with ``inject_sidecar_banner.py``
   via ``_sidecar_hook_common`` -- ``CLAUDE_PLUGIN_ROOT`` env var, else this
   hook's own plugin root, then ``<plugin_root>/scripts/praxion-sidecar``, run
-  with this process's own interpreter against the *payload's* cwd (IF-09/
-  IF-17). No ``PATH`` fallback.
+  with this process's own interpreter against the *payload's* cwd. No ``PATH`` fallback.
 """
 
 from __future__ import annotations

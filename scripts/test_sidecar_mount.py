@@ -149,7 +149,7 @@ def _exclude_nested_worktrees(project_root: Path) -> None:
 
 
 def _mount_main(sidecar_root: Path, project_root: Path) -> Path:
-    """Mount the sidecar's `main` branch at `<project_root>/.praxion`."""
+    """Mount the sidecar's `main` branch at `<project_root>/.praxion-state`."""
     _sidecar_mount.create_mount(sidecar_root, project_root, "main", project_branch="main")
     return project_root / _sidecar_mount.MOUNT_DIRNAME
 
@@ -389,7 +389,7 @@ def test_another_managed_repos_worktree_is_foreign_once_the_sidecar_root_is_know
     """Content alone cannot prove identity; the expected common dir can.
 
     A second Praxion-managed repository carries its own `.ai-state/`, so a
-    worktree of *it* sitting at `<project>/.praxion` is structurally
+    worktree of *it* sitting at `<project>/.praxion-state` is structurally
     indistinguishable from ours. Passing the real sidecar's common directory
     is what separates them -- and omitting it must keep today's behaviour.
     """

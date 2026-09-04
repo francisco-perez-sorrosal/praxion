@@ -336,7 +336,7 @@ def _seed_shadow_targets(sidecar: Path, manifest: manifests.Manifest) -> None:
 
     The leaf comes from `shadow_target()` rather than from `relpath`: shadows
     are flattened into the mount root (`.claude/settings.local.json` links to
-    `../.praxion/settings.local.json`), and re-deriving that here would be a
+    `../.praxion-state/settings.local.json`), and re-deriving that here would be a
     second, silently-divergent answer to where a shadow actually points.
     """
     for relpath, entry in manifest.paths.items():

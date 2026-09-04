@@ -40,6 +40,8 @@ from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING, Union
 
+import _sidecar_mount as mounts
+
 if TYPE_CHECKING:
     import yaml
 
@@ -71,11 +73,11 @@ _CLAUDE_MD_PATH = "CLAUDE.md"
 _CLAUDE_LOCAL_MD_PATH = "CLAUDE.local.md"
 
 # Illegal shadow targets and their ancestors (DS-2): shadowing `.claude` itself
-# (or `.git`, `.praxion`, the repo root) would ask a consumer to symlink a
+# (or `.git`, the state mount, the repo root) would ask a consumer to symlink a
 # directory something else depends on being real -- Claude Code refuses
-# worktree creation when `.claude` is a symlink. `.praxion` is the state mount
+# worktree creation when `.claude` is a symlink. The mount is the state mount
 # itself, so shadowing it would ask the mount to link into its own contents.
-NEVER_SHADOW = frozenset({".claude", ".git", ".", ".praxion"})
+NEVER_SHADOW = frozenset({".claude", ".git", ".", mounts.MOUNT_DIRNAME})
 
 # The D8 CLI allowlist, reused here as the ancestor-rule carve-out: a path on
 # this list may be shadowed even when a `NEVER_SHADOW` member is its ancestor,

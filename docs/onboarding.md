@@ -174,17 +174,17 @@ By default, `.ai-state/` is committed in your project repository — the normal 
 Sidecar state is projected into each checkout as a real directory, not a plain symlink:
 
 ```
-<checkout>/.praxion/                       REAL dir; git worktree of the sidecar, branch per checkout
+<checkout>/.praxion-state/                 REAL dir; git worktree of the sidecar, branch per checkout
     .ai-state/                             tracked in the sidecar
     CLAUDE.local.md                        tracked in the sidecar
     settings.local.json                    tracked in the sidecar
     .git                                   FILE: "gitdir: <sidecar>/.git/worktrees/<name>"
-<checkout>/.ai-state                    -> .praxion/.ai-state                 (relative)
-<checkout>/CLAUDE.local.md              -> .praxion/CLAUDE.local.md           (relative)
-<checkout>/.claude/settings.local.json  -> ../.praxion/settings.local.json    (relative)
+<checkout>/.ai-state                    -> .praxion-state/.ai-state           (relative)
+<checkout>/CLAUDE.local.md              -> .praxion-state/CLAUDE.local.md     (relative)
+<checkout>/.claude/settings.local.json  -> ../.praxion-state/settings.local.json (relative)
 ```
 
-**Why a mount, not a plain symlink.** Claude Code's worktree isolation refuses a `Write`/`Edit` on any lexically-in-worktree path whose `realpath` escapes the worktree — a symlink from inside a linked pipeline worktree straight out to `~/.praxion/sidecars/...` is refused mid-step, not at session start, with a harness message that points at a copy that does not exist. The mount avoids the refusal structurally: `<checkout>/.praxion` is a `git worktree` of the sidecar **materialised inside the checkout**, so every shadow symlink resolves to a realpath still under the checkout. This is the **in-checkout realpath invariant** — for every path Praxion asks an agent to write, `realpath(path)` stays inside the checkout the session is running in — and it holds uniformly for the main checkout and for every linked worktree, with no discriminator between them. `worktree_guard.py`'s containment check and the dashboard's `project-root.ts` containment check both stay correct **without modification**, because the paths they see never leave the checkout to begin with.
+**Why a mount, not a plain symlink.** Claude Code's worktree isolation refuses a `Write`/`Edit` on any lexically-in-worktree path whose `realpath` escapes the worktree — a symlink from inside a linked pipeline worktree straight out to `~/.praxion/sidecars/...` is refused mid-step, not at session start, with a harness message that points at a copy that does not exist. The mount avoids the refusal structurally: `<checkout>/.praxion-state` is a `git worktree` of the sidecar **materialised inside the checkout**, so every shadow symlink resolves to a realpath still under the checkout. This is the **in-checkout realpath invariant** — for every path Praxion asks an agent to write, `realpath(path)` stays inside the checkout the session is running in — and it holds uniformly for the main checkout and for every linked worktree, with no discriminator between them. `worktree_guard.py`'s containment check and the dashboard's `project-root.ts` containment check both stay correct **without modification**, because the paths they see never leave the checkout to begin with.
 
 The cost is a branch per checkout — the sidecar carries `main` for the main checkout and `wt/<name>` per linked worktree — and a merge step to bring a worktree's state home. That merge is a **convergence step**, not an ordering rule you must remember: three independent, idempotent channels can perform it (see [State convergence and merge-back](#state-convergence-and-merge-back) below), so skipping the explicit path costs latency, never correctness.
 
@@ -421,10 +421,10 @@ Nothing here is a one-way door. `publish` moves sidecar state into the project r
 | `doctor` reports `shadow:<path>` as `dangling` or `missing` | The symlink target moved or was never created in this checkout | `praxion-sidecar link` |
 | `doctor` reports `shadow:<path>` as `blocked`/`foreign` | A real file or directory occupies a shadowed slot (e.g. `git pull` brought in a tracked `CLAUDE.md`) | move it aside, then `praxion-sidecar link` |
 | `mount-conflict` FAIL | A mount was left mid-merge by the explicit `merge-back --from` | resolve then commit in the mount, or abort the merge in the mount — never a "rule was violated," an operator may legitimately be mid-resolution |
-| Project directory moved or was re-cloned | `.ai-state` (or the mount) now points at a stale sidecar path | `rm .ai-state && praxion-sidecar link` — plain `link` also repairs the sidecar's own reverse pointer automatically when the mount is intact but stale; if `.praxion/` itself is a foreign mount (a worktree of a different sidecar), `link` refuses — move it aside, then re-run `link` |
+| Project directory moved or was re-cloned | `.ai-state` (or the mount) now points at a stale sidecar path | `rm .ai-state && praxion-sidecar link` — plain `link` also repairs the sidecar's own reverse pointer automatically when the mount is intact but stale; if `.praxion-state/` itself is a foreign mount (a worktree of a different sidecar), `link` refuses — move it aside, then re-run `link` |
 | A worktree's `.ai-state` looks empty right after creation | `NotYetLinked` — the mount has not materialised yet | `post-checkout` or the next SessionStart heals it; run `praxion-sidecar link` to force it now |
 | `praxion-sidecar` hooks silently do nothing on an older Python | The consumer hooks require **Python ≥3.9** | upgrade the interpreter git invokes hooks with |
-| `Refusing to write … it is a symbolic link` on `CLAUDE.local.md` or `.claude/settings.local.json` | Claude Code's `Write`/`Edit` refuse a **file-level** symlink target even when its realpath is inside the checkout | edit the file at its mount path instead — `.praxion/<name>` (`.ai-state/` is a directory shadow and needs no such care) |
+| `Refusing to write … it is a symbolic link` on `CLAUDE.local.md` or `.claude/settings.local.json` | Claude Code's `Write`/`Edit` refuse a **file-level** symlink target even when its realpath is inside the checkout | edit the file at its mount path instead — `.praxion-state/<name>` (`.ai-state/` is a directory shadow and needs no such care) |
 
 ---
 

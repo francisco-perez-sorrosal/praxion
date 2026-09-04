@@ -13,7 +13,7 @@
 # the confirmation block (sec. 5.3 -- reworded here for the state-mount
 # architecture ARCH_WT_RULING.md introduced after that mockup was drafted:
 # the sidecar is not purely external, it is projected into the checkout at
-# `.praxion`), and delegation to `praxion-sidecar init` all live here.
+# `.praxion-state`), and delegation to `praxion-sidecar init` all live here.
 #
 # Validation is deliberately NOT duplicated: which paths are shadowable
 # (D8's allowlist), the same-path-to-both-flags check, and the `.claude`
@@ -128,7 +128,7 @@ _placement_render_block() {
     printf 'Praxion onboarding · plugin %s\n\n' "$(plugin_version)"
     printf '  Directory   %s\n' "$target"
     printf '  Placement   sidecar\n\n'
-    printf '  Project intelligence will live in a state mount (%s/.praxion)\n' "$target"
+    printf '  Project intelligence will live in a state mount (%s/.praxion-state)\n' "$target"
     printf '  backed by %s.\n\n' "$root"
     printf '  Shadowed — symlinked in, excluded via .git/info/exclude, never committed here:\n'
     _placement_print_section "$target" shadow
@@ -148,7 +148,7 @@ _placement_render_block() {
 # One line naming the mount path stands in for the block's own "Project
 # intelligence will live in..." line.
 _placement_print_quiet_summary() {
-    printf 'Placement sidecar — %s/.praxion (rerun without --quiet to see the full split).\n' "$1"
+    printf 'Placement sidecar — %s/.praxion-state (rerun without --quiet to see the full split).\n' "$1"
 }
 
 _placement_emit_json() {
@@ -256,7 +256,7 @@ resolve_sidecar_placement() {
     # `--check` (and `--check --json`) is a dry-run by contract (see
     # onboard-project's own `--check` help text): print what would happen,
     # never delegate to `praxion-sidecar init` -- no sidecar directory, no
-    # `.git/info/exclude` edit, `git status` unchanged (IF-01).
+    # `.git/info/exclude` edit, `git status` unchanged.
     if [ "$CHECK_ONLY" -eq 1 ]; then
         _placement_print_preview "$target"
         return 0

@@ -71,7 +71,7 @@ def _mount_project(sidecar_root: Path, project_root: Path, *, branch: str) -> Pa
     _run_git(project_root, "init", "-q", "-b", "main")
     _run_git(project_root, "config", "user.email", "project@example.com")
     _run_git(project_root, "config", "user.name", "Project Test")
-    mount_dir = project_root / ".praxion"
+    mount_dir = project_root / ".praxion-state"
     _run_git(sidecar_root, "worktree", "add", "-q", str(mount_dir), branch)
     return mount_dir
 
@@ -314,7 +314,7 @@ def test_project_root_that_is_itself_a_linked_worktree_resolves_to_sidecar_owned
 
     sidecar_root = tmp_path / "sidecar"
     _init_sidecar(sidecar_root)
-    mount_dir = project_root / ".praxion"
+    mount_dir = project_root / ".praxion-state"
     _run_git(sidecar_root, "worktree", "add", "-q", str(mount_dir), "main")
     _write_manifest(
         sidecar_root,
@@ -392,7 +392,7 @@ def _add_project_worktree(project_root: Path, name: str) -> Path:
 
 def _mount_worktree(sidecar_root: Path, checkout: Path, *, branch: str) -> Path:
     """The mount `praxion-sidecar link` would create in `checkout`."""
-    mount_dir = checkout / ".praxion"
+    mount_dir = checkout / ".praxion-state"
     _run_git(sidecar_root, "worktree", "add", "-q", "-b", branch, str(mount_dir), "main")
     return mount_dir
 
@@ -489,7 +489,7 @@ def test_symlink_with_missing_target_resolves_to_dangling(tmp_path: Path) -> Non
     project_root = tmp_path / "project"
     project_root.mkdir()
     link_path = project_root / ".ai-state"
-    link_path.symlink_to(Path(".praxion") / ".ai-state")  # .praxion never created
+    link_path.symlink_to(Path(".praxion-state") / ".ai-state")  # .praxion-state never created
 
     result = _state_repo.resolve_placement(project_root)
 
@@ -614,7 +614,7 @@ def test_real_directory_at_mount_slot_without_git_resolves_to_foreign_not_a_git_
 ) -> None:
     project_root = tmp_path / "project"
     project_root.mkdir()
-    mount_dir = project_root / ".praxion"
+    mount_dir = project_root / ".praxion-state"
     (mount_dir / ".ai-state").mkdir(parents=True)
     # No `.git` entry at all under the mount slot -- not a repo, not a worktree.
     _link_shadow(project_root, mount_dir)
@@ -630,7 +630,7 @@ def test_mount_git_pointer_with_unrecognized_shape_resolves_to_foreign_unrecogni
 ) -> None:
     project_root = tmp_path / "project"
     project_root.mkdir()
-    mount_dir = project_root / ".praxion"
+    mount_dir = project_root / ".praxion-state"
     (mount_dir / ".ai-state").mkdir(parents=True)
     # A `.git` pointer file exists but its shape doesn't match `gitdir:
     # <sidecar>/.git/worktrees/<name>` -- fail-closed, never a guess.
@@ -682,7 +682,7 @@ def test_require_writable_placement_raises_naming_dangling_and_target(
     project_root = tmp_path / "project"
     project_root.mkdir()
     link_path = project_root / ".ai-state"
-    link_path.symlink_to(Path(".praxion") / ".ai-state")
+    link_path.symlink_to(Path(".praxion-state") / ".ai-state")
 
     with pytest.raises(_state_repo.UnwritablePlacementError, match="(?i)dangling"):
         _state_repo.require_writable_placement(project_root)
@@ -779,7 +779,7 @@ def test_print_cli_reports_dangling_placement_and_exits_zero(tmp_path: Path) -> 
     project_root = tmp_path / "project"
     project_root.mkdir()
     link_path = project_root / ".ai-state"
-    link_path.symlink_to(Path(".praxion") / ".ai-state")  # .praxion never created
+    link_path.symlink_to(Path(".praxion-state") / ".ai-state")  # .praxion-state never created
 
     result = _run_print_cli(project_root)
 

@@ -70,7 +70,7 @@ def _init_project_repo(root: Path, *, origin: str | None = None) -> None:
 
 def _fs_snapshot(root: Path) -> dict[str, tuple[str, ...]]:
     """A structural snapshot of every path under `root`, excluding the
-    project's own `.git` and the sidecar mount `.praxion` (whose *internal*
+    project's own `.git` and the sidecar mount `.praxion-state` (whose *internal*
     git bookkeeping is not this suite's concern). Real files/dirs are keyed
     by `(mtime_ns, inode)`; symlinks by their raw target -- so a `link()`
     re-run that reads-then-no-ops is distinguishable from one that
@@ -79,7 +79,7 @@ def _fs_snapshot(root: Path) -> dict[str, tuple[str, ...]]:
     snapshot: dict[str, tuple[str, ...]] = {}
     for path in sorted(root.rglob("*")):
         parts = path.relative_to(root).parts
-        if parts[0] in (".git", ".praxion"):
+        if parts[0] in (".git", ".praxion-state"):
             continue
         rel = str(path.relative_to(root))
         if path.is_symlink():
@@ -322,7 +322,7 @@ def test_init_creates_mount_and_shadow_symlinks_with_clean_project_status(
 ) -> None:
     _init_ok(origin_project, cli_env)
 
-    mount = origin_project / ".praxion"
+    mount = origin_project / ".praxion-state"
     assert mount.is_dir()
     assert (mount / ".git").exists()
 
@@ -337,7 +337,7 @@ def test_init_creates_mount_and_shadow_symlinks_with_clean_project_status(
     assert settings_local.is_symlink()
 
     exclude = (origin_project / ".git" / "info" / "exclude").read_text(encoding="utf-8")
-    assert ".praxion" in exclude
+    assert ".praxion-state" in exclude
     assert ".ai-state" in exclude
 
     status = _git_ok(origin_project, "status", "--porcelain").stdout
@@ -407,7 +407,7 @@ def test_init_refuses_when_ai_state_is_a_real_directory(
         in result.stderr
     )
     assert "praxion-sidecar absorb" in result.stderr
-    assert not (origin_project / ".praxion").exists()
+    assert not (origin_project / ".praxion-state").exists()
 
 
 def test_init_refuses_when_sidecar_already_belongs_to_a_different_origin(
@@ -425,7 +425,7 @@ def test_init_refuses_when_sidecar_already_belongs_to_a_different_origin(
     assert result.returncode == 3
     assert "already belongs to" in result.stderr
     assert "praxion-sidecar init --id" in result.stderr
-    assert not (project_b / ".praxion").exists()
+    assert not (project_b / ".praxion-state").exists()
 
 
 def test_init_dry_run_mutates_nothing_and_prints_dry_run_trailer(
@@ -436,7 +436,7 @@ def test_init_dry_run_mutates_nothing_and_prints_dry_run_trailer(
     assert "Dry run:" in result.stdout
     assert "Nothing was modified." in result.stdout
     assert not sidecar_root.exists()
-    assert not (origin_project / ".praxion").exists()
+    assert not (origin_project / ".praxion-state").exists()
     assert not (origin_project / ".ai-state").exists()
 
 
@@ -568,7 +568,7 @@ def test_link_in_a_project_worktree_creates_a_worktree_scoped_mount(
     result = run_cli(["link"], worktree_dir, cli_env)
     assert result.returncode == 0, result.stderr
 
-    mount = worktree_dir / ".praxion"
+    mount = worktree_dir / ".praxion-state"
     assert mount.is_dir()
     branch = _git_ok(mount, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
     assert branch == "wt/wt1"
@@ -591,7 +591,7 @@ def test_link_refuses_when_ai_state_points_at_a_different_sidecar(
 
     stale = project_b / ".ai-state"
     stale.unlink()
-    stale.symlink_to(project_a / ".praxion" / ".ai-state", target_is_directory=True)
+    stale.symlink_to(project_a / ".praxion-state" / ".ai-state", target_is_directory=True)
 
     result = run_cli(["link"], project_b, cli_env)
     assert result.returncode == 3
@@ -728,7 +728,7 @@ def test_link_in_a_fresh_worktree_finds_the_sidecar_through_the_main_checkouts_m
     result = run_cli(["link"], worktree, cli_env, _relocated_root(tmp_path))
     assert result.returncode == 0, result.stderr
 
-    assert (worktree / ".praxion").is_dir()
+    assert (worktree / ".praxion-state").is_dir()
     assert (worktree / ".ai-state").is_symlink()
 
 
@@ -744,7 +744,7 @@ def test_a_foreign_mount_is_refused_rather_than_reported_as_no_sidecar(
 
     project_b = tmp_path / "repo-b"
     _init_project_repo(project_b, origin="https://github.com/acme/other")
-    (project_b / ".ai-state").symlink_to(project_a / ".praxion" / ".ai-state", True)
+    (project_b / ".ai-state").symlink_to(project_a / ".praxion-state" / ".ai-state", True)
 
     result = run_cli(["link"], project_b, cli_env, _relocated_root(tmp_path))
     assert result.returncode == 3
@@ -955,7 +955,7 @@ def test_doctor_reports_a_dangling_shadow_instead_of_refusing(
     origin_project: Path, cli_env: dict[str, str]
 ) -> None:
     _init_ok(origin_project, cli_env)
-    shutil.rmtree(origin_project / ".praxion")
+    shutil.rmtree(origin_project / ".praxion-state")
     before = _fs_snapshot(origin_project)
 
     payload, code = _doctor_json(origin_project, cli_env)
@@ -963,7 +963,7 @@ def test_doctor_reports_a_dangling_shadow_instead_of_refusing(
     row = _placement_row(payload)
     assert code == 1
     assert row["verdict"] == "fail"
-    assert ".praxion" in row["detail"]
+    assert ".praxion-state" in row["detail"]
     assert row["fix"] == "praxion-sidecar link"
     assert _fs_snapshot(origin_project) == before
 
@@ -980,7 +980,7 @@ def test_doctor_reports_a_foreign_shadow_as_json_instead_of_refusing(
     _init_ok(project_b, cli_env)
     stale = project_b / ".ai-state"
     stale.unlink()
-    stale.symlink_to(project_a / ".praxion" / ".ai-state", target_is_directory=True)
+    stale.symlink_to(project_a / ".praxion-state" / ".ai-state", target_is_directory=True)
     before = _fs_snapshot(project_b)
 
     payload, code = _doctor_json(project_b, cli_env)
@@ -1001,7 +1001,7 @@ def test_doctor_warns_when_an_unlinked_checkout_has_a_sidecar_for_its_identity(
     it) is still on disk."""
     _init_ok(origin_project, cli_env)
     (origin_project / ".ai-state").unlink()
-    shutil.rmtree(origin_project / ".praxion")
+    shutil.rmtree(origin_project / ".praxion-state")
 
     payload, code = _doctor_json(origin_project, cli_env)
 
@@ -1019,7 +1019,7 @@ def test_status_names_the_sidecar_rather_than_claiming_plain_in_repo(
 ) -> None:
     _init_ok(origin_project, cli_env)
     (origin_project / ".ai-state").unlink()
-    shutil.rmtree(origin_project / ".praxion")
+    shutil.rmtree(origin_project / ".praxion-state")
 
     result = run_cli(["status", "--json"], origin_project, cli_env)
     assert result.returncode == 0, result.stderr
@@ -1047,7 +1047,7 @@ def test_commit_after_writing_through_ai_state_advances_the_sidecar_branch(
     origin_project: Path, cli_env: dict[str, str]
 ) -> None:
     _init_ok(origin_project, cli_env)
-    mount = origin_project / ".praxion"
+    mount = origin_project / ".praxion-state"
     before_head = _git_ok(mount, "rev-parse", "HEAD").stdout.strip()
 
     (origin_project / ".ai-state" / "note.md").write_text("hello\n", encoding="utf-8")
@@ -1080,7 +1080,7 @@ def test_commit_paths_stages_only_the_named_path(
     result = run_cli(["commit", "--paths", ".ai-state/keep.md"], origin_project, cli_env)
     assert result.returncode == 0, result.stderr
 
-    mount = origin_project / ".praxion"
+    mount = origin_project / ".praxion-state"
     committed = _git_ok(mount, "show", "--stat", "--format=", "HEAD").stdout
     assert "keep.md" in committed
     assert "skip.md" not in committed
@@ -1118,7 +1118,7 @@ def test_commit_pushes_when_the_policy_is_on_autocommit(
 
     assert result.returncode == 0, result.stderr
     assert "Pushed main to origin." in result.stdout
-    mount_head = _git_ok(origin_project / ".praxion", "rev-parse", "HEAD").stdout.strip()
+    mount_head = _git_ok(origin_project / ".praxion-state", "rev-parse", "HEAD").stdout.strip()
     assert _remote_head(bare, "main") == mount_head
 
 
@@ -1282,7 +1282,7 @@ def test_the_observations_merge_driver_fires_when_two_mounts_diverge(
     _append_observation(worktree_dir, "2026-09-03T00:00:02Z", "from-worktree")
     assert run_cli(["commit"], worktree_dir, cli_env).returncode == 0
 
-    mount = origin_project / ".praxion"
+    mount = origin_project / ".praxion-state"
     merge = _git(
         mount,
         "-c",
@@ -1419,7 +1419,7 @@ def test_merge_back_from_makes_the_worktree_draft_visible_in_the_target_checkout
     draft = origin_project / ".ai-state" / "decisions" / "drafts" / "x-decision.md"
     assert not draft.exists()
     project_head_before = _git_ok(origin_project, "rev-parse", "HEAD").stdout.strip()
-    main_mount = origin_project / ".praxion"
+    main_mount = origin_project / ".praxion-state"
     mount_head_before = _git_ok(main_mount, "rev-parse", "HEAD").stdout.strip()
 
     result = run_cli(["merge-back", "--from", "wt/x"], origin_project, cli_env)
@@ -1436,7 +1436,7 @@ def test_merge_back_from_makes_the_worktree_draft_visible_in_the_target_checkout
 def test_merge_back_from_refuses_on_a_dirty_target_mount(
     linked_worktree: Path, origin_project: Path, cli_env: dict[str, str]
 ) -> None:
-    main_mount = origin_project / ".praxion"
+    main_mount = origin_project / ".praxion-state"
     (main_mount / ".ai-state" / "scratch.md").write_text("dirty\n", encoding="utf-8")
 
     result = run_cli(["merge-back", "--from", "wt/x"], origin_project, cli_env)
@@ -1451,13 +1451,13 @@ def test_merge_back_from_dry_run_mutates_nothing(
     linked_worktree: Path, origin_project: Path, cli_env: dict[str, str], sidecar_root: Path
 ) -> None:
     sidecar_dir = sidecar_root / _ORIGIN_ID
-    main_mount = origin_project / ".praxion"
-    before = _sidecar_state_snapshot(sidecar_dir, [main_mount, linked_worktree / ".praxion"])
+    main_mount = origin_project / ".praxion-state"
+    before = _sidecar_state_snapshot(sidecar_dir, [main_mount, linked_worktree / ".praxion-state"])
 
     result = run_cli(["merge-back", "--from", "wt/x", "--dry-run"], origin_project, cli_env)
     assert result.returncode == 0, result.stderr
 
-    after = _sidecar_state_snapshot(sidecar_dir, [main_mount, linked_worktree / ".praxion"])
+    after = _sidecar_state_snapshot(sidecar_dir, [main_mount, linked_worktree / ".praxion-state"])
     assert before == after
     draft = origin_project / ".ai-state" / "decisions" / "drafts" / "x-decision.md"
     assert not draft.exists()
@@ -1541,7 +1541,7 @@ def test_merge_back_auto_drops_a_merged_branch_once_its_mount_is_gone(
     # Removed on the SIDECAR side directly (not via `link --prune`) so this
     # test isolates `--auto`'s own deletion behaviour from `link`'s own
     # embedded convergence call (ARCH_WT_RULING.md sec. 13.3, channel 2).
-    _git_ok(sidecar_dir, "worktree", "remove", "--force", str(worktree / ".praxion"))
+    _git_ok(sidecar_dir, "worktree", "remove", "--force", str(worktree / ".praxion-state"))
 
     result = run_cli(["merge-back", "--auto"], origin_project, cli_env)
     assert result.returncode == 0, result.stderr
@@ -1556,14 +1556,14 @@ def test_merge_back_auto_dry_run_mutates_nothing(
     _git_ok(origin_project, "merge", "-q", "--no-ff", "--no-edit", "feat/dr")
 
     sidecar_dir = sidecar_root / _ORIGIN_ID
-    main_mount = origin_project / ".praxion"
-    before = _sidecar_state_snapshot(sidecar_dir, [main_mount, worktree / ".praxion"])
+    main_mount = origin_project / ".praxion-state"
+    before = _sidecar_state_snapshot(sidecar_dir, [main_mount, worktree / ".praxion-state"])
 
     result = run_cli(["merge-back", "--auto", "--dry-run"], origin_project, cli_env)
     assert result.returncode == 0, result.stderr
     assert "wt/dr" in result.stdout
 
-    after = _sidecar_state_snapshot(sidecar_dir, [main_mount, worktree / ".praxion"])
+    after = _sidecar_state_snapshot(sidecar_dir, [main_mount, worktree / ".praxion-state"])
     assert before == after
 
 
@@ -1592,7 +1592,7 @@ def test_merge_back_auto_aborts_a_conflict_cleanly_while_from_leaves_markers_for
     assert run_cli(["commit"], origin_project, cli_env).returncode == 0
 
     _git_ok(origin_project, "merge", "-q", "--no-ff", "--no-edit", "feat/c")
-    main_mount = origin_project / ".praxion"
+    main_mount = origin_project / ".praxion-state"
 
     auto_result = run_cli(["merge-back", "--auto"], origin_project, cli_env)
     assert auto_result.returncode == 1
@@ -1827,7 +1827,7 @@ def test_publish_refuses_on_a_dirty_project_working_tree(
     result = _run_cli_no_stdin(["publish", "--yes"], origin_project, cli_env)
     assert result.returncode == 3
     assert "Refusing to publish" in result.stderr
-    assert (origin_project / ".praxion").is_dir()
+    assert (origin_project / ".praxion-state").is_dir()
 
 
 def test_publish_without_yes_on_non_interactive_stdin_is_a_usage_error(
@@ -1863,8 +1863,8 @@ def test_publish_moves_sidecar_state_into_the_project_with_history_and_removes_e
     log = _git_ok(origin_project, "log", "--oneline", "--", ".ai-state").stdout
     assert "chore(sidecar): initialise" in log
 
-    assert not (origin_project / ".praxion").exists()
-    assert not (worktree / ".praxion").exists()
+    assert not (origin_project / ".praxion-state").exists()
+    assert not (worktree / ".praxion-state").exists()
 
     sidecar_dir = sidecar_root / _ORIGIN_ID
     if sidecar_dir.exists():
@@ -1896,7 +1896,7 @@ def test_publish_refuses_while_a_state_branch_carries_work_main_does_not(
     assert "wt/x" in result.stderr
     assert "praxion-sidecar merge-back --auto" in result.stderr
 
-    assert (origin_project / ".praxion").is_dir()
+    assert (origin_project / ".praxion-state").is_dir()
     sidecar_dir = sidecar_root / _ORIGIN_ID
     assert _git_ok(sidecar_dir, "branch", "--list", "wt/x").stdout.strip() != ""
 
@@ -1918,10 +1918,10 @@ def test_publish_rolls_back_completely_when_the_project_refuses_the_import_commi
     assert result.returncode != 0
     assert "nothing was published" in result.stderr
 
-    assert (origin_project / ".praxion").is_dir()
+    assert (origin_project / ".praxion-state").is_dir()
     assert (origin_project / ".ai-state").is_symlink()
     assert (origin_project / "CLAUDE.local.md").is_symlink()
-    assert ".praxion" in exclude.read_text(encoding="utf-8")
+    assert ".praxion-state" in exclude.read_text(encoding="utf-8")
     assert _git_ok(origin_project, "status", "--porcelain").stdout == ""
     assert _git(origin_project, "rev-parse", "-q", "--verify", "MERGE_HEAD").returncode != 0
 
@@ -1931,7 +1931,7 @@ def test_publish_rolls_back_completely_when_the_project_refuses_the_import_commi
     assert (origin_project / ".ai-state" / "note.md").read_text(encoding="utf-8") == (
         "published note\n"
     )
-    assert not (origin_project / ".praxion").exists()
+    assert not (origin_project / ".praxion-state").exists()
     # A successful publish retires the sidecar out of the identity slot (it is
     # kept as a backup under a `.published-<stamp>` name), so the branch check
     # follows it there.
@@ -1993,7 +1993,7 @@ def test_absorb_refuses_when_the_project_has_no_committed_state_to_move(
     untracked = _run_cli_no_stdin(["absorb", "--yes"], local_project, cli_env)
     assert untracked.returncode == 3
     assert "not committed" in untracked.stderr
-    assert not (local_project / ".praxion").exists()
+    assert not (local_project / ".praxion-state").exists()
 
 
 def test_absorb_moves_committed_project_state_into_a_new_sidecar_with_history(
@@ -2008,7 +2008,7 @@ def test_absorb_moves_committed_project_state_into_a_new_sidecar_with_history(
     result = _run_cli_no_stdin(["absorb", "--yes"], local_project, cli_env)
     assert result.returncode == 0, result.stderr
 
-    assert (local_project / ".praxion").is_dir()
+    assert (local_project / ".praxion-state").is_dir()
     head_after = _git_ok(local_project, "rev-parse", "HEAD").stdout.strip()
     assert head_after == head_before  # absorb never commits to the project (D1: sidecar-only)
 
@@ -2040,7 +2040,7 @@ def test_publish_refuses_before_touching_anything_when_a_mount_is_dirty(
 
     The teardown's own dirty-mount refusal fired after the import commit had
     already landed, leaving the project reporting `in-repo` beside a live
-    `.praxion`, surviving `wt/*` branches and an intact exclude block -- a
+    `.praxion-state`, surviving `wt/*` branches and an intact exclude block -- a
     state neither placement describes and no verb can undo."""
     _init_ok(origin_project, cli_env)
     worktree = _create_project_worktree(origin_project, "dirtymount")
@@ -2052,13 +2052,13 @@ def test_publish_refuses_before_touching_anything_when_a_mount_is_dirty(
     assert result.returncode == 3
     assert "not safe to remove" in result.stderr
     # Names the offending mount and how to clean it, not just a count.
-    assert str(worktree / ".praxion") in result.stderr or ".praxion" in result.stderr
+    assert str(worktree / ".praxion-state") in result.stderr or ".praxion-state" in result.stderr
     assert "praxion-sidecar commit" in result.stderr
     # Nothing was touched: the project is still sidecar-placed, both mounts
     # stand, and no import commit exists.
     assert (origin_project / ".ai-state").is_symlink()
-    assert (origin_project / ".praxion").is_dir()
-    assert (worktree / ".praxion").is_dir()
+    assert (origin_project / ".praxion-state").is_dir()
+    assert (worktree / ".praxion-state").is_dir()
     payload = json.loads(run_cli(["status", "--json"], origin_project, cli_env).stdout)
     assert payload["placement"] == "sidecar"
 
@@ -2153,9 +2153,9 @@ def test_link_from_a_second_clone_names_the_checkout_holding_the_sidecar_branch(
     assert "another checkout of this project already holds the sidecar branch 'main'" in (
         result.stderr
     )
-    assert str(origin_project / ".praxion") in result.stderr
+    assert str(origin_project / ".praxion-state") in result.stderr
     assert "second clone on the same machine is not supported yet" in result.stderr
-    assert not (second_clone / ".praxion").exists()
+    assert not (second_clone / ".praxion-state").exists()
 
 
 def test_absorb_on_a_staged_but_uncommitted_state_move_says_commit_the_adoption(
@@ -2178,7 +2178,7 @@ def test_absorb_on_a_staged_but_uncommitted_state_move_says_commit_the_adoption(
     assert result.returncode == 3
     assert "Commit the adoption first" in result.stderr
     assert "git stash" not in result.stderr
-    assert not (local_project / ".praxion").exists()
+    assert not (local_project / ".praxion-state").exists()
 
 
 def test_merge_back_auto_reports_a_plumbing_failure_as_failed_not_as_a_conflict(

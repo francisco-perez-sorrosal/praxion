@@ -153,14 +153,14 @@ def _mounted_sidecar_fixture(tmp_path: Path, *, manifest_yaml: str) -> _MountedF
     _run_git(project_root, "init", "-q", "-b", "main")
     _run_git(project_root, "config", "user.email", "project@example.com")
     _run_git(project_root, "config", "user.name", "Project Test")
-    mount_dir = project_root / ".praxion"
+    mount_dir = project_root / ".praxion-state"
     _run_git(sidecar_root, "worktree", "add", "-q", str(mount_dir), "main")
 
     sidecar_common_dir = sidecar_root / ".git"
     (sidecar_common_dir / "praxion-sidecar.yaml").write_text(manifest_yaml)
 
     link_path = project_root / ".ai-state"
-    link_path.symlink_to(Path(".praxion") / ".ai-state", target_is_directory=True)
+    link_path.symlink_to(Path(".praxion-state") / ".ai-state", target_is_directory=True)
 
     return _MountedFixture(
         project_root=project_root,
@@ -178,7 +178,7 @@ def _load(sidecar_root: Path) -> _sidecar_manifest.Manifest:
 
 
 def test_never_shadow_constant_matches_the_closed_set() -> None:
-    assert _sidecar_manifest.NEVER_SHADOW == frozenset({".claude", ".git", ".", ".praxion"})
+    assert _sidecar_manifest.NEVER_SHADOW == frozenset({".claude", ".git", ".", ".praxion-state"})
 
 
 def test_shadowable_paths_allowlist_matches_the_interface_designers_allowlist() -> None:
@@ -440,7 +440,7 @@ def test_schema_two_is_refused_with_upgrade_message(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     "illegal_path",
-    [".claude", ".git", ".", ".praxion", ".git/hooks", ".praxion/.ai-state"],
+    [".claude", ".git", ".", ".praxion-state", ".git/hooks", ".praxion-state/.ai-state"],
 )
 def test_shadow_intent_on_a_never_shadow_path_is_refused(tmp_path: Path, illegal_path: str) -> None:
     sidecar_root = _plain_sidecar(tmp_path)
@@ -748,7 +748,7 @@ def test_empty_project_id_is_refused(tmp_path: Path) -> None:
     assert exc_info.value.reason == "project-id-missing"
 
 
-# --- IF-17: PyYAML is imported lazily -- a missing install raises a named,
+# --- PyYAML is imported lazily -- a missing install raises a named,
 # actionable ManifestError, never a raw ModuleNotFoundError traceback -------
 
 

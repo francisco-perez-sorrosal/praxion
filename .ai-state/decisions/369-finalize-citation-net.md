@@ -1,7 +1,7 @@
 ---
-id: dec-draft-aae88f1f
+id: dec-369
 title: Finalize rewrites draft ids across one citation net shared with its detector, replacing the enumerated allowlist
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-09-04
 summary: The finalize cross-reference rewriter walks the same bounded net its post-condition detector scans (every markdown file under .ai-state/ and docs/ minus the frozen subtree, the in-flight .ai-work/ documents, ROADMAP.md) instead of an enumerated allowlist of named files; dec-331's own reversal trigger (a second widening) fired, so this adopts its deferred Option C.

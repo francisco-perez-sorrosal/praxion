@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-05T02:05:26Z'
+generated_at: '2026-09-05T05:31:31Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -440,7 +440,7 @@ surfaces:
   path: docs/onboarding.md
   type: markdown
   title: Project Onboarding
-  last_modified: '2026-09-03'
+  last_modified: '2026-09-04'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -552,7 +552,7 @@ surfaces:
   path: .ai-state/DESIGN_CHANGELOG.md
   type: markdown
   title: Architecture Changelog
-  last_modified: '2026-07-02'
+  last_modified: '2026-09-04'
   renderer: default_markdown
 - id: ai-state-landscape-watchlist
   path: .ai-state/LANDSCAPE_WATCHLIST.md
@@ -2550,7 +2550,7 @@ surfaces:
   path: .ai-state/decisions/331-finalize-scope-idea-ledgers.md
   type: markdown
   title: Widen the finalize rewrite allowlist to cover `.ai-state/idea_ledgers/`, rather than forbid draft-id citations there
-  last_modified: '2026-08-07'
+  last_modified: '2026-09-04'
   renderer: adr_card
 - id: ai-state-decisions-332-task-brief-obligation-enforced-by-a-non
   path: .ai-state/decisions/332-task-brief-obligation-enforced-by-a-non.md
@@ -2753,7 +2753,7 @@ surfaces:
 - id: ai-state-decisions-365-state-repo-resolver-contract
   path: .ai-state/decisions/365-state-repo-resolver-contract.md
   type: markdown
-  title: 365-state-repo-resolver-contract.md
+  title: A single resolver answers which git repository owns .ai-state/, returning a five-variant sum type; state-mutating callers fail closed
   last_modified: '2026-09-04'
   renderer: adr_card
 - id: ai-state-decisions-366-sidecar-state-mount-worktree
@@ -2774,6 +2774,12 @@ surfaces:
   title: Sidecar-placement scripts split across six sibling modules
   last_modified: '2026-09-04'
   renderer: adr_card
+- id: ai-state-decisions-369-finalize-citation-net
+  path: .ai-state/decisions/369-finalize-citation-net.md
+  type: markdown
+  title: Finalize rewrites draft ids across one citation net shared with its detector, replacing the enumerated allowlist
+  last_modified: '2026-09-04'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -2790,7 +2796,7 @@ surfaces:
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-07-31_11-52-24.md
   type: markdown
   title: Sentinel Report
-  last_modified: '2026-07-31'
+  last_modified: '2026-09-04'
   renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-08-04-13-35-55
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-04_13-35-55.md
@@ -2970,7 +2976,7 @@ surfaces:
   path: .ai-state/specs/SPEC_agent-model-routing_2026-04-25.md
   type: markdown
   title: 'SPEC: Per-Agent Model Routing Policy'
-  last_modified: '2026-08-13'
+  last_modified: '2026-09-04'
   renderer: default_markdown
 - id: ai-state-specs-spec-design-dialectic-2026-04-17
   path: .ai-state/specs/SPEC_design-dialectic_2026-04-17.md
@@ -3439,6 +3445,7 @@ groups:
   - ai-state-decisions-366-sidecar-state-mount-worktree
   - ai-state-decisions-367-ds1-gate-authority
   - ai-state-decisions-368-sidecar-module-split
+  - ai-state-decisions-369-finalize-citation-net
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

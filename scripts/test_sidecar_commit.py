@@ -1,5 +1,5 @@
-"""Behavioral tests for `_sidecar_commit.py` -- DS-9 (per-mount commit lock,
-revised) and the pathspec-scoped autocommit surface it serializes.
+"""Behavioral tests for `_sidecar_commit.py` -- the per-mount commit lock
+and the pathspec-scoped autocommit surface it serializes.
 
 `_sidecar_commit.py` does not exist yet (concurrent BDD/TDD with its
 implementation) -- this is the RED skeleton, confirmed to fail on
@@ -83,7 +83,7 @@ def _commit_all(repo: Path, message: str) -> None:
 
 def _worktree_git_dir(checkout: Path) -> Path:
     """Resolve a worktree's real git-dir (`.git/worktrees/<name>`) from its
-    `.git` pointer file -- the exact directory DS-9 hangs the per-mount lock
+    `.git` pointer file -- the exact directory the per-mount lock hangs
     off of.
     """
     result = _git_ok(checkout, "rev-parse", "--git-dir")
@@ -117,7 +117,7 @@ def _mount(
     which is concurrently in flight elsewhere. `new=False` checks out an
     existing branch (the main-checkout shape); `new=True` creates one from
     `base` (the linked-worktree shape) -- both are real sidecar worktrees,
-    each with its own `.git/worktrees/<name>/` per DS-9.
+    each with its own `.git/worktrees/<name>/` as the lock derivation expects.
     """
     mount_dir = checkout_dir / ".praxion-state"
     checkout_dir.mkdir(parents=True, exist_ok=True)
@@ -149,7 +149,7 @@ def _acquire_and_freeze(mount: Path, acquired) -> None:
         signal.pause()
 
 
-# --- lock-path derivation (DS-9) ---------------------------------------------
+# --- lock-path derivation ---------------------------------------------
 
 
 def test_lock_path_lands_under_each_mounts_own_worktree_git_dir(tmp_path: Path) -> None:
@@ -414,7 +414,7 @@ def test_residue_paths_refuses_to_report_a_failed_status_as_clean(tmp_path: Path
 
 
 def test_converge_acquires_the_target_lock_exactly_once_for_three_merges(tmp_path: Path) -> None:
-    """`_sidecar_mount.converge()` may merge several eligible branches in
+    """`_sidecar_convergence.converge()` may merge several eligible branches in
     one run; `ARCH_WT_RULING.md` sec. 13.4 requires it take the target
     mount's commit lock exactly once for the whole run, never once per
     branch. Only `_sidecar_commit` supplies the real lock class this test
@@ -422,6 +422,7 @@ def test_converge_acquires_the_target_lock_exactly_once_for_three_merges(tmp_pat
     this suite.
     """
     sidecar_mount = pytest.importorskip("_sidecar_mount")
+    sidecar_convergence = pytest.importorskip("_sidecar_convergence")
 
     sidecar_root = _init_sidecar(tmp_path / "sidecar")
     project_root = tmp_path / "project"
@@ -460,7 +461,9 @@ def test_converge_acquires_the_target_lock_exactly_once_for_three_merges(tmp_pat
         _git_ok(project_root, "merge", "-q", "--no-ff", "--no-edit", project_branch)
 
     counting_lock = _CountingLock()
-    result = sidecar_mount.converge(sidecar_root, project_root, project_root, lock=counting_lock)
+    result = sidecar_convergence.converge(
+        sidecar_root, project_root, project_root, lock=counting_lock
+    )
 
     assert {"wt/p", "wt/q", "wt/r"} <= set(result.merged)
     assert counting_lock.enter_count == 1

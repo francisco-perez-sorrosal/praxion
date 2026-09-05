@@ -31,6 +31,7 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
+import _sidecar_convergence as convergence
 import _sidecar_git as gitp
 import _sidecar_identity as identity
 import _sidecar_init as initializer
@@ -299,7 +300,7 @@ def _require_every_mount_removable(mounts_to_remove: list[Path]) -> None:
 
 def _delete_state_branches(sidecar: Path) -> None:
     for branch in gitp.branches_with_prefix(sidecar, mounts.STATE_BRANCH_PREFIX):
-        mounts.drop_branch(sidecar, branch)
+        convergence.drop_branch(sidecar, branch)
 
 
 def _read_shadowed_files(checkout: Path, manifest: manifests.Manifest) -> dict[str, str]:

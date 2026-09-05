@@ -5,11 +5,12 @@ A thin orchestration layer, deliberately: argparse, the exit-code mapping, and
 five verb bodies. Every decision it renders is made somewhere else --
 
     _sidecar_cli        the exit-code contract, the checkout, the two gates
-    _sidecar_identity   DS-7 identity: the one place a slug is derived
+    _sidecar_identity   project identity: the one place a slug is derived
     _sidecar_init       bringing a sidecar into existence
     _sidecar_inputs     the world, read into the check registry's input type
-    _sidecar_manifest   DS-2 manifest: the smart constructor that validates it
-    _sidecar_mount      DS-10 mount lifecycle: create / prune / classify
+    _sidecar_manifest   the manifest: the smart constructor that validates it
+    _sidecar_mount      state-mount lifecycle: create / prune / classify
+    _sidecar_convergence state-branch classification and convergence
     _sidecar_link       the sole reconciler (D2): exclude block, shadows, mount
     _sidecar_checks     the D3 check registry: one "is this healthy", two renderings
     _sidecar_commit     the per-mount commit lock and pathspec-scoped commit
@@ -242,7 +243,7 @@ def verb_link(args: argparse.Namespace, context: Context) -> int:
 def _refuse_foreign_shadows(checkout: Path, manifest: manifests.Manifest) -> None:
     """R2 -- a shadow pointing into some *other* sidecar is never reclaimed.
 
-    `link` creates only from `Absent` (DS-6), so it would otherwise report a
+    `link` creates only from `Absent` slots, so it would otherwise report a
     stale cross-project link as a skipped slot and exit 0 -- leaving every
     Praxion write in this checkout landing in another project's state.
     """
@@ -261,7 +262,7 @@ def _refuse_foreign_shadows(checkout: Path, manifest: manifests.Manifest) -> Non
 
 
 def _record_root(sidecar: Path, manifest: manifests.Manifest, checkout: Path) -> manifests.Manifest:
-    """Append this checkout to `roots:` when it is new (DS-7).
+    """Append this checkout to `roots:` when it is new (the identity anchor).
 
     `roots:` is the remote-less population's only identity anchor, so a
     worktree missing from it resolves as `Foreign` and every state write in it

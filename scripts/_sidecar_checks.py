@@ -21,6 +21,7 @@ from collections.abc import Mapping, Sequence
 from enum import Enum
 
 import _sidecar_commit
+import _sidecar_convergence
 import _sidecar_mount
 import _state_repo
 
@@ -179,7 +180,7 @@ class CheckInputs:
     untouched_paths: Mapping[str, str]
     hooks_status: Mapping[str, object]
     mount: _sidecar_mount.StateMountState
-    branches: Mapping[str, _sidecar_mount.StateBranchState]
+    branches: Mapping[str, _sidecar_convergence.StateBranchState]
     orphaned_mounts: tuple[str, ...]
     mount_mid_merge: bool
     sidecar_repo: SidecarRepoState | None
@@ -300,7 +301,7 @@ def _templated_row(cid: str, path: str, spec: _RowSpec) -> CheckResult:
 
 
 def _rows_placement(inputs: CheckInputs) -> list[CheckResult]:
-    """P1-14's totality row: a checkout that does not resolve into its own
+    """The totality row: a checkout that does not resolve into its own
     sidecar is *reported*, never a refusal that suppresses every other row.
 
     No row at all when the placement resolves -- like `mount-orphaned` and
@@ -412,7 +413,7 @@ def _rows_state_unmerged(inputs: CheckInputs) -> list[CheckResult]:
             fix=_MERGE_BACK_FIX_TEMPLATE.format(branch=branch),
         )
         for branch, state in inputs.branches.items()
-        if isinstance(state, _sidecar_mount.UnmergedIneligible)
+        if isinstance(state, _sidecar_convergence.UnmergedIneligible)
     ]
 
 
@@ -427,7 +428,7 @@ def _rows_state_eligible(inputs: CheckInputs) -> list[CheckResult]:
             fix=_LINK_FIX,
         )
         for branch, state in inputs.branches.items()
-        if isinstance(state, _sidecar_mount.UnmergedEligible)
+        if isinstance(state, _sidecar_convergence.UnmergedEligible)
     ]
 
 
@@ -473,7 +474,7 @@ def _rows_remote_policy(inputs: CheckInputs) -> list[CheckResult]:
 
 
 def _rows_manifest_roots(inputs: CheckInputs) -> list[CheckResult]:
-    """The manifest's `project.roots` (DS-7 identity anchor) names this
+    """The manifest's `project.roots` (the identity anchor) names this
     checkout -- WARN when it does not, since the checkout was moved or the
     manifest predates it (`link` re-derives and re-writes `roots`)."""
     if inputs.guards_roots_stale:
@@ -485,7 +486,7 @@ def _rows_manifest_roots(inputs: CheckInputs) -> list[CheckResult]:
 
 
 def _rows_commit_lock(inputs: CheckInputs) -> list[CheckResult]:
-    """The per-mount commit lock (`_sidecar_commit.read_lock_state`, DS-9) --
+    """The per-mount commit lock (`_sidecar_commit.read_lock_state`) --
     WARN on a held or abandoned lock, no row on `Idle` (nothing to report)."""
     state = inputs.lock_state
     if state is None or isinstance(state, _sidecar_commit.Idle):
@@ -501,7 +502,7 @@ def _rows_commit_lock(inputs: CheckInputs) -> list[CheckResult]:
 
 # The pinned row order: placement, exclude-block, shadow:<path>*,
 # shared:<path>*, hooks-path, hooks-chained, sidecar-repo, then the four
-# DS-11 convergence rows, then remote-policy, manifest-roots, commit-lock.
+# convergence rows, then remote-policy, manifest-roots, commit-lock.
 # Split into four lists only for the non-sidecar gate in `evaluate_checks` --
 # `_PLACEMENT_ROW_FUNCS` and `_HOOK_ROW_FUNCS` run under every placement.
 _PLACEMENT_ROW_FUNCS = [_rows_placement]

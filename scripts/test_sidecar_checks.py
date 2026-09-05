@@ -1,5 +1,5 @@
 """Behavioral tests for `_sidecar_checks.py` -- the D3 single-source check
-registry (`INTERFACE_DESIGN.md` sec. 7.3) plus the four DS-11 convergence
+registry (`INTERFACE_DESIGN.md` sec. 7.3) plus the four convergence
 rows folded in by `ARCH_WT_RULING.md` sec. 13.6.
 
 `_sidecar_checks.py` does not exist yet (concurrent BDD/TDD with its
@@ -29,10 +29,10 @@ yet either; (2) the
 probe on the symlink target, which belongs at the CLI wiring layer that
 builds a `CheckInputs`, not inside this module's pure `evaluate_checks`.
 
-`CheckInputs.mount` / `.branches` DO use the real `_sidecar_mount` sum
-types (`StateMountState`, `StateBranchState`) directly -- that module is
-landed and importable, so there is no decoupling reason to shadow it with
-a local type.
+`CheckInputs.mount` / `.branches` DO use the real sum types directly
+(`StateMountState` from `_sidecar_mount`, `StateBranchState` from
+`_sidecar_convergence`) -- both modules are landed and importable, so there
+is no decoupling reason to shadow them with a local type.
 
 Import strategy: plain sibling import (`scripts/` has no `__init__.py`, so
 pytest's prepend import mode puts it on `sys.path[0]`), matching
@@ -49,6 +49,7 @@ from pathlib import Path
 
 import _sidecar_checks
 import _sidecar_commit
+import _sidecar_convergence
 import _sidecar_mount
 import _state_repo
 import install_git_hooks
@@ -427,22 +428,22 @@ def test_sidecar_repo_over_fifty_unpushed_commits_is_warn(healthy_inputs) -> Non
     assert row.verdict == _sidecar_checks.Verdict.WARN
 
 
-# --- state-unmerged (DS-11 convergence row) -------------------------------
+# --- state-unmerged (convergence row) -------------------------------
 
 
 @pytest.mark.parametrize(
     "reason",
     [
-        _sidecar_mount.IneligibilityReason.PROJECT_BRANCH_NOT_MERGED,
-        _sidecar_mount.IneligibilityReason.PROJECT_BRANCH_DELETED,
-        _sidecar_mount.IneligibilityReason.MAPPING_MISSING,
-        _sidecar_mount.IneligibilityReason.MAPPING_UNRESOLVABLE,
+        _sidecar_convergence.IneligibilityReason.PROJECT_BRANCH_NOT_MERGED,
+        _sidecar_convergence.IneligibilityReason.PROJECT_BRANCH_DELETED,
+        _sidecar_convergence.IneligibilityReason.MAPPING_MISSING,
+        _sidecar_convergence.IneligibilityReason.MAPPING_UNRESOLVABLE,
     ],
 )
 def test_state_unmerged_names_the_exact_ineligibility_reason(healthy_inputs, reason) -> None:
     inputs = dataclasses.replace(
         healthy_inputs,
-        branches={"wt/auth-flow": _sidecar_mount.UnmergedIneligible(reason=reason)},
+        branches={"wt/auth-flow": _sidecar_convergence.UnmergedIneligible(reason=reason)},
     )
 
     results = _sidecar_checks.evaluate_checks(inputs)
@@ -461,8 +462,8 @@ def test_state_unmerged_mapping_unresolvable_reason_is_named_verbatim(healthy_in
     inputs = dataclasses.replace(
         healthy_inputs,
         branches={
-            "wt/spike": _sidecar_mount.UnmergedIneligible(
-                reason=_sidecar_mount.IneligibilityReason.MAPPING_UNRESOLVABLE
+            "wt/spike": _sidecar_convergence.UnmergedIneligible(
+                reason=_sidecar_convergence.IneligibilityReason.MAPPING_UNRESOLVABLE
             )
         },
     )
@@ -472,15 +473,15 @@ def test_state_unmerged_mapping_unresolvable_reason_is_named_verbatim(healthy_in
     assert "MappingUnresolvable" in row.detail
 
 
-# --- state-eligible (DS-11 convergence row) -------------------------------
+# --- state-eligible (convergence row) -------------------------------
 
 
 def test_state_eligible_but_not_converged_is_warn(healthy_inputs) -> None:
     inputs = dataclasses.replace(
         healthy_inputs,
         branches={
-            "wt/auth-flow": _sidecar_mount.UnmergedEligible(
-                evidence=_sidecar_mount.MergeEvidence.ANCESTOR
+            "wt/auth-flow": _sidecar_convergence.UnmergedEligible(
+                evidence=_sidecar_convergence.MergeEvidence.ANCESTOR
             )
         },
     )
@@ -491,7 +492,7 @@ def test_state_eligible_but_not_converged_is_warn(healthy_inputs) -> None:
     assert row.fix == "praxion-sidecar link"
 
 
-# --- mount-orphaned (DS-11 convergence row) --------------------------------
+# --- mount-orphaned (convergence row) --------------------------------
 
 
 def test_mount_orphaned_entry_is_warn(healthy_inputs) -> None:
@@ -504,7 +505,7 @@ def test_mount_orphaned_entry_is_warn(healthy_inputs) -> None:
     assert "wt/gone" in row.detail
 
 
-# --- mount-conflict (DS-11 convergence row) --------------------------------
+# --- mount-conflict (convergence row) --------------------------------
 
 
 def test_mount_left_mid_merge_is_fail(healthy_inputs) -> None:

@@ -203,6 +203,14 @@ def test_git_output_strips_and_collapses_failure_to_none(real_repo: Path) -> Non
     assert git_runner.git_output(real_repo, "rev-parse", "no-such-ref") is None
 
 
+def test_stdin_is_fed_to_git(real_repo: Path) -> None:
+    """`hash-object --stdin` answers only from standard input, so a wrong or
+    missing feed is a different blob id (or none), never a coincidence."""
+    blob = git_runner.git_output(real_repo, "hash-object", "--stdin", stdin="hello\n")
+
+    assert blob == "ce013625030ba8dba906f756967f9e9ca394464a"
+
+
 def test_git_output_treats_empty_stdout_as_no_answer(real_repo: Path) -> None:
     """Whitespace-only output is `None` -- the contract the callers rely on."""
     assert git_runner.git_output(real_repo, "log", "--format=", "-n", "1") is None

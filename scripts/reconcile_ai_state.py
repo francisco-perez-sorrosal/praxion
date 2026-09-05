@@ -351,7 +351,7 @@ def _check_merge_drivers() -> None:
 def _run_target_mount(target_mount_arg: str) -> None:
     """`--target-mount <mount>`: reconcile a state mount at merge-back.
 
-    The mount's own `git merge` (run by `_sidecar_mount.merge_back` before
+    The mount's own `git merge` (run by `_sidecar_convergence.merge_back` before
     this is called) already resolved `observations.jsonl` through the
     sidecar's union merge driver -- so this runs the same ADR-renumbering +
     index-regeneration half `--post-merge` runs for the project-side case,

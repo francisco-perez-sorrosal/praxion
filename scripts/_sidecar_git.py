@@ -2,8 +2,8 @@
 
 **What belongs here.** Anything that is true of *git*, independent of what
 Praxion does with the answer: ref resolution and ancestry, worktree-list and
-`.git`-pointer parsing, branch config get/set, the patch-identity probe that
-detects a squash merge, the identity fallback a merge commit needs. Every
+`.git`-pointer parsing, branch config get/set, the write-free patch-identity probe
+that detects a squash merge, the identity fallback a merge commit needs. Every
 function names its repository explicitly (first argument) and answers with a
 value -- `None`/`False`/`()` when git cannot answer -- rather than raising, so
 the callers that run inside git hooks stay total by construction.
@@ -11,9 +11,9 @@ the callers that run inside git hooks stay total by construction.
 **What does not.** Any knowledge of the state mount or the state branch: the
 `.praxion-state` directory name, the `wt/` branch prefix, the `praxion-project-branch`
 config key, and every classification those feed. Those live in
-`_sidecar_mount.py`, which imports this module. The dependency is
-one-directional and must stay that way -- nothing here may import a sidecar
-module back.
+`_sidecar_mount.py` and `_sidecar_convergence.py`, which import this module.
+The dependency is one-directional and must stay that way -- nothing here may
+import a sidecar module back.
 
 Sibling-imported the same way as `_git_runner` and `_repo_root` (``scripts/`` is
 on ``sys.path`` when any of them runs). Stdlib only, and importable on the 3.9
@@ -24,6 +24,7 @@ reach this code run under a project's own interpreter.
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Iterator
 from pathlib import Path
 
 from _git_runner import GitUnavailableError, git_output, run_git
@@ -260,22 +261,47 @@ def abort_merge(repo: Path) -> None:
 def patch_already_applied(repo: Path, head: str, ref: str) -> bool:
     """Whether ``ref``'s changes are present in ``head`` under a *different* commit.
 
-    The standard squash-merge detector: replay ``ref``'s tree as a throwaway
-    commit on the merge base, then ask `git cherry` whether an equivalent patch
-    already exists in ``head`` (a `-` prefix means it does). Callers run this
-    only after the cheap ancestor test fails, because it costs several plumbing
-    calls and writes one **unreachable** commit object into ``repo`` --
-    invisible to `git status`, reclaimed by routine gc, but a write.
+    The squash-merge detector, done without writing. ``ref``'s cumulative
+    diff against the merge base is reduced to a patch id and compared with
+    the patch id of every commit on ``head`` since that base which touches
+    the same paths -- the only commits a squash of ``ref`` could be. That is
+    what `git cherry` computes, minus the throwaway commit it needs as an
+    argument: nothing here writes to ``repo``'s object store, which matters
+    because ``repo`` is the *project's* repository and this probe re-runs on
+    every convergence for as long as a branch stays unmerged.
     """
     merge_base = git_output(repo, "merge-base", head, ref)
     tip = git_output(repo, "rev-parse", f"{ref}^{{commit}}")
     if merge_base is None or tip is None or merge_base == tip:
         return False
-    tree = git_output(repo, "rev-parse", f"{ref}^{{tree}}")
-    if tree is None:
+    wanted = _patch_ids(repo, git_output(repo, "diff-tree", "-p", merge_base, tip))
+    touched = git_output(repo, "diff-tree", "-r", "--name-only", merge_base, tip)
+    if not wanted or touched is None:
         return False
-    probe = git_output(repo, "commit-tree", tree, "-p", merge_base, "-m", "_")
-    if probe is None:
+    candidates = git_output(repo, "rev-list", f"{merge_base}..{head}", "--", *touched.splitlines())
+    if candidates is None:
         return False
-    applied = git_output(repo, "cherry", head, probe)
-    return bool(applied) and any(line.startswith("-") for line in applied.splitlines())
+    return any(
+        wanted & _patch_ids(repo, git_output(repo, "show", "-p", "--format=commit %H", *batch))
+        for batch in _batched(candidates.splitlines(), _SHOW_BATCH)
+    )
+
+
+# `git show` takes its commits on the command line; a long-lived branch on a
+# busy project can name thousands, so they go in argv-sized slices.
+_SHOW_BATCH = 256
+
+
+def _patch_ids(repo: Path, patch_text: str | None) -> frozenset[str]:
+    """The patch ids `git patch-id --stable` assigns to each patch in ``patch_text``."""
+    if not patch_text:
+        return frozenset()
+    listing = git_output(repo, "patch-id", "--stable", stdin=patch_text + "\n")
+    if listing is None:
+        return frozenset()
+    return frozenset(line.split()[0] for line in listing.splitlines() if line.strip())
+
+
+def _batched(items: list[str], size: int) -> Iterator[list[str]]:
+    for start in range(0, len(items), size):
+        yield items[start : start + size]

@@ -114,8 +114,12 @@ def run_git(
     repo_root: Path | str,
     *args: str,
     timeout: float = GIT_TIMEOUT_SECONDS,
+    stdin: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run `git <args>` in `repo_root` under a bounded timeout.
+
+    `stdin`, when given, is fed to git on standard input -- for the plumbing
+    that reads a patch or an object body from it (`patch-id`, `hash-object --stdin`).
 
     Returns the `CompletedProcess` whatever the exit code; raises
     `GitUnavailableError` when git could not run to completion.
@@ -138,6 +142,7 @@ def run_git(
             ["git", *args],
             cwd=str(repo_root),
             env=_unscoped_environ(),
+            input=stdin,
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -160,6 +165,7 @@ def git_output(
     *args: str,
     timeout: float = GIT_TIMEOUT_SECONDS,
     logger: logging.Logger | None = None,
+    stdin: str | None = None,
 ) -> str | None:
     """Return `git <args>` stdout stripped, or `None` when git cannot answer.
 
@@ -172,7 +178,7 @@ def git_output(
     callers already emitted privately.
     """
     try:
-        result = run_git(repo_root, *args, timeout=timeout)
+        result = run_git(repo_root, *args, timeout=timeout, stdin=stdin)
     except GitUnavailableError as exc:
         if logger is not None:
             logger.debug("%s", exc)

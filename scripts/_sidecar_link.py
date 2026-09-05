@@ -1,4 +1,4 @@
-"""Shadow-symlink projection into the state mount (DS-5 / DS-6).
+"""Shadow-symlink projection into the state mount: the exclude block and the shadow slots.
 
 ``link()`` drives two things from one call, in a fixed order that is
 itself a safety property: the **mount** (``_sidecar_mount.py``'s real
@@ -37,6 +37,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Union
 
+import _sidecar_convergence
 import _sidecar_git as gitp
 import _sidecar_manifest
 import _sidecar_mount
@@ -78,7 +79,7 @@ class LinkRefused(Exception):  # noqa: N818 - a refusal to act, not a failure mi
         self.reason = reason
 
 
-# --- ShadowSlotState (DS-6) ---
+# --- ShadowSlotState ---
 
 
 @dataclasses.dataclass(frozen=True)
@@ -231,7 +232,7 @@ def _clear_project_branch_mapping(sidecar_root: Path, branch: str) -> None:
     run_git(sidecar_root, "config", "--unset", key)
 
 
-# --- .git/info/exclude (DS-5) ---
+# --- .git/info/exclude ---
 
 
 def _split_block(text: str) -> tuple[str, str]:
@@ -341,7 +342,7 @@ def _foreign_mount_reason(checkout: Path, state: _sidecar_mount.StateMountState)
 
 
 def _ensure_real_parent_dir(checkout: Path, relpath: str) -> None:
-    """``mkdir -p`` a shadow slot's parent as a real directory (DS-6): it
+    """``mkdir -p`` a shadow slot's parent as a real directory: it
     must never itself become a symlink, or the checkout's ``.claude`` (say)
     would stop being the real directory Claude Code requires.
     """
@@ -473,7 +474,7 @@ def link(
     always runs; ``_apply_link`` runs only when ``not dry_run``, so a dry
     run reports the exact shape a real run would produce without writing a
     byte. ``create_mount``/``converge`` default to
-    ``_sidecar_mount.create_mount``/``_sidecar_mount.converge``; tests
+    ``_sidecar_mount.create_mount``/``_sidecar_convergence.converge``; tests
     inject doubles to observe call-time ordering.
     """
     checkout = Path(checkout)
@@ -482,7 +483,7 @@ def link(
 
     if not dry_run:
         create_mount_fn = create_mount if create_mount is not None else _sidecar_mount.create_mount
-        converge_fn = converge if converge is not None else _sidecar_mount.converge
+        converge_fn = converge if converge is not None else _sidecar_convergence.converge
         _apply_link(plan, checkout, sidecar_root, create_mount_fn, converge_fn)
 
     linked = [

@@ -20,6 +20,7 @@ from pathlib import Path
 
 import _sidecar_checks as checks
 import _sidecar_commit
+import _sidecar_convergence as convergence
 import _sidecar_git as gitp
 import _sidecar_identity as identity
 import _sidecar_link as linker
@@ -52,7 +53,7 @@ class Facts:
 def gather(context: Context) -> tuple[checks.CheckInputs, Facts]:
     """Classify this checkout: the registry's inputs, and the report's facts.
 
-    **Total over the resolver's five variants** (P1-14). The three that carry
+    **Total over the resolver's five variants.** The three that carry
     no sidecar of this project's -- `Dangling`, `Foreign`, `NotYetLinked` --
     are classified into the `placement` row rather than raised, so `doctor`
     reports them (in JSON when asked) instead of refusing before its first
@@ -139,7 +140,7 @@ def status_of(context: Context, inputs: checks.CheckInputs, facts: Facts, result
 
 
 # `status --json`'s `failed_checks` entries are bare check ids by default
-# (`row.id`) -- fine for every check except the two DS-11 convergence rows,
+# (`row.id`) -- fine for every check except the two convergence rows,
 # which emit one row PER BRANCH but all share the same bare id
 # ("state-unmerged"/"state-eligible"), so the branch identity that
 # `_sidecar_checks.py` puts in `row.detail` (formatted `"{branch}: ..."`)
@@ -418,7 +419,7 @@ def _unpushed_commits(mount: Path) -> int:
 
 def _branch_states(sidecar: Path, checkout: Path) -> dict:
     return {
-        branch: mounts.classify_branch(sidecar, checkout, branch, checkout)
+        branch: convergence.classify_branch(sidecar, checkout, branch, checkout)
         for branch in gitp.branches_with_prefix(sidecar, mounts.STATE_BRANCH_PREFIX)
     }
 

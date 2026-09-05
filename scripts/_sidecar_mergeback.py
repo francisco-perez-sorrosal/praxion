@@ -1,7 +1,7 @@
 """`merge-back`'s two forms, and the one thing that separates them.
 
 Both forms merge sidecar state branches into the branch this checkout has
-mounted, through the *same* primitive (``_sidecar_mount.merge_back``). They
+mounted, through the *same* primitive (``_sidecar_convergence.merge_back``). They
 differ in exactly one argument -- whether a conflict may be left in the tree:
 
     merge-back --from wt/x   an operator asked for this branch, and is present
@@ -28,6 +28,7 @@ import sys
 from pathlib import Path
 
 import _sidecar_commit as commits
+import _sidecar_convergence as convergence
 import _sidecar_git as gitp
 import _sidecar_mount as mounts
 import _sidecar_render as render
@@ -43,10 +44,10 @@ DRY_RUN_TRAILER = "Dry run: nothing was modified."
 FIXED_POINT_LINE = "Nothing to converge."
 
 _SKIP_PHRASES = {
-    mounts.IneligibilityReason.PROJECT_BRANCH_NOT_MERGED: "project branch not merged",
-    mounts.IneligibilityReason.PROJECT_BRANCH_DELETED: "project branch deleted",
-    mounts.IneligibilityReason.MAPPING_MISSING: "no project branch recorded for it",
-    mounts.IneligibilityReason.MAPPING_UNRESOLVABLE: "its project branch cannot be resolved",
+    convergence.IneligibilityReason.PROJECT_BRANCH_NOT_MERGED: "project branch not merged",
+    convergence.IneligibilityReason.PROJECT_BRANCH_DELETED: "project branch deleted",
+    convergence.IneligibilityReason.MAPPING_MISSING: "no project branch recorded for it",
+    convergence.IneligibilityReason.MAPPING_UNRESOLVABLE: "its project branch cannot be resolved",
 }
 
 
@@ -149,14 +150,14 @@ def merge_back_from(sidecar: Path, checkout: Path, branch: str, *, dry_run: bool
 
     _require_clean_mount(target.mount, branch)
     with commits.mount_lock(target.mount):
-        result = mounts.merge_back(sidecar, checkout, branch, allow_conflict_markers=True)
-        if result.outcome is mounts.MergeOutcome.FAILED:
+        result = convergence.merge_back(sidecar, checkout, branch, allow_conflict_markers=True)
+        if result.outcome is convergence.MergeOutcome.FAILED:
             raise EnvironmentProblem(
                 f"Merging {branch} into {target.branch} failed before git merged anything.\n"
                 f"{result.detail}\n"
                 f"Nothing was merged and the mount is unchanged; fix the cause and re-run."
             )
-        if result.outcome is mounts.MergeOutcome.CONFLICTED:
+        if result.outcome is convergence.MergeOutcome.CONFLICTED:
             return Report(_conflict_lines(target.mount, branch), EXIT_ACTIONABLE)
         reconcile_state_mount(target.mount, branch)
     return Report((f"Merged {branch} into {target.branch}.",))
@@ -182,7 +183,7 @@ def merge_back_auto(sidecar: Path, checkout: Path, project_root: Path, *, dry_ru
     branch and the explicit command that *can* resolve it.
     """
     _require_target(sidecar, checkout)
-    result = mounts.converge(
+    result = convergence.converge(
         sidecar,
         checkout,
         project_root,
@@ -197,7 +198,7 @@ def merge_back_auto(sidecar: Path, checkout: Path, project_root: Path, *, dry_ru
     return Report(lines, EXIT_ACTIONABLE if (result.aborted or result.failed) else EXIT_OK)
 
 
-def _convergence_lines(result: mounts.ConvergeResult, *, dry_run: bool) -> tuple[str, ...]:
+def _convergence_lines(result: convergence.ConvergeResult, *, dry_run: bool) -> tuple[str, ...]:
     """One line per branch the run acted on, or declined to act on.
 
     A branch that is merged *and* still mounted is the steady state of every
@@ -222,15 +223,15 @@ def _convergence_lines(result: mounts.ConvergeResult, *, dry_run: bool) -> tuple
     lines += [
         f"skipped {branch}: {_skip_phrase(result.states.get(branch))}"
         for branch in result.skipped
-        if not isinstance(result.states.get(branch), mounts.MergedLive)
+        if not isinstance(result.states.get(branch), convergence.MergedLive)
     ]
     return tuple(lines)
 
 
 def _skip_phrase(state: object) -> str:
-    if isinstance(state, mounts.UnmergedIneligible):
+    if isinstance(state, convergence.UnmergedIneligible):
         return _SKIP_PHRASES.get(state.reason, str(state.reason))
-    if isinstance(state, mounts.MergedOrphan):
+    if isinstance(state, convergence.MergedOrphan):
         return "merged, but its branch could not be deleted"
     return "not eligible to converge"
 
@@ -249,7 +250,7 @@ def drop_state_branch(sidecar: Path, branch: str, *, dry_run: bool) -> Report:
     _require_droppable(sidecar, branch)
     if dry_run:
         return Report((f"Would delete {branch} from the sidecar.", DRY_RUN_TRAILER))
-    mounts.drop_branch(sidecar, branch)
+    convergence.drop_branch(sidecar, branch)
     return Report((f"Deleted {branch}. Any state only it carried is gone.",))
 
 

@@ -1,7 +1,7 @@
 """Tests for install_git_hooks.py -- observe-then-compose git hook chaining.
 
 Covers, in order:
-  - DS-4 state classification (`observe_hooks_path`, `classify_hook_slot`):
+  - Hook-chain state classification (`observe_hooks_path`, `classify_hook_slot`):
     all `HooksPathState` and `HookSlotState` variants against real `tmp_path`
     git repos.
   - Wrapper exit-code policy and re-entrancy guard: the rendered wrapper
@@ -77,7 +77,7 @@ def plugin_root(tmp_path: Path) -> Path:
     return root
 
 
-# ---- DS-4 classification -------------------------------------------------------
+# ---- Hook-chain state classification ----------------------------------------
 
 
 class TestObserveHooksPath:

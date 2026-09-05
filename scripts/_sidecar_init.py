@@ -1,13 +1,13 @@
 """Bringing a sidecar into existence -- everything `init` does before `link`.
 
 Four steps, in this order and no other (`ARCH_WT_RULING.md` sec. 5): refuse a
-slug that already belongs to someone else, build the DS-2 manifest from the
+slug that already belongs to someone else, build the sidecar manifest from the
 defaults plus the operator's placement flags, create and seed the repository,
 then re-read the manifest through its own smart constructor.
 
 The last step is not ceremony. `init` constructs a `Manifest` in memory, and
 `write_manifest` does not validate -- so writing and then loading is what puts
-the DS-2 factory (illegal shadow paths, `kind` cross-checks, exclude
+the manifest's own factory (illegal shadow paths, `kind` cross-checks, exclude
 disjointness) between a fresh manifest and the reconciler that acts on it.
 """
 
@@ -26,9 +26,9 @@ import _state_repo
 from _git_runner import git_output
 from _sidecar_cli import EnvironmentProblem, UsageError, refusal
 
-# DS-2's default placement set, in the order `status` and the manifest render
-# them. `CLAUDE.md` sits second because its intent is a three-state decision
-# made from repo state (DS-8), not a default -- see `_claude_md_entry`.
+# The manifest's default placement set, in the order `status` and the manifest
+# render them. `CLAUDE.md` sits second because its intent is a three-state
+# decision made from repo state, not a default -- see `_claude_md_entry`.
 DEFAULT_SHADOWS = (".ai-state", "CLAUDE.local.md", ".claude/settings.local.json")
 DEFAULT_SHARES = ("docs/architecture.md",)
 # `/.claude/praxion-rules.yaml.example` is seeded by `inject_rules.py`'s
@@ -118,7 +118,7 @@ def build_manifest(
     shadow_overrides: Sequence[str],
     share_overrides: Sequence[str],
 ) -> manifests.Manifest:
-    """The DS-2 manifest for a fresh sidecar: defaults, then the operator's flags."""
+    """The manifest for a fresh sidecar: defaults, then the operator's flags."""
     validate_placement_flags(shadow_overrides, share_overrides, checkout=checkout)
     paths: dict[str, manifests.PathEntry] = {}
     for relpath in DEFAULT_SHADOWS[:1]:
@@ -209,7 +209,7 @@ def _refuse_tracked_shadows(checkout: Path, shadows: Sequence[str]) -> None:
 
 
 def _claude_md_entry(checkout: Path) -> manifests.PathEntry:
-    """DS-8: a tracked `CLAUDE.md` is the team's file and is never touched."""
+    """A tracked `CLAUDE.md` is the team's file and is never touched."""
     if git_output(checkout, "ls-files", "--", CLAUDE_MD):
         return manifests.UntouchedEntry(reason=manifests.UntouchedReason.PREEXISTING_TEAM_FILE)
     return manifests.ShadowEntry(kind=manifests.ShadowKind.FILE)

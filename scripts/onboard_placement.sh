@@ -8,8 +8,8 @@
 # declares.
 #
 # Public entry point: resolve_sidecar_placement TARGET MODE — called once
-# from main(), before any detection side effect. DS-1's placement x mode
-# gate, the shadow/share composition rules (INTERFACE_DESIGN.md sec. 5.1),
+# from main(), before any detection side effect. The placement x mode
+# legality gate, the shadow/share composition rules (INTERFACE_DESIGN.md sec. 5.1),
 # the confirmation block (sec. 5.3 -- reworded here for the state-mount
 # architecture ARCH_WT_RULING.md introduced after that mockup was drafted:
 # the sidecar is not purely external, it is projected into the checkout at
@@ -56,7 +56,7 @@ _placement_validate_composition() {
     done
 }
 
-# DS-1: `--placement sidecar` is legal only when the resolved mode is
+# `--placement sidecar` is legal only when the resolved mode is
 # `existing` -- every other mode exits usage, naming the legal combination.
 _placement_validate_mode() {
     local mode="$1"
@@ -88,7 +88,7 @@ _placement_all_paths() {
 }
 
 # Echoes shadow|share|untouched for PATH under TARGET, mirroring
-# _sidecar_init.build_manifest's own composition order exactly: DS-2
+# _sidecar_init.build_manifest's own composition order exactly: the manifest's
 # defaults, then --share overrides, then --shadow overrides (last write
 # wins) -- so this block never claims an intent `praxion-sidecar init`
 # would not also produce.

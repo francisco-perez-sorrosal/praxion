@@ -22,7 +22,7 @@ merged code rather than guessed:
 - `status --json`'s `failed_checks` array is built by
   `scripts/_sidecar_inputs.py::_failed_check_ids` -- one entry PER OFFENDING
   ROW, bare `row.id` for most checks but `state-unmerged:<branch>` /
-  `state-eligible:<branch>` for the two DS-11 convergence rows (F-3: the
+  `state-eligible:<branch>` for the two state-branch convergence rows (F-3: the
   banner names branches, not just a count).
 - `status --json`'s `counts` field is `scripts/_sidecar_checks.py::counts()`'s
   `{"pass": N, "warn": N, "fail": N}` tally, threaded through unchanged --

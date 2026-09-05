@@ -5,8 +5,8 @@ prose it checks for exists yet — `phases-core.md`, `phases-optional.md`,
 `detection.md`, and `claude-md-blocks.md` carry no sidecar/placement
 language, and no placement canonical-block variant is registered. Every test
 below is expected to fail until the implementer's paired step lands the
-placement axis described in `SYSTEMS_PLAN.md` §"Capability availability
-under sidecar placement" and DS-8.
+placement axis described in §"Capability availability
+under sidecar placement" and the `CLAUDE.md` placement-cases table.
 
 **The phase-heading grammar itself must NOT change.** Placement is a
 parameter of existing phases (`SYSTEMS_PLAN.md` § Risk Assessment) — it is
@@ -106,8 +106,8 @@ def test_phase_1_names_the_mount_exclude_entry_ahead_of_the_shadow_paths(
     section = _phase_section(core_text, "1")
     assert "/.praxion-state/" in section, (
         "Phase 1 must name the state-mount exclude entry `/.praxion-state/` "
-        "(DS-5/DS-10) — it heads the .git/info/exclude block under sidecar "
-        "placement."
+        "(the exclude block and the state mount) — it heads the "
+        ".git/info/exclude block under sidecar placement."
     )
     mount_index = section.index("/.praxion-state/")
     other_shadow_markers = ("/.ai-state", "/CLAUDE.local.md", "settings.local.json")
@@ -116,7 +116,7 @@ def test_phase_1_names_the_mount_exclude_entry_ahead_of_the_shadow_paths(
     ]
     assert later_markers, (
         "Phase 1 names /.praxion-state/ but not a single shadow path following it — "
-        "DS-5 states /.praxion-state/ heads the block with the shadow entries after it."
+        "the exclude block states /.praxion-state/ heads the block with the shadow entries after it."
     )
 
 
@@ -145,8 +145,8 @@ def test_phase_2_names_gitkeep_seeding_for_the_sidecar_mount(core_text: str) -> 
     # sidecar / `/report-praxion-issue` feedback ledger). Neither substring
     # alone can distinguish the placement-mount seeding this test targets
     # from that pre-existing content, so this test requires a SECOND
-    # `.gitkeep` mention plus the unambiguous "mount" keyword (DS-10's own
-    # vocabulary), which nothing pre-existing in this section uses.
+    # `.gitkeep` mention plus the unambiguous "mount" keyword (the state
+    # mount's own vocabulary), which nothing pre-existing in this section uses.
     section = _phase_section(core_text, "2")
     gitkeep_mentions = section.count(".gitkeep")
     assert gitkeep_mentions >= 2, (
@@ -157,7 +157,7 @@ def test_phase_2_names_gitkeep_seeding_for_the_sidecar_mount(core_text: str) -> 
         "silently missing it (ARCH_WT_RULING.md §5's Seeding obligation)."
     )
     assert "mount" in section.lower(), (
-        "Phase 2 must name the state 'mount' explicitly (DS-10) as the "
+        "Phase 2 must name the state 'mount' explicitly as the "
         "target the skeleton is seeded into under sidecar placement."
     )
 
@@ -186,7 +186,7 @@ def test_phase_3_registers_the_merge_driver_in_the_sidecars_own_config(
     )
 
 
-# -- Phase 6: DS-8's three-case `CLAUDE.md` placement table -----------------
+# -- Phase 6: the three-case `CLAUDE.md` placement table --------------------
 
 
 def test_phase_6_carries_the_ds8_three_case_claude_md_placement_table(
@@ -195,14 +195,14 @@ def test_phase_6_carries_the_ds8_three_case_claude_md_placement_table(
     section = _phase_section(core_text, "6")
     assert "CLAUDE.local.md" in section, (
         "Phase 6 must name `CLAUDE.local.md` as the shadowed Praxion-block "
-        "target when the project has a tracked CLAUDE.md (DS-8's `untouched` "
+        "target when the project has a tracked CLAUDE.md (the `untouched` "
         "case)."
     )
     assert "--share" in section or "share" in section.lower(), (
-        "Phase 6 must name the `--share CLAUDE.md` opt-in (DS-8's `share` case)."
+        "Phase 6 must name the `--share CLAUDE.md` opt-in (the `share` case)."
     )
     assert "untouched" in section.lower(), (
-        "Phase 6 must name DS-8's `untouched` case by name — a tracked "
+        "Phase 6 must name the `untouched` case by name — a tracked "
         "CLAUDE.md that already exists is never written to."
     )
 
@@ -213,23 +213,23 @@ def test_phase_6_states_no_writer_targets_an_untouched_claude_md(core_text: str)
     # `modified` case ("leaves the file untouched") and the block-class
     # predicate note ("never two for the same heading"). A bare
     # substring-anywhere-in-the-section check would pass on that pre-existing
-    # prose alone, so this test anchors on `CLAUDE.local.md` (DS-8
-    # vocabulary, absent from today's Phase 6) and requires the invariant
+    # prose alone, so this test anchors on `CLAUDE.local.md` (the placement-
+    # cases vocabulary, absent from today's Phase 6) and requires the invariant
     # wording to appear in the same neighbourhood as that anchor.
     section = _phase_section(core_text, "6")
     assert "CLAUDE.local.md" in section, (
         "Phase 6 must name `CLAUDE.local.md` before this invariant can be "
-        "meaningfully checked (see the DS-8 three-case test above)."
+        "meaningfully checked (see the placement three-case test above)."
     )
     anchor = section.index("CLAUDE.local.md")
     window = section[max(0, anchor - 500) : anchor + 500].lower()
     assert "untouched" in window, (
-        "Phase 6 must state DS-8's `untouched` case near its CLAUDE.local.md "
+        "Phase 6 must state the `untouched` case near its CLAUDE.local.md "
         "mention, not only elsewhere in the phase (where 'untouched' already "
         "appears for the unrelated refreshable-block `modified` case)."
     )
     assert "never" in window, (
-        "Phase 6 must state DS-8's invariant that no Praxion write path ever "
+        "Phase 6 must state the invariant that no Praxion write path ever "
         "targets a CLAUDE.md whose intent is `untouched`, near its "
         "CLAUDE.local.md mention."
     )

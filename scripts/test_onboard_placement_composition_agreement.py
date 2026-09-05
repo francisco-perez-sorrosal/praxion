@@ -5,12 +5,12 @@ a pre-existing `CLAUDE.md` (tracked vs. absent).
 
 Why this exists: `onboard_placement.sh` renders
 the confirmation block *before* `praxion-sidecar init` runs, so it cannot
-shell out to the real composer -- it re-implements the same DS-2 defaults ->
+shell out to the real composer -- it re-implements the same manifest defaults ->
 `--share` overrides -> `--shadow` overrides ("last write wins") order in
 bash, and its own header says so ("mirroring `_sidecar_init.build_manifest`'s
 own composition order exactly"). That claim previously had no automated
 guard -- the two readers could silently drift. This test is the "two readers
-agree" pattern DS-2's stdlib/YAML manifest-reader pair already carries,
+agree" pattern the manifest's own stdlib/YAML reader pair already carries,
 applied to this second pair.
 
 Import strategy: plain sibling import (`scripts/` has no `__init__.py`, so
@@ -31,7 +31,7 @@ import pytest
 SCRIPT_DIR = Path(__file__).resolve().parent
 ONBOARD_PLACEMENT_SH = SCRIPT_DIR / "onboard_placement.sh"
 
-# The path set `_placement_all_paths` (bash) always renders: the four DS-2
+# The path set `_placement_all_paths` (bash) always renders: the four manifest
 # shadow/share defaults plus `CLAUDE.md` -- independent of what a given case
 # also passes as `--shadow`/`--share`.
 _BASE_PATHS = (

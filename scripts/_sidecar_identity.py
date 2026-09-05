@@ -1,4 +1,4 @@
-"""DS-7 project identity -- the one place a sidecar slug is derived.
+"""Project identity -- the one place a sidecar slug is derived.
 
 Identity answers "which sidecar does this checkout belong to". It is computed
 **once, at `praxion-sidecar init`**, recorded in the manifest, and thereafter
@@ -33,7 +33,7 @@ from typing import Union
 
 import _state_repo
 
-# The sanitized alphabet (DS-7). `/` becomes `--` *before* this runs, so the
+# The sanitized alphabet. `/` becomes `--` *before* this runs, so the
 # separator survives it; every other disallowed run collapses to a single `-`.
 _DISALLOWED_RUN = re.compile(r"[^a-z0-9._-]+")
 _ID_ALLOWED = re.compile(r"\A[a-z0-9._-]+\Z")
@@ -127,7 +127,7 @@ def derive_project_id(project_root: Path) -> ProjectId:
 
 
 def slug(project_id: ProjectId) -> str:
-    """The sidecar directory name for `project_id` (DS-7's sanitized form)."""
+    """The sidecar directory name for `project_id`, in its sanitized form."""
     if isinstance(project_id, PathDerived):
         return f"{_LOCAL_PREFIX}{project_id.hash}"
     return sanitize(f"{project_id.host}/{project_id.owner}/{project_id.repo}")
@@ -176,7 +176,7 @@ def validate_id_override(raw: str) -> str:
 
 
 def sanitize(text: str) -> str:
-    """DS-7's sanitizer: lowercase, `/` -> `--`, every other disallowed run -> `-`."""
+    """The project-identity sanitizer: lowercase, `/` -> `--`, every other disallowed run -> `-`."""
     lowered = text.lower().replace("/", _PATH_SEPARATOR)
     return _DISALLOWED_RUN.sub("-", lowered)
 

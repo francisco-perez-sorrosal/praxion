@@ -531,7 +531,7 @@ def _init_project_repo(project_root: Path) -> None:
 
 
 def _write_manifest(sidecar_root: Path, *, project_root: Path) -> None:
-    """Schema-1 manifest, complete per DS-2's smart constructor: `paths:`
+    """Schema-1 manifest, complete per the manifest's smart constructor: `paths:`
     declares the three shadow slots `link` actually creates (an incomplete
     `paths:` refuses at `autocommit`/slot lookup, per
     `_sidecar_manifest.load_manifest`'s closed-enum validation)."""

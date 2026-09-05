@@ -1,5 +1,5 @@
 """Sidecar manifest smart constructor -- the single full-YAML reader/writer of
-`praxion-sidecar.yaml` (`SYSTEMS_PLAN.md` DS-2).
+`praxion-sidecar.yaml`.
 
 `load_manifest()` is the *only* place in the codebase that parses the full
 manifest; `_state_repo.py`'s stdlib line parser reads only the frozen
@@ -16,7 +16,7 @@ this module's widening is actually reached, never a raw
 import time.
 
 `Manifest` is constructible only through `load_manifest()`: every invariant
-DS-2 names (closed enums, the `PathEntry` intent-discriminated sum, the
+this schema names (closed enums, the `PathEntry` intent-discriminated sum, the
 `_NEVER_SHADOW` ancestor rule, excludes/shadow/share disjointness, the
 on-disk `kind` cross-check, the schema-first evolution contract) is enforced
 at exactly one site inside the parse, and a violation raises `ManifestError`
@@ -24,7 +24,7 @@ with a named `.reason` rather than defaulting or repairing silently.
 
 The manifest lives at `<sidecar-common-dir>/praxion-sidecar.yaml` -- the
 sidecar's git *common* directory, never inside a mount's tracked working
-tree (DS-2's location amendment): a tracked manifest would appear inside
+tree (this schema's location amendment): a tracked manifest would appear inside
 every worktree with a machine-local `roots:` list, generating cross-branch
 merge conflicts the common directory does not have.
 """
@@ -72,7 +72,7 @@ _SUPPORTED_SCHEMA = 1
 _CLAUDE_MD_PATH = "CLAUDE.md"
 _CLAUDE_LOCAL_MD_PATH = "CLAUDE.local.md"
 
-# Illegal shadow targets and their ancestors (DS-2): shadowing `.claude` itself
+# Illegal shadow targets and their ancestors: shadowing `.claude` itself
 # (or `.git`, the state mount, the repo root) would ask a consumer to symlink a
 # directory something else depends on being real -- Claude Code refuses
 # worktree creation when `.claude` is a symlink. The mount is the state mount
@@ -97,7 +97,7 @@ SHADOWABLE_PATHS = frozenset(
 
 
 class Intent(str, Enum):  # noqa: UP042 -- StrEnum needs 3.11; scripts/ targets 3.9+
-    """The one placement decision per `paths:` entry (DS-2)."""
+    """The one placement decision per `paths:` entry."""
 
     SHADOW = "shadow"
     SHARE = "share"
@@ -157,8 +157,8 @@ class UntouchedEntry:
 
 
 # A flat `PathEntry{intent, kind, reason}` record would make `{intent: share,
-# kind: file}` representable and catch it only by scattered validation
-# (DS-2). `Union`, not `X | Y`: a runtime alias in that form needs 3.10, and
+# kind: file}` representable and catch it only by scattered validation.
+# `Union`, not `X | Y`: a runtime alias in that form needs 3.10, and
 # scripts/ targets 3.9+ -- same reasoning as `_state_repo.py`'s `Placement`.
 PathEntry = Union[ShadowEntry, ShareEntry, UntouchedEntry]  # noqa: UP007
 
@@ -172,7 +172,7 @@ class ProjectIdentity:
 
 @dataclass(frozen=True)
 class RemoteConfig:
-    """A nullable *object*, never an object with a nullable `url` (DS-2):
+    """A nullable *object*, never an object with a nullable `url`:
     `{url: null, push: on-autocommit}` would parse cleanly and mean nothing."""
 
     url: str
@@ -222,7 +222,7 @@ def load_manifest(path: Path) -> Manifest:
     """Parse, validate and return the manifest at `path`, or raise `ManifestError`.
 
     `schema` is read and refused first, before any other key is trusted
-    (DS-2's evolution contract) -- a future schema that relocated a field
+    (the manifest's own evolution contract) -- a future schema that relocated a field
     must not let this parser succeed with a confident wrong result.
     """
     yaml = _require_yaml()
@@ -276,7 +276,7 @@ def write_manifest(path: Path, manifest: Manifest) -> None:
 
 
 def block_target(manifest: Manifest, project_root: Path, path: str = _CLAUDE_MD_PATH) -> Path:
-    """Where a Praxion block writer for `path` must write (DS-8).
+    """Where a Praxion block writer for `path` must write.
 
     `CLAUDE.md` is the only path with a fallback: `untouched` redirects to the
     shadowed `CLAUDE.local.md` (the team's tracked file is never touched);
@@ -408,7 +408,7 @@ def _require_kind_matches_on_disk(sidecar_root: Path, relpath: str, kind: Shadow
 
 
 def _require_excludes_disjoint(excludes: list[str], paths: dict[str, PathEntry]) -> None:
-    """`excludes:` lists NON-shadow exclusions only (DS-2 / CH-03).
+    """`excludes:` lists NON-shadow exclusions only.
 
     A `share` path in `excludes:` would be listed in the generated
     `.git/info/exclude` block, git would ignore it, and the file Praxion was
@@ -453,7 +453,7 @@ def _parse_enum(enum_cls: type[Enum], raw_value: object, *, field_name: str) -> 
 
     Shared across all five closed-enum fields (`intent`, `kind`, `reason`,
     `autocommit`, `remote.push`) -- the failure mode is identical, so one
-    named reason (`unknown-enum-value`) serves all of them (DS-2).
+    named reason (`unknown-enum-value`) serves all of them.
     """
     if raw_value is not None:
         try:
@@ -470,7 +470,7 @@ def _parse_enum(enum_cls: type[Enum], raw_value: object, *, field_name: str) -> 
 # --- Writer internals ---------------------------------------------------------
 
 
-# `roots` is DS-7's only identity anchor for a remote-less project and must
+# `roots` is the only identity anchor for a remote-less project and must
 # stay parseable by `_state_repo.py`'s stdlib reader (belt: `_flow_list`
 # understands `[a, b]` directly; braces: it also now reads a block sequence,
 # but flow keeps the written file maximally simple either way). A marker

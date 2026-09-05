@@ -1,4 +1,4 @@
-"""Behavioral tests for `_sidecar_identity.py` -- DS-7 project identity.
+"""Behavioral tests for `_sidecar_identity.py` -- project identity.
 
 Every test builds a real git repository in `tmp_path` and asserts on the
 *slug* a checkout derives, because the slug is the observable: it names the

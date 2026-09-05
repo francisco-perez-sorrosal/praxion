@@ -11,7 +11,7 @@ the repository's hook configuration (``scripts/_hook_chain_state`` sum
 types below) and then installs the shape that *composes* with it rather than
 displacing it -- see the hook-chaining ADR.
 
-Data model (DS-4, ``SYSTEMS_PLAN.md § Data Structures``):
+Data model (the hook-chain state machine):
 
     HooksPathState = Unset | PraxionWrapper{delegate} | Foreign{dir_raw, dir_abs}
                     | Unresolvable{raw, reason}
@@ -80,7 +80,7 @@ EXIT_REFUSED = 3
 EXIT_ENVIRONMENT = 4
 
 
-# ---- DS-4 sum types ---------------------------------------------------------
+# ---- Hook-chain state machine sum types -------------------------------------
 
 
 @dataclass(frozen=True)
@@ -163,7 +163,7 @@ def git_common_dir(repo_root: Path) -> Path | None:
 
     ``core.hooksPath`` is repo-local config shared by every worktree, so the
     wrapper directory must live here, never in a linked worktree's own
-    ``.git`` file (DS-4).
+    ``.git`` file.
     """
     out = git_output(repo_root, "rev-parse", "--path-format=absolute", "--git-common-dir")
     return Path(out).resolve() if out else None
@@ -271,7 +271,7 @@ def _has_marker(path: Path, marker: str) -> bool:
 # The two exit-code policies are two distinct, statically-chosen bash
 # snippets substituted at render time -- never a runtime `if $HOOK_CLASS`
 # branch. A future edit to one class's handling cannot silently touch the
-# other because there is no shared code path to edit (DS-4).
+# other because there is no shared code path to edit.
 _BLOCK_EXIT_HANDLING = (
     '    if [ "$_DELEGATE_STATUS" -ne 0 ]; then\n        exit "$_DELEGATE_STATUS"\n    fi\n'
 )
@@ -403,7 +403,7 @@ def _install_plain_slot(hooks_dir: Path, name: str, plugin_root: Path) -> bool:
 def _install_wrapper_file(hooks_dir: Path, name: str, occupant: Path, plugin_root: Path) -> None:
     backup = hooks_dir / f"{name}.pre-praxion"
     if not backup.exists():
-        # Never overwrite an existing backup (DS-4).
+        # Never overwrite an existing backup.
         occupant.replace(backup)
     rendered = render_wrapper(
         hook_name=name, delegate_raw=str(backup), delegate_mode="file", plugin_root=plugin_root
@@ -494,7 +494,7 @@ def _refresh_wrapper_bodies(wrapper_dir: Path | None, plugin_root: Path) -> Inst
 
 
 def _heal_from_unset(repo_root: Path, wrapper_dir: Path | None) -> InstallResult:
-    """DS-4's sixth row: hooksPath went Unset while a wrapper directory survives."""
+    """The hook-chain state machine's sixth row: hooksPath went Unset while a wrapper directory survives."""
     if wrapper_dir is None or not wrapper_dir.is_dir():
         return InstallResult(
             changed=False,

@@ -4,7 +4,7 @@ constructor (`praxion-sidecar.yaml`).
 `load_manifest(path)` is the *only* full-YAML reader in the codebase --
 `_state_repo.py`'s stdlib reader reads only the frozen triple. Fixtures write
 the manifest at `<sidecar_root>/.git/praxion-sidecar.yaml` (the sidecar's git
-**common** dir, per `SYSTEMS_PLAN.md` DS-2's location amendment) -- never
+**common** dir, per the manifest's own location amendment) -- never
 inside a mount's tracked tree. Most tests use a *plain* sidecar directory (a
 `.git/` subdirectory, no real git repository) since the loader only ever
 touches the manifest file and, for the on-disk `kind` cross-check, plain
@@ -600,7 +600,7 @@ def test_written_manifest_has_schema_as_first_key_and_project_fields_top_level(
     assert set(parsed["project"].keys()) >= {"origin", "id", "roots"}
 
 
-# --- `block_target()` (DS-8) -----------------------------------------------------
+# --- `block_target()` ------------------------------------------------------------
 
 
 def _load_with_claude_md_intent(
@@ -664,7 +664,7 @@ def test_block_target_raises_for_a_non_claude_md_path_whose_intent_is_untouched(
         _sidecar_manifest.block_target(manifest, project_root, path="docs/policy.md")
 
 
-# --- Two readers, two parsers, one owner (DS-2) ---------------------------------
+# --- Two readers, two parsers, one owner -----------------------------------------
 
 
 def test_stdlib_and_full_readers_agree_on_the_frozen_triple(tmp_path: Path) -> None:
@@ -696,7 +696,7 @@ def test_write_manifest_then_stdlib_reader_resolves_a_remote_less_project(
 ) -> None:
     """The writer's actual on-disk bytes -- not a hand-rolled fixture string
     like the test above -- must stay parseable by `_state_repo.py`'s stdlib
-    reader for the remote-less identity anchor (`roots:`), DS-7's only anchor
+    reader for the remote-less identity anchor (`roots:`), the only anchor
     for that population. This routes through `write_manifest()` itself, which
     `test_stdlib_and_full_readers_agree_on_the_frozen_triple` does not."""
     state_repo = pytest.importorskip("_state_repo")

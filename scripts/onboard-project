@@ -90,7 +90,7 @@ PLACEMENT_SET=0
 SHADOW_PATHS=()
 SHARE_PATHS=()
 
-# DS-1's placement x mode gate, the confirmation-block renderer, and
+# The placement x mode legality gate, the confirmation-block renderer, and
 # delegation to `praxion-sidecar init` -- split out once this surface grew
 # past onboard-project's own per-step size target (see WIP.md Batch 15
 # implementer self-review). Sourced for its functions only; every global it
@@ -886,8 +886,8 @@ main() {
     mode="$(resolve_mode "$state")"
     CAPABILITIES="$(spaced_to_csv "$(resolve_capabilities)")"
 
-    # Before any detection side effect (scaffold, --check, hand-off): DS-1's
-    # placement x mode gate, the composition rules, and (on a legal
+    # Before any detection side effect (scaffold, --check, hand-off): the
+    # placement x mode legality gate, the composition rules, and (on a legal
     # --placement sidecar request) the confirmation block + delegated
     # `praxion-sidecar init`. A no-op for the in-repo default.
     resolve_sidecar_placement "$target" "$mode"

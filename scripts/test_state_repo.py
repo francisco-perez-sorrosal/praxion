@@ -540,7 +540,7 @@ def test_manifest_with_unsupported_schema_resolves_to_foreign_schema_too_new(
 
     The stdlib reader must refuse on `schema` alone, before it ever tries to
     locate `project.id`/`project.origin` -- the frozen-triple guarantee
-    `SYSTEMS_PLAN.md` DS-2 names.
+    the manifest's own schema names.
     """
     sidecar_root = tmp_path / "sidecar"
     project_root = tmp_path / "project"

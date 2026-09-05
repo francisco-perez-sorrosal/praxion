@@ -156,7 +156,7 @@ def _heading_for_slug(slug: str) -> str:
 
 
 def _claude_md_target(repo_root: Path) -> Path:
-    """Resolve where this project's Praxion blocks live (DS-8).
+    """Resolve where this project's Praxion blocks live.
 
     In-repo: the tracked ``CLAUDE.md`` at repo root, as always. A checkout
     whose ``.ai-state`` is dangling, foreign or not yet linked is refused
@@ -361,7 +361,7 @@ def run_apply(claude_md_path: Path, original_text: str, classifications: dict[st
     performs a second, independent read of the same file. ``claude_md_path``
     is the placement-resolved target (``_claude_md_target()``) -- the tracked
     ``CLAUDE.md`` in-repo, or the shadowed ``.praxion-state/CLAUDE.local.md`` under
-    sidecar placement (DS-8).
+    sidecar placement.
     """
     lines = original_text.splitlines(keepends=True)
 

@@ -296,7 +296,7 @@ against a healthy sidecar-placed project — not hand-written; field set, row
 order and the closing summary line are copied verbatim from
 `praxion-sidecar status`/`doctor` output, with only the project name and
 absolute paths normalized to this doc's running `billing` example. Each
-checkout carries its own branch (DS-10), so a healthy `status` names no
+checkout carries its own branch, so a healthy `status` names no
 cross-checkout sharing claim:
 
 ```console

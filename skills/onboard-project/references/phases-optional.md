@@ -8,7 +8,7 @@ Placement (`--placement in-repo|sidecar`) is *nearly* orthogonal to the G3 capab
 
 | Capability | Class under `sidecar` | Reason |
 |---|---|---|
-| `core` | **local** | every surface this phase file's siblings write redirects — `.gitignore` → `.git/info/exclude`, `.ai-state/` → shadow, `.gitattributes` + merge driver → the sidecar's own, `CLAUDE.md` blocks → per DS-8 (§Phase 6) |
+| `core` | **local** | every surface this phase file's siblings write redirects — `.gitignore` → `.git/info/exclude`, `.ai-state/` → shadow, `.gitattributes` + merge driver → the sidecar's own, `CLAUDE.md` blocks → per the placement-cases table (§Phase 6) |
 | `observability` | **local** | a `.claude/settings.json` env toggle; redirects to the shadowed `settings.local.json` |
 | `arch` | **local (with one share default)** | `.ai-state/DESIGN.md` is private in the sidecar; `docs/architecture.md` defaults to `share` — a plain doc the team benefits from, citing ADRs by id text and never by an `.ai-state/` path — with `--shadow docs/architecture.md` opting out |
 | `ml` | **local** | `.ai-state/experiments/` and `gpu_budget.yaml` follow the shadow; the checkpoint `.gitignore` block goes to `.git/info/exclude`; `program.md` becomes a shadow |

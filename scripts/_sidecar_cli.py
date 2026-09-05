@@ -118,7 +118,8 @@ def require_sidecar(
 ) -> tuple[Path, manifests.Manifest]:
     """The sidecar this checkout belongs to, and its validated manifest.
 
-    **Discovered, not derived** (DS-3). The mount in `<checkout>/.praxion-state` is
+    **Discovered, not derived**, the same stance the placement resolver's own
+    result takes. The mount in `<checkout>/.praxion-state` is
     a worktree of exactly one repository, and its git common dir names that
     repository unambiguously -- so a mounted checkout knows where its sidecar
     is regardless of what `PRAXION_SIDECAR_ROOT` says today. Deriving

@@ -1,5 +1,5 @@
-"""Behavioral tests for `_sidecar_link.py` -- DS-5 (`.git/info/exclude`
-Praxion block) and DS-6 (shadow-symlink target-slot state).
+"""Behavioral tests for `_sidecar_link.py` -- the `.git/info/exclude`
+Praxion block and shadow-symlink target-slot state.
 
 `_sidecar_link.py` does not exist yet (concurrent BDD/TDD with its
 implementation) -- this is the RED skeleton, confirmed to fail on
@@ -16,7 +16,7 @@ Decoupling from the two concurrent sibling modules this suite does not own:
   collection if the module is ever unavailable. Real `Manifest` objects are
   built from raw YAML text via `load_manifest()`, never via a hand-rolled
   duck-typed double, so `link()`'s manifest-consumption contract is
-  exercised against the actual DS-2 types.
+  exercised against the actual manifest types.
 - `_sidecar_mount.py` (the state-mount lifecycle module) is never imported
   by this file at all. Every fixture that needs a real mount lets
   `_sidecar_link.link()` reach it through its own default wiring (production
@@ -220,7 +220,7 @@ def test_shadow_target_for_a_nested_slot_climbs_out_before_entering_the_mount() 
     )
 
 
-# --- ShadowSlotState (DS-6) classification -------------------------------------
+# --- ShadowSlotState classification -------------------------------------
 
 
 def test_shadow_slot_state_variants_are_frozen_against_mutation() -> None:
@@ -269,7 +269,7 @@ def test_an_absolute_symlink_to_the_correct_file_still_classifies_as_link_elsewh
     tmp_path: Path,
 ) -> None:
     """A link that works today by escaping the checkout is a link that
-    breaks the moment a pipeline worktree opens (DS-6) -- the comparison is
+    breaks the moment a pipeline worktree opens -- the comparison is
     against the raw target *string*, never the resolved realpath.
     """
     checkout = tmp_path / "checkout"
@@ -333,7 +333,7 @@ def test_sidecar_branch_for_a_linked_worktree_is_wt_prefixed_with_its_directory_
     assert _sidecar_link.sidecar_branch_for(worktree) == "wt/wt1"
 
 
-# --- rewrite_exclude_block / remove_exclude_block (DS-5) -----------------------
+# --- rewrite_exclude_block / remove_exclude_block ------------------------------
 
 
 def test_rewrite_exclude_block_preserves_content_outside_the_markers(tmp_path: Path) -> None:

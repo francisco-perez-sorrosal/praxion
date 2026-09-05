@@ -4,10 +4,11 @@ RED-first (BDD/TDD): `scripts/onboard-project` does not yet parse `--placement`/
 `--shadow`/`--share` as of this test's authoring. Every test below is expected
 to fail -- most with `unrecognized option '--placement'` (a *wrong-reason* RED,
 since the bash argument parser's `-*)` catch-all already exits 2 for any
-unknown flag) until the placement flags land DS-1's gate for real. Message-content
-assertions (not just exit codes) are what turns this into a *right-reason* RED
-that must go GREEN for the specific behavior DS-1 and `INTERFACE_DESIGN.md`
-sec. 5 describe, not merely "some flag was rejected".
+unknown flag) until the placement flags land the placement x mode legality
+gate for real. Message-content assertions (not just exit codes) are what turns
+this into a *right-reason* RED that must go GREEN for the specific behavior
+the placement x mode legality gate and `INTERFACE_DESIGN.md` sec. 5 describe,
+not merely "some flag was rejected".
 
 Drives `scripts/onboard-project` (bash) as a real subprocess, mirroring
 `tests/onboard_project_test.sh`'s sandbox pattern (stub `claude`, isolated
@@ -15,8 +16,8 @@ Drives `scripts/onboard-project` (bash) as a real subprocess, mirroring
 `onboarding-contract` topology group and the Integration Checkpoint's
 `pytest scripts tests hooks -q` run -- a bash harness would be invisible to
 both. `git` and `python3` are left un-stubbed (resolved from the real host
-PATH): the sidecar CLI they delegate to (`scripts/praxion-sidecar`, DS-2's
-manifest constructor, DS-10's mount lifecycle) is Praxion's own already-built,
+PATH): the sidecar CLI they delegate to (`scripts/praxion-sidecar`, the
+manifest's smart constructor, the state mount's lifecycle) is Praxion's own already-built,
 already-tested collaborator, not an external boundary -- exercising it for
 real is what "mock at boundaries only" recommends, and it is what proves
 `onboard-project`'s own delegation is *correct*, not merely *attempted*.
@@ -141,7 +142,7 @@ def _git(cwd: Path, *args: str) -> None:
 def existing_repo(root: Path, *, with_claude_md: bool = False) -> Path:
     """A plain existing repo -- `detect_state` resolves this to
     `git-no-praxion` / mode `existing` with no `--mode` flag needed, so it
-    is DS-1's one legal `--placement sidecar` fixture."""
+    is the one legal `--placement sidecar` fixture."""
     root.mkdir(parents=True, exist_ok=True)
     _git(root, "init", "-q")
     _git(root, "config", "user.email", "test@example.com")
@@ -218,7 +219,7 @@ def _find_json_object(stdout: str, required_key: str) -> dict | None:
     return None
 
 
-# -- DS-1: `--placement sidecar` is legal only when the resolved mode is
+# -- `--placement sidecar` is legal only when the resolved mode is
 # `existing` -- every other mode exits 2 naming the legal combination -------
 
 
@@ -468,7 +469,7 @@ def test_confirmation_block_renders_before_the_delegated_write_even_when_it_fail
     sandbox: Sandbox, tmp_path: Path
 ) -> None:
     """A foreign real directory already occupying `.praxion-state` makes the
-    delegated `praxion-sidecar init` refuse (DS-10's never-reclaim invariant).
+    delegated `praxion-sidecar init` refuse (the state mount's never-reclaim invariant).
     The block must still have printed -- proving it renders before, not as
     part of, the write it describes -- and nothing must have been committed
     to the sidecar root."""

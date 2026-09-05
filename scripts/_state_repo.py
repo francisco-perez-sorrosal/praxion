@@ -594,7 +594,7 @@ def _parse_roots(text: str) -> list[str]:
     An operator may hand-edit the manifest in either style, and the writer
     (`_sidecar_manifest.py`) may emit either. A `roots:` value that is
     neither blank (block style follows) nor a `[...]` flow list is malformed
-    and refused outright: `roots` is DS-7's only identity anchor for a
+    and refused outright: `roots` is the only identity anchor for a
     remote-less project, so silently degrading a malformed value to `[]`
     would misclassify every such project as `Foreign(identity-mismatch)`
     instead of failing loudly.

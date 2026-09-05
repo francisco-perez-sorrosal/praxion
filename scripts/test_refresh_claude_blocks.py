@@ -967,7 +967,7 @@ def test_apply_under_sidecar_placement_writes_shadow_and_leaves_tracked_file_unt
 ) -> None:
     """A sidecar-placed project whose manifest marks `CLAUDE.md` `untouched`
     must have `--apply` append the absent block to `.praxion-state/CLAUDE.local.md`
-    (`block_target()`'s fallback redirect, DS-8) -- never to the tracked
+    (`block_target()`'s fallback redirect) -- never to the tracked
     `CLAUDE.md`, which stays byte-identical."""
     from test_state_repo import _build_sidecar_owned_fixture
 

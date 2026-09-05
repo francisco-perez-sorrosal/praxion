@@ -777,7 +777,7 @@ def test_link_when_sidecar_dir_is_not_a_git_repo_exits_environment_error(
     assert "is not a git repository." in result.stderr
 
 
-# --- sidecar discovery (DS-3: from the mount, not from the environment) ---------------
+# --- sidecar discovery (from the mount, not from the environment) ---------------
 
 
 def _relocated_root(tmp_path: Path) -> dict[str, str]:
@@ -1775,7 +1775,7 @@ def test_merge_back_drop_deletes_the_branch_once_the_mount_is_gone(
     assert _git_ok(sidecar_dir, "branch", "--list", "wt/x").stdout.strip() == ""
 
 
-# --- doctor: DS-11 convergence rows ------------------------------------------------------------
+# --- doctor: state-branch convergence rows ------------------------------------------------------------
 
 
 def test_doctor_reports_state_unmerged_when_the_project_branch_is_deleted_and_unresolvable(

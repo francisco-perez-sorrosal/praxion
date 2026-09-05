@@ -75,7 +75,7 @@ tmp/
 
 If the user agrees, remove that line. If they decline, proceed without changing it but note the choice in the Phase 8 summary.
 
-**Sidecar placement.** Under `--placement sidecar`, this phase's target shifts from the tracked `.gitignore` to the per-clone `.git/info/exclude` — `.gitignore` stays **untouched** (a per-clone file is never teammate-visible, which is exactly what sidecar placement exists to avoid leaking through a tracked one). The block heads with `/.praxion-state/` (the state mount, DS-10), followed by the shadow paths:
+**Sidecar placement.** Under `--placement sidecar`, this phase's target shifts from the tracked `.gitignore` to the per-clone `.git/info/exclude` — `.gitignore` stays **untouched** (a per-clone file is never teammate-visible, which is exactly what sidecar placement exists to avoid leaking through a tracked one). The block heads with `/.praxion-state/` (the state mount), followed by the shadow paths:
 
 ```gitignore
 # >>> praxion:sidecar >>>  (managed by praxion-sidecar; edit outside these markers)
@@ -257,7 +257,7 @@ If the user agrees, remove that line. If they decline, proceed without changing 
 
 Do NOT create `.ai-state/observations.jsonl` — that is written on first use by the observability hook. Pre-creating it confuses the semantic merge driver.
 
-**Sidecar placement.** Under `--placement sidecar`, the skeleton above is created in the **sidecar mount** (`<project>/.praxion-state`, DS-10 — the sidecar's own working tree materialised inside the checkout) rather than directly in the project. Every subdirectory this phase creates additionally seeds a `.gitkeep` (or keeps a real file already present) so a fresh `git worktree` materialises it: `git worktree add` only materialises **tracked** content and git does not track empty directories, so an unseeded subdirectory silently vanishes from a newly mounted worktree. `praxion-sidecar link` then symlinks the mounted skeleton back into the checkout (`.ai-state -> .praxion-state/.ai-state`) — the same mount-then-link sequence §Phase 6 relies on for `CLAUDE.local.md`.
+**Sidecar placement.** Under `--placement sidecar`, the skeleton above is created in the **sidecar mount** (`<project>/.praxion-state` — the sidecar's own working tree materialised inside the checkout) rather than directly in the project. Every subdirectory this phase creates additionally seeds a `.gitkeep` (or keeps a real file already present) so a fresh `git worktree` materialises it: `git worktree add` only materialises **tracked** content and git does not track empty directories, so an unseeded subdirectory silently vanishes from a newly mounted worktree. `praxion-sidecar link` then symlinks the mounted skeleton back into the checkout (`.ai-state -> .praxion-state/.ai-state`) — the same mount-then-link sequence §Phase 6 relies on for `CLAUDE.local.md`.
 
 ## §Phase 3 — `.gitattributes` + merge driver registration
 
@@ -283,7 +283,7 @@ Do NOT create `.ai-state/observations.jsonl` — that is written on first use by
 
 3. **Conflict check.** If `git config --get merge.observations-jsonl.driver` already returns a value that does NOT contain `praxion` and is NOT empty, refuse to overwrite. Print: `merge.observations-jsonl.driver is already set to '<value>' — refusing to overwrite. Remove the existing driver manually if you want Praxion's, or leave as-is.`
 
-**Sidecar placement.** Under `--placement sidecar`, step 2's `git config` target is the **sidecar's own repository**, never the project's — `praxion-sidecar init` runs the registration against the sidecar's common directory, so the driver is set exactly once and every mounted worktree inherits it via that shared common directory (mirroring how the DS-5 `.git/info/exclude` block is written once and inherited the same way). `.gitattributes` itself is written inside the sidecar's tracked tree, alongside its own `.ai-state/`.
+**Sidecar placement.** Under `--placement sidecar`, step 2's `git config` target is the **sidecar's own repository**, never the project's — `praxion-sidecar init` runs the registration against the sidecar's common directory, so the driver is set exactly once and every mounted worktree inherits it via that shared common directory (mirroring how the `.git/info/exclude` block is written once and inherited the same way). `.gitattributes` itself is written inside the sidecar's tracked tree, alongside its own `.ai-state/`.
 
 ## §Phase 4 — Git hooks
 
@@ -475,7 +475,7 @@ See [`docs/rules-taxonomy.md`](../docs/rules-taxonomy.md) for the complete refer
   - `## Working in this project` (Project Essentials) — written by this phase; predicate: `grep -q '^## Working in this project$' CLAUDE.md`.
   - `## Obsidian Integration` — written by §Phase 8d; predicate: `grep -q '^## Obsidian Integration$' CLAUDE.md`. This phase reads (never writes) that same predicate purely to decide whether to mention the block as already present in its own summary line — it is not a second write path.
 
-**Sidecar placement (DS-8).** DS-8's three-case table decides, per project and once at `init`, where the Praxion block *writers* above actually target. When the project's own `CLAUDE.md` is `untouched` — a tracked file the team already owns — Praxion never writes to it; the block set goes to the shadowed `CLAUDE.local.md` instead, which loads last regardless of case:
+**Sidecar placement.** The `CLAUDE.md` placement-cases table decides, per project and once at `init`, where the Praxion block *writers* above actually target. When the project's own `CLAUDE.md` is `untouched` — a tracked file the team already owns — Praxion never writes to it; the block set goes to the shadowed `CLAUDE.local.md` instead, which loads last regardless of case:
 
 | Case | When | Praxion block target | `CLAUDE.md` on disk |
 |---|---|---|---|

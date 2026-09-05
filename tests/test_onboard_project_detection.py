@@ -4,7 +4,7 @@ RED-first (BDD/TDD): `scripts/onboard-project`'s `detect_state()`
 currently greps only `CLAUDE.md` for `^## Agent Pipeline$` (state 4 in
 `skills/onboard-project/references/detection.md`'s 6-state table). A
 sidecar-placed, team-owned project keeps its Praxion blocks in
-`CLAUDE.local.md` (DS-8's `untouched` case) and never writes to the tracked
+`CLAUDE.local.md` (the `untouched` case) and never writes to the tracked
 `CLAUDE.md` at all — so today's predicate misclassifies such a project as
 `git-no-praxion` (state 5) instead of `partially-managed` (state 4), and a
 re-run would try to onboard it from scratch rather than recognizing it.
@@ -58,7 +58,7 @@ def _git(cwd: Path, *args: str) -> None:
 
 
 def _team_owned_sidecar_project(root: Path) -> Path:
-    """A project whose Praxion blocks live in `CLAUDE.local.md` (DS-8's
+    """A project whose Praxion blocks live in `CLAUDE.local.md` (the
     `untouched` case): a tracked `CLAUDE.md` the team wrote, no `CLAUDE.md`
     Agent Pipeline marker, and the marker only in the untracked
     `CLAUDE.local.md` sidecar-placement writes to instead. No `.ai-state/`

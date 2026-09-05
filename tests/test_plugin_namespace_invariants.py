@@ -16,10 +16,13 @@ Two distinct things are asserted here, and the second is the one that matters:
    driving the current value and asserting acceptance, which would pass either
    way (`rules/swe/gate-liveness.md`, "a gate must be proven to bite").
 
-Historical records under ``.ai-state/`` are deliberately exempt. An ADR or an
-archived report naming the old identifier remains true as a record of what was
-so when it was written; rewriting history to match the present is what the
-frozen-artifact conventions forbid.
+Historical records are deliberately exempt: under ``.ai-state/``, the
+release ``CHANGELOG.md`` (generated from past commit messages, one entry per
+past release), and the frozen reports under ``docs/independent-analysis/``
+(the same carve-out the ADR-finalize walk scope grants them). An ADR, a
+changelog entry, or an archived report naming the old identifier remains true
+as a record of what was so when it was written; rewriting history to match
+the present is what the frozen-artifact conventions forbid.
 
 The retired token is assembled at runtime rather than written literally, so
 this module does not match its own repository scan.
@@ -50,6 +53,30 @@ MIGRATION_REFERENCES: dict[str, str] = {
     "commands/upgrade-project.md": (
         "documents the manual step for projects onboarded before the rename (td-145)"
     ),
+    "claude/aac-templates/precommit-block-d.sh.frag": (
+        "shipped Block D template must resolve PLUGIN_ROOT via the pre-rename "
+        "plugin-cache key too, or an already-onboarded project's golden-rule "
+        "gate silently stops finding the plugin (td-145)"
+    ),
+    "scripts/assets/praxion-precommit-hook.sh.tmpl": (
+        "shipped commit-gate template must resolve PLUGIN_ROOT via the "
+        "pre-rename plugin-cache key too, for the same reason as the Block D "
+        "template above (td-145)"
+    ),
+    "scripts/upgrade_project_pins.sh": (
+        "must recognize a pre-rename plugin-cache merge-driver path as "
+        "Praxion-managed, or every pre-rename project's driver registration "
+        "is permanently reported as stale (td-145)"
+    ),
+    "scripts/test_upgrade_project_pins.py": (
+        "fixture input driving the two reconciliation behaviors above: a "
+        "workflow file still naming the retired agent prefix, and a merge "
+        "driver still pointing at the retired plugin-cache path"
+    ),
+    "scripts/test_reconcile_aac_surfaces.py": (
+        "fixture input for the installed-workflow namespace-drift detection "
+        "the reconciler must repair"
+    ),
 }
 
 # Generated projections of other files. They cannot be independently wrong: their
@@ -58,7 +85,9 @@ MIGRATION_REFERENCES: dict[str, str] = {
 # one by hand to satisfy this scan would desynchronise it from its builder.
 DERIVED_INDEXES: tuple[str, ...] = (".ai-state/doc_manifest.yaml",)
 
-# Records of what was true when written. See the module docstring.
+# Records of what was true when written. See the module docstring. Prefixes
+# match subtrees; "CHANGELOG.md" is a full-path match against a single file
+# (str.startswith accepts an exact-length prefix as well as a directory one).
 HISTORICAL_PATHS: tuple[str, ...] = (
     ".ai-state/decisions/",
     ".ai-state/observations.jsonl",
@@ -68,6 +97,8 @@ HISTORICAL_PATHS: tuple[str, ...] = (
     ".ai-state/praxion_eval_reports/",
     ".ai-state/specs/",
     ".ai-state/calibration_log.md",
+    "CHANGELOG.md",
+    "docs/independent-analysis/",
 )
 
 
@@ -87,15 +118,49 @@ def _load_hook(name: str):
     return module
 
 
+# Directory names to skip during the no-``.git`` fallback walk (see
+# ``_tracked_files``). ``.claude/worktrees`` is matched as a path prefix, not a
+# bare name, because ``.claude/`` itself holds legitimately tracked files
+# (``.claude/settings.json`` and friends) that a bare-name skip would drop.
+_WALK_EXCLUDED_NAMES = frozenset({".git", "node_modules", "tmp"})
+_WALK_EXCLUDED_PREFIX = (".claude", "worktrees")
+
+
 def _tracked_files() -> list[str]:
-    result = subprocess.run(
-        ["git", "ls-files"],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return [line for line in result.stdout.splitlines() if line]
+    """Enumerate every file this scan should consider.
+
+    ``git ls-files`` is authoritative in a real checkout -- including a
+    worktree, where ``.git`` is a *file* pointing at the real gitdir, hence
+    the ``exists()`` check rather than ``is_dir()``. But a clean extraction
+    (``git archive`` output, e.g. from CI or the parity check this module's
+    own docstring describes) has no ``.git`` at all, and a naive subprocess
+    call from such a directory does not fail -- git walks upward, silently
+    resolves to whichever *enclosing* repository happens to contain the
+    extraction, and scopes the query to that subtree instead. Detect the
+    missing ``.git`` and fall back to a plain filesystem walk so the verdict
+    does not depend on where the extraction happens to sit.
+    """
+    if (REPO_ROOT / ".git").exists():
+        result = subprocess.run(
+            ["git", "ls-files"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return [line for line in result.stdout.splitlines() if line]
+
+    tracked: list[str] = []
+    for path in REPO_ROOT.rglob("*"):
+        if path.is_dir():
+            continue
+        parts = path.relative_to(REPO_ROOT).parts
+        if _WALK_EXCLUDED_NAMES & set(parts):
+            continue
+        if parts[: len(_WALK_EXCLUDED_PREFIX)] == _WALK_EXCLUDED_PREFIX:
+            continue
+        tracked.append("/".join(parts))
+    return tracked
 
 
 def _is_historical(path: str) -> bool:
@@ -161,19 +226,25 @@ def test_upgrade_project_reconciles_the_instantiated_aac_templates():
     pre-commit fragment -- and nothing else re-renders an existing copy.
     Both fail open if left stale: the workflow still reports green with the
     architecture sweep never running, and the golden-rule gate's skip notice
-    misnames the plugin. `/upgrade-project` is the only reconciliation path
-    for an already-instantiated copy, so this canary pins the reference to
-    both target files and to the drift-detection anchors themselves -- if a
-    future edit drops any of them, `/upgrade-project` silently stops
-    detecting the drift and td-145 reopens with no test failing to say so.
-    """
-    content = (REPO_ROOT / "commands" / "upgrade-project.md").read_text(encoding="utf-8")
+    misnames the plugin.
 
-    assert ".github/workflows/architecture.yml" in content
-    assert ".git/hooks/pre-commit" in content
-    assert "architect-validator agent" in content
-    assert "info: {} plugin not found in installed_plugins.json" in content
-    assert "td-145" in content
+    `commands/upgrade-project.md` is a thin wrapper (as of the refactor that
+    followed td-145's original fix) that delegates all reconciliation to
+    `scripts/reconcile_aac_surfaces.py`; the drift-detection anchors --
+    the two target paths and the two namespace-token regexes -- live in that
+    script now, not in the command doc. This canary pins the delegation
+    itself plus those anchors: if a future edit drops the delegation or
+    either anchor, `/upgrade-project` silently stops detecting the drift and
+    td-145 reopens with no test failing to say so.
+    """
+    wrapper = (REPO_ROOT / "commands" / "upgrade-project.md").read_text(encoding="utf-8")
+    assert "scripts/reconcile_aac_surfaces.py" in wrapper
+
+    reconciler = (REPO_ROOT / "scripts" / "reconcile_aac_surfaces.py").read_text(encoding="utf-8")
+    assert ".github/workflows/architecture.yml" in reconciler
+    assert ".git/hooks/pre-commit" in reconciler
+    assert "architect-validator agent" in reconciler
+    assert "plugin not found in installed_plugins" in reconciler
 
 
 @pytest.mark.parametrize("agent_type", ["researcher", "implementer", "sentinel"])

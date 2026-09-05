@@ -327,3 +327,59 @@ def test_a_clean_extensionless_python_executable_is_scanned_not_skipped(tmp_path
 
     assert result.returncode == 0, result.stdout
     assert "1 code file" in result.stdout, result.stdout
+
+
+# --- ds-id / criterion-id patterns (td-157) ------------------------------------
+#
+# Two identifier families the checker could not see: `DS-N` (a SYSTEMS_PLAN.md
+# § Data Structures entry) and `P<n>-NN` (a milestone-local acceptance criterion
+# in a plan's own numbering). Both resolve to nothing once .ai-work/ is deleted,
+# exactly like AC-NN, and both leaked into 27 committed files while the gate
+# stayed green.
+
+
+def test_detects_ds_id_citation(tmp_path: Path) -> None:
+    module = tmp_path / "src" / "module.py"
+    module.parent.mkdir(parents=True)
+    module.write_text('"""The DS-7 identity: the one place a slug is derived."""\n')
+
+    result = _run(["--files", str(module), "--repo-root", str(tmp_path)], cwd=tmp_path)
+
+    assert result.returncode == 1, result.stdout
+    assert "[ds-id]" in result.stdout
+
+
+def test_detects_milestone_criterion_id_citation(tmp_path: Path) -> None:
+    module = tmp_path / "src" / "module.py"
+    module.parent.mkdir(parents=True)
+    module.write_text("# P1-14's totality row: report, never refuse\n")
+
+    result = _run(["--files", str(module), "--repo-root", str(tmp_path)], cwd=tmp_path)
+
+    assert result.returncode == 1, result.stdout
+    assert "[criterion-id]" in result.stdout
+
+
+def test_prose_that_merely_resembles_the_new_shapes_is_not_flagged(tmp_path: Path) -> None:
+    """`DS` and `P<n>` alone are ordinary text; only the dashed-number form cites a plan."""
+    module = tmp_path / "src" / "module.py"
+    module.parent.mkdir(parents=True)
+    module.write_text("# P0 hook chaining ships before P1; DS stands for data structure\n")
+
+    result = _run(["--files", str(module), "--repo-root", str(tmp_path)], cwd=tmp_path)
+
+    assert result.returncode == 0, result.stdout
+
+
+def test_scratch_tmp_directory_is_not_scanned_repo_wide(tmp_path: Path) -> None:
+    """`tmp/` is the project's gitignored scratch dir; a repo-wide run must not
+    report violations from the checkout copies dogfood runs leave there."""
+    scratch = tmp_path / "tmp" / "clean-checkout" / "module.py"
+    scratch.parent.mkdir(parents=True)
+    scratch.write_text("# see AC-14\n")
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "ok.py").write_text("x = 1\n")
+
+    result = _run(["--repo-root", str(tmp_path)], cwd=tmp_path)
+
+    assert result.returncode == 0, result.stdout

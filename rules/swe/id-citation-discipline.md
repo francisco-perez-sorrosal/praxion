@@ -32,6 +32,8 @@ This is the inward-facing parallel of [`shipped-artifact-isolation.md`](shipped-
 |----------|-----------------|-----------|---------------------|
 | `REQ-NN` | `SYSTEMS_PLAN.md` (in-pipeline) / archived SPEC (post-archive) | Ephemeral during pipeline; frozen-per-feature after archive | **Never** |
 | `AC-NN` | `SYSTEMS_PLAN.md` § Acceptance Criteria | Always ephemeral (no archive path) | **Never** |
+| `DS-N` | `SYSTEMS_PLAN.md` § Data Structures | Always ephemeral (no archive path) | **Never** |
+| `P<n>-NN` (a milestone's local criterion numbering) | `SYSTEMS_PLAN.md` § Acceptance Criteria, `IMPLEMENTATION_PLAN.md` | Always ephemeral | **Never** |
 | `Step N` | `IMPLEMENTATION_PLAN.md`, `WIP.md` | Pipeline-local, always ephemeral | **Never** |
 | `dec-draft-<hash>` | `.ai-state/decisions/drafts/` | Mid-pipeline only (rewritten at finalize) | **Never** |
 | `dec-NNN` | `.ai-state/decisions/<NNN>-<slug>.md` | Persistent, committed to git | **Yes** (in comments, when citing architectural rationale) |
@@ -82,7 +84,7 @@ Describe behavior, constraints, or intent. Do not embed REQ/AC/step references. 
 
 ### Self-Test Before Committing Code
 
-- Does any function name, docstring, comment, or test body contain `REQ-`, `AC-`, or `Step N` patterns?
+- Does any function name, docstring, comment, or test body contain `REQ-`, `AC-`, `DS-`, `P<n>-NN`, or `Step N` patterns?
 - If yes — is the identifier sourced from `.ai-work/` (always ephemeral) or an archived SPEC (feature-frozen)? Both answers require removal.
 - Rewrite the site to describe behavior instead. Put the traceability link in `.ai-work/<task-slug>/traceability.yml` if the pipeline is active, or leave it to the archived SPEC matrix if the feature is already archived.
 

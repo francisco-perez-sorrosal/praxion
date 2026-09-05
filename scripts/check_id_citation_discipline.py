@@ -128,6 +128,13 @@ EXCLUDED_PATH_FRAGMENTS = (
     # worktrees) — so the gate's result would depend on how many worktrees the
     # operator happens to have open. Each worktree is scanned by its own run.
     "/.claude/worktrees/",
+    # Scratch. `tmp/` is the gitignored working directory the project's own
+    # conventions reserve for temporary files (CLAUDE.md § Critical
+    # conventions), and it routinely holds whole clean-checkout copies of
+    # the repository from dogfood runs -- a repo-wide scan that walks into it
+    # reports hundreds of violations that are not in this tree and never
+    # reach CI (a fresh clone has no tmp/).
+    "/tmp/",
     # Vendored dependency trees — never scan third-party library code.
     "/.venv/",
     "/venv/",
@@ -164,6 +171,18 @@ PATTERNS: tuple[tuple[str, re.Pattern[str], str], ...] = (
         re.compile(r"\bEC-\d+\.\d+(?:\.\d+)*\b"),
         "EC identifier (e.g., EC-3.2.4) — ephemeral criterion from "
         "SYSTEMS_PLAN.md; describe behavior inline",
+    ),
+    (
+        "ds-id",
+        re.compile(r"\bDS-\d+\b"),
+        "DS identifier (e.g., DS-7) — a SYSTEMS_PLAN.md § Data Structures entry, "
+        "deleted with .ai-work/; name the type or concept instead",
+    ),
+    (
+        "criterion-id",
+        re.compile(r"\bP\d+-\d+\b"),
+        "milestone criterion id (e.g., P1-14) — an acceptance criterion in a "
+        "plan's local numbering, as ephemeral as AC-NN; describe behavior inline",
     ),
     (
         "step-ref",

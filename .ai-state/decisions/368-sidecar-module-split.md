@@ -1,7 +1,7 @@
 ---
-id: dec-draft-0555e355
+id: dec-368
 title: Sidecar-placement scripts split across six sibling modules
-status: proposed
+status: accepted
 category: implementation
 date: 2026-09-02
 summary: Decompose SYSTEMS_PLAN.md's DS-2/3/5/6/7/8/9 across five new scripts/ sibling modules plus a thin praxion-sidecar CLI, mirroring the finalize_adrs.py split pattern.

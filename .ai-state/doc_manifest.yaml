@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-02T06:53:30Z'
+generated_at: '2026-09-05T02:03:22Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -62,7 +62,7 @@ surfaces:
   path: docs/README.md
   type: markdown
   title: Praxion docs
-  last_modified: '2026-08-30'
+  last_modified: '2026-09-02'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -126,7 +126,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-08-30'
+  last_modified: '2026-09-04'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -346,7 +346,7 @@ surfaces:
   path: docs/independent-analysis/personal-software-factory-analysis.md
   type: markdown
   title: "Praxion as a Personal Software Factory \u2014 Landscape, SDLC Coverage, Integration Seams, and the Sidecar Placement"
-  last_modified: '2026-09-01'
+  last_modified: '2026-09-02'
   diataxis: explanation
   audience: architect / maintainer
   renderer: explanation_shell
@@ -440,7 +440,7 @@ surfaces:
   path: docs/onboarding.md
   type: markdown
   title: Project Onboarding
-  last_modified: '2026-08-31'
+  last_modified: '2026-09-03'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -493,7 +493,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-08-31'
+  last_modified: '2026-09-04'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -524,7 +524,7 @@ surfaces:
   path: .ai-state/TEST_TOPOLOGY.md
   type: markdown
   title: "Test Topology \u2014 Praxion"
-  last_modified: '2026-08-31'
+  last_modified: '2026-09-03'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-design
@@ -532,7 +532,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-08-31'
+  last_modified: '2026-09-04'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -540,13 +540,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-08-31'
+  last_modified: '2026-09-03'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-09-01'
+  last_modified: '2026-09-04'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -558,7 +558,7 @@ surfaces:
   path: .ai-state/LANDSCAPE_WATCHLIST.md
   type: markdown
   title: Praxion Landscape Watchlist
-  last_modified: '2026-04-30'
+  last_modified: '2026-09-02'
   renderer: default_markdown
 - id: ai-state-upstream-issues
   path: .ai-state/UPSTREAM_ISSUES.md
@@ -2702,6 +2702,78 @@ surfaces:
   title: Broken-Block-D repair rides the finalize hook chain as a self-delivering fleet backstop
   last_modified: '2026-08-31'
   renderer: adr_card
+- id: ai-state-decisions-357-praxion-cli-exit-code-contract
+  path: .ai-state/decisions/357-praxion-cli-exit-code-contract.md
+  type: markdown
+  title: Praxion CLI exit codes are a three-layer contract; 2 stays usage and refusal moves to 3
+  last_modified: '2026-09-04'
+  renderer: adr_card
+- id: ai-state-decisions-358-sidecar-reconciler-diagnostic-split
+  path: .ai-state/decisions/358-sidecar-reconciler-diagnostic-split.md
+  type: markdown
+  title: praxion-sidecar link is the sole reconciler; doctor is read-only, network-free, and renders one shared check registry
+  last_modified: '2026-09-04'
+  renderer: adr_card
+- id: ai-state-decisions-359-claude-md-block-target-placement
+  path: .ai-state/decisions/359-claude-md-block-target-placement.md
+  type: markdown
+  title: Praxion CLAUDE.md block writers resolve their target through a per-path placement intent, and never write to a path the team already owns
+  last_modified: '2026-09-04'
+  renderer: adr_card
+- id: ai-state-decisions-360-containment-guard-state-root
+  path: .ai-state/decisions/360-containment-guard-state-root.md
+  type: markdown
+  title: Both containment guards accept a second, explicitly-declared state root, while keeping their original checks intact
+  last_modified: '2026-09-04'
+  renderer: adr_card
+- id: ai-state-decisions-361-git-hook-chaining-model
+  path: .ai-state/decisions/361-git-hook-chaining-model.md
+  type: markdown
+  title: Git-hook install observes the repository's hook configuration and composes with it, taking over core.hooksPath locally rather than integrating through a tracked file
+  last_modified: '2026-09-04'
+  renderer: adr_card
+- id: ai-state-decisions-362-hook-chain-session-start-heal
+  path: .ai-state/decisions/362-hook-chain-session-start-heal.md
+  type: markdown
+  title: The hook-chain self-heal rides a SessionStart hook, not the finalize chain, because the finalize chain cannot reach the failure it would repair
+  last_modified: '2026-09-04'
+  renderer: adr_card
+- id: ai-state-decisions-363-sidecar-autocommit-and-remote-policy
+  path: .ai-state/decisions/363-sidecar-autocommit-and-remote-policy.md
+  type: markdown
+  title: The sidecar autocommits on finalize and on session stop; the project never does; and the sidecar has no remote by default
+  last_modified: '2026-09-04'
+  renderer: adr_card
+- id: ai-state-decisions-364-sidecar-placement-axis
+  path: .ai-state/decisions/364-sidecar-placement-axis.md
+  type: markdown
+  title: Onboarding gains a placement axis; under sidecar placement the git ownership of .ai-state/ moves to a per-operator repository projected in by symlink
+  last_modified: '2026-09-04'
+  renderer: adr_card
+- id: ai-state-decisions-365-state-repo-resolver-contract
+  path: .ai-state/decisions/365-state-repo-resolver-contract.md
+  type: markdown
+  title: 365-state-repo-resolver-contract.md
+  last_modified: '2026-09-04'
+  renderer: adr_card
+- id: ai-state-decisions-366-sidecar-state-mount-worktree
+  path: .ai-state/decisions/366-sidecar-state-mount-worktree.md
+  type: markdown
+  title: Sidecar state is materialised as a git worktree mounted inside each checkout, with shadows as intra-checkout relative symlinks
+  last_modified: '2026-09-04'
+  renderer: adr_card
+- id: ai-state-decisions-367-ds1-gate-authority
+  path: .ai-state/decisions/367-ds1-gate-authority.md
+  type: markdown
+  title: DS-1's existing-only placement gate (exit 2) is authoritative over INTERFACE_DESIGN.md D10
+  last_modified: '2026-09-04'
+  renderer: adr_card
+- id: ai-state-decisions-368-sidecar-module-split
+  path: .ai-state/decisions/368-sidecar-module-split.md
+  type: markdown
+  title: Sidecar-placement scripts split across six sibling modules
+  last_modified: '2026-09-04'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -2946,6 +3018,12 @@ surfaces:
   type: markdown
   title: "SPEC: `/project-metrics` Command \u2014 Project Complexity/Health Metrics"
   last_modified: '2026-08-13'
+  renderer: default_markdown
+- id: ai-state-specs-spec-sidecar-placement-2026-09-03
+  path: .ai-state/specs/SPEC_sidecar-placement_2026-09-03.md
+  type: markdown
+  title: 'Spec: Sidecar Placement (P0 hook chaining + P1 sidecar placement axis)'
+  last_modified: '2026-09-04'
   renderer: default_markdown
 groups:
 - id: tutorial
@@ -3349,6 +3427,18 @@ groups:
   - ai-state-decisions-354-design-md-decomposition-scope
   - ai-state-decisions-355-upgrade-path-consolidation
   - ai-state-decisions-356-block-d-finalize-backstop
+  - ai-state-decisions-357-praxion-cli-exit-code-contract
+  - ai-state-decisions-358-sidecar-reconciler-diagnostic-split
+  - ai-state-decisions-359-claude-md-block-target-placement
+  - ai-state-decisions-360-containment-guard-state-root
+  - ai-state-decisions-361-git-hook-chaining-model
+  - ai-state-decisions-362-hook-chain-session-start-heal
+  - ai-state-decisions-363-sidecar-autocommit-and-remote-policy
+  - ai-state-decisions-364-sidecar-placement-axis
+  - ai-state-decisions-365-state-repo-resolver-contract
+  - ai-state-decisions-366-sidecar-state-mount-worktree
+  - ai-state-decisions-367-ds1-gate-authority
+  - ai-state-decisions-368-sidecar-module-split
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -3391,6 +3481,7 @@ groups:
   - ai-state-specs-spec-p5-issue-autofix-2026-07-24
   - ai-state-specs-spec-production-gate-cohort-2026-06-26
   - ai-state-specs-spec-project-metrics-2026-04-23
+  - ai-state-specs-spec-sidecar-placement-2026-09-03
   - ai-state-system-deployment
   - ai-state-tech-debt-ledger
   - ai-state-tech-debt-resolved

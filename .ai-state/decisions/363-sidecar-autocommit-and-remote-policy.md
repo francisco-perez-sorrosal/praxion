@@ -1,7 +1,7 @@
 ---
-id: dec-draft-7dcb6288
+id: dec-363
 title: The sidecar autocommits on finalize and on session stop; the project never does; and the sidecar has no remote by default
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-09-02
 summary: Praxion has never auto-committed anything, deliberately. The sidecar is personal, unreviewed and linear, so the discipline differs there and only there - the finalize chain and a Stop hook commit it, while project commits stay human-owned. The sidecar gets no git remote by default, and adding one is refused when the host differs from the project origin's host unless the operator acknowledges it explicitly.
@@ -51,7 +51,7 @@ and a channel created by a single convenient command.
 
 1a. **The commit is serialized by an advisory lock; staging is
    pathspec-scoped.** Under the shared-live-tree model
-   (`dec-draft-4b33b1df`), two concurrent pipelines produce up to four
+   (`dec-364`), two concurrent pipelines produce up to four
    committers — two finalize, two `Stop` — racing on the sidecar's single
    `.git/index` and `index.lock`. The sidecar index is shared mutable state and
    is given a named owner: `praxion-sidecar commit` acquires an advisory
@@ -68,7 +68,7 @@ and a channel created by a single convenient command.
    index-corruption failure mode inside the accepted shared-live-tree trade-off;
    it does not remove that trade-off (the higher-level "two pipelines see each
    other's drafts" property keeps its own reversal trigger in
-   `dec-draft-4b33b1df`).
+   `dec-364`).
 
 2. **The policy is a manifest field with a closed enum**, not a hardcoded
    behaviour: `on-finalize-and-stop` (default), `on-finalize`, `manual`. An

@@ -1,7 +1,7 @@
 ---
-id: dec-draft-c66a19a6
+id: dec-361
 title: Git-hook install observes the repository's hook configuration and composes with it, taking over core.hooksPath locally rather than integrating through a tracked file
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-02
 summary: A new scripts/install_git_hooks.py becomes the single hook-install/repair implementation, with onboarding Phase 4 and upgrade_project_pins.sh as callers. It honours core.hooksPath by installing a wrapper directory in the git common dir that delegates to the observed value, and chains with an occupied .git/hooks slot instead of displacing it. Exit codes propagate for pre-commit and are swallowed for post-hooks.

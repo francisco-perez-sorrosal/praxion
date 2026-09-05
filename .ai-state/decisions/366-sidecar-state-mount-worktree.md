@@ -1,7 +1,7 @@
 ---
-id: dec-draft-0516562a
+id: dec-366
 title: Sidecar state is materialised as a git worktree mounted inside each checkout, with shadows as intra-checkout relative symlinks
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-02
 summary: Claude Code's worktree isolation refuses Write/Edit on any lexically-in-worktree path whose realpath escapes the worktree, with no sanctioned exemption, which would leave .ai-state/ unwritable by every agent in every pipeline worktree. Under sidecar placement each checkout now materialises the sidecar as a real directory at <checkout>/.praxion-state - a git worktree of the sidecar on a per-checkout branch - and every shadow becomes a relative symlink into it, so all Praxion writes resolve inside the checkout and both containment guards stay unmodified.
@@ -11,7 +11,7 @@ agent_type: systems-architect
 branch: worktree-sidecar-placement
 pipeline_tier: full
 supersedes_in_part:
-  - dec-draft-4b33b1df
+  - dec-364
 affected_files:
   - scripts/praxion-sidecar
   - scripts/_state_repo.py
@@ -27,7 +27,7 @@ dissent: "This buys a write path by taking on a git-worktree lifecycle (creation
 
 ## Context
 
-`dec-draft-4b33b1df` establishes sidecar placement: the durable state lives in a
+`dec-364` establishes sidecar placement: the durable state lives in a
 per-operator git repository and is *projected* into the project by symlinks that
 `.git/info/exclude` hides. The plan recorded one assumption it could not verify
 at design time — that Claude Code's own worktree isolation, which blocks edits
@@ -287,7 +287,7 @@ lifecycle being tied to its checkout's:
   with its fix. A `git clean -ffdx` in the project is the same event as removing
   the checkout, and is covered by the same contract.
 
-**Neutral.** `dec-draft-4b33b1df`'s placement axis, mode pairing, capability
+**Neutral.** `dec-364`'s placement axis, mode pairing, capability
 classes and `publish`/`absorb` machinery are untouched; only its projection
 *mechanism* and its shared-live-tree consequences are narrowed. The consult
 dispositions (CH-01…CH-07) are all preserved: `SidecarIdentity`/`ManifestView`,
@@ -297,7 +297,7 @@ the commit lock, the schema-first stdlib reader, the split slot types and the
 
 ## Prior Decision
 
-`dec-draft-4b33b1df` is narrowed in two clauses, not replaced.
+`dec-364` is narrowed in two clauses, not replaced.
 
 - **Clause 2 (projection mechanism)** said state is "projected into the project
   by symlink". It is now projected by a git worktree mounted at
@@ -317,7 +317,7 @@ welcome one that the test lens argued for and did not win on the merits. It
 arrives with a cost the shared-live-tree design did not have (the merge-back
 ordering constraint), so it is a trade, not a free correction.
 
-`dec-draft-a3f65ba3` — "both containment guards accept a second,
+`dec-360` — "both containment guards accept a second,
 explicitly-declared state root" — is **retired** by this decision rather than
 superseded, because its question is gone rather than answered differently: with
 the in-checkout realpath invariant there is no containment escape to admit. Its

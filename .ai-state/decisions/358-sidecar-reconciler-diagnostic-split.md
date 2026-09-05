@@ -1,7 +1,7 @@
 ---
-id: dec-draft-b5d1b866
+id: dec-358
 title: praxion-sidecar link is the sole reconciler; doctor is read-only, network-free, and renders one shared check registry
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-09-02
 summary: The sidecar CLI splits repair from diagnosis — link reconciles all three projection surfaces idempotently, doctor never mutates and never touches the network, and status/doctor/--json/the SessionStart banner are four renderings of one ordered check registry. No doctor --fix, no link --check.

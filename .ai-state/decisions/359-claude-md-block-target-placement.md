@@ -1,7 +1,7 @@
 ---
-id: dec-draft-04485c06
+id: dec-359
 title: Praxion CLAUDE.md block writers resolve their target through a per-path placement intent, and never write to a path the team already owns
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-02
 summary: Block-target resolution moves out of each writer and into the placement resolver. CLAUDE.md joins the manifest's paths map with one of three intents - untouched when the team already has one (blocks go to a shadowed CLAUDE.local.md), shadow by default when there is none, share when --share CLAUDE.md is passed. Managed-project detection gains CLAUDE.local.md so a sidecar project is not misread as unmanaged.

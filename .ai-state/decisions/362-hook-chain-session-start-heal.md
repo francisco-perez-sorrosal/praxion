@@ -1,7 +1,7 @@
 ---
-id: dec-draft-ec3883f6
+id: dec-362
 title: The hook-chain self-heal rides a SessionStart hook, not the finalize chain, because the finalize chain cannot reach the failure it would repair
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-02
 summary: A new hooks/heal_hook_chain.py re-points core.hooksPath at the Praxion wrapper when a package manager re-points it away. The finalize chain - Praxion's established self-delivering repair channel - is structurally unable to carry this repair, because the failure being repaired is precisely that git no longer invokes the hooks the finalize chain lives in. A non-ping-pong invariant makes the heal a fixed point.

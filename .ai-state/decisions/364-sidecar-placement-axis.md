@@ -1,7 +1,7 @@
 ---
-id: dec-draft-4b33b1df
+id: dec-364
 title: Onboarding gains a placement axis; under sidecar placement the git ownership of .ai-state/ moves to a per-operator repository projected in by symlink
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-02
 summary: A second onboarding axis (in-repo | sidecar) lets one operator run the full pipeline on a repository they do not own. Under sidecar the .ai-state/ path contract on disk is preserved and only its git ownership moves, to ${PRAXION_SIDECAR_ROOT}/<project-id>/, hidden from the project by .git/info/exclude. Placement is not freely orthogonal to mode - sidecar pairs only with existing.
@@ -11,7 +11,7 @@ agent_type: systems-architect
 branch: worktree-sidecar-placement
 pipeline_tier: full
 superseded_in_part_by:
-  - dec-draft-0516562a
+  - dec-366
 affected_files:
   - scripts/praxion-sidecar
   - scripts/_state_repo.py
@@ -65,7 +65,7 @@ Onboarding gains a **placement** axis alongside its four modes.
    changes. Every agent, hook, skill and command that reads `.ai-state/` is
    untouched.
 
-   > **Narrowed by `dec-draft-0516562a`.** The projection mechanism is no longer
+   > **Narrowed by `dec-366`.** The projection mechanism is no longer
    > "a symlink into `${PRAXION_SIDECAR_ROOT}`". Each checkout mounts the
    > sidecar as a `git worktree` at `<checkout>/.praxion-state/` and the shadows are
    > *relative* symlinks pointing inward, because Claude Code's worktree
@@ -159,7 +159,7 @@ error rather than a silent leak; promotion in and out is mechanical.
 Cons: a second repository the operator must know about; two new components to
 maintain. ~~branch-scoped state isolation is lost, taking `reconcile_ai_state.py`
 and the `observations.jsonl` merge driver out of play for this mode~~ —
-corrected by `dec-draft-0516562a`: the state mount keeps both in play, on the
+corrected by `dec-366`: the state mount keeps both in play, on the
 sidecar side, at the price of a merge-back step.
 
 ## Consequences
@@ -178,7 +178,7 @@ and reconciling at merge; two concurrent pipelines on one project see each
 other's drafts immediately. `reconcile_ai_state.py` and the squash-safety
 diagnostic become no-ops in this mode, so a reader must know the mode to know
 whether they ran.~~ — **this clause no longer holds; narrowed by
-`dec-draft-0516562a`.** The state mount gives each checkout its own sidecar
+`dec-366`.** The state mount gives each checkout its own sidecar
 branch, so state is branch-scoped again, `reconcile_ai_state.py` and the merge
 drivers are back in play (on the sidecar side, at merge-back), and each mount
 has its own git index. The cost that replaces it is a **merge-back ordering
@@ -206,7 +206,7 @@ no `git log` on the sidecar, no recovery from it, no cross-machine sync — then
 the entire justification for a *repository* rather than a plain excluded
 directory has evaporated, and option A was right: same guard fixes, far less
 machinery. **This falsifier is now stronger, not weaker** — under
-`dec-draft-0516562a` the repository is load-bearing in a second way (it is what
+`dec-366` the repository is load-bearing in a second way (it is what
 `git worktree` mounts from, and what merge-back merges within), so "the history
 is never consulted" would have to coexist with machinery that exists only
 because it is a repository.
@@ -216,7 +216,7 @@ on one sidecar-placed project produce a single lost write in `calibration_log.md
 or a ledger, the shared-live-tree premise is wrong and the design needs
 per-worktree state, which is a different architecture rather than a patch.~~ —
 **retired: the shared-live-tree premise is gone.** Per-worktree state is what
-`dec-draft-0516562a` implements, arrived at from the write path rather than from
+`dec-366` implements, arrived at from the write path rather than from
 this trigger. Its replacement, recorded in that decision: one ADR draft written
 inside a pipeline worktree that is not promoted after `/merge-worktree` because
 the sidecar merge-back was missed.
@@ -237,7 +237,7 @@ behaviour under risk, not a measured fact, and it is the weakest joint in this
 decision.
 
 **Reversal trigger.** The surviving falsifier firing (the sidecar's history is
-never consulted), or `dec-draft-0516562a`'s merge-back falsifier firing — the
+never consulted), or `dec-366`'s merge-back falsifier firing — the
 latter reverses the *mechanism*, not this decision's placement axis.
 Additionally: if Claude Code introduces first-class support for external
 per-project state (an official mechanism for machine-local project intelligence

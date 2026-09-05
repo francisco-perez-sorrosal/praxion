@@ -1,7 +1,7 @@
 ---
-id: dec-draft-eb758d34
+id: dec-357
 title: Praxion CLI exit codes are a three-layer contract; 2 stays usage and refusal moves to 3
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-09-02
 summary: Every Praxion CLI shares 0=ok and 2=usage; 1 means "actionable state, not clean" per the upgrade_project_pins.sh precedent; codes >=3 are per-script and documented in --help. praxion-sidecar puts refusal at 3 and environment failure at 4, declining the initially proposed 2=refused which collided with onboard-project's EXIT_USAGE=2.

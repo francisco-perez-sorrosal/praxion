@@ -1,7 +1,7 @@
 ---
-id: dec-draft-48d81c8a
+id: dec-367
 title: DS-1's existing-only placement gate (exit 2) is authoritative over INTERFACE_DESIGN.md D10
-status: proposed
+status: accepted
 category: implementation
 date: 2026-09-02
 summary: Step 14 implements SYSTEMS_PLAN.md DS-1's placement x mode legality (sidecar legal only under mode existing, exit 2) rather than INTERFACE_DESIGN.md D10's new-and-existing/exit-3 variant.

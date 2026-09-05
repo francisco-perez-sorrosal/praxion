@@ -1,10 +1,10 @@
 ---
-id: dec-draft-bdbeea95
+id: dec-365
 title: A single resolver answers which git repository owns .ai-state/, returning a five-variant sum type; state-mutating callers fail closed
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-02
-summary: scripts/_state_repo.py is the sole answer to "which repo owns .ai-state/", returning InRepo | SidecarOwned | NotYetLinked | Dangling | Foreign with fully-resolved paths, never a bare path or an Optional. Two entry points split the contract - resolve_placement for readers, require_writable_placement for writers, which raises on the three unwritable variants so a broken or third-party link can never be written into. Revised by dec-draft-0516562a: SidecarOwned now carries the in-checkout state mount as its state_git_root plus the sidecar common dir and branch, discovery is stdlib and subprocess-free via the mount's .git pointer file, and the consumer set drops the two containment guards and the dashboard entirely. Extended in draft with a fifth variant, NotYetLinked: a linked worktree carries no shadow until link runs, so an absent .ai-state in a worktree of a sidecar-owned project is its own named state rather than InRepo.
+summary: scripts/_state_repo.py is the sole answer to "which repo owns .ai-state/", returning InRepo | SidecarOwned | NotYetLinked | Dangling | Foreign with fully-resolved paths, never a bare path or an Optional. Two entry points split the contract - resolve_placement for readers, require_writable_placement for writers, which raises on the three unwritable variants so a broken or third-party link can never be written into. Revised by dec-366: SidecarOwned now carries the in-checkout state mount as its state_git_root plus the sidecar common dir and branch, discovery is stdlib and subprocess-free via the mount's .git pointer file, and the consumer set drops the two containment guards and the dashboard entirely. Extended in draft with a fifth variant, NotYetLinked: a linked worktree carries no shadow until link runs, so an absent .ai-state in a worktree of a sidecar-owned project is its own named state rather than InRepo.
 tags: [resolver, sum-type, state-ownership, sidecar, fail-closed, data-structure-design, scripts]
 made_by: agent
 agent_type: systems-architect
@@ -21,7 +21,7 @@ affected_files:
 dissent: "Six consumers now import a module that reads a manifest on paths as hot as a per-commit hook; the previous design had no such shared dependency, and a resolver that is slow, or that raises where a caller expected a path, becomes a single point of failure for machinery that was previously independent and individually fail-open. The state mount removed the hottest consumer (a PreToolUse guard on every write) from that set, which weakens but does not retire the objection."
 ---
 
-> **Revised in place 2026-09-02** (still a draft) after `dec-draft-0516562a`
+> **Revised in place 2026-09-02** (still a draft) after `dec-366`
 > changed how sidecar state is materialised. The decision's substance is
 > unchanged — one resolver, a closed sum type, fully-resolved paths, a
 > reader/writer entry-point split, identity compared and never re-derived.
@@ -52,7 +52,7 @@ state:
 
 Two consumers named in the original draft — `worktree_guard.py` and the
 dashboard's `project-root.ts` (with `praxion-dashboard` as its launcher) —
-**left this set** with `dec-draft-0516562a`. Both broke only because a write or
+**left this set** with `dec-366`. Both broke only because a write or
 read had to follow a symlink *escaping* the checkout; under the state mount the
 resolved path lands inside the project root, so both keep their existing logic
 and neither imports this module. That is a strictly better outcome than the
@@ -255,7 +255,7 @@ resolver is additive for the ~all projects that never adopt sidecar placement.
 
 **Negative.** A shared dependency on paths that run per commit and per session.
 The sharpest version of this objection has been **removed by
-`dec-draft-0516562a`**: `worktree_guard.py`, a PreToolUse hook on every
+`dec-366`**: `worktree_guard.py`, a PreToolUse hook on every
 `Write`/`Edit`, is no longer a consumer, so the resolver no longer owes a
 per-write fast-exit budget. What remains is the finalize chain and the
 SessionStart hooks, where the stdlib two-read discovery above is cheap enough

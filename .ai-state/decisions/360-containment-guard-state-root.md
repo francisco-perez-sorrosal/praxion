@@ -1,12 +1,12 @@
 ---
-id: dec-draft-a3f65ba3
+id: dec-360
 title: Both containment guards accept a second, explicitly-declared state root, while keeping their original checks intact
 status: retired
 category: implementation
 date: 2026-09-02
 retired_by:
-  - dec-draft-0516562a
-summary: RETIRED before implementation. This decision admitted one declared containment escape into worktree_guard.py and the dashboard's project-root.ts so that a sidecar reached by an escaping symlink could be written and read. dec-draft-0516562a materialises sidecar state as a git worktree inside each checkout instead, so every Praxion path resolves inside the project root and there is no escape left to admit - the question this record answered no longer exists. Both guards keep their current logic unchanged.
+  - dec-366
+summary: RETIRED before implementation. This decision admitted one declared containment escape into worktree_guard.py and the dashboard's project-root.ts so that a sidecar reached by an escaping symlink could be written and read. dec-366 materialises sidecar state as a git worktree inside each checkout instead, so every Praxion path resolves inside the project root and there is no escape left to admit - the question this record answered no longer exists. Both guards keep their current logic unchanged.
 tags: [security, path-traversal, containment, worktree-guard, dashboard, sidecar, allowlist, retired]
 made_by: agent
 agent_type: systems-architect
@@ -19,7 +19,7 @@ affected_files:
   - scripts/_state_repo.py
 ---
 
-> **RETIRED 2026-09-02 by `dec-draft-0516562a`, before implementation.** The
+> **RETIRED 2026-09-02 by `dec-366`, before implementation.** The
 > body below is preserved as written; read it as the reasoning that *was*
 > correct for a design where sidecar state was reached by a symlink escaping the
 > checkout. It is not. See `## Prior Decision` at the end for what changed, what
@@ -162,7 +162,7 @@ server module.
 
 ## Prior Decision
 
-**What removed this decision's subject.** `dec-draft-0516562a` changed how
+**What removed this decision's subject.** `dec-366` changed how
 sidecar state is materialised: instead of a symlink escaping the checkout into
 `${PRAXION_SIDECAR_ROOT}/<id>/`, each checkout mounts the sidecar as a
 `git worktree` at `<checkout>/.praxion-state/` and the shadows become *relative*
@@ -184,9 +184,9 @@ Concretely, both clauses lapse:
   relative path — which under the mount reads `.praxion-state/.ai-state/…` — that
   allowlist constant gains a `.praxion-state/.ai-state` entry. An allowlist entry for
   an in-project prefix is not a containment relaxation, so it is recorded in the
-  plan and in `dec-draft-0516562a`, not here.
+  plan and in `dec-366`, not here.
 
-This is a **retirement, not a supersession**: `dec-draft-0516562a` makes no
+This is a **retirement, not a supersession**: `dec-366` makes no
 claim about whether admitting a declared escape was the right answer to the
 question. It removed the question.
 

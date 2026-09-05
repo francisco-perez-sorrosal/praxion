@@ -30,7 +30,7 @@ def _onboard_body() -> str:
 def _hub_sha_shared_section() -> str:
     """Return the '§ Hub SHA resolution' section shared-procedures.md now owns.
 
-    A dedup pass (planner Step 7) moved the hub-SHA resolution rules — including
+    A dedup pass moved the hub-SHA resolution rules — including
     the "never a placeholder, never a mutable ref" requirement asserted below —
     out of the per-sub-step body and into one shared section cited by anchor.
     Behavior is unchanged; only its location moved.

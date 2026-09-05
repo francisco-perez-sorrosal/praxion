@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Tests for scripts/onboard-project -- the unified onboarding entry point.
 #
-# Rewritten from tests/new_project_test.sh (kept as-is until the Step 27
-# atomic cut deletes it) for the collapsed one-script contract per
+# Rewritten from tests/new_project_test.sh (kept as-is until the atomic cut
+# deletes it) for the collapsed one-script contract per
 # INTERFACE_DESIGN.md §2 and SYSTEMS_PLAN.md §Detection Algorithm.
 #
 # RED-first (BDD/TDD): scripts/onboard-project does not exist yet as of this
@@ -26,7 +26,7 @@
 # T12 (REQUIRED canary): the bash script's detected-state name set equals
 #      references/detection.md's enumerated 6-state set -- SYSTEMS_PLAN.md
 #      §Detection Algorithm requires these to never drift apart.
-# T13 (REQUIRED canary, td-130/dec-draft-57d9129b): the scaffolded
+# T13 (REQUIRED canary, td-130/dec-344): the scaffolded
 #      .claude/settings.json carries the permissions.allow baseline, and its
 #      value stays in agreement with phases-core.md § Phase 5's canonical
 #      copy -- TD130_MECHANISM_SPEC.md Edit 6's naming ("t12_...") predates
@@ -387,7 +387,7 @@ t12_bash_state_names_agree_with_detection_md() {
     fi
 }
 
-# REQUIRED canary (td-130 / dec-draft-57d9129b): the bash-scaffolded
+# REQUIRED canary (td-130 / dec-344): the bash-scaffolded
 # .claude/settings.json's permissions.allow baseline must agree with the
 # canonical value in phases-core.md § Phase 5, sub-step 5b -- a change to
 # either site without the other must fail loudly.
@@ -432,7 +432,7 @@ t13_scaffold_seeds_permissions_baseline() {
     pass "T13: scaffold seeds the permissions.allow baseline in agreement with phases-core.md"
 }
 
-# REQUIRED canary (td-130 / dec-draft-57d9129b): the greenfield guard must
+# REQUIRED canary (td-130 / dec-344): the greenfield guard must
 # still fire on a re-invocation against a seeded scaffold -- this is the
 # regression edit 2 of TD130_MECHANISM_SPEC.md exists to prevent.
 t14_greenfield_guard_fires_on_seeded_scaffold() {

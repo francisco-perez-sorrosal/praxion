@@ -199,17 +199,20 @@ def test_absent_checkpoint_never_yields_empty_unfolded_list(tmp_path, capsys):
 
 
 def test_draft_checkpoint_reports_draft_state_not_present(tmp_path, capsys):
-    """AC-1 sanctions a `dec-draft-<hash>` mark as the normal in-flight state --
+    """A `dec-draft-<hash>` mark is the normal in-flight state --
     it must surface as its own state, distinct from `present`, since a draft id
     has no numeric position to compare against the corpus."""
-    _write_design(tmp_path, _present_cell("dec-draft-0abc1234", date="2026-08-30"))
+    _write_design(
+        tmp_path,
+        _present_cell("dec-draft-0abc1234", date="2026-08-30"),  # id-citation-discipline:ignore
+    )
 
     exit_code = check_design_checkpoint.main(["--json", "--repo-root", str(tmp_path)])
     payload = json.loads(capsys.readouterr().out)
 
     assert exit_code == 0
     assert payload["checkpoint_state"] == "draft"
-    assert payload["checkpoint"] == "dec-draft-0abc1234"
+    assert payload["checkpoint"] == "dec-draft-0abc1234"  # id-citation-discipline:ignore
     assert payload["asserted"] == "2026-08-30"
 
 
@@ -221,7 +224,7 @@ def test_draft_checkpoint_never_yields_empty_unfolded_list(tmp_path, capsys):
     decisions_dir = tmp_path / ".ai-state" / "decisions"
     _write_adr(decisions_dir, "900-tip.md", adr_id="dec-900")
     _write_live_file(tmp_path, "src/module.py")
-    _write_design(tmp_path, _present_cell("dec-draft-0abc1234"))
+    _write_design(tmp_path, _present_cell("dec-draft-0abc1234"))  # id-citation-discipline:ignore
 
     exit_code = check_design_checkpoint.main(["--json", "--repo-root", str(tmp_path)])
     payload = json.loads(capsys.readouterr().out)
@@ -235,11 +238,11 @@ def test_draft_checkpoint_never_yields_empty_unfolded_list(tmp_path, capsys):
     assert payload["unfolded"] is None
     assert payload["count"] is None
     assert "message" in payload
-    assert "dec-draft-0abc1234" in payload["message"]
+    assert "dec-draft-0abc1234" in payload["message"]  # id-citation-discipline:ignore
 
 
 def test_exits_zero_on_draft_checkpoint(tmp_path):
-    _write_design(tmp_path, _present_cell("dec-draft-0abc1234"))
+    _write_design(tmp_path, _present_cell("dec-draft-0abc1234"))  # id-citation-discipline:ignore
 
     exit_code = check_design_checkpoint.main(["--json", "--repo-root", str(tmp_path)])
 
@@ -515,7 +518,7 @@ def test_output_identical_with_pyyaml_forced_unavailable(tmp_path, capsys, monke
 
 
 def test_repeated_runs_produce_identical_output(tmp_path, capsys):
-    """AC-5 (deletable and rebuildable): two consecutive runs against the same
+    """Deletable and rebuildable: two consecutive runs against the same
     inputs must reproduce identical output -- no LLM synthesis, no hidden
     nondeterminism (ordering, timestamps)."""
     decisions_dir = tmp_path / ".ai-state" / "decisions"

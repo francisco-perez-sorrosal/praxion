@@ -57,7 +57,7 @@ _PRESENT_CELL_PREFIX = re.compile(
     r"^`(?P<id>dec-[A-Za-z0-9_-]+)`\s*\(asserted\s+(?P<date>\d{4}-\d{2}-\d{2})"
 )
 _NUMERIC_ID = re.compile(r"^dec-(\d+)$")
-# A checkpoint pinned to an in-flight ADR fragment -- legal per AC-1 (the
+# A checkpoint pinned to an in-flight ADR fragment -- legal (the
 # normal state while a pipeline is running) but not yet a resolvable corpus
 # position: finalize renumbers it to `dec-NNN` and only then can the un-folded
 # suffix be computed. Distinguished from `_NUMERIC_ID` at parse time so this

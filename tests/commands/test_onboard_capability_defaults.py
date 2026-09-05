@@ -80,7 +80,7 @@ def test_capability_id_table_is_published_once_in_skill_md() -> None:
     assert section, (
         "SKILL.md must publish the capability-ID -> phase-id mapping table as "
         "the single join point between the user-facing and internal "
-        "vocabularies (INTERFACE_DESIGN.md §2.3 / dec-draft-113cc050)"
+        "vocabularies (INTERFACE_DESIGN.md §2.3 / dec-345)"
     )
     for capability_id in CAPABILITY_IDS:
         assert re.search(rf"`{re.escape(capability_id)}`", section), (
@@ -134,7 +134,7 @@ def test_capability_to_phase_mapping_is_a_total_function_over_the_matrix() -> No
 
     A capability vocabulary that silently omits a phase id -- or double-maps
     one -- breaks the "single join point" invariant the plan requires
-    (dec-draft-113cc050): the internal phase grammar and the user-facing
+    (dec-345): the internal phase grammar and the user-facing
     surface must agree on a total, unambiguous mapping.
     """
     section = _capability_table_section()

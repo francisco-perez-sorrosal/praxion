@@ -7,11 +7,7 @@ Two groups:
     the invariant.
   - The Rust `--edition` resolver contract (`resolve_rust_edition`): reads the
     edition from the nearest `rustfmt.toml`, falls back to the nearest
-    `Cargo.toml`, and defaults to `"2024"` when neither declares one. This
-    function does not exist yet -- these three tests are the RED-first
-    interface contract the Step 4 implementer must satisfy (per the BDD/TDD
-    pairing rule, the test-engineer's canary defines the shape of the
-    to-be-built argv builder's edition resolution).
+    `Cargo.toml`, and defaults to `"2024"` when neither declares one.
 """
 
 from __future__ import annotations
@@ -24,7 +20,7 @@ from _lang_tools import LangTool
 
 # ---------------------------------------------------------------------------
 # Registry invariants (parametrized over the live registry -- these grow
-# automatically to cover the `.rs` row once Step 4 adds it, with no edit here)
+# automatically to cover the `.rs` row, with no edit here)
 # ---------------------------------------------------------------------------
 
 
@@ -126,8 +122,7 @@ def test_assert_registry_is_legal_rejects_a_malformed_row(
 
 
 # ---------------------------------------------------------------------------
-# Rust `--edition` resolution (RED -- `resolve_rust_edition` does not exist
-# yet; Step 4 adds it alongside the `.rs` registry row)
+# Rust `--edition` resolution, alongside the `.rs` registry row
 # ---------------------------------------------------------------------------
 
 

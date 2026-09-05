@@ -1,4 +1,4 @@
-"""Gate-liveness canaries for the commit-gate's future Rust branch.
+"""Gate-liveness canaries for the commit-gate's Rust branch.
 
 Cites: `rules/swe/gate-liveness.md` -- every CODE gate ships a sibling canary
 proving it fails on a known-bad input, not merely passes on the current good
@@ -11,9 +11,8 @@ deliberately): the Rust branch runs `rustfmt --edition <resolved> --check
 <staged .rs files>` via the `_lang_tools` registry -- staged-file-scoped,
 never `cargo fmt --all` -- and must exit 0 (never block) when `rustfmt` is
 unresolvable, in parity with the existing ruff-absent behavior. Both canaries
-below are expected RED until Step 4 wires the branch: today the gate only
-ever looks at staged `.py` files, so an all-Rust commit is never even
-inspected.
+below prove that branch actually inspects staged `.rs` files rather than
+only ever looking at staged `.py` files.
 
 Drives the fake `rustfmt` via a PATH shim (PM-2) rather than a real Rust
 toolchain, so these canaries run -- and bite -- on any machine. Staging
@@ -106,9 +105,9 @@ def _run_hook(payload: dict, *, cwd: Path, env: dict[str, str]) -> subprocess.Co
 def test_rejects_a_staged_badly_formatted_rust_file(tmp_path: Path) -> None:
     """A staged, badly-formatted `.rs` file blocks the commit (exit 2).
 
-    Expected RED until Step 4 lands: today the gate only scans staged `.py`
-    files, so a Rust-only staged commit passes with exit 0, never reaching
-    the `rustfmt --check` invocation this canary drives via a fake binary.
+    Proves the gate actually scans staged `.rs` files rather than only
+    `.py` files, by driving the `rustfmt --check` invocation via a fake
+    binary that always reports a formatting violation.
     """
     repo_dir = tmp_path / "repo"
     repo_dir.mkdir()
@@ -196,9 +195,9 @@ def test_silently_passes_when_rustfmt_is_unresolvable(tmp_path: Path) -> None:
 
     Parity with the existing ruff-absent behavior (PM-3): the gate must
     still surface that it attempted (and skipped) the Rust check -- a bare
-    "exit 0" is also true of today's code, which never looks at `.rs` files
-    at all, so the stderr assertion is what makes this canary RED rather
-    than vacuously green before Step 4 lands.
+    "exit 0" alone would not distinguish a real skip from the gate never
+    looking at `.rs` files at all, so the stderr assertion is what proves
+    the skip was deliberate.
     """
     repo_dir = tmp_path / "repo"
     repo_dir.mkdir()

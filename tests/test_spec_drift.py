@@ -358,7 +358,7 @@ _SPECS_DIR = Path(__file__).parents[1] / ".ai-state" / "specs"
 
 @pytest.mark.parametrize(
     "req_id",
-    ["REQ-01", "REQ-PM-01", "REQ-DDL-01", "REQ-DIAGRAM-01"],
+    ["REQ-01", "REQ-PM-01", "REQ-DDL-01", "REQ-DIAGRAM-01"],  # id-citation-discipline:ignore
 )
 def test_req_pattern_matches_each_corpus_shape(req_id: str) -> None:
     """REQ_PATTERN matches bare and every prefixed form seen in .ai-state/specs/."""
@@ -378,7 +378,12 @@ def test_req_pattern_rejects_non_req_identifier_lookalikes() -> None:
     """
     from scripts.spec_drift import REQ_PATTERN
 
-    for lookalike in ("REQ-level", "REQ-tagged", "REQ-ID", "REQ-DDLs"):
+    for lookalike in (
+        "REQ-level",  # id-citation-discipline:ignore
+        "REQ-tagged",  # id-citation-discipline:ignore
+        "REQ-ID",  # id-citation-discipline:ignore
+        "REQ-DDLs",  # id-citation-discipline:ignore
+    ):
         assert not REQ_PATTERN.fullmatch(lookalike), (
             f"REQ_PATTERN must not fullmatch prose lookalike {lookalike!r}"
         )
@@ -390,7 +395,7 @@ def test_req_pattern_prefix_shapes_cover_the_live_corpus() -> None:
 
     Parses the real corpus (not a fixture) for anything shaped like a REQ
     identifier and asserts REQ_PATTERN's matched set includes every distinct
-    prefix token found — so a future corpus form (e.g. REQ-FOO-NN) that the
+    prefix token found — so a future corpus form (e.g. REQ-FOO-NN) that the  # id-citation-discipline:ignore
     pattern can't see fails this canary instead of silently going untracked.
     """
     import re as _re
@@ -407,7 +412,7 @@ def test_req_pattern_prefix_shapes_cover_the_live_corpus() -> None:
         content = spec_file.read_text(encoding="utf-8", errors="ignore")
         for candidate in probe.findall(content):
             # Only consider candidates that are genuine "REQ-<prefix>-NN" or
-            # "REQ-NN" identifiers — i.e. end in digits — to exclude prose
+            # "REQ-NN" identifiers — i.e. end in digits — to exclude prose  # id-citation-discipline:ignore
             # lookalikes like "REQ-level" from the expected set.
             if not candidate[-1].isdigit():
                 continue

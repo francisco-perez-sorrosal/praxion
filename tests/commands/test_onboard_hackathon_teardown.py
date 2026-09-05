@@ -6,7 +6,7 @@ documented contract by parsing the file structurally, matching the precedent
 set by `tests/commands/test_onboard_ci_autofix_install.py`.
 
 `phases-core.md` documents Sub-step 5b.t (hackathon teardown) and Phase 9's
-additive-only stamp `mode` field per `SYSTEMS_PLAN.md` REQ-06 / AC-7 / AC-8.
+additive-only stamp `mode` field.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ PHASES_CORE_FILE = (
     Path(__file__).parents[2] / "skills" / "onboard-project" / "references" / "phases-core.md"
 )
 
-# The six hackathon artifacts, per SYSTEMS_PLAN.md REQ-06 / §Phase 5b's own
+# The six hackathon artifacts, per §Phase 5b's own
 # install-side enumeration (phases-core.md §Phase 5b).
 SIX_HACKATHON_ARTIFACTS = (
     "PRAXION_HACKATHON_MODE",
@@ -112,8 +112,7 @@ def test_phase_9_stamp_schema_gains_an_additive_mode_field() -> None:
     assert manifest_match, "phases-core.md §Phase 9 must document the onboard-manifest write"
     manifest_section = manifest_match.group(0)
     assert re.search(r'"mode"\s*:', manifest_section), (
-        'Phase 9\'s stamp write must add a "mode" field to '
-        ".ai-state/.praxion-onboard.json (SYSTEMS_PLAN.md REQ-06)"
+        'Phase 9\'s stamp write must add a "mode" field to .ai-state/.praxion-onboard.json'
     )
     assert re.search(r'"full"', manifest_section), 'Phase 9 must document the stamp value "full"'
     assert re.search(r'"hackathon"', manifest_section), (

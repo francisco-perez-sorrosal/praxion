@@ -691,7 +691,7 @@ def test_shape_e_superseded_by_on_non_terminal_record(repo: Path) -> None:
 
 
 def test_every_conflict_finding_carries_a_disposition(repo: Path) -> None:
-    """Step 10's protocol names a disposition per shape -- an empty one is not a finding."""
+    """The conflict-classification protocol names a disposition per shape -- an empty one is not a finding."""
     _conflict_adr(repo, 1, extra_fields={"supersedes": "dec-002", "superseded_by": "dec-002"})
     conflicts = _conflicts(adr_health.classify(repo))
     assert conflicts[0]["disposition"]

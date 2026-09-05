@@ -238,7 +238,7 @@ def test_drafts_directory_is_scanned(decisions_dir, capsys):
     _write_adr(
         drafts_dir,
         "20260830-1200-fps-main-my-slug.md",
-        adr_id="dec-draft-abc12345",
+        adr_id="dec-draft-abc12345",  # id-citation-discipline:ignore
         status="proposed",
         tags=["x"],
     )
@@ -250,7 +250,7 @@ def test_drafts_directory_is_scanned(decisions_dir, capsys):
     )
 
     assert exit_code == 0
-    assert "dec-draft-abc12345" in capsys.readouterr().out
+    assert "dec-draft-abc12345" in capsys.readouterr().out  # id-citation-discipline:ignore
 
 
 # -- Combined AND filters ---------------------------------------------------
@@ -485,7 +485,7 @@ def test_category_missing_yields_defined_sentinel_under_pyyaml(decisions_dir):
 
 
 def test_cli_text_output_unchanged_by_category_field(decisions_dir, capsys):
-    # No CLI behaviour change from Step 2 -- category is loaded, not displayed.
+    # No CLI behaviour change from adding the category field -- it is loaded, not displayed.
     _write_adr(
         decisions_dir,
         "001-a.md",

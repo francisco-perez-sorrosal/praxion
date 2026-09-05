@@ -299,8 +299,8 @@ def staged_draft_with_dead_path_repo(tmp_path: Path) -> Path:
 def test_absent_affected_files_path_warns_and_leaves_exit_code_at_zero(
     tmp_path: Path,
 ) -> None:
-    # Both halves asserted explicitly per Step 21's "Done when" -- a blocking gate
-    # here would punish a decision whose action legitimately removed the file.
+    # Both halves asserted explicitly -- a blocking gate here would punish a
+    # decision whose action legitimately removed the file.
     _write_adr(
         tmp_path,
         "313-removal-decision.md",

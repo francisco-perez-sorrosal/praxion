@@ -39,7 +39,7 @@ def _skill_body() -> str:
 
 
 def _gates_section() -> str:
-    """Return the gate-policy section body (whatever heading Step 10 gives it).
+    """Return the gate-policy section body (whatever heading the skill gives it).
 
     Anchored loosely on 'Gate' so this survives the implementer choosing
     '## §Gates' vs '## §Phase Gates' vs a renamed heading — the behavioral

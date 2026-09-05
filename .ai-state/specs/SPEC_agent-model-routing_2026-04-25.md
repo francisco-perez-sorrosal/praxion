@@ -41,11 +41,11 @@ Praxion's main orchestrator chooses the Claude model tier (`opus` / `sonnet` / `
 
 ## Key Decisions (Cross-Reference)
 
-- `dec-draft-8cbfa312` — Hybrid routing: central rule + sparing per-spawn overrides.
-- `dec-draft-3f54371e` — Frontmatter `model:` is a capability floor; rule is authoritative.
-- `dec-draft-1178a4ea` — Routing policy lives in a new always-loaded rule.
-- `dec-draft-43104bf3` — 1D routing (model only); 2D deferred.
-- `dec-draft-063470df` — Routing telemetry deferred; one-month review trigger.
+- `dec-078` — Hybrid routing: central rule + sparing per-spawn overrides.
+- `dec-077` — Frontmatter `model:` is a capability floor; rule is authoritative.
+- `dec-079` — Routing policy lives in a new always-loaded rule.
+- `dec-076` — 1D routing (model only); 2D deferred.
+- `dec-080` — Routing telemetry deferred; one-month review trigger.
 
 (Draft IDs will be rewritten to `dec-NNN` at merge-to-main by the finalize protocol.)
 

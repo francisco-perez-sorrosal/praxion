@@ -2,9 +2,19 @@
 
 Owns one responsibility: once a draft's `dec-draft-<hash>` becomes a stable
 `dec-NNN`, every *other* file that cited the draft id must be rewritten to
-match. That means owning the bounded allowlist of citation locations, the
-rewrite itself, and the detector that catches a citation the allowlist
-missed.
+match. That means owning the one definition of where such a citation may
+live -- the citation net -- the rewrite itself, and the post-condition check
+that proves the rewrite left nothing behind.
+
+The net is a single generator shared by the rewriter and the detector, and
+that sharing is the point. They used to disagree: the rewriter walked an
+enumerated allowlist of named files while the detector re-scanned every
+markdown file under `.ai-state/` and `docs/`, so each file the allowlist had
+not learned yet -- the idea ledgers, then the calibration log, then every
+archived spec of a worktree pipeline -- dangled through a finalize before it
+was listed. One definition, two consumers: a citation the detector can see is
+one the rewriter has already visited, so a survivor is a rewrite failure to
+inspect, never a scope gap to widen.
 
 Deliberately repo-root-parameterized and free of module-level path state:
 `finalize_adrs.py` resolves the consumer repo root at startup and passes it
@@ -24,187 +34,116 @@ logger = logging.getLogger("finalize_adrs")
 # them from the sweep can never strand a dangling draft reference.
 _FROZEN_DOCS_SUBTREE = Path("docs") / "independent-analysis"
 
+# The pipeline documents that cite drafts while the pipeline authoring them is
+# still in flight. `.ai-work/` is gitignored and local to the checkout finalize
+# runs in, so a worktree pipeline's copies are invisible from the canonical
+# checkout -- which is why nothing *persistent* may be scoped through them
+# (the archived-spec slug derivation once was, and every worktree pipeline's
+# spec kept its draft ids after promotion).
+_IN_FLIGHT_DOCUMENTS = ("LEARNINGS.md", "SYSTEMS_PLAN.md", "IMPLEMENTATION_PLAN.md")
+
 
 def rewrite_cross_references(repo_root: Path, old_id: str, new_id: str) -> int:
-    """Rewrite every occurrence of `old_id` to `new_id` in bounded locations.
+    """Rewrite every occurrence of `old_id` to `new_id` across the citation net.
 
-    Bounded scope:
-    - All files under `.ai-state/decisions/` (both drafts/ and finalized).
-    - `.ai-state/DESIGN.md`, `.ai-state/TECH_DEBT_LEDGER.md`,
-      `.ai-state/TECH_DEBT_RESOLVED.md`, `.ai-state/CONSULT_LEDGER.md`,
-      `.ai-state/CONSULT_COSTS.md`, `.ai-state/CONSULT_PRIORS.md`,
-      `.ai-state/SYSTEM_DEPLOYMENT.md`, and a project-root `ROADMAP.md` --
-      named persistent files that cite the ADR a decision/debt/disposition
-      row resolved.
-    - Every markdown file under `docs/` (subsumes `docs/architecture.md`),
-      excluding `docs/independent-analysis/`: design notes and integration
-      docs cite ADR ids outside `.ai-state/`. `docs/independent-analysis/`
-      is frozen historical analysis -- never regenerated, no downstream
-      automated reader, and carries zero draft ids -- so it is swept out.
-    - `.ai-state/idea_ledgers/*.md`: idea entries ground their clusters in the
-      ADRs that motivated them, cited as draft ids while the pipeline that
-      authored those drafts is still in flight.
-    - All `.ai-work/*/LEARNINGS.md`.
-    - All `.ai-work/*/SYSTEMS_PLAN.md` and `.ai-work/*/IMPLEMENTATION_PLAN.md`.
-    - `.ai-state/specs/SPEC_*.md` files matching any active pipeline task slug.
-      Matching is separator-insensitive: spec filenames conventionally use
-      underscores (`SPEC_auth_flow_YYYY-MM-DD.md`) while task slugs are
-      kebab-case (`auth-flow`), so a literal substring test never matches.
-
-    `scripts/` is deliberately excluded: id-citation-discipline forbids
-    `dec-draft-<hash>` in committed code, so the only scripts carrying a
-    concrete draft id are test fixtures that must not be rewritten.
-
-    The scope is still an explicit allowlist of named files and bounded
-    subtrees -- never an arbitrary whole-repo sweep.
-
-    Returns the number of files modified.
+    `old_id` is a concrete `dec-draft-<8-hex>` id, never the shape, so the
+    rewrite alters nothing but the citation it is looking for. Returns the
+    number of files modified.
     """
     modified = 0
-    for target in _cross_reference_targets(repo_root):
+    for target in citation_net(repo_root):
         if _rewrite_in_file(target, old_id, new_id):
             modified += 1
     return modified
 
 
 def detect_unrewritten_ids(repo_root: Path, promoted_ids: list[str]) -> list[tuple[Path, str]]:
-    """Find promoted draft ids that survived the rewrite, outside the allowlist.
+    """Post-condition: promoted draft ids that survived the rewrite, anywhere in the net.
 
-    `rewrite_cross_references` walks a bounded allowlist, and a file outside it
-    is indistinguishable from a file with no matches -- the allowlist fails
-    silently by construction, so a citation in an unlisted file dangles while
-    the run still reports success. This detector closes that failure class
-    rather than its instances: it re-scans a deliberately wider net (every
-    markdown file under `.ai-state/` and `docs/`) for the concrete ids just
-    promoted. Matching concrete ids rather than the `dec-draft-<hash>` shape
-    keeps teaching placeholders and test fixtures from registering as findings.
-
-    Read-only. Returns (path, surviving_id) pairs for the caller to report.
+    Walks exactly the files `rewrite_cross_references` walked, so a finding
+    can only mean the rewrite of that file failed -- unreadable, unwritable,
+    changed underneath the run -- and the caller reports it for a human to
+    inspect. Matching concrete ids rather than the `dec-draft-<hash>` shape
+    keeps teaching placeholders from registering as findings. Read-only.
     """
     if not promoted_ids:
         return []
     survivors: list[tuple[Path, str]] = []
-    for scan_root in (repo_root / ".ai-state", repo_root / "docs"):
-        if not scan_root.is_dir():
+    for entry in citation_net(repo_root):
+        text = _read(entry)
+        if text is None:
             continue
-        for entry in sorted(scan_root.rglob("*.md")):
-            if not entry.is_file():
-                continue
-            try:
-                text = entry.read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError):
-                continue
-            survivors.extend((entry, i) for i in promoted_ids if i in text)
+        survivors.extend((entry, i) for i in promoted_ids if i in text)
     return survivors
 
 
-def _cross_reference_targets(repo_root: Path) -> Iterator[Path]:
-    """Yield every file whose `dec-draft-<hash>` references must be rewritten."""
-    decisions = repo_root / ".ai-state" / "decisions"
-    if decisions.is_dir():
-        for entry in decisions.rglob("*.md"):
-            if entry.is_file():
-                yield entry
+def citation_net(repo_root: Path) -> Iterator[Path]:
+    """Every file a `dec-draft-<hash>` citation may legitimately live in.
 
-    # Named persistent files that legitimately cite ADR ids: the design target,
-    # both tech-debt ledgers (rows reference the ADR that resolved them), the
-    # consult disposition ledger (its `rationale-ref` column is documented to
-    # hold `dec-NNN` or, pre-finalize, `dec-draft-<hash>`), the calibration log
-    # (every tier's completion row may name the decisions the task executed,
-    # and rows written mid-pipeline can only know the draft id), plus a
-    # project-root ROADMAP.md when present.
-    for persistent_doc in (
-        repo_root / ".ai-state" / "DESIGN.md",
-        repo_root / ".ai-state" / "TECH_DEBT_LEDGER.md",
-        repo_root / ".ai-state" / "TECH_DEBT_RESOLVED.md",
-        repo_root / ".ai-state" / "CONSULT_LEDGER.md",
-        repo_root / ".ai-state" / "CONSULT_COSTS.md",
-        repo_root / ".ai-state" / "CONSULT_PRIORS.md",
-        repo_root / ".ai-state" / "SYSTEM_DEPLOYMENT.md",
-        repo_root / ".ai-state" / "calibration_log.md",
-        repo_root / "ROADMAP.md",
-    ):
-        if persistent_doc.is_file():
-            yield persistent_doc
+    Bounded subtrees and named files -- never an arbitrary repo sweep, and
+    never code:
 
-    # Bounded docs/ sweep: every markdown file under docs/ (subsumes the
-    # developer architecture guide). Consumer projects cite ADR ids from
-    # design notes and integration docs that live outside .ai-state/; without
-    # this sweep those references dangle the moment finalize runs.
-    # `docs/independent-analysis/` is excluded -- see _FROZEN_DOCS_SUBTREE.
-    docs_dir = repo_root / "docs"
-    frozen_docs_dir = repo_root / _FROZEN_DOCS_SUBTREE
-    if docs_dir.is_dir():
-        for entry in docs_dir.rglob("*.md"):
-            if not entry.is_file():
-                continue
-            if frozen_docs_dir in entry.parents:
-                continue
-            yield entry
+    - Every markdown file under `.ai-state/`: sibling decisions (drafts and
+      finalized), `DESIGN.md` and its changelog, both tech-debt ledgers, the
+      three `CONSULT_*` files, `calibration_log.md`, `SYSTEM_DEPLOYMENT.md`,
+      the idea ledgers, every archived spec, and the timestamped report
+      families. Any of them may be written mid-pipeline, when the draft id is
+      the only id there is -- the citation `rules/swe/adr-conventions.md`
+      § Linking to ADRs sanctions.
+    - Every markdown file under `docs/` except `docs/independent-analysis/`
+      (frozen historical analysis; see `_FROZEN_DOCS_SUBTREE`).
+    - The in-flight `.ai-work/*/` pipeline documents named in
+      `_IN_FLIGHT_DOCUMENTS`.
+    - A project-root `ROADMAP.md`.
 
-    # Idea ledgers cite the ADRs that motivated a cluster, and the citation is
-    # authored mid-pipeline when only the draft id exists -- the case
-    # adr-conventions explicitly sanctions. The allowlist-gap detector already
-    # scans this subtree; without the sweep the rewriter disagrees with the
-    # detector and every finalize strands those citations.
-    idea_ledgers = repo_root / ".ai-state" / "idea_ledgers"
-    if idea_ledgers.is_dir():
-        for entry in idea_ledgers.glob("*.md"):
-            if entry.is_file():
-                yield entry
+    `scripts/` is deliberately outside the net: id-citation-discipline forbids
+    `dec-draft-<hash>` in committed code, so the only scripts carrying a
+    concrete draft id are test fixtures that must stay literal.
+    """
+    yield from _markdown_under(repo_root / ".ai-state")
+    yield from _markdown_under(repo_root / "docs", excluding=repo_root / _FROZEN_DOCS_SUBTREE)
 
     ai_work = repo_root / ".ai-work"
     if ai_work.is_dir():
-        for subdir in ai_work.iterdir():
+        for subdir in sorted(ai_work.iterdir()):
             if not subdir.is_dir():
                 continue
-            for filename in (
-                "LEARNINGS.md",
-                "SYSTEMS_PLAN.md",
-                "IMPLEMENTATION_PLAN.md",
-            ):
+            for filename in _IN_FLIGHT_DOCUMENTS:
                 candidate = subdir / filename
                 if candidate.is_file():
                     yield candidate
 
-    # NOTE: scripts/ is intentionally NOT swept. id-citation-discipline forbids
-    # `dec-draft-<hash>` in committed code, so no production script legitimately
-    # carries a draft id to rewrite; the only `scripts/` files that contain a
-    # concrete draft id are test fixtures that use it as data (and must be left
-    # untouched). Sweeping scripts/ was all-risk (corrupting a fixture on a hash
-    # collision), no-benefit, and contradicted the documented bounded scope,
-    # which never listed scripts/.
-
-    specs = repo_root / ".ai-state" / "specs"
-    task_slugs = _active_task_slugs(repo_root)
-    if specs.is_dir() and task_slugs:
-        # Spec filenames conventionally use underscores while task slugs are
-        # kebab-case, so compare with both separators normalized to `-`.
-        normalized_slugs = {slug.replace("_", "-") for slug in task_slugs}
-        for entry in specs.glob("SPEC_*.md"):
-            normalized_name = entry.name.replace("_", "-")
-            if any(slug in normalized_name for slug in normalized_slugs):
-                yield entry
+    roadmap = repo_root / "ROADMAP.md"
+    if roadmap.is_file():
+        yield roadmap
 
 
-def _active_task_slugs(repo_root: Path) -> set[str]:
-    """Return task slugs derived from `.ai-work/` subdirectory names."""
-    ai_work = repo_root / ".ai-work"
-    if not ai_work.is_dir():
-        return set()
-    return {child.name for child in ai_work.iterdir() if child.is_dir()}
+def _markdown_under(root: Path, *, excluding: Path | None = None) -> Iterator[Path]:
+    if not root.is_dir():
+        return
+    for entry in sorted(root.rglob("*.md")):
+        if entry.is_file() and (excluding is None or excluding not in entry.parents):
+            yield entry
+
+
+def _read(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        logger.warning("cannot read %s: %s", path, exc)
+        return None
 
 
 def _rewrite_in_file(path: Path, old_id: str, new_id: str) -> bool:
     """Rewrite `old_id` -> `new_id` in `path`; return True if the file changed."""
+    content = _read(path)
+    if content is None or old_id not in content:
+        return False
     try:
-        content = path.read_text(encoding="utf-8")
+        path.write_text(content.replace(old_id, new_id), encoding="utf-8")
     except OSError as exc:
-        logger.warning("cannot read %s: %s", path, exc)
+        # Left in place for `detect_unrewritten_ids` to report: the id is still there.
+        logger.warning("cannot rewrite %s: %s", path, exc)
         return False
-    if old_id not in content:
-        return False
-    rewritten = content.replace(old_id, new_id)
-    path.write_text(rewritten, encoding="utf-8")
     logger.debug("rewrote %s -> %s in %s", old_id, new_id, path)
     return True

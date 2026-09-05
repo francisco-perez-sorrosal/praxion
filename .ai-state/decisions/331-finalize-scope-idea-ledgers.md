@@ -1,7 +1,8 @@
 ---
 id: dec-331
 title: Widen the finalize rewrite allowlist to cover `.ai-state/idea_ledgers/`, rather than forbid draft-id citations there
-status: accepted
+status: superseded
+superseded_by: dec-draft-aae88f1f
 category: behavioral
 date: 2026-08-07
 summary: The idea ledger legitimately cites `dec-draft-<hash>` at authoring time, so finalize's rewrite allowlist gains `.ai-state/idea_ledgers/*.md` (and the three named `.ai-state/` files the rule text had already drifted from); a cite-finalized-only rule is rejected as unsatisfiable at authoring time.

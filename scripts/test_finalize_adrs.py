@@ -30,6 +30,8 @@ import dataclasses
 import hashlib
 import importlib.util
 import inspect
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -860,31 +862,74 @@ class TestFinalizeCrossReferences:
         assert draft_id not in content
 
 
-# -- Allowlist-gap detection ---------------------------------------------------
+# -- Rewrite post-condition ---------------------------------------------------
 
 
 class TestDetectUnrewrittenIds:
-    """The rewrite allowlist fails silently by construction; this closes it."""
+    """The detector walks the same net as the rewriter; a survivor is a failed rewrite."""
 
-    def test_canary_detector_bites_on_file_outside_the_allowlist(self, repo_root: Path) -> None:
-        """Proof the detector bites: an id surviving in an unlisted file is reported.
+    def test_canary_detector_bites_on_a_file_the_rewrite_could_not_write(
+        self, repo_root: Path
+    ) -> None:
+        """Proof the detector bites: a citation the rewrite failed to replace is reported.
 
-        Reproduces the historical defect shape -- a permanent `.ai-state/`
-        artifact holds a draft id, the rewrite scope does not cover it, and the
-        run still reports success.
+        The file is in the net and readable, but not writable -- the rewrite
+        logs and moves on, and the post-condition is what turns that silent
+        skip into a finding. The historical shape this replaces (a file the
+        allowlist had not learned yet) can no longer occur: the rewriter and
+        the detector share one definition of where a citation may live.
         """
+        if os.geteuid() == 0:
+            pytest.skip("root ignores file modes; the unwritable-file shape cannot be built")
         draft = make_draft(repo_root, "20260419-1810", "alice", "main", "gap-decision")
         draft_id = f"dec-draft-{_draft_hash(draft.name)}"
 
-        unlisted = repo_root / ".ai-state" / "metrics_reports" / "METRICS_LOG.md"
-        unlisted.parent.mkdir(parents=True, exist_ok=True)
-        unlisted.write_text(f"| run | cites {draft_id} |\n", encoding="utf-8")
+        stuck = repo_root / ".ai-state" / "metrics_reports" / "METRICS_LOG.md"
+        stuck.parent.mkdir(parents=True, exist_ok=True)
+        stuck.write_text(f"| run | cites {draft_id} |\n", encoding="utf-8")
+        stuck.chmod(0o444)
 
         finalize.promote_draft(draft, 66, repo_root)
-        finalize.rewrite_cross_references(repo_root, draft_id, "dec-066")
-        survivors = finalize.detect_unrewritten_ids(repo_root, [draft_id])
+        try:
+            rewritten = finalize.rewrite_cross_references(repo_root, draft_id, "dec-066")
+            survivors = finalize.detect_unrewritten_ids(repo_root, [draft_id])
+        finally:
+            stuck.chmod(0o644)
 
-        assert survivors == [(unlisted, draft_id)]
+        assert rewritten == 0
+        assert survivors == [(stuck, draft_id)]
+
+    def test_every_file_in_the_net_is_both_rewritten_and_checked(self, repo_root: Path) -> None:
+        """One net, two consumers: whatever the detector can see, the rewriter visited.
+
+        One representative per net member, including the families that dangled
+        under the enumerated allowlist (archived specs with no `.ai-work/`
+        present, the design changelog, report snapshots), and a `scripts/`
+        fixture as the outside-the-net control that neither touches.
+        """
+        old, new = "dec-draft-0ne0ne0e", "dec-099"  # id-citation-discipline:ignore
+        in_net = [
+            repo_root / ".ai-state" / "DESIGN_CHANGELOG.md",
+            repo_root / ".ai-state" / "specs" / "SPEC_auth_flow_2026-07-30.md",
+            repo_root / ".ai-state" / "sentinel_reports" / "SENTINEL_REPORT_2026-08-05.md",
+            repo_root / ".ai-state" / "metrics_reports" / "METRICS_LOG.md",
+            repo_root / ".ai-state" / "idea_ledgers" / "IDEA_LEDGER.md",
+            repo_root / ".ai-state" / "calibration_log.md",
+            repo_root / "docs" / "design" / "notes.md",
+            repo_root / ".ai-work" / "some-feature" / "LEARNINGS.md",
+            repo_root / "ROADMAP.md",
+        ]
+        outside = repo_root / "scripts" / "test_fixture_literal.py"
+        for path in [*in_net, outside]:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(f"cites {old}\n", encoding="utf-8")
+
+        modified = finalize.rewrite_cross_references(repo_root, old, new)
+
+        assert modified == len(in_net)
+        assert finalize.detect_unrewritten_ids(repo_root, [old]) == []
+        assert all(new in path.read_text(encoding="utf-8") for path in in_net)
+        assert outside.read_text(encoding="utf-8") == f"cites {old}\n"
 
     def test_reports_nothing_when_every_citation_was_rewritten(self, repo_root: Path) -> None:
         """A fully-covered rewrite produces no findings."""
@@ -1602,7 +1647,11 @@ class TestPluginCacheGuard:
 
 
 class TestWidenedCrossReferenceScope:
-    """dec-draft ids in persistent non-ADR files are rewritten at finalize."""
+    """dec-draft ids in persistent non-ADR files are rewritten at finalize.
+
+    Each test below records a family that once dangled under the enumerated
+    allowlist; they stay as regression guards over the members of the net.
+    """
 
     def test_rewrites_ledger_roadmap_and_docs(self, repo_root: Path) -> None:
         old, new = "dec-draft-abcd1234", "dec-042"  # id-citation-discipline:ignore
@@ -1707,29 +1756,29 @@ class TestWidenedCrossReferenceScope:
         assert new in text
         assert old not in text
 
-    def test_rewrites_idea_ledger_and_leaves_unlisted_file_untouched(self, repo_root: Path) -> None:
-        """`.ai-state/idea_ledgers/*.md` is in scope; an unlisted sibling is not.
+    def test_rewrites_idea_ledger_and_leaves_a_scripts_fixture_untouched(
+        self, repo_root: Path
+    ) -> None:
+        """`.ai-state/idea_ledgers/*.md` is in the net; a `scripts/` fixture is not.
 
         Regression: an idea is promoted to the ledger during the very pipeline
         that authored its grounding ADRs, so the entry legitimately cites
-        `dec-draft-<hash>` -- and every finalize stranded those citations,
-        because the allowlist never yielded the subtree while the allowlist-gap
-        detector already scanned it. The rewriter and the detector disagreed
-        about their own scope.
+        `dec-draft-<hash>` -- and every finalize stranded those citations while
+        the rewriter and the detector disagreed about their own scope.
 
-        The second assertion pins the other half of the contract: the scope is
-        widened by exactly one bounded subtree, never into a repo sweep. A test
-        proving only that the new path is walked cannot detect that regression.
+        The second assertion pins the other half of the contract: the net is
+        bounded subtrees and named files, never a repo sweep, and never code --
+        a fixture literal in `scripts/` must survive finalize byte for byte.
         """
         old, new = "dec-draft-1dea1e46", "dec-221"  # id-citation-discipline:ignore
         ledger = repo_root / ".ai-state" / "idea_ledgers" / "IDEA_LEDGER.md"
         ledger.parent.mkdir(parents=True, exist_ok=True)
         ledger.write_text(f"- Grounded in {old}; see the cluster above.\n", encoding="utf-8")
 
-        unlisted = repo_root / ".ai-state" / "metrics_reports" / "METRICS_LOG.md"
-        unlisted.parent.mkdir(parents=True, exist_ok=True)
-        unlisted_original = f"| run | cites {old} |\n"
-        unlisted.write_text(unlisted_original, encoding="utf-8")
+        fixture = repo_root / "scripts" / "test_detector.py"
+        fixture.parent.mkdir(parents=True, exist_ok=True)
+        fixture_original = f'SAMPLE = "{old}"\n'
+        fixture.write_text(fixture_original, encoding="utf-8")
 
         modified = finalize.rewrite_cross_references(repo_root, old, new)
 
@@ -1737,7 +1786,7 @@ class TestWidenedCrossReferenceScope:
         ledger_text = ledger.read_text(encoding="utf-8")
         assert new in ledger_text
         assert old not in ledger_text
-        assert unlisted.read_text(encoding="utf-8") == unlisted_original
+        assert fixture.read_text(encoding="utf-8") == fixture_original
 
     def test_rewrites_calibration_log(self, repo_root: Path) -> None:
         """Every tier's completion row may name the decisions the task
@@ -1765,15 +1814,21 @@ class TestWidenedCrossReferenceScope:
         assert new in text
         assert old not in text
 
-    def test_rewrites_spec_despite_separator_mismatch(self, repo_root: Path) -> None:
-        """Spec filenames use underscores; task slugs are kebab-case.
+    def test_rewrites_an_archived_spec_with_no_ai_work_directory_present(
+        self, repo_root: Path
+    ) -> None:
+        """An archived spec is rewritten whether or not any `.ai-work/` exists.
 
-        Regression: matching was a literal substring test, so a slug like
-        `auth-flow` never matched `SPEC_auth_flow_2026-07-30.md` and specs were
-        silently skipped by the rewrite.
+        Regression: specs used to be selected by matching their filename
+        against the task slugs derived from `.ai-work/` subdirectories -- but a
+        worktree pipeline's `.ai-work/` is local to that worktree and ignored
+        by git, so at merge-to-main in the canonical checkout the slug set was
+        empty and every worktree pipeline's own spec kept its draft ids after
+        promotion.
         """
         old, new = "dec-draft-feedface", "dec-305"  # id-citation-discipline:ignore
-        (repo_root / ".ai-work" / "auth-flow").mkdir(parents=True, exist_ok=True)
+        shutil.rmtree(repo_root / ".ai-work", ignore_errors=True)
+        assert not (repo_root / ".ai-work").exists()
         spec = repo_root / ".ai-state" / "specs" / "SPEC_auth_flow_2026-07-30.md"
         spec.parent.mkdir(parents=True, exist_ok=True)
         spec.write_text(f"decided in {old}\n", encoding="utf-8")

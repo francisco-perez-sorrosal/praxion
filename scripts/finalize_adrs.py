@@ -804,13 +804,13 @@ def _run(mode: str, branch: str | None, dry_run: bool) -> int:
         total_rewrites += count
     logger.info("finalize_adrs: %d cross-reference file(s) rewritten", total_rewrites)
 
-    # Allowlist-gap detection. Without this, a citation living in a file the
-    # rewrite scope does not cover dangles silently while the run reports
-    # success -- the only prior detection was grepping for the id by hand.
+    # Post-condition over the same citation net the rewrite walked. A survivor
+    # means the rewrite of that one file failed (its warning is above), never
+    # that the net is missing a location -- the two share one definition.
     for path, old_id in detect_unrewritten_ids(REPO_ROOT, [p.old_id for p in plans]):
         logger.warning(
-            "finalize_adrs: %s still cites %s -- outside the rewrite scope; "
-            "add it to _cross_reference_targets()",
+            "finalize_adrs: %s still cites %s after the rewrite -- its rewrite "
+            "failed; inspect the file and rerun finalize",
             path.relative_to(REPO_ROOT),
             old_id,
         )

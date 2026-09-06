@@ -143,3 +143,47 @@ def test_model_adapter_source_contains_no_claude_alias_literal():
         "codex/config/export-codex-pipeline-adapter.py must contain no Claude alias literal "
         f"(found: {alias_literals}); key on the routing rule's Tier column instead"
     )
+
+
+def _write_model_routing_rule(repo_root: Path, *, tier: str, alias: str) -> None:
+    rules_dir = repo_root / "rules" / "swe"
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    (rules_dir / "agent-model-routing.md").write_text(
+        "## Agent Model Routing\n\n### Tier Table\n\n"
+        "| Agent | Tier | Alias | Rationale |\n|---|---|---|---|\n"
+        f"| `researcher` | {tier} | {alias} | x |\n",
+        encoding="utf-8",
+    )
+
+
+def test_rejects_unknown_tier_in_model_routing_rule(tmp_path: Path):
+    # REQ-02: export_model_routing()'s own raise (export-codex-pipeline-adapter.py:194)
+    # must fire, naming the tier, when the Tier Table declares a value
+    # CODEX_MODEL_TIER_ADAPTER does not know. The existing raise-path test above
+    # (test_export_pipeline_adapter_fails_when_canonical_table_changes) only reaches
+    # export_pipeline_semantics()'s *process*-tier raise -- export_pipeline_adapter()
+    # fails there before export_model_routing() is ever called, so this line has never
+    # been exercised. Calling export_model_routing() directly closes that gap.
+    exporter = load_exporter()
+    repo_root = tmp_path / "repo"
+    _write_model_routing_rule(repo_root, tier="X", alias="sonnet")
+
+    with pytest.raises(
+        exporter.PipelineAdapterError, match="missing Codex model adapter for tier: X"
+    ):
+        exporter.export_model_routing(repo_root)
+
+
+def test_model_routing_accepts_any_alias_for_a_recognised_tier(tmp_path: Path):
+    # REQ-01 companion: canonical_alias is opaque pass-through provenance, never a lookup
+    # key -- an arbitrary/unfamiliar alias string on a recognised Tier must resolve
+    # cleanly, not raise, so an alias-only rule change can never break the Codex export.
+    exporter = load_exporter()
+    repo_root = tmp_path / "repo"
+    _write_model_routing_rule(repo_root, tier="M", alias="claude-future-9")
+
+    routing = exporter.export_model_routing(repo_root)
+
+    route = next(r for r in routing["agent_routes"] if r["agent"] == "researcher")
+    assert route["canonical_tier"] == "M"
+    assert route["canonical_alias"] == "claude-future-9"

@@ -15,6 +15,7 @@ dissent: At n=6 the series' whole value is that every figure is the same raw qua
 affected_files:
   - .ai-state/CONSULT_COSTS.md
   - fitness/tests/test_discipline_registry_invariants.py
+affected_reqs: [REQ-06]
 ---
 
 ## Context

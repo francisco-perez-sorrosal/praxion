@@ -17,6 +17,7 @@ affected_files:
   - .ai-state/CONSULT_COSTS.md
   - fitness/tests/test_discipline_registry_invariants.py
   - fitness/tests/test_consult_append_only.py
+affected_reqs: [REQ-03, REQ-04, REQ-05]
 ---
 
 ## Context

@@ -16,6 +16,7 @@ affected_files:
   - codex/config/export-codex-agents.py
   - scripts/test_export_codex_pipeline_adapter.py
   - rules/swe/agent-model-routing.md
+affected_reqs: [REQ-01, REQ-02]
 ---
 
 ## Context

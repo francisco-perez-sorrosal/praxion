@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,19 @@ from typing import Any
 import pytest
 
 _SCRIPT_PATH = Path(__file__).resolve().parent / "prune_reports.py"
+
+# Caller docs that hardcode a `--family <value>` invocation. Both live above
+# this script's directory in the repo tree (scripts/ -> repo root).
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_CALLER_DOCS = [
+    _REPO_ROOT / "agents" / "sentinel.md",
+    _REPO_ROOT / "commands" / "project-metrics.md",
+]
+
+# Matches the value token of a `--family <value>` CLI invocation as it
+# appears embedded in markdown prose/code-spans -- stops at whitespace or a
+# closing backtick/quote so the doc's surrounding text is never captured.
+_FAMILY_TOKEN_RE = re.compile(r"--family\s+([^\s`\"']+)")
 
 # Fixed-width run timestamps, oldest-first; lexical order == chronological here.
 _TIMESTAMPS = [
@@ -364,3 +378,69 @@ def test_family_filter_composes_with_json(
     assert len(list(sentinel_dir.glob("SENTINEL_REPORT_*"))) == 1
     # Untouched sibling family: 5 runs x (.md + .json) = 10 files, unchanged.
     assert len(list(metrics_dir.glob("METRICS_REPORT_*"))) == 10
+
+
+def _known_family_labels(mod: Any) -> set[str]:
+    """The family labels `prune_reports` actually recognizes.
+
+    Derived through the module's public surface -- `select_families` is the
+    same function `_parse_args`'s `--family` validator calls to resolve and
+    reject labels -- rather than a literal list duplicated in this test file,
+    which would just relocate the doc-to-code desync instead of closing it.
+    """
+    known, _ = mod.select_families(None)
+    return {f"{rel}:{prefix}" for rel, prefix in known}
+
+
+def _assert_family_tokens_bind_to_known_labels(doc_name: str, text: str, known: set[str]) -> None:
+    """Every `--family <value>` token in `text` must be a recognized label,
+    and at least one must be present. A caller doc that names zero families
+    silently reverts to pruning every family sharing the directory -- the
+    sibling-eviction defect this whole family-scoping mechanism exists to
+    prevent -- so dropping the flag entirely is exactly as wrong as
+    hardcoding an unrecognized value.
+    """
+    tokens = _FAMILY_TOKEN_RE.findall(text)
+    assert tokens, f"{doc_name} must name at least one --family value"
+    for token in tokens:
+        assert token in known, (
+            f"{doc_name} hardcodes --family {token!r}, which is not one of "
+            f"prune_reports' recognized family labels: {sorted(known)}"
+        )
+
+
+@pytest.mark.parametrize("doc_path", _CALLER_DOCS, ids=lambda p: p.name)
+def test_caller_doc_family_flags_bind_to_known_labels(doc_path: Path) -> None:
+    """Every --family value hardcoded in a caller doc must resolve to a
+    label prune_reports actually derives from `_REPORT_FAMILIES` -- closing
+    the doc-to-code desync where a caller's hardcoded label and the script's
+    recognized families could silently drift apart."""
+    mod = _load_module()
+    known = _known_family_labels(mod)
+    _assert_family_tokens_bind_to_known_labels(doc_path.name, doc_path.read_text(), known)
+
+
+def test_flags_family_value_not_bound_to_any_recognized_label() -> None:
+    """Canary: a doc hardcoding an unrecognized --family value must fail the
+    same binding assertion the caller-doc tests rely on -- proof the scanner
+    can actually detect drift, not just pass by construction on the corpus
+    as it stands today."""
+    mod = _load_module()
+    known = _known_family_labels(mod)
+    fake_doc = "run `prune_reports.py --family .ai-state/bogus_reports:BOGUS` to prune."
+
+    with pytest.raises(AssertionError):
+        _assert_family_tokens_bind_to_known_labels("fake-doc.md", fake_doc, known)
+
+
+def test_rejects_caller_doc_naming_zero_families() -> None:
+    """Canary: a caller doc that drops the --family flag entirely (reverting
+    to pruning every family) must also fail the binding assertion -- the
+    "must name at least one family" half of the contract, not just the
+    "must be a known label" half."""
+    mod = _load_module()
+    known = _known_family_labels(mod)
+    fake_doc = "run `prune_reports.py` with no scoping flag at all."
+
+    with pytest.raises(AssertionError):
+        _assert_family_tokens_bind_to_known_labels("fake-doc.md", fake_doc, known)

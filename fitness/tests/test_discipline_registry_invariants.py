@@ -1509,6 +1509,74 @@ def check_every_post_boundary_consult_has_a_cost_row(
 
 
 # ---------------------------------------------------------------------------
+# RECONSTRUCTED: marker substance gate -- a `RECONSTRUCTED:`-prefixed `notes`
+# cell is admitted by the schema in place
+# of a harness-surfaced observation only when it actually states the four
+# things CONSULT_COSTS.md § Column Definitions requires: a derivation, a
+# calibration comparison, a transcript path, and a residual direction. Without
+# this check the marker is free to become a bare label -- the exact decay mode
+# dec-308's own `dissent:` field predicted for this series.
+# ---------------------------------------------------------------------------
+
+RECONSTRUCTED_MARKER = "RECONSTRUCTED:"
+_CALIBRATION_COMPARISON_RE = re.compile(r"\d+[^\d]{1,40}(?:vs|recorded)[^\d]{1,40}\d+")
+_RESIDUAL_DIRECTION_WORDS = ("undercount", "overcount", "residual")
+
+
+def check_reconstructed_cost_notes_are_substantive(cost_rows: list[list[str]]) -> list[str]:
+    """Return one failure string per `notes` cell that either misuses or
+    hollows out the `RECONSTRUCTED:` marker.
+
+    A row whose `notes` cell contains the literal marker is checked for:
+      - position -- the marker must lead the note, not appear mid-note (a
+        mid-note marker reads as someone quoting the convention rather than
+        invoking it, and is exempt from the substance checks below)
+      - derivation -- the note states the formula (`input_tokens` or
+        `tokens =`)
+      - calibration -- at least one comparison of two integers via `vs` or
+        `recorded`
+      - transcript -- a `.jsonl` path to the source transcript
+      - residual direction -- `undercount`, `overcount`, or `residual`
+
+    A row whose `notes` cell carries no `RECONSTRUCTED:` marker at all is not
+    inspected -- this gate only constrains rows that claim the label.
+    """
+    failures: list[str] = []
+    cost_index = {field: pos for pos, field in enumerate(COST_ROW_FIELDS)}
+    for row in cost_rows:
+        notes = row[cost_index["notes"]]
+        marker_pos = notes.find(RECONSTRUCTED_MARKER)
+        if marker_pos == -1:
+            continue
+        if marker_pos != 0:
+            failures.append(
+                f"notes cell carries a {RECONSTRUCTED_MARKER!r} marker that does not "
+                f"lead the note (found at offset {marker_pos}): {notes!r}"
+            )
+            continue
+        if "input_tokens" not in notes and "tokens =" not in notes:
+            failures.append(
+                f"RECONSTRUCTED note states no derivation (no 'input_tokens' or "
+                f"'tokens =' found): {notes!r}"
+            )
+        if not _CALIBRATION_COMPARISON_RE.search(notes):
+            failures.append(
+                f"RECONSTRUCTED note states no calibration comparison (no "
+                f"'<int> vs <int>' / '<int> recorded ... <int>' found): {notes!r}"
+            )
+        if ".jsonl" not in notes:
+            failures.append(
+                f"RECONSTRUCTED note states no transcript path (no '.jsonl' found): {notes!r}"
+            )
+        if not any(word in notes for word in _RESIDUAL_DIRECTION_WORDS):
+            failures.append(
+                f"RECONSTRUCTED note states no residual direction (no "
+                f"'undercount'/'overcount'/'residual' found): {notes!r}"
+            )
+    return failures
+
+
+# ---------------------------------------------------------------------------
 # Canaries: check_every_post_boundary_consult_has_a_cost_row and its siblings
 # fail on known-bad inputs.
 # ---------------------------------------------------------------------------
@@ -1634,6 +1702,84 @@ def test_flags_series_boundary_header_missing_from_the_cost_file() -> None:
         "check_series_boundary_matches_gate_constant must flag a cost file with no "
         "'**Series begins**:' header line; got None"
     )
+
+
+# ---------------------------------------------------------------------------
+# Canaries: check_reconstructed_cost_notes_are_substantive fails on known-bad
+# inputs -- the marker must not be free to become a bare label.
+# ---------------------------------------------------------------------------
+
+_SUBSTANTIVE_RECONSTRUCTED_NOTE = (
+    "RECONSTRUCTED: tokens = final assistant message's (input_tokens + "
+    "cache_read_input_tokens + cache_creation_input_tokens + output_tokens) from "
+    "~/.claude/projects/-Users-fperez-dev-praxion/dee467d0-eb81-475a-9974-e09ee647921b/"
+    "subagents/agent-a78b9d5b0d15db26a.jsonl. Calibration: sidecar-placement/"
+    "data-structure-specialist recorded 156321 vs reconstructed 156232 (-0.06%) -- a "
+    "consistent undercount."
+)
+
+
+def test_flags_reconstructed_note_that_is_a_bare_label() -> None:
+    """Canary: a `RECONSTRUCTED:` marker with no derivation, calibration,
+    transcript, or residual direction behind it -- the decay mode the check
+    exists to catch."""
+    bare_row = _cost_row("RECONSTRUCTED: see the async spawn for details")
+    failures = check_reconstructed_cost_notes_are_substantive([bare_row])
+
+    assert len(failures) == 4, f"expected all four substance failures; got: {failures}"
+
+
+def test_flags_reconstructed_note_missing_a_calibration_comparison() -> None:
+    """Canary: a note stating a derivation, transcript, and residual direction
+    but no calibration comparison against a recorded figure."""
+    row = _cost_row(
+        "RECONSTRUCTED: tokens = input_tokens + output_tokens from "
+        "~/.claude/projects/x/subagents/agent-abc.jsonl, a consistent undercount "
+        "of the true figure."
+    )
+    failures = check_reconstructed_cost_notes_are_substantive([row])
+
+    assert len(failures) == 1, f"expected exactly one failure; got: {failures}"
+    assert "calibration comparison" in failures[0]
+
+
+def test_flags_reconstructed_marker_not_leading_the_note() -> None:
+    """Canary: the `RECONSTRUCTED:` marker appearing mid-note, rather than at
+    the start, reads as quoting the convention rather than invoking it."""
+    row = _cost_row(f"see notes below. {_SUBSTANTIVE_RECONSTRUCTED_NOTE}")
+    failures = check_reconstructed_cost_notes_are_substantive([row])
+
+    assert len(failures) == 1, f"expected exactly one failure; got: {failures}"
+    assert "does not lead the note" in failures[0]
+
+
+def test_accepts_a_substantive_reconstructed_note() -> None:
+    """Happy path: a note stating derivation, calibration, transcript, and
+    residual direction -- the real `rust-first-class` row's shape -- passes."""
+    row = _cost_row(_SUBSTANTIVE_RECONSTRUCTED_NOTE)
+    failures = check_reconstructed_cost_notes_are_substantive([row])
+
+    assert not failures, f"expected no failures for a substantive note; got: {failures}"
+
+
+def test_accepts_a_row_with_no_reconstructed_marker() -> None:
+    """Happy path: a row whose notes cell never claims the `RECONSTRUCTED:`
+    label is out of scope for this gate entirely."""
+    row = _cost_row("first consult of the discipline; 8 challenges, 8 switch-now")
+    failures = check_reconstructed_cost_notes_are_substantive([row])
+
+    assert not failures, f"expected no failures for a non-RECONSTRUCTED row; got: {failures}"
+
+
+def test_every_real_reconstructed_cost_note_is_substantive(project_root: Path) -> None:
+    """The substance gate, exercised against the real, shipped
+    .ai-state/CONSULT_COSTS.md (skips cleanly if the file does not exist yet)."""
+    cost_path = project_root / ".ai-state" / "CONSULT_COSTS.md"
+    if not cost_path.is_file():
+        pytest.skip("CONSULT_COSTS.md does not exist yet")
+    rows = parse_cost_table_rows(cost_path.read_text(encoding="utf-8"))
+    failures = check_reconstructed_cost_notes_are_substantive(rows)
+    assert not failures, "RECONSTRUCTED note substance violations:\n  " + "\n  ".join(failures)
 
 
 # ---------------------------------------------------------------------------

@@ -42,8 +42,8 @@ ADD_LABEL_PATTERN = re.compile(r"""--add-label\s+["']?([A-Za-z0-9:_-]+)["']?""")
 # by grepping every other workflow file in `.github/workflows/`) — the
 # intake gate must pin the same commits, not merely "a" 40-hex SHA, so a
 # stale/wrong commit introduced during copy-paste is caught.
-CHECKOUT_PIN = "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0"
-SETUP_UV_PIN = "astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990"
+CHECKOUT_PIN = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+SETUP_UV_PIN = "astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9"
 
 # The autofix workflow's own owned arming/triage labels — the intake gate
 # must never be the one that applies any of these via `--add-label`.

@@ -74,7 +74,7 @@ Prefer `railway.toml`/`railway.json` for single-service settings; reach for the 
 ## CI/CD Wiring
 <!-- last-verified: 2026-07-02 -->
 
-- No first-party GitHub Action exists; marketplace Railway actions are third-party. Railway's blessed pattern is the CLI container image `ghcr.io/railwayapp/cli:latest` plus a `RAILWAY_TOKEN` secret — full workflow example in the `cicd` skill's [patterns-and-examples.md § Railway Deploy](../../cicd/references/patterns-and-examples.md#railway-deploy).
+- No first-party GitHub Action exists; marketplace Railway actions are third-party. Railway's blessed pattern is the CLI container image `ghcr.io/railwayapp/cli:latest` plus a `RAILWAY_TOKEN` secret — full workflow example in the `cicd` skill's [deployment-and-operations.md § Railway Deploy](../../cicd/references/deployment-and-operations.md#railway-deploy).
 - For repos linked to GitHub, prefer Railway's built-in autodeploy with **Wait for CI** (holds the deploy until GitHub checks pass) over deploying from Actions.
 - Post-deploy jobs: Railway emits GitHub `deployment_status` events; trigger downstream workflows on `success`.
 

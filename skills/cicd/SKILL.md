@@ -25,7 +25,8 @@ Comprehensive guidance for designing CI/CD pipelines and authoring GitHub Action
 **Satellite files** (loaded on-demand):
 
 - [references/github-actions.md](references/github-actions.md) -- workflow syntax, runners, action types, secrets, environments, security hardening, debugging
-- [references/patterns-and-examples.md](references/patterns-and-examples.md) -- complete workflow examples for Python, Node, Rust, Go, Docker, release automation, Railway deploys, and monorepo strategies
+- [references/patterns-and-examples.md](references/patterns-and-examples.md) -- complete build/test/release workflow examples for Python, Node, Rust, Go, Docker, release automation, matrix builds, monorepo strategies, and caching
+- [references/deployment-and-operations.md](references/deployment-and-operations.md) -- environment-protected deployments, Railway deploys, scheduled maintenance, PR validation, and a reusable composite setup action
 - [references/ml-experiment-ci.md](references/ml-experiment-ci.md) -- ML experiment CI patterns: eval-gated PRs, checkpoint artifact upload, baseline diffing, triggered dispatch, cost gating
 
 ## Core Principles

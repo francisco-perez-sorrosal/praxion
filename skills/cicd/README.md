@@ -22,7 +22,8 @@ Activates automatically when working on `.github/workflows/` files or discussing
 |------|---------|
 | `SKILL.md` | Core principles, pipeline architecture, deployment strategies, security hardening, caching, DORA metrics, anti-patterns, pre-merge checklist |
 | `references/github-actions.md` | GitHub Actions workflow syntax, runners, action types, secrets management, security hardening, debugging |
-| `references/patterns-and-examples.md` | Complete workflow examples for Python, Node, Rust, Go, Docker, release automation, and monorepo strategies |
+| `references/patterns-and-examples.md` | Build/test/release workflow examples for Python, Node, Rust, Go, Docker, release automation, matrix builds, monorepo strategies, and caching |
+| `references/deployment-and-operations.md` | Deploy-and-operate examples: environment-protected deployments, Railway deploys, scheduled maintenance, PR validation, composite setup action |
 | `references/ml-experiment-ci.md` | ML experiment CI patterns: eval-gated PRs, checkpoint artifact upload, baseline diffing, triggered dispatch, cost gating |
 
 ## Related Skills

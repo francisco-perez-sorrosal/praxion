@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-06T03:40:11Z'
+generated_at: '2026-09-06T03:40:14Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -546,7 +546,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-09-04'
+  last_modified: '2026-09-05'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md

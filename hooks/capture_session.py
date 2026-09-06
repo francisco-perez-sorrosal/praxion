@@ -79,7 +79,7 @@ Known WAL anomalies (diagnosed 2026-08-30, sentinel P03; refined 2026-09-05)
   reproducing since 2026-08-26; no dedup logic is warranted for a
   one-day install-transition artifact.
 * Six `agent_start` rows emitted `tool_use` and never got an `agent_stop`:
-  ``a045b98b6`` (2026-08-13, i-am:implementer), ``a74850d89`` (2026-08-25,
+  ``a045b98b6`` (2026-08-13, implementer (retired local namespace)), ``a74850d89`` (2026-08-25,
   praxion:context-engineer), ``a92a8a243`` (2026-08-31, praxion:implementer),
   ``aa309b3f8`` (2026-09-02, praxion:implementer), ``a30a946aa`` (2026-09-02,
   praxion:systems-architect), ``a07f58e1f`` (2026-09-05, praxion:implementer).

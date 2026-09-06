@@ -22,19 +22,42 @@ Three resolution outcomes:
   the current commit; resolve() returns ``Available(version="current", ...)``
   and collect() emits the line percentage cleanly with ``status == "ok"``.
 
+A fourth namespace-only status, **partial**, layers on top of the three
+resolve()-level outcomes above: a scoped test run rewrites the same
+``coverage.xml`` a full-suite run would, so the artifact's
+mere presence and freshness say nothing about how much of the repository it
+actually measured. ``collect()`` compares ``measured_files`` (from the
+artifact) against ``source_files_total`` (from the repository) and, when the
+ratio falls under ``_MIN_ARTIFACT_SCOPE``, reports ``status == "partial"``
+and withholds ``line_pct`` (set to ``None``) so a 2-of-190-file run cannot
+masquerade as a repo-wide number. **Partial takes precedence over stale**:
+an artifact that is both stale and under-scoped reports ``"partial"``, not
+``"stale"`` -- the scope problem is the one that would otherwise corrupt
+downstream aggregation and trends.
+
 Payload emitted in ``data`` when available:
 
-* ``status`` -- ``"ok"`` or ``"stale"``; the per-namespace marker consumed by
-  the MD renderer to print the freshness caveat.
+* ``status`` -- ``"ok"``, ``"stale"``, or ``"partial"``; the per-namespace
+  marker consumed by the MD renderer to print the freshness/scope caveat.
 * ``artifact_path`` -- absolute or repo-relative path of the parsed artifact;
   included so debugging "why did the number change?" is a one-glance check.
 * ``artifact_format`` -- ``"cobertura"`` or ``"lcov"``; disambiguates which
   parser ran. Useful when both formats are present and one gets updated more
   often than the other.
-* ``line_pct`` -- overall line coverage as a float in [0.0, 1.0].
+* ``line_pct`` -- overall line coverage as a float in [0.0, 1.0], or ``None``
+  when ``status == "partial"``.
 * ``per_file`` -- dict mapping each source file to its own
   ``{"line_pct", "lines_total", "lines_covered"}`` triple. The aggregate
-  composition layer reads this to populate per-file rollups.
+  composition layer reads this to populate per-file rollups. Emitted even
+  when partial -- only the misleading aggregate is withheld.
+* ``measured_files`` -- count of ``per_file`` keys that resolve to a path
+  under ``repo_root``; scratch-directory-style absolute paths from a scoped
+  run do not resolve there and are excluded.
+* ``source_files_total`` -- count of repository files sharing the extension
+  set of the measured files, excluding ecosystem-noise directories and
+  test-shaped paths. The denominator that gives ``measured_files`` meaning.
+* ``artifact_scope_pct`` -- ``measured_files / source_files_total``, or
+  ``None`` when the denominator is zero (no comparable source files found).
 
 Staleness detection uses git commit timestamps rather than filesystem mtimes
 so CI checkouts (which rewrite mtimes on every clone) do not spuriously mark
@@ -45,11 +68,14 @@ gitignored artifacts that are regenerated on demand.
 
 from __future__ import annotations
 
+import fnmatch
+import os
 import subprocess
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
+from scripts.project_metrics._path_filter import is_excluded_path
 from scripts.project_metrics.collectors.base import (
     Available,
     CollectionContext,
@@ -81,6 +107,7 @@ _COVERAGE_INSTALL_HINT_REFRESH: str = (
 _NO_ARTIFACT_REASON: str = "no_artifact"
 
 _GIT_LOG_TIMEOUT_SECONDS: float = 5.0
+_GIT_LS_FILES_TIMEOUT_SECONDS: float = 5.0
 
 # Discovery order: repo root first (most common), then a conventional
 # ``coverage/`` subdirectory. First hit wins. Cobertura before LCOV so XML
@@ -91,6 +118,31 @@ _ARTIFACT_CANDIDATES: tuple[tuple[str, str], ...] = (
     ("lcov.info", "lcov"),
     ("coverage/lcov.info", "lcov"),
 )
+
+# ---------------------------------------------------------------------------
+# Artifact-scope calibration -- below this fraction of measured-vs-source
+# files, an artifact is deemed too narrow to trust for a repo-wide line_pct
+# (see the module docstring's "partial" status entry). 0.25 was chosen
+# against this repo's own incident: the clobbered artifact measured 2 of 191
+# files (0.010), the full one 140 of 191 (0.733) -- any threshold between
+# those two values draws the same line.
+# ---------------------------------------------------------------------------
+
+_MIN_ARTIFACT_SCOPE: float = 0.25
+
+# Basename shapes that mark a file as test code rather than source, for the
+# ``source_files_total`` denominator. Matched with fnmatch, case-sensitive
+# (test naming conventions in every language covered here are lower-case).
+_TEST_BASENAME_GLOBS: tuple[str, ...] = (
+    "test_*.*",
+    "*_test.*",
+    "conftest.py",
+    "*.test.*",
+    "*.spec.*",
+)
+
+# Directory-segment names that mark an entire subtree as test code.
+_TEST_DIR_SEGMENTS: frozenset[str] = frozenset({"tests", "test"})
 
 
 class CoverageCollector(Collector):
@@ -180,15 +232,38 @@ class CoverageCollector(Collector):
             )
 
         namespace_status, extra = _classify_staleness(_check_staleness(repo_root, artifact_path))
+
+        measured_files, measured_extensions = _classify_measured_files(per_file, repo_root)
+        source_files_total = _count_source_files(repo_root, measured_extensions)
+        artifact_scope_pct = _artifact_scope_pct(measured_files, source_files_total)
+
+        is_partial = artifact_scope_pct is not None and artifact_scope_pct < _MIN_ARTIFACT_SCOPE
+        issues: list[str] = []
+        if is_partial:
+            namespace_status = "partial"
+            line_pct = None
+            issues.append(
+                f"coverage artifact measures only {measured_files} of "
+                f"{source_files_total} source files -- regenerate coverage.xml "
+                "from the full test suite before trusting line coverage"
+            )
+
         data: dict[str, Any] = {
             "status": namespace_status,
             "artifact_path": str(artifact_path),
             "artifact_format": artifact_format,
             "line_pct": line_pct,
             "per_file": per_file,
+            "measured_files": measured_files,
+            "source_files_total": source_files_total,
+            "artifact_scope_pct": artifact_scope_pct,
             **extra,
         }
-        return CollectorResult(status="ok", data=data)
+        return CollectorResult(
+            status="partial" if is_partial else "ok",
+            data=data,
+            issues=issues,
+        )
 
     # ------------------------------------------------------------------ helpers
 
@@ -321,6 +396,143 @@ def _filesystem_mtime(artifact_path: Path) -> int | None:
         return int(artifact_path.stat().st_mtime)
     except OSError:
         return None
+
+
+# ---------------------------------------------------------------------------
+# Artifact scope -- how much of the repository the artifact actually
+# measured, independent of whether it's stale. See the module docstring's
+# "partial" status entry for the incident this guards against.
+# ---------------------------------------------------------------------------
+
+
+def _classify_measured_files(
+    per_file: dict[str, Any], repo_root: Path
+) -> tuple[int, frozenset[str]]:
+    """Count ``per_file`` keys that resolve under ``repo_root``; collect their extensions.
+
+    A scoped test run still writes absolute paths for files outside the
+    current tree in some environments (a test-runner scratch copy of the
+    source tree, a different checkout). Those entries cannot
+    be compared against ``repo_root``'s own file count without inflating or
+    deflating the denominator, so they are excluded from both the numerator
+    and the extension set that drives it. Resolution is lexical (``Path.resolve``
+    with no existence requirement) -- the artifact may reference a file that
+    has since been renamed or deleted, which is a legitimate measured entry.
+    """
+
+    resolved_repo_root = repo_root.resolve()
+    measured = 0
+    extensions: set[str] = set()
+    for raw_path in per_file:
+        candidate = Path(raw_path)
+        if not candidate.is_absolute():
+            candidate = repo_root / candidate
+        try:
+            resolved = candidate.resolve()
+        except OSError:
+            continue
+        if resolved != resolved_repo_root and resolved_repo_root not in resolved.parents:
+            continue
+        measured += 1
+        suffix = Path(raw_path).suffix
+        if suffix:
+            extensions.add(suffix)
+    return measured, frozenset(extensions)
+
+
+def _is_test_shaped_path(repo_relative_path: str) -> bool:
+    """Return True when ``repo_relative_path`` is test code, not source.
+
+    Two independent shapes both disqualify a path: a ``tests/``/``test/``
+    directory segment anywhere above the file, or a test-shaped basename
+    (``test_*.py``, ``*_test.py``, ``conftest.py``, ``*.test.*``, ``*.spec.*``).
+    Either alone is sufficient -- a helper module living inside ``tests/``
+    with a plain name is still test code.
+    """
+
+    parts = [part for part in repo_relative_path.replace("\\", "/").split("/") if part]
+    if not parts:
+        return False
+    directory_parts, basename = parts[:-1], parts[-1]
+    if any(part in _TEST_DIR_SEGMENTS for part in directory_parts):
+        return True
+    return any(fnmatch.fnmatch(basename, pattern) for pattern in _TEST_BASENAME_GLOBS)
+
+
+def _list_repo_files(repo_root: Path) -> list[str]:
+    """Return every repo-relative file path, preferring ``git ls-files``.
+
+    Falls back to a filesystem walk (pruning ``DEFAULT_EXCLUDED_DIRS``) when
+    ``repo_root`` is not a git checkout or git is unavailable -- the
+    denominator must still be computable for a plain directory.
+    """
+
+    tracked = _run_git_ls_files(repo_root)
+    if tracked is not None:
+        return tracked
+    return _walk_repo_files(repo_root)
+
+
+def _run_git_ls_files(repo_root: Path) -> list[str] | None:
+    """Return ``git ls-files`` output as repo-relative paths, or None on failure."""
+
+    try:
+        completed = subprocess.run(
+            ["git", "ls-files"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=_GIT_LS_FILES_TIMEOUT_SECONDS,
+            cwd=str(repo_root),
+        )
+    except (
+        FileNotFoundError,
+        subprocess.TimeoutExpired,
+        subprocess.CalledProcessError,
+        OSError,
+    ):
+        return None
+    return [line.strip() for line in completed.stdout.splitlines() if line.strip()]
+
+
+def _walk_repo_files(repo_root: Path) -> list[str]:
+    """Enumerate files under ``repo_root`` via ``os.walk``, pruning excluded dirs."""
+
+    results: list[str] = []
+    for current_dir, dirnames, filenames in os.walk(repo_root):
+        rel_dir = Path(current_dir).relative_to(repo_root).as_posix()
+        dirnames[:] = [
+            name
+            for name in dirnames
+            if not is_excluded_path(f"{rel_dir}/{name}" if rel_dir != "." else name)
+        ]
+        for filename in filenames:
+            results.append(f"{rel_dir}/{filename}" if rel_dir != "." else filename)
+    return results
+
+
+def _count_source_files(repo_root: Path, extensions: frozenset[str]) -> int:
+    """Count repository files sharing ``extensions``, excluding noise and test paths."""
+
+    if not extensions:
+        return 0
+    count = 0
+    for rel_path in _list_repo_files(repo_root):
+        if is_excluded_path(rel_path):
+            continue
+        if _is_test_shaped_path(rel_path):
+            continue
+        if Path(rel_path).suffix in extensions:
+            count += 1
+    return count
+
+
+def _artifact_scope_pct(measured_files: int, source_files_total: int) -> float | None:
+    """Return ``measured_files / source_files_total``, or None when the denominator is zero."""
+
+    if source_files_total <= 0:
+        return None
+    return measured_files / source_files_total
 
 
 def _parse_artifact(

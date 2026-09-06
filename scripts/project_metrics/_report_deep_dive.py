@@ -373,8 +373,39 @@ def _summarize_readiness(data: dict[str, Any]) -> list[str]:
     return lines
 
 
+def _summarize_coverage_scope(data: dict[str, Any]) -> list[str]:
+    """Render the measured-vs-source scope line, plus a withheld-coverage note when partial.
+
+    ``line_pct`` alone cannot distinguish a repo-wide measurement from a
+    scoped one that happens to still be present and well-formed -- the exact
+    failure this project's own ``coverage.xml`` demonstrated: two runs at the
+    same commit recorded 0.8514 then 0.5071 because a scoped test invocation
+    had rewritten the artifact in between, with no change to what it claimed
+    to measure. Stating scope in the human-facing report, not just the JSON
+    sibling, is what makes that distinction visible to a reader.
+    """
+
+    lines: list[str] = []
+    measured = data.get("measured_files")
+    total_files = data.get("source_files_total")
+    if isinstance(measured, int) and isinstance(total_files, int) and total_files > 0:
+        scope_pct = data.get("artifact_scope_pct")
+        pct_str = fmt_pct(scope_pct) if isinstance(scope_pct, (int, float)) else NULL_CELL
+        lines.append(
+            f"- Artifact scope: {fmt_int(measured)} of {fmt_int(total_files)} "
+            f"source files ({pct_str})"
+        )
+    if data.get("status") == "partial":
+        lines.append(
+            "- Line coverage withheld: the artifact measures too small a share of "
+            "the repository to trust a repo-wide percentage — regenerate from the "
+            "full test suite; see the scope line above."
+        )
+    return lines
+
+
 def _summarize_coverage(data: dict[str, Any]) -> list[str]:
-    """Lowest-covered files, ascending — the bottom of the distribution.
+    """Artifact scope, then lowest-covered files, ascending — the bottom of the distribution.
 
     The ``line_pct`` bullet above is an aggregate, and an aggregate is
     structurally blind to one badly-tested module inside a healthy repository
@@ -397,9 +428,11 @@ def _summarize_coverage(data: dict[str, Any]) -> list[str]:
     renderer would create a second site to drift.
     """
 
+    scope_lines = _summarize_coverage_scope(data)
+
     per_file = data.get("per_file")
     if not isinstance(per_file, dict) or not per_file:
-        return []
+        return scope_lines
 
     ranked: list[tuple[float, str, Any, Any]] = []
     for path, entry in per_file.items():
@@ -410,7 +443,7 @@ def _summarize_coverage(data: dict[str, Any]) -> list[str]:
             continue
         ranked.append((float(pct), str(path), entry.get("lines_covered"), entry.get("lines_total")))
     if not ranked:
-        return []
+        return scope_lines
 
     # Path breaks ties so equally-covered files order deterministically.
     ranked.sort(key=lambda row: (row[0], row[1]))
@@ -418,7 +451,7 @@ def _summarize_coverage(data: dict[str, Any]) -> list[str]:
     omitted = len(ranked) - len(shown)
 
     scope = f"all {len(ranked)}" if omitted == 0 else f"{len(shown)} of {len(ranked)}"
-    lines = [f"- Lowest-covered files ({scope}, worst first):"]
+    lines = [*scope_lines, f"- Lowest-covered files ({scope}, worst first):"]
     for pct, path, covered, total in shown:
         detail = ""
         if isinstance(covered, int) and isinstance(total, int):

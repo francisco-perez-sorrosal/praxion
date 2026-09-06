@@ -107,10 +107,11 @@ class ToolAvailability:
     `tool_availability` block in the root JSON is a mapping from tool name
     (string) to this record.
 
-    Per-collector *content* states like `no_artifact` or `stale` (coverage
-    artifact absent vs present-but-stale) live inside the collector's own
-    namespace block (e.g., `coverage.status`), not here. Tool availability
-    tracks whether the tool ran; namespace status tracks what the tool found.
+    Per-collector *content* states like `no_artifact`, `stale`, or `partial`
+    (coverage artifact absent, present-but-stale, or present-but-scoped-to-
+    too-few-files to trust) live inside the collector's own namespace block
+    (e.g., `coverage.status`), not here. Tool availability tracks whether the
+    tool ran; namespace status tracks what the tool found.
     """
 
     status: str

@@ -14,7 +14,6 @@ affected_files:
   - scripts/praxion-sidecar
   - scripts/onboard-project
   - scripts/upgrade_project_pins.sh
-  - .ai-work/sidecar-placement/INTERFACE_DESIGN.md
 dissent: "Three shipped scripts already disagree about codes above 2 (onboard-project reserves 3-8 for its own preconditions, upgrade_project_pins.sh uses only 0/1), so codifying a 'shared' contract that in practice only fixes 0/1/2 may be ceremony over a convention that could simply be documented per script."
 ---
 

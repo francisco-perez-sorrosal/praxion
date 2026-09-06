@@ -8,6 +8,8 @@ disposition is **repair**, not retirement:
 
     placeholder-shape   a path *shape*, never a real path        -> fix the entry
     out-of-repo         `~/...` -- outside the repository        -> fix the entry
+    ephemeral-path      cites a gitignored `.ai-work/`-shaped    -> fix the entry
+                        path (or `tmp/`, `.claude/worktrees/`)
     lazy-artifact       absence is declared expected             -> nothing
     renamed             the subject moved                        -> update the path
     renamed-by-self     this decision renamed it                 -> nothing; it worked
@@ -23,6 +25,14 @@ load-bearing records in a corpus.
 edges that exist in reality but were never recorded, which is the honest
 explanation for a supersession rate near 4%: the corpus is under-linked, not
 bloated with dead decisions.
+
+`ephemeral-path` is checked before the on-disk existence test, not after: an
+`.ai-work/`-shaped reference from an in-flight pipeline can still resolve
+locally on the authoring machine and would otherwise slip past every other
+class as a false "present". The path is wrong regardless of whether it
+currently exists, because `.ai-work/`, `tmp/`, and `.claude/worktrees/` are
+gitignored and deleted at cleanup -- the entry should have cited the
+persistent artifact the ephemeral document informed.
 
 Advisory by construction: emits candidates, never edits an ADR, never changes a
 `status`, and exits 0 even with findings. A decision can be correct and silent
@@ -44,7 +54,12 @@ Decisions at a terminal status are excluded: their references are history, not
 a live index. `retired` ones are still probed in the other direction -- when a
 retired decision's paths resolve again its subject has returned, and it is
 offered as a **re-open candidate** so architecture that comes back finds its
-prior reasoning waiting instead of being re-litigated from zero.
+prior reasoning waiting instead of being re-litigated from zero. A path only
+qualifies once its prior *absence* is confirmed by the deletion index -- a
+decision retired before its subject was ever implemented never had an absence
+to reverse, and re-firing on it every run would just be noise. Without git
+history the deletion index cannot answer, so no re-open candidates are
+offered at all (withheld, not defaulted to silence).
 
 Invoked by the sentinel's DH dimension (`--json`); also runnable standalone.
 Exit code is always 0 -- this reports, it does not gate.
@@ -71,6 +86,12 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 # A path *shape* teaching a convention, never a concrete file.
 _SHAPE = re.compile(r"<[^>]*>|\*|\{\{|\bNNN\b|\bYYYY\b")
+
+# Gitignored, cleanup-deleted roots -- a reference here is wrong for the
+# record's whole life regardless of whether it happens to resolve on disk
+# right now (see `_ephemeral_root`). One tuple constant so the docstring,
+# `_classify_one`, and any future consumer share a single enumeration.
+_EPHEMERAL_ROOTS = (".ai-work/", "tmp/", ".claude/worktrees/")
 
 # Titles/summaries whose decision is itself a removal. Deliberately broad: a
 # false positive here only downgrades a finding to "the decision worked", which
@@ -445,6 +466,11 @@ def classify(repo_root: Path) -> dict:
             "(shallow clone or not a repository) -- these findings are withheld, "
             "not defaulted to `vanished`"
         )
+        withheld.append(
+            "reopen_candidates: git history unavailable (shallow clone or not a "
+            "repository) -- a retired decision's paths cannot be confirmed as "
+            "having been deleted, so none are offered as re-open candidates"
+        )
     if lazy_shapes is None:
         withheld.append(
             f"lazy-artifact, and the `vanished` residual that depends on it: could not "
@@ -474,26 +500,32 @@ def classify(repo_root: Path) -> dict:
         if status in _TERMINAL_STATUSES:
             skipped_terminal.append(adr.name)
             if status == "retired":
-                returned = [r for r in parse_affected_files(text) if (repo_root / r).exists()]
+                # Prior *absence* is the gate, not mere presence: a decision
+                # retired before its subject was ever implemented never had an
+                # absence to reverse, and would otherwise re-fire every run
+                # (see the module docstring's re-open paragraph).
+                returned = [
+                    r
+                    for r in parse_affected_files(text)
+                    if (repo_root / r).exists() and _deletion_date(r, deletions) is not None
+                ]
                 if returned:
                     reopen.append({"adr": adr.name, "paths_returned": sorted(returned)})
             continue
         for ref in parse_affected_files(text):
             scanned += 1
+            static = _classify_static(ref)
+            if static is not None:
+                # Checked before the existence test on purpose -- an in-flight
+                # `.ai-work/` path can still resolve on disk (see `_ephemeral_root`).
+                findings.append(_finding(adr.name, ref, *static))
+                continue
             if (repo_root / ref).exists():
                 continue
             cls, disp, detail = _classify_one(
                 adr.name, ref, deletions, renames, lazy_shapes, removers, have_history
             )
-            findings.append(
-                {
-                    "adr": adr.name,
-                    "path": ref,
-                    "decay_class": cls,
-                    "disposition": disp,
-                    "detail": detail,
-                }
-            )
+            findings.append(_finding(adr.name, ref, cls, disp, detail))
 
     return {
         "scanned_references": scanned,
@@ -555,12 +587,46 @@ def _category_mix(categories: list[str], ids: list[int] | None = None) -> dict:
     return mix
 
 
-def _classify_one(adr_name, ref, deletions, renames, lazy_shapes, removers, have_history):
-    """Return (decay_class, disposition, detail) for one unresolved reference."""
+def _finding(adr_name: str, ref: str, cls: str, disp: str, detail: str) -> dict:
+    """Build one `findings` entry -- shared shape for every decay class."""
+    return {"adr": adr_name, "path": ref, "decay_class": cls, "disposition": disp, "detail": detail}
+
+
+def _ephemeral_root(ref: str) -> str | None:
+    """The ephemeral root `ref` falls under, or None.
+
+    Deliberately a plain prefix match, not `_SHAPE`: an ephemeral reference is
+    almost always a concrete, currently-real path (the in-flight document a
+    pipeline just wrote), which is exactly why the existence check alone
+    cannot catch it.
+    """
+    return next((root for root in _EPHEMERAL_ROOTS if ref.startswith(root)), None)
+
+
+def _classify_static(ref: str) -> tuple[str, str, str] | None:
+    """Classes decidable from the reference string alone -- no existence check needed.
+
+    Evaluated before the on-disk existence test in `classify()`, not after: an
+    `.ai-work/`-shaped reference can still resolve locally (an in-flight pipeline
+    document), and the existence short-circuit would otherwise hide it forever.
+    Order matters -- a placeholder shape like `.ai-work/<task-slug>/x.md` teaches
+    a convention rather than citing a real ephemeral document, so shape wins.
+    """
     if _SHAPE.search(ref):
         return "placeholder-shape", "fix-entry", "a path shape, not a concrete path"
     if ref.startswith(("~", "/")):
         return "out-of-repo", "fix-entry", "resolves outside the repository"
+    if _ephemeral_root(ref) is not None:
+        return (
+            "ephemeral-path",
+            "fix-entry",
+            "ephemeral, gitignored path; cite the persistent artifact it informed",
+        )
+    return None
+
+
+def _classify_one(adr_name, ref, deletions, renames, lazy_shapes, removers, have_history):
+    """Return (decay_class, disposition, detail) for one unresolved reference."""
     if lazy_shapes is not None and any(_matches_shape(ref, s) for s in lazy_shapes):
         return "lazy-artifact", "none", "artifact-inventory declares absence expected"
     if not have_history:

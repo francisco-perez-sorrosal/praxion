@@ -14,7 +14,6 @@ affected_files:
   - scripts/praxion-sidecar
   - hooks/inject_sidecar_banner.py
   - scripts/finalize_chain.sh
-  - .ai-work/sidecar-placement/INTERFACE_DESIGN.md
 dissent: "A doctor --fix is what every operator's muscle memory expects from a doctor subcommand (brew, flutter, npm), and telling them to run a differently-named verb after every diagnosis adds a step to the most common recovery path in the whole CLI."
 ---
 

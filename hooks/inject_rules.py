@@ -389,12 +389,155 @@ def _emit_additional_context(context: str) -> None:
 # -- Main logic ----------------------------------------------------------------
 
 
-def main() -> None:
-    # Drain stdin — the hook framework can SIGPIPE if stdin is left unread.
+def _drain_stdin() -> str:
+    """Read and discard stdin so the hook framework never SIGPIPEs on its write end."""
     try:
-        raw = sys.stdin.read()
+        return sys.stdin.read()
     except OSError:
-        raw = ""
+        return ""
+
+
+def _resolve_plugin_root() -> Path:
+    """Resolve the plugin root from CLAUDE_PLUGIN_ROOT, or two levels above this file."""
+    plugin_root_str = os.environ.get("CLAUDE_PLUGIN_ROOT", "")
+    if plugin_root_str:
+        return Path(plugin_root_str)
+    return Path(__file__).resolve().parent.parent
+
+
+def _resolve_cwd(raw_payload: str) -> Path:
+    """Parse the SessionStart JSON payload on stdin and resolve the working directory."""
+    try:
+        payload = json.loads(raw_payload) if raw_payload.strip() else {}
+    except (json.JSONDecodeError, TypeError):
+        payload = {}
+    return Path(payload.get("cwd") or os.getcwd())
+
+
+def _resolve_schema_version(project_cfg: dict) -> int:
+    """Extract and validate the project config's `version:` field, coercing bad shapes to 1."""
+    raw_version = project_cfg.get("version", 1)
+    if isinstance(raw_version, int):
+        return raw_version
+    print(
+        f"[inject_rules] WARNING: 'version:' field has non-integer"
+        f" value {raw_version!r}; coercing to 1. Expected: 'version: 1'.",
+        file=sys.stderr,
+    )
+    return 1
+
+
+def _resolve_disable_patterns(cwd: Path) -> list[str]:
+    """Load the project's raw `disable:` patterns, failing open on any malformed input.
+
+    Returns an empty list for: missing config, malformed YAML, an unsupported
+    schema version, or a non-list `disable:` value. Each fail-open path emits
+    a stderr warning except the plain-missing-config case (backward compat).
+    """
+    try:
+        project_cfg = _load_project_config(cwd)
+    except ValueError as exc:
+        print(
+            f"[inject_rules] WARNING: {exc}; injecting all rules (fail open)",
+            file=sys.stderr,
+        )
+        return []
+    if project_cfg is None:
+        return []
+
+    version = _resolve_schema_version(project_cfg)
+    if version > SUPPORTED_SCHEMA_VERSION:
+        print(
+            f"[inject_rules] Schema version {version} is not supported by "
+            "this version of Praxion; falling back to no suppression",
+            file=sys.stderr,
+        )
+        return []  # Fail open: inject all (no suppression)
+
+    raw_disable = project_cfg.get("disable", [])
+    if isinstance(raw_disable, list):
+        return list(raw_disable)
+    if "disable" in project_cfg:
+        # Present but malformed: scalar, dict, or null. Silent coercion would
+        # mask a typo (e.g., `disable: ml/*` instead of `disable: [ml/*]`), so
+        # surface it explicitly.
+        print(
+            f"[inject_rules] WARNING: 'disable:' must be a YAML list,"
+            f" got {type(raw_disable).__name__}: {raw_disable!r}."
+            " Treating as empty. Use the list form:"
+            " 'disable:\\n  - rule/id'",
+            file=sys.stderr,
+        )
+    return []
+
+
+def _compute_disable_set(
+    disable_patterns: list[str], rules: list[dict], all_rule_ids: list[str]
+) -> set[str]:
+    """Resolve glob patterns to rule IDs, warn on typos, and strip core rules.
+
+    Combines glob resolution (`_resolve_disable_globs`) with core-rule
+    protection (`_filter_core_rules`) — the two steps that turn raw YAML
+    patterns into the final, safe-to-apply set of suppressed rule IDs.
+    """
+    disable_set, unmatched_patterns = _resolve_disable_globs(disable_patterns, all_rule_ids)
+    for pattern in unmatched_patterns:
+        print(
+            f"[inject_rules] WARNING: disable pattern {pattern!r} matched no"
+            " rule in rules/_manifest.yaml — typo? Run `python3"
+            " scripts/regenerate_rules_manifest.py` to see valid IDs.",
+            file=sys.stderr,
+        )
+    return _filter_core_rules(disable_set, rules)
+
+
+def _select_hook_deliver_rules(
+    rules: list[dict], disable_set: set[str]
+) -> tuple[list[dict], list[dict], list[str]]:
+    """Split hook-deliver rules into (rules to inject, all hook-deliver rules, suppressed IDs)."""
+    hook_deliver_rules = [r for r in rules if r.get("install") == "hook-deliver"]
+    inject_rules = [r for r in hook_deliver_rules if r.get("id") not in disable_set]
+    suppressed_hd_ids = [r["id"] for r in hook_deliver_rules if r.get("id") in disable_set]
+    return inject_rules, hook_deliver_rules, suppressed_hd_ids
+
+
+def _collect_rule_bodies(plugin_root: Path, inject_rules: list[dict]) -> list[str]:
+    """Read and collect bodies for the selected rules, in manifest order."""
+    bodies: list[str] = []
+    for rule in inject_rules:
+        body = _read_rule_body(plugin_root, rule)
+        if body:
+            bodies.append(body)
+    return bodies
+
+
+def _log_injection_summary(
+    rules: list[dict],
+    inject_rules: list[dict],
+    hook_deliver_rules: list[dict],
+    suppressed_hd_ids: list[str],
+    disable_set: set[str],
+) -> None:
+    """Emit the stderr observability summary line for this SessionStart run.
+
+    `disable_set` (sorted) doubles as the claudeMdExcludes entry list: it now
+    covers every non-core disabled rule regardless of install type
+    (defense-in-depth — see `_compute_symlink_exclusions`).
+    """
+    core_count = sum(1 for r in rules if r.get("core") is True)
+    hd_suppressed_str = ", ".join(sorted(suppressed_hd_ids)) if suppressed_hd_ids else "none"
+    exclusion_str = ", ".join(sorted(disable_set)) if disable_set else "none"
+    print(
+        f"[inject_rules] Loaded {core_count} core rules;"
+        f" injected {len(inject_rules)}/{len(hook_deliver_rules)} hook-deliver rules"
+        f" (suppressed: {hd_suppressed_str});"
+        f" claudeMdExcludes entries: {exclusion_str}",
+        file=sys.stderr,
+    )
+
+
+def main() -> None:
+    raw = _drain_stdin()
 
     # Kill switch: opt-out env var disables injection entirely.
     if is_disabled(DISABLE_FLAG):
@@ -404,19 +547,8 @@ def main() -> None:
         )
         return
 
-    # Resolve plugin root and working directory.
-    plugin_root_str = os.environ.get("CLAUDE_PLUGIN_ROOT", "")
-    if plugin_root_str:
-        plugin_root = Path(plugin_root_str)
-    else:
-        # Fallback: derive from hook file location (two levels up from hooks/).
-        plugin_root = Path(__file__).resolve().parent.parent
-
-    try:
-        payload = json.loads(raw) if raw.strip() else {}
-    except (json.JSONDecodeError, TypeError):
-        payload = {}
-    cwd = Path(payload.get("cwd") or os.getcwd())
+    plugin_root = _resolve_plugin_root()
+    cwd = _resolve_cwd(raw)
 
     # Locate and parse manifest; missing manifest is non-fatal.
     rules = _load_manifest(plugin_root)
@@ -432,66 +564,8 @@ def main() -> None:
 
     # Read project blacklist; missing = empty disable list (backward compat).
     # Malformed YAML is fail-open; schema version > 1 is fail-open.
-    disable_patterns: list[str] = []
-    try:
-        project_cfg = _load_project_config(cwd)
-        if project_cfg is not None:
-            raw_version = project_cfg.get("version", 1)
-            if not isinstance(raw_version, int):
-                print(
-                    f"[inject_rules] WARNING: 'version:' field has non-integer"
-                    f" value {raw_version!r}; coercing to 1. Expected: 'version: 1'.",
-                    file=sys.stderr,
-                )
-                version = 1
-            else:
-                version = raw_version
-            if version > SUPPORTED_SCHEMA_VERSION:
-                print(
-                    f"[inject_rules] Schema version {version} is not supported by "
-                    "this version of Praxion; falling back to no suppression",
-                    file=sys.stderr,
-                )
-                # Fail open: inject all (no suppression)
-                disable_patterns = []
-            else:
-                raw_disable = project_cfg.get("disable", [])
-                if isinstance(raw_disable, list):
-                    disable_patterns = list(raw_disable)
-                elif "disable" in project_cfg:
-                    # Present but malformed: scalar, dict, or null. Silent
-                    # coercion would mask a typo (e.g., `disable: ml/*` instead
-                    # of `disable: [ml/*]`), so surface it explicitly.
-                    print(
-                        f"[inject_rules] WARNING: 'disable:' must be a YAML list,"
-                        f" got {type(raw_disable).__name__}: {raw_disable!r}."
-                        " Treating as empty. Use the list form:"
-                        " 'disable:\\n  - rule/id'",
-                        file=sys.stderr,
-                    )
-                    disable_patterns = []
-                else:
-                    disable_patterns = []
-    except ValueError as exc:
-        print(
-            f"[inject_rules] WARNING: {exc}; injecting all rules (fail open)",
-            file=sys.stderr,
-        )
-        disable_patterns = []
-
-    # Resolve glob patterns (e.g., ml/*) to concrete rule IDs. Warn for any
-    # pattern that matched zero rules — catches typos like `disable: [my/tpyo]`.
-    disable_set, unmatched_patterns = _resolve_disable_globs(disable_patterns, all_rule_ids)
-    for pattern in unmatched_patterns:
-        print(
-            f"[inject_rules] WARNING: disable pattern {pattern!r} matched no"
-            " rule in rules/_manifest.yaml — typo? Run `python3"
-            " scripts/regenerate_rules_manifest.py` to see valid IDs.",
-            file=sys.stderr,
-        )
-
-    # Remove core rules from disable set; warn for each attempted suppression.
-    disable_set = _filter_core_rules(disable_set, rules)
+    disable_patterns = _resolve_disable_patterns(cwd)
+    disable_set = _compute_disable_set(disable_patterns, rules, all_rule_ids)
 
     # Reconcile claudeMdExcludes in .claude/settings.json with the symlinked
     # rules in the disable set. Hook-deliver rules are handled below via the
@@ -500,38 +574,13 @@ def main() -> None:
     symlink_exclusions = _compute_symlink_exclusions(disable_set, rules)
     _apply_symlink_exclusions(cwd, symlink_exclusions)
 
-    # Build inject set: hook-deliver rules that are not suppressed.
-    inject_rules = [
-        r for r in rules if r.get("install") == "hook-deliver" and r.get("id") not in disable_set
-    ]
-    hook_deliver_rules = [r for r in rules if r.get("install") == "hook-deliver"]
-    suppressed_hd_ids = [r["id"] for r in hook_deliver_rules if r.get("id") in disable_set]
-    # claudeMdExcludes now covers every non-core disabled rule regardless of
-    # install type (defense-in-depth — see _compute_symlink_exclusions).
-    exclusion_ids = sorted(disable_set)
-
-    core_count = sum(1 for r in rules if r.get("core") is True)
+    inject_rules, hook_deliver_rules, suppressed_hd_ids = _select_hook_deliver_rules(
+        rules, disable_set
+    )
+    _log_injection_summary(rules, inject_rules, hook_deliver_rules, suppressed_hd_ids, disable_set)
 
     # Concatenate rule bodies in manifest order under a single H2 header.
-    bodies: list[str] = []
-    for rule in inject_rules:
-        body = _read_rule_body(plugin_root, rule)
-        if body:
-            bodies.append(body)
-
-    # Emit observability summary to stderr.
-    injected_count = len(inject_rules)
-    total_hook_deliver = len(hook_deliver_rules)
-    hd_suppressed_str = ", ".join(sorted(suppressed_hd_ids)) if suppressed_hd_ids else "none"
-    exclusion_str = ", ".join(exclusion_ids) if exclusion_ids else "none"
-    print(
-        f"[inject_rules] Loaded {core_count} core rules;"
-        f" injected {injected_count}/{total_hook_deliver} hook-deliver rules"
-        f" (suppressed: {hd_suppressed_str});"
-        f" claudeMdExcludes entries: {exclusion_str}",
-        file=sys.stderr,
-    )
-
+    bodies = _collect_rule_bodies(plugin_root, inject_rules)
     if not bodies:
         return
 

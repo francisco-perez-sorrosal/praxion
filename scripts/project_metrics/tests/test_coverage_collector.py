@@ -57,6 +57,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -811,3 +812,310 @@ class TestCoverageContextAwareInstallHint:
         (tmp_path / "pyproject.toml").write_text("[project]\nname = 'demo'\n")
         hint = _choose_install_hint(tmp_path)
         assert hint == _COVERAGE_INSTALL_HINT_GENERIC
+
+
+# ---------------------------------------------------------------------------
+# Artifact scope -- a scoped test run rewrites the same coverage.xml a full
+# run would, so freshness alone (the stale-detection tests above) cannot
+# catch a 2-of-190-file measurement masquerading as repo-wide. These tests
+# cover the scope fields and the "partial" status that withholds line_pct
+# when the artifact's measured/source ratio falls under the floor.
+# ---------------------------------------------------------------------------
+
+
+def _write_cobertura(
+    path: Path,
+    files: dict[str, tuple[int, int]],
+    overall_line_rate: float = 0.5,
+) -> None:
+    """Write a minimal Cobertura ``coverage.xml`` for arbitrary per-file (total, covered) pairs.
+
+    Populates only the elements/attributes ``_parse_cobertura`` reads. This is
+    a synthetic fixture builder for artifact-scope tests -- the golden
+    round-trip parse tests above use the committed ``coverage.xml``/``lcov.info``
+    fixtures instead.
+    """
+
+    root = ET.Element("coverage", attrib={"line-rate": str(overall_line_rate)})
+    classes_elem = ET.SubElement(
+        ET.SubElement(ET.SubElement(root, "packages"), "package"), "classes"
+    )
+    for filename, (total, covered) in files.items():
+        class_elem = ET.SubElement(classes_elem, "class", attrib={"filename": filename})
+        lines_elem = ET.SubElement(class_elem, "lines")
+        for line_number in range(1, total + 1):
+            hits = "1" if line_number <= covered else "0"
+            ET.SubElement(lines_elem, "line", attrib={"number": str(line_number), "hits": hits})
+    ET.ElementTree(root).write(path)
+
+
+def _combined_git_dispatcher(
+    *,
+    artifact_ct: int = 1_713_870_000,
+    head_ct: int = 1_713_870_000,
+    ls_files_lines: list[str] | None = None,
+) -> Any:
+    """Route every ``subprocess.run`` call ``collect()`` makes: the two
+    staleness ``git log`` invocations (delegated to the golden-fixture
+    dispatcher's routing) plus the new ``git ls-files`` denominator call.
+
+    Kept in the test module rather than the collector -- dispatch-by-argv is
+    a test-double concern, not production behavior.
+    """
+
+    log_dispatch = _git_log_dispatcher(artifact_ct=artifact_ct, head_ct=head_ct)
+
+    def _dispatch(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0] if args else kwargs.get("args") or []
+        argv_list = list(argv) if isinstance(argv, (list, tuple)) else [str(argv)]
+        if "ls-files" in argv_list:
+            stdout = "".join(f"{line}\n" for line in (ls_files_lines or []))
+            return _make_completed_process(stdout=stdout, argv=argv_list)
+        return log_dispatch(*args, **kwargs)
+
+    return _dispatch
+
+
+class TestCoverageArtifactScopeFields:
+    """collect() publishes measured_files/source_files_total/artifact_scope_pct."""
+
+    def test_full_artifact_reports_ok_with_scope_fields(self, tmp_path: Path) -> None:
+        from scripts.project_metrics.collectors.coverage_collector import (
+            CoverageCollector,
+        )
+
+        scratch = tmp_path / "repo"
+        scratch.mkdir()
+        _write_cobertura(
+            scratch / "coverage.xml",
+            {
+                "src/utils.py": (20, 20),
+                "src/parser.py": (30, 15),
+                "src/cli.py": (50, 38),
+            },
+            overall_line_rate=0.73,
+        )
+
+        collector = CoverageCollector(repo_root=scratch)
+        target = "scripts.project_metrics.collectors.coverage_collector"
+        # 3 measured .py files + 1 untouched .py file -- scope well above the floor.
+        dispatcher = _combined_git_dispatcher(
+            ls_files_lines=["src/utils.py", "src/parser.py", "src/cli.py", "src/extra.py"]
+        )
+        with patch(f"{target}.subprocess.run", side_effect=dispatcher):
+            result = collector.collect(_make_context(scratch))
+
+        assert result.status == "ok"
+        assert result.data["status"] == "ok"
+        assert result.data["measured_files"] == 3
+        assert result.data["source_files_total"] == 4
+        assert result.data["artifact_scope_pct"] == 0.75
+        assert result.data["line_pct"] is not None
+        assert result.issues == []
+
+    def test_partial_artifact_reports_partial_status_and_withholds_line_pct(
+        self, tmp_path: Path
+    ) -> None:
+        from scripts.project_metrics.collectors.coverage_collector import (
+            CoverageCollector,
+        )
+
+        scratch = tmp_path / "repo"
+        scratch.mkdir()
+        _write_cobertura(
+            scratch / "coverage.xml",
+            {
+                "src/utils.py": (20, 20),
+                "src/parser.py": (30, 15),
+                "src/cli.py": (50, 38),
+            },
+            overall_line_rate=0.73,
+        )
+
+        collector = CoverageCollector(repo_root=scratch)
+        target = "scripts.project_metrics.collectors.coverage_collector"
+        # 3 measured of 23 total .py files -- 0.130 scope, well under the 0.25 floor.
+        untouched = [f"src/untouched_{i}.py" for i in range(20)]
+        dispatcher = _combined_git_dispatcher(
+            ls_files_lines=["src/utils.py", "src/parser.py", "src/cli.py", *untouched]
+        )
+        with patch(f"{target}.subprocess.run", side_effect=dispatcher):
+            result = collector.collect(_make_context(scratch))
+
+        assert result.status == "partial"
+        assert result.data["status"] == "partial"
+        assert result.data["line_pct"] is None, (
+            f"Expected line_pct withheld under a partial artifact; got {result.data['line_pct']!r}"
+        )
+        assert result.data["measured_files"] == 3
+        assert result.data["source_files_total"] == 23
+        assert abs(result.data["artifact_scope_pct"] - (3 / 23)) < 1e-9
+        # per_file must still be emitted -- only the misleading aggregate is withheld.
+        assert result.data["per_file"], "Expected per_file still populated when partial"
+        assert len(result.issues) == 1
+        assert "3" in result.issues[0]
+        assert "23" in result.issues[0]
+
+    def test_partial_takes_precedence_over_stale(self, tmp_path: Path) -> None:
+        """An artifact that is both stale and under-scoped reports 'partial', not 'stale'."""
+
+        from scripts.project_metrics.collectors.coverage_collector import (
+            CoverageCollector,
+        )
+
+        scratch = tmp_path / "repo"
+        scratch.mkdir()
+        _write_cobertura(scratch / "coverage.xml", {"src/utils.py": (20, 20)})
+
+        collector = CoverageCollector(repo_root=scratch)
+        target = "scripts.project_metrics.collectors.coverage_collector"
+        untouched = [f"src/untouched_{i}.py" for i in range(10)]
+        dispatcher = _combined_git_dispatcher(
+            artifact_ct=1_713_800_000,  # older -- would be "stale" on its own
+            head_ct=1_713_870_000,
+            ls_files_lines=["src/utils.py", *untouched],
+        )
+        with patch(f"{target}.subprocess.run", side_effect=dispatcher):
+            result = collector.collect(_make_context(scratch))
+
+        assert result.data["status"] == "partial"
+
+    def test_denominator_excludes_test_shaped_paths_and_excluded_dirs(self, tmp_path: Path) -> None:
+        from scripts.project_metrics.collectors.coverage_collector import (
+            CoverageCollector,
+        )
+
+        scratch = tmp_path / "repo"
+        scratch.mkdir()
+        _write_cobertura(
+            scratch / "coverage.xml",
+            {
+                "src/utils.py": (20, 20),
+                "src/parser.py": (30, 15),
+                "src/cli.py": (50, 38),
+            },
+            overall_line_rate=0.73,
+        )
+
+        collector = CoverageCollector(repo_root=scratch)
+        target = "scripts.project_metrics.collectors.coverage_collector"
+        noise = [
+            "src/extra.py",  # legitimate source -- counts toward the total
+            "tests/test_extra.py",  # excluded: tests/ directory segment
+            "src/test_helper.py",  # excluded: test_*.py basename
+            "src/helper_test.py",  # excluded: *_test.py basename
+            "src/conftest.py",  # excluded: conftest.py basename
+            "node_modules/vendor.py",  # excluded: ecosystem-noise directory
+            ".venv/site-packages/pkg.py",  # excluded: ecosystem-noise directory
+            "src/notes.txt",  # excluded: extension not in the measured set
+        ]
+        dispatcher = _combined_git_dispatcher(
+            ls_files_lines=["src/utils.py", "src/parser.py", "src/cli.py", *noise]
+        )
+        with patch(f"{target}.subprocess.run", side_effect=dispatcher):
+            result = collector.collect(_make_context(scratch))
+
+        # Only the 3 measured files + src/extra.py survive exclusion.
+        assert result.data["source_files_total"] == 4, (
+            f"Expected test-shaped paths and excluded dirs stripped from the "
+            f"denominator; got source_files_total={result.data['source_files_total']!r}"
+        )
+        assert result.data["measured_files"] == 3
+
+    def test_git_unavailable_falls_back_to_filesystem_walk(self, tmp_path: Path) -> None:
+        from scripts.project_metrics.collectors.coverage_collector import (
+            CoverageCollector,
+        )
+
+        scratch = tmp_path / "repo"
+        (scratch / "src").mkdir(parents=True)
+        (scratch / "tests").mkdir()
+        (scratch / "node_modules").mkdir()
+        for name in ("utils.py", "parser.py", "cli.py", "extra.py"):
+            (scratch / "src" / name).write_text("# stub\n")
+        (scratch / "tests" / "test_extra.py").write_text("# stub\n")
+        (scratch / "node_modules" / "vendor.py").write_text("# stub\n")
+        _write_cobertura(
+            scratch / "coverage.xml",
+            {
+                "src/utils.py": (20, 20),
+                "src/parser.py": (30, 15),
+                "src/cli.py": (50, 38),
+            },
+            overall_line_rate=0.73,
+        )
+
+        collector = CoverageCollector(repo_root=scratch)
+        target = "scripts.project_metrics.collectors.coverage_collector"
+        with patch(f"{target}.subprocess.run", side_effect=FileNotFoundError("git not found")):
+            result = collector.collect(_make_context(scratch))
+
+        # git unavailable -> staleness can't be determined (assumed "ok") and
+        # the denominator falls back to a filesystem walk: 4 source .py files
+        # (extra.py counted, tests/ and node_modules/ pruned).
+        assert result.data["status"] == "ok"
+        assert result.data["measured_files"] == 3
+        assert result.data["source_files_total"] == 4
+        assert result.data["artifact_scope_pct"] == 0.75
+
+
+class TestCoverageMeasuredFilesResolution:
+    """``_classify_measured_files`` excludes per_file entries outside repo_root."""
+
+    def test_tmpdir_style_absolute_path_is_excluded_from_measured_count(
+        self, tmp_path: Path
+    ) -> None:
+        from scripts.project_metrics.collectors.coverage_collector import (
+            _classify_measured_files,
+        )
+
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+        # A pytest tmp_path-style scratch copy of the source tree, entirely
+        # outside repo_root -- the shape that clobbered the artifact this
+        # incident is named for.
+        outside_scratch = tmp_path / "pytest-of-user" / "pytest-123" / "test_module0"
+        per_file = {
+            "src/utils.py": {"line_pct": 1.0, "lines_total": 10, "lines_covered": 10},
+            "src/parser.py": {"line_pct": 0.5, "lines_total": 10, "lines_covered": 5},
+            str(outside_scratch / "src" / "cli.py"): {
+                "line_pct": 1.0,
+                "lines_total": 5,
+                "lines_covered": 5,
+            },
+        }
+
+        measured, extensions = _classify_measured_files(per_file, repo_root)
+
+        assert measured == 2, (
+            f"Expected the out-of-tree tmpdir entry excluded from the count; got {measured}"
+        )
+        assert extensions == frozenset({".py"})
+
+    def test_relative_path_under_repo_root_is_measured(self, tmp_path: Path) -> None:
+        from scripts.project_metrics.collectors.coverage_collector import (
+            _classify_measured_files,
+        )
+
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+        per_file = {"src/utils.py": {"line_pct": 1.0}}
+
+        measured, extensions = _classify_measured_files(per_file, repo_root)
+
+        assert measured == 1
+        assert extensions == frozenset({".py"})
+
+    def test_absolute_path_inside_repo_root_is_measured(self, tmp_path: Path) -> None:
+        from scripts.project_metrics.collectors.coverage_collector import (
+            _classify_measured_files,
+        )
+
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+        per_file = {str(repo_root / "src" / "utils.py"): {"line_pct": 1.0}}
+
+        measured, extensions = _classify_measured_files(per_file, repo_root)
+
+        assert measured == 1
+        assert extensions == frozenset({".py"})

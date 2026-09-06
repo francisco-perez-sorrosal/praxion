@@ -138,6 +138,49 @@ def _start_payload(cwd: Path, **overrides: object) -> dict:
     return payload
 
 
+def _write_transcript(path: Path, blocks: list[str]) -> Path:
+    """Materialize a transcript fixture: one JSONL user-message record per block.
+
+    Mirrors the measured on-disk shape -- each `<task-notification>` block
+    lives inside a `message.content` string, JSON-encoded like every other
+    transcript line, never a raw multi-line text file.
+    """
+    lines = [
+        json.dumps({"type": "user", "message": {"role": "user", "content": block}})
+        for block in blocks
+    ]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+def _turn_limit_block(task_id: str, name: str = "Implementer: Step 1") -> str:
+    return (
+        "<task-notification>\n"
+        f"<task-id>{task_id}</task-id>\n"
+        f'<summary>Agent "{name}" stopped at its 60-turn limit '
+        "(partial result; SendMessage to task-id to continue)</summary>\n"
+        "</task-notification>"
+    )
+
+
+def _stopped_by_claude_block(task_id: str, name: str = "Researcher") -> str:
+    return (
+        "<task-notification>\n"
+        f"<task-id>{task_id}</task-id>\n"
+        f'<summary>Agent "{name}" was stopped by Claude</summary>\n'
+        "</task-notification>"
+    )
+
+
+def _finished_block(task_id: str, name: str = "Sentinel") -> str:
+    return (
+        "<task-notification>\n"
+        f"<task-id>{task_id}</task-id>\n"
+        f'<summary>Agent "{name}" finished</summary>\n'
+        "</task-notification>"
+    )
+
+
 @pytest.fixture
 def project(tmp_path: Path) -> Path:
     """A directory that looks like a Praxion-managed project."""
@@ -441,15 +484,17 @@ class TestStartStopCorrelation:
         assert stop["start_correlation"] == module.CORRELATION_PAIRED
         assert stop["agent_type"] == "praxion:implementer"
 
-    def test_stop_without_a_start_row_is_marked_unobserved_not_paired(
+    def test_stop_without_a_start_row_is_marked_unobserved_agent_when_nothing_ran(
         self, project: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """CANARY: the residue that is unresolvable by construction.
 
-        No `agent_start` was ever delivered, so no stop can reconstruct one.
-        The row must say so rather than claim a pairing it cannot support — and
-        it must still carry the harness `agent_id` verbatim, because the id was
-        never the broken half.
+        No `agent_start` was ever delivered and no `tool_use` row exists
+        either, so no stop can reconstruct one — this is the unannounced
+        harness-internal helper shape, not delivery loss. The row must say so
+        rather than claim a pairing it cannot support — and it must still
+        carry the harness `agent_id` verbatim, because the id was never the
+        broken half.
         """
         module = _load_module()
         obs_path = project / ".ai-state" / "observations.jsonl"
@@ -458,9 +503,22 @@ class TestStartStopCorrelation:
         _run_main(module, _stop_payload(project), monkeypatch)
 
         emitted = _read_wal(obs_path)[-1]
-        assert emitted["start_correlation"] == module.CORRELATION_UNOBSERVED_START
+        assert emitted["start_correlation"] == module.CORRELATION_UNOBSERVED_AGENT
         assert emitted["agent_id"] == "agent-orphan"
         assert emitted["agent_id"] != emitted["session_id"], "the id must not be a session fallback"
+
+    def test_stop_without_a_start_row_is_marked_unobserved_start_when_the_agent_ran(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The discriminator: a surviving `tool_use` row proves delivery loss."""
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+        _write_wal(obs_path, [_wal_row(agent_type="praxion:doc-engineer", agent_id="agent-orphan")])
+
+        _run_main(module, _stop_payload(project), monkeypatch)
+
+        emitted = _read_wal(obs_path)[-1]
+        assert emitted["start_correlation"] == module.CORRELATION_UNOBSERVED_START
 
     def test_a_tool_use_row_alone_does_not_witness_a_start(
         self, project: Path, monkeypatch: pytest.MonkeyPatch
@@ -487,16 +545,33 @@ class TestStartStopCorrelation:
     def test_detector_flags_the_unpaired_stop(
         self, project: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """CANARY: the WAL-level detector fires on the known-bad fragment."""
+        """CANARY: the WAL-level detector fires on the known-bad fragment.
+
+        The fragment carries a `tool_use` row for the orphan — the real
+        delivery-loss shape `unobserved-start` names — so the detector, which
+        reads that verdict rather than an unannounced-helper one, must fire.
+        """
         module = _load_module()
         obs_path = project / ".ai-state" / "observations.jsonl"
-        _write_wal(obs_path, [])
+        _write_wal(obs_path, [_wal_row(agent_type="praxion:doc-engineer", agent_id="agent-orphan")])
 
         _run_main(module, _stop_payload(project), monkeypatch)
 
         findings = unpaired_stop_rows(_read_wal(obs_path))
         assert len(findings) == 1
         assert findings[0]["agent_id"] == "agent-orphan"
+
+    def test_detector_stays_silent_on_an_unannounced_helper_stop(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """INVERSE GUARD: an unannounced helper (no rows at all) is not delivery loss."""
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+        _write_wal(obs_path, [])
+
+        _run_main(module, _stop_payload(project), monkeypatch)
+
+        assert unpaired_stop_rows(_read_wal(obs_path)) == []
 
     def test_detector_stays_silent_on_a_paired_stop(
         self, project: Path, monkeypatch: pytest.MonkeyPatch
@@ -535,7 +610,7 @@ class TestStartStopCorrelation:
         assert emitted["agent_id"] == "sess-1", "the row still needs a usable id"
         assert emitted["agent_type"] != module.MAIN_AGENT_TYPE
         assert emitted["agent_type_source"] == module.SOURCE_UNRESOLVED
-        assert emitted["start_correlation"] == module.CORRELATION_UNOBSERVED_START
+        assert emitted["start_correlation"] == module.CORRELATION_UNOBSERVED_AGENT
 
     def test_a_start_for_another_agent_does_not_pair(
         self, project: Path, monkeypatch: pytest.MonkeyPatch
@@ -550,7 +625,7 @@ class TestStartStopCorrelation:
 
         _run_main(module, _stop_payload(project), monkeypatch)
 
-        assert _read_wal(obs_path)[-1]["start_correlation"] == module.CORRELATION_UNOBSERVED_START
+        assert _read_wal(obs_path)[-1]["start_correlation"] == module.CORRELATION_UNOBSERVED_AGENT
 
     def test_a_start_that_scrolled_past_the_window_reads_as_unobserved(
         self, project: Path, monkeypatch: pytest.MonkeyPatch
@@ -563,7 +638,7 @@ class TestStartStopCorrelation:
 
         _run_main(module, _stop_payload(project), monkeypatch)
 
-        assert _read_wal(obs_path)[-1]["start_correlation"] == module.CORRELATION_UNOBSERVED_START
+        assert _read_wal(obs_path)[-1]["start_correlation"] == module.CORRELATION_UNOBSERVED_AGENT
 
     @pytest.mark.parametrize(
         "hook_event",
@@ -592,6 +667,7 @@ class TestStartStopCorrelation:
             assert row["start_correlation"] in {
                 module.CORRELATION_PAIRED,
                 module.CORRELATION_UNOBSERVED_START,
+                module.CORRELATION_UNOBSERVED_AGENT,
                 module.CORRELATION_NOT_APPLICABLE,
             }
 
@@ -603,15 +679,25 @@ class TestPriorAgentLookup:
             project / ".ai-state" / "observations.jsonl",
             [_wal_row(event_type="agent_start", agent_type="praxion:verifier", agent_id="agent-1")],
         )
-        assert module.lookup_prior_agent(obs_path, "agent-1") == ("praxion:verifier", True)
+        assert module.lookup_prior_agent(obs_path, "agent-1") == ("praxion:verifier", True, True)
 
     def test_lookup_reports_no_start_when_only_tool_rows_exist(self, project: Path) -> None:
+        """A `tool_use` row witnesses the agent but not its spawn."""
         module = _load_module()
         obs_path = _write_wal(
             project / ".ai-state" / "observations.jsonl",
             [_wal_row(agent_type="praxion:verifier", agent_id="agent-1")],
         )
-        assert module.lookup_prior_agent(obs_path, "agent-1") == ("praxion:verifier", False)
+        assert module.lookup_prior_agent(obs_path, "agent-1") == ("praxion:verifier", False, True)
+
+    def test_lookup_reports_nothing_when_no_row_names_the_agent(self, project: Path) -> None:
+        """CANARY: the unannounced-helper discriminant — no row at all."""
+        module = _load_module()
+        obs_path = _write_wal(
+            project / ".ai-state" / "observations.jsonl",
+            [_wal_row(agent_type="praxion:verifier", agent_id="somebody-else")],
+        )
+        assert module.lookup_prior_agent(obs_path, "agent-1") == ("", False, False)
 
     def test_lookup_pairs_a_start_whose_own_type_is_unusable(self, project: Path) -> None:
         """Pairing keys on the id; an unnameable start still witnesses the spawn."""
@@ -620,11 +706,11 @@ class TestPriorAgentLookup:
             project / ".ai-state" / "observations.jsonl",
             [_wal_row(event_type="agent_start", agent_type="unknown", agent_id="agent-1")],
         )
-        assert module.lookup_prior_agent(obs_path, "agent-1") == ("", True)
+        assert module.lookup_prior_agent(obs_path, "agent-1") == ("", True, True)
 
     def test_lookup_without_a_wal_path_reports_nothing_observed(self) -> None:
         module = _load_module()
-        assert module.lookup_prior_agent(None, "agent-1") == ("", False)
+        assert module.lookup_prior_agent(None, "agent-1") == ("", False, False)
 
 
 # ---------------------------------------------------------------------------
@@ -860,3 +946,242 @@ class TestMainContract:
         _run_main(module, {"hook_event_name": hook_event, "cwd": str(project)}, monkeypatch)
 
         assert _read_wal(obs_path)[-1]["event_type"] == event_type
+
+
+# ---------------------------------------------------------------------------
+# Transcript-sourced suspension stops -- the harness reports a suspended
+# background subagent to the MAIN agent instead of firing SubagentStop
+# ---------------------------------------------------------------------------
+
+
+class TestFindSuspendedTasks:
+    def test_extracts_turn_limit_and_stopped_by_claude_ignoring_finished(self) -> None:
+        module = _load_module()
+        text = "\n".join(
+            [
+                _turn_limit_block("task-a"),
+                _stopped_by_claude_block("task-b"),
+                _finished_block("task-c"),
+            ]
+        )
+
+        assert module.find_suspended_tasks(text) == [
+            ("task-a", module.OUTCOME_TURN_LIMIT),
+            ("task-b", module.OUTCOME_STOPPED),
+        ]
+
+    def test_returns_nothing_for_text_with_no_notifications(self) -> None:
+        module = _load_module()
+        assert module.find_suspended_tasks("just an ordinary assistant reply") == []
+
+    def test_ignores_a_block_missing_a_task_id(self) -> None:
+        module = _load_module()
+        text = '<task-notification>\n<summary>Agent "X" stopped at its 60-turn limit</summary>\n</task-notification>'
+        assert module.find_suspended_tasks(text) == []
+
+
+class TestTranscriptSuspensionBackfill:
+    def test_stop_hook_backfills_suspended_subagent_stops(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """CANARY: the measured defect, end to end through main().
+
+        The fixture reproduces both verified summary shapes plus a normal
+        completion in one transcript. The Stop hook must backfill exactly the
+        two suspended ids and leave the finished one alone -- SubagentStop
+        already covers it.
+        """
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+        _write_wal(
+            obs_path,
+            [
+                _wal_row(
+                    event_type="agent_start", agent_type="praxion:implementer", agent_id="task-a"
+                ),
+                _wal_row(
+                    event_type="agent_start", agent_type="praxion:researcher", agent_id="task-b"
+                ),
+                _wal_row(
+                    event_type="agent_start", agent_type="praxion:sentinel", agent_id="task-c"
+                ),
+            ],
+        )
+        transcript = _write_transcript(
+            project / "transcript.jsonl",
+            [
+                _turn_limit_block("task-a"),
+                _stopped_by_claude_block("task-b"),
+                _finished_block("task-c"),
+            ],
+        )
+
+        _run_main(
+            module,
+            {
+                "hook_event_name": "Stop",
+                "session_id": "sess-1",
+                "cwd": str(project),
+                "transcript_path": str(transcript),
+            },
+            monkeypatch,
+        )
+
+        synthetic = [
+            r
+            for r in _read_wal(obs_path)
+            if r.get("stop_source") == module.STOP_SOURCE_TRANSCRIPT_NOTIFICATION
+        ]
+        assert {r["agent_id"] for r in synthetic} == {"task-a", "task-b"}
+        by_id = {r["agent_id"]: r for r in synthetic}
+        assert by_id["task-a"]["outcome"] == module.OUTCOME_TURN_LIMIT
+        assert by_id["task-a"]["agent_type"] == "praxion:implementer"
+        assert by_id["task-a"]["start_correlation"] == module.CORRELATION_PAIRED
+        assert by_id["task-a"]["summary"] == "Agent suspended at turn limit: praxion:implementer"
+        assert by_id["task-b"]["outcome"] == module.OUTCOME_STOPPED
+        assert by_id["task-b"]["summary"] == "Agent stopped by orchestrator: praxion:researcher"
+
+    def test_second_stop_does_not_double_write(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Idempotency: the notification is still in the transcript on the next Stop."""
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+        _write_wal(
+            obs_path,
+            [
+                _wal_row(
+                    event_type="agent_start", agent_type="praxion:implementer", agent_id="task-a"
+                )
+            ],
+        )
+        transcript = _write_transcript(project / "transcript.jsonl", [_turn_limit_block("task-a")])
+        payload = {
+            "hook_event_name": "Stop",
+            "session_id": "sess-1",
+            "cwd": str(project),
+            "transcript_path": str(transcript),
+        }
+
+        _run_main(module, payload, monkeypatch)
+        _run_main(module, payload, monkeypatch)
+
+        synthetic = [
+            r
+            for r in _read_wal(obs_path)
+            if r.get("stop_source") == module.STOP_SOURCE_TRANSCRIPT_NOTIFICATION
+        ]
+        assert len(synthetic) == 1
+
+    def test_missing_transcript_backfills_nothing(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+        _write_wal(
+            obs_path,
+            [
+                _wal_row(
+                    event_type="agent_start", agent_type="praxion:implementer", agent_id="task-a"
+                )
+            ],
+        )
+
+        _run_main(
+            module,
+            {
+                "hook_event_name": "Stop",
+                "session_id": "sess-1",
+                "cwd": str(project),
+                "transcript_path": str(project / "does-not-exist.jsonl"),
+            },
+            monkeypatch,
+        )
+
+        assert not any(
+            r.get("stop_source") == module.STOP_SOURCE_TRANSCRIPT_NOTIFICATION
+            for r in _read_wal(obs_path)
+        )
+
+    def test_absent_transcript_path_backfills_nothing(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+        _write_wal(
+            obs_path,
+            [
+                _wal_row(
+                    event_type="agent_start", agent_type="praxion:implementer", agent_id="task-a"
+                )
+            ],
+        )
+
+        _run_main(
+            module,
+            {"hook_event_name": "Stop", "session_id": "sess-1", "cwd": str(project)},
+            monkeypatch,
+        )
+
+        assert not any(
+            r.get("stop_source") == module.STOP_SOURCE_TRANSCRIPT_NOTIFICATION
+            for r in _read_wal(obs_path)
+        )
+
+    def test_no_synthetic_row_when_the_wal_has_no_start_for_the_task(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+        _write_wal(obs_path, [])
+        transcript = _write_transcript(project / "transcript.jsonl", [_turn_limit_block("task-a")])
+
+        _run_main(
+            module,
+            {
+                "hook_event_name": "Stop",
+                "session_id": "sess-1",
+                "cwd": str(project),
+                "transcript_path": str(transcript),
+            },
+            monkeypatch,
+        )
+
+        assert not any(r.get("agent_id") == "task-a" for r in _read_wal(obs_path))
+
+    def test_stop_row_exists_survives_blank_and_torn_lines(self, project: Path) -> None:
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+        _write_wal(obs_path, [_wal_row(event_type="agent_stop", agent_id="task-a")])
+        with open(obs_path, "a", encoding="utf-8") as handle:
+            handle.write('\n{"agent_id": "task-b", "agent_ty')  # blank line + torn line
+
+        assert module._stop_row_exists(obs_path, "task-a") is True
+        assert module._stop_row_exists(obs_path, "task-b") is False
+
+
+class TestStopSourceProvenance:
+    def test_regular_agent_stop_carries_hook_stop_source(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+
+        _run_main(module, _stop_payload(project, agent_type="praxion:verifier"), monkeypatch)
+
+        assert _read_wal(obs_path)[-1]["stop_source"] == module.STOP_SOURCE_HOOK
+
+    @pytest.mark.parametrize("hook_event", ["SessionStart", "Stop", "SubagentStart"])
+    def test_non_stop_rows_carry_no_stop_source(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch, hook_event: str
+    ) -> None:
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+
+        _run_main(
+            module,
+            {"hook_event_name": hook_event, "agent_id": "a-1", "cwd": str(project)},
+            monkeypatch,
+        )
+
+        assert "stop_source" not in _read_wal(obs_path)[-1]

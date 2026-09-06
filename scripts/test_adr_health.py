@@ -117,6 +117,44 @@ def test_canary_out_of_repo_path_is_not_a_retirement_candidate(repo: Path) -> No
     assert _classes(adr_health.classify(repo))["~/.claude/CLAUDE.md"] == "out-of-repo"
 
 
+def test_canary_ephemeral_ai_work_path_is_flagged_even_when_present_on_disk(repo: Path) -> None:
+    """An in-flight `.ai-work/` path is wrong regardless of whether it resolves locally.
+
+    The existence check alone would pass this reference straight through -- the
+    fixture writes the file for real, exactly like an in-flight pipeline would.
+    """
+    d = repo / ".ai-work" / "sidecar-placement"
+    d.mkdir(parents=True)
+    (d / "INTERFACE_DESIGN.md").write_text("x", encoding="utf-8")
+    _adr(repo, 1, files=[".ai-work/sidecar-placement/INTERFACE_DESIGN.md"])
+    report = adr_health.classify(repo)
+    finding = next(
+        f
+        for f in report["findings"]
+        if f["path"] == ".ai-work/sidecar-placement/INTERFACE_DESIGN.md"
+    )
+    assert finding["decay_class"] == "ephemeral-path"
+    assert finding["disposition"] == "fix-entry"
+
+
+def test_canary_ephemeral_tmp_path_is_flagged(repo: Path) -> None:
+    (repo / "tmp").mkdir()
+    (repo / "tmp" / "scratch.md").write_text("x", encoding="utf-8")
+    _adr(repo, 1, files=["tmp/scratch.md"])
+    assert _classes(adr_health.classify(repo))["tmp/scratch.md"] == "ephemeral-path"
+
+
+def test_canary_ephemeral_claude_worktrees_path_is_flagged(repo: Path) -> None:
+    d = repo / ".claude" / "worktrees" / "feature-x"
+    d.mkdir(parents=True)
+    (d / "notes.md").write_text("x", encoding="utf-8")
+    _adr(repo, 1, files=[".claude/worktrees/feature-x/notes.md"])
+    assert (
+        _classes(adr_health.classify(repo))[".claude/worktrees/feature-x/notes.md"]
+        == "ephemeral-path"
+    )
+
+
 def test_canary_lazy_artifact_absence_is_expected(repo: Path) -> None:
     """The inventory declares absence expected; flagging it would be wrong.
 
@@ -360,11 +398,44 @@ def _retire(path: Path, by: str = "dec-999") -> None:
 
 
 def test_canary_retired_decision_whose_subject_returned_is_a_reopen_candidate(repo: Path) -> None:
-    """Retirement is reversible: architecture that comes back finds its reasoning waiting."""
+    """Retirement is reversible: architecture that comes back finds its reasoning waiting.
+
+    The candidate requires a *prior deletion*, not mere presence -- so this fixture
+    commits, deletes, and recreates `revived.py` rather than only writing it once.
+    """
+    (repo / "revived.py").write_text("x", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "add revived")
+    _git(repo, "rm", "-q", "revived.py")
+    _git(repo, "commit", "-qm", "remove revived")
     (repo / "revived.py").write_text("x", encoding="utf-8")
     _retire(_adr(repo, 1, title="Some decision", files=["revived.py"]))
     report = adr_health.classify(repo)
     assert report["reopen_candidates"] == [{"adr": "001-slug.md", "paths_returned": ["revived.py"]}]
+
+
+def test_retired_decision_whose_path_was_never_deleted_is_not_a_reopen_candidate(
+    repo: Path,
+) -> None:
+    """The dec-360 shape: retired before implementation, so the path was never absent.
+
+    The detector cannot tell "retired before implementation" from "subject deleted
+    then returned" without the deletion index -- this pins the discriminator.
+    """
+    (repo / "always_here.py").write_text("x", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "add always_here")
+    _retire(_adr(repo, 1, title="Some decision", files=["always_here.py"]))
+    assert adr_health.classify(repo)["reopen_candidates"] == []
+
+
+def test_canary_retired_reopen_probe_withholds_without_history(tmp_path: Path) -> None:
+    """No git history: a retired decision's paths cannot be confirmed as ever deleted."""
+    (tmp_path / "revived.py").write_text("x", encoding="utf-8")
+    _retire(_adr(tmp_path, 1, title="Some decision", files=["revived.py"]))
+    report = adr_health.classify(tmp_path)
+    assert report["reopen_candidates"] == []
+    assert any("reopen_candidates" in w for w in report["withheld"])
 
 
 def test_retired_decision_whose_subject_is_still_gone_is_not_a_reopen_candidate(

@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-05T05:31:31Z'
+generated_at: '2026-09-06T03:08:17Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -532,7 +532,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-09-04'
+  last_modified: '2026-09-05'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -2780,6 +2780,12 @@ surfaces:
   title: Finalize rewrites draft ids across one citation net shared with its detector, replacing the enumerated allowlist
   last_modified: '2026-09-04'
   renderer: adr_card
+- id: ai-state-decisions-370-wal-lifecycle-suspension-stops-and-helper-verdict
+  path: .ai-state/decisions/370-wal-lifecycle-suspension-stops-and-helper-verdict.md
+  type: markdown
+  title: The WAL closes subagent lifecycles the harness never reports, and names unannounced helpers
+  last_modified: '2026-09-05'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -2792,12 +2798,6 @@ surfaces:
   title: Idea Ledger
   last_modified: '2026-08-07'
   renderer: idea_grid
-- id: ai-state-sentinel-reports-sentinel-report-2026-07-31-11-52-24
-  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-07-31_11-52-24.md
-  type: markdown
-  title: Sentinel Report
-  last_modified: '2026-09-04'
-  renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-08-04-13-35-55
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-04_13-35-55.md
   type: markdown
@@ -2852,18 +2852,12 @@ surfaces:
   title: "Sentinel Report \u2014 2026-08-30_20-15-49"
   last_modified: '2026-08-30'
   renderer: default_markdown
-- id: ai-state-metrics-reports-metrics-report-2026-06-20-23-30-00
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-20_23-30-00.json
-  type: json
-  title: METRICS_REPORT_2026-06-20_23-30-00.json
-  last_modified: '2026-06-20'
-  renderer: metrics_view
-- id: ai-state-metrics-reports-metrics-report-2026-06-21-01-14-35
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-21_01-14-35.json
-  type: json
-  title: METRICS_REPORT_2026-06-21_01-14-35.json
-  last_modified: '2026-06-20'
-  renderer: metrics_view
+- id: ai-state-sentinel-reports-sentinel-report-2026-09-04-22-41-32
+  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-09-04_22-41-32.md
+  type: markdown
+  title: Sentinel Report
+  last_modified: '2026-09-05'
+  renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-07-16-05-08-18
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_05-08-18.json
   type: json
@@ -2912,18 +2906,12 @@ surfaces:
   title: METRICS_REPORT_2026-08-31_03-16-10.json
   last_modified: '2026-08-30'
   renderer: metrics_view
-- id: ai-state-metrics-reports-metrics-report-2026-06-20-23-30-00
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-20_23-30-00.md
-  type: markdown
-  title: Project Metrics Report
-  last_modified: '2026-06-20'
-  renderer: default_markdown
-- id: ai-state-metrics-reports-metrics-report-2026-06-21-01-14-35
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-06-21_01-14-35.md
-  type: markdown
-  title: Project Metrics Report
-  last_modified: '2026-06-20'
-  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-09-05-06-08-20
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-05_06-08-20.json
+  type: json
+  title: METRICS_REPORT_2026-09-05_06-08-20.json
+  last_modified: '2026-09-05'
+  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-07-16-05-08-18
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_05-08-18.md
   type: markdown
@@ -2971,6 +2959,12 @@ surfaces:
   type: markdown
   title: Project Metrics Report
   last_modified: '2026-08-30'
+  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-09-05-06-08-20
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-05_06-08-20.md
+  type: markdown
+  title: Project Metrics Report
+  last_modified: '2026-09-05'
   renderer: default_markdown
 - id: ai-state-specs-spec-agent-model-routing-2026-04-25
   path: .ai-state/specs/SPEC_agent-model-routing_2026-04-25.md
@@ -3446,14 +3440,11 @@ groups:
   - ai-state-decisions-367-ds1-gate-authority
   - ai-state-decisions-368-sidecar-module-split
   - ai-state-decisions-369-finalize-citation-net
+  - ai-state-decisions-370-wal-lifecycle-suspension-stops-and-helper-verdict
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
   - ai-state-landscape-watchlist
-  - ai-state-metrics-reports-metrics-report-2026-06-20-23-30-00
-  - ai-state-metrics-reports-metrics-report-2026-06-20-23-30-00
-  - ai-state-metrics-reports-metrics-report-2026-06-21-01-14-35
-  - ai-state-metrics-reports-metrics-report-2026-06-21-01-14-35
   - ai-state-metrics-reports-metrics-report-2026-07-16-05-08-18
   - ai-state-metrics-reports-metrics-report-2026-07-16-05-08-18
   - ai-state-metrics-reports-metrics-report-2026-07-16-06-05-57
@@ -3470,7 +3461,8 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-08-25-04-25-13
   - ai-state-metrics-reports-metrics-report-2026-08-31-03-16-10
   - ai-state-metrics-reports-metrics-report-2026-08-31-03-16-10
-  - ai-state-sentinel-reports-sentinel-report-2026-07-31-11-52-24
+  - ai-state-metrics-reports-metrics-report-2026-09-05-06-08-20
+  - ai-state-metrics-reports-metrics-report-2026-09-05-06-08-20
   - ai-state-sentinel-reports-sentinel-report-2026-08-04-13-35-55
   - ai-state-sentinel-reports-sentinel-report-2026-08-05-00-14-32
   - ai-state-sentinel-reports-sentinel-report-2026-08-05-09-52-51
@@ -3480,6 +3472,7 @@ groups:
   - ai-state-sentinel-reports-sentinel-report-2026-08-07-14-00-50
   - ai-state-sentinel-reports-sentinel-report-2026-08-24-21-04-27
   - ai-state-sentinel-reports-sentinel-report-2026-08-30-20-15-49
+  - ai-state-sentinel-reports-sentinel-report-2026-09-04-22-41-32
   - ai-state-specs-spec-agent-model-routing-2026-04-25
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30

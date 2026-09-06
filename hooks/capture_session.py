@@ -43,42 +43,66 @@ The `agent_id` this hook writes on a stop row is **not** minted here: it is the
 harness value, passed through verbatim (`resolve_agent_id`). Measured over the
 live WAL, no stop row's id was ever a fallback -- zero fell back to
 ``session_id``, zero to the sentinel. Pairing nonetheless fails for a
-substantial minority of stops, because the *start* side is missing: the WAL
-holds 614 `agent_start` rows against 651 `agent_stop` rows, and 154 stops have
-no `agent_start` for their `agent_id` anywhere in the file.
+substantial share of stops: the WAL holds 257 `agent_start` rows against 3,031
+`agent_stop` rows, and 2,812 stops have no `agent_start` for their `agent_id`
+anywhere in the file.
 
-Those starts were lost before this hook could record them, and four of the 154
-prove the loss is real rather than a phantom agent: their `agent_id` also
-carries 2, 6, 11 and 24 `tool_use` rows, so the subagent demonstrably ran while
-its `SubagentStart` capture produced nothing. A stop cannot reconstruct a start
-that was never delivered, and persisting a mapping *at start* would be absent in
-exactly the cases that need it. So the honest repair is to stop making readers
-re-derive the pairing, and record the emitter's own verdict in
-``start_correlation``:
+Those 2,812 are not one population. 2,770 of them carry `agent_type: unknown`,
+`agent_type_source: unresolved`, and **no row of any kind** -- no start, no
+`tool_use` -- for their `agent_id` anywhere in the tail: these are the
+harness's own unannounced internal helper agents (see Known WAL anomalies
+below), firing roughly once every 30s of session time, not lost starts. The
+remaining 14 carry `tool_use` rows and no `agent_start`: their agent
+demonstrably ran while its `SubagentStart` capture produced nothing, which is
+the real delivery-loss population this hook exists to name. Lumping both
+under one verdict hid that only the second class is a defect this fleet
+should chase, so the emitter's verdict now distinguishes them:
 
-    paired           -- an `agent_start` row for this agent_id was observed
-    unobserved-start -- no such row was observed (delivery loss, or rotation)
-    not-applicable   -- a start row or a session row: nothing to pair with
+    paired            -- an `agent_start` row for this agent_id was observed
+    unobserved-start  -- no start row observed, but a `tool_use` row proves
+                         the agent ran: delivery loss, or rotation
+    unobserved-agent  -- no row of any kind observed for this agent_id: an
+                         unannounced harness-internal helper, not a lost start
+    not-applicable    -- a start row or a session row: nothing to pair with
 
 The verdict is scoped to the same bounded tail window the backfill reads, so
-``unobserved-start`` asserts **non-observation, not non-existence** -- which is
-precisely the distinction a reader needs and could not previously make.
+``unobserved-start`` and ``unobserved-agent`` both assert **non-observation,
+not non-existence** -- which is precisely the distinction a reader needs and
+could not previously make.
 
-Known WAL anomalies (diagnosed 2026-08-30, sentinel P03)
---------------------------------------------------------
+Known WAL anomalies (diagnosed 2026-08-30, sentinel P03; refined 2026-09-05)
+-----------------------------------------------------------------------------
 * 2026-08-25 only: 30 lifecycle rows are near-duplicates (same agent_id +
   event_type, ms apart, one row old-style empty ``agent_type`` and one
   new-style ``unknown``) -- two installed copies of this hook (stale plugin
   cache + refreshed copy) raced during that day's plugin update. Not
   reproducing since 2026-08-26; no dedup logic is warranted for a
   one-day install-transition artifact.
-* ``a045b98b6e9067762`` (2026-08-13) and ``a74850d8996d9fef1``
-  (2026-08-25): unpaired ``agent_start`` rows with real ``tool_use``.
-  The first is a resumed subagent (second start 8 min later, same id)
-  whose final stop was lost to session truncation; the second is the
-  duplicate-emission incident above. Historical rows; expected to stay
-  unpaired forever -- an auditor re-deriving P03 should treat these two
-  ids as dispositioned.
+* Six `agent_start` rows emitted `tool_use` and never got an `agent_stop`:
+  ``a045b98b6`` (2026-08-13, i-am:implementer), ``a74850d89`` (2026-08-25,
+  praxion:context-engineer), ``a92a8a243`` (2026-08-31, praxion:implementer),
+  ``aa309b3f8`` (2026-09-02, praxion:implementer), ``a30a946aa`` (2026-09-02,
+  praxion:systems-architect), ``a07f58e1f`` (2026-09-05, praxion:implementer).
+  Cause, verified against the harness transcripts for the two most recent ids
+  and consistent (hours-long continuing sessions, no corresponding stop) for
+  the other four: the harness suspends a background subagent at its turn
+  limit and reports the suspension to the MAIN agent as a
+  `<task-notification>` in the main transcript instead of firing
+  `SubagentStop`. The notification's `<summary>` reads ``Agent "<name>"
+  stopped at its N-turn limit (partial result; SendMessage to task-id to
+  continue)`` and carries a `<task-id>` equal to the WAL `agent_id`; a second
+  shape, ``Agent "<name>" was stopped by Claude`` (3 occurrences across
+  transcripts), covers an orchestrator-initiated stop. A normal completion
+  (``Agent "<name>" finished``, 446 occurrences) *does* fire `SubagentStop` --
+  verified against a background sentinel agent this session. `main()` now
+  reads the Stop payload's own `transcript_path` for exactly these two shapes
+  and backfills the missing `agent_stop` (`stop_source:
+  "transcript-notification"`) whenever the matching `agent_start` is still in
+  the tail window -- see `find_suspended_tasks`/`build_suspension_stop` below.
+* 2,770 of the 2,812 unpaired stops carry no row of any kind for their
+  `agent_id` -- the harness's own unannounced internal helper agents (not a
+  hook defect), reported as `unobserved-agent`. See "Why the start
+  correlation below exists" above.
 A `tool_use` row deliberately does not satisfy the pairing (it satisfies the
 backfill): it names the agent, it does not witness its spawn.
 
@@ -92,6 +116,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -121,7 +146,26 @@ SOURCE_UNRESOLVED = "unresolved"
 # Start/stop correlation verdict recorded on every row this hook writes.
 CORRELATION_PAIRED = "paired"
 CORRELATION_UNOBSERVED_START = "unobserved-start"
+CORRELATION_UNOBSERVED_AGENT = "unobserved-agent"
 CORRELATION_NOT_APPLICABLE = "not-applicable"
+
+# Provenance of an agent_stop row: a regular hook delivery, or one
+# reconstructed from a transcript task-notification (see
+# find_suspended_tasks / build_suspension_stop). Only agent_stop rows carry
+# this field -- start rows and session rows have nothing to attribute.
+STOP_SOURCE_HOOK = "hook"
+STOP_SOURCE_TRANSCRIPT_NOTIFICATION = "transcript-notification"
+
+# Bound on the transcript scan for suspended-subagent task-notifications. The
+# Stop payload's transcript can grow long over a session; a just-suspended
+# subagent's notification is always among the most recent turns, so a
+# bounded tail read is enough and keeps this hot hook path cheap. Mirrors
+# BACKFILL_TAIL_BYTES's rationale below.
+TRANSCRIPT_TAIL_BYTES = 1024 * 1024  # 1 MiB
+
+# Outcomes a synthetic suspension stop can carry in its `outcome` field.
+OUTCOME_TURN_LIMIT = "turn-limit"
+OUTCOME_STOPPED = "stopped"
 
 # Bound on the lookup read. The WAL rotates at 10 MiB (_hook_utils), and this
 # hook runs on every subagent boundary, so the lookup reads a tail window rather
@@ -167,21 +211,25 @@ def _tail_lines(obs_path: Path, max_bytes: int | None = None) -> list[str]:
     return lines
 
 
-def lookup_prior_agent(obs_path: Path | None, agent_id: str) -> tuple[str, bool]:
-    """Return ``(recovered_agent_type, start_row_seen)`` for ``agent_id``.
+def lookup_prior_agent(obs_path: Path | None, agent_id: str) -> tuple[str, bool, bool]:
+    """Return ``(recovered_agent_type, start_row_seen, any_row_seen)`` for ``agent_id``.
 
-    One newest-first pass over the WAL tail answers both questions the stop path
-    asks, so recording the correlation costs no extra read. The recovered type
-    is the most recent usable one ("" when the agent has no earlier row -- the
-    measured reality for the orphaned-stop class, reported rather than papered
-    over); ``start_row_seen`` is True only for an actual ``agent_start`` row,
-    never for a ``tool_use`` row that merely names the same agent.
+    One newest-first pass over the WAL tail answers all three questions the
+    stop path asks, so recording the correlation costs no extra read. The
+    recovered type is the most recent usable one ("" when the agent has no
+    earlier row -- the measured reality for the orphaned-stop class, reported
+    rather than papered over); ``start_row_seen`` is True only for an actual
+    ``agent_start`` row, never for a ``tool_use`` row that merely names the
+    same agent; ``any_row_seen`` is True for *any* row naming this agent_id,
+    which is what separates a genuinely unannounced agent (nothing at all)
+    from a start that was merely dropped (a ``tool_use`` row survives it).
 
-    The scan ends early once a start row settles both answers.
+    The scan ends early once a start row settles all three answers.
     """
     if not agent_id or obs_path is None:
-        return "", False
+        return "", False, False
     recovered = ""
+    any_row_seen = False
     for line in reversed(_tail_lines(obs_path)):
         if not line.strip():
             continue
@@ -191,13 +239,14 @@ def lookup_prior_agent(obs_path: Path | None, agent_id: str) -> tuple[str, bool]
             continue  # a torn tail line from a concurrent append
         if not isinstance(row, dict) or row.get("agent_id") != agent_id:
             continue
+        any_row_seen = True
         if not recovered:
             recorded = str(row.get("agent_type") or "").strip()
             if recorded and recorded != UNKNOWN_AGENT_TYPE:
                 recovered = recorded
         if row.get("event_type") == "agent_start":
-            return recovered, True
-    return recovered, False
+            return recovered, True, True
+    return recovered, False, any_row_seen
 
 
 def resolve_agent_type(payload: dict, event_type: str, backfilled: str = "") -> tuple[str, str]:
@@ -221,15 +270,21 @@ def resolve_agent_type(payload: dict, event_type: str, backfilled: str = "") -> 
     return UNKNOWN_AGENT_TYPE, SOURCE_UNRESOLVED
 
 
-def resolve_start_correlation(event_type: str, start_row_seen: bool) -> str:
+def resolve_start_correlation(event_type: str, start_row_seen: bool, any_row_seen: bool) -> str:
     """Return the start/stop pairing verdict recorded on the row.
 
     Only a stop can pair: a start row *is* the start and a session row has no
     spawn, so both are ``not-applicable`` rather than a misleading "unpaired".
+    A stop with no start splits further: a surviving ``tool_use`` row proves
+    the agent ran (``unobserved-start`` -- delivery loss), while no row at all
+    means the harness never announced this agent in the first place
+    (``unobserved-agent`` -- an unannounced helper, not a defect here).
     """
     if event_type != "agent_stop":
         return CORRELATION_NOT_APPLICABLE
-    return CORRELATION_PAIRED if start_row_seen else CORRELATION_UNOBSERVED_START
+    if start_row_seen:
+        return CORRELATION_PAIRED
+    return CORRELATION_UNOBSERVED_START if any_row_seen else CORRELATION_UNOBSERVED_AGENT
 
 
 def resolve_agent_id(payload: dict) -> str:
@@ -284,14 +339,14 @@ def build_observation(payload: dict, event_type: str, obs_path: Path | None = No
     # lookup on one would backfill a subagent's type as "main" and pair its stop
     # against the session's own history.
     harness_agent_id = str(payload.get("agent_id") or "").strip()
-    backfilled, start_row_seen = (
+    backfilled, start_row_seen, any_row_seen = (
         lookup_prior_agent(obs_path, harness_agent_id)
         if _needs_wal_lookup(payload, event_type)
-        else ("", False)
+        else ("", False, False)
     )
     agent_type, agent_type_source = resolve_agent_type(payload, event_type, backfilled)
     cwd = payload.get("cwd", ".")
-    return {
+    row = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "session_id": payload.get("session_id", ""),
         "agent_type": agent_type,
@@ -304,8 +359,153 @@ def build_observation(payload: dict, event_type: str, obs_path: Path | None = No
         "outcome": None,
         "classification": None,
         "agent_type_source": agent_type_source,
-        "start_correlation": resolve_start_correlation(event_type, start_row_seen),
+        "start_correlation": resolve_start_correlation(event_type, start_row_seen, any_row_seen),
     }
+    if event_type == "agent_stop":
+        row["stop_source"] = STOP_SOURCE_HOOK
+    return row
+
+
+def _read_transcript_tail(transcript_path: str, max_bytes: int = TRANSCRIPT_TAIL_BYTES) -> str:
+    """Return the last ``max_bytes`` of ``transcript_path`` as text.
+
+    Any OSError (missing file, unreadable path) degrades to "" -- the caller
+    then backfills nothing rather than raising or delaying the Stop hook.
+    """
+    try:
+        with open(transcript_path, "rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            size = handle.tell()
+            window = min(size, max_bytes)
+            handle.seek(size - window)
+            chunk = handle.read(window)
+    except OSError:
+        return ""
+    return chunk.decode("utf-8", errors="replace")
+
+
+# A suspended-subagent notification, bounded by its own tags so a scan never
+# crosses into a sibling block. `<task-id>` and `<summary>` are pulled out of
+# the matched block rather than the whole text, for the same reason.
+_TASK_NOTIFICATION_RE = re.compile(r"<task-notification>.*?</task-notification>", re.DOTALL)
+_TASK_ID_RE = re.compile(r"<task-id>([^<]+)</task-id>")
+_SUMMARY_RE = re.compile(r"<summary>(.*?)</summary>", re.DOTALL)
+
+# The two verified suspension shapes (see the module docstring's Known WAL
+# anomalies section). A normal completion ("... finished") matches neither.
+_TURN_LIMIT_RE = re.compile(r"stopped at its \d+-turn limit")
+_STOPPED_BY_CLAUDE_RE = re.compile(r"was stopped by Claude")
+
+
+def find_suspended_tasks(text: str) -> list[tuple[str, str]]:
+    """Scan raw transcript text for suspended-subagent task-notifications.
+
+    Pure: text in, ``(task_id, outcome)`` pairs out -- so the shape stays
+    testable and replaceable the moment the harness changes its wording,
+    without touching any I/O. A `<task-notification>` block whose `<summary>`
+    matches neither known shape (a normal "... finished", or one this scan
+    does not yet recognize) contributes nothing: silence is correct here,
+    not a raise.
+    """
+    findings: list[tuple[str, str]] = []
+    for block_match in _TASK_NOTIFICATION_RE.finditer(text):
+        block = block_match.group(0)
+        task_id_match = _TASK_ID_RE.search(block)
+        summary_match = _SUMMARY_RE.search(block)
+        if not task_id_match or not summary_match:
+            continue
+        summary = summary_match.group(1)
+        if _TURN_LIMIT_RE.search(summary):
+            findings.append((task_id_match.group(1), OUTCOME_TURN_LIMIT))
+        elif _STOPPED_BY_CLAUDE_RE.search(summary):
+            findings.append((task_id_match.group(1), OUTCOME_STOPPED))
+    return findings
+
+
+_SUSPENSION_SUMMARY = {
+    OUTCOME_TURN_LIMIT: "Agent suspended at turn limit: {agent_type}",
+    OUTCOME_STOPPED: "Agent stopped by orchestrator: {agent_type}",
+}
+
+
+def build_suspension_stop(
+    payload: dict, task_id: str, kind: str, agent_type: str, agent_type_source: str
+) -> dict:
+    """Build the synthetic ``agent_stop`` row for a transcript-observed suspension.
+
+    Reuses the harness Stop payload's own ``session_id``/``cwd`` -- the
+    suspension was reported to the main agent in that same session, so the
+    row belongs to it. ``start_correlation`` is always ``paired``: the caller
+    only reaches here after confirming an `agent_start` row exists for
+    ``task_id`` (see ``_record_suspended_subagent_stops``).
+    """
+    cwd = payload.get("cwd", ".")
+    return {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "session_id": payload.get("session_id", ""),
+        "agent_type": agent_type,
+        "agent_id": task_id,
+        "project": Path(cwd).name,
+        "event_type": "agent_stop",
+        "tool_name": None,
+        "summary": _SUSPENSION_SUMMARY[kind].format(agent_type=agent_type),
+        "file_paths": [],
+        "outcome": kind,
+        "classification": None,
+        "agent_type_source": agent_type_source,
+        "start_correlation": CORRELATION_PAIRED,
+        "stop_source": STOP_SOURCE_TRANSCRIPT_NOTIFICATION,
+    }
+
+
+def _stop_row_exists(obs_path: Path, agent_id: str) -> bool:
+    """True if the WAL tail already carries an ``agent_stop`` for ``agent_id``.
+
+    The idempotency check before writing a synthetic suspension stop: a
+    second Stop reporting the same still-open notification must not
+    double-write once an earlier Stop already recorded it.
+    """
+    for line in _tail_lines(obs_path):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if (
+            isinstance(row, dict)
+            and row.get("agent_id") == agent_id
+            and row.get("event_type") == "agent_stop"
+        ):
+            return True
+    return False
+
+
+def _record_suspended_subagent_stops(obs_path: Path, payload: dict) -> None:
+    """Backfill ``agent_stop`` rows for subagents the harness suspended silently.
+
+    The harness reports a suspended background subagent to the MAIN agent as
+    a `<task-notification>` in its own transcript instead of firing
+    `SubagentStop` -- so the WAL would otherwise carry a start with no stop
+    forever (see the module docstring's Known WAL anomalies section).
+    ``transcript_path`` is read once per Stop, bounded to its tail; any
+    failure to find, read, or parse it degrades to "nothing to backfill,"
+    never a raise and never a delay beyond that bounded read.
+    """
+    transcript_path = str(payload.get("transcript_path") or "")
+    if not transcript_path:
+        return
+    text = _read_transcript_tail(transcript_path)
+    if not text:
+        return
+    for task_id, kind in find_suspended_tasks(text):
+        agent_type, start_row_seen, _ = lookup_prior_agent(obs_path, task_id)
+        if not start_row_seen or _stop_row_exists(obs_path, task_id):
+            continue
+        resolved_type, source = resolve_agent_type({}, "agent_stop", agent_type)
+        append_observation(
+            obs_path, build_suspension_stop(payload, task_id, kind, resolved_type, source)
+        )
 
 
 def main() -> None:
@@ -330,6 +530,8 @@ def main() -> None:
 
     obs_path = ai_state_dir / "observations.jsonl"
     append_observation(obs_path, build_observation(payload, event_type, obs_path))
+    if event_type == "session_stop":
+        _record_suspended_subagent_stops(obs_path, payload)
 
 
 if __name__ == "__main__":

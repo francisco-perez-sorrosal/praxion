@@ -6,8 +6,9 @@ Verifies four behaviors of the gate:
   - Pass-through for matching commands (Python invoked, stdout propagated).
   - Conservative regex: ambiguous patterns fall through to Python,
     obvious non-cleanups short-circuit.
-  - Latency budget: non-match execution stays within the configured
-    threshold (measured against subprocess floor; see LATENCY_BUDGET_MS).
+  - Latency budget: non-match execution stays within a threshold measured
+    relative to this run's own bare-subprocess fork+exec floor, not an
+    absolute wall-clock number (see LATENCY_BUDGET_MULTIPLIER).
 
 The gate is an opaque shell script — tests treat it as a black box, feeding
 JSON payloads via stdin. Two modes of verification are used:
@@ -25,7 +26,6 @@ from __future__ import annotations
 
 import json
 import os
-import statistics
 import subprocess
 import time
 from pathlib import Path
@@ -36,14 +36,31 @@ HOOKS_DIR = Path(__file__).resolve().parent
 GATE_SCRIPT = HOOKS_DIR / "cleanup_gate.sh"
 PROMOTE_HOOK = HOOKS_DIR / "promote_learnings.py"
 
-# Wall-clock budget for the no-match fast path on macOS.
-# Floor includes Python subprocess.run fork+exec (~5 ms baseline on macOS),
-# sh interpreter startup, grep exec, and exit. Measured min ~13 ms; we
-# assert on the minimum across 10 warm runs to remove scheduling noise.
-LATENCY_BUDGET_MS = 40.0
-LATENCY_BUDGET_MIN_MS = 25.0
+# A bare subprocess with the same process-spawn shape as the gate itself
+# (POSIX shell, no-op body) -- this run's own fork+exec floor, measured
+# fresh every time the test runs rather than assumed from a fixed constant.
+BASELINE_COMMAND = ["sh", "-c", ":"]
+
+# Relative-to-baseline budget: `gate_min < baseline_min * LATENCY_BUDGET_MULTIPLIER
+# + LATENCY_BUDGET_MARGIN_MS`. The multiplier absorbs the gate's own
+# additional forks over the bare baseline (cat | grep inside cleanup_gate.sh,
+# on top of the sh interpreter both share) staying proportional under CPU
+# load rather than fixed in wall-clock ms; the margin absorbs constant-ish
+# overhead (argv/JSON payload size, measurement jitter) that does not scale
+# with the baseline. Calibrated from repeated local measurement: idle-machine
+# min-ratio ~2.2x, and ~1.4x-2.9x under four concurrent `yes > /dev/null`
+# CPU-load processes -- both comfortably under a 5x multiplier plus margin.
+LATENCY_BUDGET_MULTIPLIER = 5.0
+LATENCY_BUDGET_MARGIN_MS = 15.0
 LATENCY_WARMUP_RUNS = 3
 LATENCY_MEASURED_RUNS = 10
+
+# Historical absolute budget (informational only -- no longer asserted).
+# It broke under concurrent CPU load because fork+exec cost is highly
+# load- and machine-dependent; a bound tied to a fixed wall-clock number
+# cannot track that, while a same-run relative baseline does.
+#   LATENCY_BUDGET_MS = 40.0       (old mean bound)
+#   LATENCY_BUDGET_MIN_MS = 25.0   (old min bound)
 
 # Marker string from promote_learnings.py's Python fallthrough output.
 PROMOTE_MARKER = "LEARNINGS.md files found"
@@ -209,51 +226,64 @@ def test_regex_escapes_dot_correctly() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_non_matching_command_under_latency_budget() -> None:
-    """Non-match fast-path completes within the wall-clock budget.
-
-    Measurement methodology:
-      - 3 warmup runs to amortize filesystem cache and interpreter startup.
-      - 10 measured runs; assert on min (scheduling-noise-resistant) and mean.
-      - Budget accounts for subprocess.run fork+exec overhead on macOS (~5 ms)
-        plus the gate itself (~8 ms). The gate adds no Python invocation in
-        this path; latency is dominated by sh + grep + exit.
-    """
-    payload = json.dumps(_make_bash_payload("ls -la")).encode("utf-8")
-
-    for _ in range(LATENCY_WARMUP_RUNS):
-        subprocess.run(
-            [str(GATE_SCRIPT), str(PROMOTE_HOOK)],
-            input=payload,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=True,
-        )
-
+def _measure_wall_clock_ms(argv: list[str], *, stdin_bytes: bytes | None, runs: int) -> list[float]:
+    """Run `argv` `runs` times, feeding `stdin_bytes` on each invocation, and
+    return the per-run wall-clock durations in milliseconds."""
     samples_ms: list[float] = []
-    for _ in range(LATENCY_MEASURED_RUNS):
+    for _ in range(runs):
         start = time.perf_counter()
         subprocess.run(
-            [str(GATE_SCRIPT), str(PROMOTE_HOOK)],
-            input=payload,
+            argv,
+            input=stdin_bytes,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             check=True,
         )
         samples_ms.append((time.perf_counter() - start) * 1000.0)
+    return samples_ms
 
-    min_ms = min(samples_ms)
-    mean_ms = statistics.mean(samples_ms)
 
-    assert min_ms < LATENCY_BUDGET_MIN_MS, (
-        f"fast-path min latency {min_ms:.2f} ms exceeded budget "
-        f"{LATENCY_BUDGET_MIN_MS} ms (samples: "
-        f"{[f'{s:.2f}' for s in samples_ms]})"
+def test_non_matching_command_under_latency_budget() -> None:
+    """Non-match fast-path completes within a budget relative to this run's
+    own bare-subprocess fork+exec floor -- never an absolute wall-clock
+    number, which drifts with machine load and CI noise (the historical
+    failure mode this replaces; see LATENCY_BUDGET_MULTIPLIER above).
+
+    Measurement methodology:
+      - 3 warmup runs each for baseline and gate, to amortize filesystem
+        cache and interpreter startup.
+      - 10 measured runs each; assert on min (scheduling-noise-resistant --
+        the floor is the fastest a process can possibly be scheduled, so
+        the minimum across many samples converges on the true floor even
+        under load, whereas the mean is pulled upward by scheduler noise
+        that the gate and the baseline both experience, not necessarily
+        proportionally).
+      - The gate adds no Python invocation on this path; its latency over
+        the baseline comes from cleanup_gate.sh's own cat | grep forks.
+    """
+    gate_argv = [str(GATE_SCRIPT), str(PROMOTE_HOOK)]
+    payload = json.dumps(_make_bash_payload("ls -la")).encode("utf-8")
+
+    _measure_wall_clock_ms(BASELINE_COMMAND, stdin_bytes=None, runs=LATENCY_WARMUP_RUNS)
+    _measure_wall_clock_ms(gate_argv, stdin_bytes=payload, runs=LATENCY_WARMUP_RUNS)
+
+    baseline_samples_ms = _measure_wall_clock_ms(
+        BASELINE_COMMAND, stdin_bytes=None, runs=LATENCY_MEASURED_RUNS
     )
-    assert mean_ms < LATENCY_BUDGET_MS, (
-        f"fast-path mean latency {mean_ms:.2f} ms exceeded budget "
-        f"{LATENCY_BUDGET_MS} ms (samples: "
-        f"{[f'{s:.2f}' for s in samples_ms]})"
+    gate_samples_ms = _measure_wall_clock_ms(
+        gate_argv, stdin_bytes=payload, runs=LATENCY_MEASURED_RUNS
+    )
+
+    baseline_min_ms = min(baseline_samples_ms)
+    gate_min_ms = min(gate_samples_ms)
+    budget_ms = baseline_min_ms * LATENCY_BUDGET_MULTIPLIER + LATENCY_BUDGET_MARGIN_MS
+
+    assert gate_min_ms < budget_ms, (
+        f"fast-path min latency {gate_min_ms:.2f} ms exceeded the relative budget "
+        f"{budget_ms:.2f} ms (baseline_min={baseline_min_ms:.2f} ms x "
+        f"{LATENCY_BUDGET_MULTIPLIER} + {LATENCY_BUDGET_MARGIN_MS} ms margin; "
+        f"gate samples: {[f'{s:.2f}' for s in gate_samples_ms]}, "
+        f"baseline samples: {[f'{s:.2f}' for s in baseline_samples_ms]})"
     )
 
 

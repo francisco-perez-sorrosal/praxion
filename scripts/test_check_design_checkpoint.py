@@ -602,3 +602,37 @@ def test_checkpoint_id_exceeding_corpus_tip_warns_but_does_not_fail(tmp_path, ca
     # more than the corpus contains is a fact worth surfacing, not swallowing.
     warned = "warn" in captured.err.lower() or bool(payload.get("warning"))
     assert warned, "checkpoint exceeding corpus_tip must surface a warning somewhere"
+
+
+# -- Canary: direct-call coverage for check_design_checkpoint() --------------
+#
+# Every test above drives the validator through `main()` (the CLI wrapper).
+# `check_design_checkpoint()` itself -- the function a caller embedding this
+# validator would actually import and call -- had no test calling it
+# directly, which is the gap the gate-canary-coverage meta-test's check-level
+# unit exists to catch. These two call the function itself with a bad input.
+
+
+def test_canary_check_design_checkpoint_flags_a_missing_design_doc(tmp_path):
+    """Direct call (not through main()): a tree with no `.ai-state/DESIGN.md`
+    at all must be flagged -- exit code 2, `checkpoint_state == "unreadable"`."""
+    (tmp_path / ".ai-state").mkdir(parents=True)
+    # Deliberately no DESIGN.md written.
+
+    exit_code, payload = check_design_checkpoint.check_design_checkpoint(tmp_path)
+
+    assert exit_code == 2
+    assert payload["checkpoint_state"] == "unreadable"
+
+
+def test_canary_check_design_checkpoint_flags_a_malformed_mark(tmp_path):
+    """Direct call (not through main()): an unparseable `Current as of` cell
+    must be flagged as malformed, with `unfolded` reported as `None` -- never
+    the empty list a genuinely clean checkpoint produces."""
+    _write_design(tmp_path, "not-a-valid-id")
+
+    exit_code, payload = check_design_checkpoint.check_design_checkpoint(tmp_path)
+
+    assert exit_code == 0
+    assert payload["checkpoint_state"] == "malformed"
+    assert payload["unfolded"] is None

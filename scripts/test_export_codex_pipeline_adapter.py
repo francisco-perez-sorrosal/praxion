@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -52,15 +53,28 @@ def test_export_pipeline_adapter_derives_metadata_from_canonical_rules(tmp_path:
     assert any(agent["agent"] == "verifier" for agent in pipeline["agents"])
 
     assert routing["source_path"].endswith("rules/swe/agent-model-routing.md")
+
+    # Alias expectations are re-derived from the routing rule's own table, not hardcoded --
+    # a doc-contract test that hard-codes the value it is meant to check against is not a
+    # contract test (the rule, not this file, is the source of truth for which alias an
+    # agent currently resolves to).
+    model_text = (REPO_ROOT / "rules" / "swe" / "agent-model-routing.md").read_text(
+        encoding="utf-8"
+    )
+    rule_rows_by_agent = {
+        row["agent"]: row for row in exporter.table_after_heading(model_text, "### Tier Table")
+    }
+
     architect = next(
         route for route in routing["agent_routes"] if route["agent"] == "systems-architect"
     )
-    assert architect["canonical_alias"] == "opus"
+    assert architect["canonical_alias"] == rule_rows_by_agent["systems-architect"]["alias"]
     assert architect["codex_adapter"]["codex_tier"] == "high"
+
     doc_engineer = next(
         route for route in routing["agent_routes"] if route["agent"] == "doc-engineer"
     )
-    assert doc_engineer["canonical_alias"] == "haiku"
+    assert doc_engineer["canonical_tier"] == "L"
     assert doc_engineer["codex_adapter"]["reasoning_effort"] == "low"
     assert "gpt-" not in routing_path.read_text(encoding="utf-8")
 
@@ -92,3 +106,40 @@ def test_export_pipeline_adapter_fails_when_canonical_table_changes(tmp_path: Pa
         exporter.PipelineAdapterError, match="missing Codex process adapter for tier: Weird"
     ):
         exporter.export_pipeline_adapter(repo_root, tmp_path / ".codex")
+
+
+def test_model_routing_resolves_every_tier_declared_in_the_routing_rule():
+    # Totality: the adapter must key on the routing rule's stable semantic column (Tier:
+    # H/M/L), never on the volatile Alias column. Every Tier cell the rule declares must
+    # resolve through CODEX_MODEL_TIER_ADAPTER -- this fails the moment the adapter is keyed
+    # on something other than Tier, independent of which alias currently happens to be
+    # assigned to which agent.
+    exporter = load_exporter()
+    model_text = (REPO_ROOT / "rules" / "swe" / "agent-model-routing.md").read_text(
+        encoding="utf-8"
+    )
+    rows = exporter.table_after_heading(model_text, "### Tier Table")
+    tiers_in_rule = {row["tier"] for row in rows}
+
+    assert tiers_in_rule, "expected at least one Tier row in the routing rule's Tier Table"
+    unresolved = sorted(
+        tier for tier in tiers_in_rule if tier not in exporter.CODEX_MODEL_TIER_ADAPTER
+    )
+    assert not unresolved, (
+        "CODEX_MODEL_TIER_ADAPTER does not resolve every Tier cell declared in "
+        f"rules/swe/agent-model-routing.md: missing {unresolved}"
+    )
+
+
+def test_model_adapter_source_contains_no_claude_alias_literal():
+    # No-alias-literal: a Claude alias in the adapter's own source is the coupling this
+    # invariant removes. This is stricter than the totality test above -- it fails at
+    # authoring time if alias coupling is reintroduced, rather than waiting for an alias to
+    # change.
+    source = EXPORTER_PATH.read_text(encoding="utf-8")
+    alias_literals = re.findall(r"opus|sonnet|haiku|claude-", source)
+
+    assert not alias_literals, (
+        "codex/config/export-codex-pipeline-adapter.py must contain no Claude alias literal "
+        f"(found: {alias_literals}); key on the routing rule's Tier column instead"
+    )

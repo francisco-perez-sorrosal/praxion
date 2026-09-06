@@ -1,7 +1,8 @@
 ---
 id: dec-160
 title: Add an /overview landing surface aggregating sentinel grade, metrics health, active workshops and ADR counts
-status: accepted
+status: superseded
+superseded_by: dec-draft-9095dc63
 category: architectural
 date: 2026-05-12
 summary: New /overview route + a server view-model that composes existing view-model reads into an at-a-glance "state of everything" landing; / redirects there instead of /architecture.

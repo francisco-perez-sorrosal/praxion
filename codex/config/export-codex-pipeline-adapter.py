@@ -51,17 +51,17 @@ PROCESS_TIER_ADAPTER = {
 
 
 CODEX_MODEL_TIER_ADAPTER = {
-    "opus": {
+    "H": {
         "codex_tier": "high",
         "model_selection": "strongest_available_codex_model",
         "reasoning_effort": "high",
     },
-    "sonnet": {
+    "M": {
         "codex_tier": "medium",
         "model_selection": "default_strong_codex_coding_model",
         "reasoning_effort": "medium",
     },
-    "haiku": {
+    "L": {
         "codex_tier": "low",
         "model_selection": "fast_cost_efficient_codex_model",
         "reasoning_effort": "low",
@@ -189,16 +189,18 @@ def export_model_routing(repo_root: Path) -> dict[str, object]:
     model_path, model_text = read_source(repo_root, "rules/swe/agent-model-routing.md")
     routes = []
     for row in table_after_heading(model_text, "### Tier Table"):
-        alias = row["alias"]
-        if alias not in CODEX_MODEL_TIER_ADAPTER:
-            raise PipelineAdapterError(f"missing Codex model adapter for alias: {alias}")
+        tier = row["tier"]
+        if tier not in CODEX_MODEL_TIER_ADAPTER:
+            raise PipelineAdapterError(f"missing Codex model adapter for tier: {tier}")
         routes.append(
             {
                 "agent": row["agent"],
-                "canonical_tier": row["tier"],
-                "canonical_alias": alias,
+                "canonical_tier": tier,
+                # Opaque provenance only: what the routing rule says today. The adapter
+                # never branches on this value -- see canonical_tier / codex_adapter above.
+                "canonical_alias": row["alias"],
                 "rationale": row["rationale"],
-                "codex_adapter": CODEX_MODEL_TIER_ADAPTER[alias],
+                "codex_adapter": CODEX_MODEL_TIER_ADAPTER[tier],
             }
         )
 
@@ -214,7 +216,9 @@ def export_model_routing(repo_root: Path) -> dict[str, object]:
         "tier_mapping": CODEX_MODEL_TIER_ADAPTER,
         "agent_routes": routes,
         "notes": [
-            "Canonical Claude aliases remain source semantics; Codex model IDs are intentionally not pinned here.",
+            "tier_mapping and agent_routes[].codex_adapter are keyed by the routing rule's "
+            "canonical Tier column (H/M/L), never by the rule's Alias column; "
+            "canonical_alias is opaque source-rule provenance and is not resolved here.",
             "Choose the strongest available Codex model for high-tier routes, a strong default coding model for medium-tier routes, and a fast cost-efficient model for low-tier routes.",
         ],
     }

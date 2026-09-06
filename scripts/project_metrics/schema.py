@@ -198,6 +198,16 @@ class Report:
     hotspots: dict[str, Any] = field(default_factory=dict)
     trends: TrendBlock = field(default_factory=lambda: TrendBlock(status="first_run"))
     run_metadata: RunMetadata | None = None
+    # Coverage-refresh outcome — populated only when the CLI's
+    # ``--refresh-coverage`` opt-in was passed. ``None``/``None`` means "no
+    # refresh was attempted", never "refresh succeeded"; the distinction
+    # matters because a consumer must be able to tell "this run didn't try"
+    # from "this run tried and the artifact is trustworthy". ``coverage_refresh``
+    # is one of ``"fresh"`` / ``"timed-out"`` / ``"failed"`` when populated.
+    # ``coverage_artifact_mtime`` is the artifact's own mtime captured before
+    # the refresh attempt, so a consumer can independently judge staleness.
+    coverage_refresh: str | None = None
+    coverage_artifact_mtime: float | None = None
 
 
 def to_json(report: Report) -> bytes:

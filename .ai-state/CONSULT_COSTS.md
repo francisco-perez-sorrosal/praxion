@@ -30,6 +30,7 @@ aggregation sums rows per triple.
 | 2026-07-31T19:33:43Z | verify-multidisciplinary | statistician | verification | 197631 | opus | high-stakes | Third consult of the series and the second sealed one. Convened against this verification's OWN report rather than against the initiative. 7 priors sealed at 37df0f3 before the spawn; 9 challenges, 9 switch-now, 0 dismissed. Spawn prompt enumerated ZERO attack areas, against 7 for the prior consult -- a second point on the series' largest uncontrolled covariate. |
 | 2026-08-31T07:45:00Z | adr-living-view | data-structure-specialist | architecture | 167070 | opus | standard | First consult of the data-structure-specialist discipline. UNSEALED: the convener spawned without writing Sealed Priors rows (decide-seal-spawn missed; recorded honestly rather than backdated — all 8 classifications are 'novel' by construction and the seal-witness column carries the consultant's Round-0 HEAD, not a pre-spawn seal commit). 8 challenges, 8 switch-now (CH-08's registry half deferred to a td row), 0 dismissed. Spawn prompt enumerated 5 attack areas. CH-01 independently re-verified on disk by the convener before disposition. |
 | 2026-09-02T08:11:24Z | sidecar-placement | data-structure-specialist | architecture | 156321 | opus | standard | First consult of the data-structure-specialist discipline on this task. 8 priors sealed at 41903c1 before the spawn; 7 challenges, 7 switch-now, 0 dismissed. Spawn prompt enumerated the 7 load-bearing representations as attack areas. Round-0 corpus read in isolation; seal witness 41903c1. |
+| 2026-08-30T19:29:00Z | rust-first-class | evidence-appraiser | architecture | 171245 | opus | standard | RECONSTRUCTED: tokens = final assistant message's (input_tokens + cache_read_input_tokens + cache_creation_input_tokens + output_tokens) from ~/.claude/projects/-Users-fperez-dev-praxion/dee467d0-eb81-475a-9974-e09ee647921b/subagents/agent-a78b9d5b0d15db26a.jsonl. Calibration: sidecar-placement/data-structure-specialist recorded 156321 vs reconstructed 156232 (-0.06%); adr-living-view/data-structure-specialist recorded 167070 vs reconstructed 166789 (-0.17%) -- a consistent undercount. Nothing was harness-surfaced because the consult was spawned async (status: async_launched) with no completion summary displayed to the convener. UNSEALED: no Sealed Priors rows existed before the 2026-08-30T19:20:45Z spawn; tombstone recorded post-hoc by the praxion-health pass. |
 
 ## Column Definitions
 
@@ -40,8 +41,11 @@ aggregation sums rows per triple.
   unique, because one discipline may attach at both `research` and `architecture`
   within a single task.
 - **tokens** -- the aggregate subagent token count the harness surfaces to the convener
-  at that consult's completion. A positive integer, digits only, no separators. This is
-  a **raw observation**, never a derived or price-weighted figure.
+  at that consult's completion, **or**, when an async spawn surfaced nothing, a
+  transcript-reconstructed figure whose `notes` cell begins with the literal marker
+  `RECONSTRUCTED:` and states the derivation, its calibration points and the residual
+  direction. A positive integer, digits only, no separators. Never a **price-weighted**
+  figure (dec-draft-6754571e narrows this from "never derived").
 - **model** -- the model tier that actually ran the consult (`opus` / `sonnet` / `haiku`).
   Load-bearing: tokens without a tier are not re-priceable, and an all-`opus` numerator
   over a mixed-tier denominator is exactly the bias `dec-306` corrected. Must equal the

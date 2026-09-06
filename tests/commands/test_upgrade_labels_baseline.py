@@ -6,11 +6,12 @@ the documented contract by parsing `commands/upgrade-project.md`
 structurally, matching the precedent set by
 `tests/commands/test_upgrade_project_command.py`.
 
-The command currently documents re-pointing the `ci-autofix.yml` caller and
-adding the `cross-model-review.yml` caller (surface 5) — it does not yet
-mention `refresh_labels_baseline.py` or the `labels-reconcile.yml` caller.
-All tests below are expected to FAIL until the implementer wires the labels
-surface in.
+The command already documents the `labels-reconcile.yml` caller alongside
+`ci-autofix.yml` in the numbered surface-5 list item — `_ci_autofix_repoint_description()`
+anchors there rather than on the old `CI_AUTOFIX_REPOINT_ANCHOR` free-text
+phrase the rewrite dropped. Naming `refresh_labels_baseline.py` explicitly in
+surface 6 is the one genuine gap this file pins down until the implementer
+closes it.
 """
 
 from __future__ import annotations
@@ -20,10 +21,6 @@ from pathlib import Path
 
 UPGRADE_FILE = Path(__file__).parents[2] / "commands" / "upgrade-project.md"
 
-# The exact phrase anchoring surface 5's existing ci-autofix.yml re-point
-# description (see commands/upgrade-project.md's numbered surface list).
-CI_AUTOFIX_REPOINT_ANCHOR = "ci-autofix.yml` caller's pinned hub commit reference"
-
 
 def _upgrade_body() -> str:
     """Return the full upgrade-project.md content (read lazily so collection succeeds)."""
@@ -31,20 +28,26 @@ def _upgrade_body() -> str:
 
 
 def _ci_autofix_repoint_description() -> str:
-    """Return a window of text around surface 5's existing ci-autofix.yml
-    re-point description, or '' if not found.
+    """Return the numbered surface-5 list item describing the ci-autofix.yml
+    re-point, or '' if not found.
 
-    Scoping to this window (rather than the whole file) keeps the
+    Anchored on the structural numbered-list marker (`5. The hub-SHA-pinned
+    workflow callers ... ci-autofix.yml`), windowed to the next numbered item
+    (or +600 chars as a fallback) — not the old `CI_AUTOFIX_REPOINT_ANCHOR`
+    free-text phrase, which the doc rewrite dropped. This keeps the
     "labels-reconcile mentioned alongside it" assertion anchored to the
-    actual re-point prose, instead of matching an unrelated
+    actual surface-5 description, instead of matching an unrelated
     'labels-reconcile' mention elsewhere in the file.
     """
     body = _upgrade_body()
-    idx = body.find(CI_AUTOFIX_REPOINT_ANCHOR)
-    if idx == -1:
+    match = re.search(
+        r"\n5\.\s+The hub-SHA-pinned workflow callers.*?`ci-autofix\.yml`", body, re.DOTALL
+    )
+    if not match:
         return ""
-    start = max(0, idx - 50)
-    end = min(len(body), idx + 500)
+    start = match.start()
+    next_item = re.search(r"\n6\.\s", body[match.end() :])
+    end = match.end() + next_item.start() if next_item else min(len(body), start + 600)
     return body[start:end]
 
 

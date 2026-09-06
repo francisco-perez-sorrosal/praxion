@@ -1,6 +1,6 @@
 ---
 description: Compute project complexity/health metrics (churn, complexity, coupling, hot-spots, trends) and write a timestamped report triple to .ai-state/
-argument-hint: "[--window-days N] [--top-n N] [--refresh-coverage]"
+argument-hint: "[--window-days N] [--top-n N] [--refresh-coverage] [--coverage-timeout SECONDS]"
 allowed-tools: [Bash(python3:*), Bash(git:*), Read]
 ---
 
@@ -17,6 +17,7 @@ Three optional flags parsed from `$ARGUMENTS` and forwarded verbatim to the Pyth
 | `--window-days N` | `90` | Look-back window (days) for churn, ownership, and delta computations. Must be a positive integer. |
 | `--top-n N` | `10` | Size of the hot-spot Top-N ranking in the MD report. Must be a positive integer. |
 | `--refresh-coverage` | off | Opt-in. Before the read-only metrics pipeline runs, invoke the project's canonical coverage target (via the `test-coverage` skill's probe order) to refresh `coverage.xml`. A refresh failure degrades to a stderr warning and the pipeline still runs. The sole exception to the otherwise read-only contract. |
+| `--coverage-timeout` | 1800 | Seconds allowed for the `--refresh-coverage` run before it is abandoned (Praxion's own suite takes 8–11 minutes; the previous fixed 600 s bound abandoned it every time). A timeout or failure never hides: the JSON report carries `coverage_refresh` (`fresh` / `timed-out` / `failed`) plus `coverage_artifact_mtime`, and the Markdown report shows a "Coverage Data Is Stale" note beside the figures. |
 | `--require-readiness-ai` | off | Hard-fail (non-zero exit, no partial write) when the LLM tier of Agent Readiness cannot run — i.e., when neither `ANTHROPIC_API_KEY` nor `CLAUDE_CODE_OAUTH_TOKEN` is set, or when a judge call fails. Use to enforce LLM scoring in gated pipelines. Do **not** use in offline CI environments. |
 | `--mechanical-only` | off | Skip Agent Readiness LLM enrichment entirely. All 4 LLM-judged criteria are marked `llm_skipped` and excluded from the denominator. The level is computed from the 25 mechanical criteria only. Fast and free — no API key required. Recommended for offline CI. |
 
@@ -70,14 +71,14 @@ Review the MD rendering. If it reflects project state accurately, stage and
 commit with `git add <paths> && git commit`.
 ```
 
-Then bound the directory: run `prune_reports.py` (PATH-installed by `install_claude.sh`; in the Praxion self-host checkout use `python3 scripts/prune_reports.py`) to retain the last 10 `METRICS_REPORT_*` runs — each run's `.md` + `.json` pair is kept or pruned together. It never touches `METRICS_LOG.md` (the full history stays); pruned reports remain in git history. Stage the pruned deletions in the same commit as the new report.
+Then bound the directory: run `prune_reports.py --family .ai-state/metrics_reports:METRICS` (PATH-installed by `install_claude.sh`; in the Praxion self-host checkout use `python3 scripts/prune_reports.py --family .ai-state/metrics_reports:METRICS`) to retain the last 10 `METRICS_REPORT_*` runs — each run's `.md` + `.json` pair is kept or pruned together. Naming the family scopes the prune to this command's own reports — `.ai-state/metrics_reports` also hosts the `SELF_HEALING` family, which must not be touched here. It never touches `METRICS_LOG.md` (the full history stays); pruned reports remain in git history. Stage the pruned deletions in the same commit as the new report.
 
 ### Failure modes
 
 - **Non-positive `--window-days` or `--top-n`**: CLI exits non-zero with a clear stderr message; nothing is written. Surface the stderr text as-is.
 - **`git rev-parse --show-toplevel` fails inside the CLI**: CLI refuses to invent an `.ai-state/` location and exits non-zero. Surface the stderr text as-is.
 - **Missing optional tooling** (`scc`, `uvx`-hosted collectors, language-specific analyzers): collectors downgrade to skip markers; the run still succeeds and the MD rendering notes which collectors were skipped with install hints. No special handling needed here.
-- **`--refresh-coverage` dispatch failure**: if the project has no canonical coverage target, or the target exits non-zero, the CLI degrades to a stderr warning and proceeds with the existing (possibly stale or missing) `coverage.xml`. The run still exits 0 and writes all three artifacts; the MD rendering surfaces coverage as stale/skipped.
+- **`--refresh-coverage` dispatch failure**: if the project has no canonical coverage target, or the target exits non-zero, the CLI degrades to a stderr warning and proceeds with the existing (possibly stale or missing) `coverage.xml`. The run still exits 0 and writes all three artifacts; the JSON carries `coverage_refresh: timed-out` or `failed` with the artifact's mtime, and the MD rendering shows the stale-coverage note — a stale artifact is never presented as current.
 
 ## Notes
 

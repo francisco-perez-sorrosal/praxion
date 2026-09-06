@@ -7,9 +7,12 @@ script on sys.path (mirrors the sibling detector tests).
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 _SCRIPT_PATH = Path(__file__).resolve().parent / "prune_reports.py"
 
@@ -53,6 +56,24 @@ def _make_sentinel(root: Path, timestamps: list[str]) -> Path:
     for ts in timestamps:
         (d / f"SENTINEL_REPORT_{ts}.md").write_text("md\n")
     return d
+
+
+def _inventory(directory: Path) -> dict[str, str]:
+    """Name -> content for every file directly under `directory`."""
+    return {p.name: p.read_text() for p in sorted(directory.iterdir()) if p.is_file()}
+
+
+def _run_cli(mod: Any, capsys: pytest.CaptureFixture[str], argv: list[str]) -> tuple[int, str]:
+    """Parse CLI args and run, returning (exit_code, captured_stdout).
+
+    Goes through `_parse_args` (the argparse layer), not `prune_all` directly,
+    so a not-yet-implemented `--family` flag fails here with argparse's own
+    "unrecognized arguments" error -- the correct signature for the flag's
+    absence, not a collection error.
+    """
+    args = mod._parse_args(argv)
+    code = mod._run(args)
+    return code, capsys.readouterr().out
 
 
 def test_sibling_series_in_one_directory_have_independent_retention(tmp_path: Path) -> None:
@@ -183,3 +204,163 @@ def test_bites_canary(tmp_path: Path) -> None:
         "SENTINEL_REPORT_2026-02-01_00-00-00.md",
     }
     assert len(after) == keep
+
+
+def test_family_filter_prunes_only_named_family(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """--family scopes pruning to exactly the named family. Every other
+    family -- including a sibling series sharing the same directory -- is
+    left byte-identical to its pre-run state."""
+    mod = _load_module()
+    metrics_dir = _make_metrics(tmp_path, _TIMESTAMPS)  # 5 METRICS runs
+    (metrics_dir / "SELF_HEALING_REPORT_2026-03-15_00-00-00.md").write_text("md\n")
+    sentinel_dir = _make_sentinel(tmp_path, _TIMESTAMPS)  # 5 SENTINEL runs
+    before_metrics_dir = _inventory(metrics_dir)
+
+    code, _ = _run_cli(
+        mod,
+        capsys,
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--keep",
+            "1",
+            "--family",
+            ".ai-state/sentinel_reports:SENTINEL",
+        ],
+    )
+
+    assert code == 0
+    # The named family was pruned down to its keep budget.
+    assert sorted(p.name for p in sentinel_dir.glob("SENTINEL_REPORT_*")) == [
+        "SENTINEL_REPORT_2026-05-01_00-00-00.md",
+    ]
+    # Every file in the untouched sibling directory -- both the METRICS
+    # series and the SELF_HEALING series it shares the directory with --
+    # is byte-identical to before the run.
+    assert _inventory(metrics_dir) == before_metrics_dir
+
+
+def test_family_filter_may_repeat(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """--family may be passed multiple times to prune several named
+    families in one invocation; a family never named stays untouched."""
+    mod = _load_module()
+    metrics_dir = _make_metrics(tmp_path, _TIMESTAMPS)  # 5 METRICS runs
+    (metrics_dir / "SELF_HEALING_REPORT_2026-03-01_00-00-00.md").write_text("md\n")
+    (metrics_dir / "SELF_HEALING_REPORT_2026-04-01_00-00-00.md").write_text("md\n")
+    sentinel_dir = _make_sentinel(tmp_path, _TIMESTAMPS)  # 5 SENTINEL runs, never named
+
+    code, _ = _run_cli(
+        mod,
+        capsys,
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--keep",
+            "1",
+            "--family",
+            ".ai-state/metrics_reports:METRICS",
+            "--family",
+            ".ai-state/metrics_reports:SELF_HEALING",
+        ],
+    )
+
+    assert code == 0
+    assert len(list(metrics_dir.glob("METRICS_REPORT_*.md"))) == 1
+    assert len(list(metrics_dir.glob("SELF_HEALING_REPORT_*"))) == 1
+    assert len(list(sentinel_dir.glob("SENTINEL_REPORT_*"))) == 5
+
+
+def test_rejects_unknown_family_label(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """An unrecognized --family value is refused with a non-zero exit --
+    never silently pruning nothing -- and the error names every known
+    family label so the caller can self-correct."""
+    mod = _load_module()
+    known_labels = [f"{rel}:{prefix}" for rel, prefix in mod._REPORT_FAMILIES]
+
+    with pytest.raises(SystemExit) as exc_info:
+        mod._parse_args(["--repo-root", str(tmp_path), "--family", "bogus/dir:NOPE"])
+
+    assert exc_info.value.code != 0
+    stderr = capsys.readouterr().err
+    assert "bogus/dir:NOPE" in stderr
+    for label in known_labels:
+        assert label in stderr
+
+
+def test_absent_family_flag_prunes_all_families(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Omitting --family preserves today's behavior: every family is
+    considered, unchanged from the pre-flag CLI contract."""
+    mod = _load_module()
+    metrics_dir = _make_metrics(tmp_path, _TIMESTAMPS)
+    sentinel_dir = _make_sentinel(tmp_path, _TIMESTAMPS)
+
+    code, _ = _run_cli(mod, capsys, ["--repo-root", str(tmp_path), "--keep", "1"])
+
+    assert code == 0
+    assert len(list(metrics_dir.glob("METRICS_REPORT_*.md"))) == 1
+    assert len(list(sentinel_dir.glob("SENTINEL_REPORT_*"))) == 1
+
+
+def test_family_filter_composes_with_dry_run(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """--family + --dry-run previews the scoped family's prune without
+    deleting anything, in either the named family or any other."""
+    mod = _load_module()
+    sentinel_dir = _make_sentinel(tmp_path, _TIMESTAMPS)  # 5 runs
+    metrics_dir = _make_metrics(tmp_path, _TIMESTAMPS)  # untouched sibling family
+
+    code, _ = _run_cli(
+        mod,
+        capsys,
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--keep",
+            "1",
+            "--dry-run",
+            "--family",
+            ".ai-state/sentinel_reports:SENTINEL",
+        ],
+    )
+
+    assert code == 0
+    assert len(list(sentinel_dir.glob("SENTINEL_REPORT_*"))) == 5
+    # Untouched sibling family: 5 runs x (.md + .json) = 10 files, unchanged.
+    assert len(list(metrics_dir.glob("METRICS_REPORT_*"))) == 10
+
+
+def test_family_filter_composes_with_json(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """--family + --json reports a prune count scoped to the named family
+    only; the sibling family's files stay on disk untouched."""
+    mod = _load_module()
+    sentinel_dir = _make_sentinel(tmp_path, _TIMESTAMPS)  # 5 runs, keep 1 -> 4 pruned
+    metrics_dir = _make_metrics(tmp_path, _TIMESTAMPS)  # untouched sibling family
+
+    code, out = _run_cli(
+        mod,
+        capsys,
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--keep",
+            "1",
+            "--json",
+            "--family",
+            ".ai-state/sentinel_reports:SENTINEL",
+        ],
+    )
+
+    assert code == 0
+    result = json.loads(out)
+    # If the filter were ignored, metrics (4) would inflate this total too.
+    assert result["total_pruned"] == 4
+    assert len(list(sentinel_dir.glob("SENTINEL_REPORT_*"))) == 1
+    # Untouched sibling family: 5 runs x (.md + .json) = 10 files, unchanged.
+    assert len(list(metrics_dir.glob("METRICS_REPORT_*"))) == 10

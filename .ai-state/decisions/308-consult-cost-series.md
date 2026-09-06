@@ -22,6 +22,8 @@ affected_files:
   - docs/multidisciplinary-identities-evidence.md
 dissent: A hand-appended series with no automatic capture is a series-shaped artifact rather than a series -- if the convener stops writing rows the file decays into a false record of completeness, which is strictly worse than the honest "unmeasured" label wontfix would have preserved.
 re_affirms: dec-299
+superseded_in_part_by:
+  - dec-draft-6754571e
 ---
 
 # Per-consult cost series lives in a sibling append-only side-record, not a twelfth ledger column

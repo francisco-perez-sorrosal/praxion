@@ -182,7 +182,9 @@ could not see. Do not re-add a title-matching model↔markdown check.
 
 Each check activates only when its substrate is present, mirroring the TT-dimension's conditional-activation
 idiom. AC12 fires only after at least one feature has populated both sides of the convention — until then it
-emits an INFO note and exits (dec-112).
+emits an INFO note and exits (dec-112). A project may record a deliberate non-adoption of the bidirectional
+convention as an ADR; when such a decision exists, the skip note cites it, so a permanent skip reads as a
+decision rather than as an unworked backlog item.
 
 **Substrate presence is necessary but not sufficient — the reader must also be reachable.** `query-by-metadata`
 is an MCP tool, and no agent in the fleet holds a LikeC4 MCP grant: the sentinel runs on

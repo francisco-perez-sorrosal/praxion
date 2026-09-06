@@ -92,6 +92,22 @@ def _positive_int(raw: str) -> int:
     return value
 
 
+def _positive_float(raw: str) -> float:
+    """Argparse ``type=`` converter: parse ``raw`` as a strictly positive float.
+
+    Mirrors :func:`_positive_int` for options measured in seconds, where a
+    fractional value is legitimate (``--coverage-timeout 90.5``).
+    """
+
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"invalid float value: {raw!r}") from exc
+    if value <= 0:
+        raise argparse.ArgumentTypeError(f"must be positive (got {value!r})")
+    return value
+
+
 def _build_parser() -> argparse.ArgumentParser:
     """Construct the CLI's argument parser.
 
@@ -130,6 +146,17 @@ def _build_parser() -> argparse.ArgumentParser:
             "skill's probe order) to refresh coverage.xml. A refresh failure "
             "degrades to a stderr warning and the pipeline still runs. "
             "Default: off (pipeline remains read-only)."
+        ),
+    )
+    parser.add_argument(
+        "--coverage-timeout",
+        type=_positive_float,
+        default=_DEFAULT_COVERAGE_TIMEOUT_SECONDS,
+        help=(
+            "Timeout, in seconds, for the --refresh-coverage subprocess. "
+            f"Default: {_DEFAULT_COVERAGE_TIMEOUT_SECONDS:.0f} — comfortably "
+            "above the suite's observed 8-11 minute runtime, so a normal run "
+            "is not aborted mid-flight."
         ),
     )
     parser.add_argument(
@@ -212,24 +239,40 @@ def _atomic_write_bytes(path: Path, payload: bytes) -> None:
 # ---------------------------------------------------------------------------
 
 _COVERAGE_ARTIFACT_BASENAME = "coverage.xml"
-_COVERAGE_INVOKE_TIMEOUT_SECONDS: float = 600.0
+# Comfortably above the suite's observed 8-11 minute runtime (the prior
+# hardcoded 600s bound aborted a normal run mid-flight); overridable via
+# --coverage-timeout.
+_DEFAULT_COVERAGE_TIMEOUT_SECONDS: float = 1800.0
 _PIXI_COVERAGE_TASK_NAMES: tuple[str, ...] = ("coverage", "test-coverage", "cov")
 _MAKE_COVERAGE_TARGET_NAMES: tuple[str, ...] = ("coverage", "test-coverage", "cov")
 
 
-def _refresh_coverage_artifact(repo_root: Path) -> None:
+class _CoverageRefreshTimeoutError(RuntimeError):
+    """Raised when the coverage-refresh subprocess exceeds its timeout.
+
+    A distinct type from the generic failure ``RuntimeError`` so the caller
+    can classify the report's ``coverage_refresh`` field as ``"timed-out"``
+    rather than the catch-all ``"failed"``.
+    """
+
+
+def _refresh_coverage_artifact(
+    repo_root: Path, *, timeout: float = _DEFAULT_COVERAGE_TIMEOUT_SECONDS
+) -> None:
     """Invoke the project's canonical coverage target to refresh ``coverage.xml``.
 
     Implements the test-coverage skill's Python probe order (pixi task →
     pyproject ``pytest-cov`` config → raw ``pytest --cov=<pkg>`` fallback →
     Makefile target), stops at the first hit, runs the discovered target,
-    and raises :class:`RuntimeError` if no target is discoverable, the
-    subprocess exits non-zero, or ``<repo_root>/coverage.xml`` is absent
-    after invocation.
+    and raises if no target is discoverable, the subprocess exits non-zero,
+    or ``<repo_root>/coverage.xml`` is absent after invocation.
+    :class:`_CoverageRefreshTimeoutError` is raised specifically when the
+    subprocess exceeds ``timeout``; every other failure raises a plain
+    :class:`RuntimeError`.
 
     Called only from the ``--refresh-coverage`` branch in :func:`main`.
-    Exceptions propagate so the caller can warn + continue — the helper
-    itself never swallows a failure.
+    Exceptions propagate so the caller can classify + warn + continue — the
+    helper itself never swallows a failure.
     """
 
     target = _discover_coverage_target(repo_root)
@@ -246,7 +289,7 @@ def _refresh_coverage_artifact(repo_root: Path) -> None:
             target,
             cwd=str(repo_root),
             env=_coverage_invocation_env(repo_root),
-            timeout=_COVERAGE_INVOKE_TIMEOUT_SECONDS,
+            timeout=timeout,
             check=False,
         )
     except FileNotFoundError as exc:
@@ -254,9 +297,8 @@ def _refresh_coverage_artifact(repo_root: Path) -> None:
             f"test-coverage: invocation {target!r} failed — executable not found: {exc}"
         ) from exc
     except subprocess.TimeoutExpired as exc:
-        raise RuntimeError(
-            f"test-coverage: invocation {target!r} timed out after "
-            f"{int(_COVERAGE_INVOKE_TIMEOUT_SECONDS)}s"
+        raise _CoverageRefreshTimeoutError(
+            f"test-coverage: invocation {target!r} timed out after {int(timeout)}s"
         ) from exc
 
     if completed.returncode != 0:
@@ -494,32 +536,87 @@ def _extract_toml_section(text: str, section: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-def _maybe_refresh_coverage(args: argparse.Namespace, repo_root: Path) -> None:
-    """Run the opt-in coverage refresh pre-pass; degrade failures to a warning.
+_COVERAGE_REFRESH_FRESH = "fresh"
+_COVERAGE_REFRESH_TIMED_OUT = "timed-out"
+_COVERAGE_REFRESH_FAILED = "failed"
 
-    The broad ``except Exception`` is load-bearing: the skill-invocation layer
-    surfaces heterogeneous failures (missing target, subprocess exit code,
-    absent artifact) without a narrow type hierarchy. /project-metrics must
-    never hard-fail because the refresh pre-pass did not succeed.
+
+def _read_artifact_mtime(repo_root: Path) -> float | None:
+    """Return ``coverage.xml``'s mtime (epoch float), or ``None`` if absent."""
+
+    try:
+        return (repo_root / _COVERAGE_ARTIFACT_BASENAME).stat().st_mtime
+    except OSError:
+        return None
+
+
+def _maybe_refresh_coverage(
+    args: argparse.Namespace, repo_root: Path
+) -> tuple[str | None, float | None]:
+    """Run the opt-in coverage refresh pre-pass; classify the outcome.
+
+    Returns ``(coverage_refresh, coverage_artifact_mtime)`` — both ``None``
+    when ``--refresh-coverage`` was not passed: no refresh was attempted, so
+    the report must not claim any freshness state at all. When the flag is
+    passed, ``coverage_artifact_mtime`` is the artifact's own mtime captured
+    *before* the attempt (``None`` if no artifact existed yet), and
+    ``coverage_refresh`` is one of ``"fresh"`` (the subprocess succeeded and
+    the artifact's mtime advanced), ``"timed-out"`` (the subprocess exceeded
+    ``--coverage-timeout``), or ``"failed"`` (any other failure — including a
+    subprocess that reported success without actually refreshing the
+    artifact). The broad ``except Exception`` for the non-timeout case is
+    load-bearing: the skill-invocation layer surfaces heterogeneous failures
+    (missing target, subprocess exit code, absent artifact) without a narrow
+    type hierarchy. /project-metrics must never hard-fail because the
+    refresh pre-pass did not succeed — every branch below degrades to a
+    stderr warning, never an exception.
     """
 
     if not args.refresh_coverage:
-        return
+        return None, None
+
+    pre_attempt_mtime = _read_artifact_mtime(repo_root)
     try:
-        _refresh_coverage_artifact(repo_root)
+        _refresh_coverage_artifact(repo_root, timeout=args.coverage_timeout)
+    except _CoverageRefreshTimeoutError as exc:
+        sys.stderr.write(
+            f"warning: --refresh-coverage timed out ({exc}); "
+            "continuing with existing (stale) coverage artifact\n"
+        )
+        return _COVERAGE_REFRESH_TIMED_OUT, pre_attempt_mtime
     except Exception as exc:  # noqa: BLE001 — graceful-degradation contract
         sys.stderr.write(
             f"warning: --refresh-coverage failed ({exc}); "
-            "continuing with existing coverage artifact\n"
+            "continuing with existing (stale) coverage artifact\n"
         )
+        return _COVERAGE_REFRESH_FAILED, pre_attempt_mtime
+
+    post_attempt_mtime = _read_artifact_mtime(repo_root)
+    if post_attempt_mtime is None or post_attempt_mtime == pre_attempt_mtime:
+        sys.stderr.write(
+            "warning: --refresh-coverage reported success but coverage.xml's "
+            "mtime did not advance; continuing with existing (stale) coverage "
+            "artifact\n"
+        )
+        return _COVERAGE_REFRESH_FAILED, pre_attempt_mtime
+    return _COVERAGE_REFRESH_FRESH, pre_attempt_mtime
 
 
-def _run_pipeline(args: argparse.Namespace, repo_root: Path, ai_state_dir: Path) -> Report:
+def _run_pipeline(
+    args: argparse.Namespace,
+    repo_root: Path,
+    ai_state_dir: Path,
+    *,
+    coverage_refresh: str | None,
+    coverage_artifact_mtime: float | None,
+) -> Report:
     """Execute the read-only metrics pipeline and return the composed report.
 
     ``time.monotonic`` is used (not ``datetime``) so that tests which patch
     ``cli.datetime`` to freeze the filename timestamp still get a real
-    wall-clock duration here.
+    wall-clock duration here. ``coverage_refresh``/``coverage_artifact_mtime``
+    are the outcome of the pre-pass :func:`_maybe_refresh_coverage` already
+    ran — carried through unchanged onto the composed report.
     """
 
     run_start = time.monotonic()
@@ -540,7 +637,13 @@ def _run_pipeline(args: argparse.Namespace, repo_root: Path, ai_state_dir: Path)
         commit=head_commit,
         dirty=tree_dirty,
     )
-    return dataclasses.replace(report, trends=trend_block, run_metadata=run_metadata)
+    return dataclasses.replace(
+        report,
+        trends=trend_block,
+        run_metadata=run_metadata,
+        coverage_refresh=coverage_refresh,
+        coverage_artifact_mtime=coverage_artifact_mtime,
+    )
 
 
 def _resolve_git_provenance(repo_root: Path) -> tuple[str | None, bool | None]:
@@ -795,8 +898,14 @@ def main(argv: list[str]) -> int:
     ai_state_dir = repo_root / _AI_STATE_DIRNAME
     ai_state_dir.mkdir(parents=True, exist_ok=True)
 
-    _maybe_refresh_coverage(args, repo_root)
-    report = _run_pipeline(args, repo_root, ai_state_dir)
+    coverage_refresh, coverage_artifact_mtime = _maybe_refresh_coverage(args, repo_root)
+    report = _run_pipeline(
+        args,
+        repo_root,
+        ai_state_dir,
+        coverage_refresh=coverage_refresh,
+        coverage_artifact_mtime=coverage_artifact_mtime,
+    )
     enrich_readiness(report, repo_root, args)
     _write_report(report, ai_state_dir)
 

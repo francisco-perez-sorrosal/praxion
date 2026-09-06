@@ -20,9 +20,15 @@ Invocation::
     prune_reports.py --dry-run       # preview; delete nothing
     prune_reports.py --json          # machine-readable output
     prune_reports.py --repo-root DIR # operate on another checkout (tests)
+    prune_reports.py --family .ai-state/sentinel_reports:SENTINEL
+                                      # restrict to one family (repeatable);
+                                      # an unrecognized label exits 2 rather
+                                      # than silently pruning nothing
 
-Exit code: 0 — this is maintenance, advisory, never a gate. (Always 0 even when
-a family directory is absent: nothing to prune is not an error.)
+Exit code: 0 — this is maintenance, advisory, never a gate for a *recognized*
+scope (always 0 even when a family directory is absent: nothing to prune is
+not an error). Exit 2 on misuse: a plugin-cache repo root, or an unrecognized
+``--family`` label.
 """
 
 from __future__ import annotations
@@ -32,6 +38,7 @@ import json
 import logging
 import re
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 from _repo_root import is_plugin_cache_path, resolve_repo_root
@@ -133,18 +140,56 @@ def prune_family(family_dir: Path, prefix: str, keep: int, dry_run: bool) -> dic
     }
 
 
-def prune_all(repo_root: Path, keep: int, dry_run: bool) -> dict[str, object]:
-    """Prune every configured report family under ``repo_root``."""
-    families = [
-        prune_family(repo_root / rel, prefix, keep, dry_run) for rel, prefix in _REPORT_FAMILIES
-    ]
-    total_pruned = sum(len(f["pruned"]) for f in families)  # type: ignore[arg-type]
+def prune_all(
+    repo_root: Path,
+    keep: int,
+    dry_run: bool,
+    families: Sequence[tuple[str, str]] = _REPORT_FAMILIES,
+) -> dict[str, object]:
+    """Prune ``families`` under ``repo_root`` (default: every configured family).
+
+    ``families`` lets a caller narrow the scope to specific ``(dir, prefix)``
+    pairs from ``_REPORT_FAMILIES`` -- e.g. one sentinel run pruning only its
+    own family, never a sibling metrics run sharing ``.ai-state/``.
+    """
+    pruned = [prune_family(repo_root / rel, prefix, keep, dry_run) for rel, prefix in families]
+    total_pruned = sum(len(f["pruned"]) for f in pruned)  # type: ignore[arg-type]
     return {
         "keep": keep,
         "dry_run": dry_run,
         "total_pruned": total_pruned,
-        "families": families,
+        "families": pruned,
     }
+
+
+# -- Family selection -----------------------------------------------------
+
+
+def select_families(
+    requested: list[str] | None,
+) -> tuple[list[tuple[str, str]], list[str]]:
+    """Resolve ``--family`` values to ``_REPORT_FAMILIES`` entries.
+
+    Returns ``(selected, unknown)``. ``requested is None`` (the flag was never
+    passed) selects every configured family, preserving today's default
+    behaviour. A value with no match in ``_REPORT_FAMILIES`` -- malformed or
+    simply unrecognized -- lands in ``unknown`` rather than being dropped
+    silently, so the caller can fail loudly instead of quietly pruning
+    nothing.
+    """
+    if requested is None:
+        return list(_REPORT_FAMILIES), []
+
+    known = {f"{rel}:{prefix}": (rel, prefix) for rel, prefix in _REPORT_FAMILIES}
+    selected: list[tuple[str, str]] = []
+    unknown: list[str] = []
+    for label in requested:
+        family = known.get(label)
+        if family is None:
+            unknown.append(label)
+        elif family not in selected:
+            selected.append(family)
+    return selected, unknown
 
 
 # -- Reporting ----------------------------------------------------------------
@@ -181,6 +226,18 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true", help="Preview prunes without deleting.")
     parser.add_argument("--json", action="store_true", help="Machine-readable output.")
     parser.add_argument(
+        "--family",
+        action="append",
+        metavar="DIR:PREFIX",
+        help=(
+            "Restrict pruning to one family (repeatable), using the same "
+            "<dir>:<prefix> label prune_family(family_dir, prefix, ...) already "
+            "takes -- e.g. --family .ai-state/sentinel_reports:SENTINEL. An "
+            "unrecognized label exits 2. Omit to prune every configured family "
+            "(default)."
+        ),
+    )
+    parser.add_argument(
         "--repo-root",
         default=None,
         metavar="DIR",
@@ -190,6 +247,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     if args.keep < 0:
         parser.error("--keep must be >= 0")
+    _, unknown = select_families(args.family)
+    if unknown:
+        known_labels = ", ".join(f"{rel}:{prefix}" for rel, prefix in _REPORT_FAMILIES)
+        parser.error(
+            f"unknown --family value(s): {', '.join(unknown)} (known families: {known_labels})"
+        )
     return args
 
 
@@ -198,7 +261,11 @@ def _run(args: argparse.Namespace) -> int:
     if is_plugin_cache_path(repo_root):
         logger.error("Refusing to operate on plugin-cache path: %s", repo_root)
         return 2
-    result = prune_all(repo_root, args.keep, args.dry_run)
+
+    # `_parse_args` already rejected any unknown --family value, so `unknown`
+    # here is always empty; only the resolved family list is needed.
+    families, _ = select_families(args.family)
+    result = prune_all(repo_root, args.keep, args.dry_run, families=families)
     if args.json:
         print(json.dumps(result, indent=2))
     else:

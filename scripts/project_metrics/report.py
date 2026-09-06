@@ -76,6 +76,38 @@ _TOOL_INSTALL_BLURB: dict[str, str] = {
 
 
 # ---------------------------------------------------------------------------
+# Coverage staleness note — a `--refresh-coverage` attempt that timed out or
+# failed leaves the pre-existing `coverage.xml` in place; without this note
+# the aggregate summary's coverage sentence would present that stale
+# artifact's numbers as current.
+# ---------------------------------------------------------------------------
+
+_STALE_COVERAGE_REFRESH_STATUSES: frozenset[str] = frozenset({"timed-out", "failed"})
+
+
+def _render_coverage_staleness_note(report: Report) -> str | None:
+    """Return a Markdown note flagging stale coverage data, or ``None``.
+
+    Rendered as its own section immediately before the aggregate summary
+    (the "Line coverage is X%." sentence) so it sits next to the figures it
+    qualifies. Returns ``None`` on ``"fresh"`` or absent (no refresh
+    attempted) — a successful refresh must not carry a staleness marker.
+    """
+
+    if report.coverage_refresh not in _STALE_COVERAGE_REFRESH_STATUSES:
+        return None
+    lines = [
+        "## Coverage Data Is Stale",
+        "",
+        f"The `--refresh-coverage` attempt {report.coverage_refresh} for this run; "
+        "the coverage figures below reflect the pre-existing `coverage.xml` "
+        "artifact, not a fresh measurement.",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Public render_markdown entry point.
 # ---------------------------------------------------------------------------
 
@@ -87,13 +119,20 @@ def render_markdown(report: Report) -> str:
         _render_header(report),
         _render_tool_availability(report),
         _render_install_to_improve(report),
-        render_aggregate_summary(report),
-        render_top_n(report),
-        render_trends(report),
-        render_deep_dive(report),
-        render_per_language(report),
-        _render_run_metadata(report),
     ]
+    staleness_note = _render_coverage_staleness_note(report)
+    if staleness_note is not None:
+        sections.append(staleness_note)
+    sections.extend(
+        [
+            render_aggregate_summary(report),
+            render_top_n(report),
+            render_trends(report),
+            render_deep_dive(report),
+            render_per_language(report),
+            _render_run_metadata(report),
+        ]
+    )
     # Each section already ends with one newline (joined from lines ending
     # with ""), so joining with "\n" produces one blank line between every
     # section. No trailing "\n" is appended — the final section's terminal

@@ -23,6 +23,8 @@ affected_files:
   - .ai-state/DESIGN.md
   - docs/multidisciplinary-identities-evidence.md
 dissent: A convener that wants to cheat still can. Every artifact in this repository passes through the convener's hands before it becomes a commit, so no in-repo seal is tamper-proof, and the two witness checks bite only while the pipeline's gitignored .ai-work/ still exists -- after cleanup the record is self-consistent and uncorroborated. And even a perfectly honest series answers a confounded question -- the A-to-C delta mixes disciplinary framing with standing, so it cannot settle the claim dec-306 actually made, and the arm that would separate them is named and unbuilt. Worse, the estimand may never be computed at all -- this pays a per-consult tax on a mechanism convened five times in its lifetime, to produce a rate whose only named reader is a hypothetical future ADR that re-opens a criterion nobody has asked to re-open. The honest alternative was to amend dec-306's Falsifier to say plainly that it is not estimable at this project's consult volume, and spend nothing.
+superseded_in_part_by:
+  - dec-draft-fd158a05
 ---
 
 ## Context

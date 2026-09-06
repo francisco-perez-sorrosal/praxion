@@ -5,12 +5,14 @@ Claude Code session) — it cannot be invoked from pytest. These tests validate
 the documented contract by parsing `commands/upgrade-project.md` structurally,
 matching the precedent set by `tests/commands/test_onboard_ci_autofix_install.py`.
 
-The command currently wraps `scripts/upgrade_project_pins.sh` for the four
-pre-existing version-pinned surfaces only — it does not yet resolve a hub SHA,
-forward `--hub-sha`, degrade gracefully when `gh` is unavailable, or surface
-the `CURSOR_API_KEY` setup print. All tests below are expected to FAIL until
-the implementer wires this in, per the command-layer SHA-resolution design
-(see the ADR `upgrade-caller-sha-rewrite`).
+The command already resolves a hub SHA, forwards `--hub-sha`, degrades
+gracefully when `gh` is unavailable, and prints the `CURSOR_API_KEY` setup —
+most assertions below pass against the current text. `_hub_sha_context()` is
+anchored to the structural `**Resolve the current hub SHA**` marker inside
+`## Process`, not the first free-text "hub SHA" mention (which sits in the
+intro paragraph and never reaches the resolution mechanism). The
+gh-unavailable test additionally requires the skipped surface be named at
+the point it is mentioned, not merely somewhere else in the advisory text.
 """
 
 from __future__ import annotations
@@ -33,20 +35,22 @@ def _frontmatter_block() -> str:
 
 
 def _hub_sha_context() -> str:
-    """Return a window of text around the first 'hub SHA'/'HUB_SHA' mention, or '' if absent.
+    """Return the '## Process' step-2 window documenting hub-SHA resolution, or '' if absent.
 
-    Scoping to this window (rather than the whole file) keeps the resolution-
-    mechanism, 40-hex-validation, and never-a-placeholder assertions anchored
-    to the actual SHA-resolution prose once it exists, instead of matching
-    unrelated words ("current", "actual") that already appear elsewhere in
-    this short command file.
+    Anchored on the structural marker `**Resolve the current hub SHA**`
+    inside `## Process`, windowed to the next numbered step (or +900 chars
+    as a fallback) — not the first free-text "hub SHA" mention, which sits
+    in the intro paragraph (describing *what* gets re-pointed) and never
+    reaches Process step 2's actual resolution mechanism, 40-hex validation,
+    and never-a-placeholder rule.
     """
     body = _upgrade_body()
-    match = re.search(r"hub[\s_-]?sha", body, re.IGNORECASE)
+    match = re.search(r"\*\*Resolve the current hub SHA\*\*", body)
     if not match:
         return ""
-    start = max(0, match.start() - 200)
-    end = min(len(body), match.end() + 500)
+    start = match.start()
+    next_step = re.search(r"\n\d+\.\s+\*\*", body[match.end() :])
+    end = match.end() + next_step.start() if next_step else min(len(body), start + 900)
     return body[start:end]
 
 
@@ -129,14 +133,23 @@ def test_degrades_gracefully_when_gh_is_unavailable_but_core_surfaces_still_reco
         "not fail silently and not abort the whole upgrade"
     )
     assert re.search(
-        r"(core|four|pre-existing|existing) surfaces?.{0,80}(still|continue|reconcile)"
-        r"|reconcile.{0,80}(core|four|pre-existing|existing) surfaces?",
+        r"(core|four|pre-existing|existing|every other|all other|remaining|other)"
+        r" surfaces?.{0,80}(still|continue|reconcile)"
+        r"|reconcile.{0,80}(core|four|pre-existing|existing|every other|all other|remaining|other)"
+        r" surfaces?",
         context,
         re.IGNORECASE | re.DOTALL,
     ), (
-        "The gh-unavailable path must state that the four pre-existing "
-        "surfaces still reconcile — a missing `gh` must never block the "
-        "whole upgrade"
+        "The gh-unavailable path must state that the other surfaces still "
+        "reconcile — a missing `gh` must never block the whole upgrade"
+    )
+    assert re.search(
+        r"surface\s*5\D{0,40}(hub-SHA\s+caller|cross-model-review)", context, re.IGNORECASE
+    ), (
+        "The gh-unavailable path must name the skipped surface explicitly at "
+        "the point 'surface 5' is mentioned — e.g. 'surface 5 (the hub-SHA "
+        "caller re-point and the cross-model-review add) is skipped' — not "
+        "leave the specifics scattered elsewhere in the advisory"
     )
 
 

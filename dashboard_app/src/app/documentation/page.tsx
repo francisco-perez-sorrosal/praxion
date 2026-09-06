@@ -1,8 +1,6 @@
 import path from "node:path";
 
-import { EmptyState } from "@/components/empty-state";
 import { PageShell } from "@/components/page-shell";
-import { RENDERER_REGISTRY, resolveRenderer } from "@/components/registry";
 import { getConfig } from "@/lib/config";
 import {
   getDocumentationData,
@@ -10,6 +8,9 @@ import {
 } from "@/server/view-models/documentation";
 
 import { DocGroupsNav } from "./doc-groups-nav";
+import { DocumentationEmpty } from "./documentation-empty";
+import { selectSurface } from "./select-surface";
+import { SurfaceBody } from "./surface-body";
 
 type DocumentationPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -21,78 +22,16 @@ export default async function DocumentationPage({
   const cfg = getConfig();
   const data = await getDocumentationData(cfg.projectRoot);
   const params = await searchParams;
-  const selectedSurfaceId = typeof params.surface === "string" ? params.surface : null;
 
   if (!data) {
-    const emptySources = (
-      <p>
-        Required artifact: <code>.ai-state/doc_manifest.yaml</code>
-      </p>
-    );
-
-    return (
-      <PageShell title="Documentation" sourcesContent={emptySources}>
-        <p className="page-intro__lede muted">
-          Generated documentation surfaces discovered from the project filesystem.
-        </p>
-
-        <EmptyState
-          title="No doc manifest found"
-          body="Run `python3 scripts/build_doc_manifest.py` in the target project to generate `.ai-state/doc_manifest.yaml`."
-        />
-      </PageShell>
-    );
+    return <DocumentationEmpty />;
   }
 
-  const selectedSurface =
-    data.surfaces.find((surface) => surface.id === selectedSurfaceId) ?? data.surfaces[0] ?? null;
+  const selectedSurface = selectSurface(data.surfaces, params);
   const selectedSurfaceData =
     selectedSurface === null
       ? null
       : await getDocumentationSurfaceData(cfg.projectRoot, selectedSurface);
-
-  let renderedBody: React.ReactNode = (
-    <p className="muted">Select a surface from the manifest groups.</p>
-  );
-
-  if (selectedSurfaceData?.renderMode === "markdown") {
-    const Renderer = resolveRenderer(
-      selectedSurface?.renderer,
-      selectedSurface?.diataxis,
-      selectedSurface?.type
-    );
-    renderedBody =
-      selectedSurfaceData.body === null ? (
-        <p className="muted">{selectedSurfaceData.errorMessage ?? "Unreadable file."}</p>
-      ) : (
-        <Renderer body={selectedSurfaceData.body} surface={selectedSurface ?? undefined} />
-      );
-  } else if (selectedSurfaceData?.renderMode === "api") {
-    const Renderer = resolveRenderer(undefined, undefined, "api_reference");
-    renderedBody =
-      selectedSurfaceData.body === null ? (
-        <p className="muted">{selectedSurfaceData.errorMessage ?? "Unreadable file."}</p>
-      ) : (
-        <Renderer body={selectedSurfaceData.body} surface={selectedSurface ?? undefined} />
-      );
-  } else if (selectedSurfaceData?.renderMode === "code") {
-    const rendererKey = selectedSurface?.renderer;
-    const CodeRenderer =
-      rendererKey !== undefined ? RENDERER_REGISTRY.get(rendererKey) : undefined;
-    renderedBody =
-      selectedSurfaceData.body === null ? (
-        <p className="muted">{selectedSurfaceData.errorMessage ?? "Unreadable file."}</p>
-      ) : CodeRenderer !== undefined ? (
-        <CodeRenderer body={selectedSurfaceData.body} surface={selectedSurface ?? undefined} />
-      ) : (
-        <pre className="code-block">{selectedSurfaceData.body}</pre>
-      );
-  } else if (
-    selectedSurfaceData?.renderMode === "unsupported" ||
-    selectedSurfaceData?.renderMode === "error"
-  ) {
-    renderedBody = <p className="muted">{selectedSurfaceData.errorMessage}</p>;
-  }
 
   const sources = (
     <p>
@@ -128,7 +67,7 @@ export default async function DocumentationPage({
               {selectedSurface.diataxis ? <span className="chip">{selectedSurface.diataxis}</span> : null}
             </div>
           ) : null}
-          {renderedBody}
+          <SurfaceBody surface={selectedSurface} surfaceData={selectedSurfaceData} />
         </section>
       </div>
     </PageShell>

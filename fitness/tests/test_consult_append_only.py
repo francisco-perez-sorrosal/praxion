@@ -9,7 +9,13 @@ asserts the gate flags it -- never a green run against the current tree.
 
 The contract, verbatim from the three files themselves: "This file is append-only
 -- no row is ever edited or deleted." All three declare it independently and none
-sanctions any in-place mutation, so the gate needs no per-file exceptions.
+sanctions any in-place mutation, so the gate needs no per-file exceptions. One
+narrow exemption follows from the contract rather than carving an exception out of
+it: restoring a row to the bytes its consult's own seal-witness commit already
+recorded is compliance, not mutation -- the record is being returned to what was
+sealed, not rewritten. The witness commit is the proof, read with a real `git show`
+against the sha the *baseline* copy names for that row's (task-slug, discipline,
+stage) triple; anything else, including every deletion, stays a violation.
 
 The comparison baseline is `merge-base(origin/main, HEAD)`: the verdict is then a
 function of the branch's *content* rather than of its push cadence. Two residuals
@@ -51,9 +57,19 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+from collections import defaultdict
+from collections.abc import Callable
 from pathlib import Path
+from typing import NamedTuple
 
 import pytest
+
+from .test_discipline_registry_invariants import (
+    CLASSIFICATION_ROW_FIELDS,
+    PRIOR_ROW_FIELDS,
+    _split_escaped_row,
+    parse_classification_table_rows,
+)
 
 # ---------------------------------------------------------------------------
 # Scope and baseline definitions
@@ -135,8 +151,8 @@ def _excerpt(row: str) -> str:
     return row[:_ROW_EXCERPT_LIMIT] + " ..."
 
 
-def check_rows_are_append_only(baseline_rows: list[str], working_rows: list[str]) -> list[str]:
-    """Return one failure string per baseline row the working content lost.
+def lost_baseline_rows(baseline_rows: list[str], working_rows: list[str]) -> list[tuple[str, str]]:
+    """Return one `(reason, row)` pair per baseline row the working content lost.
 
     The working content honours the contract when the baseline rows all appear in
     it, byte-identical and in their original relative order -- that is, when the
@@ -145,20 +161,37 @@ def check_rows_are_append_only(baseline_rows: list[str], working_rows: list[str]
 
     New rows interleaved anywhere are clean: `CONSULT_PRIORS.md` carries two data
     tables, so "appended" is a per-table position, not a file-final one.
+
+    The pairs, rather than pre-formatted strings, are what let the restore-to-
+    witness exemption below re-examine a lost row against the witness commit; the
+    formatting lives one layer up so both callers share one message vocabulary.
     """
-    failures: list[str] = []
+    lost: list[tuple[str, str]] = []
     cursor = 0
     for row in baseline_rows:
         try:
             position = working_rows.index(row, cursor)
         except ValueError:
             if row in working_rows:
-                failures.append(f"row moved out of its baseline order: {_excerpt(row)}")
+                lost.append(("row moved out of its baseline order", row))
             else:
-                failures.append(f"row edited or deleted since the baseline: {_excerpt(row)}")
+                lost.append(("row edited or deleted since the baseline", row))
             continue
         cursor = position + 1
-    return failures
+    return lost
+
+
+def check_rows_are_append_only(baseline_rows: list[str], working_rows: list[str]) -> list[str]:
+    """Return one failure string per baseline row the working content lost.
+
+    The unexempted comparison: every lost row is a violation. The whole-file gate
+    layers the restore-to-witness exemption on top of the same `lost_baseline_rows`
+    result rather than re-deriving it.
+    """
+    return [
+        f"{reason}: {_excerpt(row)}"
+        for reason, row in lost_baseline_rows(baseline_rows, working_rows)
+    ]
 
 
 def consult_files(project_root: Path) -> list[Path]:
@@ -169,6 +202,128 @@ def consult_files(project_root: Path) -> list[Path]:
     opposite contract, so they must never match -- see the module docstring.
     """
     return sorted((project_root / ".ai-state").glob(CONSULT_GLOB))
+
+
+# ---------------------------------------------------------------------------
+# Restore-to-witness exemption
+# ---------------------------------------------------------------------------
+
+#: A consult's identity: the (task-slug, discipline, stage) triple every CONSULT_*
+#: table joins on.
+Triple = tuple[str, str, str]
+
+#: Cell positions of that triple. All four CONSULT_* data tables (ledger, costs,
+#: sealed priors, challenge classification) open with the same four columns
+#: `timestamp | task-slug | discipline | stage`, so one positional read serves them
+#: all and a shorter row simply resolves to no triple.
+_TRIPLE_CELL_INDICES = (1, 2, 3)
+
+#: A seal-witness cell must look like a git object name before it is ever handed to
+#: `git show <value>:<path>`. This is load-bearing, not cosmetic: an empty or
+#: malformed cell would produce `git show :<path>`, which resolves the *index* --
+#: turning "no witness was recorded" into an exemption vouched for by the staged
+#: file itself. Rejecting the shape is what makes an unrecorded witness fail closed.
+_WITNESS_SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
+
+
+def row_triple(row: str) -> Triple | None:
+    r"""Return the consult triple a raw data row belongs to, or None if it has none.
+
+    Parsing here serves *grouping only*, never the equality proof -- that compares
+    raw line bytes, because the repair this exemption exists for is precisely a `\|`
+    escape that any cell-level normalisation would erase. `_split_escaped_row` is
+    reused from the registry-invariants module so the escape documented in every
+    `## Column Definitions` is read as a literal pipe rather than as a delimiter.
+    """
+    cells = _split_escaped_row(row)
+    if len(cells) <= max(_TRIPLE_CELL_INDICES):
+        return None
+    task_slug, discipline, stage = (cells[index] for index in _TRIPLE_CELL_INDICES)
+    return task_slug, discipline, stage
+
+
+def baseline_seal_witnesses(baseline_text: str) -> dict[Triple, str]:
+    """Map each consult triple to the seal-witness the BASELINE copy records for it.
+
+    Read from the baseline blob, never from the working file. The seal-witness cell
+    is itself restorable content -- one of the two real repairs this exemption
+    admits corrected exactly that cell -- so resolving it from the working copy
+    would let a rewritten row nominate the very commit that vindicates it.
+
+    A triple whose baseline rows disagree on the witness, or whose cell is not a
+    git object name, yields no entry: an unrecorded or inconsistent seal grants
+    nothing. Only `CONSULT_PRIORS.md` carries a `## Challenge Classification`
+    table, so `CONSULT_LEDGER.md` and `CONSULT_COSTS.md` resolve no witnesses at
+    all and no row in them can earn the exemption -- a deliberate narrowing, stated
+    rather than hidden: the exemption reaches exactly as far as recorded evidence.
+    """
+    index = {field: position for position, field in enumerate(CLASSIFICATION_ROW_FIELDS)}
+    recorded: dict[Triple, set[str]] = defaultdict(set)
+    for row in parse_classification_table_rows(baseline_text):
+        if len(row) != len(CLASSIFICATION_ROW_FIELDS):
+            continue
+        witness = row[index["seal-witness"]]
+        if not _WITNESS_SHA_RE.match(witness):
+            continue
+        triple = (row[index["task-slug"]], row[index["discipline"]], row[index["stage"]])
+        recorded[triple].add(witness)
+    return {
+        triple: next(iter(witnesses))
+        for triple, witnesses in recorded.items()
+        if len(witnesses) == 1
+    }
+
+
+def _restorations_by_triple(
+    baseline_rows: list[str],
+    working_rows: list[str],
+    witness_rows_for: Callable[[Triple], frozenset[str]],
+) -> dict[Triple, list[str]]:
+    """Group the working rows that are witness-attested restorations, by triple.
+
+    A candidate is a working row the baseline does not carry whose exact bytes the
+    triple's witness commit already holds. Candidates are consumed one per lost
+    row by the caller, so restoring one row can never launder the deletion of six
+    others.
+    """
+    baseline_set = set(baseline_rows)
+    candidates: dict[Triple, list[str]] = defaultdict(list)
+    for row in working_rows:
+        if row in baseline_set:
+            continue
+        triple = row_triple(row)
+        if triple is None:
+            continue
+        if row in witness_rows_for(triple):
+            candidates[triple].append(row)
+    return candidates
+
+
+def partition_witness_attested_restorations(
+    lost_rows: list[tuple[str, str]],
+    baseline_rows: list[str],
+    working_rows: list[str],
+    witness_rows_for: Callable[[Triple], frozenset[str]],
+) -> tuple[list[tuple[str, str]], list[str]]:
+    """Split lost baseline rows into (still violating, exempted as restorations).
+
+    A lost row is exempt only when its own triple has an unconsumed witness-attested
+    restoration standing in for it. A deletion has no such stand-in, so deletions
+    stay violations under every seal.
+    """
+    candidates = _restorations_by_triple(baseline_rows, working_rows, witness_rows_for)
+    violations: list[tuple[str, str]] = []
+    exemptions: list[str] = []
+    for reason, row in lost_rows:
+        triple = row_triple(row)
+        available = candidates.get(triple) if triple is not None else None
+        if not available:
+            violations.append((reason, row))
+            continue
+        exemptions.append(
+            f"restored to seal-witness bytes: {_excerpt(row)} -> {_excerpt(available.pop(0))}"
+        )
+    return violations, exemptions
 
 
 # ---------------------------------------------------------------------------
@@ -223,29 +378,79 @@ def baseline_file_text(project_root: Path, revision: str, relative_path: str) ->
     return show.stdout
 
 
-def check_consult_files_are_append_only(project_root: Path) -> list[str] | None:
-    """Return one failure per lost row across the governed files, or None.
+class AppendOnlyVerdict(NamedTuple):
+    """The gate's outcome: the violations, and the exemptions that were granted.
+
+    `exemptions` is a reported output with a named reader, not decoration. Each
+    entry is one restore-to-witness firing; the count is the series the ADR's
+    reversal trigger consults, on the reasoning that an exemption which fires
+    routinely has stopped being a narrow repair path and become a habit -- the
+    signal that should re-open the decision. `test_every_granted_exemption_names_
+    the_row_it_restored` is its in-suite consumer, and the count also rides in the
+    real-repo gate's assertion message.
+    """
+
+    failures: list[str]
+    exemptions: list[str]
+
+
+def _witness_rows_lookup(
+    project_root: Path, relative_path: str, baseline_text: str
+) -> Callable[[Triple], frozenset[str]]:
+    """Build the triple -> witness-commit-rows lookup for one governed file.
+
+    The witness sha comes from the baseline copy; its rows come from a real
+    `git show <sha>:<same path>`, cached per sha. An unrecorded, unknown, or
+    unreadable witness yields the empty set, so the exemption fails closed: there
+    is no allowlist, no per-file exception, and no path that grants an exemption
+    without a readable commit to prove it.
+    """
+    witnesses = baseline_seal_witnesses(baseline_text)
+    cache: dict[str, frozenset[str]] = {}
+
+    def rows_for(triple: Triple) -> frozenset[str]:
+        revision = witnesses.get(triple)
+        if revision is None:
+            return frozenset()
+        if revision not in cache:
+            text = baseline_file_text(project_root, revision, relative_path)
+            cache[revision] = (
+                frozenset(extract_data_rows(text)) if text is not None else frozenset()
+            )
+        return cache[revision]
+
+    return rows_for
+
+
+def check_consult_files_are_append_only(project_root: Path) -> AppendOnlyVerdict | None:
+    """Return the verdict over the governed files, or None when not evaluated.
 
     None means the baseline could not be established, and is deliberately a
-    *different* value from `[]` (clean): an unreachable baseline must never be
-    indistinguishable from a verified-clean tree. Callers skip on None.
+    *different* value from an empty failure list (clean): an unreachable baseline
+    must never be indistinguishable from a verified-clean tree. Callers skip on None.
     """
     revision = resolve_baseline_revision(project_root)
     if revision is None:
         return None
 
     failures: list[str] = []
+    exemptions: list[str] = []
     for path in consult_files(project_root):
         relative_path = path.relative_to(project_root).as_posix()
         baseline_text = baseline_file_text(project_root, revision, relative_path)
         if baseline_text is None:
             continue  # the file is new since the baseline; every row is an addition
-        lost_rows = check_rows_are_append_only(
-            extract_data_rows(baseline_text),
-            extract_data_rows(path.read_text(encoding="utf-8")),
+        baseline_rows = extract_data_rows(baseline_text)
+        working_rows = extract_data_rows(path.read_text(encoding="utf-8"))
+        violations, granted = partition_witness_attested_restorations(
+            lost_baseline_rows(baseline_rows, working_rows),
+            baseline_rows,
+            working_rows,
+            _witness_rows_lookup(project_root, relative_path, baseline_text),
         )
-        failures.extend(f"{relative_path}: {failure}" for failure in lost_rows)
-    return failures
+        failures.extend(f"{relative_path}: {reason}: {_excerpt(row)}" for reason, row in violations)
+        exemptions.extend(f"{relative_path}: {entry}" for entry in granted)
+    return AppendOnlyVerdict(failures, exemptions)
 
 
 # ---------------------------------------------------------------------------
@@ -255,14 +460,41 @@ def check_consult_files_are_append_only(project_root: Path) -> list[str] | None:
 
 def test_the_real_consult_files_are_append_only_since_the_baseline(project_root: Path) -> None:
     """No row present in a real CONSULT_*.md at the baseline has been edited,
-    deleted, or reordered in the working tree."""
-    failures = check_consult_files_are_append_only(project_root)
-    if failures is None:
+    deleted, or reordered in the working tree -- except where the working bytes are
+    a restoration of what the consult's seal-witness commit already recorded."""
+    verdict = check_consult_files_are_append_only(project_root)
+    if verdict is None:
         pytest.skip(BASELINE_SKIP_REASON)
-    assert not failures, (
+    assert not verdict.failures, (
         f"append-only violations against {BASELINE_REF_SPEC} "
         "(rules/swe/gate-liveness.md; these files are append-only -- append a new "
-        "row referencing the old one instead of rewriting it):\n  " + "\n  ".join(failures)
+        "row referencing the old one instead of rewriting it; "
+        f"{len(verdict.exemptions)} restore-to-witness exemption(s) fired):\n  "
+        + "\n  ".join(verdict.failures)
+    )
+
+
+def test_every_granted_exemption_names_the_row_it_restored(project_root: Path) -> None:
+    """Each restore-to-witness firing is traceable back to the row that produced it.
+
+    The exemption count is a reported gate output, so per rules/swe/gate-liveness.md
+    it needs a named reader rather than a number nobody consults. This test is that
+    reader inside the suite: it holds every entry to a shape that names the governed
+    file and the restored row, so a count read later -- by the ADR's reversal
+    trigger, or by anyone auditing how often the repair path fires -- can always be
+    resolved back to concrete rows instead of taken on trust.
+    """
+    verdict = check_consult_files_are_append_only(project_root)
+    if verdict is None:
+        pytest.skip(BASELINE_SKIP_REASON)
+    unattributable = [
+        entry
+        for entry in verdict.exemptions
+        if not entry.startswith(".ai-state/") or "restored to seal-witness bytes:" not in entry
+    ]
+    assert not unattributable, (
+        "every granted exemption must name its governed file and the row it "
+        f"restored, so the firing count stays auditable; got: {unattributable}"
     )
 
 
@@ -395,6 +627,18 @@ def _commit_ledger(repo: Path, ledger_text: str, message: str) -> None:
     _run_git(repo, "commit", "--quiet", "-a", "-m", message)
 
 
+def _evaluated(verdict: AppendOnlyVerdict | None) -> AppendOnlyVerdict:
+    """Assert the gate actually evaluated, and return its verdict.
+
+    Every fixture repo below plants `origin/main` explicitly, so a None here means
+    the fixture broke rather than that the gate declined to run -- surfacing that as
+    its own named failure keeps a broken fixture from reading as a canary that
+    simply did not bite.
+    """
+    assert verdict is not None, "the fixture repo must resolve a baseline; got None (not evaluated)"
+    return verdict
+
+
 # ---------------------------------------------------------------------------
 # Canaries: the gate bites on each known-bad shape
 # ---------------------------------------------------------------------------
@@ -411,11 +655,13 @@ def test_flags_a_row_edited_in_place_mid_branch(tmp_path: Path) -> None:
     _commit_ledger(repo, _ledger_document(_ROW_A, _ROW_B_EDITED), "rewrite CH-02's disposition")
     _commit_ledger(repo, _ledger_document(_ROW_A, _ROW_B_EDITED, _ROW_C), "append a new row")
 
-    failures = check_consult_files_are_append_only(repo)
+    verdict = _evaluated(check_consult_files_are_append_only(repo))
 
-    assert failures, "an in-place row edit must be flagged; got no failures (the gate is inert)"
-    assert any("CH-02" in failure for failure in failures), (
-        f"the failure must name the rewritten row; got: {failures}"
+    assert verdict.failures, (
+        "an in-place row edit must be flagged; got no failures (the gate is inert)"
+    )
+    assert any("CH-02" in failure for failure in verdict.failures), (
+        f"the failure must name the rewritten row; got: {verdict.failures}"
     )
 
 
@@ -425,11 +671,11 @@ def test_flags_a_row_deleted_since_the_baseline(tmp_path: Path) -> None:
     repo = _make_repo_with_baseline(tmp_path, _ledger_document(_ROW_A, _ROW_B))
     _commit_ledger(repo, _ledger_document(_ROW_A), "drop CH-02")
 
-    failures = check_consult_files_are_append_only(repo)
+    verdict = _evaluated(check_consult_files_are_append_only(repo))
 
-    assert failures, "a deleted row must be flagged; got no failures (the gate is inert)"
-    assert any("CH-02" in failure for failure in failures), (
-        f"the failure must name the deleted row; got: {failures}"
+    assert verdict.failures, "a deleted row must be flagged; got no failures (the gate is inert)"
+    assert any("CH-02" in failure for failure in verdict.failures), (
+        f"the failure must name the deleted row; got: {verdict.failures}"
     )
 
 
@@ -439,9 +685,9 @@ def test_flags_an_uncommitted_in_place_edit_in_the_working_tree(tmp_path: Path) 
     repo = _make_repo_with_baseline(tmp_path, _ledger_document(_ROW_A, _ROW_B))
     _write_ledger(repo, _ledger_document(_ROW_A, _ROW_B_EDITED))
 
-    failures = check_consult_files_are_append_only(repo)
+    verdict = _evaluated(check_consult_files_are_append_only(repo))
 
-    assert failures, "an uncommitted in-place edit must be flagged; got no failures"
+    assert verdict.failures, "an uncommitted in-place edit must be flagged; got no failures"
 
 
 def test_flags_rows_reordered_since_the_baseline() -> None:
@@ -574,18 +820,18 @@ def test_appending_rows_only_is_accepted(tmp_path: Path) -> None:
     repo = _make_repo_with_baseline(tmp_path, _ledger_document(_ROW_A, _ROW_B))
     _commit_ledger(repo, _ledger_document(_ROW_A, _ROW_B, _ROW_C), "append a new disposition")
 
-    failures = check_consult_files_are_append_only(repo)
+    verdict = _evaluated(check_consult_files_are_append_only(repo))
 
-    assert failures == [], f"a pure append must produce no failures; got: {failures}"
+    assert verdict.failures == [], f"a pure append must produce no failures; got: {verdict}"
 
 
 def test_an_untouched_branch_is_accepted(tmp_path: Path) -> None:
     """No-op control: a branch that changes nothing produces no failures."""
     repo = _make_repo_with_baseline(tmp_path, _ledger_document(_ROW_A, _ROW_B))
 
-    failures = check_consult_files_are_append_only(repo)
+    verdict = _evaluated(check_consult_files_are_append_only(repo))
 
-    assert failures == [], f"an untouched branch must produce no failures; got: {failures}"
+    assert verdict.failures == [], f"an untouched branch must produce no failures; got: {verdict}"
 
 
 def test_a_row_inserted_into_an_earlier_table_is_accepted() -> None:
@@ -627,3 +873,259 @@ def test_extraction_ignores_pipe_lines_inside_fenced_code_blocks() -> None:
     rows = extract_data_rows(document)
 
     assert rows == [_ROW_A], f"fenced pipe lines must not be treated as rows; got: {rows}"
+
+
+# ---------------------------------------------------------------------------
+# Fixtures: a Round-0 witness commit, a drifted baseline, a repaired working tree
+# ---------------------------------------------------------------------------
+
+# The concern cell of a sealed prior, in three states. The sealed and drifted forms
+# differ only in an escaped `\|` -- the exact shape of one of the two real repairs,
+# and the reason the exemption compares raw line bytes: any cell-level parse
+# normalises the escape away and the two forms stop being distinguishable.
+_SEALED_CONCERN = r"manifest `shadows: relpath -> kind(dir\|file)` is boolean-blind"
+_DRIFTED_CONCERN = "manifest `shadows: relpath -> kind(dir or file)` is boolean-blind"
+_INVENTED_CONCERN = "manifest shadows are fine on reflection"
+
+
+def _table(fields: tuple[str, ...], rows: tuple[str, ...]) -> str:
+    """Render a markdown table from the real field tuple plus `rows`.
+
+    The header is built from the imported field tuples rather than a literal, so a
+    schema change in `CONSULT_PRIORS.md` cannot leave these fixtures parsing a table
+    shape the production parsers no longer recognise.
+    """
+    header = "| " + " | ".join(fields) + " |"
+    separator = "|" + "|".join(["---"] * len(fields)) + "|"
+    return "\n".join([header, separator, *rows])
+
+
+def _prior_row(concern: str, prior_id: str = "P-01") -> str:
+    return (
+        f"| 2026-08-01T00:00:00Z | task-w | statistician | architecture | "
+        f"{prior_id} | lens | {concern} |"
+    )
+
+
+def _classification_row(challenge_id: str, witness: str) -> str:
+    return (
+        f"| 2026-08-02T00:00:00Z | task-w | statistician | architecture | "
+        f"{challenge_id} | novel |  | {witness} | 3 |"
+    )
+
+
+def _priors_document(prior_rows: tuple[str, ...], classification_rows: tuple[str, ...]) -> str:
+    """Build a minimal CONSULT_PRIORS.md-shaped document with both of its tables."""
+    return (
+        "# Consultation Prior Register\n\nThis file is append-only.\n\n"
+        f"## Sealed Priors\n\n{_table(PRIOR_ROW_FIELDS, prior_rows)}\n\n"
+        f"## Challenge Classification\n\n{_table(CLASSIFICATION_ROW_FIELDS, classification_rows)}\n"
+    )
+
+
+def _write_priors(repo: Path, text: str) -> None:
+    (repo / ".ai-state" / "CONSULT_PRIORS.md").write_text(text, encoding="utf-8")
+
+
+def _head_sha(repo: Path) -> str:
+    """Return the fixture repo's HEAD sha, asserting the read succeeded."""
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=_git_env(),
+    )
+    assert result.returncode == 0, f"fixture HEAD sha read failed: {result.stderr}"
+    return result.stdout.strip()
+
+
+def _make_repo_with_witness(
+    tmp_path: Path,
+    *,
+    witness_priors: tuple[str, ...],
+    baseline_priors: tuple[str, ...],
+    record_witness: bool = True,
+) -> tuple[Path, str]:
+    """Build a repo with a Round-0 witness commit and a baseline that cites it.
+
+    The witness commit holds `witness_priors` -- the sealed bytes. The baseline
+    commit, which `origin/main` points at, holds `baseline_priors` and records the
+    witness sha in its Challenge Classification row. That ordering is the real
+    shape: a seal-witness is the consultant's Round-0 HEAD, so it always predates
+    the rows that name it and can never contain them.
+
+    Returns the repo and the seal-witness the baseline records -- `""` when
+    `record_witness` is False, the no-recorded-witness shape.
+    """
+    repo = tmp_path / "repo"
+    (repo / ".ai-state").mkdir(parents=True)
+    _run_git(repo, "init", "--quiet")
+    _run_git(repo, "symbolic-ref", "HEAD", "refs/heads/main")
+    _write_priors(repo, _priors_document(witness_priors, ()))
+    _run_git(repo, "add", "-A")
+    _run_git(repo, "commit", "--quiet", "-m", "round-0 head")
+    recorded = _head_sha(repo) if record_witness else ""
+    _write_priors(
+        repo, _priors_document(baseline_priors, (_classification_row("CH-01", recorded),))
+    )
+    _run_git(repo, "commit", "--quiet", "-a", "-m", "baseline holding the drifted row")
+    _run_git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+    _run_git(repo, "checkout", "--quiet", "-b", "feature")
+    return repo, recorded
+
+
+# ---------------------------------------------------------------------------
+# Canaries: the restore-to-witness exemption is evidence-checked, not a waiver
+# ---------------------------------------------------------------------------
+
+
+def test_flags_a_rewrite_whose_bytes_the_witness_commit_does_not_hold(tmp_path: Path) -> None:
+    """Canary: a rewrite to bytes no witness commit ever recorded is still a
+    violation. The exemption is proof-carrying -- an in-place edit does not become
+    a restoration merely because the row's consult happens to have a seal."""
+    repo, witness = _make_repo_with_witness(
+        tmp_path,
+        witness_priors=(_prior_row(_SEALED_CONCERN),),
+        baseline_priors=(_prior_row(_DRIFTED_CONCERN),),
+    )
+    _write_priors(
+        repo,
+        _priors_document(
+            (_prior_row(_INVENTED_CONCERN),), (_classification_row("CH-01", witness),)
+        ),
+    )
+
+    verdict = _evaluated(check_consult_files_are_append_only(repo))
+
+    assert verdict.failures, (
+        "a rewrite the witness commit does not vouch for must be flagged; got no failures"
+    )
+    assert verdict.exemptions == [], (
+        f"no exemption may be granted without witness bytes; got: {verdict.exemptions}"
+    )
+
+
+def test_flags_a_deletion_even_when_a_sibling_row_was_restored_to_witness(tmp_path: Path) -> None:
+    """Canary: one granted restoration excuses exactly one lost row.
+
+    The working tree here restores P-01 to its sealed bytes and drops P-02
+    entirely. If candidates were matched by triple without being consumed, the
+    single restoration would launder the deletion -- so this pins both halves:
+    deletions stay violations, and an exemption is spent, not shared.
+    """
+    repo, witness = _make_repo_with_witness(
+        tmp_path,
+        witness_priors=(_prior_row(_SEALED_CONCERN),),
+        baseline_priors=(
+            _prior_row(_DRIFTED_CONCERN),
+            _prior_row("a second sealed concern", prior_id="P-02"),
+        ),
+    )
+    _write_priors(
+        repo,
+        _priors_document((_prior_row(_SEALED_CONCERN),), (_classification_row("CH-01", witness),)),
+    )
+
+    verdict = _evaluated(check_consult_files_are_append_only(repo))
+
+    assert verdict.failures, "a deleted row must be flagged even when a sibling row was restored"
+    assert any("P-02" in failure for failure in verdict.failures), (
+        f"the failure must name the deleted row; got: {verdict.failures}"
+    )
+    assert len(verdict.exemptions) == 1, (
+        f"exactly one restoration was available, so exactly one exemption may be "
+        f"granted; got: {verdict.exemptions}"
+    )
+
+
+def test_flags_a_restore_when_the_triple_records_no_seal_witness(tmp_path: Path) -> None:
+    """Canary: with no seal-witness recorded for the triple, a rewrite is a
+    violation even when its bytes match an earlier commit.
+
+    Without a recorded witness there is nothing to check the bytes against, and an
+    unrecorded seal must never resolve to a bare `<empty>:<path>` revision spec --
+    which git reads as the index, letting the staged file vouch for itself.
+    """
+    repo, recorded = _make_repo_with_witness(
+        tmp_path,
+        witness_priors=(_prior_row(_SEALED_CONCERN),),
+        baseline_priors=(_prior_row(_DRIFTED_CONCERN),),
+        record_witness=False,
+    )
+    _write_priors(
+        repo,
+        _priors_document((_prior_row(_SEALED_CONCERN),), (_classification_row("CH-01", recorded),)),
+    )
+
+    verdict = _evaluated(check_consult_files_are_append_only(repo))
+
+    assert verdict.failures, (
+        "a rewrite under a triple with no recorded seal-witness must be flagged"
+    )
+    assert verdict.exemptions == [], (
+        f"an unrecorded seal-witness must grant nothing; got: {verdict.exemptions}"
+    )
+
+
+def test_canary_a_restore_to_the_witness_recorded_bytes_is_accepted(tmp_path: Path) -> None:
+    """The sanctioned repair path: a row returned to the bytes its consult's
+    seal-witness commit already holds is compliance, not mutation, and is reported
+    as a counted exemption rather than passed silently."""
+    repo, witness = _make_repo_with_witness(
+        tmp_path,
+        witness_priors=(_prior_row(_SEALED_CONCERN),),
+        baseline_priors=(_prior_row(_DRIFTED_CONCERN),),
+    )
+    _write_priors(
+        repo,
+        _priors_document((_prior_row(_SEALED_CONCERN),), (_classification_row("CH-01", witness),)),
+    )
+
+    verdict = _evaluated(check_consult_files_are_append_only(repo))
+
+    assert verdict.failures == [], (
+        f"a restore to sealed bytes must produce no failures; got: {verdict.failures}"
+    )
+    assert len(verdict.exemptions) == 1, (
+        f"the restoration must be reported as one counted exemption; got: {verdict.exemptions}"
+    )
+
+
+def test_flags_a_rewrite_that_re_points_its_own_seal_witness_at_a_vindicating_commit(
+    tmp_path: Path,
+) -> None:
+    """Canary: the witness is resolved from the baseline copy, never the working one.
+
+    The seal-witness cell is itself restorable content, so a working copy that names
+    its own witness can always find a commit that vouches for whatever it now says.
+    Here the branch first commits a state holding the invented bytes, then points the
+    working seal-witness at that commit. Working-copy resolution would exempt the
+    rewrite; baseline resolution keeps the original Round-0 witness, which never held
+    those bytes, and the rewrite stays flagged.
+    """
+    repo, _ = _make_repo_with_witness(
+        tmp_path,
+        witness_priors=(_prior_row(_SEALED_CONCERN),),
+        baseline_priors=(_prior_row(_DRIFTED_CONCERN),),
+    )
+    _write_priors(repo, _priors_document((_prior_row(_INVENTED_CONCERN),), ()))
+    _run_git(repo, "commit", "--quiet", "-a", "-m", "a commit that holds the invented row")
+    vindicating = _head_sha(repo)
+    _write_priors(
+        repo,
+        _priors_document(
+            (_prior_row(_INVENTED_CONCERN),), (_classification_row("CH-01", vindicating),)
+        ),
+    )
+
+    verdict = _evaluated(check_consult_files_are_append_only(repo))
+
+    assert verdict.failures, (
+        "a rewrite whose working seal-witness names a commit holding its own bytes "
+        "must still be flagged; the baseline's witness never held them"
+    )
+    assert verdict.exemptions == [], (
+        f"a self-nominated witness must grant nothing; got: {verdict.exemptions}"
+    )

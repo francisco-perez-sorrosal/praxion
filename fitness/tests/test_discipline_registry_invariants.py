@@ -300,6 +300,30 @@ def _split_into_table_blocks(markdown_text: str) -> list[list[str]]:
     return blocks
 
 
+# The escape every CONSULT_* file's § Column Definitions instructs conveners to
+# write for a literal pipe inside a free-text cell ("Escape any literal `|`").
+# Splitting on a bare `|` reads that escape as a delimiter, so a cell written to
+# the documented convention splits into an extra column and trips the row-shape
+# gate -- the file's own convention and its own gate disagreeing. That is root
+# cause 1 of the ADR narrowing dec-310's G6 clause (see `.ai-state/decisions/`).
+# A raw, *unescaped* pipe still splits, which is exactly what the row-shape
+# canaries below supply and rely on.
+_UNESCAPED_PIPE_RE = re.compile(r"(?<!\\)\|")
+
+
+def _split_escaped_row(line: str) -> list[str]:
+    r"""Split one `|`-delimited markdown row into stripped cell values, reading
+    `\|` as a literal pipe inside a cell rather than as a column delimiter.
+
+    Scoped to the four CONSULT_* table parsers (ledger, cost, sealed priors,
+    challenge classification) -- those are the tables whose § Column Definitions
+    document the escape. The discipline registry documents no such convention
+    and is parsed unchanged.
+    """
+    cells = _UNESCAPED_PIPE_RE.split(line.strip().strip("|"))
+    return [cell.strip().replace("\\|", "|") for cell in cells]
+
+
 def parse_registry_table_rows(markdown_text: str) -> list[dict[str, str]]:
     """Parse the registry table out of markdown_text into a list of row dicts.
 
@@ -774,13 +798,11 @@ def parse_ledger_table_rows(ledger_text: str) -> list[list[str]]:
     for block in _split_into_table_blocks(ledger_text):
         if len(block) < 2:
             continue
-        header_cells = [cell.strip() for cell in block[0].strip().strip("|").split("|")]
+        header_cells = _split_escaped_row(block[0])
         if header_cells != list(LEDGER_ROW_FIELDS):
             continue  # not the ledger's data table -- some other pipe-prefixed block
         data_lines = block[2:]  # skip the header row and the --- separator row
-        return [
-            [cell.strip() for cell in line.strip().strip("|").split("|")] for line in data_lines
-        ]
+        return [_split_escaped_row(line) for line in data_lines]
     return []
 
 
@@ -847,6 +869,31 @@ def test_flags_ledger_row_with_unescaped_pipe_inflating_column_count() -> None:
         "check_ledger_row_has_eleven_columns must flag a row whose unescaped "
         "pipe inflates its cell count past eleven; got an empty list"
     )
+
+
+def test_accepts_a_ledger_row_whose_escaped_pipe_stays_inside_one_cell() -> None:
+    r"""The documented `\|` escape is a literal pipe, not a delimiter: a claim
+    cell written to the convention still parses to exactly eleven columns, and
+    the cell value carries an unescaped `|`.
+
+    Paired with the canary above: a *raw* pipe still inflates the count. The
+    escape is the only thing that changed."""
+    escaped_row = (
+        r"| 2026-07-30T10:00:00Z | task-a | statistician | architecture | CH-01 | "
+        r"the manifest maps kind(dir\|file) | a decision | switch-now | dec-100 | opus | standard |"
+    )
+    table = f"{_LEDGER_HEADER_ROW}\n{_LEDGER_SEPARATOR_ROW}\n{escaped_row}\n"
+    rows = parse_ledger_table_rows(table)
+
+    assert len(rows) == 1, f"expected one parsed row; got: {rows!r}"
+    assert len(rows[0]) == len(LEDGER_ROW_FIELDS), (
+        f"an escaped pipe must not split a cell; got {len(rows[0])} cells: {rows[0]!r}"
+    )
+    claim = rows[0][LEDGER_ROW_FIELDS.index("claim")]
+    assert claim == "the manifest maps kind(dir|file)", (
+        f"the escape must be unescaped to a literal pipe in the cell value; got: {claim!r}"
+    )
+    assert not check_ledger_row_has_eleven_columns(rows)
 
 
 def test_accepts_ledger_row_with_exactly_eleven_columns() -> None:
@@ -1345,13 +1392,11 @@ def parse_cost_table_rows(cost_text: str) -> list[list[str]]:
     for block in _split_into_table_blocks(cost_text):
         if len(block) < 2:
             continue
-        header_cells = [cell.strip() for cell in block[0].strip().strip("|").split("|")]
+        header_cells = _split_escaped_row(block[0])
         if header_cells != list(COST_ROW_FIELDS):
             continue  # not the cost table -- some other pipe-prefixed block
         data_lines = block[2:]  # skip the header row and the --- separator row
-        return [
-            [cell.strip() for cell in line.strip().strip("|").split("|")] for line in data_lines
-        ]
+        return [_split_escaped_row(line) for line in data_lines]
     return []
 
 
@@ -1557,6 +1602,27 @@ def test_flags_cost_row_with_unescaped_pipe_inflating_column_count() -> None:
 
     assert len(failures) == 1, f"expected exactly one failure; got: {failures}"
     assert "got 9" in failures[0], f"expected the row to report 9 cells; got: {failures}"
+
+
+def test_accepts_a_cost_row_whose_escaped_pipe_stays_inside_one_cell() -> None:
+    r"""The documented `\|` escape in a `notes` cell parses to exactly eight
+    columns and yields a literal pipe in the cell value."""
+    escaped_row = (
+        r"| 2026-08-01T12:00:00Z | task-w | statistician | architecture | 12345 | "
+        r"opus | standard | note about kind(dir\|file) |"
+    )
+    table = f"{_COST_HEADER_ROW}\n{_COST_SEPARATOR_ROW}\n{escaped_row}\n"
+    rows = parse_cost_table_rows(table)
+
+    assert len(rows) == 1, f"expected one parsed row; got: {rows!r}"
+    assert len(rows[0]) == len(COST_ROW_FIELDS), (
+        f"an escaped pipe must not split a cell; got {len(rows[0])} cells: {rows[0]!r}"
+    )
+    notes = rows[0][COST_ROW_FIELDS.index("notes")]
+    assert notes == "note about kind(dir|file)", (
+        f"the escape must be unescaped to a literal pipe in the cell value; got: {notes!r}"
+    )
+    assert not check_cost_row_has_eight_columns(rows)
 
 
 def test_flags_series_boundary_header_missing_from_the_cost_file() -> None:
@@ -1855,6 +1921,11 @@ SEAL_BOUNDARY = "2026-07-31T03:00:00Z"
 # also match.
 _PLACEHOLDER_CONCERNS = frozenset({"", "-", "--", "n/a", "na", "tbd", "none."})
 
+# The explicit empty declaration -- `.ai-state/CONSULT_PRIORS.md` § Column
+# Definitions reserves this `prior-id` value and states it must be the only row
+# for its triple.
+NONE_PRIOR_ID = "NONE"
+
 _PRIOR_ID_RE = re.compile(r"^P-\d{2}$")
 _SEAL_WITNESS_RE = re.compile(r"^[0-9a-f]{7,40}$")
 _PROMPT_AREAS_RE = re.compile(r"^\d+$")
@@ -1877,13 +1948,11 @@ def parse_prior_table_rows(priors_text: str) -> list[list[str]]:
     for block in _split_into_table_blocks(priors_text):
         if len(block) < 2:
             continue
-        header_cells = [cell.strip() for cell in block[0].strip().strip("|").split("|")]
+        header_cells = _split_escaped_row(block[0])
         if header_cells != list(PRIOR_ROW_FIELDS):
             continue  # not the Sealed Priors table -- some other pipe-prefixed block
         data_lines = block[2:]  # skip the header row and the --- separator row
-        return [
-            [cell.strip() for cell in line.strip().strip("|").split("|")] for line in data_lines
-        ]
+        return [_split_escaped_row(line) for line in data_lines]
     return []
 
 
@@ -1893,13 +1962,11 @@ def parse_classification_table_rows(priors_text: str) -> list[list[str]]:
     for block in _split_into_table_blocks(priors_text):
         if len(block) < 2:
             continue
-        header_cells = [cell.strip() for cell in block[0].strip().strip("|").split("|")]
+        header_cells = _split_escaped_row(block[0])
         if header_cells != list(CLASSIFICATION_ROW_FIELDS):
             continue  # not the Challenge Classification table -- some other block
         data_lines = block[2:]  # skip the header row and the --- separator row
-        return [
-            [cell.strip() for cell in line.strip().strip("|").split("|")] for line in data_lines
-        ]
+        return [_split_escaped_row(line) for line in data_lines]
     return []
 
 
@@ -1978,7 +2045,7 @@ def check_every_post_boundary_consult_has_a_sealed_prior(
         if source not in ("lens", "prior"):
             failures.append(f"sealed prior has an unrecognised source value: {source!r}")
         prior_id = row[prior_index["prior-id"]]
-        if not (_PRIOR_ID_RE.match(prior_id) or prior_id == "NONE"):
+        if not (_PRIOR_ID_RE.match(prior_id) or prior_id == NONE_PRIOR_ID):
             failures.append(f"sealed prior has a malformed prior-id: {prior_id!r}")
 
     priors_by_triple: dict[tuple[str, str, str], list[str]] = {}
@@ -1991,7 +2058,7 @@ def check_every_post_boundary_consult_has_a_sealed_prior(
         priors_by_triple.setdefault(triple, []).append(row[prior_index["prior-id"]])
 
     for triple, prior_ids in priors_by_triple.items():
-        if "NONE" in prior_ids and any(pid != "NONE" for pid in prior_ids):
+        if NONE_PRIOR_ID in prior_ids and any(pid != NONE_PRIOR_ID for pid in prior_ids):
             failures.append(
                 f"consult {triple!r}: a NONE declaration coexists with listed priors: {prior_ids!r}"
             )
@@ -2154,6 +2221,29 @@ def check_fragment_witness_agrees(fragment_text: str, seal_witness: str) -> str 
     return None
 
 
+def _rows_for_triple(
+    rows: list[list[str]],
+    fields: tuple[str, ...],
+    triple: tuple[str, str, str],
+) -> list[list[str]]:
+    """The rows of a `fields`-shaped table whose (task-slug, discipline, stage)
+    columns equal `triple`.
+
+    Rows too short to carry the triple are dropped -- they cannot be read at
+    all, and G0a/G0b are the gates that report their shape. A row that is too
+    *long* (an unescaped pipe) is kept: columns 1-3 are still correct, so it
+    matches its triple and fails whatever downstream comparison reads its
+    later cells, rather than disappearing from the comparison entirely.
+    """
+    index = {field: pos for pos, field in enumerate(fields)}
+    return [
+        row
+        for row in rows
+        if len(row) >= len(fields)
+        and (row[index["task-slug"]], row[index["discipline"]], row[index["stage"]]) == triple
+    ]
+
+
 def _sealed_prior_identities(
     prior_rows: list[list[str]],
     triple: tuple[str, str, str],
@@ -2168,24 +2258,132 @@ def _sealed_prior_identities(
     """
     index = {field: pos for pos, field in enumerate(PRIOR_ROW_FIELDS)}
     identities: set[tuple[str, str, str]] = set()
-    for row in prior_rows:
-        row_triple = (
-            row[index["task-slug"]],
-            row[index["discipline"]],
-            row[index["stage"]],
-        )
-        if row_triple != triple:
-            continue
+    for row in _rows_for_triple(prior_rows, PRIOR_ROW_FIELDS, triple):
         if not_after is not None and row[index["timestamp"]] > not_after:
             continue
         identities.add((row[index["prior-id"]], row[index["source"]], row[index["concern"]]))
     return identities
 
 
+# The admission a NONE tombstone owes the cost series (C3 below).
+UNSEALED_COST_NOTE_MARKER = "UNSEALED:"
+
+
+def _seal_declares_no_priors(
+    working_prior_rows: list[list[str]], triple: tuple[str, str, str]
+) -> bool:
+    """True when the working file's seal for `triple` declares `prior-id: NONE`.
+
+    Deliberately `any`, not "exactly one NONE row": a NONE row sitting beside a
+    listed prior must enter the exemption path so C1 can fail it loudly, rather
+    than quietly falling through to a set-equality comparison that a convener
+    could satisfy by appending.
+    """
+    index = {field: pos for pos, field in enumerate(PRIOR_ROW_FIELDS)}
+    return any(
+        row[index["prior-id"]] == NONE_PRIOR_ID
+        for row in _rows_for_triple(working_prior_rows, PRIOR_ROW_FIELDS, triple)
+    )
+
+
+def check_none_seal_is_exclusive(
+    prior_rows: list[list[str]], triple: tuple[str, str, str]
+) -> str | None:
+    """C1 of the G6 NONE-tombstone exemption: a `prior-id: NONE` declaration
+    must be the only Sealed Priors row for its triple.
+
+    `.ai-state/CONSULT_PRIORS.md` § Column Definitions already states the rule;
+    making it a *precondition of the exemption* is what closes the cheat the
+    exemption releases. G6 exists to catch a convener who reads the challenges,
+    appends a prior, and cites it as `matched`; under the exemption that
+    convener cannot append, because the appended row breaks exclusivity here.
+    """
+    rows = _rows_for_triple(prior_rows, PRIOR_ROW_FIELDS, triple)
+    index = {field: pos for pos, field in enumerate(PRIOR_ROW_FIELDS)}
+    prior_ids = [row[index["prior-id"]] for row in rows]
+    if NONE_PRIOR_ID not in prior_ids or len(rows) == 1:
+        return None
+    listed = sorted(prior_id for prior_id in prior_ids if prior_id != NONE_PRIOR_ID)
+    return (
+        f"sealed priors for {triple!r} declare {NONE_PRIOR_ID} alongside listed prior(s) "
+        f"{listed}; the empty declaration must be the only Sealed Priors row for its triple"
+    )
+
+
+def check_none_seal_challenges_are_all_novel(
+    classification_rows: list[list[str]], triple: tuple[str, str, str]
+) -> str | None:
+    """C2 of the G6 NONE-tombstone exemption: every Challenge Classification row
+    for the triple must be `novel` with an empty `matched-prior-id`.
+
+    A `matched` classification under a NONE seal is a contradiction -- it names
+    a prior the seal says does not exist -- and must fail loudly rather than be
+    released along with the set-equality assertion.
+
+    Row *presence* is G3's contract (`check_every_challenge_is_classified`), not
+    this one's: a triple whose classifications have not been written yet is not
+    what this check is about. Called only from G6's exemption path, so "the
+    triple seals NONE" is a premise here, not something this check re-derives.
+    """
+    rows = _rows_for_triple(classification_rows, CLASSIFICATION_ROW_FIELDS, triple)
+    index = {field: pos for pos, field in enumerate(CLASSIFICATION_ROW_FIELDS)}
+    offenders = [
+        f"{row[index['challenge-id']]} ({row[index['classification']]!r}, "
+        f"matched-prior-id {row[index['matched-prior-id']]!r})"
+        for row in rows
+        if row[index["classification"]] != "novel" or row[index["matched-prior-id"]]
+    ]
+    if not offenders:
+        return None
+    return (
+        f"{triple!r} takes the empty-seal ({NONE_PRIOR_ID}) exemption but classifies "
+        f"{', '.join(offenders)}; under an empty seal every challenge is novel by "
+        "construction, with no prior to match"
+    )
+
+
+def check_none_seal_cost_note_declares_unsealed(
+    cost_rows: list[list[str]], triple: tuple[str, str, str]
+) -> str | None:
+    """C3 of the G6 NONE-tombstone exemption: the triple's `CONSULT_COSTS.md`
+    row must carry the `UNSEALED:` marker in its `notes` cell.
+
+    The admission has to exist in the sibling file, where a cost-series reader
+    meets it, and not only in the tombstone's own prose -- a novelty rate read
+    off an unsealed consult is not informative about the discipline, and the
+    reader of the cost series is the one who needs to know that.
+
+    Presence anywhere in the cell, not a leading prefix: the shipped
+    `adr-living-view` row states the marker after an introductory sentence, and
+    demanding a fixed position would require re-editing an append-only file to
+    satisfy a gate -- the exact pressure this exemption exists to remove.
+    """
+    rows = _rows_for_triple(cost_rows, COST_ROW_FIELDS, triple)
+    index = {field: pos for pos, field in enumerate(COST_ROW_FIELDS)}
+    if not rows:
+        return (
+            f"{triple!r} takes the empty-seal ({NONE_PRIOR_ID}) exemption but has no "
+            f"CONSULT_COSTS.md row; the exemption is paid for by an "
+            f"'{UNSEALED_COST_NOTE_MARKER}' admission in the cost series, so there is "
+            "nowhere for that admission to live"
+        )
+    if any(UNSEALED_COST_NOTE_MARKER in row[index["notes"]] for row in rows):
+        return None
+    return (
+        f"{triple!r} takes the empty-seal ({NONE_PRIOR_ID}) exemption but no "
+        f"CONSULT_COSTS.md row for it carries the '{UNSEALED_COST_NOTE_MARKER}' marker in "
+        "its notes cell; the empty seal is an admission the cost series must state, not "
+        "only the tombstone's own prose"
+    )
+
+
 def check_witness_priors_equal_working_priors(
     witness_prior_rows: list[list[str]],
     working_prior_rows: list[list[str]],
     triple: tuple[str, str, str],
+    *,
+    classification_rows: list[list[str]] | None = None,
+    cost_rows: list[list[str]] | None = None,
 ) -> str | None:
     """G6. Assert **set equality** -- not containment -- between the sealed
     priors in the witness commit and those in the working file, for `triple`.
@@ -2208,7 +2406,36 @@ def check_witness_priors_equal_working_priors(
 
     Set equality detects an addition and a deletion. Scoping the working-side
     set by the witness commit's own date preserves the legitimate re-seal path.
+
+    **Vacuity exemption** (the ADR narrowing dec-310's G6 clause). A triple whose
+    working seal is the empty `prior-id: NONE` declaration is exempt from the equality
+    assertion, because the assertion has no content there: the recorded
+    seal-witness is the consultant's Round-0 HEAD, a commit that by
+    construction predates the consult, so a tombstone recorded honestly after
+    the fact can never appear in it. G6-as-written therefore admitted no honest
+    tombstone -- only a witness re-pointed to a later commit, which is the
+    drift it exists to detect. The exemption is *paid for* by C1, C2 and C3
+    above, each of which is an assertion the unexempt path never made; the
+    evidence they need is supplied through `classification_rows` and
+    `cost_rows`. Omitting either fails closed: an exemption whose payment
+    cannot be checked is not granted.
     """
+    if _seal_declares_no_priors(working_prior_rows, triple):
+        if classification_rows is None or cost_rows is None:
+            return (
+                f"{triple!r} seals {NONE_PRIOR_ID}, but the compensating evidence for the "
+                "vacuity exemption was not supplied (classification_rows and cost_rows); "
+                "the exemption is granted only where C1-C3 can be checked"
+            )
+        for compensating_failure in (
+            check_none_seal_is_exclusive(working_prior_rows, triple),
+            check_none_seal_challenges_are_all_novel(classification_rows, triple),
+            check_none_seal_cost_note_declares_unsealed(cost_rows, triple),
+        ):
+            if compensating_failure is not None:
+                return compensating_failure
+        return None
+
     sealed = _sealed_prior_identities(witness_prior_rows, triple)
 
     # A legitimate later re-seal appends rows *after* everything the witness
@@ -2611,6 +2838,54 @@ def test_flags_a_classification_row_with_an_unescaped_pipe_inflating_the_column_
     assert "got 10" in failures[0], f"expected the row to report 10 cells; got: {failures}"
 
 
+def test_accepts_a_prior_row_whose_escaped_pipe_stays_inside_one_cell() -> None:
+    r"""The documented `\|` escape in a `concern` cell parses to exactly seven
+    columns and yields a literal pipe in the cell value.
+
+    The payload is the real one: `sidecar-placement`'s P-02 concern, as the
+    `41903c16` seal witness records it. Written to the convention the file's own
+    § Column Definitions prescribes, it parsed to eight columns under the bare
+    splitter -- so the only way to make the row-shape gate green was to edit a
+    sealed cell, which is what happened."""
+    escaped_row = (
+        r"| 2026-07-31T02:00:00Z | task-a | statistician | architecture | P-02 | lens | "
+        r"Manifest `shadows: relpath -> kind(dir\|file)` is boolean-blind |"
+    )
+    table = f"{_PRIOR_HEADER_ROW}\n{_PRIOR_SEPARATOR_ROW}\n{escaped_row}\n"
+    rows = parse_prior_table_rows(table)
+
+    assert len(rows) == 1, f"expected one parsed row; got: {rows!r}"
+    assert len(rows[0]) == len(PRIOR_ROW_FIELDS), (
+        f"an escaped pipe must not split a cell; got {len(rows[0])} cells: {rows[0]!r}"
+    )
+    concern = rows[0][PRIOR_ROW_FIELDS.index("concern")]
+    assert concern == "Manifest `shadows: relpath -> kind(dir|file)` is boolean-blind", (
+        f"the escape must be unescaped to a literal pipe in the cell value; got: {concern!r}"
+    )
+    assert not check_prior_row_has_seven_columns(rows)
+
+
+def test_accepts_a_classification_row_whose_escaped_pipe_stays_inside_one_cell() -> None:
+    r"""The documented `\|` escape parses to exactly nine columns and yields a
+    literal pipe in the cell value."""
+    escaped_row = (
+        r"| 2026-08-01T12:00:00Z | task-a | statistician | architecture | CH-01\|a | novel | "
+        r" | 0123456789abcdef0123456789abcdef01234567 | 7 |"
+    )
+    table = f"{_CLASSIFICATION_HEADER_ROW}\n{_CLASSIFICATION_SEPARATOR_ROW}\n{escaped_row}\n"
+    rows = parse_classification_table_rows(table)
+
+    assert len(rows) == 1, f"expected one parsed row; got: {rows!r}"
+    assert len(rows[0]) == len(CLASSIFICATION_ROW_FIELDS), (
+        f"an escaped pipe must not split a cell; got {len(rows[0])} cells: {rows[0]!r}"
+    )
+    challenge_id = rows[0][CLASSIFICATION_ROW_FIELDS.index("challenge-id")]
+    assert challenge_id == "CH-01|a", (
+        f"the escape must be unescaped to a literal pipe in the cell value; got: {challenge_id!r}"
+    )
+    assert not check_classification_row_has_nine_columns(rows)
+
+
 def test_flags_the_seal_boundary_header_missing_from_the_priors_file() -> None:
     """Canary: a priors file with no `**Series begins**:` header line is
     flagged -- the gate's file-absent-or-header-absent case must fail, not
@@ -2818,6 +3093,159 @@ def test_flags_a_backdated_prior_sharing_the_witness_latest_timestamp() -> None:
 
     assert result is not None, "a backdated prior inside the boundary must still fail"
     assert "P-02" in result
+
+
+# ---------------------------------------------------------------------------
+# G6 vacuity exemption (the ADR narrowing dec-310's G6 clause): a NONE tombstone
+# is exempt from the equality assertion, and pays for it with C1, C2 and C3. One canary
+# per compensating check, plus one for the fail-closed path -- the exemption
+# must never be free, and "free" is exactly what an unchecked carve-out is.
+# ---------------------------------------------------------------------------
+
+
+def _classification_row(
+    challenge_id: str,
+    classification: str = "novel",
+    matched_prior_id: str = "",
+    seal_witness: str = "0123456789abcdef0123456789abcdef01234567",
+) -> list[str]:
+    """One well-formed Challenge Classification row for `_G6_TRIPLE`."""
+    return [
+        "2026-08-01T12:00:00Z",
+        "task-a",
+        "statistician",
+        "architecture",
+        challenge_id,
+        classification,
+        matched_prior_id,
+        seal_witness,
+        "5",
+    ]
+
+
+def _cost_row(notes: str) -> list[str]:
+    """One well-formed cost row for `_G6_TRIPLE`."""
+    return [
+        "2026-08-01T12:00:00Z",
+        "task-a",
+        "statistician",
+        "architecture",
+        "123456",
+        "opus",
+        "standard",
+        notes,
+    ]
+
+
+_NONE_SEAL = [_prior_row(NONE_PRIOR_ID, "tombstone recorded post-hoc; no priors existed to seal")]
+_UNSEALED_NOTE = "UNSEALED: the convener spawned without writing Sealed Priors rows"
+
+
+def test_flags_a_none_declaration_coexisting_with_a_listed_prior_under_the_exemption() -> None:
+    """Canary for C1: appending a listed prior beside the NONE declaration is
+    the exact cheat G6 exists to catch, and the exemption must not release it.
+
+    The witness set is empty -- an honest Round-0 HEAD predating the consult --
+    so without C1 the exemption would return None and the appended prior would
+    ride through unexamined."""
+    working = _NONE_SEAL + [_prior_row("P-01", "appended after reading the challenges")]
+
+    result = check_none_seal_is_exclusive(working, _G6_TRIPLE)
+    through_gate = check_witness_priors_equal_working_priors(
+        [],
+        working,
+        _G6_TRIPLE,
+        classification_rows=[_classification_row("CH-01")],
+        cost_rows=[_cost_row(_UNSEALED_NOTE)],
+    )
+
+    assert result is not None, "a NONE declaration beside a listed prior must be flagged"
+    assert "P-01" in result, f"the failure must name the offending prior; got: {result!r}"
+    assert through_gate == result, (
+        f"the exemption must surface C1's failure rather than returning None; got: {through_gate!r}"
+    )
+
+
+def test_flags_a_matched_classification_under_a_none_seal() -> None:
+    """Canary for C2: a `matched` classification under an empty seal names a
+    prior the seal says does not exist -- a contradiction, and the citation half
+    of the cheat C1 blocks the append half of."""
+    classification_rows = [
+        _classification_row("CH-01"),
+        _classification_row("CH-02", classification="matched", matched_prior_id="P-01"),
+    ]
+
+    result = check_none_seal_challenges_are_all_novel(classification_rows, _G6_TRIPLE)
+    through_gate = check_witness_priors_equal_working_priors(
+        [],
+        _NONE_SEAL,
+        _G6_TRIPLE,
+        classification_rows=classification_rows,
+        cost_rows=[_cost_row(_UNSEALED_NOTE)],
+    )
+
+    assert result is not None, "a matched classification under a NONE seal must be flagged"
+    assert "CH-02" in result, f"the failure must name the offending challenge; got: {result!r}"
+    assert through_gate == result, (
+        f"the exemption must surface C2's failure rather than returning None; got: {through_gate!r}"
+    )
+
+
+def test_flags_a_none_seal_whose_cost_note_omits_the_unsealed_marker() -> None:
+    """Canary for C3: the admission must reach the cost series, where a reader
+    of the novelty rate will meet it -- a tombstone whose sibling cost row reads
+    as an ordinary sealed consult is the omission this check exists for."""
+    silent_cost_rows = [_cost_row("first consult of the discipline; 8 challenges, 8 switch-now")]
+
+    result = check_none_seal_cost_note_declares_unsealed(silent_cost_rows, _G6_TRIPLE)
+    absent = check_none_seal_cost_note_declares_unsealed([], _G6_TRIPLE)
+    through_gate = check_witness_priors_equal_working_priors(
+        [],
+        _NONE_SEAL,
+        _G6_TRIPLE,
+        classification_rows=[_classification_row("CH-01")],
+        cost_rows=silent_cost_rows,
+    )
+
+    assert result is not None, "a NONE seal whose cost note omits UNSEALED: must be flagged"
+    assert UNSEALED_COST_NOTE_MARKER in result, (
+        f"the failure must name the marker the note owes; got: {result!r}"
+    )
+    assert absent is not None, "a NONE seal with no cost row at all must be flagged too"
+    assert through_gate == result, (
+        f"the exemption must surface C3's failure rather than returning None; got: {through_gate!r}"
+    )
+
+
+def test_flags_an_exemption_claimed_without_the_compensating_evidence() -> None:
+    """Canary for the fail-closed default: a caller that reaches G6 with a NONE
+    seal but supplies no classification or cost rows gets a failure, not a free
+    pass. An exemption whose payment cannot be checked is not granted -- the
+    three-argument call shape must never become the cheap way through."""
+    result = check_witness_priors_equal_working_priors([], _NONE_SEAL, _G6_TRIPLE)
+
+    assert result is not None, "an unpaid exemption must fail closed"
+    assert "not supplied" in result, f"the failure must name what is missing; got: {result!r}"
+
+
+def test_accepts_a_none_tombstone_whose_exemption_is_paid_for() -> None:
+    """Non-firing control: an honest tombstone -- one NONE row, all-novel
+    classifications, an UNSEALED: cost note -- passes G6 without consulting the
+    witness commit.
+
+    This is the case G6-as-written could not admit: the recorded seal-witness is
+    the consultant's Round-0 HEAD, which predates the consult, so no honest
+    post-hoc tombstone can appear in it. Before the exemption, the only green
+    path was re-pointing the witness at a later commit."""
+    result = check_witness_priors_equal_working_priors(
+        [],
+        _NONE_SEAL,
+        _G6_TRIPLE,
+        classification_rows=[_classification_row("CH-01"), _classification_row("CH-02")],
+        cost_rows=[_cost_row(_UNSEALED_NOTE)],
+    )
+
+    assert result is None, f"a paid-for NONE tombstone must pass G6; got: {result!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -3106,6 +3534,13 @@ def test_the_witness_commit_contains_the_sealed_prior_rows(
     and why -- when the sha does not resolve to a reachable commit (a
     shallow clone, or a squash-merged branch).
 
+    A triple whose working seal is the empty `NONE` declaration takes G6's
+    vacuity exemption instead, which is why the classification and cost rows
+    are read here and handed to the check: they carry the compensating evidence
+    (C1-C3) the exemption is paid for with. Reading an absent cost file as zero
+    rows rather than as "no evidence supplied" is deliberate -- both are red,
+    and the empty-list path reports the more specific reason.
+
     One triple per test case: a skip here retires only its own triple, never
     a sibling's assertions."""
     if triple is None:
@@ -3154,10 +3589,18 @@ def test_the_witness_commit_contains_the_sealed_prior_rows(
     assert show.returncode == 0, (
         f"git show {seal_witness}:.ai-state/CONSULT_PRIORS.md failed: {show.stderr}"
     )
+    cost_path = project_root / ".ai-state" / "CONSULT_COSTS.md"
+    cost_rows = (
+        parse_cost_table_rows(cost_path.read_text(encoding="utf-8")) if cost_path.is_file() else []
+    )
     witness_prior_rows = parse_prior_table_rows(show.stdout)
     working_prior_rows = parse_prior_table_rows(priors_text)
     failure = check_witness_priors_equal_working_priors(
-        witness_prior_rows, working_prior_rows, triple
+        witness_prior_rows,
+        working_prior_rows,
+        triple,
+        classification_rows=classification_rows,
+        cost_rows=cost_rows,
     )
     assert failure is None, f"witness commit {seal_witness!r}: {failure}"
 

@@ -11,11 +11,12 @@ agent_type: systems-architect
 branch: worktree-praxion-health
 pipeline_tier: full
 supersedes_in_part: [dec-310]
-dissent: An exemption is an exemption. dec-310 named "the gate goes red and the proposed remedy is a skip-list entry" as grounds for reopening the whole mechanism, and a NONE-shaped carve-out is a skip-list with a predicate instead of a literal. A convener who wants the seal check off now has a documented shape to write — a tombstone — and the three compensating checks all constrain the same convener who chose to write it.
+dissent: 'An exemption is an exemption. dec-310 named "the gate goes red and the proposed remedy is a skip-list entry" as grounds for reopening the whole mechanism, and a NONE-shaped carve-out is a skip-list with a predicate instead of a literal. A convener who wants the seal check off now has a documented shape to write — a tombstone — and the three compensating checks all constrain the same convener who chose to write it. Part 5 compounds this: legalising restore-to-witness rewrites means the append-only gate stops being the thing that catches an in-place edit at the moment it happens, because drift followed by restore now nets to green. The gate that fired correctly on nine rows is being taught to accept the ninth kind of correct-looking rewrite.'
 affected_files:
   - .ai-state/CONSULT_PRIORS.md
   - .ai-state/CONSULT_COSTS.md
   - fitness/tests/test_discipline_registry_invariants.py
+  - fitness/tests/test_consult_append_only.py
 ---
 
 ## Context
@@ -81,8 +82,9 @@ honest tombstone; it admits only a re-pointed one.** That is the defect.
 
 ## Decision
 
-Four parts. Parts 1 and 2 are the mechanism repair; parts 3 and 4 are record repairs that
-restore what was actually recorded.
+Five parts. Parts 1 and 2 are the mechanism repair; parts 3 and 4 are record repairs that
+restore what was actually recorded; part 5 makes those repairs legal under the append-only
+contract without weakening it.
 
 **1. The three `CONSULT_*` parsers honour the escape convention.** Row splitting becomes
 `re.split(r"(?<!\\)\|", line)` with `\|` unescaped to `|` in each cell value, applied
@@ -147,6 +149,37 @@ seal is **not** re-pointed; `41903c16` stands.
 convener of either consult. The tombstone's `concern` cell must say so in its own words, so no
 future reader mistakes a post-hoc repair for a seal.
 
+**5. The append-only gate gains a restore-to-witness exemption.**
+`fitness/tests/test_consult_append_only.py` enforces "no row is ever edited or deleted" against
+`merge-base(origin/main, HEAD)`, and its remedy text says to append a new row referencing the old
+one. Parts 3 and 4 are in-place rewrites of nine rows, so the gate flags all nine — correctly,
+under the contract as written. Appending cannot satisfy G6 without backdating, and backdating is
+the one thing forbidden outright, so the contract as written admits **no** legal repair of a
+post-seal edit. That is the defect this part closes.
+
+An in-place row change is permitted **iff the new row bytes equal that row's bytes in the
+seal-witness commit recorded for that row's triple**; the gate resolves the witness from the
+triple's Challenge Classification rows and reads `git show <witness>:<file>`. Any other in-place
+edit still fails, and deletion is never permitted. A canary proves a non-witness rewrite is still
+flagged.
+
+The predicate is **monotone toward the witness**: the only rewrite it admits is one whose result
+equals an already-committed, independently-witnessed byte sequence. It can therefore restore a
+drifted row and can never fabricate one, introduce new text, or remove a row — the same shape of
+argument as part 2, narrowing an invariant to the domain where it has content rather than naming
+a triple and stopping.
+
+Two implementation constraints the gate must pin, because both are otherwise ambiguous:
+
+- **Resolve the witness from the *baseline* copy of the file, not the post-edit one.** For the
+  `adr-living-view` rows the `seal-witness` cell is itself the thing being restored, so resolving
+  from the new value would let a row nominate the very commit that vindicates it. Baseline
+  resolution closes that circularity. (Both resolutions happen to accept the two real cases —
+  `git show 166c5084:…` and `git show 9021caae:…` both carry `9021caae` on those rows — so this
+  is a specification choice, not a behaviour change today.)
+- **Compare bytes, not parsed cells.** The whole point of part 3 is restoring an exact byte
+  sequence containing `\|`; a comparison over parsed values would defeat it.
+
 ## Considered Options
 
 ### A — Restore the sealed P-02 text only, and leave the tombstone problem to a skip-list
@@ -186,10 +219,20 @@ removes the structural incentive that produced the `adr-living-view` drift. The 
 targets is more tightly closed for exempt triples than it was. Two records now say what
 actually happened.
 
+**Positive (part 5).** A post-seal edit becomes *repairable* rather than permanently
+un-green — the contract previously admitted no legal remedy at all, which is what made
+witness re-pointing look like the only way out and produced the `adr-living-view` drift in the
+first place. The exemption is mechanically checkable against git, not against a reviewer's
+judgement.
+
 **Negative.** A gate whose claim is tamper-evidence acquires a predicate-shaped carve-out —
 see `dissent:`. The `adr-living-view` seal-witness is edited a second time, and an
 append-only file has now been edited three times in its short life, which is itself a signal
-worth watching. `prompt-areas = 5` is a judgement about a prompt that is not a committed
+worth watching. Part 5 costs one more: drift-then-restore now nets to green, so the append-only
+gate no longer catches an in-place edit at the moment it happens — only a *net* divergence from
+the witness. And the gate's baseline is `merge-base(origin/main, HEAD)`, so it could not have
+caught either of the two edits this pass repairs; both were already in `origin/main` history. The
+gate protects forward from its baseline and makes no retrospective claim. `prompt-areas = 5` is a judgement about a prompt that is not a committed
 artifact, and is unfalsifiable by a later reader (the column definition already concedes this
 is a crude proxy).
 
@@ -226,8 +269,12 @@ one-third composed of admissions that the protocol was not followed is not measu
 sophisticated avoidance of the simpler finding that the protocol is not being followed.
 
 **Reversal trigger.** Any of three: (i) the falsifier above — NONE tombstones become the
-common case rather than the exception; (ii) a third post-seal working-file edit occurs on any
-`CONSULT_*` file, which would mean append-only is not holding and the remedy is process, not
-gate design; (iii) `dec-306`'s criterion is re-opened and the analyst finds the tombstone rows
-must be excluded, at which point the exemption bought nothing and the rows should be moved out
-of the series rather than exempted inside it.
+common case rather than the exception; (ii) **the restore-to-witness exemption fires for drift
+introduced *after* this decision** — the two rows it repairs are historical, so a third occurrence
+means append-only is not holding prospectively and the remedy is process, not gate design. Part 5
+changes how this trigger must be watched: a post-decision drift-then-restore now passes the gate,
+so the trigger needs a **counter** (how many times the exemption fired, and against which
+baseline) rather than a red test. If the gate cannot report that count, part 5 is under-built;
+(iii) `dec-306`'s criterion is re-opened and the analyst finds the tombstone rows must be
+excluded, at which point the exemption bought nothing and the rows should be moved out of the
+series rather than exempted inside it.

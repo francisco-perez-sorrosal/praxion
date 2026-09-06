@@ -33,7 +33,8 @@ hub SHA), runs it, and surfaces the result. The script reconciles:
    gate allows it. Reconciled only when `gh` resolved a current hub SHA for
    this run (see Process step 2); a foreign, hand-edited, or non-SHA-pinned
    caller is always left untouched.
-6. The `.github/labels.yml` `baseline:` block, refreshed from the shipped
+6. The `.github/labels.yml` `baseline:` block (delegated to
+   `scripts/refresh_labels_baseline.py`), refreshed from the shipped
    template — the project's `additional:` block and surrounding comments are
    preserved. Mode-aware: `--check`/`--dry-run` report the verdict without
    touching the manifest.
@@ -83,12 +84,11 @@ never goes stale and is left alone — only its appended Block D fragment
    This is the same resolution call and 40-hex validation the onboarding CI
    sub-step uses for `{{HUB_SHA}}`. If `gh` is unavailable, unauthenticated,
    or anything other than a 40-hex SHA came back, print an advisory and
-   proceed without `--hub-sha` — surface 5 is skipped this run; every other
-   surface still reconciles:
+   proceed without `--hub-sha`:
    ```
-   Advisory: gh is unavailable or unauthenticated — the hub-SHA caller
-   re-points and the cross-model-review add are skipped this run. All other
-   surfaces still reconcile below.
+   Advisory: gh is unavailable or unauthenticated — surface 5 (the hub-SHA
+   caller re-points and the cross-model-review add) is skipped this run;
+   the pre-existing surfaces 1–4 plus surfaces 6–7 still reconcile below.
    ```
 
 3. **Run the reconciler**, forwarding `$ARGUMENTS` (`--check` / `--dry-run` or

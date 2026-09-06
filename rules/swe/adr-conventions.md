@@ -106,7 +106,7 @@ Narrowing only *some* clauses of an existing ADR uses `supersedes_in_part`/`supe
 
 ### Finalize Protocol
 
-Finalize promotes drafts in `.ai-state/decisions/drafts/` to finalized `<NNN>-<slug>.md` records at merge-to-main. Invoked by the post-merge git hook and `/merge-worktree`; the protocol is **idempotent**, advisory-locked, and rewrites `dec-draft-<hash>` cross-references across one **bounded citation net**: every markdown file under `.ai-state/` (sibling ADRs, `DESIGN.md` and its changelog, both tech-debt ledgers, the three `CONSULT_*` files, `calibration_log.md`, `SYSTEM_DEPLOYMENT.md`, the idea ledgers, every archived spec, the report snapshots); every markdown file under `docs/` **except `docs/independent-analysis/`** (frozen historical reports — no `dec-draft` ids, no downstream reader, exempt on the same grounds as frozen diagrams); the in-flight `.ai-work/*/LEARNINGS.md` / `SYSTEMS_PLAN.md` / `IMPLEMENTATION_PLAN.md`; and a project-root `ROADMAP.md` — bounded subtrees and named files, never an arbitrary repo sweep, and never code (`scripts/` fixtures keep their literals). The bounded net is the contract — finalize never touches unrelated text, and a rewrite replaces only a concrete 8-hex draft id. The rewriter and its post-condition detector share that one definition, so a citation the detector can see is one the rewriter has already visited: a survivor is a failed rewrite to inspect, never a scope gap to widen. A citation that dangles because it sits *outside* the net is fixed by extending the net, not by forbidding the citation. `DECISIONS_INDEX.md` regenerates last.
+Finalize promotes drafts in `.ai-state/decisions/drafts/` to finalized `<NNN>-<slug>.md` records at merge-to-main. Invoked by the post-merge git hook and `/merge-worktree`; the protocol is **idempotent**, advisory-locked, and rewrites `dec-draft-<hash>` cross-references across one **bounded citation net**: every markdown file under `.ai-state/` and under `docs/` (minus `docs/independent-analysis/`); the in-flight `.ai-work/*/LEARNINGS.md` / `SYSTEMS_PLAN.md` / `IMPLEMENTATION_PLAN.md`; and a project-root `ROADMAP.md` — bounded subtrees and named files, never an arbitrary repo sweep, and never code (`scripts/` fixtures keep their literals). The bounded net is the contract — finalize never touches unrelated text, and a rewrite replaces only a concrete 8-hex draft id. The rewriter and its post-condition detector share that one definition, so a citation the detector can see is one the rewriter has already visited: a survivor is a failed rewrite to inspect, never a scope gap to widen. `DECISIONS_INDEX.md` regenerates last.
 
 For the full step sequence (draft detection, NNN assignment, file rename + frontmatter `id:`/`status:` rewrites, the cross-reference-rewrite location table, concurrency safety, and exit codes), see [`adr-authoring-protocols.md § Finalize at Merge-to-Main`](../../skills/software-planning/references/adr-authoring-protocols.md#finalize-at-merge-to-main).
 
@@ -119,6 +119,13 @@ For the full step sequence (draft detection, NNN assignment, file rename + front
 | interface-designer | Phase 4 (trade-off analysis) | Interface-layer decisions: UI framework / API paradigm / MCP tool decomposition / error format / pagination / component-pattern selection | `.ai-state/decisions/drafts/` (fragment) |
 | orchestrator | Direct/Lightweight tier, no pipeline agent spawned | Any decision worth preserving during an interactive session | `.ai-state/decisions/drafts/` (fragment; preferred) |
 | user | Manual (no session, no agent) | Any decision worth preserving | `.ai-state/decisions/drafts/` preferred; `<NNN>-<slug>.md` acceptable only for this manual path |
+
+**The implementer authors no ADR, and may apply mechanical corpus edits a plan step
+specifies.** A step may direct it to flip a `status:`, set a cross-reference field
+(`superseded_by`, `retired_by`, `re_affirmed_by`, `superseded_in_part_by`), or correct
+malformed frontmatter — edits an ADR-authoring agent has already decided and written down.
+Anything needing a new record, a rationale, or a category judgement returns to the architect
+or planner.
 
 All ADR authors also record decisions in `LEARNINGS.md ### Decisions Made` using the structured format. While a pipeline is in flight, `LEARNINGS.md` carries `dec-draft-<hash>` references; finalize rewrites these to `dec-NNN` at merge-to-main.
 
@@ -152,4 +159,4 @@ Each consumer's ADR-touching behavior lives at its own definition, not duplicate
 
 ### Migration — historical ADRs
 
-Pre-existing finalized ADRs (those already at `.ai-state/decisions/<NNN>-<slug>.md` before the fragment scheme rolled out) remain **untouched**. Their filenames, `id: dec-NNN` frontmatter, and cross-references are preserved as-is. The fragment-name-at-create scheme applies only to newly authored ADRs from the rollout forward; no retroactive renumbering runs over historical records.
+Pre-existing finalized ADRs keep their filenames, `dec-NNN` ids and cross-references; the fragment scheme applies only to newly authored records.

@@ -99,7 +99,7 @@ Source: `eval/src/praxion_evals/harness/families/seeded_scenarios.py`
 
 Corpus: 5 static, golden-fixture scenarios under `eval/tests/fixtures/scenarios/` — not a resolved-target corpus slice, since the fixtures are seeded inputs bundled with the harness rather than artifacts that vary per eval target. Each fixture pairs a seeded input with a `recorded_*` field: a golden capture of what a compliant agent produced. This family grades the recorded fixture; it never spawns a live agent.
 
-This is deliberately **not** numbered against the deferred Family 3–6 roster below (Dogfooding fidelity / Onboarding outcome quality / Token-budget surface stability / Learning-loop closure latency) — those slots keep their existing meanings, and Family 5 (token-budget surface stability) ships separately as its own collector.
+This is deliberately **not** numbered against the deferred Family 3, 4, 6 roster below (Dogfooding fidelity / Onboarding outcome quality / Learning-loop closure latency) — those slots keep their existing meanings. Family 5 (token-budget surface stability) has shipped separately as its own collector — see below.
 
 **Scenarios:**
 
@@ -116,6 +116,16 @@ This is deliberately **not** numbered against the deferred Family 3–6 roster b
 **LLM-judged checks** (one API call per scenario, skipped under `--mechanical-only`): a judge rates the same recorded field against the rubric baked into the fixture.
 
 A sixth scenario, `inheritance-probe`, spawns a live `praxion:*` subagent and asserts the file paths named in its `claudeMd` system block — the executable guard for the subagent-inheritance correction (P0.3). It is intentionally **not** part of this family (grading a static fixture cannot prove a live-inheritance claim) and instead ships as a standalone script, `eval/scripts/inheritance_probe.py`, run once per M-confidence slice rather than on every mechanical pass.
+
+### Family 5 — Token-budget surface stability
+
+Source: `eval/src/praxion_evals/harness/families/family5_token_budget_stability.py`
+
+A **collector**, not an artifact-per-item family: there is exactly one always-loaded surface to observe, so it reports a single CheckResult rather than one per corpus item. Entirely mechanical — it never calls the judge and never reads `ANTHROPIC_API_KEY` (it always takes `measure()`/`measure_listing()`'s graceful no-key byte-based estimate), so it runs identically under `--mechanical-only` and makes no live token-count API call either way.
+
+Reuses `scripts/measure_token_budget.py` (loaded by path, since `scripts/` sits outside the `praxion-evals` package) for the governed-surface reading (vs the 25,000-token ceiling) and the listing-surface reading (vs the frozen listing ceiling), then compares both against `.ai-state/token_budget_baseline.json` — read-only. Unlike the commit-gate's `ratchet()`, this collector never appends today's sample to the baseline file: an eval report is an observation, not a bookkeeping step, and re-running `/eval-praxion` must never mutate committed state.
+
+**Verdict**: `FAIL` if governed tokens exceed the ceiling, the trailing-30-day governed-byte delta is positive, or listing tokens exceed the frozen (basis-matched) ceiling; `WARN` if none of those but governed utilisation is ≥90%; `PASS` otherwise, including whenever the baseline file is absent, corrupt, or too young for a 30-day trend (all degrade gracefully, never as an error).
 
 ## Deferred families
 
@@ -138,16 +148,6 @@ A sixth scenario, `inheritance-probe`, spawns a live `praxion:*` subagent and as
 **What's needed before v2.** The `--project=<external>` corpus resolution mode; a project-structure snapshot schema distinct from the ADR/SPEC corpus.
 
 **Dependencies.** `--project=<external>` design (see open questions).
-
-### Family 5 — Token-budget surface stability
-
-**What it measures.** Tracks the always-loaded surface size (CLAUDE.md files + always-on rules) across pipeline runs, comparing against the 25,000-token guardrail and flagging trends that approach the ceiling. Each report row carries the byte count and token estimate so the operator sees a time-series.
-
-**Why deferred.** This is a pure mechanical check with no LLM call, but it requires a reliable `wc -c` + token-estimate calculation across the always-loaded surface — a collector, not a family in the current sense. The collector pattern does not yet have a home in the harness (the existing families run per-artifact; this family runs per-file-set).
-
-**What's needed before v2.** A collector sub-protocol in the harness for non-artifact-per-item checks; a byte-to-token estimation utility; a v1 baseline to compare against.
-
-**Dependencies.** None blocking; complexity is in the harness extension, not the check logic.
 
 ### Family 6 — Learning-loop closure latency
 

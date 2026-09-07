@@ -8,8 +8,8 @@ The Tier 1 behavioral / artifact-manifest surface (formerly `/eval behavioral`) 
 
 | Invocation | What runs | Cost |
 |------------|-----------|------|
-| `praxion-evals` (no args) | Both families against `main` HEAD; LLM judging on | API credits |
-| `praxion-evals <ref-or-path>` | Both families against the resolved target | API credits |
+| `praxion-evals` (no args) | All families against `main` HEAD; LLM judging on | API credits |
+| `praxion-evals <ref-or-path>` | All families against the resolved target | API credits |
 | `praxion-evals --task-slug <slug>` | Adds the in-flight `.ai-work/<slug>/` manifest scan to Family 1 | API credits |
 | `praxion-evals --mechanical-only` | Skip every LLM-judged check across families; no auth env needed | Free |
 
@@ -56,6 +56,8 @@ See `eval/EVAL_PLAN.md` for the full design narrative, deferred families, and op
 |--------|--------|--------|
 | Family 1 — Pipeline-outcome fidelity | `harness/families/family1_pipeline_fidelity.py` | `.ai-state/specs/`, `.ai-state/decisions/`, `DECISIONS_INDEX.md` |
 | Family 2 — Behavioral-contract adherence | `harness/families/family2_bc_adherence.py` | `VERIFICATION_REPORT.md` files |
+| Seeded scenario corpus | `harness/families/seeded_scenarios.py` | Bundled fixtures under `tests/fixtures/scenarios/` |
+| Family 5 — Token-budget surface stability | `harness/families/family5_token_budget_stability.py` | `.ai-state/token_budget_baseline.json` (read-only) |
 
 ## Development
 

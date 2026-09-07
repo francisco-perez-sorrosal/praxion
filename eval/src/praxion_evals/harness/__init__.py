@@ -7,6 +7,7 @@ Public surface:
     Family1PipelineOutcomeFidelity — Family 1 checks (pipeline-outcome fidelity)
     Family2BehavioralContractAdherence — Family 2 checks (BC adherence)
     SeededScenarioFamily — seeded scenario corpus checks (P0.7)
+    Family5TokenBudgetStability — token-budget surface stability collector (P0.7)
     Orchestrator — wires families → ReportWriter → Report
     ReportWriter — writes per-run report + appends to frozen-column log
     run_eval     — thin composition function: resolves corpus, selects judge,
@@ -28,6 +29,9 @@ from praxion_evals.harness.families.family1_pipeline_fidelity import (
 )
 from praxion_evals.harness.families.family2_bc_adherence import (
     Family2BehavioralContractAdherence,
+)
+from praxion_evals.harness.families.family5_token_budget_stability import (
+    Family5TokenBudgetStability,
 )
 from praxion_evals.harness.families.seeded_scenarios import (
     SeededScenarioFamily,
@@ -54,6 +58,7 @@ __all__ = [
     "Family",
     "Family1PipelineOutcomeFidelity",
     "Family2BehavioralContractAdherence",
+    "Family5TokenBudgetStability",
     "JudgeClient",
     "JudgeVerdict",
     "NullJudgeClient",
@@ -84,9 +89,17 @@ def run_eval(
     Composition:
         CorpusReader(repo_root).resolve(target, task_slug=…, pipeline_tier=…)
         → select_judge_client()  (or NullJudgeClient when mechanical_only)
-        → Orchestrator([Family1, Family2, SeededScenarioFamily], output_dir)
-              .run(corpus, judge, …)
+        → Orchestrator(
+              [Family1, Family2, SeededScenarioFamily,
+               Family5TokenBudgetStability(repo_root=root)],
+              output_dir,
+          ).run(corpus, judge, …)
         → Report
+
+    Family5TokenBudgetStability is constructed with the resolved *root*
+    (rather than its own default) so a corpus pointed at a scratch directory
+    (tests) measures that scratch directory's own always-loaded surface —
+    never this repo's real committed baseline.
 
     Args:
         target: Invocation target — path, worktree name, git ref, or 'main'.
@@ -117,6 +130,7 @@ def run_eval(
         Family1PipelineOutcomeFidelity(),
         Family2BehavioralContractAdherence(),
         SeededScenarioFamily(),
+        Family5TokenBudgetStability(repo_root=root),
     ]
     orchestrator = Orchestrator(families=families, output_dir=out_dir)
     return orchestrator.run(corpus, judge, mechanical_only=mechanical_only)

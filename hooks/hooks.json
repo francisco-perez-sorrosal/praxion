@@ -49,7 +49,7 @@
           {
             "type": "command",
             "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/measure_context_surface.py 2>/dev/null",
-            "timeout": 5,
+            "timeout": 20,
             "async": true
           },
           {

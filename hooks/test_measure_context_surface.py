@@ -1,7 +1,12 @@
 """Tests for hooks/measure_context_surface.py — SessionStart observability hook.
 
-Verifies measurement correctness, graceful degradation, and the path-scope
-filter that distinguishes always-loaded rules from path-scoped ones.
+The hook now delegates its measurement to `scripts.measure_token_budget.measure()`
+-- the same function the commit-gate check calls -- so file-set correctness and
+divisor/tokenizer behavior are already covered by `scripts/test_measure_token_budget.py`.
+These tests cover only what is specific to the hook: SessionStart gating,
+graceful degradation, the observability opt-out, and the parity guarantee that
+motivated the delegation (the hook can never disagree with the gate on the
+same tree).
 """
 
 from __future__ import annotations
@@ -14,7 +19,13 @@ from pathlib import Path
 import pytest
 
 HOOKS_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = HOOKS_DIR.parent
 HOOK_SCRIPT_PATH = HOOKS_DIR / "measure_context_surface.py"
+
+# Mirrors hooks/test_capture_memory.py's own sys.path-based import of a
+# sibling scripts/ module.
+sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
+import measure_token_budget as mtb  # noqa: E402
 
 
 def _load_module():
@@ -27,154 +38,6 @@ def _load_module():
     return module
 
 
-# ---------------------------------------------------------------------------
-# Frontmatter detection
-# ---------------------------------------------------------------------------
-
-
-class TestFrontmatterDetection:
-    def test_inline_paths_returns_true(self):
-        m = _load_module()
-        content = '---\npaths: ["docs/**/*.md"]\n---\n\n## Rule\n'
-        assert m._has_paths_frontmatter(content) is True
-
-    def test_block_style_paths_returns_true(self):
-        m = _load_module()
-        content = '---\npaths:\n  - "docs/**"\n  - "src/**"\n---\n\n## Rule\n'
-        assert m._has_paths_frontmatter(content) is True
-
-    def test_no_frontmatter_returns_false(self):
-        m = _load_module()
-        content = "## Rule\n\nBody.\n"
-        assert m._has_paths_frontmatter(content) is False
-
-    def test_frontmatter_without_paths_returns_false(self):
-        m = _load_module()
-        content = "---\nname: foo\nowner: bar\n---\n\n## Rule\n"
-        assert m._has_paths_frontmatter(content) is False
-
-    def test_paths_appearing_in_body_does_not_count(self):
-        """Only frontmatter `paths:` triggers — body mentions do not."""
-        m = _load_module()
-        content = "## Rule\n\nDocument with `paths:` mentioned in body.\n"
-        assert m._has_paths_frontmatter(content) is False
-
-
-# ---------------------------------------------------------------------------
-# Surface collection
-# ---------------------------------------------------------------------------
-
-
-class TestCollectAlwaysLoaded:
-    def test_counts_unscoped_rules_skips_scoped_ones(self, tmp_path: Path):
-        m = _load_module()
-
-        rules_dir = tmp_path / "rules"
-        (rules_dir / "swe").mkdir(parents=True)
-
-        (rules_dir / "always-loaded.md").write_text(
-            "## Always Loaded\n\nNo paths frontmatter.\n", encoding="utf-8"
-        )
-        (rules_dir / "swe" / "path-scoped.md").write_text(
-            '---\npaths: ["src/**"]\n---\n\n## Path Scoped\n', encoding="utf-8"
-        )
-        (rules_dir / "README.md").write_text(
-            "# Rules\n\nDirectory README — not loaded.\n", encoding="utf-8"
-        )
-
-        project_md = tmp_path / "CLAUDE.md"
-        project_md.write_text("# Project\n", encoding="utf-8")
-        global_md = tmp_path / "global_CLAUDE.md"
-        global_md.write_text("# Global\n", encoding="utf-8")
-
-        total, records = m._collect_always_loaded(project_md, global_md, rules_dir)
-
-        kinds = {r["type"] for r in records}
-        assert "claude_md_project" in kinds
-        assert "claude_md_global" in kinds
-        assert "rule" in kinds
-
-        rule_paths = [r["path"] for r in records if r["type"] == "rule"]
-        assert any("always-loaded.md" in p for p in rule_paths)
-        assert not any("path-scoped.md" in p for p in rule_paths)
-        assert not any("README.md" in p for p in rule_paths)
-
-        # Total bytes equals the sum of records' bytes — sanity check.
-        assert total == sum(r["bytes"] for r in records)
-
-    def test_plugin_tree_adds_hook_deliver_rules_and_dedups_symlinks(self, tmp_path: Path):
-        """Hook-deliver rules live only in the plugin tree and must be counted;
-        a rule symlinked into the global dir must count exactly once."""
-        m = _load_module()
-
-        plugin_rules = tmp_path / "plugin" / "rules"
-        (plugin_rules / "swe").mkdir(parents=True)
-        shared = plugin_rules / "swe" / "shared.md"
-        shared.write_text("## Shared\n\nSymlink-installed rule.\n", encoding="utf-8")
-        (plugin_rules / "swe" / "hook-deliver.md").write_text(
-            "## Hook Deliver\n\nInjected at runtime, not symlinked.\n",
-            encoding="utf-8",
-        )
-
-        # Global dir mirrors only the symlink-installed rule (not hook-deliver).
-        rules_dir = tmp_path / "global_rules"
-        rules_dir.mkdir()
-        (rules_dir / "shared.md").symlink_to(shared)
-
-        project_md = tmp_path / "CLAUDE.md"
-        project_md.write_text("# Project\n", encoding="utf-8")
-        global_md = tmp_path / "global_CLAUDE.md"
-        global_md.write_text("# Global\n", encoding="utf-8")
-
-        total, records = m._collect_always_loaded(project_md, global_md, rules_dir, plugin_rules)
-
-        rule_paths = [r["path"] for r in records if r["type"] == "rule"]
-        # hook-deliver rule is reachable only via the plugin tree
-        assert any("hook-deliver.md" in p for p in rule_paths)
-        # shared rule counted exactly once despite appearing in both dirs
-        assert sum("shared.md" in p for p in rule_paths) == 1
-        assert total == sum(r["bytes"] for r in records)
-
-    def test_missing_files_skipped_silently(self, tmp_path: Path):
-        m = _load_module()
-        missing_project = tmp_path / "does-not-exist.md"
-        missing_global = tmp_path / "also-missing.md"
-        missing_rules = tmp_path / "no-rules-dir"
-
-        total, records = m._collect_always_loaded(missing_project, missing_global, missing_rules)
-
-        assert total == 0
-        assert records == []
-
-    def test_unicode_bytes_counted_correctly(self, tmp_path: Path):
-        """Multi-byte chars (em dash, accented vowels) count as actual bytes,
-        not character count, so token estimates stay realistic."""
-        m = _load_module()
-
-        rules_dir = tmp_path / "rules"
-        rules_dir.mkdir()
-        # 4 ASCII chars + em dash (3 bytes in UTF-8) = 7 bytes total in body
-        unicode_md = rules_dir / "unicode.md"
-        unicode_md.write_text("hi — there\n", encoding="utf-8")
-
-        project_md = tmp_path / "p.md"
-        project_md.write_text("", encoding="utf-8")
-        global_md = tmp_path / "g.md"
-        global_md.write_text("", encoding="utf-8")
-
-        total, records = m._collect_always_loaded(project_md, global_md, rules_dir)
-        rule_record = next(r for r in records if r["type"] == "rule")
-        # "hi — there\n" → 13 bytes: 'hi ' (3) + em-dash (3) + ' there\n' (7).
-        # Char count is 11; byte count is 13. The hook reports bytes, not chars,
-        # which keeps token estimates honest for non-ASCII content.
-        assert rule_record["bytes"] == 13
-
-
-# ---------------------------------------------------------------------------
-# End-to-end: stdin payload → observations.jsonl row
-# ---------------------------------------------------------------------------
-
-
 class TestMainEntry:
     def _stub_stdin(self, payload: dict, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(sys, "stdin", _StringIO(json.dumps(payload)))
@@ -183,15 +46,12 @@ class TestMainEntry:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
         m = _load_module()
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
         # Set up a project tree with .ai-state/ so the hook does not bail.
         ai_state = tmp_path / ".ai-state"
         ai_state.mkdir()
         (tmp_path / "CLAUDE.md").write_text("# Project\n", encoding="utf-8")
-
-        # Point the global rules dir at an empty path so collection is bounded.
-        monkeypatch.setattr(m, "_GLOBAL_RULES_DIR", tmp_path / "no-rules-dir")
-        monkeypatch.setattr(m, "_GLOBAL_CLAUDE_MD", tmp_path / "no-global.md")
 
         payload = {
             "hook_event_name": "SessionStart",
@@ -256,6 +116,44 @@ class TestMainEntry:
         m = _load_module()
         monkeypatch.setattr(sys, "stdin", _StringIO("not-json{"))
         m.main()  # No raise = pass.
+
+
+# ---------------------------------------------------------------------------
+# Parity with the commit-gate script — the whole reason for this step.
+# ---------------------------------------------------------------------------
+
+
+class TestMeasurementParity:
+    def test_hook_tokens_and_bytes_match_the_gate(self, monkeypatch: pytest.MonkeyPatch):
+        """The hook must report the identical figure as the gate on the same
+        tree, in the deterministic (no API key) estimate path — the parity
+        this whole step exists to guarantee, by construction rather than by
+        keeping two divisors in sync.
+        """
+        m = _load_module()
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+        captured: list[dict] = []
+        monkeypatch.setattr(m, "_append_observation", lambda _path, obs: captured.append(obs))
+
+        payload = {
+            "hook_event_name": "SessionStart",
+            "cwd": str(PROJECT_ROOT),
+            "session_id": "parity-check",
+            "agent_type": "main",
+        }
+        monkeypatch.setattr(sys, "stdin", _StringIO(json.dumps(payload)))
+
+        m.main()
+
+        assert len(captured) == 1
+        gate_report = mtb.measure(PROJECT_ROOT, api_key=None)
+
+        observation = captured[0]
+        assert f"{gate_report['tokens']:,} tokens" in observation["summary"]
+        assert f"({gate_report['bytes']:,} bytes)" in observation["summary"]
+        assert len(observation["file_paths"]) == len(gate_report["files"])
+        assert sorted(observation["file_paths"]) == sorted(gate_report["files"])
 
 
 class _StringIO:

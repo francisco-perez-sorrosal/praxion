@@ -529,5 +529,56 @@ def test_read_wal_keeps_active_row_with_malformed_timestamp(tmp_path):
     )
 
 
+# --- graceful degradation on a fully absent raw WAL (fresh clone, since the raw
+# WAL left git tracking) -----------------------------------------------------
+
+
+def test_read_wal_handles_missing_active_file_gracefully(tmp_path):
+    """No observations.jsonl at all (not even an empty one) must not raise.
+
+    This is the fresh-clone scenario every future clone hits once the raw WAL
+    left git tracking: the file is absent, not empty.
+    """
+    obs_path = tmp_path / "observations.jsonl"  # never created
+
+    rows = rps._read_wal(obs_path, max_age_days=7, now=_NOW)
+    assert rows == []
+
+
+def test_reconcile_ignores_absent_wal_and_trusts_tier1(tmp_path):
+    """reconcile() with a real (absent) .ai-state/observations.jsonl must still
+    classify from Tier-1 (files changed + tests) — Tier-2 correlation degrades
+    to empty, it never blocks or corrupts the Tier-1 verdict."""
+    root = _setup(tmp_path, "- [ ] Step 1: build\n", PLAN_ONE_STEP)
+    # No .ai-state/ directory at all — the real absent-WAL shape, not an override.
+    out = rps.reconcile(
+        SLUG,
+        root,
+        None,
+        _changed_files_override=["src/foo.py"],
+        _test_status_override="green",
+    )
+    verdict = _verdict_for(out, "Step 1")
+    assert verdict["verdict"] == "verified-complete"
+    assert verdict["tier2"]["agent_stop_seen"] is False
+
+
+def test_main_reports_no_local_wal_on_stderr_when_absent(tmp_path, capsys, monkeypatch):
+    """main() surfaces an explicit INFO line when the raw WAL is absent —
+    Tier-1 classification proceeds unaffected (no traceback, no crash)."""
+    _setup(tmp_path, "- [x] Step 1: build\n", PLAN_ONE_STEP)
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "foo.py").write_text("x = 1\n", encoding="utf-8")
+    monkeypatch.setattr(rps, "resolve_repo_root", lambda *_a, **_k: tmp_path)
+    monkeypatch.setattr(rps, "is_plugin_cache_path", lambda *_a, **_k: False)
+    monkeypatch.setattr(rps, "_git_changed_files", lambda *_a, **_k: {"src/foo.py"})
+    monkeypatch.setattr(rps, "_read_test_status", lambda *_a, **_k: "green")
+
+    exit_code = rps.main([SLUG, "--json"])
+    err = capsys.readouterr().err
+    assert "no local WAL" in err
+    assert exit_code == 0
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))

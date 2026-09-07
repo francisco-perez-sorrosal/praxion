@@ -571,6 +571,24 @@ class TestMain:
         out = capsys.readouterr().out
         assert "Nothing to reconcile" in out
 
+    def test_main_reports_no_local_wal_when_observations_absent(
+        self, tmp_path: Path, capsys, monkeypatch
+    ):
+        """A missing observations.jsonl (fresh clone, since the raw WAL left
+        git tracking) is reported explicitly rather than folded into the
+        generic 'Nothing to reconcile' summary, which could otherwise be
+        mistaken for a clean merge."""
+        monkeypatch.setattr(reconcile, "OBSERVATIONS_PATH", tmp_path / "observations.jsonl")
+        monkeypatch.setattr(reconcile, "DECISIONS_DIR", tmp_path / "decisions")
+        monkeypatch.setattr(reconcile, "has_drafts_directory_changed_in_merge", lambda: False)
+        monkeypatch.setattr(reconcile, "git", lambda *args: _make_completed_process(0))
+        monkeypatch.setattr(reconcile, "apply_repo_root", lambda *_a, **_k: None)
+
+        monkeypatch.setattr(sys, "argv", ["reconcile_ai_state.py"])
+        reconcile.main()
+        out = capsys.readouterr().out
+        assert "observations.jsonl: no local WAL -- nothing to reconcile" in out
+
     def test_main_post_merge_skips_observations(self, tmp_path: Path, capsys, monkeypatch):
         """--post-merge skips observations reconciliation path."""
         ai_state = tmp_path / ".ai-state"

@@ -172,6 +172,47 @@ def _stopped_by_claude_block(task_id: str, name: str = "Researcher") -> str:
     )
 
 
+def _assistant_line(
+    input_tokens: int = 1,
+    output_tokens: int = 1,
+    cache_read: int = 0,
+    cache_create: int = 0,
+    model: str = "claude-opus-5",
+    timestamp: str = "2026-09-07T00:00:00.000Z",
+    agent_id: str | None = None,
+) -> str:
+    """One JSONL line mirroring the real per-agent transcript shape (see
+    LEARNINGS.md's live-transcript inspection: `message.usage` carries
+    `input_tokens`/`output_tokens`/`cache_read_input_tokens`/
+    `cache_creation_input_tokens`; `message.model` is a full model id).
+    ``agent_id=None`` omits the top-level ``agentId`` key entirely, matching
+    the observed real shape.
+    """
+    row: dict = {
+        "type": "assistant",
+        "timestamp": timestamp,
+        "message": {
+            "model": model,
+            "usage": {
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "cache_read_input_tokens": cache_read,
+                "cache_creation_input_tokens": cache_create,
+            },
+        },
+    }
+    if agent_id is not None:
+        row["agentId"] = agent_id
+    return json.dumps(row)
+
+
+def _write_usage_transcript(path: Path, lines: list[str]) -> Path:
+    """Materialize a synthetic transcript of pre-built JSONL lines."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
 def _finished_block(task_id: str, name: str = "Sentinel") -> str:
     return (
         "<task-notification>\n"
@@ -1187,6 +1228,138 @@ class TestStopSourceProvenance:
         assert "stop_source" not in _read_wal(obs_path)[-1]
 
 
+class TestSubagentTranscriptUsage:
+    """`agent_stop` gains tokens/duration/model from the SubagentStop transcript."""
+
+    def test_sums_usage_and_takes_model_and_duration_from_matching_lines(
+        self, tmp_path: Path
+    ) -> None:
+        module = _load_module()
+        transcript = _write_usage_transcript(
+            tmp_path / "agent-a1.jsonl",
+            [
+                _assistant_line(
+                    input_tokens=2,
+                    output_tokens=10,
+                    cache_read=100,
+                    cache_create=5,
+                    model="claude-opus-5",
+                    timestamp="2026-09-07T00:00:00.000Z",
+                ),
+                _assistant_line(
+                    input_tokens=3,
+                    output_tokens=20,
+                    cache_read=200,
+                    cache_create=0,
+                    model="claude-opus-5",
+                    timestamp="2026-09-07T00:00:05.500Z",
+                ),
+            ],
+        )
+
+        fields = module._sum_subagent_transcript(
+            {"transcript_path": str(transcript), "agent_id": "a1"}
+        )
+
+        assert fields["tokens_in"] == 5
+        assert fields["tokens_out"] == 30
+        assert fields["cache_read"] == 300
+        assert fields["cache_create"] == 5
+        assert fields["model"] == "claude-opus-5"
+        assert fields["duration_ms"] == 5500
+
+    def test_filters_to_matching_agent_id_when_agentid_is_present(self, tmp_path: Path) -> None:
+        """A shared/sidechain transcript must not count another agent's lines."""
+        module = _load_module()
+        transcript = _write_usage_transcript(
+            tmp_path / "shared.jsonl",
+            [
+                _assistant_line(input_tokens=100, output_tokens=100, agent_id="other-agent"),
+                _assistant_line(input_tokens=2, output_tokens=4, agent_id="a1"),
+            ],
+        )
+
+        fields = module._sum_subagent_transcript(
+            {"transcript_path": str(transcript), "agent_id": "a1"}
+        )
+
+        assert fields["tokens_in"] == 2
+        assert fields["tokens_out"] == 4
+
+    def test_lines_without_agentid_are_counted_unconditionally(self, tmp_path: Path) -> None:
+        """The observed real shape: per-agent transcripts carry no `agentId` key."""
+        module = _load_module()
+        transcript = _write_usage_transcript(
+            tmp_path / "agent-a1.jsonl", [_assistant_line(input_tokens=7, output_tokens=8)]
+        )
+
+        fields = module._sum_subagent_transcript(
+            {"transcript_path": str(transcript), "agent_id": "a1"}
+        )
+
+        assert fields["tokens_in"] == 7
+        assert fields["tokens_out"] == 8
+
+    def test_missing_transcript_path_degrades_every_field_to_none(self) -> None:
+        module = _load_module()
+
+        fields = module._sum_subagent_transcript({"agent_id": "a1"})
+
+        assert all(value is None for value in fields.values())
+
+    def test_unreadable_transcript_degrades_every_field_to_none(self, tmp_path: Path) -> None:
+        module = _load_module()
+
+        fields = module._sum_subagent_transcript(
+            {"transcript_path": str(tmp_path / "missing.jsonl"), "agent_id": "a1"}
+        )
+
+        assert all(value is None for value in fields.values())
+
+    def test_malformed_line_is_skipped_not_fatal(self, tmp_path: Path) -> None:
+        module = _load_module()
+        transcript = _write_usage_transcript(
+            tmp_path / "agent-a1.jsonl",
+            ["not-json-at-all", _assistant_line(input_tokens=9, output_tokens=1)],
+        )
+
+        fields = module._sum_subagent_transcript(
+            {"transcript_path": str(transcript), "agent_id": "a1"}
+        )
+
+        assert fields["tokens_in"] == 9
+        assert fields["tokens_out"] == 1
+
+    def test_build_observation_writes_transcript_fields_onto_agent_stop_row(
+        self, project: Path, tmp_path: Path
+    ) -> None:
+        module = _load_module()
+        transcript = _write_usage_transcript(
+            tmp_path / "agent-a1.jsonl", [_assistant_line(input_tokens=4, output_tokens=6)]
+        )
+
+        row = module.build_observation(
+            {
+                "agent_id": "a1",
+                "cwd": str(project),
+                "transcript_path": str(transcript),
+            },
+            "agent_stop",
+        )
+
+        assert row["tokens_in"] == 4
+        assert row["tokens_out"] == 6
+        assert row["model"] == "claude-opus-5"
+
+    def test_agent_start_rows_carry_no_transcript_fields(self, project: Path) -> None:
+        """Only `agent_stop` rows are enriched -- a start has no transcript yet."""
+        module = _load_module()
+
+        row = module.build_observation({"agent_id": "a1", "cwd": str(project)}, "agent_start")
+
+        assert "tokens_in" not in row
+
+
 # ---------------------------------------------------------------------------
 # Committed per-session summary (observations_summary.jsonl) -- P0.5
 # ---------------------------------------------------------------------------
@@ -1282,7 +1455,12 @@ class TestBuildSessionSummary:
         assert summary["duration_ms"] == 60_000
 
     def test_tokens_by_agent_type_and_gate_fire_counts_are_empty_by_default(self) -> None:
-        """Step 10/12 populate these; until then the summary emits empty dicts."""
+        """No agent_stop/gate_fire rows in this session -> both stay empty dicts.
+
+        `gate_fire_counts` stays empty until Step 12 emits `gate_fire` rows;
+        `tokens_by_agent_type` is exercised separately below once agent_stop
+        rows carry Step 10's usage fields.
+        """
         module = _load_module()
         rows = [_wal_row(event_type="tool_use", tool_name="Write")]
 
@@ -1292,6 +1470,67 @@ class TestBuildSessionSummary:
 
         assert summary["tokens_by_agent_type"] == {}
         assert summary["gate_fire_counts"] == {}
+
+    def test_tokens_by_agent_type_sums_usage_across_stops_of_the_same_type(self) -> None:
+        module = _load_module()
+        rows = [
+            _wal_row(
+                event_type="agent_stop",
+                agent_type="praxion:implementer",
+                tokens_in=2,
+                tokens_out=3,
+                cache_read=10,
+                cache_create=1,
+            ),
+            _wal_row(
+                event_type="agent_stop",
+                agent_type="praxion:implementer",
+                tokens_in=4,
+                tokens_out=5,
+                cache_read=0,
+                cache_create=0,
+            ),
+            _wal_row(
+                event_type="agent_stop",
+                agent_type="praxion:researcher",
+                tokens_in=100,
+                tokens_out=100,
+                cache_read=0,
+                cache_create=0,
+            ),
+        ]
+
+        summary = module.build_session_summary(
+            rows, {"session_id": "sess-1"}, "2026-08-06T18:05:00+00:00"
+        )
+
+        assert summary["tokens_by_agent_type"]["praxion:implementer"] == {
+            "tokens_in": 6,
+            "tokens_out": 8,
+            "cache_read": 10,
+            "cache_create": 1,
+        }
+        assert summary["tokens_by_agent_type"]["praxion:researcher"]["tokens_in"] == 100
+
+    def test_tokens_by_agent_type_excludes_stops_with_no_usage_data(self) -> None:
+        """A stop whose transcript parse failed (Step 10's None fields) contributes nothing."""
+        module = _load_module()
+        rows = [
+            _wal_row(
+                event_type="agent_stop",
+                agent_type="praxion:implementer",
+                tokens_in=None,
+                tokens_out=None,
+                cache_read=None,
+                cache_create=None,
+            )
+        ]
+
+        summary = module.build_session_summary(
+            rows, {"session_id": "sess-1"}, "2026-08-06T18:05:00+00:00"
+        )
+
+        assert summary["tokens_by_agent_type"] == {}
 
     def test_models_collects_unique_values_when_present(self) -> None:
         """Forward-compatible: agent_stop rows carry no `model` field until Step 10."""

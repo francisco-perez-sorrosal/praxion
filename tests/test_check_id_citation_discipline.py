@@ -9,9 +9,12 @@ extension closes that gap.
 
 from __future__ import annotations
 
+import json
+import runpy
 import stat
 import subprocess
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -383,3 +386,99 @@ def test_scratch_tmp_directory_is_not_scanned_repo_wide(tmp_path: Path) -> None:
     result = _run(["--repo-root", str(tmp_path)], cwd=tmp_path)
 
     assert result.returncode == 0, result.stdout
+
+
+# -- Step 12: gate_fire observations -------------------------------------------
+
+
+def _read_gate_fire_rows(cwd: Path) -> list[dict]:
+    obs_path = cwd / ".ai-state" / "observations.jsonl"
+    if not obs_path.exists():
+        return []
+    return [json.loads(line) for line in obs_path.read_text(encoding="utf-8").splitlines()]
+
+
+def test_gate_fire_row_on_pass(tmp_path: Path) -> None:
+    """A clean scan (rc=0) records outcome=pass.
+
+    `.ai-state/` lives under the hermetic tmp_path repo used as the subprocess
+    cwd -- never the live Praxion WAL.
+    """
+    (tmp_path / ".ai-state").mkdir()
+    script = tmp_path / "scripts" / "clean-tool"
+    _make_exec_script(script, "#!/usr/bin/env bash\necho hello world\n")
+
+    result = _run(["--files", str(script), "--repo-root", str(tmp_path)], cwd=tmp_path)
+
+    assert result.returncode == 0
+    rows = _read_gate_fire_rows(tmp_path)
+    assert len(rows) == 1
+    assert rows[0]["event_type"] == "gate_fire"
+    assert rows[0]["tool_name"] == "check_id_citation_discipline"
+    assert rows[0]["outcome"] == "pass"
+
+
+def test_gate_fire_row_on_block(tmp_path: Path) -> None:
+    """A violation (rc=1) records outcome=block."""
+    (tmp_path / ".ai-state").mkdir()
+    script = tmp_path / "scripts" / "my-tool"
+    _make_exec_script(
+        script, "#!/usr/bin/env bash\n# Step 1 smoke-check should be caught\necho hi\n"
+    )
+
+    result = _run(["--files", str(script), "--repo-root", str(tmp_path)], cwd=tmp_path)
+
+    assert result.returncode == 1
+    rows = _read_gate_fire_rows(tmp_path)
+    assert len(rows) == 1
+    assert rows[0]["outcome"] == "block"
+
+
+def _raise(*_args, **_kwargs):
+    raise RuntimeError("boom")
+
+
+def _run_main_block_in_process(monkeypatch, argv: list[str]) -> int:
+    """Execute check_id_citation_discipline.py's `__main__` block in-process,
+    with `_hook_utils.record_gate_fire` swapped for a raising fake.
+
+    `sys.modules` caching intercepts `from _hook_utils import record_gate_fire`
+    before the script's own `sys.path.insert(0, .../hooks)` line is ever
+    consulted, so the fake wins regardless of that hardcoded path.
+    """
+    fake_hook_utils = types.ModuleType("_hook_utils")
+    fake_hook_utils.record_gate_fire = _raise
+    monkeypatch.setitem(sys.modules, "_hook_utils", fake_hook_utils)
+    monkeypatch.setattr(sys, "argv", [str(CHECKER), *argv])
+    # Unlike a real subprocess, runpy.run_path() does not add the script's own
+    # directory to sys.path -- CHECKER's sibling import (`_git_runner`) needs
+    # it added explicitly.
+    monkeypatch.syspath_prepend(str(CHECKER.parent))
+
+    with pytest.raises(SystemExit) as exc_info:
+        runpy.run_path(str(CHECKER), run_name="__main__")
+    return exc_info.value.code
+
+
+def test_helper_exception_does_not_change_exit_code_on_pass(tmp_path: Path, monkeypatch) -> None:
+    script = tmp_path / "scripts" / "clean-tool"
+    _make_exec_script(script, "#!/usr/bin/env bash\necho hello world\n")
+
+    code = _run_main_block_in_process(
+        monkeypatch, ["--files", str(script), "--repo-root", str(tmp_path)]
+    )
+
+    assert code == 0
+
+
+def test_helper_exception_does_not_change_exit_code_on_block(tmp_path: Path, monkeypatch) -> None:
+    script = tmp_path / "scripts" / "my-tool"
+    _make_exec_script(
+        script, "#!/usr/bin/env bash\n# Step 1 smoke-check should be caught\necho hi\n"
+    )
+
+    code = _run_main_block_in_process(
+        monkeypatch, ["--files", str(script), "--repo-root", str(tmp_path)]
+    )
+
+    assert code == 1

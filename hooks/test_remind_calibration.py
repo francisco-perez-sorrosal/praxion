@@ -32,6 +32,7 @@ lands the hook.
 
 from __future__ import annotations
 
+import io
 import json
 import subprocess
 import sys
@@ -39,7 +40,8 @@ from pathlib import Path
 
 import pytest
 
-_HOOK_PATH = Path(__file__).resolve().parent / "remind_calibration.py"
+_HOOKS_DIR = Path(__file__).resolve().parent
+_HOOK_PATH = _HOOKS_DIR / "remind_calibration.py"
 
 # Calibration log header matching the real .ai-state/calibration_log.md format.
 _CALIBRATION_HEADER = """\
@@ -281,3 +283,92 @@ def test_resolves_consumer_repo_root_via_git(tmp_path: Path) -> None:
         "remind_calibration.py must resolve the consumer repo root via git "
         "(git rev-parse --show-toplevel / git_toplevel_from_cwd), not __file__"
     )
+
+
+# -- Step 12: gate_fire observations -------------------------------------------
+
+
+def _read_gate_fire_rows(repo: Path) -> list[dict]:
+    obs_path = repo / ".ai-state" / "observations.jsonl"
+    if not obs_path.exists():
+        return []
+    return [json.loads(line) for line in obs_path.read_text(encoding="utf-8").splitlines()]
+
+
+def test_gate_fire_row_on_pass(tmp_path: Path) -> None:
+    """No calibration log yet (covered=True by definition) records outcome=pass.
+
+    `.ai-state/` lives under the hermetic tmp_path repo -- never the live WAL.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    (repo / ".ai-state").mkdir()
+    _make_commit(repo, "feat: initial commit -- no calibration log exists yet")
+
+    result = _run_hook('git commit -m "feat: second commit, still no log"', repo)
+
+    assert result.returncode == 0
+    rows = _read_gate_fire_rows(repo)
+    assert len(rows) == 1
+    assert rows[0]["event_type"] == "gate_fire"
+    assert rows[0]["tool_name"] == "remind_calibration"
+    assert rows[0]["outcome"] == "pass"
+
+
+def test_gate_fire_row_on_warn(tmp_path: Path) -> None:
+    """A lagging calibration log (the gate-liveness canary fixture) records outcome=warn."""
+    repo = _build_lagging_repo(tmp_path)
+
+    result = _run_hook('git commit -m "feat: add rate limiting"', repo)
+
+    assert result.returncode == 0
+    rows = _read_gate_fire_rows(repo)
+    assert len(rows) == 1
+    assert rows[0]["outcome"] == "warn"
+
+
+def _load_module():
+    """Load remind_calibration.py fresh, for in-process exception-injection tests."""
+    import importlib.util
+
+    if str(_HOOKS_DIR) not in sys.path:
+        sys.path.insert(0, str(_HOOKS_DIR))
+    spec = importlib.util.spec_from_file_location("remind_calibration", _HOOK_PATH)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _raise(*_args, **_kwargs):
+    raise RuntimeError("boom")
+
+
+def test_helper_exception_does_not_change_exit_code_on_pass(tmp_path: Path, monkeypatch) -> None:
+    module = _load_module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    _make_commit(repo, "feat: initial commit -- no calibration log exists yet")
+    monkeypatch.chdir(repo)
+    monkeypatch.setattr(module, "record_gate_fire", _raise)
+    payload = {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "feat: two"'}}
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
+
+    module.main()  # must not raise; always exits 0 (fail-open)
+
+
+def test_helper_exception_does_not_change_exit_code_on_warn(tmp_path: Path, monkeypatch) -> None:
+    module = _load_module()
+    repo = _build_lagging_repo(tmp_path)
+    monkeypatch.chdir(repo)
+    monkeypatch.setattr(module, "record_gate_fire", _raise)
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": 'git commit -m "feat: add rate limiting"'},
+    }
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
+
+    module.main()  # must not raise; always exits 0 (fail-open, advisory-only)

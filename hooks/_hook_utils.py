@@ -6,7 +6,9 @@ kill-switch flag consumed by the capture/telemetry hooks (``capture_memory``,
 ``notify_bg_session_state``).
 
 Also provides the shared ``append_observation`` helper (with best-effort
-rotation at ``OBSERVATIONS_MAX_BYTES``) used by all capture hooks.
+rotation at ``OBSERVATIONS_MAX_BYTES``) used by all capture hooks, and
+``record_gate_fire`` -- the same append, specialized for commit-gate scripts
+recording their own pass/warn/block verdict.
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 # -- Per-project opt-out flag --------------------------------------------------
@@ -74,3 +77,67 @@ def append_observation(obs_path: Path, observation: dict) -> None:
                 f.flush()
         finally:
             fcntl.flock(lock_fd, fcntl.LOCK_UN)
+
+
+# -- gate_fire observations ----------------------------------------------------
+# Decision values a commit-gate script may report. Kept as a plain tuple (not
+# an enum) because the six call sites are independent scripts translating
+# their own pass/fail/return-code convention into this shared vocabulary --
+# see each gate's own comment at its record_gate_fire() call site.
+GATE_FIRE_DECISIONS = ("pass", "warn", "block")
+
+
+def record_gate_fire(
+    hook: str,
+    decision: str,
+    reason: str = "",
+    *,
+    session_id: str = "",
+) -> None:
+    """Append a `gate_fire` observation recording one commit-gate's verdict.
+
+    Fail-open, mirroring every other writer in this module: any exception is
+    swallowed here so a gate's own instrumentation can never affect the
+    gate's exit code or its stdout/stderr output. Callers additionally wrap
+    their own call site in try/except (belt-and-suspenders, per the
+    behavioral requirement that a helper defect must never reach a gate's
+    exit path).
+
+    ``hook`` names the calling gate script (e.g. "check_token_ratchet"),
+    never a path. ``decision`` is one of ``GATE_FIRE_DECISIONS``. The row
+    carries the value under both ``hook`` (the field
+    `hooks/capture_session.py`'s Stop-time rollup already groups
+    `gate_fire` rows by) and ``tool_name`` (the field every other
+    observation event carries) -- both keys, one value, so this row is
+    consistent with the pre-existing rollup contract and the general
+    envelope shape at once.
+
+    ``session_id`` is best-effort: pass it when the caller already parsed a
+    hook payload carrying one, so the Stop-time per-session summary can
+    attribute this row to the session that triggered it. A caller that
+    cannot cheaply reach a session id (e.g. a gate invoked without ever
+    reading its own stdin payload) still gets its row into the raw WAL --
+    just outside that session's rollup.
+
+    Resolves the target project's `.ai-state/` the way every ambient-invoked
+    hook in this codebase falls back when no parsed payload `cwd` is in
+    scope: the process's own working directory. Gate scripts run with the
+    target project as the process cwd (git invokes `PreToolUse` hooks that
+    way), so this is not a degraded case here -- it is the normal one.
+    """
+    try:
+        ai_state_dir = Path(os.getcwd()) / ".ai-state"
+        if not ai_state_dir.exists():
+            return
+        observation = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "session_id": session_id,
+            "event_type": "gate_fire",
+            "hook": hook,
+            "tool_name": hook,
+            "outcome": decision,
+            "reason": reason,
+        }
+        append_observation(ai_state_dir / "observations.jsonl", observation)
+    except Exception:
+        pass

@@ -29,6 +29,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 HOOKS_DIR = Path(__file__).resolve().parent
 HOOK_PATH = HOOKS_DIR / "check_code_quality.py"
 
@@ -213,3 +215,113 @@ def test_silently_passes_when_rustfmt_is_unresolvable(tmp_path: Path) -> None:
         "the gate must report that it checked for (and could not resolve) "
         f"rustfmt, parity with the ruff-absent log; stderr={result.stderr!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Step 12: gate_fire observations
+#
+# Requirement 2: one gate_fire row per commit, on both the pass and the block
+# path. Requirement 1: a helper exception must never change the gate's own
+# exit code, on either path.
+# ---------------------------------------------------------------------------
+
+
+def _read_gate_fire_rows(repo_dir: Path) -> list[dict]:
+    obs_path = repo_dir / ".ai-state" / "observations.jsonl"
+    if not obs_path.exists():
+        return []
+    return [json.loads(line) for line in obs_path.read_text(encoding="utf-8").splitlines()]
+
+
+def test_gate_fire_row_on_pass(tmp_path: Path) -> None:
+    """A clean commit (no staged Python/Rust files) records outcome=pass.
+
+    `.ai-state/` lives under the hermetic tmp_path repo used as the subprocess
+    cwd -- never the live Praxion WAL.
+    """
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    _init_repo(repo_dir)
+    (repo_dir / ".ai-state").mkdir()
+    _stage_file(repo_dir, "README.md", "hello\n")
+
+    result = _run_hook(_commit_payload(), cwd=repo_dir, env={"PATH": _controlled_path()})
+
+    assert result.returncode == 0
+    rows = _read_gate_fire_rows(repo_dir)
+    assert len(rows) == 1
+    assert rows[0]["event_type"] == "gate_fire"
+    assert rows[0]["tool_name"] == "check_code_quality"
+    assert rows[0]["outcome"] == "pass"
+
+
+def test_gate_fire_row_on_block(tmp_path: Path) -> None:
+    """A staged badly-formatted .rs file (blocked commit) records outcome=block."""
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    _init_repo(repo_dir)
+    (repo_dir / ".ai-state").mkdir()
+    _stage_file(repo_dir, "src/lib.rs", BADLY_FORMATTED_RUST)
+
+    bin_dir = tmp_path / "bin"
+    _write_fake_rustfmt(bin_dir, script=FAKE_RUSTFMT_CHECK_REJECTS_SCRIPT)
+
+    result = _run_hook(_commit_payload(), cwd=repo_dir, env={"PATH": _controlled_path(bin_dir)})
+
+    assert result.returncode == 2
+    rows = _read_gate_fire_rows(repo_dir)
+    assert len(rows) == 1
+    assert rows[0]["outcome"] == "block"
+
+
+def _load_gate_module():
+    """Load check_code_quality.py fresh, for in-process exception-injection tests."""
+    import importlib.util
+
+    if str(HOOKS_DIR) not in sys.path:
+        sys.path.insert(0, str(HOOKS_DIR))
+    spec = importlib.util.spec_from_file_location("check_code_quality", HOOK_PATH)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _raise(*_args, **_kwargs):
+    raise RuntimeError("boom")
+
+
+def test_helper_exception_does_not_change_exit_code_on_pass(tmp_path: Path, monkeypatch) -> None:
+    import io
+
+    module = _load_gate_module()
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    _init_repo(repo_dir)
+    _stage_file(repo_dir, "README.md", "hello\n")
+    monkeypatch.chdir(repo_dir)
+    monkeypatch.setattr(module, "record_gate_fire", _raise)
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(_commit_payload())))
+
+    module.main()  # must not raise, and must not sys.exit (blocked=False)
+
+
+def test_helper_exception_does_not_change_exit_code_on_block(tmp_path: Path, monkeypatch) -> None:
+    import io
+
+    module = _load_gate_module()
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    _init_repo(repo_dir)
+    _stage_file(repo_dir, "src/lib.rs", BADLY_FORMATTED_RUST)
+    bin_dir = tmp_path / "bin"
+    _write_fake_rustfmt(bin_dir, script=FAKE_RUSTFMT_CHECK_REJECTS_SCRIPT)
+    monkeypatch.chdir(repo_dir)
+    monkeypatch.setenv("PATH", _controlled_path(bin_dir))
+    monkeypatch.setattr(module, "record_gate_fire", _raise)
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(_commit_payload())))
+
+    with pytest.raises(SystemExit) as exc_info:
+        module.main()
+    assert exc_info.value.code == 2

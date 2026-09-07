@@ -23,13 +23,15 @@ dispatches it during a real `git commit`.
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import subprocess
 import sys
 from pathlib import Path
 
-_HOOK_PATH = Path(__file__).resolve().parent / "remind_adr.py"
+_HOOKS_DIR = Path(__file__).resolve().parent
+_HOOK_PATH = _HOOKS_DIR / "remind_adr.py"
 
 
 # -- Git / repo helpers -------------------------------------------------------
@@ -158,3 +160,104 @@ def test_malformed_stdin_json_never_raises(tmp_path: Path) -> None:
     assert "Traceback" not in result.stderr, (
         f"malformed stdin must not leak a Python traceback; got stderr={result.stderr!r}"
     )
+
+
+# -- Step 12: gate_fire observations -------------------------------------------
+
+
+def _read_gate_fire_rows(repo: Path) -> list[dict]:
+    obs_path = repo / ".ai-state" / "observations.jsonl"
+    if not obs_path.exists():
+        return []
+    return [json.loads(line) for line in obs_path.read_text(encoding="utf-8").splitlines()]
+
+
+def test_gate_fire_row_on_pass(tmp_path: Path) -> None:
+    """A commit with no architectural files staged records outcome=pass.
+
+    `.ai-state/` lives under the hermetic tmp_path repo -- never the live WAL.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    (repo / ".ai-state").mkdir()
+    _stage_file(repo, "README.md", "hello\n")
+
+    result = _run_hook('git commit -m "docs: readme"', repo)
+
+    assert result.returncode == 0
+    rows = _read_gate_fire_rows(repo)
+    assert len(rows) == 1
+    assert rows[0]["event_type"] == "gate_fire"
+    assert rows[0]["tool_name"] == "remind_adr"
+    assert rows[0]["outcome"] == "pass"
+
+
+def test_gate_fire_row_on_warn(tmp_path: Path) -> None:
+    """An architectural file staged with no ADR records outcome=warn."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    (repo / ".ai-state").mkdir()
+    _stage_file(repo, "rules/x.md", "## New Rule\n")
+
+    result = _run_hook('git commit -m "docs: add rule"', repo)
+
+    assert result.returncode == 0
+    rows = _read_gate_fire_rows(repo)
+    assert len(rows) == 1
+    assert rows[0]["outcome"] == "warn"
+
+
+def _load_module():
+    """Load remind_adr.py fresh, for in-process exception-injection tests."""
+    import importlib.util
+
+    if str(_HOOKS_DIR) not in sys.path:
+        sys.path.insert(0, str(_HOOKS_DIR))
+    spec = importlib.util.spec_from_file_location("remind_adr", _HOOK_PATH)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _raise(*_args, **_kwargs):
+    raise RuntimeError("boom")
+
+
+def test_helper_exception_does_not_change_exit_code_on_pass(tmp_path: Path, monkeypatch) -> None:
+    module = _load_module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    _stage_file(repo, "README.md", "hello\n")
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("PRAXION_HACKATHON_MODE", "0")
+    monkeypatch.setattr(module, "record_gate_fire", _raise)
+    monkeypatch.setattr(
+        sys, "stdin", io.StringIO(json.dumps(_commit_payload('git commit -m "docs: readme"')))
+    )
+
+    module.main()  # must not raise; always exits 0 (fail-open)
+
+
+def test_helper_exception_does_not_change_exit_code_on_warn(tmp_path: Path, monkeypatch) -> None:
+    module = _load_module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    _stage_file(repo, "rules/x.md", "## New Rule\n")
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("PRAXION_HACKATHON_MODE", "0")
+    monkeypatch.setattr(module, "record_gate_fire", _raise)
+    monkeypatch.setattr(
+        sys, "stdin", io.StringIO(json.dumps(_commit_payload('git commit -m "docs: add rule"')))
+    )
+
+    module.main()  # must not raise; always exits 0 (fail-open, advisory-only)
+
+
+def _commit_payload(command: str) -> dict:
+    return {"tool_name": "Bash", "tool_input": {"command": command}}

@@ -13,7 +13,8 @@ restates none of it.
 Stdlib-only, for the reason `measure_token_budget.py`'s own module docstring
 already gives: it is ambient-invoked, so a third-party import would make it a
 finding of `check_gate_liveness.py`'s own `ambient-import` check. This script
-imports only that stdlib-only sibling plus `_repo_root`.
+imports only that stdlib-only sibling, `_repo_root`, and `hooks/_hook_utils`
+(also stdlib-only) for `record_gate_fire`.
 
 Exit codes: 0 clean or fail-open skip, 1 the ratchet breached, 3 script
 error -- an unhandled exception here must never resolve to 1 (findings) or
@@ -34,8 +35,19 @@ from pathlib import Path
 import measure_token_budget as mtb
 from _repo_root import resolve_repo_root
 
+# hooks/_hook_utils.py is a sibling package to this file's own scripts/
+# directory, not on sys.path by default -- add it, mirroring the reverse
+# direction hooks/remind_calibration.py already uses for scripts/.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
+from _hook_utils import record_gate_fire  # noqa: E402
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 _SCRIPT_ERROR = 3
+
+# rc -> gate_fire decision. A script error (rc == _SCRIPT_ERROR) is neither a
+# clean pass nor an enforced block -- it fails open by design (see the exit
+# code table above) but is still worth flagging, so it records as "warn".
+_DECISION_BY_RC = {0: "pass", 1: "block"}
 
 
 def _format_reasons(result: dict) -> str:
@@ -75,4 +87,12 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    _rc = main()
+    try:
+        # No parsed payload is in scope here (main() never reads stdin), so
+        # this row lands without a session_id -- still in the raw WAL, just
+        # outside the Stop-time per-session rollup.
+        record_gate_fire("check_token_ratchet", _DECISION_BY_RC.get(_rc, "warn"))
+    except Exception:
+        pass
+    sys.exit(_rc)

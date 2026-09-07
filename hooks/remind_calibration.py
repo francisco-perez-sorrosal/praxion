@@ -18,6 +18,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from _hook_utils import record_gate_fire
+
 # Locate the sibling `scripts/` directory to import compute_coverage in-process.
 # This is *plugin-internal code location* -- finding this hook's own sibling
 # module inside the plugin's own checkout -- and is unrelated to resolving the
@@ -106,15 +108,25 @@ def main():
     if repo_root is None:
         return
 
+    decision = _check_and_warn(repo_root)
+    try:
+        record_gate_fire("remind_calibration", decision, session_id=payload.get("session_id", ""))
+    except Exception:
+        pass
+
+
+def _check_and_warn(repo_root: Path) -> str:
+    """Warn when calibration coverage lags. Returns the gate's decision."""
     result = compute_coverage(repo_root)
     if result["covered"]:
-        return
+        return "pass"
 
     _log(
         f"{result['uncalibrated_commits']} uncalibrated commit(s) since the newest "
         f".ai-state/calibration_log.md row (threshold: {K_COMMITS}). Append a row -- "
         "the Retrospective cell doubles as the micro-capture slot."
     )
+    return "warn"
 
 
 if __name__ == "__main__":

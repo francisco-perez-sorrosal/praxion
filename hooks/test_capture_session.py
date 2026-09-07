@@ -1512,6 +1512,21 @@ class TestBuildSessionSummary:
         }
         assert summary["tokens_by_agent_type"]["praxion:researcher"]["tokens_in"] == 100
 
+    def test_gate_fire_counts_populated_from_a_synthetic_wal(self) -> None:
+        """Step 12's `gate_fire` rows roll up by `hook`, same shape as tool_calls_by_tool."""
+        module = _load_module()
+        rows = [
+            _wal_row(event_type="gate_fire", hook="check_token_ratchet", outcome="pass"),
+            _wal_row(event_type="gate_fire", hook="check_token_ratchet", outcome="block"),
+            _wal_row(event_type="gate_fire", hook="remind_adr", outcome="warn"),
+        ]
+
+        summary = module.build_session_summary(
+            rows, {"session_id": "sess-1"}, "2026-08-06T18:05:00+00:00"
+        )
+
+        assert summary["gate_fire_counts"] == {"check_token_ratchet": 2, "remind_adr": 1}
+
     def test_tokens_by_agent_type_excludes_stops_with_no_usage_data(self) -> None:
         """A stop whose transcript parse failed (Step 10's None fields) contributes nothing."""
         module = _load_module()

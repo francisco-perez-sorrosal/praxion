@@ -18,11 +18,12 @@ All LLM calls route through JudgeClient.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from praxion_evals.harness.families import FAMILY_REGISTRY, Family
-from praxion_evals.harness.judge_client import JudgeClient
-from praxion_evals.harness.schemas import CheckResult, Corpus
+from praxion_evals.harness.judge_client import JudgeClient, run_parallel_judged
+from praxion_evals.harness.schemas import CheckResult, Corpus, JudgeVerdict
 
 # ---------------------------------------------------------------------------
 # BC violation tag definitions
@@ -333,28 +334,63 @@ class Family2BehavioralContractAdherence(Family):
         return results
 
     def _check_bc_rubrics(self, path: str, content: str, judge: JudgeClient) -> list[CheckResult]:
-        """Run one LLM rubric check per behavioral-contract behavior."""
+        """Run one LLM rubric check per behavioral-contract behavior.
+
+        Calls run concurrently (bounded pool, see run_parallel_judged) but
+        results are re-assembled in _BC_BEHAVIORS order.
+        """
         family_id = getattr(self, "id", self.__class__.__name__)
+        calls = [
+            self._bc_rubric_call(family_id, path, content, judge, check_slug, behavior_name)
+            for check_slug, behavior_name in _BC_BEHAVIORS
+        ]
+        outcomes = run_parallel_judged(calls)
+
         results: list[CheckResult] = []
-        for check_slug, behavior_name in _BC_BEHAVIORS:
-            print(f"[{family_id}] llm-check {check_slug} — {path}", flush=True)
-            rubric = _build_bc_rubric(behavior_name)
-            verdict_obj = judge.judge(
-                rubric=rubric,
-                artifact=content,
-                schema=_BC_SCHEMA,
-            )
+        for (check_slug, _behavior_name), outcome in zip(_BC_BEHAVIORS, outcomes, strict=True):
+            if isinstance(outcome, Exception):
+                # Per-behavior fail-soft: one judge failure becomes one FAIL
+                # row, not a wipe of the other behaviors' rubric checks.
+                results.append(
+                    CheckResult(
+                        check_name=check_slug,
+                        check_kind="llm",
+                        verdict="FAIL",
+                        artifact_path=path,
+                        findings=(f"Judge call failed: {type(outcome).__name__}: {outcome}",),
+                        score=-1,
+                    )
+                )
+                continue
             results.append(
                 CheckResult(
                     check_name=check_slug,
                     check_kind="llm",
-                    verdict=verdict_obj.verdict,
+                    verdict=outcome.verdict,
                     artifact_path=path,
-                    findings=verdict_obj.findings,
-                    score=verdict_obj.score,
+                    findings=outcome.findings,
+                    score=outcome.score,
                 )
             )
         return results
+
+    @staticmethod
+    def _bc_rubric_call(
+        family_id: str,
+        path: str,
+        content: str,
+        judge: JudgeClient,
+        check_slug: str,
+        behavior_name: str,
+    ) -> Callable[[], JudgeVerdict]:
+        """Build the zero-arg judge callable for one behavior (see run_parallel_judged)."""
+
+        def _call() -> JudgeVerdict:
+            print(f"[{family_id}] llm-check {check_slug} — {path}", flush=True)
+            rubric = _build_bc_rubric(behavior_name)
+            return judge.judge(rubric=rubric, artifact=content, schema=_BC_SCHEMA)
+
+        return _call
 
 
 # ---------------------------------------------------------------------------

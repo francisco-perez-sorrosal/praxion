@@ -23,12 +23,16 @@ class JudgeVerdict:
         findings: Ordered prose observations from the judge.
         score: 0–100 confidence / quality score.
         raw: The raw structured-output dict from the underlying SDK call.
+        cached: True when this verdict was served from CachingJudgeClient's
+            verdict cache instead of a live judge call. A cached verdict
+            never carries usage (no call was made, so nothing was spent).
     """
 
     verdict: Literal["PASS", "WARN", "FAIL"]
     findings: tuple[str, ...]
     score: int
     raw: dict  # type: ignore[type-arg]
+    cached: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -144,12 +148,21 @@ class Report:
         cost_usd_estimate: Rough LLM call cost; 0.0 when no LLM calls were made.
         report_path: Absolute path to the written report file, or empty string
             if the report has not been written yet.
+        judge_calls: Total .judge() invocations across all families,
+            including cache hits.
+        judge_cache_hits: Subset of judge_calls served from
+            CachingJudgeClient's verdict cache (no network call made).
+        judge_workers: Configured worker-pool size for a judged loop
+            (see judge_client.judge_workers()).
     """
 
     corpus: Corpus
     check_results: tuple[CheckResult, ...]
     cost_usd_estimate: float = 0.0
     report_path: str = ""
+    judge_calls: int = 0
+    judge_cache_hits: int = 0
+    judge_workers: int = 0
 
     @property
     def pass_count(self) -> int:

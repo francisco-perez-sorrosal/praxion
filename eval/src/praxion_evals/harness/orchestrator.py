@@ -10,10 +10,11 @@ error as a FAIL CheckResult and continues with the remaining families.
 
 from __future__ import annotations
 
+import dataclasses
 from pathlib import Path
 from typing import Any
 
-from praxion_evals.harness.judge_client import JudgeClient
+from praxion_evals.harness.judge_client import JudgeClient, judge_workers
 from praxion_evals.harness.report_writer import ReportWriter
 from praxion_evals.harness.schemas import CheckResult, Corpus, Report
 
@@ -89,15 +90,13 @@ class Orchestrator:
             corpus=corpus,
             check_results=tuple(all_results),
             cost_usd_estimate=0.0,
+            judge_calls=getattr(judge, "call_count", 0),
+            judge_cache_hits=getattr(judge, "cache_hit_count", 0),
+            judge_workers=judge_workers(),
         )
 
         writer = ReportWriter(output_dir=self._output_dir)
         report_path = writer.write(report)
         writer.append_log(report, report_path)
 
-        return Report(
-            corpus=corpus,
-            check_results=tuple(all_results),
-            cost_usd_estimate=0.0,
-            report_path=report_path,
-        )
+        return dataclasses.replace(report, report_path=report_path)

@@ -26,6 +26,7 @@ This module never imports claude_agent_sdk or anthropic directly.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -36,8 +37,8 @@ from praxion_evals.harness.families.family1_pipeline_fidelity import (
     _REQUIRED_FRONTMATTER_FIELDS,
     _parse_frontmatter,
 )
-from praxion_evals.harness.judge_client import JudgeClient
-from praxion_evals.harness.schemas import CheckResult, Corpus
+from praxion_evals.harness.judge_client import JudgeClient, run_parallel_judged
+from praxion_evals.harness.schemas import CheckResult, Corpus, JudgeVerdict
 
 # ---------------------------------------------------------------------------
 # Fixture location and load order
@@ -267,12 +268,26 @@ class SeededScenarioFamily(Family):
             `_inheritance_probe_skip_result`).
         """
         del corpus  # unused: static fixture corpus, not the resolved target
-        results: list[CheckResult] = []
-        for data in load_scenario_fixtures():
-            scenario_id = data["scenario_id"]
-            results.append(self._check_mechanical(scenario_id, data))
-            if not mechanical_only:
-                results.append(self._check_llm(scenario_id, data, judge))
+        fixtures = list(load_scenario_fixtures())
+        mechanical_results = [self._check_mechanical(d["scenario_id"], d) for d in fixtures]
+
+        if mechanical_only:
+            results = list(mechanical_results)
+            results.append(_inheritance_probe_skip_result())
+            return results
+
+        # LLM calls run concurrently (bounded pool, see run_parallel_judged)
+        # but are re-assembled in fixture order, interleaved with each
+        # scenario's own mechanical result exactly as before parallelization.
+        calls = [self._llm_call(d["scenario_id"], d, judge) for d in fixtures]
+        outcomes = run_parallel_judged(calls)
+
+        results = []
+        for mechanical_result, data, outcome in zip(
+            mechanical_results, fixtures, outcomes, strict=True
+        ):
+            results.append(mechanical_result)
+            results.append(self._llm_outcome_to_result(data["scenario_id"], outcome))
         results.append(_inheritance_probe_skip_result())
         return results
 
@@ -290,20 +305,44 @@ class SeededScenarioFamily(Family):
             score=-1,
         )
 
-    def _check_llm(self, scenario_id: str, data: dict[str, Any], judge: JudgeClient) -> CheckResult:
-        print(f"[{self.id}] llm-check scenario_{_slug(scenario_id)} — {scenario_id}", flush=True)
-        verdict_obj = judge.judge(
-            rubric=data["llm_rubric"],
-            artifact=_judged_artifact(data),
-            schema=_JUDGE_SCHEMA,
-        )
+    def _llm_call(
+        self, scenario_id: str, data: dict[str, Any], judge: JudgeClient
+    ) -> Callable[[], JudgeVerdict]:
+        """Build the zero-arg judge callable for one scenario (see run_parallel_judged)."""
+
+        def _call() -> JudgeVerdict:
+            print(
+                f"[{self.id}] llm-check scenario_{_slug(scenario_id)} — {scenario_id}", flush=True
+            )
+            return judge.judge(
+                rubric=data["llm_rubric"],
+                artifact=_judged_artifact(data),
+                schema=_JUDGE_SCHEMA,
+            )
+
+        return _call
+
+    @staticmethod
+    def _llm_outcome_to_result(scenario_id: str, outcome: JudgeVerdict | Exception) -> CheckResult:
+        """Turn one run_parallel_judged() outcome into its CheckResult (fail-soft)."""
+        check_name = f"scenario_{_slug(scenario_id)}_llm"
+        artifact_path = f"scenarios/{scenario_id}.yaml"
+        if isinstance(outcome, Exception):
+            return CheckResult(
+                check_name=check_name,
+                check_kind="llm",
+                verdict="FAIL",
+                artifact_path=artifact_path,
+                findings=(f"Judge call failed: {type(outcome).__name__}: {outcome}",),
+                score=-1,
+            )
         return CheckResult(
-            check_name=f"scenario_{_slug(scenario_id)}_llm",
+            check_name=check_name,
             check_kind="llm",
-            verdict=verdict_obj.verdict,
-            artifact_path=f"scenarios/{scenario_id}.yaml",
-            findings=verdict_obj.findings,
-            score=verdict_obj.score,
+            verdict=outcome.verdict,
+            artifact_path=artifact_path,
+            findings=outcome.findings,
+            score=outcome.score,
         )
 
 

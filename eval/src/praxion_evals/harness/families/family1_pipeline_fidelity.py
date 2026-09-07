@@ -22,14 +22,14 @@ claude_agent_sdk or anthropic directly.
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import yaml
 
 from praxion_evals.harness.families import FAMILY_REGISTRY, Family
-from praxion_evals.harness.judge_client import JudgeClient
-from praxion_evals.harness.schemas import CheckResult, Corpus
+from praxion_evals.harness.judge_client import JudgeClient, run_parallel_judged
+from praxion_evals.harness.schemas import CheckResult, Corpus, JudgeVerdict
 
 # ---------------------------------------------------------------------------
 # Required ADR frontmatter fields (per adr-conventions.md)
@@ -768,23 +768,23 @@ class Family1PipelineOutcomeFidelity(Family):
         """Evaluate the substantiveness of each ADR's Considered Options section.
 
         Uses the JudgeClient to call an LLM (Haiku tier, cost-sensitive).
-        Returns one CheckResult per ADR.
+        Calls run concurrently (bounded pool, see run_parallel_judged) but
+        results are re-assembled in adr_entries order. Returns one
+        CheckResult per ADR.
         """
-        results: list[CheckResult] = []
-
         if not adr_entries:
-            return results
+            return []
 
         family_id = getattr(self, "id", self.__class__.__name__)
-        for path, content in adr_entries:
-            print(f"[{family_id}] llm-check option-depth — {path}", flush=True)
-            try:
-                verdict_obj = judge.judge(
-                    rubric=_OPTION_DEPTH_RUBRIC,
-                    artifact=content,
-                    schema=_OPTION_DEPTH_SCHEMA,
-                )
-            except Exception as exc:
+        calls = [
+            self._option_depth_call(family_id, path, content, judge)
+            for path, content in adr_entries
+        ]
+        outcomes = run_parallel_judged(calls)
+
+        results: list[CheckResult] = []
+        for (path, _content), outcome in zip(adr_entries, outcomes, strict=True):
+            if isinstance(outcome, Exception):
                 # Per-ADR fail-soft: a single judge failure (rate limit, SDK
                 # error, malformed response) becomes one FAIL row, not a
                 # family-wide wipe of the mechanical results.
@@ -794,7 +794,7 @@ class Family1PipelineOutcomeFidelity(Family):
                         check_kind="llm",
                         verdict="FAIL",
                         artifact_path=path,
-                        findings=(f"Judge call failed: {type(exc).__name__}: {exc}",),
+                        findings=(f"Judge call failed: {type(outcome).__name__}: {outcome}",),
                         score=-1,
                     )
                 )
@@ -803,14 +803,30 @@ class Family1PipelineOutcomeFidelity(Family):
                 CheckResult(
                     check_name="adr_option_depth",
                     check_kind="llm",
-                    verdict=verdict_obj.verdict,
+                    verdict=outcome.verdict,
                     artifact_path=path,
-                    findings=verdict_obj.findings,
-                    score=verdict_obj.score,
+                    findings=outcome.findings,
+                    score=outcome.score,
                 )
             )
 
         return results
+
+    @staticmethod
+    def _option_depth_call(
+        family_id: str, path: str, content: str, judge: JudgeClient
+    ) -> Callable[[], JudgeVerdict]:
+        """Build the zero-arg judge callable for one ADR (see run_parallel_judged)."""
+
+        def _call() -> JudgeVerdict:
+            print(f"[{family_id}] llm-check option-depth — {path}", flush=True)
+            return judge.judge(
+                rubric=_OPTION_DEPTH_RUBRIC,
+                artifact=content,
+                schema=_OPTION_DEPTH_SCHEMA,
+            )
+
+        return _call
 
 
 # ---------------------------------------------------------------------------

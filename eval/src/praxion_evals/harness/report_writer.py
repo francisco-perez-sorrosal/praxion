@@ -129,6 +129,10 @@ def _render_report(report: Report, timestamp: str) -> str:
         f"{report.fail_count} FAIL / "
         f"{report.skip_count} SKIP"
     )
+    lines.append(
+        f"**Judged**: {report.judge_calls} calls, {report.judge_cache_hits} cache hits, "
+        f"{report.judge_workers} workers"
+    )
     lines.append(f"**Estimated cost**: ${report.cost_usd_estimate:.4f} USD")
     lines.append("")
 

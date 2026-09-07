@@ -37,6 +37,7 @@ from praxion_evals.harness.families.seeded_scenarios import (
     SeededScenarioFamily,
 )
 from praxion_evals.harness.judge_client import (
+    CachingJudgeClient,
     JudgeClient,
     NullJudgeClient,
     select_judge_client,
@@ -52,6 +53,7 @@ from praxion_evals.harness.schemas import (
 from praxion_evals.harness.task_manifest import PipelineTier
 
 __all__ = [
+    "CachingJudgeClient",
     "CheckResult",
     "Corpus",
     "CorpusReader",
@@ -74,6 +76,9 @@ __all__ = [
 # Default report output directory (relative to repo root / cwd).
 _DEFAULT_OUTPUT_DIR = Path(".ai-state") / "praxion_eval_reports"
 
+# Committed, cross-run verdict cache — see CachingJudgeClient.
+_JUDGE_CACHE_RELATIVE = Path(".ai-state") / "praxion_eval_reports" / "judge_cache.jsonl"
+
 
 def run_eval(
     target: str = "main",
@@ -83,6 +88,7 @@ def run_eval(
     task_slug: str | None = None,
     pipeline_tier: PipelineTier | None = None,
     mechanical_only: bool = False,
+    no_judge_cache: bool = False,
 ) -> Report:
     """Run all eval families against a target and return the written Report.
 
@@ -116,6 +122,9 @@ def run_eval(
                          families. No auth env vars are required in this mode
                          — a ``NullJudgeClient`` is wired in to surface any
                          family that accidentally calls ``judge.judge()``.
+        no_judge_cache: When True, bypass reading the committed verdict cache
+                        (fresh verdicts are still written to it). Ignored in
+                        mechanical-only mode, where no judge call is made.
 
     Returns:
         A populated Report with a non-empty ``report_path``.
@@ -124,7 +133,15 @@ def run_eval(
     out_dir = Path(output_dir) if output_dir is not None else root / _DEFAULT_OUTPUT_DIR
 
     corpus = CorpusReader(root).resolve(target, task_slug=task_slug, pipeline_tier=pipeline_tier)
-    judge: JudgeClient = NullJudgeClient() if mechanical_only else select_judge_client()
+    judge: JudgeClient
+    if mechanical_only:
+        judge = NullJudgeClient()
+    else:
+        judge = CachingJudgeClient(
+            select_judge_client(),
+            root / _JUDGE_CACHE_RELATIVE,
+            read_cache=not no_judge_cache,
+        )
 
     families: list[Family] = [
         Family1PipelineOutcomeFidelity(),

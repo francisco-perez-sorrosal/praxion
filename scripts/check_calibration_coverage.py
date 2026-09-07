@@ -16,14 +16,23 @@ absent, no verdict is produced (skip-with-INFO, exit 0). A project that has neve
 logged a calibration row has no baseline to compare against and must not be penalised
 at bootstrap.
 
+Also validates the Retrospective-cell enum convention: rows dated on or after
+`ENUM_CUTOFF_DATE` must start their Retrospective cell with one of ENUM_VALUES
+(`correct` / `over-calibrated` / `under-calibrated`), optionally followed by an
+em-dash and prose. Rows predating the cutover are exempt (mirrors the ADR corpus's
+clean-cutover precedent at dec-230). This stays advisory -- sentinel CA02 is the
+mechanical consumer, matching the existing non-blocking `remind_calibration.py`
+pattern; nothing wires `--check`'s exit code into the commit gate today.
+
 Invocation:
 
     check_calibration_coverage.py                 # summary to stdout
     check_calibration_coverage.py --json          # machine-readable JSON
-    check_calibration_coverage.py --check         # exit 1 when under-covered
+    check_calibration_coverage.py --check         # exit 1 when under-covered or enum-noncompliant
     check_calibration_coverage.py --repo-root DIR # operate on another checkout (tests)
 
-Exit code: 0 by default (advisory). With --check, 1 when under-covered.
+Exit code: 0 by default (advisory). With --check, 1 when under-covered or when a
+post-cutover row is missing the required Retrospective enum prefix.
 Always 0 when calibration_log.md is absent (no substrate).
 """
 
@@ -68,6 +77,13 @@ _EXCLUDED_PREFIXES = ("bump:", "chore(finalize)")
 
 # Threshold: uncalibrated pipeline-commit count that triggers under-coverage.
 K_COMMITS = 2
+
+# Required first token of the Retrospective cell on rows dated on/after the cutover.
+ENUM_VALUES = ("correct", "over-calibrated", "under-calibrated")
+
+# Rows dated on/after this date must carry an ENUM_VALUES prefix; older rows are
+# exempt (the convention did not exist when they were written).
+ENUM_CUTOFF_DATE = "2026-09-08"
 
 # Timestamp column header in the calibration log Markdown table.
 _TIMESTAMP_COL = "Timestamp"
@@ -152,6 +168,81 @@ def _newest_calibration_timestamp(log_path: Path) -> str | None:
     return timestamps[-1] if timestamps else None
 
 
+def _row_timestamp_and_retrospective(line: str) -> tuple[str, str] | None:
+    """Extract (timestamp, retrospective) from a calibration-log data row.
+
+    Takes the first and last cells rather than a fixed-position split: a middle
+    column (Task/Signals/Source prose) occasionally carries an unescaped literal
+    pipe, which shifts a positional split but never touches the row's outer
+    boundary cells. Returns None for non-data lines (header, separator, blank).
+    """
+    stripped = line.strip()
+    if not stripped.startswith("|"):
+        return None
+    cells = stripped.split("|")
+    if len(cells) < 4:
+        return None
+    timestamp = cells[1].strip()
+    if not timestamp or timestamp == _TIMESTAMP_COL or timestamp.startswith("-"):
+        return None
+    retrospective = cells[-2].strip()
+    return timestamp, retrospective
+
+
+# -- Enum-compliance computation -----------------------------------------------
+
+
+def compute_enum_compliance(repo_root: Path) -> dict[str, object]:
+    """Return enum-compliance stats for rows dated on/after ENUM_CUTOFF_DATE.
+
+    Rows predating the cutover are exempt -- the enum-first Retrospective
+    convention only binds new rows (dec-draft-3adfda75), mirroring the ADR
+    corpus's clean-cutover precedent at dec-230.
+    """
+    log_path = repo_root / CALIBRATION_LOG_REL
+
+    if not log_path.exists():
+        return {
+            "compliant": True,
+            "new_rows": 0,
+            "violations": [],
+            "details": "No calibration_log.md found — skip-with-INFO (no substrate)",
+        }
+
+    text = log_path.read_text(encoding="utf-8")
+    violations: list[dict[str, str]] = []
+    new_rows = 0
+
+    for line in text.splitlines():
+        cells = _row_timestamp_and_retrospective(line)
+        if cells is None:
+            continue
+        timestamp, retrospective = cells
+        if timestamp[:10] < ENUM_CUTOFF_DATE:
+            continue
+        new_rows += 1
+        if not retrospective.startswith(ENUM_VALUES):
+            violations.append({"timestamp": timestamp, "retrospective": retrospective})
+
+    compliant = not violations
+    if new_rows == 0:
+        details = "No rows on/after the enum cutover — nothing to validate."
+    elif compliant:
+        details = f"{new_rows} row(s) on/after the enum cutover, all enum-compliant."
+    else:
+        details = (
+            f"{len(violations)} of {new_rows} row(s) on/after the enum cutover are "
+            f"missing the required Retrospective enum prefix ({'/'.join(ENUM_VALUES)})."
+        )
+
+    return {
+        "compliant": compliant,
+        "new_rows": new_rows,
+        "violations": violations,
+        "details": details,
+    }
+
+
 # -- Coverage computation -----------------------------------------------------
 
 
@@ -219,6 +310,22 @@ def _format_human(result: dict[str, object]) -> str:
     )
 
 
+def _format_enum_human(enum_result: dict[str, object]) -> str:
+    if enum_result["compliant"]:
+        return f"check_calibration_coverage (enum): {enum_result['details']}"
+    lines = [
+        "",
+        "=" * 72,
+        "CALIBRATION RETROSPECTIVE ENUM NON-COMPLIANCE",
+        "=" * 72,
+        str(enum_result["details"]),
+    ]
+    for violation in enum_result["violations"]:
+        lines.append(f"  - {violation['timestamp']}: {violation['retrospective']!r}")
+    lines.append("=" * 72)
+    return "\n".join(lines) + "\n"
+
+
 # -- Orchestration ------------------------------------------------------------
 
 
@@ -241,7 +348,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Exit 1 when under-covered (opt-in CI gate).",
+        help="Exit 1 when under-covered or when a post-cutover row is enum-noncompliant (opt-in CI gate).",
     )
     parser.add_argument("--verbose", action="store_true", help="Enable DEBUG logging.")
     return parser.parse_args(argv)
@@ -253,15 +360,19 @@ def _run(args: argparse.Namespace) -> int:
         logger.error("Refusing to operate on plugin-cache path: %s", repo_root)
         return 2
     result = compute_coverage(repo_root)
+    enum_result = compute_enum_compliance(repo_root)
 
     if args.json:
-        print(json.dumps(result, indent=2))
+        payload = dict(result)
+        payload["enum_compliance"] = enum_result
+        print(json.dumps(payload, indent=2))
     else:
-        report = _format_human(result)
         covered = result["covered"]
-        print(report, file=sys.stdout if covered else sys.stderr)
+        print(_format_human(result), file=sys.stdout if covered else sys.stderr)
+        enum_compliant = enum_result["compliant"]
+        print(_format_enum_human(enum_result), file=sys.stdout if enum_compliant else sys.stderr)
 
-    return 1 if (args.check and not result["covered"]) else 0
+    return 1 if (args.check and (not result["covered"] or not enum_result["compliant"])) else 0
 
 
 def main(argv: list[str] | None = None) -> None:

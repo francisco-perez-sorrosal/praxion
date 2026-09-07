@@ -1,3 +1,53 @@
+## v0.28.0 (2026-09-07)
+
+### Feat
+
+- **gate**: the id-citation checker sees DS-N and milestone criterion ids, and skips tmp/
+- **onboarding**: the placement axis — --placement sidecar across the phases
+- **commands**: merge-worktree runs the explicit sidecar merge-back first
+- **sidecar**: merge-back, publish, absorb, remote; convergence channels; NotYetLinked
+- **sidecar**: praxion-sidecar CLI — init, link, status, doctor, commit
+- **state**: reconcilers run against the state mount at merge-back
+- **finalize**: promote ADR drafts into the state mount, fail closed
+- **dashboard**: admit the state mount's .ai-state in the artifact allowlist
+- **sidecar**: shadow projection — inward relative links, exclude block first
+- **sidecar**: check registry — one pure evaluation, two renderings
+- **sidecar**: state mount lifecycle, branch convergence, per-mount commit lock
+- **sidecar**: manifest smart constructor; resolver reads block-style roots
+- **sidecar**: state-repository resolver — mount-aware placement sum type
+- **hooks**: P0 hook chaining — compose Praxion git hooks with existing hook managers
+
+### Fix
+
+- **health**: consult gates parse the documented escape and exempt NONE tombstones and witness restores (dec-draft-fd158a05); rust-first-class consult recorded post-hoc with a RECONSTRUCTED cost (dec-draft-6754571e); /upgrade-project names its labels script and tests anchor on structure; prune_reports --family scopes sentinel and metrics callers; --coverage-timeout plus coverage_refresh staleness marker; AC12 recorded unadopted (dec-draft-6f149b5a); documentation page and deep-dive renderer decomposed (td-164, td-166)
+- **codex**: model adapter keys on the routing rule's Tier column, never a Claude alias (dec-draft-41df8a7a); latency test bounds relative to a same-run subprocess floor; check_design_checkpoint gains direct canaries; dec-160 superseded by dec-draft-9095dc63
+- sentinel 2026-09-04 remediation — adr_health ephemeral-path class + prior-absence reopen gate, dec-357/358 stop citing .ai-work (td-167, td-168); coverage collector reports partial and withholds line_pct under 25% artifact scope (td-169); inject_rules main() decomposed ccn 31 -> 6 (td-165); capture_session anomaly note drops the retired namespace literal
+- **hooks**: the WAL records turn-limit and orchestrator-stopped subagents from the transcript and names unannounced helper stops (dec-370; sentinel I-2, S-14)
+- **adr**: dec-365's summary is a quoted scalar so its frontmatter parses
+- **finalize**: the cross-reference rewriter and its detector share one citation net (td-163, td-153)
+- **test**: the namespace invariants gate is honest again after the upgrade-tooling and thin-wrapper changes
+- **sidecar**: the blocks refresh refuses an unwritable placement instead of writing the tracked CLAUDE.md
+- **sidecar**: prune states its contract, the rules example is excluded, init inherits the project identity
+- **sidecar**: doctor reports every placement, init refuses to shadow a tracked path, the push policy pushes
+- **placement**: block writer resolves its target through placement; --check delegates nothing; upgrade reconciles the sidecar
+- **doctor**: honest hooks-chained and commit-lock rows; hooks run the CLI where the session is
+- **sidecar**: link prunes stale records, repairs moved mounts, absorb restores every shadow
+- **finalize**: promote drafts atomically and commit the mount first; chain scripts adopt the git runner
+- **sidecar**: live-dogfood findings — hook env scrub, publish pre-checks, round trip, banner
+- **hooks**: install_git_hooks.py imports on the Python 3.9 consumer floor
+- **hooks**: commit P0 files left in the working tree (precommit template, onboard detection, topology)
+- **gate**: pass-safe on an unparseable commit payload under the signal
+- **gate**: id-citation gate cannot crash into a blocking full scan
+- **gate**: id-citation hook mode never full-scans under git contention
+- **gate**: make id-citation hook-mode detection deterministic under load
+- **gate**: scope id-citation commit gate to the commit and prune excluded trees
+
+### Refactor
+
+- **sidecar**: split convergence out of the mount module; the squash probe stops writing to the project
+- **sidecar**: rename the state mount to .praxion-state
+- **sidecar**: fold the duplicated mount and git helpers; promote the reached-across private names
+
 ## v0.27.1 (2026-09-01)
 
 ### Fix

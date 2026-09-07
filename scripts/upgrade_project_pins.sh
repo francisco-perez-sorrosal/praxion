@@ -35,6 +35,11 @@
 #      reconcile_aac_surfaces.py: namespace-token re-point plus the structural
 #      repair of the broken pre-fix Block D PLUGIN_ROOT resolution. Needs no
 #      hub SHA.
+#   8. The observations WAL .gitignore line (the raw WAL moved from
+#      git-tracked to gitignored-but-present) — appends the missing line to
+#      an already-onboarded project's "AI assistants" block and untracks the
+#      file if it is still tracked. Additive/idempotent; a no-op under
+#      sidecar placement (.ai-state is already excluded wholesale there).
 # The Phase-4 pre-commit hook body (id-citation gate) resolves the plugin path
 # at run time, so it is version-independent and never goes stale — this script
 # leaves it be; only its appended Block D fragment (surface 7) can drift.
@@ -117,6 +122,7 @@ fi
 
 MANIFEST="$REPO_ROOT/.ai-state/.praxion-onboard.json"
 GITATTR="$REPO_ROOT/.gitattributes"
+GITIGNORE="$REPO_ROOT/.gitignore"
 HOOKS_DIR="$REPO_ROOT/.git/hooks"
 
 # ---- resolve the live plugin install path ----------------------------------
@@ -667,6 +673,52 @@ else
     AAC_N="$(printf '%s\n' "$AAC_OUT" | sed -n 's/^aac-changes: //p')"
     if [ -n "$AAC_N" ] && [ "$AAC_N" -gt 0 ] 2>/dev/null; then
         CHANGES=$((CHANGES + AAC_N))
+    fi
+fi
+echo
+
+# ---- 8. observations WAL gitignore + untrack --------------------------------
+# The raw observations WAL moved from git-tracked to gitignored-but-present.
+# Already-onboarded projects need the ignore line appended to their "AI
+# assistants" .gitignore block, and the file untracked if it is still tracked.
+# Purely additive/idempotent: never rewrites .gitignore wholesale, never
+# deletes observations.jsonl from disk — only appends the missing line and/or
+# drops the path from the index.
+
+echo "[wal] Observations WAL gitignore + untrack"
+WAL_REL='.ai-state/observations.jsonl'
+if [ "$PLACEMENT" = "sidecar" ]; then
+    # .ai-state is already excluded wholesale under sidecar placement (it is a
+    # shadow symlink onto the state mount, per phases-core.md's sidecar
+    # .gitignore block) — no per-file line is needed in the project repo, and
+    # the mount's own tracking is praxion-sidecar's concern, not this script's.
+    info "sidecar placement — .ai-state already excluded wholesale, nothing to do"
+else
+    wal_needs_ignore=0
+    if [ ! -f "$GITIGNORE" ]; then
+        info ".gitignore: absent → nothing to reconcile"
+    elif ! grep -qF '# AI assistants' "$GITIGNORE"; then
+        info ".gitignore: no \"AI assistants\" block → not onboarded via this path, skipping"
+    elif grep -qxF "$WAL_REL" "$GITIGNORE"; then
+        info ".gitignore: line already present"
+    else
+        wal_needs_ignore=1
+    fi
+
+    wal_tracked=0
+    git -C "$REPO_ROOT" ls-files --error-unmatch -- "$WAL_REL" >/dev/null 2>&1 && wal_tracked=1
+
+    if [ "$wal_needs_ignore" -eq 1 ] || [ "$wal_tracked" -eq 1 ]; then
+        note_change
+        [ "$wal_needs_ignore" -eq 1 ] && info ".gitignore: line missing → appending"
+        [ "$wal_tracked" -eq 1 ] && info "observations.jsonl: still tracked → untracking (file stays on disk)"
+        if mutating; then
+            if [ "$wal_needs_ignore" -eq 1 ]; then
+                printf '%s\n' "$WAL_REL" >> "$GITIGNORE"
+                STAGED_FILES+=("$GITIGNORE")
+            fi
+            [ "$wal_tracked" -eq 1 ] && git -C "$REPO_ROOT" rm --cached --quiet -- "$WAL_REL"
+        fi
     fi
 fi
 echo

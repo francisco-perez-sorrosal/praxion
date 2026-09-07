@@ -123,7 +123,7 @@ Full per-document writer / reader / lifetime: [`artifact-inventory.md`](../../sk
 
 ### Version Control and Cleanup
 
-- **Never commit `.ai-work/`** — add to `.gitignore`. **Always commit `.ai-state/`**.
+- **Never commit `.ai-work/`** — add to `.gitignore`. **Always commit `.ai-state/`**, except the local-only observations WAL (rollup: `observations_summary.jsonl`).
 - Clean up with `rm -rf .ai-work/<task-slug>/` after pipeline completion. `LEARNINGS.md` prose sections are `/skill-genesis`-harvested-or-lost. Remove `.ai-work/` itself only when all task directories have been cleaned.
 
 ### Parallel Execution

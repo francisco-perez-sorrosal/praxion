@@ -115,7 +115,7 @@ This is deliberately **not** numbered against the deferred Family 3, 4, 6 roster
 
 **LLM-judged checks** (one API call per scenario, skipped under `--mechanical-only`): a judge rates the same recorded field against the rubric baked into the fixture.
 
-A sixth scenario, `inheritance-probe`, spawns a live `praxion:*` subagent and asserts the file paths named in its `claudeMd` system block — the executable guard for the subagent-inheritance correction (P0.3). It is intentionally **not** part of this family (grading a static fixture cannot prove a live-inheritance claim) and instead ships as a standalone script, `eval/scripts/inheritance_probe.py`, run once per M-confidence slice rather than on every mechanical pass.
+A sixth scenario, `inheritance-probe`, spawns a fresh out-of-band `claude -p` session and asserts the file paths named in its `claudeMd` system block — the executable guard for the subagent-inheritance correction (P0.3). Grading a static fixture cannot prove a live-inheritance claim, so it ships as a standalone script, `eval/scripts/inheritance_probe.py`, run deliberately once per M-confidence slice rather than on every pass. It is registered in this family for visibility only — the family always resolves it to a single `SKIP` result (`check_kind="skip"`) in both mechanical-only and full/judged runs; the family never spawns the live session itself.
 
 ### Family 5 — Token-budget surface stability
 

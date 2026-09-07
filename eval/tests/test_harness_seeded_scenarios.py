@@ -78,7 +78,8 @@ def test_every_fixture_carries_an_llm_rubric():
 
 
 def test_mechanical_only_run_produces_five_pass_and_zero_llm_checks():
-    """A mechanical-only run grades all 5 golden fixtures PASS with no LLM calls."""
+    """A mechanical-only run grades all 5 golden fixtures PASS with no LLM
+    calls, plus one always-SKIP result for the inheritance-probe scenario."""
     from praxion_evals.harness.families.seeded_scenarios import SeededScenarioFamily
     from praxion_evals.harness.judge_client import NullJudgeClient
     from praxion_evals.harness.schemas import EMPTY_CORPUS
@@ -86,25 +87,37 @@ def test_mechanical_only_run_produces_five_pass_and_zero_llm_checks():
     family = SeededScenarioFamily()
     results = family.run(EMPTY_CORPUS, NullJudgeClient(), mechanical_only=True)
 
-    assert len(results) == 5, f"expected 5 mechanical results, got {len(results)}"
-    assert all(r.check_kind == "mechanical" for r in results)
-    assert all(r.verdict == "PASS" for r in results), [
-        (r.check_name, r.findings) for r in results if r.verdict != "PASS"
+    mechanical_results = [r for r in results if r.check_kind == "mechanical"]
+    skip_results = [r for r in results if r.check_kind == "skip"]
+
+    assert len(results) == 6, f"expected 5 mechanical + 1 skip, got {len(results)}"
+    assert len(mechanical_results) == 5
+    assert all(r.verdict == "PASS" for r in mechanical_results), [
+        (r.check_name, r.findings) for r in mechanical_results if r.verdict != "PASS"
     ]
+    assert len(skip_results) == 1
+    assert skip_results[0].verdict == "SKIP"
+    assert skip_results[0].check_name == "scenario_inheritance_probe_skip"
 
 
 def test_full_run_adds_one_llm_result_per_scenario():
-    """With mechanical_only=False, each scenario also gets one llm CheckResult."""
+    """With mechanical_only=False, each fixture-graded scenario also gets one
+    llm CheckResult; inheritance-probe still resolves to a single SKIP."""
     from praxion_evals.harness.families.seeded_scenarios import SeededScenarioFamily
     from praxion_evals.harness.schemas import EMPTY_CORPUS
 
     family = SeededScenarioFamily()
     results = family.run(EMPTY_CORPUS, FakeJudgeClient(), mechanical_only=False)
 
-    assert len(results) == 10, f"expected 10 results (5 mechanical + 5 llm), got {len(results)}"
+    assert len(results) == 11, (
+        f"expected 11 results (5 mechanical + 5 llm + 1 skip), got {len(results)}"
+    )
     llm_results = [r for r in results if r.check_kind == "llm"]
+    skip_results = [r for r in results if r.check_kind == "skip"]
     assert len(llm_results) == 5
     assert all(r.verdict == "PASS" for r in llm_results)
+    assert len(skip_results) == 1
+    assert skip_results[0].verdict == "SKIP"
 
 
 def test_mechanical_only_never_calls_the_judge():

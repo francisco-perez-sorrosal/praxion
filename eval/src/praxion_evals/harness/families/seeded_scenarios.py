@@ -8,14 +8,18 @@ discipline, and Lightweight-tier artifact minimalism.
 
 Each fixture carries a ``recorded_*`` field — a golden capture of what a
 compliant agent produced for the seeded input. This family grades the
-recorded fixture; it does not spawn a live agent. (The one scenario that
-does spawn a live subagent, ``inheritance-probe``, is intentionally out of
-this family's scope — see ``eval/scripts/inheritance_probe.py``.)
+recorded fixture; it does not spawn a live agent.
 
 Mechanical checks (no API calls) validate the recorded field against a
 structural rule specific to each scenario. LLM-judged checks (skipped under
 ``mechanical_only``) ask a judge to rate the same recorded field against a
 rubric baked into the fixture — the paid tier this family exists to support.
+
+A sixth scenario, ``inheritance-probe``, is registered here for visibility
+but graded neither mechanically nor by judge: it always resolves to one
+SKIP result, since confirming its claim requires spawning a live `claude -p`
+session (`eval/scripts/inheritance_probe.py`), which this family never does
+automatically. See ``_inheritance_probe_skip_result`` below.
 
 This module never imports claude_agent_sdk or anthropic directly.
 """
@@ -178,6 +182,36 @@ _MECHANICAL_CHECKS: dict[str, Any] = {
     "lightweight-fix": _check_lightweight_fix,
 }
 
+# ---------------------------------------------------------------------------
+# Scenario 6, inheritance-probe — judged-tier-only, never auto-run
+# ---------------------------------------------------------------------------
+
+# Unlike the 5 fixture-graded scenarios above, this one has no recorded
+# golden capture to grade: proving what a subagent's claudeMd block actually
+# contains requires spawning a live `claude -p` session (one full
+# API-metered headless session per invocation — see
+# `eval/scripts/inheritance_probe.py`). The harness never triggers that
+# spawn itself, in either mode — mechanical-only or full/judged — so this
+# entry always resolves to a single SKIP result pointing at the standalone
+# script, run deliberately per `EVAL_PLAN.md`'s "once per M-confidence
+# slice" cadence rather than on every eval pass.
+_INHERITANCE_PROBE_SCENARIO_ID = "inheritance-probe"
+
+
+def _inheritance_probe_skip_result() -> CheckResult:
+    return CheckResult(
+        check_name=f"scenario_{_slug(_INHERITANCE_PROBE_SCENARIO_ID)}_skip",
+        check_kind="skip",
+        verdict="SKIP",
+        artifact_path="scripts/inheritance_probe.py",
+        findings=(
+            "judged-tier-only; not auto-run by the harness in either mode -- "
+            "invoke `eval/scripts/inheritance_probe.py` directly (spawns a "
+            "real `claude -p` session, once per M-confidence slice).",
+        ),
+        score=-1,
+    )
+
 
 def _slug(scenario_id: str) -> str:
     return scenario_id.replace("-", "_")
@@ -226,8 +260,11 @@ class SeededScenarioFamily(Family):
             mechanical_only: When True, skip the LLM-judged check per scenario.
 
         Returns:
-            Ordered list of CheckResult objects, two per scenario at most
-            (mechanical always; llm unless mechanical_only).
+            Ordered list of CheckResult objects: two per fixture-graded
+            scenario at most (mechanical always; llm unless
+            mechanical_only), plus one always-SKIP result for the
+            judged-tier-only `inheritance-probe` scenario (see
+            `_inheritance_probe_skip_result`).
         """
         del corpus  # unused: static fixture corpus, not the resolved target
         results: list[CheckResult] = []
@@ -236,6 +273,7 @@ class SeededScenarioFamily(Family):
             results.append(self._check_mechanical(scenario_id, data))
             if not mechanical_only:
                 results.append(self._check_llm(scenario_id, data, judge))
+        results.append(_inheritance_probe_skip_result())
         return results
 
     def _check_mechanical(self, scenario_id: str, data: dict[str, Any]) -> CheckResult:

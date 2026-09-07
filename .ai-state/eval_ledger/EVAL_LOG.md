@@ -1,0 +1,7 @@
+# EVAL_LOG — context-layer quality baselines
+
+One row per recorded baseline or post-slice measurement of the context layer (roadmap `docs/independent-analysis/process-economy-roadmap.md` §6 P0.7). Mechanical runs are free and run after every slice; the LLM-judged run repeats only after M-confidence slices. Report files live in `.ai-state/praxion_eval_reports/`.
+
+| date | commit | purpose | mechanical (PASS/WARN/FAIL) | judged (PASS/WARN/FAIL) | always-loaded tokens | listing tokens | family5 verdict | notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-09-07 | d483b2ec (main, pre-Phase-0) → worktree-process-economy-phase0 @ 84b5a100 | Phase 0 baseline | 758/389/1 (`PRAXION_EVAL_REPORT_2026-09-07T20-46-38Z.md`, target main HEAD) | 1503/39/2 (`PRAXION_EVAL_REPORT_2026-09-07T21-32-00Z.md`, target worktree, messages-api, one Haiku call per ADR, ~50 min sequential) | 24,542 / 25,000 (tokenizer, 9 files) | 11,336 (tokenizer; frozen ceiling) | WARN — inconclusive on the estimate basis inside the harness subprocess; the byte trend is flat | The 2 judged FAILs are the in-flight manifest scan: `SYSTEMS_PLAN.md` absent by decision (architect skipped) and `VERIFICATION_REPORT.md` absent because the verifier had not run; 36 of 39 WARNs are pre-existing `affected_reqs_resolvability`; 1 `adr_option_depth` WARN; 3 `test_harness_family1_corpus_integration.py` failures pre-exist on main. Cost column in the harness log was hardcoded at the time of this run (fixed in Step 20). |

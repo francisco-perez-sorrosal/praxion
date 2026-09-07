@@ -88,7 +88,7 @@ _MINIMAL_PAYLOAD = {
 
 @pytest.mark.parametrize(
     "script",
-    ["send_event.py", "capture_session.py", "capture_memory.py"],
+    ["send_event.py", "capture_session.py", "capture_observations.py"],
 )
 def test_observability_hook_exits_silently_when_disabled(script):
     """With PRAXION_DISABLE_OBSERVABILITY set, each observability hook must

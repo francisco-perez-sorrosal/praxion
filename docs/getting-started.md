@@ -166,7 +166,7 @@ After `/clean-work` removes `.ai-work/<task-slug>/`, several categories of artif
 | **Behavioral specs (medium/large features)** | `.ai-state/specs/SPEC_<name>_YYYY-MM-DD.md` | implementation-planner at end-of-feature | Project lifetime |
 | **Idea ledger** | `.ai-state/idea_ledgers/IDEA_LEDGER_*.md` | promethean | Project lifetime |
 | **Tier calibration log** | `.ai-state/calibration_log.md` | main agent on every task | Append-only |
-| **Auto-captured tool events** | `.ai-state/observations.jsonl` | hooks (`capture_memory.py`, `capture_session.py`) | Append-only |
+| **Auto-captured tool events** | `.ai-state/observations.jsonl` | hooks (`capture_observations.py`, `capture_session.py`) | Append-only |
 
 > There is no curated cross-session *memory* artifact: dec-225 removed the in-house memory subsystem (`memory.json`, the Memory MCP, `remember()`/`recall()`). Cross-session knowledge now lives in the committed `.ai-state/` artifacts above (ADRs, specs) plus learnings promoted out of `LEARNINGS.md`; `sandbook` is the planned external memory backend.
 

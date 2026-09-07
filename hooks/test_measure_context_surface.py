@@ -22,7 +22,7 @@ HOOKS_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = HOOKS_DIR.parent
 HOOK_SCRIPT_PATH = HOOKS_DIR / "measure_context_surface.py"
 
-# Mirrors hooks/test_capture_memory.py's own sys.path-based import of a
+# Mirrors hooks/test_capture_observations.py's own sys.path-based import of a
 # sibling scripts/ module.
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 import measure_token_budget as mtb  # noqa: E402

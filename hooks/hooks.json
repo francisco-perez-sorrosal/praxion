@@ -161,7 +161,7 @@
           },
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/capture_memory.py 2>/dev/null",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/capture_observations.py 2>/dev/null",
             "timeout": 5,
             "async": true
           }

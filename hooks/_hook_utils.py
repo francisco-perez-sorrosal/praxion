@@ -1,7 +1,7 @@
 """Shared utilities for Praxion hooks.
 
 Provides the per-project opt-out check (``is_disabled``) and the observability
-kill-switch flag consumed by the capture/telemetry hooks (``capture_memory``,
+kill-switch flag consumed by the capture/telemetry hooks (``capture_observations``,
 ``capture_session``, ``send_event``, ``measure_context_surface``,
 ``notify_bg_session_state``).
 

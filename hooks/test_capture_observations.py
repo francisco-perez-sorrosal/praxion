@@ -1,4 +1,4 @@
-"""Tests for hooks/capture_memory.py — the `skill_activation` observations event.
+"""Tests for hooks/capture_observations.py — the `skill_activation` observations event.
 
 Targets `build_observation(payload: dict) -> dict`, the pure function
 extracted from `main()`'s inlined observation-dict assembly. Calling it
@@ -20,12 +20,12 @@ import pytest
 
 HOOKS_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = HOOKS_DIR.parent
-HOOK_SCRIPT_PATH = HOOKS_DIR / "capture_memory.py"
+HOOK_SCRIPT_PATH = HOOKS_DIR / "capture_observations.py"
 
 
 def _load_module():
-    """Load capture_memory.py as a module inside a test body."""
-    spec = importlib.util.spec_from_file_location("capture_memory", HOOK_SCRIPT_PATH)
+    """Load capture_observations.py as a module inside a test body."""
+    spec = importlib.util.spec_from_file_location("capture_observations", HOOK_SCRIPT_PATH)
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -48,7 +48,7 @@ def _load_reconcile_observations():
 def _tool_call_payload(tool_name: str, tool_input: dict | None = None, **overrides: object) -> dict:
     """Build a synthetic completed-PostToolUse payload for the given tool.
 
-    Mirrors the fields `capture_memory.py` reads off a real Claude Code
+    Mirrors the fields `capture_observations.py` reads off a real Claude Code
     PostToolUse payload: tool_name, tool_input, tool_response, cwd,
     session_id, agent_type, agent_id.
     """
@@ -188,7 +188,7 @@ class TestSkillActivationMergeSurvival:
 def isolated_project(tmp_path: Path) -> Path:
     """A throwaway project root carrying a real `.ai-state/` directory.
 
-    `capture_memory` derives the WAL path from the *payload's* `cwd`, so a
+    `capture_observations` derives the WAL path from the *payload's* `cwd`, so a
     payload pointing here can never reach the repository's own
     `.ai-state/observations.jsonl`. The `.ai-state/` directory must exist or
     `main()` takes its graceful-degradation exit instead of the write path.

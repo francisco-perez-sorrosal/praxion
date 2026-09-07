@@ -33,6 +33,7 @@ class _CountingJudgeClient:
         *,
         model: str = "claude-haiku-4-5",
         fail: bool = False,
+        usage: Any = None,
     ) -> None:
         self.call_count = 0
         self.model = model
@@ -40,6 +41,7 @@ class _CountingJudgeClient:
         self._findings = findings
         self._score = score
         self._fail = fail
+        self._usage = usage
 
     def judge(self, rubric: str, artifact: str, schema: Any) -> Any:
         from praxion_evals.harness.schemas import JudgeVerdict
@@ -52,6 +54,7 @@ class _CountingJudgeClient:
             findings=self._findings,
             score=self._score,
             raw={"verdict": self._verdict, "findings": list(self._findings), "score": self._score},
+            usage=self._usage,
         )
 
 
@@ -91,6 +94,38 @@ def test_cache_hit_returns_stored_verdict_without_a_call(tmp_path: Path):
     assert inner.call_count == 1, "an identical second call must be served from cache"
     assert second.cached is True
     assert second.verdict == first.verdict
+
+
+def test_cache_miss_passes_the_live_call_usage_through(tmp_path: Path):
+    """A miss returns the inner client's real usage, unmodified."""
+    from praxion_evals.harness.judge_client import CachingJudgeClient
+    from praxion_evals.harness.schemas import JudgeUsage
+
+    usage = JudgeUsage(input_tokens=100, output_tokens=20)
+    inner = _CountingJudgeClient(usage=usage)
+    cache_path = tmp_path / "judge_cache.jsonl"
+    client = CachingJudgeClient(inner, cache_path)
+
+    verdict = client.judge(rubric="r", artifact="a", schema={"type": "object"})
+
+    assert verdict.usage == usage
+
+
+def test_cache_hit_carries_no_usage_because_no_call_was_made(tmp_path: Path):
+    """A cache hit costs nothing — its usage must be None, even if the
+    original live call that populated the cache had real usage."""
+    from praxion_evals.harness.judge_client import CachingJudgeClient
+    from praxion_evals.harness.schemas import JudgeUsage
+
+    usage = JudgeUsage(input_tokens=100, output_tokens=20)
+    cache_path = tmp_path / "judge_cache.jsonl"
+    client = CachingJudgeClient(_CountingJudgeClient(usage=usage), cache_path)
+    client.judge(rubric="r", artifact="a", schema={"type": "object"})
+
+    hit = client.judge(rubric="r", artifact="a", schema={"type": "object"})
+
+    assert hit.cached is True
+    assert hit.usage is None, "a served-from-cache verdict must carry no usage"
 
 
 def test_cache_round_trips_across_client_instances(tmp_path: Path):

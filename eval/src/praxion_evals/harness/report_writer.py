@@ -13,7 +13,7 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 
-from praxion_evals.harness.schemas import Report
+from praxion_evals.harness.schemas import Report, sum_usage
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -106,6 +106,16 @@ def _iso_timestamp() -> str:
     return now.strftime("%Y-%m-%dT%H-%M-%SZ")
 
 
+def _format_cost(cost: float | None) -> str:
+    """Render an estimated-cost figure, or 'unpriced' when the model is unknown."""
+    return f"${cost:.4f} USD" if cost is not None else "unpriced"
+
+
+def _format_cost_cell(cost: float | None) -> str:
+    """Render the log table's Cost (USD) cell — no unit suffix (already in the header)."""
+    return f"${cost:.4f}" if cost is not None else "unpriced"
+
+
 def _detect_auth_route() -> str:
     """Return the auth route label based on current env vars."""
     if os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
@@ -133,7 +143,14 @@ def _render_report(report: Report, timestamp: str) -> str:
         f"**Judged**: {report.judge_calls} calls, {report.judge_cache_hits} cache hits, "
         f"{report.judge_workers} workers"
     )
-    lines.append(f"**Estimated cost**: ${report.cost_usd_estimate:.4f} USD")
+    usage_totals = sum_usage(report.check_results)
+    lines.append(
+        f"**Tokens**: {usage_totals.input_tokens:,} in / "
+        f"{usage_totals.output_tokens:,} out / "
+        f"{usage_totals.cache_read_input_tokens:,} cache-read / "
+        f"{usage_totals.cache_creation_input_tokens:,} cache-write"
+    )
+    lines.append(f"**Estimated cost**: {_format_cost(report.cost_usd_estimate)}")
     lines.append("")
 
     # Check results table
@@ -191,5 +208,5 @@ def _build_log_row(report: Report, report_path: str) -> str:
     return (
         f"| {timestamp} | {corpus.target_label} | {auth_route} | {families_str} "
         f"| {report.pass_count} | {report.warn_count} | {report.fail_count} "
-        f"| ${report.cost_usd_estimate:.4f} | {report_name} |"
+        f"| {_format_cost_cell(report.cost_usd_estimate)} | {report_name} |"
     )

@@ -343,6 +343,7 @@ class SeededScenarioFamily(Family):
             artifact_path=artifact_path,
             findings=outcome.findings,
             score=outcome.score,
+            usage=outcome.usage,
         )
 
 

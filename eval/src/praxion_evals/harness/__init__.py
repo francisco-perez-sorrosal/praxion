@@ -47,6 +47,7 @@ from praxion_evals.harness.report_writer import ReportWriter
 from praxion_evals.harness.schemas import (
     CheckResult,
     Corpus,
+    JudgeUsage,
     JudgeVerdict,
     Report,
 )
@@ -62,6 +63,7 @@ __all__ = [
     "Family2BehavioralContractAdherence",
     "Family5TokenBudgetStability",
     "JudgeClient",
+    "JudgeUsage",
     "JudgeVerdict",
     "NullJudgeClient",
     "Orchestrator",

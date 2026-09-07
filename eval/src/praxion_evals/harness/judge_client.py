@@ -30,7 +30,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
-from praxion_evals.harness.schemas import JudgeVerdict
+from praxion_evals.harness.schemas import JudgeUsage, JudgeVerdict
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -48,6 +48,16 @@ _API_TIMEOUT_MS_MARGIN_MS = 5_000
 # Bounded concurrency for a family's judged loop (see run_parallel_judged()).
 _JUDGE_WORKERS_ENV = "PRAXION_EVAL_JUDGE_WORKERS"
 _JUDGE_WORKERS_DEFAULT = 8
+
+# Anthropic first-party rates, skill table cached 2026-06-24 — USD per million
+# tokens (input, output). Estimate only, not a billing-accurate figure; a
+# model absent from this table is "unpriced" (see estimate_cost_usd()).
+_PRICE_USD_PER_MTOK: dict[str, tuple[float, float]] = {
+    "claude-haiku-4-5": (1.00, 5.00),
+}
+_CACHE_READ_DISCOUNT = 0.10  # cache reads bill at 10% of the input rate
+_CACHE_WRITE_PREMIUM = 1.25  # cache writes bill at 125% of the input rate
+_TOKENS_PER_MTOK = 1_000_000
 
 
 # ---------------------------------------------------------------------------
@@ -207,7 +217,8 @@ class MessagesApiJudgeClient(JudgeClient):
                 raw = dict(block.input)
                 break
 
-        return _parse_verdict(raw)
+        verdict = _parse_verdict(raw)
+        return dataclasses.replace(verdict, usage=_usage_from_response(response))
 
 
 # ---------------------------------------------------------------------------
@@ -288,7 +299,8 @@ class CachingJudgeClient(JudgeClient):
 
         with self._lock:
             self.call_count += 1
-            self._cache[key] = dataclasses.replace(verdict, cached=True)
+            # A future hit costs nothing — the stored copy never carries usage.
+            self._cache[key] = dataclasses.replace(verdict, cached=True, usage=None)
             self._append_row(key, verdict)
         return verdict
 
@@ -361,6 +373,30 @@ def run_parallel_judged(
     return results
 
 
+def estimate_cost_usd(model: str, usage: JudgeUsage) -> float | None:
+    """Estimate USD cost for summed *usage* against a judge *model*.
+
+    Returns None ("unpriced") when *model* is absent from the price table —
+    an unrecognized model is a genuine pricing unknown, not a zero cost,
+    even when *usage* itself is all zeros.
+
+    See _PRICE_USD_PER_MTOK's comment for the pricing source; cache reads
+    and cache writes are billed at a discount/premium off the input rate
+    (Anthropic prompt-caching pricing), not a flat per-token rate.
+    """
+    price = _PRICE_USD_PER_MTOK.get(model)
+    if price is None:
+        return None
+    input_rate, output_rate = price
+    cost = (
+        usage.input_tokens * input_rate
+        + usage.output_tokens * output_rate
+        + usage.cache_read_input_tokens * input_rate * _CACHE_READ_DISCOUNT
+        + usage.cache_creation_input_tokens * input_rate * _CACHE_WRITE_PREMIUM
+    )
+    return cost / _TOKENS_PER_MTOK
+
+
 # ---------------------------------------------------------------------------
 # Factory
 # ---------------------------------------------------------------------------
@@ -423,6 +459,24 @@ def _parse_verdict(raw: dict) -> JudgeVerdict:  # type: ignore[type-arg]
         findings=tuple(raw["findings"]),
         score=int(raw["score"]),
         raw=raw,
+    )
+
+
+def _usage_from_response(response: Any) -> JudgeUsage | None:
+    """Extract token usage from a Messages API response.
+
+    Cache-related fields are absent on responses that never touched the
+    prompt cache; default to 0 rather than raising. Returns None only when
+    the response carries no ``usage`` attribute at all.
+    """
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return None
+    return JudgeUsage(
+        input_tokens=getattr(usage, "input_tokens", 0) or 0,
+        output_tokens=getattr(usage, "output_tokens", 0) or 0,
+        cache_read_input_tokens=getattr(usage, "cache_read_input_tokens", 0) or 0,
+        cache_creation_input_tokens=getattr(usage, "cache_creation_input_tokens", 0) or 0,
     )
 
 

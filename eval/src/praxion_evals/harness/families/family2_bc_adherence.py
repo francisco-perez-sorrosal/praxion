@@ -370,6 +370,7 @@ class Family2BehavioralContractAdherence(Family):
                     artifact_path=path,
                     findings=outcome.findings,
                     score=outcome.score,
+                    usage=outcome.usage,
                 )
             )
         return results

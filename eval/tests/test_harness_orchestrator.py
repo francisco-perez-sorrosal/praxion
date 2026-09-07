@@ -9,6 +9,8 @@ Tests verify:
 - Result ordering is deterministic (families run in registry order)
 - ReportWriter is called with the aggregated Report
 - The orchestrator records which auth route was used in the report header
+- The orchestrator sums judged usage across families and prices it against
+  the judge's model, or reports "unpriced" (None) for an unknown model
 
 All production imports are deferred inside each test body (RED-state handshake).
 """
@@ -357,3 +359,70 @@ def test_orchestrator_with_no_families_produces_empty_report(tmp_path: Path):
     assert report.pass_count == 0
     assert report.warn_count == 0
     assert report.fail_count == 0
+
+
+# ---------------------------------------------------------------------------
+# Orchestrator: real cost accounting from summed CheckResult usage
+# ---------------------------------------------------------------------------
+
+
+class _JudgeWithModel:
+    """A JudgeClient test double that declares a priced .model."""
+
+    def __init__(self, model: str = "claude-haiku-4-5") -> None:
+        self.model = model
+
+    def judge(self, rubric: str, artifact: str, schema: Any) -> Any:
+        raise AssertionError("this test double's judge() must never be called")
+
+
+class _FamilyProducingOneLlmCheckWithUsage:
+    """A Family substitute producing one llm CheckResult carrying usage."""
+
+    id = "fake-family-llm-usage"
+    name = "Fake Family (llm usage)"
+    corpus_paths: tuple[str, ...] = ()
+
+    def run(self, corpus: Any, judge: Any, *, mechanical_only: bool = False) -> list[Any]:
+        from praxion_evals.harness.schemas import CheckResult, JudgeUsage
+
+        return [
+            CheckResult(
+                check_name="fake_llm_check",
+                check_kind="llm",
+                verdict="PASS",
+                artifact_path="fake/llm.md",
+                findings=("ok",),
+                score=90,
+                usage=JudgeUsage(input_tokens=1_000_000, output_tokens=1_000_000),
+            )
+        ]
+
+
+def test_orchestrator_prices_cost_from_summed_check_result_usage(tmp_path: Path):
+    """A judged CheckResult's usage flows through to a real cost estimate."""
+    from praxion_evals.harness.orchestrator import Orchestrator
+
+    corpus = _make_fake_corpus("cost-accounting-test")
+    judge = _JudgeWithModel("claude-haiku-4-5")
+    families = [_FamilyProducingOneLlmCheckWithUsage()]
+
+    orchestrator = Orchestrator(families=families, output_dir=tmp_path)
+    report = orchestrator.run(corpus, judge)
+
+    # 1M input @ $1/MTok + 1M output @ $5/MTok = $6.00
+    assert report.cost_usd_estimate == 6.00
+
+
+def test_orchestrator_unknown_judge_model_yields_unpriced_cost(tmp_path: Path):
+    """An unrecognized judge model reports None ('unpriced'), not $0.00."""
+    from praxion_evals.harness.orchestrator import Orchestrator
+
+    corpus = _make_fake_corpus("unpriced-model-test")
+    judge = _JudgeWithModel("some-future-model")
+    families = [_FamilyProducingOneLlmCheckWithUsage()]
+
+    orchestrator = Orchestrator(families=families, output_dir=tmp_path)
+    report = orchestrator.run(corpus, judge)
+
+    assert report.cost_usd_estimate is None

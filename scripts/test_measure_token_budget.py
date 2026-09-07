@@ -106,3 +106,85 @@ def test_the_fallback_divisor_errs_high_against_the_measured_ratio(tmp_path: Pat
     start under-reporting and quietly hide a breach.
     """
     assert mtb._FALLBACK_DIVISOR < mtb._MEASURED_RATIO
+
+
+# -- The listing surface (skill/command/agent `description:` frontmatter) ------
+
+
+def _skill(root: Path, name: str, description: str, body: str) -> None:
+    path = root / "skills" / name / "SKILL.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"---\nname: {name}\ndescription: {description}\n---\n\n{body}\n")
+
+
+def _command(root: Path, name: str, description: str, body: str) -> None:
+    path = root / "commands" / f"{name}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f'---\ndescription: "{description}"\n---\n\n{body}\n')
+
+
+def _agent(root: Path, name: str, description_lines: list[str], body: str) -> None:
+    path = root / "agents" / f"{name}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    folded = "\n".join(f"  {line}" for line in description_lines)
+    path.write_text(f"---\nname: {name}\ndescription: >\n{folded}\n---\n\n{body}\n")
+
+
+def test_listing_counts_only_frontmatter_descriptions_not_body_text(tmp_path: Path) -> None:
+    """The counter's whole job: description in, body out."""
+    _skill(tmp_path, "a-skill", "short skill description", "z" * 5000)
+    _command(tmp_path, "a-command", "short command description", "z" * 5000)
+    _agent(
+        tmp_path,
+        "an-agent",
+        ["a folded", "agent description"],
+        "z" * 5000,
+    )
+
+    with_body = mtb.measure_listing(tmp_path, api_key=None)
+    without_bodies = "\n".join(
+        [
+            "short skill description",
+            "short command description",
+            "a folded agent description",
+        ]
+    )
+    expected_bytes = len(without_bodies.encode("utf-8"))
+
+    assert with_body["bytes"] == expected_bytes
+    assert with_body["file_count"] == 3
+
+
+def test_listing_folded_block_scalar_description_is_joined_on_one_line(tmp_path: Path) -> None:
+    """The `>` folded-scalar shape used across most skills/agents."""
+    _agent(tmp_path, "folded-agent", ["line one of the", "folded description"], "body\n")
+
+    (tmp_path / "skills").mkdir(exist_ok=True)
+    (tmp_path / "commands").mkdir(exist_ok=True)
+
+    descriptions_only = mtb.listing_files(tmp_path)
+    text = (tmp_path / "agents" / "folded-agent.md").read_text(encoding="utf-8")
+    frontmatter = mtb._frontmatter_block(text)
+
+    assert descriptions_only == [tmp_path / "agents" / "folded-agent.md"]
+    assert mtb._extract_description(frontmatter) == "line one of the folded description"
+
+
+def test_listing_single_line_quoted_description_is_unquoted(tmp_path: Path) -> None:
+    """The single-line `"..."` shape used across most commands."""
+    _command(tmp_path, "quoted-command", "a quoted description", "body\n")
+
+    text = (tmp_path / "commands" / "quoted-command.md").read_text(encoding="utf-8")
+    frontmatter = mtb._frontmatter_block(text)
+
+    assert mtb._extract_description(frontmatter) == "a quoted description"
+
+
+def test_listing_reports_a_labelled_estimate_without_an_api_key(tmp_path: Path) -> None:
+    """Same estimate-labelling discipline as the governed reading."""
+    _command(tmp_path, "solo-command", "a description", "body\n")
+
+    listing = mtb.measure_listing(tmp_path, api_key=None)
+
+    assert "estimate" in listing["basis"]
+    assert listing["tokens"] == round(listing["bytes"] / mtb._FALLBACK_DIVISOR)

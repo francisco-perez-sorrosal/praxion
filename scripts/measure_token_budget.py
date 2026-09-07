@@ -134,16 +134,92 @@ def measure(repo_root: Path, *, api_key: str | None = None) -> dict:
     }
 
 
+_LISTING_GLOBS = ("skills/*/SKILL.md", "commands/*.md", "agents/*.md")
+
+
+def listing_files(repo_root: Path) -> list[Path]:
+    """Skill/command/agent files whose `description:` frontmatter Claude Code loads
+    into every session's tool/skill listing -- a second always-loaded surface,
+    disjoint from the rule/CLAUDE.md set `always_loaded_files()` measures."""
+    files: list[Path] = []
+    for pattern in _LISTING_GLOBS:
+        files.extend(sorted(repo_root.glob(pattern)))
+    return [f for f in files if f.is_file()]
+
+
+def _frontmatter_block(text: str) -> str | None:
+    """The YAML frontmatter body between the first two `---` fences, or None."""
+    if not text.startswith("---"):
+        return None
+    end = text.find("\n---", 3)
+    return None if end == -1 else text[3:end]
+
+
+def _extract_description(frontmatter: str) -> str:
+    """The `description:` value only -- a single-line scalar or a `>`/`|` block.
+
+    Deliberately not a YAML parse (this module is stdlib-only by construction,
+    see the module docstring): frontmatter across skills/commands/agents uses
+    only these two shapes in practice, and a body line can never look like a
+    `description:` key because this only ever scans the fenced frontmatter.
+    """
+    lines = frontmatter.splitlines()
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped.startswith("description:"):
+            continue
+        value = stripped[len("description:") :].strip()
+        if not value:
+            return ""
+        if value[0] not in ">|":
+            return value.strip("\"'")
+        block = []
+        for cont in lines[index + 1 :]:
+            if cont.strip() == "" or cont.startswith((" ", "\t")):
+                block.append(cont.strip())
+                continue
+            break
+        return " ".join(block)
+    return ""
+
+
+def measure_listing(repo_root: Path, *, api_key: str | None = None) -> dict:
+    """Measure the listing surface: only `description:` frontmatter, never body text."""
+    files = listing_files(repo_root)
+    descriptions = []
+    for f in files:
+        frontmatter = _frontmatter_block(f.read_text(encoding="utf-8"))
+        if frontmatter is None:
+            continue
+        description = _extract_description(frontmatter)
+        if description:
+            descriptions.append(description)
+    blob = "\n".join(descriptions)
+    chars = len(blob.encode("utf-8"))
+
+    tokens = count_tokens(blob, api_key) if api_key else None
+    measured = tokens is not None
+    if not measured:
+        tokens = round(chars / _FALLBACK_DIVISOR)
+
+    return {
+        "tokens": tokens,
+        "bytes": chars,
+        "basis": "tokenizer" if measured else f"estimate (bytes / {_FALLBACK_DIVISOR})",
+        "file_count": len(files),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Always-loaded token budget (measured).")
     parser.add_argument("--json", action="store_true", help="emit the reading as JSON")
     parser.add_argument("--repo-root", help="repository root (defaults to git discovery)")
     args = parser.parse_args(argv)
 
-    report = measure(
-        resolve_repo_root(args.repo_root, script_dir=SCRIPT_DIR),
-        api_key=os.environ.get("ANTHROPIC_API_KEY"),
-    )
+    repo_root = resolve_repo_root(args.repo_root, script_dir=SCRIPT_DIR)
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    report = measure(repo_root, api_key=api_key)
+    report["listing"] = measure_listing(repo_root, api_key=api_key)
 
     if args.json:
         print(json.dumps(report, indent=2))
@@ -160,6 +236,11 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 "  NOTE: no ANTHROPIC_API_KEY — this is an estimate that errs high, not a measurement"
             )
+        listing = report["listing"]
+        print(
+            f"  listing: {listing['tokens']:,} tokens ({listing['basis']}) over "
+            f"{listing['file_count']} files, {listing['bytes']:,} bytes"
+        )
     return 1 if report["over_by"] else 0
 
 

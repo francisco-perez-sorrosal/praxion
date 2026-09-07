@@ -36,7 +36,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from _hook_utils import DISABLE_OBSERVABILITY, is_disabled  # noqa: E402
-from measure_token_budget import measure  # noqa: E402
 
 # -- Observation emission -----------------------------------------------------
 
@@ -71,6 +70,18 @@ def _append_observation(obs_path: Path, observation: dict) -> None:
 
 def main() -> None:
     if is_disabled(DISABLE_OBSERVABILITY):
+        return
+
+    try:
+        # Imported here, not at module scope: an import failure (broken
+        # sys.path, a plugin-cache layout where scripts/ isn't a sibling, a
+        # bad import inside measure_token_budget.py itself) must be caught by
+        # this hook's own fail-open contract ("Exit 0 unconditionally.",
+        # module docstring) -- a module-level import raises before the
+        # __main__ guard's `except Exception: pass` is ever reached.
+        from measure_token_budget import measure
+    except Exception as exc:  # noqa: BLE001 - fail-open on any import failure
+        print(f"measure_context_surface: import failed -- {exc}", file=sys.stderr)
         return
 
     try:

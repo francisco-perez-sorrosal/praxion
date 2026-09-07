@@ -111,6 +111,43 @@ def test_the_fallback_divisor_errs_high_against_the_measured_ratio(tmp_path: Pat
     assert mtb._FALLBACK_DIVISOR < mtb._MEASURED_RATIO
 
 
+def test_count_tokens_is_memoized_per_text_and_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A repeated request for the same `(text, api_key)` must not pay the
+    network round-trip twice -- tests, or a future caller re-deriving an
+    already-measured reading, are the realistic cases this guards. It does
+    NOT reduce `ratchet()`'s two calls per commit to one: the governed and
+    listing corpora are disjoint text (see `count_tokens`'s own docstring).
+    """
+    mtb.count_tokens.cache_clear()
+    calls = {"n": 0}
+
+    class _FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc_info: object) -> bool:
+            return False
+
+        def read(self) -> bytes:
+            return json.dumps({"input_tokens": 42}).encode()
+
+    def _fake_urlopen(request: object, timeout: int) -> _FakeResponse:
+        calls["n"] += 1
+        return _FakeResponse()
+
+    monkeypatch.setattr(mtb.urllib.request, "urlopen", _fake_urlopen)
+
+    try:
+        first = mtb.count_tokens("same text", "key")
+        second = mtb.count_tokens("same text", "key")
+    finally:
+        mtb.count_tokens.cache_clear()
+
+    assert first == 42
+    assert second == 42
+    assert calls["n"] == 1, "a repeated identical request must not re-hit the network"
+
+
 # -- The listing surface (skill/command/agent `description:` frontmatter) ------
 
 
@@ -207,12 +244,27 @@ def _seed_baseline(path: Path, *, listing_ceiling: int, samples: list[dict]) -> 
 
 
 def _stub_measurements(
-    monkeypatch: pytest.MonkeyPatch, *, governed_tokens: int, listing_tokens: int
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    governed_tokens: int,
+    listing_tokens: int,
+    governed_measured: bool = True,
+    listing_measured: bool = True,
 ) -> None:
     monkeypatch.setattr(
-        mtb, "measure", lambda repo_root, **kw: {"files": ["x"], "tokens": governed_tokens}
+        mtb,
+        "measure",
+        lambda repo_root, **kw: {
+            "files": ["x"],
+            "tokens": governed_tokens,
+            "measured": governed_measured,
+        },
     )
-    monkeypatch.setattr(mtb, "measure_listing", lambda repo_root, **kw: {"tokens": listing_tokens})
+    monkeypatch.setattr(
+        mtb,
+        "measure_listing",
+        lambda repo_root, **kw: {"tokens": listing_tokens, "measured": listing_measured},
+    )
 
 
 def test_ratchet_positive_governed_delta_blocks(
@@ -262,6 +314,94 @@ def test_ratchet_listing_over_ceiling_blocks_independent_of_governed_delta(
     assert result["governed_delta"] == -5, "governed side alone would pass"
     assert result["listing_over_ceiling"] is True
     assert result["ratchet_ok"] is False
+
+
+# -- Basis awareness: a tokenizer count and a fallback estimate are different rulers --
+
+
+def test_ratchet_skips_the_governed_delta_check_on_a_basis_mismatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A tokenizer-vs-estimate swing (~20% on identical text) must never read
+    as growth. The only same-basis prior is 'tokenizer'; today's reading is
+    an 'estimate' (no API key) -- the delta check must fail open with a note,
+    not manufacture a breach out of two different rulers.
+    """
+    baseline = tmp_path / "baseline.json"
+    _seed_baseline(
+        baseline,
+        listing_ceiling=999_999,
+        samples=[{"date": "2026-01-01", "governed_tokens": 100, "basis": "tokenizer"}],
+    )
+    _stub_measurements(monkeypatch, governed_tokens=150, listing_tokens=10, governed_measured=False)
+
+    result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
+
+    assert result["governed_delta"] is None
+    assert result["ratchet_ok"] is True
+    assert any("same-basis" in note for note in result["notes"])
+
+
+def test_ratchet_skips_the_listing_ceiling_check_on_a_basis_mismatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The frozen ceiling was seeded on 'tokenizer'; today's listing reading
+    is an 'estimate' that would breach it if compared directly -- basis
+    mismatch must fail this tripwire open too, independent of the governed
+    side.
+    """
+    baseline = tmp_path / "baseline.json"
+    baseline.parent.mkdir(parents=True, exist_ok=True)
+    baseline.write_text(
+        json.dumps(
+            {
+                "schema": 1,
+                "listing_ceiling": 100,
+                "listing_ceiling_basis": "tokenizer",
+                "samples": [{"date": "2026-01-01", "governed_tokens": 100, "basis": "tokenizer"}],
+            }
+        )
+    )
+    _stub_measurements(monkeypatch, governed_tokens=100, listing_tokens=101, listing_measured=False)
+
+    result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
+
+    assert result["listing_over_ceiling"] is False
+    assert result["ratchet_ok"] is True
+    assert any("listing ceiling" in note for note in result["notes"])
+
+
+def test_ratchet_same_basis_listing_ceiling_still_blocks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The inverse guard: an explicit, matching basis on both sides must
+    still compare -- the mismatch skip must not swallow a real breach.
+    """
+    baseline = tmp_path / "baseline.json"
+    baseline.parent.mkdir(parents=True, exist_ok=True)
+    baseline.write_text(
+        json.dumps(
+            {
+                "schema": 1,
+                "listing_ceiling": 100,
+                "listing_ceiling_basis": "estimate",
+                "samples": [{"date": "2026-01-01", "governed_tokens": 100, "basis": "estimate"}],
+            }
+        )
+    )
+    _stub_measurements(
+        monkeypatch,
+        governed_tokens=100,
+        listing_tokens=101,
+        governed_measured=False,
+        listing_measured=False,
+    )
+
+    result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
+
+    assert result["listing_over_ceiling"] is True
+    assert result["ratchet_ok"] is False
+    assert result["notes"] == []
 
 
 def test_ratchet_within_30_days_skips_the_delta_check(

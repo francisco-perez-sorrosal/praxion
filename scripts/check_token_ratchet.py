@@ -15,10 +15,14 @@ already gives: it is ambient-invoked, so a third-party import would make it a
 finding of `check_gate_liveness.py`'s own `ambient-import` check. This script
 imports only that stdlib-only sibling plus `_repo_root`.
 
-Exit codes: 0 clean or fail-open skip, 1 the ratchet breached, 2 script error
--- an unhandled exception here must never resolve to 1, the code
-`--blocking` maps onto a block: a bug in this script would otherwise block
-every commit fleet-wide, which is a worse failure than the gate going dark.
+Exit codes: 0 clean or fail-open skip, 1 the ratchet breached, 3 script
+error -- an unhandled exception here must never resolve to 1 (findings) or
+2. Exit 2 is not merely "the code `--blocking` maps onto a block" -- it is
+the code `hooks/commit_gate.sh` passes straight through *unchanged* for
+every value other than 1 (only rc==1 is translated to 2; a literal 2
+returned by this script reaches PreToolUse as 2 regardless), so a script
+error returning 2 blocks every commit fleet-wide exactly like a breach
+would. 3 is unambiguously non-blocking on both sides of that translation.
 """
 
 from __future__ import annotations
@@ -31,7 +35,7 @@ import measure_token_budget as mtb
 from _repo_root import resolve_repo_root
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-_SCRIPT_ERROR = 2
+_SCRIPT_ERROR = 3
 
 
 def _format_reasons(result: dict) -> str:
@@ -56,6 +60,9 @@ def main() -> int:
     except Exception as exc:  # noqa: BLE001 - see module docstring on exit codes
         print(f"token ratchet: SCRIPT ERROR -- {exc}", file=sys.stderr)
         return _SCRIPT_ERROR
+
+    for note in result.get("notes", []):
+        print(f"token ratchet: INFO -- {note}")
 
     if result["skipped"]:
         print(f"token ratchet: SKIPPED -- {result['reason']}")

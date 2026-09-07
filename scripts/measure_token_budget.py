@@ -24,6 +24,13 @@ Without an API key it falls back to `_FALLBACK_DIVISOR`, which is retained at
 and a budget guardrail should overestimate. The fallback is always labelled an
 estimate; only a tokenizer run is reported as measured.
 
+Every reading and every persisted baseline sample carries its `basis`
+(`"tokenizer"` or `"estimate"`) precisely because the two are not
+interchangeable -- the ~20% swing between them (see `measure_listing()`'s
+docstring) is large enough to read as real corpus growth on its own.
+`ratchet()` compares a sample only against a same-basis prior; a mismatch
+fails open with an INFO note rather than diffing two different rulers.
+
 Stdlib-only, deliberately: the sentinel invokes this through the ambient
 interpreter, so a third-party import would make it a finding of the
 `ambient-import` gate-liveness check.
@@ -37,6 +44,7 @@ Cites: rules/CLAUDE.md#token-budget (the ceiling and the attention-share rule).
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import os
 import sys
@@ -95,8 +103,27 @@ def always_loaded_files(repo_root: Path, *, include_global: bool = True) -> list
     return [f for f in files if f.is_file()]
 
 
+@functools.lru_cache(maxsize=32)
 def count_tokens(text: str, api_key: str) -> int | None:
-    """Real token count, or None when the API is unreachable."""
+    """Real token count, or None when the API is unreachable.
+
+    Memoized per `(text, api_key)`: a process that ends up asking for the
+    same corpus twice -- tests, or a future caller re-deriving an
+    already-measured reading -- pays the network round-trip once, not twice.
+    Use `count_tokens.cache_clear()` between tests that need a fresh call.
+
+    This does NOT collapse `ratchet()`'s two round-trips per commit into
+    one: the governed-rules corpus (`measure()`) and the listing-description
+    corpus (`measure_listing()`) are disjoint text, so each still needs its
+    own call -- there is no shared substring to memoize across them. Both
+    share this module's 60s socket `_TIMEOUT` and both run inside
+    `check_token_ratchet.py`'s 20s PreToolUse hook timeout
+    (`hooks/hooks.json`); a slow or degraded endpoint can still exceed that
+    20s budget across the two sequential calls. This cache guards against
+    redundant re-tokenization of identical text, not against API latency --
+    if endpoint latency becomes an operational problem, shorten `_TIMEOUT`
+    for that call site instead.
+    """
     request = urllib.request.Request(  # noqa: S310 - fixed https endpoint
         _COUNT_TOKENS_URL,
         data=json.dumps(
@@ -213,8 +240,20 @@ def measure_listing(repo_root: Path, *, api_key: str | None = None) -> dict:
         "tokens": tokens,
         "bytes": chars,
         "basis": "tokenizer" if measured else f"estimate (bytes / {_FALLBACK_DIVISOR})",
+        "measured": measured,
         "file_count": len(files),
     }
+
+
+def _basis_label(reading: dict) -> str:
+    """The short comparison basis for a `measure()`/`measure_listing()` reading.
+
+    Defaults to `"tokenizer"` when `measured` is absent -- the shape every
+    `ratchet()` test double and every pre-migration baseline sample used
+    before this field existed, and in this repo's dev environment (API key
+    always set) that default was also always the true value.
+    """
+    return "tokenizer" if reading.get("measured", True) else "estimate"
 
 
 def ratchet(
@@ -240,6 +279,13 @@ def ratchet(
     one entry per calendar date; a same-day rerun overwrites with the same
     value) before computing the trailing-window delta, so the committed file
     grows by ordinary use rather than a separate bookkeeping step.
+
+    Both tripwires (the trailing-window delta and the listing ceiling) also
+    fail open -- with an INFO `note`, not a manufactured verdict -- when
+    today's reading and the historical one it would compare against were
+    taken on different `basis` (tokenizer vs. estimate). The two bases
+    disagree by ~20% on identical text, which dwarfs any real growth the
+    ratchet exists to catch.
     """
     path = baseline_path or repo_root.joinpath(*_BASELINE_RELATIVE_PATH)
     today = today or date.today()
@@ -253,31 +299,30 @@ def ratchet(
         return _ratchet_skip(f"no baseline file at {path}")
 
     listing = measure_listing(repo_root, api_key=api_key)
-    updated = _append_sample(baseline, today=today, governed_tokens=governed["tokens"])
+    governed_basis = _basis_label(governed)
+    updated = _append_sample(
+        baseline, today=today, governed_tokens=governed["tokens"], basis=governed_basis
+    )
     _write_baseline(path, updated)
 
     today_str = today.isoformat()
     prior_samples = sorted(
         (s for s in updated["samples"] if s["date"] != today_str), key=lambda s: s["date"]
     )
-    oldest_prior = prior_samples[0] if prior_samples else None
-    tracked_days = (today - date.fromisoformat(oldest_prior["date"])).days if oldest_prior else 0
+    governed_delta, notes = _governed_delta(prior_samples, governed, governed_basis, today)
 
-    # The comparison point is the oldest surviving prior sample, never today's
-    # own just-appended entry -- comparing today against itself would always
-    # read as zero delta and mask real growth whenever the daily cadence has a
-    # gap. The 35-day prune bound (`_append_sample`) already caps how far back
-    # "oldest" can reach, so this stays a trailing-window comparison without
-    # needing a second, narrower window filter that can end up with nothing
-    # but today's entry left inside it.
-    governed_delta = (
-        governed["tokens"] - oldest_prior["governed_tokens"]
-        if tracked_days >= _RATCHET_WINDOW_DAYS
-        else None
-    )
-
+    listing_basis = _basis_label(listing)
     listing_ceiling = baseline.get("listing_ceiling")
-    listing_over_ceiling = listing_ceiling is not None and listing["tokens"] > listing_ceiling
+    listing_ceiling_basis = baseline.get("listing_ceiling_basis", "tokenizer")
+    listing_over_ceiling = False
+    if listing_ceiling is not None:
+        if listing_ceiling_basis == listing_basis:
+            listing_over_ceiling = listing["tokens"] > listing_ceiling
+        else:
+            notes.append(
+                f"listing ceiling was frozen on basis '{listing_ceiling_basis}' but today's "
+                f"listing reading is basis '{listing_basis}' -- skipping the listing-ceiling check"
+            )
 
     return {
         "skipped": False,
@@ -288,7 +333,37 @@ def ratchet(
         "governed_tokens": governed["tokens"],
         "listing_tokens": listing["tokens"],
         "listing_ceiling": listing_ceiling,
+        "notes": notes,
     }
+
+
+def _governed_delta(
+    prior_samples: list[dict], governed: dict, governed_basis: str, today: date
+) -> tuple[int | None, list[str]]:
+    """The trailing-window delta against the oldest same-basis prior sample.
+
+    The comparison point is the oldest surviving *same-basis* prior sample,
+    never today's own just-appended entry (comparing today against itself
+    would always read as zero delta) and never a different-basis sample
+    (comparing a tokenizer count against an estimate reads a ~20% basis
+    swing as growth). The 35-day prune bound (`_append_sample`) already caps
+    how far back "oldest" can reach, so this stays a trailing-window
+    comparison without needing a second, narrower window filter.
+    """
+    same_basis_priors = [s for s in prior_samples if s.get("basis", "tokenizer") == governed_basis]
+    if not same_basis_priors:
+        if prior_samples:
+            return None, [
+                f"no same-basis ('{governed_basis}') prior sample in the tracked window -- "
+                "skipping the governed-token delta check"
+            ]
+        return None, []
+
+    oldest_prior = same_basis_priors[0]
+    tracked_days = (today - date.fromisoformat(oldest_prior["date"])).days
+    if tracked_days < _RATCHET_WINDOW_DAYS:
+        return None, []
+    return governed["tokens"] - oldest_prior["governed_tokens"], []
 
 
 def _ratchet_skip(reason: str) -> dict:
@@ -298,6 +373,7 @@ def _ratchet_skip(reason: str) -> dict:
         "ratchet_ok": True,
         "governed_delta": None,
         "listing_over_ceiling": False,
+        "notes": [],
     }
 
 
@@ -311,11 +387,11 @@ def _load_baseline(path: Path) -> dict | None:
         return None
 
 
-def _append_sample(baseline: dict, *, today: date, governed_tokens: int) -> dict:
+def _append_sample(baseline: dict, *, today: date, governed_tokens: int, basis: str) -> dict:
     """A new baseline dict with today's sample appended and old samples pruned."""
     today_str = today.isoformat()
     samples = [s for s in baseline.get("samples", []) if s["date"] != today_str]
-    samples.append({"date": today_str, "governed_tokens": governed_tokens})
+    samples.append({"date": today_str, "governed_tokens": governed_tokens, "basis": basis})
     cutoff = today - timedelta(days=_BASELINE_PRUNE_DAYS)
     samples = [s for s in samples if date.fromisoformat(s["date"]) >= cutoff]
     samples.sort(key=lambda s: s["date"])
@@ -345,14 +421,17 @@ def main(argv: list[str] | None = None) -> int:
         result = ratchet(repo_root, api_key=api_key)
         if args.json:
             print(json.dumps(result, indent=2))
-        elif result["skipped"]:
-            print(f"ratchet: SKIPPED -- {result['reason']}")
         else:
-            verdict = "OK" if result["ratchet_ok"] else "BLOCKED"
-            print(
-                f"ratchet: {verdict} -- governed_delta={result['governed_delta']}, "
-                f"listing={result['listing_tokens']}/{result['listing_ceiling']}"
-            )
+            for note in result.get("notes", []):
+                print(f"ratchet: INFO -- {note}")
+            if result["skipped"]:
+                print(f"ratchet: SKIPPED -- {result['reason']}")
+            else:
+                verdict = "OK" if result["ratchet_ok"] else "BLOCKED"
+                print(
+                    f"ratchet: {verdict} -- governed_delta={result['governed_delta']}, "
+                    f"listing={result['listing_tokens']}/{result['listing_ceiling']}"
+                )
         return 0 if result["ratchet_ok"] else 1
 
     report = measure(repo_root, api_key=api_key)

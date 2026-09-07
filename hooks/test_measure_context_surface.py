@@ -117,6 +117,33 @@ class TestMainEntry:
         monkeypatch.setattr(sys, "stdin", _StringIO("not-json{"))
         m.main()  # No raise = pass.
 
+    def test_a_broken_measure_token_budget_import_fails_open(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ):
+        """The import lives inside main()'s own try/except specifically so a
+        broken sys.path or plugin-cache layout (missing scripts/ sibling, a
+        bad import inside measure_token_budget.py itself) degrades to a
+        silent no-op instead of a crash -- proving the fail-open contract
+        ("Exit 0 unconditionally.") actually covers the import, not just the
+        code that runs after it.
+        """
+        m = _load_module()
+        monkeypatch.setitem(sys.modules, "measure_token_budget", None)
+
+        ai_state = tmp_path / ".ai-state"
+        ai_state.mkdir()
+        payload = {
+            "hook_event_name": "SessionStart",
+            "cwd": str(tmp_path),
+            "session_id": "x",
+        }
+        self._stub_stdin(payload, monkeypatch)
+
+        m.main()  # No raise = pass.
+
+        assert not (ai_state / "observations.jsonl").exists()
+        assert "import failed" in capsys.readouterr().err
+
 
 # ---------------------------------------------------------------------------
 # Parity with the commit-gate script — the whole reason for this step.

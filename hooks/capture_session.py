@@ -396,7 +396,9 @@ def _sum_subagent_transcript(payload: dict) -> dict[str, int | str | None]:
     last_ts: str | None = None
     matched = False
     try:
-        with open(transcript_path, encoding="utf-8") as handle:
+        # errors="replace": a single undecodable byte must degrade one line,
+        # never drop the whole agent_stop row (light-review 2, item 1).
+        with open(transcript_path, encoding="utf-8", errors="replace") as handle:
             for line in handle:
                 line = line.strip()
                 if not line:

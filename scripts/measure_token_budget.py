@@ -256,17 +256,25 @@ def ratchet(
     updated = _append_sample(baseline, today=today, governed_tokens=governed["tokens"])
     _write_baseline(path, updated)
 
-    window_start = today - timedelta(days=_RATCHET_WINDOW_DAYS)
-    in_window = sorted(
-        (s for s in updated["samples"] if date.fromisoformat(s["date"]) >= window_start),
-        key=lambda s: s["date"],
+    today_str = today.isoformat()
+    prior_samples = sorted(
+        (s for s in updated["samples"] if s["date"] != today_str), key=lambda s: s["date"]
     )
-    earliest = in_window[0] if in_window else None
-    span_days = (today - date.fromisoformat(earliest["date"])).days if earliest else 0
+    oldest_prior = prior_samples[0] if prior_samples else None
+    tracked_days = (today - date.fromisoformat(oldest_prior["date"])).days if oldest_prior else 0
 
-    governed_delta = None
-    if span_days >= _RATCHET_WINDOW_DAYS:
-        governed_delta = governed["tokens"] - earliest["governed_tokens"]
+    # The comparison point is the oldest surviving prior sample, never today's
+    # own just-appended entry -- comparing today against itself would always
+    # read as zero delta and mask real growth whenever the daily cadence has a
+    # gap. The 35-day prune bound (`_append_sample`) already caps how far back
+    # "oldest" can reach, so this stays a trailing-window comparison without
+    # needing a second, narrower window filter that can end up with nothing
+    # but today's entry left inside it.
+    governed_delta = (
+        governed["tokens"] - oldest_prior["governed_tokens"]
+        if tracked_days >= _RATCHET_WINDOW_DAYS
+        else None
+    )
 
     listing_ceiling = baseline.get("listing_ceiling")
     listing_over_ceiling = listing_ceiling is not None and listing["tokens"] > listing_ceiling

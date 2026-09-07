@@ -1,0 +1,19 @@
+scenario_id: lightweight-fix
+description: >
+  A seeded Lightweight-tier one-file fix. Lightweight tier carries no
+  three-document planning overhead (rules/swe/swe-agent-coordination-protocol.md
+  § Process Calibration) — the only durable artifact a conformant run
+  produces is a calibration-log row.
+seeded_fix: "Fix an off-by-one in the pagination helper in scripts/paginate.py."
+recorded_artifacts_written:
+  - ".ai-state/calibration_log.md"
+forbidden_artifact_patterns:
+  - "SYSTEMS_PLAN.md"
+  - "IMPLEMENTATION_PLAN.md"
+  - "WIP.md"
+  - "VERIFICATION_REPORT.md"
+llm_rubric: >
+  Given the seeded fix and the recorded list of artifacts written, judge
+  whether the run respected Lightweight-tier's "no SDD, no three-document
+  planning" constraint — a single calibration row is proportionate; any
+  full-pipeline document is over-calibration for a one-file fix.

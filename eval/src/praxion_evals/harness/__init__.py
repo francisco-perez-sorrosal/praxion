@@ -6,10 +6,11 @@ Public surface:
     CorpusReader — resolves an invocation target to an immutable Corpus
     Family1PipelineOutcomeFidelity — Family 1 checks (pipeline-outcome fidelity)
     Family2BehavioralContractAdherence — Family 2 checks (BC adherence)
+    SeededScenarioFamily — seeded scenario corpus checks (P0.7)
     Orchestrator — wires families → ReportWriter → Report
     ReportWriter — writes per-run report + appends to frozen-column log
     run_eval     — thin composition function: resolves corpus, selects judge,
-                   runs both families, writes report, returns Report
+                   runs all families, writes report, returns Report
 
 SDK imports are lazy — importing this package never fails even when
 ``claude_agent_sdk`` or ``anthropic`` are absent.  They are only imported
@@ -27,6 +28,9 @@ from praxion_evals.harness.families.family1_pipeline_fidelity import (
 )
 from praxion_evals.harness.families.family2_bc_adherence import (
     Family2BehavioralContractAdherence,
+)
+from praxion_evals.harness.families.seeded_scenarios import (
+    SeededScenarioFamily,
 )
 from praxion_evals.harness.judge_client import (
     JudgeClient,
@@ -57,6 +61,7 @@ __all__ = [
     "PipelineTier",
     "Report",
     "ReportWriter",
+    "SeededScenarioFamily",
     "run_eval",
     "select_judge_client",
 ]
@@ -74,12 +79,13 @@ def run_eval(
     pipeline_tier: PipelineTier | None = None,
     mechanical_only: bool = False,
 ) -> Report:
-    """Run both eval families against a target and return the written Report.
+    """Run all eval families against a target and return the written Report.
 
     Composition:
         CorpusReader(repo_root).resolve(target, task_slug=…, pipeline_tier=…)
         → select_judge_client()  (or NullJudgeClient when mechanical_only)
-        → Orchestrator([Family1, Family2], output_dir).run(corpus, judge, …)
+        → Orchestrator([Family1, Family2, SeededScenarioFamily], output_dir)
+              .run(corpus, judge, …)
         → Report
 
     Args:
@@ -110,6 +116,7 @@ def run_eval(
     families: list[Family] = [
         Family1PipelineOutcomeFidelity(),
         Family2BehavioralContractAdherence(),
+        SeededScenarioFamily(),
     ]
     orchestrator = Orchestrator(families=families, output_dir=out_dir)
     return orchestrator.run(corpus, judge, mechanical_only=mechanical_only)

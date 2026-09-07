@@ -1,0 +1,42 @@
+scenario_id: spawn-selection
+description: >
+  Given a seeded task description, an orchestrator must select the tier and
+  spawn set the swe-agent-coordination-protocol tier table (Direct / Lightweight
+  / Standard / Full / Spike) prescribes. Each case pairs a task with the
+  recorded orchestrator decision — a golden capture, not a live re-run.
+llm_rubric: >
+  Given the task description and the recorded tier/agents decision, judge
+  whether the decision matches the fast-path tier selector in
+  rules/swe/swe-agent-coordination-protocol.md (Direct: single-file fix/config/
+  doc/typo; Lightweight: 2-3 files, single behavior; Standard: 4-8 files or an
+  architectural decision; Full: 9+ files or cross-cutting; Spike: exploratory,
+  outcome uncertain).
+cases:
+  - task: "Fix a typo in the README's install command."
+    expected_tier: direct
+    expected_agents: []
+    recorded_tier: direct
+    recorded_agents: []
+  - task: "Rename one helper function used in two sibling test files."
+    expected_tier: lightweight
+    expected_agents: []
+    recorded_tier: lightweight
+    recorded_agents: []
+  - task: "Add a new REST endpoint spanning a router, a service layer, a data
+      model change, and 5 new tests, requiring a resource-modeling decision."
+    expected_tier: standard
+    expected_agents: [systems-architect, implementation-planner, implementer, verifier]
+    recorded_tier: standard
+    recorded_agents: [systems-architect, implementation-planner, implementer, verifier]
+  - task: "Migrate the auth subsystem off a deprecated session store across
+      11 files and 6 distinct behaviors, cutting across the API, worker, and CLI."
+    expected_tier: full
+    expected_agents: [systems-architect, implementation-planner, implementer, test-engineer, verifier]
+    recorded_tier: full
+    recorded_agents: [systems-architect, implementation-planner, implementer, test-engineer, verifier]
+  - task: "Investigate whether switching the cache backend would reduce p99
+      latency — outcome unknown, timeboxed."
+    expected_tier: spike
+    expected_agents: [researcher]
+    recorded_tier: spike
+    recorded_agents: [researcher]

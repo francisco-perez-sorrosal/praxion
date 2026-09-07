@@ -93,6 +93,30 @@ The judge runs **per-behavior**, not per-file, so a v2 adversarial-fixture set c
 
 **v1 calibration gap.** The only available `VERIFICATION_REPORT.md` at v1 launch has no BC violation tags — the verifier emitted clean PASS findings. The LLM judge's false-negative detection is therefore unvalidated against an adversarial fixture. Every v1 report records this gap explicitly in its `## Calibration Notes` section. See also [Family 2 real-corpus validation note](#family-2-real-corpus-validation-note).
 
+### Seeded scenario corpus (process-economy P0.7)
+
+Source: `eval/src/praxion_evals/harness/families/seeded_scenarios.py`
+
+Corpus: 5 static, golden-fixture scenarios under `eval/tests/fixtures/scenarios/` — not a resolved-target corpus slice, since the fixtures are seeded inputs bundled with the harness rather than artifacts that vary per eval target. Each fixture pairs a seeded input with a `recorded_*` field: a golden capture of what a compliant agent produced. This family grades the recorded fixture; it never spawns a live agent.
+
+This is deliberately **not** numbered against the deferred Family 3–6 roster below (Dogfooding fidelity / Onboarding outcome quality / Token-budget surface stability / Learning-loop closure latency) — those slots keep their existing meanings, and Family 5 (token-budget surface stability) ships separately as its own collector.
+
+**Scenarios:**
+
+| Scenario | What it checks |
+|----------|----------------|
+| `spawn-selection` | Orchestrator tier/agent decision for 5 seeded task descriptions matches the fast-path tier selector |
+| `ui-step-conformance` | A seeded UI-touching implementer step cites the interface skill's conventions by name |
+| `adr-authoring` | A seeded architectural ADR fragment carries complete frontmatter and a `## Disconfirmation` section |
+| `commit-staging` | A seeded commit's staging command is pathspec-scoped (no `-A`/`--all`, no WAL path) |
+| `lightweight-fix` | A seeded Lightweight-tier fix writes no artifact beyond a calibration-log row |
+
+**Mechanical checks** (no API calls): one structural rule per scenario, evaluated against the fixture's `recorded_*` field. All 5 golden fixtures are seeded to PASS.
+
+**LLM-judged checks** (one API call per scenario, skipped under `--mechanical-only`): a judge rates the same recorded field against the rubric baked into the fixture.
+
+A sixth scenario, `inheritance-probe`, spawns a live `praxion:*` subagent and asserts the file paths named in its `claudeMd` system block — the executable guard for the subagent-inheritance correction (P0.3). It is intentionally **not** part of this family (grading a static fixture cannot prove a live-inheritance claim) and instead ships as a standalone script, `eval/scripts/inheritance_probe.py`, run once per M-confidence slice rather than on every mechanical pass.
+
 ## Deferred families
 
 ### Family 3 — Dogfooding fidelity

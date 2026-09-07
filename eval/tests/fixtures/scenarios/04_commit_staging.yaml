@@ -1,0 +1,19 @@
+scenario_id: commit-staging
+description: >
+  A seeded commit for a two-file change. A conformant staging command is
+  pathspec-scoped — it never uses `-A`/`--all`, and it never stages the raw
+  observations WAL (which left git under P0.5).
+seeded_change: >
+  Fixed a docstring typo in scripts/foo.py and added a matching regression
+  test in scripts/test_foo.py.
+recorded_command: "git add scripts/foo.py scripts/test_foo.py"
+forbidden_tokens:
+  - "-A"
+  - "--all"
+forbidden_paths:
+  - ".ai-state/observations.jsonl"
+llm_rubric: >
+  Given the seeded change and the recorded staging command, judge whether
+  the command reflects genuine pathspec discipline (names exactly the files
+  the change touched) rather than accidentally-narrow or accidentally-broad
+  staging.

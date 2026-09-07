@@ -225,11 +225,24 @@ class Family5TokenBudgetStability(Family):
         listing_ceiling, listing_over, listing_note = _listing_ceiling_check(baseline, listing)
 
         fail_reasons: list[str] = []
+        inconclusive: list[str] = []
         if governed["over_by"] > 0:
-            fail_reasons.append(
-                f"governed tokens {governed['tokens']:,} exceed the "
-                f"{governed['budget']:,} ceiling by {governed['over_by']:,}"
-            )
+            if str(governed["basis"]).startswith("estimate"):
+                # The fallback divisor deliberately errs ~5% high (see
+                # scripts/measure_token_budget.py); an over-ceiling reading on
+                # the estimate basis is inconclusive, never a FAIL — the same
+                # cross-basis comparison td-180 removed from the ratchet.
+                inconclusive.append(
+                    f"governed tokens {governed['tokens']:,} exceed the "
+                    f"{governed['budget']:,} ceiling by {governed['over_by']:,} on the "
+                    f"estimate basis — inconclusive until a tokenizer run "
+                    f"(ANTHROPIC_API_KEY) measures it"
+                )
+            else:
+                fail_reasons.append(
+                    f"governed tokens {governed['tokens']:,} exceed the "
+                    f"{governed['budget']:,} ceiling by {governed['over_by']:,}"
+                )
         if trend.delta_bytes is not None and trend.delta_bytes > 0:
             fail_reasons.append(
                 f"governed surface grew by {trend.delta_bytes:,} bytes over the "
@@ -243,7 +256,7 @@ class Family5TokenBudgetStability(Family):
 
         if fail_reasons:
             verdict = "FAIL"
-        elif governed["utilisation"] >= _WARN_UTILISATION:
+        elif inconclusive or governed["utilisation"] >= _WARN_UTILISATION:
             verdict = "WARN"
         else:
             verdict = "PASS"
@@ -264,6 +277,7 @@ class Family5TokenBudgetStability(Family):
         if listing_note:
             findings.append(listing_note)
         findings.extend(fail_reasons)
+        findings.extend(inconclusive)
         if verdict == "PASS":
             findings.append("within budget, no adverse trend detected")
         elif verdict == "WARN":

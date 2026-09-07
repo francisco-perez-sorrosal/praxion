@@ -39,7 +39,7 @@ Aliases for `opus`/`sonnet` (they track the newest generation — Opus 5 / Sonne
 | `context-engineer` | M | `sonnet` | Placement, conflict detection |
 | `researcher` | M | `sonnet` | Default; modes route up or down |
 | `cicd-engineer` | M | `sonnet` | Pipeline design, security review |
-| `sentinel` | M | `sonnet` | Mechanical scan + 10-dimension judgment |
+| `sentinel` | M | `sonnet` | Mechanical scan + judgment |
 | `skill-genesis` | M | `sonnet` | Triage, dedup, autonomous report writing |
 | `doc-engineer` | L | `claude-haiku-4-5` | Mechanical doc verification, pattern writing; pinned full ID (see alias note above) |
 

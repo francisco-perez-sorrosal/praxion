@@ -61,7 +61,7 @@ Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.m
 - **Praxion-specific principles** (extend `~/.claude/CLAUDE.md`): token budget first-class, measure before optimize, standards convergence as opportunity, curiosity over dogma. Full rationale in `README.md#guiding-principles`.
 - **Assistant-agnostic shared assets** at repo root (`skills/`, `commands/`, `agents/`); assistant-specific config in subdirectories (`claude/config/`, `codex/config/`, `cursor/config/`).
 - **Progressive disclosure** in skills (metadata at startup, body on activation, references on demand) is a load-bearing pattern — preserve it when crafting new skills.
-- **No cross-session memory backend** (per dec-225): the in-house memory subsystem was removed; `sandbook` is the planned replacement but is not yet integrated. Do not call `remember`/`recall`/`search` — no memory tools exist. Observability (`observations.jsonl`) and ADR injection are unaffected.
+- No **MCP** memory tools are registered (`dec-225`) — do not call `remember`/`recall`/`search`. The harness agent-memory directory (`memory:` frontmatter, `~/.claude/projects/<p>/memory/`) is live.
 
 ## When NOT to use the full pipeline
 

@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-07T01:57:13Z'
+generated_at: '2026-09-07T02:49:29Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -83,6 +83,7 @@ surfaces:
   - docs-external-api-docs
   - docs-getting-started
   - docs-independent-analysis-personal-software-factory-analysis
+  - docs-independent-analysis-process-economy-roadmap
   - docs-metrics-readme
   - docs-ml-training-onramp
   - docs-multi-session
@@ -364,6 +365,17 @@ surfaces:
   last_modified: '2026-06-29'
   audience: architect / context-engineer / implementation-planner / maintainer
   renderer: default_markdown
+- id: docs-independent-analysis-process-economy-roadmap
+  path: docs/independent-analysis/process-economy-roadmap.md
+  type: markdown
+  title: "Praxion Process Economy \u2014 Best-in-Class Against Modern Agentic Pipelines by Spending Less"
+  last_modified: '2026-09-06'
+  diataxis: explanation
+  audience: architect / maintainer
+  renderer: explanation_shell
+  surfaces_referenced:
+  - docs-context-prj-comparison-2026-05-12-readme
+  - docs-independent-analysis-personal-software-factory-analysis
 - id: docs-independent-analysis-self-healing-loop-implementation-brief
   path: docs/independent-analysis/self-healing-loop-implementation-brief.md
   type: markdown
@@ -3107,6 +3119,7 @@ groups:
   - docs-context-prj-comparison-2026-05-12-readme
   - docs-decision-tracking
   - docs-independent-analysis-personal-software-factory-analysis
+  - docs-independent-analysis-process-economy-roadmap
   - docs-multidisciplinary-identities-evidence
 - id: other
   label: Other

@@ -12,9 +12,12 @@ own subject matter exists to eliminate.
 
 from __future__ import annotations
 
+import json
+from datetime import date
 from pathlib import Path
 
 import measure_token_budget as mtb
+import pytest
 
 
 def _rule(root: Path, rel: str, body: str) -> Path:
@@ -188,3 +191,144 @@ def test_listing_reports_a_labelled_estimate_without_an_api_key(tmp_path: Path) 
 
     assert "estimate" in listing["basis"]
     assert listing["tokens"] == round(listing["bytes"] / mtb._FALLBACK_DIVISOR)
+
+
+# -- The ratchet (fixed `today`, stubbed measurements -- no wall clock, no network) --
+
+
+_TODAY = date(2026, 1, 31)
+
+
+def _seed_baseline(path: Path, *, listing_ceiling: int, samples: list[dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps({"schema": 1, "listing_ceiling": listing_ceiling, "samples": samples})
+    )
+
+
+def _stub_measurements(
+    monkeypatch: pytest.MonkeyPatch, *, governed_tokens: int, listing_tokens: int
+) -> None:
+    monkeypatch.setattr(
+        mtb, "measure", lambda repo_root, **kw: {"files": ["x"], "tokens": governed_tokens}
+    )
+    monkeypatch.setattr(mtb, "measure_listing", lambda repo_root, **kw: {"tokens": listing_tokens})
+
+
+def test_ratchet_positive_governed_delta_blocks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The gate contract: growth over the window must fail, not just report."""
+    baseline = tmp_path / "baseline.json"
+    _seed_baseline(
+        baseline, listing_ceiling=999_999, samples=[{"date": "2026-01-01", "governed_tokens": 100}]
+    )
+    _stub_measurements(monkeypatch, governed_tokens=150, listing_tokens=10)
+
+    result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
+
+    assert result["governed_delta"] == 50
+    assert result["ratchet_ok"] is False
+
+
+def test_ratchet_relocation_that_nets_non_positive_passes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A relocation with pointer overhead: net smaller, so it must not block."""
+    baseline = tmp_path / "baseline.json"
+    _seed_baseline(
+        baseline, listing_ceiling=999_999, samples=[{"date": "2026-01-01", "governed_tokens": 200}]
+    )
+    _stub_measurements(monkeypatch, governed_tokens=195, listing_tokens=10)
+
+    result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
+
+    assert result["governed_delta"] == -5
+    assert result["ratchet_ok"] is True
+
+
+def test_ratchet_listing_over_ceiling_blocks_independent_of_governed_delta(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The listing ceiling is a second, independent tripwire."""
+    baseline = tmp_path / "baseline.json"
+    _seed_baseline(
+        baseline, listing_ceiling=100, samples=[{"date": "2026-01-01", "governed_tokens": 200}]
+    )
+    _stub_measurements(monkeypatch, governed_tokens=195, listing_tokens=101)
+
+    result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
+
+    assert result["governed_delta"] == -5, "governed side alone would pass"
+    assert result["listing_over_ceiling"] is True
+    assert result["ratchet_ok"] is False
+
+
+def test_ratchet_within_30_days_skips_the_delta_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bootstrap exemption: under 30 days of history, don't manufacture a verdict."""
+    baseline = tmp_path / "baseline.json"
+    _seed_baseline(
+        baseline, listing_ceiling=999_999, samples=[{"date": "2026-01-15", "governed_tokens": 100}]
+    )
+    _stub_measurements(monkeypatch, governed_tokens=500, listing_tokens=10)
+
+    result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
+
+    assert result["governed_delta"] is None
+    assert result["ratchet_ok"] is True
+
+
+def test_ratchet_absent_baseline_fails_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every managed project without a seeded baseline must warn and pass, not block."""
+    _stub_measurements(monkeypatch, governed_tokens=999_999, listing_tokens=10)
+
+    result = mtb.ratchet(tmp_path, baseline_path=tmp_path / "missing.json", today=_TODAY)
+
+    assert result["skipped"] is True
+    assert "baseline" in result["reason"]
+    assert result["ratchet_ok"] is True
+
+
+def test_ratchet_empty_governed_set_fails_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A misconfigured governed glob must not silently pass every future commit as clean."""
+    monkeypatch.setattr(mtb, "measure", lambda repo_root, **kw: {"files": [], "tokens": 0})
+
+    result = mtb.ratchet(tmp_path, baseline_path=tmp_path / "unused.json", today=_TODAY)
+
+    assert result["skipped"] is True
+    assert "empty" in result["reason"]
+    assert result["ratchet_ok"] is True
+
+
+def test_ratchet_records_todays_sample_idempotently(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A same-day rerun must not duplicate today's entry."""
+    baseline = tmp_path / "baseline.json"
+    _seed_baseline(
+        baseline, listing_ceiling=999_999, samples=[{"date": "2025-12-01", "governed_tokens": 100}]
+    )
+    _stub_measurements(monkeypatch, governed_tokens=110, listing_tokens=10)
+
+    mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
+    mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
+
+    samples = json.loads(baseline.read_text())["samples"]
+    todays = [s for s in samples if s["date"] == _TODAY.isoformat()]
+    assert len(todays) == 1
+    assert todays[0]["governed_tokens"] == 110
+
+
+def test_ratchet_cli_exits_zero_on_a_skip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`--ratchet` at the CLI must not block a commit when there is nothing to ratchet against."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    _repo(tmp_path)
+    _rule(tmp_path, "small.md", "# a short rule\n")
+
+    assert mtb.main(["--repo-root", str(tmp_path), "--ratchet"]) == 0

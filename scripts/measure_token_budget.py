@@ -42,6 +42,7 @@ import os
 import sys
 import urllib.error
 import urllib.request
+from datetime import date, timedelta
 from pathlib import Path
 
 from _repo_root import resolve_repo_root
@@ -60,6 +61,12 @@ _MEASURED_ON = "2026-08-05"
 _COUNT_TOKENS_URL = "https://api.anthropic.com/v1/messages/count_tokens"
 _MODEL = "claude-sonnet-4-5"
 _TIMEOUT = 60
+
+_BASELINE_SCHEMA = 1
+_BASELINE_RELATIVE_PATH = (".ai-state", "token_budget_baseline.json")
+_RATCHET_WINDOW_DAYS = 30  # the net-delta comparison window
+_BASELINE_PRUNE_DAYS = 35  # kept slightly wider than the window so the window
+# always has an in-range sample to compare against, even the day before a prune
 
 
 def _is_path_scoped(path: Path) -> bool:
@@ -210,14 +217,136 @@ def measure_listing(repo_root: Path, *, api_key: str | None = None) -> dict:
     }
 
 
+def ratchet(
+    repo_root: Path,
+    *,
+    api_key: str | None = None,
+    baseline_path: Path | None = None,
+    today: date | None = None,
+) -> dict:
+    """Today's token-budget ratchet reading against the committed baseline.
+
+    Fails open -- `skipped: True` with a `reason`, never a false `ratchet_ok:
+    False` -- whenever the mechanism cannot answer honestly: a governed file
+    set found empty (a misconfigured `always_loaded_files()` glob would
+    otherwise silently pass every commit), or an absent/unreadable baseline
+    file. The second case is deliberately the single detector for two distinct
+    situations this gate ships into (a fleet plugin, not just this repo): a
+    project that has never seeded a baseline, and a project that is not
+    Praxion-managed at all -- neither carries this file, so one check answers
+    both without a second, redundant "is this project managed" predicate.
+
+    Records today's sample into the baseline on disk (idempotent -- at most
+    one entry per calendar date; a same-day rerun overwrites with the same
+    value) before computing the trailing-window delta, so the committed file
+    grows by ordinary use rather than a separate bookkeeping step.
+    """
+    path = baseline_path or repo_root.joinpath(*_BASELINE_RELATIVE_PATH)
+    today = today or date.today()
+
+    governed = measure(repo_root, api_key=api_key)
+    if not governed["files"]:
+        return _ratchet_skip("the governed file set is empty")
+
+    baseline = _load_baseline(path)
+    if baseline is None:
+        return _ratchet_skip(f"no baseline file at {path}")
+
+    listing = measure_listing(repo_root, api_key=api_key)
+    updated = _append_sample(baseline, today=today, governed_tokens=governed["tokens"])
+    _write_baseline(path, updated)
+
+    window_start = today - timedelta(days=_RATCHET_WINDOW_DAYS)
+    in_window = sorted(
+        (s for s in updated["samples"] if date.fromisoformat(s["date"]) >= window_start),
+        key=lambda s: s["date"],
+    )
+    earliest = in_window[0] if in_window else None
+    span_days = (today - date.fromisoformat(earliest["date"])).days if earliest else 0
+
+    governed_delta = None
+    if span_days >= _RATCHET_WINDOW_DAYS:
+        governed_delta = governed["tokens"] - earliest["governed_tokens"]
+
+    listing_ceiling = baseline.get("listing_ceiling")
+    listing_over_ceiling = listing_ceiling is not None and listing["tokens"] > listing_ceiling
+
+    return {
+        "skipped": False,
+        "reason": None,
+        "ratchet_ok": not listing_over_ceiling and (governed_delta is None or governed_delta <= 0),
+        "governed_delta": governed_delta,
+        "listing_over_ceiling": listing_over_ceiling,
+        "governed_tokens": governed["tokens"],
+        "listing_tokens": listing["tokens"],
+        "listing_ceiling": listing_ceiling,
+    }
+
+
+def _ratchet_skip(reason: str) -> dict:
+    return {
+        "skipped": True,
+        "reason": reason,
+        "ratchet_ok": True,
+        "governed_delta": None,
+        "listing_over_ceiling": False,
+    }
+
+
+def _load_baseline(path: Path) -> dict | None:
+    """The baseline, or None on absence/corruption -- both fail open the same way."""
+    if not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _append_sample(baseline: dict, *, today: date, governed_tokens: int) -> dict:
+    """A new baseline dict with today's sample appended and old samples pruned."""
+    today_str = today.isoformat()
+    samples = [s for s in baseline.get("samples", []) if s["date"] != today_str]
+    samples.append({"date": today_str, "governed_tokens": governed_tokens})
+    cutoff = today - timedelta(days=_BASELINE_PRUNE_DAYS)
+    samples = [s for s in samples if date.fromisoformat(s["date"]) >= cutoff]
+    samples.sort(key=lambda s: s["date"])
+    return {**baseline, "samples": samples}
+
+
+def _write_baseline(path: Path, baseline: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(baseline, indent=2) + "\n", encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Always-loaded token budget (measured).")
     parser.add_argument("--json", action="store_true", help="emit the reading as JSON")
     parser.add_argument("--repo-root", help="repository root (defaults to git discovery)")
+    parser.add_argument(
+        "--ratchet",
+        action="store_true",
+        help="report the trailing-30-day governed-token delta and listing ceiling instead",
+    )
     args = parser.parse_args(argv)
 
     repo_root = resolve_repo_root(args.repo_root, script_dir=SCRIPT_DIR)
     api_key = os.environ.get("ANTHROPIC_API_KEY")
+
+    if args.ratchet:
+        result = ratchet(repo_root, api_key=api_key)
+        if args.json:
+            print(json.dumps(result, indent=2))
+        elif result["skipped"]:
+            print(f"ratchet: SKIPPED -- {result['reason']}")
+        else:
+            verdict = "OK" if result["ratchet_ok"] else "BLOCKED"
+            print(
+                f"ratchet: {verdict} -- governed_delta={result['governed_delta']}, "
+                f"listing={result['listing_tokens']}/{result['listing_ceiling']}"
+            )
+        return 0 if result["ratchet_ok"] else 1
+
     report = measure(repo_root, api_key=api_key)
     report["listing"] = measure_listing(repo_root, api_key=api_key)
 

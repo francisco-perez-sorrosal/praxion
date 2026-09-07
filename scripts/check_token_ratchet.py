@@ -6,7 +6,7 @@ Thin by design, matching the existing `check_*.py` commit-gate convention
 script path, no forwarded CLI args): this script's only job is translating
 `ratchet()`'s structured result into the 0-clean/1-findings exit convention
 `--blocking` maps onto PreToolUse's block code. The ratchet's own definition
--- the trailing-30-day governed-token delta, the frozen listing ceiling, and
+-- the trailing-30-day governed-*byte* delta, the frozen listing ceiling, and
 the fail-open conditions -- lives in `measure_token_budget.py`; this file
 restates none of it.
 
@@ -40,10 +40,10 @@ _SCRIPT_ERROR = 3
 
 def _format_reasons(result: dict) -> str:
     reasons = []
-    if result["governed_delta"] is not None and result["governed_delta"] > 0:
+    delta_bytes = result["governed_delta_bytes"]
+    if delta_bytes is not None and delta_bytes > 0:
         reasons.append(
-            f"governed always-loaded tokens grew by {result['governed_delta']} "
-            "over the trailing 30 days"
+            f"governed always-loaded bytes grew by {delta_bytes} over the trailing 30 days"
         )
     if result["listing_over_ceiling"]:
         reasons.append(

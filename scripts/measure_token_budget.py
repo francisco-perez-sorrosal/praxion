@@ -27,9 +27,16 @@ estimate; only a tokenizer run is reported as measured.
 Every reading and every persisted baseline sample carries its `basis`
 (`"tokenizer"` or `"estimate"`) precisely because the two are not
 interchangeable -- the ~20% swing between them (see `measure_listing()`'s
-docstring) is large enough to read as real corpus growth on its own.
-`ratchet()` compares a sample only against a same-basis prior; a mismatch
-fails open with an INFO note rather than diffing two different rulers.
+docstring) is large enough to read as real corpus growth on its own. That
+swing is why `ratchet()`'s trailing-window trend compares **bytes**, not
+tokens: the governed file set serializes to the same byte count regardless
+of whether `ANTHROPIC_API_KEY` happened to be set on the day a sample was
+taken, so the trend line needs no basis at all. Tokens (and `basis`) remain
+only for the two absolute-ceiling checks -- the budget check in `measure()`
+and the frozen listing ceiling in `ratchet()` -- where a labelled estimate
+is still an honest answer to "how many tokens right now," and the listing
+ceiling alone keeps its basis-mismatch guard (a mismatch there still fails
+open with an INFO note rather than diffing two different rulers).
 
 Stdlib-only, deliberately: the sentinel invokes this through the ambient
 interpreter, so a third-party import would make it a finding of the
@@ -47,6 +54,7 @@ import argparse
 import functools
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -83,24 +91,226 @@ def _is_path_scoped(path: Path) -> bool:
     return any(line.strip().startswith("paths:") for line in head)
 
 
-def always_loaded_files(repo_root: Path, *, include_global: bool = True) -> list[Path]:
-    """The always-loaded surface, as the loader actually resolves it.
-
-    Catalog `README.md` files are excluded. This is not a convenience: a
-    `rules/README.md` carries no `paths:` and so reads as always-loaded under a
-    naive "no frontmatter means always loaded" test, but it is a catalog rather
-    than a rule and a live session does not inject it. Counting them in swings
-    the total by roughly 4,500 tokens -- enough on its own to flip the verdict.
+def _unscoped_rule_files(base: Path) -> list[Path]:
+    """Unscoped (no `paths:`) `.md` rule files under `base`, catalog `README.md`
+    excluded -- a `README.md` carries no `paths:` and so reads as always-loaded
+    under a naive "no frontmatter means always loaded" test, but it is a
+    catalog rather than a rule and a live session does not inject it. Counting
+    it in swings the total by roughly 4,500 tokens -- enough on its own to flip
+    the verdict. Absent `base` is not an error: most managed projects carry no
+    project-scoped `.claude/rules/`, relying on the global one instead.
     """
-    files = [
+    if not base.is_dir():
+        return []
+    return [
         path
-        for path in sorted(repo_root.glob("rules/**/*.md"))
+        for path in sorted(base.glob("**/*.md"))
         if path.name != "README.md" and not _is_path_scoped(path)
     ]
-    files.append(repo_root / "CLAUDE.md")
+
+
+def _load_claude_md_excludes(settings_path: Path) -> list[str]:
+    """`claudeMdExcludes` glob patterns from a `.claude/settings.json`, or `[]`.
+
+    Absence or malformation fails open (empty list) -- most managed projects
+    carry no excludes at all, so a missing file is the common case, not an
+    error.
+    """
+    if not settings_path.is_file():
+        return []
+    try:
+        data = json.loads(settings_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    excludes = data.get("claudeMdExcludes", [])
+    if not isinstance(excludes, list):
+        return []
+    return [pattern for pattern in excludes if isinstance(pattern, str)]
+
+
+def _exclude_glob_to_regex(pattern: str) -> re.Pattern[str]:
+    """A `claudeMdExcludes`-style glob to regex -- `**` crosses `/`, `*` does not.
+
+    Not `fnmatch`: `fnmatch.fnmatch("x/y.md", "**/x/y.md")` is `False` because
+    `fnmatch` translates `*` to `.*` with no path-segment awareness, so a
+    leading `**/` (meant to match "at any depth, including zero") never
+    matches the zero-depth case. This translates each glob primitive by hand
+    instead, precisely to keep that zero-depth case matching.
+    """
+    escaped = re.escape(pattern)
+    escaped = escaped.replace(r"\*\*/", "(?:.*/)?")
+    escaped = escaped.replace(r"\*\*", ".*")
+    escaped = escaped.replace(r"\*", "[^/]*")
+    escaped = escaped.replace(r"\?", ".")
+    return re.compile(f"^{escaped}$")
+
+
+def _is_excluded(path: Path, repo_root: Path, patterns: list[str]) -> bool:
+    """True when `path` matches any `claudeMdExcludes` glob.
+
+    Tried against both the path relative to `repo_root` and relative to the
+    user's home directory (a pattern may target either root), plus the
+    absolute posix string as a last resort -- so a pattern anchored at
+    whichever root wrote it still matches.
+    """
+    if not patterns:
+        return False
+    candidates = {path.as_posix()}
+    for root in (repo_root, Path.home()):
+        try:
+            candidates.add(path.relative_to(root).as_posix())
+        except ValueError:
+            pass
+    return any(
+        _exclude_glob_to_regex(pattern).match(candidate)
+        for pattern in patterns
+        for candidate in candidates
+    )
+
+
+def _discover_rules_manifest(repo_root: Path) -> Path | None:
+    """`rules/_manifest.yaml`, checked at the project root first, then the
+    live plugin install (`CLAUDE_PLUGIN_ROOT`) -- a managed project's own
+    checkout rarely carries the manifest (it ships with the plugin, not the
+    project), so the plugin-root fallback is the common case there."""
+    candidate = repo_root / "rules" / "_manifest.yaml"
+    if candidate.is_file():
+        return candidate
+    plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT")
+    if plugin_root:
+        candidate = Path(plugin_root) / "rules" / "_manifest.yaml"
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _hook_deliver_rule_paths(manifest_text: str) -> list[str]:
+    """`path:` values of manifest entries whose `install:` is `hook-deliver`.
+
+    Deliberately not a YAML parse -- this module is stdlib-only by
+    construction (see the module docstring) -- and `rules/_manifest.yaml` is
+    machine-generated by `regenerate_rules_manifest.py` with one guaranteed
+    shape: a flat list of `- id: ...` entries, each a run of unindented-once
+    `key: value` scalar lines with no nesting. A line-scan over that one
+    shape is exact; it would not be for arbitrary YAML.
+    """
+    current_path: str | None = None
+    current_install: str | None = None
+    results: list[str] = []
+
+    def _flush() -> None:
+        if current_path and current_install == "hook-deliver":
+            results.append(current_path)
+
+    for line in manifest_text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("- id:"):
+            _flush()
+            current_path, current_install = None, None
+        elif stripped.startswith("path:"):
+            current_path = stripped[len("path:") :].strip().strip("'\"")
+        elif stripped.startswith("install:"):
+            current_install = stripped[len("install:") :].strip().strip("'\"")
+    _flush()
+    return results
+
+
+def _hook_delivered_files(repo_root: Path) -> list[tuple[Path, str]]:
+    """Rules delivered into a session by `inject_rules.py` rather than
+    symlinked -- the manifest's `install: hook-deliver` rows -- resolved
+    against the manifest's own repo root (`<root>/rules/_manifest.yaml` ->
+    `<root>`), since a plugin-cache manifest and a checkout manifest
+    describe two different physical trees. Returns `(path, name)` pairs so
+    the caller can dedup by `name` against whatever other channel already
+    delivered the same rule (see `always_loaded_files`)."""
+    manifest_path = _discover_rules_manifest(repo_root)
+    if manifest_path is None:
+        return []
+    manifest_root = manifest_path.parent.parent
+    relative_paths = _hook_deliver_rule_paths(manifest_path.read_text(encoding="utf-8"))
+    return [
+        (manifest_root / rel, rel.removeprefix("rules/"))
+        for rel in relative_paths
+        if rel.startswith("rules/")
+    ]
+
+
+def _rule_name(path: Path, root: Path) -> str:
+    """`path`'s identity within a rules tree -- its path relative to `root`,
+    POSIX-style. The dedup key across every channel that can deliver the same
+    rule (see `always_loaded_files`)."""
+    return path.relative_to(root).as_posix()
+
+
+def always_loaded_files(repo_root: Path, *, include_global: bool = True) -> list[Path]:
+    """The always-loaded surface, as the Claude Code loader actually resolves it
+    for a session in `repo_root`.
+
+    Four sources: the project's own `CLAUDE.md` and its unscoped
+    `.claude/rules/**`; the global `~/.claude/CLAUDE.md` and its unscoped
+    `~/.claude/rules/**`; `claudeMdExcludes` glob subtraction from either
+    `settings.json`; and the rules a project's own onboarding never symlinks
+    at all because `inject_rules.py` delivers them per-session instead
+    (`install: hook-deliver` in `rules/_manifest.yaml`). For Praxion's own
+    tree, the project-root `rules/**` is *also* included unscoped -- this
+    repository is the source the global symlinks point at, not a
+    `.claude/rules/`-shaped consumer of it.
+
+    Deduplication is by **rule name** (path relative to whichever rules-tree
+    root delivered it), not realpath and not content: a self-hosted checkout
+    running from a worktree has its own `rules/**` diverge byte-for-byte from
+    whatever `~/.claude/rules/**` symlinks to (a different physical checkout
+    entirely, mid-edit relative to it) -- realpath dedup never collapses that
+    divergence (two different files), and content-hash dedup only collapses
+    it for rules that happen to be byte-identical at measurement time, which
+    an in-flight edit to exactly one rule defeats. Name-based dedup collapses
+    all of them, and processing project-scoped sources before global ones
+    means the project's own (freshest) copy always wins -- exactly the
+    "prefer the repo path when present" rule a self-hosted checkout needs.
+    The two `CLAUDE.md` singletons (project root, global) are never part of
+    a rules-tree name collision and are deduped on their own literal path.
+    """
+    excludes = _load_claude_md_excludes(repo_root / ".claude" / "settings.json")
     if include_global:
-        files.append(Path.home() / ".claude" / "CLAUDE.md")
-    return [f for f in files if f.is_file()]
+        excludes = excludes + _load_claude_md_excludes(Path.home() / ".claude" / "settings.json")
+
+    files: list[Path] = []
+    seen_names: set[str] = set()
+    seen_paths: set[Path] = set()
+
+    def _add(path: Path, name: str | None = None) -> None:
+        if not path.is_file() or _is_excluded(path, repo_root, excludes):
+            return
+        if name is None:
+            if path in seen_paths:
+                return
+            seen_paths.add(path)
+        else:
+            if name in seen_names:
+                return
+            seen_names.add(name)
+        files.append(path)
+
+    _add(repo_root / "CLAUDE.md")
+    project_rules = repo_root / ".claude" / "rules"
+    for rule_path in _unscoped_rule_files(project_rules):
+        _add(rule_path, name=_rule_name(rule_path, project_rules))
+    dogfood_rules = repo_root / "rules"
+    for rule_path in _unscoped_rule_files(dogfood_rules):
+        _add(rule_path, name=_rule_name(rule_path, dogfood_rules))
+    if include_global:
+        _add(Path.home() / ".claude" / "CLAUDE.md")
+        global_rules = Path.home() / ".claude" / "rules"
+        for rule_path in _unscoped_rule_files(global_rules):
+            _add(rule_path, name=_rule_name(rule_path, global_rules))
+        # Hook-delivered rules ride the same "consult ambient session state"
+        # channel as the global scan above (`CLAUDE_PLUGIN_ROOT`, a live
+        # plugin install) -- gated the same way so `include_global=False`
+        # stays what its callers rely on it for: a hermetic, project-only
+        # reading with no ambient environment lookups at all.
+        for rule_path, name in _hook_delivered_files(repo_root):
+            _add(rule_path, name=name)
+    return files
 
 
 @functools.lru_cache(maxsize=32)
@@ -280,12 +490,18 @@ def ratchet(
     value) before computing the trailing-window delta, so the committed file
     grows by ordinary use rather than a separate bookkeeping step.
 
-    Both tripwires (the trailing-window delta and the listing ceiling) also
-    fail open -- with an INFO `note`, not a manufactured verdict -- when
-    today's reading and the historical one it would compare against were
-    taken on different `basis` (tokenizer vs. estimate). The two bases
-    disagree by ~20% on identical text, which dwarfs any real growth the
-    ratchet exists to catch.
+    The trailing-window trend compares **bytes**, not tokens (td-180): a
+    project whose `ANTHROPIC_API_KEY` availability flips day to day (CI vs.
+    local commits) would otherwise see its governed-token history alternate
+    between a tokenizer count and the `bytes / 3.6` fallback estimate, and
+    the ~20% swing between those two rulers on identical text dwarfs any
+    real growth the ratchet exists to catch. Bytes need no such basis --
+    the same file set always serializes to the same byte count regardless
+    of which measurement path produced today's *token* reading -- so the
+    byte-delta check never skips on that account. The frozen listing
+    ceiling is a separate, still token-based tripwire and keeps its own
+    basis-mismatch guard below, since a labelled token estimate is still
+    the right answer to "how many tokens right now."
     """
     path = baseline_path or repo_root.joinpath(*_BASELINE_RELATIVE_PATH)
     today = today or date.today()
@@ -299,9 +515,12 @@ def ratchet(
         return _ratchet_skip(f"no baseline file at {path}")
 
     listing = measure_listing(repo_root, api_key=api_key)
-    governed_basis = _basis_label(governed)
     updated = _append_sample(
-        baseline, today=today, governed_tokens=governed["tokens"], basis=governed_basis
+        baseline,
+        today=today,
+        governed_tokens=governed["tokens"],
+        governed_bytes=governed["bytes"],
+        basis=_basis_label(governed),
     )
     _write_baseline(path, updated)
 
@@ -309,7 +528,7 @@ def ratchet(
     prior_samples = sorted(
         (s for s in updated["samples"] if s["date"] != today_str), key=lambda s: s["date"]
     )
-    governed_delta, notes = _governed_delta(prior_samples, governed, governed_basis, today)
+    governed_delta_bytes, notes = _governed_byte_delta(prior_samples, governed, today)
 
     listing_basis = _basis_label(listing)
     listing_ceiling = baseline.get("listing_ceiling")
@@ -327,43 +546,47 @@ def ratchet(
     return {
         "skipped": False,
         "reason": None,
-        "ratchet_ok": not listing_over_ceiling and (governed_delta is None or governed_delta <= 0),
-        "governed_delta": governed_delta,
+        "ratchet_ok": not listing_over_ceiling
+        and (governed_delta_bytes is None or governed_delta_bytes <= 0),
+        "governed_delta_bytes": governed_delta_bytes,
         "listing_over_ceiling": listing_over_ceiling,
         "governed_tokens": governed["tokens"],
+        "governed_bytes": governed["bytes"],
         "listing_tokens": listing["tokens"],
         "listing_ceiling": listing_ceiling,
         "notes": notes,
     }
 
 
-def _governed_delta(
-    prior_samples: list[dict], governed: dict, governed_basis: str, today: date
+def _governed_byte_delta(
+    prior_samples: list[dict], governed: dict, today: date
 ) -> tuple[int | None, list[str]]:
-    """The trailing-window delta against the oldest same-basis prior sample.
+    """The trailing-window byte delta against the oldest byte-tracked prior sample.
 
-    The comparison point is the oldest surviving *same-basis* prior sample,
-    never today's own just-appended entry (comparing today against itself
-    would always read as zero delta) and never a different-basis sample
-    (comparing a tokenizer count against an estimate reads a ~20% basis
-    swing as growth). The 35-day prune bound (`_append_sample`) already caps
-    how far back "oldest" can reach, so this stays a trailing-window
-    comparison without needing a second, narrower window filter.
+    The comparison point is the oldest surviving prior sample that carries
+    `governed_bytes`, never today's own just-appended entry (comparing today
+    against itself would always read as zero delta). Legacy samples recorded
+    before this field existed carry only `governed_tokens` -- skipped here,
+    not `KeyError`'d, so an old baseline degrades to "no comparison yet"
+    rather than crashing the gate. The 35-day prune bound (`_append_sample`)
+    already caps how far back "oldest" can reach, so this stays a
+    trailing-window comparison without needing a second, narrower window
+    filter.
     """
-    same_basis_priors = [s for s in prior_samples if s.get("basis", "tokenizer") == governed_basis]
-    if not same_basis_priors:
+    byte_tracked_priors = [s for s in prior_samples if "governed_bytes" in s]
+    if not byte_tracked_priors:
         if prior_samples:
             return None, [
-                f"no same-basis ('{governed_basis}') prior sample in the tracked window -- "
-                "skipping the governed-token delta check"
+                "no byte-tracked prior sample in the tracked window -- skipping "
+                "the governed-byte delta check"
             ]
         return None, []
 
-    oldest_prior = same_basis_priors[0]
+    oldest_prior = byte_tracked_priors[0]
     tracked_days = (today - date.fromisoformat(oldest_prior["date"])).days
     if tracked_days < _RATCHET_WINDOW_DAYS:
         return None, []
-    return governed["tokens"] - oldest_prior["governed_tokens"], []
+    return governed["bytes"] - oldest_prior["governed_bytes"], []
 
 
 def _ratchet_skip(reason: str) -> dict:
@@ -371,7 +594,7 @@ def _ratchet_skip(reason: str) -> dict:
         "skipped": True,
         "reason": reason,
         "ratchet_ok": True,
-        "governed_delta": None,
+        "governed_delta_bytes": None,
         "listing_over_ceiling": False,
         "notes": [],
     }
@@ -387,11 +610,25 @@ def _load_baseline(path: Path) -> dict | None:
         return None
 
 
-def _append_sample(baseline: dict, *, today: date, governed_tokens: int, basis: str) -> dict:
-    """A new baseline dict with today's sample appended and old samples pruned."""
+def _append_sample(
+    baseline: dict, *, today: date, governed_tokens: int, governed_bytes: int, basis: str
+) -> dict:
+    """A new baseline dict with today's sample appended and old samples pruned.
+
+    `governed_tokens`/`basis` are kept for reporting (the absolute reading on
+    the day the sample was taken); `governed_bytes` is what `ratchet()`'s
+    trailing-window trend actually compares (td-180).
+    """
     today_str = today.isoformat()
     samples = [s for s in baseline.get("samples", []) if s["date"] != today_str]
-    samples.append({"date": today_str, "governed_tokens": governed_tokens, "basis": basis})
+    samples.append(
+        {
+            "date": today_str,
+            "governed_tokens": governed_tokens,
+            "governed_bytes": governed_bytes,
+            "basis": basis,
+        }
+    )
     cutoff = today - timedelta(days=_BASELINE_PRUNE_DAYS)
     samples = [s for s in samples if date.fromisoformat(s["date"]) >= cutoff]
     samples.sort(key=lambda s: s["date"])
@@ -429,7 +666,7 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 verdict = "OK" if result["ratchet_ok"] else "BLOCKED"
                 print(
-                    f"ratchet: {verdict} -- governed_delta={result['governed_delta']}, "
+                    f"ratchet: {verdict} -- governed_delta_bytes={result['governed_delta_bytes']}, "
                     f"listing={result['listing_tokens']}/{result['listing_ceiling']}"
                 )
         return 0 if result["ratchet_ok"] else 1

@@ -63,6 +63,132 @@ def test_a_catalog_readme_is_not_always_loaded(tmp_path: Path) -> None:
     assert "real.md" in names
 
 
+def test_a_project_scoped_claude_rules_file_is_always_loaded(tmp_path: Path) -> None:
+    """The Claude Code loader model: `<root>/.claude/rules/**` is project-scoped,
+    distinct from Praxion's own dogfooding `<root>/rules/**` (td-179)."""
+    _repo(tmp_path)
+    scoped_rule = tmp_path / ".claude" / "rules" / "x.md"
+    scoped_rule.parent.mkdir(parents=True)
+    scoped_rule.write_text("# a project rule\n")
+
+    files = mtb.always_loaded_files(tmp_path, include_global=False)
+
+    assert scoped_rule in files
+
+
+def test_a_symlinked_global_duplicate_is_not_double_counted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`~/.claude/rules/**` is a directory of symlinks back into a project's own
+    rules for a self-hosted checkout -- the same physical file reached through
+    both scans must count once, not twice (td-179)."""
+    monkeypatch.delenv("CLAUDE_PLUGIN_ROOT", raising=False)
+    root = tmp_path / "proj"
+    home = tmp_path / "home"
+    root.mkdir()
+    _repo(root)
+    real_rule = _rule(root, "swe/shared.md", "# shared\n")
+    (home / ".claude" / "rules" / "swe").mkdir(parents=True)
+    (home / ".claude" / "rules" / "swe" / "shared.md").symlink_to(real_rule)
+    (home / ".claude" / "CLAUDE.md").write_text("# global\n")
+    monkeypatch.setenv("HOME", str(home))
+
+    files = mtb.always_loaded_files(root)
+
+    matches = [f for f in files if f.resolve() == real_rule.resolve()]
+    assert len(matches) == 1, "the symlink and its target must count as one file, not two"
+
+
+def test_a_claude_md_exclude_glob_drops_a_matched_rule(tmp_path: Path) -> None:
+    """`claudeMdExcludes` in `.claude/settings.json` subtracts from the surface,
+    the same mechanism Claude Code itself honors (td-179)."""
+    _repo(tmp_path)
+    excluded = tmp_path / ".claude" / "rules" / "ml" / "excluded.md"
+    excluded.parent.mkdir(parents=True)
+    excluded.write_text("# excluded\n")
+    kept = tmp_path / ".claude" / "rules" / "ml" / "kept.md"
+    kept.write_text("# kept\n")
+    settings = tmp_path / ".claude" / "settings.json"
+    settings.write_text(json.dumps({"claudeMdExcludes": ["**/.claude/rules/ml/excluded.md"]}))
+
+    files = mtb.always_loaded_files(tmp_path, include_global=False)
+
+    assert excluded not in files
+    assert kept in files
+
+
+def test_hook_delivered_rules_are_added_from_the_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A rule delivered by `inject_rules.py` (`install: hook-deliver`) is never
+    symlinked anywhere -- the manifest is the only way to discover it in a
+    project with no `<root>/rules/**` of its own (td-179)."""
+    project = tmp_path / "proj"
+    project.mkdir()
+    _repo(project)
+    manifest_dir = tmp_path / "plugin"
+    delivered = manifest_dir / "rules" / "swe" / "delivered.md"
+    delivered.parent.mkdir(parents=True)
+    delivered.write_text("# delivered\n")
+    (manifest_dir / "rules" / "_manifest.yaml").write_text(
+        "rules:\n"
+        "- id: swe/delivered\n"
+        "  path: rules/swe/delivered.md\n"
+        "  install: hook-deliver\n"
+        "- id: swe/symlinked\n"
+        "  path: rules/swe/symlinked.md\n"
+        "  install: symlink\n"
+    )
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(manifest_dir))
+    monkeypatch.setenv("HOME", str(tmp_path / "empty-home"))
+
+    files = mtb.always_loaded_files(project)
+
+    assert delivered in files
+
+
+def test_praxion_shaped_tree_dedupes_symlinked_globals_to_nine_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression pin (td-179): Praxion's own tree -- a project-root `rules/**`
+    that global `~/.claude/rules/**` symlinks back into, plus the project and
+    global `CLAUDE.md` -- must still resolve to exactly 9 always-loaded files,
+    the gate's basis this whole fix must not move.
+
+    A synthetic fixture, not the live developer machine's `~/.claude/rules/`:
+    a regression test must not depend on where that symlink happens to point
+    on whichever machine or worktree runs it.
+    """
+    monkeypatch.delenv("CLAUDE_PLUGIN_ROOT", raising=False)
+    root = tmp_path / "proj"
+    home = tmp_path / "home"
+    root.mkdir()
+    _repo(root)
+    always_on = [_rule(root, "CLAUDE.md", "# rules catalog\n")]
+    for name in ("a", "b", "c", "d"):
+        always_on.append(_rule(root, f"swe/{name}.md", f"# {name}\n"))
+    hook_delivered = [
+        _rule(root, "swe/hookA.md", "# hookA\n"),
+        _rule(root, "swe/hookB.md", "# hookB\n"),
+    ]
+    _rule(root, "README.md", "# catalog\n")
+    _rule(root, "ml/scoped.md", "---\npaths: ['**/*.py']\n---\nbody\n")
+
+    home_rules = home / ".claude" / "rules"
+    (home_rules / "swe").mkdir(parents=True)
+    (home / ".claude" / "CLAUDE.md").write_text("# global\n")
+    (home_rules / "CLAUDE.md").symlink_to(always_on[0])
+    for name, rule_path in zip(("a", "b", "c", "d"), always_on[1:], strict=True):
+        (home_rules / "swe" / f"{name}.md").symlink_to(rule_path)
+
+    monkeypatch.setenv("HOME", str(home))
+
+    files = mtb.always_loaded_files(root)
+
+    assert len(files) == 9
+    assert all(f in files for f in [*always_on, *hook_delivered])
+
+
 # -- The reading ---------------------------------------------------------------
 
 
@@ -248,15 +374,19 @@ def _stub_measurements(
     *,
     governed_tokens: int,
     listing_tokens: int,
+    governed_bytes: int | None = None,
     governed_measured: bool = True,
     listing_measured: bool = True,
 ) -> None:
+    if governed_bytes is None:
+        governed_bytes = governed_tokens * 4  # arbitrary but stable when a test doesn't care
     monkeypatch.setattr(
         mtb,
         "measure",
         lambda repo_root, **kw: {
             "files": ["x"],
             "tokens": governed_tokens,
+            "bytes": governed_bytes,
             "measured": governed_measured,
         },
     )
@@ -267,79 +397,117 @@ def _stub_measurements(
     )
 
 
-def test_ratchet_positive_governed_delta_blocks(
+def test_ratchet_positive_byte_delta_blocks(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The gate contract: growth over the window must fail, not just report."""
+    """The gate contract: growth over the window must fail, not just report (td-180)."""
     baseline = tmp_path / "baseline.json"
     _seed_baseline(
-        baseline, listing_ceiling=999_999, samples=[{"date": "2026-01-01", "governed_tokens": 100}]
+        baseline,
+        listing_ceiling=999_999,
+        samples=[{"date": "2026-01-01", "governed_tokens": 100, "governed_bytes": 400}],
     )
-    _stub_measurements(monkeypatch, governed_tokens=150, listing_tokens=10)
+    _stub_measurements(monkeypatch, governed_tokens=150, governed_bytes=600, listing_tokens=10)
 
     result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
 
-    assert result["governed_delta"] == 50
+    assert result["governed_delta_bytes"] == 200
     assert result["ratchet_ok"] is False
 
 
-def test_ratchet_relocation_that_nets_non_positive_passes(
+def test_ratchet_relocation_that_nets_non_positive_bytes_passes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A relocation with pointer overhead: net smaller, so it must not block."""
     baseline = tmp_path / "baseline.json"
     _seed_baseline(
-        baseline, listing_ceiling=999_999, samples=[{"date": "2026-01-01", "governed_tokens": 200}]
+        baseline,
+        listing_ceiling=999_999,
+        samples=[{"date": "2026-01-01", "governed_tokens": 200, "governed_bytes": 800}],
     )
-    _stub_measurements(monkeypatch, governed_tokens=195, listing_tokens=10)
+    _stub_measurements(monkeypatch, governed_tokens=195, governed_bytes=790, listing_tokens=10)
 
     result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
 
-    assert result["governed_delta"] == -5
+    assert result["governed_delta_bytes"] == -10
     assert result["ratchet_ok"] is True
 
 
-def test_ratchet_listing_over_ceiling_blocks_independent_of_governed_delta(
+def test_ratchet_listing_over_ceiling_blocks_independent_of_governed_byte_delta(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The listing ceiling is a second, independent tripwire."""
     baseline = tmp_path / "baseline.json"
     _seed_baseline(
-        baseline, listing_ceiling=100, samples=[{"date": "2026-01-01", "governed_tokens": 200}]
+        baseline,
+        listing_ceiling=100,
+        samples=[{"date": "2026-01-01", "governed_tokens": 200, "governed_bytes": 800}],
     )
-    _stub_measurements(monkeypatch, governed_tokens=195, listing_tokens=101)
+    _stub_measurements(monkeypatch, governed_tokens=195, governed_bytes=790, listing_tokens=101)
 
     result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
 
-    assert result["governed_delta"] == -5, "governed side alone would pass"
+    assert result["governed_delta_bytes"] == -10, "governed side alone would pass"
     assert result["listing_over_ceiling"] is True
     assert result["ratchet_ok"] is False
 
 
-# -- Basis awareness: a tokenizer count and a fallback estimate are different rulers --
-
-
-def test_ratchet_skips_the_governed_delta_check_on_a_basis_mismatch(
+def test_ratchet_byte_delta_ignores_a_governed_basis_mismatch(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A tokenizer-vs-estimate swing (~20% on identical text) must never read
-    as growth. The only same-basis prior is 'tokenizer'; today's reading is
-    an 'estimate' (no API key) -- the delta check must fail open with a note,
-    not manufacture a breach out of two different rulers.
+    """The whole point of td-180: a tokenizer-vs-estimate swing on the governed
+    *token* reading must not block the byte-based trend, because bytes need
+    no basis -- unlike the old token-delta check, this one still compares
+    even though the prior sample is 'tokenizer' and today's is 'estimate'.
     """
     baseline = tmp_path / "baseline.json"
     _seed_baseline(
         baseline,
         listing_ceiling=999_999,
-        samples=[{"date": "2026-01-01", "governed_tokens": 100, "basis": "tokenizer"}],
+        samples=[
+            {
+                "date": "2026-01-01",
+                "governed_tokens": 100,
+                "governed_bytes": 400,
+                "basis": "tokenizer",
+            }
+        ],
     )
-    _stub_measurements(monkeypatch, governed_tokens=150, listing_tokens=10, governed_measured=False)
+    _stub_measurements(
+        monkeypatch,
+        governed_tokens=150,
+        governed_bytes=600,
+        listing_tokens=10,
+        governed_measured=False,
+    )
 
     result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
 
-    assert result["governed_delta"] is None
+    assert result["governed_delta_bytes"] == 200
+    assert result["ratchet_ok"] is False
+    assert result["notes"] == []
+
+
+def test_ratchet_legacy_sample_without_bytes_skips_the_byte_delta_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A baseline seeded before td-180 carries only `governed_tokens` -- the
+    byte-delta check must degrade to "no comparison yet," not `KeyError`.
+    """
+    baseline = tmp_path / "baseline.json"
+    _seed_baseline(
+        baseline, listing_ceiling=999_999, samples=[{"date": "2026-01-01", "governed_tokens": 100}]
+    )
+    _stub_measurements(monkeypatch, governed_tokens=150, governed_bytes=600, listing_tokens=10)
+
+    result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
+
+    assert result["governed_delta_bytes"] is None
     assert result["ratchet_ok"] is True
-    assert any("same-basis" in note for note in result["notes"])
+    assert any("byte-tracked" in note for note in result["notes"])
+
+
+# -- Basis awareness: the listing ceiling is still token-based --------------------
 
 
 def test_ratchet_skips_the_listing_ceiling_check_on_a_basis_mismatch(
@@ -358,11 +526,24 @@ def test_ratchet_skips_the_listing_ceiling_check_on_a_basis_mismatch(
                 "schema": 1,
                 "listing_ceiling": 100,
                 "listing_ceiling_basis": "tokenizer",
-                "samples": [{"date": "2026-01-01", "governed_tokens": 100, "basis": "tokenizer"}],
+                "samples": [
+                    {
+                        "date": "2026-01-01",
+                        "governed_tokens": 100,
+                        "governed_bytes": 400,
+                        "basis": "tokenizer",
+                    }
+                ],
             }
         )
     )
-    _stub_measurements(monkeypatch, governed_tokens=100, listing_tokens=101, listing_measured=False)
+    _stub_measurements(
+        monkeypatch,
+        governed_tokens=100,
+        governed_bytes=400,
+        listing_tokens=101,
+        listing_measured=False,
+    )
 
     result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
 
@@ -385,13 +566,21 @@ def test_ratchet_same_basis_listing_ceiling_still_blocks(
                 "schema": 1,
                 "listing_ceiling": 100,
                 "listing_ceiling_basis": "estimate",
-                "samples": [{"date": "2026-01-01", "governed_tokens": 100, "basis": "estimate"}],
+                "samples": [
+                    {
+                        "date": "2026-01-01",
+                        "governed_tokens": 100,
+                        "governed_bytes": 400,
+                        "basis": "estimate",
+                    }
+                ],
             }
         )
     )
     _stub_measurements(
         monkeypatch,
         governed_tokens=100,
+        governed_bytes=400,
         listing_tokens=101,
         governed_measured=False,
         listing_measured=False,
@@ -416,7 +605,7 @@ def test_ratchet_within_30_days_skips_the_delta_check(
 
     result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
 
-    assert result["governed_delta"] is None
+    assert result["governed_delta_bytes"] is None
     assert result["ratchet_ok"] is True
 
 
@@ -452,9 +641,11 @@ def test_ratchet_records_todays_sample_idempotently(
     """A same-day rerun must not duplicate today's entry."""
     baseline = tmp_path / "baseline.json"
     _seed_baseline(
-        baseline, listing_ceiling=999_999, samples=[{"date": "2025-12-01", "governed_tokens": 100}]
+        baseline,
+        listing_ceiling=999_999,
+        samples=[{"date": "2025-12-01", "governed_tokens": 100, "governed_bytes": 400}],
     )
-    _stub_measurements(monkeypatch, governed_tokens=110, listing_tokens=10)
+    _stub_measurements(monkeypatch, governed_tokens=110, governed_bytes=440, listing_tokens=10)
 
     mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
     mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
@@ -463,6 +654,7 @@ def test_ratchet_records_todays_sample_idempotently(
     todays = [s for s in samples if s["date"] == _TODAY.isoformat()]
     assert len(todays) == 1
     assert todays[0]["governed_tokens"] == 110
+    assert todays[0]["governed_bytes"] == 440
 
 
 def test_ratchet_cli_exits_zero_on_a_skip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

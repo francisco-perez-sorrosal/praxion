@@ -43,7 +43,7 @@ def test_exits_zero_when_the_ratchet_is_clean(monkeypatch: pytest.MonkeyPatch) -
         {
             "skipped": False,
             "ratchet_ok": True,
-            "governed_delta": -5,
+            "governed_delta_bytes": -5,
             "listing_over_ceiling": False,
             "listing_tokens": 100,
             "listing_ceiling": 200,
@@ -62,7 +62,7 @@ def test_canary_a_breached_ratchet_exits_nonzero(
         {
             "skipped": False,
             "ratchet_ok": False,
-            "governed_delta": 42,
+            "governed_delta_bytes": 42,
             "listing_over_ceiling": False,
             "listing_tokens": 100,
             "listing_ceiling": 200,
@@ -80,7 +80,7 @@ def test_a_listing_ceiling_breach_also_exits_nonzero(monkeypatch: pytest.MonkeyP
         {
             "skipped": False,
             "ratchet_ok": False,
-            "governed_delta": None,
+            "governed_delta_bytes": None,
             "listing_over_ceiling": True,
             "listing_tokens": 250,
             "listing_ceiling": 200,
@@ -147,13 +147,13 @@ def test_end_to_end_a_deliberately_breached_baseline_exits_one(
     monkeypatch.setattr(gate, "resolve_repo_root", lambda *a, **kw: tmp_path)
     (tmp_path / "CLAUDE.md").write_text("# project\n" + "word " * 30_000, encoding="utf-8")
     old_date = (date.today() - timedelta(days=31)).isoformat()
-    # basis="estimate" matches the no-API-key reading this test takes today --
-    # a same-basis prior is required for the delta check to actually compare
-    # rather than fail open (see measure_token_budget.ratchet's basis-aware fix).
+    # The byte-based trend (td-180) needs no basis match -- a tiny prior byte
+    # count against today's huge corpus is a breach regardless of which
+    # measurement path produced the tokens.
     _seed(
         tmp_path,
         listing_ceiling=999_999,
-        samples=[{"date": old_date, "governed_tokens": 10, "basis": "estimate"}],
+        samples=[{"date": old_date, "governed_bytes": 10}],
     )
 
     assert gate.main() == 1
@@ -169,7 +169,7 @@ def test_end_to_end_a_clean_baseline_exits_zero(
     _seed(
         tmp_path,
         listing_ceiling=999_999,
-        samples=[{"date": old_date, "governed_tokens": 999_999, "basis": "estimate"}],
+        samples=[{"date": old_date, "governed_bytes": 999_999_999}],
     )
 
     assert gate.main() == 0

@@ -6,6 +6,7 @@
     {
       "date": "2026-09-07",
       "governed_tokens": 24542,
+      "governed_bytes": 93499,
       "basis": "tokenizer"
     }
   ]

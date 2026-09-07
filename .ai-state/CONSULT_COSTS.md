@@ -45,7 +45,7 @@ aggregation sums rows per triple.
   transcript-reconstructed figure whose `notes` cell begins with the literal marker
   `RECONSTRUCTED:` and states the derivation, its calibration points and the residual
   direction. A positive integer, digits only, no separators. Never a **price-weighted**
-  figure (dec-draft-6754571e narrows this from "never derived").
+  figure (dec-373 narrows this from "never derived").
 - **model** -- the model tier that actually ran the consult (`opus` / `sonnet` / `haiku`).
   Load-bearing: tokens without a tier are not re-priceable, and an all-`opus` numerator
   over a mixed-tier denominator is exactly the bias `dec-306` corrected. Must equal the

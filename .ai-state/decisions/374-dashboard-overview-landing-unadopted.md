@@ -1,7 +1,7 @@
 ---
-id: dec-draft-9095dc63
+id: dec-374
 title: The dashboard /overview landing is not adopted; / continues to redirect to /architecture
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-06
 summary: dec-160's three components never existed in git history and no code references them. Rather than leave an accepted decision asserting a design target that was never built, this record decides the question the other way and supersedes it.
@@ -49,7 +49,7 @@ record.
 
 **The `/overview` landing is not adopted. `/` continues to redirect to `/architecture`.**
 `dec-160` is superseded: it flips to `status: superseded` with `superseded_by:
-dec-draft-9095dc63`, and its three phantom components leave the design target.
+dec-374`, and its three phantom components leave the design target.
 
 **Why supersession and not retirement.** The retirement protocol is for the case where a later
 decision's *action removed this decision's subject* — the question itself is gone. That is not
@@ -69,7 +69,7 @@ worse than a record that is closed.
 edits specified here):
 
 - `.ai-state/decisions/160-overview-landing-surface.md`: `status: accepted` → `status: superseded`;
-  add `superseded_by: dec-draft-9095dc63` (finalize rewrites it to the assigned `dec-NNN`).
+  add `superseded_by: dec-374` (finalize rewrites it to the assigned `dec-NNN`).
 - `affected_files` on `dec-160` is **left as written**. The list is part of the historical
   record of what was proposed; this record explains why three of its entries never
   materialised. Editing it would erase the evidence for this decision.

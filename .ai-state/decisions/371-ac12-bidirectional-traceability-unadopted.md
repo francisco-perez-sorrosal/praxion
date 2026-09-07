@@ -1,7 +1,7 @@
 ---
-id: dec-draft-6f149b5a
+id: dec-371
 title: Praxion deliberately does not adopt AC12's bidirectional REQ-to-element traceability convention
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-09-06
 summary: The req_ids / architectural_elements convention stays unpopulated in Praxion at 1 real .c4 model and 9 archived specs, where the check would find orphans by construction rather than by drift. AC12's skip note gains a clause so a permanent skip reads as a decision, not a backlog item.

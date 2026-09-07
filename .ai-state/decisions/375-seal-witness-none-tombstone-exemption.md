@@ -1,7 +1,7 @@
 ---
-id: dec-draft-fd158a05
+id: dec-375
 title: The seal-witness equality check exempts NONE tombstones as vacuous, and the priors parsers honour the escape convention the files document
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-09-06
 summary: Two root causes behind four fitness failures — the CONSULT_* escape convention is unparseable by the gate's own splitter, and G6 set-equality is unsatisfiable for any honestly post-hoc NONE tombstone. Fixed by escape-aware splitting, a paid-for G6 vacuity exemption, and two record repairs that restore what was actually recorded.
@@ -247,7 +247,7 @@ seal is a NONE-only declaration**, where the assertion has no content. Everythin
 `dec-310` stands — the ordering, the schema, the witness datum's provenance, the append-only
 discipline, G0–G5, and the tamper-evidence framing (which this decision arguably restores,
 since it removes the one path by which a witness re-point was the only way to be green).
-`dec-310` accordingly stays `accepted` and gains `superseded_in_part_by: [dec-draft-fd158a05]`.
+`dec-310` accordingly stays `accepted` and gains `superseded_in_part_by: [dec-375]`.
 
 The escape-aware parser change is not a narrowing of `dec-310` at all — it is the
 implementation catching up to a convention `dec-310`'s own file already documented.

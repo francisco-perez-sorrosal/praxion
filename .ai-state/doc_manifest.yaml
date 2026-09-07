@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-06T16:55:01Z'
+generated_at: '2026-09-07T00:44:34Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -99,7 +99,7 @@ surfaces:
   path: docs/aac-dac.md
   type: markdown
   title: Architecture-as-Code + Documentation-as-Code
-  last_modified: '2026-08-30'
+  last_modified: '2026-09-06'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -126,7 +126,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-09-05'
+  last_modified: '2026-09-06'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -493,7 +493,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-09-04'
+  last_modified: '2026-09-06'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -532,7 +532,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-09-05'
+  last_modified: '2026-09-06'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -546,7 +546,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-09-05'
+  last_modified: '2026-09-06'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -1524,7 +1524,7 @@ surfaces:
   path: .ai-state/decisions/160-overview-landing-surface.md
   type: markdown
   title: Add an /overview landing surface aggregating sentinel grade, metrics health, active workshops and ADR counts
-  last_modified: '2026-05-12'
+  last_modified: '2026-09-06'
   renderer: adr_card
 - id: ai-state-decisions-161-svg-server-side-normalization
   path: .ai-state/decisions/161-svg-server-side-normalization.md
@@ -2412,7 +2412,7 @@ surfaces:
   path: .ai-state/decisions/308-consult-cost-series.md
   type: markdown
   title: Per-consult cost series lives in a sibling append-only side-record, not a twelfth ledger column
-  last_modified: '2026-07-30'
+  last_modified: '2026-09-06'
   renderer: adr_card
 - id: ai-state-decisions-309-roster-ship-zero
   path: .ai-state/decisions/309-roster-ship-zero.md
@@ -2424,7 +2424,7 @@ surfaces:
   path: .ai-state/decisions/310-sealed-consult-prior.md
   type: markdown
   title: The convener seals a lens-run prior list before spawning a consultant, and the seal is tamper-evident rather than tamper-proof
-  last_modified: '2026-07-31'
+  last_modified: '2026-09-06'
   renderer: adr_card
 - id: ai-state-decisions-311-defer-project-local-overlay-unit
   path: .ai-state/decisions/311-defer-project-local-overlay-unit.md
@@ -2786,6 +2786,36 @@ surfaces:
   title: The WAL closes subagent lifecycles the harness never reports, and names unannounced helpers
   last_modified: '2026-09-05'
   renderer: adr_card
+- id: ai-state-decisions-371-ac12-bidirectional-traceability-unadopted
+  path: .ai-state/decisions/371-ac12-bidirectional-traceability-unadopted.md
+  type: markdown
+  title: Praxion deliberately does not adopt AC12's bidirectional REQ-to-element traceability convention
+  last_modified: '2026-09-06'
+  renderer: adr_card
+- id: ai-state-decisions-372-codex-model-routing-derives-from-tier
+  path: .ai-state/decisions/372-codex-model-routing-derives-from-tier.md
+  type: markdown
+  title: The Codex model adapter keys on the routing rule's Tier column, never on a Claude alias literal
+  last_modified: '2026-09-06'
+  renderer: adr_card
+- id: ai-state-decisions-373-consult-cost-reconstructed-provenance
+  path: .ai-state/decisions/373-consult-cost-reconstructed-provenance.md
+  type: markdown
+  title: "The cost series admits a second, labelled provenance class \u2014 a transcript-reconstructed figure \u2014 rather than a non-numeric \"unrecorded\" sentinel"
+  last_modified: '2026-09-06'
+  renderer: adr_card
+- id: ai-state-decisions-374-dashboard-overview-landing-unadopted
+  path: .ai-state/decisions/374-dashboard-overview-landing-unadopted.md
+  type: markdown
+  title: The dashboard /overview landing is not adopted; / continues to redirect to /architecture
+  last_modified: '2026-09-06'
+  renderer: adr_card
+- id: ai-state-decisions-375-seal-witness-none-tombstone-exemption
+  path: .ai-state/decisions/375-seal-witness-none-tombstone-exemption.md
+  type: markdown
+  title: The seal-witness equality check exempts NONE tombstones as vacuous, and the priors parsers honour the escape convention the files document
+  last_modified: '2026-09-06'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -2798,12 +2828,6 @@ surfaces:
   title: Idea Ledger
   last_modified: '2026-08-07'
   renderer: idea_grid
-- id: ai-state-sentinel-reports-sentinel-report-2026-08-04-13-35-55
-  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-04_13-35-55.md
-  type: markdown
-  title: Sentinel Report
-  last_modified: '2026-08-04'
-  renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-08-05-00-14-32
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-05_00-14-32.md
   type: markdown
@@ -2857,6 +2881,12 @@ surfaces:
   type: markdown
   title: Sentinel Report
   last_modified: '2026-09-05'
+  renderer: default_markdown
+- id: ai-state-sentinel-reports-sentinel-report-2026-09-06-12-31-26
+  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-09-06_12-31-26.md
+  type: markdown
+  title: Sentinel Report
+  last_modified: '2026-09-06'
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-07-16-05-08-18
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_05-08-18.json
@@ -2912,6 +2942,12 @@ surfaces:
   title: METRICS_REPORT_2026-09-05_06-08-20.json
   last_modified: '2026-09-05'
   renderer: metrics_view
+- id: ai-state-metrics-reports-metrics-report-2026-09-06-19-30-28
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-06_19-30-28.json
+  type: json
+  title: METRICS_REPORT_2026-09-06_19-30-28.json
+  last_modified: '2026-09-06'
+  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-07-16-05-08-18
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_05-08-18.md
   type: markdown
@@ -2965,6 +3001,12 @@ surfaces:
   type: markdown
   title: Project Metrics Report
   last_modified: '2026-09-05'
+  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-09-06-19-30-28
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-06_19-30-28.md
+  type: markdown
+  title: Project Metrics Report
+  last_modified: '2026-09-06'
   renderer: default_markdown
 - id: ai-state-specs-spec-agent-model-routing-2026-04-25
   path: .ai-state/specs/SPEC_agent-model-routing_2026-04-25.md
@@ -3441,6 +3483,11 @@ groups:
   - ai-state-decisions-368-sidecar-module-split
   - ai-state-decisions-369-finalize-citation-net
   - ai-state-decisions-370-wal-lifecycle-suspension-stops-and-helper-verdict
+  - ai-state-decisions-371-ac12-bidirectional-traceability-unadopted
+  - ai-state-decisions-372-codex-model-routing-derives-from-tier
+  - ai-state-decisions-373-consult-cost-reconstructed-provenance
+  - ai-state-decisions-374-dashboard-overview-landing-unadopted
+  - ai-state-decisions-375-seal-witness-none-tombstone-exemption
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -3463,7 +3510,8 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-08-31-03-16-10
   - ai-state-metrics-reports-metrics-report-2026-09-05-06-08-20
   - ai-state-metrics-reports-metrics-report-2026-09-05-06-08-20
-  - ai-state-sentinel-reports-sentinel-report-2026-08-04-13-35-55
+  - ai-state-metrics-reports-metrics-report-2026-09-06-19-30-28
+  - ai-state-metrics-reports-metrics-report-2026-09-06-19-30-28
   - ai-state-sentinel-reports-sentinel-report-2026-08-05-00-14-32
   - ai-state-sentinel-reports-sentinel-report-2026-08-05-09-52-51
   - ai-state-sentinel-reports-sentinel-report-2026-08-05-21-27-47
@@ -3473,6 +3521,7 @@ groups:
   - ai-state-sentinel-reports-sentinel-report-2026-08-24-21-04-27
   - ai-state-sentinel-reports-sentinel-report-2026-08-30-20-15-49
   - ai-state-sentinel-reports-sentinel-report-2026-09-04-22-41-32
+  - ai-state-sentinel-reports-sentinel-report-2026-09-06-12-31-26
   - ai-state-specs-spec-agent-model-routing-2026-04-25
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30

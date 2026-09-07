@@ -1,7 +1,7 @@
 ---
-id: dec-draft-6754571e
+id: dec-373
 title: The cost series admits a second, labelled provenance class — a transcript-reconstructed figure — rather than a non-numeric "unrecorded" sentinel
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-09-06
 summary: CONSULT_COSTS.md's tokens column widens from "raw observation only" to "raw observation, or a RECONSTRUCTED figure carrying its formula, its calibration and its residual direction in notes". The rust-first-class/evidence-appraiser row is recorded this way; the gate's positive-integer requirement is untouched.
@@ -133,7 +133,7 @@ location, grain, writer, append-only discipline, the `model` and `difficulty` co
 their load-bearing rationale, the cross-file gate, and the `cost_usd` prohibition — which is
 the derivation `dec-308` was actually defending against, and which this decision does not
 touch. `dec-308` accordingly stays `accepted` and gains
-`superseded_in_part_by: [dec-draft-6754571e]`.
+`superseded_in_part_by: [dec-373]`.
 
 ## Disconfirmation
 

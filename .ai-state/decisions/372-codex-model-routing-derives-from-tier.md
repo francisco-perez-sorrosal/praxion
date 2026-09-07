@@ -1,7 +1,7 @@
 ---
-id: dec-draft-41df8a7a
+id: dec-372
 title: The Codex model adapter keys on the routing rule's Tier column, never on a Claude alias literal
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-06
 summary: CODEX_MODEL_TIER_ADAPTER is re-keyed from the Alias column (opus/sonnet/haiku) to the Tier column (H/M/L), so a Claude-side alias change or full-ID pin can never desynchronise the Codex export from rules/swe/agent-model-routing.md.

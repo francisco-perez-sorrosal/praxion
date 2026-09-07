@@ -13,6 +13,14 @@ Canonical structure for code review reports. Used by the verifier agent (pipelin
 
 Automated review complements but does not replace human judgment.
 
+## Calibration Verdict
+
+[Standard/Full only — see agents/verifier.md Phase 12]
+
+**Retrospective**: [correct / over-calibrated / under-calibrated]
+
+**Evidence**: [one line citing a measurable from the plan or diff — spawn count, tokens, artifact count, or a mid-task re-tier event]
+
 ## Acceptance Criteria
 
 | Criterion | Status | Evidence |

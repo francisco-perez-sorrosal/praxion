@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-07T02:49:29Z'
+generated_at: '2026-09-07T02:49:58Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -62,7 +62,7 @@ surfaces:
   path: docs/README.md
   type: markdown
   title: Praxion docs
-  last_modified: '2026-09-02'
+  last_modified: '2026-09-06'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -570,7 +570,7 @@ surfaces:
   path: .ai-state/LANDSCAPE_WATCHLIST.md
   type: markdown
   title: Praxion Landscape Watchlist
-  last_modified: '2026-09-02'
+  last_modified: '2026-09-06'
   renderer: default_markdown
 - id: ai-state-upstream-issues
   path: .ai-state/UPSTREAM_ISSUES.md

@@ -1185,3 +1185,260 @@ class TestStopSourceProvenance:
         )
 
         assert "stop_source" not in _read_wal(obs_path)[-1]
+
+
+# ---------------------------------------------------------------------------
+# Committed per-session summary (observations_summary.jsonl) -- P0.5
+# ---------------------------------------------------------------------------
+
+
+def _read_summary(summary_path: Path) -> list[dict]:
+    if not summary_path.exists():
+        return []
+    return [
+        json.loads(line) for line in summary_path.read_text(encoding="utf-8").splitlines() if line
+    ]
+
+
+class TestBuildSessionSummary:
+    """Unit tests for the pure aggregation function."""
+
+    def test_counts_spawns_by_agent_type(self) -> None:
+        module = _load_module()
+        rows = [
+            _wal_row(event_type="agent_start", agent_type="praxion:implementer", agent_id="a1"),
+            _wal_row(event_type="agent_start", agent_type="praxion:researcher", agent_id="a2"),
+            _wal_row(event_type="agent_start", agent_type="praxion:implementer", agent_id="a3"),
+        ]
+
+        summary = module.build_session_summary(
+            rows, {"session_id": "sess-1"}, "2026-08-06T18:05:00+00:00"
+        )
+
+        assert summary["spawns_by_agent_type"] == {
+            "praxion:implementer": 2,
+            "praxion:researcher": 1,
+        }
+
+    def test_counts_tool_calls_by_tool(self) -> None:
+        module = _load_module()
+        rows = [
+            _wal_row(event_type="tool_use", tool_name="Write"),
+            _wal_row(event_type="tool_use", tool_name="Write"),
+            _wal_row(event_type="tool_use", tool_name="Bash"),
+        ]
+
+        summary = module.build_session_summary(
+            rows, {"session_id": "sess-1"}, "2026-08-06T18:05:00+00:00"
+        )
+
+        assert summary["tool_calls_by_tool"] == {"Write": 2, "Bash": 1}
+
+    def test_complete_is_true_when_every_start_has_a_matching_stop(self) -> None:
+        module = _load_module()
+        rows = [
+            _wal_row(event_type="agent_start", agent_id="a1"),
+            _wal_row(event_type="agent_stop", agent_id="a1"),
+        ]
+
+        summary = module.build_session_summary(
+            rows, {"session_id": "sess-1"}, "2026-08-06T18:05:00+00:00"
+        )
+
+        assert summary["complete"] is True
+
+    def test_complete_is_false_when_a_start_has_no_matching_stop(self) -> None:
+        """CANARY: a background subagent still running at Stop (pre-mortem 3)."""
+        module = _load_module()
+        rows = [_wal_row(event_type="agent_start", agent_id="a1")]
+
+        summary = module.build_session_summary(
+            rows, {"session_id": "sess-1"}, "2026-08-06T18:05:00+00:00"
+        )
+
+        assert summary["complete"] is False
+
+    def test_complete_is_true_with_no_spawns_at_all(self) -> None:
+        module = _load_module()
+
+        summary = module.build_session_summary(
+            [], {"session_id": "sess-1"}, "2026-08-06T18:05:00+00:00"
+        )
+
+        assert summary["complete"] is True
+
+    def test_duration_ms_spans_earliest_row_to_ended_at(self) -> None:
+        module = _load_module()
+        rows = [
+            _wal_row(timestamp="2026-08-06T18:00:00+00:00"),
+            _wal_row(timestamp="2026-08-06T18:00:30+00:00"),
+        ]
+
+        summary = module.build_session_summary(
+            rows, {"session_id": "sess-1"}, "2026-08-06T18:01:00+00:00"
+        )
+
+        assert summary["started_at"] == "2026-08-06T18:00:00+00:00"
+        assert summary["duration_ms"] == 60_000
+
+    def test_tokens_by_agent_type_and_gate_fire_counts_are_empty_by_default(self) -> None:
+        """Step 10/12 populate these; until then the summary emits empty dicts."""
+        module = _load_module()
+        rows = [_wal_row(event_type="tool_use", tool_name="Write")]
+
+        summary = module.build_session_summary(
+            rows, {"session_id": "sess-1"}, "2026-08-06T18:05:00+00:00"
+        )
+
+        assert summary["tokens_by_agent_type"] == {}
+        assert summary["gate_fire_counts"] == {}
+
+    def test_models_collects_unique_values_when_present(self) -> None:
+        """Forward-compatible: agent_stop rows carry no `model` field until Step 10."""
+        module = _load_module()
+        rows = [
+            _wal_row(event_type="agent_stop", model="claude-opus-5"),
+            _wal_row(event_type="agent_stop", model="claude-sonnet-5"),
+            _wal_row(event_type="agent_stop", model="claude-opus-5"),
+        ]
+
+        summary = module.build_session_summary(
+            rows, {"session_id": "sess-1"}, "2026-08-06T18:05:00+00:00"
+        )
+
+        assert summary["models"] == ["claude-opus-5", "claude-sonnet-5"]
+
+
+class TestSessionSummaryUpsert:
+    def test_stop_writes_one_summary_row(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        module = _load_module()
+        summary_path = project / ".ai-state" / module.SUMMARY_FILENAME
+
+        _run_main(
+            module,
+            {"hook_event_name": "Stop", "session_id": "sess-1", "cwd": str(project)},
+            monkeypatch,
+        )
+
+        rows = _read_summary(summary_path)
+        assert len(rows) == 1
+        assert rows[0]["session_id"] == "sess-1"
+
+    def test_second_stop_in_same_session_updates_not_appends(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        module = _load_module()
+        summary_path = project / ".ai-state" / module.SUMMARY_FILENAME
+        payload = {"hook_event_name": "Stop", "session_id": "sess-1", "cwd": str(project)}
+
+        _run_main(module, payload, monkeypatch)
+        _run_main(module, payload, monkeypatch)
+
+        assert len(_read_summary(summary_path)) == 1
+
+    def test_distinct_sessions_get_distinct_rows(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        module = _load_module()
+        summary_path = project / ".ai-state" / module.SUMMARY_FILENAME
+
+        _run_main(
+            module,
+            {"hook_event_name": "Stop", "session_id": "sess-1", "cwd": str(project)},
+            monkeypatch,
+        )
+        _run_main(
+            module,
+            {"hook_event_name": "Stop", "session_id": "sess-2", "cwd": str(project)},
+            monkeypatch,
+        )
+
+        rows = _read_summary(summary_path)
+        assert {r["session_id"] for r in rows} == {"sess-1", "sess-2"}
+
+    def test_summary_aggregates_only_rows_from_its_own_session(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+        summary_path = project / ".ai-state" / module.SUMMARY_FILENAME
+        _write_wal(
+            obs_path,
+            [
+                _wal_row(
+                    session_id="sess-1",
+                    event_type="agent_start",
+                    agent_type="praxion:implementer",
+                    agent_id="a1",
+                ),
+                _wal_row(
+                    session_id="sess-other",
+                    event_type="agent_start",
+                    agent_type="praxion:researcher",
+                    agent_id="a2",
+                ),
+            ],
+        )
+
+        _run_main(
+            module,
+            {"hook_event_name": "Stop", "session_id": "sess-1", "cwd": str(project)},
+            monkeypatch,
+        )
+
+        row = _read_summary(summary_path)[0]
+        assert row["spawns_by_agent_type"] == {"praxion:implementer": 1}
+
+    def test_raw_wal_untouched_by_summary_writer(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The summary is derived from the raw WAL; it must never write back into it."""
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+
+        _run_main(
+            module,
+            {"hook_event_name": "Stop", "session_id": "sess-1", "cwd": str(project)},
+            monkeypatch,
+        )
+
+        assert len(_read_wal(obs_path)) == 1
+
+    def test_summary_failure_does_not_prevent_the_session_stop_row(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """CANARY: a defect in the new aggregation path must stay fail-open."""
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+
+        def _boom(*_args: object, **_kwargs: object) -> dict:
+            raise RuntimeError("synthetic aggregation failure")
+
+        monkeypatch.setattr(module, "build_session_summary", _boom)
+
+        _run_main(
+            module,
+            {"hook_event_name": "Stop", "session_id": "sess-1", "cwd": str(project)},
+            monkeypatch,
+        )
+
+        assert _read_wal(obs_path)[-1]["event_type"] == "session_stop"
+        assert not (project / ".ai-state" / module.SUMMARY_FILENAME).exists()
+
+    def test_malformed_existing_summary_row_is_skipped_not_raised(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        module = _load_module()
+        summary_path = project / ".ai-state" / module.SUMMARY_FILENAME
+        summary_path.write_text('not json {{{\n{"session_id": "sess-other"}\n', encoding="utf-8")
+
+        _run_main(
+            module,
+            {"hook_event_name": "Stop", "session_id": "sess-1", "cwd": str(project)},
+            monkeypatch,
+        )
+
+        rows = _read_summary(summary_path)
+        assert {r["session_id"] for r in rows} == {"sess-other", "sess-1"}

@@ -58,6 +58,9 @@ tmp/
 .ai-state/*.lock
 .ai-state/**/*.lock
 .ai-state/*.backup.json
+# Raw observations WAL: local-only per dec-draft-66cd5bb6 (observations-wal-leaves-git).
+# The committed rollup is .ai-state/observations_summary.jsonl (one row per session).
+.ai-state/observations.jsonl
 .ai-state/observations.jsonl.1
 .ai-state/*.pre-forget.json
 

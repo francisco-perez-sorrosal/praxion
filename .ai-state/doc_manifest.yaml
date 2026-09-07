@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-07T01:32:56Z'
+generated_at: '2026-09-07T01:57:13Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -2888,12 +2888,6 @@ surfaces:
   title: Sentinel Report
   last_modified: '2026-09-06'
   renderer: default_markdown
-- id: ai-state-metrics-reports-metrics-report-2026-07-16-05-08-18
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_05-08-18.json
-  type: json
-  title: METRICS_REPORT_2026-07-16_05-08-18.json
-  last_modified: '2026-07-15'
-  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-07-16-06-05-57
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_06-05-57.json
   type: json
@@ -2948,12 +2942,12 @@ surfaces:
   title: METRICS_REPORT_2026-09-06_19-30-28.json
   last_modified: '2026-09-06'
   renderer: metrics_view
-- id: ai-state-metrics-reports-metrics-report-2026-07-16-05-08-18
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_05-08-18.md
-  type: markdown
-  title: Project Metrics Report
-  last_modified: '2026-07-15'
-  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-09-07-01-45-44
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-07_01-45-44.json
+  type: json
+  title: METRICS_REPORT_2026-09-07_01-45-44.json
+  last_modified: '2026-09-06'
+  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-07-16-06-05-57
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_06-05-57.md
   type: markdown
@@ -3004,6 +2998,12 @@ surfaces:
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-09-06-19-30-28
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-06_19-30-28.md
+  type: markdown
+  title: Project Metrics Report
+  last_modified: '2026-09-06'
+  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-09-07-01-45-44
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-07_01-45-44.md
   type: markdown
   title: Project Metrics Report
   last_modified: '2026-09-06'
@@ -3492,8 +3492,6 @@ groups:
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
   - ai-state-landscape-watchlist
-  - ai-state-metrics-reports-metrics-report-2026-07-16-05-08-18
-  - ai-state-metrics-reports-metrics-report-2026-07-16-05-08-18
   - ai-state-metrics-reports-metrics-report-2026-07-16-06-05-57
   - ai-state-metrics-reports-metrics-report-2026-07-16-06-05-57
   - ai-state-metrics-reports-metrics-report-2026-07-16-06-44-58
@@ -3512,6 +3510,8 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-09-05-06-08-20
   - ai-state-metrics-reports-metrics-report-2026-09-06-19-30-28
   - ai-state-metrics-reports-metrics-report-2026-09-06-19-30-28
+  - ai-state-metrics-reports-metrics-report-2026-09-07-01-45-44
+  - ai-state-metrics-reports-metrics-report-2026-09-07-01-45-44
   - ai-state-sentinel-reports-sentinel-report-2026-08-05-00-14-32
   - ai-state-sentinel-reports-sentinel-report-2026-08-05-09-52-51
   - ai-state-sentinel-reports-sentinel-report-2026-08-05-21-27-47

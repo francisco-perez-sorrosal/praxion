@@ -526,7 +526,7 @@ class TestObservationsAreAppended:
 
 
 class TestObservationsAreSuppressed:
-    @pytest.mark.parametrize("tool_name", ["Read", "Grep", "TodoWrite", "ToolSearch"])
+    @pytest.mark.parametrize("tool_name", ["TodoWrite", "ToolSearch"])
     def test_high_noise_tools_are_never_recorded(
         self, tool_name: str, isolated_project: Path, monkeypatch: pytest.MonkeyPatch
     ):
@@ -577,6 +577,89 @@ class TestObservationsAreSuppressed:
         _drive_main(m, payload_text, monkeypatch)
 
         assert _wal_rows(isolated_project) == []
+
+
+class TestReadGrepGlobAreCapturedWithoutContent:
+    """Step 11: Read/Glob/Grep are no longer blocklisted -- they record the
+    path (and, for Grep/Glob, the search/glob pattern) but never file content
+    or match text.
+    """
+
+    def test_read_call_records_its_file_path_with_no_content_field(
+        self, isolated_project: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        m = _load_module()
+        payload = _tool_call_payload(
+            "Read",
+            {"file_path": "src/refund.py"},
+            cwd=str(isolated_project),
+            tool_response={"content": "def refund():\n    ...secret business logic..."},
+        )
+
+        _drive_main(m, json.dumps(payload), monkeypatch)
+
+        rows = _wal_rows(isolated_project)
+        assert len(rows) == 1
+        assert rows[0]["tool_name"] == "Read"
+        assert rows[0]["file_paths"] == ["src/refund.py"]
+        serialized = json.dumps(rows[0])
+        assert "secret business logic" not in serialized
+
+    def test_grep_call_records_the_scope_path_and_pattern_with_no_match_text(
+        self, isolated_project: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        m = _load_module()
+        payload = _tool_call_payload(
+            "Grep",
+            {"pattern": r"credential_token\s*=", "path": "src/"},
+            cwd=str(isolated_project),
+            tool_response={"content": "src/config.py:3:credential_token = 'do-not-leak-me'"},
+        )
+
+        _drive_main(m, json.dumps(payload), monkeypatch)
+
+        rows = _wal_rows(isolated_project)
+        assert len(rows) == 1
+        assert rows[0]["tool_name"] == "Grep"
+        assert rows[0]["file_paths"] == ["src/"]
+        assert "pattern=" in rows[0]["summary"]
+        serialized = json.dumps(rows[0])
+        assert "do-not-leak-me" not in serialized
+
+    def test_glob_call_records_the_scope_path_with_no_match_listing(
+        self, isolated_project: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        m = _load_module()
+        payload = _tool_call_payload(
+            "Glob",
+            {"pattern": "**/*.py", "path": "src/"},
+            cwd=str(isolated_project),
+            tool_response={"content": "src/a.py\nsrc/b.py\nsrc/secret_module.py"},
+        )
+
+        _drive_main(m, json.dumps(payload), monkeypatch)
+
+        rows = _wal_rows(isolated_project)
+        assert len(rows) == 1
+        assert rows[0]["tool_name"] == "Glob"
+        assert rows[0]["file_paths"] == ["src/"]
+        serialized = json.dumps(rows[0])
+        assert "secret_module" not in serialized
+
+    def test_malformed_read_payload_is_swallowed_with_exit_0(
+        self, isolated_project: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """A malformed Read-shaped payload (non-dict tool_input) must not raise --
+        `main()` degrades to recording an empty file_paths list, same as any
+        other tool hitting the `isinstance(tool_input, str)` guard."""
+        m = _load_module()
+        payload = _tool_call_payload("Read", tool_input="not-a-dict", cwd=str(isolated_project))
+
+        _drive_main(m, json.dumps(payload), monkeypatch)
+
+        rows = _wal_rows(isolated_project)
+        assert len(rows) == 1
+        assert rows[0]["file_paths"] == []
 
 
 class TestHookNeverRaisesIntoTheHarness:

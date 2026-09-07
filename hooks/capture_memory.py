@@ -25,12 +25,11 @@ from pathlib import Path
 
 from _hook_utils import DISABLE_OBSERVABILITY, append_observation, is_disabled
 
-# Tools that generate too much noise to capture
+# Tools that generate too much noise to capture. Read/Glob/Grep are
+# deliberately absent -- they are recorded (path + pattern only, never file
+# content or match text; see extract_file_paths/build_summary).
 BLOCKLIST = frozenset(
     {
-        "Read",
-        "Glob",
-        "Grep",
         "TodoRead",
         "TodoWrite",
         "TaskList",

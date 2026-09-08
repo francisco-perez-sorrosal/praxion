@@ -3,11 +3,11 @@ direction: down
 PraxionOrchestration: {
   label: "Orchestration Layer"
 
-  Orchestrator: {
-    label: "Main Agent (Orchestrator)"
-  }
   Hooks: {
     label: "Hooks"
+  }
+  Orchestrator: {
+    label: "Main Agent (Orchestrator)"
   }
   Doc_findings: {
     label: "VERIFIER_FINDINGS.md"
@@ -64,7 +64,6 @@ PraxionOrchestration.Pipeline.Verifier -> PraxionOrchestration.Doc_verify: "writ
 PraxionOrchestration.Pipeline.Verifier -> PraxionOrchestration.Doc_rework: "emits Phase 12.5"
 PraxionOrchestration.Doc_rework -> PraxionOrchestration.Orchestrator: "reads manifest"
 PraxionOrchestration.Orchestrator -> PraxionOrchestration.Doc_findings: "writes one VERIFIER_FINDINGS.md per \nworktree"
-PraxionOrchestration.Hooks -> PraxionOrchestration.Doc_findings: "inject_worktree_banner surfaces \naffordance"
 PraxionOrchestration.Pipeline.Architect -> PraxionOrchestration.Doc_systems: "[...]"
 PraxionOrchestration.Doc_systems -> PraxionOrchestration.Pipeline.Planner: "reads"
 PraxionOrchestration.Doc_findings -> PraxionKnowledge.Commands: "auto-discovered by /resume-rework"

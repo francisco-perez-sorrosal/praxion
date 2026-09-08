@@ -20,7 +20,7 @@ every test builds its own temporary git repo via tmp_path, with git identity
 configured and an injected .ai-state/calibration_log.md fixture. The real Praxion
 calibration_log.md is never read.
 
-Subprocess harness (template: hooks/test_worktree_guard.py): the hook is invoked as
+Subprocess harness (template: hooks/test_inject_rules.py): the hook is invoked as
 a real subprocess with a JSON payload on stdin, mirroring exactly how commit_gate.sh
 dispatches it during a real `git commit`.
 

@@ -28,7 +28,7 @@ Behavior contract:
 - **Opt-out**: ``PRAXION_DISABLE_FEEDBACK_SURFACING=1`` suppresses the advisory
   (mirrors the ``PRAXION_DISABLE_*`` convention used by the other hooks).
 - **Sync (async: false)**: its stdout ``additionalContext`` becomes session
-  context, like ``inject_worktree_banner.py`` -- not a fire-and-forget notify.
+  context, like ``inject_rules.py`` -- not a fire-and-forget notify.
 """
 
 from __future__ import annotations

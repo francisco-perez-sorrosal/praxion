@@ -113,7 +113,7 @@ model {
         roadmap_cartographer = agent "Roadmap Cartographer" { description "Project-level audit-to-roadmap through a project-derived lens set (on-demand)" }
       }
 
-      hooks    = component "Hooks"          { description "Lifecycle enforcement (worktree_guard, inject_worktree_banner, send_event)" }
+      hooks    = component "Hooks"          { description "Lifecycle enforcement (send_event)" }
       aiwork   = component ".ai-work/"      { description "Ephemeral pipeline docs (task-slug scoped)" }
 
       // Pipeline documents — first-class elements so handoff edges are addressable.
@@ -231,7 +231,6 @@ model {
     orchestration.doc_findings        -> knowledge.commands "auto-discovered by /resume-rework" { #rework_loop }
     knowledge.commands                -> orchestration.pipeline.architect "dispatches systems-architect (always-first)" { #rework_loop }
     orchestration.pipeline.architect  -> orchestration.doc_systems "re-enters pipeline at SYSTEMS_PLAN" { #rework_loop }
-    orchestration.hooks               -> orchestration.doc_findings "inject_worktree_banner surfaces affordance" { #rework_loop }
 
     // Validator + skill-genesis side-channels (post-pipeline)
     orchestration.pipeline.arch_validator -> persistence.tdl "files drift rows"
@@ -392,11 +391,11 @@ views {
   // L2 — Verifier rework loop detail.
   // Backward-feeding: verifier Phase 12.5 emits REWORK_MANIFEST; orchestrator spawns
   // a rework worktree per row, writes VERIFIER_FINDINGS.md, flips td-NNN rows to in-flight;
-  // a fresh Claude Code session in the worktree surfaces /resume-rework, which dispatches
+  // a fresh Claude Code session in the worktree; the user runs /resume-rework, which dispatches
   // systems-architect always-first; the architect re-enters the pipeline at SYSTEMS_PLAN.md.
   view rework_loop_detail {
     title "Rework Loop Detail — Backward-Feeding (L2)"
-    description "Verifier Phase 12.5 -> REWORK_MANIFEST.md -> orchestrator -> rework worktrees -> /resume-rework -> systems-architect (always-first) -> re-pipeline; subagent isolation enforced by worktree_guard"
+    description "Verifier Phase 12.5 -> REWORK_MANIFEST.md -> orchestrator -> rework worktrees -> /resume-rework -> systems-architect (always-first) -> re-pipeline; subagent isolation enforced by native worktree isolation"
 
     include
       praxion.orchestration.pipeline.verifier,

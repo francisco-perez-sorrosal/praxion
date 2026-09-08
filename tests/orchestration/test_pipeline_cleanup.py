@@ -22,10 +22,15 @@ import re
 from pathlib import Path
 
 VERIFIER_FILE = Path(__file__).parents[2] / "agents" / "verifier.md"
+# The rework-spawn / cleanup procedure prose moved out of the verifier body into this
+# reference (process-economy P1.9); the verifier keeps the trigger + a pointer to it.
+REWORK_REFERENCE = (
+    Path(__file__).parents[2] / "skills" / "software-planning" / "references" / "rework-manifest.md"
+)
 
 
 def _collaboration_section() -> str:
-    """Return the full text of agents/verifier.md from ## Collaboration onward."""
+    """Return agents/verifier.md from ## Collaboration onward plus the rework-manifest reference it points to."""
     text = VERIFIER_FILE.read_text(encoding="utf-8")
     match = re.search(r"^## Collaboration", text, re.MULTILINE)
     if not match:
@@ -33,7 +38,8 @@ def _collaboration_section() -> str:
             "agents/verifier.md does not contain a '## Collaboration' section — "
             "the orchestration prose has not yet been added"
         )
-    return text[match.start() :]
+    reference = REWORK_REFERENCE.read_text(encoding="utf-8") if REWORK_REFERENCE.is_file() else ""
+    return text[match.start() :] + "\n" + reference
 
 
 def test_documents_cleanup_gated_on_open_reworks() -> None:

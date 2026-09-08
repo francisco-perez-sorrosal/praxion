@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-08T07:18:43Z'
+generated_at: '2026-09-08T07:56:36Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -127,7 +127,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-09-07'
+  last_modified: '2026-09-08'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -142,7 +142,7 @@ surfaces:
   path: docs/claude-code-limitations.md
   type: markdown
   title: Known Claude Code Limitations
-  last_modified: '2026-08-30'
+  last_modified: '2026-09-08'
   renderer: default_markdown
 - id: docs-claude-ecosystem-learning-resources
   path: docs/claude-ecosystem-learning-resources.md
@@ -452,7 +452,7 @@ surfaces:
   path: docs/onboarding.md
   type: markdown
   title: Project Onboarding
-  last_modified: '2026-09-04'
+  last_modified: '2026-09-08'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -2846,6 +2846,12 @@ surfaces:
   title: Simplification requires a measured cost and an executable guard
   last_modified: '2026-09-07'
   renderer: adr_card
+- id: ai-state-decisions-379-retire-worktree-guard-hooks
+  path: .ai-state/decisions/379-retire-worktree-guard-hooks.md
+  type: markdown
+  title: Retire the worktree guard and banner hooks in favour of the harness's native worktree isolation
+  last_modified: '2026-09-08'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3522,6 +3528,7 @@ groups:
   - ai-state-decisions-376-calibration-verdict-owned-by-verifier
   - ai-state-decisions-377-observations-wal-leaves-git
   - ai-state-decisions-378-simplification-evidence-standard
+  - ai-state-decisions-379-retire-worktree-guard-hooks
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

@@ -1,7 +1,7 @@
 ---
-id: dec-draft-30dd031c
+id: dec-379
 title: Retire the worktree guard and banner hooks in favour of the harness's native worktree isolation
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-08
 summary: Delete hooks/worktree_guard.py and hooks/inject_worktree_banner.py (and their tests and hooks.json entries); native Claude Code worktree isolation becomes the sole write-containment layer, /merge-worktree keeps finalize + .ai-state reconciliation, and the tier-to-isolation policy row stays resident.

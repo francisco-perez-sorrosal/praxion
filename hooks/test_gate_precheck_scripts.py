@@ -1,5 +1,5 @@
 """Tests for the SessionStart pre-check gates added in P1.11:
-hooks/gate_surface_feedback.sh and hooks/gate_sidecar_banner.sh.
+hooks/gate_sidecar_banner.sh (the feedback gate was dropped: its shell mirror diverged from the hook's git-toplevel resolution — P1.11 light-review F1).
 
 Cites: rules/swe/gate-liveness.md — every CODE gate ships tests proving both
 the pass (interpreter starts) and skip (interpreter never starts) paths. Each
@@ -52,52 +52,6 @@ def _run_gate(
     )
 
 
-# ---------------------------------------------------------------------------
-# gate_surface_feedback.sh
-# ---------------------------------------------------------------------------
-
-GATE_FEEDBACK = HOOKS_DIR / "gate_surface_feedback.sh"
-
-
-def test_feedback_gate_is_executable() -> None:
-    assert GATE_FEEDBACK.exists()
-    assert os.access(GATE_FEEDBACK, os.X_OK)
-
-
-def test_feedback_gate_skips_when_pending_md_absent(tmp_path: Path) -> None:
-    """No .ai-state/praxion_feedback/PENDING.md -- the hook's own documented
-    'absent ledger' no-op -- so the interpreter must never start."""
-    spy = _write_spy_interpreter(tmp_path)
-    payload = {"cwd": str(tmp_path)}
-    result = _run_gate(GATE_FEEDBACK, spy, payload, {})
-    assert result.returncode == 0
-    assert DELEGATION_MARKER not in result.stdout
-
-
-def test_feedback_gate_delegates_when_pending_md_present(tmp_path: Path) -> None:
-    ledger_dir = tmp_path / ".ai-state" / "praxion_feedback"
-    ledger_dir.mkdir(parents=True)
-    (ledger_dir / "PENDING.md").write_text("# Pending Praxion Feedback\n", encoding="utf-8")
-    spy = _write_spy_interpreter(tmp_path)
-    payload = {"cwd": str(tmp_path)}
-    result = _run_gate(GATE_FEEDBACK, spy, payload, {})
-    assert result.returncode == 0
-    assert DELEGATION_MARKER in result.stdout
-
-
-def test_feedback_gate_skips_when_disable_flag_set(tmp_path: Path) -> None:
-    """Disable flag wins even when the ledger is present."""
-    ledger_dir = tmp_path / ".ai-state" / "praxion_feedback"
-    ledger_dir.mkdir(parents=True)
-    (ledger_dir / "PENDING.md").write_text("# Pending Praxion Feedback\n", encoding="utf-8")
-    spy = _write_spy_interpreter(tmp_path)
-    payload = {"cwd": str(tmp_path)}
-    result = _run_gate(GATE_FEEDBACK, spy, payload, {"PRAXION_DISABLE_FEEDBACK_SURFACING": "1"})
-    assert result.returncode == 0
-    assert DELEGATION_MARKER not in result.stdout
-
-
-# ---------------------------------------------------------------------------
 # gate_sidecar_banner.sh
 # ---------------------------------------------------------------------------
 

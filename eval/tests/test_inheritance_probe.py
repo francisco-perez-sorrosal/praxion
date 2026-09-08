@@ -1,10 +1,12 @@
-"""Unit tests for the inheritance-probe checker (process-economy P0.7).
+"""Unit tests for the inheritance-probe differential checker.
 
-Exercises `check_inheritance()` — the pure layer — against fixture JSON path
-lists shaped like what a live `claude -p` session would report. Never spawns
-the real session: `build_invocation()`/`main()` are out of scope for this
-file by design (one full headless session per invocation, API-metered — see
-`eval/scripts/inheritance_probe.py`'s own module docstring).
+Exercises `parse_report()` and `check_differential()` — the pure layers —
+against fixture JSON shaped like what a live `claude -p` session would
+report. Never spawns a real session: `main()`'s two `_run()` subprocess
+calls are out of scope for this file by design (two full headless sessions
+per invocation, API-metered — see `eval/scripts/inheritance_probe.py`'s own
+module docstring). `--dry-run` is the one `main()` path this file *does*
+exercise, since it never touches `subprocess`.
 
 `eval/scripts/` is not part of the `praxion_evals` package (no `__init__.py`,
 not listed in `pyproject.toml`'s wheel target), so the module under test is
@@ -19,13 +21,15 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
+import pytest
+
 _FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures" / "inheritance_probe"
 _SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "inheritance_probe.py"
 _MODULE_NAME = "inheritance_probe"
 
 
-def _load_fixture(name: str) -> list[str]:
-    return json.loads((_FIXTURES_DIR / name).read_text(encoding="utf-8"))
+def _load_fixture_text(name: str) -> str:
+    return (_FIXTURES_DIR / name).read_text(encoding="utf-8")
 
 
 def _load_module() -> ModuleType:
@@ -44,47 +48,64 @@ def _load_module() -> ModuleType:
     return module
 
 
-def test_all_expected_paths_present_passes():
-    """Every expected identifier present, no forbidden rule -- PASS."""
-    check_inheritance = _load_module().check_inheritance
+def test_differential_passes_when_only_top_level_reports_heading():
+    """Top-level sees the routing heading, subagent does not -- PASS."""
+    probe = _load_module()
 
-    verdict = check_inheritance(_load_fixture("all_present.json"))
-
-    assert verdict.verdict == "PASS"
-    assert verdict.missing == ()
-    assert verdict.unexpected == ()
-
-
-def test_missing_expected_path_fails():
-    """Dropping one expected always-loaded rule (adr-conventions.md) -- FAIL."""
-    check_inheritance = _load_module().check_inheritance
-
-    verdict = check_inheritance(_load_fixture("missing_expected.json"))
-
-    assert verdict.verdict == "FAIL"
-    assert any("adr-conventions.md" in m for m in verdict.missing)
-    assert verdict.unexpected == ()
-
-
-def test_hook_delivered_rule_present_fails():
-    """A hook-delivered rule (agent-model-routing.md) leaking into a subagent
-    probe's claudeMd block -- FAIL, even with every expected path present."""
-    check_inheritance = _load_module().check_inheritance
-
-    verdict = check_inheritance(_load_fixture("hook_delivered_present.json"))
-
-    assert verdict.verdict == "FAIL"
-    assert verdict.missing == ()
-    assert any("agent-model-routing.md" in u for u in verdict.unexpected)
-
-
-def test_extra_unrelated_paths_still_passes():
-    """Extra paths outside the expected/forbidden sets (e.g. a skill file) are
-    inert -- PASS, since only the named identifiers are checked."""
-    check_inheritance = _load_module().check_inheritance
-
-    verdict = check_inheritance(_load_fixture("extra_unrelated.json"))
+    top_level = probe.parse_report("top-level", _load_fixture_text("pass_top_level.json"))
+    subagent = probe.parse_report("subagent", _load_fixture_text("pass_subagent.json"))
+    verdict = probe.check_differential(top_level, subagent)
 
     assert verdict.verdict == "PASS"
-    assert verdict.missing == ()
-    assert verdict.unexpected == ()
+
+
+def test_differential_fails_when_both_report_heading_present():
+    """Both runs agree the heading is present -- the vacuous-guard bug this
+    rework fixes -- FAIL, naming the subagent run as the culprit."""
+    probe = _load_module()
+
+    top_level = probe.parse_report("top-level", _load_fixture_text("fail_top_level.json"))
+    subagent = probe.parse_report("subagent", _load_fixture_text("fail_subagent.json"))
+    verdict = probe.check_differential(top_level, subagent)
+
+    assert verdict.verdict == "FAIL"
+    assert any("subagent run reported" in f for f in verdict.findings)
+
+
+def test_differential_fails_when_a_run_is_missing_expected_paths():
+    """Dropping one of the 7 always-loaded paths from either run -- FAIL."""
+    probe = _load_module()
+
+    top_level = probe.parse_report("top-level", _load_fixture_text("pass_top_level.json"))
+    subagent_data = json.loads(_load_fixture_text("pass_subagent.json"))
+    subagent_data["claude_md_paths"] = [
+        p for p in subagent_data["claude_md_paths"] if "adr-conventions.md" not in p
+    ]
+    subagent = probe.parse_report("subagent", json.dumps(subagent_data))
+
+    verdict = probe.check_differential(top_level, subagent)
+
+    assert verdict.verdict == "FAIL"
+    assert any("adr-conventions.md" in f for f in verdict.findings)
+
+
+def test_malformed_output_raises_on_parse():
+    """A session that doesn't reply with the requested JSON shape -- the
+    parse fails loudly rather than being silently coerced into a verdict."""
+    probe = _load_module()
+
+    with pytest.raises(json.JSONDecodeError):
+        probe.parse_report("top-level", _load_fixture_text("malformed.txt"))
+
+
+def test_dry_run_exits_zero_and_prints_two_invocations(capsys):
+    """`--dry-run` never touches `subprocess`; prints both argv lists."""
+    probe = _load_module()
+
+    exit_code = probe.main(["--dry-run"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "top-level" in captured.out
+    assert "subagent" in captured.out
+    assert "claude" in captured.out

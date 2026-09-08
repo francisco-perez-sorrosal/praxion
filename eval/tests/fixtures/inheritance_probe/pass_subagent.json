@@ -1,0 +1,12 @@
+{
+  "claude_md_paths": [
+    "/Users/example/.claude/CLAUDE.md",
+    "/Users/example/dev/praxion/rules/CLAUDE.md",
+    "/Users/example/dev/praxion/CLAUDE.md",
+    "/Users/example/dev/praxion/rules/swe/agent-behavioral-contract.md",
+    "/Users/example/dev/praxion/rules/swe/adr-conventions.md",
+    "/Users/example/dev/praxion/rules/swe/swe-agent-coordination-protocol.md",
+    "/Users/example/dev/praxion/rules/swe/agent-intermediate-documents.md"
+  ],
+  "routing_heading_present": false
+}

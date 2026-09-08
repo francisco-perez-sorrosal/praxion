@@ -1,12 +1,6 @@
 ---
 name: data-modeling
-description: >
-  Database and data model design: relational schema design, NoSQL document modeling,
-  normalization strategies, migration planning, ORM patterns, schema evolution.
-  Triggers: designing database schemas, choosing relational vs NoSQL, planning data
-  migrations, modeling entities/relationships, designing indexes, ORMs,
-  normalizing/denormalizing, ER diagrams, domain-driven design (DDD) aggregates,
-  evolving schemas in production.
+description: "Database and data model design: relational/NoSQL modeling, normalization, migration planning, ORM patterns, schema evolution. Triggers: designing database schemas, choosing relational vs NoSQL, planning data migrations, modeling entities/relationships, designing indexes, ORMs, normalizing/denormalizing, ER diagrams, domain-driven design (DDD) aggregates, evolving schemas in production."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

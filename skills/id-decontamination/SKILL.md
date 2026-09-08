@@ -1,11 +1,6 @@
 ---
 name: id-decontamination
-description: >
-  Detect and remove ephemeral identifier citations (REQ-*, AC-*, EC-X.X.X,
-  Step N, req{NN}_ test naming) from project source code. Triggers: pre-discipline
-  Praxion project, check_id_citation_discipline.py reports violations, user asks
-  to "clean up REQ citations"/"decontaminate id references"/"remove pipeline
-  residues from code", /decontaminate-ids invoked.
+description: "Detect and remove ephemeral identifier citations (REQ-*, AC-*, EC-X.X.X, Step N, req{NN}_ test naming) from project source code. Triggers: pre-discipline Praxion project, check_id_citation_discipline.py reports violations, user asks to clean up REQ citations/decontaminate id references/remove pipeline residues from code, /decontaminate-ids invoked."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

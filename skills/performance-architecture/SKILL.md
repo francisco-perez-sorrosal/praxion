@@ -1,16 +1,6 @@
 ---
 name: performance-architecture
-description: >
-  Architectural patterns and decisions for performant software systems, including
-  agentic/multi-agent systems. Triggers: designing for performance, analyzing
-  bottlenecks, choosing caching strategies, planning capacity, optimizing
-  latency/throughput, setting up load testing, defining performance budgets,
-  reviewing for performance anti-patterns; performance budgets, latency analysis,
-  throughput, caching, connection pooling, async/concurrent patterns, database
-  query optimization, load testing, benchmarking, capacity planning,
-  scaling/scalability; token budget, context-window efficiency, agent spawn cost,
-  subagent fan-out, multi-agent pipeline wall-clock, progressive disclosure as
-  a performance optimization.
+description: "Architectural patterns for performant software systems, including agentic/multi-agent systems. Triggers: performance, bottlenecks, caching strategies, capacity planning, latency, throughput, load testing, performance budgets, performance anti-patterns, latency analysis, connection pooling, async/concurrent patterns, database query optimization, benchmarking, scaling/scalability, token budget, context-window efficiency, agent spawn cost, subagent fan-out, multi-agent pipeline wall-clock, progressive disclosure as a performance optimization."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

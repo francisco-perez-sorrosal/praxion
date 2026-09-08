@@ -1,11 +1,6 @@
 ---
 name: hook-crafting
-description: >
-  Creating, testing, and registering Claude Code hooks: hook events, registration
-  lifecycle, output patterns (additionalContext, updatedInput, decision), gotchas,
-  installer integration; automated code quality, observability, security gates,
-  workflow enforcement. Triggers: creating new hooks, debugging hook execution,
-  fixing hook registration, choosing hook types, why a hook is not firing.
+description: "Creating, testing, and registering Claude Code hooks: hook events, registration lifecycle, output patterns (additionalContext, updatedInput, decision), gotchas, installer integration. Triggers: creating new hooks, debugging hook execution, fixing hook registration, choosing hook types, why a hook is not firing."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

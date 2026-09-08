@@ -1,15 +1,6 @@
 ---
 name: multi-perspective-analysis
-description: >
-  Composition layer for multi-perspective deliberation primitives: calibrated
-  confidence annotation, lens-independence discipline, heterogeneous model
-  orchestration (Haiku-proposer / Opus-aggregator), and two-tier disconfirmation
-  (Tier-A always-on for architectural ADRs; Tier-B cross-model adversarial
-  challenge gated to high-stakes contested decisions). Triggers: high-stakes
-  design decisions with genuine uncertainty, adversarial stress-testing of
-  architectural choices, calibrating confidence on research claims, parallel
-  lens fan-out that must remain independent, pre-mortem failure-imagination at
-  planning→implementation boundary.
+description: "Composition layer for multi-perspective deliberation: calibrated confidence annotation, lens-independence discipline, heterogeneous model orchestration (Haiku-proposer/Opus-aggregator), two-tier disconfirmation (Tier-A architectural ADRs, Tier-B cross-model adversarial challenge). Triggers: high-stakes design decisions with genuine uncertainty, adversarial stress-testing of architectural choices, calibrating confidence on research claims, parallel lens fan-out that must remain independent, pre-mortem failure-imagination at planning-implementation boundary."
 allowed-tools: [Read, Glob, Grep]
 compatibility: Claude Code
 metadata:

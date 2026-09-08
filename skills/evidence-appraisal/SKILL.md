@@ -1,20 +1,6 @@
 ---
 name: evidence-appraisal
-description: >
-  Appraises imported claims -- cited studies, benchmark results, vendor
-  documentation, blog-post findings -- for whether the source actually
-  supports the claim being made of it. Covers source-strength hierarchy,
-  study design vs claim strength, external validity and transfer to a new
-  setting, preprint vs peer-reviewed weighting and replication status,
-  citation drift, vendor and marketing claims as a distinct evidentiary
-  class, benchmark provenance, and writing a claim with its warrant attached.
-  Triggers: citing a study, paper, or benchmark to justify a decision;
-  relaying a coefficient, effect size, or vendor number without independent
-  verification; importing an external finding into an architecture or design
-  doc; appraising a source before it becomes load-bearing. Distinct from
-  applied-statistics, which audits inference on our own numbers -- this skill
-  audits whether someone else's numbers license the claim we are making of
-  them.
+description: "Appraises imported claims -- cited studies, benchmarks, vendor docs, blog findings -- for whether the source actually supports the claim made of it. Triggers: citing a study, paper, or benchmark to justify a decision; relaying a coefficient, effect size, or vendor number without independent verification; importing an external finding into an architecture or design doc; appraising a source before it becomes load-bearing. Distinct from applied-statistics (audits inference on our own numbers) -- this audits whether someone else's numbers license our claim."
 allowed-tools: [Read, Glob, Grep, WebFetch]
 compatibility: Claude Code
 ---

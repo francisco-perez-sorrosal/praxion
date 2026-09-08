@@ -1,15 +1,6 @@
 ---
 name: ml-training
-description: >
-  ML/AI pre-training project management in Praxion: training archetype
-  vocabulary (eval harness, datasets, experiment log, checkpoints, compute
-  budget, hyperparameters), three operational modes (owned-GPU, rented-GPU,
-  separated-cloud), program.md as experiment-loop meta-prompt, compute-budget
-  rules for training-dispatch steps. Triggers: onboarding neural-network
-  training; train.py/prepare.py/program.md present; GPUs, loss curves,
-  perplexity, autoresearch, Karpathy, torch/jax/tensorflow; an autonomous agent
-  driving a training loop. Compose with agentic-sdks, agent-evals; siblings
-  llm-training-eval, neo-cloud-abstraction, experiment-tracking.
+description: "ML/AI pre-training project management in Praxion: training archetype vocabulary, three operational modes (owned-GPU, rented-GPU, separated-cloud), program.md as experiment-loop meta-prompt, compute-budget rules. Triggers: onboarding neural-network training; train.py/prepare.py/program.md present; GPUs, loss curves, perplexity, autoresearch, Karpathy, torch/jax/tensorflow; an autonomous agent driving a training loop. Compose with agentic-sdks, agent-evals; siblings llm-training-eval, neo-cloud-abstraction, experiment-tracking."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

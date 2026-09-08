@@ -1,14 +1,6 @@
 ---
 name: deployment
-description: >
-  Application deployment: Docker Compose (watch mode, profiles, GPU passthrough,
-  health checks), PaaS, cloud containers, Kubernetes, AI-native GPU platforms,
-  reverse proxy, secrets management, AI/ML model serving. Triggers: deploying an
-  app, writing compose.yaml or Dockerfile, choosing a hosting platform, configuring
-  Caddy/nginx, deploying Ollama/vLLM, GPU passthrough, choosing Render/Railway/Fly.io/
-  Vercel, managing Railway environments or PR environments, wiring Railway's agent
-  plugin/MCP/CLI, deploying to Cloud Run/ECS/Modal/CoreWeave, writing systemd units
-  for Compose. Siblings: cicd-engineer (pipeline automation), observability (monitoring).
+description: "Application deployment: Docker Compose, PaaS, cloud containers, Kubernetes, AI-native GPU platforms, reverse proxy, secrets management, AI/ML model serving. Triggers: deploying an app, writing compose.yaml or Dockerfile, choosing a hosting platform, configuring Caddy/nginx, deploying Ollama/vLLM, GPU passthrough, choosing Render/Railway/Fly.io/Vercel, managing Railway environments or PR environments, wiring Railway's agent plugin/MCP/CLI, deploying to Cloud Run/ECS/Modal/CoreWeave, writing systemd units for Compose. Siblings: cicd (pipeline automation), observability (monitoring)."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

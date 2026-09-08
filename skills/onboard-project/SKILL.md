@@ -1,13 +1,6 @@
 ---
 name: onboard-project
-description: >
-  Bring a project into the Praxion ecosystem — detect its current state and install
-  the managed-project contract (gitignore block, .ai-state/ skeleton, git hooks,
-  merge drivers, settings toggles, CLAUDE.md blocks) plus optional capability tiers
-  (architecture baseline, code-quality, CI autofix, Architecture-as-Code, ML
-  conventions, Obsidian). Handles four modes over one idempotent engine: new
-  (empty directory), existing (any prior state), hackathon (minimal, promotable),
-  and promote (hackathon → fully managed). Safe to re-run; nothing is committed.
+description: "Bring a project into the Praxion ecosystem: detect state and install the managed-project contract (gitignore block, .ai-state/ skeleton, git hooks, merge drivers, settings toggles, CLAUDE.md blocks) plus optional tiers (architecture, code-quality, CI autofix, Architecture-as-Code, ML, Obsidian). Four modes: new, existing, hackathon, promote. Safe to re-run; nothing is committed."
 when_to_use: >
   Invoked by the user via /praxion:onboard-project, or handed off from the
   scripts/onboard-project entry script. Never auto-invoked.

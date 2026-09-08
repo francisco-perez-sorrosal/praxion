@@ -1,11 +1,6 @@
 ---
 name: doc-management
-description: >
-  Writing and maintaining project documentation: README.md, catalogs, architecture
-  docs, changelogs, Mermaid diagrams. Cross-reference validation, catalog
-  maintenance, freshness checks, structural integrity. Triggers: creating/reviewing/
-  fixing documentation, maintaining catalog READMEs, verifying filesystem state
-  match, documentation audit, checking doc freshness, authoring diagrams.
+description: "Writing and maintaining project documentation: README.md, catalogs, architecture docs, changelogs, Mermaid diagrams. Triggers: creating/reviewing/fixing documentation, maintaining catalog READMEs, verifying filesystem state match, documentation audit, checking doc freshness, authoring diagrams."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

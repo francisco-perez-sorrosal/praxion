@@ -1,18 +1,6 @@
 ---
 name: goal-disambiguation
-description: >
-  Task-intake protocol for turning a fuzzy user request into an unambiguous,
-  verifiable goal before committing to a direction. Covers the ask-vs-proceed
-  decision rule (the 2x2 of intent-clarity x reversibility), lexical ambiguity
-  detection, the XY-problem test, assumption surfacing over interrogation,
-  Mom-Test question phrasing with a hard 3-question cap, and capturing
-  measurable outcome signals (Intent / Key Signals / Health Guards / Uncertainty
-  Flag) into a TASK_BRIEF.md that seeds downstream architecting, planning,
-  testing, and verification. Triggers: at the start of any non-trivial task when
-  the request is vague, implementation-first, or its success is not measurable;
-  deciding whether to ask the user a clarifying question or proceed with stated
-  assumptions; capturing acceptance criteria / definition-of-done at intake;
-  reducing rework from misread intent.
+description: "Task-intake protocol for turning a fuzzy user request into an unambiguous, verifiable goal before committing to a direction. Triggers: at the start of any non-trivial task when the request is vague, implementation-first, or its success is not measurable; deciding whether to ask the user a clarifying question or proceed with stated assumptions; capturing acceptance criteria / definition-of-done at intake; reducing rework from misread intent."
 ---
 
 ## Goal Disambiguation at Task Intake

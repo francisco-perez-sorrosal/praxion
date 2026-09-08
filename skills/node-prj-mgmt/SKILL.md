@@ -1,11 +1,6 @@
 ---
 name: node-prj-mgmt
-description: >
-  Node.js project lifecycle: version pinning, package management, dependency
-  graph hygiene, workspace/monorepo patterns, tsconfig baseline philosophy.
-  Triggers: setting up a Node.js project, choosing a package manager, wiring
-  a monorepo, managing transitive dependency conflicts, configuring tsconfig
-  inheritance, auditing dependency graph health. Language module: TypeScript.
+description: "Node.js project lifecycle: version pinning, package management, dependency graph hygiene, workspace/monorepo patterns, tsconfig baseline philosophy. Triggers: setting up a Node.js project, choosing a package manager, wiring a monorepo, managing transitive dependency conflicts, configuring tsconfig inheritance, auditing dependency graph health. TypeScript module."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

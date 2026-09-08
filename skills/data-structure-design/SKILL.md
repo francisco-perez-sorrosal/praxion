@@ -1,15 +1,6 @@
 ---
 name: data-structure-design
-description: >
-  Program-level data-structure and representation design: choosing the types,
-  invariants, state shapes, and schemas at the heart of every component before
-  writing the behavior that consumes them. Triggers: defining or changing a core
-  domain type or data model, designing state machines or lifecycle phases,
-  choosing sum vs product types, making illegal states unrepresentable,
-  parse-don't-validate boundaries, newtypes/smart constructors for constrained
-  values, designing schema contracts between components or agent tools, deciding
-  a representation before its operations. Persistence-layer schema design
-  (databases, ORMs, migrations) belongs to the data-modeling skill, not here.
+description: "Data-structure and representation design: types, invariants, state shapes, and schemas at the heart of a component, chosen before its behavior. Triggers: defining or changing a core domain type or data model, designing state machines or lifecycle phases, choosing sum vs product types, making illegal states unrepresentable, parse-don't-validate boundaries, newtypes/smart constructors for constrained values, designing schema contracts between components or agent tools, deciding a representation before its operations. Persistence-layer schema design (databases, ORMs, migrations) belongs to data-modeling, not here."
 allowed-tools: [Read, Grep, Glob]
 compatibility: Claude Code
 metadata:

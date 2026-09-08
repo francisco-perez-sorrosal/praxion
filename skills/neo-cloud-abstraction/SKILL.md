@@ -1,14 +1,6 @@
 ---
 name: neo-cloud-abstraction
-description: >
-  ML training job dispatch abstraction for Praxion ML/AI projects: mode-invariant
-  training_job_descriptor schema, four backends (local subprocess, SkyPilot 20+
-  providers, RunPod and Nebius direct adapters). Triggers: configuring a compute backend,
-  dispatching via /run-experiment, reading/writing training_job_descriptor YAML or
-  neo_cloud_backend.yaml, debugging backend dispatch errors, choosing local vs
-  SkyPilot vs RunPod vs Nebius, subprocess training, GPU cloud dispatch, Nebius,
-  backend: nebius-direct. Activate alongside ml-training and llm-training-eval for
-  full pipeline work.
+description: "ML training job dispatch abstraction for Praxion ML/AI projects: mode-invariant training_job_descriptor schema, four backends (local subprocess, SkyPilot 20+ providers, RunPod, Nebius). Triggers: configuring a compute backend, dispatching via /run-experiment, reading/writing training_job_descriptor YAML or neo_cloud_backend.yaml, debugging backend dispatch errors, choosing local vs SkyPilot vs RunPod vs Nebius, subprocess training, GPU cloud dispatch, Nebius, backend: nebius-direct. Activate alongside ml-training and llm-training-eval."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

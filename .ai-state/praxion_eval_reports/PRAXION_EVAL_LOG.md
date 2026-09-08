@@ -4,3 +4,4 @@
 | 2026-08-07T08-11-55Z | git:a8957b3ff17621d21a30e513526da560aa97d2af (a8957b3) | messages-api | family1+family2 | 988 | 350 | 4 | $0.0000 | PRAXION_EVAL_REPORT_2026-08-07T08-11-55Z.md |
 | 2026-09-07T20-46-38Z | git:d483b2ecffad3abf9b4647a6ed67f13a7ae06084 (d483b2e) | agent-sdk | family1+family2 | 758 | 389 | 1 | $0.0000 | PRAXION_EVAL_REPORT_2026-09-07T20-46-38Z.md |
 | 2026-09-07T21-32-00Z | /Users/fperez/dev/praxion/.claude/worktrees/process-economy-phase0 | messages-api | family1+family2 | 1503 | 39 | 2 | $0.0000 | PRAXION_EVAL_REPORT_2026-09-07T21-32-00Z.md |
+| 2026-09-08T04-32-06Z | /Users/fperez/dev/praxion/.claude/worktrees/process-economy-phase1 | agent-sdk | family1+family2 | 1128 | 39 | 5 | $0.0000 | PRAXION_EVAL_REPORT_2026-09-08T04-32-06Z.md |

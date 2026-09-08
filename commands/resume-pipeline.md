@@ -2,6 +2,7 @@
 description: "Reconcile a pipeline's WIP.md against ground truth (git + tests + the observations.jsonl WAL) and auto-recover truncated steps — auto-mark verified-complete work, auto-resume partial work, surface the ambiguous — leaving a full audit trail on every action."
 allowed-tools: [Read, Edit, Glob, Grep, Bash(reconcile_pipeline_state.py:*), Bash(python3:*), Bash(git:*), Agent]
 argument-hint: "<task-slug> [--dry-run] [--base-ref <ref>]"
+disable-model-invocation: true
 ---
 
 ## Help

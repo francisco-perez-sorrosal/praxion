@@ -1,7 +1,7 @@
 ---
-id: dec-draft-a4b27081
+id: dec-378
 title: Simplification requires a measured cost and an executable guard
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-09-07
 summary: A simplification of process or context artifacts requires a measured cost and an executable guard (check, test, eval scenario, or read/fire telemetry); self-graded logs are not guards until they show variance.

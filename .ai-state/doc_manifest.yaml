@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-07T02:49:58Z'
+generated_at: '2026-09-08T02:00:53Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -32,7 +32,7 @@ surfaces:
   path: README_DEV.md
   type: markdown
   title: Developer Guide
-  last_modified: '2026-08-30'
+  last_modified: '2026-09-07'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-040-eval-framework-out-of-band
@@ -42,7 +42,7 @@ surfaces:
   path: CLAUDE.md
   type: markdown
   title: Praxion
-  last_modified: '2026-08-30'
+  last_modified: '2026-09-07'
   renderer: default_markdown
   surfaces_referenced:
   - docs-claude-code-limitations
@@ -127,7 +127,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-09-06'
+  last_modified: '2026-09-07'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -318,7 +318,7 @@ surfaces:
   path: docs/getting-started.md
   type: markdown
   title: Getting Started
-  last_modified: '2026-08-30'
+  last_modified: '2026-09-07'
   diataxis: tutorial
   audience: developer
   renderer: tutorial_shell
@@ -505,7 +505,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-09-06'
+  last_modified: '2026-09-07'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -522,7 +522,7 @@ surfaces:
   path: .ai-state/SYSTEM_DEPLOYMENT.md
   type: markdown
   title: System Deployment
-  last_modified: '2026-08-07'
+  last_modified: '2026-09-07'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-116-ai-training-results-schema-owner
@@ -544,7 +544,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-09-06'
+  last_modified: '2026-09-07'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -558,7 +558,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-09-06'
+  last_modified: '2026-09-07'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -864,7 +864,7 @@ surfaces:
   path: .ai-state/decisions/048-observation-span-correlation.md
   type: markdown
   title: Observation/span correlation via OpenInference `session.id` + W3C trace-context
-  last_modified: '2026-04-16'
+  last_modified: '2026-09-07'
   renderer: adr_card
 - id: ai-state-decisions-049-reaffirm-dec022-coord-cohort
   path: .ai-state/decisions/049-reaffirm-dec022-coord-cohort.md
@@ -2076,7 +2076,7 @@ surfaces:
   path: .ai-state/decisions/250-wal-bounding-rotation.md
   type: markdown
   title: "Bound the recovery WAL \u2014 best-effort rotate-and-archive to a gitignored segment + windowed cross-boundary read"
-  last_modified: '2026-06-26'
+  last_modified: '2026-09-07'
   renderer: adr_card
 - id: ai-state-decisions-251-artifact-registry-declarative-spine
   path: .ai-state/decisions/251-artifact-registry-declarative-spine.md
@@ -2190,7 +2190,7 @@ surfaces:
   path: .ai-state/decisions/269-skill-activation-observations-event.md
   type: markdown
   title: First-class `skill_activation` observations event via the single PostToolUse WAL emitter
-  last_modified: '2026-07-16'
+  last_modified: '2026-09-07'
   renderer: adr_card
 - id: ai-state-decisions-270-agent-pipeline-block-pointer
   path: .ai-state/decisions/270-agent-pipeline-block-pointer.md
@@ -2827,6 +2827,24 @@ surfaces:
   type: markdown
   title: The seal-witness equality check exempts NONE tombstones as vacuous, and the priors parsers honour the escape convention the files document
   last_modified: '2026-09-06'
+  renderer: adr_card
+- id: ai-state-decisions-376-calibration-verdict-owned-by-verifier
+  path: .ai-state/decisions/376-calibration-verdict-owned-by-verifier.md
+  type: markdown
+  title: The calibration verdict is authored by the verifier, not the agent that chose the tier
+  last_modified: '2026-09-07'
+  renderer: adr_card
+- id: ai-state-decisions-377-observations-wal-leaves-git
+  path: .ai-state/decisions/377-observations-wal-leaves-git.md
+  type: markdown
+  title: The raw observations WAL leaves git; a per-session summary stays committed
+  last_modified: '2026-09-07'
+  renderer: adr_card
+- id: ai-state-decisions-378-simplification-evidence-standard
+  path: .ai-state/decisions/378-simplification-evidence-standard.md
+  type: markdown
+  title: Simplification requires a measured cost and an executable guard
+  last_modified: '2026-09-07'
   renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
@@ -3501,6 +3519,9 @@ groups:
   - ai-state-decisions-373-consult-cost-reconstructed-provenance
   - ai-state-decisions-374-dashboard-overview-landing-unadopted
   - ai-state-decisions-375-seal-witness-none-tombstone-exemption
+  - ai-state-decisions-376-calibration-verdict-owned-by-verifier
+  - ai-state-decisions-377-observations-wal-leaves-git
+  - ai-state-decisions-378-simplification-evidence-standard
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

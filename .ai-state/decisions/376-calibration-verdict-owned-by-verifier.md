@@ -1,7 +1,7 @@
 ---
-id: dec-draft-3adfda75
+id: dec-376
 title: The calibration verdict is authored by the verifier, not the agent that chose the tier
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-07
 summary: At Standard/Full, the required calibration-retrospective enum is written by the verifier (independent of tier selection); at Direct/Lightweight the orchestrator writes it but must cite a measurable.

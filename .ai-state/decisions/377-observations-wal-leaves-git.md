@@ -1,7 +1,7 @@
 ---
-id: dec-draft-66cd5bb6
+id: dec-377
 title: The raw observations WAL leaves git; a per-session summary stays committed
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-07
 summary: .ai-state/observations.jsonl becomes gitignored at its current path (file stays on disk); a new committed .ai-state/observations_summary.jsonl gains one compact row per session at Stop.

@@ -17,7 +17,7 @@ affected_files:
   - docs/onboarding.md
   - docs/architecture.md
   - docs/diagrams/architecture/src/architecture.c4
-dissent: "The guard's command-text heuristics were the only layer that refused a Bash heredoc or `sh -c` write into the main checkout from a worktree session; native isolation covers Write/Edit only, so a later pipeline's implementer can silently edit the wrong tree through Bash."
+dissent: "Two things are lost, not one: the banner's /resume-rework affordance in fresh rework worktrees, and the guard's command-text heuristics were the only layer that refused a Bash heredoc or `sh -c` write into the main checkout from a worktree session; native isolation covers Write/Edit only, so a later pipeline's implementer can silently edit the wrong tree through Bash."
 ---
 
 ## Context
@@ -48,6 +48,7 @@ Delete `hooks/worktree_guard.py`, `hooks/inject_worktree_banner.py`, their three
 ## Consequences
 
 - Positive: one enforcement layer; fewer subprocesses per edit; the documented false positives disappear; the docs stop describing a mechanism the harness already provides.
+- Negative: the banner was also the SessionStart affordance that surfaced `/resume-rework` inside a fresh rework worktree; that hint is gone, so rework dispatch now relies on the orchestrator's hand-off (or the user) naming `/resume-rework` — `docs/architecture.md` § Rework Loop records the removal.
 - Negative: a Bash heredoc or script run from a worktree session can write into the main checkout without refusal. Accepted, with the procedural controls above; recorded as a real behaviour change, not a regression, in the pipeline's LEARNINGS.
 - The `docs/onboarding.md` sidecar-mount rationale and `docs/architecture.md` sidecar row are reworded to rest on the state mount's realpath invariant alone, which native isolation honours for the same reason the guard did.
 

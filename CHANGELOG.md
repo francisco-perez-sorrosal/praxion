@@ -1,3 +1,39 @@
+## v0.29.0 (2026-09-08)
+
+### Feat
+
+- **eval**: report judged token usage and estimated cost from usage
+- **eval**: incremental judging with a committed verdict cache and parallel judge calls
+- **eval**: inheritance-probe scenario (P0.7)
+- **eval**: Family 5 token-budget stability collector (P0.7)
+- **eval**: five seeded context-layer scenarios (P0.7, part 1)
+- **calibration**: rewrite sentinel CA02 over the Retrospective enum distribution
+- **calibration**: verifier writes the calibration verdict at Standard/Full
+- **calibration**: require Retrospective enum prefix on new calibration-log rows
+- **observability**: gate_fire observations from every commit gate (P0.4)
+- **observability**: capture Read/Glob/Grep paths in the tool-use WAL
+- **observability**: SubagentStop telemetry — tokens, duration, model per spawn (P0.4)
+- **observability**: committed per-session summary WAL (P0.5)
+- **onboarding**: propagate WAL untrack to already-onboarded projects
+- **token-budget**: wire the ratchet into the commit-gate chain
+- **token-budget**: add --ratchet mode and its committed baseline
+- **token-budget**: add listing surface line item to measure_token_budget
+
+### Fix
+
+- **observability**: verifier findings F1, F4, F7, F8, F9, F10
+- **eval**: Family 5 treats an over-ceiling estimate-basis reading as inconclusive, not FAIL
+- **observability**: tolerate undecodable transcript bytes; rename in the observability diagram
+- **observability**: readers degrade gracefully without the raw WAL (P0.5)
+- **token-budget**: loader-model file set and byte-based ratchet trend (td-179, td-180)
+- **token-budget**: fail-open ratchet gate, basis-aware baseline, guarded hook import
+- **docs**: correct three inheritance/routing text drifts
+- **hooks**: measure_context_surface delegates to the token-budget gate
+
+### Refactor
+
+- **hooks**: rename capture_memory to capture_observations (P0.4)
+
 ## v0.28.0 (2026-09-07)
 
 ### Feat

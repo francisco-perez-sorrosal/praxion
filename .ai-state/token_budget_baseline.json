@@ -5,8 +5,8 @@
   "samples": [
     {
       "date": "2026-09-07",
-      "governed_tokens": 20193,
-      "governed_bytes": 78250,
+      "governed_tokens": 17968,
+      "governed_bytes": 69416,
       "basis": "tokenizer"
     }
   ]

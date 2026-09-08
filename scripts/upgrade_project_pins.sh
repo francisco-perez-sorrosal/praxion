@@ -35,7 +35,7 @@
 #      reconcile_aac_surfaces.py: namespace-token re-point plus the structural
 #      repair of the broken pre-fix Block D PLUGIN_ROOT resolution. Needs no
 #      hub SHA.
-#   8. The observations WAL .gitignore line (the raw WAL moved from
+#   8. The observations WAL .gitignore line + merge-attribute migration (the raw WAL moved from
 #      git-tracked to gitignored-but-present) — appends the missing line to
 #      an already-onboarded project's "AI assistants" block and untracks the
 #      file if it is still tracked. Additive/idempotent; a no-op under
@@ -504,7 +504,9 @@ if [ "$PLACEMENT" = "sidecar" ] && [ -n "$MOUNT_DIR" ]; then
 else
     cur_driver="$(git -C "$REPO_ROOT" config --get merge.observations-jsonl.driver 2>/dev/null || true)"
     attr_present=0
-    [ -f "$GITATTR" ] && grep -qF '.ai-state/observations.jsonl merge=observations-jsonl' "$GITATTR" && attr_present=1
+    # Either the current (summary) line or the pre-dec-377 raw-WAL line counts as
+    # "mapped": the [wal] surface below migrates the old line to the new one.
+    [ -f "$GITATTR" ] && grep -qE '^\.ai-state/observations(_summary)?\.jsonl merge=observations-jsonl$' "$GITATTR" && attr_present=1
 
     if [ "$cur_driver" = "$LIVE_DRIVER" ]; then
         info "ok"
@@ -580,7 +582,7 @@ if [ -f "$MANIFEST" ] && command -v jq >/dev/null 2>&1; then
     # core keys win (so a retired driver is still pruned from merge_drivers /
     # gitattributes), while a conditional caller-set key an onboard recorded
     # (e.g. ci_autofix) is preserved across the upgrade.
-    expected_artifacts='{"hooks":["pre-commit","post-merge","post-commit","post-checkout"],"merge_drivers":["observations-jsonl"],"gitattributes":[".ai-state/observations.jsonl merge=observations-jsonl"]}'
+    expected_artifacts='{"hooks":["pre-commit","post-merge","post-commit","post-checkout"],"merge_drivers":["observations-jsonl"],"gitattributes":[".ai-state/observations_summary.jsonl merge=observations-jsonl"]}'
     cur_artifacts="$(jq -cS '.artifacts // {}' "$MANIFEST")"
     merged_artifacts="$(jq -cS '(.artifacts // {}) + $a' --argjson a "$expected_artifacts" "$MANIFEST")"
 
@@ -715,16 +717,38 @@ else
         git -C "$REPO_ROOT" ls-files --error-unmatch -- "$WAL_REL" >/dev/null 2>&1 && wal_tracked=1
     fi
 
-    if [ "$wal_needs_ignore" -eq 1 ] || [ "$wal_tracked" -eq 1 ]; then
+    # The merge attribute follows the tracked file: dec-377 moved the driver's
+    # target from the (now untracked) raw WAL to the committed per-session
+    # rollup, so the old .gitattributes line is dead and the new one is needed
+    # (td-182). Migrated in place, line-for-line; a project with neither line
+    # was never mapped and is left alone (surface [2/4] reports that case).
+    SUMMARY_ATTR_LINE='.ai-state/observations_summary.jsonl merge=observations-jsonl'
+    RAW_ATTR_LINE='.ai-state/observations.jsonl merge=observations-jsonl'
+    attr_migrate=0
+    if [ "$wal_onboarded" -eq 1 ] && [ -f "$GITATTR" ] && grep -qxF "$RAW_ATTR_LINE" "$GITATTR"; then
+        attr_migrate=1
+    fi
+
+    if [ "$wal_needs_ignore" -eq 1 ] || [ "$wal_tracked" -eq 1 ] || [ "$attr_migrate" -eq 1 ]; then
         note_change
         [ "$wal_needs_ignore" -eq 1 ] && info ".gitignore: line missing → appending"
         [ "$wal_tracked" -eq 1 ] && info "observations.jsonl: still tracked → untracking (file stays on disk)"
+        [ "$attr_migrate" -eq 1 ] && info ".gitattributes: merge attribute on the raw WAL → moving it to observations_summary.jsonl"
         if mutating; then
             if [ "$wal_needs_ignore" -eq 1 ]; then
                 printf '%s\n' "$WAL_REL" >> "$GITIGNORE"
                 STAGED_FILES+=("$GITIGNORE")
             fi
             [ "$wal_tracked" -eq 1 ] && git -C "$REPO_ROOT" rm --cached --quiet -- "$WAL_REL"
+            if [ "$attr_migrate" -eq 1 ]; then
+                if grep -qxF "$SUMMARY_ATTR_LINE" "$GITATTR"; then
+                    grep -vxF "$RAW_ATTR_LINE" "$GITATTR" > "$GITATTR.tmp"
+                else
+                    sed "s|^$RAW_ATTR_LINE\$|$SUMMARY_ATTR_LINE|" "$GITATTR" > "$GITATTR.tmp"
+                fi
+                mv "$GITATTR.tmp" "$GITATTR"
+                STAGED_FILES+=("$GITATTR")
+            fi
         fi
     fi
 fi

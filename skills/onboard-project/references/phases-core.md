@@ -257,15 +257,15 @@ If the user agrees, remove that line. If they decline, proceed without changing 
 
   **Action.** Copy `${PLUGIN_INSTALL_PATH}/claude/project-baseline/principles.yaml.tmpl` to `.ai-state/principles.yaml`, stripping the leading template-doc comment block (the lines from `# -- template-doc` through the first `# ---` divider); keep the retained header comments — they document ownership and the consumer contract for the project's readers. If the plugin install path was not detected at pre-flight (skip-phase-4 flag set), skip this sub-step and emit: `Skipping principles.yaml seed — install the plugin and re-run /onboard-project. Without it, the beautiful-code dimensions are documented but never gate this project's pipeline.` Print on success: `Phase 2: .ai-state/principles.yaml seeded (8 advisory principles — the beautiful-code dimensions; edit freely, it is yours)`.
 
-Do NOT create `.ai-state/observations.jsonl` — that is written on first use by the observability hook. Pre-creating it confuses the semantic merge driver.
+Do NOT create `.ai-state/observations.jsonl` — that is written on first use by the observability hook. The raw WAL carries no merge driver (only the committed rollup, `.ai-state/observations_summary.jsonl`, does) — there is simply no reason to pre-create it.
 
 **Sidecar placement.** Under `--placement sidecar`, the skeleton above is created in the **sidecar mount** (`<project>/.praxion-state` — the sidecar's own working tree materialised inside the checkout) rather than directly in the project. Every subdirectory this phase creates additionally seeds a `.gitkeep` (or keeps a real file already present) so a fresh `git worktree` materialises it: `git worktree add` only materialises **tracked** content and git does not track empty directories, so an unseeded subdirectory silently vanishes from a newly mounted worktree. `praxion-sidecar link` then symlinks the mounted skeleton back into the checkout (`.ai-state -> .praxion-state/.ai-state`) — the same mount-then-link sequence §Phase 6 relies on for `CLAUDE.local.md`.
 
 ## §Phase 3 — `.gitattributes` + merge driver registration
 
-**Why this phase exists.** Line-based merge corrupts structured data. `.ai-state/observations.jsonl` (event log) is a merge-conflict target when concurrent edits land — the semantic merge driver reconciles it at the JSONL level instead. The full `.ai-state/` safety contract at PR time, including merge policy and the squash-merge ban for `.ai-state/`-touching branches, lives in `rules/swe/vcs/pr-conventions.md`.
+**Why this phase exists.** Line-based merge corrupts structured data. `.ai-state/observations_summary.jsonl` (the committed per-session rollup — the raw WAL is gitignored-but-present and never reaches a git merge) is a merge-conflict target when concurrent edits land — the semantic merge driver reconciles it by `session_id` instead. The full `.ai-state/` safety contract at PR time, including merge policy and the squash-merge ban for `.ai-state/`-touching branches, lives in `rules/swe/vcs/pr-conventions.md`.
 
-**Predicate (version-aware).** Detect the `.gitattributes` entry via exact-line `grep -qF '.ai-state/observations.jsonl merge=observations-jsonl' .gitattributes`. Detect driver registration via `git config --get merge.observations-jsonl.driver`. The registration is **stale** (and must be re-registered, not skipped) when the registered command contains `/praxion/` but its path is NOT the live `${PLUGIN_INSTALL_PATH}` captured at pre-flight — see [shared-procedures.md § Version-aware staleness comparison rationale](shared-procedures.md#-version-aware-staleness-comparison-rationale) for why a full-path comparison is required.
+**Predicate (version-aware).** Detect the `.gitattributes` entry via exact-line `grep -qF '.ai-state/observations_summary.jsonl merge=observations-jsonl' .gitattributes`. Detect driver registration via `git config --get merge.observations-jsonl.driver`. The registration is **stale** (and must be re-registered, not skipped) when the registered command contains `/praxion/` but its path is NOT the live `${PLUGIN_INSTALL_PATH}` captured at pre-flight — see [shared-procedures.md § Version-aware staleness comparison rationale](shared-procedures.md#-version-aware-staleness-comparison-rationale) for why a full-path comparison is required.
 
 **Cross-version cleanup.** Read the prior onboard manifest `.ai-state/.praxion-onboard.json` if present (written by §Phase 9 of an earlier run). For every merge driver named in its `artifacts.merge_drivers` that is NOT in the current expected set (`observations-jsonl` only), the feature was retired between versions: `git config --unset merge.<name>.driver` (ignore failure if already absent) and delete its `.gitattributes` line. Example: a project onboarded by an older version carries `.ai-state/memory.json merge=memory-json`; the `memory-json` driver was dropped, so onboarding must remove both the git-config entry and the `.gitattributes` line rather than leaving a `.gitattributes` mapping to a driver that no longer exists. Only touch Praxion-managed entries (driver value contains `/praxion/` or `merge_driver_`); never remove a user's own driver.
 
@@ -274,14 +274,14 @@ Do NOT create `.ai-state/observations.jsonl` — that is written on first use by
 1. **Append to `.gitattributes`** (create the file if missing):
    ```gitattributes
    # Praxion semantic merge drivers — see rules/swe/agent-intermediate-documents.md
-   .ai-state/observations.jsonl merge=observations-jsonl
+   .ai-state/observations_summary.jsonl merge=observations-jsonl
    ```
 
 2. **Register (or re-register) the driver in this repo's `git config`**. Run this whenever the driver is absent OR the predicate flagged a stale `/praxion/` path — `git config` overwrites in place, upgrading a stale-version pin to the live install path:
    ```bash
    git config merge.observations-jsonl.driver "python3 ${PLUGIN_INSTALL_PATH}/scripts/merge_driver_observations.py %O %A %B"
    ```
-   `${PLUGIN_INSTALL_PATH}` is the value captured in §Pre-flight. If the plugin was not detected (skip-phase-4 flag is set), still write `.gitattributes` but emit a warning: `Merge driver not registered — run 'git config merge.observations-jsonl.driver "..."' manually after installing the plugin. Without this, .ai-state/observations.jsonl will be corrupted by line-based merge on first concurrent edit.`
+   `${PLUGIN_INSTALL_PATH}` is the value captured in §Pre-flight. If the plugin was not detected (skip-phase-4 flag is set), still write `.gitattributes` but emit a warning: `Merge driver not registered — run 'git config merge.observations-jsonl.driver "..."' manually after installing the plugin. Without this, .ai-state/observations_summary.jsonl will be corrupted by line-based merge on first concurrent edit.`
 
 3. **Conflict check.** If `git config --get merge.observations-jsonl.driver` already returns a value that does NOT contain `praxion` and is NOT empty, refuse to overwrite. Print: `merge.observations-jsonl.driver is already set to '<value>' — refusing to overwrite. Remove the existing driver manually if you want Praxion's, or leave as-is.`
 
@@ -569,7 +569,7 @@ Do not recommend tools the user already has, and do not recommend `uv` if no Pyt
      "artifacts": {
        "hooks": ["pre-commit", "post-merge", "post-commit", "post-checkout"],
        "merge_drivers": ["observations-jsonl"],
-       "gitattributes": [".ai-state/observations.jsonl merge=observations-jsonl"],
+       "gitattributes": [".ai-state/observations_summary.jsonl merge=observations-jsonl"],
        "ci_autofix": {
          "caller": ".github/workflows/ci-autofix.yml",
          "policy": ".github/autofix-policy.yml",

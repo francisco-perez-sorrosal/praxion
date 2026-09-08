@@ -987,3 +987,25 @@ def test_wal_sidecar_placement_is_a_noop(tmp_path: Path) -> None:
 
     assert r.returncode == 0, r.stderr
     assert "sidecar placement" in r.stdout
+
+
+def test_wal_surface_migrates_merge_attribute_to_summary(project: dict) -> None:
+    """td-182: the pre-dec-377 raw-WAL attribute line is moved to the committed rollup."""
+    repo = project["repo"]
+    gitignore = repo / ".gitignore"
+    gitignore.write_text("# AI assistants\n.ai-work/\n")
+    _git(repo, "add", ".gitignore")
+    _git(repo, "commit", "-q", "-m", "gitignore")
+
+    _run(repo, project["live"])
+
+    attrs = (repo / ".gitattributes").read_text().splitlines()
+    assert ".ai-state/observations_summary.jsonl merge=observations-jsonl" in attrs
+    assert ".ai-state/observations.jsonl merge=observations-jsonl" not in attrs
+    assert _manifest(repo)["artifacts"]["gitattributes"] == [
+        ".ai-state/observations_summary.jsonl merge=observations-jsonl"
+    ]
+    # idempotent: a second run changes nothing further
+    before = (repo / ".gitattributes").read_text()
+    _run(repo, project["live"])
+    assert (repo / ".gitattributes").read_text() == before

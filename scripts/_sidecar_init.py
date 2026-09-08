@@ -57,11 +57,15 @@ PATH_COLUMN = 30
 
 # The sidecar's own semantic merge routing, byte-identical to what onboarding
 # Phase 3 writes into a project. It has to live in the *sidecar* too: under the
-# state mount, `.ai-state/` is the sidecar's tracked tree, so a `merge-back`
-# between two mounts merges `observations.jsonl` inside the sidecar repository
-# -- and without this routing git would reconcile an append-only event log with
-# its default line-based 3-way strategy and corrupt it on the first concurrent
-# session.
+# state mount, `.ai-state/` is the sidecar's tracked tree -- unlike the InRepo
+# case, sidecar placement keeps the raw WAL tracked *there* rather than
+# gitignoring it (the whole point of the mount is to hold the full `.ai-state/`
+# history out of the team repo) -- so a `merge-back` between two mounts merges
+# `observations.jsonl` inside the sidecar repository, and without this routing
+# git would reconcile an append-only event log with its default line-based
+# 3-way strategy and corrupt it on the first concurrent session. The driver
+# dispatches on row shape (see `merge_driver_observations.py`), so routing the
+# raw WAL here still gets the composite-key merge it needs.
 GITATTRIBUTES_HEADER = (
     "# Praxion semantic merge drivers — see rules/swe/agent-intermediate-documents.md"
 )

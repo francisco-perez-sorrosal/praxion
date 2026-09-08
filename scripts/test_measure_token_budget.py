@@ -664,3 +664,83 @@ def test_ratchet_cli_exits_zero_on_a_skip(tmp_path: Path, monkeypatch: pytest.Mo
     _rule(tmp_path, "small.md", "# a short rule\n")
 
     assert mtb.main(["--repo-root", str(tmp_path), "--ratchet"]) == 0
+
+
+# -- The P1.12 absolute listing target (distinct from the baseline ceiling) ------
+
+
+def test_ratchet_cli_reports_over_target_without_failing_by_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The 2,000-token target is directional during the P1.12 sweep -- exceeding
+    it must not block commits until --enforce-listing-ceiling opts in."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    baseline = tmp_path / ".ai-state" / "token_budget_baseline.json"
+    _seed_baseline(
+        baseline,
+        listing_ceiling=999_999,
+        samples=[{"date": "2026-01-01", "governed_tokens": 100, "governed_bytes": 400}],
+    )
+    _stub_measurements(monkeypatch, governed_tokens=100, governed_bytes=400, listing_tokens=2500)
+
+    exit_code = mtb.main(["--repo-root", str(tmp_path), "--ratchet", "--listing-ceiling", "2000"])
+
+    assert exit_code == 0
+    assert "listing-target OVER (report-only)" in capsys.readouterr().out
+
+
+def test_ratchet_cli_enforces_target_when_flag_passed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Batch 5 flips this on: once the description diet lands, the same
+    over-target reading must block the commit."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    baseline = tmp_path / ".ai-state" / "token_budget_baseline.json"
+    _seed_baseline(
+        baseline,
+        listing_ceiling=999_999,
+        samples=[{"date": "2026-01-01", "governed_tokens": 100, "governed_bytes": 400}],
+    )
+    _stub_measurements(monkeypatch, governed_tokens=100, governed_bytes=400, listing_tokens=2500)
+
+    exit_code = mtb.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--ratchet",
+            "--listing-ceiling",
+            "2000",
+            "--enforce-listing-ceiling",
+        ]
+    )
+
+    assert exit_code == 1
+    assert "listing-target OVER (enforced)" in capsys.readouterr().out
+
+
+def test_ratchet_cli_listing_under_target_reports_ok(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A synthetic listing under the target reads OK regardless of enforcement."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    baseline = tmp_path / ".ai-state" / "token_budget_baseline.json"
+    _seed_baseline(
+        baseline,
+        listing_ceiling=999_999,
+        samples=[{"date": "2026-01-01", "governed_tokens": 100, "governed_bytes": 400}],
+    )
+    _stub_measurements(monkeypatch, governed_tokens=100, governed_bytes=400, listing_tokens=1500)
+
+    exit_code = mtb.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--ratchet",
+            "--listing-ceiling",
+            "2000",
+            "--enforce-listing-ceiling",
+        ]
+    )
+
+    assert exit_code == 0
+    assert "listing-target OK (enforced)" in capsys.readouterr().out

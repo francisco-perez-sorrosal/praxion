@@ -1,0 +1,12 @@
+# Skill-description diet table (P1.12). `name -> description`: the exact new
+# frontmatter `description:` value applied to `skills/<name>/SKILL.md` by
+# `apply_skill_description_diet.py`. Applied incrementally across P1.12
+# Batches 1-3 (~20 skills each, alphabetical) -- a bad cut (PM-7: a trigger
+# noun dropped from a description silently stops that skill's activation) is
+# one row to revert in review, not a diff to hand-reconstruct.
+#
+# PM-7 binding: every noun that appeared in the skill's original `Triggers:`
+# clause (or trigger sentences, when the skill had no explicit `Triggers:`
+# label) survives verbatim in the row below. Each value must be <=300 chars
+# (enforced by `load_table()` -- a longer row fails the script, not silently).
+{}

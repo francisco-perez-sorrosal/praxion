@@ -67,6 +67,15 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 BUDGET_TOKENS = 25_000
 
+# The P1.12 directional target for the listing surface: ~1% of a 200k-token
+# context window. Distinct from `ratchet()`'s baseline-pinned `listing_ceiling`
+# (a no-regression-from-today floor, frozen at whatever the listing measured
+# on the day that field was last written) -- this is an absolute target,
+# checked ad hoc via `--listing-ceiling` and report-only by default
+# (`--enforce-listing-ceiling` opts in) so the P1.12 description-diet sweep
+# does not block every intermediate commit before it lands the whole corpus.
+_LISTING_TARGET_CEILING_DEFAULT = 2_000
+
 # Measured 2026-08-05 (see module docstring). Errs ~5% high, which is the
 # direction a guardrail should err. Re-derive with --json after a material
 # change to the corpus rather than trusting this indefinitely.
@@ -649,6 +658,22 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="report the trailing-30-day governed-token delta and listing ceiling instead",
     )
+    parser.add_argument(
+        "--listing-ceiling",
+        type=int,
+        default=_LISTING_TARGET_CEILING_DEFAULT,
+        help=(
+            "absolute token ceiling for the skill/command/agent description listing, "
+            f"checked alongside --ratchet (default {_LISTING_TARGET_CEILING_DEFAULT}, "
+            "~1%% of a 200k window); reported only unless --enforce-listing-ceiling is "
+            "also passed"
+        ),
+    )
+    parser.add_argument(
+        "--enforce-listing-ceiling",
+        action="store_true",
+        help="fail --ratchet when --listing-ceiling is exceeded (default: report only)",
+    )
     args = parser.parse_args(argv)
 
     repo_root = resolve_repo_root(args.repo_root, script_dir=SCRIPT_DIR)
@@ -656,6 +681,13 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.ratchet:
         result = ratchet(repo_root, api_key=api_key)
+        target_over = None
+        if not result["skipped"]:
+            target_over = result["listing_tokens"] > args.listing_ceiling
+            result["listing_target_ceiling"] = args.listing_ceiling
+            result["listing_over_target"] = target_over
+            if args.enforce_listing_ceiling and target_over:
+                result["ratchet_ok"] = False
         if args.json:
             print(json.dumps(result, indent=2))
         else:
@@ -668,6 +700,12 @@ def main(argv: list[str] | None = None) -> int:
                 print(
                     f"ratchet: {verdict} -- governed_delta_bytes={result['governed_delta_bytes']}, "
                     f"listing={result['listing_tokens']}/{result['listing_ceiling']}"
+                )
+                target_verdict = "OVER" if target_over else "OK"
+                enforced = "enforced" if args.enforce_listing_ceiling else "report-only"
+                print(
+                    f"ratchet: listing-target {target_verdict} ({enforced}) -- "
+                    f"{result['listing_tokens']}/{args.listing_ceiling}"
                 )
         return 0 if result["ratchet_ok"] else 1
 

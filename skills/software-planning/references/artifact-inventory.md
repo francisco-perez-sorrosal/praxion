@@ -1,12 +1,92 @@
-# Artifact Inventory — Detailed Per-Artifact Writers, Readers, Shape & Lifetime
+# Artifact Inventory — Directory Trees and Per-Artifact Writers, Readers, Shape & Lifetime
 
-Back-link: [`rules/swe/agent-intermediate-documents.md`](../../../rules/swe/agent-intermediate-documents.md) — the always-loaded rule that owns the `.ai-work/` and `.ai-state/` file trees, the `.ai-work` vs `.ai-state` split, the lifecycle-state vocabulary, and cleanup conventions. This reference carries the verbose per-artifact detail that does not need to be always-loaded; read it on demand when authoring or consuming a specific artifact.
+Back-link: [`rules/swe/agent-intermediate-documents.md`](../../../rules/swe/agent-intermediate-documents.md) — the always-loaded rule that owns the `.ai-work` vs `.ai-state` split, the task-slug convention, the lifecycle-state vocabulary, the tech-debt-ledger writer contract, and cleanup conventions. This reference carries the canonical **directory trees** and the verbose per-artifact detail that does not need to be always-loaded; read it on demand when authoring or consuming a specific artifact.
 
-The file **trees** in the rule are the canonical list of what exists and where. The tables below add the per-artifact **writer/updater**, **reader**, **shape**, and **lifetime** detail, plus the per-row **lifecycle state** (defined in the rule's compact decision table).
+## Directory Trees
+
+The canonical list of what exists and where. The inventory tables below add the per-artifact **writer/updater**, **reader**, **shape**, and **lifetime** detail, plus the per-row **lifecycle state**.
+
+### `.ai-work/<task-slug>/` — ephemeral pipeline documents
+
+```
+<project-root>/
+  .ai-work/
+    <task-slug>/
+      IDEA_PROPOSAL.md
+      TASK_BRIEF.md
+      RESEARCH_FINDINGS.md
+      CONTEXT_REVIEW.md
+      INTERFACE_DESIGN.md
+      TRANSACTIONS_DESIGN.md
+      CONSULT_<discipline>.md
+      SYSTEMS_PLAN.md
+      PRE_REFACTOR_PLAN.md
+      SPEC_DELTA.md
+      IMPLEMENTATION_PLAN.md
+      WIP.md
+      LEARNINGS.md
+      TEST_BASELINE.md
+      TEST_RESULTS.md
+      traceability.yml
+      VERIFICATION_REPORT.md
+      REWORK_MANIFEST.md
+      PROGRESS.md
+```
+
+`PROGRESS.md` is an append-only log of agent phase-transition signals. Format: `[TIMESTAMP] [AGENT] Phase N/M: [phase-name] -- [summary] #label1 #key=value`
+
+- Dot-prefixed — hidden by default in file browsers and `ls`
+- **Task-scoped** — each run uses its own `<task-slug>/` subdirectory, preventing collisions between concurrent pipelines
+- **Worktree-scoped** — `.ai-work/` is gitignored, so each worktree holds its own copy; under `EnterWorktree` the pipeline's `.ai-work/` lives inside the worktree, isolated from other sessions
+- Created on first use — agents create `.ai-work/<task-slug>/` when writing their first document
+
+Scope: **exclusively for agent coordination pipeline documents** — the outputs defined in the SWE agent coordination protocol rule. Not stored here: command scratch files or skill working files; project documentation or ADRs; build artifacts or tool caches.
+
+### `.ai-state/` — persistent project intelligence
+
+```
+<project-root>/
+  .ai-state/
+    calibration_log.md
+    observations_summary.jsonl
+    token_budget_baseline.json
+    DESIGN.md
+    SYSTEM_DEPLOYMENT.md
+    TEST_TOPOLOGY.md
+    TECH_DEBT_LEDGER.md
+    CONSULT_LEDGER.md
+    CONSULT_COSTS.md
+    CONSULT_PRIORS.md
+    decisions/
+      <NNN>-<slug>.md
+      DECISIONS_INDEX.md
+    specs/
+      SPEC_<name>_YYYY-MM-DD.md
+    sentinel_reports/
+      SENTINEL_REPORT_*.md
+      SENTINEL_LOG.md
+    skill_genesis_reports/
+      SKILL_GENESIS_REPORT_*.md
+      SKILL_GENESIS_LOG.md
+    metrics_reports/
+      METRICS_REPORT_*.{md,json}
+      METRICS_LOG.md
+    idea_ledgers/
+      IDEA_LEDGER.md
+    eval_ledger/
+      EVAL_LOG.md
+    project_profile.yaml
+```
+
+- Committed to git — versioned, shareable, accumulates value over time
+- **Worktree-aware** — in a worktree, `.ai-state/` changes are committed on the pipeline branch and reconciled at merge (see [.ai-state/ Reconciliation](agent-pipeline-details.md#ai-state-reconciliation-for-worktree-merges))
+- Created on first use — agents create `.ai-state/` when writing their first persistent document
+
+The trees are the canonical file list; the inventory is derivable from the filesystem.
 
 ## Lifecycle States
 
-| State | Meaning when the artifact is absent |
+| State | Meaning when the artifact is absent (examples: `active` — `WIP.md`, `SYSTEMS_PLAN.md`, `VERIFICATION_REPORT.md`, `DESIGN.md`, `decisions/`, `calibration_log.md`, `specs/`, sentinel/metrics/idea/skill-genesis reports; `optional-lazy` — `principles.yaml`, `LANDSCAPE_WATCHLIST.md`, the ML `training_runs/` family, `eval_ledger/EVAL_LOG.md`; `threshold-lazy` — `TEST_TOPOLOGY.md` (M2+ adoption); `future-designed` — `project_profile.yaml`) |
 |---|---|
 | `active` | A real gap — the artifact should exist for this project/pipeline. |
 | `optional-lazy` | The feature was not adopted; absence is expected and fine. |
@@ -15,7 +95,7 @@ The file **trees** in the rule are the canonical list of what exists and where. 
 
 ## `.ai-state/` Persistent Artifacts
 
-The tree in the rule is the canonical list. Per-artifact detail:
+The tree above is the canonical list. Per-artifact detail:
 
 | Artifact | State | Writers / updaters | Shape · lifecycle · reference |
 |---|---|---|---|

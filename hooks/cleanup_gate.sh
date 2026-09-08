@@ -16,8 +16,12 @@ set -e
 
 input=$(cat)
 
-if echo "$input" | grep -qE 'rm[[:space:]]+.*\.ai-work|find[[:space:]]+.*\.ai-work.*-delete|clean\.work|clean-work'; then
-    echo "$input" | python3 "$1"
+# The payload is forwarded with printf, never echo: /bin/sh on macOS is bash in
+# POSIX mode, whose builtin echo interprets backslash escapes, so a command that
+# contains `\|`, `\s` or `\n` (any grep pattern) arrives as invalid JSON and
+# every Python hook's json.loads fails silently -- td-188.
+if printf '%s\n' "$input" | grep -qE 'rm[[:space:]]+.*\.ai-work|find[[:space:]]+.*\.ai-work.*-delete|clean\.work|clean-work'; then
+    printf '%s\n' "$input" | python3 "$1"
 else
     exit 0
 fi

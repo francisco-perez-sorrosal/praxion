@@ -37,7 +37,11 @@ input=$(cat)
 
 # Quick text check — the JSON payload contains "git commit" in the command field.
 # False positives (rare) just run the Python hook unnecessarily — same as before.
-if echo "$input" | grep -q 'git.*commit'; then
+# The payload is forwarded with printf, never echo: /bin/sh on macOS is bash in
+# POSIX mode, whose builtin echo interprets backslash escapes, so a command that
+# contains `\|`, `\s` or `\n` (any grep pattern) arrives as invalid JSON and
+# every Python hook's json.loads fails silently -- td-188.
+if printf '%s\n' "$input" | grep -q 'git.*commit'; then
     rc=0
     # PRAXION_COMMIT_PAYLOAD tells a payload-aware checker that stdin carries a
     # hook payload deterministically, rather than sniffing stdin readiness with
@@ -45,7 +49,7 @@ if echo "$input" | grep -q 'git.*commit'; then
     # runs a whole-repo scan and blocks the commit). Harmless to checkers that
     # ignore it. The `echo | python3` pipe always reaches EOF, so a blocking
     # read is safe here.
-    echo "$input" | PRAXION_COMMIT_PAYLOAD=1 python3 "$1" || rc=$?
+    printf '%s\n' "$input" | PRAXION_COMMIT_PAYLOAD=1 python3 "$1" || rc=$?
     if [ "$blocking" -eq 1 ] && [ "$rc" -eq 1 ]; then
         exit 2
     fi

@@ -309,3 +309,30 @@ def test_blocks_fast_path_for_ai_work_rm_command(tmp_path: Path) -> None:
         "cleanup_gate.sh must delegate an `rm -rf .ai-work/` command to Python "
         f"(fast-path must NOT silence it); stdout={result.stdout!r}"
     )
+
+
+# td-188: the wrapper must hand the Python hook byte-identical JSON. Under
+# /bin/sh (bash in POSIX mode) `echo "$input"` interprets backslash escapes,
+# so a command carrying a grep pattern like `\\|` reached json.loads as an
+# invalid escape and every gate silently returned before recording anything.
+_ROUNDTRIP_HOOK = """
+import json, sys
+from pathlib import Path
+payload = json.loads(sys.stdin.read())
+Path(sys.argv[1] if len(sys.argv) > 1 else "roundtrip.json").write_text(json.dumps(payload))
+"""
+
+
+def test_forwards_backslash_bearing_payload_intact(tmp_path: Path) -> None:
+    """A command containing `\\|` and `\\n` must parse on the Python side unchanged."""
+    hook = tmp_path / "roundtrip_hook.py"
+    out = tmp_path / "roundtrip.json"
+    hook.write_text(_ROUNDTRIP_HOOK.replace('"roundtrip.json"', repr(str(out))))
+    command = "rm -rf .ai-work/old-slug 2>&1 | grep -v 'busy\\|locked' && printf 'a\\nb'"
+    payload = {"tool_name": "Bash", "tool_input": {"command": command}, "cwd": str(tmp_path)}
+
+    result = _run_gate(payload, hook=hook)
+
+    assert result.returncode == 0, result.stderr
+    assert out.exists(), "the Python hook never received parseable JSON"
+    assert json.loads(out.read_text())["tool_input"]["command"] == command

@@ -9,4 +9,4 @@
 #   - Use regular merge (not squash) to preserve both sides' changes
 #   - Or rebase locally first, then push, so the branch has main's latest state
 
-.ai-state/observations.jsonl merge=observations-jsonl
+.ai-state/observations_summary.jsonl merge=observations-jsonl

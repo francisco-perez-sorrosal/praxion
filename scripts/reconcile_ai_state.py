@@ -162,6 +162,61 @@ def reconcile_observations(ours_text: str, theirs_text: str) -> str:
     return "\n".join(lines) + "\n" if lines else ""
 
 
+def _index_summary_rows(text: str) -> dict[str, dict]:
+    """Parse a summary JSONL blob into ``{session_id: row}``.
+
+    A malformed line is skipped, mirroring ``reconcile_observations``'s
+    tolerance -- a torn write should not fail the whole merge.
+    """
+    rows: dict[str, dict] = {}
+    for line in text.strip().splitlines():
+        if not line.strip():
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        rows[obj.get("session_id", "")] = obj
+    return rows
+
+
+def reconcile_observations_summary(ours_text: str, theirs_text: str) -> str:
+    """Merge two ``observations_summary.jsonl`` files by ``session_id``.
+
+    The committed rollup (dec-377) upserts one row per ``session_id`` --
+    unlike the raw WAL's composite-key rows, which are always distinct
+    events and so a first-seen union is correct, two branches can each
+    Stop-write a *different* rollup for the *same* session_id. A plain
+    union would silently keep whichever side git happened to see first, so
+    this picks a winner explicitly: union session_ids across both sides,
+    and where both sides carry the same id, keep the row with the later
+    ``ended_at`` (a fresher Stop always rolls up more of the session; ties
+    favor ours, matching git's own %A-is-ours convention). The result is
+    ordered by ``started_at`` then ``session_id`` for a stable, diffable
+    file -- matching the compact, one-row-per-line shape
+    ``hooks/capture_session.py`` writes.
+    """
+    ours_by_id = _index_summary_rows(ours_text)
+    theirs_by_id = _index_summary_rows(theirs_text)
+
+    merged: dict[str, dict] = dict(theirs_by_id)
+    for session_id, ours_row in ours_by_id.items():
+        theirs_row = theirs_by_id.get(session_id)
+        if theirs_row is None or ours_row.get("ended_at", "") >= theirs_row.get("ended_at", ""):
+            merged[session_id] = ours_row
+        else:
+            merged[session_id] = theirs_row
+
+    ordered = sorted(
+        merged.values(),
+        key=lambda row: (row.get("started_at", ""), row.get("session_id", "")),
+    )
+    info(f"observations_summary.jsonl: {len(ordered)} sessions after merge")
+
+    lines = [json.dumps(row, ensure_ascii=False, separators=(",", ":")) for row in ordered]
+    return "\n".join(lines) + "\n" if lines else ""
+
+
 # -- ADR number reconciliation ------------------------------------------------
 
 

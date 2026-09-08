@@ -1,3 +1,40 @@
+## v0.30.0 (2026-09-08)
+
+### Feat
+
+- **scripts**: table-driven skill-description diet + listing-budget guard (P1.12)
+
+### Fix
+
+- **phase1**: verifier quick fixes — Codex bridge drops the retired worktree-guard delegate (td-190); dec-163/180 retired by dec-379, dec-173/174/379 affected_files corrected (td-191); live docs stop naming the deleted hooks (td-192); listing ratchet no longer assumes the unverified override key (td-194); DESIGN.md EC06 note (td-195a)
+- **docs**: coordination-details no longer claims a retired EC06 check keeps a deleted CLAUDE.md block in sync (P1.5 light-review F1)
+- **rules**: restore the skill-genesis on-demand trigger row dropped by the coordination diet (P1.4 light-review F1)
+- **hooks**: gate wrappers forward the payload with printf, not echo (td-188)
+- **state**: merge driver now guards observations_summary.jsonl by session_id (td-182)
+- **eval**: inheritance probe becomes a differential subagent-vs-top-level test (td-183)
+
+### Refactor
+
+- **skills**: name-only listing overrides for the 12 preload-only skills; listing measurement honours overrides + model-invocation flags; ratchet ceiling 11,336 -> 8,043 (P1.12)
+- **commands**: disable-model-invocation on the two side-effecting commands no agent or skill names (P1.12)
+- **skills**: description diet batch 3/3 (P1.12)
+- **skills**: description diet batch 2/3 (P1.12)
+- **skills**: description diet batch 1/3 (P1.12)
+- **hooks**: retire worktree_guard.py and inject_worktree_banner.py in favour of native worktree isolation (P1.10, dec-draft-30dd031c)
+- **agents**: relocate verifier rework-manifest + skill-genesis sections and architect pre-refactor procedure to software-planning references (P1.9)
+- **agents**: drop memory: frontmatter from agents with no memory-write evidence (P1.8)
+- **agents**: retire the PROGRESS.md per-phase write mandate; completion handshake = terminal marker + WIP.md (P1.7)
+- **claude-md**: CLAUDE.md pair diet — deliverables block, contract, learning loop, layout, onboarding/Obsidian pointers; sentinel EC06 retired; token-budget history to rule-crafting (P1.5)
+- **rules**: coordination-protocol diet — conditional rows to trigger sentences, agent table to paths, checkpoints to names + triggers; procedure to coordination-details.md (P1.4)
+- **rules**: routing rule keeps the tier table; policy relocated; agent routing comments stripped; implementer cites staging discipline (P1.6)
+- **rules**: relocate .ai-work/.ai-state trees to artifact-inventory.md (P1.3)
+- **rules**: relocate ADR schema and relation protocols to adr-authoring-protocols.md; agents cite it (P1.2)
+- **agents**: trim interface/agentic skill preloads to on-demand loads (P1.1)
+
+### Perf
+
+- **hooks**: SessionStart chain behind shell pre-checks and a cached non-shim interpreter wrapper (P1.11)
+
 ## v0.29.0 (2026-09-08)
 
 ### Feat

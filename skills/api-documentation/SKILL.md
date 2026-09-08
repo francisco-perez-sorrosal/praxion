@@ -1,14 +1,6 @@
 ---
 name: api-documentation
-description: >
-  Producing best-in-class documentation of your OWN API surface for both humans
-  and AI agents: REST/OpenAPI reference docs, Python and TypeScript library/service
-  docs, GraphQL schema docs, MCP server docs from tools/list introspection, and
-  agent-consumable docs (llms.txt). Covers spec-as-source-of-truth, the human-vs-agent
-  divergence, mandatory doc sections (quickstart/auth/RFC9457 errors/pagination/
-  rate-limit/changelog), and docs-as-CI-artifact. Triggers: document my API, API
-  reference docs, OpenAPI docs, MCP server docs, GraphQL schema docs, agent-consumable
-  docs, llms.txt, document a REST/Python/TypeScript API surface.
+description: "Producing best-in-class docs of your OWN API surface for humans and AI agents: REST/OpenAPI, Python/TypeScript libraries, GraphQL schemas, MCP server docs, agent-consumable docs (llms.txt). Triggers: document my API, API reference docs, OpenAPI docs, MCP server docs, GraphQL schema docs, agent-consumable docs, llms.txt, document a REST/Python/TypeScript API surface."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

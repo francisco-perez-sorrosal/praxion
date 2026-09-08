@@ -1,16 +1,6 @@
 ---
 name: agent-readiness
-description: >
-  Interpret and act on the Agent Readiness score produced by /project-metrics:
-  8 Factory pillars × 5 maturity levels × 80%-per-level gate + Praxion-native
-  Pillar 9 Manageability sub-score. Read the readiness block from
-  METRICS_REPORT_*.json, understand the LLM-judged criteria
-  (naming_conventions, test_quality, readme_quality, docs_agent_friendliness),
-  prioritize remediation by failing criterion → pipeline handoff, and interpret
-  level-by-level progress. Triggers: reading or acting on an agent readiness
-  report, understanding why a project scored a given level, deciding how to
-  improve readiness, interpreting mechanical vs LLM criteria, running readiness
-  without an API key, grounding a new readiness run on a prior report.
+description: "Interpret and act on the /project-metrics Agent Readiness score: 8 Factory pillars x 5 maturity levels x 80%-per-level gate, plus Pillar 9 Manageability. Triggers: reading or acting on an agent readiness report, understanding why a project scored a given level, deciding how to improve readiness, interpreting mechanical vs LLM criteria (naming_conventions, test_quality, readme_quality, docs_agent_friendliness), running readiness without an API key, grounding a new readiness run on a prior report."
 allowed-tools: [Read, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

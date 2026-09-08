@@ -41,20 +41,26 @@ DEFAULT_TABLE = SCRIPT_DIR / "skill_description_diet.yaml"
 
 
 def load_table(path: Path) -> dict[str, str]:
-    """`name -> description` mapping. Fails loud on a >300-char row -- a
-    silently-applied over-length row would defeat the point of the diet."""
+    """`name -> description` mapping. Fails loud on a non-string value -- a
+    silently-applied non-string row would corrupt frontmatter -- but NOT on
+    length: PM-7 (every Triggers: noun survives verbatim) outranks the
+    300-char-per-skill target, and several trigger-dense skills cannot hit
+    300 without dropping vocabulary. `over_cap_names()` reports these; the
+    aggregate 2,000-token listing ceiling this feeds is itself directional
+    (see `--listing-ceiling` in `measure_token_budget.py`), never the
+    per-skill cap enforced as a hard block."""
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(data, dict):
         raise ValueError(f"{path}: table must be a mapping of name -> description")
     for name, description in data.items():
         if not isinstance(description, str):
             raise ValueError(f"{path}: {name!r} description must be a string")
-        if len(description) > MAX_DESCRIPTION_CHARS:
-            raise ValueError(
-                f"{path}: {name!r} description is {len(description)} chars, "
-                f"exceeds the {MAX_DESCRIPTION_CHARS}-char diet target"
-            )
     return data
+
+
+def over_cap_names(table: dict[str, str]) -> list[str]:
+    """Table entries exceeding the 300-char target -- reported, never blocked."""
+    return sorted(name for name, d in table.items() if len(d) > MAX_DESCRIPTION_CHARS)
 
 
 def _yaml_quote(value: str) -> str:
@@ -182,6 +188,12 @@ def main(argv: list[str] | None = None) -> int:
     if not table:
         print("apply-skill-description-diet: table is empty, nothing to do")
         return 0
+
+    for name in over_cap_names(table):
+        print(
+            f"apply-skill-description-diet: INFO -- {name} is {len(table[name])} chars "
+            f"(> {MAX_DESCRIPTION_CHARS}, trigger-noun preservation takes precedence)"
+        )
 
     changed, findings = apply_table(
         table, repo_root / "skills", check=args.check, dry_run=args.dry_run

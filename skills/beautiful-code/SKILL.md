@@ -1,16 +1,6 @@
 ---
 name: beautiful-code
-description: >
-  The eight dimensions of beautiful code — storytelling, simplicity, clarity of
-  intent, expressiveness, purity, sustainability, durability, creativity — as
-  named, reviewable qualities with their practitioner canon, techniques, and
-  review checks. An index over Praxion's existing conventions plus the depth
-  they don't yet carry. Triggers: writing or reviewing code with beauty,
-  elegance, or readability at stake; milestone code reviews; asking "is there a
-  more elegant way"; judging a creative-but-unfamiliar solution; comment and
-  narrative discipline; functional core / imperative shell; backward-compat and
-  observable-behavior judgment; reconciling cleverness vs insight.
-  Operationalizes CLAUDE.md§Structural Beauty.
+description: "The eight dimensions of beautiful code -- storytelling, simplicity, clarity of intent, expressiveness, purity, sustainability, durability, creativity -- with practitioner canon and review checks. Triggers: writing or reviewing code with beauty, elegance, or readability at stake; milestone code reviews; asking is there a more elegant way; judging a creative-but-unfamiliar solution; comment and narrative discipline; functional core / imperative shell; backward-compat and observable-behavior judgment; reconciling cleverness vs insight."
 allowed-tools: [Read, Grep, Glob]
 compatibility: Claude Code
 metadata:

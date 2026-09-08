@@ -1,15 +1,6 @@
 ---
 name: api-design-craft
-description: >
-  API quality, taste, and review craft — the layer above api-design methodology.
-  Canonical APIs (Stripe, S3, Linear, GitHub, Twilio, Resend), Bloch core as review
-  checklist, robust-API canon (RFC 9457, cursor pagination, idempotency, versioning),
-  REST vs GraphQL vs gRPC selection, HTTP status code semantics (Retry-After, 422 vs
-  400), PATCH semantics, webhook design, long-running ops, low-latency ergonomics
-  (N+1, ETag, DataLoader). Triggers: reviewing API quality, applying a taste lens,
-  choosing a paradigm, designing error contracts/pagination/webhooks, evaluating
-  latency ergonomics. Methodology in api-design; agentic tool design in
-  agentic-interface-design.
+description: "API quality, taste, and review craft above api-design methodology: canonical APIs (Stripe, S3, Linear, GitHub, Twilio, Resend), Bloch review checklist, robust-API canon, REST vs GraphQL vs gRPC, HTTP status semantics, PATCH, webhooks, low-latency ergonomics. Triggers: reviewing API quality, applying a taste lens, choosing a paradigm, designing error contracts/pagination/webhooks, evaluating latency ergonomics. Methodology in api-design; agentic tool design in agentic-interface-design."
 allowed-tools: [Read, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

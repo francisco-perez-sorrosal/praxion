@@ -1,12 +1,6 @@
 ---
 name: agent-evals
-description: >
-  AI agent evaluation: Inspect AI/DeepEval/Promptfoo framework selection, golden
-  datasets, LLM-as-judge, grader design, scoring, non-determinism handling, CI/CD
-  integration. Triggers: evaluating agent behavior, choosing an eval framework,
-  designing eval suites, building golden datasets, trajectory evaluation, eval-driven
-  development, integrating evals into CI/CD. Python-focused; TypeScript coverage
-  (Vitest + Promptfoo) in references/typescript.md.
+description: "AI agent evaluation: Inspect AI/DeepEval/Promptfoo framework selection, golden datasets, LLM-as-judge, grader design, scoring, non-determinism handling, CI/CD integration. Triggers: evaluating agent behavior, choosing an eval framework, designing eval suites, building golden datasets, trajectory evaluation, eval-driven development, integrating evals into CI/CD. Python-focused; TypeScript in references/typescript.md."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

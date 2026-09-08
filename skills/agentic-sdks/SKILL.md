@@ -1,11 +1,6 @@
 ---
 name: agentic-sdks
-description: >
-  Building AI agents with OpenAI Agents SDK and Claude Agent SDK: agent
-  architecture, tool integration, multi-agent orchestration, safety guardrails,
-  tracing, context management, streaming, MCP integration. Triggers: building
-  autonomous agents, multi-agent workflows, choosing agent frameworks, integrating
-  MCP servers, agent safety patterns. Language modules available for Python and TypeScript.
+description: "Building AI agents with OpenAI Agents SDK and Claude Agent SDK: architecture, tool integration, multi-agent orchestration, safety guardrails, tracing, context management, streaming, MCP integration. Triggers: building autonomous agents, multi-agent workflows, choosing agent frameworks, integrating MCP servers, agent safety patterns. Python and TypeScript modules."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

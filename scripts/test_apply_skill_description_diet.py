@@ -122,11 +122,15 @@ def test_dry_run_writes_nothing(tmp_path: Path, capsys: pytest.CaptureFixture[st
 # -- load_table(): the over-300-char rejection ----------------------------------
 
 
-def test_load_table_rejects_a_row_over_300_chars(tmp_path: Path) -> None:
+def test_load_table_accepts_an_over_300_char_row(tmp_path: Path) -> None:
+    """PM-7 (trigger-noun preservation) outranks the per-skill 300-char
+    target -- an over-length row is a reported finding, not a hard block."""
     table_path = _table(tmp_path, {"foo": "x" * 301})
 
-    with pytest.raises(ValueError, match="exceeds the 300-char"):
-        diet.load_table(table_path)
+    table = diet.load_table(table_path)
+
+    assert table == {"foo": "x" * 301}
+    assert diet.over_cap_names(table) == ["foo"]
 
 
 def test_load_table_accepts_a_row_at_exactly_300_chars(tmp_path: Path) -> None:
@@ -140,13 +144,26 @@ def test_load_table_accepts_a_row_at_exactly_300_chars(tmp_path: Path) -> None:
 # -- main(): CLI exit codes -----------------------------------------------------
 
 
-def test_main_exit_2_on_a_malformed_table(tmp_path: Path) -> None:
+def test_main_exit_2_on_a_non_string_table_value(tmp_path: Path) -> None:
     (tmp_path / "skills").mkdir()
-    table_path = _table(tmp_path, {"foo": "x" * 301})
+    table_path = tmp_path / "table.yaml"
+    table_path.write_text("foo: 123\n", encoding="utf-8")
 
     exit_code = diet.main(["--table", str(table_path), "--repo-root", str(tmp_path)])
 
     assert exit_code == 2
+
+
+def test_main_reports_over_cap_rows_without_blocking(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _skill(tmp_path, "foo", ">\n  Old description.")
+    table_path = _table(tmp_path, {"foo": "x" * 301})
+
+    exit_code = diet.main(["--table", str(table_path), "--repo-root", str(tmp_path)])
+
+    assert exit_code == 0
+    assert "INFO -- foo is 301 chars" in capsys.readouterr().out
 
 
 def test_main_exit_0_on_an_empty_table(tmp_path: Path) -> None:

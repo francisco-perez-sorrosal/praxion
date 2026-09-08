@@ -1,13 +1,6 @@
 ---
 name: agentic-interface-design
-description: >
-  Interface design for the model as consumer: MCP tools, function-calling schemas,
-  A2A contracts (Agent Cards). Human-vs-agent ergonomics, tool naming, error grammar,
-  fat-vs-thin decomposition, progressive disclosure (lazy loading), idempotency
-  (request_id), response pagination (next_cursor, has_more), JSON-schema craft.
-  Triggers: designing/reviewing MCP tools, tool descriptions, function-calling schemas,
-  agent error ergonomics, A2A contracts. Not for web/CLI (web-ui-design, tui-design)
-  or REST/GraphQL quality (api-design-craft).
+description: "Interface design for the model as consumer: MCP tools, function-calling schemas, A2A contracts. Ergonomics, tool naming, error grammar, fat-vs-thin decomposition, progressive disclosure, idempotency, response pagination, JSON-schema craft. Triggers: designing/reviewing MCP tools, tool descriptions, function-calling schemas, agent error ergonomics, A2A contracts. Not for web/CLI (web-ui-design, tui-design) or REST/GraphQL quality (api-design-craft)."
 allowed-tools: [Read, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

@@ -1,10 +1,6 @@
 ---
 name: agent-failure-taxonomy
-description: >
-  Classification rubric for runtime failure modes of agentic AI apps (Microsoft AI Red
-  Team taxonomy: prompt injection, excessive agency, tool abuse). Triggers: classify or
-  diagnose an observed agent failure, or run a design-time failure-mode review. Diagnosis
-  — not prevention (agent-runtime-guardrails), not plugin security (context-security-review).
+description: "Classification rubric for agentic-AI runtime failure modes (Microsoft AI Red Team taxonomy: prompt injection, excessive agency, tool abuse). Triggers: classify or diagnose an observed agent failure, or run a design-time failure-mode review. Diagnosis -- not prevention (agent-runtime-guardrails), not plugin security (context-security-review)."
 allowed-tools: [Read, Glob, Grep]
 compatibility: Claude Code
 ---

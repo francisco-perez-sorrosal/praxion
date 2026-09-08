@@ -1,11 +1,6 @@
 ---
 name: agent-runtime-guardrails
-description: >
-  The un-bypassable runtime-enforcement layer for agentic apps: input validation,
-  structured-output enforcement, tool-call gating, and budget/permission enforcement, via
-  the deterministic-harness pattern. Triggers: design, build, or verify guardrails that
-  enforce model I/O and gate tool calls regardless of model output. Prevention — not SDK
-  mechanics (agentic-sdks), not failure classification (agent-failure-taxonomy).
+description: "Un-bypassable runtime enforcement for agentic apps: input validation, structured-output enforcement, tool-call gating, budget/permission enforcement via the deterministic-harness pattern. Triggers: design, build, or verify guardrails that enforce model I/O and gate tool calls regardless of model output. Prevention -- not SDK mechanics (agentic-sdks), not failure classification (agent-failure-taxonomy)."
 allowed-tools: [Read, Glob, Grep]
 compatibility: Claude Code
 ---

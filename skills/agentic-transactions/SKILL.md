@@ -1,16 +1,6 @@
 ---
 name: agentic-transactions
-description: >
-  Provider contract, decision rubric, and composition guidance for implementing
-  agentic transactions in a managed project — covering both Space A (agentic payments:
-  mandate-based payment rails, stablecoin/card/crypto settlement) and Space B (agentic
-  trading: brokerage order placement, market data, portfolio positions).
-  Triggers: agentic payment, agentic trading, Provider contract, mandate, settlement
-  finality, HITL spend-gating, brokerage agent, MCP trading, order execution, payment
-  rail, idempotency key, TransactionError, supports_sandbox. Activate when a managed
-  project needs to implement agentic payments or stock trading behind a provider-pluggable
-  contract. Language modules not applicable — the contract is language-independent;
-  a Python binding sketch is in references/provider-contract.md.
+description: "Provider contract, decision rubric, and composition guidance for agentic payments (mandate-based rails, stablecoin/card/crypto settlement) and agentic trading (brokerage order placement, market data, portfolio positions). Triggers: agentic payment, agentic trading, Provider contract, mandate, settlement finality, HITL spend-gating, brokerage agent, MCP trading, order execution, payment rail, idempotency key, TransactionError, supports_sandbox. Language-independent; Python binding in references/provider-contract.md."
 allowed-tools: [Read, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

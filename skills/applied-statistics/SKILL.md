@@ -1,14 +1,6 @@
 ---
 name: applied-statistics
-description: >
-  Applied statistics for engineering decisions: power and sample-size planning
-  before collection, multiple-comparisons correction, bootstrap intervals on
-  pass@k, chance-corrected judge agreement, non-determinism variance,
-  confounding and Simpson's-paradox risk in metric trends,
-  error-model-derived tolerance bands, sequential testing and type-I/II error
-  control. Triggers: claiming an effect is significant, sizing a sample or run
-  count, comparing systems across benchmarks, deriving a threshold or tolerance
-  band, when to stop collecting data.
+description: "Applied statistics for engineering decisions: power/sample-size planning, multiple-comparisons correction, bootstrap intervals on pass@k, judge agreement, non-determinism variance, confounding/Simpson's-paradox risk, error-model tolerance bands, sequential testing. Triggers: claiming an effect is significant, sizing a sample or run count, comparing systems across benchmarks, deriving a threshold or tolerance band, when to stop collecting data."
 allowed-tools: [Read, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

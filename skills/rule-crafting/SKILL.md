@@ -185,6 +185,10 @@ The ecosystem-wide budget for *all* always-loaded content (every `CLAUDE.md` plu
 
 This budget *is* the attention budget: the always-loaded surface competes with everything else for the model's finite, degrading attention. See [context-engineering foundations](../skill-crafting/references/context-engineering-foundations.md) for the empirical grounding (context rot) — why a tight rule outperforms an exhaustive one.
 
+### Token budget measurement history
+
+It settles the two things that previously flipped verdicts. **Catalog `README.md` files are excluded**: one carries no `paths:` and so reads as always-loaded under a naive test, but a live session does not inject it, and counting it in swings the total ~4,500 tokens. And **a divisor is not a measurement** — measured 2026-08-05 the true ratio was 3.796 chars/token, so the `/3.5` and `/3.6` then in circulation ran 8.5% and 5.4% high, enough to straddle the ceiling on identical bytes. Three mutually inconsistent bases have coexisted here before, and every historical PASS was basis-dependent; encoding the set in code is what stops a fourth.
+
 ## Rule File Structure
 
 Use `##` (h2) as the top-level heading — rules are injected into a larger context, so h1 would conflict with the surrounding document structure.

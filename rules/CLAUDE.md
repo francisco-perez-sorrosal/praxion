@@ -19,9 +19,7 @@ Contextual domain knowledge files loaded automatically based on relevance. Rules
 
 IMPORTANT: Rules without `paths:` frontmatter are **always loaded** — each costs tokens every session. The always-loaded budget (CLAUDE.md files + unconditional rules) is **25,000 tokens** — a failure-mode guardrail, not a target. Every always-loaded token must earn its attention share: applied in >30% of sessions, or unconditionally relevant. Scope with `paths:`, or move to a skill, anything not universally needed.
 
-**Measure with `scripts/measure_token_budget.py`, never by hand.** The file set, the ceiling and the fallback all live there, and it counts real tokens when `ANTHROPIC_API_KEY` is set. That script is the authoritative basis — any site restating a divisor is a copy that will drift. Re-measure when touching an always-loaded rule.
-
-It settles the two things that previously flipped verdicts. **Catalog `README.md` files are excluded**: one carries no `paths:` and so reads as always-loaded under a naive test, but a live session does not inject it, and counting it in swings the total ~4,500 tokens. And **a divisor is not a measurement** — measured 2026-08-05 the true ratio was 3.796 chars/token, so the `/3.5` and `/3.6` then in circulation ran 8.5% and 5.4% high, enough to straddle the ceiling on identical bytes. Three mutually inconsistent bases have coexisted here before, and every historical PASS was basis-dependent; encoding the set in code is what stops a fourth.
+**Measure with `scripts/measure_token_budget.py`, never by hand.** The file set, the ceiling and the fallback all live there, and it counts real tokens when `ANTHROPIC_API_KEY` is set. That script is the authoritative basis — any site restating a divisor is a copy that will drift. Re-measure when touching an always-loaded rule. Measurement history (why the file set excludes catalog `README.md`s, why a divisor is not a measurement): `skills/rule-crafting/SKILL.md § Token budget measurement history`.
 
 ## Installation
 

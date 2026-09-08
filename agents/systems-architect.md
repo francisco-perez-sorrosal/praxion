@@ -267,7 +267,7 @@ Small decisions don't need this format. Reserve it for choices that affect:
    - Cross-reference sibling drafts authored during this pipeline via `supersedes: dec-draft-<hash>` or `re_affirms: dec-draft-<hash>`. The finalize step at merge-to-main rewrites these to stable `dec-NNN`.
    - Do **not** invoke `scripts/regenerate_adr_index.py` — `DECISIONS_INDEX.md` regenerates automatically at finalize.
 
-See the [ADR conventions rule](../rules/swe/adr-conventions.md) for the full file format, frontmatter schema, identity-derivation pseudocode, supersession protocol, and finalize protocol. Do not duplicate the schema here.
+See the [ADR conventions rule](../rules/swe/adr-conventions.md) for the file-format overview and the [`adr-authoring-protocols.md`](../skills/software-planning/references/adr-authoring-protocols.md) reference for the full frontmatter schema, identity-derivation pseudocode, and the supersession/re-affirmation/retirement/partial-supersession and finalize protocols. Do not duplicate the schema here.
 
 ### Phase 8 — Risk Assessment
 

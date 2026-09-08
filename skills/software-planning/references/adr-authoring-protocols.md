@@ -1,6 +1,6 @@
 # ADR Authoring Protocols
 
-Procedural protocols for creating and maintaining Architecture Decision Records under `.ai-state/decisions/`. Reference material for the [Software Planning](../SKILL.md) skill. For the file format, frontmatter schema, naming conventions, and finalize protocol, see the [adr-conventions rule](../../../rules/swe/adr-conventions.md) — that is the canonical source of truth.
+Procedural protocols for creating and maintaining Architecture Decision Records under `.ai-state/decisions/`. Reference material for the [Software Planning](../SKILL.md) skill. The [adr-conventions rule](../../../rules/swe/adr-conventions.md) owns the file-format overview, the fragment-lifecycle summary, and the `architectural` category test; this reference is the canonical source for the full frontmatter schema, the fragment-filename construction, and the relation/finalize protocol step sequences.
 
 ## ADR Creation Protocol (fragment-name-at-create)
 
@@ -11,7 +11,7 @@ When a decision-making agent (systems-architect, implementation-planner) records
 1. **Derive author identity** from `git config` — see [Identity Derivation and Filename Construction](#identity-derivation-and-filename-construction) below for the pseudocode.
 2. **Build the fragment filename** `<YYYYMMDD-HHMM>-<user>-<branch>-<slug>.md`, where `<slug>` is the kebab-case decision title and `<branch>` is the sanitized current branch (`git rev-parse --abbrev-ref HEAD`).
 3. **Compute the provisional id** as `dec-draft-<sha1(filename)[:8]>`.
-4. **Create the fragment** at `.ai-state/decisions/drafts/<fragment-filename>.md` using the Write tool, with frontmatter `id: dec-draft-<hash>`, `status: proposed`, and `branch: <branch_slug>` (the sanitized authoring branch from step 1) plus the full schema fields (see the [Frontmatter table](../../../rules/swe/adr-conventions.md#frontmatter) in the rule for the canonical schema). Recording `branch:` lets `finalize_adrs.py` parse hyphenated branches unambiguously even when only one fragment remains in `drafts/`.
+4. **Create the fragment** at `.ai-state/decisions/drafts/<fragment-filename>.md` using the Write tool, with frontmatter `id: dec-draft-<hash>`, `status: proposed`, and `branch: <branch_slug>` (the sanitized authoring branch from step 1) plus the full schema fields (see [Frontmatter Schema](#frontmatter-schema) below for the canonical field table). Recording `branch:` lets `finalize_adrs.py` parse hyphenated branches unambiguously even when only one fragment remains in `drafts/`.
 5. **Cross-references between drafts** use `dec-draft-<hash>` values for `supersedes` / `superseded_by` / `re_affirms` / `re_affirmed_by`. Finalize rewrites these to `dec-NNN` at merge-to-main.
 6. **Record the decision** in `LEARNINGS.md ### Decisions Made` citing `(dec-draft-<hash>)`. Finalize rewrites this reference too.
 7. **Write the `## Disconfirmation` body block** when `category: architectural`. Three sub-items are required: (a) **Falsifier** — what evidence would make this decision wrong; (b) **Steelmanned runner-up** — the strongest case for the next-best option; (c) **Reversal trigger** — the future signal that should prompt revisiting. Set `dissent:` in frontmatter to a one-line summary of the strongest objection. This block attacks the chosen option and is always-on for architectural decisions; it is not optional.
@@ -44,6 +44,34 @@ id          = f"dec-draft-{sha1(filename)[:8]}"
 
 **Collision avoidance**: minute-precision timestamp + user + branch makes collisions effectively impossible in normal use. If two drafts with the same minute, user, branch, and slug do land, append `-2`, `-3`, ... to the slug at write time.
 
+## Frontmatter Schema
+
+The frontmatter schema is shared between draft and finalized ADRs (summary and the field-name list live in the [adr-conventions rule § Frontmatter](../../../rules/swe/adr-conventions.md#frontmatter)). Only the `id` value format differs between the two stages (`dec-draft-<8-char-hash>` during draft; `dec-NNN` after finalize). Cross-reference fields (`supersedes`, `superseded_by`, `re_affirms`, `re_affirmed_by`) likewise carry `dec-draft-<hash>` values during the draft stage and `dec-NNN` values after finalize.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | Yes | `dec-draft-<8-char-hash>` in drafts; `dec-NNN` after finalize |
+| `title` | string | Yes | Short decision title |
+| `status` | string | Yes | `proposed` / `accepted` / `superseded` / `rejected` / `re-affirmation` / `retired` |
+| `category` | string | Yes | `architectural` / `behavioral` / `implementation` / `configuration` |
+| `date` | string | Yes | ISO 8601 date (`YYYY-MM-DD`) |
+| `summary` | string | Yes | One-line description for index and scanning |
+| `tags` | list | Yes | Lowercase topic tags for filtering |
+| `made_by` | string | Yes | `agent` / `user` |
+| `agent_type` | string | When agent | Which agent (e.g., `systems-architect`, `orchestrator`) |
+| `branch` | string | Recommended on drafts | Sanitized authoring branch (`[a-z0-9-]+`). Lets `finalize_adrs.py` disambiguate hyphenated branches from slugs without sibling-prefix discovery — eliminates the single-fragment parsing ambiguity (td-017). Optional for backward compat; pre-existing fragments without it still parse via filename heuristics |
+| `pipeline_tier` | string | No | `direct` / `lightweight` / `standard` / `full` / `spike` — the 5-tier calibration value (process weight actually used), never an execution-mode label ("no agent fan-out" notes belong in the calibration-log `Source` prose) |
+| `affected_files` | list | No | Paths impacted by the decision |
+| `affected_reqs` | list | No | REQ IDs linked to the decision |
+| `supersedes` | string \| list | No | id(s) of the prior decision(s) this one replaces. A **list** when one decision replaces several — same reason `retired_by` is a list: a scalar silently under-records the rest |
+| `superseded_by` | string | No | id of replacing decision |
+| `re_affirms` | string | No | id of prior decision this ADR re-affirms without superseding |
+| `re_affirmed_by` | list | No | ids of later ADRs that re-affirmed this decision |
+| `retired_by` | list | When `retired` | ids of the decisions whose action removed this one's subject. A **list**, because one removal commonly strands several decisions and `superseded_by` (a string) cannot express that |
+| `supersedes_in_part` | list | No | ids of prior decisions this one narrows (some, not all, clauses). Mutually exclusive with `supersedes` per target pair; requires `## Prior Decision` |
+| `superseded_in_part_by` | list | No | ids of later decisions that narrowed this record. Mutually exclusive with `superseded_by` per pair; status stays non-terminal (`accepted`/`re-affirmation`) |
+| `dissent` | string | No | Machine-queryable companion to the `## Disconfirmation` body block; one-line strongest objection to the chosen option. Required when `category: architectural` |
+
 ## Who Creates ADRs
 
 Not all agents create ADR fragments. The division follows decision-making authority:
@@ -60,6 +88,18 @@ Not all agents create ADR fragments. The division follows decision-making author
 Implementers, test-engineers, and verifiers record decisions in `LEARNINGS.md` only — the planner or architect persists significant decisions as ADR fragments.
 
 User-authored direct-tier ADRs (no pipeline involvement) MAY be created directly at `.ai-state/decisions/<NNN>-<slug>.md` with a manually-assigned `<NNN>`, but the fragment scheme is preferred even for direct-tier authoring because it avoids `<NNN>` collisions when work is in flight on multiple branches.
+
+## Who Writes ADRs
+
+Per-agent when/scope/destination detail for the five ADR-creating roles (summary and the implementer's no-ADR rule live in the [adr-conventions rule § Who Writes ADRs](../../../rules/swe/adr-conventions.md#who-writes-adrs)):
+
+| Agent | When | Scope | Destination |
+|-------|------|-------|-------------|
+| systems-architect | Phase 4 (trade-off analysis) | Decisions meeting the [`architectural` test](../../../rules/swe/adr-conventions.md#what-makes-a-decision-architectural) — inventory, boundary, or published contract; lesser trade-offs are recorded at their true category | `.ai-state/decisions/drafts/` (fragment) |
+| implementation-planner | Step decomposition | Decisions affecting step ordering, module structure, approach | `.ai-state/decisions/drafts/` (fragment) |
+| interface-designer | Phase 4 (trade-off analysis) | Interface-layer decisions: UI framework / API paradigm / MCP tool decomposition / error format / pagination / component-pattern selection | `.ai-state/decisions/drafts/` (fragment) |
+| orchestrator | Direct/Lightweight tier, no pipeline agent spawned | Any decision worth preserving during an interactive session | `.ai-state/decisions/drafts/` (fragment; preferred) |
+| user | Manual (no session, no agent) | Any decision worth preserving | `.ai-state/decisions/drafts/` preferred; `<NNN>-<slug>.md` acceptable only for this manual path |
 
 ## Supersession Protocol
 

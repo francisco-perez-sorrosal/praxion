@@ -1,11 +1,6 @@
 ---
 name: typescript-development
-description: >
-  TypeScript development: strict-mode type system, Biome v2 (greenfield)/ESLint v9
-  (framework projects), Vitest test discipline, React 19/Next.js 15/Vite, Vue 3/
-  Nuxt 3. Triggers: writing/reviewing TypeScript source files, configuring tsconfig,
-  choosing linter/formatter, setting up Vitest, bare-TS/Node services, React or Vue
-  projects. Layered contexts: TypeScript baseline, React, Vue.
+description: "TypeScript development: strict-mode type system, Biome v2/ESLint v9, Vitest test discipline, React 19/Next.js 15/Vite, Vue 3/Nuxt 3. Triggers: writing/reviewing TypeScript source files, configuring tsconfig, choosing linter/formatter, setting up Vitest, bare-TS/Node services, React or Vue projects. Layered contexts: TypeScript baseline, React, Vue."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

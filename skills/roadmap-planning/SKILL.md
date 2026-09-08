@@ -1,13 +1,6 @@
 ---
 name: roadmap-planning
-description: >
-  Feature prioritization and backlog management: RICE/MoSCoW/WSJF/Kano/ICE
-  frameworks, dependency mapping, roadmap formats (now-next-later, timeline,
-  theme-based, outcome-based), capacity-based planning. Integrates promethean
-  IDEA_LEDGER output into backlogs that flow into spec-driven-development.
-  Triggers: prioritizing features, building a product roadmap, sequencing
-  releases, release planning, backlog grooming, mapping feature dependencies,
-  deciding what to build next.
+description: "Feature prioritization and backlog management: RICE/MoSCoW/WSJF/Kano/ICE frameworks, dependency mapping, roadmap formats (now-next-later, timeline, theme-based, outcome-based), capacity-based planning. Integrates promethean IDEA_LEDGER output into spec-driven-development. Triggers: prioritizing features, building a product roadmap, sequencing releases, release planning, backlog grooming, mapping feature dependencies, deciding what to build next."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

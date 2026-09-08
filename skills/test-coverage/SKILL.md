@@ -1,12 +1,6 @@
 ---
 name: test-coverage
-description: >
-  Dispatcher/renderer for test coverage: locate, invoke, and render coverage
-  via the project's own tooling (pytest-cov, vitest, etc.) — never installs
-  tooling or mutates config. Triggers: reporting coverage percentages, running
-  canonical coverage targets, rendering coverage tables, comparing against a
-  prior run, wiring coverage into commands/agents/metrics pipelines.
-  Per-language references for Python, TypeScript, and Rust.
+description: "Dispatcher/renderer for test coverage: locate, invoke, and render coverage via the project's own tooling (pytest-cov, vitest, etc.) -- never installs tooling or mutates config. Triggers: reporting coverage percentages, running canonical coverage targets, rendering coverage tables, comparing against a prior run, wiring coverage into commands/agents/metrics pipelines. Python/TypeScript/Rust references."
 allowed-tools: [Read, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

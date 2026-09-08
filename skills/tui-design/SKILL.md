@@ -1,14 +1,6 @@
 ---
 name: tui-design
-description: >
-  CLI/TUI design craft: clig.dev contract, output discipline (data→stdout,
-  messages→stderr, NO_COLOR, --json), help-text levels, three-part error messages
-  (what/why/fix), TTY detection, exit codes, TUI frameworks (Python textual+rich,
-  Node Ink, Go Charm/Bubble Tea+Lip Gloss), render discipline (diff-before-render,
-  DECSET 2026, stream-as-it-arrives), terminal accessibility. Triggers: designing/
-  reviewing CLI tools, agent terminal output, TUIs, help text, error messages, exit
-  codes, choosing a TUI framework. Not for web UI (web-ui-design) or agent-tool
-  design (api-design-craft, agentic-interface-design).
+description: "CLI/TUI design craft: clig.dev contract, output discipline (data to stdout, messages to stderr, NO_COLOR, --json), help-text levels, three-part error messages, TTY detection, exit codes, TUI frameworks (Python textual/rich, Node Ink, Go Charm). Triggers: designing/reviewing CLI tools, agent terminal output, TUIs, help text, error messages, exit codes, choosing a TUI framework. Not for web UI (web-ui-design) or agent-tool design (api-design-craft, agentic-interface-design)."
 allowed-tools: [Read, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

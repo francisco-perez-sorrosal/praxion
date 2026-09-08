@@ -1,15 +1,6 @@
 ---
 name: rust-development
-description: >
-  Rust development conventions: type-driven API design (newtypes, builders,
-  typestate), error-handling doctrine (thiserror for libraries, anyhow for
-  applications), Cargo workspace/lint/toolchain configuration, and a
-  mechanical-vs-judgment split distinguishing what cargo/clippy/rustfmt enforce
-  from what needs agent review. Triggers: writing Rust code, configuring
-  Cargo.toml lints or workspace, rustfmt/clippy setup, choosing thiserror vs
-  anyhow, cargo-nextest test runs, reviewing unsafe code, Rust CI pipeline
-  design, picking a crate for a new capability (async runtime, web framework,
-  serialization, database).
+description: "Rust development conventions: type-driven API design (newtypes, builders, typestate), error handling (thiserror for libraries, anyhow for apps), Cargo workspace/lint/toolchain config, mechanical-vs-judgment split. Triggers: writing Rust code, configuring Cargo.toml lints or workspace, rustfmt/clippy setup, choosing thiserror vs anyhow, cargo-nextest test runs, reviewing unsafe code, Rust CI pipeline design, picking a crate for a new capability (async runtime, web framework, serialization, database)."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

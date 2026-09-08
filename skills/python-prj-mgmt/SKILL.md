@@ -1,11 +1,6 @@
 ---
 name: python-prj-mgmt
-description: >
-  Python project management with pixi and uv: project initialization, dependency
-  management, pyproject.toml, lockfiles (pixi.lock, uv.lock), virtual environments,
-  workspaces, CI/CD integration, conda vs PyPI packages. Defaults to pixi unless uv
-  is explicitly requested. Triggers: setting up Python projects, managing
-  dependencies, choosing between package managers.
+description: "Python project management with pixi and uv: initialization, dependency management, pyproject.toml, lockfiles (pixi.lock, uv.lock), virtual environments, workspaces, CI/CD integration, conda vs PyPI. Defaults to pixi unless uv is explicitly requested. Triggers: setting up Python projects, managing dependencies, choosing between package managers."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

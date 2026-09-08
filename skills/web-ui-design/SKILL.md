@@ -1,15 +1,6 @@
 ---
 name: web-ui-design
-description: >
-  Web UI design craft for React, Next.js, and component-based UIs. Visual
-  hierarchy (Laws of UX),
-  design canon (Rams/Norman/Nielsen/Tufte/Refactoring UI/Linear/Stripe/Vercel),
-  design tokens, 4px/8px grid, typography, WCAG 2.2 AA accessibility, component
-  taste, motion timing, RAIL perceived performance, Radix/shadcn
-  accessible-primitives. Triggers: designing/reviewing web UI, design systems,
-  tokens, component ergonomics, UI framework selection, auditing React/Next.js
-  quality and accessibility. Not for CLI/terminal (tui-design) or API/tools
-  (api-design-craft, agentic-interface-design).
+description: "Web UI design craft for React, Next.js, and component-based UIs: visual hierarchy (Laws of UX), design canon (Rams/Norman/Nielsen/Tufte/Refactoring UI/Linear/Stripe/Vercel), design tokens, 4px/8px grid, typography, WCAG 2.2 AA, component taste, motion timing, RAIL, Radix/shadcn primitives. Triggers: designing/reviewing web UI, design systems, tokens, component ergonomics, UI framework selection, auditing React/Next.js quality and accessibility. Not for CLI/terminal (tui-design) or API/tools (api-design-craft, agentic-interface-design)."
 allowed-tools: [Read, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

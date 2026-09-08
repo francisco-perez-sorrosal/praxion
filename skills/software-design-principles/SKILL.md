@@ -1,16 +1,6 @@
 ---
 name: software-design-principles
-description: >
-  Software design principles for the AI era — SOLID reframed as heuristics in
-  service of balanced coupling (managing knowledge flow between components), plus
-  the agent-as-consumer lens. Covers single responsibility, open/closed, Liskov
-  substitution, interface segregation, dependency inversion, low coupling / high
-  cohesion, integration strength vs distance vs volatility, and why generation
-  speed raises the stakes. Triggers: applying or reviewing SOLID, deciding
-  whether to introduce an abstraction, reducing coupling, improving cohesion,
-  designing module/interface boundaries, designing a surface an AI agent will
-  consume, judging whether a design will accrue debt under fast code generation.
-  Use up-front during architecture and design, not only during refactoring.
+description: "Software design principles for the AI era: SOLID reframed as balanced-coupling heuristics, plus the agent-as-consumer lens. Covers single responsibility, open/closed, Liskov substitution, interface segregation, dependency inversion, coupling/cohesion, integration strength vs distance vs volatility. Triggers: applying or reviewing SOLID, deciding whether to introduce an abstraction, reducing coupling, improving cohesion, designing module/interface boundaries, designing a surface an AI agent will consume, judging whether a design will accrue debt under fast code generation. Use up-front, not only during refactoring."
 allowed-tools: [Read, Grep, Glob]
 compatibility: Claude Code
 metadata:

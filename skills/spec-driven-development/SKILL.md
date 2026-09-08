@@ -1,12 +1,6 @@
 ---
 name: spec-driven-development
-description: >
-  Behavioral specification methodology with requirement traceability for medium and
-  large features: spec format (When/and/the system/so that), complexity triage
-  (trivial through spike), REQ ID conventions, REQ-* traceability threading through
-  the pipeline, decision documentation, spec archival. Triggers: behavioral
-  specifications, requirement traceability, SDD methodology, spec format, REQ IDs,
-  spec-driven development, complexity triage, spec archival.
+description: "Behavioral specification methodology with requirement traceability for medium and large features: spec format (When/and/the system/so that), complexity triage, REQ ID conventions, traceability threading, decision documentation, spec archival. Triggers: behavioral specifications, requirement traceability, SDD methodology, spec format, REQ IDs, spec-driven development, complexity triage, spec archival."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

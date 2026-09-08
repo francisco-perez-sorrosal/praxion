@@ -1,12 +1,6 @@
 ---
 name: software-planning
-description: >
-  Planning complex software tasks via a three-document model (IMPLEMENTATION_PLAN.md,
-  WIP.md, LEARNINGS.md) in small, known-good increments. Triggers: starting
-  significant development, breaking down complex features, architecture planning,
-  multi-session projects, feature breakdown, work planning, task tracking, WIP
-  management, incremental development. Language modules available for Python,
-  TypeScript.
+description: "Planning complex software tasks via a three-document model (IMPLEMENTATION_PLAN.md, WIP.md, LEARNINGS.md) in small, known-good increments. Triggers: starting significant development, breaking down complex features, architecture planning, multi-session projects, feature breakdown, work planning, task tracking, WIP management, incremental development. Python/TypeScript modules."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

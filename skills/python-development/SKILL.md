@@ -1,14 +1,6 @@
 ---
 name: python-development
-description: >
-  Python development conventions: type hints, pytest, code quality tools (ruff,
-  mypy, pyright), data modeling (dataclasses, Pydantic), async patterns, error
-  handling, structural pattern matching, version-specific idioms (3.10-3.14+), and
-  a curated battle-tested library catalog by project archetype. Triggers: writing
-  Python code, implementing tests, configuring linting/formatting, choosing between
-  dataclasses and Pydantic, pytest fixtures and parametrize, ruff formatting/linting,
-  mypy type checking, pytest configuration, picking a library for a new capability
-  (web framework, ORM, CLI parsing, dataframes, async task queue, logging, config).
+description: "Python development conventions: type hints, pytest, code quality tools (ruff, mypy, pyright), data modeling (dataclasses, Pydantic), async patterns, error handling, pattern matching, version-specific idioms (3.10-3.14+), curated library catalog by archetype. Triggers: writing Python code, implementing tests, configuring linting/formatting, choosing between dataclasses and Pydantic, pytest fixtures and parametrize, ruff formatting/linting, mypy type checking, pytest configuration, picking a library for a new capability (web framework, ORM, CLI parsing, dataframes, async task queue, logging, config)."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

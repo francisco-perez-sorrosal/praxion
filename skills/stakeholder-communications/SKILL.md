@@ -1,13 +1,6 @@
 ---
 name: stakeholder-communications
-description: >
-  Developer-produced stakeholder communication patterns: technical status
-  updates, RFC/design proposal authoring, release announcements, release notes,
-  breaking change notifications, migration guides, technical demo scripts,
-  approval workflows. Triggers: writing status reports/updates, authoring RFCs
-  or design docs, communicating releases/breaking changes to downstream
-  consumers, preparing sprint demo scripts, seeking architecture/security
-  approval, drafting technical decision records.
+description: "Developer-produced stakeholder communication patterns: status updates, RFC/design proposals, release announcements/notes, breaking change notifications, migration guides, demo scripts, approval workflows. Triggers: writing status reports/updates, authoring RFCs or design docs, communicating releases/breaking changes to downstream consumers, preparing sprint demo scripts, seeking architecture/security approval, drafting technical decision records."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 ---

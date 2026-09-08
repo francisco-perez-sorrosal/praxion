@@ -436,13 +436,47 @@ def _extract_description(frontmatter: str) -> str:
     return ""
 
 
+_DISABLE_MODEL_INVOCATION_RE = re.compile(r"^disable-model-invocation:\s*true\s*$", re.M)
+
+
+def name_only_overrides(repo_root: Path) -> set[str]:
+    """Skill names the project settings list under `skillOverrides` as `name-only`.
+
+    Claude Code shows only the name for these -- their description leaves the
+    model-facing listing. Keys may carry the plugin namespace (`praxion:x`);
+    both forms are accepted. Read from `.claude/settings.json` and
+    `.claude/settings.local.json` (local wins on conflict, as in the harness).
+    """
+    names: set[str] = set()
+    for rel in (".claude/settings.json", ".claude/settings.local.json"):
+        path = repo_root / rel
+        if not path.is_file():
+            continue
+        try:
+            overrides = json.loads(path.read_text(encoding="utf-8")).get("skillOverrides", {})
+        except (OSError, ValueError):
+            continue
+        for key, mode in overrides.items():
+            if mode == "name-only":
+                names.add(key.split(":", 1)[-1])
+    return names
+
+
 def measure_listing(repo_root: Path, *, api_key: str | None = None) -> dict:
-    """Measure the listing surface: only `description:` frontmatter, never body text."""
+    """Measure the listing surface as the model sees it: `description:` frontmatter only,
+    minus entries `disable-model-invocation: true` removes outright, and with
+    `skillOverrides` name-only skills contributing their name instead of a description."""
     files = listing_files(repo_root)
+    name_only = name_only_overrides(repo_root)
     descriptions = []
     for f in files:
         frontmatter = _frontmatter_block(f.read_text(encoding="utf-8"))
         if frontmatter is None:
+            continue
+        if _DISABLE_MODEL_INVOCATION_RE.search(frontmatter):
+            continue
+        if f.name == "SKILL.md" and f.parent.name in name_only:
+            descriptions.append(f.parent.name)
             continue
         description = _extract_description(frontmatter)
         if description:

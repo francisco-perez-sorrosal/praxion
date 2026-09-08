@@ -24,5 +24,19 @@
       "Bash(obsidian theme:install*)",
       "Bash(obsidian theme:set*)"
     ]
+  },
+  "skillOverrides": {
+    "praxion:agentic-sdks": "name-only",
+    "praxion:agentic-transactions": "name-only",
+    "praxion:api-design": "name-only",
+    "praxion:api-design-craft": "name-only",
+    "praxion:cicd": "name-only",
+    "praxion:data-structure-design": "name-only",
+    "praxion:doc-management": "name-only",
+    "praxion:mcp-crafting": "name-only",
+    "praxion:refactoring": "name-only",
+    "praxion:software-planning": "name-only",
+    "praxion:tui-design": "name-only",
+    "praxion:web-ui-design": "name-only"
   }
 }

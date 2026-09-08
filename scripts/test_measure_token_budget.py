@@ -744,3 +744,46 @@ def test_ratchet_cli_listing_under_target_reports_ok(
 
     assert exit_code == 0
     assert "listing-target OK (enforced)" in capsys.readouterr().out
+
+
+def _listing_repo(tmp_path):
+    (tmp_path / ".claude").mkdir()
+    for name, desc, extra in (
+        ("alpha", "Alpha does alpha things when alpha is asked.", ""),
+        ("beta", "Beta description that is fairly long and descriptive.", ""),
+        ("gamma", "Gamma description.", "disable-model-invocation: true\n"),
+    ):
+        d = tmp_path / "skills" / name
+        d.mkdir(parents=True)
+        (d / "SKILL.md").write_text(f"---\nname: {name}\ndescription: {desc}\n{extra}---\nbody\n")
+    return tmp_path
+
+
+def test_listing_skips_disable_model_invocation_entries(tmp_path):
+    from measure_token_budget import measure_listing
+
+    repo = _listing_repo(tmp_path)
+    reading = measure_listing(repo)
+    assert "Gamma" not in "".join(
+        (repo / "skills" / n / "SKILL.md").read_text() for n in ("alpha", "beta")
+    )
+    # alpha + beta descriptions only: gamma leaves the model-facing listing outright
+    expected = len(
+        b"Alpha does alpha things when alpha is asked.\nBeta description that is fairly long and descriptive."
+    )
+    assert reading["bytes"] == expected
+
+
+def test_listing_counts_name_only_overrides_as_their_name(tmp_path):
+    import json
+
+    from measure_token_budget import measure_listing, name_only_overrides
+
+    repo = _listing_repo(tmp_path)
+    (repo / ".claude" / "settings.json").write_text(
+        json.dumps({"skillOverrides": {"praxion:beta": "name-only"}})
+    )
+    assert name_only_overrides(repo) == {"beta"}
+    reading = measure_listing(repo)
+    expected = len(b"Alpha does alpha things when alpha is asked.\nbeta")
+    assert reading["bytes"] == expected

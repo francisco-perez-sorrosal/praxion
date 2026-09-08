@@ -307,6 +307,34 @@ Triggered when `.ai-work/<task-slug>/PRE_REFACTOR_PLAN.md` exists at the archite
 
 The mini-pipeline runs **inside the parent task's worktree** — no `EnterWorktree` call, no fresh branch. Rationale: the refactor is *for* the parent feature; isolating it across worktrees would duplicate `.ai-state/` reconciliation work for no benefit. The boundary the mini-pipeline preserves is *behavioral*, enforced by characterization tests, not *spatial*, enforced by git tree separation. The verifier rework loop differs (it does spawn a worktree per row) because its work is post-merge cleanup, not in-flight refactor.
 
+### Architect-Side Authoring Procedure
+
+The procedure the systems-architect follows to decide among, and populate, Phase 2.5's four labeled outcomes (`no-refactor` / `fold-into-Prerequisites` / `emit-PRE_REFACTOR_PLAN` / `rescope-and-restart` — the entry test and skip conditions stay resident in `agents/systems-architect.md § Phase 2.5`).
+
+**Classifier (magnitude × independence).** From Phase 2's structural inventory and the feature scope, score the candidate refactor on two axes:
+
+- **Magnitude**: file count + step count + behavioral-preservation risk. Low (≤3 files, single commit, mechanical) → bias toward `fold-into-Prerequisites`. High (4+ files, multi-step, behavioral-preservation contract needed) → bias toward `emit-PRE_REFACTOR_PLAN`.
+- **Independence**: can the refactor land cleanly without the feature, with its own characterization tests and verifier-checkable acceptance? High → `emit-PRE_REFACTOR_PLAN` is the right shape. Low (the refactor only makes sense as part of the feature work) → `fold-into-Prerequisites`.
+
+If the candidate refactor is large AND the feature itself feels wrong against the architecture (e.g., the feature wants behavior the architecture has no seam for, and there is no clean refactor that opens one), the answer is `rescope-and-restart` — do not torture a `PRE_REFACTOR_PLAN.md` into existence to disguise an architectural mismatch.
+
+**Tech-debt ledger filter (consumer-only).** Read `.ai-state/TECH_DEBT_LEDGER.md` if it exists. Filter by `location` overlapping the documented refactor scope AND `owner-role ∈ {systems-architect, implementation-planner}` AND `status: open`. When the outcome is `emit-PRE_REFACTOR_PLAN`, flip each matching row's `status` in place `open → in-flight` AT plan-write time (do not wait for the mini-pipeline to start), update its `last-seen` to today's ISO date, append `// in-flight via pre-refactor sub-pipeline <task-slug>` to its `notes`, and LIST the row in `PRE_REFACTOR_PLAN.md § Affected td-NNN rows`. The architect REMAINS a tech-debt-ledger CONSUMER, not a writer — only in-place `status` updates are permitted; never create a new `td-NNN` row from Phase 2.5. Newly-surfaced refactor-worthy debt that has no matching ledger row gets documented in `SYSTEMS_PLAN.md § Codebase Readiness` (existing behavior) and waits for the next verifier or sentinel pass to land it as a row. The four-writer policy in [`tech-debt-ledger.md`](tech-debt-ledger.md) is preserved unchanged. (Resolution lifecycle, `in-flight → resolved`, is covered in § Tech-Debt Ledger Lifecycle below.)
+
+**`PRE_REFACTOR_PLAN.md` 8-section schema** (when `emit-PRE_REFACTOR_PLAN`; required as top-level `##` headings in this fixed order — sentinel `PR01` validates presence and order):
+
+1. **`## Goal`** — one-sentence statement of the refactor's behavior-preserving outcome
+2. **`## Behavior Preservation Contract`** — enumerate the behaviors that MUST be preserved across the refactor. Each behavior is the seed of a characterization test the test-engineer writes in the mini-pipeline's first step. Sparse contract → thin safety net → sentinel `PR01`'s substance-over-structure clause flags an empty contract as FAIL.
+3. **`## Acceptance Criteria`** — observable, verifier-checkable conditions for the refactor's completion. The verifier sources these instead of `SYSTEMS_PLAN.md § Acceptance Criteria` when invoked in pre-refactor mode.
+4. **`## Scope`** — `### In scope` and `### Out of scope` subsections enumerating files / modules / interfaces this refactor touches and the adjacent concerns explicitly excluded. Optional `### Steps` bullets under Scope may hint decomposition for the planner; there is no separate top-level `## Steps` section.
+5. **`## Affected td-NNN rows`** — table listing each `td-NNN` row flipped `open → in-flight` at plan-write time (required top-level section even when none apply — state explicitly, e.g. `_No matching open rows._`)
+6. **`## Verifier Bypass Criteria`** — a fenced ` ```yaml ... ``` ` block; entries are objects with `id`, `description`, `check` (human-auditable string). Logical AND: all criteria must hold for the orchestrator to recommend bypass. Empty list means "no bypass — always run verifier".
+7. **`## Loop-Back Conditions`** — a fenced ` ```yaml ... ``` ` block; entries are objects with `id`, `description`, `check`. Logical OR: any condition true triggers loop-back-to-architect. Empty list means "no loop-back path; verifier always runs".
+8. **`## Resolved Tech Debt`** — populated at mini-pipeline completion by the orchestrator (or by the architect on re-entry); restates which `td-NNN` rows transitioned from `in-flight → resolved` with commit refs; becomes input to `scripts/finalize_tech_debt_ledger.py` at merge
+
+Sections 1–7 are populated when the architect writes the artifact; section 8 is populated later.
+
+**Cross-reference (HOW vs WHEN/WHAT).** This phase decides WHEN a pre-refactor sub-pipeline fires and WHAT scope it covers; the HOW of refactoring (incremental, behavior-preserving, characterization-tests-first, post-restructuring re-wiring verification) lives in [`skills/refactoring/SKILL.md`](../../refactoring/SKILL.md). The planner decomposes from `PRE_REFACTOR_PLAN.md § Scope` and `§ Behavior Preservation Contract` and tags steps with `[Phase: Refactoring]` so the refactoring skill's verification checklist flows in unchanged.
+
 ### Orchestrator's Mechanical Evaluation
 
 When `PRE_REFACTOR_PLAN.md` is present, the orchestrator reads two structured YAML blocks from the plan:

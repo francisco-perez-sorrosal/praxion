@@ -9,7 +9,7 @@ See also: [../SKILL.md](../SKILL.md) | [agent-pipeline-details.md](agent-pipelin
 
 When delegating to an agent, the main agent **must** include these deliverables in the prompt. The subagent's system prompt contains full instructions, but the main agent's prompt determines priority and scope.
 
-This is the **authoritative source of truth** for per-agent delegation deliverables. Sentinel `EC06` validates that the condensed pipeline-deliverables block in `claude/config/CLAUDE.md` stays in sync with this section. The condensed-block scope covers the four agents named below (systems-architect, implementation-planner, implementer, verifier); other agents in the table appear here for orchestrator reference.
+This is the **authoritative source of truth** for per-agent delegation deliverables. This section is the single copy — the condensed pipeline-deliverables block that once mirrored it in `claude/config/CLAUDE.md` (and the sentinel `EC06` check that kept the two in sync) was retired; the always-loaded CLAUDE.md now points here instead.md` stays in sync with this section. The condensed-block scope covers the four agents named below (systems-architect, implementation-planner, implementer, verifier); other agents in the table appear here for orchestrator reference.
 
 **systems-architect** — always include in prompt:
 - "Produce `SYSTEMS_PLAN.md` at `.ai-work/<task-slug>/`"

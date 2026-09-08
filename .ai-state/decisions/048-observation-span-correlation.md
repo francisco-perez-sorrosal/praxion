@@ -14,7 +14,7 @@ affected_files:
   - memory-mcp/src/memory_mcp/correlation.py
   - memory-mcp/src/memory_mcp/server.py
   - task-chronograph-mcp/src/task_chronograph_mcp/otel_relay.py
-  - hooks/capture_memory.py
+  - hooks/capture_observations.py
 ---
 
 ## Context

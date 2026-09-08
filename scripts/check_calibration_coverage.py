@@ -83,7 +83,7 @@ ENUM_VALUES = ("correct", "over-calibrated", "under-calibrated")
 
 # Rows dated on/after this date must carry an ENUM_VALUES prefix; older rows are
 # exempt (the convention did not exist when they were written).
-ENUM_CUTOFF_DATE = "2026-09-08"
+ENUM_CUTOFF_DATE = "2026-09-07"  # the date the enum shipped; its own pipeline's row is not exempt
 
 # Timestamp column header in the calibration log Markdown table.
 _TIMESTAMP_COL = "Timestamp"

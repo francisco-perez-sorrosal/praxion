@@ -135,8 +135,15 @@ def record_gate_fire(
             "event_type": "gate_fire",
             "hook": hook,
             "tool_name": hook,
-            "outcome": decision,
-            "reason": reason,
+            # The vocabulary is enforced here, fail-open: an unrecognised
+            # decision at a call site is recorded as "pass" with the raw
+            # value kept in the reason, never as a novel outcome.
+            "outcome": decision if decision in GATE_FIRE_DECISIONS else "pass",
+            "reason": (
+                reason
+                if decision in GATE_FIRE_DECISIONS
+                else f"unrecognised decision {decision!r}: {reason}"
+            ),
         }
         append_observation(ai_state_dir / "observations.jsonl", observation)
     except Exception:

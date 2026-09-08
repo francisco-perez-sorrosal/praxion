@@ -626,15 +626,23 @@ def _write_summary_rows(summary_path: Path, rows: list[dict]) -> None:
     summary_path.parent.mkdir(parents=True, exist_ok=True)
     lock_path = summary_path.parent / "observations_summary.lock"
     lock_path.touch(exist_ok=True)
+    # Atomic replace: write a sibling temp file and rename it over the committed
+    # artifact, so a kill between open and flush (hook timeout, SIGKILL, full
+    # disk) can never leave the rollup truncated or empty. The lock serialises
+    # writers; the rename makes each write all-or-nothing.
+    tmp_path = summary_path.with_name(summary_path.name + ".tmp")
     with open(lock_path, "w") as lock_fd:
         fcntl.flock(lock_fd, fcntl.LOCK_EX)
         try:
-            with open(summary_path, "w", encoding="utf-8") as f:
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 for row in rows:
                     f.write(json.dumps(row, separators=(",", ":")) + "\n")
                 f.flush()
+            tmp_path.replace(summary_path)
         finally:
             fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            if tmp_path.exists():
+                tmp_path.unlink()
 
 
 def _upsert_session_summary(summary_path: Path, row: dict) -> None:

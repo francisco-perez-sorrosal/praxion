@@ -695,18 +695,25 @@ if [ "$PLACEMENT" = "sidecar" ]; then
     info "sidecar placement — .ai-state already excluded wholesale, nothing to do"
 else
     wal_needs_ignore=0
+    wal_onboarded=1
     if [ ! -f "$GITIGNORE" ]; then
         info ".gitignore: absent → nothing to reconcile"
+        wal_onboarded=0
     elif ! grep -qF '# AI assistants' "$GITIGNORE"; then
         info ".gitignore: no \"AI assistants\" block → not onboarded via this path, skipping"
+        wal_onboarded=0
     elif grep -qxF "$WAL_REL" "$GITIGNORE"; then
         info ".gitignore: line already present"
     else
         wal_needs_ignore=1
     fi
 
+    # Untracking is gated on the same onboarding predicate as the ignore line:
+    # untracking without ignoring would leave a permanently dirty tree.
     wal_tracked=0
-    git -C "$REPO_ROOT" ls-files --error-unmatch -- "$WAL_REL" >/dev/null 2>&1 && wal_tracked=1
+    if [ "$wal_onboarded" -eq 1 ]; then
+        git -C "$REPO_ROOT" ls-files --error-unmatch -- "$WAL_REL" >/dev/null 2>&1 && wal_tracked=1
+    fi
 
     if [ "$wal_needs_ignore" -eq 1 ] || [ "$wal_tracked" -eq 1 ]; then
         note_change

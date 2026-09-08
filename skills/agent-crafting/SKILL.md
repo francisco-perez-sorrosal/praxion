@@ -21,6 +21,7 @@ Guide for building agents -- specialized subprocesses with separate context wind
 - [../skill-crafting/references/context-engineering-foundations.md](../skill-crafting/references/context-engineering-foundations.md) -- the shared "why" (an agent is progressive disclosure for a whole task: clean context in, distilled **pointer-not-payload** summary out)
 - [references/configuration.md](references/configuration.md) -- detailed field docs, prompt writing guide, prompt template, CLI agents, troubleshooting
 - [references/examples.md](references/examples.md) -- complete agent definitions showing distinct patterns (read-only, edit-capable, hooks, memory)
+- [references/model-routing-policy.md](references/model-routing-policy.md) -- effort routing, researcher routing modes, kill-switch precedence, per-spawn overrides, quality-cliff guards relocated from `rules/swe/agent-model-routing.md` (which keeps only the resident Tier Table)
 - [../skill-crafting/references/artifact-naming.md](../skill-crafting/references/artifact-naming.md) -- naming conventions for all artifact types
 
 ## Creating Agents

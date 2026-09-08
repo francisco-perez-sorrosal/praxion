@@ -10,7 +10,7 @@ description: >
 tools: Read, Write, Edit, Glob, Grep, Bash
 skills: [cicd, external-api-docs]
 memory: user
-model: sonnet  # capability floor per rules/swe/agent-model-routing.md
+model: sonnet
 effort: high
 maxTurns: 80
 background: true

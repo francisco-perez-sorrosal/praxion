@@ -6,7 +6,7 @@ description: >
   VERIFICATION_REPORT.md with pass/fail/warn findings. Use after implementation,
   when the planner's Phase 7 confirms plan adherence, or at milestones to
   validate quality before committing results.
-model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.
+model: opus
 effort: xhigh
 tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit
@@ -475,7 +475,7 @@ Every finding must reference either the step's `Done when` criteria or a convent
 
 ### Model
 
-Spawn at `sonnet` — per-spawn override below the `opus` floor. This is a step-scoped diff review, not a whole-pipeline quality gate. See `rules/swe/agent-model-routing.md`.
+Spawn at `sonnet` — per-spawn override below the `opus` floor. This is a step-scoped diff review, not a whole-pipeline quality gate. See the Per-Spawn Overrides table in `skills/agent-crafting/references/model-routing-policy.md`.
 
 ### Anti-instructions (hard limits for this mode)
 

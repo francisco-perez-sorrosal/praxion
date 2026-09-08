@@ -9,7 +9,7 @@ description: >
   implementation.
 tools: Read, Glob, Grep, Bash, Write, Edit
 skills: [claude-ecosystem, external-api-docs, data-structure-design]
-model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.
+model: opus
 effort: xhigh
 background: true
 memory: user

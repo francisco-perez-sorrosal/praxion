@@ -10,7 +10,7 @@ tools: Read, Write, Edit, Glob, Grep, Bash
 skills: [software-planning, code-review, refactoring, external-api-docs]
 background: true
 memory: user
-model: sonnet  # capability floor per rules/swe/agent-model-routing.md
+model: sonnet
 effort: high
 maxTurns: 80
 ---
@@ -215,7 +215,7 @@ Keep the return to ≤5 lines. Do not echo diff content, test output, or `LEARNI
 
 - **Single-step scope.** Implement only the step assigned to you. Do not look ahead or implement the next step.
 - **No plan modification.** If the plan is wrong, report `[BLOCKED]` — do not fix the plan.
-- **No git commits.** Write code and update planning documents, but never commit. The user or planner handles commits.
+- **No git commits.** Write code and update planning documents, but never commit. The user or planner handles commits, staging by explicit pathspec per [`rules/swe/vcs/git-conventions.md` § Staging Discipline](../rules/swe/vcs/git-conventions.md#staging-discipline) — never `git add -A`.
 - **File conflict stop.** If you discover you need to modify a file outside your step's declared `Files` set (parallel mode), stop immediately and report `[CONFLICT]` with the file path and reason.
 - **Read before write.** Never modify a file you have not read in this session.
 - **Path-scoped rules load on Read, not Write.** Before creating a *new* file in a directory, read an existing sibling first (or, if there is none, a canonical example of that file type elsewhere) so the path-scoped conventions for it (`coding-style`, `readme-style`, diagram/HTML/PR conventions, `id-citation-discipline`, etc.) load into context — otherwise they silently do not.

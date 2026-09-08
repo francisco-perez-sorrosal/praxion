@@ -9,7 +9,7 @@ description: >
   project gaps and opportunities should be explored.
 tools: Read, Glob, Grep, Bash, Write, Edit, AskUserQuestion, WebFetch
 skills: [software-planning, external-api-docs, web-ui-design, tui-design, agentic-interface-design, api-design-craft]
-model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.
+model: opus
 effort: xhigh
 memory: user
 maxTurns: 80

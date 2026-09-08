@@ -14,7 +14,7 @@ description: >
   improvised discipline.
 tools: Read, Glob, Grep, Bash, Write, Edit, Skill
 skills: [multi-perspective-analysis]
-model: sonnet  # capability floor, deliberately low; the convener routes up per the difficulty-hint policy below. See rules/swe/agent-model-routing.md.
+model: sonnet
 effort: high
 background: true
 memory: user

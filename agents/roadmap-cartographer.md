@@ -37,7 +37,7 @@ description: >-
   <commentary>`diff` mode is incremental and Decision-Log-preserving.</commentary>
   </example>
 tools: Read, Glob, Grep, Bash(git:*), Bash(wc:*), Bash(grep:*), Bash(find:*), Bash(jq:*), Write, Edit, AskUserQuestion, Task
-model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.
+model: opus
 effort: xhigh
 skills: [roadmap-synthesis, roadmap-planning]
 memory: user

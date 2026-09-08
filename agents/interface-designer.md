@@ -20,7 +20,7 @@ description: >
   selection, or error-format / pagination / interaction-model decision.
 tools: Read, Glob, Grep, Bash, Write, Edit
 skills: [web-ui-design, tui-design, agentic-interface-design, api-design-craft, api-design, external-api-docs, api-documentation]
-model: opus  # capability floor; orchestrator may route up via per-spawn override, never below. See rules/swe/agent-model-routing.md.
+model: opus
 effort: xhigh
 background: true
 memory: user

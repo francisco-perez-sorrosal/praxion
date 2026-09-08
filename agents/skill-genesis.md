@@ -13,7 +13,7 @@ disallowedTools: Edit
 skills: [skill-crafting, rule-crafting]
 memory: user
 background: true
-model: sonnet  # capability floor per rules/swe/agent-model-routing.md
+model: sonnet
 effort: medium
 maxTurns: 80
 ---

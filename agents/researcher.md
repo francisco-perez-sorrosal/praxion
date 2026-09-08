@@ -9,7 +9,7 @@ tools: Read, Glob, Grep, Bash, WebSearch, WebFetch, Write, Edit
 skills: [claude-ecosystem, external-api-docs]
 background: true
 memory: user
-model: sonnet  # capability floor per rules/swe/agent-model-routing.md
+model: sonnet
 effort: high
 maxTurns: 80
 ---

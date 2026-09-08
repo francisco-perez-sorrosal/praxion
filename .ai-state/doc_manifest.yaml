@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-08T07:56:44Z'
+generated_at: '2026-09-08T08:55:18Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -32,7 +32,7 @@ surfaces:
   path: README_DEV.md
   type: markdown
   title: Developer Guide
-  last_modified: '2026-09-07'
+  last_modified: '2026-09-08'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-040-eval-framework-out-of-band
@@ -505,7 +505,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-09-07'
+  last_modified: '2026-09-08'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -1554,7 +1554,7 @@ surfaces:
   path: .ai-state/decisions/163-worktree-orientation-banner.md
   type: markdown
   title: Worktree-orientation banner via a SessionStart hook
-  last_modified: '2026-05-12'
+  last_modified: '2026-09-08'
   renderer: adr_card
 - id: ai-state-decisions-164-architecture-c4-dual-agent-representation
   path: .ai-state/decisions/164-architecture-c4-dual-agent-representation.md
@@ -1614,13 +1614,13 @@ surfaces:
   path: .ai-state/decisions/173-verifier-rework-loop-resume-rework-arg-shape.md
   type: markdown
   title: /resume-rework takes no positional argument; reads VERIFIER_FINDINGS.md from cwd
-  last_modified: '2026-05-14'
+  last_modified: '2026-09-08'
   renderer: adr_card
 - id: ai-state-decisions-174-verifier-rework-loop-rework-manifest-format
   path: .ai-state/decisions/174-verifier-rework-loop-rework-manifest-format.md
   type: markdown
   title: REWORK_MANIFEST.md uses a markdown table with one fenced JSON block per row
-  last_modified: '2026-05-14'
+  last_modified: '2026-09-08'
   renderer: adr_card
 - id: ai-state-decisions-175-verifier-rework-loop-verifier-findings-schema
   path: .ai-state/decisions/175-verifier-rework-loop-verifier-findings-schema.md
@@ -1656,7 +1656,7 @@ surfaces:
   path: .ai-state/decisions/180-verifier-rework-loop-subagent-isolation-test-harness.md
   type: markdown
   title: Subagent isolation in rework worktrees verified by controlled-test harness; ship blocked if hook does not fire
-  last_modified: '2026-05-14'
+  last_modified: '2026-09-08'
   renderer: adr_card
 - id: ai-state-decisions-181-verifier-rework-loop-td-linkage-notes-suffix
   path: .ai-state/decisions/181-verifier-rework-loop-td-linkage-notes-suffix.md

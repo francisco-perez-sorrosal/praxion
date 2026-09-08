@@ -209,9 +209,25 @@ Information flows **forward only between concurrent agents**: the architect read
 
 `INTERFACE_DESIGN.md` is single-writer (interface-designer only) and cumulative per pipeline run. It is ephemeral — deleted with `.ai-work/<task-slug>/` after the pipeline completes. It is not subject to fragment file patterns.
 
+## Agentic-Transactions-Architect Shadowing & Challenge Loop
+
+Structurally identical to [Interface-Designer Shadowing & the Architecture-Challenge Loop](#interface-designer-shadowing--the-architecture-challenge-loop) above, with `TRANSACTIONS_DESIGN.md` in place of `INTERFACE_DESIGN.md` and a domain-specific activation signal — no new coordination primitive.
+
+### Activation
+
+Shadowing is **conditional** — it activates when the task involves agentic payments or agentic trading: a payment mandate, settlement finality, brokerage order execution, or HITL spend-gating. It runs in parallel with the researcher (research-stage shadow) and systems-architect (architecture-stage shadow), producing `.ai-work/<task-slug>/TRANSACTIONS_DESIGN.md`.
+
+### Everything else is shared
+
+The research/architecture-stage shadow structure, the `## Architecture Challenges` channel, the orchestrator-mediated loop-back protocol (one re-evaluation round, escalate on non-convergence), and the durable-disposition-record requirement are identical to the interface-designer's above — that section's [durable disposition record](#interface-designer-shadowing--the-architecture-challenge-loop) point already names `TRANSACTIONS_DESIGN.md`'s challenge channel explicitly.
+
 ## Discipline-Consultant Dialogue Protocol
 
 The discipline-consultant (`agents/discipline-consultant.md`) runs an isolate → challenge → disposition → reconcile protocol once spawned against a specific discipline via a `Discipline: <name>` directive. This section is the canonical procedural reference the consultant's own Round 0–3 summary points at.
+
+### Convening
+
+Convening is **gated, never unconditional** — a registry trigger predicate must match a load-bearing specialist claim, or a pipeline agent must nominate the discipline citing the signal and the decision at stake (`skills/multi-perspective-analysis/references/discipline-registry.md`). The registry row's `attaches-to` column decides which stage the consultant convenes at — **research as well as architecture**. Attaching at research is deliberate: it catches an unsound imported claim before a research wave is spent relaying it, the cheapest point in the pipeline to catch one. Concurrency is capped at 2-3 consultants, one discipline each.
 
 ### Before Round 0 — The Convener Seals Its Prior List
 
@@ -238,6 +254,18 @@ The convener — never the consultant — adjudicates **each challenge individua
 **The convener also appends one row to `.ai-state/CONSULT_COSTS.md` for the consult as a whole**, at this same moment — the aggregate subagent token count the harness surfaced at the consult's completion, its model tier and its difficulty class. Ledger rows are per challenge; the cost row is per consult, which is why it lives in a sibling file rather than a twelfth ledger column. Omitting it fails `fitness/tests/test_discipline_registry_invariants.py`, which names the missing `(task-slug, discipline, stage)` triple. Schema: `.ai-state/CONSULT_COSTS.md § Column Definitions`.
 
 **The convener also classifies each challenge against the list it sealed before spawning** — `novel` or `matched`, one `.ai-state/CONSULT_PRIORS.md § Challenge Classification` row per challenge, carrying the matched row's `prior-id` and the consultant's `**Round-0 HEAD:**` sha as the seal witness. This is the set difference the lens-versus-consultant question needs; without it the question is answered from memory, by the party with an interest in the answer. Omitting it fails `fitness/tests/test_discipline_registry_invariants.py`, which names the unclassified challenge. Schema: `.ai-state/CONSULT_PRIORS.md § Column Definitions`.
+
+### Durable Disposition Homes
+
+Beyond the per-consult `.ai-state/CONSULT_COSTS.md` row and the per-challenge `.ai-state/CONSULT_PRIORS.md` classification (both § Round 2 above), the convener appends one `.ai-state/CONSULT_LEDGER.md` row **per challenge** — the fragment keeps the adjudication next to the claim it answers (sentinel P07 checks this), the ledger is the durable counter.
+
+Every disposition needs a durable home beyond the ephemeral `CONSULT_<discipline>.md` fragment (deleted with `.ai-work/<task-slug>/` at cleanup):
+
+- `switch-now` → becomes an ADR
+- `defer-with-rationale` carrying residual risk → becomes a `.ai-state/TECH_DEBT_LEDGER.md` row
+- `dismiss-with-rationale` worth remembering → becomes a `wontfix` tombstone
+
+A challenge whose reasoning lives only in the ephemeral fragment is lost at cleanup, and a later agent re-derives the constraint from scratch.
 
 ### Round 3 — Reconcile, Then Stop
 

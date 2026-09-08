@@ -23,7 +23,7 @@ Assess the task before starting work. Each tier prescribes what to do — higher
 - The main agent selects the tier at task intake. User override always wins. Default to the lower tier when uncertain — process can be added later, but overhead cannot be reclaimed.
 - Bug fixes: Direct unless 4+ files or structural issue (escalate to Standard). Refactoring: Standard with `[Phase: Refactoring]` delegation to the [refactoring skill](../../skills/refactoring/SKILL.md). Mid-task escalation mirrors Lightweight's: if it grows past a single file plus trivial siblings, or turns structural, stop and re-tier.
 - The SDD skill's [complexity triage](../../skills/spec-driven-development/SKILL.md#complexity-triage) refines specification depth within Standard/Full.
-- All tiers append a row to `.ai-state/calibration_log.md` on task completion (calibration accuracy analysis stays unbiased) and may create ADRs in `.ai-state/decisions/` when a decision is worth preserving — see [adr-conventions.md](adr-conventions.md). Direct tier's row is the sanctioned single-line format ([spec](../../skills/spec-driven-development/references/calibration-procedure.md#calibration-log)); `Retrospective` is the micro-capture slot for a learning/gotcha/debt/decision note, promotable to ADR/ledger row if substantial.
+- All tiers append a row to `.ai-state/calibration_log.md` on completion (keeps calibration accuracy analysis unbiased) and may create ADRs per [adr-conventions.md](adr-conventions.md). Direct tier uses the sanctioned single-line format ([spec](../../skills/spec-driven-development/references/calibration-procedure.md#calibration-log)); `Retrospective` is the micro-capture slot, promotable to ADR/ledger row if substantial.
 - **Lightweight specifics** (acceptance criteria inline, researcher scaffold, no `TEST_RESULTS.md`, architecture-doc update on structural change, mid-task escalation to Standard rather than silent scope-creep): see [tier-templates.md#lightweight-snippet](../../skills/software-planning/references/tier-templates.md#lightweight-snippet).
 
 **Tier Selector (fast path).** Walk top-to-bottom, stop at the first match: **Spike** (exploratory, uncertain) → **Direct** (single-file fix/config/doc/typo) → **Lightweight** (2–3 files, single behavior, clear scope) → **Standard** (4–8 files, or 2–4 behaviors, or an architectural decision) → **Full** (9+ files, or 5+ behaviors, or cross-cutting refactor). For ambiguous cases, use the SDD skill's [calibration-procedure.md](../../skills/spec-driven-development/references/calibration-procedure.md) signal scoring.
@@ -49,27 +49,27 @@ Two hooks reinforce this boundary: `inject_worktree_banner.py` (SessionStart) an
 
 ### Available Agents
 
-Outputs use path prefixes to signal lifecycle: `.ai-work/<slug>/` = ephemeral (deleted after pipeline), `.ai-state/` = permanent (committed to git). Rows reading → are enumerated once, under [Delegation Checklists](#delegation-checklists).
+Path prefix signals lifecycle: `.ai-work/<slug>/` ephemeral, `.ai-state/` permanent (committed). Rows reading → point to [Delegation Checklists](#delegation-checklists).
 
-| Agent | Purpose | Output | Bg Safe |
-|-------|---------|--------|---------|
-| `promethean` | Feature-level ideation from project state | `.ai-work/<slug>/IDEA_PROPOSAL.md`, `.ai-state/idea_ledgers/IDEA_LEDGER_*.md` | No |
-| `researcher` | Codebase exploration, external docs, comparative analysis | `.ai-work/<slug>/RESEARCH_FINDINGS.md` | Yes |
-| `systems-architect` | Trade-off analysis, system design | → Delegation Checklists | Yes |
-| `implementation-planner` | Step decomposition, execution supervision | → Delegation Checklists | Yes |
-| `context-engineer` | Context artifact domain expert; any pipeline stage | Audit report + artifact changes, `.ai-work/<slug>/CONTEXT_REVIEW.md` (shadowing) | Yes |
-| `implementer` | Executes implementation steps with self-review | → Delegation Checklists | Yes |
-| `test-engineer` | Dedicated testing: complex test design, test suite refactoring, testing infrastructure | Test code + `.ai-work/<slug>/WIP.md` update + `.ai-work/<slug>/TEST_RESULTS.md` (canonical when paired with implementer on tests) | Yes |
-| `verifier` | Post-implementation review against acceptance criteria | → Delegation Checklists | Yes |
-| `doc-engineer` | Documentation quality (READMEs, catalogs, changelogs, developer architecture guide) | Doc report or file fixes | Yes |
-| `sentinel` | Read-only ecosystem auditor (independent, not a pipeline stage) | `.ai-state/sentinel_reports/SENTINEL_REPORT_*.md`, `.ai-state/sentinel_reports/SENTINEL_LOG.md` | Yes |
-| `architect-validator` | Per-PR / on-demand structural validator for the code↔DSL↔ADR triangle | `.ai-work/<task-slug>/ARCHITECTURE_VALIDATION.md`, `.ai-state/TECH_DEBT_LEDGER.md` rows on FAIL | Yes |
-| `skill-genesis` | Autonomous learning-harvest report writer; user dispositions via `/skill-genesis-review` | `.ai-state/skill_genesis_reports/SKILL_GENESIS_REPORT_*.md`, `.ai-state/skill_genesis_reports/SKILL_GENESIS_LOG.md` | Yes |
-| `cicd-engineer` | CI/CD pipeline design, GitHub Actions, deployment automation | Workflow files + pipeline config | Yes |
-| `roadmap-cartographer` | Project-level audit-to-roadmap through a project-derived lens set (SPIRIT, DORA, SPACE, FAIR, CNCF, or Custom); invoked via `/roadmap` | `ROADMAP.md` at project root, `.ai-work/<slug>/ROADMAP_DRAFT.md`, `.ai-work/<slug>/AUDIT_<lens>.md` fragments | No |
-| `interface-designer` | Interface-layer design specialist — peer sub-architect for web UI, TUI/CLI, REST/GraphQL/gRPC APIs, MCP/agent tools, A2A contracts; makes framework/paradigm/error-format/pagination decisions and sketches designs; writes ADR fragments for load-bearing calls | `.ai-work/<slug>/INTERFACE_DESIGN.md` + ADR fragments in `.ai-state/decisions/drafts/` | Yes |
-| `agentic-transactions-architect` | Transaction-domain expert and shadow + on-demand sub-architect for managed projects implementing agentic payments or agentic trading; shadows researcher and systems-architect stages when a task involves transaction / payment / trading / brokerage / mandate / settlement / HITL context; makes provider-contract and HITL spend-gating decisions; writes ADR fragments for load-bearing calls | `.ai-work/<slug>/TRANSACTIONS_DESIGN.md` + ADR fragments in `.ai-state/decisions/drafts/` | Yes |
-| `discipline-consultant` | Discipline-parameterized adversarial consultant; gated peer sub-architect spawned with a `Discipline: <name>` directive resolved against the roster in `skills/multi-perspective-analysis/references/discipline-registry.md`. Reads sources in isolation, then challenges the draft. Challenges only — decides nothing, writes no ADRs, no code | `.ai-work/<slug>/CONSULT_<discipline>.md`; convener appends `.ai-state/CONSULT_LEDGER.md` rows | Yes |
+| Agent | Output | Bg Safe |
+|-------|--------|---------|
+| `promethean` | `.ai-work/<slug>/IDEA_PROPOSAL.md`, `.ai-state/idea_ledgers/IDEA_LEDGER_*.md` | No |
+| `researcher` | `.ai-work/<slug>/RESEARCH_FINDINGS.md` | Yes |
+| `systems-architect` | → Delegation Checklists | Yes |
+| `implementation-planner` | → Delegation Checklists | Yes |
+| `context-engineer` | Audit report + artifact changes, `.ai-work/<slug>/CONTEXT_REVIEW.md` (shadowing) | Yes |
+| `implementer` | → Delegation Checklists | Yes |
+| `test-engineer` | Test code + `.ai-work/<slug>/WIP.md` update + `.ai-work/<slug>/TEST_RESULTS.md` (canonical when paired) | Yes |
+| `verifier` | → Delegation Checklists | Yes |
+| `doc-engineer` | Doc report or file fixes | Yes |
+| `sentinel` | `.ai-state/sentinel_reports/SENTINEL_REPORT_*.md`, `.ai-state/sentinel_reports/SENTINEL_LOG.md` | Yes |
+| `architect-validator` | `.ai-work/<task-slug>/ARCHITECTURE_VALIDATION.md`, `.ai-state/TECH_DEBT_LEDGER.md` rows on FAIL | Yes |
+| `skill-genesis` | `.ai-state/skill_genesis_reports/SKILL_GENESIS_REPORT_*.md`, `.ai-state/skill_genesis_reports/SKILL_GENESIS_LOG.md` | Yes |
+| `cicd-engineer` | Workflow files + pipeline config | Yes |
+| `roadmap-cartographer` | `ROADMAP.md` at project root, `.ai-work/<slug>/ROADMAP_DRAFT.md`, `.ai-work/<slug>/AUDIT_<lens>.md` fragments | No |
+| `interface-designer` | `.ai-work/<slug>/INTERFACE_DESIGN.md` + ADR fragments in `.ai-state/decisions/drafts/` | Yes |
+| `agentic-transactions-architect` | `.ai-work/<slug>/TRANSACTIONS_DESIGN.md` + ADR fragments in `.ai-state/decisions/drafts/` | Yes |
+| `discipline-consultant` | `.ai-work/<slug>/CONSULT_<discipline>.md`; convener appends `.ai-state/CONSULT_LEDGER.md` rows | Yes |
 
 ### Delegation Checklists
 
@@ -79,7 +79,7 @@ When delegating to an agent, the main agent **must** include the per-agent deliv
 
 When the orchestrator authors a pipeline artifact itself rather than spawning its owning agent — legitimate at any tier — the document contract still binds: **the schema binds the path, not the author**. Write that agent's canonical section skeleton, or pick a filename it does not own.
 
-The full per-agent checklists for systems-architect, implementation-planner, implementer, and verifier — including conditional clauses (`if deployment in scope`, `if structural`, `if tests`) — are authoritative at [`coordination-details.md § Delegation Checklists`](../../skills/software-planning/references/coordination-details.md#delegation-checklists); the condensed reminder in `claude/config/CLAUDE.md` is held in sync with it by sentinel `EC06`. When `REWORK_MANIFEST.md` is produced, the main agent is responsible for spawning rework worktrees before invoking cleanup.
+Full per-agent checklists (systems-architect, implementation-planner, implementer, verifier) are authoritative at [`coordination-details.md § Delegation Checklists`](../../skills/software-planning/references/coordination-details.md#delegation-checklists). `REWORK_MANIFEST.md` triggers the main agent to spawn rework worktrees before cleanup.
 
 ### Proactive Agent Usage
 
@@ -91,11 +91,8 @@ Spawn agents without waiting for the user to ask:
 - Context artifacts stale/conflicting or plan touches them --> `context-engineer` (parallel with `researcher`/`systems-architect` as shadow; see context-engineer shadowing rule below)
 - Ecosystem health or regression check --> `sentinel`; stale check: `.ai-state/sentinel_reports/SENTINEL_LOG.md` vs `git log -1 --format=%ci`
 - Documentation impact likely --> `doc-engineer`: at pipeline checkpoints (after planning, after implementation, after refactoring), or in parallel with `implementer` + `test-engineer` when the planner assigns a doc step to the parallel group
-- On-demand only — `skill-genesis` runs when the user invokes `/skill-genesis` (autonomous harvest, background) or `/skill-genesis-review` (disposition pending proposals); never pipeline-spawned
-- Task involves substantial interface surface (new web UI, new TUI, CLI-output pass, new/changed API, MCP tool surface) --> `interface-designer` (parallel with `researcher` / `systems-architect` as shadow; see Interface-designer shadowing + challenge loop rule below)
-- Task involves agentic payments or agentic trading (payment mandate, settlement finality, brokerage order execution, HITL spend-gating) --> `agentic-transactions-architect` (parallel with `researcher` / `systems-architect` as shadow; see Agentic-transactions-architect shadowing + challenge loop rule below)
-- A registry trigger predicate matches a load-bearing specialist claim, or a pipeline agent nominates a discipline citing the signal and the decision at stake --> `discipline-consultant` (gated, never unconditional; 2-3 concurrent max, one discipline each; see convening rule below)
-- Step is RISKY (auto-signals or `review: force`) → spawn `verifier` in `Mode: light-review` (sonnet; step-scoped independent reviewer spawn; max 1 revise loop — see [`intra-step-review.md`](../../skills/software-planning/references/intra-step-review.md))
+
+Gated/on-demand agents (`skill-genesis`, `interface-designer`, `agentic-transactions-architect`, `discipline-consultant`, RISKY-step `verifier` light-review) have their trigger conditions enumerated once, in the [Pipeline Rules table](#coordination-pipeline) below.
 
 **Depth check:** Before spawning an agent recommended by another agent's output, confirm with the user if doing so would create a chain of 3+ agents from the original request.
 
@@ -105,11 +102,11 @@ Spawn agents without waiting for the user to ask:
 
 ### Cross-Agent Skill Conventions
 
-Phase-independent conventions for all pipeline agents: external API docs are mandatory (use the `external-api-docs` skill before writing/designing/testing against any external API or SDK; submit `chub_feedback` on drift); library version/capability checks are mandatory (verify before committing to a library; record confirmed versions in canonical outputs). Full text and per-agent obligations: [`skills/software-planning/references/cross-agent-skill-conventions.md`](../../skills/software-planning/references/cross-agent-skill-conventions.md).
+Phase-independent conventions for all pipeline agents: external API docs are mandatory (`external-api-docs` skill before designing/testing against any API/SDK; `chub_feedback` on drift); library version/capability checks are mandatory before committing to a library. Full text and per-agent obligations: [`skills/software-planning/references/cross-agent-skill-conventions.md`](../../skills/software-planning/references/cross-agent-skill-conventions.md).
 
 ### Coordination Pipeline
 
-Agents communicate through shared documents, not direct invocation. The pipeline flows promethean → researcher → systems-architect → implementation-planner → (implementer ∥ test-engineer ∥ doc-engineer) → verifier, with context-engineer shadowing research+architecture and sentinel running as an independent audit. See [coordination-details.md#coordination-pipeline-diagram](../../skills/software-planning/references/coordination-details.md#coordination-pipeline-diagram) for the ASCII diagram.
+Agents communicate through shared documents, not direct invocation — see [coordination-details.md#coordination-pipeline-diagram](../../skills/software-planning/references/coordination-details.md#coordination-pipeline-diagram) for the full pipeline-flow diagram.
 
 **Pipeline rules** (deep-dive sections live in [coordination-details.md](../../skills/software-planning/references/coordination-details.md)):
 
@@ -120,36 +117,36 @@ Agents communicate through shared documents, not direct invocation. The pipeline
 | Do not skip stages | Research before architecture (unless codebase context suffices); re-invoke upstream when downstream input is incomplete |
 | BDD/TDD execution | Paired implementation + test steps; concurrent on disjoint file sets; tests run until green |
 | Batched improvements | Evaluate independence; execute with maximum parallelism via Classify / Pair-spawn / Sequence / Full-suite-gate procedure |
-| Context-engineer shadowing | Conditional on context artifacts being touched; runs parallel to researcher / systems-architect; appends to cumulative `CONTEXT_REVIEW.md` |
-| Context-engineer scope | Single artifact → direct invocation any stage; 3+ artifacts → full pipeline; also runs for standalone audits |
+| Context-engineer shadowing | Context artifacts touched → context-engineer shadows researcher/systems-architect, appending to cumulative `CONTEXT_REVIEW.md` — [deep-dive](../../skills/software-planning/references/coordination-details.md#context-engineer-shadowing). |
+| Context-engineer scope | 1 artifact → direct invocation at any stage; 3+ artifacts or restructuring → full pipeline under planner supervision — same deep-dive as above. |
 | Sentinel | Independent of pipeline; reports (`SENTINEL_REPORT_*.md`) public to any agent or user |
-| Doc-engineer parallel | When the planner assigns it to the parallel group: concurrent with implementer / test-engineer on disjoint files; also at pipeline checkpoints |
-| Interface-designer shadowing + challenge loop | When an interface surface is in scope: parallel to researcher + systems-architect; forward-only `INTERFACE_DESIGN.md` with one orchestrator-mediated loop-back when `## Architecture Challenges` is populated |
-| Agentic-transactions-architect shadowing + challenge loop | When a task involves agentic payments/trading: parallel to researcher + systems-architect; forward-only `TRANSACTIONS_DESIGN.md` with one orchestrator-mediated loop-back when `## Architecture Challenges` is populated |
-| Discipline-consultant convening + disposition | Gated, never unconditional. **Attaches at research as well as architecture** — the registry row's `attaches-to` column decides, and a consult convened at the research stage catches an unsound imported claim before a research wave is spent relaying it, which is the cheapest point to catch one. Round 0 isolates (no draft access), round 1 challenges; the convener dispositions **per challenge** — writing disposition and rationale back into that challenge's own `### CH-NN` entry in the fragment **and** appending one `.ai-state/CONSULT_LEDGER.md` row. Both, never either: the fragment keeps the adjudication next to the claim it answers (sentinel P07 checks this), the ledger is the durable counter. **Every disposition needs a durable home**: `switch-now` becomes an ADR, `defer-with-rationale` carrying residual risk becomes a tech-debt row, and `dismiss-with-rationale` worth remembering becomes a `wontfix` tombstone — a challenge whose reasoning lives only in the ephemeral fragment is lost at cleanup, and a later agent re-derives the constraint from scratch. One orchestrator-mediated loop-back, then escalate to the user. |
-| Verifier rework loop | When `REWORK_MANIFEST.md` is present in `.ai-work/<slug>/`, main agent creates a rework worktree per row via `EnterWorktree`, writes `VERIFIER_FINDINGS.md` inside, flips `td-NNN` rows to `in-flight`, and surfaces `/resume-rework` to the user. See `commands/resume-rework.md` for the fresh-session dispatch path. |
-| Pre-refactor sub-pipeline | When `PRE_REFACTOR_PLAN.md` is present in `.ai-work/<slug>/` after the architect's Phase 2.5 emits `emit-PRE_REFACTOR_PLAN`, the orchestrator detects it by artifact-presence (mirroring verifier-rework and interface-designer-challenge triggers), mechanically parses the structured `## Verifier Bypass Criteria` and `## Loop-Back Conditions` YAML blocks, surfaces a recommendation through the existing pre-verification Conversation Checkpoint, and the user decides. The mini-pipeline runs **in the same worktree** as the parent task (no `EnterWorktree`); steps reuse the existing `[Phase: Refactoring]` tag (no new tag invented); first non-trivial step is a `test-engineer`-assigned characterization-tests-first step. One-pass recursion bound — the architect's re-entry runs in `post-refactor-adaptation` mode, which is forbidden from re-running Phase 2.5. Deep-dive: [`coordination-details.md` § Pre-Refactor Sub-Pipeline & the Verifier-vs-Loopback Decision](../../skills/software-planning/references/coordination-details.md#pre-refactor-sub-pipeline--the-verifier-vs-loopback-decision). |
-| Intra-step pair-review | When a step is tagged RISKY (Uncertainty Flag < 7, one-way-door, or `tier: H`) or carries `review: force`, orchestrator spawns `verifier` in `Mode: light-review` (independent reviewer spawn, step-scoped diff review) at the implementer→planner seam before advancing; `review: off` suppresses. Non-RISKY steps incur zero added cost. Deep procedure (iteration bound, escalation, composition): [`skills/software-planning/references/intra-step-review.md`](../../skills/software-planning/references/intra-step-review.md). |
+| Doc-engineer parallel | Planner assigns a doc step to the parallel group → doc-engineer runs concurrent with implementer/test-engineer on disjoint files — [deep-dive](../../skills/software-planning/references/coordination-details.md#doc-engineer-parallel-execution). |
+| Interface-designer shadowing + challenge loop | Substantial interface surface in scope → interface-designer shadows researcher + systems-architect, writing forward-only `INTERFACE_DESIGN.md`, with one orchestrator-mediated loop-back when `## Architecture Challenges` is populated — [deep-dive](../../skills/software-planning/references/coordination-details.md#interface-designer-shadowing--the-architecture-challenge-loop). |
+| Agentic-transactions-architect shadowing + challenge loop | Task involves agentic payments/trading → same shadow/loop-back pattern, writing forward-only `TRANSACTIONS_DESIGN.md` — [deep-dive](../../skills/software-planning/references/coordination-details.md#agentic-transactions-architect-shadowing--challenge-loop). |
+| Discipline-consultant convening + disposition | Registry trigger predicate matches a load-bearing claim, or an agent nominates one → `discipline-consultant` convenes; per-challenge disposition lands in the fragment + `.ai-state/CONSULT_LEDGER.md` — [deep-dive](../../skills/software-planning/references/coordination-details.md#discipline-consultant-dialogue-protocol). |
+| Verifier rework loop | `REWORK_MANIFEST.md` present in `.ai-work/<slug>/` → main agent creates a rework worktree per row via `EnterWorktree`, writes `VERIFIER_FINDINGS.md`, flips `td-NNN` rows to `in-flight`, and surfaces `/resume-rework` — dispatch path: `commands/resume-rework.md`. |
+| Pre-refactor sub-pipeline | `PRE_REFACTOR_PLAN.md` present in `.ai-work/<slug>/` after the architect's Phase 2.5 → orchestrator runs a same-worktree mini-pipeline (no `EnterWorktree`) and surfaces a verifier-vs-loopback recommendation at the pre-verification checkpoint — [deep-dive](../../skills/software-planning/references/coordination-details.md#pre-refactor-sub-pipeline--the-verifier-vs-loopback-decision). |
+| Intra-step pair-review | Step tagged RISKY (Uncertainty Flag < 7, one-way-door, `tier: H`) or carrying `review: force` → orchestrator spawns `verifier` in `Mode: light-review` at the implementer→planner seam (`review: off` suppresses) — [deep-dive](../../skills/software-planning/references/intra-step-review.md). |
 
 ### Conversation Checkpoints
 
 The human-in-the-loop half of the Conversation discipline (the agent-side half is `Surface Assumptions` in the behavioral contract). The orchestrator owns three checkpoints — one at intake, two at the seams between subagent spawns where the orchestrator is interactive:
 
-- **Intake Clarity Gate** (all tiers above Direct) — before tier-commit and before spawning the first agent, disambiguate intent. Surface gap-filling assumptions **univocally** (so the user can halt) and proceed; raise a *blocking* clarifying question (≤3, via `AskUserQuestion`) **only when intent is ambiguous AND a wrong guess is hard to reverse** — never on ambiguity alone. At Standard/Full, capture `.ai-work/<task-slug>/TASK_BRIEF.md` (Intent / Key Signals / Health Guards / Uncertainty Flag) unconditionally before the first agent spawn, seeding every downstream stage and the verifier's rubric; at Lightweight, capture when success is non-obvious; Direct skips. The brief floor governs *writing*, not *asking* — the 2×2 rule still decides whether a blocking question fires. Full procedure + the 2×2 decision rule: the `goal-disambiguation` skill.
-- **Phase-transition surfacing** (Standard/Full) — at phase boundaries (research→architecture→planning→implementation) and load-bearing steps, *not* intra-phase agent handoffs, the orchestrator pauses, digests the critical assumptions and constraints taken, and lets the user reflect or roll back.
-- **Pre-verification checkpoint** — before invoking the verifier, the orchestrator presents a curated executive digest plus an acknowledgement of the load-bearing assumptions; the user proceeds, or rolls back to a specific upstream agent with the pipeline still in flight. This is distinct from the verifier rework loop (the verifier-driven backstop) — the two rollback paths bracket the verifier by design.
-  - **Verifier-vs-loopback recommendation** (named variant of the pre-verification checkpoint, active when `PRE_REFACTOR_PLAN.md` is present): the orchestrator mechanically evaluates the plan's `## Verifier Bypass Criteria` and `## Loop-Back Conditions` YAML blocks and surfaces one of three recommendations — `proceed-to-verifier`, `bypass-verifier-with-user-ack`, or `loop-back-to-architect`. The user retains final say in every case; the recommendation is advisory.
-- **Pre-mortem gate** (named variant of phase-transition surfacing, always-on at Standard/Full) — fires at the planner→implementer boundary: the orchestrator asks "assume this plan shipped and caused an incident — why?" Failure modes are recorded in `WIP.md`. Procedure detail in [`coordination-details.md#conversation-checkpoints`](../../skills/software-planning/references/coordination-details.md#conversation-checkpoints).
+- **Intake Clarity Gate** (all tiers above Direct) — before spawning the first agent, disambiguate intent (surface assumptions; blocking question only when ambiguity meets a hard-to-reverse wrong guess). Full procedure: `goal-disambiguation` skill.
+- **Phase-transition surfacing** (Standard/Full) — at phase boundaries and load-bearing steps (not intra-phase handoffs); pauses to digest assumptions/constraints and lets the user reflect or roll back.
+- **Pre-verification checkpoint** — before invoking the verifier, presents a digest + load-bearing-assumption acknowledgement; user proceeds or rolls back to a specific upstream agent (distinct from the verifier rework loop).
+  - **Verifier-vs-loopback recommendation** (named variant, active when `PRE_REFACTOR_PLAN.md` is present) — mechanically evaluates Bypass/Loop-Back YAML blocks, surfaces one of three recommendations; user has final say.
+- **Pre-mortem gate** (named variant of phase-transition surfacing, always-on at Standard/Full) — fires at the planner→implementer boundary: "assume this plan shipped and caused an incident — why?"; failure modes recorded in `WIP.md`.
+
+Full digest-curation, acknowledgement-shape, rollback-routing, and degraded-mode procedure for every checkpoint above: [`coordination-details.md#conversation-checkpoints`](../../skills/software-planning/references/coordination-details.md#conversation-checkpoints).
 
 Direct/Lightweight tiers have no phases — the discipline collapses to the Intake Clarity Gate (Lightweight; Direct uses only intake `Surface Assumptions`) plus a pre-commit digest. Interactive (pauses on) is the default; an explicitly requested automated run suppresses the pauses but still captures assumptions and writes the digest as a post-hoc record. Automated is an execution mode orthogonal to the tier.
-
-Procedure — digest curation, acknowledgement shape, rollback routing, degraded-mode behavior: [coordination-details.md#conversation-checkpoints](../../skills/software-planning/references/coordination-details.md#conversation-checkpoints).
 
 ### Agent Selection Criteria
 
 Use an agent when the task benefits from a separate context window (large scope, multiple phases, structured output). Work directly for quick lookups, single changes, one-step edits. Per-agent Claude model tier is governed by [`agent-model-routing.md`](agent-model-routing.md).
 
-**Shipped-Explore fallback.** If `Agent(subagent_type="Explore", ...)` fails before producing output (harness error, orphaned-tool-start, no agent-start event), don't retry the same input — its tokens are already spent. Fall back to `praxion:researcher` for substantive code surveys (returns a structured `RESEARCH_FINDINGS.md`) or to direct `find`/`grep` via Bash for narrow lookups. Many-skill / many-MCP environments are especially prone to this.
+**Shipped-Explore fallback.** If `Agent(subagent_type="Explore", ...)` fails before producing output, don't retry the same input — fall back to `praxion:researcher` for substantive code surveys or direct `find`/`grep` via Bash for narrow lookups. Full failure signature and tracking: [`docs/claude-code-limitations.md`](../../docs/claude-code-limitations.md).
 
 ### Delegation Depth
 

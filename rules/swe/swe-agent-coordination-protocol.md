@@ -127,6 +127,7 @@ Agents communicate through shared documents, not direct invocation — see [coor
 | Verifier rework loop | `REWORK_MANIFEST.md` present in `.ai-work/<slug>/` → main agent creates a rework worktree per row via `EnterWorktree`, writes `VERIFIER_FINDINGS.md`, flips `td-NNN` rows to `in-flight`, and surfaces `/resume-rework` — dispatch path: `commands/resume-rework.md`. |
 | Pre-refactor sub-pipeline | `PRE_REFACTOR_PLAN.md` present in `.ai-work/<slug>/` after the architect's Phase 2.5 → orchestrator runs a same-worktree mini-pipeline (no `EnterWorktree`) and surfaces a verifier-vs-loopback recommendation at the pre-verification checkpoint — [deep-dive](../../skills/software-planning/references/coordination-details.md#pre-refactor-sub-pipeline--the-verifier-vs-loopback-decision). |
 | Intra-step pair-review | Step tagged RISKY (Uncertainty Flag < 7, one-way-door, `tier: H`) or carrying `review: force` → orchestrator spawns `verifier` in `Mode: light-review` at the implementer→planner seam (`review: off` suppresses) — [deep-dive](../../skills/software-planning/references/intra-step-review.md). |
+| Skill-genesis | On-demand only — `/skill-genesis` (autonomous harvest, background) or `/skill-genesis-review` (disposition of pending proposals); never pipeline-spawned |
 
 ### Conversation Checkpoints
 

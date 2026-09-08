@@ -1,0 +1,23 @@
+scenario_id: ui-step-conformance
+description: >
+  A seeded implementer step that touches a web UI surface. A conformant
+  implementer step report cites the interface-layer skill's conventions by
+  name rather than inventing ad-hoc UI judgment calls.
+seeded_step: >
+  Add a loading state to the ADR list view in dashboard_app/ so users see
+  something within 100ms while decisions load from .ai-state/decisions/.
+recorded_output: >
+  Per the web-ui-design skill's five UI states, added a skeleton screen
+  (load time >1s expected, layout known in advance) that approximates the
+  final ADR-card grid, wrapped so it swaps to the default/empty/error state
+  once the fetch resolves. Contrast and spacing follow the existing
+  tokens.css scale — no ad-hoc values introduced.
+required_citations:
+  - "web-ui-design"
+  - "skeleton"
+  - "five UI states"
+llm_rubric: >
+  Given the seeded step and the recorded implementer output, judge whether
+  the output demonstrates genuine conformance to the cited skill's
+  conventions (not just name-dropping the skill) — does it correctly apply
+  the skeleton-vs-spinner decision rule and the five-states requirement?

@@ -47,6 +47,12 @@ from pathlib import Path
 
 from _git_runner import run_git
 
+# hooks/_hook_utils.py is a sibling package to this file's own scripts/
+# directory, not on sys.path by default -- add it, mirroring the reverse
+# direction hooks/remind_calibration.py already uses for scripts/.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
+from _hook_utils import record_gate_fire  # noqa: E402
+
 CODE_EXTENSIONS = frozenset(
     {
         ".py",
@@ -600,4 +606,14 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    _rc = main(sys.argv[1:])
+    try:
+        # No parsed payload is in scope at this call site (main() only reads
+        # its own stdin conditionally, deep inside _hook_scope_from_stdin),
+        # so this row lands without a session_id -- still in the raw WAL,
+        # just outside the Stop-time per-session rollup. rc is 0 (pass) or 1
+        # (block, translated to exit 2 by commit_gate.sh --blocking).
+        record_gate_fire("check_id_citation_discipline", "block" if _rc == 1 else "pass")
+    except Exception:
+        pass
+    sys.exit(_rc)

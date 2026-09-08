@@ -187,6 +187,15 @@ def main(argv: list[str] | None = None) -> int:
             "supersession reciprocity, BC tag scans)."
         ),
     )
+    parser.add_argument(
+        "--no-judge-cache",
+        action="store_true",
+        help=(
+            "Bypass reading the committed judge-verdict cache — every "
+            "judged item is re-judged this run. Fresh verdicts are still "
+            "written to the cache."
+        ),
+    )
 
     args = parser.parse_args(argv)
 
@@ -210,6 +219,7 @@ def main(argv: list[str] | None = None) -> int:
             task_slug=args.task_slug,
             pipeline_tier=tier,
             mechanical_only=args.mechanical_only,
+            no_judge_cache=args.no_judge_cache,
         )
     except (RuntimeError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)

@@ -426,7 +426,11 @@ def main() -> None:
     any_changes = False
 
     if not post_merge_only:
-        # 1. observations.jsonl
+        # 1. observations.jsonl -- gitignored since it left git tracking; a
+        # fresh clone (or any checkout predating that first write) has no
+        # local WAL at all. Distinct from "no conflicts": that message would
+        # otherwise be indistinguishable from a genuinely absent file, hiding
+        # that this reconciliation step never ran.
         if OBSERVATIONS_PATH.exists():
             changed = reconcile_file(
                 OBSERVATIONS_PATH,
@@ -438,6 +442,8 @@ def main() -> None:
                 any_changes = True
             elif not is_conflicted(OBSERVATIONS_PATH):
                 info("observations.jsonl: no conflicts")
+        else:
+            info("observations.jsonl: no local WAL -- nothing to reconcile")
 
     # 2+3. ADR renumbering + index regeneration (always runs)
     if _reconcile_adr_and_index():

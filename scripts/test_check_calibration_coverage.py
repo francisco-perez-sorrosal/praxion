@@ -74,13 +74,22 @@ def _init_repo(path: Path) -> Path:
 
 
 def _write_calibration_log(repo: Path, newest_timestamp: str) -> None:
-    """Write a synthetic calibration_log.md with one row at newest_timestamp."""
+    """Write a synthetic calibration_log.md with one row at newest_timestamp.
+
+    Retrospective is enum-compliant by construction: these fixtures exercise
+    coverage logic, not enum logic, and some use post-cutover dates -- an
+    enum-bare cell would otherwise fail --check for an unrelated reason.
+    """
+    _write_calibration_log_with_retrospective(repo, newest_timestamp, "correct — retrospective")
+
+
+def _write_calibration_log_with_retrospective(
+    repo: Path, timestamp: str, retrospective: str
+) -> None:
+    """Write a synthetic calibration_log.md with one row carrying a given Retrospective cell."""
     state_dir = repo / ".ai-state"
     state_dir.mkdir(parents=True, exist_ok=True)
-    row = (
-        f"| {newest_timestamp} | wave-test | signals | Standard | Standard"
-        " | test | retrospective |\n"
-    )
+    row = f"| {timestamp} | wave-test | signals | Standard | Standard | test | {retrospective} |\n"
     (state_dir / "calibration_log.md").write_text(_CALIBRATION_HEADER + row, encoding="utf-8")
 
 
@@ -285,3 +294,95 @@ def test_exits_zero_when_no_calibration_log_present(
         "Absent calibration_log.md must exit 0 (skip-with-INFO), "
         "not WARN/FAIL — no substrate means no verdict"
     )
+
+
+# -- Retrospective enum-compliance tests --------------------------------------
+
+
+def test_check_fails_on_post_cutover_row_missing_enum(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Gate-liveness canary: a post-cutover row with no enum prefix fails --check."""
+    _init_repo(tmp_path)
+    _write_calibration_log_with_retrospective(tmp_path, "2026-09-08", "did fine, no issues")
+    _git(tmp_path, "add", ".ai-state")
+    _git(tmp_path, "commit", "-m", "chore: add calibration baseline")
+
+    mod = _load_module()
+    with pytest.raises(SystemExit) as exc:
+        mod.main(["--repo-root", str(tmp_path), "--check"])
+
+    assert exc.value.code == 1, (
+        "A post-cutover row without the required enum prefix must fail --check"
+    )
+
+
+def test_check_fails_on_misspelled_enum(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A near-miss spelling (missing the hyphen) does not satisfy the enum prefix."""
+    _init_repo(tmp_path)
+    _write_calibration_log_with_retrospective(
+        tmp_path, "2026-09-08", "over calibrated -- ran too much process"
+    )
+    _git(tmp_path, "add", ".ai-state")
+    _git(tmp_path, "commit", "-m", "chore: add calibration baseline")
+
+    mod = _load_module()
+    with pytest.raises(SystemExit) as exc:
+        mod.main(["--repo-root", str(tmp_path), "--check"])
+
+    assert exc.value.code == 1, "A misspelled enum value must not satisfy the prefix requirement"
+
+
+def test_check_passes_compliant_post_cutover_row(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A compliant post-cutover row (enum + em-dash + prose) passes --check."""
+    _init_repo(tmp_path)
+    _write_calibration_log_with_retrospective(
+        tmp_path, "2026-09-08", "correct — Standard was the right call, ran cleanly"
+    )
+    _git(tmp_path, "add", ".ai-state")
+    _git(tmp_path, "commit", "-m", "chore: add calibration baseline")
+
+    mod = _load_module()
+    with pytest.raises(SystemExit) as exc:
+        mod.main(["--repo-root", str(tmp_path), "--check"])
+
+    assert exc.value.code == 0, "A compliant post-cutover row must pass --check"
+
+
+def test_check_exempts_pre_cutover_row_without_enum(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A row dated before the enum cutover is exempt, even with no enum prefix."""
+    _init_repo(tmp_path)
+    _write_calibration_log_with_retrospective(
+        tmp_path, "2026-08-01", "On target: ran smoothly, no follow-up needed"
+    )
+    _git(tmp_path, "add", ".ai-state")
+    _git(tmp_path, "commit", "-m", "chore: add calibration baseline")
+
+    mod = _load_module()
+    with pytest.raises(SystemExit) as exc:
+        mod.main(["--repo-root", str(tmp_path), "--check"])
+
+    assert exc.value.code == 0, "Rows predating the enum cutover are exempt from the requirement"
+
+
+def test_json_reports_enum_compliance_counts(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """--json includes an enum_compliance block with new_rows/compliant/violations."""
+    _init_repo(tmp_path)
+    _write_calibration_log_with_retrospective(tmp_path, "2026-09-08", "not-a-real-enum value")
+    _git(tmp_path, "add", ".ai-state")
+    _git(tmp_path, "commit", "-m", "chore: add calibration baseline")
+
+    mod = _load_module()
+    with pytest.raises(SystemExit):
+        mod.main(["--repo-root", str(tmp_path), "--json"])
+
+    enum_compliance = json.loads(capsys.readouterr().out)["enum_compliance"]
+    assert enum_compliance["compliant"] is False
+    assert enum_compliance["new_rows"] == 1
+    assert len(enum_compliance["violations"]) == 1

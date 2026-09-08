@@ -11,6 +11,8 @@ import re
 import sys
 from pathlib import Path
 
+from _hook_utils import record_gate_fire
+
 # Source-of-truth for cleanup detection. hooks/cleanup_gate.sh mirrors a looser
 # variant of these patterns for the PreToolUse fast-path; Python remains
 # authoritative. Keep in sync when editing either side.
@@ -66,10 +68,18 @@ def main() -> None:
     if not _is_cleanup_command(command):
         return
 
-    cwd = payload.get("cwd", ".")
+    decision = _check_and_warn(payload.get("cwd", "."))
+    try:
+        record_gate_fire("promote_learnings", decision, session_id=payload.get("session_id", ""))
+    except Exception:
+        pass
+
+
+def _check_and_warn(cwd: str) -> str:
+    """Warn about unpromoted LEARNINGS.md entries about to be deleted. Returns the decision."""
     learnings = _find_learnings(cwd)
     if not learnings:
-        return
+        return "pass"
 
     files_list = "\n".join(f"- {path}: {count} entries" for path, count in learnings)
     output = {
@@ -85,6 +95,7 @@ def main() -> None:
         }
     }
     print(json.dumps(output))
+    return "warn"
 
 
 if __name__ == "__main__":

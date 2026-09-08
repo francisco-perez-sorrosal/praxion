@@ -6,10 +6,12 @@ Public surface:
     CorpusReader — resolves an invocation target to an immutable Corpus
     Family1PipelineOutcomeFidelity — Family 1 checks (pipeline-outcome fidelity)
     Family2BehavioralContractAdherence — Family 2 checks (BC adherence)
+    SeededScenarioFamily — seeded scenario corpus checks (P0.7)
+    Family5TokenBudgetStability — token-budget surface stability collector (P0.7)
     Orchestrator — wires families → ReportWriter → Report
     ReportWriter — writes per-run report + appends to frozen-column log
     run_eval     — thin composition function: resolves corpus, selects judge,
-                   runs both families, writes report, returns Report
+                   runs all families, writes report, returns Report
 
 SDK imports are lazy — importing this package never fails even when
 ``claude_agent_sdk`` or ``anthropic`` are absent.  They are only imported
@@ -28,7 +30,14 @@ from praxion_evals.harness.families.family1_pipeline_fidelity import (
 from praxion_evals.harness.families.family2_bc_adherence import (
     Family2BehavioralContractAdherence,
 )
+from praxion_evals.harness.families.family5_token_budget_stability import (
+    Family5TokenBudgetStability,
+)
+from praxion_evals.harness.families.seeded_scenarios import (
+    SeededScenarioFamily,
+)
 from praxion_evals.harness.judge_client import (
+    CachingJudgeClient,
     JudgeClient,
     NullJudgeClient,
     select_judge_client,
@@ -38,31 +47,39 @@ from praxion_evals.harness.report_writer import ReportWriter
 from praxion_evals.harness.schemas import (
     CheckResult,
     Corpus,
+    JudgeUsage,
     JudgeVerdict,
     Report,
 )
 from praxion_evals.harness.task_manifest import PipelineTier
 
 __all__ = [
+    "CachingJudgeClient",
     "CheckResult",
     "Corpus",
     "CorpusReader",
     "Family",
     "Family1PipelineOutcomeFidelity",
     "Family2BehavioralContractAdherence",
+    "Family5TokenBudgetStability",
     "JudgeClient",
+    "JudgeUsage",
     "JudgeVerdict",
     "NullJudgeClient",
     "Orchestrator",
     "PipelineTier",
     "Report",
     "ReportWriter",
+    "SeededScenarioFamily",
     "run_eval",
     "select_judge_client",
 ]
 
 # Default report output directory (relative to repo root / cwd).
 _DEFAULT_OUTPUT_DIR = Path(".ai-state") / "praxion_eval_reports"
+
+# Committed, cross-run verdict cache — see CachingJudgeClient.
+_JUDGE_CACHE_RELATIVE = Path(".ai-state") / "praxion_eval_reports" / "judge_cache.jsonl"
 
 
 def run_eval(
@@ -73,14 +90,24 @@ def run_eval(
     task_slug: str | None = None,
     pipeline_tier: PipelineTier | None = None,
     mechanical_only: bool = False,
+    no_judge_cache: bool = False,
 ) -> Report:
-    """Run both eval families against a target and return the written Report.
+    """Run all eval families against a target and return the written Report.
 
     Composition:
         CorpusReader(repo_root).resolve(target, task_slug=…, pipeline_tier=…)
         → select_judge_client()  (or NullJudgeClient when mechanical_only)
-        → Orchestrator([Family1, Family2], output_dir).run(corpus, judge, …)
+        → Orchestrator(
+              [Family1, Family2, SeededScenarioFamily,
+               Family5TokenBudgetStability(repo_root=root)],
+              output_dir,
+          ).run(corpus, judge, …)
         → Report
+
+    Family5TokenBudgetStability is constructed with the resolved *root*
+    (rather than its own default) so a corpus pointed at a scratch directory
+    (tests) measures that scratch directory's own always-loaded surface —
+    never this repo's real committed baseline.
 
     Args:
         target: Invocation target — path, worktree name, git ref, or 'main'.
@@ -97,6 +124,9 @@ def run_eval(
                          families. No auth env vars are required in this mode
                          — a ``NullJudgeClient`` is wired in to surface any
                          family that accidentally calls ``judge.judge()``.
+        no_judge_cache: When True, bypass reading the committed verdict cache
+                        (fresh verdicts are still written to it). Ignored in
+                        mechanical-only mode, where no judge call is made.
 
     Returns:
         A populated Report with a non-empty ``report_path``.
@@ -105,11 +135,21 @@ def run_eval(
     out_dir = Path(output_dir) if output_dir is not None else root / _DEFAULT_OUTPUT_DIR
 
     corpus = CorpusReader(root).resolve(target, task_slug=task_slug, pipeline_tier=pipeline_tier)
-    judge: JudgeClient = NullJudgeClient() if mechanical_only else select_judge_client()
+    judge: JudgeClient
+    if mechanical_only:
+        judge = NullJudgeClient()
+    else:
+        judge = CachingJudgeClient(
+            select_judge_client(),
+            root / _JUDGE_CACHE_RELATIVE,
+            read_cache=not no_judge_cache,
+        )
 
     families: list[Family] = [
         Family1PipelineOutcomeFidelity(),
         Family2BehavioralContractAdherence(),
+        SeededScenarioFamily(),
+        Family5TokenBudgetStability(repo_root=root),
     ]
     orchestrator = Orchestrator(families=families, output_dir=out_dir)
     return orchestrator.run(corpus, judge, mechanical_only=mechanical_only)

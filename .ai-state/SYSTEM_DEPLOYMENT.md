@@ -159,7 +159,7 @@ Praxion has no traditional health-check endpoints. The Chronograph MCP HTTP daem
 |---|---|---|
 | task-chronograph-mcp | stderr | Claude Code error log; per-session |
 | Hooks | stderr | Claude Code displays on hook block (exit 2) |
-| Observations WAL | append-only file | `.ai-state/observations.jsonl` (written by `capture_session.py` + `capture_memory.py`; merge-driver reconciled) |
+| Observations WAL | append-only file | `.ai-state/observations.jsonl` (written by `capture_session.py` + `capture_observations.py`; merge-driver reconciled) |
 
 ### Service Level Indicators (if defined)
 

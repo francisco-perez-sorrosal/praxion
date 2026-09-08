@@ -648,6 +648,7 @@ EOF
 .ai-state/*.lock
 .ai-state/**/*.lock
 .ai-state/*.backup.json
+.ai-state/observations.jsonl
 .ai-state/observations.jsonl.1
 .claude/settings.local.json
 .claude/worktrees/

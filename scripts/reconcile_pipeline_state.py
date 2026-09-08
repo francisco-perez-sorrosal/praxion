@@ -590,6 +590,12 @@ def main(argv: list[str] | None = None) -> int:
         return 3
     state_root = Path(args.worktree_root).resolve() if args.worktree_root else repo_root
 
+    if not args.quiet and not (state_root / ".ai-state" / "observations.jsonl").exists():
+        sys.stderr.write(
+            "reconcile_pipeline_state: no local WAL -- Tier-2 correlation skipped, "
+            "Tier-1 (git diff + tests) verdicts unaffected\n"
+        )
+
     try:
         verdicts = reconcile(
             args.slug,

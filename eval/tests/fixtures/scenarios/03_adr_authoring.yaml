@@ -1,0 +1,68 @@
+scenario_id: adr-authoring
+description: >
+  A seeded architectural decision drafted as an ADR fragment. Mechanically,
+  a fragment tagged `category: architectural` must carry complete frontmatter
+  and a `## Disconfirmation` body section (adr-conventions.md).
+seeded_decision: >
+  Split the monolithic `capture_memory.py` hook into a writer module and a
+  BLOCKLIST-filter module because the two responsibilities changed for
+  different reasons (P0.4).
+adr_fragment: |
+  ---
+  id: dec-draft-9f3c1a2b
+  title: Split hook writer from event-filter responsibility
+  status: proposed
+  category: architectural
+  date: 2026-09-07
+  summary: Separate the observation writer from the tool-filter policy inside the PostToolUse hook.
+  tags: [observability, hooks, seeded-fixture]
+  made_by: agent
+  agent_type: systems-architect
+  dissent: Keeping both responsibilities in one file is simpler to trace in one read, but that simplicity does not survive the third policy addition.
+  ---
+
+  ## Context
+
+  `capture_memory.py` mixes two responsibilities that already change for
+  different reasons: how an observation is written to the WAL, and which
+  tool events are worth recording (BLOCKLIST policy). P0.4 adds a third
+  policy axis (path-only capture for Read/Grep/Glob), compounding the mix.
+
+  ## Decision
+
+  Extract the BLOCKLIST/event-filter policy into its own module; the writer
+  keeps only the append-to-WAL responsibility.
+
+  ## Considered Options
+
+  ### Option A — extract the filter module (chosen)
+  Pros: each module has one reason to change; the filter is unit-testable
+  without a filesystem.
+  Cons: one more import to track at the call site.
+
+  ### Option B — leave both in one file, add a comment boundary
+  Pros: no new file.
+  Cons: does not stop the next policy addition from re-entangling the two.
+
+  ## Consequences
+
+  Positive: filter policy changes (P0.4's Read/Grep/Glob un-blocklisting)
+  touch one small file instead of the writer. Negative: one more module to
+  discover when onboarding to the hook's behavior.
+
+  ## Disconfirmation
+
+  - Falsifier: if the writer and filter are shown to always change together
+    across the next 5 policy edits, the split adds indirection without
+    buying independence and should be reverted.
+  - Steelmanned runner-up: Option B is simpler to read in one pass for a
+    hook this small, and the file was under 150 lines before this decision.
+  - Reversal trigger: if a future hook consolidation pass merges all
+    PostToolUse hooks into one dispatcher, this split's module boundary
+    would need to be re-drawn at the dispatcher level instead.
+llm_rubric: >
+  Given the seeded decision and the drafted ADR fragment, judge whether
+  `category: architectural` is the correct classification against the
+  falsifier test in adr-conventions.md ("architectural iff it changes what
+  exists or what connects — name the component added, removed, or whose
+  responsibility moved").

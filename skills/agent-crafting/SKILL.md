@@ -146,12 +146,13 @@ Do **not** reach for a subagent for a quick targeted edit (spawn latency dwarfs 
 
 - **Keep an agent's tool list static for its whole session.** Changing `tools` mid-session invalidates the prompt cache at the `tools` level and everything after it (`system` + `messages` too) — a full cache rebuild, not a partial one, per Anthropic's cache invalidation hierarchy (see `claude-ecosystem`'s [platform-services.md § Cache Invalidation Hierarchy](../claude-ecosystem/references/platform-services.md#cache-invalidation-hierarchy)). Praxion's plugin agents already declare a fixed `tools:`/`disallowedTools:` allowlist per agent definition and never mutate it at runtime — this is validated practice under the cache model, not just cleanliness, per Anthropic's own Claude Code engineering write-up ("Lessons from building Claude Code: prompt caching is everything", Apr 2026).
 - **Agents cannot spawn agents.** Do not include `Agent` (or its `Task` alias) in tools. Chain agents from the main conversation instead.
-- **System prompt isolation.** Agents receive only their markdown body + basic env details, not the full Claude Code system prompt. They do **not** inherit:
+- **System prompt isolation.** Agents receive only their markdown body + basic env details, not the full Claude Code system prompt. Subagents **do** inherit the `claudeMd` surface — every `CLAUDE.md` file plus every symlinked always-loaded rule (measured 21,287 tokens). They do **not** inherit:
   - Skills from the parent context (must be listed in the `skills` field)
-  - Rules (`~/.claude/rules/` content is not injected into subagents)
-  - Parent CLAUDE.md content (project or user-level)
-  - Memory settings (must be set via the `memory` field)
+  - Hook-delivered rules (`install: hook-deliver` — `SessionStart` does not fire for subagents)
   - Parent's conversation history or context
+  - The full system prompt
+
+  Corollary: a token added to a symlinked always-loaded rule is multiplied by the pipeline's spawn count.
 - **Session loading.** Agents load at session start. Manually added files need a restart or `/agents`.
 - **Foreground**: Blocks main conversation; permission prompts pass through.
 - **Background**: Runs concurrently; permissions pre-approved; press **Ctrl+B** to background a running agent (or set `background: true`).

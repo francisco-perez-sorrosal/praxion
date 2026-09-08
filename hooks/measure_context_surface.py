@@ -3,10 +3,13 @@
 Fires on SessionStart. Async hook (async: true) -- never blocks the session.
 Exit 0 unconditionally.
 
-For each session, compute the byte size and approximate token count of the
-always-loaded context surface (CLAUDE.md files + all rules without `paths:`
-frontmatter, including the `install: hook-deliver` rules that live only in the
-plugin tree) and emit one observation to `.ai-state/observations.jsonl`.
+Delegates the actual measurement to `scripts.measure_token_budget.measure()` --
+the same function the commit-gate check calls -- so this hook can never report
+a different figure than the gate on the same tree by construction. Previously
+this hook carried its own file-glob + hardcoded divisor, which counted a wider
+(and wrong) file set: 14 files / 41,216 tokens here versus the gate's 9 files /
+24,542 tokens on an identical checkout. Importing `measure()` fixes the file
+set by reuse, not by patching the divisor.
 
 Future context audits become data-driven instead of one-off `wc` exercises:
 - Which rules earn their >30% session-relevance threshold? (count appearances)
@@ -21,7 +24,6 @@ from __future__ import annotations
 import fcntl
 import json
 import os
-import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,136 +31,21 @@ from pathlib import Path
 # Allow hook tests to import shared utilities without forcing repo-relative
 # layout on plugin-installed copies.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+# `measure_token_budget` lives in the sibling scripts/ tree -- same
+# cross-directory import precedent as hooks/remind_calibration.py.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from _hook_utils import DISABLE_OBSERVABILITY, is_disabled  # noqa: E402
 
-# -- Constants ----------------------------------------------------------------
-
-# Conservative bytes-per-token estimate for Markdown — matches the figure
-# documented in `rules/CLAUDE.md` (Token Budget section). Real usage with
-# Claude's tokenizer averages ~4.0 bytes/token; we use 3.6 to bias toward
-# over-reporting rather than under-reporting.
-BYTES_PER_TOKEN = 3.6
-
-# Frontmatter `paths:` key signals a path-scoped (NOT always-loaded) rule.
-# Match either inline list (`paths: [a, b]`) or block style (`paths:` followed
-# by indented `- item` lines).
-_PATHS_KEY = re.compile(r"^paths:\s*", re.MULTILINE)
-_FRONTMATTER_DELIMITER = "---"
-
-# Where rules live once installed. The plugin install symlinks the repo's
-# rules/ tree into ~/.claude/rules/, so this path works for both Praxion-the-
-# repo (where the symlink points back to ./rules/) and any onboarded project.
-_GLOBAL_RULES_DIR = Path.home() / ".claude" / "rules"
-_GLOBAL_CLAUDE_MD = Path.home() / ".claude" / "CLAUDE.md"
+# -- Observation emission -----------------------------------------------------
 
 
-# -- Frontmatter scanning -----------------------------------------------------
-
-
-def _has_paths_frontmatter(content: str) -> bool:
-    """Return True if the file's YAML frontmatter declares a `paths:` key.
-
-    Path-scoped rules load only when matching files are accessed, so they do
-    not contribute to the always-loaded surface.
-    """
-    lines = content.split("\n", 32)
-    if not lines or lines[0].strip() != _FRONTMATTER_DELIMITER:
-        return False
-    # Walk frontmatter lines until the closing delimiter.
-    for line in lines[1:]:
-        if line.strip() == _FRONTMATTER_DELIMITER:
-            return False
-        if _PATHS_KEY.match(line):
-            return True
-    return False
-
-
-def _is_rule_README(path: Path) -> bool:  # noqa: N802 — README is a filename, not a word — lowercasing it loses the distinction
-    """README.md files in the rules directory are documentation, not rules.
-
-    They are not symlinked into ~/.claude/rules/ by the installer, so they
-    do not count toward the always-loaded surface.
-    """
-    return path.name == "README.md"
-
-
-# -- Surface measurement ------------------------------------------------------
-
-
-def _collect_always_loaded(
-    project_claude_md: Path,
-    global_claude_md: Path,
-    rules_dir: Path,
-    plugin_rules_dir: Path | None = None,
-) -> tuple[int, list[dict]]:
-    """Return (total_bytes, [file_record, ...]) for every always-loaded file.
-
-    file_record schema: {"path": str, "bytes": int, "type": "claude_md"|"rule"}.
-    Missing files are skipped silently — graceful degradation across hosts
-    where the global config or rules tree may be absent.
-
-    Rules are collected from the union of `rules_dir` (the symlink-installed
-    rules under ~/.claude/rules/) and `plugin_rules_dir` (the plugin's own
-    rules/ tree). The plugin tree additionally holds `install: hook-deliver`
-    rules (agent-model-routing, git-conventions) that are NOT
-    symlinked into ~/.claude/rules/ — without scanning it those always-loaded
-    rules were silently undercounted. Entries are deduplicated
-    by resolved path so a symlink and its target count once. The result is an
-    upper bound on the *installable* surface; per-project suppression (memory
-    MCP disabled, or the project rules blacklist) may inject fewer at runtime.
-    """
-    records: list[dict] = []
-    total = 0
-
-    for path, kind in (
-        (project_claude_md, "claude_md_project"),
-        (global_claude_md, "claude_md_global"),
-    ):
-        try:
-            size = path.stat().st_size
-        except OSError:
-            continue
-        records.append({"path": str(path), "bytes": size, "type": kind})
-        total += size
-
-    seen: set[str] = set()
-    for base in (rules_dir, plugin_rules_dir):
-        if base is None or not base.is_dir():
-            continue
-        for path in sorted(base.rglob("*.md")):
-            if not path.is_file() or _is_rule_README(path):
-                continue
-            try:
-                resolved = str(path.resolve())
-            except OSError:
-                resolved = str(path)
-            if resolved in seen:
-                continue
-            try:
-                content = path.read_text(encoding="utf-8")
-            except OSError:
-                continue
-            if _has_paths_frontmatter(content):
-                continue
-            seen.add(resolved)
-            size = len(content.encode("utf-8"))
-            records.append({"path": str(path), "bytes": size, "type": "rule"})
-            total += size
-
-    return total, records
-
-
-def _build_summary(total_bytes: int, file_count: int) -> str:
+def _build_summary(tokens: int, bytes_: int, file_count: int, basis: str) -> str:
     """One-line human-readable summary for the observation row."""
-    tokens = int(total_bytes / BYTES_PER_TOKEN)
     return (
         f"Always-loaded surface: {tokens:,} tokens "
-        f"({total_bytes:,} bytes) across {file_count} files"
+        f"({bytes_:,} bytes) across {file_count} files [{basis}]"
     )
-
-
-# -- Observation emission -----------------------------------------------------
 
 
 def _append_observation(obs_path: Path, observation: dict) -> None:
@@ -186,6 +73,18 @@ def main() -> None:
         return
 
     try:
+        # Imported here, not at module scope: an import failure (broken
+        # sys.path, a plugin-cache layout where scripts/ isn't a sibling, a
+        # bad import inside measure_token_budget.py itself) must be caught by
+        # this hook's own fail-open contract ("Exit 0 unconditionally.",
+        # module docstring) -- a module-level import raises before the
+        # __main__ guard's `except Exception: pass` is ever reached.
+        from measure_token_budget import measure
+    except Exception as exc:  # noqa: BLE001 - fail-open on any import failure
+        print(f"measure_context_surface: import failed -- {exc}", file=sys.stderr)
+        return
+
+    try:
         payload = json.loads(sys.stdin.read())
     except (json.JSONDecodeError, OSError):
         return
@@ -199,17 +98,11 @@ def main() -> None:
     if not ai_state_dir.exists():
         return  # graceful degradation: no state dir means no project to measure
 
-    project_claude_md = Path(cwd) / "CLAUDE.md"
-    plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT", "")
-    plugin_rules_dir = Path(plugin_root) / "rules" if plugin_root else None
-    total_bytes, records = _collect_always_loaded(
-        project_claude_md, _GLOBAL_CLAUDE_MD, _GLOBAL_RULES_DIR, plugin_rules_dir
-    )
+    report = measure(Path(cwd), api_key=os.environ.get("ANTHROPIC_API_KEY"))
 
-    if total_bytes == 0:
+    if report["bytes"] == 0:
         return  # nothing measurable — skip silently
 
-    file_paths = [r["path"] for r in records]
     session_id = payload.get("session_id", "")
 
     observation = {
@@ -220,8 +113,10 @@ def main() -> None:
         "project": Path(cwd).name,
         "event_type": "context_surface_measurement",
         "tool_name": None,
-        "summary": _build_summary(total_bytes, len(records)),
-        "file_paths": file_paths,
+        "summary": _build_summary(
+            report["tokens"], report["bytes"], len(report["files"]), report["basis"]
+        ),
+        "file_paths": report["files"],
         "outcome": None,
         "classification": None,
     }

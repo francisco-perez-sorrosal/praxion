@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "listing_ceiling": 11336,
+  "listing_ceiling_basis": "tokenizer",
+  "samples": [
+    {
+      "date": "2026-09-07",
+      "governed_tokens": 24547,
+      "governed_bytes": 93522,
+      "basis": "tokenizer"
+    }
+  ]
+}

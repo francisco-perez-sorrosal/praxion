@@ -299,9 +299,10 @@ Skip this phase entirely in standalone mode.
    - **PASS** -- all acceptance criteria met, no FAIL findings
    - **PASS WITH FINDINGS** -- all acceptance criteria met, only WARN findings
    - **FAIL** -- any acceptance criterion not met, FAIL findings in convention compliance, or any requirement in the traceability matrix shows FAIL
-3. Write `VERIFICATION_REPORT.md` to `.ai-work/<task-slug>/`
-4. Include the disclaimer: "Automated review complements but does not replace human judgment."
-5. Include the merge-to-LEARNINGS reminder: "Before deleting this report, merge recurring patterns and systemic quality issues into LEARNINGS.md. Tag merged entries with `**[verifier]**` for attribution."
+3. **Calibration Verdict** (pipeline mode, Standard/Full tier only): fill the report's `## Calibration Verdict` section with the required Retrospective enum (`correct` / `over-calibrated` / `under-calibrated`) plus a one-line evidence clause citing a measurable from the plan or diff (spawn count, a token figure, artifact count, or a mid-task re-tier event) -- you read the finished plan and diff and did not select the tier, so judge independently rather than deferring to the plan's own framing. The orchestrator copies this verdict into `.ai-state/calibration_log.md`'s Retrospective cell rather than authoring its own. Skip this sub-step outside pipeline mode or below Standard tier.
+4. Write `VERIFICATION_REPORT.md` to `.ai-work/<task-slug>/`
+5. Include the disclaimer: "Automated review complements but does not replace human judgment."
+6. Include the merge-to-LEARNINGS reminder: "Before deleting this report, merge recurring patterns and systemic quality issues into LEARNINGS.md. Tag merged entries with `**[verifier]**` for attribution."
 
 ### Phase 12.5 — Rework Manifest Emission
 

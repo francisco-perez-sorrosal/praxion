@@ -110,10 +110,28 @@ Named consumers: the sentinel's pipeline-dimension pairing check and
 `scripts/reconcile_pipeline_state.py`, both of which currently re-derive the
 pairing by scanning the whole file and report an unpaired stop as a failure
 rather than as an unobserved start.
+
+Committed per-session summary (`observations_summary.jsonl`, dec-draft-66cd5bb6)
+----------------------------------------------------------------------------
+The raw WAL above is gitignored (P0.5) so a fresh clone carries no history at
+all. Every `session_stop` event upserts one compact row into a second,
+**committed** file, `.ai-state/observations_summary.jsonl`, keyed by
+`session_id`. "Upsert" matters because `Stop` fires once per top-level turn,
+not once per CLI session -- the same `session_id` recurs many times, and each
+firing simply overwrites that session's row with a fresher rollup rather than
+appending a duplicate.
+
+The row is a rollup of *this session's local WAL rows as of this Stop*, never
+a claim that the pipeline itself is complete: a background subagent the
+harness has not yet reported back (see the suspension-backfill section above)
+means real work can still be in flight that this row cannot see. Its own
+`complete` field says so explicitly, rather than leaving a reader to infer
+completeness from the row's mere existence.
 """
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import re
@@ -166,6 +184,18 @@ TRANSCRIPT_TAIL_BYTES = 1024 * 1024  # 1 MiB
 # Outcomes a synthetic suspension stop can carry in its `outcome` field.
 OUTCOME_TURN_LIMIT = "turn-limit"
 OUTCOME_STOPPED = "stopped"
+
+# The committed per-session summary (see module docstring). Upserted, never
+# appended-to, at every `session_stop`.
+SUMMARY_FILENAME = "observations_summary.jsonl"
+
+# Event types the summary aggregates by count. An explicit, narrow set --
+# not every event_type -- so the summary stays the "compact row" P0.5
+# promised rather than a second copy of the raw WAL.
+_SPAWN_EVENT_TYPE = "agent_start"
+_STOP_EVENT_TYPE = "agent_stop"
+_TOOL_EVENT_TYPE = "tool_use"
+_GATE_FIRE_EVENT_TYPE = "gate_fire"
 
 # Bound on the lookup read. The WAL rotates at 10 MiB (_hook_utils), and this
 # hook runs on every subagent boundary, so the lookup reads a tail window rather
@@ -301,6 +331,116 @@ def resolve_agent_id(payload: dict) -> str:
     return session_id or UNKNOWN_AGENT_ID
 
 
+def _duration_ms(started_at: str, ended_at: str) -> int | None:
+    """Return the millisecond span between two ISO-8601 timestamps, or None.
+
+    Malformed or missing timestamps degrade to None -- the caller (a summary
+    row or an agent_stop row) is still useful without a duration.
+    """
+    try:
+        start = datetime.fromisoformat(started_at)
+        end = datetime.fromisoformat(ended_at)
+    except (TypeError, ValueError):
+        return None
+    return int((end - start).total_seconds() * 1000)
+
+
+# The subagent-usage fields an ``agent_stop`` row gains once its transcript
+# parses -- named once here so build_observation's degrade-to-None path and
+# the summary rollup's per-agent-type sum (_tokens_by_agent_type) share one
+# list instead of two independently-maintained ones.
+TOKEN_USAGE_FIELDS = ("tokens_in", "tokens_out", "cache_read", "cache_create")
+
+# Maps each row field above to the `message.usage` key it sums, in the same
+# order -- built once so the per-line loop in _sum_subagent_transcript below
+# does no per-iteration tuple construction.
+_USAGE_KEY_BY_FIELD = dict(
+    zip(
+        TOKEN_USAGE_FIELDS,
+        ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"),
+        strict=True,
+    )
+)
+
+
+def _sum_subagent_transcript(payload: dict) -> dict[str, int | str | None]:
+    """Recover token usage, model, and duration from a SubagentStop transcript.
+
+    Reads ``payload["transcript_path"]`` line by line -- the file can run
+    100+ MiB, so it is streamed rather than loaded whole -- and sums
+    ``message.usage`` across every ``assistant`` line. A line carrying its own
+    ``agentId`` is counted only when it matches this stop's ``agent_id``
+    (defensive against a transcript shared across agents via sidechain
+    markers; every real transcript inspected so far uses one agent per file
+    and omits the field entirely -- see LEARNINGS.md). ``model`` is taken from
+    the last matching line; ``duration_ms`` spans the first to the last
+    matching line's timestamp.
+
+    A missing file, an unreadable path, or a transcript with no matching
+    assistant line degrades every field to None -- this is a best-effort
+    enrichment of an already-written row, never a reason to fail the stop.
+    A malformed individual line is skipped, not fatal to the rest of the scan.
+    """
+    fields: dict[str, int | str | None] = dict.fromkeys(TOKEN_USAGE_FIELDS)
+    fields["duration_ms"] = None
+    fields["model"] = None
+
+    transcript_path = str(payload.get("transcript_path") or "")
+    if not transcript_path:
+        return fields
+    agent_id = str(payload.get("agent_id") or "").strip()
+
+    totals = dict.fromkeys(TOKEN_USAGE_FIELDS, 0)
+    model: str | None = None
+    first_ts: str | None = None
+    last_ts: str | None = None
+    matched = False
+    try:
+        # errors="replace": a single undecodable byte must degrade one line,
+        # never drop the whole agent_stop row (light-review 2, item 1).
+        with open(transcript_path, encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+                if not isinstance(row, dict) or row.get("type") != "assistant":
+                    continue
+                row_agent_id = row.get("agentId")
+                if row_agent_id is not None and agent_id and str(row_agent_id) != agent_id:
+                    continue
+                message = row.get("message")
+                if not isinstance(message, dict):
+                    continue
+                try:
+                    usage = message.get("usage") or {}
+                    if isinstance(usage, dict):
+                        for field, usage_key in _USAGE_KEY_BY_FIELD.items():
+                            totals[field] += int(usage.get(usage_key) or 0)
+                    if message.get("model"):
+                        model = str(message["model"])
+                except (TypeError, ValueError):
+                    continue  # this line's numbers are unusable; keep scanning
+                timestamp = row.get("timestamp")
+                if timestamp:
+                    first_ts = first_ts or str(timestamp)
+                    last_ts = str(timestamp)
+                matched = True
+    except OSError:
+        return fields
+
+    if not matched:
+        return fields
+    fields.update(totals)
+    fields["model"] = model
+    if first_ts and last_ts:
+        fields["duration_ms"] = _duration_ms(first_ts, last_ts)
+    return fields
+
+
 def build_summary(event_type: str, payload: dict, agent_type: str) -> str:
     """Build a human-readable summary for lifecycle events."""
     if event_type == "session_start":
@@ -363,7 +503,162 @@ def build_observation(payload: dict, event_type: str, obs_path: Path | None = No
     }
     if event_type == "agent_stop":
         row["stop_source"] = STOP_SOURCE_HOOK
+        row.update(_sum_subagent_transcript(payload))
     return row
+
+
+# ---------------------------------------------------------------------------
+# Committed per-session summary -- see module docstring's
+# "Committed per-session summary" section for why this upserts rather than
+# appends.
+# ---------------------------------------------------------------------------
+
+
+def _read_jsonl_rows(path: Path) -> list[dict]:
+    """Return every parsable JSON object in a JSONL file, one per line.
+
+    Used both for the full-session WAL scan below and for reading the
+    existing summary rows before an upsert. Any OSError (missing file -- the
+    fresh-clone shape P0.5 creates for the raw WAL) degrades to an empty
+    list; a torn or malformed line is skipped rather than raised.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    rows: list[dict] = []
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if isinstance(row, dict):
+            rows.append(row)
+    return rows
+
+
+def _count_by(rows: list[dict], event_type: str, key: str) -> dict[str, int]:
+    """Return ``{value: count}`` for ``key`` across rows matching ``event_type``."""
+    counts: dict[str, int] = {}
+    for row in rows:
+        if row.get("event_type") != event_type:
+            continue
+        value = str(row.get(key) or "").strip()
+        if not value:
+            continue
+        counts[value] = counts.get(value, 0) + 1
+    return counts
+
+
+def _tokens_by_agent_type(rows: list[dict]) -> dict[str, dict[str, int]]:
+    """Sum each ``agent_stop`` row's token-usage fields per ``agent_type``.
+
+    An agent_type contributes only from rows where at least one usage field
+    is populated (Step 10's transcript parse succeeded) -- an agent_type with
+    no usage data anywhere in the session is absent from the result, not
+    reported as an all-zero row.
+    """
+    totals: dict[str, dict[str, int]] = {}
+    for row in rows:
+        if row.get("event_type") != _STOP_EVENT_TYPE:
+            continue
+        if not any(row.get(field) is not None for field in TOKEN_USAGE_FIELDS):
+            continue
+        agent_type = str(row.get("agent_type") or "").strip()
+        if not agent_type:
+            continue
+        bucket = totals.setdefault(agent_type, dict.fromkeys(TOKEN_USAGE_FIELDS, 0))
+        for field in TOKEN_USAGE_FIELDS:
+            bucket[field] += int(row.get(field) or 0)
+    return totals
+
+
+def build_session_summary(session_rows: list[dict], payload: dict, ended_at: str) -> dict:
+    """Assemble one committed summary row from this session's local WAL rows.
+
+    ``session_rows`` is every raw-WAL row already filtered to this
+    ``session_id``. The result is a rollup of what this session recorded
+    *locally* by the time this Stop fired -- never a claim that the pipeline
+    itself is complete (see module docstring). ``tokens_by_agent_type`` sums
+    each `agent_stop` row's usage fields per agent_type (empty for a row
+    whose transcript parse failed); ``gate_fire_counts`` stays empty until
+    gates emit `gate_fire` rows -- it is counted here defensively (the
+    aggregation is generic over event_type/key) so no further change to this
+    function is needed once that field exists.
+    """
+    session_id = payload.get("session_id", "")
+    timestamps = [str(r["timestamp"]) for r in session_rows if r.get("timestamp")]
+    started_at = min(timestamps) if timestamps else ended_at
+
+    started_agent_ids = {
+        r.get("agent_id") for r in session_rows if r.get("event_type") == _SPAWN_EVENT_TYPE
+    }
+    stopped_agent_ids = {
+        r.get("agent_id") for r in session_rows if r.get("event_type") == _STOP_EVENT_TYPE
+    }
+    models = sorted({str(r["model"]) for r in session_rows if r.get("model")})
+
+    return {
+        "session_id": session_id,
+        "started_at": started_at,
+        "ended_at": ended_at,
+        "spawns_by_agent_type": _count_by(session_rows, _SPAWN_EVENT_TYPE, "agent_type"),
+        "tool_calls_by_tool": _count_by(session_rows, _TOOL_EVENT_TYPE, "tool_name"),
+        "tokens_by_agent_type": _tokens_by_agent_type(session_rows),
+        "duration_ms": _duration_ms(started_at, ended_at),
+        "models": models,
+        "gate_fire_counts": _count_by(session_rows, _GATE_FIRE_EVENT_TYPE, "hook"),
+        # A background subagent the harness has not yet reported back leaves
+        # a start with no matching stop -- this session's row cannot see
+        # that work land, so it says so rather than implying completeness.
+        "complete": started_agent_ids.issubset(stopped_agent_ids),
+    }
+
+
+def _write_summary_rows(summary_path: Path, rows: list[dict]) -> None:
+    """Rewrite ``summary_path`` with exactly ``rows``, one JSON object per line.
+
+    Locked the same way ``append_observation`` locks the raw WAL, so a
+    concurrent Stop from another session cannot interleave a torn write.
+    """
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = summary_path.parent / "observations_summary.lock"
+    lock_path.touch(exist_ok=True)
+    # Atomic replace: write a sibling temp file and rename it over the committed
+    # artifact, so a kill between open and flush (hook timeout, SIGKILL, full
+    # disk) can never leave the rollup truncated or empty. The lock serialises
+    # writers; the rename makes each write all-or-nothing.
+    tmp_path = summary_path.with_name(summary_path.name + ".tmp")
+    with open(lock_path, "w") as lock_fd:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                for row in rows:
+                    f.write(json.dumps(row, separators=(",", ":")) + "\n")
+                f.flush()
+            tmp_path.replace(summary_path)
+        finally:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            if tmp_path.exists():
+                tmp_path.unlink()
+
+
+def _upsert_session_summary(summary_path: Path, row: dict) -> None:
+    """Write ``row`` into the committed summary, replacing any prior row for
+    the same ``session_id``.
+
+    `Stop` fires once per top-level turn, not once per CLI session, so the
+    same `session_id` recurs many times over a session's life. Appending on
+    every firing would grow the file unboundedly and leave every entry but
+    the last stale; upserting keeps exactly one row per session_id, always
+    the freshest rollup.
+    """
+    session_id = row.get("session_id", "")
+    rows = [r for r in _read_jsonl_rows(summary_path) if r.get("session_id") != session_id]
+    rows.append(row)
+    _write_summary_rows(summary_path, rows)
 
 
 def _read_transcript_tail(transcript_path: str, max_bytes: int = TRANSCRIPT_TAIL_BYTES) -> str:
@@ -529,9 +824,22 @@ def main() -> None:
         return  # graceful degradation
 
     obs_path = ai_state_dir / "observations.jsonl"
-    append_observation(obs_path, build_observation(payload, event_type, obs_path))
+    observation = build_observation(payload, event_type, obs_path)
+    append_observation(obs_path, observation)
     if event_type == "session_stop":
         _record_suspended_subagent_stops(obs_path, payload)
+        try:
+            session_id = payload.get("session_id", "")
+            session_rows = [
+                r for r in _read_jsonl_rows(obs_path) if r.get("session_id") == session_id
+            ]
+            summary_row = build_session_summary(session_rows, payload, observation["timestamp"])
+            _upsert_session_summary(ai_state_dir / SUMMARY_FILENAME, summary_row)
+        except Exception:
+            # The summary is a rollup, not the ground truth (the raw WAL
+            # above already wrote successfully) -- a failure here must
+            # never propagate past this hook's own fail-open contract.
+            pass
 
 
 if __name__ == "__main__":

@@ -1,13 +1,9 @@
 """PostToolUse hook: capture tool events as append-only observations.
 
-LEGACY FILENAME (retained for hook-registration stability). This is an
-*observability* hook — it appends a JSONL line to `.ai-state/observations.jsonl`,
-not curated memory. The `capture_memory` name predates dec-225's removal of the
-in-house memory subsystem; it is kept because the filename is referenced from
-`hooks/hooks.json`, the plugin manifest, and the Codex bridge generator, and a
-rename would churn all of those for no behavioral gain. If a future change
-touches those registration sites anyway, rename to `capture_observations.py`
-then. Functionally this is the observations-WAL writer (see dec-248).
+This is an *observability* hook — it appends a JSONL line to
+`.ai-state/observations.jsonl`, not curated memory (the in-house memory
+subsystem it predates was removed per dec-225). Functionally this is the
+observations-WAL writer (see dec-248).
 
 Extracts structured fields using pattern matching (no LLM calls).
 Appends a single JSONL line to .ai-state/observations.jsonl.
@@ -25,12 +21,11 @@ from pathlib import Path
 
 from _hook_utils import DISABLE_OBSERVABILITY, append_observation, is_disabled
 
-# Tools that generate too much noise to capture
+# Tools that generate too much noise to capture. Read/Glob/Grep are
+# deliberately absent -- they are recorded (path + pattern only, never file
+# content or match text; see extract_file_paths/build_summary).
 BLOCKLIST = frozenset(
     {
-        "Read",
-        "Glob",
-        "Grep",
         "TodoRead",
         "TodoWrite",
         "TaskList",

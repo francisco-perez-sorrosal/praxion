@@ -15,7 +15,7 @@ import re
 import subprocess
 import sys
 
-from _hook_utils import is_disabled
+from _hook_utils import is_disabled, record_gate_fire
 
 GIT_COMMIT_RE = re.compile(r"git\s+commit")
 _HACKATHON_FLAG = "PRAXION_HACKATHON_MODE"
@@ -159,24 +159,32 @@ def main():
     if is_disabled(_HACKATHON_FLAG):
         return
 
+    decision = _check_and_warn()
+    try:
+        record_gate_fire("remind_adr", decision, session_id=payload.get("session_id", ""))
+    except Exception:
+        pass
+
+
+def _check_and_warn() -> str:
+    """Warn when staged architectural files carry no ADR. Returns the gate's decision."""
     staged_files = _staged_files()
     if not staged_files:
-        return
+        return "pass"
 
     architectural_files = [f for f in staged_files if _matches_architectural_pattern(f)]
     if not architectural_files:
-        return
+        return "pass"
 
     # Check if an ADR was touched (staged or recently committed)
-    if _has_adr_file_in_staged(staged_files):
-        return
-    if _has_recent_adr_commit():
-        return
+    if _has_adr_file_in_staged(staged_files) or _has_recent_adr_commit():
+        return "pass"
 
     # Architectural files changed without an ADR
     _log("Architectural files modified without an ADR.")
     _log(f"  Changed: {', '.join(architectural_files)}")
     _log("  Consider creating one in .ai-state/decisions/")
+    return "warn"
 
 
 if __name__ == "__main__":

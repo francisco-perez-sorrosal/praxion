@@ -21,6 +21,7 @@ import re
 import subprocess
 import sys
 
+from _hook_utils import record_gate_fire
 from _lang_tools import LANG_TOOLS, resolve_rust_edition, staged_files
 
 GIT_COMMIT_RE = re.compile(r"git\s+commit")
@@ -157,8 +158,18 @@ def main():
 
     python_blocked = _check_staged_python_files()
     rust_blocked = _check_staged_rust_files()
+    blocked = python_blocked or rust_blocked
 
-    if python_blocked or rust_blocked:
+    try:
+        record_gate_fire(
+            "check_code_quality",
+            "block" if blocked else "pass",
+            session_id=payload.get("session_id", ""),
+        )
+    except Exception:
+        pass
+
+    if blocked:
         sys.exit(2)
 
 

@@ -13,7 +13,7 @@ pipeline_tier: standard
 re_affirms: dec-248
 affected_files:
   - hooks/_hook_utils.py
-  - hooks/capture_memory.py
+  - hooks/capture_observations.py
   - hooks/capture_session.py
   - scripts/reconcile_pipeline_state.py
   - .gitignore

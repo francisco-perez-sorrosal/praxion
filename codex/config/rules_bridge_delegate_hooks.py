@@ -134,7 +134,7 @@ from hook_runtime import run_canonical_hook
 def main() -> int:
     raw = sys.stdin.read()
     status = run_canonical_hook("hooks/send_event.py", raw)
-    capture_status = run_canonical_hook("hooks/capture_memory.py", raw)
+    capture_status = run_canonical_hook("hooks/capture_observations.py", raw)
     return capture_status or status
 
 

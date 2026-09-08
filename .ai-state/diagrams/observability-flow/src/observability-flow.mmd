@@ -12,7 +12,7 @@ graph LR
     Phoenix[(Arize Phoenix SQLite)]
 
     Hook -->|capture_session| Obs
-    Hook -->|capture_memory + trace context| Obs
+    Hook -->|capture_observations + trace context| Obs
     Hook -.->|send_event HTTP| ES
     ES --> OTel
     OTel -.->|OTLP| Phoenix

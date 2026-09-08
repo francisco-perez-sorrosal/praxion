@@ -88,7 +88,7 @@ _MINIMAL_PAYLOAD = {
 
 @pytest.mark.parametrize(
     "script",
-    ["send_event.py", "capture_session.py", "capture_memory.py"],
+    ["send_event.py", "capture_session.py", "capture_observations.py"],
 )
 def test_observability_hook_exits_silently_when_disabled(script):
     """With PRAXION_DISABLE_OBSERVABILITY set, each observability hook must
@@ -190,3 +190,57 @@ def test_canary_rotate_at_threshold_zero(tmp_path, monkeypatch):
         "rotation canary FAILED: <obs_path>.1 must exist when threshold is 0 "
         "— rotation is either absent or misconditioned"
     )
+
+
+# -- record_gate_fire() --------------------------------------------------------
+# Step 12: the shared helper every commit-gate script calls to record its own
+# pass/warn/block verdict. Covers the helper directly; per-gate call-site
+# wiring (the row actually lands, and a helper exception never changes a
+# gate's exit code) is covered by each gate's own test file.
+
+
+def test_record_gate_fire_appends_row_with_expected_fields(tmp_path, monkeypatch):
+    hu = _import_hook_utils()
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".ai-state").mkdir()
+
+    hu.record_gate_fire("check_token_ratchet", "block", "listing over ceiling", session_id="s1")
+
+    obs_path = tmp_path / ".ai-state" / "observations.jsonl"
+    rows = [json.loads(line) for line in obs_path.read_text(encoding="utf-8").splitlines()]
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["event_type"] == "gate_fire"
+    # Both keys carry the same value: `hook` (what Step 8's rollup groups by)
+    # and `tool_name` (the field every other observation event carries).
+    assert row["hook"] == "check_token_ratchet"
+    assert row["tool_name"] == "check_token_ratchet"
+    assert row["outcome"] == "block"
+    assert row["reason"] == "listing over ceiling"
+    assert row["session_id"] == "s1"
+    assert "timestamp" in row
+
+
+def test_record_gate_fire_noop_when_no_ai_state_dir(tmp_path, monkeypatch):
+    """No `.ai-state/` at cwd (e.g. a non-managed project) -> silent no-op."""
+    hu = _import_hook_utils()
+    monkeypatch.chdir(tmp_path)
+
+    hu.record_gate_fire("check_code_quality", "pass")
+
+    assert not (tmp_path / ".ai-state").exists()
+
+
+def test_record_gate_fire_swallows_append_observation_exception(tmp_path, monkeypatch):
+    """A defect in append_observation itself must never reach the gate."""
+    hu = _import_hook_utils()
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".ai-state").mkdir()
+
+    def _raise(*_args, **_kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(hu, "append_observation", _raise)
+
+    # Must not raise.
+    hu.record_gate_fire("check_code_quality", "pass")

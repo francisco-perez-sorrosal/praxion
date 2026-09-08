@@ -872,3 +872,118 @@ def test_i_am_era_driver_registration_is_repointed(project):
     assert r.returncode == 0, r.stderr
     current = _git(repo, "config", "--get", "merge.observations-jsonl.driver")
     assert str(live) in current
+
+
+# ---- observations WAL gitignore + untrack (surface 8) -----------------------
+
+_OLD_AI_ASSISTANTS_BLOCK = (
+    "# AI assistants\n"
+    ".ai-work/\n"
+    ".ai-state/*.lock\n"
+    ".ai-state/**/*.lock\n"
+    ".ai-state/*.backup.json\n"
+    ".ai-state/observations.jsonl.1\n"
+    ".claude/settings.local.json\n"
+    ".claude/worktrees/\n"
+    ".env\n"
+    ".env.*\n"
+    ".env.local\n"
+    "tmp/\n"
+)
+
+
+def test_wal_gitignore_check_reports_drift_without_mutating(project):
+    """A project onboarded before the WAL-untrack change carries the old block
+    with no `.ai-state/observations.jsonl` line -- --check must flag it and
+    leave the file byte-for-byte unchanged."""
+    repo, live = project["repo"], project["live"]
+    gitignore = repo / ".gitignore"
+    gitignore.write_text(_OLD_AI_ASSISTANTS_BLOCK)
+    before = gitignore.read_text()
+
+    r = _run(repo, live, "--check")
+
+    assert r.returncode == 1, r.stdout
+    assert "wal" in r.stdout.lower()
+    assert gitignore.read_text() == before
+
+
+def test_wal_gitignore_apply_appends_line_and_is_idempotent(project):
+    repo, live = project["repo"], project["live"]
+    gitignore = repo / ".gitignore"
+    gitignore.write_text(_OLD_AI_ASSISTANTS_BLOCK)
+
+    r = _run(repo, live)
+
+    assert r.returncode == 0, r.stderr
+    assert ".ai-state/observations.jsonl\n" in gitignore.read_text()
+    staged = _git(repo, "diff", "--cached", "--name-only")
+    assert ".gitignore" in staged
+
+    # Idempotent: a second apply makes no further change, --check exits 0.
+    after_first = gitignore.read_text()
+    second = _run(repo, live)
+    assert "Already current" in second.stdout, second.stdout
+    assert gitignore.read_text() == after_first
+    assert _run(repo, live, "--check").returncode == 0
+
+
+def test_wal_gitignore_absent_ai_assistants_block_is_a_clean_skip(project):
+    """A .gitignore with no onboarding-installed block at all (never onboarded
+    via this path) must not be touched -- only projects carrying the block get
+    the line appended."""
+    repo, live = project["repo"], project["live"]
+    gitignore = repo / ".gitignore"
+    gitignore.write_text("node_modules/\n")
+
+    r = _run(repo, live)
+
+    assert r.returncode == 0, r.stderr
+    assert gitignore.read_text() == "node_modules/\n"
+
+
+def test_wal_gitignore_absent_file_is_a_clean_skip(project):
+    repo, live = project["repo"], project["live"]
+    assert not (repo / ".gitignore").exists()
+
+    r = _run(repo, live)
+
+    assert r.returncode == 0, r.stderr
+    assert not (repo / ".gitignore").exists()
+
+
+def test_wal_tracked_file_untracked_on_apply_and_stays_on_disk(project):
+    """A project that onboarded before the WAL-untrack change may still have
+    observations.jsonl in its index; apply must drop it from the index while
+    leaving the file's on-disk content untouched -- never a destructive
+    delete."""
+    repo, live = project["repo"], project["live"]
+    (repo / ".gitignore").write_text(_OLD_AI_ASSISTANTS_BLOCK)
+    wal = repo / ".ai-state" / "observations.jsonl"
+    wal.write_text('{"event": "seed"}\n')
+    _git(repo, "add", ".ai-state/observations.jsonl")
+
+    r = _run(repo, live)
+
+    assert r.returncode == 0, r.stderr
+    tracked = subprocess.run(
+        ["git", "-C", str(repo), "ls-files", ".ai-state/observations.jsonl"],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert tracked == "", "observations.jsonl must be dropped from the index"
+    assert wal.read_text() == '{"event": "seed"}\n', "the file itself must survive on disk"
+
+
+def test_wal_sidecar_placement_is_a_noop(tmp_path: Path) -> None:
+    """Under sidecar placement .ai-state is already excluded wholesale via the
+    shadow symlink -- the [wal] surface must report a no-op rather than
+    attempting to touch a .gitignore the project repo does not own for this
+    purpose."""
+    stale = f"python3 {tmp_path / 'gone' / 'scripts' / 'merge_driver_observations.py'} %O %A %B"
+    project_root = _build_sidecar_project(tmp_path, stale_driver=stale)
+
+    r = _run(project_root, _REAL_SCRIPTS_ROOT)
+
+    assert r.returncode == 0, r.stderr
+    assert "sidecar placement" in r.stdout

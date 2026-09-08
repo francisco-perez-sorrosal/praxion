@@ -6,12 +6,36 @@ corpus; no mutation is needed after construction.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Literal
 
 # ---------------------------------------------------------------------------
 # JudgeClient output
 # ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class JudgeUsage:
+    """Token usage for one live judge() call.
+
+    ``None`` on JudgeVerdict/CheckResult when no usage is available: a
+    cached verdict (no call was made, so nothing was spent) or a judge
+    route that exposes no usage data (see AgentSdkJudgeClient).
+
+    Fields:
+        input_tokens: Non-cached input tokens billed for this call.
+        output_tokens: Output tokens generated.
+        cache_read_input_tokens: Input tokens served from a prompt cache
+            (billed at a discount — see judge_client.estimate_cost_usd()).
+        cache_creation_input_tokens: Input tokens written to a prompt cache
+            (billed at a premium — see judge_client.estimate_cost_usd()).
+    """
+
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_read_input_tokens: int = 0
+    cache_creation_input_tokens: int = 0
 
 
 @dataclass(frozen=True)
@@ -23,12 +47,18 @@ class JudgeVerdict:
         findings: Ordered prose observations from the judge.
         score: 0–100 confidence / quality score.
         raw: The raw structured-output dict from the underlying SDK call.
+        cached: True when this verdict was served from CachingJudgeClient's
+            verdict cache instead of a live judge call. A cached verdict
+            never carries usage (no call was made, so nothing was spent).
+        usage: Token usage for this call, or None (see JudgeUsage).
     """
 
     verdict: Literal["PASS", "WARN", "FAIL"]
     findings: tuple[str, ...]
     score: int
     raw: dict  # type: ignore[type-arg]
+    cached: bool = False
+    usage: JudgeUsage | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -50,6 +80,9 @@ class CheckResult:
         artifact_path: Path (relative to corpus root) of the artifact judged.
         findings: Ordered prose observations.
         score: 0–100 score; -1 when not applicable (mechanical checks).
+        usage: Token usage copied from the originating JudgeVerdict for an
+            ``llm``-kind check; None for mechanical/skip checks and for any
+            llm check whose verdict itself carried no usage.
     """
 
     check_name: str
@@ -58,6 +91,29 @@ class CheckResult:
     artifact_path: str
     findings: tuple[str, ...]
     score: int = -1
+    usage: JudgeUsage | None = None
+
+
+def sum_usage(check_results: Iterable[CheckResult]) -> JudgeUsage:
+    """Sum token usage across every judged CheckResult.
+
+    A CheckResult with no usage (mechanical check, cache hit, or a route
+    that exposed none) contributes zero — it is skipped, not an error.
+    """
+    input_tokens = output_tokens = cache_read = cache_creation = 0
+    for result in check_results:
+        if result.usage is None:
+            continue
+        input_tokens += result.usage.input_tokens
+        output_tokens += result.usage.output_tokens
+        cache_read += result.usage.cache_read_input_tokens
+        cache_creation += result.usage.cache_creation_input_tokens
+    return JudgeUsage(
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cache_read_input_tokens=cache_read,
+        cache_creation_input_tokens=cache_creation,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -141,15 +197,27 @@ class Report:
     Fields:
         corpus: The resolved corpus the families ran against.
         check_results: All CheckResult objects from all families, in order.
-        cost_usd_estimate: Rough LLM call cost; 0.0 when no LLM calls were made.
+        cost_usd_estimate: Rough LLM call cost estimated from summed usage
+            (see judge_client.estimate_cost_usd()); 0.0 when no LLM calls
+            were made; None when the judge model has no known price
+            ("unpriced" — see judge_client's price table).
         report_path: Absolute path to the written report file, or empty string
             if the report has not been written yet.
+        judge_calls: Total .judge() invocations across all families,
+            including cache hits.
+        judge_cache_hits: Subset of judge_calls served from
+            CachingJudgeClient's verdict cache (no network call made).
+        judge_workers: Configured worker-pool size for a judged loop
+            (see judge_client.judge_workers()).
     """
 
     corpus: Corpus
     check_results: tuple[CheckResult, ...]
-    cost_usd_estimate: float = 0.0
+    cost_usd_estimate: float | None = 0.0
     report_path: str = ""
+    judge_calls: int = 0
+    judge_cache_hits: int = 0
+    judge_workers: int = 0
 
     @property
     def pass_count(self) -> int:
@@ -187,7 +255,9 @@ __all__ = [
     "CheckResult",
     "Corpus",
     "EMPTY_CORPUS",
+    "JudgeUsage",
     "JudgeVerdict",
     "Report",
     "TaskArtifactVerdict",
+    "sum_usage",
 ]

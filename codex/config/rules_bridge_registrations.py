@@ -144,19 +144,6 @@ def render_hook_registrations() -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": command(
-                                "praxion-worktree-guard-pre-tool-use.py", project_root
-                            ),
-                            "timeout": 15,
-                            "statusMessage": "Praxion: checking worktree boundary",
-                        }
-                    ],
-                },
-                {
-                    "matcher": "Edit|MultiEdit|NotebookEdit|Write|apply_patch|ApplyPatch",
-                    "hooks": [
-                        {
-                            "type": "command",
                             "command": command("praxion-pre-tool-use.py", project_root),
                             "timeout": 30,
                             "statusMessage": "Praxion: routing file-scoped rules",

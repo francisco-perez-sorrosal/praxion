@@ -117,8 +117,6 @@ hooks/                               # Hook scripts (auto-discovered by Claude C
 ├── test_cleanup_gate.py
 ├── test_hook_utils.py
 ├── test_send_event.py
-├── test_worktree_guard.py
-└── worktree_guard.py
 .claude-plugin/                      # Claude Code plugin manifest
 ├── CLAUDE.md                        # Plugin config conventions (lazy loaded)
 ├── plugin.json
@@ -202,7 +200,6 @@ Four env-var flags let a downstream project disable Praxion hooks that cost toke
 |------|------------------|-------------|
 | `PRAXION_DISABLE_OBSERVABILITY` | `send_event.py`, `capture_session.py`, `capture_observations.py` | Disables chronograph telemetry and `observations.jsonl` writes. Zero prompt-token impact; saves process-spawn time and local I/O. |
 | `PRAXION_DISABLE_PROCESS_INJECT` | `inject_process_framing.py` (UserPromptSubmit) | Disables the compact process-framing reminder that reinforces the tier selector and behavioral contract. No prompt-token impact; use when you want Codex or Claude to stay silent on that reminder. |
-| `PRAXION_DISABLE_WORKTREE_GUARD` | `worktree_guard.py` (PreToolUse on `Write\|Edit\|NotebookEdit`) | Disables the cross-worktree write guard that blocks absolute paths resolving outside the session worktree into a sibling git tree. No prompt-token impact. Set when a workflow legitimately needs to edit the main repo or a sibling worktree from inside a linked worktree (rare; fail-open semantics mean the guard never wedges work — this flag silences the explicit block). |
 | `PRAXION_DISABLE_RULE_INJECTION` | `inject_rules.py` (SessionStart) | Escape hatch for the per-project rules disable mechanism. Skips the hook entirely, so the 2 hook-deliver rules (`agent-model-routing`, `vcs/git-conventions`) are absent from `additionalContext` AND no `claudeMdExcludes` reconciliation runs — existing entries from prior sessions remain in effect via Claude Code's native runtime, so previously-disabled symlinked rules stay disabled. Use when debugging the hook, or when a project wants hook-deliver rules out of all sessions without authoring a per-project disable list. See `docs/rules-taxonomy.md`. |
 
 Example `.claude/settings.json` for a project that wants Praxion skills/agents but **no observability telemetry**:

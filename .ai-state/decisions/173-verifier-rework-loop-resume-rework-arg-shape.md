@@ -12,7 +12,6 @@ branch: worktree-verifier-rework-loop
 pipeline_tier: standard
 affected_files:
   - commands/resume-rework.md
-  - hooks/inject_worktree_banner.py
 ---
 
 ## Context

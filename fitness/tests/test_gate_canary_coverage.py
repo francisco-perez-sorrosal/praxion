@@ -81,7 +81,6 @@ _SKIP_GATE_STEMS = frozenset(
     {
         "check_aac_golden_rule",  # test_check_aac_golden_rule.py has test_*_fails
         "check_squash_safety",  # test_check_squash_safety.py has test_erasure_flagged_*
-        "worktree_guard",  # test_worktree_guard.py has test_blocks_*
     }
 )
 

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "listing_ceiling": 8043,
+  "listing_ceiling": 9243,
   "listing_ceiling_basis": "tokenizer",
   "samples": [
     {
@@ -15,5 +15,6 @@
       "governed_bytes": 66991,
       "basis": "tokenizer"
     }
-  ]
+  ],
+  "listing_overrides_verified": false
 }

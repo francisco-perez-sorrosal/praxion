@@ -12,7 +12,6 @@ DELEGATE_KINDS = frozenset(
         "observability-post-tool-use",
         "process-framing-user-prompt-submit",
         "subagent-pre-tool-use",
-        "worktree-guard-pre-tool-use",
         "commit-quality-pre-tool-use",
         "commit-adr-pre-tool-use",
         "cleanup-learnings-pre-tool-use",
@@ -190,27 +189,6 @@ def _normalize_task_payload(raw: str) -> str:
 def main() -> int:
     raw = sys.stdin.read()
     return run_canonical_hook("hooks/inject_subagent_context.py", _normalize_task_payload(raw))
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
-"""
-    elif kind == "worktree-guard-pre-tool-use":
-        return """#!/usr/bin/env python3
-from __future__ import annotations
-
-import sys
-from pathlib import Path
-
-HELPER_DIR = Path(__file__).resolve().parents[1] / "praxion"
-sys.path.insert(0, str(HELPER_DIR))
-
-from hook_runtime import run_canonical_hook
-
-
-def main() -> int:
-    raw = sys.stdin.read()
-    return run_canonical_hook("hooks/worktree_guard.py", raw)
 
 
 if __name__ == "__main__":

@@ -787,3 +787,20 @@ def test_listing_counts_name_only_overrides_as_their_name(tmp_path):
     reading = measure_listing(repo)
     expected = len(b"Alpha does alpha things when alpha is asked.\nbeta")
     assert reading["bytes"] == expected
+
+
+def test_listing_ignores_overrides_when_not_honoured(tmp_path):
+    import json
+
+    from measure_token_budget import measure_listing
+
+    repo = _listing_repo(tmp_path)
+    (repo / ".claude" / "settings.json").write_text(
+        json.dumps({"skillOverrides": {"praxion:beta": "name-only"}})
+    )
+    assumed = measure_listing(repo, honor_overrides=True)["bytes"]
+    floor = measure_listing(repo, honor_overrides=False)["bytes"]
+    assert floor > assumed
+    assert floor == len(
+        b"Alpha does alpha things when alpha is asked.\nBeta description that is fairly long and descriptive."
+    )

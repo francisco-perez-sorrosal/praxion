@@ -84,7 +84,6 @@ def test_export_rules_bridge_writes_prefixed_hooks_and_manifest(tmp_path: Path):
     assert out_dir / "hooks" / "praxion-user-prompt-submit.py" in written
     assert out_dir / "hooks" / "praxion-process-framing-user-prompt-submit.py" in written
     assert out_dir / "hooks" / "praxion-subagent-pre-tool-use.py" in written
-    assert out_dir / "hooks" / "praxion-worktree-guard-pre-tool-use.py" in written
     assert out_dir / "hooks" / "praxion-pre-tool-use.py" in written
     assert out_dir / "hooks" / "praxion-format-python-post-tool-use.py" in written
     assert out_dir / "hooks" / "praxion-detect-duplication-post-tool-use.py" in written
@@ -132,7 +131,7 @@ def test_export_rules_bridge_writes_prefixed_hooks_and_manifest(tmp_path: Path):
     )
     assert "praxion-subagent-pre-tool-use.py" in pre_tool_commands
     assert "praxion-commit-memory-pre-tool-use.py" not in pre_tool_commands
-    assert "praxion-worktree-guard-pre-tool-use.py" in pre_tool_commands
+    assert "praxion-worktree-guard-pre-tool-use.py" not in pre_tool_commands  # retired by dec-379
     rule_group = next(
         group
         for group in hooks["PreToolUse"]

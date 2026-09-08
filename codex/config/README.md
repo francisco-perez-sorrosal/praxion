@@ -136,8 +136,6 @@ Generated surfaces:
   commit gates for quality, ADR reminders, and ID citation discipline
 - `.codex/hooks/praxion-cleanup-learnings-pre-tool-use.py` -- warns before
   cleanup deletes unpromoted `.ai-work/**/LEARNINGS.md` content
-- `.codex/hooks/praxion-worktree-guard-pre-tool-use.py` -- blocks
-  cross-worktree file writes from linked git worktrees
 - `.codex/hooks/praxion-pre-tool-use.py` -- routes file-scoped rules before
   mutating file tool activity
 - `.codex/hooks/praxion-observability-pre-tool-use.py` -- forwards tool-start

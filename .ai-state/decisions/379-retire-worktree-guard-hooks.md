@@ -11,6 +11,12 @@ agent_type: orchestrator
 branch: worktree-process-economy-phase1
 pipeline_tier: full
 affected_files:
+  - hooks/worktree_guard.py
+  - hooks/inject_worktree_banner.py
+  - hooks/test_worktree_guard.py
+  - hooks/test_inject_worktree_banner.py
+  - hooks/test_worktree_guard_subagent.py
+  - hooks/MANUAL_VERIFICATION.md
   - hooks/hooks.json
   - rules/swe/swe-agent-coordination-protocol.md
   - skills/software-planning/references/coordination-details.md

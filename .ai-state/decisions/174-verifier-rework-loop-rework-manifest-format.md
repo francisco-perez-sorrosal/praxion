@@ -13,7 +13,6 @@ pipeline_tier: standard
 affected_files:
   - agents/verifier.md
   - commands/resume-rework.md
-  - hooks/inject_worktree_banner.py
 ---
 
 ## Context

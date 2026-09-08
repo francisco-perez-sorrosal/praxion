@@ -1,7 +1,7 @@
 ---
 id: dec-163
 title: Worktree-orientation banner via a SessionStart hook
-status: accepted
+status: retired
 category: implementation
 date: 2026-05-12
 summary: Inject the worktree-context banner with a dedicated SessionStart hook (inject_worktree_banner.py) rather than a committed .claude/worktrees/CLAUDE.md or a worktree-local note file.
@@ -9,6 +9,7 @@ tags: [worktree, hooks, context-engineering, roadmap-p5]
 made_by: user
 branch: main
 pipeline_tier: lightweight
+retired_by: [dec-379]
 affected_files:
   - hooks/inject_worktree_banner.py
   - hooks/hooks.json
@@ -47,3 +48,7 @@ Use mechanism **(b)**: a dedicated `SessionStart` hook, `hooks/inject_worktree_b
 **Positive.** Closes the "lost agent writes to parent" hole for the most common case (a session opened inside a worktree) with native, low-maintenance machinery; the banner is self-announcing (injects itself only when relevant) so it costs zero always-loaded budget; the three cross-references (`swe-agent-coordination-protocol.md`, `coordination-details.md#pipeline-worktree-lifecycle`, `commands/merge-worktree.md`) make the banner+guard pair discoverable from the coordination docs.
 
 **Negative / follow-up.** Subagents spawned after a mid-session `EnterWorktree` do not receive the banner — only the `worktree_guard.py` block protects them. The obvious follow-up is to carry an abbreviated worktree note via `inject_subagent_context.py` (the existing `PreToolUse(Agent)` `updatedInput` hook); deferred to keep P5 surgical. Also: two worktree hooks now carry near-identical `git rev-parse` probing — acceptable at two copies, but a third worktree hook should trigger extraction of `hooks/_worktree_utils`.
+
+## Prior Decision
+
+Retired 2026-09-08 by dec-379, whose action removed this decision's subject (`hooks/inject_worktree_banner.py`, the SessionStart worktree-orientation banner) rather than deciding its question differently. The record is preserved; it re-opens if the subject returns.

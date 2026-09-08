@@ -75,7 +75,6 @@ def export_rules_bridge(repo_root: Path, out_dir: Path) -> list[Path]:
             "praxion-commit-id-citation-pre-tool-use.py",
             "commit-id-citation-pre-tool-use",
         ),
-        ("praxion-worktree-guard-pre-tool-use.py", "worktree-guard-pre-tool-use"),
         ("praxion-pre-tool-use.py", "pre-tool-use"),
         ("praxion-observability-pre-tool-use.py", "observability-pre-tool-use"),
         ("praxion-observability-post-tool-use.py", "observability-post-tool-use"),

@@ -1,7 +1,7 @@
 ---
 id: dec-180
 title: Subagent isolation in rework worktrees verified by controlled-test harness; ship blocked if hook does not fire
-status: accepted
+status: retired
 category: architectural
 date: 2026-05-14
 summary: Add a controlled-test harness that spawns a subagent inside a rework worktree session, has it attempt an Edit outside the worktree, and asserts worktree_guard.py blocks the call. If the test fails, the rework feature does not ship — the test pass IS the load-bearing precondition for the rework loop's safety invariant.
@@ -10,6 +10,7 @@ made_by: agent
 agent_type: systems-architect
 branch: worktree-verifier-rework-loop
 pipeline_tier: standard
+retired_by: [dec-379]
 affected_files:
   - hooks/test_worktree_guard_subagent.py
   - hooks/worktree_guard.py
@@ -114,3 +115,7 @@ Rejected — disproportionate.
 ## Linkage to td-034
 
 `td-034` is referenced in the row's `notes` (via the inflight-suffix convention from `dec-181` if this rework spawns one of its own; not otherwise). The test-harness outcome feeds td-034's resolution path step 1: "write a controlled-test hook script that spawns a minimal subagent in a worktree session." If the harness passes, td-034's hypothesis (a) and (c) are ruled out for this specific case; if it fails, the harness's failure mode informs which hypothesis fires.
+
+## Prior Decision
+
+Retired 2026-09-08 by dec-379, whose action removed this decision's subject (`hooks/worktree_guard.py` and its controlled-test harness `hooks/test_worktree_guard_subagent.py`; native worktree isolation is now the sole enforcement layer) rather than deciding its question differently. The record is preserved; it re-opens if the subject returns.

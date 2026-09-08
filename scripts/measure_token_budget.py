@@ -462,12 +462,17 @@ def name_only_overrides(repo_root: Path) -> set[str]:
     return names
 
 
-def measure_listing(repo_root: Path, *, api_key: str | None = None) -> dict:
+def measure_listing(
+    repo_root: Path, *, api_key: str | None = None, honor_overrides: bool = True
+) -> dict:
     """Measure the listing surface as the model sees it: `description:` frontmatter only,
     minus entries `disable-model-invocation: true` removes outright, and with
     `skillOverrides` name-only skills contributing their name instead of a description."""
     files = listing_files(repo_root)
-    name_only = name_only_overrides(repo_root)
+    # `honor_overrides=False` measures what the model sees if Claude Code ignores the
+    # `skillOverrides` key form written to settings -- the ratchet uses that reading
+    # until the baseline records `listing_overrides_verified: true` (checked live).
+    name_only = name_only_overrides(repo_root) if honor_overrides else set()
     descriptions = []
     for f in files:
         frontmatter = _frontmatter_block(f.read_text(encoding="utf-8"))
@@ -557,7 +562,9 @@ def ratchet(
     if baseline is None:
         return _ratchet_skip(f"no baseline file at {path}")
 
-    listing = measure_listing(repo_root, api_key=api_key)
+    overrides_verified = bool(baseline.get("listing_overrides_verified", False))
+
+    listing = measure_listing(repo_root, api_key=api_key, honor_overrides=overrides_verified)
     updated = _append_sample(
         baseline,
         today=today,
@@ -597,6 +604,7 @@ def ratchet(
         "governed_bytes": governed["bytes"],
         "listing_tokens": listing["tokens"],
         "listing_ceiling": listing_ceiling,
+        "listing_overrides_verified": overrides_verified,
         "notes": notes,
     }
 

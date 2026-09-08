@@ -241,7 +241,7 @@ The convener may act on what the pass surfaces — fixing the draft before spawn
 
 ### Round 0 — Isolation
 
-The consultant reads the same source materials the authoring agents read, with **no access to their draft**. **The draft is whatever the convening stage is producing; everything upstream of it is a source** — convened at research the draft is `RESEARCH_FINDINGS.md` (sources: task brief, codebase, the researcher's external sources); at architecture it is `SYSTEMS_PLAN.md` (sources add `RESEARCH_FINDINGS.md`); at planning it is `IMPLEMENTATION_PLAN.md` (sources add `SYSTEMS_PLAN.md`). A **sibling `CONSULT_*.md` is off-limits at every stage**. Reading a fixed list rather than the stage-relative one inverts the rule at the research seam, where research findings are the draft and not a source. Sharing the draft at this stage produces **correlation collapse** — the consultant's view anchors on the draft's framing, and the pipeline pays N× the spawn cost for one correlated opinion instead of an independent one. `## Independent Reading` plus an explicit `## Sources Read` list make the isolation checkable from the artifact itself, not merely asserted. **`PROGRESS.md` is append-only for the consultant during Round 0 and must not be read**: it is a shared log carrying other agents' phase lines, including compressed conclusions from the very draft isolation exists to withhold, so reading it to orient leaks the draft by construction rather than by carelessness. **`.ai-state/CONSULT_PRIORS.md` is off-limits too** — it is the convener's own pre-registered list of concerns about the draft the consultant must not see.
+The consultant reads the same source materials the authoring agents read, with **no access to their draft**. **The draft is whatever the convening stage is producing; everything upstream of it is a source** — convened at research the draft is `RESEARCH_FINDINGS.md` (sources: task brief, codebase, the researcher's external sources); at architecture it is `SYSTEMS_PLAN.md` (sources add `RESEARCH_FINDINGS.md`); at planning it is `IMPLEMENTATION_PLAN.md` (sources add `SYSTEMS_PLAN.md`). A **sibling `CONSULT_*.md` is off-limits at every stage**. Reading a fixed list rather than the stage-relative one inverts the rule at the research seam, where research findings are the draft and not a source. Sharing the draft at this stage produces **correlation collapse** — the consultant's view anchors on the draft's framing, and the pipeline pays N× the spawn cost for one correlated opinion instead of an independent one. `## Independent Reading` plus an explicit `## Sources Read` list make the isolation checkable from the artifact itself, not merely asserted. **`.ai-state/CONSULT_PRIORS.md` is off-limits too** — it is the convener's own pre-registered list of concerns about the draft the consultant must not see.
 
 ### Round 1 — Challenge
 
@@ -454,7 +454,7 @@ When the planner assigns a doc step to a parallel group, the doc-engineer runs c
 ### Parallel Group Composition
 
 - A parallel group can have up to three concurrent agents: implementer + test-engineer + doc-engineer.
-- All three write to fragment files (`WIP_<agent-type>.md`, `LEARNINGS_<agent-type>.md`, `PROGRESS_<agent-type>.md`) to avoid document collisions.
+- All three write to fragment files (`WIP_<agent-type>.md`, `LEARNINGS_<agent-type>.md`) to avoid document collisions.
 - File disjointness is verified by the planner before spawning: the doc-engineer's declared files must not overlap with the implementer's or test-engineer's.
 
 ### When a Doc Step Is Assigned
@@ -490,7 +490,6 @@ When agents run concurrently within a pipeline (e.g., implementer + test-enginee
 |-----------|-----------------|---------|
 | `WIP.md` | `WIP_<agent-type>.md` | `WIP_implementer.md`, `WIP_test-engineer.md`, `WIP_doc-engineer.md` |
 | `LEARNINGS.md` | `LEARNINGS_<agent-type>.md` | `LEARNINGS_implementer.md`, `LEARNINGS_doc-engineer.md` |
-| `PROGRESS.md` | `PROGRESS_<agent-type>.md` | `PROGRESS_implementer.md`, `PROGRESS_doc-engineer.md` |
 
 Agent types use the names from the coordination protocol (`implementer`, `test-engineer`, `doc-engineer`, `cicd-engineer`, etc.).
 
@@ -511,11 +510,10 @@ The supervising agent merges fragment files into canonical documents within the 
 - **Planner-supervised batches** (paired implementer + test-engineer steps, batched improvements): the implementation-planner merges the fragments at the end of the batch.
 - **Main-agent-supervised direct spawns** (e.g., intra-stage parallel researchers or context-engineers): the main agent merges at batch end.
 
-Fragment files are deleted after a successful merge. For the full per-document-type merge schemas and invariants (WIP, LEARNINGS, PROGRESS reconciliation), see [agent-pipeline-details.md#semantic-document-reconciliation](agent-pipeline-details.md#semantic-document-reconciliation). That reference covers:
+Fragment files are deleted after a successful merge. For the full per-document-type merge schemas and invariants (WIP, LEARNINGS reconciliation), see [agent-pipeline-details.md#semantic-document-reconciliation](agent-pipeline-details.md#semantic-document-reconciliation). That reference covers:
 
 - `WIP.md` schema, fragment structure, and merge procedure (including batch status and progress checklist updates).
 - `LEARNINGS.md` topic-section merge with attribution preservation and deduplication policy.
-- `PROGRESS.md` timestamp-ordered append with duplicate detection.
 - Post-merge invariants for each document type.
 
 ## Coordination Pipeline Diagram

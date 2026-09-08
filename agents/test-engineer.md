@@ -178,7 +178,7 @@ You write ONLY to your own step's fields:
 - Another step's status or checkbox
 - The `Progress` checklist ordering
 
-**Parallel mode fragment files**: When running concurrently with another agent (parallel mode), write to `WIP_test-engineer.md` instead of `WIP.md`. Same fragment naming for `LEARNINGS_test-engineer.md` and `PROGRESS_test-engineer.md`. The supervising agent merges fragments after all concurrent agents complete.
+**Parallel mode fragment files**: When running concurrently with another agent (parallel mode), write to `WIP_test-engineer.md` instead of `WIP.md`. Same fragment naming for `LEARNINGS_test-engineer.md`. The supervising agent merges fragments after all concurrent agents complete.
 
 ### Phase 7 — Update LEARNINGS.md
 
@@ -269,16 +269,6 @@ This feedback surfaces design issues for the implementer or architect to address
 | Run the full test suite and fix test failures | Make go/no-go decisions on the feature |
 | Update WIP.md with step completion status | Skip steps or reorder the plan |
 | Assess test coverage gaps and recommend improvements | Chase coverage numbers as targets |
-
-## Progress Signals
-
-At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
-
-```
-[TIMESTAMP] [test-engineer] Phase N/8: [phase-name] -- [one-line summary of what was done or found]
-```
-
-Write the line immediately upon entering each new phase. Include optional hashtag labels at the end for categorization (e.g., `#testing #feature=auth`).
 
 ## Constraints
 

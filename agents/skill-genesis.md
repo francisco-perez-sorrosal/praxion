@@ -316,16 +316,6 @@ After writing the report, return a concise summary:
 4. **Report path** -- `.ai-state/skill_genesis_reports/SKILL_GENESIS_REPORT_<TS>.md`
 5. **Next step** -- run `/skill-genesis-review` to disposition proposals
 
-## Progress Signals
-
-At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
-
-```
-[TIMESTAMP] [skill-genesis] Phase N/7: [phase-name] -- [one-line summary of what was done or found]
-```
-
-Write the line immediately upon entering each new phase. Include optional hashtag labels at the end for categorization (e.g., `#learning-harvest #feature=auth`).
-
 ## Constraints
 
 - **Do not create artifacts.** Your job is to triage and propose. Creation is delegated to the context-engineer and implementer after the user approves via `/skill-genesis-review`.

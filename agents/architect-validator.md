@@ -268,14 +268,6 @@ not a second durable store.
 - **No architecture markdown files**: Phase 5 emits one INFO note (`no fenced markdown to validate`) and continues. Not a FAIL.
 - **Missing `$BASE` in pre-merge mode**: default to `origin/main`. Surface the assumption at Phase 1 start.
 
-## Progress Signals
-
-At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md`:
-
-```
-[TIMESTAMP] [architect-validator] Phase N/7: [phase-name] -- [one-line summary] #aac #structural-validation
-```
-
 ## Constraints
 
 - **Do not fix issues.** Identify and classify only; never write corrective code or edit architectural files.

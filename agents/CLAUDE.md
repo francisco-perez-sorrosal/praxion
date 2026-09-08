@@ -24,7 +24,7 @@ Agents communicate through shared documents in `.ai-work/` (ephemeral) and `.ai-
 
 ## Architect Invocation Modes
 
-The `systems-architect` agent supports three invocation modes, signaled by an explicit `Mode: <name>` directive in the spawn prompt (no frontmatter, no marker file). Phase 1 (Input Assessment) detects the directive on intake and logs the mode to `PROGRESS.md`. When updating `agents/systems-architect.md`, preserve compatibility with all three modes.
+The `systems-architect` agent supports three invocation modes, signaled by an explicit `Mode: <name>` directive in the spawn prompt (no frontmatter, no marker file). Phase 1 (Input Assessment) detects the directive on intake. When updating `agents/systems-architect.md`, preserve compatibility with all three modes.
 
 | Mode | Trigger | Phase 2.5 behavior | Output |
 |---|---|---|---|
@@ -42,7 +42,7 @@ The `systems-architect` agent supports three invocation modes, signaled by an ex
 
 ## Discipline Consultant Directive
 
-The `discipline-consultant` agent carries no discipline of its own — it is parameterized at spawn time by an explicit `Discipline: <name>` directive in the spawn prompt (no frontmatter, no marker file; the same signaling mechanism as the architect's `Mode:` directive above). Phase 1 resolves the directive before any other work and logs the resolved discipline on the first `PROGRESS.md` line. When updating `agents/discipline-consultant.md`, preserve the resolution contract below.
+The `discipline-consultant` agent carries no discipline of its own — it is parameterized at spawn time by an explicit `Discipline: <name>` directive in the spawn prompt (no frontmatter, no marker file; the same signaling mechanism as the architect's `Mode:` directive above). Phase 1 resolves the directive before any other work. When updating `agents/discipline-consultant.md`, preserve the resolution contract below.
 
 | Directive | Required | Resolves against | Effect once resolved |
 |---|---|---|---|

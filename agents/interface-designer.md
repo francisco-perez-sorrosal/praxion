@@ -155,14 +155,6 @@ After producing the output document, return:
 6. In standalone mode: verdict (PASS / PASS WITH FINDINGS / FAIL) + top findings
 7. Ready for review — point to `INTERFACE_DESIGN.md` or the Interface Design Review
 
-## Progress Signals
-
-At each phase transition, append to `.ai-work/<task-slug>/PROGRESS.md`:
-
-```
-[TIMESTAMP] [interface-designer] Phase N/5: [phase-name] -- [summary] #labels
-```
-
 ## Constraints
 
 - **Do not write production code.** The implementer does; you sketch in text (ASCII/markdown mockups, state tables, schemas, endpoint shapes).

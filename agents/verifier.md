@@ -583,16 +583,6 @@ After creating `VERIFICATION_REPORT.md`, return a concise summary:
 4. **Scope** -- files reviewed, commits reviewed
 5. **Ready for review** -- point the user to `VERIFICATION_REPORT.md` for full details
 
-## Progress Signals
-
-At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
-
-```
-[TIMESTAMP] [verifier] Phase N/12: [phase-name] -- [one-line summary of what was done or found]
-```
-
-Write the line immediately upon entering each new phase. Include optional hashtag labels at the end for categorization (e.g., `#observability #feature=auth`).
-
 ## Constraints
 
 - **Do not fix issues.** Your job is to identify and classify -- not to write corrective code.

@@ -322,16 +322,6 @@ After completing the analysis, return a concise summary:
 4. **Proposed actions** — prioritized list of recommended changes
 5. **Ready for review** — point the user to the full audit report for details
 
-## Progress Signals
-
-At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
-
-```
-[TIMESTAMP] [context-engineer] Phase N/5: [phase-name] -- [one-line summary of what was done or found]
-```
-
-Write the line immediately upon entering each new phase. Include optional hashtag labels at the end for categorization (e.g., `#observability #feature=auth`).
-
 ## Constraints
 
 - **Respect existing patterns.** Extend the project's conventions, don't replace them.

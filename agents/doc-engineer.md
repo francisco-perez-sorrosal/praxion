@@ -173,7 +173,6 @@ When running in parallel, write to fragment files per the [agent-intermediate-do
 
 - `WIP_doc-engineer.md` — step status update
 - `LEARNINGS_doc-engineer.md` — documentation-related discoveries
-- `PROGRESS_doc-engineer.md` — phase transition signals
 
 The supervising agent merges fragments into canonical documents after all agents in the batch complete.
 
@@ -256,16 +255,6 @@ After completing the assessment, return a concise summary:
 4. **Top findings** -- 3-5 most impactful issues
 5. **Actions taken** (fix mode) or **Recommended actions** (audit mode)
 6. **Ready for review** -- point the user to the full report or changed files
-
-## Progress Signals
-
-At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
-
-```text
-[TIMESTAMP] [doc-engineer] Phase N/6: [phase-name] -- [one-line summary of what was done or found]
-```
-
-Write the line immediately upon entering each new phase. Include optional hashtag labels at the end for categorization (e.g., `#documentation #audit`).
 
 ## Constraints
 

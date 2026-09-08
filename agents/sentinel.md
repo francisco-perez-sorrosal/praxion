@@ -668,14 +668,6 @@ The sentinel diagnoses and reports. For remediation, invoke the context-engineer
 - The user decides which findings to act on
 - The user routes findings to the appropriate agent (context-engineer, promethean, or direct fix)
 
-## Progress Signals
-
-At each phase transition, append a line to `.ai-work/<task-slug>/PROGRESS.md`:
-
-```
-[TIMESTAMP] [sentinel] Phase N/7: [phase-name] -- [one-line summary] #sentinel
-```
-
 ## Constraints
 
 - **Read-only audit.** Never use the Edit tool. Never modify any artifact you audit. Your write targets are `.ai-state/sentinel_reports/SENTINEL_REPORT_YYYY-MM-DD_HH-MM-SS.md` (timestamped, one per run), `.ai-state/sentinel_reports/SENTINEL_LOG.md` (append-only), and **append-only rows in `.ai-state/TECH_DEBT_LEDGER.md`** for TD01–TD04, TT04 and EC07 — the six checks whose output *is* a ledger row, and for which `rules/swe/agent-intermediate-documents.md` names the sentinel one of only four sanctioned writers. Appending there is not modifying an artifact you audit: the ledger is an **output** surface, not an input to the audit. Read-only means you never edit what you assess; it never meant you cannot record what you found.

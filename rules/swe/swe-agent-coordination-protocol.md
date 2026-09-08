@@ -113,7 +113,7 @@ Agents communicate through shared documents, not direct invocation — see [coor
 | Rule | Behavior |
 |------|----------|
 | Return contract | A subagent's final message is a **pointer, not a payload**: a terse summary (≤ ~15 lines) + its `.ai-work/<task-slug>/` artifact path — never the artifact body. The orchestrator delegates for summaries and reads an artifact only when it needs the detail. Deep-dive: [agent-pipeline-details.md](../../skills/software-planning/references/agent-pipeline-details.md#agent-return-contract). |
-| Completion handshake | Trust a subagent return only if it carries a recognized terminal marker (`[COMPLETE]`/`[BLOCKED]`/`[CONFLICT]`/`[PARTIAL]`) **and** the durable artifact agrees (step's `WIP.md` checkbox flipped; `PROGRESS.md` at its final phase). A missing or contradicted marker is a **suspected truncation**: do **not** advance and do **not** re-run from scratch — re-derive completion from ground truth (codebase + `git diff` + tests, never the checkboxes), then mark verified-done work complete or re-spawn the unfinished remainder. Operationalized by `scripts/reconcile_pipeline_state.py` + `/resume-pipeline`; every auto-recovery is logged to `RECOVERY_LOG.md` and surfaced to the user. Deep-dive: [agent-pipeline-details.md](../../skills/software-planning/references/agent-pipeline-details.md#completion-handshake-truncation-detection). |
+| Completion handshake | Trust a subagent return only if it carries a recognized terminal marker (`[COMPLETE]`/`[BLOCKED]`/`[CONFLICT]`/`[PARTIAL]`) **and** the durable artifact agrees (step's `WIP.md` checkbox flipped). A missing or contradicted marker is a **suspected truncation**: do **not** advance and do **not** re-run from scratch — re-derive completion from ground truth (codebase + `git diff` + tests, never the checkboxes), then mark verified-done work complete or re-spawn the unfinished remainder. Operationalized by `scripts/reconcile_pipeline_state.py` + `/resume-pipeline`; every auto-recovery is logged to `RECOVERY_LOG.md` and surfaced to the user. Deep-dive: [agent-pipeline-details.md](../../skills/software-planning/references/agent-pipeline-details.md#completion-handshake-truncation-detection). |
 | Do not skip stages | Research before architecture (unless codebase context suffices); re-invoke upstream when downstream input is incomplete |
 | BDD/TDD execution | Paired implementation + test steps; concurrent on disjoint file sets; tests run until green |
 | Batched improvements | Evaluate independence; execute with maximum parallelism via Classify / Pair-spawn / Sequence / Full-suite-gate procedure |
@@ -156,7 +156,7 @@ Use an agent when the task benefits from a separate context window (large scope,
 
 ### Background Agents
 
-Run agents in the background when their output is not immediately needed. Check the Bg Safe column before using `run_in_background`. Monitor `.ai-work/<task-slug>/PROGRESS.md` for status; check output before proceeding with dependent work.
+Run agents in the background when their output is not immediately needed. Check the Bg Safe column before using `run_in_background`. Check output before proceeding with dependent work.
 
 ### Parallel Execution & Boundary Discipline
 

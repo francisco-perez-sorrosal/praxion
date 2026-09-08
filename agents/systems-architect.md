@@ -30,7 +30,7 @@ Work through these phases in order. Complete each phase before moving to the nex
 
 Determine what you have to work with. The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all reads and writes.
 
-**Detect invocation mode first** — scan the spawn prompt for a `Mode: <name>` directive. The three modes are catalogued in `agents/CLAUDE.md § Architect Invocation Modes`. Absent any directive, default to `feature` mode. Log the detected mode to `PROGRESS.md` as the very first phase-transition line so the choice is observable. Mode determines whether Phase 2.5 runs (`feature`) or is skipped (`baseline-audit`, `post-refactor-adaptation`). In `post-refactor-adaptation` mode specifically: read the existing `.ai-work/<task-slug>/PRE_REFACTOR_PLAN.md` and confirm the mini-pipeline completed (its `WIP.md` shows all steps complete and the orchestrator emitted a routing decision); then re-run Phase 1 and Phase 2 against the now-refactored codebase, SKIP Phase 2.5 (recursion guard), proceed through Phases 3–10 to update `SYSTEMS_PLAN.md`, flip any remaining `in-flight` `td-NNN` rows (in `.ai-state/TECH_DEBT_LEDGER.md`) whose `dedup_key` was claimed by the `PRE_REFACTOR_PLAN.md § Affected td-NNN rows` table to `resolved` with `resolved-by: <merge-commit-sha-or-tag>`, and append a `[CONSUMED]` marker line at the end of the `PRE_REFACTOR_PLAN.md` (the artifact stays in `.ai-work/` until `.ai-work/` cleanup; the marker tells future readers the contract has fired). The mini-pipeline must not be respawned — that is the hard one-pass rule mirrored from baseline-audit mode.
+**Detect invocation mode first** — scan the spawn prompt for a `Mode: <name>` directive. The three modes are catalogued in `agents/CLAUDE.md § Architect Invocation Modes`. Absent any directive, default to `feature` mode. Mode determines whether Phase 2.5 runs (`feature`) or is skipped (`baseline-audit`, `post-refactor-adaptation`). In `post-refactor-adaptation` mode specifically: read the existing `.ai-work/<task-slug>/PRE_REFACTOR_PLAN.md` and confirm the mini-pipeline completed (its `WIP.md` shows all steps complete and the orchestrator emitted a routing decision); then re-run Phase 1 and Phase 2 against the now-refactored codebase, SKIP Phase 2.5 (recursion guard), proceed through Phases 3–10 to update `SYSTEMS_PLAN.md`, flip any remaining `in-flight` `td-NNN` rows (in `.ai-state/TECH_DEBT_LEDGER.md`) whose `dedup_key` was claimed by the `PRE_REFACTOR_PLAN.md § Affected td-NNN rows` table to `resolved` with `resolved-by: <merge-commit-sha-or-tag>`, and append a `[CONSUMED]` marker line at the end of the `PRE_REFACTOR_PLAN.md` (the artifact stays in `.ai-work/` until `.ai-work/` cleanup; the marker tells future readers the contract has fired). The mini-pipeline must not be respawned — that is the hard one-pass rule mirrored from baseline-audit mode.
 
 1. **Check for RESEARCH_FINDINGS.md** — if it exists, read it thoroughly. This is your primary information source. If `VERIFIER_FINDINGS.md` is present in `.ai-work/<task-slug>/` and no `RESEARCH_FINDINGS.md` exists, read it as the primary task-intake document — its `## Problem`, `## Scope`, and `## Success Criteria` sections fill the same role.
 2. **Check for CONTEXT_REVIEW.md** — if present, read the `## Research Stage Review` section for context artifact inventory, health assessment, and artifact placement recommendations. Factor these into your architectural decisions when the task involves context artifacts.
@@ -105,7 +105,7 @@ For **Medium** dependencies, flag drift in the Risk Assessment without stopping 
 
 ### Phase 2.5 — Pre-Refactor Assessment
 
-**Skip conditions.** This phase runs only in `feature` mode. Skip entirely in `baseline-audit` mode (no feature → no pre-refactor target) and in `post-refactor-adaptation` mode (one-pass recursion bound — see Phase 1 mode-detection). When skipped, log a single line to `PROGRESS.md`: `Phase 2.5: SKIP (mode=<name>)`. The skip is the documented no-op — do not write any pre-refactor content.
+**Skip conditions.** This phase runs only in `feature` mode. Skip entirely in `baseline-audit` mode (no feature → no pre-refactor target) and in `post-refactor-adaptation` mode (one-pass recursion bound — see Phase 1 mode-detection). When skipped, this is the documented no-op — do not write any pre-refactor content.
 
 **Self-reflection question.** Read Phase 2's structural-issue inventory against the feature scope you defined in Phase 1. Ask: *given the structural issues I just catalogued, is the codebase ready to receive this feature cleanly, or does preparatory work belong before any feature code is written?* The answer is a labeled outcome, not prose. Record exactly one of the four below in `SYSTEMS_PLAN.md § Codebase Readiness § Pre-Refactor Assessment` with a one-paragraph rationale.
 
@@ -451,16 +451,6 @@ After creating `SYSTEMS_PLAN.md` (and `SPEC_DELTA.md` for brownfield features, `
 5. **Codebase readiness** — clean / needs preparatory work
 6. **Stakeholder review** — tier used, key findings
 7. **Ready for review** — point the user to `SYSTEMS_PLAN.md` for full details
-
-## Progress Signals
-
-At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
-
-```
-[TIMESTAMP] [systems-architect] Phase N/10: [phase-name] -- [one-line summary of what was done or found]
-```
-
-Write the line immediately upon entering each new phase. Include optional hashtag labels at the end for categorization (e.g., `#observability #feature=auth`).
 
 ## Constraints
 

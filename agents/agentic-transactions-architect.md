@@ -169,14 +169,6 @@ After producing the output document, return:
 7. In standalone mode: verdict (PASS / PASS WITH FINDINGS / FAIL) + top findings
 8. Ready for review — point to `TRANSACTIONS_DESIGN.md` or the Transaction Architecture Review
 
-## Progress Signals
-
-At each phase transition, append to `.ai-work/<task-slug>/PROGRESS.md`:
-
-```
-[TIMESTAMP] [agentic-transactions-architect] Phase N/5: [phase-name] -- [summary] #labels
-```
-
 ## Constraints
 
 - **Do not write production code.** The implementer does; you sketch transaction flows in text (sequence diagrams, mandate lifecycle tables, provider contract shapes, error grammar mappings).

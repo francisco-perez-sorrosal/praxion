@@ -200,12 +200,12 @@ A subagent's full output lives in its `.ai-work/<task-slug>/` artifact. Its **re
 
 ### Completion handshake (truncation detection)
 
-The contract above tells the orchestrator *how* to read a return; this clause tells it *when to distrust one*. A subagent can be hard-truncated at its context ceiling **mid-work** — code half-written, or written but its `WIP.md` checkbox never flipped — after which the harness returns only the partial text the agent last produced. Because every status signal (`WIP.md`, `PROGRESS.md`, the terminal marker) is authored by the agent itself, "agent died" and "status not written" are perfectly correlated: a return arriving is **not** proof the step finished.
+The contract above tells the orchestrator *how* to read a return; this clause tells it *when to distrust one*. A subagent can be hard-truncated at its context ceiling **mid-work** — code half-written, or written but its `WIP.md` checkbox never flipped — after which the harness returns only the partial text the agent last produced. Because every status signal (`WIP.md`, the terminal marker) is authored by the agent itself, "agent died" and "status not written" are perfectly correlated: a return arriving is **not** proof the step finished.
 
 **The gate.** Before advancing the pipeline past any subagent, the orchestrator confirms a *completion handshake*. It applies to step-executing pipeline agents (those whose `## Output` block defines terminal markers and that write a durable step artifact — `implementer`, `test-engineer`, `implementation-planner`, etc.); research/exploration agents without markers are governed by check 2 alone.
 
 1. **Terminal marker present** — the return carries one of the agent's recognized terminal markers (`[COMPLETE]` / `[BLOCKED]` / `[CONFLICT]` / `[PARTIAL]`). A return that ends mid-sentence with no marker is the signature of a hard cut.
-2. **Durable artifact agrees** — for a claimed `[COMPLETE]`, the step's `WIP.md` checkbox is flipped (`- [x]` / `[COMPLETE]`) and, where present, `PROGRESS.md`'s last phase line is the agent's final phase. A marker that contradicts the artifact is as suspect as a missing one.
+2. **Durable artifact agrees** — for a claimed `[COMPLETE]`, the step's `WIP.md` checkbox is flipped (`- [x]` / `[COMPLETE]`). A marker that contradicts the artifact is as suspect as a missing one.
 
 If **either** check fails, treat the return as a **suspected truncation** — do **not** advance, and do **not** blindly re-spawn the step from scratch (that redoes completed work and can clobber it).
 
@@ -216,7 +216,7 @@ If **either** check fails, treat the return as a **suspected truncation** — do
 - If the work is partial, re-spawn the step's agent scoped to the **unfinished remainder only**, citing what ground truth shows already done so it does not repeat it.
 - If ground truth is ambiguous, surface the suspected truncation to the user rather than guessing.
 
-The Tier-2 localization hint is the harness write-ahead log `.ai-state/observations.jsonl` — `agent_start` / `tool_use` (with `file_paths`, `outcome`) / `agent_stop` rows that the `capture_session.py` + `capture_observations.py` hooks append durably and independently of the agent's cooperation (so they survive a hard cut that drops `PROGRESS.md`). It tells you *which agent stopped* and *where it last wrote* — an accelerator, never the arbiter. `PROGRESS.md` and the chronograph's `get_pipeline_status` are weaker hints of the same kind. The handshake never depends on any of them: a dropped WAL line costs localization precision, never a verdict.
+The Tier-2 localization hint is the harness write-ahead log `.ai-state/observations.jsonl` — `agent_start` / `tool_use` (with `file_paths`, `outcome`) / `agent_stop` rows that the `capture_session.py` + `capture_observations.py` hooks append durably and independently of the agent's cooperation (so they survive a hard cut mid-work). It tells you *which agent stopped* and *where it last wrote* — an accelerator, never the arbiter. The chronograph's `get_pipeline_status` is a weaker hint of the same kind. The handshake never depends on any of them: a dropped WAL line costs localization precision, never a verdict.
 
 **Mechanism.** The handshake is operationalized by `scripts/reconcile_pipeline_state.py <slug>` — a side-effect-free reader that classifies every `WIP.md` step against Tier-1 (git + tests) with the WAL as the localization hint, emitting per-step verdicts: `verified-complete` / `mismatch` (a false `[COMPLETE]` claim) / `partial@<point>` / `in-flight` / `unknown` / `pending`. Ground truth — not the checkbox — drives `verified-complete`, so a step whose files are all changed but still shows `- [ ]` is caught as a needs-mark completion (the died-before-checkbox case). When correlation is ambiguous (no declared `Files:`, dropped WAL lines, conflicting workstream claims), it degrades to `unknown` and surfaces to the user — it never guesses a `verified-complete`. The `/resume-pipeline <slug>` command drives the reader and acts on the verdicts (auto-mark verified-complete, auto-resume partial scoped to the unfinished remainder, surface unknown), recording every automatic action in five audit surfaces — `.ai-work/<slug>/RECOVERY_LOG.md`, a `WIP.md` `[AUTO-RECOVERED <ts>]` annotation, a `LEARNINGS.md ### Recovery Events` entry, a real-time user notice, and a synthetic `recovery` event in `observations.jsonl` — so recovery is never silent.
 
@@ -224,7 +224,7 @@ The Tier-2 localization hint is the harness write-ahead log `.ai-state/observati
 
 ## Semantic Document Reconciliation
 
-When concurrent agents write to fragment files (`WIP_<agent>.md`, `LEARNINGS_<agent>.md`, `PROGRESS_<agent>.md`), the supervising agent (implementation-planner) merges fragments into canonical documents after all agents in a batch complete. All fragment files and canonical documents live inside the task-scoped directory (`.ai-work/<task-slug>/`). Each document type has its own schema and merge semantics -- naive concatenation produces structurally invalid documents.
+When concurrent agents write to fragment files (`WIP_<agent>.md`, `LEARNINGS_<agent>.md`), the supervising agent (implementation-planner) merges fragments into canonical documents after all agents in a batch complete. All fragment files and canonical documents live inside the task-scoped directory (`.ai-work/<task-slug>/`). Each document type has its own schema and merge semantics -- naive concatenation produces structurally invalid documents.
 
 **Note:** `CONTEXT_REVIEW.md` is not subject to fragment patterns — it is single-writer (context-engineer only) with cumulative stage-delimited sections. No reconciliation needed.
 
@@ -279,30 +279,6 @@ Status: in-progress
 **Deduplication:** Do not deduplicate by content. Different agents may report similar learnings from different perspectives -- both are valuable. Flag suspicious near-duplicates for human review during end-of-feature learnings merge.
 
 **Post-merge invariants:** Every entry has `**[agent-name]**` attribution. Every entry under a topic section. No duplicate `## [Topic]` headers. File header present exactly once.
-
-### PROGRESS.md Reconciliation
-
-**Schema:** Timestamped log lines, one per entry:
-
-```
-[TIMESTAMP] [AGENT] Phase N/M: [phase-name] -- [summary] #label1 #key=value
-```
-
-Append-only. Entries in chronological order by timestamp.
-
-**Fragment structure:** Each `PROGRESS_<agent>.md` (in `.ai-work/<task-slug>/`) contains the agent's own entries in the same format, chronologically ordered within the fragment.
-
-**Merge procedure:**
-
-1. Read canonical `.ai-work/<task-slug>/PROGRESS.md` and all `PROGRESS_<agent>.md` fragments from the same directory.
-2. Collect all fragment entries into a single list.
-3. Sort by timestamp (ISO 8601 prefix enables lexicographic sorting).
-4. Append sorted entries to canonical `PROGRESS.md`. Do not re-sort existing canonical entries.
-5. Delete fragment files after successful append.
-
-**Validation:** No two entries with the same timestamp + agent + phase number (discard duplicates). Phase transitions per agent should be monotonically increasing -- non-monotonic transitions are warnings, not merge failures.
-
-**Post-merge invariants:** All entries in timestamp order. Every entry matches the format pattern. No exact-duplicate entries.
 
 ### TEST_RESULTS.md Reconciliation
 
@@ -393,6 +369,5 @@ After merging a pipeline worktree branch back into the target branch, run this c
 2. Compare the `## Progress` checklist against git log: check if commits for "completed" steps exist on the current branch.
 3. Update steps whose implementation is visible in git history but marked incomplete: set status to `[COMPLETE]`, marker to `[x]`.
 4. Incorporate `LEARNINGS.md` entries from the merged worktree using the topic-section merge protocol above.
-5. Same for `PROGRESS.md` fragments.
 
 This is a safety net -- normal reconciliation happens before worktree merge during the planner's batch supervision.

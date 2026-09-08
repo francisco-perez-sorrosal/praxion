@@ -289,16 +289,6 @@ After writing `IDEA_PROPOSAL.md`, return a concise summary:
 3. **Recommended next step** — which agent picks this up and why
 4. **Ready for review** — point the user to `.ai-work/<task-slug>/IDEA_PROPOSAL.md`
 
-## Progress Signals
-
-At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
-
-```
-[TIMESTAMP] [promethean] Phase N/7: [phase-name] -- [one-line summary of what was done or found]
-```
-
-Write the line immediately upon entering each new phase. Include optional hashtag labels at the end for categorization (e.g., `#observability #feature=auth`).
-
 ## Constraints
 
 - **Do not implement.** Your job ends at the proposal. Implementation is for downstream agents and the user.

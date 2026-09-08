@@ -339,10 +339,10 @@ After the plan is approved and implementation begins, the implementation planner
 
 When the plan contains parallel groups:
 
-1. **Prepare the batch** — write WIP.md in parallel mode with per-step assignees and file lists. The main agent spawns concurrent agents in the pipeline worktree (do NOT use `isolation: "worktree"` on the Agent tool — all agents share the same worktree). Each agent writes to fragment files (`WIP_<agent-type>.md`, `LEARNINGS_<agent-type>.md`, `PROGRESS_<agent-type>.md`) per the [agent-intermediate-documents](../rules/swe/agent-intermediate-documents.md) naming convention to avoid document collisions. A batch may include up to three agents: implementer, test-engineer, and doc-engineer.
+1. **Prepare the batch** — write WIP.md in parallel mode with per-step assignees and file lists. The main agent spawns concurrent agents in the pipeline worktree (do NOT use `isolation: "worktree"` on the Agent tool — all agents share the same worktree). Each agent writes to fragment files (`WIP_<agent-type>.md`, `LEARNINGS_<agent-type>.md`) per the [agent-intermediate-documents](../rules/swe/agent-intermediate-documents.md) naming convention to avoid document collisions. A batch may include up to three agents: implementer, test-engineer, and doc-engineer.
 2. **Track concurrently** — each agent (implementer, test-engineer, doc-engineer) updates its own step's status independently
 3. **Coherence review** — after all agents in a batch report back, re-read all files touched by the batch and verify integration correctness (code, tests, and documentation)
-4. **Reconcile documents** — after all agents in a batch report back, execute the semantic document reconciliation protocols from the software-planning skill's [agent-pipeline-details.md](../skills/software-planning/references/agent-pipeline-details.md): merge `WIP_<agent>.md` fragments into canonical `WIP.md` (preserving batch structure), merge `LEARNINGS_<agent>.md` into topic sections, merge `PROGRESS_<agent>.md` in timestamp order. Delete fragment files after successful merge.
+4. **Reconcile documents** — after all agents in a batch report back, execute the semantic document reconciliation protocols from the software-planning skill's [agent-pipeline-details.md](../skills/software-planning/references/agent-pipeline-details.md): merge `WIP_<agent>.md` fragments into canonical `WIP.md` (preserving batch structure), merge `LEARNINGS_<agent>.md` into topic sections. Delete fragment files after successful merge.
 5. **Batch failure handling** — if one agent reports `[BLOCKED]` or `[CONFLICT]`, let the others finish. Handle the failure during coherence review: retry, amend the plan, or escalate
 6. **Advance** — update WIP.md to the next batch or step
 
@@ -420,16 +420,6 @@ After completing the planning documents, return a concise summary:
 4. **Testing strategy** — paired test steps, which acceptance criteria they validate, integration checkpoints
 5. **Supervision checkpoints** — milestones for execution review
 6. **Ready for review** — point the user to `IMPLEMENTATION_PLAN.md` for full details
-
-## Progress Signals
-
-At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
-
-```
-[TIMESTAMP] [implementation-planner] Phase N/7: [phase-name] -- [one-line summary of what was done or found]
-```
-
-Write the line immediately upon entering each new phase. Include optional hashtag labels at the end for categorization (e.g., `#observability #feature=auth`).
 
 ## Constraints
 

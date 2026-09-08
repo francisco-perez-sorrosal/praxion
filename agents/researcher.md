@@ -283,16 +283,6 @@ After creating `RESEARCH_FINDINGS.md`, return a concise summary:
 4. **Open questions** — unresolved items needing decisions
 5. **Ready for review** — point the user to `RESEARCH_FINDINGS.md` for full details
 
-## Progress Signals
-
-At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
-
-```
-[TIMESTAMP] [researcher] Phase N/5: [phase-name] -- [one-line summary of what was done or found]
-```
-
-Write the line immediately upon entering each new phase. Include optional hashtag labels at the end for categorization (e.g., `#observability #feature=auth`).
-
 ## Constraints
 
 - **Do not design or recommend.** Your job is to gather and present information — not make architectural decisions. That is the systems-architect's role.

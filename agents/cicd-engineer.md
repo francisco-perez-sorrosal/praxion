@@ -152,16 +152,6 @@ Return a concise summary:
 | Review CI/CD configuration | Review application code quality (that's code-review) |
 | Suggest deployment strategies | Execute production deployments |
 
-## Progress Signals
-
-At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
-
-```text
-[TIMESTAMP] [cicd-engineer] Phase N/6: [phase-name] -- [one-line summary of what was done or found]
-```
-
-Write the line immediately upon entering each new phase. Include optional hashtag labels at the end for categorization (e.g., `#cicd #github-actions`).
-
 ## Constraints
 
 - **Read before write.** Always read existing workflows and project config before proposing changes.

@@ -76,7 +76,6 @@ Mode is passed from the command as a single token:
 - **`.ai-work/<task-slug>/ROADMAP_DRAFT.md`** — intermediate draft before Gate 3.
 - **`.ai-work/<task-slug>/AUDIT_<lens>.md`** — one fragment per Phase 3 researcher.
 - **`.ai-work/<task-slug>/CONTRADICTION_MAP.md`** — cross-lens conflict list produced by Phase 3.5; ephemeral.
-- **`.ai-work/<task-slug>/PROGRESS.md`** — append-only phase-transition log.
 
 Use [`skills/roadmap-synthesis/assets/ROADMAP_TEMPLATE.md`](../skills/roadmap-synthesis/assets/ROADMAP_TEMPLATE.md) as the scaffold.
 
@@ -99,8 +98,6 @@ Two sub-steps:
 **1b. Lens-set derivation.** Follow the 4-step methodology in [`lens-framework.md`](../skills/roadmap-synthesis/references/lens-framework.md): inventory the project's own values (README, CLAUDE.md, CONTRIBUTING, ADRs — grep for `we value`, `principles`, `goals`); inventory domain constraints (paradigm, deployment model, team shape, stakeholders); compose a 4-8 lens set drawn from project values + best-fit exemplar (SPIRIT / DORA / SPACE / FAIR / CNCF Platform Maturity / Custom) + universal Quality and Docs lenses. Name each derived lens, note its source (project value quoted or exemplar borrowed), and record derivation inputs for the Methodology Footer.
 
 **Gate 1**: use `AskUserQuestion` to confirm paradigm classification, scope, **and the proposed lens set**. The user can accept, modify individual lenses, or override with a named exemplar. Record the user's final decision verbatim; it goes into the ROADMAP's Methodology Footer.
-
-Write a phase marker to `.ai-work/<task-slug>/PROGRESS.md` including the derived lens set.
 
 ### Phase 2 — Ecosystem Inventory
 
@@ -147,8 +144,6 @@ Run the grounding-protocol checklist from [`grounding-protocol.md`](../skills/ro
 - **`fresh` mode**: write a new `ROADMAP.md`; start the Decision Log with this run's entry.
 - **`diff` mode**: update sections in place; **preserve** the existing Decision Log verbatim and **append** a new entry describing what changed.
 
-Write the final phase marker to `PROGRESS.md`.
-
 ## Non-Interactive Mode
 
 When launched as a background agent or with a turn budget that forecloses dialog, skip `AskUserQuestion` and apply these defaults. Each skipped gate must be annotated in the output so a user can audit the decision.
@@ -179,14 +174,6 @@ You have no `remember()`/`recall()` tool — Praxion carries no curated-memory b
 ```
 
 Emit at least one candidate per run if the audit surfaced anything non-derivable from code or git history. Zero candidates is acceptable only when the run produced nothing durable.
-
-## Progress Signals
-
-At each phase transition, append one line to `.ai-work/<task-slug>/PROGRESS.md`:
-
-```
-[TIMESTAMP] [roadmap-cartographer] Phase N/7: [phase-name] -- [one-line summary] #tag
-```
 
 ## Partial Output on Failure
 

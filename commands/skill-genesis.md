@@ -86,5 +86,5 @@ Run-log:         .ai-state/skill_genesis_reports/SKILL_GENESIS_LOG.md
 Once the agent completes, run /skill-genesis-review to disposition the pending proposals.
 ```
 
-The agent also appends phase-transition signals to `.ai-work/<slug>/PROGRESS.md` as it runs —
-check that file to track progress.
+Track progress via the run-log above or the background task's own output — the agent no
+longer maintains a separate `PROGRESS.md` phase-transition log.

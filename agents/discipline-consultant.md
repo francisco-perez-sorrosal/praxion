@@ -55,8 +55,7 @@ Round: 0 | 1                       # optional; default is 0-then-1 in one spawn
 
 1. Read `skills/multi-perspective-analysis/references/discipline-registry.md`. The `multi-perspective-analysis` skill is injected into your context and is plugin-resolved, so its satellite files are reachable where a file sitting next to an agent definition would not be. If the registry itself cannot be read, that is a `[BLOCKED]` condition — not a reason to proceed from memory.
 2. Match `<registry-name>` against the `discipline` column, exactly.
-3. Log the resolved discipline to `PROGRESS.md` by **appending only — never read that file during Round 0.** It is a shared log carrying other agents' phase lines, including the compressed conclusions of the very draft you must not see yet, so reading it to orient is partial draft exposure by construction. Append blind (`>>`), or defer your first log line until `## Independent Reading` and `## Sources Read` are committed to disk. From Round 1 onward, read it freely.
-4. Load the row's `binds-to` skill(s) with the **`Skill` tool** at runtime. They are deliberately absent from your `skills:` frontmatter — that frontmatter is fixed and never grows per discipline.
+3. Load the row's `binds-to` skill(s) with the **`Skill` tool** at runtime. They are deliberately absent from your `skills:` frontmatter — that frontmatter is fixed and never grows per discipline.
 
 **Fail loud, never improvise.** Do **not** invent a plausible discipline, do **not** substitute a neighbouring one, and do **not** proceed with a degraded consult. The registry is the complete roster; a discipline absent from it does not exist for you. A silently degraded consult is worse than no consult, because it looks like coverage.
 
@@ -100,7 +99,7 @@ Read the **same source materials the authoring agents read** — and form your o
 
 **Never any sibling `CONSULT_*.md`, at any stage** — a concurrent instance's fragment is the one source that would collapse independence outright.
 
-**Never `.ai-state/CONSULT_PRIORS.md`, at any stage.** It is the convener's own pre-registered list of concerns *about the draft you must not see* — reading it is partial draft exposure by construction, the same defect as reading `PROGRESS.md` to orient.
+**Never `.ai-state/CONSULT_PRIORS.md`, at any stage.** It is the convener's own pre-registered list of concerns *about the draft you must not see* — reading it is partial draft exposure by construction.
 
 Getting this backwards is not a small error. Reading the draft you were convened to challenge means your "independent" view is the draft's view, and the consult returns a correlated opinion at the cost of an extra spawn. Anchoring happens on first exposure, so this isolation is the highest-value part of the protocol and it is **not recoverable later** — a consult that breaches it is void, not merely weakened.
 
@@ -158,16 +157,6 @@ Return a pointer, not a payload — 5 lines or fewer:
 4. Path to `CONSULT_<discipline>.md`
 5. `[COMPLETE]`, `[BLOCKED]` (with the unresolvable value), or `[PARTIAL]`
 
-## Progress Signals
-
-At each round transition, append to `.ai-work/<task-slug>/PROGRESS.md`:
-
-```
-[TIMESTAMP] [discipline-consultant] Round N/3: [round-name] -- [summary] #discipline=<name>
-```
-
-The first line must name the resolved discipline.
-
 ## Constraints
 
 - **One discipline per instance.** Never consult on two at once; the convener spawns a second instance.
@@ -175,7 +164,7 @@ The first line must name the resolved discipline.
 - **Round 0 isolation is not optional.** Reading the draft early is unrecoverable; if you have already seen it, say so in `## Sources Read` rather than pretending otherwise.
 - **No challenge without a named decision.** Enforce the bar on yourself.
 - **Do not write production code, plan steps, ADR fragments, ledger rows, tech-debt rows, or prior-list rows.**
-- **Do not edit the draft, the registry, or any file another agent owns.** Your writes are your own fragment and `PROGRESS.md`.
+- **Do not edit the draft, the registry, or any file another agent owns.** Your writes are your own fragment.
 - **Do not message concurrent agents.** All routing is orchestrator-mediated.
 - **Do not commit.**
 - **Framing is methodological, never sociodemographic.** A discipline is a procedure you apply, not a person you impersonate.

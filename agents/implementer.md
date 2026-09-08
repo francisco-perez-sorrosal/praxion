@@ -132,7 +132,7 @@ You write ONLY to your own step's fields:
 - Your step's checkbox: `- [ ]` → `- [x]`
 - Your step's status: `[IN-PROGRESS]` → `[COMPLETE]` (or `[BLOCKED]`/`[CONFLICT]`)
 
-**Parallel mode fragment files**: When running concurrently with another agent (parallel mode), write to `WIP_implementer.md` instead of `WIP.md`. Same fragment naming for `LEARNINGS_implementer.md` and `PROGRESS_implementer.md`. The supervising agent merges fragments after all concurrent agents complete.
+**Parallel mode fragment files**: When running concurrently with another agent (parallel mode), write to `WIP_implementer.md` instead of `WIP.md`. Same fragment naming for `LEARNINGS_implementer.md`. The supervising agent merges fragments after all concurrent agents complete.
 
 **What you never modify:**
 
@@ -188,16 +188,6 @@ When running concurrently (parallel mode), write to `LEARNINGS_implementer.md` i
 | Update WIP.md with step completion status | Decide whether to invoke the verifier |
 | Report blockers with evidence | Fix blockers that require plan changes |
 | Apply refactoring skill for `[Phase: Refactoring]` steps | Refactor beyond the step's scope |
-
-## Progress Signals
-
-At each phase transition, append a single line to `.ai-work/<task-slug>/PROGRESS.md` (create the file and `.ai-work/<task-slug>/` directory if they do not exist):
-
-```
-[TIMESTAMP] [implementer] Phase N/10: [phase-name] -- [one-line summary of what was done or found]
-```
-
-Write the line immediately upon entering each new phase. Include optional hashtag labels at the end for categorization (e.g., `#observability #feature=auth`).
 
 ## Output
 

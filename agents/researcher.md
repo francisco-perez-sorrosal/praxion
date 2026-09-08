@@ -8,7 +8,6 @@ description: >
 tools: Read, Glob, Grep, Bash, WebSearch, WebFetch, Write, Edit
 skills: [claude-ecosystem, external-api-docs]
 background: true
-memory: user
 model: sonnet
 effort: high
 maxTurns: 80

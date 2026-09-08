@@ -12,7 +12,6 @@ description: >
 tools: Read, Glob, Grep, Bash, Write, Edit
 skills: skill-crafting, rule-crafting, command-crafting, agent-crafting
 background: true
-memory: user
 model: sonnet
 effort: high
 maxTurns: 80

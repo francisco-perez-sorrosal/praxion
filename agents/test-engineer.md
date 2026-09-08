@@ -10,7 +10,6 @@ description: >
 tools: Read, Write, Edit, Glob, Grep, Bash
 skills: [software-planning, code-review, refactoring, external-api-docs]
 background: true
-memory: user
 model: sonnet
 effort: high
 maxTurns: 80

@@ -12,7 +12,6 @@ skills: [claude-ecosystem, external-api-docs, data-structure-design]
 model: opus
 effort: xhigh
 background: true
-memory: user
 maxTurns: 80
 ---
 

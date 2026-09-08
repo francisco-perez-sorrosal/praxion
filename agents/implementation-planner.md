@@ -9,7 +9,6 @@ description: >
 tools: Read, Glob, Grep, Bash, Write, Edit
 skills: [software-planning, external-api-docs, data-structure-design]
 background: true
-memory: user
 model: sonnet
 effort: xhigh
 maxTurns: 100

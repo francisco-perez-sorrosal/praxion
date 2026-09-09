@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-08T08:56:34Z'
+generated_at: '2026-09-09T05:13:55Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -486,7 +486,7 @@ surfaces:
   path: docs/skill-genesis.md
   type: markdown
   title: Harvesting Learnings with Skill-Genesis
-  last_modified: '2026-06-25'
+  last_modified: '2026-09-08'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell

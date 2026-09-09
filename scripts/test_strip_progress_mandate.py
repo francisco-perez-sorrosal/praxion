@@ -44,7 +44,7 @@ def test_allowlisted_paths_still_mention_progress(rel: str) -> None:
     assert "PROGRESS" in (REPO_ROOT / rel).read_text(encoding="utf-8")
 
 
-def test_reintroduced_claim_is_caught(tmp_path: Path) -> None:
+def test_reintroduced_claim_is_flagged(tmp_path: Path) -> None:
     """The canary: a producer-side claim in a scanned, non-allowlisted file
     must fail the check."""
     target = REPO_ROOT / "skills" / "roadmap-synthesis" / "SKILL.md"
